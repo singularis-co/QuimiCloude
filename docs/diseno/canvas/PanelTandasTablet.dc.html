@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fórmulas en tablet con panel de tandas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.qc{--bg:oklch(0.985 0.004 215);--fg:oklch(0.15 0.01 215);--card:oklch(1 0 0);--primary:oklch(0.44 0.076 188);--primary-fg:oklch(1 0 0);--muted:oklch(0.965 0.006 215);--muted-fg:oklch(0.45 0.013 215);--border:oklch(0.925 0.009 215);--ring:oklch(0.44 0.076 188);--n-bg:oklch(0.94 0.008 215);--n-fg:oklch(0.35 0.013 215);--n-dot:oklch(0.6 0.013 215);--i-bg:oklch(0.95 0.024 285);--i-fg:oklch(0.42 0.11 285);--i-dot:oklch(0.53 0.13 285);--s-bg:oklch(0.95 0.04 145);--s-fg:oklch(0.42 0.11 145);--s-dot:oklch(0.52 0.14 145);--d-bg:oklch(0.95 0.024 27);--d-fg:oklch(0.42 0.11 27);--d-dot:oklch(0.55 0.21 27);font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--fg);background:var(--bg);font-size:14px;line-height:1.45}
+.qc *{box-sizing:border-box}
+.qc button{font:inherit}
+.qc button:focus-visible,.qc a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn-pri{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.btn-ghost{border-color:transparent;background:transparent;color:var(--muted-fg)}
+.link{color:var(--primary);font-weight:500;text-decoration:underline;text-underline-offset:3px;min-height:44px;display:inline-flex;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.pill i{width:6px;height:6px;border-radius:50%;display:inline-block}
+.t-n{background:var(--n-bg);color:var(--n-fg)}.t-n i{background:var(--n-dot)}
+.t-i{background:var(--i-bg);color:var(--i-fg)}.t-i i{background:var(--i-dot)}
+.t-s{background:var(--s-bg);color:var(--s-fg)}.t-s i{background:var(--s-dot)}
+.t-d{background:var(--d-bg);color:var(--d-fg)}.t-d i{background:var(--d-dot)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px}
+.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.panel{border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.batch{border-top:1px solid var(--border);padding:12px 16px 14px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:6px 0;border-top:1px dashed var(--border)}
+.sub{color:var(--muted-fg);font-size:13px}
+.err{color:var(--d-fg);font-size:13px}
+</style>
+</helmet>
+<div class="qc" style="width: 834px; min-height: 1112px">
+  <header style="display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--card)">
+    <button class="btn btn-ghost" type="button" aria-label="Abrir menú" style="padding: 0 12px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+    <span style="font-weight: 700">QuimiCloud</span>
+  </header>
+  <main style="padding: 24px; display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 600; flex: 1 1 200px">Fórmulas</h1>
+      <button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v4h16v-4"></path></svg>Subir PDFs</button>
+      <button class="btn btn-pri" type="button">Nueva fórmula</button>
+    </div>
+
+    <section class="panel" aria-labelledby="t-h">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 8px">
+        <button class="btn btn-ghost" type="button" aria-expanded="{{ openStr }}" aria-controls="t-body" onClick="{{ toggle }}" style="padding: 0 8px">
+          <sc-if value="{{ open }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></sc-if>
+          <sc-if value="{{ closed }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></sc-if>
+          <span id="t-h" style="font-weight: 600; color: var(--fg)">Tandas de PDFs</span>
+        </button>
+        <span class="pill t-n">2</span>
+        <span class="sub" style="margin-left: auto">1 en curso</span>
+      </div>
+      <sc-if value="{{ open }}" hint-placeholder-val="{{ true }}">
+        <div id="t-body">
+          <section class="batch" aria-label="Tanda de hoy, 14:32 · 3 archivos">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+              <h2 style="margin: 0; font-size: 14px; font-weight: 600">Tanda de hoy, 14:32 · 3 archivos</h2>
+              <span class="pill t-i"><i></i>En curso</span>
+              <button class="btn btn-ghost" type="button" aria-label="Descartar la tanda de hoy, 14:32" style="margin-left: auto">Descartar</button>
+            </div>
+            <div class="row" style="border-top: 0"><div class="mono">formula-desengrasante.pdf</div><span class="pill t-s"><i></i>Listo</span><a class="link" href="#">Revisar</a></div>
+            <div class="row"><div><div class="mono">formula-jabon-liquido.pdf</div><div class="sub">Intento 2 de 4</div></div><span class="pill t-i"><i></i>Procesando</span><span style="width: 56px"></span></div>
+            <div class="row"><div class="mono">formula-suavizante.pdf</div><span class="pill t-n"><i></i>En cola</span><span style="width: 56px"></span></div>
+          </section>
+          <section class="batch" aria-label="Tanda de ayer, 18:05 · 2 archivos">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+              <h2 style="margin: 0; font-size: 14px; font-weight: 600">Tanda de ayer, 18:05 · 2 archivos</h2>
+              <span class="pill t-s"><i></i>Terminada</span>
+              <button class="btn btn-ghost" type="button" aria-label="Descartar la tanda de ayer, 18:05" style="margin-left: auto">Descartar</button>
+            </div>
+            <div class="row" style="border-top: 0"><div class="mono">formula-cloro-gel.pdf</div><span class="pill t-s"><i></i>Listo</span><a class="link" href="#">Revisar</a></div>
+            <div class="row"><div style="min-width: 0"><div class="mono">escaneo-ilegible.pdf</div><div class="err">[MENSAJE DEL CATÁLOGO DE ERRORES] · Intento 4 de 4</div></div><span class="pill t-d"><i></i>Error</span><span style="width: 56px"></span></div>
+          </section>
+        </div>
+      </sc-if>
+    </section>
+
+    <section class="panel" aria-label="Lista de fórmulas" style="padding: 16px; color: var(--muted-fg)">[TABLA DE FÓRMULAS]</section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":834,"height":1112}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: true };
+  }
+  renderVals() {
+    var self = this;
+    return {
+      open: this.state.open,
+      closed: !this.state.open,
+      openStr: this.state.open ? 'true' : 'false',
+      toggle: function () { self.setState({ open: !self.state.open }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 > spec. Este archivo fija dos cosas:
 > - el comportamiento que ya existe y se conserva: R1–R17 (R18 está retirado);
 > - las correcciones de los hallazgos 3 a 10 de la revisión (`progress/review-pdf-status-panel.md`,
->   en el worktree principal): R19–R39 (R28 está retirado).
+>   en el worktree principal) y lo que fijó el tablero: R19–R41 (R28 está retirado).
 
 ## Alcance
 
@@ -44,7 +44,7 @@
 
 | Fecha | Pregunta | Decisión | Cubierta por |
 |---|---|---|---|
-| 2026-10-21 | ¿Qué hacer con un código que entró en `dev` sin spec ni revisión? | **Opción A:** abrir la ficha, escribir el spec y el diseño a posteriori y corregir los hallazgos 3 a 10 de la revisión. | R1–R39 |
+| 2026-10-21 | ¿Qué hacer con un código que entró en `dev` sin spec ni revisión? | **Opción A:** abrir la ficha, escribir el spec y el diseño a posteriori y corregir los hallazgos 3 a 10 de la revisión. | R1–R41 |
 | 2026-10-21 | ¿Se toca la cola o la política de reintentos? | **No.** `maxAttempts` sigue saliendo de la configuración en cada consulta. La cota de «Intento N de M» se aplica al mostrarlo. | R2, R32 |
 | 2026-09-24 (QC-160) | ¿Qué pasa si se cierra la ventana a mitad de una tanda? | Sin aviso. Al reabrir se ve la misma tanda con su estado, porque la ventana tiene `keepMounted`. Esta ficha lo conserva. | R16, R24 |
 | 2026-10-21 | P1: ¿dónde va el panel? | En una sección a todo el ancho **debajo** de la cabecera, no en `PageHeader > actions`. Es plegable y solo se ve si hay tandas recordadas. | R14, R17, R39 |
@@ -55,6 +55,11 @@
 | 2026-10-21 | P6: ¿el pase `/design` va antes que el spec? | **Sí**, antes de aprobar el spec. T0 sigue siendo bloqueante. `design.md` citará el tablero cuando exista en `docs/diseno/canvas/`. | R38, T0 |
 | 2026-10-21 | P7: ¿qué texto lleva el rótulo de cada tanda? | «Tanda de hoy, 14:32 · 3 archivos», «Tanda de ayer, …» y fecha corta para el resto. Nombre accesible del botón: «Descartar la tanda de hoy, 14:32». | R33, R34 |
 | 2026-10-21 | P8: ¿cuál es el ancho máximo de línea? | 100 columnas, **solo** en los archivos de esta feature. No se cambian los documentos ni ESLint. | R37 |
+| 2026-10-21 | Tablero: ¿cómo arranca el panel? | **Desplegado.** Aprobado con `PanelTandas*.dc.html`. | R39 |
+| 2026-10-21 | Tablero: ¿qué formato tiene la fecha corta? | «15/10, 09:12». El año solo aparece si no es el actual. | R33 |
+| 2026-10-21 | Tablero: ¿qué aviso se muestra en solo lectura? | El texto exacto: «La subida de PDFs está desactivada. Las tandas que ya enviaste siguen procesándose: puedes revisarlas y descartarlas.» | R35 |
+| 2026-10-21 | Tablero: ¿qué nombre accesible lleva «Reanudar» en el error de consulta? | El mismo patrón que «Descartar»: «Reanudar la tanda de hoy, 10:47». | R40 |
+| 2026-10-21 | Tablero: ¿qué muestra la cabecera del panel? | Un contador de tandas y un resumen: «1 en curso», «Todas terminadas», «1 en curso · 1 con errores». | R41 |
 
 ## Requisitos (EARS)
 
@@ -193,7 +198,8 @@ el tope recibido, ENTONCES N DEBE ser M.
 local de su registro:
 - registrada hoy: «Tanda de hoy, 14:32»;
 - registrada ayer: «Tanda de ayer, 14:32»;
-- registrada antes: la fecha corta seguida de la hora.
+- registrada antes, en el año actual: «Tanda del 15/10, 09:12»;
+- registrada en otro año: la fecha corta con el año.
 
 En cuanto se conoce el número de archivos, el rótulo lo añade: «Tanda de hoy, 14:32 · 3 archivos».
 
@@ -207,7 +213,9 @@ asociado a su rótulo como nombre accesible.
 solo lectura:
 - muestra el estado de cada tanda;
 - ofrece «Revisar» y «Descartar»;
-- no ofrece ninguna acción de subida.
+- no ofrece ninguna acción de subida;
+- muestra el aviso «La subida de PDFs está desactivada. Las tandas que ya enviaste siguen
+  procesándose: puedes revisarlas y descartarlas.»
 
 #### Formato y catálogo (hallazgo 10)
 
@@ -224,12 +232,28 @@ del panel. También DEBE dejar de declarar como «no cubierta» la sincronía en
 
 **R39** — CUANDO el usuario pliega el panel, el sistema DEBE ocultar la lista de tandas y dejar
 visible el título con un control para desplegarlo. CUANDO lo despliega, DEBE volver a mostrarla. El
-estado de partida (plegado o desplegado) es el del tablero aprobado (T0).
+panel DEBE arrancar desplegado.
+
+#### Reanudar accesible (tablero)
+
+**R40** — SI la consulta de una tanda falla, ENTONCES su control «Reanudar» DEBE tener un nombre
+accesible distinto, de la forma «Reanudar la tanda de hoy, 10:47», con el día y la hora del rótulo
+según R33.
+
+#### Cabecera del panel (tablero)
+
+**R41** — La cabecera del panel DEBE mostrar el número de tandas recordadas visibles y un resumen de
+su estado:
+- «N en curso» si hay tandas sin terminar;
+- «N con errores» si hay tandas terminadas con algún archivo en error;
+- las dos partes unidas por « · » cuando se dan las dos («1 en curso · 1 con errores»);
+- «Todas terminadas» cuando no hay ninguna de las dos.
 
 ## Preguntas abiertas
 
-Ninguna. P1–P8 se cerraron el 2026-10-21 y están en `## Decisiones cerradas`.
+Ninguna. P1–P8 y los detalles del tablero se cerraron el 2026-10-21 y están en
+`## Decisiones cerradas`.
 
-Quedan dos detalles que fija el pase `/design` (T0), no una pregunta al humano:
-- el estado de partida del panel, plegado o desplegado (R39);
-- el formato exacto de la «fecha corta» para las tandas de antes de ayer (R33).
+Una interpretación queda pendiente de confirmar contra el tablero (R41): que «con errores» cuenta
+tandas terminadas con al menos un archivo en error. Tampoco consta qué muestra una tanda
+desaparecida en el resumen. Si el tablero dice otra cosa, se corrige la R41 antes de aprobar.

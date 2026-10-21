@@ -1287,6 +1287,42 @@
       "w": 1440,
       "x": 0,
       "y": 10190
+    },
+    "PanelTandas.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "page": "formulas",
+      "title": "PanelTandas",
+      "w": 1440,
+      "x": 0,
+      "y": 14070
+    },
+    "PanelTandasTablet.dc.html": {
+      "h": 1112,
+      "is_interactive": true,
+      "page": "formulas",
+      "title": "PanelTandasTablet",
+      "w": 834,
+      "x": 1520,
+      "y": 14070
+    },
+    "PanelTandasMovil.dc.html": {
+      "h": 1100,
+      "is_interactive": true,
+      "page": "formulas",
+      "title": "PanelTandasMovil",
+      "w": 390,
+      "x": 2504,
+      "y": 14070
+    },
+    "PanelTandasEstados.dc.html": {
+      "h": 1240,
+      "page": "formulas",
+      "title": "PanelTandasEstados",
+      "w": 1440,
+      "x": 0,
+      "y": 15290
     }
   },
   "createdOnFiles": {
@@ -2012,7 +2048,11 @@
     "Notificaciones.dc.html",
     "NotificacionesTablet.dc.html",
     "NotificacionesMovil.dc.html",
-    "NotificacionesEstados.dc.html"
+    "NotificacionesEstados.dc.html",
+    "PanelTandas.dc.html",
+    "PanelTandasTablet.dc.html",
+    "PanelTandasMovil.dc.html",
+    "PanelTandasEstados.dc.html"
   ],
   "pages": [
     {

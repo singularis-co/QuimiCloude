@@ -14,22 +14,16 @@ Las decisiones P1–P8 están cerradas (2026-10-21). R18 y R28 están retirados.
 
 ## Bloque 0: puerta humana (bloqueante, P6)
 
-### T0 — Pase `/design` del panel, antes de aprobar el spec
+### T0 — Pase `/design` del panel, antes de aprobar el spec (CERRADA, 2026-10-21)
 
-- [ ] Hacer el tablero del panel en escritorio, tablet y teléfono, con todos sus estados:
-  - en curso, error, listo, desaparecida, error de consulta, plegado y solo lectura.
-- [ ] El tablero tiene que mostrar lo ya decidido:
-  - la sección a todo el ancho debajo de la cabecera (P1);
-  - la solo lectura (P2);
-  - los rótulos de hoy, ayer y fecha corta (P7).
-- [ ] El tablero fija el estado de partida, plegado o desplegado (R39), y el formato de la fecha
-  corta (R33).
-- [ ] El humano lo aprueba.
-- [ ] Copiar los tableros a `docs/diseno/canvas/PanelTandas*.dc.html`.
-- [ ] Citarlos en `design.md`, en la sección «Pase de diseño».
+- [x] Hacer el tablero en escritorio, tablet y teléfono, más una hoja de estados.
+- [x] El humano lo aprueba (2026-10-21).
+- [x] Copiar a `docs/diseno/canvas/`: `PanelTandas.dc.html`, `PanelTandasEstados.dc.html`,
+  `PanelTandasTablet.dc.html` y `PanelTandasMovil.dc.html`, registrados en `canvas.json`.
+- [x] Citarlos en `design.md`, en la sección «Pase de diseño».
+- [x] Pasar a requisitos lo que fijó el tablero: R33, R35, R39, R40 y R41.
 
-**Hecho cuando:** los tres tableros están en la rama y `design.md` los cita. Solo entonces se pide
-la aprobación del spec.
+**Hecho:** los cuatro tableros están en la rama y `design.md` los cita.
 
 ## Bloque 1: trazabilidad de lo que ya existe (Dep.: ninguna)
 
@@ -134,23 +128,32 @@ verde y no hay `.subscribe(` en la carpeta.
 
 - [ ] Escribir primero `tests/unit/documentos-ui/labels.test.ts` con estos casos:
   - R32: los valores 0→1, 2→2 y 5→4 sobre un tope de 4;
-  - R33: con un `now` fijo, «Tanda de hoy, 14:32», «Tanda de ayer, 14:32», la fecha corta y
-    « · 3 archivos»;
-  - R34: «Descartar la tanda de hoy, 14:32».
+  - R33: con un `now` fijo, «Tanda de hoy, 14:32», «Tanda de ayer, 14:32», «Tanda del 15/10, 09:12»
+    (sin año en el año actual y con él en otro año) y « · 3 archivos»;
+  - R34: «Descartar la tanda de hoy, 14:32»;
+  - R40: «Reanudar la tanda de hoy, 10:47»;
+  - R41: «1 en curso», «Todas terminadas», «1 con errores» y «1 en curso · 1 con errores»;
+  - R35: el texto exacto del aviso de solo lectura.
 - [ ] Acotar `attemptLabel`.
-- [ ] Añadir `batchLabel` y `discardBatchLabel` en `labels.ts`.
+- [ ] Añadir a `labels.ts` `batchLabel`, `discardBatchLabel`, `resumeBatchLabel`, `batchesSummary` y
+  `READ_ONLY_NOTICE`.
 
-**Hecho cuando:** el test está en verde y la fecha corta coincide con el tablero.
+**Hecho cuando:** el test está en verde.
 
 ### T10 — Panel accesible y plegable (Dep.: T0, T6, T9)
 
 - [ ] Escribir primero en `document-batch-panel.test.tsx` estos casos:
   - R34: un nombre accesible único por «Descartar» y por bloque;
-  - R39: plegar oculta la lista y deja el título y el control; desplegar la muestra.
+  - R40: un nombre accesible único por «Reanudar»;
+  - R39: arranca desplegado; plegar oculta la lista y deja el título y el control; desplegar la
+    muestra;
+  - R41: el contador coincide con las tandas visibles, y el resumen sigue visible con el panel
+    plegado.
 - [ ] En `document-batch-panel.tsx`:
   - `aria-labelledby` en cada bloque;
-  - `aria-label` en «Descartar»;
-  - `Collapsible` con el estado de partida del tablero;
+  - `aria-label` en «Descartar» y en «Reanudar»;
+  - `Collapsible` abierto de partida;
+  - cabecera con contador y resumen;
   - quitar `PANEL_BATCH_LABEL` si queda sin uso.
 
 **Hecho cuando:** los casos están en verde y la pantalla coincide con el tablero.
@@ -160,8 +163,8 @@ verde y no hay `.subscribe(` en la carpeta.
 - [ ] Escribir primero estos casos:
   - R17 en `formulas-upload.test.tsx` y `formula-pdf-upload.test.tsx`: el panel queda fuera de
     `actions`, debajo de la cabecera;
-  - R35 en `formula-pdf-upload.test.tsx`: con `disabled`, el panel muestra el estado, «Revisar» y
-    «Descartar», sin acción de subida.
+  - R35 en `formula-pdf-upload.test.tsx`: con `disabled`, el panel muestra el estado, «Revisar»,
+    «Descartar» y el aviso con el texto exacto, sin acción de subida.
 - [ ] Partir `formula-pdf-upload.tsx`: la ventana sigue en `actions` y el panel va en una sección a
   todo el ancho que monta `page.tsx`.
 - [ ] Quitar el `return null` por `disabled` en `document-batch-panel.tsx`.
@@ -198,8 +201,9 @@ verde y no hay `.subscribe(` en la carpeta.
   - quitar «entre pestañas» de lo no cubierto;
   - el almacén de sondeo compartido;
   - `registryScope`;
-  - la solo lectura y el pliegue;
-  - la columna `Diseño` con los tableros de T0.
+  - la solo lectura, el pliegue y el resumen de la cabecera;
+  - en la columna `Diseño`, citar `docs/diseno/canvas/PanelTandas.dc.html` en lugar de
+    `Formulas.dc.html` y `ModalesProduccion.dc.html` para `DocumentBatchPanel`.
 
 **Hecho cuando:** el caso R38 y `guard-catalogo-de-componentes.test.ts` están en verde.
 
@@ -207,7 +211,7 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T15 — Informe y mapa de trazabilidad
 
-- [ ] Escribir `progress/impl_QC-306-pdf-status-panel.md` con el mapa R1–R39 → test, sin entradas
+- [ ] Escribir `progress/impl_QC-306-pdf-status-panel.md` con el mapa R1–R41 → test, sin entradas
   vacías salvo R18 y R28, que están retirados.
 - [ ] Pasar `./init.sh` en verde.
 
@@ -217,8 +221,10 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### Diseño
 - `docs/diseno/canvas/PanelTandas.dc.html`
+- `docs/diseno/canvas/PanelTandasEstados.dc.html`
 - `docs/diseno/canvas/PanelTandasTablet.dc.html`
 - `docs/diseno/canvas/PanelTandasMovil.dc.html`
+- `docs/diseno/canvas/canvas.json`
 
 ### Pieza de subida
 - `components/shared/document-upload/batch-memory.ts`

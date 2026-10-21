@@ -4,7 +4,7 @@
 > `683a7e2e..97070fad`) del **cambio** que pide esta ficha. Los requisitos están en
 > `requirements.md`:
 > - R1–R17 se conservan; R18 está retirado.
-> - R19–R39 son correcciones; R28 está retirado.
+> - R19–R41 son correcciones y lo que fijó el tablero; R28 está retirado.
 >
 > Las decisiones P1–P8 se cerraron el 2026-10-21 y están en `requirements.md > Decisiones cerradas`.
 
@@ -47,32 +47,30 @@ solo consumidor, la pantalla de fórmulas.
 - Consumidores identificados: `app/(private)/produccion/formulas/page.tsx`, a través de su
   envoltorio de cliente.
 
-### Pase de diseño: FALTA (bloqueante; decisión P6)
+### Pase de diseño: aprobado el 2026-10-21
 
-El panel es un componente **nuevo** (paso 3), así que necesita un pase `/design` aprobado
+El panel es un componente **nuevo** (paso 3) y su pase `/design` está aprobado
 (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`).
-- Hoy **no existe** ningún tablero del panel en `docs/diseno/canvas/`.
-- La fila del catálogo cita `Formulas.dc.html` y `ModalesProduccion.dc.html`, pero en ellos no sale
-  el panel (hallazgo 2).
-- Decisión P6: el pase va **antes de aprobar el spec**, y T0 sigue siendo bloqueante.
 
-**Cita del tablero: pendiente.** Se escribirá aquí cuando el tablero aprobado exista en
-`docs/diseno/canvas/`. Nombres previstos:
-- `PanelTandas.dc.html`
-- `PanelTandasTablet.dc.html`
-- `PanelTandasMovil.dc.html`
+Tableros, registrados en `docs/diseno/canvas/canvas.json` en la página `formulas`:
 
-El tablero tiene que dibujar lo ya decidido:
-- la ubicación (P1);
-- la solo lectura con la subida deshabilitada (P2);
-- los rótulos (P7);
-- los estados: en curso, error, listo, desaparecida, error de consulta y plegado.
+| Tablero | Qué contiene |
+|---|---|
+| `docs/diseno/canvas/PanelTandas.dc.html` | Escritorio: la sección debajo de la cabecera, desplegada, con el contador y el resumen |
+| `docs/diseno/canvas/PanelTandasEstados.dc.html` | Los estados: en curso, error, listo, desaparecida, error de consulta con «Reanudar», solo lectura con su aviso, y plegado con el resumen «1 en curso · 1 con errores» |
+| `docs/diseno/canvas/PanelTandasTablet.dc.html` | Tablet |
+| `docs/diseno/canvas/PanelTandasMovil.dc.html` | Teléfono, con su ficha por plataforma |
 
-Le toca fijar dos cosas:
-- el estado de partida, plegado o desplegado (R39);
-- el formato de la «fecha corta» (R33).
+Canvas vivo: https://claude.ai/artifact/3ofdk6AuAZ2VYjgV5qjEWe (privado).
 
-**Sin esa referencia no se implementa ninguna tarea visual.**
+Lo que fijó el tablero está en las decisiones cerradas de `requirements.md`:
+- arranca desplegado (R39);
+- fecha corta «15/10, 09:12», con año solo si no es el actual (R33);
+- aviso de solo lectura (R35);
+- «Reanudar» con nombre accesible (R40);
+- contador y resumen en la cabecera (R41).
+
+Donde el dibujo y el spec difieran, manda el spec.
 
 ## 1. Modelo de datos
 
@@ -162,9 +160,12 @@ configuración, y tocarlo sería tocar la política de reintentos, que está fue
 | | Estado actual | Cambio |
 |---|---|---|
 | Ubicación | Dentro de `PageHeader > actions`, con `basis-full` | Una sección a todo el ancho **debajo** de `PageHeader`, en `page.tsx` (P1, R17). `FormulaPdfUpload` se parte: la ventana sigue en `actions` y el panel se monta aparte, con la misma `registryScope`. |
-| Pliegue | No hay | `Collapsible`: el título queda siempre visible, con un control para plegar y desplegar (R39). El estado de partida lo fija el tablero. |
+| Pliegue | No hay | `Collapsible`: el título queda siempre visible, con un control para plegar y desplegar (`aria-expanded`). Arranca **desplegado** (R39). |
+| Cabecera | Solo el título `PANEL_TITLE` | Título, contador de tandas visibles (una `pill`) y `batchesSummary(statuses)`: «N en curso», «N con errores», las dos unidas por « · », o «Todas terminadas» (R41). El resumen sale de las fotos del almacén de sondeo (2.4), sin consultas extra. |
+| «Reanudar» | Mismo nombre en todos | `aria-label={resumeBatchLabel(rememberedAt, now)}`, que da «Reanudar la tanda de hoy, 10:47» (R40) |
+| Aviso de solo lectura | No hay | Con `disabled`, una nota con `READ_ONLY_NOTICE`, el texto exacto de R35 |
 | Visibilidad | Sin tandas no se pinta | Igual (R14) |
-| Rótulo por tanda | «Tanda», igual para todas (`PANEL_BATCH_LABEL`) | `batchLabel(rememberedAt, fileCount, now)` da «Tanda de hoy, 14:32», «Tanda de ayer, 14:32» o «Tanda del <fecha corta>, 14:32», y añade « · 3 archivos» cuando hay estado (R33, P7) |
+| Rótulo por tanda | «Tanda», igual para todas (`PANEL_BATCH_LABEL`) | `batchLabel(rememberedAt, fileCount, now)` da «Tanda de hoy, 14:32», «Tanda de ayer, 14:32» o «Tanda del 15/10, 09:12» (con año, `15/10/2025`, solo si no es el actual), y añade « · 3 archivos» cuando hay estado (R33) |
 | Nombre accesible del bloque | Ninguno | El `<li>` lleva `aria-labelledby` al rótulo (R34) |
 | «Descartar» | Mismo nombre en todos | `aria-label={discardBatchLabel(rememberedAt, now)}`, que da «Descartar la tanda de hoy, 14:32» (R34) |
 | «Intento N de M» | `Math.max(1, attempts)`, sin cota superior | `Math.min(Math.max(1, attempts), maxAttempts)` (R32) |
@@ -186,7 +187,7 @@ configuración, y tocarlo sería tocar la política de reintentos, que está fue
 - En la fila del catálogo:
   - se añade el punto que falta en «permite descartarla. No cubre»;
   - se quita «ni la sincronización del registro entre pestañas»;
-  - la columna `Diseño` cita el tablero aprobado.
+  - la columna `Diseño` cita `docs/diseno/canvas/PanelTandas.dc.html`.
 
 ## 3. Alternativas descartadas
 
@@ -240,7 +241,9 @@ R28 están retirados y no tienen test.
 | R32 | `tests/unit/documentos-ui/labels.test.ts`, **nuevo**: `attemptLabel(0,4)` da «Intento 1 de 4», `(2,4)` da «2 de 4» y `(5,4)` da «4 de 4» |
 | R33 | `labels.test.ts`: con un `now` fijo, «Tanda de hoy, 14:32», «Tanda de ayer, …», la fecha corta para el resto, y « · 3 archivos» solo con el recuento |
 | R34 | `labels.test.ts` («Descartar la tanda de hoy, 14:32») y `document-batch-panel.test.tsx`: `getByRole('button', { name })` es único por tanda, y cada `listitem` tiene su nombre accesible |
-| R35 | `formula-pdf-upload.test.tsx`: con `disabled` y tandas recordadas, el panel muestra el estado, «Revisar» y «Descartar», y no hay ningún control de subida dentro del panel |
+| R35 | `formula-pdf-upload.test.tsx`: con `disabled` y tandas recordadas, el panel muestra el estado, «Revisar», «Descartar» y el aviso con el texto exacto, y no hay ningún control de subida dentro del panel |
+| R40 | `labels.test.ts` («Reanudar la tanda de hoy, 10:47») y `document-batch-panel.test.tsx`: con dos tandas en error de consulta, `getByRole('button', { name })` es único por tanda |
+| R41 | `labels.test.ts`: `batchesSummary` da «1 en curso», «Todas terminadas», «1 con errores» y «1 en curso · 1 con errores». `document-batch-panel.test.tsx`: el contador coincide con las tandas visibles y el resumen sigue visible con el panel plegado. |
 | R36, R37 | `tests/unit/documentos-ui/document-upload-convenciones.test.ts`: un caso nuevo que lee los archivos de producción de la feature (salto de línea final y como mucho 100 columnas) |
 | R38 | `document-upload-convenciones.test.ts`: la fila del catálogo cita un `.dc.html` existente que no es `Formulas` ni `ModalesProduccion`, y no contiene «entre pestañas» como no cubierto |
 | R39 | `document-batch-panel.test.tsx`: plegar oculta la lista y deja el título y el control; desplegar la muestra |
