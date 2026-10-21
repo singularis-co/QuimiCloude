@@ -6,6 +6,7 @@ import {
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
   effectivePackages,
+  largestPackageFirst,
   orderedPackages,
   packedTotalInOrderUnit,
   packingSurplusByLine,
@@ -206,6 +207,38 @@ describe('compareDecimals', () => {
     expect(compareDecimals('2.5', '10')).toBe(-1);
     expect(compareDecimals('0.25', '0.125')).toBe(1);
     expect(compareDecimals('-1', '0.5')).toBe(-1);
+  });
+});
+
+describe('largestPackageFirst', () => {
+  const ids = (result: ReturnType<typeof largestPackageFirst<PackedDistributionLine>>) =>
+    result.kind === 'ok' ? result.lines.map((line) => line.lineId) : result.kind;
+
+  it('R7: de mayor a menor contenido por envase, convirtiendo a la unidad del pedido', () => {
+    const result = largestPackageFirst(LITRO, [
+      packed({ lineId: 'cuarto', content: '250', unit: MILILITRO }),
+      packed({ lineId: 'galon', content: '3.78' }),
+      packed({ lineId: 'litro', content: '1' }),
+    ]);
+    expect(ids(result)).toEqual(['galon', 'litro', 'cuarto']);
+  });
+
+  it('R7: a igual contenido conserva el orden recibido', () => {
+    const mililitros = packed({ lineId: 'ml', content: '1000', unit: MILILITRO });
+    const litros = packed({ lineId: 'l', content: '1' });
+    expect(ids(largestPackageFirst(LITRO, [mililitros, litros]))).toEqual(['ml', 'l']);
+    expect(ids(largestPackageFirst(LITRO, [litros, mililitros]))).toEqual(['l', 'ml']);
+  });
+
+  it('R3: informa la linea sin contenido o con unidad inconvertible', () => {
+    expect(largestPackageFirst(LITRO, [packed({ lineId: 'a', content: null, presentationId: 'p-sin' })])).toEqual({
+      kind: 'presentation_without_content',
+      presentationId: 'p-sin',
+    });
+    expect(largestPackageFirst(LITRO, [packed({ lineId: 'k', unit: KILO, presentationId: 'p-kilo' })])).toEqual({
+      kind: 'incompatible_units',
+      presentationId: 'p-kilo',
+    });
   });
 });
 

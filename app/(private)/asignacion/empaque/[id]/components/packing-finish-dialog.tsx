@@ -29,6 +29,7 @@ import {
   PACKING_INCREASE_REASONS,
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
+  largestPackageFirst,
   packedTotalInOrderUnit,
   packingSurplusByLine,
   type PackedLineCount,
@@ -195,7 +196,7 @@ function withUnit(value: string, unitLabel: string): string {
   return `${formatDecimalDisplay(value)} ${unitLabel}`;
 }
 
-/** Lo que sobra sobre el pedido y los envases que quedan libres, en el orden del reparto. */
+/** Lo que sobra sobre el pedido y los envases que quedan libres, de mayor a menor contenido. */
 type SurplusView = {
   readonly excess: string;
   readonly free: readonly { readonly name: string; readonly packages: number }[];
@@ -289,7 +290,13 @@ function describeLines(
   );
   if (computed.kind !== 'ok' || computed.excess === '0') return { views, total, surplus: null };
 
-  const free = finish.lines.flatMap((line) => {
+  // Se listan en el orden en que se repartió el excedente, no en el de las líneas.
+  const ordered = largestPackageFirst(
+    finish.orderUnit,
+    finish.lines.map((line, index) => ({ ...packedLines[index]!, label: line.label })),
+  );
+  if (ordered.kind !== 'ok') return { views, total, surplus: null };
+  const free = ordered.lines.flatMap((line) => {
     const packages = computed.byLine.get(line.lineId) ?? 0;
     return packages > 0 ? [{ name: line.label, packages }] : [];
   });

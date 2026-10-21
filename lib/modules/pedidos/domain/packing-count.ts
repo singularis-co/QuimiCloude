@@ -156,8 +156,33 @@ export type PackingSurplus =
   | { readonly kind: 'presentation_without_content'; readonly presentationId: string }
   | { readonly kind: 'incompatible_units'; readonly presentationId: string };
 
-function onePackageContent(orderUnit: UnitConversion, line: SurplusLine): SumInOrderUnitResult {
+function onePackageContent(orderUnit: UnitConversion, line: PackedDistributionLine): SumInOrderUnitResult {
   return sumInOrderUnit(orderUnit, toDistributionLines([{ ...line, packedPackages: 1 }]));
+}
+
+export type LargestPackageFirst<T> =
+  | { readonly kind: 'ok'; readonly lines: readonly T[] }
+  | { readonly kind: 'presentation_without_content'; readonly presentationId: string }
+  | { readonly kind: 'incompatible_units'; readonly presentationId: string };
+
+/**
+ * `lines` de mayor a menor contenido por envase en la unidad del pedido y, a igual contenido, en
+ * su orden. Es el orden en que se reparte el excedente; quien lo muestre lo reutiliza para no
+ * contar los libres en un orden distinto del que los fijo.
+ */
+export function largestPackageFirst<T extends PackedDistributionLine>(
+  orderUnit: UnitConversion,
+  lines: readonly T[],
+): LargestPackageFirst<T> {
+  const withContent: { readonly line: T; readonly content: string }[] = [];
+  for (const line of lines) {
+    const content = onePackageContent(orderUnit, line);
+    if (content.kind !== 'ok') return content;
+    withContent.push({ line, content: content.total });
+  }
+  // `sort` es estable: a igual contenido se conserva el orden de `lines`.
+  withContent.sort((a, b) => compareDecimals(b.content, a.content));
+  return { kind: 'ok', lines: withContent.map(({ line }) => line) };
 }
 
 /** El mayor numero de envases sobre el plan de `line` que cabe en `remaining`, y lo que sobra. */
@@ -205,17 +230,14 @@ export function packingSurplusByLine(
   // `validateDistribution` da el disponible en negativo cuando se supera la cantidad.
   const excess = checked.available.slice(1);
 
-  const candidates: { readonly line: SurplusLine; readonly content: string }[] = [];
-  for (const line of lines) {
-    if (line.packedPackages <= line.plan) continue;
-    const content = onePackageContent(orderUnit, line);
-    if (content.kind !== 'ok') return content;
-    candidates.push({ line, content: content.total });
-  }
-  candidates.sort((a, b) => compareDecimals(b.content, a.content));
+  const candidates = largestPackageFirst(
+    orderUnit,
+    lines.filter((line) => line.packedPackages > line.plan),
+  );
+  if (candidates.kind !== 'ok') return candidates;
 
   let remaining = excess;
-  for (const { line } of candidates) {
+  for (const line of candidates.lines) {
     const fitted = largestFitting(remaining, orderUnit, line);
     byLine.set(line.lineId, fitted.packages);
     remaining = fitted.available;

@@ -186,11 +186,13 @@ export {
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
   effectivePackages,
+  largestPackageFirst,
   orderedPackages,
   packedTotalInOrderUnit,
   packingSurplusByLine,
 } from './domain/packing-count';
 export type {
+  LargestPackageFirst,
   PackedDistributionLine,
   PackedLineCount,
   PackingCountCheck,

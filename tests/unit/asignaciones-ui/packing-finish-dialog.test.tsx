@@ -470,6 +470,48 @@ describe('diálogo — con excedente sobre el pedido', () => {
     expect(terminar()).toBeEnabled();
   });
 
+  it('R20, R7: con la línea de menor contenido antes en el reparto, el aviso lista de mayor a menor contenido', async () => {
+    const botellaPrimero: Finish = { ...FINISH, lines: [...FINISH.lines].reverse() };
+    const { user } = pintar({ finish: botellaPrimero });
+
+    await contar(user, galon(), '16');
+    await contar(user, botella(), '17');
+
+    expect(screen.getAllByTestId(PACKING_FINISH_LINE_TESTID).map((fila) => fila.getAttribute('data-line-id'))).toEqual([
+      'linea-botella',
+      'linea-galon',
+    ]);
+    expect(aviso()).toHaveTextContent(
+      'Quedan libres en stock: 1 envase de Galón 3,78 L, 1 envase de Botella 1 L.',
+    );
+  });
+
+  it('R20, R7: a igual contenido el aviso conserva el orden del reparto', async () => {
+    const botella1L = (lineId: string, label: string) => ({
+      lineId,
+      label,
+      plan: 36,
+      content: '1',
+      unit: LITRO,
+      packaging: { productId: `envase-${lineId}`, name: label, freePackages: 6 },
+    });
+    // Ni alfabético ni por número de libres: la Z va primero en el reparto y deja menos.
+    const igualContenido: Finish = {
+      ...FINISH,
+      lines: [botella1L('linea-z', 'Botella Z 1 L'), botella1L('linea-a', 'Botella A 1 L')],
+    };
+    const { user } = pintar({ finish: igualContenido });
+
+    // 37 + 39 = 76 L: sobran 4 L; la Z suelta su envase de más y la A los 3 restantes.
+    await contar(user, linea('linea-z'), '37');
+    await contar(user, linea('linea-a'), '39');
+
+    expect(aviso()).toHaveTextContent('Sobran 4 L sobre el pedido.');
+    expect(aviso()).toHaveTextContent(
+      'Quedan libres en stock: 1 envase de Botella Z 1 L, 3 envases de Botella A 1 L.',
+    );
+  });
+
   it('R20: varios envases libres de una presentación van en plural', async () => {
     const holgado: Finish = {
       ...FINISH,

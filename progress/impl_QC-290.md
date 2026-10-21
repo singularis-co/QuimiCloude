@@ -394,3 +394,21 @@ Archivos de toda la feature: `git diff 0105afe1 --stat` (44 archivos). Detalle p
 
 ### Gate
 Por decisión del humano (2026-10-20), `./init.sh` no se corre al cerrar las tandas: la suite completa la corre CI (`gate-completo`) en el PR. Solo la tanda 1 lo corrió en local (verde). Lo que se verificó en local está en cada sección.
+
+## Ajuste del reviewer: orden del aviso
+
+El aviso de excedente listaba los libres en el orden de las líneas; ahora los lista de mayor a menor contenido por envase y, a igual contenido, en el orden del reparto (R7, tablero `EmpaqueTerminar.dc.html` estado `excedente`). Las cantidades siguen siendo las de `packingSurplusByLine`.
+
+- `lib/modules/pedidos/domain/packing-count.ts`: nuevo `largestPackageFirst(orderUnit, lines)` (ordena con `compareDecimals`, `sort` estable). `packingSurplusByLine` lo usa para su cascada, sin cambio de comportamiento.
+- `lib/modules/pedidos/index.ts`: publica `largestPackageFirst` y el tipo `LargestPackageFirst`.
+- `app/(private)/asignacion/empaque/[id]/components/packing-finish-dialog.tsx`: el aviso recorre las líneas en ese orden.
+- `tests/unit/pedidos/packing-count.test.ts`: `describe('largestPackageFirst')` con «R7: de mayor a menor contenido por envase, convirtiendo a la unidad del pedido», «R7: a igual contenido conserva el orden recibido», «R3: informa la linea sin contenido o con unidad inconvertible».
+- `tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx`: «R20, R7: con la línea de menor contenido antes en el reparto, el aviso lista de mayor a menor contenido», «R20, R7: a igual contenido el aviso conserva el orden del reparto».
+
+Salida:
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: 0 errores, 10 warnings previos en otros archivos; `eslint` sobre los 5 archivos tocados: limpio.
+- `pnpm exec vitest run tests/unit/pedidos/order-packing.test.ts tests/unit/pedidos/packing-count.test.ts tests/unit/asignaciones-ui/packing-finish-dialog.test.tsx`: 3 archivos, 172 tests en verde.
+- `vitest related`: sin las rutas con corchetes no encuentra tests del diálogo; con `packing-count.ts` arrastra el proyecto `integration` (pide `DATABASE_URL`) y, limitado a `node`/`ui`, abarca casi toda la suite por el barril `@/lib/modules/pedidos`: se cortó. En su lugar se corrieron los tests que consumen directamente el diálogo y `packing-count` (arriba).
+
+Veredicto: aviso ordenado como pide R7 con la misma regla del dominio; tests tocados en verde.
