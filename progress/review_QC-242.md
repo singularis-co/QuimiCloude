@@ -415,3 +415,49 @@ más honesto lanzar el error.
 menores. Todo lo demás de la enmienda (P21, sincronización, habilitar sin `APPROVED`, clave en uso,
 contrato, tests ajenos y trazabilidad) está correcto y verificado. La vuelta 2 puede acotarse al paso
 6 de la migración, a su `.int` y a §18.3.
+
+## Enmienda, vuelta 2 (acotada a 220ff849..75fe550d)
+
+Revisados: `81335446` (B1 y m3), `1bbeca0d` (§18.3 y §18.9, m2) y `75fe550d` (D79, m1). No se
+rehace la trazabilidad.
+
+### Verificación
+
+```
+--project integration whatsapp-variable-keys-migration.int -> 6/6 (el caso R86 R95 con 11 filas)
+vitest run guard + module-shape + whatsapp-template-prisma-binding.test -> 87 files; 1304 passed | 22 skipped
+pnpm run typecheck -> sin errores
+SQL del paso 6 de la migración frente al bloque SQL de design §18.3, línea a línea (sin sangría) -> IGUAL
+```
+
+### Hallazgos de la vuelta 1
+
+- [x] **B1, cerrado.** El `WHERE` exige ahora cuatro cosas:
+  - que `components` sea un array;
+  - que no haya ningún componente de un tipo distinto de HEADER, BODY, FOOTER o BUTTONS;
+  - que el HEADER tenga `format` y que sea `TEXT`;
+  - que los botones sean de los tres tipos conocidos.
+
+  Las negaciones van como `!(… == …)`, y así no dejan pasar una clave ausente: es justo el fallo
+  del `!=` de jsonpath. El `.int` gana cinco filas. `completa_editable` (HEADER TEXT, BODY, FOOTER y
+  QUICK_REPLY) queda «relacionada». `carousel`, `oferta_limitada`, `header_sin_format` y
+  `componente_sin_type` quedan «sin relacionar» y deshabilitadas. Pasa contra Postgres local. El
+  comentario de la migración y §18.3 dicen ahora lo mismo y declaran el resto que no se replica:
+  componentes repetidos y la forma interna de cada componente. Ese resto se acepta en el diseño
+  porque Meta no lo devuelve, y queda a la vista.
+- [x] **m2, cerrado.** §18.9 y §18.6/§18.7 llevan la marca «[reemplazado por la enmienda 2, F1 …]».
+- [x] **m3, cerrado.** `toBinding` lanza un error si llega una fila sin destino. Hay test unitario de
+  las tres ramas.
+  - Para el test, se exporta desde el adaptador. Nada fuera de los tests lo importa, y la guardia de
+    ámbito y `module-shape` siguen en verde.
+  - El comentario nuevo no cita el spec.
+- [x] **m1, llevado a deuda.** Es D79 en `progress/deudas.md`, con dueño y lo que falta.
+
+### Hallazgos nuevos
+
+Ninguno.
+
+### Veredicto
+
+**OK.** 0 bloqueantes, 0 menores nuevos. Los 4 hallazgos de la vuelta 1 están cerrados: 3 arreglados
+y m1 llevado a deuda (D79). Queda `gate-completo` en CI.
