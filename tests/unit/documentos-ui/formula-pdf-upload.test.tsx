@@ -78,7 +78,7 @@ async function elegirYSubir(): Promise<void> {
 }
 
 describe('el envoltorio de subida de formulas', () => {
-  it('encola con la estrategia "formula" (R1)', async () => {
+  it('R5 — encola con la estrategia "formula"', async () => {
     getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: tandaDeFormula('processing') });
 
     render(<FormulaPdfUpload />);
@@ -90,7 +90,7 @@ describe('el envoltorio de subida de formulas', () => {
     expect(encolado).toMatchObject({ strategy: 'formula' });
   });
 
-  it('en "listo" la fila ofrece el enlace a formulaImportRoute(id) (R1)', async () => {
+  it('R10, R16 — en "listo" la fila de la ventana ofrece el enlace a formulaImportRoute(id)', async () => {
     getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: tandaDeFormula('done') });
 
     render(<FormulaPdfUpload />);
@@ -103,7 +103,7 @@ describe('el envoltorio de subida de formulas', () => {
   });
 
   it.each<DocumentFileStatus>(['processing', 'error', 'queued'])(
-    'en estado "%s" la fila no ofrece ningun enlace (R1)',
+    'R10 — en estado "%s" la fila no ofrece ningun enlace',
     async (status) => {
       getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: tandaDeFormula(status) });
 

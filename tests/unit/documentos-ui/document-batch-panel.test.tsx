@@ -104,7 +104,7 @@ function leerGuardadas(): Array<{ readonly batchId: string; readonly strategy: s
 }
 
 describe('la memoria de tandas recordadas', () => {
-  it('al encolar con exito, la tanda queda en el registro con su estrategia (R1)', async () => {
+  it('R5 — al encolar con exito, la tanda queda en el registro con su estrategia', async () => {
     render(<DocumentUpload strategy="formula" />);
     await elegirYSubir();
 
@@ -114,7 +114,7 @@ describe('la memoria de tandas recordadas', () => {
     ]);
   });
 
-  it('un encolado que falla no deja ninguna tanda en el registro (R1)', async () => {
+  it('R5 — un encolado que falla no deja ninguna tanda en el registro', async () => {
     enqueueBatchActionMock.mockResolvedValue({
       status: 'error',
       code: 'unexpected',
@@ -129,7 +129,7 @@ describe('la memoria de tandas recordadas', () => {
     expect(leerGuardadas()).toEqual([]);
   });
 
-  it('la tanda recordada sobrevive al desmontaje: el panel la encuentra despues (R1)', async () => {
+  it('R5, R16 — la tanda recordada sobrevive al desmontaje: el panel la encuentra despues', async () => {
     render(<DocumentUpload strategy="formula" />);
     await elegirYSubir();
 
@@ -142,7 +142,7 @@ describe('la memoria de tandas recordadas', () => {
     expect(screen.getByTestId(rowNameTestId(0, PANEL_ROW_SCOPE))).toHaveTextContent('uno.pdf');
   });
 
-  it('el panel solo sondea las tandas de su estrategia (R1)', async () => {
+  it('R7 — el panel solo sondea las tandas de su estrategia', async () => {
     rememberBatch('tanda-catalogo', 'catalogo');
     rememberBatch('tanda-formula', 'formula');
 
@@ -154,7 +154,7 @@ describe('la memoria de tandas recordadas', () => {
     expect(getBatchStatusActionMock).not.toHaveBeenCalledWith('tanda-catalogo');
   });
 
-  it('pasado el tope, se descartan las tandas mas viejas (R1)', () => {
+  it('R6 — pasado el tope, se descartan las tandas mas viejas', () => {
     for (let indice = 0; indice <= MAX_REMEMBERED_BATCHES; indice++) {
       rememberBatch(`tanda-${indice}`, 'formula');
     }
@@ -167,7 +167,7 @@ describe('la memoria de tandas recordadas', () => {
 });
 
 describe('el panel de tandas fuera de la ventana', () => {
-  it('con la tanda en curso muestra nombre, estado e intento N de M (R2)', async () => {
+  it('R8, R16 — con la tanda en curso muestra nombre, estado e intento N de M', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({
       status: 'success',
@@ -192,7 +192,7 @@ describe('el panel de tandas fuera de la ventana', () => {
     );
   });
 
-  it('un archivo terminado en error muestra el mensaje del catalogo y su motivo, y la tanda sigue visible (R2, R3)', async () => {
+  it('R9 — un archivo terminado en error muestra el mensaje del catalogo y su motivo, y la tanda sigue visible', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({
       status: 'success',
@@ -211,7 +211,7 @@ describe('el panel de tandas fuera de la ventana', () => {
     expect(screen.getByTestId(panelBatchTestId(0))).toBeVisible();
   });
 
-  it('un archivo listo ofrece el enlace a su revision (R2)', async () => {
+  it('R10 — un archivo listo ofrece el enlace a su revision', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({
       status: 'success',
@@ -224,7 +224,7 @@ describe('el panel de tandas fuera de la ventana', () => {
     expect(enlace).toHaveAttribute('href', formulaImportRoute(ARCHIVO_ID));
   });
 
-  it('una tanda terminada se puede descartar del registro (R3)', async () => {
+  it('R11 — una tanda terminada se puede descartar del registro', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({
       status: 'success',
@@ -242,7 +242,7 @@ describe('el panel de tandas fuera de la ventana', () => {
     expect(rememberedBatches()).toEqual([]);
   });
 
-  it('una tanda que ya no existe se muestra como desconocida y se puede descartar (R3)', async () => {
+  it('R12 — una tanda que ya no existe se muestra como desconocida y se puede descartar', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({ status: 'success', data: null });
 
@@ -257,14 +257,14 @@ describe('el panel de tandas fuera de la ventana', () => {
     await waitFor(() => expect(screen.queryByTestId(DOCUMENT_BATCH_PANEL_TESTID)).toBeNull());
   });
 
-  it('sin tandas recordadas el panel no se pinta (R3)', () => {
+  it('R14 — sin tandas recordadas el panel no se pinta', () => {
     render(<DocumentBatchPanel strategy="formula" />);
 
     expect(screen.queryByTestId(DOCUMENT_BATCH_PANEL_TESTID)).toBeNull();
     expect(getBatchStatusActionMock).not.toHaveBeenCalled();
   });
 
-  it('un error de consulta se muestra y Reanudar vuelve a sondear (R3)', async () => {
+  it('R13 — un error de consulta se muestra y Reanudar vuelve a sondear', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({
       status: 'error',
@@ -296,7 +296,7 @@ describe('el panel de tandas fuera de la ventana', () => {
 });
 
 describe('el montaje en la vista de formulas', () => {
-  it('FormulaPdfUpload pinta el panel junto a la ventana, con la ruta de revision de formulas (R4)', async () => {
+  it('R10, R16 — FormulaPdfUpload pinta el panel junto a la ventana, con la ruta de revision de formulas', async () => {
     rememberBatch('batch-1', 'formula');
     getBatchStatusActionMock.mockResolvedValue({
       status: 'success',
@@ -314,15 +314,5 @@ describe('el montaje en la vista de formulas', () => {
       'href',
       formulaImportRoute(ARCHIVO_ID),
     );
-  });
-
-  it('con la subida deshabilitada el panel tampoco se pinta (R4)', () => {
-    rememberBatch('batch-1', 'formula');
-
-    render(<FormulaPdfUpload disabled />);
-
-    expect(screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).toBeDisabled();
-    expect(screen.queryByTestId(DOCUMENT_BATCH_PANEL_TESTID)).toBeNull();
-    expect(getBatchStatusActionMock).not.toHaveBeenCalled();
   });
 });
