@@ -94,7 +94,7 @@
   - `order-columns.tsx` según design §5.1 («Costo estimado» + «Costo real», `CostCell`).
   - `use-order-cost-quote.ts` con `frozen` y `order-form.tsx` que lo pasa (design §5.2).
   - Tests: `tests/unit/pedidos-ui/order-columns.test.tsx` (orden y rótulos; guion con «Sin dato» sin
-    real; `$ 120.00` sin `title`; `$ 12,752.55` con `title` `12752.5512`; no ordenables ni
+    real; `$120.00` (sin espacio, `formatMoneyDisplay`) sin `title`; `$12,752.55` con `title` `12752.5512`; no ordenables ni
     filtrables); `tests/unit/pedidos-ui/use-order-cost-quote.test.ts` y
     `tests/unit/pedidos-ui/order-form-quote.test.tsx` (en `EN_CURSO` no se pide cotización y se ve el
     guardado; en `PENDIENTE`, como hoy).

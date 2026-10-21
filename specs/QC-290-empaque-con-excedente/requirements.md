@@ -195,3 +195,5 @@ Ninguna.
 | 2026-10-20 | Pase `/design` | Se hace antes de aprobar el spec, sin excepción (`docs/perfil-agentes.md > Pase de diseño`). Cierra P2. |
 | 2026-10-20 | (P2) Texto y tono del aviso | Aprobado el tablero `EmpaqueTerminar*.dc.html` (estado `excedente`): un aviso informativo encima del pie, detallado. Ej.: «Sobran 5,48 L sobre el pedido.» / «Quedan libres en stock: 1 envase de Galón 3,78 L, 1 envase de Botella 1 L.» Sin libres: «Ningún envase queda libre: lo que sobra no llega a un envase entero y sigue en el pedido.» Sin «(estimados)». |
 | 2026-10-20 | QC-304 | Duplicado de esta ficha: cancelada, decisiones absorbidas aquí. |
+
+> **Enmienda QC-305 (2026-10-21):** el coste que se reparte entre los lotes, excedente incluido (R10), es el coste real del pedido, no el estimado. Ver `specs/QC-305-coste-real-de-produccion/requirements.md` R16.

@@ -104,9 +104,9 @@
 - **R20.** SI el pedido no tiene coste real, ENTONCES su celda DEBE mostrar el guion con el rótulo
   accesible «Sin dato», nunca `0` ni una celda vacía; lo mismo para el estimado sin importe, como
   hoy. [¿Sin coste real?]
-- **R21.** El sistema DEBE pintar el coste real con el formato `$ 1,234,567.50` (`$` fijo y un
-  espacio, coma de miles, punto decimal, dos decimales; `120.0000` → `$ 120.00`, `12752.5512` →
-  `$ 12,752.55`) y, SI el valor exacto difiere del pintado, ENTONCES DEBE exponer el valor exacto en
+- **R21.** El sistema DEBE pintar el coste real en el listado con el formato `$1,234,567.50` (`$`
+  fijo sin espacio, coma de miles, punto decimal, dos decimales; `120.0000` → `$120.00`,
+  `12752.5512` → `$12,752.55`), el mismo `formatMoneyDisplay` del estimado (decisión 2026-10-21) y, SI el valor exacto difiere del pintado, ENTONCES DEBE exponer el valor exacto en
   el atributo `title`; SI coincide, NO DEBE llevar `title`. NO DEBE usar `Intl.NumberFormat`,
   `toLocaleString` ni coma flotante para obtenerlo. [Tipo y formato]
 - **R22.** El detalle de producto terminado (tab «Costo de producción») DEBE mostrar, para un lote
@@ -180,3 +180,4 @@ Ninguna. P1–P3 se cerraron al aprobar el spec (2026-10-21): ver las tres últi
 | 2026-10-21 | (P3, R19) ¿Dónde y cómo se ve en el pedido? | En el **listado de pedidos**: «Costo de producción» pasa a «Costo estimado» y a su derecha nace «Costo real». **Sin pase `/design`** (excepción de `docs/perfil-agentes.md > Pase de diseño`, como QC-284). Concreta la fila «¿Dónde se ve?». *Cerrada por el humano al aprobar el spec (F1.4).* |
 | 2026-10-21 | Alcance del congelado del estimado | Aprobado tal como lo amplía el spec: tampoco recalcula la edición de reparto y unidad (QC-170) en `EN_CURSO`/`POR_EMPACAR` (R13), y el formulario de un pedido comenzado deja de recotizar (R15, enmienda QC-151 R12 solo para comenzados). *Humano, F1.4.* |
 | 2026-10-21 | R17: el CHECK de QC-150/QC-281 se quita por migración; lote PT sin coste real = unit_cost NULL | `product_batches_package_content_requires_unit_cost` impedía un lote de producto terminado sin `unit_cost`. Se quita por una migración con `down.sql` (`unit_cost_positive` se queda). Sin coste real el lote nace con `unit_cost` NULL; quien lee lotes de PT lo trata como «sin coste» (guion), nunca 0 ni el estimado. *Humano, F2.1, al desbloquear T4.* |
+| 2026-10-21 | R21: el listado usa formatMoneyDisplay ($120.00, sin espacio), igual que el estimado; el formulario sigue con formatOrderAmount | R21 pedía `$ 120.00` (con espacio, de QC-151 R18) y design §5.1 reutilizaba `formatMoneyDisplay`, que pinta `$120.00`. Gana el design: las dos columnas del listado se ven igual. El bloque de coste del formulario (`formatOrderAmount`, `$ 1,234.50`) no cambia. *Humano, F2.1, al cerrar T7.* |
