@@ -40,6 +40,10 @@ export function createGetBatchStatus(
     // La caducidad también cierra archivos: sin esto, una tanda con uno colgado nunca avisaría.
     await notifyIfBatchFinished?.(batchId, actor.companyId);
 
-    return deps.repository.readBatch(batchId, actor.companyId);
+    const batch = await deps.repository.readBatch(batchId, actor.companyId);
+    if (batch === null) return null;
+    // `maxRetries()` cuenta las entregas EXTRA tras la primera («total = 1 + retries» en QStash),
+    // y `attempts` suma una por entrega reclamada: el tope, en intentos totales, es uno mas.
+    return { ...batch, maxAttempts: deps.config.maxRetries() + 1 };
   };
 }

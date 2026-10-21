@@ -12,7 +12,7 @@ import { dobleDeProveedor, LECTURA_PDF_PRENDIDA } from './run-document-job-doubl
 import { AiProviderError, DocumentosError, ValidationError } from '@/lib/modules/documentos/domain/errors';
 import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
 
-import type { BatchStatus } from '@/lib/modules/documentos/domain/batch-status';
+import type { ReadBatch } from '@/lib/modules/documentos/domain/batch-status';
 import type {
   CropCatalogImagesInput,
   CropCatalogImagesResult,
@@ -50,7 +50,7 @@ const SIN_CUOTA: AiProviderFailure = { kind: 'quota', httpStatus: 429, model: nu
 function dobleDeRepositorio(strategy: Strategy) {
   const finish = vi.fn<DocumentBatchRepository['finish']>(async () => {});
   const claimed: ClaimedFile = { id: ARCHIVO, companyId: EMPRESA, batchId: TANDA, path: RUTA };
-  const batch: BatchStatus = { id: TANDA, companyId: EMPRESA, strategy, files: [] };
+  const batch: ReadBatch = { id: TANDA, companyId: EMPRESA, strategy, files: [] };
   const noUsar = vi.fn(async () => {
     throw new Error('run-document-job no deberia llamar a esto');
   });

@@ -8,7 +8,7 @@ import { failureKind } from '@/lib/modules/documentos/domain/failure-kind';
 import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
 import { createIsCompanyAddonActive, type Addon } from '@/lib/modules/identity';
 
-import type { BatchStatus } from '@/lib/modules/documentos/domain/batch-status';
+import type { ReadBatch } from '@/lib/modules/documentos/domain/batch-status';
 import type { AiProviderGateway } from '@/lib/modules/documentos/domain/run-document-job';
 import type {
   ClaimedFile,
@@ -36,8 +36,8 @@ function prohibido(que: string) {
 function montar(pdfReading: PdfReadingSwitch) {
   const claim = vi.fn(async (): Promise<ClaimedFile | null> => FILA);
   const finish = vi.fn<DocumentBatchRepository['finish']>(async () => {});
-  const batch: BatchStatus = { id: 'tanda-1', companyId: EMPRESA, strategy: 'formula', files: [] };
-  const readBatch = vi.fn(async (): Promise<BatchStatus | null> => batch);
+  const batch: ReadBatch = { id: 'tanda-1', companyId: EMPRESA, strategy: 'formula', files: [] };
+  const readBatch = vi.fn(async (): Promise<ReadBatch | null> => batch);
   const repository: DocumentBatchRepository = {
     createBatch: prohibido('createBatch'),
     attachMessageId: prohibido('attachMessageId'),

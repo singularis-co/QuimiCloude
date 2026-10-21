@@ -10,8 +10,8 @@ import { trabajoConProveedor } from './run-document-job-doubles';
 
 
 import type {
-  BatchStatus,
   DocumentFileStatusEntry,
+  ReadBatch,
 } from '@/lib/modules/documentos/domain/batch-status';
 import type { CropCatalogImagesResult } from '@/lib/modules/documentos/domain/crop-catalog-images';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
@@ -50,7 +50,7 @@ function dobleDeLog() {
 function dobleDeRepositorio() {
   const finish = vi.fn<DocumentBatchRepository['finish']>(async () => {});
   const claim = vi.fn(async (): Promise<ClaimedFile | null> => fila());
-  const batch: BatchStatus = {
+  const batch: ReadBatch = {
     id: TANDA,
     companyId: EMPRESA,
     strategy: 'catalogo',
@@ -68,7 +68,7 @@ function dobleDeRepositorio() {
     expireStale: vi.fn(async () => {
       throw new Error('este test no caduca nada');
     }),
-    readBatch: vi.fn(async (): Promise<BatchStatus | null> => batch),
+    readBatch: vi.fn(async (): Promise<ReadBatch | null> => batch),
     readFileForReview: vi.fn(async () => {
       throw new Error('este test no lee para revision');
     }),

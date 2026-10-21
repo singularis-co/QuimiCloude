@@ -7,7 +7,7 @@
  * `queued` tras un fallo reintentable.
  */
 import type { ErrorCode } from '@/lib/modules/errores';
-import type { BatchStatus, DocumentFileStatus } from '../domain/batch-status';
+import type { DocumentFileStatus, ReadBatch } from '../domain/batch-status';
 import type { PdfStrategy } from '../domain/pdf-strategy';
 
 export type NewBatch = {
@@ -55,7 +55,7 @@ export interface DocumentBatchRepository {
   finish(documentFileId: string, outcome: JobOutcome): Promise<void>;
   /** Pasa a `error` por caducidad las filas de esa tanda y esa empresa mas viejas que el plazo. */
   expireStale(batchId: string, companyId: string, olderThan: Date): Promise<void>;
-  readBatch(batchId: string, companyId: string): Promise<BatchStatus | null>;
+  readBatch(batchId: string, companyId: string): Promise<ReadBatch | null>;
   /** El archivo con lo que su revision necesita. `null` si no existe o es de otra empresa: los
    *  dos casos se ven igual desde fuera. */
   readFileForReview(documentFileId: string, companyId: string): Promise<FileForReview | null>;

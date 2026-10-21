@@ -13,7 +13,7 @@ import type {
   JobOutcome,
   NewBatch,
 } from '../../../ports/document-batch-repository';
-import type { BatchStatus, DocumentFileStatus } from '../../../domain/batch-status';
+import type { DocumentFileStatus, ReadBatch } from '../../../domain/batch-status';
 import type { PdfStrategy } from '../../../domain/pdf-strategy';
 
 /**
@@ -121,12 +121,18 @@ export async function expireStale(
   });
 }
 
+/** El nombre legible de una fila sin `original_name`: el ultimo segmento de su ruta en el bucket. */
+function lastPathSegment(path: string): string {
+  const segments = path.split('/').filter((segment) => segment.length > 0);
+  return segments[segments.length - 1] ?? path;
+}
+
 /**
  * Sin `include`: `DocumentBatch` y `DocumentFile` no llevan `@relation` en el esquema —la FK que
  * las une esta escrita a mano en la migracion—, asi que la tanda y sus archivos se leen en dos
  * consultas separadas, no en un `include`.
  */
-export async function readBatch(batchId: string, companyId: string): Promise<BatchStatus | null> {
+export async function readBatch(batchId: string, companyId: string): Promise<ReadBatch | null> {
   const batch = await prisma.documentBatch.findFirst({
     where: { id: batchId, companyId },
     select: { id: true, companyId: true, strategy: true },
@@ -138,6 +144,8 @@ export async function readBatch(batchId: string, companyId: string): Promise<Bat
     select: {
       id: true,
       path: true,
+      attempts: true,
+      originalName: true,
       status: true,
       extractedText: true,
       errorCode: true,
@@ -152,6 +160,8 @@ export async function readBatch(batchId: string, companyId: string): Promise<Bat
     files: files.map((file) => ({
       id: file.id,
       path: file.path,
+      attempts: file.attempts,
+      name: file.originalName ?? lastPathSegment(file.path),
       status: file.status as DocumentFileStatus,
       extractedText: file.extractedText,
       errorCode: file.errorCode as ErrorCode | null,
