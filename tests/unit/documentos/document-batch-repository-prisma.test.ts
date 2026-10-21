@@ -49,7 +49,7 @@ beforeEach(() => {
 });
 
 describe('createBatch — una transaccion con la tanda y sus archivos', () => {
-  it('R1 — inserta la tanda y un archivo por ruta, todo en la misma tx', async () => {
+  it('QC-111 R1 — inserta la tanda y un archivo por ruta, todo en la misma tx', async () => {
     const batchCreate = vi.fn().mockResolvedValue({ id: TANDA });
     const fileCreate = vi
       .fn()
@@ -95,7 +95,7 @@ describe('attachMessageId', () => {
 });
 
 describe('claim — el UPDATE condicional', () => {
-  it('R10 — devuelve la fila reclamada cuando el UPDATE devuelve una', async () => {
+  it('QC-111 R10 — devuelve la fila reclamada cuando el UPDATE devuelve una', async () => {
     doble.queryRaw.mockResolvedValue([
       { id: ARCHIVO, company_id: EMPRESA, batch_id: TANDA, path: 'empresa/a.pdf' },
     ]);
@@ -108,7 +108,7 @@ describe('claim — el UPDATE condicional', () => {
     });
   });
 
-  it('R10 — devuelve null cuando el UPDATE no reclamo ninguna fila', async () => {
+  it('QC-111 R10 — devuelve null cuando el UPDATE no reclamo ninguna fila', async () => {
     doble.queryRaw.mockResolvedValue([]);
 
     await expect(claim(ARCHIVO, 'msg-1')).resolves.toBeNull();
@@ -116,7 +116,7 @@ describe('claim — el UPDATE condicional', () => {
 });
 
 describe('finish — los tres desenlaces', () => {
-  it('R13 — done: guarda el texto tal cual y limpia error', async () => {
+  it('QC-111 R13 — done: guarda el texto tal cual y limpia error', async () => {
     doble.documentFileUpdate.mockResolvedValue({});
 
     await finish(ARCHIVO, { kind: 'done', text: 'texto extraido' });
@@ -138,7 +138,7 @@ describe('finish — los tres desenlaces', () => {
     });
   });
 
-  it('R17 — requeue: vuelve a queued LIMPIANDO code y reason', async () => {
+  it('QC-111 R17 — requeue: vuelve a queued LIMPIANDO code y reason', async () => {
     doble.documentFileUpdate.mockResolvedValue({});
 
     await finish(ARCHIVO, { kind: 'requeue', code: 'ai_unavailable', reason: 'la IA no respondio' });
@@ -151,7 +151,7 @@ describe('finish — los tres desenlaces', () => {
 });
 
 describe('expireStale — acotado por tanda Y por empresa', () => {
-  it('R17 — pasa a error lo que lleva demasiado en queued/processing, con su motivo', async () => {
+  it('QC-111 R17 — pasa a error lo que lleva demasiado en queued/processing, con su motivo', async () => {
     doble.documentFileUpdateMany.mockResolvedValue({ count: 2 });
     const limite = new Date('2026-09-18T00:00:00.000Z');
 
@@ -174,14 +174,14 @@ describe('expireStale — acotado por tanda Y por empresa', () => {
 });
 
 describe('readBatch — null si no existe o es de otra empresa', () => {
-  it('R18 — sin fila de tanda visible en la empresa, devuelve null sin leer los archivos', async () => {
+  it('R3, QC-111 R18 — sin fila de tanda visible en la empresa, devuelve null sin leer los archivos', async () => {
     doble.documentBatchFindFirst.mockResolvedValue(null);
 
     await expect(readBatch(TANDA, EMPRESA)).resolves.toBeNull();
     expect(doble.documentFileFindMany).not.toHaveBeenCalled();
   });
 
-  it('R3 — pide attempts y originalName ademas de las columnas del estado', async () => {
+  it('R1 — pide attempts y originalName ademas de las columnas del estado', async () => {
     doble.documentBatchFindFirst.mockResolvedValue({ id: TANDA, companyId: EMPRESA, strategy: 'catalogo' });
     doble.documentFileFindMany.mockResolvedValue([]);
 
@@ -277,8 +277,8 @@ describe('readBatch — null si no existe o es de otra empresa', () => {
   });
 });
 
-describe('readFileForReview — null para otra empresa (R3)', () => {
-  it('R3 — sin archivo visible en la empresa, devuelve null sin consultar la tanda', async () => {
+describe('readFileForReview — null para otra empresa (QC-158 R3)', () => {
+  it('QC-158 R3 — sin archivo visible en la empresa, devuelve null sin consultar la tanda', async () => {
     doble.documentFileFindFirst.mockResolvedValue(null);
 
     await expect(readFileForReview(ARCHIVO, EMPRESA)).resolves.toBeNull();
@@ -289,7 +289,7 @@ describe('readFileForReview — null para otra empresa (R3)', () => {
     expect(doble.documentBatchFindFirst).not.toHaveBeenCalled();
   });
 
-  it('R3 — archivo visible pero tanda de otra empresa, devuelve null', async () => {
+  it('QC-158 R3 — archivo visible pero tanda de otra empresa, devuelve null', async () => {
     doble.documentFileFindFirst.mockResolvedValue({
       status: 'done',
       extractedText: 'texto',
