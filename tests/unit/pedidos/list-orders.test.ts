@@ -903,7 +903,13 @@ describe('listOrders — por entregar', () => {
     { id: GALON, name: 'Galón', content: null, unitId: 'unidad-1' },
     { id: VASO, name: 'Vaso', content: null, unitId: 'unidad-1' },
   ]
-  type Linea = { presentationId: string; packages: number; packedPackages?: number | null; deliveredPackages?: number }
+  type Linea = {
+    presentationId: string
+    packages: number
+    packedPackages?: number | null
+    packedSurplusPackages?: number
+    deliveredPackages?: number
+  }
   const reparto = (...ids: readonly string[]) =>
     ids.map((presentationId) => ({ presentationId, packages: 1, presentationContent: null, packagingProductId: null }))
   function progreso(id: string, lineas: readonly Linea[]): OrderDeliveryProgress {
@@ -914,6 +920,7 @@ describe('listOrders — por entregar', () => {
         presentationId: l.presentationId,
         packages: l.packages,
         packedPackages: l.packedPackages ?? null,
+        packedSurplusPackages: l.packedSurplusPackages ?? 0,
         deliveredPackages: l.deliveredPackages ?? 0,
       })),
     }
@@ -971,6 +978,24 @@ describe('listOrders — por entregar', () => {
     const estado = await estadoDe('POR_ACONDICIONAR', [{ presentationId: VASO, packages: 3, packedPackages: 2 }])
 
     expect(estado).toEqual({ kind: 'pending', items: [{ label: 'Vaso', quantity: 2 }] })
+  })
+
+  it('R12: los envases libres no cuentan como pendientes: 12 reales con 2 libres esperan 10', async () => {
+    const estado = await estadoDe('TERMINADO', [
+      { presentationId: GALON, packages: 5, packedPackages: 12, packedSurplusPackages: 2, deliveredPackages: 3 },
+      { presentationId: VASO, packages: 1, packedPackages: 0 },
+    ])
+
+    expect(estado).toEqual({ kind: 'pending', items: [{ label: 'Galón', quantity: 7 }] })
+  })
+
+  it('R12: entregados los 10 que espera el pedido, es entregado aunque los 2 libres sigan sin entregar', async () => {
+    const estado = await estadoDe('TERMINADO', [
+      { presentationId: GALON, packages: 5, packedPackages: 12, packedSurplusPackages: 2, deliveredPackages: 10 },
+      { presentationId: VASO, packages: 1, packedPackages: 0 },
+    ])
+
+    expect(estado).toEqual({ kind: 'delivered' })
   })
 
   it('un pedido que empaco cero envases no tiene nada empacado', async () => {

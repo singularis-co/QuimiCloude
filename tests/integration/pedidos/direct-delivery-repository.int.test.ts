@@ -18,6 +18,7 @@ import {
   createWaitingOrdersReader,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma'
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma'
+import { surplusPackages, waitingOrders } from '@/lib/modules/pedidos/domain/direct-delivery'
 import { formatOrderNumber } from '@/lib/modules/pedidos/domain/order-number'
 import { prisma } from '@/lib/shared/db/prisma'
 
@@ -160,6 +161,7 @@ type OrderSeed = {
     readonly presentationId: string
     readonly packages: number
     readonly packedPackages?: number
+    readonly packedSurplusPackages?: number
   }[]
 }
 
@@ -198,7 +200,8 @@ async function createOrder(
         presentationId: line.presentationId,
         packages: line.packages,
         packedPackages: line.packedPackages ?? null,
-        packedReason: counted ? 'merma' : null,
+        packedReason: counted ? ((line.packedPackages ?? 0) > line.packages ? 'conteo_fisico' : 'merma') : null,
+        packedSurplusPackages: line.packedSurplusPackages ?? 0,
       },
       select: { id: true },
     })
@@ -493,6 +496,55 @@ describe('WaitingOrdersReader contra Postgres real', () => {
           presentationId: a.presentationId,
         },
       ])
+    })
+  })
+
+  it('R16, R17: un TERMINADO de 10 con 12 reales y 2 libres espera 10, y con sus 12 envases en el lote el excedente es 2', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const pedido = await createOrder(tx, a, {
+        lines: [{ presentationId: a.presentationId, packages: 10, packedPackages: 12, packedSurplusPackages: 2 }],
+      })
+
+      const filas = await createWaitingOrdersReader(tx).listWaitingLines(
+        [{ recipeId: a.recipeId, presentationId: a.presentationId }],
+        { companyId: a.companyId },
+      )
+
+      expect(filas).toEqual([
+        {
+          orderId: pedido.orderId,
+          numberText: formatOrderNumber({ year: ANIO, sequence: pedido.sequence }),
+          orderedPackages: 10,
+          deliveredPackages: 0,
+          recipeId: a.recipeId,
+          presentationId: a.presentationId,
+        },
+      ])
+      // El lote guarda los 12 reales, libres incluidos; nada entregado y sin otros lotes.
+      expect(surplusPackages(12, waitingOrders(filas))).toBe(2)
+    })
+  })
+
+  it('R16, R17: los libres de un pedido cubren lo que espera otro TERMINADO de la misma receta y presentacion', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const conLibres = await createOrder(tx, a, {
+        lines: [{ presentationId: a.presentationId, packages: 10, packedPackages: 12, packedSurplusPackages: 2 }],
+      })
+      const otro = await createOrder(tx, a, { lines: [{ presentationId: a.presentationId, packages: 2 }] })
+
+      const filas = await createWaitingOrdersReader(tx).listWaitingLines(
+        [{ recipeId: a.recipeId, presentationId: a.presentationId }],
+        { companyId: a.companyId },
+      )
+
+      expect(filas.map((f) => [f.orderId, f.orderedPackages, f.deliveredPackages])).toEqual([
+        [conLibres.orderId, 10, 0],
+        [otro.orderId, 2, 0],
+      ])
+      // Los 12 del lote: 10 para el primero y los 2 libres para el segundo; no queda excedente.
+      expect(surplusPackages(12, waitingOrders(filas))).toBe(0)
     })
   })
 

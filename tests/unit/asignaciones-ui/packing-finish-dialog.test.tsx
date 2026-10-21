@@ -16,6 +16,7 @@ import {
   PACKING_FINISH_REASON_FOLD_TESTID,
   PACKING_FINISH_REASON_OPTION_TESTID,
   PACKING_FINISH_REASON_TESTID,
+  PACKING_FINISH_SURPLUS_TESTID,
   PACKING_FINISH_TOTAL_TESTID,
   PackingFinishDialog,
   type PackingFinishDialogProps,
@@ -27,6 +28,7 @@ import {
 } from '@/components/shared/entity-image';
 import { STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
+import { packingSurplusByLine } from '@/lib/modules/pedidos';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
@@ -409,32 +411,257 @@ describe('diálogo — conteo no válido', () => {
   });
 });
 
-describe('diálogo — tope de la cantidad del pedido', () => {
-  it('R8: Galón 16 supera 72 L → error con total y máximo, insignia en error, pie y Terminar deshabilitado', async () => {
-    const { user, onConfirm } = pintar();
+describe('diálogo — con excedente sobre el pedido', () => {
+  const aviso = () => screen.queryByTestId(PACKING_FINISH_SURPLUS_TESTID);
+  const totalEnvasado = () =>
+    screen.getByTestId(PACKING_FINISH_TOTAL_TESTID).querySelector('.font-semibold') as HTMLElement;
+
+  it('R19, R24: Galón 16 supera 72 L → sin error de línea, insignia normal, total sin tono de error y Terminar activo', async () => {
+    const { user } = pintar();
 
     await contar(user, galon(), '16');
 
-    expect(within(galon()).getByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toHaveTextContent(
-      'Supera la cantidad del pedido: con 16 envases se envasan 75.48 L de 72 L. Máximo en esta línea: 15.',
-    );
-    expect(within(galon()).getByTestId(PACKING_FINISH_BADGE_TESTID)).toHaveAttribute('data-tone', 'danger');
-    expect(within(galon()).queryByTestId(PACKING_FINISH_HELP_TESTID)).toBeNull();
+    expect(within(galon()).queryByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toBeNull();
+    expect(screen.queryByText(/Supera la cantidad del pedido/)).toBeNull();
+    expect(within(galon()).getByTestId(PACKING_FINISH_COUNT_TESTID)).not.toHaveAttribute('aria-invalid');
+    expect(within(galon()).getByTestId(PACKING_FINISH_BADGE_TESTID)).toHaveAttribute('data-tone', 'waiting');
     expect(screen.getByTestId(PACKING_FINISH_TOTAL_TESTID)).toHaveTextContent('Envasado: 75.48 L de 72 L');
-    expect(pie()).toBe('Corrige las líneas marcadas para poder terminar.');
-    expect(terminar()).toBeDisabled();
-
-    await user.click(terminar());
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect(totalEnvasado()).toHaveTextContent('75.48 L');
+    expect(totalEnvasado()).not.toHaveClass('text-destructive');
+    expect(pie()).toBe('');
+    expect(terminar()).toBeEnabled();
   });
 
-  it('R8: igual o por debajo de la cantidad no hay error de tope', async () => {
+  it('R19: con excedente y motivos, Terminar envía el conteo real', async () => {
+    const { user, onConfirm } = pintar();
+
+    await contar(user, galon(), '16');
+    await elegirMotivo(user, galon(), 'Conteo físico');
+    await contar(user, botella(), '17');
+    await elegirMotivo(user, botella(), 'Error de carga');
+    await user.click(terminar());
+
+    expect(onConfirm).toHaveBeenCalledWith([
+      { lineId: 'linea-galon', packedPackages: 16, reason: 'conteo_fisico', reasonOther: null },
+      { lineId: 'linea-botella', packedPackages: 17, reason: 'error_de_carga', reasonOther: null },
+    ]);
+  });
+
+  it('R20: estado del tablero (Galón 16, Botella 17) → un aviso informativo encima del pie con lo que sobra y los libres', async () => {
     const { user } = pintar();
 
+    await contar(user, galon(), '16');
+    await contar(user, botella(), '17');
+
+    const notice = screen.getByTestId(PACKING_FINISH_SURPLUS_TESTID);
+    expect(screen.getAllByTestId(PACKING_FINISH_SURPLUS_TESTID)).toHaveLength(1);
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice).toHaveAttribute('data-tone', 'info');
+    expect(within(notice).getByText('Sobran 5.48 L sobre el pedido.')).toBeInTheDocument();
+    expect(
+      within(notice).getByText('Quedan libres en stock: 1 envase de Galón 3,78 L, 1 envase de Botella 1 L.'),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId(PACKING_FINISH_TOTAL_TESTID)).toHaveTextContent('Envasado: 77.48 L de 72 L');
+    // Encima del pie: antes del total en el orden del documento.
+    expect(
+      notice.compareDocumentPosition(screen.getByTestId(PACKING_FINISH_TOTAL_TESTID)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(terminar()).toBeEnabled();
+  });
+
+  it('R20, R7: con la línea de menor contenido antes en el reparto, el aviso lista de mayor a menor contenido', async () => {
+    const botellaPrimero: Finish = { ...FINISH, lines: [...FINISH.lines].reverse() };
+    const { user } = pintar({ finish: botellaPrimero });
+
+    await contar(user, galon(), '16');
+    await contar(user, botella(), '17');
+
+    expect(screen.getAllByTestId(PACKING_FINISH_LINE_TESTID).map((fila) => fila.getAttribute('data-line-id'))).toEqual([
+      'linea-botella',
+      'linea-galon',
+    ]);
+    expect(aviso()).toHaveTextContent(
+      'Quedan libres en stock: 1 envase de Galón 3,78 L, 1 envase de Botella 1 L.',
+    );
+  });
+
+  it('R20, R7: a igual contenido el aviso conserva el orden del reparto', async () => {
+    const botella1L = (lineId: string, label: string) => ({
+      lineId,
+      label,
+      plan: 36,
+      content: '1',
+      unit: LITRO,
+      packaging: { productId: `envase-${lineId}`, name: label, freePackages: 6 },
+    });
+    // Ni alfabético ni por número de libres: la Z va primero en el reparto y deja menos.
+    const igualContenido: Finish = {
+      ...FINISH,
+      lines: [botella1L('linea-z', 'Botella Z 1 L'), botella1L('linea-a', 'Botella A 1 L')],
+    };
+    const { user } = pintar({ finish: igualContenido });
+
+    // 37 + 39 = 76 L: sobran 4 L; la Z suelta su envase de más y la A los 3 restantes.
+    await contar(user, linea('linea-z'), '37');
+    await contar(user, linea('linea-a'), '39');
+
+    expect(aviso()).toHaveTextContent('Sobran 4 L sobre el pedido.');
+    expect(aviso()).toHaveTextContent(
+      'Quedan libres en stock: 1 envase de Botella Z 1 L, 3 envases de Botella A 1 L.',
+    );
+  });
+
+  it('R20: varios envases libres de una presentación van en plural', async () => {
+    const holgado: Finish = {
+      ...FINISH,
+      lines: FINISH.lines.map((line) => ({
+        ...line,
+        packaging: line.packaging === null ? null : { ...line.packaging, freePackages: 20 },
+      })),
+    };
+    const { user } = pintar({ finish: holgado });
+
+    // 14 × 3,78 + 22 × 1 = 74,92 L: sobran 2,92 L, caben 2 botellas enteras.
+    await contar(user, botella(), '22');
+
+    expect(aviso()).toHaveTextContent('Sobran 2.92 L sobre el pedido.');
+    expect(aviso()).toHaveTextContent('Quedan libres en stock: 2 envases de Botella 1 L.');
+  });
+
+  it('R20: si lo que sobra no llega a un envase entero, lo dice y no promete libres', async () => {
+    const { user } = pintar();
+
+    // 15 × 3,78 + 16 × 1 = 72,70 L: sobran 0,70 L, menos que una botella.
+    await contar(user, galon(), '15');
+    await contar(user, botella(), '16');
+
+    expect(aviso()).toHaveTextContent('Sobran 0.7 L sobre el pedido.');
+    expect(aviso()).toHaveTextContent(
+      'Ningún envase queda libre: lo que sobra no llega a un envase entero y sigue en el pedido.',
+    );
+  });
+
+  it('R20: con una línea con error de conteo no hay aviso aunque el resto supere el pedido', async () => {
+    const { user } = pintar();
+
+    await contar(user, galon(), '20');
+    expect(aviso()).not.toBeNull();
+    await contar(user, botella(), '');
+
+    expect(within(botella()).getByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toBeInTheDocument();
+    expect(aviso()).toBeNull();
+  });
+
+  it('R21: igual o por debajo de la cantidad no hay aviso ni error', async () => {
+    const { user } = pintar();
+
+    expect(aviso()).toBeNull();
     await contar(user, galon(), '15');
 
     expect(within(galon()).queryByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toBeNull();
     expect(screen.getByTestId(PACKING_FINISH_TOTAL_TESTID)).toHaveTextContent('Envasado: 71.7 L de 72 L');
+    expect(aviso()).toBeNull();
+  });
+
+  it('R21: al volver por debajo de la cantidad el aviso desaparece', async () => {
+    const { user } = pintar();
+
+    await contar(user, galon(), '16');
+    expect(aviso()).not.toBeNull();
+    await contar(user, galon(), '14');
+
+    expect(aviso()).toBeNull();
+  });
+
+  it.each([
+    ['Galón 16, Botella 17', '16', '17'],
+    ['Galón 18, Botella 15', '18', '15'],
+    ['Galón 15, Botella 17', '15', '17'],
+  ])('R22: %s → los libres del aviso son los de packingSurplusByLine', async (_caso, galones, botellas) => {
+    const { user } = pintar();
+
+    await contar(user, galon(), galones);
+    await contar(user, botella(), botellas);
+
+    const surplus = packingSurplusByLine(
+      FINISH.orderQuantity,
+      FINISH.orderUnit,
+      FINISH.lines.map((line) => ({
+        lineId: line.lineId,
+        presentationId: line.lineId,
+        packedPackages: Number(line.lineId === 'linea-galon' ? galones : botellas),
+        content: line.content,
+        unit: line.unit,
+        plan: line.plan,
+      })),
+    );
+    expect(surplus.kind).toBe('ok');
+    if (surplus.kind !== 'ok') return;
+    const libres = FINISH.lines
+      .map((line) => ({ name: line.label, packages: surplus.byLine.get(line.lineId) ?? 0 }))
+      .filter((item) => item.packages > 0)
+      .map((item) => T.freePackages(item.packages, item.name));
+    expect(libres.length).toBeGreaterThan(0);
+    expect(aviso()).toHaveTextContent(T.surplusFree(libres));
+  });
+
+  it('R23: con excedente el stock del envase sigue bloqueando y sin aviso', async () => {
+    const { user, onConfirm } = pintar();
+
+    // 16 × 3,78 + 19 × 1 = 79,48 L; Botella pide 4 vacías y quedan 2.
+    await contar(user, galon(), '16');
+    await contar(user, botella(), '19');
+
+    expect(within(botella()).getByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toHaveTextContent(
+      'No alcanza el stock del envase: hacen falta 4 envases vacíos de Botella 1 L y quedan 2 libres.',
+    );
+    expect(within(botella()).getByTestId(PACKING_FINISH_BADGE_TESTID)).toHaveAttribute('data-tone', 'danger');
+    expect(aviso()).toBeNull();
+    expect(pie()).toBe('Corrige las líneas marcadas para poder terminar.');
+    expect(terminar()).toBeDisabled();
+    await user.click(terminar());
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('R23: con excedente siguen los motivos de «más», el motivo obligatorio y la ayuda de envases vacíos', async () => {
+    const { user, onConfirm } = pintar();
+
+    await contar(user, galon(), '16');
+    expect(within(galon()).getByTestId(PACKING_FINISH_HELP_TESTID)).toHaveTextContent(
+      'Salen 2 envases vacíos del stock libre (quedan 6).',
+    );
+    expect(within(galon()).getByText(T.increaseHint)).toBeInTheDocument();
+    await user.click(terminar());
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(within(galon()).getByTestId(PACKING_FINISH_REASON_ERROR_TESTID)).toHaveTextContent('Elige un motivo.');
+    expect(pie()).toBe('Falta el motivo en las líneas que no coinciden con el plan.');
+    expect(aviso()).not.toBeNull();
+    expect(await opcionesDeMotivo(user, galon())).toEqual(['Conteo físico', 'Error de carga', 'Otro']);
+  });
+
+  it('R23: con excedente un conteo vacío sigue siendo error y deshabilita Terminar', async () => {
+    const { user } = pintar();
+
+    await contar(user, galon(), '20');
+    await contar(user, botella(), '');
+
+    expect(within(botella()).getByTestId(PACKING_FINISH_LINE_ERROR_TESTID)).toHaveTextContent(
+      'Escribe un número entero: 0 o más.',
+    );
+    expect(pie()).toBe('Corrige las líneas marcadas para poder terminar.');
+    expect(terminar()).toBeDisabled();
+  });
+
+  it('R24: el pie dice siempre «Envasado: total de cantidad», también por encima', async () => {
+    const { user } = pintar();
+
+    await contar(user, galon(), '20');
+
+    // 20 × 3,78 + 15 = 90,60 L
+    expect(screen.getByTestId(PACKING_FINISH_TOTAL_TESTID)).toHaveTextContent('Envasado: 90.6 L de 72 L');
+    expect(totalEnvasado()).not.toHaveClass('text-destructive');
   });
 });
 
@@ -537,9 +764,14 @@ describe('diálogo — cancelar', () => {
 });
 
 describe('diálogo — textos del tablero', () => {
-  it('R1–R10: los textos con plantilla dicen lo del tablero', () => {
-    expect(T.exceeds(16, '75,48 L', '72,00 L', 15)).toBe(
-      'Supera la cantidad del pedido: con 16 envases se envasan 75,48 L de 72,00 L. Máximo en esta línea: 15.',
+  it('R1–R10, R19, R20: los textos con plantilla dicen lo del tablero', () => {
+    expect(T).not.toHaveProperty('exceeds');
+    expect(T.surplus('5,48 L')).toBe('Sobran 5,48 L sobre el pedido.');
+    expect(T.surplusFree([T.freePackages(1, 'Galón 3,78 L'), T.freePackages(2, 'Botella 1 L')])).toBe(
+      'Quedan libres en stock: 1 envase de Galón 3,78 L, 2 envases de Botella 1 L.',
+    );
+    expect(T.surplusNoneFree).toBe(
+      'Ningún envase queda libre: lo que sobra no llega a un envase entero y sigue en el pedido.',
     );
     expect(T.stock(4, 'Botella 1 L', 2)).toBe(
       'No alcanza el stock del envase: hacen falta 4 envases vacíos de Botella 1 L y quedan 2 libres.',

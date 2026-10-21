@@ -21,7 +21,6 @@ import {
   OrderPackingTakenError,
   OrderWithoutUnitError,
   PackagingStockInsufficientError,
-  PackedExceedsQuantityError,
   PresentationWithoutContentError,
   RecipeNotFoundError,
   ValidationError,
@@ -136,7 +135,6 @@ function finishPackingError(outcome: ExecutionWriteOutcome): AsignacionesError {
   if (outcome === 'order_without_unit') return new OrderWithoutUnitError();
   if (outcome === 'insufficient_material') return new MaterialShortageError();
   if (outcome === 'invalid_packing_count') return new ValidationError('invalid_packing_count');
-  if (outcome === 'packed_exceeds_quantity') return new PackedExceedsQuantityError();
   if (outcome === 'packaging_stock_insufficient') return new PackagingStockInsufficientError();
   return new OrderNotFoundError();
 }

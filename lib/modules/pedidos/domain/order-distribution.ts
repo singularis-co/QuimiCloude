@@ -60,6 +60,15 @@ export function sameDecimal(a: string, b: string): boolean {
   return rescale(left, scale) === rescale(right, scale);
 }
 
+export function compareDecimals(a: string, b: string): -1 | 0 | 1 {
+  const left = parseDecimal(a);
+  const right = parseDecimal(b);
+  const scale = Math.max(left.scale, right.scale);
+  const difference = rescale(left, scale) - rescale(right, scale);
+  if (difference === BigInt(0)) return 0;
+  return difference < BigInt(0) ? -1 : 1;
+}
+
 function addDecimals(a: Scaled, b: Scaled): Scaled {
   const scale = Math.max(a.scale, b.scale);
   return { unscaled: rescale(a, scale) + rescale(b, scale), scale };

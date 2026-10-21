@@ -848,7 +848,9 @@ model OrderPresentationLine {
   packedReason      String? @map("packed_reason")
   /// Texto del motivo `otro`, ya recortado.
   packedReasonOther String? @map("packed_reason_other")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Envases del conteo real que el pedido no espera: quedan libres en el lote. 0 sin excedente.
+  packedSurplusPackages Int @default(0) @map("packed_surplus_packages")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)

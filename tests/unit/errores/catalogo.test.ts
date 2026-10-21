@@ -83,8 +83,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
       // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
       // `company_name_mismatch` y `company_not_deleted`.
-      // QC-281 2026-10-14: 101 y no 99: entran `packed_exceeds_quantity` y
-      // `packaging_stock_insufficient`.
+      // 2026-10-14: 101 y no 99: entran dos errores de Terminar el empaque.
       // 2026-10-16: 102 y no 101: entra `company_last_administrator`.
       // QC-288 2026-10-19 (merge de dev): 103 y no 102: entra también `delivery_exceeds_surplus`.
       // 2026-10-19: 106 y no 103: entran `customer_phone_country_required`,
@@ -94,7 +93,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-239 2026-10-20: 107 y no 108: sale `customer_duplicate_phone`.
       // QC-242 2026-10-20: 112 y no 106: entran los seis codigos de plantillas y de Meta de WhatsApp.
       // Merge de dev en QC-239 (2026-10-20): 113 = 106 + 2 de contactos - 1 retirado + 6 de plantillas.
-      expect(ERROR_CODES).toHaveLength(113)
+      // Merge de dev en QC-290 (2026-10-20): 112 = 113 - 1, sale el error de lo envasado por
+      // encima de la cantidad del pedido, que Terminar ya no produce.
+      expect(ERROR_CODES).toHaveLength(112)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
