@@ -638,3 +638,56 @@ Abierto para el reviewer:
 - La forma del `GET` sigue siendo [P4]: no está documentado si Meta reformatea `phone_number`.
 
 Veredicto: T22–T40 implementadas; R53–R96 mapeados (los reemplazados remiten a su sustituto).
+
+## Review enmienda, vuelta 1 (backend_dev, 2026-10-20): B1 y m3
+
+m1 (carrera renombrar/relacionar) no se arregla: queda como deuda, por decisión del leader. m2 es de
+`design.md`, que corrige el spec_author.
+
+**B1.** El relleno (paso 6 de `20261020180000_whatsapp_variable_keys/migration.sql`) es ahora el SQL de
+`design.md §18.3`, tal cual: componentes de solo HEADER, BODY, FOOTER o BUTTONS, un BODY, un HEADER
+(si lo hay) con `format = TEXT` y botones de los tres tipos, con negaciones `!(… == …)`. Se ha
+corregido el comentario: ya no dice que solo falle con componentes repetidos.
+
+Sonda contra Postgres 16.1 local:
+- `!(@.format == "TEXT")` ya marca el HEADER sin `format` (`true`). El `!(exists (@.format))` aparte
+  también da `true`: es redundante pero inocuo.
+- El `@.format != "TEXT"` anterior daba `false`, que era el fallo.
+- `!(@.type == … || …)` marca un componente sin `type` (`true`).
+
+§18.3 funciona tal cual.
+
+En el `.int` de la migración, `R86 R95` gana cinco casos:
+- `completa_editable` (HEADER TEXT + BODY + FOOTER + QUICK_REPLY) ⇒ MAPPED y habilitada;
+- `carousel`, `oferta_limitada` (LIMITED_TIME_OFFER), `header_sin_format` y `componente_sin_type` ⇒
+  UNMAPPED y deshabilitadas.
+
+En la base local, migrate, foto del catálogo, `db:rollback`, foto y `db:migrate` dan la misma foto
+antes y después: 32 columnas, 11 índices, 22 restricciones, RLS y enum, comparados con `cmp`. La base
+local tiene 0 plantillas.
+
+**m3.** `toBinding` (ahora exportada) lanza si una fila no tiene ni constante ni variable propia, en
+lugar de devolver `variableKeyId: ''`.
+
+Archivos:
+- `db/migrations/20261020180000_whatsapp_variable_keys/migration.sql`
+- `lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma.ts`
+- `tests/integration/integraciones/whatsapp-variable-keys-migration.int.test.ts`
+- `tests/unit/integraciones/whatsapp/templates/whatsapp-template-prisma-binding.test.ts` (nuevo)
+
+Mapa:
+- R86, R95, P16 → `whatsapp-variable-keys-migration.int > R86 R95` (casos nuevos).
+- R93 → `whatsapp-template-prisma-binding.test.ts` (3 casos, incluida la fila sin destino).
+
+Salida:
+```
+vitest --project integration whatsapp-variable-keys-migration.int  -> 1 file, 6 passed
+vitest --project integration whatsapp-template-flow.int            -> 1 file, 8 passed
+vitest --project integration whatsapp-template-prisma.int          -> 1 file, 35 passed
+vitest whatsapp-template-prisma-binding + -prisma-errors + module-shape -> 3 files, 116 passed | 1 skipped
+pnpm typecheck                                                     -> tsc --noEmit sin errores
+pnpm lint                                                          -> 0 errors, 10 warnings (ajenos)
+pnpm test:guardias                                                 -> 85 files, 1197 passed | 21 skipped
+```
+
+Veredicto: B1 y m3 cerrados; el relleno ya no habilita plantillas no relacionables.

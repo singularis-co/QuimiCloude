@@ -71,14 +71,20 @@ ALTER TABLE "whatsapp_template_variables" ADD CONSTRAINT "whatsapp_template_vari
   ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- 6. Relleno: las existentes quedan sin relaciones. Las vivas sin variables y con contenido que la
---    app sabe editar nacen relacionadas y habilitadas. Aproxima `contentOf`: no detecta componentes
---    repetidos.
+--    app sabe editar nacen relacionadas y habilitadas: todos los componentes son HEADER, BODY, FOOTER
+--    o BUTTONS, hay un BODY, el HEADER (si esta) es de texto y los botones son de los tres tipos
+--    conocidos. Las negaciones van como `!(... == ...)`: en jsonpath, `!=` sobre una clave ausente no
+--    es verdadero y dejaria pasar un componente sin `type` o un HEADER sin `format`. No replica de
+--    `contentOf` los componentes repetidos ni la forma interna de cada componente.
 UPDATE "whatsapp_templates" SET "mapping_status" = 'MAPPED', "enabled" = true
 WHERE "deleted_at" IS NULL
   AND position('{{' in "components"::text) = 0
+  AND jsonb_typeof("components") = 'array'
   AND jsonb_path_exists("components", '$[*] ? (@.type == "BODY")')
-  AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && @.format != "TEXT")')
-  AND NOT jsonb_path_exists("components", '$[*].buttons[*] ? (@.type != "QUICK_REPLY" && @.type != "URL" && @.type != "PHONE_NUMBER")');
+  AND NOT jsonb_path_exists("components", '$[*] ? (!(@.type == "HEADER" || @.type == "BODY" || @.type == "FOOTER" || @.type == "BUTTONS"))')
+  AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && !(@.format == "TEXT"))')
+  AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && !(exists (@.format)))')
+  AND NOT jsonb_path_exists("components", '$[*].buttons[*] ? (!(@.type == "QUICK_REPLY" || @.type == "URL" || @.type == "PHONE_NUMBER"))');
 
 -- 7. RLS activada y forzada, sin policies, al final.
 ALTER TABLE "whatsapp_variable_keys" ENABLE ROW LEVEL SECURITY;

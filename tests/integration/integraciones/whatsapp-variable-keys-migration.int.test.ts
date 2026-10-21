@@ -299,6 +299,20 @@ describe('migracion whatsapp_variable_keys contra Postgres real', () => {
           mapped: false,
         },
         { name: 'eliminada', components: [body], deleted: true, mapped: false },
+        {
+          name: 'completa_editable',
+          components: [
+            { type: 'HEADER', format: 'TEXT', text: 'Aviso' },
+            body,
+            { type: 'FOOTER', text: 'Pie' },
+            { type: 'BUTTONS', buttons: [{ type: 'QUICK_REPLY', text: 'Si' }] },
+          ],
+          mapped: true,
+        },
+        { name: 'carousel', components: [body, { type: 'CAROUSEL', cards: [] }], mapped: false },
+        { name: 'oferta_limitada', components: [body, { type: 'LIMITED_TIME_OFFER', limited_time_offer: {} }], mapped: false },
+        { name: 'header_sin_format', components: [{ type: 'HEADER', text: 'Aviso' }, body], mapped: false },
+        { name: 'componente_sin_type', components: [body, { text: 'suelto' }], mapped: false },
       ]
       for (const caso of casos) {
         await insertTemplate(tx, ids, caso.name, caso.components, caso.deleted ?? false)

@@ -92,11 +92,15 @@ const VARIABLE_SELECT = {
 
 type VariableRow = Prisma.WhatsappTemplateVariableGetPayload<{ select: typeof VARIABLE_SELECT }>;
 
-// El CHECK de la tabla garantiza la forma del hueco y que hay exactamente un destino.
-function toBinding(row: VariableRow): TemplateVariableBinding {
+// El CHECK de la tabla garantiza la forma del hueco y que hay exactamente un destino. Si aun asi
+// llega una fila sin destino, se falla: inventarle uno mostraria un hueco ligado a nada.
+export function toBinding(row: VariableRow): TemplateVariableBinding {
   const slot = row.slot as TemplateSlot;
   if (row.systemKey !== null) return { slot, kind: 'system', systemKey: row.systemKey };
-  return { slot, kind: 'company', variableKeyId: row.variableKeyId ?? '' };
+  if (row.variableKeyId === null) {
+    throw new Error(`la relacion del hueco ${row.slot} de la plantilla ${row.templateId} no tiene destino`);
+  }
+  return { slot, kind: 'company', variableKeyId: row.variableKeyId };
 }
 
 function relationData(columns: { readonly companyId: string }, templateId: string, binding: TemplateVariableBinding) {
