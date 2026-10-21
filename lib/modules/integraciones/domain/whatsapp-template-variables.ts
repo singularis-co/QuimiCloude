@@ -1,5 +1,4 @@
-import { sameComponents } from './template-sync-plan';
-import { contentOf } from './whatsapp-template-components';
+import { contentOf, sameComponents } from './whatsapp-template-components';
 import type { WhatsappTemplateButton, WhatsappTemplateContent } from './whatsapp-template-draft';
 
 export type TemplateSlot = 'header' | `body.${number}` | `button.${number}`;

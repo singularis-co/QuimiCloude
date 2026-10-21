@@ -551,3 +551,12 @@ Salidas (un comando por llamada):
 - `vitest run guard` → 85 files, 1172 passed, 21 skipped.
 - `--project integration whatsapp-template-migration.int` → 6/6; `whatsapp-variable-keys-migration.int` → 6/6 (aplica, revierte, reaplica con el mismo esquema).
 - Rojo conocido hasta T34: `module-shape.test.ts` (lista de archivos y número de modelos).
+
+### Tanda E2 — T26–T29 (backend_dev), 2026-10-20
+
+- Ciclo de imports: `canonical` y `sameComponents` se mueven a `domain/whatsapp-template-components.ts`; plan y variables importan de ahí (sin cambio de comportamiento).
+- Nuevos: `ports/whatsapp-variable-key-repository.ts` (6 métodos, sin `countSystemKeyUsage`), `adapters/driven/persistence/whatsapp-variable-key-prisma.ts`, `tests/integration/integraciones/whatsapp-variable-key-prisma.int.test.ts`.
+- Modificados: `template-sync-plan.ts`, `whatsapp-template.ts` (record y vista), `whatsapp-template-components.ts`, `whatsapp-template-variables.ts`, `ports/whatsapp-template-repository.ts`, `company-scope.ts` (+2 envolturas), `whatsapp-template-prisma.ts`, `lib/composition/index.ts` (para compilar), ajuste mínimo en `create-whatsapp-template.ts` y `list-whatsapp-templates.ts` (lo sustituyen T31/T33); tests: `whatsapp-doubles.ts`, `template-sync-plan.test.ts`, `whatsapp-template-prisma.int.test.ts`, `aislamiento.json`, `guard-ambito-empresa-integraciones.test.ts`, `create-`/`list-whatsapp-templates.test.ts`, `whatsapp-template-actions.test.ts`, `whatsapp-connection-prisma.int.test.ts`.
+- Decisión anotada: las lecturas no hacen la «tercera consulta» de §18.8 (claves de propias por `id in`): el binding `company` solo lleva `variableKeyId`; la clave la pone la vista con `listAll` una vez por llamada (§18.7, T33).
+
+Salidas: typecheck limpio; lint 0 errores (10 warnings ajenos); plan 31/31; `vitest run tests/unit/integraciones/whatsapp` 37 files 760/760; `tests/unit/composition` 80/80; guard 85 files 1197 passed 21 skipped; `.int` uno por llamada: template-prisma 35/35, variable-key-prisma 19/19, connection-prisma 16/16, template-flow 7/7. Rojo conocido hasta T34: `module-shape` (2).

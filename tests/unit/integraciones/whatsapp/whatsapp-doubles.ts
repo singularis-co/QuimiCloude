@@ -5,7 +5,11 @@
 import { vi } from 'vitest'
 
 import type { Actor } from '@/lib/modules/integraciones/domain/actor'
-import { SecretUnreadableError, WhatsappTemplateNameTakenError } from '@/lib/modules/integraciones/domain/errors'
+import {
+  SecretUnreadableError,
+  WhatsappTemplateNameTakenError,
+  WhatsappVariableKeyTakenError,
+} from '@/lib/modules/integraciones/domain/errors'
 import type { IntegracionesScope } from '@/lib/modules/integraciones/domain/integraciones-scope'
 import type { SecretContext } from '@/lib/modules/integraciones/domain/secret-context'
 import type { TemplateSyncPlan } from '@/lib/modules/integraciones/domain/template-sync-plan'
@@ -14,6 +18,8 @@ import type {
   TemplateWebhookUpdate,
   WhatsappTemplateRecord,
 } from '@/lib/modules/integraciones/domain/whatsapp-template'
+import { sameComponents } from '@/lib/modules/integraciones/domain/whatsapp-template-components'
+import type { WhatsappVariableKeyRecord } from '@/lib/modules/integraciones/domain/whatsapp-variable-key'
 import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch'
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source'
 import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-cipher'
@@ -29,6 +35,7 @@ import type {
   TemplateSyncRow,
   WhatsappTemplateRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
+import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory'
 
 export const COMPANY_ID = '00000000-0000-4000-8000-0000000000aa'
@@ -263,6 +270,9 @@ export function storedTemplate(overrides: Partial<WhatsappTemplateRecord> = {}):
     createdById: ACTOR_ID,
     createdAt: new Date('2026-10-01T00:00:00.000Z'),
     deletedAt: null,
+    mappingStatus: 'MAPPED',
+    enabled: true,
+    variables: [],
     ...overrides,
   }
 }
@@ -293,6 +303,8 @@ function toSyncRow(row: WhatsappTemplateRecord): TemplateSyncRow {
     rejectedReason: row.rejectedReason,
     components: row.components,
     deletedAt: row.deletedAt,
+    mappingStatus: row.mappingStatus,
+    enabled: row.enabled,
   }
 }
 
@@ -304,7 +316,7 @@ function insertCreatedInto(
   row: NewCreatedTemplateRow,
   connectionId: string,
   scope: IntegracionesScope,
-): WhatsappTemplateRecord {
+): { record: WhatsappTemplateRecord; inserted: boolean } {
   const existing = [...rows.values()].find(
     (candidate) => candidate.connectionId === connectionId && candidate.metaTemplateId === row.metaTemplateId,
   )
@@ -312,7 +324,7 @@ function insertCreatedInto(
     if (!ofScope(existing, scope)) throw new Error('doble: la conexion no es de la empresa del ambito')
     const kept = { ...existing, createdById: existing.createdById ?? row.createdById }
     rows.set(kept.id, kept)
-    return { ...kept }
+    return { record: { ...kept }, inserted: false }
   }
   const taken = [...rows.values()].some(
     (candidate) =>
@@ -338,9 +350,18 @@ function insertCreatedInto(
     createdById: row.createdById,
     createdAt: now(),
     deletedAt: null,
+    mappingStatus: row.mappingStatus,
+    enabled: row.enabled,
+    variables: row.variables,
   }
   rows.set(record.id, record)
-  return { ...record }
+  return { record: { ...record }, inserted: true }
+}
+
+/** Como el adaptador: solo escribe si sigue viva y con los componentes leidos. */
+function isUnchanged(rows: TemplateRows, id: string, expectedComponents: unknown, scope: IntegracionesScope): boolean {
+  const row = rows.get(id)
+  return row !== undefined && isLive(row, scope) && sameComponents(row.components, expectedComponents)
 }
 
 /** Mismo orden que el adaptador: borrados (no los creados desde `startedAt`), cambios, altas. */
@@ -357,14 +378,21 @@ function applySyncTo(
     const row = rows.get(id)
     if (row === undefined || !isLive(row, scope) || row.connectionId !== connectionId) continue
     if (row.createdAt.getTime() >= startedAt.getTime()) continue
-    rows.set(id, { ...row, deletedAt: at, lastSyncedAt: at })
+    rows.set(id, { ...row, deletedAt: at, lastSyncedAt: at, enabled: false, variables: [] })
   }
-  for (const { id, template, changed } of plan.updates) {
-    const row = rows.get(id)
+  for (const update of plan.updates) {
+    const row = rows.get(update.id)
     if (row === undefined || !ofScope(row, scope) || row.connectionId !== connectionId) continue
-    rows.set(id, changed ? { ...row, ...template, deletedAt: null, lastSyncedAt: at } : { ...row, lastSyncedAt: at })
+    if (!update.changed && !update.resetVariables) {
+      rows.set(update.id, { ...row, lastSyncedAt: at })
+      continue
+    }
+    const reset = update.resetVariables
+      ? { mappingStatus: update.mappingStatusAfterReset, enabled: update.enabledAfterReset, variables: [] }
+      : {}
+    rows.set(update.id, { ...row, ...update.template, ...reset, deletedAt: null, lastSyncedAt: at })
   }
-  for (const template of plan.inserts) {
+  for (const { template, mappingStatus, enabled } of plan.inserts) {
     const id = newId()
     rows.set(id, {
       id,
@@ -375,6 +403,9 @@ function applySyncTo(
       createdById: null,
       createdAt: at,
       deletedAt: null,
+      mappingStatus,
+      enabled,
+      variables: [],
     })
   }
 }
@@ -451,7 +482,21 @@ export function makeTemplateRepository(initial: WhatsappTemplateRecord[] = [], n
   const markDeleted = vi.fn<WhatsappTemplateRepository['markDeleted']>(async (id, at, scope) => {
     const row = rows.get(id)
     if (row === undefined || !isLive(row, scope)) return false
-    rows.set(id, { ...row, deletedAt: at })
+    rows.set(id, { ...row, deletedAt: at, enabled: false, variables: [] })
+    return true
+  })
+  const replaceVariables = vi.fn<WhatsappTemplateRepository['replaceVariables']>(
+    async (id, bindings, mapping, expectedComponents, scope) => {
+      const row = rows.get(id)
+      if (row === undefined || !isUnchanged(rows, id, expectedComponents, scope)) return false
+      rows.set(id, { ...row, variables: [...bindings], mappingStatus: mapping.mappingStatus, enabled: mapping.enabled })
+      return true
+    },
+  )
+  const setEnabled = vi.fn<WhatsappTemplateRepository['setEnabled']>(async (id, enabled, expectedComponents, scope) => {
+    const row = rows.get(id)
+    if (row === undefined || !isUnchanged(rows, id, expectedComponents, scope)) return false
+    rows.set(id, { ...row, enabled })
     return true
   })
   const listForSync = vi.fn<WhatsappTemplateRepository['listForSync']>(async (connectionId, scope) =>
@@ -472,6 +517,8 @@ export function makeTemplateRepository(initial: WhatsappTemplateRecord[] = [], n
     findLiveById,
     findLiveByNameAndLanguage,
     insertCreated,
+    replaceVariables,
+    setEnabled,
     markDeleted,
     listForSync,
     applySync,
@@ -483,12 +530,97 @@ export function makeTemplateRepository(initial: WhatsappTemplateRecord[] = [], n
     findLiveById,
     findLiveByNameAndLanguage,
     insertCreated,
+    replaceVariables,
+    setEnabled,
     markDeleted,
     listForSync,
     applySync,
     applyWebhookUpdates,
     /** La hora que `applySync` anoto en la conexion. */
     syncedAtOf: (connectionId: string) => syncedAt.get(connectionId),
+    row: (id: string) => {
+      const row = rows.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+    all: () => [...rows.values()].map((row) => ({ ...row })),
+  }
+}
+
+/** Una variable propia guardada de la empresa por defecto. */
+export function storedVariableKey(overrides: Partial<WhatsappVariableKeyRecord> = {}): WhatsappVariableKeyRecord {
+  return {
+    id: '00000000-0000-4000-8000-000000000201',
+    companyId: COMPANY_ID,
+    key: 'cuenta_numero',
+    label: 'Numero de cuenta',
+    value: '123-456',
+    createdAt: new Date('2026-10-01T00:00:00.000Z'),
+    ...overrides,
+  }
+}
+
+/**
+ * Variables propias en memoria con las reglas del adaptador: ambito de empresa, clave unica por
+ * empresa, orden por clave y el uso por plantillas vivas que da `usage`. Cambiar la clave o borrar
+ * una en uso devuelve `in_use`.
+ */
+export function makeVariableKeyRepository(
+  initial: WhatsappVariableKeyRecord[] = [],
+  usage: (id: string) => number = () => 0,
+  now: () => Date = () => NOW,
+) {
+  const rows = new Map(initial.map((row) => [row.id, { ...row }]))
+  let counter = 0
+  const newId = () => {
+    counter += 1
+    return `00000000-0000-4000-8000-${String(800000000000 + counter)}`
+  }
+  const ofCompany = (scope: IntegracionesScope) =>
+    [...rows.values()].filter((row) => row.companyId === scope.companyId).sort((a, b) => a.key.localeCompare(b.key))
+  const keyTaken = (key: string, exceptId: string | null, scope: IntegracionesScope) =>
+    ofCompany(scope).some((row) => row.key === key && row.id !== exceptId)
+
+  const listAll = vi.fn<WhatsappVariableKeyRepository['listAll']>(async (scope) => ofCompany(scope).map((row) => ({ ...row })))
+  const listWithUsage = vi.fn<WhatsappVariableKeyRepository['listWithUsage']>(async (scope) =>
+    ofCompany(scope).map((row) => ({ ...row, usedBy: usage(row.id) })),
+  )
+  const findByKeys = vi.fn<WhatsappVariableKeyRepository['findByKeys']>(async (keys, scope) =>
+    ofCompany(scope)
+      .filter((row) => keys.includes(row.key))
+      .map((row) => ({ ...row })),
+  )
+  const create = vi.fn<WhatsappVariableKeyRepository['create']>(async (input, scope) => {
+    if (keyTaken(input.key, null, scope)) throw new WhatsappVariableKeyTakenError('doble: otra con la misma clave')
+    const record: WhatsappVariableKeyRecord = { id: newId(), companyId: scope.companyId, ...input, createdAt: now() }
+    rows.set(record.id, record)
+    return { ...record }
+  })
+  const update = vi.fn<WhatsappVariableKeyRepository['update']>(async (id, input, scope) => {
+    const row = rows.get(id)
+    if (row === undefined || row.companyId !== scope.companyId) return { kind: 'not_found' }
+    if (row.key !== input.key && usage(id) > 0) return { kind: 'in_use' }
+    if (keyTaken(input.key, id, scope)) throw new WhatsappVariableKeyTakenError('doble: otra con la misma clave')
+    const record = { ...row, ...input }
+    rows.set(id, record)
+    return { kind: 'updated', record: { ...record } }
+  })
+  const remove = vi.fn<WhatsappVariableKeyRepository['delete']>(async (id, scope) => {
+    const row = rows.get(id)
+    if (row === undefined || row.companyId !== scope.companyId) return 'not_found'
+    if (usage(id) > 0) return 'in_use'
+    rows.delete(id)
+    return 'deleted'
+  })
+
+  const variableKeys: WhatsappVariableKeyRepository = { listAll, listWithUsage, findByKeys, create, update, delete: remove }
+  return {
+    variableKeys,
+    listAll,
+    listWithUsage,
+    findByKeys,
+    create,
+    update,
+    delete: remove,
     row: (id: string) => {
       const row = rows.get(id)
       return row === undefined ? undefined : { ...row }

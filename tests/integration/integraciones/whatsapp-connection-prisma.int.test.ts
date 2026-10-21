@@ -31,6 +31,8 @@ import {
   listLiveWhatsappTemplates,
   listWhatsappTemplatesForSync,
   markWhatsappTemplateDeleted,
+  replaceWhatsappTemplateVariables,
+  setWhatsappTemplateEnabled,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma'
 import { createCreateWhatsappConnection } from '@/lib/modules/integraciones/domain/create-whatsapp-connection'
 import {
@@ -366,6 +368,8 @@ describe('R9: a la base solo llegan valores cifrados y el resumen del verify tok
         findLiveById: findLiveWhatsappTemplateById,
         findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
         insertCreated: insertCreatedWhatsappTemplate,
+        replaceVariables: replaceWhatsappTemplateVariables,
+        setEnabled: setWhatsappTemplateEnabled,
         markDeleted: markWhatsappTemplateDeleted,
         listForSync: listWhatsappTemplatesForSync,
         applySync: applyWhatsappTemplateSync,

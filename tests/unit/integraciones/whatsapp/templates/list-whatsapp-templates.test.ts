@@ -162,7 +162,21 @@ describe('vista de una plantilla', () => {
     )
 
     expect(Object.keys(view).sort()).toEqual(
-      ['category', 'content', 'createdAt', 'id', 'language', 'lastSyncedAt', 'name', 'rejectedReason', 'status', 'statusRaw'].sort(),
+      [
+        'category',
+        'content',
+        'createdAt',
+        'enabled',
+        'id',
+        'language',
+        'lastSyncedAt',
+        'mappingStatus',
+        'name',
+        'rejectedReason',
+        'status',
+        'statusRaw',
+        'variables',
+      ].sort(),
     )
     expect(view).toEqual({
       id: TEMPLATE_ID,
@@ -175,6 +189,9 @@ describe('vista de una plantilla', () => {
       content,
       lastSyncedAt: '2026-10-03T00:00:00.000Z',
       createdAt: '2026-10-01T00:00:00.000Z',
+      mappingStatus: 'MAPPED',
+      enabled: true,
+      variables: [],
     })
   })
 

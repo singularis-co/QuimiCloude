@@ -7,6 +7,7 @@ import { templateGraphErrorOf } from './template-graph-failure';
 import { isWhatsappTemplateCategory, type WhatsappTemplateView } from './whatsapp-template';
 import { toMetaComponents } from './whatsapp-template-components';
 import { validateWhatsappTemplateDraft } from './whatsapp-template-draft';
+import { mappingStatusOf } from './whatsapp-template-variables';
 
 import type { SecretCipher } from '../ports/secret-cipher';
 import type { WhatsappConnectionRepository } from '../ports/whatsapp-connection-repository';
@@ -62,7 +63,8 @@ export function createCreateWhatsappTemplate(
 
     const category =
       created.category !== null && isWhatsappTemplateCategory(created.category) ? created.category : draft.category;
-    const record = await deps.templates.insertCreated(
+    const mappingStatus = mappingStatusOf(components, []);
+    const { record } = await deps.templates.insertCreated(
       {
         metaTemplateId: created.id,
         name: draft.name,
@@ -72,6 +74,9 @@ export function createCreateWhatsappTemplate(
         status: 'PENDING',
         createdById: actor.id,
         lastSyncedAt: now(),
+        variables: [],
+        mappingStatus,
+        enabled: mappingStatus === 'MAPPED',
       },
       connection.id,
       scope,

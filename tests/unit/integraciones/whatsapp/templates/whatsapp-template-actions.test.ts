@@ -90,19 +90,25 @@ const VIEW: WhatsappTemplateView = {
   content: { header: null, body: { text: 'Hola {{1}}', examples: ['Ana'] }, footer: null, buttons: [] },
   lastSyncedAt: null,
   createdAt: '2026-10-20T12:00:00.000Z',
+  mappingStatus: 'MAPPED',
+  enabled: true,
+  variables: [],
 }
 
 const VIEW_KEYS = [
   'category',
   'content',
   'createdAt',
+  'enabled',
   'id',
   'language',
   'lastSyncedAt',
+  'mappingStatus',
   'name',
   'rejectedReason',
   'status',
   'statusRaw',
+  'variables',
 ]
 
 const LIST: WhatsappTemplateList = { templates: [VIEW], templatesSyncedAt: '2026-10-20T08:00:00.000Z' }

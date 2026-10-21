@@ -97,6 +97,23 @@ function onlyOne<T extends ParsedComponent['type']>(
   return found[0] ?? null;
 }
 
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
+    );
+  }
+  return value;
+}
+
+// Meta puede devolver las mismas claves en otro orden.
+export function sameComponents(a: unknown, b: unknown): boolean {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
+
 /** `null` si algun componente no es de los que esta fase sabe editar. */
 export function contentOf(components: unknown): WhatsappTemplateContent | null {
   const parsed = z.array(metaComponentSchema).safeParse(components);

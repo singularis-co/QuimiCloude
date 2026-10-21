@@ -5,6 +5,10 @@ import type {
   WhatsappTemplateCategory,
   WhatsappTemplateRecord,
 } from '../domain/whatsapp-template';
+import type { TemplateMappingStatus, TemplateVariableBinding } from '../domain/whatsapp-template-variables';
+
+/** Se escriben siempre juntos: una plantilla sin relacionar no puede quedar habilitada. */
+export type TemplateMappingWrite = { readonly mappingStatus: TemplateMappingStatus; readonly enabled: boolean };
 
 /** Sin `companyId` ni conexión: la empresa la pone el adaptador desde `scope`. */
 export type NewCreatedTemplateRow = {
@@ -16,7 +20,8 @@ export type NewCreatedTemplateRow = {
   readonly status: 'PENDING';
   readonly createdById: string;
   readonly lastSyncedAt: Date;
-};
+  readonly variables: readonly TemplateVariableBinding[];
+} & TemplateMappingWrite;
 
 /** Vivas y eliminadas: una eliminada que Meta vuelve a listar se revive, no se duplica. */
 export type TemplateSyncRow = LocalTemplateForSync;
@@ -39,14 +44,29 @@ export interface WhatsappTemplateRepository {
     scope: IntegracionesScope,
   ): Promise<WhatsappTemplateRecord | null>;
   /**
-   * Si la sincronización ya insertó ese `metaTemplateId`, se queda su fila y solo gana el creador.
-   * Otra viva con el mismo nombre e idioma lanza `WhatsappTemplateNameTakenError`.
+   * Si la sincronización ya insertó ese `metaTemplateId`, se queda su fila y solo gana el creador
+   * (`inserted: false`, sin escribir relaciones). Otra viva con el mismo nombre e idioma lanza
+   * `WhatsappTemplateNameTakenError`.
    */
   insertCreated(
     row: NewCreatedTemplateRow,
     connectionId: string,
     scope: IntegracionesScope,
-  ): Promise<WhatsappTemplateRecord>;
+  ): Promise<{ readonly record: WhatsappTemplateRecord; readonly inserted: boolean }>;
+  /**
+   * Sustituye todas las relaciones. `false`, sin escribir, si la plantilla ya no está viva o sus
+   * componentes ya no son `expectedComponents`.
+   */
+  replaceVariables(
+    id: string,
+    bindings: readonly TemplateVariableBinding[],
+    mapping: TemplateMappingWrite,
+    expectedComponents: unknown,
+    scope: IntegracionesScope,
+  ): Promise<boolean>;
+  /** Misma condición que `replaceVariables`. */
+  setEnabled(id: string, enabled: boolean, expectedComponents: unknown, scope: IntegracionesScope): Promise<boolean>;
+  /** También quita sus relaciones y la deshabilita. */
   markDeleted(id: string, at: Date, scope: IntegracionesScope): Promise<boolean>;
   listForSync(connectionId: string, scope: IntegracionesScope): Promise<readonly TemplateSyncRow[]>;
   /** Todo o nada. No borra lo creado desde `startedAt`, y anota `at` en la conexión. */

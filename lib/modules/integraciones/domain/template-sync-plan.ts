@@ -1,5 +1,7 @@
 import type { WhatsappTemplateRecord } from './whatsapp-template';
+import { sameComponents } from './whatsapp-template-components';
 import type { MetaTemplateSnapshot } from './whatsapp-template-meta';
+import { componentsChanged, mappingStatusOf, type TemplateMappingStatus } from './whatsapp-template-variables';
 
 export type LocalTemplateForSync = Pick<
   WhatsappTemplateRecord,
@@ -13,11 +15,29 @@ export type LocalTemplateForSync = Pick<
   | 'rejectedReason'
   | 'components'
   | 'deletedAt'
+  | 'mappingStatus'
+  | 'enabled'
 >;
 
+export type TemplateSyncInsert = {
+  readonly template: MetaTemplateSnapshot;
+  readonly mappingStatus: TemplateMappingStatus;
+  readonly enabled: boolean;
+};
+
+/** Sin `resetVariables`, los dos campos `AfterReset` son los que la fila ya tenia. */
+export type TemplateSyncUpdate = {
+  readonly id: string;
+  readonly template: MetaTemplateSnapshot;
+  readonly changed: boolean;
+  readonly resetVariables: boolean;
+  readonly mappingStatusAfterReset: TemplateMappingStatus;
+  readonly enabledAfterReset: boolean;
+};
+
 export type TemplateSyncPlan = {
-  readonly inserts: readonly MetaTemplateSnapshot[];
-  readonly updates: readonly { readonly id: string; readonly template: MetaTemplateSnapshot; readonly changed: boolean }[];
+  readonly inserts: readonly TemplateSyncInsert[];
+  readonly updates: readonly TemplateSyncUpdate[];
   readonly deletes: readonly string[];
 };
 
@@ -27,23 +47,6 @@ export type TemplateSyncPlanInput = {
   /** Ids de Meta que no se borran aunque no vengan en la lista. */
   readonly protectedIds: readonly string[];
 };
-
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
-    );
-  }
-  return value;
-}
-
-// Meta puede devolver las mismas claves en otro orden.
-export function sameComponents(a: unknown, b: unknown): boolean {
-  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
-}
 
 function differs(local: LocalTemplateForSync, template: MetaTemplateSnapshot): boolean {
   return (
@@ -66,15 +69,34 @@ function uniqueByMetaId(snapshots: readonly MetaTemplateSnapshot[]): MetaTemplat
   return [...seen.values()];
 }
 
+/** Sin relaciones: solo queda relacionada si no tiene huecos, y solo entonces nace habilitada. */
+function importedMapping(components: unknown): { mappingStatus: TemplateMappingStatus; enabled: boolean } {
+  const mappingStatus = mappingStatusOf(components, []);
+  return { mappingStatus, enabled: mappingStatus === 'MAPPED' };
+}
+
+function updateOf(local: LocalTemplateForSync, template: MetaTemplateSnapshot): TemplateSyncUpdate {
+  const changed = differs(local, template);
+  const revived = local.deletedAt !== null;
+  const resetVariables = revived || componentsChanged(local.components, template.components);
+  if (!resetVariables) {
+    return { id: local.id, template, changed, resetVariables, mappingStatusAfterReset: local.mappingStatus, enabledAfterReset: local.enabled };
+  }
+  const imported = importedMapping(template.components);
+  // Sin huecos se conserva la habilitacion: solo volver a «sin relacionar» deshabilita.
+  const enabledAfterReset = revived ? imported.enabled : imported.mappingStatus === 'MAPPED' && local.enabled;
+  return { id: local.id, template, changed, resetVariables, mappingStatusAfterReset: imported.mappingStatus, enabledAfterReset };
+}
+
 export function planTemplateSync({ locals, snapshots, protectedIds }: TemplateSyncPlanInput): TemplateSyncPlan {
   const localByMetaId = new Map(locals.map((local) => [local.metaTemplateId, local]));
-  const inserts: MetaTemplateSnapshot[] = [];
-  const updates: { id: string; template: MetaTemplateSnapshot; changed: boolean }[] = [];
+  const inserts: TemplateSyncInsert[] = [];
+  const updates: TemplateSyncUpdate[] = [];
   const unique = uniqueByMetaId(snapshots);
   for (const template of unique) {
     const local = localByMetaId.get(template.metaTemplateId);
-    if (local === undefined) inserts.push(template);
-    else updates.push({ id: local.id, template, changed: differs(local, template) });
+    if (local === undefined) inserts.push({ template, ...importedMapping(template.components) });
+    else updates.push(updateOf(local, template));
   }
   const kept = new Set([...unique.map((t) => t.metaTemplateId), ...protectedIds]);
   const deletes = locals

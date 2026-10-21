@@ -35,6 +35,9 @@ export function toWhatsappTemplateView(record: WhatsappTemplateRecord): Whatsapp
     content: contentOf(record.components),
     lastSyncedAt: record.lastSyncedAt === null ? null : record.lastSyncedAt.toISOString(),
     createdAt: record.createdAt.toISOString(),
+    mappingStatus: record.mappingStatus,
+    enabled: record.enabled,
+    variables: [],
   };
 }
 

@@ -206,21 +206,21 @@
     etiqueta como ejemplo) verde en los dos sentidos; los tests de T3 del validador `{{n}}` siguen
     verdes sin cambiar sus casos.
 
-- [ ] **T26 [P] — Plan de sincronización** (R70–R72). Depende de: T25 y el contraste previo
+- [x] **T26 [P] — Plan de sincronización** (R70–R72). Depende de: T25 y el contraste previo
   - `domain/template-sync-plan.ts` (§18.7, «Sincronización») y `template-sync-plan.test.ts` ampliado.
   - **Hecho:** tabla de §18.10 verde; un caso fija que lo creado (`toMetaComponents`) y lo que lista el
     doble `canned` para esa misma plantilla no cuentan como cambio; los casos de T5 siguen verdes.
 
 ## Bloque I — Puertos y adaptadores (enmienda)
 
-- [ ] **T27 — Puertos y dobles** (R63). Depende de: T25, T26
+- [x] **T27 — Puertos y dobles** (R63). Depende de: T25, T26
   - `ports/whatsapp-variable-key-repository.ts` (nuevo) y `ports/whatsapp-template-repository.ts`
     (§18.8); `domain/whatsapp-template.ts` (record y vista).
   - `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: doble de variables propias y métodos
     nuevos.
   - **Hecho:** typecheck verde; los tests de T7–T14 que usan los dobles siguen verdes.
 
-- [ ] **T28 [P] — Persistencia de variables propias** (R53, R58–R60, R63). Depende de: T22, T27
+- [x] **T28 [P] — Persistencia de variables propias** (R53, R58–R60, R63). Depende de: T22, T27
   - `adapters/driven/persistence/whatsapp-variable-key-prisma.ts` (nuevo) y `company-scope.ts` (+ dos
     envolturas).
   - `tests/integration/integraciones/whatsapp-variable-key-prisma.int.test.ts`; entrada en
@@ -228,7 +228,7 @@
   - `tests/guards/guard-ambito-empresa-integraciones.test.ts`: cuarto puerto, envolturas nuevas.
   - **Hecho:** casos de §18.10 de ese archivo verdes; la guardia verde con sus casos de sensibilidad.
 
-- [ ] **T29 [P] — Persistencia de plantillas ampliada** (R68–R73, R76, R80). Depende de: T22, T27
+- [x] **T29 [P] — Persistencia de plantillas ampliada** (R68–R73, R76, R80). Depende de: T22, T27
   - `adapters/driven/persistence/whatsapp-template-prisma.ts` (§18.8).
   - `tests/integration/integraciones/whatsapp-template-prisma.int.test.ts` ampliado y
     `whatsapp-variable-keys-migration.int.test.ts` (nuevo, R84, R86); entrada en `aislamiento.json`.
