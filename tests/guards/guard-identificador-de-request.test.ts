@@ -795,6 +795,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261020120000_whatsapp_templates',
   // QC-290 2026-10-20: envases libres por linea del reparto; no toca el identificador.
   '20261020160000_order_presentation_lines_packed_surplus',
+  // QC-242 2026-10-20: diccionario de variables de WhatsApp; no toca el identificador.
+  '20261020180000_whatsapp_variable_keys',
 ] as const
 
 export function hallazgosDeMigraciones(

@@ -633,3 +633,10 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Riesgo:** rompe el E2E de QC-243 si ese E2E sincroniza después de aprobar.
 - **Qué falta:** que el spec de QC-243 lo cite y, o bien no sincronice tras aprobar en el E2E, o bien el doble guarde el estado que llega por webhook.
 - **Dueño:** Christian Quevedo (QC-243).
+
+### D79 — Carrera entre renombrar una clave y relacionar una variable (QC-242)
+- **Origen:** review de la enmienda de QC-242, vuelta 1 (m1).
+- **Qué pasa:** si se renombra una variable propia sin uso mientras otra petición relaciona un `{{n}}` con ella, el hueco queda ligado a la clave nueva, que el usuario no eligió.
+- **Riesgo:** bajo; necesita dos acciones del Administrador casi a la vez y ningún requisito lo cubre.
+- **Qué falta:** bloquear la fila de la variable al relacionar, o comprobar la clave dentro de la misma transacción.
+- **Dueño:** Christian Quevedo.

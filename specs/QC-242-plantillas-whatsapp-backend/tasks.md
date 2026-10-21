@@ -156,6 +156,178 @@
     con Meta.
   - **Hecho:** cada `R1…R52` mapeado a un test concreto.
 
+# Enmienda 2026-10-20 — diccionario de variables (T22–T35, R53–R86)
+
+> T1–T21 están hechas y mergeadas (PR #281). Estas tasks van en la misma rama, con un segundo PR. Mismas
+> reglas de cierre que arriba. Diseño en `design.md > 18`; decisiones E1–E16 en `requirements.md >
+> Enmienda 2026-10-20`.
+>
+> [P10], [P11], [P13], [P14], [P16] y [P18] aprobadas por el humano el 2026-10-20. De [P11] siguen
+> abiertos el dato de `nombre` y la forma de `pedido_numero`: no bloquean T24 (el catálogo solo declara
+> de qué dato sale cada constante); los cierra la ficha que escribe el resolvedor.
+>
+> **Antes de T26**: contrastar con la documentación vigente de la Cloud API la forma en que `GET
+> message_templates` devuelve los componentes (sobre todo `example`) frente a lo que se envía al crear
+> ([P4] [POR CONFIRMAR]); anotarlo en `progress/impl_QC-242.md`. Si difieren en algo que
+> `componentsChanged` (§18.5) no normaliza, se para y se pregunta: E6 quitaría la relación a todas las
+> creadas.
+
+## Bloque G — Base (enmienda)
+
+- [x] **T22 — Esquema y migración** (R53, R63, R80, R84, R86). Depende de: —
+  - `db/schema.prisma`: enum `WhatsappTemplateMappingStatus`, modelos `WhatsappVariableKey` y
+    `WhatsappTemplateVariable` con `/// @module integraciones`; `mappingStatus`, `enabled` y el único
+    `(companyId, id)` en `WhatsappTemplate` (§18.2).
+  - `db/migrations/20261020180000_whatsapp_variable_keys/migration.sql` y `down.sql` a mano, en el
+    orden de §18.3, con el relleno del paso 6.
+  - **Hecho:** la migración se aplica sobre la base de test; `down.sql` la revierte y se vuelve a
+    aplicar; `prisma validate` y `generate` en verde; `guard-empresa-en-esquema` y `guard-rls-force`
+    en verde.
+
+- [x] **T23 [P] — Códigos de error** (R85). Depende de: —
+  - `error-codes.ts`, `error-catalog.ts`: los 5 códigos de §18.9; `domain/errors.ts`: las 5 clases.
+  - `tests/unit/errores/catalogo.test.ts`: cuenta + 5.
+  - **Hecho:** catálogo y su test verdes.
+
+## Bloque H — Dominio puro (enmienda)
+
+- [x] **T24 — Constantes y variable propia** (R53–R55). Depende de: T23
+  - `domain/whatsapp-system-variables.ts` y `domain/whatsapp-variable-key.ts` (§18.4).
+  - `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key.test.ts`.
+  - **Hecho:** casos de §18.10 en el límite y en el límite + 1; los dos archivos solo importan `zod` y
+    `domain/`.
+
+- [x] **T25 — Huecos, estado del mapeo, traducción y borrador con claves** (R6, R64–R67, R81).
+  Depende de: T24
+  - `domain/whatsapp-template-variables.ts` (§18.5), `domain/whatsapp-template-keyed-draft.ts` (§18.6),
+    `domain/whatsapp-template-draft.ts` (+ `unknown_key`).
+  - Tests `whatsapp-template-variables.test.ts` y `whatsapp-template-keyed-draft.test.ts`.
+  - **Hecho:** el ejemplo canónico de E16 (`Hola {{nombre}}` ⇄ `Hola {{1}}` con `body.1 = nombre` y la
+    etiqueta como ejemplo) verde en los dos sentidos; los tests de T3 del validador `{{n}}` siguen
+    verdes sin cambiar sus casos.
+
+- [x] **T26 [P] — Plan de sincronización** (R70–R72). Depende de: T25 y el contraste previo
+  - `domain/template-sync-plan.ts` (§18.7, «Sincronización») y `template-sync-plan.test.ts` ampliado.
+  - **Hecho:** tabla de §18.10 verde; un caso fija que lo creado (`toMetaComponents`) y lo que lista el
+    doble `canned` para esa misma plantilla no cuentan como cambio; los casos de T5 siguen verdes.
+
+## Bloque I — Puertos y adaptadores (enmienda)
+
+- [x] **T27 — Puertos y dobles** (R63). Depende de: T25, T26
+  - `ports/whatsapp-variable-key-repository.ts` (nuevo) y `ports/whatsapp-template-repository.ts`
+    (§18.8); `domain/whatsapp-template.ts` (record y vista).
+  - `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: doble de variables propias y métodos
+    nuevos.
+  - **Hecho:** typecheck verde; los tests de T7–T14 que usan los dobles siguen verdes.
+
+- [x] **T28 [P] — Persistencia de variables propias** (R53, R58–R60, R63). Depende de: T22, T27
+  - `adapters/driven/persistence/whatsapp-variable-key-prisma.ts` (nuevo) y `company-scope.ts` (+ dos
+    envolturas).
+  - `tests/integration/integraciones/whatsapp-variable-key-prisma.int.test.ts`; entrada en
+    `tests/integration/aislamiento.json`.
+  - `tests/guards/guard-ambito-empresa-integraciones.test.ts`: cuarto puerto, envolturas nuevas.
+  - **Hecho:** casos de §18.10 de ese archivo verdes; la guardia verde con sus casos de sensibilidad.
+
+- [x] **T29 [P] — Persistencia de plantillas ampliada** (R68–R73, R76, R80). Depende de: T22, T27
+  - `adapters/driven/persistence/whatsapp-template-prisma.ts` (§18.8).
+  - `tests/integration/integraciones/whatsapp-template-prisma.int.test.ts` ampliado y
+    `whatsapp-variable-keys-migration.int.test.ts` (nuevo, R84, R86); entrada en `aislamiento.json`.
+  - **Hecho:** casos de §18.10 verdes; los casos de T9 siguen verdes (incluida la traducción del único
+    parcial medida en `03054b0d`).
+
+## Bloque J — Casos de uso (enmienda)
+
+- [x] **T30 — Diccionario** (R55–R62). Depende de: T27
+  - `domain/manage-whatsapp-variable-keys.ts` (§18.7) y `manage-whatsapp-variable-keys.test.ts`.
+  - **Hecho:** sin permiso, ningún puerto llamado; una clave de constante ⇒ `taken` sin puerto.
+
+- [x] **T31 [P] — Crear con claves** (R14, R66–R69). Depende de: T27
+  - `domain/create-whatsapp-template.ts` (§18.7, «Crear») y `create-whatsapp-template.test.ts`
+    ampliado.
+  - **Hecho:** casos de §18.10; los casos de T10 de crear se reescriben solo en su borrador (`{{n}}` ⇒
+    `{{clave}}`), no en lo que comprueban.
+
+- [x] **T32 [P] — Relacionar, habilitar, deshabilitar** (R72, R74–R80). Depende de: T27
+  - `domain/relate-whatsapp-template-variables.ts` (§18.7) y `relate-whatsapp-template-variables.test.ts`.
+  - **Hecho:** casos de §18.10; ninguna llamada a Graph en ningún caso.
+
+- [x] **T33 [P] — Listar, consultar y vista** (R81, R82). Depende de: T27
+  - `domain/list-whatsapp-templates.ts` (§18.7, «Listar») y `list-whatsapp-templates.test.ts` ampliado.
+  - **Hecho:** claves exactas de la vista; los casos de T10 de listar siguen verdes salvo la lista
+    exacta de claves de R46, que se amplía.
+
+## Bloque K — Bordes y cierre (enmienda)
+
+- [x] **T34 — Composición, contrato y Server Actions** (R83). Depende de: T28–T33
+  - `lib/composition/index.ts`, `lib/modules/integraciones/index.ts` (§18.9);
+    `adapters/driving/whatsapp-variable-key-actions.ts` (nuevo) y `whatsapp-template-actions.ts`.
+  - Tests `whatsapp-variable-key-actions.test.ts`, `whatsapp-template-actions.test.ts` ampliado,
+    `tests/unit/integraciones/module-shape.test.ts` tensado (archivos, contrato, modelos de seis a ocho,
+    R6 sobre el validador con claves).
+  - **Hecho:** `module-shape`, `guard-arquitectura-modulos` y el test de una lectura de sesión por
+    petición verdes con las acciones nuevas.
+
+- [x] **T35 — Recorrido y cierre** (criterios de E1–E16). Depende de: T34
+  - `tests/integration/integraciones/whatsapp-template-flow.int.test.ts` ampliado con el recorrido de
+    §18.10.
+  - `pnpm exec vitest run guard`, `./init.sh` en verde; `package.json` y `.env.example` sin cambios
+    (R52).
+  - `progress/impl_QC-242.md`: mapa `R53…R86 → test`, el contraste de la forma del `GET` y lo que se
+    resolvió de [P10]–[P18].
+  - **Hecho:** cada `R53…R86` mapeado a un test concreto.
+
+# Enmienda 2 — 2026-10-20 (tarde): las constantes las define el front (T36–T40, R87–R96)
+
+> Decisiones F1–F4 en `requirements.md > Enmienda 2`; diseño en `design.md > 19`. T22–T25 están
+> implementadas **sin commit** sobre la versión anterior: T36–T38 las corrigen encima, sin rehacerlas
+> desde cero. [P19]–[P22] aprobadas por el humano el 2026-10-20 como se propusieron.
+
+- [x] **T36 — Corregir T22** (R88, R84). Depende de: —
+  - Migración `20261020180000_whatsapp_variable_keys`: `CHECK whatsapp_template_variables_system_key_format`
+    a la forma de constante de §19.2 (la migración no se ha aplicado fuera del worktree: se edita, no se
+    añade otra). `down.sql` no cambia. Comentario del modelo en `db/schema.prisma`.
+  - `tests/integration/integraciones/whatsapp-template-migration.int.test.ts`: sus dos casos de índices
+    y `CHECK` exactos de `whatsapp_templates` ganan `whatsapp_templates_company_id_id_key` y
+    `whatsapp_templates_enabled_requires_mapped` (§19.1).
+  - **Hecho:** la migración se aplica, se revierte y se vuelve a aplicar; los dos casos verdes.
+
+- [x] **T37 — Corregir T24** (R87–R90). Depende de: T36
+  - Borrar `domain/whatsapp-system-variables.ts` y su export; `domain/whatsapp-variable-key.ts` con
+    `WHATSAPP_CONSTANT_KEY_PATTERN` y la vista sin rama `system` (§19.2, §19.5).
+  - `whatsapp-variable-key.test.ts`: fuera los casos del catálogo; casos de R88 (dos segmentos, tres
+    segmentos, segmento de 41, punto en una propia).
+  - **Hecho:** ningún archivo importa el catálogo; los 5 códigos de T23 sin cambio.
+
+- [x] **T38 — Corregir T25** (R91, R92, R95). Depende de: T37
+  - `domain/whatsapp-template-keyed-draft.ts` (§19.3, §19.4) y `domain/whatsapp-template-variables.ts`
+    (`variableSlotsOf` con marcas no numéricas ⇒ `null`).
+  - Tests `whatsapp-template-keyed-draft.test.ts` (ejemplo corregido de `Hola {{cliente.nombre}}`;
+    propia desconocida ⇒ `unknown_key`; constante sin etiqueta ⇒ `example_missing`) y
+    `whatsapp-template-variables.test.ts` (`{{first_name}}` ⇒ no relacionable).
+  - **Hecho:** casos verdes; T3 sigue verde sin cambiar sus casos.
+
+- [x] **T39 [P] — `contentOf` con el ejemplo de URL como texto** (R96). Depende de: —
+  - `domain/whatsapp-template-components.ts` (§19.5) y `whatsapp-template-components.test.ts`.
+  - **Hecho:** los dos formatos dan el mismo contenido; la ida y vuelta de T4 sigue verde.
+
+- [x] **T40 — Cierre de la enmienda 2** (R87–R96). Depende de: T36–T39 y T26–T35
+  - `progress/impl_QC-242.md`: mapa `R87…R96 → test`.
+  - **Hecho:** cada `R87…R96` mapeado a un test concreto.
+
+**Cambios en las tasks pendientes T26–T35** (se hacen con la versión de §19):
+
+- **T26**: sin cambio de alcance; el contraste con Meta ya salió sin bloqueo. El caso «lo creado y lo
+  listado no cuentan como cambio» se escribe después de T39.
+- **T27**: el puerto de variables propias pierde `countSystemKeyUsage`.
+- **T28**: el `CHECK` de §19.2 en el `.int` (constante con un segmento ⇒ rechazo).
+- **T30**: listar solo propias (R90); crear y modificar ya no miran ningún catálogo (R89).
+- **T31**: la acción de crear pasa `constantLabels` ([P20]).
+- **T32**: clasificar con §19.3 (R93).
+- **T33**: la vista con `label: null` para constantes (R94).
+- **T34**: el contrato pierde `WHATSAPP_SYSTEM_VARIABLES` y `SystemVariable`, gana
+  `WHATSAPP_CONSTANT_KEY_PATTERN`.
+- **T35**: el recorrido usa `Hola {{cliente.nombre}}` con su etiqueta en `constantLabels`.
+
 ## Archivos esperados
 
 - `db/schema.prisma`
@@ -229,3 +401,31 @@
 - `tests/guards/guard-ambito-empresa-integraciones.test.ts`
 - `tests/guards/guard-rutas-fuera-de-sesion.test.ts`
 - `progress/impl_QC-242.md`
+
+Enmienda 2026-10-20 (T22–T35); las que ya están arriba se repiten solo si son nuevas:
+
+- `db/migrations/20261020180000_whatsapp_variable_keys/migration.sql`
+- `db/migrations/20261020180000_whatsapp_variable_keys/down.sql`
+- `lib/modules/integraciones/domain/whatsapp-system-variables.ts`
+- `lib/modules/integraciones/domain/whatsapp-variable-key.ts`
+- `lib/modules/integraciones/domain/whatsapp-template-variables.ts`
+- `lib/modules/integraciones/domain/whatsapp-template-keyed-draft.ts`
+- `lib/modules/integraciones/domain/manage-whatsapp-variable-keys.ts`
+- `lib/modules/integraciones/domain/relate-whatsapp-template-variables.ts`
+- `lib/modules/integraciones/ports/whatsapp-variable-key-repository.ts`
+- `lib/modules/integraciones/adapters/driven/persistence/whatsapp-variable-key-prisma.ts`
+- `lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions.ts`
+- `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key.test.ts`
+- `tests/unit/integraciones/whatsapp/templates/whatsapp-template-variables.test.ts`
+- `tests/unit/integraciones/whatsapp/templates/whatsapp-template-keyed-draft.test.ts`
+- `tests/unit/integraciones/whatsapp/templates/manage-whatsapp-variable-keys.test.ts`
+- `tests/unit/integraciones/whatsapp/templates/relate-whatsapp-template-variables.test.ts`
+- `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key-actions.test.ts`
+- `tests/integration/integraciones/whatsapp-variable-key-prisma.int.test.ts`
+- `tests/integration/integraciones/whatsapp-variable-keys-migration.int.test.ts`
+
+Enmienda 2 (T36–T40): no añade rutas nuevas. Toca, entre las ya listadas,
+`lib/modules/integraciones/domain/whatsapp-template-components.ts`,
+`tests/unit/integraciones/whatsapp/templates/whatsapp-template-components.test.ts`,
+`tests/integration/integraciones/whatsapp-template-migration.int.test.ts` y borra
+`lib/modules/integraciones/domain/whatsapp-system-variables.ts`.

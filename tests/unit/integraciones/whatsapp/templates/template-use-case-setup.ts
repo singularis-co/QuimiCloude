@@ -9,6 +9,8 @@ import type { SecretCipher } from '@/lib/modules/integraciones/ports/secret-ciph
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository'
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
 import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
+import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
+import type { WhatsappVariableKeyRecord } from '@/lib/modules/integraciones/domain/whatsapp-variable-key'
 
 import {
   NOW,
@@ -16,12 +18,14 @@ import {
   makeGraph,
   makeRepository,
   makeTemplateRepository,
+  makeVariableKeyRepository,
   storedConnection,
 } from '../whatsapp-doubles'
 
 export type TemplateSetupOptions = {
   connection?: Partial<WhatsappConnectionRecord> | null
   templates?: WhatsappTemplateRecord[]
+  variableKeys?: WhatsappVariableKeyRecord[]
 }
 
 export function setupTemplates(options: TemplateSetupOptions = {}) {
@@ -29,14 +33,16 @@ export function setupTemplates(options: TemplateSetupOptions = {}) {
   const repo = makeRepository(options.connection === null ? [] : [storedConnection(cipher.seed, options.connection)])
   const graph = makeGraph()
   const templates = makeTemplateRepository(options.templates ?? [])
+  const variableKeys = makeVariableKeyRepository(options.variableKeys ?? [])
   const deps = {
     connections: repo.connections,
     cipher: cipher.cipher,
     graph: graph.graph,
     templates: templates.templates,
+    variableKeys: variableKeys.variableKeys,
     now: () => NOW,
   }
-  return { cipher, repo, graph, templates, deps }
+  return { cipher, repo, graph, templates, variableKeys, deps }
 }
 
 /** Dobles que fallan si los llaman: una operacion sin permiso tiene que lanzar sin tocar nada. */
@@ -64,10 +70,20 @@ export function explodingTemplateDeps() {
     findLiveById: explota('templates.findLiveById'),
     findLiveByNameAndLanguage: explota('templates.findLiveByNameAndLanguage'),
     insertCreated: explota('templates.insertCreated'),
+    replaceVariables: explota('templates.replaceVariables'),
+    setEnabled: explota('templates.setEnabled'),
     markDeleted: explota('templates.markDeleted'),
     listForSync: explota('templates.listForSync'),
     applySync: explota('templates.applySync'),
     applyWebhookUpdates: explota('templates.applyWebhookUpdates'),
+  }
+  const variableKeys = {
+    listAll: explota('variableKeys.listAll'),
+    listWithUsage: explota('variableKeys.listWithUsage'),
+    findByKeys: explota('variableKeys.findByKeys'),
+    create: explota('variableKeys.create'),
+    update: explota('variableKeys.update'),
+    delete: explota('variableKeys.delete'),
   }
   const now = explota('now')
   return {
@@ -76,20 +92,22 @@ export function explodingTemplateDeps() {
       graph: graph as unknown as WhatsappGraphClient,
       cipher: cipher as unknown as SecretCipher,
       templates: templates as unknown as WhatsappTemplateRepository,
+      variableKeys: variableKeys as unknown as WhatsappVariableKeyRepository,
       now: now as unknown as () => Date,
     },
-    espias: [...Object.values(connections), ...Object.values(graph), ...Object.values(cipher), ...Object.values(templates), now],
+    espias: [...Object.values(connections), ...Object.values(graph), ...Object.values(cipher), ...Object.values(templates), ...Object.values(variableKeys), now],
   }
 }
 
-/** Un borrador valido con una variable en el body y un boton de respuesta rapida. */
+/** Un borrador valido con una constante en el body y un boton de respuesta rapida. */
 export function validDraft(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     name: 'pedido_listo',
     language: 'es',
     category: 'UTILITY',
     header: null,
-    body: { text: 'Hola {{1}}, tu pedido esta listo.', examples: ['Ana'] },
+    body: { text: 'Hola {{cliente.nombre}}, tu pedido esta listo.' },
+    constantLabels: { 'cliente.nombre': 'Ana' },
     footer: null,
     buttons: [{ type: 'QUICK_REPLY', text: 'Gracias' }],
     ...overrides,

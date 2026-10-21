@@ -50,7 +50,13 @@ export function toMetaComponents(content: WhatsappTemplateContent): MetaTemplate
 
 const metaButtonSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('QUICK_REPLY'), text: z.string() }),
-  z.object({ type: z.literal('URL'), text: z.string(), url: z.string(), example: z.array(z.string()).optional() }),
+  // El ejemplo llega como texto o como lista: las dos formas son el mismo contenido.
+  z.object({
+    type: z.literal('URL'),
+    text: z.string(),
+    url: z.string(),
+    example: z.union([z.string(), z.array(z.string())]).optional(),
+  }),
   z.object({ type: z.literal('PHONE_NUMBER'), text: z.string(), phone_number: z.string() }),
 ]);
 
@@ -78,7 +84,8 @@ function buttonOf(button: ParsedButton): WhatsappTemplateButton {
   if (button.type === 'PHONE_NUMBER') {
     return { type: 'PHONE_NUMBER', text: button.text, phoneNumber: button.phone_number };
   }
-  return { type: 'URL', text: button.text, url: button.url, example: button.example?.[0] ?? null };
+  const example = typeof button.example === 'string' ? button.example : (button.example?.[0] ?? null);
+  return { type: 'URL', text: button.text, url: button.url, example };
 }
 
 function onlyOne<T extends ParsedComponent['type']>(
@@ -88,6 +95,23 @@ function onlyOne<T extends ParsedComponent['type']>(
   const found = components.filter((c): c is Extract<ParsedComponent, { type: T }> => c.type === type);
   if (found.length > 1) return undefined;
   return found[0] ?? null;
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
+    );
+  }
+  return value;
+}
+
+// Meta puede devolver las mismas claves en otro orden.
+export function sameComponents(a: unknown, b: unknown): boolean {
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
 }
 
 /** `null` si algun componente no es de los que esta fase sabe editar. */

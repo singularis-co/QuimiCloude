@@ -10,10 +10,13 @@ import {
   createWhatsappTemplateAction,
   deleteWhatsappTemplateAction,
   listWhatsappTemplatesAction,
+  relateWhatsappTemplateVariablesAction,
+  setWhatsappTemplateEnabledAction,
   syncWhatsappTemplatesAction,
 } from '@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions'
 import { errorMessage } from '@/lib/modules/errores'
 import {
+  ActionNotAllowedError,
   SecretUnreadableError,
   UnauthorizedError,
   ValidationError,
@@ -22,8 +25,11 @@ import {
   WhatsappMetaUnreachableError,
   WhatsappTemplateNameTakenError,
   WhatsappTemplateNotFoundError,
+  WhatsappTemplateNotMappableError,
+  WhatsappTemplateNotMappedError,
   WhatsappTemplateRateLimitedError,
   WhatsappTemplateRejectedError,
+  WhatsappVariableKeyNotFoundError,
   type TemplateSyncSummary,
   type WhatsappTemplateList,
   type WhatsappTemplateView,
@@ -34,6 +40,8 @@ const {
   createMock,
   syncMock,
   deleteMock,
+  relateMock,
+  setEnabledMock,
   getSessionUserMock,
   getSessionContextMock,
   revalidatePathMock,
@@ -43,6 +51,8 @@ const {
   createMock: vi.fn(),
   syncMock: vi.fn(),
   deleteMock: vi.fn(),
+  relateMock: vi.fn(),
+  setEnabledMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   revalidatePathMock: vi.fn(),
@@ -59,6 +69,8 @@ vi.mock('@/lib/composition', () => ({
     createWhatsappTemplate: createMock,
     syncWhatsappTemplates: syncMock,
     deleteWhatsappTemplate: deleteMock,
+    relateWhatsappTemplateVariables: relateMock,
+    setWhatsappTemplateEnabled: setEnabledMock,
   },
 }))
 
@@ -90,19 +102,25 @@ const VIEW: WhatsappTemplateView = {
   content: { header: null, body: { text: 'Hola {{1}}', examples: ['Ana'] }, footer: null, buttons: [] },
   lastSyncedAt: null,
   createdAt: '2026-10-20T12:00:00.000Z',
+  mappingStatus: 'MAPPED',
+  enabled: true,
+  variables: [],
 }
 
 const VIEW_KEYS = [
   'category',
   'content',
   'createdAt',
+  'enabled',
   'id',
   'language',
   'lastSyncedAt',
+  'mappingStatus',
   'name',
   'rejectedReason',
   'status',
   'statusRaw',
+  'variables',
 ]
 
 const LIST: WhatsappTemplateList = { templates: [VIEW], templatesSyncedAt: '2026-10-20T08:00:00.000Z' }
@@ -125,6 +143,13 @@ const DRAFT = {
   buttons: [],
 }
 
+const RELATE_INPUT = {
+  templateId: TEMPLATE_ID,
+  bindings: [{ slot: 'body.1', key: 'cliente.nombre' }],
+}
+
+const ENABLE_INPUT = { templateId: TEMPLATE_ID, enabled: true }
+
 /** Datos de la conexion que nunca pueden salir de una accion de plantillas. */
 const CONNECTION_LEAK = {
   connection: { id: CONNECTION_ID, wabaId: '222', phoneNumberId: '333', accessTokenEnc: 'v1:enc' },
@@ -138,6 +163,8 @@ const ACTIONS = {
   create: () => createWhatsappTemplateAction(DRAFT),
   sync: () => syncWhatsappTemplatesAction(),
   delete: () => deleteWhatsappTemplateAction(TEMPLATE_ID),
+  relate: () => relateWhatsappTemplateVariablesAction(RELATE_INPUT),
+  setEnabled: () => setWhatsappTemplateEnabledAction(ENABLE_INPUT),
 } as const
 
 const USE_CASE_OF = {
@@ -145,6 +172,8 @@ const USE_CASE_OF = {
   create: createMock,
   sync: syncMock,
   delete: deleteMock,
+  relate: relateMock,
+  setEnabled: setEnabledMock,
 } as const
 
 const WRITES = ['create', 'sync', 'delete'] as const
@@ -157,6 +186,8 @@ beforeEach(() => {
   createMock.mockResolvedValue(VIEW)
   syncMock.mockResolvedValue(SUMMARY)
   deleteMock.mockResolvedValue({ id: TEMPLATE_ID })
+  relateMock.mockResolvedValue(VIEW)
+  setEnabledMock.mockResolvedValue(VIEW)
 })
 
 describe('R47: el contrato de cada accion de plantillas', () => {
@@ -345,6 +376,69 @@ describe('R5: el actor llega al caso de uso, que rechaza sin permiso', () => {
       const lastCall = useCase.mock.calls[useCase.mock.calls.length - 1] ?? []
       expect(lastCall[lastCall.length - 1], name).toEqual({ ...ACTOR, permissions: [] })
       expect(result, name).toEqual({ status: 'error', code: 'unauthorized', message: errorMessage('unauthorized') })
+    }
+  })
+})
+
+describe('R83: relacionar y habilitar por el mismo contrato', () => {
+  it('R83: crear pasa constantLabels dentro del borrador, tal cual', async () => {
+    const draft = {
+      ...DRAFT,
+      body: { text: 'Hola {{cliente.nombre}}' },
+      constantLabels: { 'cliente.nombre': 'Nombre del cliente' },
+    }
+    await createWhatsappTemplateAction(draft)
+    expect(createMock).toHaveBeenCalledWith(draft, ACTOR)
+  })
+
+  it('R83: relacionar pasa la entrada tal cual y devuelve success con la vista', async () => {
+    const result = await ACTIONS.relate()
+    expect(result).toEqual({ status: 'success', data: VIEW })
+    expect(relateMock).toHaveBeenCalledWith(RELATE_INPUT, ACTOR)
+  })
+
+  it('R83: habilitar y deshabilitar pasan { templateId, enabled } y devuelven success con la vista', async () => {
+    expect(await ACTIONS.setEnabled()).toEqual({ status: 'success', data: VIEW })
+    expect(setEnabledMock).toHaveBeenCalledWith(ENABLE_INPUT, ACTOR)
+
+    await setWhatsappTemplateEnabledAction({ templateId: TEMPLATE_ID, enabled: false })
+    expect(setEnabledMock).toHaveBeenLastCalledWith({ templateId: TEMPLATE_ID, enabled: false }, ACTOR)
+  })
+
+  it('R83: las dos revalidan la pantalla de WhatsApp en exito', async () => {
+    for (const name of ['relate', 'setEnabled'] as const) {
+      revalidatePathMock.mockClear()
+      await ACTIONS[name]()
+      expect(revalidatePathMock, name).toHaveBeenCalledTimes(1)
+      expect(revalidatePathMock, name).toHaveBeenCalledWith(WHATSAPP_ROUTE)
+    }
+  })
+
+  it('R83: las dos devuelven exactamente las claves de la vista', async () => {
+    for (const name of ['relate', 'setEnabled'] as const) {
+      const result = await ACTIONS[name]()
+      if (result.status !== 'success') throw new Error(`${name}: se esperaba success`)
+      expect(Object.keys(result.data).sort(), name).toEqual(VIEW_KEYS)
+    }
+  })
+
+  it('R83: los errores propios de relacionar y habilitar salen con su codigo y sin revalidar', async () => {
+    const CASES = [
+      { error: new WhatsappTemplateNotMappedError('diagnostico interno'), code: 'whatsapp_template_not_mapped' },
+      { error: new WhatsappTemplateNotMappableError('diagnostico interno'), code: 'whatsapp_template_not_mappable' },
+      { error: new WhatsappVariableKeyNotFoundError('diagnostico interno'), code: 'whatsapp_variable_key_not_found' },
+      { error: new ActionNotAllowedError('diagnostico interno'), code: 'action_not_allowed' },
+    ] as const
+
+    for (const name of ['relate', 'setEnabled'] as const) {
+      for (const { error, code } of CASES) {
+        USE_CASE_OF[name].mockRejectedValueOnce(error)
+        revalidatePathMock.mockClear()
+        const result = await ACTIONS[name]()
+        expect(result, `${name} / ${code}`).toEqual({ status: 'error', code, message: errorMessage(code) })
+        expect(JSON.stringify(result)).not.toContain('diagnostico interno')
+        expect(revalidatePathMock).not.toHaveBeenCalled()
+      }
     }
   })
 })

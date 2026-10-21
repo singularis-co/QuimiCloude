@@ -96,6 +96,32 @@ export async function syncWhatsappTemplatesAction(): Promise<WhatsappTemplateSyn
   }
 }
 
+/** `input` es `{ templateId, bindings: [{ slot, key }] }`: sustituye todas las relaciones. */
+export async function relateWhatsappTemplateVariablesAction(input: unknown): Promise<WhatsappTemplateCreateResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await integraciones.relateWhatsappTemplateVariables(input, actor);
+    refreshScreen();
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** `input` es `{ templateId, enabled }`. */
+export async function setWhatsappTemplateEnabledAction(input: unknown): Promise<WhatsappTemplateCreateResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await integraciones.setWhatsappTemplateEnabled(input, actor);
+    refreshScreen();
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
 export async function deleteWhatsappTemplateAction(id: string): Promise<WhatsappTemplateDeleteResult> {
   const actor = await currentActor();
 

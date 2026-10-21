@@ -3,6 +3,13 @@
 > Zona: `backend` · Complejidad: `medium` · depends_on: QC-237, QC-238 · Rama:
 > `feature/QC-242-plantillas-whatsapp-backend`
 >
+> **Enmienda 2 — 2026-10-20 (tarde), constantes del front (R87–R96): §19.** Cambia §18.2, §18.3,
+> §18.4, §18.6, §18.7 y §3.4 donde lo dice §19.
+>
+> **Enmienda 2026-10-20 (diccionario de variables, R53–R86): §18.** §1–§17 describen lo implementado
+> en el PR #281 y siguen valiendo; donde §18 cambia algo de ellas, lo dice con la sección afectada
+> (§3.3, §3.4, §4.3, §4.4, §4.5, §4.6, §5, §9, §11, §12).
+>
 > El **qué** está en `requirements.md` (R1–R52). Aquí va el **cómo**. Precedentes que se copian:
 >
 > - **QC-237**: `WhatsappConnectionRepository`, `decryptStoredSecret` (descifrar y dejar la conexión en
@@ -952,3 +959,684 @@ de prueba, ver el webhook `APPROVED`, borrarla; evidencia a `progress/impl_QC-24
 **Ninguna** (R52). `after` es de `next/server` (Next 16.3.0, ya instalado); `zod` ya está; `fetch` y
 `AbortSignal.timeout` son de la plataforma. `package.json` no cambia. Ninguna variable nueva: se usan
 `CRON_SECRET` (QC-141), `WHATSAPP_GRAPH_API_VERSION` y las de cifrado (QC-234/QC-237).
+
+---
+
+## 18. Enmienda 2026-10-20 — diccionario de variables (R53–R86)
+
+Decisiones del humano E1–E16 y P10, P11, P13, P14, P16, P18 (aprobadas el 2026-10-20) en
+`requirements.md > Enmienda 2026-10-20`. De P11 siguen abiertos el dato de `nombre` y la forma de
+`pedido_numero` (comentarios del catálogo en §18.4).
+
+### 18.0 Lo que ya existe
+
+Buscado `variable_key`, `VariableKey`, `diccionario de variables`, `whatsapp_event_templates` y
+`variables con nombre` en `feature_list.json` (por `key` QC-243, QC-245, QC-247), `specs/` y el código
+(Grep; el grafo no tiene indexado este worktree tras el merge). Para la lista de constantes ([P11]) se
+leyeron `Customer`, `Order` y `Company` en `db/schema.prisma`.
+
+| Apareció | Qué es | Qué se hace |
+|---|---|---|
+| Lo implementado de QC-242 (`lib/modules/integraciones/**/whatsapp-template*`, `template-sync-plan.ts`, `whatsapp-template-prisma.ts`, `whatsapp-template-actions.ts`) | Modelo, validador `{{n}}`, `toMetaComponents`/`contentOf`, plan de sincronización, repositorio y acciones | **Se amplía.** Nada se reescribe: el validador `{{n}}` queda como regla de Meta detrás de la traducción |
+| QC-247 (`pending`): catálogo de eventos en código con `cliente.nombre`, `pedido.numero`, `pedido.fecha_entrega`, `empresa.nombre`, y `whatsapp_event_templates` con «mapeo de variables (`{{1}}` → `cliente.nombre`)» | Consumidor | Las constantes del sistema (E3) cubren lo que su mapeo hacía: con la enmienda, la plantilla ya sabe de dónde sale cada variable. Su spec decide si su mapeo desaparece. No existe aún: no hay código que cambiar |
+| QC-245 (`pending`): «valida que la cantidad de parámetros coincida con sus variables» | Consumidor | Con la enmienda, toma de la vista los huecos (R81) y arma los parámetros con los resolvedores de las constantes y los valores de las propias |
+| QC-243 (`pending`): «Agregar variable inserta `{{n}}`», «campo de ejemplo obligatorio por variable» | La pantalla | Pasa a insertar `{{clave}}`; frontera en §18.11 |
+| Contraste con Meta (`progress/impl_QC-242.md`): Meta tiene `parameter_format: named` | La opción B | Descartada (§18.12) |
+| Ninguna tabla, puerto ni caso de uso de diccionario | — | Nace aquí |
+
+Sin UI: no se consulta `components/shared/CATALOGO.md` ni hay pase `/design`.
+
+### 18.1 Qué cambia (resumen)
+
+```
+db/schema.prisma                                ← 1 enum, WhatsappVariableKey, WhatsappTemplateVariable, + mappingStatus y enabled en WhatsappTemplate
+db/migrations/20261020180000_whatsapp_variable_keys/{migration,down}.sql
+lib/modules/errores/domain/{error-codes,error-catalog}.ts   ← + 5 códigos
+lib/modules/integraciones/
+  index.ts                                      ← + fábricas, validadores, catálogo de constantes, tipos, errores
+  domain/
+    errors.ts                                   ← + 5 errores
+    whatsapp-system-variables.ts                ← nuevo: catálogo de constantes del sistema (R53, R55, [P11])
+    whatsapp-variable-key.ts                    ← nuevo: variable propia, límites, validador puro (R54)
+    whatsapp-template-variables.ts              ← nuevo: huecos, estado del mapeo, traducción {{clave}} ⇄ {{n}} (R64, R65, R67, R81)
+    whatsapp-template-keyed-draft.ts            ← nuevo: validador público con claves (R66, R67)
+    whatsapp-template-draft.ts                  ← + código de problema `unknown_key`
+    whatsapp-template.ts                        ← record y vista ampliados
+    template-sync-plan.ts                       ← + qué filas pierden la relación (R70, R71)
+    create-whatsapp-template.ts                 ← borrador con claves, relación, carrera (R66–R69)
+    list-whatsapp-templates.ts                  ← vista traducida (R81, R82)
+    manage-whatsapp-variable-keys.ts            ← nuevo: listar, crear, modificar, eliminar (R56–R62)
+    relate-whatsapp-template-variables.ts       ← nuevo: relacionar, habilitar, deshabilitar (R72, R74–R80)
+  ports/
+    whatsapp-variable-key-repository.ts         ← nuevo
+    whatsapp-template-repository.ts             ← + replaceVariables, setEnabled; insertCreated con relación
+  adapters/driven/persistence/
+    company-scope.ts                            ← + whatsappVariableKeyCompanyScope, whatsappTemplateVariableCompanyScope
+    whatsapp-variable-key-prisma.ts             ← nuevo
+    whatsapp-template-prisma.ts                 ← relaciones en el record; applySync y markDeleted las quitan
+  adapters/driving/
+    whatsapp-variable-key-actions.ts            ← nuevo: 4 Server Actions
+    whatsapp-template-actions.ts                ← + 2 Server Actions
+lib/composition/index.ts                        ← amplía `integraciones`
+tests/**                                        ← §18.10
+```
+
+### 18.2 Modelo de datos
+
+```prisma
+enum WhatsappTemplateMappingStatus {
+  UNMAPPED
+  MAPPED
+  @@map("whatsapp_template_mapping_status")
+}
+
+/// @module integraciones
+model WhatsappVariableKey {                         // variables propias; las constantes viven en código
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  key       String
+  label     String
+  value     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, key], map: "whatsapp_variable_keys_company_key_key")
+  @@unique([companyId, id], map: "whatsapp_variable_keys_company_id_id_key")
+  @@map("whatsapp_variable_keys")
+}
+
+/// @module integraciones
+model WhatsappTemplateVariable {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  templateId    String   @map("template_id") @db.Uuid
+  slot          String
+  variableKeyId String?  @map("variable_key_id") @db.Uuid     // variable propia
+  systemKey     String?  @map("system_key")                   // constante del sistema
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([templateId, slot], map: "whatsapp_template_variables_template_slot_key")
+  @@index([variableKeyId], map: "whatsapp_template_variables_variable_key_idx")
+  @@map("whatsapp_template_variables")
+}
+```
+
+`WhatsappTemplate` gana `mappingStatus WhatsappTemplateMappingStatus @default(UNMAPPED)
+@map("mapping_status")`, `enabled Boolean @default(false)` y `@@unique([companyId, id], map:
+"whatsapp_templates_company_id_id_key")` (clave de la FK compuesta).
+
+Decisiones del modelo:
+
+- **Constantes en código, variables propias en la base** (E3, E4, E16). Una constante no tiene fila:
+  su clave, etiqueta y de qué dato sale viven en `domain/whatsapp-system-variables.ts`, iguales para
+  todas las empresas y de solo lectura (R55). La relación de un hueco apunta a una de las dos:
+  `CHECK (("variable_key_id" IS NULL) <> ("system_key" IS NULL))` y
+  `CHECK ("system_key" IS NULL OR "system_key" ~ '^[a-z][a-z0-9_]{0,39}$')` (misma forma que una
+  propia, [P10]). Que la constante exista en el catálogo lo comprueba el dominio: la base no conoce el
+  catálogo. Ejemplo de E16: la fila `(slot 'body.1', system_key 'nombre')` es el «`1 = nombre`».
+- **Una tabla de relaciones, no un `jsonb` en la plantilla.** La FK a la variable propia con
+  `ON DELETE RESTRICT` hace que la base impida borrar una en uso (R59) y la FK compuesta
+  `(company_id, …)` impide cruzar empresas (R63). Un `jsonb` no da ninguna de las dos (§18.12).
+- **`slot` como texto con forma fija**: `header`, `body.<n>` (n ≥ 1) o `button.<i>` (posición del botón,
+  0–9). `CHECK ("slot" ~ '^(header|body\.[1-9][0-9]*|button\.[0-9])$')`. Un hueco es una cadena estable
+  que viaja igual en la vista, en la acción de relacionar y en la base.
+- **El estado del mapeo se guarda** (E5 lo llama «campo»): lo escribe el dominio en cada escritura de
+  relaciones o componentes (R65), nunca el usuario. Guardarlo permite fijar en la base la regla de E8 y
+  R80: `CHECK (NOT "enabled" OR "mapping_status" = 'MAPPED')`. Una plantilla habilitada «sin relacionar»
+  no se puede escribir ni por error.
+- **Borrado físico de la variable propia**: el resto del módulo usa `deletedAt`, pero aquí un borrado
+  lógico dejaría a la FK sin efecto. Las relaciones de una plantilla que se marca eliminada se borran en
+  la misma transacción (R73), para que no retengan la variable.
+- **Renombrar la clave** (R58) no toca las relaciones: apuntan al `id`. E7 lo restringe igual, porque la
+  clave se ve en el contenido de las plantillas (`{{clave}}`, R81).
+- **Sin `@relation`** (como §2.1): FK escritas a mano en la migración.
+- Una variable usada en una plantilla de una conexión ya borrada sigue «en uso» mientras esa plantilla
+  no esté eliminada. Se acepta: es raro y se ve en el conteo de R60.
+
+### 18.3 Migración `20261020180000_whatsapp_variable_keys`
+
+A mano, en orden:
+
+1. `CREATE TYPE "whatsapp_template_mapping_status" AS ENUM ('UNMAPPED', 'MAPPED')`.
+2. `CREATE TABLE "whatsapp_variable_keys"` con `CHECK ("key" ~ '^[a-z][a-z0-9_]{0,39}$')`,
+   `CHECK (length("label") BETWEEN 1 AND 60)`, `CHECK (length("value") BETWEEN 1 AND 50)` (E14) y
+   `CHECK (position('{{' in "value") = 0 AND position('}}' in "value") = 0)`; el dominio mide en puntos
+   de código como §3.3 y `length` de Postgres UTF-8 también; `updated_at` sin default; únicos de §18.2;
+   FK `company_id → companies(id)`.
+3. `CREATE UNIQUE INDEX "whatsapp_templates_company_id_id_key" ON "whatsapp_templates" ("company_id", "id")`.
+4. `ALTER TABLE "whatsapp_templates" ADD COLUMN "mapping_status" "whatsapp_template_mapping_status" NOT
+   NULL DEFAULT 'UNMAPPED', ADD COLUMN "enabled" BOOLEAN NOT NULL DEFAULT false`, y el `CHECK` de
+   `enabled` de §18.2 (`whatsapp_templates_enabled_requires_mapped`).
+5. `CREATE TABLE "whatsapp_template_variables"` con los tres `CHECK`, el único y el índice de §18.2; FK
+   `(company_id, template_id) → whatsapp_templates (company_id, id)` y `(company_id, variable_key_id) →
+   whatsapp_variable_keys (company_id, id)` (una FK compuesta con una columna nula no se comprueba, que
+   es lo buscado para las constantes), las dos `ON DELETE RESTRICT ON UPDATE CASCADE`; `company_id →
+   companies(id)`.
+6. **Relleno** (R86): las filas existentes quedan sin relaciones; las vivas que cumplen R70 traducido a
+   SQL pasan a `MAPPED` y `enabled = true`:
+   ```sql
+   UPDATE "whatsapp_templates" SET "mapping_status" = 'MAPPED', "enabled" = true
+   WHERE "deleted_at" IS NULL
+     AND position('{{' in "components"::text) = 0
+     AND jsonb_typeof("components") = 'array'
+     AND jsonb_path_exists("components", '$[*] ? (@.type == "BODY")')
+     AND NOT jsonb_path_exists("components", '$[*] ? (!(@.type == "HEADER" || @.type == "BODY" || @.type == "FOOTER" || @.type == "BUTTONS"))')
+     AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && !(@.format == "TEXT"))')
+     AND NOT jsonb_path_exists("components", '$[*] ? (@.type == "HEADER" && !(exists (@.format)))')
+     AND NOT jsonb_path_exists("components", '$[*].buttons[*] ? (!(@.type == "QUICK_REPLY" || @.type == "URL" || @.type == "PHONE_NUMBER"))');
+   ```
+   La regla es la de `contentOf` (§3.4): **todos** los componentes son `HEADER`, `BODY`, `FOOTER` o
+   `BUTTONS` (uno de tipo desconocido, como `CAROUSEL` o `LIMITED_TIME_OFFER`, la deja «sin
+   relacionar»); el `HEADER`, si está, trae `format = TEXT` (sin `format`, o con otro, también «sin
+   relacionar»); hay un `BODY`; y todos los botones son de los tres tipos. Los predicados se escriben
+   en positivo y negados (`!(… == …)`) a propósito: en jsonpath, `@.x != "v"` sobre una clave que no
+   existe no es verdadero, así que con `!=` un componente sin `type` o un `HEADER` sin `format` pasarían
+   el filtro. El `exists` separado cubre el `HEADER` sin `format`, por si `!(…)` sobre un desconocido no
+   lo cubre en la versión de Postgres del entorno; el test de migración lo fija.
+
+   Lo que el SQL **no** replica de `contentOf`: componentes repetidos (dos `BODY`) y la forma interna de
+   cada componente (un `BODY` sin `text`, un botón sin `text`). Esas filas quedan «relacionadas» por el
+   relleno y el dominio las vería no relacionables; las corrige la primera sincronización de esa
+   plantilla solo si Meta la cambia. Se acepta porque Meta no devuelve esas formas, y el relleno corre
+   sobre cero filas si `dev` y la migración de §2.2 llegan juntas a producción. El test de migración fija
+   los casos de §18.10 más `CAROUSEL`, `LIMITED_TIME_OFFER` y `HEADER` sin `format` ⇒ `UNMAPPED` y
+   deshabilitada.
+7. `ENABLE` y `FORCE ROW LEVEL SECURITY` en las dos tablas nuevas, sin policies (R84).
+
+`down.sql`: `DROP TABLE "whatsapp_template_variables"`, `ALTER TABLE "whatsapp_templates" DROP
+CONSTRAINT "whatsapp_templates_enabled_requires_mapped", DROP COLUMN "enabled", DROP COLUMN
+"mapping_status"`, `DROP INDEX "whatsapp_templates_company_id_id_key"`, `DROP TABLE
+"whatsapp_variable_keys"`, `DROP TYPE "whatsapp_template_mapping_status"`.
+
+`guard-empresa-en-esquema`: las dos tablas tienen `company_id`. `guard-rls-force` las ve por la
+migración. Sin filas de permisos nuevas.
+
+### 18.4 Dominio: constantes y variables propias — R53–R55, R60
+
+> **[La parte de constantes queda derogada por §19.2: no hay catálogo en el backend.]**
+
+**Constantes (`domain/whatsapp-system-variables.ts`)**, lista inicial de [P11]:
+
+```ts
+export type SystemVariableSource = 'customer' | 'order' | 'company';
+export type SystemVariable = { key: string; label: string; source: SystemVariableSource; field: string };
+export const WHATSAPP_SYSTEM_VARIABLES: readonly SystemVariable[] = [
+  { key: 'nombre', label: 'Nombre del cliente', source: 'customer', field: 'name' },        // E16; [P11] firstNames o nombres + apellidos
+  { key: 'pedido_numero', label: 'Número de pedido', source: 'order', field: 'number' },     // [P11] [POR CONFIRMAR] la forma del número
+  { key: 'empresa_nombre', label: 'Nombre de la empresa', source: 'company', field: 'name' },
+];
+export function systemVariableOf(key: string): SystemVariable | null;
+```
+
+`source`/`field` dicen de qué dato sale el valor; **leerlo no es de esta ficha** ([P11]): QC-245 y
+QC-247 implementan el resolvedor, con el cliente, el pedido y la empresa que ya tienen al enviar. Un
+test fija que las claves del catálogo son únicas y cumplen `WHATSAPP_VARIABLE_KEY_PATTERN`.
+
+**Variables propias (`domain/whatsapp-variable-key.ts`)**:
+
+```ts
+export const WHATSAPP_VARIABLE_KEY_LIMITS = { keyMaxLength: 40, labelMaxLength: 60, valueMaxLength: 50 } as const;
+export const WHATSAPP_VARIABLE_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
+export type WhatsappVariableKeyRecord = { id; companyId; key; label; value; createdAt: Date };
+export type WhatsappVariableKeyInput = { key: string; label: string; value: string };
+export type WhatsappDictionaryEntryView =                       // R60, campo a campo
+  | { kind: 'system'; id: null; key; label; value: null; usedBy: number }
+  | { kind: 'company'; id: string; key; label; value: string; usedBy: number };
+
+export function validateWhatsappVariableKeyInput(input: unknown):
+  | { ok: true; value: WhatsappVariableKeyInput }
+  | { ok: false; issues: readonly WhatsappTemplateIssue[] };
+```
+
+Puro, como el validador de §3.3: solo `zod` y `domain/`. Mismos criterios de §3.3: puntos de código,
+rechaza solo espacios y `\u0000`. El valor: obligatorio, 1–50 (E14), sin `{{` ni `}}` porque irá
+dentro de un parámetro de Meta. La modificación recibe los tres campos: si la clave no cambia, es
+R57; si cambia, R58.
+
+### 18.5 Dominio: huecos, estado del mapeo y traducción (`domain/whatsapp-template-variables.ts`) — R64, R65, R71, R81
+
+```ts
+export type TemplateSlot = 'header' | `body.${number}` | `button.${number}`;
+export type TemplateVariableBinding =
+  | { slot: TemplateSlot; kind: 'system'; systemKey: string }
+  | { slot: TemplateSlot; kind: 'company'; variableKeyId: string };
+
+export function variableSlotsOf(content: WhatsappTemplateContent | null): readonly TemplateSlot[] | null;
+export function mappingStatusOf(components: unknown, bindings: readonly TemplateVariableBinding[]): 'UNMAPPED' | 'MAPPED';
+export function componentsChanged(before: unknown, after: unknown): boolean;     // E6, R71
+export function showKeys(content: WhatsappTemplateContent, keyBySlot: ReadonlyMap<TemplateSlot, string>): WhatsappTemplateContent;
+```
+
+- `variableSlotsOf`: `null` si el contenido es `null` (no relacionable, R64, [P16]); si no, `header` si
+  el texto del header tiene `{{1}}`, `body.<n>` por cada número distinto del body en orden,
+  `button.<i>` por cada botón URL cuya URL termina en `{{1}}`.
+- `mappingStatusOf` (R65): `MAPPED` si `variableSlotsOf(contentOf(components))` no es `null` y cada
+  hueco tiene una relación; una relacionable sin huecos es `MAPPED`. Es la **única** función que decide
+  el estado; todo camino que escribe relaciones o componentes la llama y guarda su resultado.
+- `componentsChanged(antes, después)` (E6): con los dos `contentOf` no nulos, compara el **contenido
+  normalizado** (header, body, footer, botones y ejemplos, campo a campo); con alguno nulo,
+  `!sameComponents(antes, después)` (§4.3). Se compara el contenido y no el JSON porque `components`
+  guarda lo **enviado** al crear y la sincronización trae lo que **lista** Meta: con el JSON, una
+  diferencia de forma (una clave de más en el `GET`) quitaría la relación a toda plantilla creada en
+  la primera sincronización. Cualquier cambio real de componente cuenta, como pide E6. La forma del
+  `GET` es [P4] [POR CONFIRMAR]; T26 fija con un test que lo creado y lo listado por el doble no cuentan
+  como cambio.
+- `showKeys` (R81, E16): sustituye, en el texto de cada hueco relacionado, `{{n}}` por `{{clave}}`
+  (`Hola {{1}}` con `body.1 = nombre` ⇒ `Hola {{nombre}}`); los huecos sin relación quedan con `{{n}}`.
+  Los ejemplos del contenido no se tocan (son los de Meta).
+
+### 18.6 Dominio: el borrador con claves (`domain/whatsapp-template-keyed-draft.ts`) — R66, R67
+
+```ts
+export type WhatsappTemplateKeyedDraft = {        // sin ejemplos (E15)
+  name; language; category;
+  header: { text: string } | null;
+  body: { text: string };
+  footer: string | null;
+  buttons: readonly ({ type: 'QUICK_REPLY'; text } | { type: 'URL'; text; url } | { type: 'PHONE_NUMBER'; text; phoneNumber })[];
+};
+export type DictionaryEntry =
+  | { kind: 'system'; key: string; label: string }
+  | { kind: 'company'; id: string; key: string; label: string };
+
+export function validateKeyedTemplateDraft(input: unknown, dictionary: readonly DictionaryEntry[]):
+  | { ok: true; draft: WhatsappTemplateDraft; bindings: readonly TemplateVariableBinding[] }
+  | { ok: false; issues: readonly WhatsappTemplateIssue[] };
+```
+
+`dictionary` = `WHATSAPP_SYSTEM_VARIABLES` + las propias de la empresa **[reemplazado por la enmienda
+2, F1: solo las propias; las constantes se reconocen por su forma, §19.3]**. La pantalla lo recibe de
+`listWhatsappDictionaryAction` (§18.9) y el caso de uso de crear lo arma igual.
+
+1. zod con `.strip()` (por defecto): un `example`/`examples` que llegue se descarta (R67, E15); así
+   QC-243 puede pasar el contenido de una vista al duplicar sin limpiarlo.
+2. Marcas: `/\{\{([^{}]*)\}\}/g`. Un interior que no casa con `WHATSAPP_VARIABLE_KEY_PATTERN` y su
+   largo ⇒ `invalid_variable` (incluye `{{1}}`, [P18]); una clave que no está en `dictionary` ⇒
+   `unknown_key` (código nuevo en `WHATSAPP_TEMPLATE_ISSUE_CODES`) en ese campo (R66).
+3. Traducción por componente (R67, E16): header, body y cada URL por separado; cada clave distinta
+   recibe el siguiente número por orden de primera aparición; las repetidas, el mismo
+   (`Hola {{nombre}}, tu pedido {{pedido_numero}}` ⇒ `Hola {{1}}, tu pedido {{2}}`). Ejemplos (E15): la
+   **etiqueta** de la entrada por cada número (`["Nombre del cliente", "Número de pedido"]`); en URL,
+   `url.replace('{{1}}', label)`.
+4. `validateWhatsappTemplateDraft(traducido)` (§3.3, sin cambiar) y se **descartan** los problemas de
+   los campos de ejemplo (`header.example`, `body.examples.*`, `buttons.<i>.example`): E15 dice que el
+   ejemplo no se valida en la app. Si Meta lo rechaza, `templateGraphErrorOf` ya lo traduce (R19). El
+   resto de problemas se devuelven con el `field` del borrador con claves. Los límites de largo se miden
+   sobre el texto **traducido** (`Hola {{1}}`, lo que recibe Meta), no sobre el que escribe el usuario:
+   el mensaje lo dice («El cuerpo admite como mucho 1024 caracteres una vez numeradas las variables»).
+5. `bindings`: por cada hueco, la constante (`systemKey`) o la propia (`variableKeyId`) de su clave.
+
+`validateWhatsappTemplateDraft` sale del contrato (`index.ts`): la pantalla usa la de claves. Sigue
+siendo la regla de Meta y sus tests de T3 no cambian. R6 pasa a cumplirse con
+`validateKeyedTemplateDraft` (pura; `module-shape` fija sus imports igual que con la otra).
+
+### 18.7 Casos de uso
+
+Regla que atraviesa todos: el par (estado del mapeo, habilitada) se escribe siempre junto, calculado
+por `mappingStatusOf` y por la regla «si queda `UNMAPPED`, `enabled = false`» (R72, R80). El `CHECK` de
+§18.2 lo respalda en la base.
+
+**Crear (§4.4 cambia en los pasos 2, 7 y 8).** `deps` gana `variableKeys`.
+
+2. `dictionary = [...WHATSAPP_SYSTEM_VARIABLES, ...await variableKeys.listAll(scope)]`
+   **[reemplazado por la enmienda 2, F1: `await variableKeys.listAll(scope)` y `constantLabels`, §19.4]**;
+   `validateKeyedTemplateDraft(input, dictionary)`; inválido ⇒ `ValidationError` (R14). Leer el
+   diccionario no es escribir: R14 se mantiene.
+7. `templates.insertCreated({ …, variables: bindings, mappingStatus: 'MAPPED', enabled: true },
+   connection.id, scope)` (R68, E11) devuelve `{ record, inserted }`.
+8. Carrera (R69): si `inserted === false` (la sincronización ya la había insertado),
+   `record.variables.length === 0` y `sameSlots(variableSlotsOf(contentOf(record.components)),
+   slotsDe(bindings))` ⇒ `templates.replaceVariables(record.id, bindings, { mappingStatus: 'MAPPED',
+   enabled: true }, record.components, scope)`; si no, se deja como está. Devuelve la vista de la fila
+   final.
+
+**Eliminar (§4.5).** Sin cambio en el dominio; `markDeleted` quita las relaciones y pone
+`enabled = false` en su transacción (R73). El estado del mapeo se deja como estaba: la fila eliminada
+no se lee, y si se revive, R70 lo recalcula.
+
+**Listar y consultar (§4.6).** El filtro no cambia (R82, E9): `onlyApproved` sigue filtrando solo por
+`status`. `deps` gana `variableKeys`; se lee la lista de propias **una vez** por llamada y
+`toWhatsappTemplateView(record, dictionaryByKey)` arma la vista de R81:
+
+```ts
+export type WhatsappTemplateVariableView = {
+  slot: string; position: number;                         // `position` = n del {{n}} (1 en header y botón)
+  kind: 'system' | 'company' | null; key: string | null; label: string | null;
+};
+// WhatsappTemplateView gana, campo a campo:
+mappingStatus: 'UNMAPPED' | 'MAPPED'; enabled: boolean; variables: readonly WhatsappTemplateVariableView[];
+```
+
+El `mappingStatus` de la vista es el guardado. Una relación a una constante que ya no está en el
+catálogo (se quitó del código) sale con `kind: 'system'`, la clave y `label: null`; la vista no
+recalcula el estado. Quitar una constante del catálogo exige antes una migración de datos: queda
+escrito en la cabecera de `whatsapp-system-variables.ts`.
+
+**Diccionario (`domain/manage-whatsapp-variable-keys.ts`, R56–R62).** Cuatro fábricas; todas
+`requirePermission` → `scopeOf` primero.
+
+- `createListWhatsappDictionary`: constantes del catálogo (con `usedBy` de
+  `variableKeys.countSystemKeyUsage(scope)`) más `variableKeys.listWithUsage(scope)`, todo ordenado por
+  `key` (R60).
+- `createCreateWhatsappVariableKey(input)`: R54 ⇒ `ValidationError`; `systemVariableOf(key) !== null`
+  ⇒ `WhatsappVariableKeyTakenError` (R56) sin tocar la base; `variableKeys.create(value, scope)`; el
+  adaptador traduce el `23505` de `whatsapp_variable_keys_company_key_key` a
+  `WhatsappVariableKeyTakenError` (reconocido por el nombre del índice, como `isNameLanguageTaken`).
+- `createUpdateWhatsappVariableKey(id, input)`: id no UUID ⇒ `WhatsappVariableKeyNotFoundError`; R54;
+  clave de una constante ⇒ `WhatsappVariableKeyTakenError`; `variableKeys.update(id, value, scope)`
+  devuelve `{ kind: 'updated', record } | { kind: 'not_found' } | { kind: 'in_use' }`. El adaptador, en
+  una transacción con la fila bloqueada, devuelve `in_use` solo si **la clave cambia** y la variable
+  tiene relaciones con plantillas vivas (R58); etiqueta y valor se guardan siempre (R57, [P13]).
+- `createDeleteWhatsappVariableKey(id)`: id no UUID ⇒ no encontrada; `variableKeys.delete(id, scope)`
+  devuelve `'deleted' | 'not_found' | 'in_use'`. El adaptador comprueba el uso y borra en una
+  transacción; un `23503` de la FK también se traduce a `in_use` (la base es la última palabra, R59).
+- Una constante no tiene id: modificar o eliminar con cualquier id llega al repositorio de propias y,
+  si no es una propia de la empresa, es `not_found` (R55, R61).
+
+**Relacionar, habilitar, deshabilitar (`domain/relate-whatsapp-template-variables.ts`, R72, R74–R80).**
+
+```ts
+createRelateWhatsappTemplateVariables(deps)(input: unknown, actor)   // { templateId, bindings: [{ slot, key }] }
+createSetWhatsappTemplateEnabled(deps)(input: unknown, actor)        // { templateId, enabled: boolean }
+```
+
+1. `requirePermission`, `scopeOf`; zod de la entrada (forma rota ⇒ `ValidationError`).
+2. `templateId` no UUID, sin conexión viva, plantilla no viva o de otra conexión ⇒
+   `WhatsappTemplateNotFoundError` (R75 remite a R45). No exige conexión habilitada (R74).
+3. Relacionar: `slots = variableSlotsOf(contentOf(record.components))`; `null` ⇒
+   `WhatsappTemplateNotMappableError` (R75). Hueco que no está en `slots` o repetido ⇒
+   `ValidationError`. Cada `key` se resuelve: `systemVariableOf(key)` ⇒ relación a constante; si no,
+   `variableKeys.findByKeys(keys, scope)`; una que falte ⇒ `WhatsappVariableKeyNotFoundError`.
+   La entrada lleva la **clave** y no el id: es lo que el usuario ve en `{{clave}}` y sirve igual para
+   las dos clases. Se calcula `mappingStatus = mappingStatusOf(record.components, bindings)` y
+   `enabled = mappingStatus === 'MAPPED' && record.enabled` (R72, [P14]; relacionar nunca habilita,
+   R79). Escribe `replaceVariables(id, bindings, { mappingStatus, enabled }, record.components, scope)`.
+4. Habilitar: `record.mappingStatus !== 'MAPPED'` ⇒ `WhatsappTemplateNotMappedError` (R77); no mira el
+   estado de Meta (E13). `setEnabled(id, true, record.components, scope)`. Deshabilitar:
+   `setEnabled(id, false, …)`, sin otra condición (R78).
+5. Las dos escrituras pasan los `components` leídos: el adaptador bloquea la fila (`FOR UPDATE`) y
+   escribe solo si sigue viva y `components = $leídos::jsonb` (igualdad de `jsonb`, que no depende del
+   orden de claves); si no ⇒ `false` ⇒ `ActionNotAllowedError('la plantilla cambió')` (R76). Se compara
+   `components` y no `updatedAt` porque un webhook de estado cambia `updatedAt` sin cambiar las
+   variables.
+6. Devuelve la vista de R81.
+
+**Sincronización (§4.3 y §5.2 cambian).** `planTemplateSync` gana, por fila, la decisión de variables:
+
+```ts
+inserts: { template; mappingStatus; enabled: boolean }[];                          // R70, E11
+updates: { id; template; changed; resetVariables: boolean; mappingStatusAfterReset; enabledAfterReset: boolean }[];  // R70, R71
+```
+
+- En un insert o un reset: sin relaciones, `mappingStatus = mappingStatusOf(template.components, [])`
+  (`MAPPED` solo si es relacionable y sin huecos), y `enabled = mappingStatus === 'MAPPED'` (E11).
+- `resetVariables = local.deletedAt !== null || componentsChanged(local.components,
+  template.components)` (E6). Un revivido no tiene relaciones (R73 las quitó) y se trata como un
+  importado (R70).
+- **Reset con huecos ⇒ `UNMAPPED` y `enabled = false`** (E6, E12). Reset sin huecos ⇒ `MAPPED` y se
+  **conserva** la habilitación que tenía, salvo un revivido, que sigue E11: E12 solo deshabilita al
+  volver a «sin relacionar».
+- `resetVariables` implica que los componentes difieren, que ya era `changed`; los conteos de R25 no
+  cambian.
+
+`syncConnectionTemplates` no cambia: pasa el plan al repositorio. Los webhooks de estado y categoría
+(`applyWebhookUpdates`) no tocan `mapping_status`, `enabled` ni las relaciones (R73): no cambian.
+
+### 18.8 Puertos y adaptadores
+
+```ts
+export interface WhatsappVariableKeyRepository {
+  listAll(scope): Promise<readonly WhatsappVariableKeyRecord[]>;
+  listWithUsage(scope): Promise<readonly (WhatsappVariableKeyRecord & { usedBy: number })[]>;
+  countSystemKeyUsage(scope): Promise<ReadonlyMap<string, number>>;          // plantillas vivas por constante
+  findByKeys(keys: readonly string[], scope): Promise<readonly WhatsappVariableKeyRecord[]>;
+  create(input: WhatsappVariableKeyInput, scope): Promise<WhatsappVariableKeyRecord>;
+  update(id: string, input: WhatsappVariableKeyInput, scope)
+    : Promise<{ kind: 'updated'; record: WhatsappVariableKeyRecord } | { kind: 'not_found' } | { kind: 'in_use' }>;
+  delete(id: string, scope): Promise<'deleted' | 'not_found' | 'in_use'>;
+}
+
+type MappingWrite = { mappingStatus: 'UNMAPPED' | 'MAPPED'; enabled: boolean };
+
+// WhatsappTemplateRepository (§5.1) cambia:
+insertCreated(row: NewCreatedTemplateRow & { variables } & MappingWrite, connectionId, scope)
+  : Promise<{ record: WhatsappTemplateRecord; inserted: boolean }>;
+replaceVariables(id, bindings, mapping: MappingWrite, expectedComponents: unknown, scope): Promise<boolean>;
+setEnabled(id, enabled: boolean, expectedComponents: unknown, scope): Promise<boolean>;
+// WhatsappTemplateRecord gana `mappingStatus`, `enabled` y `variables` (TemplateVariableBinding[]).
+```
+
+`whatsapp-template-prisma.ts`:
+
+- Lecturas (`listLive`, `findLiveById`, `findLiveByNameAndLanguage`) traen las relaciones con una
+  segunda consulta por `templateId in (…)` y el mismo ámbito (sin `include`, §2.1), y las claves de las
+  propias con una tercera por `id in (…)`.
+- `insertCreated`: una transacción interactiva. El `INSERT … ON CONFLICT … DO UPDATE` de §5.2 gana
+  `mapping_status` y `enabled` en el `INSERT` (el `DO UPDATE` no los toca) y devuelve
+  `(xmax = 0) AS "inserted"`; si insertó, `createMany` de las relaciones con
+  `companyScopeColumns(scope)`. Si no insertó, no escribe relaciones (lo decide el dominio, §18.7).
+- `replaceVariables` / `setEnabled`: transacción con `SELECT … FOR UPDATE` en el ámbito; condición de
+  §18.7 paso 5; `deleteMany` + `createMany` de relaciones y `update` de `mappingStatus` y `enabled`.
+- `markDeleted`: en una transacción, `deleteMany` de sus relaciones y `enabled: false`.
+- `applySync` (sigue siendo una transacción): los borrados de §5.2 paso 1 también borran sus relaciones
+  y ponen `enabled: false` (R73); cada `update` con `resetVariables` borra sus relaciones y escribe
+  `mappingStatusAfterReset` y `enabledAfterReset`; los `inserts` llevan su `mappingStatus` y `enabled`.
+  El orden de §5.2 se mantiene (borrados primero). El paso 1 filtra por `createdAt < startedAt`: el
+  `deleteMany` de relaciones usa el mismo filtro a través de `template_id in (ids que cumplen)`,
+  calculados dentro de la transacción.
+
+`whatsapp-variable-key-prisma.ts`: cada función con `scope: IntegracionesScope` al final y
+`whatsappVariableKeyCompanyScope(scope)`. `listWithUsage` y `countSystemKeyUsage` cuentan plantillas
+**vivas** distintas (`whatsapp_template_variables` unido a plantillas con `deleted_at IS NULL`, en el
+ámbito). `update` y `delete`: transacción con la fila bloqueada y el conteo de uso.
+
+`guard-ambito-empresa-integraciones.test.ts`: cuarto puerto (7 métodos), dos métodos más en el de
+plantillas (10), dos envolturas más en `company-scope.ts`.
+
+### 18.9 Server Actions, composición, contrato y errores
+
+`adapters/driving/whatsapp-variable-key-actions.ts` (nuevo, `'use server'`, mismo patrón que §9):
+
+```ts
+listWhatsappDictionaryAction(): Promise<{ status: 'success'; data: readonly WhatsappDictionaryEntryView[] } | ErrorState>;
+createWhatsappVariableKeyAction(input: unknown): Promise<{ status: 'success'; data: WhatsappDictionaryEntryView } | ErrorState>;
+updateWhatsappVariableKeyAction(id: string, input: unknown): Promise<{ status: 'success'; data: WhatsappDictionaryEntryView } | ErrorState>;
+deleteWhatsappVariableKeyAction(id: string): Promise<{ status: 'success'; data: { id: string } } | ErrorState>;
+```
+
+`whatsapp-template-actions.ts` gana (E8: la acción de habilitar que pide QC-243):
+
+```ts
+relateWhatsappTemplateVariablesAction(input: unknown): Promise<WhatsappTemplateCreateResult>;   // vista de R81
+setWhatsappTemplateEnabledAction(input: unknown): Promise<WhatsappTemplateCreateResult>;       // { templateId, enabled }
+```
+
+`listWhatsappTemplatesAction` no cambia de firma; su `data.templates` trae los campos nuevos de la
+vista (R82). Las de escritura llaman `revalidatePath(WHATSAPP_INTEGRATION_ROUTE)` (R83). La vista de la
+entrada se copia campo a campo; `usedBy` en la creación es 0.
+
+**Composición**: `whatsappVariableKeyRepository` atado a sus funciones; `variableKeys` entra en los deps
+de crear, listar, consultar, relacionar y habilitar; seis fábricas nuevas en `integraciones`.
+
+**Contrato (`index.ts`)**: se suman `createListWhatsappDictionary`, `createCreateWhatsappVariableKey`,
+`createUpdateWhatsappVariableKey`, `createDeleteWhatsappVariableKey`,
+`createRelateWhatsappTemplateVariables`, `createSetWhatsappTemplateEnabled`,
+`validateKeyedTemplateDraft`, `validateWhatsappVariableKeyInput`, `WHATSAPP_VARIABLE_KEY_LIMITS`,
+`WHATSAPP_VARIABLE_KEY_PATTERN`, ~~`WHATSAPP_SYSTEM_VARIABLES` (con `source` y `field`, para que QC-245 y
+QC-247 escriban sus resolvedores, [P11])~~ **[reemplazado por la enmienda 2, F1: no entra en el
+contrato; en su lugar `WHATSAPP_CONSTANT_KEY_PATTERN`, §19.2]**, los 5 errores y los tipos
+`WhatsappDictionaryEntryView`, `WhatsappTemplateVariableView`, `WhatsappTemplateKeyedDraft`,
+~~`SystemVariable`~~ **[reemplazado por la enmienda 2, F1]**. Sale
+`validateWhatsappTemplateDraft` (§18.6). Se mantienen `TEMPLATE_LIMITS` y `WhatsappTemplateDraft` (la
+pantalla pinta contadores).
+
+**Errores (R85)**, cuenta + 5 en `catalogo.test.ts`:
+
+| Código | Texto |
+|---|---|
+| `whatsapp_variable_key_not_found` | No se encontró la variable. |
+| `whatsapp_variable_key_taken` | Ya existe una variable con esa clave. |
+| `whatsapp_variable_key_in_use` | La variable se usa en una o más plantillas. Quítala de ellas antes de eliminarla o cambiar su clave. |
+| `whatsapp_template_not_mapped` | Relaciona todas las variables de la plantilla antes de habilitarla. |
+| `whatsapp_template_not_mappable` | Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar. |
+
+R76 reutiliza `action_not_allowed` (ya existe).
+
+### 18.10 Tests
+
+| Archivo | Cubre |
+|---|---|
+| `tests/unit/integraciones/whatsapp/templates/whatsapp-variable-key.test.ts` (nuevo) | R54: clave en el límite (40) y +1, empieza por dígito, mayúscula, guion, punto; etiqueta 60/61, solo espacios; valor ausente, vacío, 50/51, con `{{`; catálogo de constantes: claves únicas y con el patrón (R53) |
+| `…/templates/whatsapp-template-variables.test.ts` (nuevo) | R64 (huecos de header, body repetido, botón URL en posición 2, no relacionable ⇒ `null`), R65 (`mappingStatusOf`: cero huecos ⇒ `MAPPED`; uno sin relación ⇒ `UNMAPPED`; no relacionable sin variables ⇒ `UNMAPPED`, [P16]), `componentsChanged` por tabla (E6: body, footer, ejemplo o botón cambian ⇒ sí; el mismo contenido con otra forma de JSON ⇒ no), `showKeys` (`Hola {{1}}` ⇒ `Hola {{nombre}}`, E16; un hueco sin relación queda `{{n}}`, R81) |
+| `…/templates/whatsapp-template-keyed-draft.test.ts` (nuevo) | R66 (`{{1}}`, `{{Nombre}}`, clave desconocida ⇒ `unknown_key` en su campo; constante y propia valen), R67 (`Hola {{nombre}}` ⇒ `Hola {{1}}` con ejemplo «Nombre del cliente», E16; traducción por componente; repetida ⇒ mismo número; URL con la etiqueta sustituida; ejemplos del borrador ignorados; una etiqueta de 60 en un header no da problema, E15; largo medido traducido; `field` reescrito), R6 (solo `zod` y `domain/`, vía `module-shape`) |
+| `…/templates/template-sync-plan.test.ts` (se amplía) | R70 (insert sin huecos ⇒ `MAPPED` y habilitada; con huecos o no relacionable ⇒ `UNMAPPED` y deshabilitada), R71 (`resetVariables` por tabla; reset con huecos ⇒ `UNMAPPED` y deshabilitada, R72; reset sin huecos conserva la habilitación), revivida ⇒ como importada |
+| `…/templates/create-whatsapp-template.test.ts` (se amplía) | R14 con R66–R67 (Graph no llamado), R67 (Meta rechaza por el ejemplo ⇒ `whatsapp_template_rejected`), R68 (relaciones, `MAPPED` y `enabled` enviados), R69 (`inserted: false` sin relaciones y mismos huecos ⇒ `replaceVariables`; con relaciones o huecos distintos ⇒ no) |
+| `…/templates/list-whatsapp-templates.test.ts` (se amplía) | R81 (claves exactas de la vista, contenido con `{{clave}}`, constante quitada del catálogo ⇒ `label: null`), R82 (`onlyApproved` devuelve aprobadas `UNMAPPED` y deshabilitadas, con los dos campos), las propias se leen una vez |
+| `…/templates/manage-whatsapp-variable-keys.test.ts` (nuevo) | R55 (id de una constante ⇒ no encontrada; vista sin id ni valor), R56 (clave repetida y clave de una constante ⇒ `taken`, sin puerto en el segundo caso), R57, R58 (renombrar sin uso guarda; con uso ⇒ `in_use`), R59, R60 (orden, constantes y propias, claves exactas), R61, R62 (sin permiso ningún puerto llamado) |
+| `…/templates/relate-whatsapp-template-variables.test.ts` (nuevo) | R74 (sustituye todo; constante y propia; recalcula a `MAPPED`; sin Graph; conexión deshabilitada sirve), R72 (quitar una relación a una habilitada ⇒ `UNMAPPED` y deshabilitada, [P14]), R75 (cada rama), R76 (`false` del puerto ⇒ `action_not_allowed`), R77 (`UNMAPPED` ⇒ `not_mapped`; `PENDING` y `REJECTED` relacionadas se habilitan, E13), R78, R79 (quedar `MAPPED` no habilita), R62 |
+| `…/templates/whatsapp-template-actions.test.ts` (se amplía) | R83 para las dos acciones nuevas; `revalidatePath` |
+| `…/templates/whatsapp-variable-key-actions.test.ts` (nuevo) | R83 (contrato, claves exactas de `data`, `revalidatePath` en las tres de escritura), R62 |
+| `tests/integration/integraciones/whatsapp-variable-key-prisma.int.test.ts` (nuevo) | R53 (único por empresa; la misma clave en otra empresa entra; `CHECK` del valor 50/51), R58 y R59 (con uso ⇒ `in_use`; la FK impide borrar en uso), R60 (`usedBy` y `countSystemKeyUsage` no cuentan eliminadas), R63 (empresa B no ve ni borra; FK compuesta rechaza relación cruzada; relación con las dos columnas o ninguna ⇒ rechazo) |
+| `tests/integration/integraciones/whatsapp-template-prisma.int.test.ts` (se amplía) | R68, R69 (`inserted` con la carrera de §4.4), R70–R72 dentro de `applySync`, R73 en `markDeleted` y en `applyWebhookUpdates`, R76 (componentes cambiados entre lectura y escritura ⇒ `false`), R80 (el `CHECK` rechaza `enabled` con `UNMAPPED`) |
+| `tests/integration/integraciones/whatsapp-variable-keys-migration.int.test.ts` (nuevo) | R84 (`down.sql` y vuelta, RLS forzada, índices y `CHECK` por nombre), R86 (relleno: sin variables ⇒ `MAPPED` y habilitada; con `{{1}}`, header `IMAGE`, botón `OTP`, eliminada ⇒ `UNMAPPED` y deshabilitada) |
+| `tests/integration/integraciones/whatsapp-template-flow.int.test.ts` (se amplía) | Recorrido de E16: crear `cuenta_numero`; crear `Hola {{nombre}}, tu cuenta {{cuenta_numero}}` ⇒ Meta (doble) recibe `{{1}}`/`{{2}}` con las etiquetas de ejemplo, la vista vuelve con las claves, `MAPPED` y habilitada; importar una de Meta con `{{1}}` ⇒ `UNMAPPED` y deshabilitada; relacionarla ⇒ `MAPPED` y sigue deshabilitada; habilitar; Meta cambia el body ⇒ `UNMAPPED` y deshabilitada; borrar `cuenta_numero` en uso ⇒ `in_use` |
+| `tests/unit/errores/catalogo.test.ts` | cuenta + 5 (R85) |
+| `tests/unit/integraciones/module-shape.test.ts` | archivos nuevos, contrato, modelos de seis a ocho, R6 sobre el validador con claves |
+| `tests/guards/guard-ambito-empresa-integraciones.test.ts` | cuarto puerto, métodos nuevos, dos envolturas |
+| `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts` | doble del diccionario y de los métodos nuevos |
+| `tests/integration/aislamiento.json` | los dos `.int.test.ts` nuevos |
+
+### 18.11 Fronteras
+
+- **QC-243**: el formulario inserta `{{clave}}` del diccionario (no `{{n}}`), llama a
+  `validateKeyedTemplateDraft` con la lista de `listWhatsappDictionaryAction`, no pide ejemplos (son las
+  etiquetas, E15) y gana: una sección de diccionario (constantes de solo lectura y propias con clave,
+  etiqueta y valor), un «Relacionar variables» por plantilla, el interruptor de habilitar (E8) y los
+  dos campos en el listado. La vista previa puede mostrar el valor de las propias y la etiqueta de las
+  constantes. Su descripción de Jira dice «Agregar variable inserta `{{n}}`» y «un campo de ejemplo
+  obligatorio por variable»: **la ficha QC-243 necesita ajustarse** antes de su spec (eso lo hace el
+  humano en Jira, no este spec).
+- **QC-245** y **QC-247**: usan una plantilla solo si es `APPROVED` y habilitada (lo comprueban ellas:
+  el listado no filtra por eso, E9); arman los parámetros por hueco, en orden de `position`: una
+  constante con su resolvedor ([P11]), una propia con su `value` (E4). El mapeo
+  `{{1}} → cliente.nombre` que describe QC-247 queda cubierto por las constantes; su spec decide si lo
+  conserva.
+- **QC-240/QC-241** no cambian: envían `{{n}}` posicionales; el orden de los parámetros lo arma quien
+  envía con la lista de huecos.
+
+| Archivo | Con quién | Cómo se resuelve |
+|---|---|---|
+| `db/schema.prisma`, `db/migrations/` | Fichas con esquema en vuelo | Bloque al final; timestamp re-fechado si `dev` trae una posterior |
+| `lib/composition/index.ts`, `errores/domain/*`, `catalogo.test.ts`, `aislamiento.json` | Como §15 | Como §15 |
+| `lib/modules/integraciones/**` | QC-239, QC-240, QC-241 | Como §15 |
+
+### 18.12 Alternativas descartadas
+
+1. **Opción A — solo un catálogo de claves en código** (una lista fija `nombre`, `pedido_numero`…).
+   Daría resolvedores gratis, pero cada dato propio de la empresa (un número de cuenta, un horario)
+   exigiría un despliegue. El humano eligió un diccionario por empresa (E1) y luego lo hizo mixto (E3):
+   lo bueno de A se conserva en las constantes del sistema.
+2. **Opción B — variables `NAMED` de Meta** (`parameter_format: named`, `{{usuario_nombre}}` dentro de
+   Meta). La ficha la deja fuera («Variables con nombre (`NAMED`)»); no resuelve las plantillas
+   importadas, que siguen llegando con `{{1}}` y necesitarían la misma relación; el nombre viviría por
+   plantilla en Meta, sin etiqueta, valor ni diccionario de empresa; y cambia el envío de QC-240
+   (`parameter_name` en cada parámetro). E16 fija el texto posicional hacia Meta.
+3. **Solo variables propias, sin constantes** (la primera versión de esta enmienda). Cada empresa
+   tendría que crear «Nombre del cliente» a mano y nadie sabría resolverla al enviar. E3 lo descarta.
+4. **Constantes como filas de la base** (sembradas por migración en cada empresa). Las haría
+   relacionables por la misma FK, pero obliga a sembrar cada empresa nueva y a migrar todas para añadir
+   una constante; y el resolvedor, que es código, quedaría separado de su clave. Se dejan en código y la
+   relación apunta a una de las dos (`variable_key_id` o `system_key`).
+5. **La relación como `jsonb` en `whatsapp_templates`.** Una sola tabla y una escritura menos, pero sin
+   FK: nada impide borrar una variable en uso ni apuntar a una de otra empresa, y «en uso» exigiría
+   recorrer el `jsonb` de todas las plantillas.
+6. **Un solo campo «habilitada» automático** (la versión intermedia de esta enmienda). El humano lo
+   separó en dos (E5, E8): el estado del mapeo es un hecho que el sistema calcula; la habilitación es
+   una decisión del Administrador.
+7. **Calcular el estado del mapeo al leer, sin guardarlo.** Evita mantenerlo en cada escritura, pero
+   sin la columna la base no puede impedir una plantilla habilitada «sin relacionar» (`CHECK` de §18.2)
+   y el listado tendría que parsear los componentes de cada fila.
+8. **Comparar el JSON crudo de los componentes para E6.** Más simple, pero `components` guarda lo
+   enviado al crear y lo que lista Meta, que pueden diferir en forma; cada plantilla creada perdería su
+   relación en la primera sincronización. Se compara el contenido normalizado (§18.5), que sigue
+   contando cualquier cambio real.
+9. **Seguir aceptando `{{1}}` en el borrador de creación** junto a las claves: dejaría plantillas
+   creadas desde la app sin relacionar, contra E5 ([P18]).
+10. **Validar en la app el ejemplo (la etiqueta) contra los límites de Meta**: E15 lo descarta; Meta es
+    quien decide y su rechazo ya se traduce (R19).
+
+### 18.13 Dependencias y entorno
+
+Ninguna (R52). `jsonb_path_exists` es de Postgres 12+, ya en uso por Supabase. Ninguna variable nueva.
+
+---
+
+## 19. Enmienda 2 — 2026-10-20 (tarde): las constantes las define el front (R87–R96)
+
+Decisiones F1–F4 y P19–P22 (aprobadas el 2026-10-20) en `requirements.md > Enmienda 2`.
+
+### 19.1 Lo que ya existe (sin commit en el worktree, hecho sobre §18)
+
+| Archivo | Tarea | Qué hay | Qué cambia |
+|---|---|---|---|
+| `db/migrations/20261020180000_whatsapp_variable_keys/{migration,down}.sql`, `db/schema.prisma` | T22 | `system_key` con `CHECK` de forma sin punto; `whatsapp_variable_keys_key_format` sin punto | Solo el `CHECK` `whatsapp_template_variables_system_key_format` pasa a la forma de constante de §19.2; el de la clave propia ya es correcto (no admite punto). El comentario del modelo en `schema.prisma` deja de decir «constante del catálogo». La columna se queda: guarda la clave de constante tal cual |
+| `lib/modules/integraciones/domain/whatsapp-system-variables.ts` | T24 | Catálogo `WHATSAPP_SYSTEM_VARIABLES`, `systemVariableOf` | **Se borra**, con su export en `index.ts` y sus casos de test (R87) |
+| `domain/whatsapp-variable-key.ts` | T24 | `WHATSAPP_VARIABLE_KEY_PATTERN`, validador, `WhatsappDictionaryEntryView` con `kind: 'system' \| 'company'` | Gana `WHATSAPP_CONSTANT_KEY_PATTERN` e `isConstantKey`/`isOwnKey` (R88); la vista del diccionario pierde la rama `system` (R90). El validador de la propia ya rechaza el punto |
+| `domain/whatsapp-template-variables.ts` | T25 | Huecos, `mappingStatusOf`, `componentsChanged`, `showKeys`; binding `kind: 'system'` | `variableSlotsOf` da `null` (no relacionable) si un texto trae una marca que no es `{{n}}` (R95, [P21]). El binding `system` se queda: es la relación a una constante, solo cambia de dónde sale |
+| `domain/whatsapp-template-keyed-draft.ts` | T25 | `DictionaryEntry` con constantes del catálogo; etiqueta como ejemplo | El diccionario son solo propias; cada clave se clasifica por su forma (§19.3); las constantes toman la etiqueta de `constantLabels` ([P20]) |
+| 5 códigos de error | T23 | `whatsapp_variable_key_not_found`, `_taken`, `_in_use`, `whatsapp_template_not_mapped`, `whatsapp_template_not_mappable` | **Se mantienen los cinco** con su texto. `_taken` ahora solo salta entre propias (R89) |
+| `tests/integration/integraciones/whatsapp-template-migration.int.test.ts` | T9 (QC-242 original) | Fija los índices y `CHECK` exactos de `whatsapp_templates` | Sus dos casos de lista exacta fallan desde T22, porque la migración nueva añade `whatsapp_templates_company_id_id_key` y `whatsapp_templates_enabled_requires_mapped`. Los actualiza **T36**: es una consecuencia de esa migración, no un relajamiento |
+
+### 19.2 Forma de las claves (R88)
+
+```ts
+export const WHATSAPP_VARIABLE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;                          // propia
+export const WHATSAPP_CONSTANT_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}\.[a-z][a-z0-9_]{0,39}$/;    // entidad.campo
+```
+
+Exactamente dos segmentos. En la base, `CHECK ("system_key" IS NULL OR "system_key" ~
+'^[a-z][a-z0-9_]{0,39}\.[a-z][a-z0-9_]{0,39}$')`. Una propia nunca casa con la de constante ni al
+revés: no hay choque posible y R56 deja de necesitar «la clave de una constante» (R89).
+
+### 19.3 Clasificar una clave (R91, R93)
+
+`classifyKey(key, ownByKey)`:
+1. Casa con la forma de constante ⇒ `{ kind: 'system', systemKey: key }`. No se consulta nada (F1).
+2. Casa con la forma propia y está en `ownByKey` ⇒ `{ kind: 'company', variableKeyId }`.
+3. Casa con la forma propia y no está ⇒ clave desconocida ([P19]): `unknown_key` en el borrador,
+   `WhatsappVariableKeyNotFoundError` al relacionar.
+4. Ninguna forma ⇒ `invalid_variable` en el borrador, `ValidationError` al relacionar.
+
+Con todos los huecos relacionados, `mappingStatusOf` da `MAPPED` (F2): no cambia.
+
+### 19.4 Crear (cambia §18.6 y §18.7 «Crear»)
+
+`createWhatsappTemplateAction(draft)`: el borrador gana `constantLabels?: Record<string, string>`
+([P20]). `validateKeyedTemplateDraft(input, ownEntries)`: ejemplo de una constante =
+`constantLabels[key]`; si falta o está vacía ⇒ problema `example_missing` en el campo donde aparece la
+clave (R92). No se valida su largo (E15). Las etiquetas de constantes no se guardan.
+
+### 19.5 Listar, vista y `contentOf`
+
+- `createListWhatsappDictionary` devuelve solo propias (R90); `countSystemKeyUsage` sale del puerto.
+- Vista (R94): una relación a constante sale con `kind: 'system'`, la clave y `label: null`.
+- `contentOf` (§3.4, R96, [P22]): el `example` del botón URL se acepta como `string` o `string[]`; con
+  lista se toma el primero. `componentsChanged` compara el contenido, así que las dos formas no
+  cuentan como cambio. Test nuevo en `whatsapp-template-components.test.ts`.
+
+### 19.6 Fronteras (F3)
+
+Al enviar, QC-245 y QC-247 reciben del front los valores de las constantes ya resueltos y completan las
+propias con su `value`. La función que arma los parámetros posicionales es de esas fichas; esta deja
+los datos: los huecos con su clave y tipo (R81) y el valor de cada propia (R90). QC-243 define el
+catálogo de constantes en el front y manda `constantLabels` al crear.
+
+### 19.7 Alternativas descartadas
+
+1. **Mantener el catálogo en el backend** (§18.4): el humano lo descarta (F1); además duplicaría en
+   dos sitios las claves que el front ya conoce.
+2. **Guardar la etiqueta de la constante en la relación**: la vista podría devolverla, pero sería una
+   copia del front que se queda vieja si el front la cambia.
+3. **Constantes sin punto, distinguidas solo por no existir como propia** ([P19], alternativa): una
+   propia creada más tarde con esa clave cambiaría el sentido de relaciones ya guardadas.

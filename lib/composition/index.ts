@@ -2802,6 +2802,12 @@ import {
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
   createVerifyWhatsappWebhook,
+  createCreateWhatsappVariableKey,
+  createDeleteWhatsappVariableKey,
+  createListWhatsappDictionary,
+  createRelateWhatsappTemplateVariables,
+  createSetWhatsappTemplateEnabled,
+  createUpdateWhatsappVariableKey,
   createRefreshWhatsappContactLinks,
   createLinkWhatsappContact,
   createUnlinkWhatsappContact,
@@ -2832,7 +2838,17 @@ import {
   listLiveWhatsappTemplates,
   listWhatsappTemplatesForSync,
   markWhatsappTemplateDeleted,
+  replaceWhatsappTemplateVariables,
+  setWhatsappTemplateEnabled,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma';
+import {
+  createWhatsappVariableKey,
+  deleteWhatsappVariableKey,
+  findWhatsappVariableKeysByKeys,
+  listAllWhatsappVariableKeys,
+  listWhatsappVariableKeysWithUsage,
+  updateWhatsappVariableKey,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-variable-key-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
@@ -2843,6 +2859,7 @@ import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/p
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
 import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
 import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
+import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
@@ -2879,10 +2896,21 @@ const whatsappTemplateRepository: WhatsappTemplateRepository = {
   findLiveById: findLiveWhatsappTemplateById,
   findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
   insertCreated: insertCreatedWhatsappTemplate,
+  replaceVariables: replaceWhatsappTemplateVariables,
+  setEnabled: setWhatsappTemplateEnabled,
   markDeleted: markWhatsappTemplateDeleted,
   listForSync: listWhatsappTemplatesForSync,
   applySync: applyWhatsappTemplateSync,
   applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+};
+
+const whatsappVariableKeyRepository: WhatsappVariableKeyRepository = {
+  listAll: listAllWhatsappVariableKeys,
+  listWithUsage: listWhatsappVariableKeysWithUsage,
+  findByKeys: findWhatsappVariableKeysByKeys,
+  create: createWhatsappVariableKey,
+  update: updateWhatsappVariableKey,
+  delete: deleteWhatsappVariableKey,
 };
 
 const randomSource: RandomSource = randomSourceNode;
@@ -2890,6 +2918,7 @@ const randomSource: RandomSource = randomSourceNode;
 const whatsappDeps = {
   connections: whatsappConnectionRepository,
   templates: whatsappTemplateRepository,
+  variableKeys: whatsappVariableKeyRepository,
   graph: whatsappGraphClient,
   cipher: secretCipher,
   digest: secretDigest,
@@ -3046,6 +3075,12 @@ export const integraciones = {
   deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
   resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
   syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  listWhatsappDictionary: createListWhatsappDictionary(whatsappDeps),
+  createWhatsappVariableKey: createCreateWhatsappVariableKey(whatsappDeps),
+  updateWhatsappVariableKey: createUpdateWhatsappVariableKey(whatsappDeps),
+  deleteWhatsappVariableKey: createDeleteWhatsappVariableKey(whatsappDeps),
+  relateWhatsappTemplateVariables: createRelateWhatsappTemplateVariables(whatsappDeps),
+  setWhatsappTemplateEnabled: createSetWhatsappTemplateEnabled(whatsappDeps),
   verifyCronSecret,
 } as const;
 

@@ -35,6 +35,13 @@ import {
   WhatsappTemplateRateLimitedError,
   WhatsappTemplateRejectedError,
 } from '@/lib/modules/integraciones'
+import {
+  WhatsappTemplateNotMappableError,
+  WhatsappTemplateNotMappedError,
+  WhatsappVariableKeyInUseError,
+  WhatsappVariableKeyNotFoundError,
+  WhatsappVariableKeyTakenError,
+} from '@/lib/modules/integraciones/domain/errors'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -95,7 +102,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // Merge de dev en QC-239 (2026-10-20): 113 = 106 + 2 de contactos - 1 retirado + 6 de plantillas.
       // Merge de dev en QC-290 (2026-10-20): 112 = 113 - 1, sale el error de lo envasado por
       // encima de la cantidad del pedido, que Terminar ya no produce.
-      expect(ERROR_CODES).toHaveLength(112)
+      // 2026-10-20: 117 y no 112: entran los cinco del diccionario de variables de WhatsApp.
+      // Merge de dev en QC-242 (2026-10-20): 117 = 112 + 5 del diccionario de variables de WhatsApp.
+      expect(ERROR_CODES).toHaveLength(117)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -691,6 +700,41 @@ describe('plantillas de WhatsApp — codigos de plantilla y de Meta', () => {
       [new WhatsappTemplateRejectedError(), 'whatsapp_template_rejected'],
       [new WhatsappMetaRejectedError(), 'whatsapp_meta_rejected'],
       [new WhatsappMetaUnreachableError(), 'whatsapp_meta_unreachable'],
+    ] as const
+    for (const [error, code] of casos) {
+      expect(error.code).toBe(code)
+      expect(error.message).toBe(esperados[code])
+    }
+  })
+})
+
+describe('diccionario de variables de WhatsApp — codigos de variable y de mapeo', () => {
+  const esperados = {
+    whatsapp_variable_key_not_found: 'No se encontró la variable.',
+    whatsapp_variable_key_taken: 'Ya existe una variable con esa clave.',
+    whatsapp_variable_key_in_use:
+      'La variable se usa en una o más plantillas. Quítala de ellas antes de eliminarla o cambiar su clave.',
+    whatsapp_template_not_mapped: 'Relaciona todas las variables de la plantilla antes de habilitarla.',
+    whatsapp_template_not_mappable:
+      'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
+  } as const satisfies Partial<Record<ErrorCode, string>>
+
+  it('R85: los cinco codigos estan en el catalogo con su clave y su texto en español', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    for (const [code, texto] of Object.entries(esperados) as [keyof typeof esperados, string][]) {
+      expect(codigos, `falta el codigo ${code}`).toContain(code)
+      expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+      expect(errorMessage(code)).toBe(texto)
+    }
+  })
+
+  it('R85: cada clase de integraciones lleva su codigo y su texto', () => {
+    const casos = [
+      [new WhatsappVariableKeyNotFoundError(), 'whatsapp_variable_key_not_found'],
+      [new WhatsappVariableKeyTakenError(), 'whatsapp_variable_key_taken'],
+      [new WhatsappVariableKeyInUseError(), 'whatsapp_variable_key_in_use'],
+      [new WhatsappTemplateNotMappedError(), 'whatsapp_template_not_mapped'],
+      [new WhatsappTemplateNotMappableError(), 'whatsapp_template_not_mappable'],
     ] as const
     for (const [error, code] of casos) {
       expect(error.code).toBe(code)

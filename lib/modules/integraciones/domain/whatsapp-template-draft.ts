@@ -34,6 +34,7 @@ export const WHATSAPP_TEMPLATE_ISSUE_CODES = [
   'invalid_url',
   'invalid_phone',
   'not_allowed',
+  'unknown_key',
 ] as const;
 export type WhatsappTemplateIssueCode = (typeof WHATSAPP_TEMPLATE_ISSUE_CODES)[number];
 

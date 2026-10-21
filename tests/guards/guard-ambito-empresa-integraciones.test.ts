@@ -47,6 +47,7 @@ const ADAPTADOR = 'whatsapp-connection-prisma.ts'
 const ADAPTADOR_INBOX = 'whatsapp-inbox-prisma.ts'
 const ADAPTADOR_CONTACTOS = 'whatsapp-contact-prisma.ts'
 const ADAPTADOR_PLANTILLAS = 'whatsapp-template-prisma.ts'
+const ADAPTADOR_VARIABLES = 'whatsapp-variable-key-prisma.ts'
 
 const FORMA_DE_AMBITO = {
   identificador: 'scope',
@@ -106,12 +107,21 @@ const PUERTO_PLANTILLAS: PuertoVigilado = {
   nombre: 'WhatsappTemplateRepository',
   ruta: join(MODULE_ROOT, 'ports', 'whatsapp-template-repository.ts'),
   constante: 'whatsappTemplateRepository',
-  metodosEsperados: 8,
+  metodosEsperados: 10,
   adaptador: ADAPTADOR_PLANTILLAS,
-  ayudantes: [],
+  ayudantes: ['variablesByTemplate', 'lockIfUnchanged'],
 }
 
-const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_CONTACTOS, PUERTO_PLANTILLAS]
+const PUERTO_VARIABLES: PuertoVigilado = {
+  nombre: 'WhatsappVariableKeyRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-variable-key-repository.ts'),
+  constante: 'whatsappVariableKeyRepository',
+  metodosEsperados: 6,
+  adaptador: ADAPTADOR_VARIABLES,
+  ayudantes: ['liveUsage', 'lockedKey'],
+}
+
+const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_CONTACTOS, PUERTO_PLANTILLAS, PUERTO_VARIABLES]
 
 /**
  * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Cada entrada la
@@ -564,7 +574,7 @@ function cableadoDelPuerto(puerto: PuertoVigilado): ReadonlyMap<string, string> 
 // --- Casos -------------------------------------------------------------------------------------
 
 describe('R2 — el punto unico de integraciones es de verdad UNA definicion', () => {
-  it('company-scope.ts: `companyScope` es privada, es la unica lectura del ambito y las cinco envolturas delegan en ella', () => {
+  it('company-scope.ts: `companyScope` es privada, es la unica lectura del ambito y las siete envolturas delegan en ella', () => {
     const analizado = analizar(PUNTO_UNICO)
     const exportadas = analizado.funciones.filter((f) =>
       new RegExp(`^export\\s+function\\s+${f.nombre}\\b`, 'm').test(analizado.codigo),
@@ -575,6 +585,8 @@ describe('R2 — el punto unico de integraciones es de verdad UNA definicion', (
       'whatsappContactCompanyScope',
       'whatsappMessageCompanyScope',
       'whatsappTemplateCompanyScope',
+      'whatsappTemplateVariableCompanyScope',
+      'whatsappVariableKeyCompanyScope',
     ])
 
     for (const envoltura of exportadas) {
@@ -684,12 +696,15 @@ describe('R45 — las escrituras sobre un contacto llevan el ambito en el `where
   })
 })
 
-/** Las llamadas `prisma.<modelo>.<operacion>(` de `cuerpo` cuyo argumento no lleva `<envoltura>(scope)`. */
+/**
+ * Las llamadas `prisma.<modelo>.<operacion>(` (o `tx.`, dentro de una transaccion interactiva) de
+ * `cuerpo` cuyo argumento no lleva `<envoltura>(scope)`.
+ */
 function escriturasSinAmbito(cuerpo: string, modelo: string, operacion: string, envoltura: string): {
   readonly llamadas: number
   readonly sinAmbito: number
 } {
-  const patron = new RegExp(`\\bprisma\\s*\\.\\s*${modelo}\\s*\\.\\s*${operacion}\\s*\\(`, 'g')
+  const patron = new RegExp(`\\b(?:prisma|tx)\\s*\\.\\s*${modelo}\\s*\\.\\s*${operacion}\\s*\\(`, 'g')
   const llamadas = [...cuerpo.matchAll(patron)]
   const sinAmbito = llamadas.filter((llamada) => {
     const abre = cuerpo.indexOf('(', llamada.index)
@@ -708,6 +723,8 @@ describe('R3 — las escrituras de plantillas llevan el ambito en cada `updateMa
     ['markDeleted', 1],
     ['applySync', 3],
     ['applyWebhookUpdates', 1],
+    ['replaceVariables', 1],
+    ['setEnabled', 1],
   ] as const)('%s: sus %i `updateMany` de plantillas llevan `whatsappTemplateCompanyScope(scope)`', (metodo, esperadas) => {
     const funcion = funcionDe(metodo)
     expect(funcion).toBeTruthy()
@@ -741,6 +758,112 @@ describe('R3 — las escrituras de plantillas llevan el ambito en cada `updateMa
     const texto = fuente.slice(funcion?.inicio ?? 0, (funcion?.fin ?? 0) + 1)
     expect(texto).toMatch(/\$\{\s*columns\.companyId\s*\}::uuid/)
     expect(texto).toMatch(/DO UPDATE[\s\S]*WHERE\s+"whatsapp_templates"\."company_id"\s*=\s*EXCLUDED\."company_id"/)
+  })
+})
+
+/** Los bloques de SQL crudo (`$queryRaw` / `$executeRaw` como plantilla etiquetada) que no filtran por la empresa de `columns`. */
+function sqlCrudoSinEmpresa(texto: string): { readonly bloques: number; readonly sinEmpresa: number } {
+  const bloques = [...texto.matchAll(/\$(?:queryRaw|executeRaw)\s*(?:<[^`]*>)?\s*`([^`]*)`/g)]
+  const sinEmpresa = bloques.filter((bloque) => !/"company_id"\s*=\s*\$\{\s*columns\.companyId\s*\}::uuid/.test(bloque[1] ?? ''))
+  return { bloques: bloques.length, sinEmpresa: sinEmpresa.length }
+}
+
+describe('R63 — las relaciones y las variables propias llevan el ambito en cada escritura', () => {
+  const plantillas = analizar(ADAPTADOR_PLANTILLAS)
+  const variables = analizar(ADAPTADOR_VARIABLES)
+  const cableadoPlantillas = cableadoDe(PUERTO_PLANTILLAS.constante, PUERTO_PLANTILLAS.nombre)
+  const cableadoVariables = cableadoDe(PUERTO_VARIABLES.constante, PUERTO_VARIABLES.nombre)
+  const cuerpoDe = (adaptador: ArchivoAnalizado, cableado: ReadonlyMap<string, string>, metodo: string) =>
+    adaptador.funciones.find((f) => f.nombre === cableado.get(metodo))?.cuerpo ?? ''
+  const textoDe = (archivo: string, adaptador: ArchivoAnalizado, nombre: string) => {
+    const funcion = adaptador.funciones.find((f) => f.nombre === nombre)
+    const fuente = sinComentarios(readFileSync(join(PERSISTENCE_ROOT, archivo), 'utf8'))
+    return fuente.slice(funcion?.inicio ?? 0, (funcion?.fin ?? 0) + 1)
+  }
+
+  it.each([
+    ['markDeleted', 1],
+    ['replaceVariables', 1],
+  ] as const)('%s: sus %i `deleteMany` de relaciones llevan `whatsappTemplateVariableCompanyScope(scope)`', (metodo, esperadas) => {
+    expect(
+      escriturasSinAmbito(
+        cuerpoDe(plantillas, cableadoPlantillas, metodo),
+        'whatsappTemplateVariable',
+        'deleteMany',
+        'whatsappTemplateVariableCompanyScope',
+      ),
+    ).toEqual({ llamadas: esperadas, sinAmbito: 0 })
+  })
+
+  it.each(['insertCreated', 'replaceVariables'] as const)(
+    '%s: las relaciones se crean con `relationData(columns, …)` y `columns` sale de `companyScopeColumns(scope)`',
+    (metodo) => {
+      const cuerpo = cuerpoDe(plantillas, cableadoPlantillas, metodo)
+      expect(cuerpo).toMatch(/\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/)
+      expect(cuerpo).toMatch(/\btx\s*\.\s*whatsappTemplateVariable\s*\.\s*createMany\s*\(\s*\{\s*data\s*:[\s\S]*relationData\s*\(\s*columns\b/)
+      expect(plantillas.funciones.find((f) => f.nombre === 'relationData')?.cuerpo ?? '').toMatch(/\.\.\.columns\b/)
+    },
+  )
+
+  it('applySync y lockIfUnchanged: cada bloque de SQL crudo filtra por la empresa de `companyScopeColumns(scope)`', () => {
+    const applySync = textoDe(ADAPTADOR_PLANTILLAS, plantillas, cableadoPlantillas.get('applySync') ?? '')
+    expect(sqlCrudoSinEmpresa(applySync)).toEqual({ bloques: 2, sinEmpresa: 0 })
+    expect(sqlCrudoSinEmpresa(textoDe(ADAPTADOR_PLANTILLAS, plantillas, 'lockIfUnchanged'))).toEqual({ bloques: 1, sinEmpresa: 0 })
+    expect(sqlCrudoSinEmpresa(textoDe(ADAPTADOR_VARIABLES, variables, 'lockedKey'))).toEqual({ bloques: 1, sinEmpresa: 0 })
+  })
+
+  it.each([
+    ['update', 'update', 1],
+    ['delete', 'deleteMany', 1],
+  ] as const)('variables propias %s: sus %s llevan `whatsappVariableKeyCompanyScope(scope)`', (metodo, operacion, esperadas) => {
+    expect(
+      escriturasSinAmbito(
+        cuerpoDe(variables, cableadoVariables, metodo),
+        'whatsappVariableKey',
+        operacion,
+        'whatsappVariableKeyCompanyScope',
+      ),
+    ).toEqual({ llamadas: esperadas, sinAmbito: 0 })
+  })
+
+  it('variables propias create: la empresa del alta sale de `companyScopeColumns(scope)`', () => {
+    expect(cuerpoDe(variables, cableadoVariables, 'create')).toMatch(/data\s*:\s*\{\s*\.\.\.companyScopeColumns\s*\(\s*scope\s*\)/)
+  })
+})
+
+describe('R63 — sensibilidad: las comprobaciones de relaciones muerden', () => {
+  it('un `tx.whatsappTemplateVariable.deleteMany` sin la envoltura se cuenta como sin ambito', () => {
+    const cuerpo =
+      'await tx.whatsappTemplateVariable.deleteMany({ where: { templateId: id, ...whatsappTemplateVariableCompanyScope(scope) } })\n' +
+      'await tx.whatsappTemplateVariable.deleteMany({ where: { templateId: id } })\n'
+    expect(
+      escriturasSinAmbito(cuerpo, 'whatsappTemplateVariable', 'deleteMany', 'whatsappTemplateVariableCompanyScope'),
+    ).toEqual({ llamadas: 2, sinAmbito: 1 })
+  })
+
+  it('la envoltura de plantillas no cuenta como ambito de relaciones ni la de relaciones como la de variables', () => {
+    const relaciones = 'await tx.whatsappTemplateVariable.deleteMany({ where: { id, ...whatsappTemplateCompanyScope(scope) } })\n'
+    expect(
+      escriturasSinAmbito(relaciones, 'whatsappTemplateVariable', 'deleteMany', 'whatsappTemplateVariableCompanyScope').sinAmbito,
+    ).toBe(1)
+    const variables = 'await tx.whatsappVariableKey.update({ where: { id, ...whatsappTemplateVariableCompanyScope(scope) } })\n'
+    expect(escriturasSinAmbito(variables, 'whatsappVariableKey', 'update', 'whatsappVariableKeyCompanyScope').sinAmbito).toBe(1)
+  })
+
+  it('un bloque de SQL crudo sin el filtro de empresa se cuenta', () => {
+    const texto =
+      'await tx.$queryRaw<{ key: string }[]>`SELECT "key" FROM "whatsapp_variable_keys" WHERE "id" = ${id}::uuid FOR UPDATE`\n' +
+      'await prisma.$executeRaw`DELETE FROM "whatsapp_template_variables" WHERE "company_id" = ${columns.companyId}::uuid`\n'
+    expect(sqlCrudoSinEmpresa(texto)).toEqual({ bloques: 2, sinEmpresa: 1 })
+  })
+
+  it('una funcion del adaptador que consulta por `tx` sin estar cableada ni en `ayudantes` se ve', () => {
+    const fuente =
+      "import { whatsappTemplateVariableCompanyScope } from './company-scope'\n" +
+      'async function suelta(tx: Prisma.TransactionClient, scope: IntegracionesScope) {\n' +
+      '  return tx.whatsappTemplateVariable.findMany({ where: whatsappTemplateVariableCompanyScope(scope) })\n' +
+      '}\n'
+    expect(analizarFuente(fuente).funciones.filter((f) => tocaLaBase(f.cuerpo)).map((f) => f.nombre)).toEqual(['suelta'])
   })
 })
 

@@ -1,4 +1,5 @@
 import type { WhatsappTemplateContent } from './whatsapp-template-draft';
+import type { TemplateMappingStatus, TemplateVariableBinding } from './whatsapp-template-variables';
 
 export const WHATSAPP_TEMPLATE_CATEGORIES = ['MARKETING', 'UTILITY', 'AUTHENTICATION'] as const;
 export type WhatsappTemplateCategory = (typeof WHATSAPP_TEMPLATE_CATEGORIES)[number];
@@ -28,6 +29,18 @@ export type WhatsappTemplateRecord = {
   readonly createdById: string | null;
   readonly createdAt: Date;
   readonly deletedAt: Date | null;
+  readonly mappingStatus: TemplateMappingStatus;
+  readonly enabled: boolean;
+  readonly variables: readonly TemplateVariableBinding[];
+};
+
+/** `position` es el `n` de `{{n}}`: 1 en el header y en un boton. */
+export type WhatsappTemplateVariableView = {
+  readonly slot: string;
+  readonly position: number;
+  readonly kind: 'system' | 'company' | null;
+  readonly key: string | null;
+  readonly label: string | null;
 };
 
 export type WhatsappTemplateView = {
@@ -41,6 +54,9 @@ export type WhatsappTemplateView = {
   readonly content: WhatsappTemplateContent | null;
   readonly lastSyncedAt: string | null;
   readonly createdAt: string;
+  readonly mappingStatus: TemplateMappingStatus;
+  readonly enabled: boolean;
+  readonly variables: readonly WhatsappTemplateVariableView[];
 };
 
 export type WhatsappTemplateList = {

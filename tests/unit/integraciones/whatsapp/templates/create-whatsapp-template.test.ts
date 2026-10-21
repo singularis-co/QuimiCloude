@@ -30,8 +30,10 @@ import {
   CREATED_META_TEMPLATE_ID,
   NOW,
   OTHER_COMPANY_ID,
+  TEMPLATE_ID,
   admin,
   storedTemplate,
+  storedVariableKey,
 } from '../whatsapp-doubles'
 import { explodingTemplateDeps, setupTemplates, validDraft, type TemplateSetupOptions } from './template-use-case-setup'
 
@@ -160,6 +162,9 @@ describe('crear plantilla: exito', () => {
         status: 'PENDING',
         createdById: ACTOR_ID,
         lastSyncedAt: NOW,
+        variables: [{ slot: 'body.1', kind: 'system', systemKey: 'cliente.nombre' }],
+        mappingStatus: 'MAPPED',
+        enabled: true,
       },
       CONNECTION_ID,
       { companyId: admin().companyId },
@@ -174,7 +179,7 @@ describe('crear plantilla: exito', () => {
       lastSyncedAt: NOW.toISOString(),
       content: {
         header: null,
-        body: { text: 'Hola {{1}}, tu pedido esta listo.', examples: ['Ana'] },
+        body: { text: 'Hola {{cliente.nombre}}, tu pedido esta listo.', examples: ['Ana'] },
         footer: null,
         buttons: [{ type: 'QUICK_REPLY', text: 'Gracias' }],
       },
@@ -276,5 +281,184 @@ describe('crear plantilla: Meta rechaza', () => {
 
     expect(error).toBeInstanceOf(WhatsappTemplateRejectedError)
     expect(error.diagnostic).not.toContain(ACCESS_TOKEN)
+  })
+})
+
+const CUENTA = storedVariableKey()
+
+/** Lo que Meta recibe del borrador de `validDraft` una vez numeradas sus variables. */
+const SENT_COMPONENTS = toMetaComponents({
+  header: null,
+  body: { text: 'Hola {{1}}, tu pedido esta listo.', examples: ['Ana'] },
+  footer: null,
+  buttons: [{ type: 'QUICK_REPLY', text: 'Gracias' }],
+})
+
+describe('crear plantilla: borrador con claves', () => {
+  it.each([
+    ['una marca {{1}}', { body: { text: 'Hola {{1}}' } }, 'body.text:invalid_variable'],
+    ['una marca que no es clave', { body: { text: 'Hola {{Nombre}}' } }, 'body.text:invalid_variable'],
+    ['una propia que la empresa no tiene', { body: { text: 'Hola {{desconocida}}' } }, 'body.text:unknown_key'],
+    ['una constante sin su etiqueta', { body: { text: 'Hola {{pedido.numero}}' }, constantLabels: {} }, 'body.text:example_missing'],
+  ])('R14 R66 R91 R92: %s rechaza con invalid_input sin llamar a Graph ni escribir', async (_caso, overrides, code) => {
+    const { graph, templates, repo, create } = setup({ variableKeys: [CUENTA] })
+
+    const error = await caught(create(validDraft(overrides), admin()))
+
+    expect(error).toBeInstanceOf(ValidationError)
+    expect((error as ValidationError).diagnostic).toContain(code)
+    expect(repo.findLive).not.toHaveBeenCalled()
+    expect(graph.createTemplate).not.toHaveBeenCalled()
+    expect(templates.insertCreated).not.toHaveBeenCalled()
+    expect(templates.all()).toEqual([])
+  })
+
+  it('R91 R92 R67: una constante vale sin catalogo y una propia con su etiqueta; Meta recibe {{n}} con las etiquetas de ejemplo', async () => {
+    const { graph, variableKeys, create } = setup({ variableKeys: [CUENTA] })
+
+    await create(
+      validDraft({
+        body: { text: 'Hola {{cliente.nombre}}, tu cuenta {{cuenta_numero}}. Gracias {{cliente.nombre}}.' },
+        constantLabels: { 'cliente.nombre': 'Nombre del cliente' },
+      }),
+      admin(),
+    )
+
+    expect(graph.createTemplate.mock.calls[0]?.[0].components).toEqual(
+      toMetaComponents({
+        header: null,
+        body: {
+          text: 'Hola {{1}}, tu cuenta {{2}}. Gracias {{1}}.',
+          examples: ['Nombre del cliente', CUENTA.label],
+        },
+        footer: null,
+        buttons: [{ type: 'QUICK_REPLY', text: 'Gracias' }],
+      }),
+    )
+    expect(variableKeys.listAll).toHaveBeenCalledTimes(1)
+    expect(variableKeys.listAll).toHaveBeenCalledWith({ companyId: admin().companyId })
+    expect(variableKeys.findByKeys).not.toHaveBeenCalled()
+  })
+
+  it('R67: si Meta rechaza el ejemplo responde whatsapp_template_rejected y no guarda nada; la app no mide la etiqueta', async () => {
+    const { graph, templates, create } = setup()
+    graph.createTemplate.mockImplementation(
+      answer({ ok: false, kind: 'rejected', message: 'ejemplo invalido', code: 100, subcode: 2388043 }),
+    )
+
+    const error = await caught(create(validDraft({ constantLabels: { 'cliente.nombre': 'x'.repeat(2000) } }), admin()))
+
+    expect(graph.createTemplate).toHaveBeenCalledTimes(1)
+    expect(error).toBeInstanceOf(WhatsappTemplateRejectedError)
+    expect((error as IntegracionesError).code).toBe('whatsapp_template_rejected')
+    expect(templates.all()).toEqual([])
+  })
+})
+
+describe('crear plantilla: relaciones', () => {
+  it('R68: guarda la relacion de cada hueco con su entrada, relacionada y habilitada, y la vista trae las claves', async () => {
+    const { templates, create } = setup({ variableKeys: [CUENTA] })
+
+    const view = await create(
+      validDraft({
+        header: { text: 'Cuenta {{cuenta_numero}}' },
+        body: { text: 'Hola {{cliente.nombre}}' },
+        constantLabels: { 'cliente.nombre': 'Nombre del cliente' },
+      }),
+      admin(),
+    )
+
+    expect(templates.insertCreated.mock.calls[0]?.[0]).toMatchObject({
+      variables: [
+        { slot: 'header', kind: 'company', variableKeyId: CUENTA.id },
+        { slot: 'body.1', kind: 'system', systemKey: 'cliente.nombre' },
+      ],
+      mappingStatus: 'MAPPED',
+      enabled: true,
+    })
+    expect(view.mappingStatus).toBe('MAPPED')
+    expect(view.enabled).toBe(true)
+    expect(view.variables).toEqual([
+      { slot: 'header', position: 1, kind: 'company', key: 'cuenta_numero', label: CUENTA.label },
+      { slot: 'body.1', position: 1, kind: 'system', key: 'cliente.nombre', label: null },
+    ])
+    expect(view.content?.header?.text).toBe('Cuenta {{cuenta_numero}}')
+    expect(view.content?.body.text).toBe('Hola {{cliente.nombre}}')
+  })
+
+  it('R68: sin variables nace relacionada y habilitada sin relaciones', async () => {
+    const { templates, create } = setup()
+
+    await create(validDraft({ body: { text: 'Hola, tu pedido esta listo.' } }), admin())
+
+    expect(templates.insertCreated.mock.calls[0]?.[0]).toMatchObject({ variables: [], mappingStatus: 'MAPPED', enabled: true })
+  })
+})
+
+describe('crear plantilla: la sincronizacion ya la habia guardado', () => {
+  function raced(overrides: Parameters<typeof storedTemplate>[0] = {}) {
+    const ctx = setup({
+      templates: [
+        storedTemplate({
+          metaTemplateId: CREATED_META_TEMPLATE_ID,
+          name: 'pedido_listo',
+          components: SENT_COMPONENTS,
+          status: 'PENDING',
+          createdById: null,
+          mappingStatus: 'UNMAPPED',
+          enabled: false,
+          variables: [],
+          ...overrides,
+        }),
+      ],
+    })
+    // La sincronizacion la inserta entre la comprobacion del nombre y el alta.
+    ctx.templates.findLiveByNameAndLanguage.mockResolvedValueOnce(null)
+    return ctx
+  }
+
+  it('R69: sin relaciones y con los mismos huecos le pone la relacion de la creacion y la habilita', async () => {
+    const { templates, create } = raced()
+
+    const view = await create(validDraft(), admin())
+
+    const bindings = [{ slot: 'body.1', kind: 'system', systemKey: 'cliente.nombre' }]
+    expect(templates.replaceVariables).toHaveBeenCalledWith(
+      TEMPLATE_ID,
+      bindings,
+      { mappingStatus: 'MAPPED', enabled: true },
+      SENT_COMPONENTS,
+      { companyId: admin().companyId },
+    )
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ variables: bindings, mappingStatus: 'MAPPED', enabled: true })
+    expect(view).toMatchObject({ id: TEMPLATE_ID, mappingStatus: 'MAPPED', enabled: true })
+    expect(view.content?.body.text).toBe('Hola {{cliente.nombre}}, tu pedido esta listo.')
+  })
+
+  it('R69: si ya tiene relaciones no cambia su relacion ni su habilitacion', async () => {
+    const own = [{ slot: 'body.1' as const, kind: 'company' as const, variableKeyId: CUENTA.id }]
+    const { templates, create } = raced({ variables: own, mappingStatus: 'MAPPED', enabled: false })
+
+    const view = await create(validDraft(), admin())
+
+    expect(templates.replaceVariables).not.toHaveBeenCalled()
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ variables: own, mappingStatus: 'MAPPED', enabled: false })
+    expect(view.enabled).toBe(false)
+  })
+
+  it('R69: si sus huecos no son los creados no cambia su relacion ni su habilitacion', async () => {
+    const components = toMetaComponents({
+      header: null,
+      body: { text: 'Hola {{1}} y {{2}}', examples: ['Ana', 'Luis'] },
+      footer: null,
+      buttons: [],
+    })
+    const { templates, create } = raced({ components })
+
+    const view = await create(validDraft(), admin())
+
+    expect(templates.replaceVariables).not.toHaveBeenCalled()
+    expect(templates.row(TEMPLATE_ID)).toMatchObject({ variables: [], mappingStatus: 'UNMAPPED', enabled: false })
+    expect(view).toMatchObject({ mappingStatus: 'UNMAPPED', enabled: false })
   })
 })

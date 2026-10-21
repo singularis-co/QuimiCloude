@@ -8,15 +8,21 @@ import {
   companyScopeColumns,
   whatsappConnectionCompanyScope,
   whatsappTemplateCompanyScope,
+  whatsappTemplateVariableCompanyScope,
 } from './company-scope';
 
 import type { IntegracionesScope } from '../../../domain/integraciones-scope';
 import type { TemplateSyncPlan } from '../../../domain/template-sync-plan';
 import type { TemplateWebhookUpdate, WhatsappTemplateRecord } from '../../../domain/whatsapp-template';
 import type { MetaTemplateSnapshot } from '../../../domain/whatsapp-template-meta';
-import type { NewCreatedTemplateRow, TemplateSyncRow } from '../../../ports/whatsapp-template-repository';
+import type { TemplateSlot, TemplateVariableBinding } from '../../../domain/whatsapp-template-variables';
+import type {
+  NewCreatedTemplateRow,
+  TemplateMappingWrite,
+  TemplateSyncRow,
+} from '../../../ports/whatsapp-template-repository';
 
-/** Exactamente los campos de `WhatsappTemplateRecord`. */
+/** Los campos de `WhatsappTemplateRecord` salvo `variables`, que se leen aparte. */
 const TEMPLATE_SELECT = {
   id: true,
   companyId: true,
@@ -33,6 +39,8 @@ const TEMPLATE_SELECT = {
   createdById: true,
   createdAt: true,
   deletedAt: true,
+  mappingStatus: true,
+  enabled: true,
 } satisfies Prisma.WhatsappTemplateSelect;
 
 const SYNC_SELECT = {
@@ -46,11 +54,13 @@ const SYNC_SELECT = {
   rejectedReason: true,
   components: true,
   deletedAt: true,
+  mappingStatus: true,
+  enabled: true,
 } satisfies Prisma.WhatsappTemplateSelect;
 
 type TemplateRow = Prisma.WhatsappTemplateGetPayload<{ select: typeof TEMPLATE_SELECT }>;
 
-function toRecord(row: TemplateRow): WhatsappTemplateRecord {
+function toRecord(row: TemplateRow, variables: readonly TemplateVariableBinding[]): WhatsappTemplateRecord {
   return {
     id: row.id,
     companyId: row.companyId,
@@ -67,7 +77,84 @@ function toRecord(row: TemplateRow): WhatsappTemplateRecord {
     createdById: row.createdById,
     createdAt: row.createdAt,
     deletedAt: row.deletedAt,
+    mappingStatus: row.mappingStatus,
+    enabled: row.enabled,
+    variables,
   };
+}
+
+const VARIABLE_SELECT = {
+  templateId: true,
+  slot: true,
+  variableKeyId: true,
+  systemKey: true,
+} satisfies Prisma.WhatsappTemplateVariableSelect;
+
+type VariableRow = Prisma.WhatsappTemplateVariableGetPayload<{ select: typeof VARIABLE_SELECT }>;
+
+// El CHECK de la tabla garantiza la forma del hueco y que hay exactamente un destino. Si aun asi
+// llega una fila sin destino, se falla: inventarle uno mostraria un hueco ligado a nada.
+export function toBinding(row: VariableRow): TemplateVariableBinding {
+  const slot = row.slot as TemplateSlot;
+  if (row.systemKey !== null) return { slot, kind: 'system', systemKey: row.systemKey };
+  if (row.variableKeyId === null) {
+    throw new Error(`la relacion del hueco ${row.slot} de la plantilla ${row.templateId} no tiene destino`);
+  }
+  return { slot, kind: 'company', variableKeyId: row.variableKeyId };
+}
+
+function relationData(columns: { readonly companyId: string }, templateId: string, binding: TemplateVariableBinding) {
+  return {
+    ...columns,
+    templateId,
+    slot: binding.slot,
+    variableKeyId: binding.kind === 'company' ? binding.variableKeyId : null,
+    systemKey: binding.kind === 'system' ? binding.systemKey : null,
+  };
+}
+
+async function variablesByTemplate(
+  tx: Prisma.TransactionClient,
+  templateIds: readonly string[],
+  scope: IntegracionesScope,
+): Promise<ReadonlyMap<string, TemplateVariableBinding[]>> {
+  const byTemplate = new Map<string, TemplateVariableBinding[]>();
+  if (templateIds.length === 0) return byTemplate;
+  const rows = await tx.whatsappTemplateVariable.findMany({
+    where: { templateId: { in: [...templateIds] }, ...whatsappTemplateVariableCompanyScope(scope) },
+    orderBy: [{ templateId: 'asc' }, { slot: 'asc' }],
+    select: VARIABLE_SELECT,
+  });
+  for (const row of rows) byTemplate.set(row.templateId, [...(byTemplate.get(row.templateId) ?? []), toBinding(row)]);
+  return byTemplate;
+}
+
+async function withVariables(
+  rows: readonly TemplateRow[],
+  scope: IntegracionesScope,
+): Promise<WhatsappTemplateRecord[]> {
+  const byTemplate = await variablesByTemplate(prisma, rows.map((row) => row.id), scope);
+  return rows.map((row) => toRecord(row, byTemplate.get(row.id) ?? []));
+}
+
+/**
+ * Bloquea la fila hasta el final de la transacción. `false` si ya no está viva o sus componentes
+ * no son los leídos; la igualdad de `jsonb` no depende del orden de las claves.
+ */
+async function lockIfUnchanged(
+  tx: Prisma.TransactionClient,
+  id: string,
+  expectedComponents: unknown,
+  scope: IntegracionesScope,
+): Promise<boolean> {
+  const columns = companyScopeColumns(scope);
+  const rows = await tx.$queryRaw<{ unchanged: boolean }[]>`
+    SELECT ("components" = ${JSON.stringify(expectedComponents)}::jsonb) AS "unchanged"
+    FROM "whatsapp_templates"
+    WHERE "id" = ${id}::uuid AND "company_id" = ${columns.companyId}::uuid AND "deleted_at" IS NULL
+    FOR UPDATE
+  `;
+  return rows[0]?.unchanged === true;
 }
 
 /** Los componentes vienen de un JSON (de Meta o del borrador): ya son JSON válido. */
@@ -173,7 +260,7 @@ export async function listLiveWhatsappTemplates(
     orderBy: [{ name: 'asc' }, { language: 'asc' }, { id: 'asc' }],
     select: TEMPLATE_SELECT,
   });
-  return rows.map(toRecord);
+  return withVariables(rows, scope);
 }
 
 export async function findLiveWhatsappTemplateById(
@@ -184,7 +271,7 @@ export async function findLiveWhatsappTemplateById(
     where: { id, deletedAt: null, ...whatsappTemplateCompanyScope(scope) },
     select: TEMPLATE_SELECT,
   });
-  return row === null ? null : toRecord(row);
+  return row === null ? null : ((await withVariables([row], scope))[0] ?? null);
 }
 
 export async function findLiveWhatsappTemplateByNameAndLanguage(
@@ -197,61 +284,122 @@ export async function findLiveWhatsappTemplateByNameAndLanguage(
     where: { connectionId, name, language, deletedAt: null, ...whatsappTemplateCompanyScope(scope) },
     select: TEMPLATE_SELECT,
   });
-  return row === null ? null : toRecord(row);
+  return row === null ? null : ((await withVariables([row], scope))[0] ?? null);
 }
 
 /**
  * Si el webhook ya resincronizó y la insertó, gana esa fila (más reciente) y solo se le pone el
- * creador. El `WHERE` del `DO UPDATE` impide tocar una fila de otra empresa.
+ * creador; sus relaciones no se tocan. El `WHERE` del `DO UPDATE` impide tocar una fila de otra
+ * empresa. `xmax = 0` solo en la fila recién insertada.
  */
 export async function insertCreatedWhatsappTemplate(
   row: NewCreatedTemplateRow,
   connectionId: string,
   scope: IntegracionesScope,
-): Promise<WhatsappTemplateRecord> {
+): Promise<{ readonly record: WhatsappTemplateRecord; readonly inserted: boolean }> {
   const columns = companyScopeColumns(scope);
-  let inserted: TemplateRow[];
   try {
-    inserted = await prisma.$queryRaw<TemplateRow[]>`
-      INSERT INTO "whatsapp_templates" (
-        "company_id", "connection_id", "meta_template_id", "name", "language", "category",
-        "components", "status", "last_synced_at", "created_by", "updated_at"
-      ) VALUES (
-        ${columns.companyId}::uuid, ${connectionId}::uuid, ${row.metaTemplateId}, ${row.name},
-        ${row.language}, ${row.category}::"whatsapp_template_category",
-        ${JSON.stringify(row.components)}::jsonb, ${row.status}::"whatsapp_template_status",
-        ${row.lastSyncedAt}, ${row.createdById}::uuid, now()
-      )
-      ON CONFLICT ("connection_id", "meta_template_id") DO UPDATE
-        SET "created_by" = COALESCE("whatsapp_templates"."created_by", EXCLUDED."created_by"),
-            "updated_at" = now()
-        WHERE "whatsapp_templates"."company_id" = EXCLUDED."company_id"
-      RETURNING "id", "company_id" AS "companyId", "connection_id" AS "connectionId",
-        "meta_template_id" AS "metaTemplateId", "name", "language", "category"::text AS "category",
-        "components", "status"::text AS "status", "status_raw" AS "statusRaw",
-        "rejected_reason" AS "rejectedReason", "last_synced_at" AS "lastSyncedAt",
-        "created_by" AS "createdById", "created_at" AS "createdAt", "deleted_at" AS "deletedAt"
-    `;
+    return await prisma.$transaction(async (tx) => {
+      const returned = await tx.$queryRaw<(TemplateRow & { inserted: boolean })[]>`
+        INSERT INTO "whatsapp_templates" (
+          "company_id", "connection_id", "meta_template_id", "name", "language", "category",
+          "components", "status", "last_synced_at", "created_by", "mapping_status", "enabled", "updated_at"
+        ) VALUES (
+          ${columns.companyId}::uuid, ${connectionId}::uuid, ${row.metaTemplateId}, ${row.name},
+          ${row.language}, ${row.category}::"whatsapp_template_category",
+          ${JSON.stringify(row.components)}::jsonb, ${row.status}::"whatsapp_template_status",
+          ${row.lastSyncedAt}, ${row.createdById}::uuid,
+          ${row.mappingStatus}::"whatsapp_template_mapping_status", ${row.enabled}, now()
+        )
+        ON CONFLICT ("connection_id", "meta_template_id") DO UPDATE
+          SET "created_by" = COALESCE("whatsapp_templates"."created_by", EXCLUDED."created_by"),
+              "updated_at" = now()
+          WHERE "whatsapp_templates"."company_id" = EXCLUDED."company_id"
+        RETURNING "id", "company_id" AS "companyId", "connection_id" AS "connectionId",
+          "meta_template_id" AS "metaTemplateId", "name", "language", "category"::text AS "category",
+          "components", "status"::text AS "status", "status_raw" AS "statusRaw",
+          "rejected_reason" AS "rejectedReason", "last_synced_at" AS "lastSyncedAt",
+          "created_by" AS "createdById", "created_at" AS "createdAt", "deleted_at" AS "deletedAt",
+          "mapping_status"::text AS "mappingStatus", "enabled", (xmax = 0) AS "inserted"
+      `;
+      const created = returned[0];
+      if (created === undefined) {
+        throw new Error('alta de plantilla: la conexión no es de la empresa del ámbito');
+      }
+      if (!created.inserted) {
+        const byTemplate = await variablesByTemplate(tx, [created.id], scope);
+        return { record: toRecord(created, byTemplate.get(created.id) ?? []), inserted: false };
+      }
+      if (row.variables.length > 0) {
+        await tx.whatsappTemplateVariable.createMany({
+          data: row.variables.map((binding) => relationData(columns, created.id, binding)),
+        });
+      }
+      return { record: toRecord(created, row.variables), inserted: true };
+    });
   } catch (error) {
     if (isNameLanguageTaken(error)) throw new WhatsappTemplateNameTakenError('alta de plantilla: otra viva con el mismo nombre e idioma');
     throw error;
   }
-  const created = inserted[0];
-  if (created === undefined) {
-    throw new Error('alta de plantilla: la conexión no es de la empresa del ámbito');
-  }
-  return toRecord(created);
 }
 
+export async function replaceWhatsappTemplateVariables(
+  id: string,
+  bindings: readonly TemplateVariableBinding[],
+  mapping: TemplateMappingWrite,
+  expectedComponents: unknown,
+  scope: IntegracionesScope,
+): Promise<boolean> {
+  const columns = companyScopeColumns(scope);
+  return prisma.$transaction(async (tx) => {
+    if (!(await lockIfUnchanged(tx, id, expectedComponents, scope))) return false;
+    await tx.whatsappTemplateVariable.deleteMany({
+      where: { templateId: id, ...whatsappTemplateVariableCompanyScope(scope) },
+    });
+    if (bindings.length > 0) {
+      await tx.whatsappTemplateVariable.createMany({
+        data: bindings.map((binding) => relationData(columns, id, binding)),
+      });
+    }
+    await tx.whatsappTemplate.updateMany({
+      where: { id, deletedAt: null, ...whatsappTemplateCompanyScope(scope) },
+      data: { mappingStatus: mapping.mappingStatus, enabled: mapping.enabled },
+    });
+    return true;
+  });
+}
+
+export async function setWhatsappTemplateEnabled(
+  id: string,
+  enabled: boolean,
+  expectedComponents: unknown,
+  scope: IntegracionesScope,
+): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    if (!(await lockIfUnchanged(tx, id, expectedComponents, scope))) return false;
+    await tx.whatsappTemplate.updateMany({
+      where: { id, deletedAt: null, ...whatsappTemplateCompanyScope(scope) },
+      data: { enabled },
+    });
+    return true;
+  });
+}
+
+/** Una eliminada no tiene relaciones: si vuelve, la sincronización la trata como importada. */
 export async function markWhatsappTemplateDeleted(
   id: string,
   at: Date,
   scope: IntegracionesScope,
 ): Promise<boolean> {
-  const { count } = await prisma.whatsappTemplate.updateMany({
-    where: { id, deletedAt: null, ...whatsappTemplateCompanyScope(scope) },
-    data: { deletedAt: at },
-  });
+  const [, { count }] = await prisma.$transaction([
+    prisma.whatsappTemplateVariable.deleteMany({
+      where: { templateId: id, ...whatsappTemplateVariableCompanyScope(scope) },
+    }),
+    prisma.whatsappTemplate.updateMany({
+      where: { id, deletedAt: null, ...whatsappTemplateCompanyScope(scope) },
+      data: { deletedAt: at, enabled: false },
+    }),
+  ]);
   return count > 0;
 }
 
@@ -269,7 +417,8 @@ export async function listWhatsappTemplatesForSync(
 /**
  * Una transacción, y primero los borrados: así una plantilla borrada y vuelta a crear en Meta con
  * el mismo nombre e idioma no choca con el único de las vivas. Lo creado desde `startedAt` no se
- * borra: la lista de Meta se leyó antes de que existiera.
+ * borra: la lista de Meta se leyó antes de que existiera. Las relaciones de una borrada o de una
+ * cuyas variables se reinician se quitan con el mismo filtro que su `UPDATE`, antes de él.
  */
 export async function applyWhatsappTemplateSync(
   connectionId: string,
@@ -279,10 +428,19 @@ export async function applyWhatsappTemplateSync(
   scope: IntegracionesScope,
 ): Promise<void> {
   const columns = companyScopeColumns(scope);
-  const changed = plan.updates.filter((update) => update.changed);
-  const unchangedIds = plan.updates.filter((update) => !update.changed).map((update) => update.id);
+  const written = plan.updates.filter((update) => update.changed || update.resetVariables);
+  const resetIds = written.filter((update) => update.resetVariables).map((update) => update.id);
+  const unchangedIds = plan.updates.filter((update) => !update.changed && !update.resetVariables).map((update) => update.id);
 
   await prisma.$transaction([
+    prisma.$executeRaw`
+      DELETE FROM "whatsapp_template_variables" AS v
+      USING "whatsapp_templates" AS t
+      WHERE v."company_id" = ${columns.companyId}::uuid AND t."company_id" = v."company_id"
+        AND t."id" = v."template_id" AND t."id" = ANY(${[...plan.deletes]}::uuid[])
+        AND t."connection_id" = ${connectionId}::uuid AND t."deleted_at" IS NULL
+        AND t."created_at" < ${startedAt}
+    `,
     prisma.whatsappTemplate.updateMany({
       where: {
         id: { in: [...plan.deletes] },
@@ -291,12 +449,26 @@ export async function applyWhatsappTemplateSync(
         createdAt: { lt: startedAt },
         ...whatsappTemplateCompanyScope(scope),
       },
-      data: { deletedAt: at, lastSyncedAt: at },
+      data: { deletedAt: at, lastSyncedAt: at, enabled: false },
     }),
-    ...changed.map(({ id, template }) =>
+    prisma.$executeRaw`
+      DELETE FROM "whatsapp_template_variables" AS v
+      USING "whatsapp_templates" AS t
+      WHERE v."company_id" = ${columns.companyId}::uuid AND t."company_id" = v."company_id"
+        AND t."id" = v."template_id" AND t."id" = ANY(${resetIds}::uuid[])
+        AND t."connection_id" = ${connectionId}::uuid
+    `,
+    ...written.map((update) =>
       prisma.whatsappTemplate.updateMany({
-        where: { id, connectionId, ...whatsappTemplateCompanyScope(scope) },
-        data: { ...syncedFields(template), deletedAt: null, lastSyncedAt: at },
+        where: { id: update.id, connectionId, ...whatsappTemplateCompanyScope(scope) },
+        data: {
+          ...syncedFields(update.template),
+          deletedAt: null,
+          lastSyncedAt: at,
+          ...(update.resetVariables
+            ? { mappingStatus: update.mappingStatusAfterReset, enabled: update.enabledAfterReset }
+            : {}),
+        },
       }),
     ),
     prisma.whatsappTemplate.updateMany({
@@ -304,13 +476,15 @@ export async function applyWhatsappTemplateSync(
       data: { lastSyncedAt: at },
     }),
     prisma.whatsappTemplate.createMany({
-      data: plan.inserts.map((template) => ({
+      data: plan.inserts.map((insert) => ({
         ...columns,
         connectionId,
-        metaTemplateId: template.metaTemplateId,
-        ...syncedFields(template),
+        metaTemplateId: insert.template.metaTemplateId,
+        ...syncedFields(insert.template),
         createdById: null,
         lastSyncedAt: at,
+        mappingStatus: insert.mappingStatus,
+        enabled: insert.enabled,
       })),
       skipDuplicates: true,
     }),

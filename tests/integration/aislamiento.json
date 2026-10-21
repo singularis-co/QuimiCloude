@@ -52,6 +52,7 @@
     "integraciones/whatsapp-connection-migration.int.test.ts",
     "integraciones/whatsapp-messages-migration.int.test.ts",
     "integraciones/whatsapp-template-migration.int.test.ts",
+    "integraciones/whatsapp-variable-keys-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
@@ -703,7 +704,12 @@
     },
     {
       "archivo": "integraciones/whatsapp-template-prisma.int.test.ts",
-      "motivo": "Ejercita las funciones de whatsapp-template-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado ('applyWhatsappTemplateSync' abre su PROPIA 'prisma.$transaction'), asi que una transaccion del test con ROLLBACK no las envolveria; ademas el alta que choca con el unico parcial de nombre e idioma y la sincronizacion que no borra lo creado despues de 'startedAt' necesitan filas confirmadas de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra plantillas -> conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "motivo": "Ejercita las funciones de whatsapp-template-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado ('applyWhatsappTemplateSync' abre su PROPIA 'prisma.$transaction'), asi que una transaccion del test con ROLLBACK no las envolveria; ademas el alta que choca con el unico parcial de nombre e idioma y la sincronizacion que no borra lo creado despues de 'startedAt' necesitan filas confirmadas de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra relaciones -> variables -> plantillas -> conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "integraciones/whatsapp-variable-key-prisma.int.test.ts",
+      "motivo": "Ejercita las funciones de whatsapp-variable-key-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado ('updateWhatsappVariableKey' y 'deleteWhatsappVariableKey' abren su PROPIA 'prisma.$transaction'), asi que una transaccion del test con ROLLBACK no las envolveria; ademas el unico de clave por empresa y la FK que impide borrar una variable en uso necesitan filas confirmadas de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra relaciones -> variables -> plantillas -> conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-20"
     },
     {

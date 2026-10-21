@@ -31,6 +31,7 @@ import {
   connectionSecretContext,
 } from '@/lib/modules/integraciones/domain/connection-secrets'
 import { normalizeCompanyName } from '@/lib/modules/identity'
+import { WhatsappVariableKeyInUseError } from '@/lib/modules/integraciones'
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { Actor } from '@/lib/modules/integraciones/domain/actor'
@@ -179,10 +180,15 @@ afterAll(async () => {
   resetCannedTemplates()
   const ids = conexiones.map((conexion) => conexion.companyId)
   const enEmpresas = { where: { companyId: { in: ids } } }
+  // Las relaciones primero: sus FK a plantillas y variables propias son RESTRICT.
+  await prisma.whatsappTemplateVariable.deleteMany(enEmpresas)
   await prisma.whatsappTemplate.deleteMany(enEmpresas)
+  await prisma.whatsappVariableKey.deleteMany(enEmpresas)
   await prisma.whatsappMessage.deleteMany(enEmpresas)
   await prisma.whatsappContact.deleteMany(enEmpresas)
   await prisma.whatsappConnection.deleteMany(enEmpresas)
+  expect(await prisma.whatsappTemplateVariable.count(enEmpresas)).toBe(0)
+  expect(await prisma.whatsappVariableKey.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappTemplate.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappMessage.count(enEmpresas)).toBe(0)
   expect(await prisma.whatsappContact.count(enEmpresas)).toBe(0)
@@ -408,5 +414,159 @@ describe('eliminar una plantilla', () => {
     const resync = await integraciones.resyncWhatsappTemplates(conexion.id)
     expect(resync.kind).toBe('synced')
     expect((await filaDe(enIngles.id)).deletedAt).toBeNull()
+  })
+})
+
+// --- Variables: crear con claves, importar, relacionar, habilitar y el cambio de Meta -------------
+
+/** El cuerpo `{{1}}` de una plantilla de Meta con su ejemplo. */
+function cuerpoPosicional(text: string, ejemplo: string) {
+  return [{ type: 'BODY', text, example: { body_text: [[ejemplo]] } }]
+}
+
+/** Una plantilla con `{{1}}` que solo tiene Meta: la sincronizacion la importa. */
+async function plantillaPosicionalSoloEnMeta(conexion: Conexion, name: string): Promise<string> {
+  const creada = await whatsappGraphClientCanned.createTemplate({
+    wabaId: conexion.wabaId,
+    accessToken: 'no-se-usa-en-el-doble',
+    name,
+    language: 'es',
+    category: 'UTILITY',
+    components: cuerpoPosicional('Su pedido {{1}} ya esta listo.', '12345'),
+  })
+  if (!creada.ok) throw new Error('el doble canned rechazo la plantilla')
+  return creada.id
+}
+
+/** Meta devuelve otro body para `metaTemplateId`; el resto del listado del doble no cambia. */
+function metaCambiaElBody(metaTemplateId: string, text: string, ejemplo: string): void {
+  const listarOriginal = whatsappGraphClientCanned.listTemplatesPage
+  vi.spyOn(whatsappGraphClientCanned, 'listTemplatesPage').mockImplementation(async (input) => {
+    const pagina = await listarOriginal(input)
+    if (!pagina.ok) return pagina
+    return {
+      ...pagina,
+      items: (pagina.items as readonly Record<string, unknown>[]).map((item) =>
+        item.id === metaTemplateId ? { ...item, components: cuerpoPosicional(text, ejemplo) } : item,
+      ),
+    }
+  })
+}
+
+describe('el recorrido de las variables de una plantilla', () => {
+  it('R83 R89 R91 R92 R67 R68 R94 R70 R74 R79 R77 R71 R72 R58 E16 F1 F2: crear con una constante y una propia, importar con {{1}}, relacionar, habilitar, Meta cambia el body y borrar la propia en uso', async () => {
+    const conexion = await crearConexion()
+    const { actor } = conexion
+
+    // La propia: su etiqueta es el ejemplo y su valor se guarda.
+    const propia = await integraciones.createWhatsappVariableKey(
+      { key: 'cuenta_numero', label: 'Numero de cuenta', value: '0123-4567' },
+      actor,
+    )
+    expect(propia).toEqual({
+      id: expect.any(String),
+      key: 'cuenta_numero',
+      label: 'Numero de cuenta',
+      value: '0123-4567',
+      usedBy: 0,
+    })
+
+    // Crear con claves: la constante no esta en ningun catalogo del back; su etiqueta llega del front.
+    const crearEnMeta = vi.spyOn(whatsappGraphClientCanned, 'createTemplate')
+    const name = nombreUnico()
+    const creada = await integraciones.createWhatsappTemplate(
+      {
+        name,
+        language: 'es',
+        category: 'UTILITY',
+        body: { text: 'Hola {{cliente.nombre}}, tu cuenta {{cuenta_numero}}' },
+        constantLabels: { 'cliente.nombre': 'Nombre del cliente' },
+      },
+      actor,
+    )
+
+    expect(crearEnMeta).toHaveBeenCalledTimes(1)
+    expect(crearEnMeta.mock.calls[0]?.[0].components).toEqual([
+      {
+        type: 'BODY',
+        text: 'Hola {{1}}, tu cuenta {{2}}',
+        example: { body_text: [['Nombre del cliente', 'Numero de cuenta']] },
+      },
+    ])
+    const variablesCreada = [
+      { slot: 'body.1', position: 1, kind: 'system', key: 'cliente.nombre', label: null },
+      { slot: 'body.2', position: 2, kind: 'company', key: 'cuenta_numero', label: 'Numero de cuenta' },
+    ]
+    expect(creada).toMatchObject({ mappingStatus: 'MAPPED', enabled: true, variables: variablesCreada })
+    expect(creada.content?.body.text).toBe('Hola {{cliente.nombre}}, tu cuenta {{cuenta_numero}}')
+    expect(await integraciones.getWhatsappTemplate(creada.id, actor)).toMatchObject({
+      mappingStatus: 'MAPPED',
+      enabled: true,
+      variables: variablesCreada,
+      content: { body: { text: 'Hola {{cliente.nombre}}, tu cuenta {{cuenta_numero}}' } },
+    })
+    expect(await filaDe(creada.id)).toMatchObject({ mappingStatus: 'MAPPED', enabled: true })
+    const relacionesCreada = await prisma.whatsappTemplateVariable.findMany({
+      where: { templateId: creada.id },
+      orderBy: { slot: 'asc' },
+      select: { slot: true, variableKeyId: true, systemKey: true },
+    })
+    expect(relacionesCreada).toEqual([
+      { slot: 'body.1', variableKeyId: null, systemKey: 'cliente.nombre' },
+      { slot: 'body.2', variableKeyId: propia.id, systemKey: null },
+    ])
+
+    // Importar una de Meta con {{1}}: llega sin relacionar y deshabilitada.
+    const nombreImportada = nombreUnico()
+    const metaTemplateId = await plantillaPosicionalSoloEnMeta(conexion, nombreImportada)
+    const primeraSync = await integraciones.syncWhatsappTemplates(actor)
+    expect(primeraSync.imported).toBe(1)
+    const importada = await prisma.whatsappTemplate.findFirstOrThrow({
+      where: { connectionId: conexion.id, metaTemplateId, deletedAt: null },
+    })
+    expect(importada).toMatchObject({ name: nombreImportada, mappingStatus: 'UNMAPPED', enabled: false })
+    // Lo creado y lo listado por Meta no cuentan como cambio: la creada sigue relacionada.
+    expect(await filaDe(creada.id)).toMatchObject({ mappingStatus: 'MAPPED', enabled: true })
+
+    // Relacionar con una constante con forma valida: queda relacionada y sigue deshabilitada.
+    const relacionada = await integraciones.relateWhatsappTemplateVariables(
+      { templateId: importada.id, bindings: [{ slot: 'body.1', key: 'pedido.numero' }] },
+      actor,
+    )
+    expect(relacionada).toMatchObject({
+      mappingStatus: 'MAPPED',
+      enabled: false,
+      variables: [{ slot: 'body.1', position: 1, kind: 'system', key: 'pedido.numero', label: null }],
+      content: { body: { text: 'Su pedido {{pedido.numero}} ya esta listo.' } },
+    })
+    expect(await filaDe(importada.id)).toMatchObject({ mappingStatus: 'MAPPED', enabled: false })
+
+    // Habilitar.
+    const habilitada = await integraciones.setWhatsappTemplateEnabled({ templateId: importada.id, enabled: true }, actor)
+    expect(habilitada).toMatchObject({ mappingStatus: 'MAPPED', enabled: true })
+    expect(await filaDe(importada.id)).toMatchObject({ mappingStatus: 'MAPPED', enabled: true })
+
+    // Meta cambia el body: vuelve a sin relacionar y se deshabilita sola, sin sus relaciones.
+    metaCambiaElBody(metaTemplateId, 'Tu pedido {{1}} sale hoy.', '12345')
+    const segundaSync = await integraciones.syncWhatsappTemplates(actor)
+    expect(segundaSync.updated).toBeGreaterThanOrEqual(1)
+    expect(await filaDe(importada.id)).toMatchObject({ mappingStatus: 'UNMAPPED', enabled: false })
+    expect(await prisma.whatsappTemplateVariable.count({ where: { templateId: importada.id } })).toBe(0)
+    const listado = await integraciones.listWhatsappTemplates(undefined, actor)
+    expect(listado.templates.find((plantilla) => plantilla.id === importada.id)).toMatchObject({
+      mappingStatus: 'UNMAPPED',
+      enabled: false,
+      variables: [{ slot: 'body.1', position: 1, kind: null, key: null, label: null }],
+      content: { body: { text: 'Tu pedido {{1}} sale hoy.' } },
+    })
+    // La creada desde la app no cambio en Meta: conserva relaciones y habilitacion.
+    expect(await filaDe(creada.id)).toMatchObject({ mappingStatus: 'MAPPED', enabled: true })
+
+    // Borrar la propia en uso: error de dominio y la fila sigue.
+    expect(await integraciones.listWhatsappDictionary(actor)).toEqual([{ ...propia, usedBy: 1 }])
+    await expect(integraciones.deleteWhatsappVariableKey(propia.id, actor)).rejects.toBeInstanceOf(
+      WhatsappVariableKeyInUseError,
+    )
+    expect(await prisma.whatsappVariableKey.count({ where: { id: propia.id } })).toBe(1)
   })
 })
