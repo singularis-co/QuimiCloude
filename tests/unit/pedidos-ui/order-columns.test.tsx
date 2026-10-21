@@ -675,7 +675,7 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
     pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '120.0000' }));
 
     const celda = screen.getByTestId(ACTUAL_COST_TESTID);
-    expect(celda).toHaveTextContent('120.00');
+    expect(celda.textContent).toBe('$120.00');
     expect(celda).not.toHaveAttribute('title');
   });
 
@@ -683,14 +683,14 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
     pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '12752.5512' }));
 
     const celda = screen.getByTestId(ACTUAL_COST_TESTID);
-    expect(celda).toHaveTextContent('12,752.55');
+    expect(celda.textContent).toBe('$12,752.55');
     expect(celda).toHaveAttribute('title', '12752.5512');
   });
 
   it('R21: el real se pinta de `actualCost` y no del estimado', () => {
     pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '99.0000', actualCost: '120.0000' }));
 
-    expect(screen.getByTestId(ACTUAL_COST_TESTID)).toHaveTextContent('120.00');
+    expect(screen.getByTestId(ACTUAL_COST_TESTID).textContent).toBe('$120.00');
     expect(screen.getByTestId(ACTUAL_COST_TESTID)).not.toHaveTextContent('99.00');
   });
 

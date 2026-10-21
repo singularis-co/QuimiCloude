@@ -89,7 +89,7 @@
     `tests/unit/asignaciones/list-assigned-orders.test.ts` (ninguna clave de importe).
   - Hecho: tests verdes.
 
-- [ ] **T7 — UI: columnas del listado y formulario en `EN_CURSO`** (frontend). Depende de T4, T5.
+- [x] **T7 — UI: columnas del listado y formulario en `EN_CURSO`** (frontend). Depende de T4, T5.
   **Si el humano pide tablero en P3, espera a él.** R15, R19, R20, R21, R22.
   - `order-columns.tsx` según design §5.1 («Costo estimado» + «Costo real», `CostCell`).
   - `use-order-cost-quote.ts` con `frozen` y `order-form.tsx` que lo pasa (design §5.2).
@@ -100,7 +100,7 @@
     guardado; en `PENDIENTE`, como hoy).
   - Hecho: tests verdes; capturas del listado en escritorio y teléfono en `progress/impl_QC-305.md`.
 
-- [ ] **T8 — E2E** (frontend/backend). Depende de T4, T5, T7. R26 (y R1, R12, R16, R19, R22 de
+- [x] **T8 — E2E** (frontend/backend). Depende de T4, T5, T7. R26 (y R1, R12, R16, R19, R22 de
   punta a punta).
   - `e2e/coste-real-de-produccion.spec.ts` según design §7, con los datos que necesite en el seed de
     E2E.

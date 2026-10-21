@@ -347,3 +347,125 @@ Verificacion (salida real):
 - `pnpm exec vitest run guard-arquitectura guard-catalogo`: `Test Files 4 passed (4)`, `Tests 163 passed (163)`.
 
 Veredicto T7: R15, R19, R20 verdes; R21 verde salvo el prefijo `$ ` pendiente de decision; R22 sin UI.
+
+## T8 (frontend_dev) — E2E y cierre de R21 — 2026-10-21
+
+### Archivos
+- Nuevo: `e2e/coste-real-de-produccion.spec.ts` (un `test()`; prefijo `qc305_e2e_` + `RUN_ID`, empresa efímera,
+  limpieza de huérfanos por prefijo y edad). Reutiliza `helpers/landing` (`loginAndLand`), `helpers/fixture-user`,
+  `helpers/confirm-dialog` (`clickAndConfirm`, `enterAndStartAssignedOrder`), `helpers/order-distribution`
+  (`addPackagingLine`, `openOrderRowMenu`, `orderMenuTrigger`, `submitOrderWithLeftover`) y `helpers/packaging`
+  (`seedPackaging`). Los datos se siembran en el propio spec (como el resto de `e2e/`); no hizo falta tocar el seed
+  ni el backend.
+- Modificado: `tests/unit/pedidos-ui/order-columns.test.tsx` — R21 (decisión 2026-10-21): los tres casos de R21 fijan el
+  texto completo `$120.00` (sin `title`) y `$12,752.55` (con `title` `12752.5512`) con `textContent` exacto.
+- Capturas: `progress/capturas/QC-305/escritorio.png`, `progress/capturas/QC-305/telefono.png` (paso del propio spec,
+  solo chromium y solo con `E2E_SCREENSHOTS_DIR` en el entorno; en CI no se escriben).
+- Sin dependencias nuevas.
+
+### Recorrido
+Ingrediente en litros con dos lotes: A 4 l a 10, B 6 l a 20 (A más antiguo). Envase de 1 l a 0,50, 10 en stock.
+Alta por la pantalla: 6 l en 6 envases → estimado guardado (`$93.00` en el listado) → el Operador comienza (`EN_CURSO`)
+→ el Administrador edita la cantidad a 8 l: el bloque de coste sigue en `formatOrderAmount(estimado)` sin «cotizando»,
+guarda con sobrante, la base conserva `ingredients_cost` y el listado el mismo `$93.00` con «Costo real» en guion →
+el Operador finaliza: asientos de consumo en los dos lotes del ingrediente, de coste distinto → el Empacador comienza y
+termina con 7 envases (+1, Conteo físico) → `actual_cost` = Σ(consumo × `unit_cost` del lote) leída de
+`inventory_movements`/`product_batches` y calculada en el test con BigInt sobre cadenas (4·10 + 4·20 + 7·0,5 =
+`123.5000`), estimado intacto → listado: cabeceras y celdas `productionCost` → `actualCost` contiguas, rótulos «Costo
+estimado» / «Costo real», `$93.00` y `$123.50` con `title` según `exactDecimalTitle` → tab «Costo de producción» del
+producto terminado: lote de 7 l con `unit_cost` = `123.5000 / 7` = `17.6429` en base y en la celda, total
+`productionCostTotal(17.6429, 7)`.
+
+### Mapa R -> test
+Todos en `e2e/coste-real-de-produccion.spec.ts` › «R26, R1, R12, R16, R19, R21, R22 - el ingrediente se consume de dos
+lotes, el estimado no cambia al editar en EN_CURSO, Terminar con 7 envases en vez de 6 guarda el real ponderado de los
+asientos, el listado lo muestra junto al estimado y el lote de producto terminado cuesta real ÷ envasado»:
+- R26 (a)–(e): el caso entero, en chromium y webkit.
+- R1: `actual_cost` = suma ponderada de los asientos (ingrediente de dos lotes + envases del conteo real).
+- R12 (y R6): estimado guardado igual tras la edición en `EN_CURSO` y tras Terminar; bloque de coste sin recotizar.
+- R16: `unit_cost` del lote de producto terminado = real ÷ 7 l.
+- R19: cabeceras y celdas contiguas, en ese orden, con sus rótulos (tabla).
+- R21: celdas con `formatMoneyDisplay` y `title` exacto; unit: `order-columns.test.tsx` «R21: un importe exacto a dos
+  decimales no lleva `title`» (`$120.00`), «R21: un importe que se redondea expone el exacto en el `title`»
+  (`$12,752.55`, `12752.5512`), «R21: el real se pinta de `actualCost` y no del estimado».
+- R22: celdas «Costo unitario» y «Costo total» de la tab.
+
+### Verificación (salida real)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm exec eslint e2e/coste-real-de-produccion.spec.ts tests/unit/pedidos-ui/order-columns.test.tsx`: `No issues found`.
+- `pnpm exec vitest run tests/unit/pedidos-ui/order-columns.test.tsx`: `Test Files 1 passed (1)`, `Tests 79 passed (79)`.
+- `pnpm exec vitest run guard-e2e`: `Test Files 4 passed (4)`, `Tests 27 passed (27)`; `guard-dobles-e2e`: `20 passed`.
+- Base: `pnpm exec tsx --env-file=../../.env scripts/test-db.ts template` → «plantilla reutilizada: qct_tpl_06ae9a5f7969
+  (113 migraciones)»; en `_prisma_migrations` de la plantilla: `20261021140000_orders_actual_cost`,
+  `20261021150000_finished_goods_lot_cost_optional`. `CREATE DATABASE qc305_e2e TEMPLATE "qct_tpl_06ae9a5f7969"`;
+  Playwright con `DATABASE_URL`/`DIRECT_URL` → `qc305_e2e` (mismo host y credenciales), lanzado como
+  `node --env-file=../../.env node_modules/@playwright/test/cli.js test e2e/coste-real-de-produccion.spec.ts
+  --project=<p> --workers=1`, un proyecto por corrida. QuimiCloude y `quimicloude_e2e` sin tocar.
+
+chromium:
+```
+Running 1 test using 1 worker
+  ✓  1 [chromium] › e2e\coste-real-de-produccion.spec.ts:508:7 › coste real de producción › R26, R1, R12, R16, R19, R21, R22 - … (1.5m)
+  1 passed (2.4m)
+```
+webkit:
+```
+Running 1 test using 1 worker
+  ✓  1 [webkit] › e2e\coste-real-de-produccion.spec.ts:508:7 › coste real de producción › R26, R1, R12, R16, R19, R21, R22 - … (2.0m)
+  1 passed (2.8m)
+```
+- Al terminar: `DROP DATABASE qc305_e2e` → comprobado en `pg_database`: «qc305_e2e existe: false».
+
+### Hallazgo abierto: la tarjeta del listado no muestra los costes (R19 «tabla y tarjeta»)
+En teléfono (`telefono.png`, 390×844) el listado pasa a tarjetas (`DataTable`, `@max-[760px]`) y la tarjeta solo pinta
+los campos de `ORDER_TABLE_CARD` (`order-table.tsx`: número, estado, receta, cliente, fecha, prioridad). Ni «Costo
+estimado» ni «Costo real» aparecen; tampoco el estimado antes de esta ficha. design §5.1 dice «la tarjeta sale de las
+columnas de `DataTable`: no se toca aparte», pero eso no es así para los campos que se ven. Decide el humano: (a) R19
+se lee solo para la tabla, o (b) se añaden `productionCost` y `actualCost` a `meta` (o `footer`) de `ORDER_TABLE_CARD`
+(cambio visual de la tarjeta: pase de diseño o excepción declarada). La captura de teléfono también muestra que el
+nombre largo de la receta del fixture desborda la tarjeta (es del dato de prueba).
+
+### Veredicto T8
+E2E verde en chromium y webkit sobre base propia ya borrada; R21 fijado con el prefijo `$` sin espacio; queda abierta
+la tarjeta de teléfono para R19.
+
+## T9 — Cierre: mapa consolidado R1–R26 → test (implementer, 2026-10-21)
+
+Detalle por tanda (archivos, nombres completos de los casos, salida real) en las secciones T1–T8 de arriba.
+Enmiendas de una línea añadidas al pie de los `requirements.md` de QC-281, QC-290 y QC-151 (design §9).
+
+| R | Test |
+|---|---|
+| R1 | `tests/unit/pedidos/actual-order-cost.test.ts` («R1: pondera por cantidad: 8 x 10 + 2 x 20 = 120.0000…», redondeo único, mitad arriba); `tests/integration/pedidos/actual-order-cost.int.test.ts` «R1, R5, R6, R16, R22»; E2E R26 (real 123.5000 = Σ asientos × coste del lote, leído de la base) |
+| R2 | `tests/integration/inventario/order-consumption-ledger.int.test.ts` «R2: … ingrediente de dos lotes y los envases con su excedente»; `actual-order-cost.test.ts` «R2: suma todos los lotes…» |
+| R3 | `order-consumption-ledger.int.test.ts` «R3: cuenta el lote del asiento aunque el pedido no lo tuviera apartado» |
+| R4 | `order-consumption-ledger.int.test.ts` «R4: deja fuera los asientos de otro pedido y los que no son de consumo», «R4: con la empresa equivocada…» |
+| R5 | `tests/unit/pedidos/order-packing.test.ts` «R5: lee los consumos… y guarda el real ponderado…», «R5: un Terminar rechazado antes del calculo no guarda ningun real», «R5: un rechazo despues de guardar el real deshace la transaccion entera…»; `actual-order-cost.int.test.ts` «R1, R5, R6, R16, R22» |
+| R6 | `order-packing.test.ts` «R6: Terminar no escribe el estimado del pedido»; `actual-order-cost.int.test.ts` (estimado 155.0000 intacto frente a real 145.0000); `finish-with-finished-goods.int.test.ts` «QC-305 R16, R6: …» |
+| R7 | `actual-order-cost.test.ts` (sin lotes, lote sin coste, desborde → `null`); `order-packing.test.ts` «R7, R8: un pedido sin ningun consumo…»; `actual-order-cost.int.test.ts` «R7, R17, R22…»; `finish-with-finished-goods.int.test.ts` «QC-305 P1 / R7, R17: un ingrediente con material pero sin costo deja el pedido sin coste real…» (reescrito desde QC-150) |
+| R8 | `order-packing.test.ts` «R8: sin reparto calcula y guarda el real…», «R8: con todas las lineas en 0…»; `actual-order-cost.int.test.ts` «R8: con todas las lineas en 0 guarda el real y no nace ningun lote» |
+| R9 | `actual-order-cost.int.test.ts` «R9: un ajuste de existencia, un cambio del coste de un lote, una entrega y su anulacion posteriores no cambian el real»; `order-consumption-ledger.int.test.ts` «R9: lee el unit_cost del lote en el instante de leerlo» |
+| R10 | `tests/unit/pedidos/schema/orders-actual-cost-migration.test.ts` (CHECK de estado, sin `UPDATE` de relleno) |
+| R11 | `tests/unit/pedidos/update-order.test.ts` «R11: en PENDIENTE / BLOQUEADO la edicion sigue recalculando…»; `update-order-presentation-lines.test.ts` R45 (PENDIENTE) / R46 (BLOQUEADO) existentes |
+| R12 | `update-order.test.ts` «R12: en EN_CURSO, con otra receta / otra cantidad / otro reparto / otra prioridad, el estimado no cambia y el resto de la edicion si», «R12, R14: si el pedido se Comenzo entre la lectura y el bloqueo…»; `tests/integration/pedidos/order-repository.int.test.ts` «R12, R14: con keep el UPDATE…»; E2E R26 (b) |
+| R13 | `tests/unit/pedidos/update-order-presentation-lines.test.ts` «R13: en EN_CURSO / POR_EMPACAR guardar el reparto y la unidad no escribe el estimado ni lo calcula», «R13: en %s sin importe guardado tampoco…» |
+| R14 | `update-order.test.ts` «R14: STARTED_ORDER_STATUSES son los estados de «comenzado»…», «R14: con el pedido en %s ningun escritor del estimado se llama desde la edicion general»; `update-order-presentation-lines.test.ts` «R14: con el pedido en %s ningun escritor del estimado se llama desde el reparto…» |
+| R15 | `tests/unit/pedidos-ui/use-order-cost-quote.test.ts` «R15: con frozen ningun manejador pide cotizacion…», «R15: con frozen y sin importe guardado queda el guion…», «R15: sin frozen se cotiza como hoy»; `tests/unit/pedidos-ui/order-form-quote.test.tsx` «R15: se ve el guardado y cambiar cantidad, receta o unidad no pide cotizacion», «R15: en PENDIENTE la edicion sigue cotizando como hoy»; E2E R26 (b) |
+| R16 | `order-packing.test.ts` «R16: los lotes llevan el real entre lo envasado…», «R16: el coste real se reparte entre los 12 L envasados…»; `actual-order-cost.int.test.ts` «R1, R5, R6, R16, R22»; E2E R26 (e) (17.6429 = 123.5 ÷ 7) |
+| R17 | `order-packing.test.ts` «R17: si un lote consumido no tiene coste…», «R17: un pedido con reparto y sin ningun consumo…»; `actual-order-cost.int.test.ts` «R7, R17, R22…»; `finish-with-finished-goods.int.test.ts` «QC-305 P1 / R7, R17…»; `tests/unit/inventario/schema/finished-goods-lot-cost-optional-migration.test.ts` (CHECK retirado, decisión 2026-10-21) |
+| R18 | `actual-order-cost.int.test.ts` «R18: un lote de producto terminado nacido con el estimado, antes de esta ficha, conserva su coste…», «R16, R18: un segundo Terminar…» |
+| R19 | `tests/unit/pedidos-ui/order-columns.test.tsx` «R19: son contiguas, en ese orden…», «R19: se rotulan «Costo estimado» y «Costo real»…», «R19: ninguna de las dos ordena ni filtra»; E2E R26 (d). **Tarjeta de teléfono: ABIERTO** (ver abajo) |
+| R20 | `order-columns.test.tsx` «R20: sin coste real pinta el guion con el rotulo «Sin dato», nunca 0 ni vacio», «R20: sin estimado pinta el guion…», «R20: el real no cae al estimado cuando falta» |
+| R21 | `order-columns.test.tsx` «R21: un importe exacto a dos decimales no lleva `title`» (`$120.00`), «R21: un importe que se redondea expone el exacto en el `title`» (`$12,752.55`, `title` `12752.5512`), «R21: el real se pinta de `actualCost`…»; decisión 2026-10-21 sin espacio |
+| R22 | `actual-order-cost.int.test.ts` «R1, R5, R6, R16, R22» (tab: `unitCost` 14.5000, `totalCost` 145.0000) y «R7, R17, R22» (guion: `null`); `list-finished-product-costs.test.ts` (null → guion, existente); E2E R26 (e) |
+| R23 | `actual-order-cost.test.ts` (cadena con 4 decimales, sin `number`/`parseFloat`); `orders-actual-cost-migration.test.ts` y `pedidos-schema.test.ts` (`Decimal(14,4)`); `tests/guards/guard-dependencias-aprobadas.test.ts` (sin dependencias nuevas) |
+| R24 | `tests/unit/pedidos/get-order.test.ts` y `tests/unit/pedidos/list-orders.test.ts` (bloques «QC-305 … (R24)»); `tests/unit/asignaciones/get-assigned-order-execution.test.ts` y `tests/unit/asignaciones/list-assigned-orders.test.ts` (ninguna clave de importe) |
+| R25 | `orders-actual-cost-migration.test.ts` (columna opcional en `orders`, sin tabla nueva, `down.sql` exacto, borrado lógico y marcas conservados) |
+| R26 | `e2e/coste-real-de-produccion.spec.ts` › «R26, R1, R12, R16, R19, R21, R22 - …» (chromium 1/1 en 2.4m, webkit 1/1 en 2.8m, base propia `qc305_e2e` borrada) |
+
+### Abierto al cierre: R19 en la tarjeta del listado (teléfono)
+
+Por debajo de 760 px el listado pasa a tarjetas y `ORDER_TABLE_CARD` (`app/(private)/pedidos/components/order-table.tsx:108`)
+solo pinta número, estado, receta, cliente, fecha y prioridad: ni el estimado (tampoco antes de esta ficha) ni el real.
+Design §5.1 daba por hecho que «la tarjeta sale de las columnas de DataTable»; no es así. Captura:
+`progress/capturas/QC-305/telefono.png` (escritorio: `progress/capturas/QC-305/escritorio.png`). Pendiente de decisión humana.
