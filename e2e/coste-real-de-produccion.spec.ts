@@ -682,14 +682,27 @@ test.describe('coste real de producción', () => {
     await expectAmountCell(row.getByTestId(ACTUAL_COST_TESTID), expectedActual);
 
     const screenshotsDir = process.env.E2E_SCREENSHOTS_DIR;
+    const desktopViewport = page.viewportSize();
     if (screenshotsDir !== undefined && testInfo.project.name === 'chromium') {
       await row.getByTestId(ACTUAL_COST_TESTID).scrollIntoViewIfNeeded();
       await page.screenshot({ path: join(screenshotsDir, 'escritorio.png') });
-      await page.setViewportSize(PHONE_VIEWPORT);
-      await openOrders(page);
-      await expect(page.getByTestId(`data-table-card-${order.id}`)).toBeVisible({ timeout: 60_000 });
+    }
+
+    // R19 (decision 2026-10-21, opcion b): la tarjeta de telefono lleva los dos costes rotulados.
+    await page.setViewportSize(PHONE_VIEWPORT);
+    await openOrders(page);
+    const card = page.getByTestId(`data-table-card-${order.id}`);
+    await expect(card).toBeVisible({ timeout: 60_000 });
+    const cardEstimated = card.getByTestId(`data-table-card-field-${ESTIMATED_COST_COLUMN_ID}`);
+    const cardActual = card.getByTestId(`data-table-card-field-${ACTUAL_COST_COLUMN_ID}`);
+    await expect(cardEstimated).toContainText(ESTIMATED_COST_LABEL);
+    await expect(cardActual).toContainText(ACTUAL_COST_LABEL);
+    await expectAmountCell(cardEstimated.getByTestId(ESTIMATED_COST_TESTID), estimated);
+    await expectAmountCell(cardActual.getByTestId(ACTUAL_COST_TESTID), expectedActual);
+    if (screenshotsDir !== undefined && testInfo.project.name === 'chromium') {
       await page.screenshot({ path: join(screenshotsDir, 'telefono.png'), fullPage: true });
     }
+    if (desktopViewport !== null) await page.setViewportSize(desktopViewport);
 
     // --- 7. R16, R22: el lote de producto terminado cuesta real ÷ envasado (7 l).
     const batch = await prisma.productBatch.findFirstOrThrow({

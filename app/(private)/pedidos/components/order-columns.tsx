@@ -1,5 +1,6 @@
 'use client';
 
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
@@ -220,7 +221,13 @@ function producedProductsOf(
 /**
  * Celda de importe. El estimado es `ingredientsCost` y NADA MAS: ya incluye los envases, y sumar
  * `packagingCost` los contaria dos veces. Sin importe, el marcador de ausencia; nunca `0`.
+ *
+ * QC-305 R19 — la misma celda va a la tarjeta de telefono con su rotulo delante
+ * (`withCardFieldLabel`), que dentro de la tabla se oculta: la cabecera ya lo dice.
  */
+export const PRODUCTION_COST_LABEL = 'Costo estimado';
+export const ACTUAL_COST_LABEL = 'Costo real';
+
 const COST_TESTIDS = {
   [PRODUCTION_COST_COLUMN_ID]: PRODUCTION_COST_TESTID,
   [ACTUAL_COST_COLUMN_ID]: ACTUAL_COST_TESTID,
@@ -233,11 +240,16 @@ function CostCell({
   readonly value: string | null;
   readonly field: keyof typeof COST_TESTIDS;
 }) {
-  if (value === null) return <MissingValue field={field} />;
-  return (
-    <span data-testid={COST_TESTIDS[field]} title={exactDecimalTitle(value)}>
-      {formatMoneyDisplay(value)}
-    </span>
+  const label = field === PRODUCTION_COST_COLUMN_ID ? PRODUCTION_COST_LABEL : ACTUAL_COST_LABEL;
+  return withCardFieldLabel(
+    label,
+    value === null ? (
+      <MissingValue field={field} />
+    ) : (
+      <span data-testid={COST_TESTIDS[field]} title={exactDecimalTitle(value)}>
+        {formatMoneyDisplay(value)}
+      </span>
+    ),
   );
 }
 
@@ -380,14 +392,14 @@ export function buildOrderColumns({
     },
     {
       id: PRODUCTION_COST_COLUMN_ID,
-      label: 'Costo estimado',
+      label: PRODUCTION_COST_LABEL,
       align: 'end',
       tabular: true,
       cell: (order) => <CostCell value={order.ingredientsCost} field={PRODUCTION_COST_COLUMN_ID} />,
     },
     {
       id: ACTUAL_COST_COLUMN_ID,
-      label: 'Costo real',
+      label: ACTUAL_COST_LABEL,
       align: 'end',
       tabular: true,
       cell: (order) => <CostCell value={order.actualCost} field={ACTUAL_COST_COLUMN_ID} />,

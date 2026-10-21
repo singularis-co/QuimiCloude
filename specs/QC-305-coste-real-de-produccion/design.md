@@ -219,7 +219,10 @@ cotización (`quoteOrderCostAction`) no cambia: es la UI la que deja de llamarla
   `tabular: true`, sin `sortable` ni `filter`, `data-testid` `order-actual-cost`. Celda: la de
   `ProductionCost` generalizada a un `CostCell({ value, field })`, con `MissingValue` sin importe y
   `formatMoneyDisplay` + `exactDecimalTitle` con importe.
-- La tarjeta del listado sale de las columnas de `DataTable`: no se toca aparte.
+- **Corrección (2026-10-21, al cerrar T8):** la tarjeta del listado **no** sale de las columnas:
+  la define `ORDER_TABLE_CARD` (`order-table.tsx`), que no pintaba ningún coste. Se le añaden
+  «Costo estimado» y «Costo real» con el estilo de campo de tarjeta existente, `formatMoneyDisplay`,
+  guion sin valor y solo con `pedidos.consultar`, igual que la tabla (R19, excepción de P3).
 
 El implementer comprueba que una preferencia de columnas guardada antes de esta ficha no esconde la
 columna nueva. Si la esconde, lo anota en `progress/impl_QC-305.md`; no se cambia `DataTable` en

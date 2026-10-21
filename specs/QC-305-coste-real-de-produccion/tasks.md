@@ -107,7 +107,7 @@
   - Hecho: `pnpm exec playwright test e2e/coste-real-de-produccion.spec.ts` verde en Chromium y
     WebKit.
 
-- [ ] **T9 — Cierre de tanda**. Depende de todo.
+- [x] **T9 — Cierre de tanda**. Depende de todo.
   - Mapa `R<n> → test` en `progress/impl_QC-305.md` (design §11), R23 incluido con el gate de
     dependencias.
   - Nota de enmienda con referencia a QC-305 al pie de los `requirements.md` de QC-281, QC-290 y

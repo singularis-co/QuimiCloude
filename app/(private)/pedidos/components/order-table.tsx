@@ -19,9 +19,11 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
 import {
+  ACTUAL_COST_COLUMN_ID,
   buildOrderColumns,
   ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
+  PRODUCTION_COST_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
 } from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
@@ -105,11 +107,16 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   closeMenu: 'Cerrar',
 };
 
+/**
+ * La tarjeta de telefono. QC-305 R19: los dos costes van en los datos secundarios, en el orden de
+ * la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion propia: la
+ * pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
+ */
 const ORDER_TABLE_CARD: DataTableCardLayout = {
   primary: ORDER_NUMBER_COLUMN_ID,
   status: STATUS_COLUMN_ID,
   title: RECIPE_NAME_COLUMN_ID,
-  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, CREATED_AT_COLUMN_ID],
+  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, CREATED_AT_COLUMN_ID, PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID],
   footer: PRIORITY_COLUMN_ID,
 };
 

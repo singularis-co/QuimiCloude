@@ -454,7 +454,7 @@ Enmiendas de una línea añadidas al pie de los `requirements.md` de QC-281, QC-
 | R16 | `order-packing.test.ts` «R16: los lotes llevan el real entre lo envasado…», «R16: el coste real se reparte entre los 12 L envasados…»; `actual-order-cost.int.test.ts` «R1, R5, R6, R16, R22»; E2E R26 (e) (17.6429 = 123.5 ÷ 7) |
 | R17 | `order-packing.test.ts` «R17: si un lote consumido no tiene coste…», «R17: un pedido con reparto y sin ningun consumo…»; `actual-order-cost.int.test.ts` «R7, R17, R22…»; `finish-with-finished-goods.int.test.ts` «QC-305 P1 / R7, R17…»; `tests/unit/inventario/schema/finished-goods-lot-cost-optional-migration.test.ts` (CHECK retirado, decisión 2026-10-21) |
 | R18 | `actual-order-cost.int.test.ts` «R18: un lote de producto terminado nacido con el estimado, antes de esta ficha, conserva su coste…», «R16, R18: un segundo Terminar…» |
-| R19 | `tests/unit/pedidos-ui/order-columns.test.tsx` «R19: son contiguas, en ese orden…», «R19: se rotulan «Costo estimado» y «Costo real»…», «R19: ninguna de las dos ordena ni filtra»; E2E R26 (d). **Tarjeta de teléfono: ABIERTO** (ver abajo) |
+| R19 | `tests/unit/pedidos-ui/order-columns.test.tsx` «R19: son contiguas, en ese orden…», «R19: se rotulan «Costo estimado» y «Costo real»…», «R19: ninguna de las dos ordena ni filtra»; tarjeta: `tests/unit/pedidos-ui/order-cards.test.tsx` › «R19: los costes en la tarjeta de telefono» (4 casos, ver T9b); E2E R26 (d) tabla y tarjeta |
 | R20 | `order-columns.test.tsx` «R20: sin coste real pinta el guion con el rotulo «Sin dato», nunca 0 ni vacio», «R20: sin estimado pinta el guion…», «R20: el real no cae al estimado cuando falta» |
 | R21 | `order-columns.test.tsx` «R21: un importe exacto a dos decimales no lleva `title`» (`$120.00`), «R21: un importe que se redondea expone el exacto en el `title`» (`$12,752.55`, `title` `12752.5512`), «R21: el real se pinta de `actualCost`…»; decisión 2026-10-21 sin espacio |
 | R22 | `actual-order-cost.int.test.ts` «R1, R5, R6, R16, R22» (tab: `unitCost` 14.5000, `totalCost` 145.0000) y «R7, R17, R22» (guion: `null`); `list-finished-product-costs.test.ts` (null → guion, existente); E2E R26 (e) |
@@ -463,9 +463,50 @@ Enmiendas de una línea añadidas al pie de los `requirements.md` de QC-281, QC-
 | R25 | `orders-actual-cost-migration.test.ts` (columna opcional en `orders`, sin tabla nueva, `down.sql` exacto, borrado lógico y marcas conservados) |
 | R26 | `e2e/coste-real-de-produccion.spec.ts` › «R26, R1, R12, R16, R19, R21, R22 - …» (chromium 1/1 en 2.4m, webkit 1/1 en 2.8m, base propia `qc305_e2e` borrada) |
 
-### Abierto al cierre: R19 en la tarjeta del listado (teléfono)
+### Cerrado: decision 2026-10-21 opcion b
 
-Por debajo de 760 px el listado pasa a tarjetas y `ORDER_TABLE_CARD` (`app/(private)/pedidos/components/order-table.tsx:108`)
-solo pinta número, estado, receta, cliente, fecha y prioridad: ni el estimado (tampoco antes de esta ficha) ni el real.
-Design §5.1 daba por hecho que «la tarjeta sale de las columnas de DataTable»; no es así. Captura:
-`progress/capturas/QC-305/telefono.png` (escritorio: `progress/capturas/QC-305/escritorio.png`). Pendiente de decisión humana.
+R19 en la tarjeta del listado (teléfono): la tarjeta muestra «Costo estimado» y «Costo real». Detalle en T9b.
+
+## T9b — costes en la tarjeta (R19) (frontend_dev, 2026-10-21)
+
+Decisión humana 2026-10-21, opción b; sin pase `/design` (excepción declarada, como P3).
+
+### Archivos
+- `app/(private)/pedidos/components/order-columns.tsx`: `CostCell` envuelve importe o «Sin dato» con
+  `withCardFieldLabel` (rótulo de tarjeta existente, oculto dentro de `<table>`); constantes `PRODUCTION_COST_LABEL` y
+  `ACTUAL_COST_LABEL`, que también rotulan las cabeceras.
+- `app/(private)/pedidos/components/order-table.tsx`: `ORDER_TABLE_CARD.meta` añade `productionCost` y `actualCost`
+  tras la fecha. Sin condición propia: la pantalla entera exige `pedidos.consultar`, la misma que decide las columnas.
+  Sin tocar `DataTable` ni `DataTableCardLayout`.
+- `tests/unit/pedidos-ui/order-cards.test.tsx`: bloque nuevo «R19: los costes en la tarjeta de telefono».
+- `tests/unit/paridad/__snapshots__/pedidos-paridad.test.tsx.snap`: actualizado con `-u`. Diff revisado: solo los
+  dos campos nuevos de la tarjeta y el rótulo de tarjeta (`[table_&]:hidden`) dentro de las celdas de coste de la tabla
+  (jsdom no aplica el CSS, por eso el nombre de la celda pasa a «Costo estimadoSin dato»; en navegador se oculta).
+- `e2e/coste-real-de-produccion.spec.ts`: el paso 6 pasa siempre a 390×844 y afirma en la tarjeta los rótulos y los
+  importes (`$93.00`, `$123.50` con `title`); las capturas siguen solo con `E2E_SCREENSHOTS_DIR` en chromium.
+- `progress/capturas/QC-305/telefono.png` (y `escritorio.png`) rehechas.
+
+### Tests (order-cards.test.tsx)
+- «R19: con valor, «Costo estimado» y «Costo real» con su importe, en ese orden, tras la fecha» (`$120.00` sin `title`,
+  `$12,752.55` con `title` `12752.5512`).
+- «R19: sin valor, el guion con el rotulo accesible «Sin dato», nunca 0».
+- «R19: el rotulo de tarjeta no cambia el texto del importe en la fila de la tabla».
+- «R19: sin pedidos.consultar no aparecen: la pagina corta antes de pintar la lista» (el corte de la página va antes de
+  `<OrderListSection`, y la tabla no tiene otra condición de permiso).
+
+### Verificación (salida real)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos tocados (`eslint` sobre los 4 archivos: sin salida).
+- `pnpm exec vitest run` order-cards, order-columns, order-table, pedidos-viewport, order-list-section,
+  order-row-wiring, paridad/pedidos-paridad: `Test Files 7 passed (7)`, `Tests 209 passed (209)`.
+- E2E chromium, `--workers=1`, base `qc305_e2e` creada de `qct_tpl_06ae9a5f7969` (113 migraciones):
+```
+Running 1 test using 1 worker
+  ✓  1 [chromium] › e2e\coste-real-de-produccion.spec.ts:508:7 › coste real de producción › R26, R1, R12, R16, R19, R21, R22 - … (1.4m)
+  1 passed (1.8m)
+```
+- Al terminar: `DROP DATABASE IF EXISTS qc305_e2e WITH (FORCE)` → `pg_database`: «qc305_e2e existe: false».
+- webkit no se corrió en esta tanda (pedido: solo chromium).
+
+### Veredicto T9b
+R19 cerrado también en la tarjeta: unit y E2E chromium en verde, base borrada.
