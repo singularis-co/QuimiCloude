@@ -156,25 +156,7 @@
 
 ## Preguntas abiertas
 
-Cada una lleva escrita la posición por defecto con la que está redactado el spec. Si el humano la
-cambia al aprobar, se ajusta el requisito citado sin renumerar.
-
-- **P1 (R7). ¿Un lote consumido sin coste unitario deja el pedido sin coste real?** Hoy los lotes de
-  insumo y envase exigen coste al darse de alta (`db/schema.prisma > ProductBatch.unitCost`), pero la
-  columna es anulable y puede haber lotes antiguos sin él. El estimado los deja fuera del promedio
-  (QC-141 D22); en una suma ponderada, dejarlos fuera daría un real más bajo que el verdadero sin
-  avisar. **Por defecto: el pedido queda sin coste real (guion).**
-- **P2 (R17). Sin coste real, ¿qué coste lleva el lote de producto terminado?** La tabla dice «el lote
-  toma el coste real» y «guion, nunca 0», pero no cubre este caso. Hoy un lote de producto terminado
-  siempre nace con coste (como mínimo `0.0000`, `order-packing.ts > divideCost`). **Por defecto: el
-  lote nace sin coste unitario y el detalle pinta guion**; las otras dos salidas son `0.0000` (un
-  dato falso) o el estimado (contradice la enmienda de D20).
-- **P3 (R19). Rótulos de las columnas y pase `/design`.** Hoy el listado tiene una sola columna,
-  «Costo de producción», con el estimado. **Por defecto: esa columna pasa a «Costo estimado» y a su
-  derecha nace «Costo real»**, con la misma celda (guion o importe con `title`). No hay componente
-  nuevo: es una columna más de `DataTable` que solo compone piezas catalogadas, y el spec se acoge a
-  la excepción de `docs/perfil-agentes.md > Pase de diseño` como QC-284. Si el humano quiere un
-  tablero `/design`, el spec queda bloqueado hasta tenerlo.
+Ninguna. P1–P3 se cerraron al aprobar el spec (2026-10-21): ver las tres últimas filas de la tabla.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -193,3 +175,7 @@ cambia al aprobar, se ajusta el requisito citado sin renumerar.
 | 2026-10-21 | ¿Quién lo ve? | Quien tenga `pedidos.consultar`, validado en el service. Sin permiso nuevo. La vía `asignaciones` no lleva importe. *Heredado de QC-123 D10.* |
 | 2026-10-21 | ¿E2E? | Sí: toca importes e inventario (`docs/checkpoints-proyecto.md > Flujos criticos`). |
 | 2026-09-01 | Forma de la tabla | Borrado lógico, `created_at` / `updated_at` / `deleted_at`, identificadores en inglés. *Heredado de QC-4.* |
+| 2026-10-21 | (P1, R7) ¿Un lote consumido sin coste unitario? | El pedido queda **sin coste real** (guion). No se suma sin ese lote: daría un real más bajo que el verdadero sin avisar. *Cerrada por el humano al aprobar el spec (F1.4).* |
+| 2026-10-21 | (P2, R17) Sin coste real, ¿qué coste lleva el lote de producto terminado? | **Sin coste unitario**; el detalle pinta guion. Ni `0.0000` ni el estimado. *Cerrada por el humano al aprobar el spec (F1.4).* |
+| 2026-10-21 | (P3, R19) ¿Dónde y cómo se ve en el pedido? | En el **listado de pedidos**: «Costo de producción» pasa a «Costo estimado» y a su derecha nace «Costo real». **Sin pase `/design`** (excepción de `docs/perfil-agentes.md > Pase de diseño`, como QC-284). Concreta la fila «¿Dónde se ve?». *Cerrada por el humano al aprobar el spec (F1.4).* |
+| 2026-10-21 | Alcance del congelado del estimado | Aprobado tal como lo amplía el spec: tampoco recalcula la edición de reparto y unidad (QC-170) en `EN_CURSO`/`POR_EMPACAR` (R13), y el formulario de un pedido comenzado deja de recotizar (R15, enmienda QC-151 R12 solo para comenzados). *Humano, F1.4.* |
