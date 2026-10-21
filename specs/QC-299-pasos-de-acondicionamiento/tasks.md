@@ -112,10 +112,10 @@ nombre de cada caso de test. Antes de T1: las preguntas abiertas P1–P6 resuelt
 
 ## Bloque E — punta a punta y cierre
 
-- [ ] **T19. E2E** — dep: T15, T17, T18.
+- [x] **T19. E2E** — dep: T15, T17, T18.
   `e2e/pasos-de-acondicionamiento.spec.ts`, según R39.
   Hecho: `pnpm exec playwright test e2e/pasos-de-acondicionamiento.spec.ts` verde. Caso `R39`.
-- [ ] **T20. Cierre** — dep: todas.
+- [x] **T20. Cierre** — dep: todas.
   Mapa `R<n> -> test` en `progress/impl_QC-299.md`; `./init.sh` verde.
 
 ## Archivos esperados

@@ -215,3 +215,82 @@ Anotada en `requirements.md > Decisiones cerradas`. `composeConditioningStepsVie
 - R37 → `tests/unit/paridad/recorridos-paridad.test.tsx` (paridad del detalle intacta)
 
 Pendientes: T19 (E2E, R39) y T20 (cierre).
+
+## Tanda 5 — T19 (E2E) y T20 (cierre)
+
+### Archivos
+- Nuevo `e2e/pasos-de-acondicionamiento.spec.ts` (un caso `R39:`; empresa efímera `qc299_e2e_*` con `enableAllAddons`, usuarios del propio fixture, limpieza por prefijo).
+- `tests/guards/guard-identificador-de-request.test.ts`: alta del spec en la lista cerrada `E2E_ESPERADOS`.
+
+### Cómo se corrió
+La base compartida `QuimiCloude` no tiene las migraciones de QC-299 y **no se tocó**. Como CI
+(`gate.yml > Base del E2E`), se creó `qc299_e2e` como copia de la plantilla migrada
+`qct_tpl_c94dd731b081` (`pnpm run db:test template`), se corrió el spec con `DATABASE_URL` y
+`DIRECT_URL` apuntando a ella y después se borró.
+
+Dos fallos del propio test, corregidos: (1) la empresa efímera no activaba add-ons y el
+Administrador no tenía `dashboard.consultar` → 404 en el recorrido (diagnosticado con logs del
+servidor; `getExecutionTrace` no llegaba a ejecutarse); (2) en webkit, `toBeEnabled()` del «Siguiente»
+con el timeout por defecto de 5 s frente a la espera obligatoria de 5 s → plazo
+`STEP_WAIT_MS + 30_000`. Ningún bug de la app.
+
+### Salida de `pnpm exec playwright test e2e/pasos-de-acondicionamiento.spec.ts`
+```
+Running 2 tests using 2 workers
+  ✓  1 [chromium] › e2e\pasos-de-acondicionamiento.spec.ts:485:7 › pasos de acondicionamiento de punta a punta (R39) › R39: ... (1.7m)
+  ✓  2 [webkit] › e2e\pasos-de-acondicionamiento.spec.ts:485:7 › pasos de acondicionamiento de punta a punta (R39) › R39: ... (1.8m)
+
+  2 passed (2.7m)
+```
+
+## Mapa R<n> -> test — consolidado R1–R39
+Detalle de cada caso en las secciones de mapa de cada tanda. Rutas bajo `tests/` salvo el E2E.
+
+| R | Tests |
+|---|---|
+| R1 | `integration/recetas/recipe-conditioning-steps-migration.int.test.ts` (UP/DOWN); `unit/recetas/schema/recetas-schema.test.ts`; `unit/recetas/recipe-input.test.ts`; `unit/recetas/scope.test.ts` (censo) |
+| R2 | `unit/recetas/recipe-input.test.ts` |
+| R3 | `unit/recetas/recipe-input.test.ts` |
+| R4 | `unit/recetas/recipe-input.test.ts`; `unit/recetas/conditioning-steps.test.ts`; `integration/recetas/conditioning-steps.int.test.ts` |
+| R5 | `unit/recetas/recipe-input.test.ts`; `unit/recetas/schema/recetas-schema.test.ts` |
+| R6 | `unit/recetas/conditioning-steps.test.ts` |
+| R7 | `unit/documentos/confirm-formula-import.test.ts` |
+| R8 | `unit/recetas-ui/recipe-form-conditioning-steps.test.tsx`; `unit/recetas-ui/recipe-steps-field.test.tsx` |
+| R9 | `unit/recetas-ui/recipe-steps-field.test.tsx`; `recipe-step-editor.test.tsx`; `recipe-form-conditioning-steps.test.tsx` |
+| R10 | `unit/recetas-ui/recipe-step-editor.test.tsx`; `recipe-steps-field.test.tsx`; `recipe-form-conditioning-steps.test.tsx` |
+| R11 | `unit/recetas-ui/recipe-steps-field.test.tsx`; `recipe-form-conditioning-steps.test.tsx` |
+| R12 | `unit/recetas-ui/recipe-form-conditioning-steps.test.tsx`; `recipe-steps-field.test.tsx` |
+| R13 | `unit/recetas-ui/recipe-form-conditioning-steps.test.tsx` |
+| R14 | `unit/recetas/recipe-input.test.ts`; `unit/recetas/conditioning-steps.test.ts` |
+| R15 | `unit/recetas/conditioning-steps.test.ts`; `unit/recetas/recipe-conditioning-steps-reader.test.ts`; `integration/recetas/conditioning-steps.int.test.ts` |
+| R16 | `unit/recetas-ui/recipe-version-form.test.tsx` |
+| R17 | `unit/asignaciones/get-conditioning-order.test.ts` |
+| R18 | `unit/asignaciones-ui/conditioning-steps-panel.test.tsx`; `conditioning-order-screen.test.tsx` |
+| R19 | `unit/asignaciones/get-conditioning-order.test.ts`; `finish-conditioning.test.ts`; `unit/asignaciones-ui/conditioning-order-screen.test.tsx` |
+| R20 | `unit/asignaciones-ui/conditioning-steps-panel.test.tsx` |
+| R21 | `unit/asignaciones/record-conditioning-step.test.ts`; `evidence-target.test.ts`; `read-order-evidence.test.ts`; `step-evidence.test.ts`; `unit/asignaciones-ui/conditioning-steps-panel.test.tsx` |
+| R22 | `unit/asignaciones/get-conditioning-order.test.ts`; `unit/asignaciones-ui/conditioning-steps-panel.test.tsx`; `conditioning-step-responsibles-picker.test.tsx` |
+| R23 | `unit/asignaciones/record-conditioning-step.test.ts` |
+| R24 | `unit/asignaciones-ui/conditioning-steps-panel.test.tsx` |
+| R25 | `unit/asignaciones/finish-conditioning.test.ts`; `unit/asignaciones-ui/conditioning-steps-panel.test.tsx`; `conditioning-order-screen.test.tsx`; `conditioning-batch-data-form.test.tsx` |
+| R26 | `unit/asignaciones-ui/conditioning-steps-panel.test.tsx`; `unit/asignaciones/get-conditioning-order.test.ts` |
+| R27 | `integration/recetas/recipe-conditioning-steps-migration.int.test.ts`; `unit/asignaciones/conditioning-steps.test.ts`; `execution-log-prisma.test.ts`; `record-conditioning-step.test.ts`; `integration/asignaciones/conditioning-steps-progress.int.test.ts` |
+| R28 | `unit/asignaciones/conditioning-steps.test.ts`; `execution-log-prisma.test.ts`; `record-conditioning-step.test.ts`; `get-conditioning-order.test.ts`; `integration/asignaciones/conditioning-steps-progress.int.test.ts` |
+| R29 | `unit/asignaciones/record-conditioning-step.test.ts` |
+| R30 | `unit/recetas/recipe-conditioning-steps-reader.test.ts`; `unit/asignaciones/get-conditioning-order.test.ts` |
+| R31 | `unit/asignaciones/record-conditioning-step.test.ts`; `get-conditioning-order.test.ts`; `finish-conditioning.test.ts`; `order-conditioning-actions.test.ts`; `unit/composition/asignaciones-facade.test.ts` |
+| R32 | `integration/recetas/conditioning-steps.int.test.ts`; `unit/asignaciones/{evidence-target,count-evidence-locking-orders,read-order-evidence,record-conditioning-step,get-conditioning-order,finish-conditioning}.test.ts`; `integration/asignaciones/conditioning-steps-progress.int.test.ts` |
+| R33 | `integration/recetas/conditioning-steps.int.test.ts` |
+| R34 | `unit/recetas/conditioning-steps.test.ts`; `unit/asignaciones/count-evidence-locking-orders.test.ts` |
+| R35 | `unit/asignaciones/get-execution-trace.test.ts`; `record-conditioning-step.test.ts`; `ui/dashboard/execution-trace-detail.test.tsx` |
+| R36 | `unit/asignaciones/get-execution-trace.test.ts`; `ui/dashboard/execution-trace-detail.test.tsx` |
+| R37 | `unit/asignaciones/get-execution-trace.test.ts`; `list-execution-traces.test.ts`; `unit/paridad/recorridos-paridad.test.tsx` |
+| R38 | `unit/asignaciones/execution-trace.test.ts` |
+| R39 | `e2e/pasos-de-acondicionamiento.spec.ts` («R39: el Administrador crea la formula…», chromium + webkit) |
+
+### Verificación de cierre de la tanda 5 (corrida por el implementer)
+- `pnpm run typecheck`: **0 errores**.
+- `pnpm run lint`: 0 errores, 10 warnings (preexistentes).
+- `pnpm exec vitest run guard`: 80 archivos, 1096 verdes, 20 skipped.
+- E2E: 2 passed (chromium + webkit), salida arriba.
+- `./init.sh`: lo corre el leader (criterio de hecho de T20).
