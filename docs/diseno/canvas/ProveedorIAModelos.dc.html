@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Proveedor IA · modelo por tarea</title>
+<title>Proveedor IA · modelo</title>
 <script src="./support.js"></script>
 <link rel="stylesheet" href="./qc.css">
 </head>
@@ -43,35 +43,32 @@
           <sc-if value="{{ isErr }}" hint-placeholder-val="{{ false }}">
             <div role="alert" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in oklch, var(--destructive) 40%, transparent); background: color-mix(in oklch, var(--destructive) 8%, transparent)">
               <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--destructive); flex: none; margin-top: 2px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>
-              <div style="display: flex; flex-direction: column; gap: 2px"><strong>Error con tu proveedor</strong><span class="sub">El modelo <span class="mono">[MODELO B]</span> que elegiste para «Catálogo desde PDF» ya no está disponible en Claude. Elige otro modelo para volver a leer catálogos.</span></div>
+              <div style="display: flex; flex-direction: column; gap: 2px"><strong>Error con tu proveedor</strong><span class="sub">El modelo <span class="mono">[MODELO B]</span> que elegiste ya no está disponible en Claude. Elige otro modelo para volver a leer fórmulas y catálogos en PDF.</span></div>
             </div>
           </sc-if>
 
           <section aria-labelledby="mt-t" style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px">
-            <div style="display: flex; flex-direction: column; gap: 2px"><h3 id="mt-t" class="h3">Modelo por tarea</h3><p class="sub">Elige con qué modelo de Claude se lee cada tipo de PDF. Si no eliges, se usa el predeterminado.</p></div>
-
-            <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="2">
-              <div class="f">
-                <span class="fl" id="{{ t.lid }}">{{ t.label }}</span>
-                <div class="anchor">
-                  <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ t.open }}" aria-invalid="{{ t.invalid }}" aria-labelledby="{{ t.lid }}" aria-describedby="{{ t.hid }}" onClick="{{ t.toggle }}"><span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span class="mono" style="text-decoration: {{ t.strike }}">{{ t.model }}</span><sc-if value="{{ t.isDefault }}" hint-placeholder-val="{{ true }}"><span class="sb t-neutral"><i></i>Predeterminado</span></sc-if><sc-if value="{{ t.isGone }}" hint-placeholder-val="{{ false }}"><span class="sb t-danger"><i></i>No disponible</span></sc-if></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
-                  <div class="{{ t.pop }}" role="listbox" aria-labelledby="{{ t.lid }}">
-                    <sc-for list="{{ t.opts }}" as="o" hint-placeholder-count="4">
-                      <button class="opt" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}" style="justify-content: space-between"><span style="display: flex; align-items: center; gap: 8px"><span class="mono">{{ o.id }}</span><sc-if value="{{ o.isDefault }}" hint-placeholder-val="{{ false }}"><span class="cap">predeterminado</span></sc-if></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ o.op }}; color: var(--primary)"><path d="m5 12 5 5 9-10"></path></svg></button>
-                    </sc-for>
-                  </div>
+            <div style="display: flex; flex-direction: column; gap: 2px"><h3 class="h3">Modelo</h3><p class="sub">Se usa para leer fórmulas y catálogos en PDF. Solo aparecen modelos de Claude que leen PDF e imágenes.</p></div>
+            <div class="f">
+              <span class="fl" id="mt-t">Modelo de Claude</span>
+              <div class="anchor">
+                <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ openStr }}" aria-invalid="{{ invalid }}" aria-labelledby="mt-t" aria-describedby="mt-h" onClick="{{ toggle }}"><span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span class="mono" style="text-decoration: {{ strike }}">{{ model }}</span><sc-if value="{{ isDefault }}" hint-placeholder-val="{{ true }}"><span class="sb t-neutral"><i></i>Predeterminado</span></sc-if><sc-if value="{{ isGone }}" hint-placeholder-val="{{ false }}"><span class="sb t-danger"><i></i>No disponible</span></sc-if></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                <div class="{{ pop }}" role="listbox" aria-labelledby="mt-t">
+                  <sc-for list="{{ opts }}" as="o" hint-placeholder-count="3">
+                    <button class="opt" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}" style="justify-content: space-between"><span style="display: flex; align-items: center; gap: 8px"><span class="mono">{{ o.id }}</span><sc-if value="{{ o.isDefault }}" hint-placeholder-val="{{ false }}"><span class="cap">predeterminado</span></sc-if></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ o.op }}; color: var(--primary)"><path d="m5 12 5 5 9-10"></path></svg></button>
+                  </sc-for>
                 </div>
-                <span class="{{ t.helpCls }}" id="{{ t.hid }}">{{ t.help }}</span>
               </div>
-            </sc-for>
+              <span class="{{ helpCls }}" id="mt-h">{{ help }}</span>
+            </div>
           </section>
 
           <dl class="spec" style="margin: 0">
             <dt>Última prueba</dt><dd>{{ lastTest }}</dd>
           </dl>
           <div aria-live="polite" style="min-height: 22px">
-            <sc-if value="{{ testing }}" hint-placeholder-val="{{ false }}"><span class="cap">Probando la key y los modelos en uso…</span></sc-if>
-            <sc-if value="{{ testOk }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Conexión correcta · los dos modelos en uso responden</span></sc-if>
+            <sc-if value="{{ testing }}" hint-placeholder-val="{{ false }}"><span class="cap">Probando la key y el modelo en uso…</span></sc-if>
+            <sc-if value="{{ testOk }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Conexión correcta · el modelo en uso responde</span></sc-if>
             <sc-if value="{{ testErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Error con tu proveedor: el modelo <span class="mono">[MODELO B]</span> ya no está disponible.</span></sc-if>
           </div>
           <div class="actions cq-stack" style="justify-content: space-between">
@@ -86,29 +83,11 @@
         <sc-if value="{{ confirmChange }}" hint-placeholder-val="{{ false }}">
           <div role="alertdialog" aria-labelledby="ia-ch-t" class="card" style="max-width: 460px; margin-top: 16px; gap: 12px; box-shadow: var(--shadow-pop)">
             <h2 id="ia-ch-t" class="h2">¿Cambiar de proveedor?</h2>
-            <p class="sub">Los modelos que elegiste para cada tarea son de Claude. Si conectas otro proveedor, cada tarea vuelve a su modelo predeterminado del nuevo proveedor. Si solo cambias la key de Claude, se conservan.</p>
+            <p class="sub">El modelo que elegiste es de Claude. Si conectas otro proveedor, se usa el modelo predeterminado del nuevo proveedor. Si solo cambias la key de Claude, se conserva.</p>
             <div class="actions cq-stack"><button class="b b-out b-touch-m" type="button" onClick="{{ cancelChange }}">Cancelar</button><button class="b b-pri b-touch-m" type="button" onClick="{{ cancelChange }}">Continuar</button></div>
           </div>
         </sc-if>
 
-        <section aria-labelledby="ref-t" class="card" style="max-width: 760px; margin-top: 16px; gap: 12px">
-          <button class="trig" type="button" aria-expanded="{{ refOpen }}" aria-controls="ref-list" onClick="{{ toggleRef }}" style="border: 0; background: transparent; padding: 0; font: inherit; color: inherit; min-height: 44px"><span style="display: flex; flex-direction: column; gap: 2px"><span id="ref-t" class="h3">Modelos de otros proveedores</span><span class="sub">Solo como referencia. Para usarlos, conecta ese proveedor.</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
-          <sc-if value="{{ refShow }}" hint-placeholder-val="{{ true }}">
-            <div id="ref-list" style="display: flex; flex-direction: column; gap: 14px">
-              <sc-for list="{{ others }}" as="p" hint-placeholder-count="3">
-                <div style="display: flex; gap: 12px; align-items: flex-start">
-                  <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px dashed var(--input); display: grid; place-items: center; font: 600 13px 'IBM Plex Sans', sans-serif; color: var(--muted-fg)">{{ p.mono }}</span>
-                  <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
-                    <span style="font-weight: 600">{{ p.name }}</span>
-                    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px">
-                      <sc-for list="{{ p.models }}" as="m" hint-placeholder-count="3"><li class="mono" style="padding: 2px 8px; border-radius: 6px; background: var(--muted); color: var(--muted-fg); font-size: 13px">{{ m }}</li></sc-for>
-                    </ul>
-                  </div>
-                </div>
-              </sc-for>
-            </div>
-          </sc-if>
-        </section>
       </div>
     </div>
   </div>
@@ -137,61 +116,40 @@ const s = this.state || {};
 const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
 const view = s.view || this.props.estado || 'predeterminado';
 const MODELS = ['[MODELO A]', '[MODELO B]', '[MODELO C]'];
-const DEF = { recipe: '[MODELO A]', catalog: '[MODELO A]' };
-const BASE = {
-  predeterminado: { recipe: null, catalog: null },
-  elegido: { recipe: '[MODELO C]', catalog: null },
-  'modelo-retirado': { recipe: null, catalog: '[MODELO B]' }
-};
-const pick = Object.assign({}, BASE[view], s.pick || {});
-const gone = view === 'modelo-retirado' && pick.catalog === '[MODELO B]' ? 'catalog' : null;
+const DEF = '[MODELO A]';
+const BASE = { predeterminado: null, elegido: '[MODELO C]', 'modelo-retirado': '[MODELO B]' };
+const chosen = s.pick !== undefined ? s.pick : BASE[view];
+const model = chosen || DEF;
+const isGone = view === 'modelo-retirado' && chosen === '[MODELO B]';
 const later = (fn, ms) => { clearTimeout(this.tt); this.tt = setTimeout(fn, ms); };
 const toast = (msg) => { this.setState({ toast: msg }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
-const T = [['recipe', 'Fórmula desde PDF', 'fórmula'], ['catalog', 'Catálogo desde PDF', 'catálogo']];
 const V = [['predeterminado', 'Predeterminado'], ['elegido', 'Modelo elegido'], ['modelo-retirado', 'Modelo retirado']];
-const isErr = gone !== null;
+const isErr = isGone;
 return {
   rootCls: dark ? 'qc app dk' : 'qc app',
   toggleDark: () => this.setState({ dark: !dark }),
   menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
   menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l', ovCls: s.menu ? 'ov open' : 'ov', closeAll: () => this.setState({ menu: false, open: null }),
-  views: V.map((v) => ({ label: v[1], sel: v[0] === view ? 'true' : 'false', pick: () => this.setState({ view: v[0], pick: {}, open: null, test: null, confirmChange: false }) })),
+  views: V.map((v) => ({ label: v[1], sel: v[0] === view ? 'true' : 'false', pick: () => this.setState({ view: v[0], pick: undefined, open: false, test: null, confirmChange: false }) })),
   isErr: isErr,
   stateBadge: isErr ? 'sb t-danger' : 'sb t-success', stateLabel: isErr ? 'Error' : 'Conectado',
-  tasks: T.map((t) => {
-    const chosen = pick[t[0]];
-    const model = chosen || DEF[t[0]];
-    const isGone = gone === t[0];
-    const open = s.open === t[0];
-    return {
-      lid: 'mt-' + t[0], hid: 'mt-' + t[0] + '-h', label: t[1], model: model,
-      isDefault: !chosen, isGone: isGone, strike: isGone ? 'line-through' : 'none',
-      invalid: isGone ? 'true' : 'false', open: open ? 'true' : 'false',
-      pop: open ? 'pop full open' : 'pop full',
-      toggle: () => this.setState({ open: open ? null : t[0] }),
-      helpCls: isGone ? 'err' : 'help',
-      help: isGone ? 'Este modelo ya no está disponible. Elige otro para volver a leer ' + t[2] + 's.' : (chosen ? 'Elegido por tu empresa.' : 'Se usa el modelo predeterminado de Claude.'),
-      opts: MODELS.filter((m) => !(isGone && m === '[MODELO B]')).map((m) => ({
-        id: m, isDefault: m === DEF[t[0]], sel: m === model ? 'true' : 'false', op: m === model ? '1' : '0',
-        pick: () => {
-          const np = Object.assign({}, s.pick || {}); np[t[0]] = m === DEF[t[0]] ? null : m;
-          const nv = view === 'modelo-retirado' && t[0] === 'catalog' ? 'elegido' : view;
-          this.setState({ pick: nv !== view ? Object.assign({ recipe: null }, np) : np, view: nv, open: null, test: null });
-          toast('Modelo de ' + t[2] + ' guardado');
-        }
-      }))
-    };
-  }),
+  model: model, isDefault: !chosen, isGone: isGone, strike: isGone ? 'line-through' : 'none',
+  invalid: isGone ? 'true' : 'false', openStr: s.open ? 'true' : 'false',
+  pop: s.open ? 'pop full open' : 'pop full',
+  toggle: () => this.setState({ open: !s.open }),
+  helpCls: isGone ? 'err' : 'help',
+  help: isGone ? 'Este modelo ya no está disponible. Elige otro para volver a leer PDF.' : (chosen ? 'Elegido por tu empresa.' : 'Se usa el modelo predeterminado de Claude.'),
+  opts: MODELS.filter((m) => !(isGone && m === '[MODELO B]')).map((m) => ({
+    id: m, isDefault: m === DEF, sel: m === model ? 'true' : 'false', op: m === model ? '1' : '0',
+    pick: () => {
+      this.setState({ pick: m === DEF ? null : m, view: isGone ? 'elegido' : view, open: false, test: null });
+      toast('Modelo guardado');
+    }
+  })),
   lastTest: isErr ? 'Falló el 22/10/2026 09:40 · modelo no disponible (404)' : 'Correcta el 22/10/2026 09:15',
   testing: s.test === 'run', testOk: s.test === 'ok', testErr: s.test === 'err',
   test: () => { if (s.test === 'run') return; this.setState({ test: 'run' }); later(() => this.setState({ test: isErr ? 'err' : 'ok' }), 900); },
   confirmChange: !!s.confirmChange, askChange: () => this.setState({ confirmChange: true }), cancelChange: () => this.setState({ confirmChange: false }),
-  refOpen: s.ref === false ? 'false' : 'true', refShow: s.ref !== false, toggleRef: () => this.setState({ ref: s.ref === false }),
-  others: [
-    { name: 'Gemini', mono: 'G', models: ['[MODELO A]', '[MODELO B]'] },
-    { name: 'OpenAI', mono: 'O', models: ['[MODELO A]', '[MODELO B]'] },
-    { name: 'OpenRouter', mono: 'R', models: ['[MODELO A]', '[MODELO B]', '[MODELO C]'] }
-  ],
   toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toast || ''
 };
 }
