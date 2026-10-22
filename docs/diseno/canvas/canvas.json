@@ -936,6 +936,32 @@
       "x": 1520,
       "y": 11740
     },
+    "ProveedorIAModelos.dc.html": {
+      "expand": "fill",
+      "h": 1300,
+      "is_interactive": true,
+      "page": "configuracion",
+      "title": "Proveedor IA · modelo por tarea (QT-291)",
+      "w": 1440,
+      "x": 0,
+      "y": 21750
+    },
+    "ProveedorIAModelosMovil.dc.html": {
+      "h": 1300,
+      "page": "configuracion",
+      "title": "ProveedorIAModelosMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 21750
+    },
+    "ProveedorIAModelosTablet.dc.html": {
+      "h": 1300,
+      "page": "configuracion",
+      "title": "ProveedorIAModelosTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 21750
+    },
     "ProveedorImportar.dc.html": {
       "expand": "fill",
       "h": 1600,
@@ -2135,6 +2161,9 @@
     "ProveedorIA.dc.html",
     "ProveedorIATablet.dc.html",
     "ProveedorIAMovil.dc.html",
+    "ProveedorIAModelos.dc.html",
+    "ProveedorIAModelosMovil.dc.html",
+    "ProveedorIAModelosTablet.dc.html",
     "AltaConversion.dc.html",
     "AltaConversionTablet.dc.html",
     "AltaConversionMovil.dc.html",

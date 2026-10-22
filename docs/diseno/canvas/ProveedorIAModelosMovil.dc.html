@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proveedor IA · modelo por tarea en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProveedorIAModelos" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Proveedor IA · modelo por tarea · ficha (QT-291)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd>La tarjeta «conectado» de <span class="mono">ProveedorIA.dc.html</span> (QC-275) sin cambios en cabecera, aviso de error, prueba y acciones · <span class="mono">ui/select</span> (Select, Base UI) dentro de <span class="mono">shared/select-field</span> para cada tarea · <span class="mono">shared/status-badge</span> («Predeterminado», «No disponible», «Error») · <span class="mono">shared/confirm-dialog</span> (cambiar de proveedor) · <span class="mono">ui/collapsible</span> (modelos de otros proveedores) · <span class="mono">sonner</span> para el toast</dd>
+      <dt>Nuevo</dt><dd>Sección «Modelo por tarea» dentro de la tarjeta: un selector por tarea (Fórmula desde PDF, Catálogo desde PDF) con los modelos del proveedor conectado; el predeterminado lleva su marca · bloque plegable «Modelos de otros proveedores», solo lectura, agrupado por proveedor con su logo</dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Select, Collapsible) · <span class="mono">lucide-react</span> · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>Tarjeta de 760 px como máximo · tres estados en el selector del tablero: predeterminado (las dos tareas con su modelo predeterminado), modelo elegido (fórmula con un modelo elegido) y modelo retirado (catálogo con un modelo que el proveedor ya no ofrece: tarjeta en Error, aviso arriba, selector en rojo tachado con «No disponible»; el modelo retirado no aparece en la lista) · elegir un modelo lo guarda al instante con toast · «Probar conexión» prueba la key y los dos modelos en uso · «Cambiar key o proveedor» avisa antes de que la elección se pierda al cambiar de proveedor</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · igual que escritorio</dd>
+      <dt>Teléfono</dt><dd>Selectores a todo el ancho con 48 px; la lista se abre como hoja inferior (patrón <span class="mono">CountrySelect</span>) · botones apilados a todo el ancho con 44 px · el bloque de otros proveedores empieza plegado</dd>
+      <dt>Animación</dt><dd>La flecha del selector gira 180° al abrir · la lista entra con <span class="mono">.pop</span> (opacidad y escala) · check en la opción elegida · el plegable abre con altura en 150 ms · toast al guardar</dd>
+      <dt>Por confirmar</dt><dd>[MODELO A/B/C]: la lista sembrada por proveedor y cuál es el predeterminado de cada tarea, que fija el spec (F1.4) · [LOGO OFICIAL] de cada proveedor, el mismo de QC-275</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Proveedor IA · modelo por tarea</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="proveedor-ia" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page">
+        <div class="ph">
+          <div class="ph-t"><span class="crumb">Integraciones<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></span><h1 class="h1">Proveedor IA</h1></div>
+        </div>
+        <p class="sub" style="max-width: 720px; margin: 0 0 18px">La lectura de fórmulas y catálogos en PDF usa la cuenta de IA de tu empresa. Elige el proveedor, pega tu API key y prueba la conexión. La key se guarda cifrada y nunca se vuelve a mostrar.</p>
+
+        <div class="card" style="max-width: 760px; gap: 16px">
+          <div class="card-hd">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0">
+              <span aria-hidden="true" style="flex: none; width: 44px; height: 44px; border-radius: 8px; border: 1px dashed var(--input); display: grid; place-items: center; font: 600 16px 'IBM Plex Sans', sans-serif; color: var(--muted-fg)">C</span>
+              <div style="display: flex; flex-direction: column; gap: 2px"><h2 class="h2">Claude</h2><p class="sub">Key guardada el 13/10/2026 · cifrada</p></div>
+            </div>
+            <span class="{{ stateBadge }}"><i></i>{{ stateLabel }}</span>
+          </div>
+
+          <sc-if value="{{ isErr }}" hint-placeholder-val="{{ false }}">
+            <div role="alert" style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid color-mix(in oklch, var(--destructive) 40%, transparent); background: color-mix(in oklch, var(--destructive) 8%, transparent)">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--destructive); flex: none; margin-top: 2px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>
+              <div style="display: flex; flex-direction: column; gap: 2px"><strong>Error con tu proveedor</strong><span class="sub">El modelo <span class="mono">[MODELO B]</span> que elegiste para «Catálogo desde PDF» ya no está disponible en Claude. Elige otro modelo para volver a leer catálogos.</span></div>
+            </div>
+          </sc-if>
+
+          <section aria-labelledby="mt-t" style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px">
+            <div style="display: flex; flex-direction: column; gap: 2px"><h3 id="mt-t" class="h3">Modelo por tarea</h3><p class="sub">Elige con qué modelo de Claude se lee cada tipo de PDF. Si no eliges, se usa el predeterminado.</p></div>
+
+            <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="2">
+              <div class="f">
+                <span class="fl" id="{{ t.lid }}">{{ t.label }}</span>
+                <div class="anchor">
+                  <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ t.open }}" aria-invalid="{{ t.invalid }}" aria-labelledby="{{ t.lid }}" aria-describedby="{{ t.hid }}" onClick="{{ t.toggle }}"><span style="display: flex; align-items: center; gap: 8px; min-width: 0"><span class="mono" style="text-decoration: {{ t.strike }}">{{ t.model }}</span><sc-if value="{{ t.isDefault }}" hint-placeholder-val="{{ true }}"><span class="sb t-neutral"><i></i>Predeterminado</span></sc-if><sc-if value="{{ t.isGone }}" hint-placeholder-val="{{ false }}"><span class="sb t-danger"><i></i>No disponible</span></sc-if></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                  <div class="{{ t.pop }}" role="listbox" aria-labelledby="{{ t.lid }}">
+                    <sc-for list="{{ t.opts }}" as="o" hint-placeholder-count="4">
+                      <button class="opt" type="button" role="option" aria-selected="{{ o.sel }}" onClick="{{ o.pick }}" style="justify-content: space-between"><span style="display: flex; align-items: center; gap: 8px"><span class="mono">{{ o.id }}</span><sc-if value="{{ o.isDefault }}" hint-placeholder-val="{{ false }}"><span class="cap">predeterminado</span></sc-if></span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="opacity: {{ o.op }}; color: var(--primary)"><path d="m5 12 5 5 9-10"></path></svg></button>
+                    </sc-for>
+                  </div>
+                </div>
+                <span class="{{ t.helpCls }}" id="{{ t.hid }}">{{ t.help }}</span>
+              </div>
+            </sc-for>
+          </section>
+
+          <dl class="spec" style="margin: 0">
+            <dt>Última prueba</dt><dd>{{ lastTest }}</dd>
+          </dl>
+          <div aria-live="polite" style="min-height: 22px">
+            <sc-if value="{{ testing }}" hint-placeholder-val="{{ false }}"><span class="cap">Probando la key y los modelos en uso…</span></sc-if>
+            <sc-if value="{{ testOk }}" hint-placeholder-val="{{ false }}"><span class="sb t-success"><i></i>Conexión correcta · los dos modelos en uso responden</span></sc-if>
+            <sc-if value="{{ testErr }}" hint-placeholder-val="{{ false }}"><span class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Error con tu proveedor: el modelo <span class="mono">[MODELO B]</span> ya no está disponible.</span></sc-if>
+          </div>
+          <div class="actions cq-stack" style="justify-content: space-between">
+            <button class="b b-des b-touch-m" type="button">Desconectar</button>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap" class="cq-stack">
+              <button class="b b-out b-touch-m" type="button" onClick="{{ test }}"><sc-if value="{{ testing }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>Probar conexión</button>
+              <button class="b b-pri b-touch-m" type="button" onClick="{{ askChange }}">Cambiar key o proveedor</button>
+            </div>
+          </div>
+        </div>
+
+        <sc-if value="{{ confirmChange }}" hint-placeholder-val="{{ false }}">
+          <div role="alertdialog" aria-labelledby="ia-ch-t" class="card" style="max-width: 460px; margin-top: 16px; gap: 12px; box-shadow: var(--shadow-pop)">
+            <h2 id="ia-ch-t" class="h2">¿Cambiar de proveedor?</h2>
+            <p class="sub">Los modelos que elegiste para cada tarea son de Claude. Si conectas otro proveedor, cada tarea vuelve a su modelo predeterminado del nuevo proveedor. Si solo cambias la key de Claude, se conservan.</p>
+            <div class="actions cq-stack"><button class="b b-out b-touch-m" type="button" onClick="{{ cancelChange }}">Cancelar</button><button class="b b-pri b-touch-m" type="button" onClick="{{ cancelChange }}">Continuar</button></div>
+          </div>
+        </sc-if>
+
+        <section aria-labelledby="ref-t" class="card" style="max-width: 760px; margin-top: 16px; gap: 12px">
+          <button class="trig" type="button" aria-expanded="{{ refOpen }}" aria-controls="ref-list" onClick="{{ toggleRef }}" style="border: 0; background: transparent; padding: 0; font: inherit; color: inherit; min-height: 44px"><span style="display: flex; flex-direction: column; gap: 2px"><span id="ref-t" class="h3">Modelos de otros proveedores</span><span class="sub">Solo como referencia. Para usarlos, conecta ese proveedor.</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <sc-if value="{{ refShow }}" hint-placeholder-val="{{ true }}">
+            <div id="ref-list" style="display: flex; flex-direction: column; gap: 14px">
+              <sc-for list="{{ others }}" as="p" hint-placeholder-count="3">
+                <div style="display: flex; gap: 12px; align-items: flex-start">
+                  <span aria-hidden="true" style="flex: none; width: 32px; height: 32px; border-radius: 8px; border: 1px dashed var(--input); display: grid; place-items: center; font: 600 13px 'IBM Plex Sans', sans-serif; color: var(--muted-fg)">{{ p.mono }}</span>
+                  <div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+                    <span style="font-weight: 600">{{ p.name }}</span>
+                    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px">
+                      <sc-for list="{{ p.models }}" as="m" hint-placeholder-count="3"><li class="mono" style="padding: 2px 8px; border-radius: 6px; background: var(--muted); color: var(--muted-fg); font-size: 13px">{{ m }}</li></sc-for>
+                    </ul>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="proveedor-ia" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div style="position: absolute; left: 50%; bottom: 20px; translate: -50% 0; z-index: 45; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; border-radius: 14px; border: 1px dashed var(--input); background: color-mix(in oklch, var(--card) 92%, transparent); box-shadow: var(--shadow-pop)">
+    <span class="cap">Selector del tablero (no es parte de la app)</span>
+    <div class="tabs" role="tablist" aria-label="Estado que se muestra">
+      <sc-for list="{{ views }}" as="v" hint-placeholder-count="3"><button class="tab" type="button" role="tab" aria-selected="{{ v.sel }}" onClick="{{ v.pick }}">{{ v.label }}</button></sc-for>
+    </div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 110px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["predeterminado","elegido","modelo-retirado"],"default":"predeterminado"},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.tt); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const view = s.view || this.props.estado || 'predeterminado';
+const MODELS = ['[MODELO A]', '[MODELO B]', '[MODELO C]'];
+const DEF = { recipe: '[MODELO A]', catalog: '[MODELO A]' };
+const BASE = {
+  predeterminado: { recipe: null, catalog: null },
+  elegido: { recipe: '[MODELO C]', catalog: null },
+  'modelo-retirado': { recipe: null, catalog: '[MODELO B]' }
+};
+const pick = Object.assign({}, BASE[view], s.pick || {});
+const gone = view === 'modelo-retirado' && pick.catalog === '[MODELO B]' ? 'catalog' : null;
+const later = (fn, ms) => { clearTimeout(this.tt); this.tt = setTimeout(fn, ms); };
+const toast = (msg) => { this.setState({ toast: msg }); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
+const T = [['recipe', 'Fórmula desde PDF', 'fórmula'], ['catalog', 'Catálogo desde PDF', 'catálogo']];
+const V = [['predeterminado', 'Predeterminado'], ['elegido', 'Modelo elegido'], ['modelo-retirado', 'Modelo retirado']];
+const isErr = gone !== null;
+return {
+  rootCls: dark ? 'qc app dk' : 'qc app',
+  toggleDark: () => this.setState({ dark: !dark }),
+  menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+  menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l', ovCls: s.menu ? 'ov open' : 'ov', closeAll: () => this.setState({ menu: false, open: null }),
+  views: V.map((v) => ({ label: v[1], sel: v[0] === view ? 'true' : 'false', pick: () => this.setState({ view: v[0], pick: {}, open: null, test: null, confirmChange: false }) })),
+  isErr: isErr,
+  stateBadge: isErr ? 'sb t-danger' : 'sb t-success', stateLabel: isErr ? 'Error' : 'Conectado',
+  tasks: T.map((t) => {
+    const chosen = pick[t[0]];
+    const model = chosen || DEF[t[0]];
+    const isGone = gone === t[0];
+    const open = s.open === t[0];
+    return {
+      lid: 'mt-' + t[0], hid: 'mt-' + t[0] + '-h', label: t[1], model: model,
+      isDefault: !chosen, isGone: isGone, strike: isGone ? 'line-through' : 'none',
+      invalid: isGone ? 'true' : 'false', open: open ? 'true' : 'false',
+      pop: open ? 'pop full open' : 'pop full',
+      toggle: () => this.setState({ open: open ? null : t[0] }),
+      helpCls: isGone ? 'err' : 'help',
+      help: isGone ? 'Este modelo ya no está disponible. Elige otro para volver a leer ' + t[2] + 's.' : (chosen ? 'Elegido por tu empresa.' : 'Se usa el modelo predeterminado de Claude.'),
+      opts: MODELS.filter((m) => !(isGone && m === '[MODELO B]')).map((m) => ({
+        id: m, isDefault: m === DEF[t[0]], sel: m === model ? 'true' : 'false', op: m === model ? '1' : '0',
+        pick: () => {
+          const np = Object.assign({}, s.pick || {}); np[t[0]] = m === DEF[t[0]] ? null : m;
+          const nv = view === 'modelo-retirado' && t[0] === 'catalog' ? 'elegido' : view;
+          this.setState({ pick: nv !== view ? Object.assign({ recipe: null }, np) : np, view: nv, open: null, test: null });
+          toast('Modelo de ' + t[2] + ' guardado');
+        }
+      }))
+    };
+  }),
+  lastTest: isErr ? 'Falló el 22/10/2026 09:40 · modelo no disponible (404)' : 'Correcta el 22/10/2026 09:15',
+  testing: s.test === 'run', testOk: s.test === 'ok', testErr: s.test === 'err',
+  test: () => { if (s.test === 'run') return; this.setState({ test: 'run' }); later(() => this.setState({ test: isErr ? 'err' : 'ok' }), 900); },
+  confirmChange: !!s.confirmChange, askChange: () => this.setState({ confirmChange: true }), cancelChange: () => this.setState({ confirmChange: false }),
+  refOpen: s.ref === false ? 'false' : 'true', refShow: s.ref !== false, toggleRef: () => this.setState({ ref: s.ref === false }),
+  others: [
+    { name: 'Gemini', mono: 'G', models: ['[MODELO A]', '[MODELO B]'] },
+    { name: 'OpenAI', mono: 'O', models: ['[MODELO A]', '[MODELO B]'] },
+    { name: 'OpenRouter', mono: 'R', models: ['[MODELO A]', '[MODELO B]', '[MODELO C]'] }
+  ],
+  toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>
