@@ -21,10 +21,10 @@
  *    propio portal: jsdom no los monta igual.
  *  - Chromium y WebKit. WebKit es el motor de iOS, y la regla multiplataforma pide ejercitarlo.
  *
- * NAVEGACION SIEMPRE POR URL (`page.goto`), nunca pulsando el item del menu, salvo la UNICA
- * comprobacion de que `nav-clientes` existe o no para cada rol: pulsar el item metera en el
- * recorrido el filtrado del menu por permisos, que no es lo que este spec afirma. La URL se
- * deriva SIEMPRE de `CUSTOMERS_ROUTE`: ningun literal `/clientes` en todo el archivo.
+ * NAVEGACION POR URL (`page.goto`) en todos los casos menos uno: el del grupo «Clientes» del menu,
+ * que lo despliega y pulsa sus hijos a proposito porque eso es lo que afirma. En los demas, pulsar
+ * el menu meteria en el recorrido algo que no es lo que miden. Las URL se derivan SIEMPRE de
+ * `CUSTOMERS_ROUTE` y `CUSTOMER_CONTACTS_ROUTE`: ningun literal de ruta en todo el archivo.
  *
  * POR QUE LA EMPRESA NACE SIN NINGUN CLIENTE: el estado vacio -"todavia no hay clientes
  * registrados", con el disparador de alta dentro- es justo el primer paso del recorrido 1, y solo
@@ -62,8 +62,9 @@
  * LOS `data-testid` VAN COMO CONSTANTES LOCALES y no importados del barrel de la ruta: sus
  * modulos son de CLIENTE (`'use client'`, JSX, `useActionState`) e importarlos desde el proceso de
  * Node del runner arrastraria React sin aportar nada. Es el mismo criterio que
- * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Ningun assert mira copy: todo se localiza
- * por `data-testid`, por rol ARIA o por valores del fixture.
+ * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Los de contactos si se importan: su modulo de
+ * textos no es de cliente. Ningun assert mira copy escrito a mano: todo se localiza por
+ * `data-testid`, por rol ARIA, por valores del fixture o por la constante de la etiqueta.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
  * importarse y `next dev` -que arranca el `webServer` de la config- carga el suyo.
@@ -86,8 +87,13 @@ import {
   normalizeCompanyName,
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import {
+  CUSTOMER_CONTACTS_EMPTY_TESTID,
+  CUSTOMER_CONTACTS_TITLE_TESTID,
+} from '@/app/(private)/clientes/contactos/components';
 import { prisma } from '@/lib/shared/db/prisma';
-import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
+import { CUSTOMER_CONTACTS_LABEL } from '@/lib/shared/navigation/private-nav';
+import { CUSTOMER_CONTACTS_ROUTE, CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 
 // La entrada y su aterrizaje, derivado de los permisos del usuario en la base.
 import { createFixtureUser } from './helpers/fixture-user';
@@ -137,6 +143,10 @@ const DELETE_MESSAGE_TESTID = 'delete-customer-message';
 const DELETE_CONFIRM_TESTID = 'delete-customer-confirm';
 /** El 404 de la zona privada: se pinta DENTRO del layout, con su menu ya filtrado. */
 const NOT_FOUND_TESTID = 'private-not-found';
+/** El grupo «Clientes» del menu y sus dos hijos. */
+const NAV_CUSTOMERS_GROUP_TESTID = 'nav-clientes';
+const NAV_CUSTOMERS_LIST_TESTID = 'nav-clientes-lista';
+const NAV_CUSTOMER_CONTACTS_TESTID = 'nav-clientes-contactos';
 
 /** Palabras que la pantalla de 404 NO puede contener: delatarian que la pantalla existe. */
 const FORBIDDEN_404_WORDS = ['cliente', 'permiso', 'autoriz'] as const;
@@ -154,9 +164,9 @@ const operatorUser: Credentials = {
 };
 
 /**
- * Los seis datos capturados en el alta. Solo los tres obligatorios: telefono, correo y
- * direccion se dejan vacios a proposito, que ya cubren `customer-form.test.tsx` y
- * `customer-columns.test.tsx`.
+ * Los datos capturados en el alta. Solo los tres obligatorios: telefono, correo y direccion se
+ * dejan vacios a proposito. El telefono con pais tiene su propio recorrido en
+ * `e2e/clientes-telefono.spec.ts`.
  *
  * **El apellido lleva tilde** (ver cabecera): se busca despues por el mismo apellido sin ella.
  */
@@ -296,14 +306,14 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('pantalla de clientes', () => {
-  test('el Administrador entra por la URL, da de alta un cliente, lo encuentra sin tilde, lo edita y lo da de baja (R41)', async ({
+  test('el Administrador entra por la URL, da de alta un cliente, lo encuentra sin tilde, lo edita y lo da de baja (R41; QC-236 R10)', async ({
     page,
   }) => {
     await loginAndLand(page, adminUser);
 
     // --- 1. La pantalla se sirve a quien tiene `clientes.consultar`, y su item de menu existe.
     // No se pulsa a proposito (ver cabecera): la navegacion del recorrido es por URL.
-    await expect(page.getByTestId('nav-clientes')).toHaveCount(1);
+    await expect(page.getByTestId(NAV_CUSTOMERS_GROUP_TESTID)).toHaveCount(1);
 
     const listUrl = CUSTOMERS_ROUTE;
     await page.goto(listUrl);
@@ -336,14 +346,26 @@ test.describe('pantalla de clientes', () => {
     await expect(page.locator('[data-sonner-toast]').first()).toBeVisible({ timeout: 60_000 });
 
     // --- 7. Lo guardo el backend de verdad, no solo lo pinto la pantalla: la fila existe, cuelga
-    // de la empresa DEL ACTOR (que el formulario no envia) y los tres opcionales quedaron sin
-    // valor -nunca cadena vacia-.
+    // de la empresa DEL ACTOR (que el formulario no envia) y los opcionales quedaron sin valor
+    // -nunca cadena vacia-. Sin numero, ninguna de las cuatro columnas del telefono se llena.
     const created = await prisma.customer.findFirstOrThrow({
       where: { lastNames: nuevoCliente.lastNames },
-      select: { id: true, companyId: true, phone: true, email: true, address: true },
+      select: {
+        id: true,
+        companyId: true,
+        phone: true,
+        phoneCountry: true,
+        phoneE164: true,
+        phoneIssue: true,
+        email: true,
+        address: true,
+      },
     });
     expect(created.companyId, 'la empresa sale del actor, no del formulario').toBe(companyId);
     expect(created.phone).toBeNull();
+    expect(created.phoneCountry).toBeNull();
+    expect(created.phoneE164).toBeNull();
+    expect(created.phoneIssue).toBeNull();
     expect(created.email).toBeNull();
     expect(created.address).toBeNull();
 
@@ -412,7 +434,41 @@ test.describe('pantalla de clientes', () => {
     ).toHaveCount(0);
   });
 
-  test('una sesion valida sin `clientes.consultar` recibe 404 dentro del layout privado y no ve la tabla (R42)', async ({
+  test('el Administrador despliega «Clientes» en el menu, ve sus dos hijos y navega a Contactos y de vuelta a la lista (R4, R6, R7)', async ({
+    page,
+  }) => {
+    const landing = await loginAndLand(page, adminUser);
+    // Si el aterrizaje fuera un hijo del grupo, el submenu arrancaria abierto y el clic lo cerraria.
+    expect([CUSTOMERS_ROUTE, CUSTOMER_CONTACTS_ROUTE], 'el aterrizaje no puede ser un hijo del grupo').not.toContain(
+      landing,
+    );
+
+    const group = page.getByTestId(NAV_CUSTOMERS_GROUP_TESTID);
+    await expect(group).toBeVisible({ timeout: 60_000 });
+    await group.click();
+    await expect(group).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId(NAV_CUSTOMERS_LIST_TESTID)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId(NAV_CUSTOMER_CONTACTS_TESTID)).toBeVisible({ timeout: 15_000 });
+
+    await page.getByTestId(NAV_CUSTOMER_CONTACTS_TESTID).click();
+    await page.waitForURL((url) => url.pathname === CUSTOMER_CONTACTS_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveText(CUSTOMER_CONTACTS_LABEL, {
+      timeout: 60_000,
+    });
+    await expect(page.getByTestId(CUSTOMER_CONTACTS_EMPTY_TESTID)).toBeVisible({ timeout: 60_000 });
+
+    await page.getByTestId(NAV_CUSTOMERS_LIST_TESTID).click();
+    await page.waitForURL((url) => url.pathname === CUSTOMERS_ROUTE, { timeout: 60_000 });
+    await expect(page.getByTestId(TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
+
+    const response = await page.goto(CUSTOMER_CONTACTS_ROUTE);
+    expect(response?.status(), 'la pantalla de contactos se sirve a quien tiene el permiso').toBe(200);
+    await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveText(CUSTOMER_CONTACTS_LABEL, {
+      timeout: 60_000,
+    });
+  });
+
+  test('una sesion valida sin `clientes.consultar` recibe 404 dentro del layout privado y no ve la tabla (R42, R5, R8)', async ({
     page,
   }) => {
     // El Operador del seed no tiene ni `clientes.consultar` ni `clientes.modificar`,
@@ -422,7 +478,9 @@ test.describe('pantalla de clientes', () => {
 
     // --- 1. Sin `clientes.consultar` el item de menu no se emite: ni etiqueta, ni
     // destino, ni identificador de test.
-    await expect(page.getByTestId('nav-clientes')).toHaveCount(0);
+    await expect(page.getByTestId(NAV_CUSTOMERS_GROUP_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(NAV_CUSTOMERS_LIST_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(NAV_CUSTOMER_CONTACTS_TESTID)).toHaveCount(0);
 
     // --- 2. Sesion valida, permiso ausente: **404, sin redireccion**. La respuesta es
     // indistinguible de la de una ruta que no existe, que es justo lo que evita delatar que el
@@ -454,5 +512,23 @@ test.describe('pantalla de clientes', () => {
     await expect(page.getByTestId(DATA_TABLE_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(LIST_EMPTY_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(CREATE_OPEN_TESTID)).toHaveCount(0);
+
+    // --- 6. Contactos responde igual que la lista: 404 dentro del layout, sin delatar nada.
+    const contactsResponse = await page.goto(CUSTOMER_CONTACTS_ROUTE);
+    expect(
+      contactsResponse?.status(),
+      'una ruta privada sin permiso debe responder 404, indistinguible de una que no existe',
+    ).toBe(404);
+    const contactsNotFound = page.getByTestId(NOT_FOUND_TESTID);
+    await expect(contactsNotFound).toBeVisible({ timeout: 60_000 });
+    const contactsNotFoundText = ((await contactsNotFound.textContent()) ?? '').toLowerCase();
+    for (const word of FORBIDDEN_404_WORDS) {
+      expect(
+        contactsNotFoundText.includes(word),
+        `la pantalla de 404 no puede mencionar «${word}»: distinguiria «no existe» de «no puedes»`,
+      ).toBe(false);
+    }
+    await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(CUSTOMER_CONTACTS_EMPTY_TESTID)).toHaveCount(0);
   });
 });

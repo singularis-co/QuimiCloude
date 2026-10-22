@@ -115,11 +115,6 @@ export {
   type ConditioningOrdersEmptyProps,
 } from './conditioning-orders-empty';
 export {
-  DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT,
-  DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID,
-  DeliveredConditionedOrdersListSection,
-} from './delivered-conditioned-orders-list-section';
-export {
   CONDITIONING_ORDERS_SECTION_TESTID,
   ConditioningOrdersListSection,
 } from './conditioning-orders-list-section';
@@ -190,6 +185,8 @@ export {
   PACKING_ORDER_NUMBER_COLUMN_ID,
   PACKING_ORDER_PACKER_COLUMN_ID,
   PACKING_ORDER_PRESENTATION_COLUMN_ID,
+  PACKING_ORDER_PRIORITY_COLUMN_ID,
+  PACKING_ORDER_QUANTITY_COLUMN_ID,
   PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
   PACKING_ORDER_STATUS_COLUMN_ID,
   PACKING_ORDERS_CARD,

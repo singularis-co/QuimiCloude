@@ -6,6 +6,7 @@ import { useId, useState, type ReactNode, type TransitionEvent } from 'react';
 import { movementReasonLabel } from '@/app/(private)/inventario/components/movement-reason-label';
 import { EntityImage } from '@/components/shared/entity-image';
 import { FieldError } from '@/components/shared/field-error';
+import { Notice } from '@/components/shared/notice';
 import { SharedSelectControl } from '@/components/shared/shared-select';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
@@ -28,8 +29,9 @@ import {
   PACKING_INCREASE_REASONS,
   PACKING_REASON_OTHER_MAX,
   checkPackingCounts,
-  maxPackagesForLine,
+  largestPackageFirst,
   packedTotalInOrderUnit,
+  packingSurplusByLine,
   type PackedLineCount,
   type PackingDifferenceReason,
 } from '@/lib/modules/pedidos';
@@ -76,8 +78,6 @@ export const PACKING_FINISH_DIALOG_TEXTS = {
   invalidCount: 'Escribe un número entero: 0 o más.',
   missingReason: 'Elige un motivo.',
   missingOther: 'Escribe el motivo.',
-  exceeds: (packages: number, total: string, quantity: string, max: number) =>
-    `Supera la cantidad del pedido: con ${packages} envases se envasan ${total} de ${quantity}. Máximo en esta línea: ${max}.`,
   stock: (needed: number, name: string, free: number) =>
     `No alcanza el stock del envase: hacen falta ${needed} envases vacíos de ${name} y quedan ${free} libres.`,
   zeroHelp: (plan: number) => `Esta línea no da de alta lote. Se liberan sus ${plan} envases apartados.`,
@@ -87,6 +87,12 @@ export const PACKING_FINISH_DIALOG_TEXTS = {
     taken === 1
       ? `Sale 1 envase vacío del stock libre (quedan ${free}).`
       : `Salen ${taken} envases vacíos del stock libre (quedan ${free}).`,
+  surplus: (excess: string) => `Sobran ${excess} sobre el pedido.`,
+  freePackages: (packages: number, name: string) =>
+    packages === 1 ? `1 envase de ${name}` : `${packages} envases de ${name}`,
+  surplusFree: (items: readonly string[]) => `Quedan libres en stock: ${items.join(', ')}.`,
+  surplusNoneFree:
+    'Ningún envase queda libre: lo que sobra no llega a un envase entero y sigue en el pedido.',
   packed: 'Envasado:',
   of: 'de',
   blocked: 'Corrige las líneas marcadas para poder terminar.',
@@ -111,6 +117,7 @@ export const PACKING_FINISH_OTHER_ERROR_TESTID = 'packing-finish-other-error';
 export const PACKING_FINISH_HELP_TESTID = 'packing-finish-help';
 export const PACKING_FINISH_TOTAL_TESTID = 'packing-finish-total';
 export const PACKING_FINISH_GATE_TESTID = 'packing-finish-gate';
+export const PACKING_FINISH_SURPLUS_TESTID = 'packing-finish-surplus';
 
 const TEXTS = PACKING_FINISH_DIALOG_TEXTS;
 
@@ -178,7 +185,6 @@ type LineView = {
   readonly packed: number | null;
   readonly difference: number;
   readonly error: string | null;
-  readonly exceeds: boolean;
   /** Difiere del plan y le falta el motivo o el texto de «Otro». */
   readonly incomplete: boolean;
   readonly reasonError: string | null;
@@ -190,11 +196,21 @@ function withUnit(value: string, unitLabel: string): string {
   return `${formatDecimalDisplay(value)} ${unitLabel}`;
 }
 
+/** Lo que sobra sobre el pedido y los envases que quedan libres, de mayor a menor contenido. */
+type SurplusView = {
+  readonly excess: string;
+  readonly free: readonly { readonly name: string; readonly packages: number }[];
+};
+
 function describeLines(
   finish: PackingFinishView,
   states: ReadonlyMap<string, LineState>,
   tried: boolean,
-): { readonly views: readonly LineView[]; readonly total: string | null } {
+): {
+  readonly views: readonly LineView[];
+  readonly total: string | null;
+  readonly surplus: SurplusView | null;
+} {
   const stateOf = (line: PackingFinishLine): LineState =>
     states.get(line.lineId) ?? { value: String(line.plan), reason: null, reasonOther: '' };
 
@@ -229,21 +245,11 @@ function describeLines(
     const difference = packed === null ? 0 : packed - line.plan;
 
     let error: string | null = null;
-    let exceeds = false;
     if (packed === null) {
       error = TEXTS.invalidCount;
-    } else if (difference > 0) {
-      const max = maxPackagesForLine(finish.orderQuantity, finish.orderUnit, packedLines, line.lineId);
-      const excess = line.packaging === null ? 0 : excessByPackaging.get(line.packaging.productId) ?? 0;
-      if ((max === null || packed > max) && total !== null) {
-        exceeds = true;
-        error = TEXTS.exceeds(
-          packed,
-          withUnit(total, finish.orderUnitLabel),
-          withUnit(finish.orderQuantity, finish.orderUnitLabel),
-          max ?? 0,
-        );
-      } else if (line.packaging !== null && excess > line.packaging.freePackages) {
+    } else if (difference > 0 && line.packaging !== null) {
+      const excess = excessByPackaging.get(line.packaging.productId) ?? 0;
+      if (excess > line.packaging.freePackages) {
         error = TEXTS.stock(excess, line.label, line.packaging.freePackages);
       }
     }
@@ -266,7 +272,6 @@ function describeLines(
       packed,
       difference,
       error,
-      exceeds,
       incomplete: reasonMissing || otherMissing,
       reasonError: tried && reasonMissing ? TEXTS.missingReason : null,
       otherError: tried && otherMissing ? TEXTS.missingOther : null,
@@ -274,7 +279,28 @@ function describeLines(
     };
   });
 
-  return { views, total };
+  // Con alguna línea en error no se puede terminar: el aviso hablaría de un conteo que no vale.
+  if (views.some((view) => view.error !== null)) return { views, total, surplus: null };
+
+  // La misma regla que aplica el servidor al terminar, para que lo anunciado sea lo guardado.
+  const computed = packingSurplusByLine(
+    finish.orderQuantity,
+    finish.orderUnit,
+    finish.lines.map((line, index) => ({ ...packedLines[index]!, plan: line.plan })),
+  );
+  if (computed.kind !== 'ok' || computed.excess === '0') return { views, total, surplus: null };
+
+  // Se listan en el orden en que se repartió el excedente, no en el de las líneas.
+  const ordered = largestPackageFirst(
+    finish.orderUnit,
+    finish.lines.map((line, index) => ({ ...packedLines[index]!, label: line.label })),
+  );
+  if (ordered.kind !== 'ok') return { views, total, surplus: null };
+  const free = ordered.lines.flatMap((line) => {
+    const packages = computed.byLine.get(line.lineId) ?? 0;
+    return packages > 0 ? [{ name: line.label, packages }] : [];
+  });
+  return { views, total, surplus: { excess: computed.excess, free } };
 }
 
 function initialStates(finish: PackingFinishView | null): ReadonlyMap<string, LineState> {
@@ -340,13 +366,12 @@ function PackingFinishBody({
   const [states, setStates] = useState(() => initialStates(finish));
   const [tried, setTried] = useState(false);
 
-  const { views, total } =
-    finish === null ? { views: [], total: null } : describeLines(finish, states, tried);
+  const { views, total, surplus } =
+    finish === null ? { views: [], total: null, surplus: null } : describeLines(finish, states, tried);
   const blocked = views.some((view) => view.error !== null);
   const missing = views.some((view) => view.incomplete);
 
   const gate = blocked ? TEXTS.blocked : tried && missing ? TEXTS.missing : '';
-  const overQuantity = views.some((view) => view.exceeds);
 
   const description = hasEvidenceSteps
     ? `${TEXTS.descriptionLead} ${STEP_EVIDENCE_TEXTS.finishWarning}`
@@ -415,11 +440,23 @@ function PackingFinishBody({
       </div>
 
       <div className="flex flex-col items-stretch gap-3 border-t border-border px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom))] md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4 md:px-6 md:pt-3.5 md:pb-5">
+        {finish === null || surplus === null ? null : (
+          <Notice
+            tone="info"
+            title={TEXTS.surplus(withUnit(surplus.excess, finish.orderUnitLabel))}
+            className="w-full flex-none"
+            testId={PACKING_FINISH_SURPLUS_TESTID}
+          >
+            {surplus.free.length === 0
+              ? TEXTS.surplusNoneFree
+              : TEXTS.surplusFree(surplus.free.map((item) => TEXTS.freePackages(item.packages, item.name)))}
+          </Notice>
+        )}
         <div className="flex flex-col gap-0.5 text-sm" aria-live="polite">
           {finish === null ? null : (
             <span data-testid={PACKING_FINISH_TOTAL_TESTID}>
               {TEXTS.packed}{' '}
-              <span className={cn('font-mono font-semibold', overQuantity && 'text-destructive')}>
+              <span className="font-mono font-semibold">
                 {total === null ? '—' : withUnit(total, finish.orderUnitLabel)}
               </span>{' '}
               {TEXTS.of}{' '}

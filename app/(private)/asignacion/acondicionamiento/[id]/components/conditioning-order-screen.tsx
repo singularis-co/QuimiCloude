@@ -50,7 +50,6 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
   conditionedBy: (name: string) => `Lo acondiciona ${name}.`,
   backToQueue: 'Volver a «Por acondicionar»',
   backToConditioned: 'Volver a «Acondicionados»',
-  backToDelivered: 'Volver a «Entregados»',
   batchDataMissing: (count: number) =>
     count === 1 ? 'Faltan los datos de lote de 1 línea.' : `Faltan los datos de lote de ${count} líneas.`,
 } as const;
@@ -58,14 +57,8 @@ export const CONDITIONING_ORDER_SCREEN_TEXTS = {
 const BATCH_DATA_MISSING_ID = 'conditioning-order-batch-data-missing';
 
 function backLink(status: OrderStatus): { readonly href: string; readonly label: string } {
-  if (status === 'TERMINADO') {
+  if (status === 'TERMINADO' || status === 'ENTREGADO') {
     return { href: assignmentViewHref('acondicionados'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToConditioned };
-  }
-  if (status === 'ENTREGADO') {
-    return {
-      href: assignmentViewHref('acondicionados_entregados'),
-      label: CONDITIONING_ORDER_SCREEN_TEXTS.backToDelivered,
-    };
   }
   return { href: assignmentViewHref('por_acondicionar'), label: CONDITIONING_ORDER_SCREEN_TEXTS.backToQueue };
 }

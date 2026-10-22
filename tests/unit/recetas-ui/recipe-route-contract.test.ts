@@ -1440,6 +1440,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // Alta: la pantalla de clientes. No es una ruta ni una funcion de ruta del asistente de
         // lectura -no la marca el patron de arriba ni apunta a ninguna URL del asistente-.
         'CUSTOMERS_ROUTE',
+        // Alta: la pantalla de contactos, derivada de `CUSTOMERS_ROUTE`. No es una ruta del
+        // asistente de lectura. La lista sigue CERRADA.
+        'CUSTOMER_CONTACTS_ROUTE',
         'DASHBOARD_ROUTE',
         // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
         // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
@@ -1523,6 +1526,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'WHATSAPP_WEBHOOK_ROUTE_BASE',
         'whatsappWebhookPath',
+        // Las pantallas del Maestro, bajo /maestro: ninguna es del asistente de lectura.
+        'MAESTRO_ADMINISTRATORS_ROUTE',
+        'MAESTRO_COMPANIES_ROUTE',
+        'maestroCompanyRoute',
       ].sort(),
     );
   });

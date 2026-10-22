@@ -541,6 +541,7 @@ describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -650,6 +651,9 @@ const CLIENTE: CustomerView = {
   lastNames: 'Lopez',
   city: 'Bogota',
   phone: '3001234567',
+  phoneCountry: null,
+  phoneE164: null,
+  phoneIssue: null,
   email: null,
   address: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -813,9 +817,19 @@ const BAJAS_DE_FILA: readonly BajaDeFila[] = [
   },
 ];
 
+/**
+ * Con tarjetas, jsdom pinta la tabla y las tarjetas a la vez (no evalua las consultas de
+ * contenedor) y el disparador sale dos veces: el primero es el de la fila de la tabla.
+ */
+function disparadorDeLaFila(testId: string): HTMLElement {
+  const [primero] = screen.getAllByTestId(testId);
+  if (primero === undefined) throw new Error(`no hay ningun «${testId}»`);
+  return primero;
+}
+
 describe.each(BAJAS_DE_FILA)('$pantalla: baja desde el menu de la fila (R33)', (caso) => {
   async function abrir(user: ReturnType<typeof setupUser>) {
-    await clickRowAction(user, screen.getByTestId(caso.disparador), caso.accion);
+    await clickRowAction(user, disparadorDeLaFila(caso.disparador), caso.accion);
     return screen.findByTestId(caso.dialogo);
   }
 
@@ -872,7 +886,7 @@ describe('inventario: el panel de lotes de la fila (R33)', () => {
   it('tras cerrarse sigue en el DOM, cerrado, mientras sale', async () => {
     const user = setupUser();
     render(<ProductTable products={[PRODUCTO]} params={parametros()} totalPages={1} />);
-    await clickRowAction(user, screen.getByTestId('product-row-actions'), 'product-batches-open');
+    await clickRowAction(user, within(screen.getByRole('table')).getByTestId('product-row-actions'), 'product-batches-open');
     const panel = await screen.findByTestId('product-batches-sheet');
     expect(panel).toHaveAttribute('data-open');
 

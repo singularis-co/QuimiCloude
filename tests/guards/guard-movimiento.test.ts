@@ -5,8 +5,11 @@
 // nada se repite en bucle sobre el contenido. La única excepción es el fondo de las pantallas de
 // acceso (QC-226 D7), que vive entre los delimitadores «Pantallas de acceso — INICIO/FIN» de
 // `app/globals.css`;
-// y, según P2, los indicadores de carga (`animate-spin`, `animate-pulse`), cuyo bucle lo declara
-// Tailwind y no este repo.
+// según P2, los indicadores de carga (`animate-spin`, `animate-pulse`), cuyo bucle lo declara
+// Tailwind y no este repo;
+// y la lista cerrada `EXCEPCIONES_DE_DURACION`, que hoy tiene una sola entrada: el balanceo de la
+// campana de avisos (`notification-bell-swing`), que dura 700 ms por decisión del humano del
+// 2026-10-19 (QC-137 R36). Solo exime la duración, exacta, de esa animación y en esos archivos.
 //
 // Recorre ARCHIVOS de `app/` y `components/` (`.ts`, `.tsx`, `.css`), por el mismo motivo que sus
 // hermanas de esta carpeta: una clase prohibida es texto, y donde se ve es en el texto. Cada
@@ -52,6 +55,41 @@ const SIN_ANIMACION = ['components/ui/table.tsx', 'components/ui/badge.tsx', 'co
  * escrita— el `toEqual([])` de abajo sería un falso verde.
  */
 const ARCHIVOS_MINIMOS = 50
+
+type ExcepcionDeDuracion = {
+  readonly nombre: string
+  readonly ms: number
+  readonly archivos: readonly string[]
+  readonly motivo: string
+}
+
+/**
+ * Lista cerrada. Una duración de más de 400 ms solo pasa si es exactamente `ms`, en una
+ * declaración que nombra la animación `nombre` y en uno de `archivos`.
+ */
+const EXCEPCIONES_DE_DURACION: readonly ExcepcionDeDuracion[] = [
+  {
+    nombre: 'notification-bell-swing',
+    ms: 700,
+    archivos: ['app/globals.css', 'app/(private)/components/notifications/notification-bell.tsx'],
+    motivo: 'QC-137 R36: balanceo de la campana al llegar un aviso, 700 ms por decisión del humano del 2026-10-19',
+  },
+]
+
+function nombraAnimacion(valor: string, nombre: string): boolean {
+  return new RegExp(`(?<![\\w-])${nombre}(?![\\w-])`).test(valor)
+}
+
+function duracionExenta(
+  ruta: string,
+  valor: string,
+  valorMs: number,
+  excepciones: readonly ExcepcionDeDuracion[],
+): boolean {
+  return excepciones.some(
+    (e) => e.archivos.includes(ruta) && e.ms === valorMs && nombraAnimacion(valor, e.nombre),
+  )
+}
 
 // ENMIENDA QC-260: el bloque exento pasa de «Pantalla de login» a «Pantallas de acceso», porque
 // ahora lo usan el login y establecer contraseña.
@@ -109,7 +147,12 @@ function yDeLaCurva(curva: string): number[] {
  * Las infracciones de un archivo. `tokens` son las duraciones `--dur-*` de `globals.css`: una
  * referencia a una variable de duración que no está ahí no se puede medir y cuenta como infracción.
  */
-function infracciones(ruta: string, fuenteOriginal: string, tokens: Map<string, number>): string[] {
+function infracciones(
+  ruta: string,
+  fuenteOriginal: string,
+  tokens: Map<string, number>,
+  excepciones: readonly ExcepcionDeDuracion[] = EXCEPCIONES_DE_DURACION,
+): string[] {
   const esCss = ruta.endsWith('.css')
   const fuente = sinComentarios(ruta, esCss ? fueraDelLogin(fuenteOriginal) : fuenteOriginal)
   const halladas: string[] = []
@@ -155,7 +198,9 @@ function infracciones(ruta: string, fuenteOriginal: string, tokens: Map<string, 
     for (const [, propiedad, valor] of fuente.matchAll(declaraciones)) {
       for (const literal of valor.match(/(?<![\w.-])\d*\.?\d+m?s(?![\w-])/g) ?? []) {
         const valorMs = ms(literal)
-        if (valorMs !== null && valorMs > TOPE_MS) anotar(`${propiedad}: ${literal} supera ${TOPE_MS} ms`)
+        if (valorMs === null || valorMs <= TOPE_MS) continue
+        if (duracionExenta(ruta, valor, valorMs, excepciones)) continue
+        anotar(`${propiedad}: ${literal} supera ${TOPE_MS} ms`)
       }
       for (const [, variable] of valor.matchAll(/var\((--dur-[\w-]+)\)/g)) {
         const valorMs = tokens.get(variable)
@@ -268,6 +313,28 @@ describe('guardia de movimiento: los detectores muerden (casos negativos)', () =
     deja('components/ui/dialog.tsx', tsx('data-open:animate-in'))
   })
 
+  it('QC-137 R36: la excepción del balanceo de la campana admite solo ese nombre, en esos archivos y a 700 ms', () => {
+    expect(EXCEPCIONES_DE_DURACION).toHaveLength(1)
+    const [excepcion] = EXCEPCIONES_DE_DURACION
+    expect(excepcion.nombre).toBe('notification-bell-swing')
+    expect(excepcion.ms).toBe(700)
+    expect(excepcion.motivo).toMatch(/QC-137 R36/)
+
+    const swing = (nombre: string, duracion: string) =>
+      `@utility animate-x { animation: ${nombre} ${duracion} var(--ease-standard) both; }`
+    deja('app/globals.css', swing('notification-bell-swing', '700ms'))
+    deja('app/globals.css', swing('notification-bell-swing', '.7s'))
+    // Casos negativos: otro nombre a 700 ms, el mismo nombre en otro archivo y el mismo a 701 ms.
+    detecta('app/globals.css', swing('notification-bell-swingy', '700ms'))
+    detecta('app/globals.css', swing('otra-animacion', '700ms'))
+    detecta('app/otro.css', swing('notification-bell-swing', '700ms'))
+    detecta('components/x.css', swing('notification-bell-swing', '700ms'))
+    detecta('app/globals.css', swing('notification-bell-swing', '701ms'))
+    // La excepción no exime la curva ni el bucle.
+    detecta('app/globals.css', '.a { animation: notification-bell-swing 700ms ease-in-out both; }')
+    detecta('app/globals.css', '.a { animation: notification-bell-swing 700ms var(--ease-standard) infinite; }')
+  })
+
   it('un comentario que nombra una clase prohibida no es usarla', () => {
     deja('components/x.tsx', '// no usar ease-in ni animate-bounce\n/* duration-1000 */\nexport const a = 1\n')
     // Pero un `//` de URL no es un comentario: lo que va detrás en la línea se sigue mirando.
@@ -289,11 +356,15 @@ describe('guardia de movimiento: app/ y components/ (R1, R2, R23)', () => {
     for (const valorMs of tokens.values()) expect(valorMs).toBeLessThanOrEqual(TOPE_MS)
   })
 
-  it('el bloque del login está delimitado, y es lo único que la guardia deja fuera', () => {
+  it('el bloque del login y la excepción del balanceo de la campana son lo único que la guardia deja fuera', () => {
     expect(LOGIN_INICIO.test(css)).toBe(true)
     expect(LOGIN_FIN.test(css)).toBe(true)
     // Sin los delimitadores el bloque del login sí tendría infracciones: la exclusión es real.
     expect(infracciones('app/globals.css', css.replace(LOGIN_INICIO, '').replace(LOGIN_FIN, ''), tokens)).not.toEqual([])
+    // Sin la lista de excepciones el balanceo de la campana sí sería una infracción, y la única.
+    expect(infracciones('app/globals.css', css, tokens, [])).toEqual([
+      'app/globals.css: animation: 700ms supera 400 ms',
+    ])
   })
 
   it('ningún archivo declara movimiento prohibido', () => {

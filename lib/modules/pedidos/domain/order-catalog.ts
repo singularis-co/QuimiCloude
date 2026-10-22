@@ -204,9 +204,9 @@ export interface OrderCatalog {
    * `counts` son los envases contados de verdad, uno por linea del reparto: mandan sobre el plan
    * para guardar el conteo en la linea, consumir y liberar envases, dar de alta lotes (una linea
    * en 0 no da lote) y repartir el coste. `'invalid_packing_count'` son conteos que no casan con
-   * las lineas o con sus motivos; `'packed_exceeds_quantity'`, lo envasado por encima de la
-   * cantidad del pedido; `'packaging_stock_insufficient'`, un envase sin existencia libre para el
-   * exceso sobre lo apartado. Los tres deshacen todo.
+   * las lineas o con sus motivos; `'packaging_stock_insufficient'`, un envase sin existencia libre
+   * para el exceso sobre lo apartado. Los dos deshacen todo. Lo envasado puede superar la cantidad
+   * del pedido: lo que sobra queda libre en el lote.
    */
   finishPackingAliveById(
     id: string,
@@ -225,7 +225,6 @@ export interface OrderCatalog {
     | 'order_without_unit'
     | 'insufficient_material'
     | 'invalid_packing_count'
-    | 'packed_exceeds_quantity'
     | 'packaging_stock_insufficient'
   >;
 
@@ -294,6 +293,8 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
+  /** La fecha de solicitud del pedido. */
+  readonly createdAt: Date;
   /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo. */
   readonly presentationLines: readonly AssignedOrderPresentationLine[];
   /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la tienen
@@ -318,6 +319,8 @@ export type OrderDeliveryProgressLine = {
   readonly packages: number;
   /** `null` = sin contar al terminar el empaque: vale `packages` (`effectivePackages`). */
   readonly packedPackages: number | null;
+  /** Envases del conteo que el pedido no espera; restan de lo que le falta (`orderedPackages`). */
+  readonly packedSurplusPackages: number;
   readonly deliveredPackages: number;
 };
 

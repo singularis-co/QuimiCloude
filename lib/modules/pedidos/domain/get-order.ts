@@ -171,6 +171,7 @@ export function toOrderView(
     // cancelado. Ningun caso de uso lo vacia ni lo sustituye.
     cancellationReason: row.cancellationReason,
     ingredientsCost: row.ingredientsCost,
+    packagingCost: row.packagingCost,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,

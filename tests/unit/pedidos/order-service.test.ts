@@ -76,6 +76,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
@@ -332,6 +333,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       status: 'PENDIENTE',
       cancellationReason: null,
       ingredientsCost: null,
+      packagingCost: null,
       createdAt: new Date('2026-01-02T03:04:05.000Z'),
       updatedAt: new Date('2026-01-02T03:04:05.000Z'),
       // R46: los dos autores salen como IDENTIFICADORES; resolver sus nombres es de QC-35.

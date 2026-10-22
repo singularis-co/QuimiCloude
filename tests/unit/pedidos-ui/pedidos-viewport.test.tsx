@@ -312,6 +312,7 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -720,7 +721,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // (decision humana: es el texto largo de la fila); ninguna declara las claves de
     // dimensionado de la libreria, asi que por esa via no impone nada.
     const columnas = buildOrderColumns({ units: [], bridge: null });
-    expect(columnas).toHaveLength(12);
+    expect(columnas).toHaveLength(13);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {

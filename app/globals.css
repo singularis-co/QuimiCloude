@@ -667,6 +667,43 @@
   }
 }
 
+/* Pulso del conteo de avisos cuando llega uno nuevo. */
+@keyframes notification-count-bump {
+  0%,
+  100% {
+    scale: 1;
+  }
+  40% {
+    scale: 1.3;
+  }
+}
+
+/* Balanceo de la campana cuando llega un aviso nuevo. Dura más que el tope de la guía por
+   decisión del humano; la guardia de movimiento lo admite con nombre. */
+@keyframes notification-bell-swing {
+  0%,
+  100% {
+    rotate: 0deg;
+  }
+  20% {
+    rotate: 14deg;
+  }
+  40% {
+    rotate: -12deg;
+  }
+  60% {
+    rotate: 8deg;
+  }
+  80% {
+    rotate: -4deg;
+  }
+}
+
+@utility animate-notification-bell-swing {
+  animation: notification-bell-swing 700ms var(--ease-standard) both;
+  transform-origin: 50% 10%;
+}
+
 /* Las pantallas del operario ocupan todo el ancho: fuera la barra lateral (con su hueco) y la
    cabecera privada. Sin soporte de `:has()` se siguen viendo, como antes. */
 body:has([data-operator-screen]) [data-slot="sidebar"],

@@ -237,15 +237,20 @@ function conditioningSwitch(kind: 'evidence' | 'assignment', position: number): 
 }
 
 describe('QC-299 R8 — sección «Acondicionamiento» en el formulario de fórmula', () => {
-  it('R8: el alta la muestra tras «Envasado», separada por un divisor, marcada «(opcional)», con su ayuda y una fila vacía', () => {
+  // QC-264 (R11) sustituye los divisores por tarjetas (merge 2026-10-21): la sección va en su
+  // propia tarjeta, tras la de «Envasado», como dev comprueba «Envasado» tras «Pasos».
+  it('R8: el alta la muestra tras «Envasado», en su propia tarjeta, marcada «(opcional)», con su ayuda y una fila vacía', () => {
     renderCreate();
 
     const packing = screen.getByTestId('recipe-packing-steps-field');
-    const separator = screen.getByTestId('recipe-form-conditioning-separator');
     const conditioning = screen.getByTestId('recipe-conditioning-steps-field');
+    const packingCard = packing.closest('[data-slot="card"]');
+    const conditioningCard = conditioning.closest('[data-slot="card"]');
 
-    expect(follows(packing, separator)).toBe(true);
-    expect(follows(separator, conditioning)).toBe(true);
+    expect(packingCard).not.toBeNull();
+    expect(conditioningCard).not.toBeNull();
+    expect(conditioningCard).not.toBe(packingCard);
+    expect(follows(packingCard as Element, conditioningCard as Element)).toBe(true);
     expect(follows(conditioning, screen.getByTestId('recipe-form-submit'))).toBe(true);
     expect(packing.contains(conditioning)).toBe(false);
 

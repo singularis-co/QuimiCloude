@@ -298,6 +298,7 @@ describe('el montaje en la pantalla de proveedores', () => {
     expect(encolado).toEqual({
       strategy: 'catalogo',
       paths: signedUploads(1).map((upload) => upload.path),
+      names: ['catalogo.pdf'],
     });
   });
 

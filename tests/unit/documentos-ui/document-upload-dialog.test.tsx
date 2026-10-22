@@ -180,8 +180,8 @@ describe('los objetivos tactiles y el tamano de la ventana (R15)', () => {
 
     expect(screen.getByTestId(DOCUMENT_UPLOAD_CLOSE_TESTID).className).toMatch(/min-h-11/);
     expect(screen.getByTestId(DOCUMENT_UPLOAD_CLOSE_TESTID).className).toMatch(/min-w-11/);
-    expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID).className).toMatch(
-      /max-h-\[85dvh\]/,
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID).className).toContain(
+      'max-h-[calc(100dvh-32px)]',
     );
     expect(screen.getByTestId(DOCUMENT_UPLOAD_DIALOG_TESTID).className).toMatch(/overflow-y-auto/);
   });

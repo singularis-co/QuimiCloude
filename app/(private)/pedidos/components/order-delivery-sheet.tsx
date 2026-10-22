@@ -39,10 +39,10 @@ import {
   OrderDeliveryCustomerBlock,
   type OrderDeliveryBlockPresentation,
   type OrderDeliveryCustomerBlockLabels,
-} from './order-delivery-customer-block';
+} from '@/components/shared/order-delivery-customer-block';
 import { packagesKey, type OrderDeliveryDraft } from './order-delivery-draft';
 import { OrderDeliverySummary, type OrderDeliverySummaryLabels, type OrderDeliverySummaryLine } from './order-delivery-summary';
-import { type OrderCustomerChoice } from './order-customer-label';
+import { type OrderCustomerChoice } from '@/components/shared/order-customer-label';
 import { OrderRecipeImage } from './order-recipe-image';
 import { useOrderDeliveryDraft } from './use-order-delivery-draft';
 

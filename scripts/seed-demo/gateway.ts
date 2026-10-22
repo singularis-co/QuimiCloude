@@ -304,7 +304,8 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
         firstNames: customer.firstNames,
         lastNames: customer.lastNames,
         city: customer.city,
-        phone: customer.phone,
+        phoneCountry: 'CO',
+        phoneNumber: customer.phone,
         email: customer.email,
         address: customer.address,
       }

@@ -3,6 +3,7 @@ export * from './customer-form';
 export * from './customer-labels';
 export * from './customer-list-params';
 export * from './customer-list-section';
+export * from './customer-phone-field';
 export * from './customer-row-actions';
 export * from './customer-sheet';
 export * from './customer-table';

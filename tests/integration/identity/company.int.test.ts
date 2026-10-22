@@ -489,6 +489,28 @@ describe('createWithAdministrator', () => {
     })
   })
 
+  it('country: el alta con pais lo guarda en la misma transaccion, con un unico evento company.created', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyRepository(tx)
+      const actorId = await createMaestro(tx)
+      const data = write(`Alta pais ${tag()}`)
+
+      const result = await repo.createWithAdministrator({
+        company: data,
+        country: 'CO',
+        administrator: administrator(),
+        actorId,
+        now: NOW,
+      })
+      if (typeof result === 'string') throw new Error(`el alta no debia fallar, y devolvio \`${result}\``)
+
+      expect(await readCompany(tx, result.companyId)).toMatchObject({ country: 'CO' })
+      expect(
+        await tx.companyEvent.findMany({ where: { companyId: result.companyId }, select: { kind: true } }),
+      ).toEqual([{ kind: 'company.created' }])
+    })
+  })
+
   it('R13, R14: el usuario del Maestro (sin distinguir mayusculas) → username, sin empresa ni evento', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyRepository(tx)
@@ -879,13 +901,40 @@ describe('list', () => {
           id: viva,
           name: `Lista viva ${marca}`,
           taxId: `L-${marca}`,
+          contactEmail: null,
+          contactPhone: null,
           country: 'CO',
           liveUserCount: 2,
           createdAt: at(-5),
           status: 'active',
+          storedAddons: [],
         },
       ])
       expect(page).toMatchObject({ total: 1, page: 1, pageSize: 10, totalPages: 1 })
+    })
+  })
+
+  it('cada fila trae el contacto y solo los añadidos con interruptor prendido', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createCompanyRepository(tx)
+      const marca = tag()
+      const id = await seedCompany(tx, `Contacto ${marca}`)
+      await tx.company.update({
+        where: { id },
+        data: { contactEmail: 'compras@example.test', contactPhone: '+57 604 000 0000' },
+      })
+      await tx.companyAddonOverride.createMany({
+        data: [
+          { companyId: id, addonKey: 'proveedores', enabled: true },
+          { companyId: id, addonKey: 'lectura_pdf', enabled: true },
+          { companyId: id, addonKey: 'dashboard', enabled: false },
+        ],
+      })
+
+      const [fila] = (await repo.list(listQuery({ search: marca }))).items
+
+      expect(fila).toMatchObject({ contactEmail: 'compras@example.test', contactPhone: '+57 604 000 0000' })
+      expect([...(fila?.storedAddons ?? [])].sort()).toEqual(['lectura_pdf', 'proveedores'])
     })
   })
 

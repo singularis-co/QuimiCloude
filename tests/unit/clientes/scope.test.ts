@@ -115,15 +115,24 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'adapters/driven/persistence/company-scope.ts',
       // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
       'adapters/driven/persistence/customer-catalog-prisma.ts',
+      // QC-239 2026-10-20: telefonos de cliente.
+      'adapters/driven/persistence/customer-phone-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
+      // QC-239 2026-10-20: la transaccion de los telefonos del cliente.
+      'adapters/driven/persistence/customer-unit-of-work-prisma.ts',
+      'adapters/driven/persistence/legacy-phone-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
       'domain/actor.ts',
+      'domain/backfill-legacy-phones.ts',
       'domain/create-customer.ts',
       // QC-156: el contrato de ese servicio.
       'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
+      // QC-239 2026-10-20: orquestacion de los telefonos de un cliente.
+      'domain/customer-phone-links.ts',
+      'domain/customer-phone.ts',
       'domain/customer-queryable.ts',
       'domain/customer-scope.ts',
       'domain/customer-text.ts',
@@ -132,12 +141,20 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/delete-customer.ts',
       'domain/errors.ts',
       'domain/get-customer.ts',
+      'domain/legacy-phone-backfill.ts',
       'domain/list-customers.ts',
       'domain/list-query.ts',
       'domain/page.ts',
+      'domain/phone-matches-wa-id.ts',
       'domain/update-customer.ts',
       'index.ts',
+      'ports/company-country-lookup.ts',
+      // QC-239 2026-10-20: telefonos, escritura transaccional y unidad de trabajo del cliente.
+      'ports/customer-phone-repository.ts',
       'ports/customer-repository.ts',
+      'ports/customer-unit-of-work.ts',
+      'ports/customer-write-repository.ts',
+      'ports/legacy-phone-repository.ts',
       'ports/list-query-log.ts',
     ]
     const archivosReales = filesIn(moduloDir, /\.tsx?$/)
@@ -201,6 +218,8 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
    *  pantalla y el item del menu que la enlaza, cada uno acotado a su archivo exacto -nunca a la
    *  carpeta de componentes de la ruta, que sigue en rojo. */
   const PANTALLA_PERMITIDA = 'app/(private)/clientes/page.tsx'
+  // El corte de la pantalla hermana de contactos, tambien por ruta exacta.
+  const PANTALLA_CONTACTOS_PERMITIDA = 'app/(private)/clientes/contactos/page.tsx'
   const NAV_PERMITIDA = 'lib/shared/navigation/private-nav.ts'
 
   function permisoPermitidoEn(relativo: string): boolean {
@@ -209,6 +228,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
       relativo === CATALOGO_DE_ANADIDOS ||
       relativo.startsWith('lib/modules/clientes/domain/') ||
       relativo === PANTALLA_PERMITIDA ||
+      relativo === PANTALLA_CONTACTOS_PERMITIDA ||
       relativo === NAV_PERMITIDA
     )
   }
@@ -226,7 +246,7 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return hallazgos
   }
 
-  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en company-addons.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx o en private-nav.ts', () => {
+  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en company-addons.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx, en app/(private)/clientes/contactos/page.tsx o en private-nav.ts', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
@@ -285,6 +305,19 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
       rmSync(raiz, { recursive: true, force: true })
     }
   })
+
+  it('R3, R14 — el literal en app/(private)/clientes/contactos/components/ SI dispara: la admision es solo su page.tsx', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc244-scope-'))
+    try {
+      const relativoFabricado = 'app/(private)/clientes/contactos/components/__sensibilidad_literal__.ts'
+      const rutaFabricada = join(raiz, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+      expect(detectarLiteralesDePermiso(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------------------------
@@ -317,6 +350,15 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // fijado por specs/QC-282-entrega-a-varios-clientes/tasks.md > TI). Siembra dos clientes por
   // Prisma -la entrega se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
   // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-288): entra `entrega-sin-pedido.spec.ts`, el E2E de R56 de QC-288 (nombre
+  // fijado por specs/QC-288-entrega-sin-pedido/tasks.md). Siembra dos clientes por Prisma -la
+  // entrega sin pedido se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
+  // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-236): entra `clientes-telefono.spec.ts`, el E2E del telefono de cliente con
+  // pais (nombre fijado por specs/QC-236-telefono-de-cliente-con-codigo-de-pais/tasks.md > T11).
+  // Recorre la pantalla de clientes: alta con el pais de la empresa, duplicado, empresa sin pais,
+  // avisos de los migrados en la lista y el campo en telefono. Siembra clientes por Prisma con la
+  // normalizacion del barrel de `clientes`, la unica definicion. La lista sigue CERRADA.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
@@ -327,6 +369,8 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
     'detalle-de-producto-terminado.spec.ts',
     'pedidos-rediseno.spec.ts',
     'entrega-a-varios-clientes.spec.ts',
+    'entrega-sin-pedido.spec.ts',
+    'clientes-telefono.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
@@ -510,6 +554,9 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       'lastNames',
       'city',
       'phone',
+      'phoneCountry',
+      'phoneE164',
+      'phoneIssue',
       'email',
       'address',
       // F1.4: las tres unicas columnas nuevas de esta ficha.
@@ -529,7 +576,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     ])
   })
 
-  it('solo tres migraciones del repo tocan la tabla customers: la de QC-153, la de esta ficha y la de QC-156', () => {
+  it('solo las siete migraciones de la lista cerrada nombran la tabla customers, cada una con su motivo', () => {
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanCustomers = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -547,12 +594,16 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     // compuesta desde la tabla nueva; no altera `customers`.
     // QC-282 2026-10-15: + `order_delivery_lines_customer`, que mueve esa FK compuesta de
     // `order_deliveries` a `order_delivery_lines`; tampoco altera `customers`.
+    // QC-239 2026-10-20: + `customer_phone_numbers`, que copia los telefonos de `customers` a la
+    // tabla puente, la referencia con una FK compuesta y retira su indice unico de telefono.
     expect(tocanCustomers).toEqual([
       '20260924120000_customers',
       '20260924200000_customers_search_normalized',
       '20261006160000_orders_customer',
       '20261008150100_order_deliveries',
       '20261015130000_order_delivery_lines_customer',
+      '20261019130000_customers_phone_e164',
+      '20261020120000_customer_phone_numbers',
     ])
   })
 

@@ -8,10 +8,11 @@ import {
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
+import { exactDecimalTitle, formatMoneyDisplay } from '@/lib/shared/ui/decimal-display';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
-import { orderCustomerLabel } from './order-customer-label';
+import { orderCustomerLabel } from '@/components/shared/order-customer-label';
 import {
   OrderProducedPresentations,
   type ProducedProductsByOrder,
@@ -39,7 +40,7 @@ import {
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
- * Las DOCE columnas de la lista de pedidos (once de datos y la de acciones), declaradas
+ * Las TRECE columnas de la lista de pedidos (doce de datos y la de acciones), declaradas
  * **como datos** (R8-R12, R14, R19, R23, `design.md > 7`).
  *
  * **Modulo de CLIENTE, y no por gusto** (`design.md > 6.1`): la columna de acciones devuelve
@@ -76,6 +77,10 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * `asignaciones` (R14)-: los trae un lote aparte que el Server Component de la seccion pide UNA
  * vez por pagina y reparte por fila (`design.md > 1`). La columna **no ordena y no filtra**, y el
  * esqueleto sube a nueve con ella (R22).
+ *
+ * **2026-10-20: COSTO DE PRODUCCION** (decision humana, sin spec), ultima columna de datos, justo
+ * antes de las acciones. No ordena ni filtra. Deja sin efecto el «no hay columna de importe» de
+ * QC-123 R18 para el costo: lo que se pinta es un coste guardado, no un precio de venta.
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -90,6 +95,9 @@ export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
+/** Costo de produccion del pedido (2026-10-20). Ultima columna de datos. */
+export const PRODUCTION_COST_COLUMN_ID = 'productionCost';
+export const PRODUCTION_COST_TESTID = 'order-production-cost';
 export const ACTIONS_COLUMN_ID = 'actions';
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
@@ -206,6 +214,22 @@ function producedProductsOf(
   const products = producedProductsByOrder[order.id];
   if (products === undefined || Object.keys(products).length === 0) return null;
   return products;
+}
+
+/**
+ * Celda «Costo de produccion»: `ingredientsCost` y NADA MAS. El guardado ya es el total de
+ * ingredientes + envases (`calculateOrderCost`/`storedOrderCost`); `packagingCost` es solo la parte
+ * de envases que va dentro, asi que sumarlo contaria los envases dos veces. Se pinta como dinero
+ * con el valor exacto en el `title`, como el costo de inventario; sin costo, el marcador de ausencia.
+ */
+function ProductionCost({ order }: { readonly order: OrderSummary }) {
+  const cost = order.ingredientsCost;
+  if (cost === null) return <MissingValue field={PRODUCTION_COST_COLUMN_ID} />;
+  return (
+    <span data-testid={PRODUCTION_COST_TESTID} title={exactDecimalTitle(cost)}>
+      {formatMoneyDisplay(cost)}
+    </span>
+  );
 }
 
 function ignoreAction(): void {}
@@ -344,6 +368,14 @@ export function buildOrderColumns({
           responsiblesCatalog={responsiblesCatalog}
         />
       ),
+    },
+    {
+      id: PRODUCTION_COST_COLUMN_ID,
+      label: 'Costo de producción',
+      align: 'end',
+      tabular: true,
+      // Solo informa: sin `sortable` y sin `filter`.
+      cell: (order) => <ProductionCost order={order} />,
     },
     actionsColumn({
       id: ACTIONS_COLUMN_ID,

@@ -82,8 +82,10 @@ const BARREL_DE_LA_RUTA = `@/${CARPETA_DE_COMPONENTES}`;
  * | 2026-10-08 | bajas: `user-list-{empty,error,skeleton}.tsx` y
  * |            | `work-group-list-{empty,error,skeleton}.tsx`: los tres estados de cada lista los
  * |            | pinta ahora la tabla compartida | 25 |
+ * | 2026-10-20 | baja: `username-from-names.ts` sube a `components/shared/`, que lo comparte con
+ * |            | los campos del administrador del Maestro | 24 |
  */
-const COMPONENTES_ESPERADOS = 25;
+const COMPONENTES_ESPERADOS = 24;
 
 /** Carpetas del repo que se barren buscando importes por ruta profunda (R38). */
 const CARPETAS_DEL_REPO = ['app', 'components', 'lib', 'tests'] as const;

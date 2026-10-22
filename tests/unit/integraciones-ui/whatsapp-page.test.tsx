@@ -218,6 +218,20 @@ describe('WhatsappIntegrationPage', () => {
     expect(screen.queryByTestId(WHATSAPP_CONNECTION_CARD_TESTID)).toBeNull();
   });
 
+  it('R49: la guia incluye un paso que pide suscribir messages, message_template_status_update y template_category_update', async () => {
+    render(await WhatsappIntegrationPage());
+
+    const guia = screen.getByTestId(WHATSAPP_SETUP_GUIDE_TESTID);
+    const pasos = within(guia)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '');
+    const campos = ['messages', 'message_template_status_update', 'template_category_update'];
+    const paso = pasos.find((texto) => campos.every((campo) => texto.includes(campo)));
+
+    expect(paso).toBeDefined();
+    expect(pasos).toHaveLength(WHATSAPP_SETUP_GUIDE_STEPS.length);
+  });
+
   it('R37: con conexion, muestra la tarjeta, el panel del webhook y las acciones, sin formulario de alta', async () => {
     getConnectionMock.mockResolvedValue({
       status: 'success',

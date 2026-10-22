@@ -12,7 +12,6 @@ import {
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
-  DeliveredConditionedOrdersListSection,
   OrderOutcomeNotice,
 } from '@/app/(private)/asignacion/components';
 import { PackingOrderScreen } from '@/app/(private)/asignacion/empaque/[id]/components';
@@ -47,7 +46,6 @@ const {
   getSessionContextMock,
   listConditioningOrdersMock,
   listConditionedOrdersMock,
-  listDeliveredConditionedOrdersMock,
   finishConditioningActionMock,
 } = vi.hoisted(() => ({
   routerMock: {
@@ -62,7 +60,6 @@ const {
   getSessionContextMock: vi.fn<() => Promise<unknown>>(),
   listConditioningOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
   listConditionedOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
-  listDeliveredConditionedOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
   finishConditioningActionMock:
     vi.fn<(prev: FinishConditioningResult, data: FormData) => Promise<FinishConditioningResult>>(),
 }));
@@ -73,7 +70,6 @@ vi.mock('@/lib/composition', () => ({
     listPackingOrders: vi.fn(),
     listConditioningOrders: listConditioningOrdersMock,
     listConditionedOrders: listConditionedOrdersMock,
-    listDeliveredConditionedOrders: listDeliveredConditionedOrdersMock,
   },
   observabilidad: {
     readRequestIdHeader: vi.fn(async () => '7b1c9f2e-4d3a-4f5b-9c0d-1e2f3a4b5c6d'),
@@ -255,6 +251,8 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     unitId: 'unit-1',
     unitLabel: 'kg',
     status: 'POR_EMPACAR',
+    priority: 'MEDIA',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     packedByName: null,
     packedById: null,
     packingSteps: [],
@@ -303,13 +301,6 @@ const LISTAS: readonly Lista[] = [
     fila: ACONDICIONADO,
     montar: (params) => ConditionedOrdersListSection({ params }),
   },
-  {
-    nombre: 'entregados',
-    responder: (items, page) =>
-      listDeliveredConditionedOrdersMock.mockResolvedValue(pagina(items, page)),
-    fila: ACONDICIONADO,
-    montar: (params) => DeliveredConditionedOrdersListSection({ params }),
-  },
 ];
 
 describe('paridad del acondicionador — sus tres listas', () => {
@@ -334,7 +325,7 @@ describe('paridad del acondicionador — sus tres listas', () => {
     expect(arbolAccesible()).toMatchSnapshot();
   });
 
-  it.each(['por_acondicionar', 'acondicionados', 'acondicionados_entregados'] as const)(
+  it.each(['por_acondicionar', 'acondicionados'] as const)(
     'R6 R24 — esqueleto de %s',
     (list) => {
       render(<ConditioningOrdersSkeleton rows={3} list={list} />);

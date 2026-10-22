@@ -101,6 +101,7 @@ export async function createCompanyAction(
     const { companyId, administratorId, mail } = await identity.createCompany(actor, {
       company: companyDataFromFormData(formData),
       administrator: administratorFromFormData(formData),
+      country: formData.get('country'),
     });
     return { status: 'success', companyId, administratorId, mail };
   } catch (error) {

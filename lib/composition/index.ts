@@ -131,8 +131,15 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import { createFinishedBatchLabels } from '@/lib/modules/inventario/adapters/driven/persistence/finished-batch-labels-prisma';
-import { createFinishedGoodsDispatch } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
-import { findDeliverableBatches } from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
+import {
+  createFinishedGoodsDirectDispatch,
+  createFinishedGoodsDispatch,
+} from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma';
+import {
+  findDeliverableBatches,
+  findForDelivery,
+  findSurplusBases,
+} from '@/lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma';
 import { listStockGroups } from '@/lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma';
 import {
   findAliveFinishedProduct,
@@ -327,6 +334,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
 import { findOrderNumberTextsByIds } from '@/lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma';
 import {
+  findCustomerIdsForMovements,
   listDeliveryLinesByBatchIds,
   summarizeDeliveredByBatchIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma';
@@ -353,6 +361,23 @@ import {
   createFinishedGoodsReturn,
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma';
 import type { OrderDeliveryVoidUnitOfWork } from '@/lib/modules/pedidos/ports/order-delivery-void-unit-of-work';
+import {
+  createDeliverDirect,
+  createGetDirectDelivery,
+  createGetDirectDeliveryForVoid,
+  createListDirectDeliverySurplus,
+  createVoidDirectDelivery,
+} from '@/lib/modules/pedidos';
+import type {
+  DirectDeliveryUnitOfWork,
+  DirectDeliveryVoidUnitOfWork,
+} from '@/lib/modules/pedidos/ports/direct-delivery-unit-of-work';
+import {
+  createDirectDeliveryRepository,
+  createWaitingOrdersLock,
+  createWaitingOrdersReader,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma';
+import type { DeliveryCustomerDirectory, FinishedProductDeliveryCatalog } from '@/lib/modules/inventario';
 import {
   createRecipeExecutionReader,
   findAliveRecipeByNormalizedName,
@@ -473,7 +498,6 @@ import {
   createListConditionedOrders,
   createGetConditioningOrder,
   createListConditioningTeamCandidates,
-  createListDeliveredConditionedOrders,
   createSaveConditioningBatchData,
   createRecordConditioningStep,
   createRequestEvidenceUpload,
@@ -507,8 +531,11 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
-import { listActiveCompanyIds } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
-import { createSetCompanyCountry } from '@/lib/modules/identity';
+import {
+  listActiveCompanyIds,
+  listAllCompanyIds,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
+import { createGetCompanyCountry, createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
 import {
   createCreateCompany,
@@ -520,7 +547,10 @@ import {
   createReactivateCompany,
   createUpdateCompany,
 } from '@/lib/modules/identity';
-import { createCompanyRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
+import {
+  createCompanyMembershipReader,
+  createCompanyRepository,
+} from '@/lib/modules/identity/adapters/driven/persistence/company-prisma';
 import {
   createCreateAdministrator,
   createDeleteAdministrator,
@@ -533,7 +563,9 @@ import { createAdministratorRepository } from '@/lib/modules/identity/adapters/d
 import { createCompanyAddonRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-addons-prisma';
 import {
   createGetCompanyAddons,
+  createIsCompanyActive,
   createIsCompanyAddonActive,
+  createIsUserInCompany,
   createSetAllCompanyAddons,
   createSetCompanyAddon,
 } from '@/lib/modules/identity';
@@ -620,18 +652,25 @@ import { requestScoped } from '@/lib/shared/request-scope';
 // `clientes`. Imports al final del bloque, bloque de cableado al final del archivo: no
 // reordena ni reformatea nada de lo que hay arriba.
 import {
+  createBackfillLegacyPhones,
   createCreateCustomer,
+  createCustomerPhoneLinks,
   createDeleteCustomer,
   createGetCustomer,
   createListCustomers,
   createUpdateCustomer,
 } from '@/lib/modules/clientes';
+import { createCustomerPhoneRepository } from '@/lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma';
+import { withCustomerTransaction } from '@/lib/modules/clientes/adapters/driven/persistence/customer-unit-of-work-prisma';
+import type { CustomerUnitOfWork, WhatsappLinkRefresher } from '@/lib/modules/clientes/ports/customer-unit-of-work';
+import { processLegacyPhonesOfCompany } from '@/lib/modules/clientes/adapters/driven/persistence/legacy-phone-prisma';
+import type { LegacyPhoneRepository } from '@/lib/modules/clientes/ports/legacy-phone-repository';
+import type { CompanyCountryLookup } from '@/lib/modules/clientes/ports/company-country-lookup';
 import {
-  createCustomer,
+  createCustomerWriteRepository,
   findAliveCustomerById,
   listAliveCustomers,
   softDeleteAliveCustomer,
-  updateAliveCustomer,
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma';
 import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/clientes/ports/list-query-log';
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
@@ -846,6 +885,7 @@ const workGroupCandidateReader: WorkGroupCandidateReader = { listCandidatesAlive
 
 const companyRepository = createCompanyRepository();
 const companyAddonRepository = createCompanyAddonRepository();
+const companyMembershipReader = createCompanyMembershipReader();
 const administratorRepository = createAdministratorRepository();
 
 // `orders` es de `pedidos`: `identity` solo ve el puerto.
@@ -978,6 +1018,7 @@ export const identity = {
   }),
   // Operacion de plataforma: el actor no lleva empresa.
   setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  getCompanyCountry: createGetCompanyCountry({ companies: createCompanyCountryRepository() }),
   // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
   createCompany: createCreateCompany({
     companies: companyRepository,
@@ -997,6 +1038,8 @@ export const identity = {
   listCompanyEvents: createListCompanyEvents({ companies: companyRepository }),
   // Sin actor: la usan los trabajos que corren sin sesión.
   isCompanyAddonActive: createIsCompanyAddonActive({ addons: companyAddonRepository }),
+  isUserInCompany: createIsUserInCompany({ members: companyMembershipReader }),
+  isCompanyActive: createIsCompanyActive({ members: companyMembershipReader }),
   getCompanyAddons: createGetCompanyAddons({ addons: companyAddonRepository }),
   setCompanyAddon: createSetCompanyAddon({ addons: companyAddonRepository }),
   setAllCompanyAddons: createSetAllCompanyAddons({ addons: companyAddonRepository }),
@@ -1075,6 +1118,8 @@ const finishedDeliveryDirectory: FinishedDeliveryDirectory = {
   listDeliveryLines: listDeliveryLinesByBatchIds,
   summarizeDelivered: summarizeDeliveredByBatchIds,
 };
+
+const deliveryCustomerDirectory: DeliveryCustomerDirectory = { findCustomerIds: findCustomerIdsForMovements };
 
 const finishedDistributionDirectory: FinishedDistributionDirectory = {
   listPackedLines: listPackedLinesByCombination,
@@ -1209,6 +1254,10 @@ export const inventario = {
     products: productRepository,
     people: assignmentDirectoryPrisma,
     orders: orderNumberDirectory,
+    deliveryCustomers: deliveryCustomerDirectory,
+    customers: {
+      findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
+    },
   }),
   listOrderBatches: createListOrderBatches({ finishedOrders: finishedOrderRepository }),
   listFinishedStock: createListFinishedStock({
@@ -1656,6 +1705,32 @@ const orderDeliveryVoidUnitOfWork: OrderDeliveryVoidUnitOfWork = {
     ),
 };
 
+const finishedProductDeliveryCatalog: FinishedProductDeliveryCatalog = { findForDelivery, findSurplusBases };
+
+/** La entrega sin pedido y la salida de `inventario` confirman o se deshacen juntas. */
+const directDeliveryUnitOfWork: DirectDeliveryUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        deliveries: createDirectDeliveryRepository(tx),
+        waiting: createWaitingOrdersReader(tx),
+        waitingLock: createWaitingOrdersLock(tx),
+        finishedGoods: createFinishedGoodsDirectDispatch(tx),
+      }),
+    ),
+};
+
+/** La anulacion sin pedido y la devolucion a `inventario` confirman o se deshacen juntas. */
+const directDeliveryVoidUnitOfWork: DirectDeliveryVoidUnitOfWork = {
+  run: (work) =>
+    withOrderTransaction((tx) =>
+      work({
+        voids: createOrderDeliveryVoidRepository(tx),
+        finishedGoods: createFinishedGoodsReturn(tx),
+      }),
+    ),
+};
+
 export const pedidos = {
   createOrder: createCreateOrder({
     recipes: recipeCatalog,
@@ -1763,6 +1838,29 @@ export const pedidos = {
     unitOfWork: orderDeliveryVoidUnitOfWork,
     voids: createOrderDeliveryVoidRepository(),
     orders: orderRepository,
+  }),
+  getDirectDelivery: createGetDirectDelivery({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: createWaitingOrdersReader(),
+  }),
+  listDirectDeliverySurplus: createListDirectDeliverySurplus({
+    catalog: finishedProductDeliveryCatalog,
+    waiting: createWaitingOrdersReader(),
+  }),
+  deliverDirect: createDeliverDirect({
+    customerCatalog,
+    catalog: finishedProductDeliveryCatalog,
+    unitOfWork: directDeliveryUnitOfWork,
+    deliveries: createDirectDeliveryRepository(),
+  }),
+  getDirectDeliveryForVoid: createGetDirectDeliveryForVoid({
+    voids: createOrderDeliveryVoidRepository(),
+    catalog: finishedProductDeliveryCatalog,
+    customerCatalog,
+  }),
+  voidDirectDelivery: createVoidDirectDelivery({
+    unitOfWork: directDeliveryVoidUnitOfWork,
+    voids: createOrderDeliveryVoidRepository(),
   }),
 } as const;
 
@@ -2217,15 +2315,6 @@ export const asignaciones = {
     groups: workGroupDirectory,
     now: () => new Date(),
   }),
-  listDeliveredConditionedOrders: createListDeliveredConditionedOrders({
-    orders: orderCatalog,
-    assignments: orderAssignmentRepository,
-    recipes: recipeCatalog,
-    people: peopleDirectory,
-    presentations: presentationCatalog,
-    units: unitCatalog,
-    now: () => new Date(),
-  }),
   saveConditioningBatchData: createSaveConditioningBatchData({
     orders: orderCatalog,
     batches: createFinishedBatchLabels(),
@@ -2448,6 +2537,34 @@ function documentPipelineFor(reader: AiReader) {
  */
 const documentJobLog: DocumentJobLog = forModule('documentos');
 
+// `notificaciones` se lee al llamar, no al construir: su fachada se declara más abajo.
+const batchFinishedDeps: NonNullable<Parameters<typeof createRunDocumentJob>[0]['batchFinished']> = {
+  notices: documentBatchRepositoryPrisma,
+  log: documentJobLog,
+  listener: {
+    async onBatchFinished(e) {
+      if (e.createdBy === null) {
+        documentJobLog.warn('batch_notice_without_author', { batchId: e.batchId, companyId: e.companyId });
+        return;
+      }
+      await notificaciones.notify({
+        key: 'documentos.tanda_terminada',
+        companyId: e.companyId,
+        dedupeKey: `documentos.tanda_terminada:${e.batchId}`,
+        payload: {
+          recipientUserId: e.createdBy,
+          strategy: e.strategy,
+          uploadedAt: e.uploadedAt,
+          total: e.total,
+          done: e.done,
+          failed: e.failed,
+          failedNames: e.failedNames,
+        },
+      });
+    },
+  },
+};
+
 const runDocumentJob = createRunDocumentJob({
   repository: documentBatchRepository,
   storage: documentStorage,
@@ -2456,6 +2573,7 @@ const runDocumentJob = createRunDocumentJob({
   pdfReading: { isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'lectura_pdf') },
   pipelineFor: documentPipelineFor,
   log: documentJobLog,
+  batchFinished: batchFinishedDeps,
 });
 
 const processingQueue: ProcessingQueue = {
@@ -2574,6 +2692,7 @@ export const documentos = {
   getBatchStatus: createGetBatchStatus({
     repository: documentBatchRepository,
     config: processingConfig,
+    batchFinished: batchFinishedDeps,
   }),
   queueSignature,
   // Las DOS operaciones nuevas de la revision de catalogo, ya cableadas con `catalogImportDeps`
@@ -2595,12 +2714,46 @@ export const documentos = {
 const clientesListQueryLog: ClientesListQueryLog = { ignoredFields: logIgnoredListQueryFields };
 
 const customerRepository: CustomerRepository = {
-  create: createCustomer,
   findAliveById: findAliveCustomerById,
-  updateAlive: updateAliveCustomer,
   softDeleteAlive: softDeleteAliveCustomer,
   listAlive: listAliveCustomers,
 };
+
+type CustomerTransactionClient = Parameters<Parameters<typeof withCustomerTransaction>[0]>[0];
+
+/** El servicio de telefonos de `clientes` sobre la transaccion abierta: lo usan el recalculo de
+ *  contactos y las acciones de `integraciones` que escriben los telefonos de un cliente. */
+function customerPhoneLinksOn(tx: CustomerTransactionClient) {
+  return createCustomerPhoneLinks({ phones: createCustomerPhoneRepository(tx) });
+}
+
+/** `clientes` no importa `integraciones`: el recalculo de los contactos le llega por su puerto,
+ *  sobre el mismo `tx`. */
+function whatsappLinkRefreshOn(tx: CustomerTransactionClient): WhatsappLinkRefresher {
+  const refresh = createRefreshWhatsappContactLinks({
+    contacts: createWhatsappContactRepository(tx),
+    owners: { ownersOf: customerPhoneLinksOn(tx).ownersOf },
+  });
+  return { refresh: (numbers, companyId) => refresh(numbers, { companyId }) };
+}
+
+const customerUnitOfWork: CustomerUnitOfWork = {
+  run: (work) =>
+    withCustomerTransaction((tx) =>
+      work({
+        customers: createCustomerWriteRepository(tx),
+        phones: createCustomerPhoneRepository(tx),
+        whatsappLinks: whatsappLinkRefreshOn(tx),
+      }),
+    ),
+};
+
+const legacyPhoneRepository: LegacyPhoneRepository = {
+  processCompany: processLegacyPhonesOfCompany,
+};
+
+/** `clientes` no importa `identity`: el pais de la empresa le llega por su propio puerto. */
+const companyCountryLookup: CompanyCountryLookup = identity.getCompanyCountry;
 
 /**
  * Fachada del modulo `clientes` ya cableada. Es lo que consume la Server Action.
@@ -2609,11 +2762,16 @@ const customerRepository: CustomerRepository = {
  * recibe por parametro, y quien lo obtiene de las dos caras de la sesion es la Server Action.
  */
 export const clientes = {
-  createCustomer: createCreateCustomer({ customers: customerRepository }),
-  updateCustomer: createUpdateCustomer({ customers: customerRepository }),
+  createCustomer: createCreateCustomer({ unitOfWork: customerUnitOfWork }),
+  updateCustomer: createUpdateCustomer({ unitOfWork: customerUnitOfWork }),
   deleteCustomer: createDeleteCustomer({ customers: customerRepository }),
   getCustomer: createGetCustomer({ customers: customerRepository }),
   listCustomers: createListCustomers({ customers: customerRepository, log: clientesListQueryLog }),
+  backfillLegacyPhones: createBackfillLegacyPhones({
+    listCompanyIds: listActiveCompanyIds,
+    legacyPhones: legacyPhoneRepository,
+    companyCountryOf: companyCountryLookup,
+  }),
 } as const;
 
 /** Servicio de lectura que `clientes` ofrece a `pedidos`. El ambito interno de `clientes` se
@@ -2647,12 +2805,35 @@ const secretDigest: SecretDigest = secretDigestSha256;
 
 import {
   createCreateWhatsappConnection,
+  createCreateWhatsappTemplate,
+  createDeleteWhatsappTemplate,
   createGetWhatsappConnection,
+  createGetWhatsappTemplate,
+  createListWhatsappTemplates,
+  createReceiveWhatsappWebhook,
   createRegenerateWhatsappVerifyToken,
+  createResyncWhatsappTemplates,
   createSetWhatsappConnectionEnabled,
+  createSyncAllWhatsappTemplates,
+  createSyncWhatsappTemplates,
   createTestWhatsappConnection,
   createUpdateWhatsappConnection,
+  createVerifyWhatsappWebhook,
+  createCreateWhatsappVariableKey,
+  createDeleteWhatsappVariableKey,
+  createListWhatsappDictionary,
+  createRelateWhatsappTemplateVariables,
+  createSetWhatsappTemplateEnabled,
+  createUpdateWhatsappVariableKey,
+  createRefreshWhatsappContactLinks,
+  createLinkWhatsappContact,
+  createUnlinkWhatsappContact,
+  createSetWhatsappContactBlocked,
 } from '@/lib/modules/integraciones';
+import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
+import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
+import type { WhatsappContactRepository } from '@/lib/modules/integraciones/ports/whatsapp-contact-repository';
+import type { WhatsappContactUnitOfWork } from '@/lib/modules/integraciones/ports/whatsapp-contact-unit-of-work';
 import { integrationsE2EDoublesEnabled } from '@/lib/modules/integraciones/adapters/driven/config/e2e-doubles-env';
 import { readPublicBaseUrl } from '@/lib/modules/integraciones/adapters/driven/config/public-base-url-env';
 import { whatsappGraphClientCanned } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned';
@@ -2661,12 +2842,42 @@ import {
   findLiveWhatsappConnection,
   findLiveWhatsappConnectionById,
   insertWhatsappConnection,
+  recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma';
+import { createWhatsappInboxRecorder } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-inbox-prisma';
+import {
+  applyWhatsappTemplateSync,
+  applyWhatsappTemplateWebhookUpdates,
+  findLiveWhatsappTemplateById,
+  findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreatedWhatsappTemplate,
+  listLiveWhatsappTemplates,
+  listWhatsappTemplatesForSync,
+  markWhatsappTemplateDeleted,
+  replaceWhatsappTemplateVariables,
+  setWhatsappTemplateEnabled,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma';
+import {
+  createWhatsappVariableKey,
+  deleteWhatsappVariableKey,
+  findWhatsappVariableKeysByKeys,
+  listAllWhatsappVariableKeys,
+  listWhatsappVariableKeysWithUsage,
+  updateWhatsappVariableKey,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-variable-key-prisma';
+import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
+import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
+import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch';
 import type { RandomSource } from '@/lib/modules/integraciones/ports/random-source';
+import type { WebhookSignature } from '@/lib/modules/integraciones/ports/webhook-signature';
 import type { WhatsappConnectionRepository } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client';
+import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-inbox-repository';
+import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
+import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository';
+import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
@@ -2675,6 +2886,18 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.fetchPhoneNumber(input)
       : whatsappGraphClientFetch.fetchPhoneNumber(input),
+  createTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.createTemplate(input)
+      : whatsappGraphClientFetch.createTemplate(input),
+  listTemplatesPage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.listTemplatesPage(input)
+      : whatsappGraphClientFetch.listTemplatesPage(input),
+  deleteTemplate: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.deleteTemplate(input)
+      : whatsappGraphClientFetch.deleteTemplate(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {
@@ -2682,17 +2905,76 @@ const whatsappConnectionRepository: WhatsappConnectionRepository = {
   findLiveById: findLiveWhatsappConnectionById,
   create: insertWhatsappConnection,
   update: updateLiveWhatsappConnection,
+  recordWebhookHandshake: recordWhatsappWebhookHandshake,
+};
+
+const whatsappTemplateRepository: WhatsappTemplateRepository = {
+  listLive: listLiveWhatsappTemplates,
+  findLiveById: findLiveWhatsappTemplateById,
+  findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreated: insertCreatedWhatsappTemplate,
+  replaceVariables: replaceWhatsappTemplateVariables,
+  setEnabled: setWhatsappTemplateEnabled,
+  markDeleted: markWhatsappTemplateDeleted,
+  listForSync: listWhatsappTemplatesForSync,
+  applySync: applyWhatsappTemplateSync,
+  applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+};
+
+const whatsappVariableKeyRepository: WhatsappVariableKeyRepository = {
+  listAll: listAllWhatsappVariableKeys,
+  listWithUsage: listWhatsappVariableKeysWithUsage,
+  findByKeys: findWhatsappVariableKeysByKeys,
+  create: createWhatsappVariableKey,
+  update: updateWhatsappVariableKey,
+  delete: deleteWhatsappVariableKey,
 };
 
 const randomSource: RandomSource = randomSourceNode;
 
 const whatsappDeps = {
   connections: whatsappConnectionRepository,
+  templates: whatsappTemplateRepository,
+  variableKeys: whatsappVariableKeyRepository,
   graph: whatsappGraphClient,
   cipher: secretCipher,
   digest: secretDigest,
   random: randomSource,
 };
+
+const whatsappWebhookDirectory: WhatsappWebhookDirectory = { companyOfConnection: companyOfWhatsappConnection };
+/** Los dueños de cada número se leen con el servicio de `clientes` sobre la transacción de la recepción. */
+const whatsappInboxRepository: WhatsappInboxRepository = createWhatsappInboxRecorder({ ownersOn: customerPhoneLinksOn });
+const webhookSignature: WebhookSignature = webhookSignatureHmac;
+/** La clave del anadido vive aqui, no en el modulo. */
+const integrationsSwitch: IntegrationsSwitch = {
+  isOn: (companyId) => identity.isCompanyAddonActive(companyId, 'integraciones'),
+};
+
+/** `graph` solo lo usa la resincronización, que corre después de responder a Meta. */
+const whatsappWebhookDeps = {
+  directory: whatsappWebhookDirectory,
+  integrations: integrationsSwitch,
+  connections: whatsappConnectionRepository,
+  digest: secretDigest,
+  cipher: secretCipher,
+  signature: webhookSignature,
+  inbox: whatsappInboxRepository,
+  templates: whatsappTemplateRepository,
+  graph: whatsappGraphClient,
+};
+
+const whatsappContactRepository: WhatsappContactRepository = createWhatsappContactRepository();
+
+const whatsappContactUnitOfWork: WhatsappContactUnitOfWork = {
+  run: (work) =>
+    withWhatsappContactTransaction((tx) => {
+      const links = customerPhoneLinksOn(tx);
+      return work({ contacts: createWhatsappContactRepository(tx), customerPhones: links, owners: links });
+    }),
+};
+
+const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -2798,4 +3080,77 @@ export const integraciones = {
   getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
   resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
+  verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
+  receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
+  linkWhatsappContact: createLinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
+  unlinkWhatsappContact: createUnlinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),
+  setWhatsappContactBlocked: createSetWhatsappContactBlocked({ contacts: whatsappContactRepository }),
+  listWhatsappTemplates: createListWhatsappTemplates(whatsappDeps),
+  getWhatsappTemplate: createGetWhatsappTemplate(whatsappDeps),
+  createWhatsappTemplate: createCreateWhatsappTemplate(whatsappDeps),
+  syncWhatsappTemplates: createSyncWhatsappTemplates(whatsappDeps),
+  deleteWhatsappTemplate: createDeleteWhatsappTemplate(whatsappDeps),
+  resyncWhatsappTemplates: createResyncWhatsappTemplates(whatsappWebhookDeps),
+  syncAllWhatsappTemplates: createSyncAllWhatsappTemplates(whatsappTemplateCronDeps),
+  listWhatsappDictionary: createListWhatsappDictionary(whatsappDeps),
+  createWhatsappVariableKey: createCreateWhatsappVariableKey(whatsappDeps),
+  updateWhatsappVariableKey: createUpdateWhatsappVariableKey(whatsappDeps),
+  deleteWhatsappVariableKey: createDeleteWhatsappVariableKey(whatsappDeps),
+  relateWhatsappTemplateVariables: createRelateWhatsappTemplateVariables(whatsappDeps),
+  setWhatsappTemplateEnabled: createSetWhatsappTemplateEnabled(whatsappDeps),
+  verifyCronSecret,
+} as const;
+
+import {
+  createChannelFactory,
+  createGetNotificationSummary,
+  createListNotifications,
+  createMarkAllNotificationsRead,
+  createMarkNotificationRead,
+  createNotify,
+  createPurgeExpiredNotifications,
+  NOTIFICATION_CATALOG,
+  type ChannelRegistry,
+} from '@/lib/modules/notificaciones';
+import { createInAppChannel } from '@/lib/modules/notificaciones/adapters/driven/channels/in-app-channel';
+import { createNotificationLogConsole } from '@/lib/modules/notificaciones/adapters/driven/observability/notification-log-console';
+import { createNotificationInboxPrisma } from '@/lib/modules/notificaciones/adapters/driven/persistence/notification-inbox-prisma';
+import type { CompanyStatus } from '@/lib/modules/notificaciones/ports/company-status';
+import type { RecipientDirectory } from '@/lib/modules/notificaciones/ports/recipient-directory';
+
+const notificationLog = createNotificationLogConsole();
+const notificationInbox = createNotificationInboxPrisma();
+const notificationsClock = () => new Date();
+
+// Hoy solo el canal de la aplicación; los demás se registran aquí cuando existan.
+const notificationChannels: ChannelRegistry = { in_app: createInAppChannel(notificationLog) };
+
+const notificationCompanies: CompanyStatus = {
+  isActive: (companyId) => identity.isCompanyActive(companyId),
+};
+
+const notificationRecipients: RecipientDirectory = {
+  belongsToCompany: (userId, companyId) => identity.isUserInCompany(userId, companyId),
+};
+
+const notificationReadDeps = { inbox: notificationInbox, now: notificationsClock };
+
+/** Fachada de `notificaciones`. El actor lo resuelve la Server Action; `notify` no lo lleva. */
+export const notificaciones = {
+  notify: createNotify({
+    catalog: NOTIFICATION_CATALOG,
+    inbox: notificationInbox,
+    companies: notificationCompanies,
+    recipients: notificationRecipients,
+    channels: createChannelFactory(notificationChannels),
+    log: notificationLog,
+  }),
+  getNotificationSummary: createGetNotificationSummary(notificationReadDeps),
+  listNotifications: createListNotifications(notificationReadDeps),
+  markNotificationRead: createMarkNotificationRead(notificationReadDeps),
+  markAllNotificationsRead: createMarkAllNotificationsRead(notificationReadDeps),
+  purgeExpiredNotifications: createPurgeExpiredNotifications(notificationReadDeps),
+  // La tarea diaria de borrado: la misma puerta que el cron de pedidos y las empresas de una en una.
+  verifyCronSecret,
+  listCompanyIds: listAllCompanyIds,
 } as const;

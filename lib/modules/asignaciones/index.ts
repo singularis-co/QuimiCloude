@@ -58,7 +58,6 @@ export {
   NoWholePackageError,
   OrderPackingTakenError,
   OrderNotPackableError,
-  PackedExceedsQuantityError,
   PackagingStockInsufficientError,
   OrderProducedFrozenError,
   OrderConditioningTakenError,
@@ -312,10 +311,6 @@ export {
   type RecordConditioningStepDeps,
   type RecordConditioningStepResult,
 } from './domain/record-conditioning-step';
-export {
-  createListDeliveredConditionedOrders,
-  type ListDeliveredConditionedOrdersDeps,
-} from './domain/list-delivered-conditioned-orders';
 export {
   createSaveConditioningBatchData,
   saveConditioningBatchDataSchema,

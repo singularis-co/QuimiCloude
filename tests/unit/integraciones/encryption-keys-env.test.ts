@@ -257,24 +257,46 @@ describe('la composición se importa sin las variables del cifrado', () => {
         '@/lib/modules/integraciones/adapters/driven/security/secret-digest-sha256'
       )
 
+      // Enmendado el 2026-10-20 (QC-239): la fachada gana `linkWhatsappContact`,
+      // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
+      // Merge de dev (2026-10-20): se suman los siete de plantillas de QC-242 y `verifyCronSecret`.
       expect(Object.keys(composition.integraciones).sort()).toEqual([
         'createWhatsappConnection',
+        'createWhatsappTemplate',
+        'createWhatsappVariableKey',
+        'deleteWhatsappTemplate',
+        'deleteWhatsappVariableKey',
         'disconnectAiProvider',
         'getAiProviderConnection',
         'getAiProviderReadiness',
         'getAiProviderStatus',
         'getWhatsappConnection',
+        'getWhatsappTemplate',
+        'linkWhatsappContact',
+        'listWhatsappDictionary',
+        'listWhatsappTemplates',
+        'receiveWhatsappWebhook',
         'regenerateWhatsappVerifyToken',
+        'relateWhatsappTemplateVariables',
         'reportAiProviderOutcome',
         'resolveAiProviderForReading',
+        'resyncWhatsappTemplates',
         'saveAiProviderConnection',
         'secretCipher',
         'secretDigest',
         'setWhatsappConnectionEnabled',
+        'setWhatsappContactBlocked',
+        'setWhatsappTemplateEnabled',
+        'syncAllWhatsappTemplates',
+        'syncWhatsappTemplates',
         'testAiProviderKey',
         'testSavedAiProvider',
         'testWhatsappConnection',
+        'unlinkWhatsappContact',
         'updateWhatsappConnection',
+        'updateWhatsappVariableKey',
+        'verifyCronSecret',
+        'verifyWhatsappWebhook',
         'whatsappWebhookUrl',
       ])
       expect(composition.integraciones.secretCipher).toBe(secretCipherAesGcm)

@@ -16,12 +16,7 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
 const LISTAS: readonly { readonly vista: AssignmentViewKind; readonly page: number; readonly pageSize: number; readonly esperada: string }[] = [
   { vista: 'por_acondicionar', page: 1, pageSize: 25, esperada: '/asignacion?page=1&pageSize=25&vista=por_acondicionar' },
   { vista: 'acondicionados', page: 2, pageSize: 50, esperada: '/asignacion?page=2&pageSize=50&vista=acondicionados' },
-  {
-    vista: 'acondicionados_entregados',
-    page: 3,
-    pageSize: 10,
-    esperada: '/asignacion?page=3&pageSize=10&vista=acondicionados_entregados',
-  },
+  { vista: 'acondicionados', page: 3, pageSize: 10, esperada: '/asignacion?page=3&pageSize=10&vista=acondicionados' },
   { vista: 'terminados', page: 1, pageSize: 100, esperada: '/asignacion?page=1&pageSize=100&vista=terminados' },
   { vista: 'por_empacar', page: 4, pageSize: 25, esperada: '/asignacion?page=4&pageSize=25&vista=por_empacar' },
 ];

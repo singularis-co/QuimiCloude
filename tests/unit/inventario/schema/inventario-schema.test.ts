@@ -1109,3 +1109,21 @@ describe('QC-284 R1/R2 — la unicidad del lote vive en dos indices parciales, n
     )
   })
 })
+
+// QC-288 2026-10-16: el tipo del asiento gana los de la entrega sin pedido y su anulacion, al
+// final y sin reordenar. Los casos anteriores no cambian.
+describe('QC-288 — InventoryMovementKind con los asientos de la entrega sin pedido', () => {
+  it('R41: InventoryMovementKind termina en direct_delivery y direct_delivery_void, en ingles y sin reordenar', () => {
+    const kind = schemaEnums.find((declared) => declared.name === 'InventoryMovementKind')
+    expect(kind?.values).toEqual([
+      'opening',
+      'adjustment',
+      'consumption',
+      'production',
+      'delivery',
+      'delivery_void',
+      'direct_delivery',
+      'direct_delivery_void',
+    ])
+  })
+})

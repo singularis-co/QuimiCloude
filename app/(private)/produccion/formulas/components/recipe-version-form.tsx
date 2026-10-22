@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 // desde esta ficha; aqui hace falta la vista sin estado del documento.
 import { StepDocumentView } from '@/components/shared/step-reader/step-document-view';
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +32,7 @@ import { recipeEditRoute } from '@/lib/shared/routes';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 import { cn } from '@/lib/utils';
 
+import { FormFooterBar } from './form-footer-bar';
 import type { RecipeFormProductPage } from './recipe-form';
 import {
   RECIPE_LINE_ERROR_MESSAGES,
@@ -54,6 +55,10 @@ import {
   type RecipeToolErrors,
   type RecipeVersionFormState,
 } from './recipe-form-state';
+import {
+  RECIPE_VERSION_UNDER_REVIEW_LABEL,
+  RECIPE_VERSION_UNDER_REVIEW_TONE,
+} from './recipe-version-tones';
 
 const FIELD_TEXT = 'text-base';
 
@@ -345,9 +350,12 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
       }}
     >
       {props.mode === 'edit' && props.version.isUnderReview ? (
-        <Badge variant="info" className="self-start" data-testid="recipe-version-form-under-review">
-          Por revisar
-        </Badge>
+        <StatusBadge
+          tone={RECIPE_VERSION_UNDER_REVIEW_TONE}
+          label={RECIPE_VERSION_UNDER_REVIEW_LABEL}
+          className="self-start"
+          data-testid="recipe-version-form-under-review"
+        />
       ) : null}
 
       {saveError === null ? null : (
@@ -409,7 +417,7 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
 
       {props.mode === 'edit' ? <InheritedFromOriginal version={props.version} /> : null}
 
-      <div className="flex justify-end gap-2">
+      <FormFooterBar testId="recipe-version-form-footer">
         <Link
           href={originalRoute}
           data-slot="button"
@@ -427,7 +435,7 @@ export function RecipeVersionForm(props: RecipeVersionFormProps) {
         >
           {isPending ? 'Guardando…' : 'Guardar'}
         </Button>
-      </div>
+      </FormFooterBar>
     </form>
   );
 }

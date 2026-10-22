@@ -15,6 +15,7 @@
 import { USE_BY_STRATEGY } from './ai-read-use';
 import { AiProviderError } from './errors';
 import { failureKind, STORAGE_FAILURE_KIND } from './failure-kind';
+import { createNotifyIfBatchFinished, type BatchFinishedDeps } from './notify-if-batch-finished';
 import { createDownloadDocument } from './read-document';
 
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
@@ -25,7 +26,11 @@ import type { CropCatalogImagesInput, CropCatalogImagesResult } from './crop-cat
 import type { ProcessPdfByStrategyInput, StrategyRunResult } from './process-pdf-by-strategy';
 import type { AiProviderGateway } from '../ports/ai-provider-gateway';
 import type { AiReader } from '../ports/ai-reader';
-import type { DocumentBatchRepository, JobOutcome } from '../ports/document-batch-repository';
+import type {
+  ClaimedFile,
+  DocumentBatchRepository,
+  JobOutcome,
+} from '../ports/document-batch-repository';
 import type { DocumentJobLog } from '../ports/document-job-log';
 import type { DocumentStorage } from '../ports/document-storage';
 import type { PdfReadingSwitch } from '../ports/pdf-reading-switch';
@@ -60,6 +65,7 @@ export type RunDocumentJobDeps = {
   readonly pipelineFor: (reader: AiReader) => DocumentPipeline;
   /** Opcional para que quien no observa el trabajo no tenga que pasar un doble mudo. */
   readonly log?: DocumentJobLog;
+  readonly batchFinished?: BatchFinishedDeps;
 };
 
 const LOG_MUDO: DocumentJobLog = {
@@ -105,8 +111,12 @@ export function createRunDocumentJob(
   const downloadDocument = createDownloadDocument({ storage: deps.storage });
   const log = deps.log ?? LOG_MUDO;
 
+  const notifyIfBatchFinished =
+    deps.batchFinished === undefined ? null : createNotifyIfBatchFinished(deps.batchFinished);
+
   // El texto de un `done` es lo que leyo la IA: al registro solo va el desenlace, nunca el texto.
-  async function terminar(fileId: string, outcome: JobOutcome): Promise<void> {
+  async function terminar(file: ClaimedFile, outcome: JobOutcome): Promise<void> {
+    const fileId = file.id;
     await deps.repository.finish(fileId, outcome);
     log.info(
       'trabajo terminado',
@@ -114,6 +124,10 @@ export function createRunDocumentJob(
         ? { fileId, outcome: outcome.kind }
         : { fileId, outcome: outcome.kind, code: outcome.code, reason: outcome.reason },
     );
+    // Un `requeue` vuelve a dejar el archivo pendiente: no puede cerrar la tanda.
+    if (outcome.kind !== 'requeue' && notifyIfBatchFinished !== null) {
+      await notifyIfBatchFinished(file.batchId, file.companyId);
+    }
   }
 
   // El archivo ya terminó: un fallo al informar a la conexión se avisa y no cambia su desenlace.
@@ -159,7 +173,7 @@ export function createRunDocumentJob(
         code: 'unauthorized',
         reason: 'run-document-job: la lectura de PDF no esta activa en la empresa',
       } as const;
-      await terminar(claimed.id, outcome);
+      await terminar(claimed, outcome);
       return { kind: outcome.kind };
     }
 
@@ -177,7 +191,7 @@ export function createRunDocumentJob(
         code: UNEXPECTED_ERROR_CODE,
         reason: `run-document-job: la tanda '${claimed.batchId}' no aparece tras reclamar '${claimed.id}'`,
       } as const;
-      await terminar(claimed.id, outcome);
+      await terminar(claimed, outcome);
       return { kind: outcome.kind };
     }
 
@@ -196,7 +210,7 @@ export function createRunDocumentJob(
             ? 'run-document-job: la empresa no tiene proveedor IA conectado'
             : 'run-document-job: la key guardada del proveedor IA no se pudo leer',
       } as const;
-      await terminar(claimed.id, outcome);
+      await terminar(claimed, outcome);
       return { kind: outcome.kind };
     }
     const observado = observeAccountFailures(lookup.reader);
@@ -218,7 +232,7 @@ export function createRunDocumentJob(
         code: UNEXPECTED_ERROR_CODE,
         reason: `run-document-job: descarga fallida sobre '${claimed.path}' (${causaDe(error)})`,
       } as const;
-      await terminar(claimed.id, outcome);
+      await terminar(claimed, outcome);
       return { kind: outcome.kind };
     }
     log.info('pdf descargado', { fileId: claimed.id, byteLength: bytes.byteLength });
@@ -255,7 +269,7 @@ export function createRunDocumentJob(
             code: crop.code,
             reason: crop.reason,
           } as const;
-          await terminar(claimed.id, outcome);
+          await terminar(claimed, outcome);
           await informarFallo();
           return { kind: outcome.kind };
         }
@@ -266,7 +280,7 @@ export function createRunDocumentJob(
         });
       }
 
-      await terminar(claimed.id, { kind: 'done', text: result.text });
+      await terminar(claimed, { kind: 'done', text: result.text });
       // La fila ya esta en `done`: propagar aqui haria reintentar a la cola un trabajo terminado
       // cuyo `claim` ya no se puede ganar. Queda un PDF huerfano, y el aviso es lo que lo delata.
       try {
@@ -285,7 +299,7 @@ export function createRunDocumentJob(
       code: result.code,
       reason: result.reason,
     } as const;
-    await terminar(claimed.id, outcome);
+    await terminar(claimed, outcome);
     await informarFallo();
     return { kind: outcome.kind };
   }

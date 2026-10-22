@@ -51,6 +51,7 @@ function fila(recipeId: string): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
@@ -310,5 +311,23 @@ describe('la ficha lleva la imagen de la receta', () => {
 
     expect((await createGetOrder(conImagen)(ORDER_ID, ADMIN)).recipeImageUrl).toBe('https://cdn.test/recetas/crema.png')
     expect((await createGetOrder(dobles(fila(VERSION), []))(ORDER_ID, ADMIN)).recipeImageUrl).toBeNull()
+  })
+})
+
+describe('getOrder — el importe y su parte de envases', () => {
+  it('la ficha devuelve ingredientsCost y packagingCost tal como vienen de la fila', async () => {
+    const conImporte = { ...fila(ORIGINAL), ingredientsCost: '30.0000', packagingCost: '4.5000' }
+
+    const vista = await createGetOrder(dobles(conImporte))(ORDER_ID, ADMIN)
+
+    expect(vista.ingredientsCost).toBe('30.0000')
+    expect(vista.packagingCost).toBe('4.5000')
+  })
+
+  it('sin importe, los dos salen null y no "0.0000"', async () => {
+    const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
+
+    expect(vista.ingredientsCost).toBeNull()
+    expect(vista.packagingCost).toBeNull()
   })
 })

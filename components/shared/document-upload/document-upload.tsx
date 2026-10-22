@@ -10,6 +10,7 @@ import { issueUploadLinksAction } from '@/lib/modules/documentos/adapters/drivin
 import type { ErrorState } from '@/lib/modules/errores';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
+import { rememberBatch } from './batch-memory';
 import { DocumentUploadRow } from './document-upload-row';
 import {
   CLEAR_LABEL,
@@ -128,16 +129,23 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
       })),
     );
 
-    const paths = uploads
-      .map((upload, index) => (results[index] === true ? upload.path : null))
-      .filter((path): path is string => path !== null);
+    const uploaded = uploads.flatMap((upload, index) => {
+      const entry = files[index];
+      return results[index] === true && entry !== undefined
+        ? [{ path: upload.path, name: entry.file.name }]
+        : [];
+    });
 
-    if (paths.length === 0) {
+    if (uploaded.length === 0) {
       setBusy(false);
       return;
     }
 
-    const enqueued = await enqueueBatchAction({ strategy, paths });
+    const enqueued = await enqueueBatchAction({
+      strategy,
+      paths: uploaded.map(({ path }) => path),
+      names: uploaded.map(({ name }) => name),
+    });
     if (enqueued.status === 'error') {
       setActionError(enqueued);
       setBusy(false);
@@ -145,6 +153,7 @@ export function DocumentUpload({ strategy, reviewHrefFor }: DocumentUploadProps)
     }
 
     setBatchId(enqueued.data.batchId);
+    rememberBatch(enqueued.data.batchId, strategy);
     setBusy(false);
   }
 

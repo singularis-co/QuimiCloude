@@ -70,6 +70,7 @@ function lineaDe(overrides: Partial<FinishPackingLine> = {}): FinishPackingLine 
     presentationContent: '1.0000',
     packagingProductId: null,
     packedPackages: null,
+    packedSurplusPackages: 0,
     ...overrides,
   };
 }
@@ -857,17 +858,129 @@ describe('createFinishPacking con el conteo real de envases', () => {
     });
   });
 
-  it('R15, R22: lo envasado por encima de la cantidad, sumado en la unidad del pedido, rechaza con packed_exceeds_quantity y deshace todo', async () => {
+  it('R1, R6, R8: lo envasado por encima de la cantidad, sumado en la unidad del pedido, se acepta sin tope propio y guarda sus libres', async () => {
     const { lines, catalogos, quantity } = lineasMixtas();
     const m = montarConteo({ lines, catalogos, quantity });
 
-    // 4 x 200 ml + 1 x 0,4 L = 1,2 L de un pedido de 1 L.
-    await expect(m.terminar([conteo('linea-ml', 4, 'conteo_fisico'), conteo('linea-l', 1)])).resolves.toBe('packed_exceeds_quantity');
+    // 4 x 200 ml + 1 x 0,4 L = 1,2 L de un pedido de 1 L: sobran 0,2 L, un envase de 200 ml.
+    await expect(m.terminar([conteo('linea-ml', 4, 'conteo_fisico'), conteo('linea-l', 1)])).resolves.toMatchObject({ kind: 'ok' });
 
-    expect(m.deshecho()).toBe(true);
-    expect(m.recordPackedCounts).not.toHaveBeenCalled();
-    expect(m.settlePackagingForOrder).not.toHaveBeenCalled();
-    expect(m.receiveFromOrder).not.toHaveBeenCalled();
+    expect(m.deshecho()).toBe(false);
+    expect(m.recordPackedCounts).toHaveBeenCalledExactlyOnceWith(
+      PEDIDO,
+      [
+        { ...conteo('linea-ml', 4, 'conteo_fisico'), packedSurplusPackages: 1 },
+        { ...conteo('linea-l', 1), packedSurplusPackages: 0 },
+      ],
+      { companyId: EMPRESA },
+    );
+    expect(m.settlePackagingForOrder).toHaveBeenCalled();
+    expect(m.receiveFromOrder).toHaveBeenCalled();
+  });
+
+  describe('Terminar con excedente: plan 5 x 1 L + 1 x 5 L de un pedido de 10 L', () => {
+    const PLAN = [
+      lineaDe({ id: 'linea-1l', presentationId: 'p-1l', packages: 5, packagingProductId: 'envase-1l' }),
+      lineaDe({ id: 'linea-5l', presentationId: 'p-5l', packages: 1, presentationContent: '5.0000', packagingProductId: 'envase-5l' }),
+    ];
+    const montarPlan = (extra: Partial<Parameters<typeof montarConteo>[0]> = {}) =>
+      montarConteo({
+        lines: PLAN,
+        quantity: '10.0000',
+        catalogos: catalogosGlobales({ presentationRefs: [{ id: 'p-5l', content: '5.0000' }] }),
+        ...extra,
+      });
+
+    it('R1, R6, R8, R9: con 12 x 1 L + 0 x 5 L acepta y guarda 2 libres en la linea de 1 L; el lote lleva los 12 reales', async () => {
+      const m = montarPlan();
+
+      const resultado = await m.terminar([conteo('linea-1l', 12, 'conteo_fisico'), conteo('linea-5l', 0, 'rotura')]);
+
+      expect(resultado).toEqual({ kind: 'ok', finishedGoods: [{ productName: 'PT p-1l', packages: '12' }] });
+      expect(m.deshecho()).toBe(false);
+      expect(m.recordPackedCounts).toHaveBeenCalledExactlyOnceWith(
+        PEDIDO,
+        [
+          { ...conteo('linea-1l', 12, 'conteo_fisico'), packedSurplusPackages: 2 },
+          { ...conteo('linea-5l', 0, 'rotura'), packedSurplusPackages: 0 },
+        ],
+        { companyId: EMPRESA },
+      );
+      expect(m.orden.slice(0, 3)).toEqual(['finishPackingAlive', 'recordPackedCounts', 'settlePackagingForOrder']);
+      expect(m.receiveFromOrder).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ orderPresentationLineId: 'linea-1l', packages: 12, orderContent: '1.0000' }),
+      );
+    });
+
+    it('R10: el coste del pedido se reparte entre los 12 L envasados, libres incluidos, y la suma es el coste del pedido', async () => {
+      const m = montarPlan({ ingredientsCost: '24.0000' });
+
+      await m.terminar([conteo('linea-1l', 12, 'conteo_fisico'), conteo('linea-5l', 0, 'rotura')]);
+
+      const lote = m.receiveFromOrder.mock.calls[0]![0] as unknown as { readonly packages: number; readonly unitCost: string };
+      expect(lote.unitCost).toBe('2.0000');
+      expect(lote.packages * Number(lote.unitCost)).toBeCloseTo(24, 4);
+    });
+
+    it('R5: con 9 x 1 L + 0 x 5 L no supera la cantidad y guarda 0 libres aunque la linea de 1 L pase su plan', async () => {
+      const m = montarPlan();
+
+      await expect(m.terminar([conteo('linea-1l', 9, 'conteo_fisico'), conteo('linea-5l', 0, 'rotura')])).resolves.toMatchObject({
+        kind: 'ok',
+      });
+
+      expect(m.recordPackedCounts).toHaveBeenCalledWith(
+        PEDIDO,
+        [
+          { ...conteo('linea-1l', 9, 'conteo_fisico'), packedSurplusPackages: 0 },
+          { ...conteo('linea-5l', 0, 'rotura'), packedSurplusPackages: 0 },
+        ],
+        { companyId: EMPRESA },
+      );
+    });
+
+    it.each([
+      ['sin motivo', conteo('linea-1l', 12)],
+      ['con un motivo de «menos»', conteo('linea-1l', 12, 'merma')],
+      ['con «Otro» en blanco', conteo('linea-1l', 12, 'otro', '   ')],
+      ['con «Otro» de 201 caracteres', conteo('linea-1l', 12, 'otro', 'x'.repeat(201))],
+    ])('R2: con excedente, la linea por encima del plan %s rechaza con invalid_packing_count sin guardar nada', async (_caso, linea) => {
+      const m = montarPlan();
+
+      await expect(m.terminar([linea, conteo('linea-5l', 0, 'rotura')])).resolves.toBe('invalid_packing_count');
+
+      expect(m.deshecho()).toBe(true);
+      expect(m.recordPackedCounts).not.toHaveBeenCalled();
+      expect(m.settlePackagingForOrder).not.toHaveBeenCalled();
+      expect(m.receiveFromOrder).not.toHaveBeenCalled();
+    });
+
+    it('R3: con excedente, una linea en una unidad que no se convierte a la del pedido rechaza con incompatible_units sin guardar libres', async () => {
+      const m = montarPlan({
+        catalogos: catalogosGlobales({ presentationRefs: [{ id: 'p-5l', content: '5.0000', unitId: KILO }] }),
+      });
+
+      await expect(m.terminar([conteo('linea-1l', 12, 'conteo_fisico'), conteo('linea-5l', 0, 'rotura')])).resolves.toBe(
+        'incompatible_units',
+      );
+
+      expect(m.deshecho()).toBe(true);
+      expect(m.recordPackedCounts).not.toHaveBeenCalled();
+      expect(m.receiveFromOrder).not.toHaveBeenCalled();
+    });
+
+    it('R4, R8: con excedente, sin stock libre del envase rechaza con packaging_stock_insufficient y deshace los libres ya escritos', async () => {
+      const settlePackagingForOrder = vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['envase-1l'] }));
+      const m = montarPlan({ settlePackagingForOrder });
+
+      await expect(m.terminar([conteo('linea-1l', 12, 'conteo_fisico'), conteo('linea-5l', 0, 'rotura')])).resolves.toBe(
+        'packaging_stock_insufficient',
+      );
+
+      expect(m.recordPackedCounts).toHaveBeenCalled();
+      expect(m.deshecho()).toBe(true);
+      expect(m.receiveFromOrder).not.toHaveBeenCalled();
+    });
   });
 
   it('R15: lo envasado igual a la cantidad del pedido, con unidades mixtas, se acepta', async () => {
@@ -885,7 +998,11 @@ describe('createFinishPacking con el conteo real de envases', () => {
 
     await expect(m.terminar(counts)).resolves.toMatchObject({ kind: 'ok' });
 
-    expect(m.recordPackedCounts).toHaveBeenCalledExactlyOnceWith(PEDIDO, counts, { companyId: EMPRESA });
+    expect(m.recordPackedCounts).toHaveBeenCalledExactlyOnceWith(
+      PEDIDO,
+      counts.map((count) => ({ ...count, packedSurplusPackages: 0 })),
+      { companyId: EMPRESA },
+    );
     expect(m.orden.slice(0, 3)).toEqual(['finishPackingAlive', 'recordPackedCounts', 'settlePackagingForOrder']);
   });
 

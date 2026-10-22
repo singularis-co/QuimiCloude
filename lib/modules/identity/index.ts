@@ -365,6 +365,7 @@ export {
 export type { PlatformActor } from './domain/platform-actor';
 export { CompanyNotFoundError } from './domain/errors';
 export { createSetCompanyCountry, type SetCompanyCountryDeps } from './domain/set-company-country';
+export { createGetCompanyCountry, type GetCompanyCountryDeps } from './domain/get-company-country';
 
 // Gestion de empresas por el Maestro: casos de uso de plataforma, sus vistas y el historial.
 export {
@@ -417,6 +418,8 @@ export {
   createIsCompanyAddonActive,
   type IsCompanyAddonActiveDeps,
 } from './domain/is-company-addon-active';
+export { createIsCompanyActive, type IsCompanyActiveDeps } from './domain/is-company-active';
+export { createIsUserInCompany, type IsUserInCompanyDeps } from './domain/is-user-in-company';
 export {
   companyAddonsQuerySchema,
   setAllCompanyAddonsSchema,

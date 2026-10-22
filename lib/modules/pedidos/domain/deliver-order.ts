@@ -18,7 +18,7 @@ import {
   type DeliveryAllocation,
 } from './order-delivery';
 import type { OrderScope } from './order-scope';
-import { effectivePackages } from './packing-count';
+import { orderedPackages } from './packing-count';
 import { assertTransition } from './order-transitions';
 
 import type { NewOrderDeliveryLine, OrderDeliveryRepository } from '../ports/order-delivery-repository';
@@ -135,7 +135,7 @@ async function deliverInTransaction(
   const check = checkDelivery(
     lines.map((line) => ({
       presentationLineId: line.id,
-      orderedPackages: effectivePackages(line),
+      orderedPackages: orderedPackages(line),
       deliveredPackages: delivered.get(line.id) ?? 0,
     })),
     null,
@@ -180,9 +180,11 @@ async function deliverInTransaction(
  *  la entrega exige `TERMINADO` y `TERMINADO` no se cancela. */
 async function alreadyRegistered(
   orders: OrderRepository,
-  orderId: string,
+  orderId: string | null,
   scope: OrderScope,
 ): Promise<DeliverOrderResult> {
+  // La clave es de una entrega sin pedido: no es un reintento de esta.
+  if (orderId === null) throw new ValidationError();
   const order = await orders.findAliveById(orderId, scope);
   if (order === null) throw new OrderNotFoundError();
   if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();

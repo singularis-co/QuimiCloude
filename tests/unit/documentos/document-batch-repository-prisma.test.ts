@@ -181,12 +181,35 @@ describe('readBatch — null si no existe o es de otra empresa', () => {
     expect(doble.documentFileFindMany).not.toHaveBeenCalled();
   });
 
-  it('con la tanda visible, devuelve la tanda y sus archivos', async () => {
+  it('R3 — pide attempts y originalName ademas de las columnas del estado', async () => {
+    doble.documentBatchFindFirst.mockResolvedValue({ id: TANDA, companyId: EMPRESA, strategy: 'catalogo' });
+    doble.documentFileFindMany.mockResolvedValue([]);
+
+    await readBatch(TANDA, EMPRESA);
+
+    expect(doble.documentFileFindMany.mock.calls[0]?.[0]).toEqual({
+      where: { batchId: TANDA, companyId: EMPRESA },
+      select: {
+        id: true,
+        path: true,
+        attempts: true,
+        originalName: true,
+        status: true,
+        extractedText: true,
+        errorCode: true,
+        errorReason: true,
+      },
+    });
+  });
+
+  it('R1 — con la tanda visible, devuelve cada archivo con su attempts y su name', async () => {
     doble.documentBatchFindFirst.mockResolvedValue({ id: TANDA, companyId: EMPRESA, strategy: 'catalogo' });
     doble.documentFileFindMany.mockResolvedValue([
       {
         id: ARCHIVO,
         path: 'empresa/a.pdf',
+        attempts: 2,
+        originalName: 'factura.pdf',
         status: 'done',
         extractedText: 'texto',
         errorCode: null,
@@ -202,6 +225,8 @@ describe('readBatch — null si no existe o es de otra empresa', () => {
         {
           id: ARCHIVO,
           path: 'empresa/a.pdf',
+          attempts: 2,
+          name: 'factura.pdf',
           status: 'done',
           extractedText: 'texto',
           errorCode: null,
@@ -209,9 +234,46 @@ describe('readBatch — null si no existe o es de otra empresa', () => {
         },
       ],
     });
-    expect(doble.documentFileFindMany.mock.calls[0]?.[0]).toMatchObject({
-      where: { batchId: TANDA, companyId: EMPRESA },
-    });
+  });
+
+  it('R1 — attempts pasa tal cual, tambien a cero cuando nadie reclamo la fila', async () => {
+    doble.documentBatchFindFirst.mockResolvedValue({ id: TANDA, companyId: EMPRESA, strategy: 'catalogo' });
+    doble.documentFileFindMany.mockResolvedValue([
+      {
+        id: ARCHIVO,
+        path: 'empresa/a.pdf',
+        attempts: 0,
+        originalName: null,
+        status: 'queued',
+        extractedText: null,
+        errorCode: null,
+        errorReason: null,
+      },
+    ]);
+
+    const resultado = await readBatch(TANDA, EMPRESA);
+
+    expect(resultado?.files[0]?.attempts).toBe(0);
+  });
+
+  it('R1 — sin originalName, name es el ultimo segmento del path', async () => {
+    doble.documentBatchFindFirst.mockResolvedValue({ id: TANDA, companyId: EMPRESA, strategy: 'catalogo' });
+    doble.documentFileFindMany.mockResolvedValue([
+      {
+        id: ARCHIVO,
+        path: 'empresa/subidas/informe.pdf',
+        attempts: 1,
+        originalName: null,
+        status: 'processing',
+        extractedText: null,
+        errorCode: null,
+        errorReason: null,
+      },
+    ]);
+
+    const resultado = await readBatch(TANDA, EMPRESA);
+
+    expect(resultado?.files[0]?.name).toBe('informe.pdf');
   });
 });
 

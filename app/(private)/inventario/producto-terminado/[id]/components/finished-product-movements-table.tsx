@@ -31,6 +31,8 @@ export const FINISHED_PRODUCT_MOVEMENT_KIND_LABELS: Readonly<
   delivery: 'Entrega a cliente',
   delivery_void: 'Anulación de entrega',
   consumption: 'Consumo',
+  direct_delivery: 'Entrega sin pedido',
+  direct_delivery_void: 'Anulación de entrega sin pedido',
 };
 
 /** Recorta el ISO en vez de usar `Date`: así servidor y navegador pintan la misma hora. */

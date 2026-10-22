@@ -1413,45 +1413,100 @@ export async function receiveFinishedGoods(
   return { kind: 'received', productId: product.id, productName: product.name, packages: input.packages.toString() };
 }
 
+/** De donde sale la entrega: de un pedido (por su receta y presentacion) o de un producto terminado
+ *  elegido sin pedido. */
+export type FinishedGoodsDispatchOrigin =
+  | {
+      readonly origin: 'order';
+      readonly orderId: string;
+      readonly recipeId: string;
+      readonly presentationId: string;
+    }
+  | { readonly origin: 'direct'; readonly productId: string };
+
+/** El producto terminado vivo de la empresa, bloqueado con `FOR NO KEY UPDATE` como la entrada: por
+ *  su receta y presentacion, o por su id. Sin fila, `undefined`. */
+async function lockAliveFinishedProduct(
+  tx: Prisma.TransactionClient,
+  origin: FinishedGoodsDispatchOrigin,
+  scope: InventoryScope,
+): Promise<{ id: string; recipeId: string | null; presentationId: string | null } | undefined> {
+  const { companyId } = companyScopeColumns(scope);
+  const match =
+    origin.origin === 'order'
+      ? Prisma.sql`"recipe_id" = ${origin.recipeId}::uuid AND "presentation_id" = ${origin.presentationId}::uuid`
+      : Prisma.sql`"id" = ${origin.productId}::uuid`;
+  const rows = await tx.$queryRaw<
+    ReadonlyArray<{ id: string; recipeId: string | null; presentationId: string | null }>
+  >(Prisma.sql`
+    SELECT "id", "recipe_id" AS "recipeId", "presentation_id" AS "presentationId"
+      FROM "products"
+     WHERE "company_id" = ${companyId}::uuid
+       AND ${match}
+       AND "type" = ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType"
+       AND "deleted_at" IS NULL
+       FOR NO KEY UPDATE
+  `);
+  return rows[0];
+}
+
 /**
- * La salida de producto terminado hacia un cliente, para UNA combinacion receta-presentacion, sobre
- * la MISMA transaccion de quien llama: bloquea el producto terminado vivo (`FOR NO KEY UPDATE`,
- * como la entrada), lee los lotes pedidos -de ese producto, de la empresa y con contenido de
- * envase-, y por cada lote hace el decremento CONDICIONAL (`stock >= cantidad` en el `where`, como
- * `consumeBatchStock`) de la suma de sus asignaciones y un asiento `delivery` en negativo. Recalcula
- * `products.stock` una sola vez, al final. Devuelve una linea por asignacion, en el orden de entrada.
+ * Lectura con bloqueo, sin escritura, para la entrega sin pedido: bloquea el producto terminado vivo
+ * de la empresa igual que `dispatchFinishedGoods` y, ya bloqueado, lee sus lotes con contenido de
+ * envase. `null` si el id no es un producto terminado vivo de la empresa.
+ */
+export async function lockFinishedProductForDelivery(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  scope: InventoryScope,
+): Promise<{
+  readonly recipeId: string | null;
+  readonly presentationId: string | null;
+  readonly batches: readonly { readonly stock: string; readonly packageContent: string }[];
+} | null> {
+  const product = await lockAliveFinishedProduct(tx, { origin: 'direct', productId }, scope);
+  if (product === undefined) return null;
+
+  const rows = await tx.productBatch.findMany({
+    where: { AND: [batchCompanyScope(scope), { productId: product.id, packageContent: { not: null } }] },
+    select: { stock: true, packageContent: true },
+  });
+  const batches: { stock: string; packageContent: string }[] = [];
+  for (const row of rows) {
+    if (row.packageContent !== null) {
+      batches.push({ stock: row.stock.toFixed(4), packageContent: row.packageContent.toFixed(4) });
+    }
+  }
+  return { recipeId: product.recipeId, presentationId: product.presentationId, batches };
+}
+
+/**
+ * La salida de producto terminado hacia un cliente, de UN producto terminado -el de la combinacion
+ * receta-presentacion de un pedido o el elegido sin pedido-, sobre la MISMA transaccion de quien
+ * llama: bloquea el producto terminado vivo (`FOR NO KEY UPDATE`, como la entrada), lee los lotes
+ * pedidos -de ese producto, de la empresa y con contenido de envase-, y por cada lote hace el
+ * decremento CONDICIONAL (`stock >= cantidad` en el `where`, como `consumeBatchStock`) de la suma de
+ * sus asignaciones y un asiento en negativo: `delivery` con su pedido, o `direct_delivery` sin
+ * pedido. Recalcula `products.stock` una sola vez, al final. Devuelve una linea por asignacion, en
+ * el orden de entrada.
  *
  * No lanza por un lote ausente o corto: lo devuelve, y quien llama deshace la transaccion entera.
  * Un lote de otra empresa, de otro producto o sin contenido sale igual que uno que no existe.
  */
 export async function dispatchFinishedGoods(
   tx: Prisma.TransactionClient,
-  input: {
-    readonly orderId: string;
+  input: FinishedGoodsDispatchOrigin & {
     readonly orderDeliveryId: string;
-    readonly recipeId: string;
-    readonly presentationId: string;
     readonly allocations: readonly { readonly batchId: string; readonly packages: number }[];
     readonly actorId: string;
     readonly now: Date;
   },
   scope: InventoryScope,
 ): Promise<FinishedGoodsDispatchOutcome> {
-  const { companyId } = companyScopeColumns(scope);
   const firstAllocation = input.allocations[0];
   if (firstAllocation === undefined) return { kind: 'dispatched', lines: [] };
 
-  const productRows = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
-    SELECT "id"
-      FROM "products"
-     WHERE "company_id" = ${companyId}::uuid
-       AND "recipe_id" = ${input.recipeId}::uuid
-       AND "presentation_id" = ${input.presentationId}::uuid
-       AND "type" = ${PRODUCT_TYPES.FINISHED_PRODUCT}::"ProductType"
-       AND "deleted_at" IS NULL
-       FOR NO KEY UPDATE
-  `);
-  const product = productRows[0];
+  const product = await lockAliveFinishedProduct(tx, input, scope);
   if (product === undefined) return { kind: 'batch_not_found', batchId: firstAllocation.batchId };
 
   const packagesByBatch = new Map<string, number>();
@@ -1507,10 +1562,10 @@ export async function dispatchFinishedGoods(
       tx,
       {
         batchId,
-        kind: 'delivery',
+        kind: input.origin === 'order' ? 'delivery' : 'direct_delivery',
         quantity: negateQuantity(quantity),
         reason: null,
-        orderId: input.orderId,
+        orderId: input.origin === 'order' ? input.orderId : null,
         orderPresentationLineId: null,
         orderDeliveryId: input.orderDeliveryId,
         createdBy: input.actorId,
@@ -1536,14 +1591,15 @@ export async function dispatchFinishedGoods(
  * La vuelta al lote de lo que salio en una entrega anulada, sobre la MISMA transaccion de quien
  * llama. Los productos se bloquean ordenados por `id` para que dos devoluciones concurrentes no se
  * crucen, y sin mirar `deleted_at`: un producto dado de baja tambien recupera su existencia. El
- * incremento no es condicional porque sumar no puede dejar el lote en negativo.
+ * incremento no es condicional porque sumar no puede dejar el lote en negativo. Con pedido el asiento
+ * es `delivery_void`; con `orderId` nulo -la anulacion de una entrega sin pedido-, `direct_delivery_void`.
  *
  * No lanza por un lote ausente o de otra empresa: lo devuelve, y quien llama deshace todo.
  */
 export async function returnFinishedGoods(
   tx: Prisma.TransactionClient,
   input: {
-    readonly orderId: string;
+    readonly orderId: string | null;
     readonly orderDeliveryVoidId: string;
     readonly lines: readonly { readonly batchId: string; readonly quantity: string }[];
     readonly actorId: string;
@@ -1589,7 +1645,7 @@ export async function returnFinishedGoods(
       tx,
       {
         batchId,
-        kind: 'delivery_void',
+        kind: input.orderId === null ? 'direct_delivery_void' : 'delivery_void',
         quantity,
         reason: null,
         orderId: input.orderId,

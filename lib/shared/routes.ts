@@ -309,9 +309,22 @@ export const CANCELLED_ORDER_PARAM = 'cancelado';
  */
 export const CUSTOMERS_ROUTE = '/clientes';
 
+/** Sin fila propia en `PRIVATE_ROUTE_PREFIXES`: la de `CUSTOMERS_ROUTE` ya la cubre por segmentos. */
+export const CUSTOMER_CONTACTS_ROUTE = `${CUSTOMERS_ROUTE}/contactos`;
+
 export const AI_PROVIDER_INTEGRATION_ROUTE = '/integraciones/proveedor-ia';
 export const INVENTORY_INTEGRATION_ROUTE = '/integraciones/inventarios';
 export const WHATSAPP_INTEGRATION_ROUTE = '/integraciones/whatsapp';
+
+// Sin constante para `/maestro`: no hay pantalla en esa dirección, como pasa con `/configuracion`.
+export const MAESTRO_COMPANIES_ROUTE = '/maestro/empresas';
+
+export function maestroCompanyRoute(id: string, tab?: 'datos' | 'modulos' | 'historial'): string {
+  const base = `${MAESTRO_COMPANIES_ROUTE}/${id}`;
+  return tab === undefined ? base : `${base}?tab=${tab}`;
+}
+
+export const MAESTRO_ADMINISTRATORS_ROUTE = '/maestro/administradores';
 
 /**
  * Prefijos de URL que cuelgan de `app/(private)/` y, por tanto, exigen sesion valida (R1).
@@ -360,6 +373,9 @@ export const PRIVATE_ROUTE_PREFIXES = [
   AI_PROVIDER_INTEGRATION_ROUTE,
   INVENTORY_INTEGRATION_ROUTE,
   WHATSAPP_INTEGRATION_ROUTE,
+  // Cubre también el detalle `/maestro/empresas/<id>`: la comparación es por segmentos.
+  MAESTRO_COMPANIES_ROUTE,
+  MAESTRO_ADMINISTRATORS_ROUTE,
 ] as const;
 
 /** Ruta publica del webhook de WhatsApp: Meta la llama sin sesion, con el id de la conexion al final. */

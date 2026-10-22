@@ -1,4 +1,6 @@
-import type { CompanyDetail, CompanyEventView, CompanyRow } from '../domain/company-view';
+import type { CountryCode } from 'libphonenumber-js';
+
+import type { CompanyDetail, CompanyEventView, CompanyListRecord } from '../domain/company-view';
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 
@@ -21,8 +23,10 @@ export type CompanyDuplicate = 'duplicate_name' | 'duplicate_tax_id';
 // Cada escritura deja su evento de historial en la misma transaccion. No hay ningun metodo que
 // modifique ni borre un evento.
 export interface CompanyRepository {
+  /** `country` ausente es «sin pais». Se guarda en la misma fila que se crea: no deja evento propio. */
   createWithAdministrator(input: {
     readonly company: CompanyWrite;
+    readonly country?: CountryCode | null;
     readonly administrator: NewAdministrator;
     readonly actorId: string;
     readonly now: Date;
@@ -55,7 +59,7 @@ export interface CompanyRepository {
     readonly now: Date;
   }): Promise<'ok' | 'not_found' | 'not_deleted' | CompanyDuplicate>;
 
-  list(query: ListQuery): Promise<Page<CompanyRow>>;
+  list(query: ListQuery): Promise<Page<CompanyListRecord>>;
 
   findById(companyId: string): Promise<CompanyDetail | null>;
 

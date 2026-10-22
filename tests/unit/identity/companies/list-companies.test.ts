@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createListCompanies, type CompanyRow, type PlatformActor } from '@/lib/modules/identity';
 
+import type { CompanyListRecord } from '@/lib/modules/identity/domain/company-view';
 import type { Page } from '@/lib/modules/identity/domain/page';
 import type { CompanyRepository } from '@/lib/modules/identity/ports/company-repository';
 import type { ListQueryLog } from '@/lib/modules/identity/ports/list-query-log';
@@ -12,18 +13,28 @@ const MAESTRO: PlatformActor = {
   permissions: ['empresas.consultar', 'empresas.modificar'],
 };
 
+const DATOS_DE_FILA = {
+  id: '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13',
+  name: 'QuimiCloud',
+  taxId: '900',
+  contactEmail: 'contacto@quimicloud.co',
+  contactPhone: '+57 300 000 0000',
+  country: 'CO',
+  liveUserCount: 3,
+  createdAt: new Date('2026-09-04T00:00:00.000Z'),
+  status: 'active',
+} as const;
+
+const PAGINA_DEL_PUERTO: Page<CompanyListRecord> = {
+  items: [{ ...DATOS_DE_FILA, storedAddons: ['proveedores', 'dashboard'] }],
+  total: 1,
+  page: 1,
+  pageSize: 10,
+  totalPages: 1,
+};
+
 const PAGINA: Page<CompanyRow> = {
-  items: [
-    {
-      id: '7c1e0f52-8a3d-4b6e-9f21-5d0c4a8e7b13',
-      name: 'QuimiCloud',
-      taxId: '900',
-      country: 'CO',
-      liveUserCount: 3,
-      createdAt: new Date('2026-09-04T00:00:00.000Z'),
-      status: 'active',
-    },
-  ],
+  items: [{ ...DATOS_DE_FILA, activeAddons: ['dashboard', 'proveedores'] }],
   total: 1,
   page: 1,
   pageSize: 10,
@@ -51,7 +62,7 @@ function repositorio(overrides: Partial<CompanyRepository> = {}): CompanyReposit
 }
 
 function setup() {
-  const list = vi.fn<CompanyRepository['list']>(async () => PAGINA);
+  const list = vi.fn<CompanyRepository['list']>(async () => PAGINA_DEL_PUERTO);
   const ignoredFields = vi.fn<ListQueryLog['ignoredFields']>();
   const companies = repositorio({ list });
   const listCompanies = createListCompanies({ companies, log: { ignoredFields } });
@@ -96,14 +107,51 @@ describe('listCompanies', () => {
     const { listCompanies, list } = setup();
     const sinEmpresa: PlatformActor = { id: MAESTRO.id, permissions: ['empresas.consultar'] };
 
-    await expect(listCompanies(sinEmpresa, {})).resolves.toBe(PAGINA);
+    await expect(listCompanies(sinEmpresa, {})).resolves.toEqual(PAGINA);
     expect(list).toHaveBeenCalledTimes(1);
   });
 
-  it('R29: devuelve la pagina del puerto tal cual', async () => {
+  it('R29: devuelve la pagina del puerto con los añadidos ya resueltos', async () => {
     const { listCompanies } = setup();
 
     await expect(listCompanies(MAESTRO, {})).resolves.toEqual(PAGINA);
+  });
+
+  it('cada fila lleva el correo y el telefono de contacto del puerto, tambien vacios', async () => {
+    const list = vi.fn<CompanyRepository['list']>(async () => ({
+      ...PAGINA_DEL_PUERTO,
+      items: [
+        PAGINA_DEL_PUERTO.items[0]!,
+        { ...DATOS_DE_FILA, id: 'otra', contactEmail: null, contactPhone: null, storedAddons: [] },
+      ],
+    }));
+    const listCompanies = createListCompanies({ companies: repositorio({ list }), log: { ignoredFields: vi.fn() } });
+
+    const { items } = await listCompanies(MAESTRO, {});
+
+    expect(items.map(({ contactEmail, contactPhone }) => ({ contactEmail, contactPhone }))).toEqual([
+      { contactEmail: 'contacto@quimicloud.co', contactPhone: '+57 300 000 0000' },
+      { contactEmail: null, contactPhone: null },
+    ]);
+    expect(items.every((item) => !('storedAddons' in item))).toBe(true);
+  });
+
+  it.each([
+    { caso: 'ninguno guardado', stored: [], activos: [] },
+    { caso: 'en el orden del catalogo, no en el guardado', stored: ['integraciones', 'dashboard'], activos: ['dashboard', 'integraciones'] },
+    { caso: 'sin su dependencia no cuenta', stored: ['lectura_pdf', 'proveedores'], activos: ['proveedores'] },
+    { caso: 'con su dependencia si cuenta', stored: ['lectura_pdf', 'integraciones'], activos: ['lectura_pdf', 'integraciones'] },
+    { caso: 'claves desconocidas o repetidas se ignoran', stored: ['planes', 'dashboard', 'dashboard'], activos: ['dashboard'] },
+  ])('activeAddons: $caso', async ({ stored, activos }) => {
+    const list = vi.fn<CompanyRepository['list']>(async () => ({
+      ...PAGINA_DEL_PUERTO,
+      items: [{ ...DATOS_DE_FILA, storedAddons: stored }],
+    }));
+    const listCompanies = createListCompanies({ companies: repositorio({ list }), log: { ignoredFields: vi.fn() } });
+
+    const { items } = await listCompanies(MAESTRO, {});
+
+    expect(items[0]?.activeAddons).toEqual(activos);
   });
 
   it('R30, R32: una consulta vacia llega al puerto con los defectos y sin filtros', async () => {

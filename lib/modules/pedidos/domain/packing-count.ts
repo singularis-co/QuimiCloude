@@ -4,7 +4,12 @@
 import { MOVEMENT_REASONS, STOCK_INCREASE_REASONS } from '@/lib/modules/inventario';
 import type { UnitConversion } from '@/lib/modules/unidades';
 
-import { sumInOrderUnit, validateDistribution, type SumInOrderUnitResult } from './order-distribution';
+import {
+  compareDecimals,
+  sumInOrderUnit,
+  validateDistribution,
+  type SumInOrderUnitResult,
+} from './order-distribution';
 
 /** Motivos validos cuando salen menos envases que el plan. */
 export const PACKING_DIFFERENCE_REASONS = [...MOVEMENT_REASONS, 'otro'] as const;
@@ -99,9 +104,18 @@ export function checkPackingCounts(
   return { kind: 'invalid', missingLineIds, unexpectedLineIds, lineErrors };
 }
 
-/** Los envases que cuentan para entregar, acondicionar y consultar: sin conteo guardado, el plan. */
+/** Los envases reales de la linea, para acondicionar y consultar: sin conteo guardado, el plan. */
 export function effectivePackages(line: { readonly packages: number; readonly packedPackages: number | null }): number {
   return line.packedPackages ?? line.packages;
+}
+
+/** Los libres siguen en la existencia del lote, pero el pedido no los espera al entregar. */
+export function orderedPackages(line: {
+  readonly packages: number;
+  readonly packedPackages: number | null;
+  readonly packedSurplusPackages: number;
+}): number {
+  return effectivePackages(line) - line.packedSurplusPackages;
 }
 
 export type PackedDistributionLine = {
@@ -129,38 +143,104 @@ export function packedTotalInOrderUnit(
   return sumInOrderUnit(orderUnit, toDistributionLines(lines));
 }
 
+export type SurplusLine = PackedDistributionLine & { readonly plan: number };
+
+export type PackingSurplus =
+  | {
+      readonly kind: 'ok';
+      /** Envasado menos la cantidad, en la unidad del pedido; `'0'` si no la supera. */
+      readonly excess: string;
+      /** Envases libres por `lineId`: estan todas las lineas, con 0 si no dejan libres. */
+      readonly byLine: ReadonlyMap<string, number>;
+    }
+  | { readonly kind: 'presentation_without_content'; readonly presentationId: string }
+  | { readonly kind: 'incompatible_units'; readonly presentationId: string };
+
+function onePackageContent(orderUnit: UnitConversion, line: PackedDistributionLine): SumInOrderUnitResult {
+  return sumInOrderUnit(orderUnit, toDistributionLines([{ ...line, packedPackages: 1 }]));
+}
+
+export type LargestPackageFirst<T> =
+  | { readonly kind: 'ok'; readonly lines: readonly T[] }
+  | { readonly kind: 'presentation_without_content'; readonly presentationId: string }
+  | { readonly kind: 'incompatible_units'; readonly presentationId: string };
+
 /**
- * El mayor numero de envases de `lineId` que, con las demas lineas como estan, no supera la
- * cantidad del pedido. `null` si ni con 0 cabe, o si alguna linea no se puede convertir.
+ * `lines` de mayor a menor contenido por envase en la unidad del pedido y, a igual contenido, en
+ * su orden. Es el orden en que se reparte el excedente; quien lo muestre lo reutiliza para no
+ * contar los libres en un orden distinto del que los fijo.
  */
-export function maxPackagesForLine(
-  quantity: string,
+export function largestPackageFirst<T extends PackedDistributionLine>(
   orderUnit: UnitConversion,
-  lines: readonly PackedDistributionLine[],
-  lineId: string,
-): number | null {
-  if (!lines.some((line) => line.lineId === lineId)) return null;
-
-  const fits = (packages: number): boolean =>
-    validateDistribution(
-      quantity,
-      orderUnit,
-      toDistributionLines(lines.map((line) => (line.lineId === lineId ? { ...line, packedPackages: packages } : line))),
-    ).kind === 'ok';
-
-  if (!fits(0)) return null;
-
-  let low = 0;
-  let high = 1;
-  while (fits(high)) {
-    if (high >= Number.MAX_SAFE_INTEGER) return Number.MAX_SAFE_INTEGER;
-    low = high;
-    high = Math.min(high * 2, Number.MAX_SAFE_INTEGER);
+  lines: readonly T[],
+): LargestPackageFirst<T> {
+  const withContent: { readonly line: T; readonly content: string }[] = [];
+  for (const line of lines) {
+    const content = onePackageContent(orderUnit, line);
+    if (content.kind !== 'ok') return content;
+    withContent.push({ line, content: content.total });
   }
+  // `sort` es estable: a igual contenido se conserva el orden de `lines`.
+  withContent.sort((a, b) => compareDecimals(b.content, a.content));
+  return { kind: 'ok', lines: withContent.map(({ line }) => line) };
+}
+
+/** El mayor numero de envases sobre el plan de `line` que cabe en `remaining`, y lo que sobra. */
+function largestFitting(
+  remaining: string,
+  orderUnit: UnitConversion,
+  line: SurplusLine,
+): { readonly packages: number; readonly available: string } {
+  let low = 0;
+  let available = remaining;
+  let high = line.packedPackages - line.plan + 1;
   while (high - low > 1) {
     const middle = low + Math.floor((high - low) / 2);
-    if (fits(middle)) low = middle;
-    else high = middle;
+    const result = validateDistribution(
+      remaining,
+      orderUnit,
+      toDistributionLines([{ ...line, packedPackages: middle }]),
+    );
+    if (result.kind === 'ok') {
+      low = middle;
+      available = result.available;
+    } else {
+      high = middle;
+    }
   }
-  return low;
+  return { packages: low, available };
+}
+
+/**
+ * Que envases reales no espera el pedido. Solo salen de lineas por encima de su plan, en envases
+ * enteros y sin pasar del excedente; se reparten primero a la de mayor contenido por envase y, a
+ * igual contenido, en el orden de `lines`. Lo que no llega a un envase entero sigue en el pedido.
+ */
+export function packingSurplusByLine(
+  quantity: string,
+  orderUnit: UnitConversion,
+  lines: readonly SurplusLine[],
+): PackingSurplus {
+  const checked = validateDistribution(quantity, orderUnit, toDistributionLines(lines));
+  if (checked.kind === 'presentation_without_content' || checked.kind === 'incompatible_units') return checked;
+
+  const byLine = new Map<string, number>(lines.map((line) => [line.lineId, 0]));
+  if (checked.kind !== 'exceeds_quantity') return { kind: 'ok', excess: '0', byLine };
+
+  // `validateDistribution` da el disponible en negativo cuando se supera la cantidad.
+  const excess = checked.available.slice(1);
+
+  const candidates = largestPackageFirst(
+    orderUnit,
+    lines.filter((line) => line.packedPackages > line.plan),
+  );
+  if (candidates.kind !== 'ok') return candidates;
+
+  let remaining = excess;
+  for (const line of candidates.lines) {
+    const fitted = largestFitting(remaining, orderUnit, line);
+    byLine.set(line.lineId, fitted.packages);
+    remaining = fitted.available;
+  }
+  return { kind: 'ok', excess, byLine };
 }

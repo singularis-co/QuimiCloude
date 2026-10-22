@@ -56,9 +56,9 @@ const CASOS_DE_USO_QUE_LO_EXIGEN = [
   'lib/modules/asignaciones/domain/list-conditioned-orders.ts',
   'lib/modules/asignaciones/domain/get-conditioning-order.ts',
   'lib/modules/asignaciones/domain/list-conditioning-team-candidates.ts',
-  // 2026-10-09 (QC-219 R26): guardar los datos de lote y listar «Entregados».
+  // 2026-10-09 (QC-219 R26): guardar los datos de lote. 2026-10-19 (QC-301 R6): sale el caso de
+  // uso de listar «Entregados», que se borro.
   'lib/modules/asignaciones/domain/save-conditioning-batch-data.ts',
-  'lib/modules/asignaciones/domain/list-delivered-conditioned-orders.ts',
   // 2026-10-21 (QC-299 R21, R31): las fotos de la fase de acondicionamiento y completar sus pasos.
   'lib/modules/asignaciones/domain/evidence-target.ts',
   'lib/modules/asignaciones/domain/record-conditioning-step.ts',
@@ -238,8 +238,10 @@ describe('R17, R21 — solo el catalogo, los casos de uso del acondicionamiento 
     ...CONSUMIDORES_QUE_NO_SON_CASO_DE_USO,
   ];
 
-  it('R21, R31, QC-219 R26, QC-299 R31: son catorce rutas exactas: los dos catalogos (permisos y anadidos), diez casos de uso (con los candidatos del equipo, guardar los datos de lote, «Entregados», las fotos y los pasos de acondicionamiento) y dos consumidores', () => {
-    expect(new Set(permitidos).size).toBe(14);
+  // Merge de dev en QC-299 (2026-10-21): 13 = 11 que deja QC-301 + las fotos y los pasos de
+  // acondicionamiento de QC-299.
+  it('R21, R31, QC-219 R26, QC-301 R6, QC-299 R31: son trece rutas exactas: los dos catalogos (permisos y anadidos), nueve casos de uso (con los candidatos del equipo, guardar los datos de lote, las fotos y los pasos de acondicionamiento) y dos consumidores', () => {
+    expect(new Set(permitidos).size).toBe(13);
   });
 
   it('R17, R21: el codigo solo aparece en el catalogo de permisos y en las rutas exactas abiertas', () => {

@@ -482,6 +482,9 @@ const CASOS_DE_USO: ReadonlyArray<{
         products: repos.products,
         people: repos.people,
         orders: repos.orders,
+        // 2026-10-16 (QC-288): los clientes de las entregas sin pedido; el permiso va antes.
+        deliveryCustomers: { findCustomerIds: vi.fn(async () => new Map<string, readonly string[]>()) },
+        customers: { findRefsIncludingDeleted: vi.fn(async () => []) },
       })('lote-1', actor),
     invocarConEntradaInvalida: null,
   },

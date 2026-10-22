@@ -57,6 +57,8 @@ export {
   PENDING_DELIVERY_COLUMN_ID,
   PENDING_DELIVERY_TESTID,
   PRESENTATION_NAME_COLUMN_ID,
+  PRODUCTION_COST_COLUMN_ID,
+  PRODUCTION_COST_TESTID,
   RECIPE_NAME_COLUMN_ID,
   RESPONSIBLES_COLUMN_ID,
   buildOrderColumns,
@@ -110,7 +112,7 @@ export {
   type OrderDeliveryBlockPresentation,
   type OrderDeliveryCustomerBlockLabels,
   type OrderDeliveryCustomerBlockProps,
-} from './order-delivery-customer-block';
+} from '@/components/shared/order-delivery-customer-block';
 export {
   ORDER_DELIVERY_LINE_COMPLETE_TESTID,
   ORDER_DELIVERY_LINE_EXCEEDS_TESTID,
@@ -169,7 +171,7 @@ export {
   orderCustomerChoiceLabel,
   orderCustomerLabel,
   type OrderCustomerChoice,
-} from './order-customer-label';
+} from '@/components/shared/order-customer-label';
 export {
   ORDER_CUSTOMER_DIALOG_DISMISS_TESTID,
   ORDER_CUSTOMER_DIALOG_ERROR_TESTID,
@@ -191,7 +193,7 @@ export {
   ORDER_CUSTOMER_PICKER_TOUCH_CLASSES,
   OrderCustomerPicker,
   type OrderCustomerPickerProps,
-} from './order-customer-picker';
+} from '@/components/shared/order-customer-picker';
 export { divideDecimal, multiplyDecimal, subtractDecimal } from './order-decimal';
 export {
   lineCoverage,

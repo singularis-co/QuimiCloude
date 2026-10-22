@@ -39,6 +39,10 @@ import {
   type OrderView,
   type Page,
   type VoidDeliveryResult,
+  type DeliverDirectResult,
+  type DirectDeliveryView,
+  type DirectDeliveryVoidView,
+  type VoidDirectDeliveryResult,
 } from '@/lib/modules/pedidos';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -613,6 +617,99 @@ export async function voidDeliveryAction(input: unknown): Promise<VoidDeliveryAc
 
   try {
     const data = await pedidos.voidDelivery(input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// La entrega sin pedido y su anulacion.
+// ---------------------------------------------------------------------------------------------
+
+export type DirectDeliveryResult = { status: 'success'; data: DirectDeliveryView } | ErrorState;
+
+/** Lo que el sheet de entrega sin pedido pinta de un producto terminado. */
+export async function getDirectDeliveryAction(productId: string): Promise<DirectDeliveryResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.getDirectDelivery(productId, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Plano y serializable: `productId -> envases de excedente`. */
+export type DirectDeliverySurplusResult = { status: 'success'; data: Readonly<Record<string, number>> } | ErrorState;
+
+export async function listDirectDeliverySurplusAction(
+  productIds: readonly string[],
+): Promise<DirectDeliverySurplusResult> {
+  const actor = await currentActor();
+
+  try {
+    const surplus = await pedidos.listDirectDeliverySurplus(productIds, actor);
+    return { status: 'success', data: Object.fromEntries(surplus) };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type DeliverDirectInput = {
+  readonly productId: string;
+  readonly deliveryKey: string;
+  readonly note: string | null;
+  readonly customers: readonly {
+    readonly customerId: string;
+    readonly allocations: readonly { readonly batchId: string; readonly packages: number }[];
+  }[];
+};
+
+export type DeliverDirectActionResult = { status: 'success'; data: DeliverDirectResult } | ErrorState;
+
+/** Registra una entrega sin pedido. `input` tiene la forma de `DeliverDirectInput`; la valida el caso de uso. */
+export async function deliverDirectAction(input: unknown): Promise<DeliverDirectActionResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.deliverDirect(input, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type DirectDeliveryVoidViewResult = { status: 'success'; data: DirectDeliveryVoidView } | ErrorState;
+
+/** Lo que el dialogo de anular pinta de una entrega sin pedido. */
+export async function getDirectDeliveryForVoidAction(deliveryId: string): Promise<DirectDeliveryVoidViewResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.getDirectDeliveryForVoid(deliveryId, actor);
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type VoidDirectDeliveryInput = {
+  readonly deliveryId: string;
+  readonly voidKey: string;
+  readonly customerIds: readonly string[];
+  readonly reason: string;
+};
+
+export type VoidDirectDeliveryActionResult = { status: 'success'; data: VoidDirectDeliveryResult } | ErrorState;
+
+/** Anula la parte de unos clientes de una entrega sin pedido. `input` tiene la forma de `VoidDirectDeliveryInput`. */
+export async function voidDirectDeliveryAction(input: unknown): Promise<VoidDirectDeliveryActionResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await pedidos.voidDirectDelivery(input, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

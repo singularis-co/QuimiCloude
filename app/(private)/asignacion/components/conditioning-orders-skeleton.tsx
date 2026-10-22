@@ -16,10 +16,6 @@ const SKELETON_SHAPE = {
     columnCount: FINISHED_ORDERS_SKELETON_COLUMN_COUNT,
     label: 'Cargando pedidos terminados…',
   },
-  acondicionados_entregados: {
-    columnCount: FINISHED_ORDERS_SKELETON_COLUMN_COUNT,
-    label: 'Cargando pedidos entregados…',
-  },
 } as const;
 
 export type ConditioningOrdersSkeletonProps = {
@@ -28,7 +24,7 @@ export type ConditioningOrdersSkeletonProps = {
   readonly list: keyof typeof SKELETON_SHAPE;
 };
 
-/** El esqueleto de las tres tablas del acondicionador. */
+/** El esqueleto de las dos tablas del acondicionador. */
 export function ConditioningOrdersSkeleton({ rows, list }: ConditioningOrdersSkeletonProps) {
   const { columnCount, label } = SKELETON_SHAPE[list];
 

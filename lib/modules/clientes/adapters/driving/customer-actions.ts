@@ -64,7 +64,8 @@ function buildCustomerCandidate(formData: FormData): unknown {
     firstNames: readFormString(formData, 'firstNames'),
     lastNames: readFormString(formData, 'lastNames'),
     city: readFormString(formData, 'city'),
-    phone: readOptionalFormString(formData, 'phone'),
+    phoneCountry: readOptionalFormString(formData, 'phoneCountry'),
+    phoneNumber: readOptionalFormString(formData, 'phoneNumber'),
     email: readOptionalFormString(formData, 'email'),
     address: readOptionalFormString(formData, 'address'),
   };

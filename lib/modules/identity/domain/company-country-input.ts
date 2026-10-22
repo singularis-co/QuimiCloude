@@ -11,9 +11,11 @@ const countryCodeSchema = z.custom<CountryCode>(
 
 // `''` es «sin pais». Un campo ausente o `null` no pasa, para que un formulario que no manda el
 // campo no vacie el pais por accidente.
+export const companyCountrySchema = z.union([z.literal('').transform(() => null), countryCodeSchema]);
+
 export const setCompanyCountrySchema = z.strictObject({
   companyId: z.string().uuid(),
-  country: z.union([z.literal('').transform(() => null), countryCodeSchema]),
+  country: companyCountrySchema,
 });
 
 export type SetCompanyCountryInput = z.output<typeof setCompanyCountrySchema>;

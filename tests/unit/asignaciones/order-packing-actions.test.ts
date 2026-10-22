@@ -13,7 +13,6 @@ import {
   OrderNotPackableError,
   OrderPackingTakenError,
   PackagingStockInsufficientError,
-  PackedExceedsQuantityError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/asignaciones';
@@ -204,7 +203,6 @@ describe('finishPackingAction — conteo real de envases en `lines` (QC-281)', (
   });
 
   it.each([
-    [new PackedExceedsQuantityError(), 'packed_exceeds_quantity', 'Lo envasado supera la cantidad del pedido.'],
     [new PackagingStockInsufficientError(), 'packaging_stock_insufficient', 'No alcanza el stock del envase.'],
   ] as const)('R13: el rechazo del servidor se traduce por su `code` %s y no redirige', async (error, code, message) => {
     finishPackingMock.mockRejectedValue(error);

@@ -37,6 +37,7 @@ import {
   updateCompanyAction,
 } from '@/lib/modules/identity/adapters/driving/company-actions';
 
+import type { CompanyListRecord } from '@/lib/modules/identity/domain/company-view';
 import type { CompanyAddonRepository } from '@/lib/modules/identity/ports/company-addon-repository';
 import type { CompanyCountryRepository } from '@/lib/modules/identity/ports/company-country-repository';
 import type { CompanyRepository } from '@/lib/modules/identity/ports/company-repository';
@@ -255,10 +256,13 @@ const FILA: CompanyRow = {
   id: COMPANY_ID,
   name: 'Quimi Cloud',
   taxId: '900.123.456-7',
+  contactEmail: null,
+  contactPhone: null,
   country: 'CO',
   liveUserCount: 3,
   createdAt: new Date('2026-10-01T00:00:00.000Z'),
   status: 'active',
+  activeAddons: [],
 };
 
 const PAGINA_DE_EMPRESAS: Page<CompanyRow> = {
@@ -267,6 +271,24 @@ const PAGINA_DE_EMPRESAS: Page<CompanyRow> = {
   page: 1,
   pageSize: 10,
   totalPages: 1,
+};
+
+const PAGINA_DEL_PUERTO: Page<CompanyListRecord> = {
+  ...PAGINA_DE_EMPRESAS,
+  items: [
+    {
+      id: FILA.id,
+      name: FILA.name,
+      taxId: FILA.taxId,
+      contactEmail: FILA.contactEmail,
+      contactPhone: FILA.contactPhone,
+      country: FILA.country,
+      liveUserCount: FILA.liveUserCount,
+      createdAt: FILA.createdAt,
+      status: FILA.status,
+      storedAddons: [],
+    },
+  ],
 };
 
 const FICHA: CompanyDetail = {
@@ -318,7 +340,7 @@ function cablearEmpresas(): Puertos {
     update: vi.fn<CompanyRepository['update']>(async () => 'ok'),
     softDelete: vi.fn<CompanyRepository['softDelete']>(async () => 'ok'),
     reactivate: vi.fn<CompanyRepository['reactivate']>(async () => 'ok'),
-    list: vi.fn<CompanyRepository['list']>(async () => PAGINA_DE_EMPRESAS),
+    list: vi.fn<CompanyRepository['list']>(async () => PAGINA_DEL_PUERTO),
     findById: vi.fn<CompanyRepository['findById']>(async () => FICHA),
     countLiveUsersOfAlive: vi.fn<CompanyRepository['countLiveUsersOfAlive']>(async () => 4),
     listEvents: vi.fn<CompanyRepository['listEvents']>(async () => PAGINA_DE_EVENTOS),
@@ -492,6 +514,7 @@ describe('createCompanyAction', () => {
         documentNumber: '123456',
         username: 'ana.perez',
       },
+      country: null,
     });
     expect(puertos.companies.createWithAdministrator).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -503,6 +526,32 @@ describe('createCompanyAction', () => {
     expect(puertos.issueForPendingUser).toHaveBeenCalledWith(
       expect.objectContaining({ userId: ADMIN_ID, companyId: COMPANY_ID }),
     );
+  });
+
+  it('country: el campo country del formulario llega al caso de uso y el alta guarda el pais', async () => {
+    const resultado = await createCompanyAction(
+      IDLE,
+      formData({ ...CAMPOS_EMPRESA, ...CAMPOS_ADMINISTRADOR, country: 'CO' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'success', companyId: COMPANY_ID });
+    expect(puertos.casos.createCompany).toHaveBeenCalledWith(
+      ACTOR_DE_SESION,
+      expect.objectContaining({ country: 'CO' }),
+    );
+    expect(puertos.companies.createWithAdministrator).toHaveBeenCalledWith(
+      expect.objectContaining({ country: 'CO' }),
+    );
+  });
+
+  it('country: un pais invalido responde invalid_input sin tocar ningun puerto', async () => {
+    const resultado = await createCompanyAction(
+      IDLE,
+      formData({ ...CAMPOS_EMPRESA, ...CAMPOS_ADMINISTRADOR, country: 'XX' }),
+    );
+
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    ningunPuertoTocado();
   });
 
   it('R3, R15: el correo fallido sale como mail failed dentro del exito', async () => {
@@ -559,7 +608,8 @@ describe('createCompanyAction', () => {
       company: Record<string, unknown>;
       administrator: Record<string, unknown>;
     };
-    expect(Object.keys(entrada).sort()).toEqual(['administrator', 'company']);
+    expect(Object.keys(entrada).sort()).toEqual(['administrator', 'company', 'country']);
+    expect(entrada).toHaveProperty('country', 'CO');
     expect(Object.keys(entrada.company).sort()).toEqual(
       ['contactEmail', 'contactPhone', 'name', 'taxId'].sort(),
     );

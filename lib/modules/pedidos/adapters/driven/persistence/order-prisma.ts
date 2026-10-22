@@ -22,13 +22,13 @@ import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-
 import type { Page } from '../../../domain/page';
 import type { StoredOrderCost } from '../../../domain/order-cost';
 import type { OrderScope } from '../../../domain/order-scope';
-import type { PackedLineCount } from '../../../domain/packing-count';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../../../domain/order-view';
 import type {
   FinishPackingLine,
   FinishPackingUpdateOutcome,
   LockedOrderRow,
   OrderWriteRepository,
+  RecordedPackedLine,
 } from '../../../ports/order-write-repository';
 import type { OrderConditioningRepository } from '../../../ports/order-conditioning-repository';
 import type { OrderPackingRepository } from '../../../ports/order-packing-repository';
@@ -77,6 +77,7 @@ const ORDER_SELECT = {
   status: true,
   cancellationReason: true,
   ingredientsCost: true,
+  packagingCost: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -126,6 +127,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     // `null` sigue `null`: nunca se convierte en `'0.0000'`, `fromDecimal` solo se llama si hay
     // valor.
     ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
+    packagingCost: row.packagingCost === null ? null : fromDecimal(row.packagingCost),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -655,7 +657,6 @@ export async function softDeleteAliveOrder(
 type LockedOrderIdRow = {
   readonly id: string;
   readonly reserved_at: Date | null;
-  readonly packaging_cost: string | null;
 };
 
 /**
@@ -670,7 +671,7 @@ async function lockAliveOrderById(
 ): Promise<LockedOrderRow | null> {
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<LockedOrderIdRow>>(Prisma.sql`
-    SELECT "id", "reserved_at", "packaging_cost"::text AS "packaging_cost"
+    SELECT "id", "reserved_at"
       FROM "orders"
      WHERE "id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -682,11 +683,7 @@ async function lockAliveOrderById(
 
   const row = await tx.order.findUnique({ where: { id: alive.id }, select: ORDER_SELECT });
   if (row === null) return null;
-  return {
-    ...toOrderRow(row),
-    reservedAt: alive.reserved_at,
-    packagingCost: alive.packaging_cost === null ? null : fromDecimal(toDecimalInput(alive.packaging_cost)),
-  };
+  return { ...toOrderRow(row), reservedAt: alive.reserved_at };
 }
 
 /**
@@ -760,6 +757,7 @@ async function insertAliveOrder(
     status: data.status,
     cancellationReason: null,
     ingredientsCost: cost === null ? null : fromDecimal(toDecimalInput(cost.total)),
+    packagingCost: cost === null ? null : fromDecimal(toDecimalInput(cost.packaging)),
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,
@@ -1184,6 +1182,7 @@ type FinishPackingLineRow = {
   readonly presentation_content: string | null;
   readonly packaging_product_id: string | null;
   readonly packed_packages: number | null;
+  readonly packed_surplus_packages: number;
 };
 
 async function findPresentationLinesForFinishOrder(
@@ -1194,7 +1193,7 @@ async function findPresentationLinesForFinishOrder(
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
     SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content",
-           "packaging_product_id", "packed_packages"
+           "packaging_product_id", "packed_packages", "packed_surplus_packages"
       FROM "order_presentation_lines"
      WHERE "order_id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -1208,12 +1207,13 @@ async function findPresentationLinesForFinishOrder(
     presentationContent: row.presentation_content,
     packagingProductId: row.packaging_product_id,
     packedPackages: row.packed_packages,
+    packedSurplusPackages: row.packed_surplus_packages,
   }));
 }
 
 async function recordPackedCountsForOrder(
   id: string,
-  counts: readonly PackedLineCount[],
+  counts: readonly RecordedPackedLine[],
   scope: OrderScope,
   tx: PrismaLike,
 ): Promise<void> {
@@ -1223,7 +1223,8 @@ async function recordPackedCountsForOrder(
       UPDATE "order_presentation_lines"
          SET "packed_packages" = ${count.packedPackages}::integer,
              "packed_reason" = ${count.reason}::text,
-             "packed_reason_other" = ${count.reasonOther === null ? null : count.reasonOther.trim()}::text
+             "packed_reason_other" = ${count.reasonOther === null ? null : count.reasonOther.trim()}::text,
+             "packed_surplus_packages" = ${count.packedSurplusPackages}::integer
        WHERE "id" = ${count.lineId}::uuid
          AND "order_id" = ${id}::uuid
          AND "company_id" = ${companyId}::uuid

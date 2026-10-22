@@ -23,14 +23,18 @@
     "asignaciones/responsible-eligibility.int.test.ts",
     "asignaciones/step-evidence-constraints.int.test.ts",
     "asignaciones/unassign.int.test.ts",
+    "clientes/customer-phone-numbers-migration.int.test.ts",
     "clientes/customers-constraints.int.test.ts",
     "clientes/customers-migration.int.test.ts",
+    "clientes/customers-phone-migration.int.test.ts",
     "clientes/customers-search-migration.int.test.ts",
     "documentos/document-batches-and-files-constraints.int.test.ts",
     "identity/administrator.int.test.ts",
     "identity/company-addons.int.test.ts",
+    "identity/company-country-read.int.test.ts",
     "identity/company-country.int.test.ts",
     "identity/company-directory-addons.int.test.ts",
+    "identity/company-membership.int.test.ts",
     "identity/company.int.test.ts",
     "identity/conditioning-role-migration.int.test.ts",
     "identity/delivery-permission-migration.int.test.ts",
@@ -41,10 +45,14 @@
     "identity/identity-seed.int.test.ts",
     "identity/integrations-permission-migration.int.test.ts",
     "identity/maestro-migration.int.test.ts",
+    "identity/notifications-addon-migration.int.test.ts",
     "identity/packer-role-migration.int.test.ts",
     "identity/packing-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
+    "integraciones/whatsapp-messages-migration.int.test.ts",
+    "integraciones/whatsapp-template-migration.int.test.ts",
+    "integraciones/whatsapp-variable-keys-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
@@ -57,6 +65,8 @@
     "inventario/qc195-packaging-constraints.int.test.ts",
     "inventario/reservations-and-decimal-stock-migration.int.test.ts",
     "inventario/reserve-existing-orders-migration.int.test.ts",
+    "notificaciones/notification-inbox.int.test.ts",
+    "notificaciones/notifications-schema.int.test.ts",
     "pedidos/company-scope.int.test.ts",
     "pedidos/order-company-stats.int.test.ts",
     "pedidos/order-conditioning-constraints.int.test.ts",
@@ -88,7 +98,9 @@
     "recetas/recipe-versions-constraints.int.test.ts",
     "unidades/mass-volume-bridge.int.test.ts",
     "unidades/unidades-constraints.int.test.ts",
-    "inventario/product-batch-production-date-migration.int.test.ts"
+    "inventario/product-batch-production-date-migration.int.test.ts",
+    "pedidos/direct-delivery-constraints.int.test.ts",
+    "pedidos/direct-delivery-repository.int.test.ts"
   ],
   "commit": [
     {
@@ -115,6 +127,11 @@
       "archivo": "documentos/formula-import.int.test.ts",
       "motivo": "T6 (QC-159): ejercita `createConfirmFormulaImport` con los adaptadores de Prisma reales de `documentos`, `recetas`, `inventario` y `pedidos` cableados a mano -el mismo cableado que hara `lib/composition`, sin pasar por el-. `replaceAliveRecipe` y `createOrder` abren SU PROPIA `prisma.$transaction` contra el cliente GLOBAL, y R18 necesita ver la receta EXACTAMENTE como quedo tras un fallo REAL del CHECK `recipe_lines_percentage_check` -envolver la corrida en una transaccion de test con ROLLBACK ocultaria justo eso, igual que ya razona `catalog-import-isolation.int.test.ts`-. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento y unidad incluidos) y la limpia en el `afterAll`, en el orden que exigen las FK: reservas -> pedidos -> recetas (sus lineas caen con ON DELETE CASCADE) -> archivos y tandas de documento -> asientos de inventario -> lotes -> productos -> presentaciones -> unidad propia -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"
+    },
+    {
+      "archivo": "documentos/batch-notice.int.test.ts",
+      "motivo": "QC-137 T9/T10: ejercita `createBatch` y `readBatchNotice` de `document-batch-repository-prisma.ts`, que usan el cliente Prisma GLOBAL; `createBatch` abre ademas SU PROPIA `prisma.$transaction`, asi que envolverlos en una transaccion del test con ROLLBACK seria un aislamiento de mentira. Cada caso fabrica su empresa efimera con randomUUID (y el usuario autor cuando lo necesita) y `afterAll` las borra en el orden que exigen las FK (archivos -> tandas -> usuarios -> empresas) y afirma que no quedo ninguna. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
     },
     {
       "archivo": "documentos/document-batch-claim-concurrency.int.test.ts",
@@ -517,6 +534,21 @@
       "desde": "2026-10-06"
     },
     {
+      "archivo": "clientes/customer-phone-shared.int.test.ts",
+      "motivo": "T5 (QC-236), renombrado y reescrito en T5 (QC-239): ejercita createCustomer y updateAliveCustomer de customer-prisma.ts, y el alta y la edicion de lib/composition con su unidad de trabajo real (withCustomerTransaction), que abre su propia transaccion sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Dos empresas efimeras (randomUUID, con usuario, rol y tipo de documento) nacen en beforeAll; afterAll borra por company_id, en el orden de las FK, vinculos de telefono, numeros y clientes, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "clientes/customer-phone-numbers.int.test.ts",
+      "motivo": "T3 y T5 (QC-239): ejercita customer-phone-prisma.ts sobre el cliente Prisma GLOBAL, withCustomerTransaction (que abre su propia transaccion y la reintenta) y el alta y la edicion de lib/composition, asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso siembra sus propios clientes y numeros, irrepetibles entre corridas; afterAll borra por company_id, en el orden de las FK, vinculos, numeros, clientes, usuario, rol, tipo de documento y empresa, y cuenta que no quedo ninguno. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "clientes/legacy-phone-backfill.int.test.ts",
+      "motivo": "T5 (QC-236): ejercita el relleno de telefonos (createBackfillLegacyPhones + legacy-phone-prisma.ts), que abre una transaccion por empresa sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria. El caso de uso recorre SOLO las empresas efimeras del archivo (listCompanyIds inyectado), nunca filas de otros archivos. afterAll borra sus clientes por company_id, cuenta que no quedo ninguno y despues borra usuarios, rol, tipo de documento y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
       "archivo": "proveedores/catalog-image-url.int.test.ts",
       "motivo": "T4 (QC-171): ejercita `listCatalogLines` y `listSupplierShowcase` ya cableados por `lib/composition`, cuyos adaptadores driven llaman al cliente Prisma GLOBAL (mismo criterio que supplier-showcase.int.test.ts), asi que una transaccion del test con ROLLBACK no los envolveria -correrian en otra conexion del pool y verian una base vacia-. Siembra una empresa efimera con randomUUID (proveedor, presentacion y dos lineas de catalogo) y COMMITEA; el afterAll borra lineas, proveedor, presentacion y empresa por su id exacto, en el orden que exigen las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-09-25"
@@ -657,6 +689,41 @@
       "desde": "2026-10-09"
     },
     {
+      "archivo": "integraciones/whatsapp-inbox-prisma.int.test.ts",
+      "motivo": "Ejercita 'recordWhatsappInbound' de whatsapp-inbox-prisma.ts, que abre su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria; ademas el caso de dos 'record' concurrentes del mismo numero necesita dos transacciones que confirmen de verdad contra el unico (connection_id, wa_id). Los duenos de cada numero se leen con el servicio real de telefonos de clientes sobre esa misma transaccion, y los clientes se dan de alta por clientes.createCustomer de lib/composition, que abre su propia transaccion. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-webhook-route.int.test.ts",
+      "motivo": "Recorre los GET/POST exportados por whatsapp-webhook-route.ts con la composicion real: el POST guarda en la PROPIA 'prisma.$transaction' de recordWhatsappInbound sobre el cliente GLOBAL, y el handshake y el descifrado ilegible escriben la conexion con el mismo cliente, asi que una transaccion del test con ROLLBACK no los envolveria; el caso de la transaccion que falla necesita ademas que el reintento confirme de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con o sin el anadido integraciones, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes por 'company_id' (los clientes los da de alta clientes.createCustomer de lib/composition, que abre su propia transaccion), afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa (los anadidos caen en cascada). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-messages-constraints.int.test.ts",
+      "motivo": "Ejercita 'companyOfWhatsappConnection' de whatsapp-webhook-directory-prisma.ts y las altas de conexion de whatsapp-connection-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria. Las altas que la base debe rechazar (unicos, CHECK y FK compuestas de empresa) no dejan fila. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> clientes por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-19"
+    },
+    {
+      "archivo": "integraciones/whatsapp-contact-links.int.test.ts",
+      "motivo": "T7 (QC-239): recorre vincular, desvincular y bloquear contactos, y el alta y la edicion de clientes, por la fachada real de lib/composition: withWhatsappContactTransaction y withCustomerTransaction abren su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no las envolveria, y el caso del fallo forzado necesita que la transaccion real se deshaga. Cada caso siembra sus numeros irrepetibles en dos empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "integraciones/whatsapp-template-prisma.int.test.ts",
+      "motivo": "Ejercita las funciones de whatsapp-template-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado ('applyWhatsappTemplateSync' abre su PROPIA 'prisma.$transaction'), asi que una transaccion del test con ROLLBACK no las envolveria; ademas el alta que choca con el unico parcial de nombre e idioma y la sincronizacion que no borra lo creado despues de 'startedAt' necesitan filas confirmadas de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra relaciones -> variables -> plantillas -> conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "integraciones/whatsapp-variable-key-prisma.int.test.ts",
+      "motivo": "Ejercita las funciones de whatsapp-variable-key-prisma.ts, que usan el cliente Prisma GLOBAL y no un 'tx' inyectado ('updateWhatsappVariableKey' y 'deleteWhatsappVariableKey' abren su PROPIA 'prisma.$transaction'), asi que una transaccion del test con ROLLBACK no las envolveria; ademas el unico de clave por empresa y la FK que impide borrar una variable en uso necesitan filas confirmadas de verdad. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra relaciones -> variables -> plantillas -> conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
+      "archivo": "integraciones/whatsapp-template-flow.int.test.ts",
+      "motivo": "QC-242 T20: el recorrido de plantillas por la fachada 'integraciones' (crear, eliminar, recibir el webhook y resincronizar) y por el 'POST' de la ruta del webhook; todos escriben con el cliente Prisma GLOBAL y la ruta abre su PROPIA 'prisma.$transaction', asi que una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa con el anadido 'integraciones', usuario y conexion) y 'afterAll' borra plantillas -> mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda nada y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-20"
+    },
+    {
       "archivo": "recetas/step-evidence-flag.int.test.ts",
       "motivo": "QC-214 T1: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeExecutionContentById` / `findRecipePackingStepsById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Una empresa efimera (randomUUID) nace en `beforeAll` y muere en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
@@ -700,6 +767,31 @@
       "archivo": "pedidos/order-delivery-lines-customer-migration.int.test.ts",
       "motivo": "QC-282 B1 (2026-10-15): aplica el migration.sql y el down.sql reales de 'order_delivery_lines_customer' por 'pg' (solo su protocolo simple ejecuta un .sql con un bloque DO $$ y su error trae 'code'). No toca las tablas de 'public': cada caso copia con LIKE las siete tablas que la migracion lee, escribe o debe dejar intactas a un esquema de usar y tirar, repone sus FK entre ellas, trabaja ahi con search_path solo en ese esquema -asi el DDL del UP y del DOWN no bloquea las tablas reales que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que 'inventario/product-batch-lot-per-presentation-migration.int.test.ts'. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-15"
+    },
+    {
+      "archivo": "pedidos/direct-deliveries-migration.int.test.ts",
+      "motivo": "QC-288 B1 (2026-10-16): aplica el migration.sql y el down.sql reales de 'inventory_movement_kind_direct_delivery' y 'direct_deliveries' por 'pg' (solo su protocolo simple ejecuta un .sql con bloques $$ y su error trae 'code'). No toca las tablas ni el tipo de 'public': cada caso copia con LIKE las seis tablas que las migraciones leen, escriben o deben dejar intactas a un esquema de usar y tirar, con una tabla 'products' minima y una copia propia de 'InventoryMovementKind' para la columna 'kind', repone sus FK y los dos disparadores, trabaja ahi con search_path solo en ese esquema -asi el DDL del UP y del DOWN, incluido el que recrea el enum, no bloquea las tablas reales que usan los demas archivos- y lo borra con DROP SCHEMA CASCADE en un 'finally'. Mismo patron que 'pedidos/order-delivery-lines-customer-migration.int.test.ts'. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery.int.test.ts",
+      "motivo": "QC-288 B4: la entrega sin pedido por la fachada real de 'lib/composition' (y, en el fallo forzado, por 'createDeliverDirect' cableado con los mismos adaptadores reales): 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (entrega, salida de inventario y lectura de lo que esperan los pedidos), y las lecturas del sheet y del listado usan ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (tests/helpers/direct-delivery-seed.ts sobre order-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery-concurrency.int.test.ts",
+      "motivo": "QC-288 B4: entregas sin pedido reales a la vez, a la vez que una entrega de pedido y a la vez que una transaccion que termina el acondicionamiento de un pedido, por la fachada de 'lib/composition': cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra vea lo que escribio despues de esperar el bloqueo de los pedidos o del producto, y la transaccion del acondicionamiento la abre el propio test con 'prisma.$transaction' y la confirma, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/direct-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery-void.int.test.ts",
+      "motivo": "QC-288 B4: la anulacion de una entrega sin pedido por la fachada real de 'lib/composition' (y, en el fallo forzado, por 'createVoidDirectDelivery' cableado con los mismos adaptadores reales): 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL (anulacion y devolucion a inventario), y la entrega previa, la lectura del dialogo y la lectura previa de la clave usan ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (tests/helpers/direct-delivery-seed.ts) y las borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
+    },
+    {
+      "archivo": "pedidos/direct-delivery-void-concurrency.int.test.ts",
+      "motivo": "QC-288 B4: anulaciones sin pedido reales a la vez por la fachada de 'lib/composition' (y, en el caso de la misma clave, por 'createVoidDirectDelivery' cableado con los mismos adaptadores reales y solo la lectura previa de la clave sincronizada): cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra choque con el unico de 'delivery_line_id' o de la clave, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/direct-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-16"
     },
     {
       "archivo": "asignaciones/conditioning-steps-progress.int.test.ts",

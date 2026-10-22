@@ -71,8 +71,8 @@ function entradaDeUnCliente(): DeliverOrderInput {
 }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
 ]
 
 /** Pedidos 4 + 10; entregados 4 + 3: a la segunda linea le faltan 7. */
@@ -703,7 +703,7 @@ const GALLON_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 /** Las de QC-223 mas el galon: pedidos 5, ninguno entregado. */
 const LINEAS_VARIOS: readonly FinishPackingLine[] = [
   ...LINEAS,
-  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null },
+  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
 ]
 
 type Bloque = DeliverOrderInput['customers'][number]
@@ -1143,5 +1143,83 @@ describe('QC-282 R23 + QC-281 — tope por envases reales sobre la suma de los c
     // Al galon le siguen faltando 5: el pedido sigue TERMINADO.
     await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'TERMINADO' })
     expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-16 (QC-288): la clave es unica por empresa y la comparten las entregas sin pedido.
+describe('QC-288 deliverOrder — clave de una entrega sin pedido', () => {
+  it('R38: una entrega de pedido con la clave de una entrega sin pedido es invalid_input, sin abrir la transaccion', async () => {
+    const m = montar({ registrada: { id: DELIVERY_ID, orderId: null } })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entradaDeUnCliente(), ENTREGADOR))).toBe('invalid_input')
+    expect(m.run).not.toHaveBeenCalled()
+    expect(m.findAliveById).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+
+  it('R38: si la clave la inserta a la vez una entrega sin pedido, duplicate_key relee y responde invalid_input sin despachar', async () => {
+    const m = montar({ creada: { kind: 'duplicate_key' } })
+    const findByKey = vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: DELIVERY_ID, orderId: null } satisfies RegisteredOrderDelivery)
+    const deps: DeliverOrderDeps = { ...m.deps, deliveries: { findByKey } }
+
+    expect(await codigoDelFallo(() => createDeliverOrder(deps)(entradaDeUnCliente(), ENTREGADOR))).toBe('invalid_input')
+    expect(findByKey).toHaveBeenCalledTimes(2)
+    expect(m.findAliveById).not.toHaveBeenCalled()
+    nadaEscrito(m)
+  })
+})
+
+describe('QC-290 — deliverOrder espera solo lo pedido', () => {
+  /** Plan 4 + 10; la segunda linea termino con 12 reales y 2 libres: el pedido espera 10. */
+  const CON_LIBRES: readonly FinishPackingLine[] = [
+    { ...LINEAS[0]!, packedPackages: null },
+    { ...LINEAS[1]!, packedPackages: 12, packedSurplusPackages: 2 },
+  ]
+  const NADA_DE_LA_SEGUNDA = new Map([[COMPLETE_LINE_ID, 4]])
+
+  it('R13: 12 reales con 2 libres admiten como mucho 10: pedir 11 es delivery_exceeds_remaining sin escribir nada', async () => {
+    const m = montar({ lineas: CON_LIBRES, entregados: NADA_DE_LA_SEGUNDA })
+    const entrada = deliverInput({
+      customers: [
+        clienteA([
+          { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 6 },
+          { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 5 },
+        ]),
+      ],
+    })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
+    nadaEscrito(m)
+  })
+
+  it('R13: con 3 ya entregados, el tope es 10 - 3 = 7 aunque los reales sin libres admitirian 9', async () => {
+    const m = montar({ lineas: CON_LIBRES })
+    const entrada = deliverInput({
+      customers: [clienteA([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 8 }])],
+    })
+
+    expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entrada, ENTREGADOR))).toBe('delivery_exceeds_remaining')
+    nadaEscrito(m)
+  })
+
+  it('R13, R14: entregar los 10 que espera el pedido lo pasa a ENTREGADO aunque los 2 libres sigan en el lote', async () => {
+    const m = montar({ lineas: CON_LIBRES, entregados: NADA_DE_LA_SEGUNDA })
+    const entrada = deliverInput({
+      customers: [
+        clienteA([
+          { presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 6 },
+          { presentationLineId: PENDING_LINE_ID, batchId: NEWER_BATCH_ID, packages: 4 },
+        ]),
+      ],
+    })
+
+    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({
+      status: 'delivered',
+      orderStatus: 'ENTREGADO',
+    })
+    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
   })
 })

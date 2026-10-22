@@ -428,6 +428,8 @@ enum InventoryMovementKind {
   production
   delivery
   delivery_void
+  direct_delivery
+  direct_delivery_void
 }
 
 /// Un asiento no se corrige: se corrige con otro. Sin `updatedAt` ni `deletedAt`, a proposito.
@@ -847,7 +849,9 @@ model OrderPresentationLine {
   packedReason      String? @map("packed_reason")
   /// Texto del motivo `otro`, ya recortado.
   packedReasonOther String? @map("packed_reason_other")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Envases del conteo real que el pedido no espera: quedan libres en el lote. 0 sin excedente.
+  packedSurplusPackages Int @default(0) @map("packed_surplus_packages")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -861,21 +865,25 @@ model OrderPresentationLine {
   @@map("order_presentation_lines")
 }
 
-/// Una entrega del producto terminado de un pedido, a uno o varios clientes: el cliente va en cada
-/// linea, no aqui. Solo de insercion: sin `updatedAt` ni `deletedAt`. `deliveryKey` la hace
-/// idempotente por empresa. `createdBy` y `companyId` no llevan `@relation`: `User` y `Company` son
-/// de otros modulos; sus FK estan escritas a mano y son drift, y la del autor es compuesta con
-/// `companyId`. La FK de `order` tambien es compuesta en la base (`(order_id, company_id)`).
+/// Una entrega de producto terminado, a uno o varios clientes: el cliente va en cada linea, no
+/// aqui. Es de un pedido (`orderId`) o de un producto sin pedido (`productId`), nunca de los dos;
+/// solo la que no tiene pedido lleva `note`. Solo de insercion: sin `updatedAt` ni `deletedAt`.
+/// `deliveryKey` la hace idempotente por empresa. `createdBy`, `companyId` y `productId` no llevan
+/// `@relation`: `User`, `Company` y `Product` son de otros modulos; sus FK estan escritas a mano y
+/// son drift, y las del autor y del producto son compuestas con `companyId`. La FK de `order`
+/// tambien es compuesta en la base (`(order_id, company_id)`). Los CHECK son drift.
 /// @module pedidos
 model OrderDelivery {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId   String   @map("company_id") @db.Uuid
-  orderId     String   @map("order_id") @db.Uuid
+  orderId     String?  @map("order_id") @db.Uuid
+  productId   String?  @map("product_id") @db.Uuid
+  note        String?
   deliveryKey String   @map("delivery_key") @db.Uuid
   createdBy   String   @map("created_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  order Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  order Order?              @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   lines OrderDeliveryLine[]
   voids OrderDeliveryVoid[]
 
@@ -883,27 +891,29 @@ model OrderDelivery {
   @@unique([companyId, deliveryKey], map: "order_deliveries_company_key_unique")
   @@index([orderId], map: "order_deliveries_order_id_idx")
   @@index([createdBy], map: "order_deliveries_created_by_idx")
+  @@index([companyId, productId], map: "order_deliveries_product_id_idx")
   @@map("order_deliveries")
 }
 
-/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el para una linea del
-/// reparto y su cantidad. Solo de insercion. `customerId` y `batchId` no llevan `@relation`:
-/// `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son compuestas con
-/// `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine` tambien son
-/// compuestas en la base. Los CHECK de positivos son drift.
+/// Un lote dentro de una entrega para un cliente: cuantos envases salen de el y su cantidad. La de
+/// una entrega de pedido lleva su linea del reparto; la de una entrega sin pedido no, y su lote es
+/// del producto de la entrega (disparador, drift). Solo de insercion. `customerId` y `batchId` no
+/// llevan `@relation`: `Customer` es de `clientes` y `ProductBatch` de `inventario`; sus FK son
+/// compuestas con `companyId`, escritas a mano y drift. Las FK de `delivery` y `presentationLine`
+/// tambien son compuestas en la base. Los CHECK de positivos son drift.
 /// @module pedidos
 model OrderDeliveryLine {
   id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId               String  @map("company_id") @db.Uuid
   deliveryId              String  @map("delivery_id") @db.Uuid
   customerId              String  @map("customer_id") @db.Uuid
-  orderPresentationLineId String  @map("order_presentation_line_id") @db.Uuid
+  orderPresentationLineId String? @map("order_presentation_line_id") @db.Uuid
   batchId                 String  @map("batch_id") @db.Uuid
   packages                Int
   quantity                Decimal @db.Decimal(14, 4)
 
   delivery         OrderDelivery         @relation(fields: [deliveryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  presentationLine OrderPresentationLine @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  presentationLine OrderPresentationLine? @relation(fields: [orderPresentationLineId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   voidLine         OrderDeliveryVoidLine?
 
   @@unique([deliveryId, customerId, batchId], map: "order_delivery_lines_delivery_customer_batch_unique")
@@ -1029,6 +1039,7 @@ model DocumentFile {
   batchId        String             @map("batch_id") @db.Uuid
   companyId      String             @map("company_id") @db.Uuid
   path           String
+  originalName   String?            @map("original_name")
   status         DocumentFileStatus @default(queued)
   extractedText  String?            @map("extracted_text")
   errorCode      String?            @map("error_code")
@@ -1044,13 +1055,13 @@ model DocumentFile {
   @@map("document_files")
 }
 
-/// Nada es unico: dos clientes pueden repetir todos sus datos, asi que no hay indice unico de
-/// negocio. Las tres columnas `*Normalized` son derivadas, escritas por la aplicacion para la
-/// busqueda sin acentos; no llevan `@unique` ni `@@index` porque sus indices de trigramas son
-/// parciales y viven solo en la migracion. `companyId`, `createdBy` y `updatedBy` van sin
-/// `@relation` para que un `include` no cruce a otro modulo; sus FK estan escritas a mano y son
-/// drift. `customers_company_id_id_key` es la clave candidata para las FK compuestas de las
-/// tablas que apunten a un cliente.
+/// `phoneE164` puede repetirse entre clientes: es el espejo del telefono principal de
+/// `CustomerPhoneNumber`, y sus CHECK de formato viven solo en la migracion. Las tres columnas
+/// `*Normalized` son derivadas, escritas por la aplicacion para la busqueda sin acentos; no llevan `@unique` ni
+/// `@@index` porque sus indices de trigramas son parciales y viven solo en la migracion.
+/// `companyId`, `createdBy` y `updatedBy` van sin `@relation` para que un `include` no cruce a
+/// otro modulo; sus FK estan escritas a mano y son drift. `customers_company_id_id_key` es la
+/// clave candidata para las FK compuestas de las tablas que apunten a un cliente.
 /// @module clientes
 model Customer {
   id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -1058,6 +1069,9 @@ model Customer {
   lastNames            String    @map("last_names")
   city                 String
   phone                String?
+  phoneCountry         String?   @map("phone_country") @db.VarChar(2)
+  phoneE164            String?   @map("phone_e164") @db.VarChar(15)
+  phoneIssue           String?   @map("phone_issue") @db.VarChar(20)
   email                String?
   address              String?
   firstNamesNormalized String    @map("first_names_normalized")
@@ -1074,6 +1088,37 @@ model Customer {
   @@index([createdBy], map: "customers_created_by_idx")
   @@index([updatedBy], map: "customers_updated_by_idx")
   @@map("customers")
+}
+
+/// Un numero por empresa. Nunca se borra: un numero sin clientes es una fila sin uso.
+/// @module clientes
+model PhoneNumber {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  e164      String   @db.VarChar(15)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, e164], map: "phone_numbers_company_id_e164_key")
+  @@unique([companyId, id], map: "phone_numbers_company_id_id_key")
+  @@map("phone_numbers")
+}
+
+/// FK compuestas con company_id escritas a mano en la migracion; los indices unicos son parciales
+/// y viven solo en la migracion.
+/// @module clientes
+model CustomerPhoneNumber {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  phoneNumberId String    @map("phone_number_id") @db.Uuid
+  main          Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([companyId, phoneNumberId], map: "customer_phone_numbers_company_phone_idx")
+  @@map("customer_phone_numbers")
 }
 
 enum OrderExecutionAction {
@@ -1177,6 +1222,7 @@ model WhatsappConnection {
   lastError          String?                  @map("last_error")
   lastCheckedAt      DateTime?                @map("last_checked_at") @db.Timestamptz(6)
   lastWebhookAt      DateTime?                @map("last_webhook_at") @db.Timestamptz(6)
+  templatesSyncedAt  DateTime?                @map("templates_synced_at") @db.Timestamptz(6)
   createdById        String                   @map("created_by") @db.Uuid
   createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1185,6 +1231,196 @@ model WhatsappConnection {
   @@unique([companyId, id], map: "whatsapp_connections_company_id_id_key")
   @@index([createdById], map: "whatsapp_connections_created_by_idx")
   @@map("whatsapp_connections")
+}
+
+enum WhatsappMessageDirection {
+  IN
+  OUT
+
+  @@map("whatsapp_message_direction")
+}
+
+enum WhatsappMessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  CONTACTS
+  REACTION
+  BUTTON
+  INTERACTIVE
+  TEMPLATE
+  UNSUPPORTED
+
+  @@map("whatsapp_message_type")
+}
+
+enum WhatsappMessageStatus {
+  RECEIVED
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+
+  @@map("whatsapp_message_status")
+}
+
+enum WhatsappMessageOrigin {
+  USER
+  SYSTEM
+
+  @@map("whatsapp_message_origin")
+}
+
+/// Sin `@relation`: las FK compuestas con `company_id` (a la conexion, al cliente y, en los
+/// mensajes, al contacto) estan escritas a mano en la migracion, para que ningun `include` cruce
+/// de empresa. `customerLinkedBy` no nulo marca el vinculo elegido por un usuario: el recalculo
+/// automatico no lo pisa mientras el cliente conserve el numero.
+/// @module integraciones
+model WhatsappContact {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  connectionId     String    @map("connection_id") @db.Uuid
+  waId             String    @map("wa_id")
+  profileName      String?   @map("profile_name")
+  customerId       String?   @map("customer_id") @db.Uuid
+  customerLinkedBy String?   @map("customer_linked_by") @db.Uuid
+  blockedAt        DateTime? @map("blocked_at") @db.Timestamptz(6)
+  blockedBy        String?   @map("blocked_by") @db.Uuid
+  lastInboundAt    DateTime? @map("last_inbound_at") @db.Timestamptz(6)
+  lastMessageAt    DateTime? @map("last_message_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([connectionId, waId], map: "whatsapp_contacts_connection_id_wa_id_key")
+  @@unique([companyId, id], map: "whatsapp_contacts_company_id_id_key")
+  @@unique([companyId, connectionId, id], map: "whatsapp_contacts_company_connection_id_key")
+  @@index([customerId], map: "whatsapp_contacts_customer_id_idx")
+  @@map("whatsapp_contacts")
+}
+
+/// @module integraciones
+model WhatsappMessage {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String                   @map("company_id") @db.Uuid
+  connectionId   String                   @map("connection_id") @db.Uuid
+  contactId      String                   @map("contact_id") @db.Uuid
+  direction      WhatsappMessageDirection
+  wamid          String?                  @unique(map: "whatsapp_messages_wamid_key")
+  type           WhatsappMessageType
+  body           String?
+  payload        Json                     @default("{}")
+  status         WhatsappMessageStatus
+  errorCode      String?                  @map("error_code")
+  errorReason    String?                  @map("error_reason")
+  metaTimestamp  DateTime?                @map("meta_timestamp") @db.Timestamptz(6)
+  origin         WhatsappMessageOrigin?
+  sentById       String?                  @map("sent_by") @db.Uuid
+  templateName   String?                  @map("template_name")
+  attempts       Int                      @default(0)
+  queueMessageId String?                  @map("queue_message_id")
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([connectionId, contactId, metaTimestamp], map: "whatsapp_messages_connection_contact_ts_idx")
+  @@index([sentById], map: "whatsapp_messages_sent_by_idx")
+  @@map("whatsapp_messages")
+}
+
+enum WhatsappTemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+
+  @@map("whatsapp_template_category")
+}
+
+enum WhatsappTemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+  OTHER
+
+  @@map("whatsapp_template_status")
+}
+
+/// Sin `@relation`: las FK (compuesta con `company_id` a la conexion, a la empresa y al autor) y
+/// el unico parcial de nombre e idioma entre las vivas estan escritos a mano en la migracion.
+/// @module integraciones
+model WhatsappTemplate {
+  id             String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String                        @map("company_id") @db.Uuid
+  connectionId   String                        @map("connection_id") @db.Uuid
+  metaTemplateId String                        @map("meta_template_id")
+  name           String
+  language       String
+  category       WhatsappTemplateCategory
+  components     Json                          @default("[]")
+  status         WhatsappTemplateStatus
+  statusRaw      String?                       @map("status_raw")
+  rejectedReason String?                       @map("rejected_reason")
+  lastSyncedAt   DateTime?                     @map("last_synced_at") @db.Timestamptz(6)
+  createdById    String?                       @map("created_by") @db.Uuid
+  createdAt      DateTime                      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?                     @map("deleted_at") @db.Timestamptz(6)
+  mappingStatus  WhatsappTemplateMappingStatus @default(UNMAPPED) @map("mapping_status")
+  enabled        Boolean                       @default(false)
+
+  @@unique([connectionId, metaTemplateId], map: "whatsapp_templates_connection_meta_id_key")
+  @@unique([companyId, id], map: "whatsapp_templates_company_id_id_key")
+  @@index([createdById], map: "whatsapp_templates_created_by_idx")
+  @@map("whatsapp_templates")
+}
+
+enum WhatsappTemplateMappingStatus {
+  UNMAPPED
+  MAPPED
+
+  @@map("whatsapp_template_mapping_status")
+}
+
+/// Variables propias de la empresa. Las constantes las define el front y no tienen fila: solo su
+/// clave se guarda en la relacion.
+/// Borrado fisico: con `deleted_at` la FK de las relaciones no impediria borrar una en uso.
+/// @module integraciones
+model WhatsappVariableKey {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  key       String
+  label     String
+  value     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([companyId, key], map: "whatsapp_variable_keys_company_key_key")
+  @@unique([companyId, id], map: "whatsapp_variable_keys_company_id_id_key")
+  @@map("whatsapp_variable_keys")
+}
+
+/// Que entrada del diccionario llena cada hueco de una plantilla: una variable propia o una
+/// constante, nunca las dos. Sin `@relation`: las FK compuestas con `company_id` y los CHECK estan
+/// escritos a mano en la migracion.
+/// @module integraciones
+model WhatsappTemplateVariable {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  templateId    String   @map("template_id") @db.Uuid
+  slot          String
+  variableKeyId String?  @map("variable_key_id") @db.Uuid
+  systemKey     String?  @map("system_key")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([templateId, slot], map: "whatsapp_template_variables_template_slot_key")
+  @@index([variableKeyId], map: "whatsapp_template_variables_variable_key_idx")
+  @@map("whatsapp_template_variables")
 }
 
 enum EvidencePhase {
@@ -1268,4 +1504,45 @@ model AiProviderConnection {
 
   @@index([provider], map: "ai_provider_connections_provider_idx")
   @@map("ai_provider_connections")
+}
+
+/// Sin `@relation`: las FK a `companies`, `users` y `roles` cruzan de módulo y están escritas a mano
+/// en la migración, igual que sus CHECK. `notifications_id_company_id_key` es la clave candidata a la
+/// que apunta la FK compuesta de `notification_reads`: quitarla la rompe.
+/// @module notificaciones
+model Notification {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  eventKey        String    @map("event_key")
+  tone            String
+  title           String
+  body            String
+  bodyTime        DateTime? @map("body_time") @db.Timestamptz(6)
+  linkLabel       String    @map("link_label")
+  targetKind      String?   @map("target_kind")
+  targetParams    Json?     @map("target_params")
+  recipientUserId String?   @map("recipient_user_id") @db.Uuid
+  recipientRole   String?   @map("recipient_role")
+  dedupeKey       String    @map("dedupe_key")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([companyId, dedupeKey], map: "notifications_company_id_dedupe_key_key")
+  @@unique([id, companyId], map: "notifications_id_company_id_key")
+  @@index([companyId, recipientUserId, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_company_id_recipient_user_id_created_at_id_idx")
+  @@index([companyId, recipientRole, createdAt(sort: Desc), id(sort: Desc)], map: "notifications_company_id_recipient_role_created_at_id_idx")
+  @@index([companyId, createdAt], map: "notifications_company_id_created_at_idx")
+  @@map("notifications")
+}
+
+/// La FK a `notifications` es compuesta con `company_id`: una lectura de otra empresa no puede
+/// existir. Va escrita a mano en la migración, como la de `users`.
+/// @module notificaciones
+model NotificationRead {
+  notificationId String   @map("notification_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at") @db.Timestamptz(6)
+
+  @@id([notificationId, userId], map: "notification_reads_pkey")
+  @@map("notification_reads")
 }

@@ -323,6 +323,58 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         reason: 'El cliente devolvio el producto',
       }),
   },
+  // QC-288 2026-10-16: las cinco acciones de la entrega sin pedido resuelven el actor con `currentActor()`.
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'getDirectDeliveryAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).getDirectDeliveryAction(
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'listDirectDeliverySurplusAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).listDirectDeliverySurplusAction([
+        '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+      ]),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'deliverDirectAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).deliverDirectAction({
+        productId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        deliveryKey: '8b3e2c51-4d6e-4f7a-8b29-1e5c7a3f9d42',
+        note: null,
+        customers: [
+          {
+            customerId: '9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53',
+            allocations: [{ batchId: 'be6b5f84-7a9b-4cad-9e5c-4b8fad6c2a75', packages: 1 }],
+          },
+        ],
+      }),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'getDirectDeliveryForVoidAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).getDirectDeliveryForVoidAction(
+        'cf7c6a95-8bac-4dbe-8f6d-5c9a0b7d3b86',
+      ),
+  },
+  {
+    archivo: 'lib/modules/pedidos/adapters/driving/order-actions.ts',
+    nombre: 'voidDirectDeliveryAction',
+    invocar: async () =>
+      (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).voidDirectDeliveryAction({
+        deliveryId: 'cf7c6a95-8bac-4dbe-8f6d-5c9a0b7d3b86',
+        voidKey: 'd08d7ba6-9cbd-4ecf-9a7e-6dab1c8e4c97',
+        customerIds: ['9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53'],
+        reason: 'El cliente devolvio el producto',
+      }),
+  },
   {
     // Anadido el 2026-09-17 por QC-63, que estrena la pantalla de ejecucion: su archivo de
     // `driving/` resuelve las dos caras de la sesion, asi que el censo tiene que cubrirlo o R15
@@ -557,6 +609,19 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).getWhatsappConnectionAction(),
   },
   {
+    // QC-239 2026-10-20: las acciones sobre un contacto de WhatsApp resuelven las dos caras de la
+    // sesion. La accion captura el `unauthorized` del caso de uso y devuelve un estado.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-contact-actions.ts',
+    nombre: 'linkWhatsappContactAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-contact-actions')
+      ).linkWhatsappContactAction({
+        contactId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        customerId: '9c4f3d62-5e7f-4a8b-9c3a-2f6d8b4a0e53',
+      }),
+  },
+  {
     // Las fotos de evidencia por paso: la accion captura el error de un pedido inexistente y
     // devuelve un estado, asi que la invocacion no rompe.
     archivo: 'lib/modules/asignaciones/adapters/driving/step-evidence-actions.ts',
@@ -587,6 +652,34 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       (
         await import('@/lib/modules/integraciones/adapters/driving/ai-provider-actions')
       ).getAiProviderConnectionAction(),
+  },
+  {
+    // La lectura es la mas barata; la accion captura el error y devuelve un estado.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-template-actions.ts',
+    nombre: 'listWhatsappTemplatesAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions')
+      ).listWhatsappTemplatesAction(),
+  },
+  {
+    // La lectura del diccionario; la accion captura el error y devuelve un estado.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions.ts',
+    nombre: 'listWhatsappDictionaryAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions')
+      ).listWhatsappDictionaryAction(),
+  },
+  {
+    // QC-137: el resumen de la campana, que el navegador consulta cada 30 s. Sin permisos responde
+    // `forbidden` antes de tocar la bandeja.
+    archivo: 'lib/modules/notificaciones/adapters/driving/notification-actions.ts',
+    nombre: 'getNotificationSummaryAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/notificaciones/adapters/driving/notification-actions')
+      ).getNotificationSummaryAction(),
   },
 ];
 

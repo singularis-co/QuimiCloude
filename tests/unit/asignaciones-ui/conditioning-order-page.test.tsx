@@ -312,7 +312,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
   });
 
-  it('R21: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Entregados»', async () => {
+  it('R21, QC-301 R4: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Acondicionados»', async () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'ENTREGADO',
@@ -327,8 +327,8 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Guardar datos de lote' })).toBeEnabled();
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
-    expect(back).toHaveTextContent('Volver a «Entregados»');
-    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+    expect(back).toHaveTextContent('Volver a «Acondicionados»');
+    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados');
   });
 
   it('R21: un ENTREGADO que no deja ver el caso de uso sigue dando 404', async () => {

@@ -82,6 +82,7 @@ type AssignedOrderSummaryRow = {
   readonly quantity: { toFixed(digits: number): string };
   readonly priority: string;
   readonly status: string;
+  readonly createdAt: Date;
   readonly unitId: string | null;
   readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
@@ -104,6 +105,7 @@ const SUMMARY_SELECT = {
   quantity: true,
   priority: true,
   status: true,
+  createdAt: true,
   unitId: true,
   presentationLines: {
     select: {
@@ -166,6 +168,7 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
     quantity: row.quantity.toFixed(4),
     priority: row.priority as AssignedOrderSummary['priority'],
     status: row.status as OrderStatus,
+    createdAt: row.createdAt,
     unitId: row.unitId,
     presentationLines: row.presentationLines.map(
       (line): OrderSummaryLineRecord => ({
@@ -290,6 +293,7 @@ type OrderDeliveryProgressRow = {
     readonly presentationId: string;
     readonly packages: number;
     readonly packedPackages: number | null;
+    readonly packedSurplusPackages: number;
     readonly deliveryLines: readonly { readonly packages: number }[];
   }[];
 };
@@ -303,6 +307,7 @@ export function toOrderDeliveryProgress(row: OrderDeliveryProgressRow): OrderDel
       presentationId: line.presentationId,
       packages: line.packages,
       packedPackages: line.packedPackages,
+      packedSurplusPackages: line.packedSurplusPackages,
       deliveredPackages: line.deliveryLines.reduce((total, delivery) => total + delivery.packages, 0),
     })),
   };
@@ -329,6 +334,7 @@ export async function listOrderDeliveryProgressByIdsIncludingDeleted(
           presentationId: true,
           packages: true,
           packedPackages: true,
+          packedSurplusPackages: true,
           deliveryLines: { where: { voidLine: { is: null } }, select: { packages: true } },
         },
         orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
