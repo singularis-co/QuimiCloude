@@ -237,8 +237,53 @@ type SeededOrder = {
 };
 
 /**
+ * Lo que el Operador consumió al finalizar: un ingrediente con un lote de `ORDER_QUANTITY` litros
+ * cuyo coste suma `ingredientsCost`, y su asiento `consumption` del pedido, como lo deja Finalizar.
+ * Sin él, el coste real (QC-305 R1, R2) solo tendría los envases.
+ */
+async function seedIngredientConsumption(offset: number, orderId: string, ingredientsCost: string): Promise<void> {
+  const { companyId, unitId, packerId } = seeded();
+  const unitCost = deriveUnitCost(ingredientsCost, ORDER_QUANTITY);
+  if (unitCost === null) throw new Error(`coste de ingrediente inválido: ${ingredientsCost}`);
+  const name = `${SHARED_TOKEN}_ingrediente${offset}`;
+  const purchaseDate = new Date('2026-01-01T00:00:00Z');
+  // `products.unit_id` a mano: el disparador del lote exige que el producto ya tenga unidad.
+  const product = await prisma.product.create({
+    data: { name, nameNormalized: normalizeProductName(name), unitId, stock: '0', companyId },
+    select: { id: true },
+  });
+  const batch = await prisma.productBatch.create({
+    data: {
+      productId: product.id,
+      presentationId: null,
+      companyId,
+      stock: '0',
+      unitCost,
+      lot: `${RUN_ID.slice(0, 16)}_ing${offset}`,
+      purchaseDate,
+      createdBy: packerId,
+    },
+    select: { id: true },
+  });
+  await prisma.inventoryMovement.createMany({
+    data: [
+      { batchId: batch.id, kind: 'opening', quantity: ORDER_QUANTITY, reason: null, companyId, createdBy: packerId, createdAt: purchaseDate },
+      { batchId: batch.id, kind: 'consumption', quantity: `-${ORDER_QUANTITY}`, reason: null, orderId, companyId, createdBy: packerId },
+    ],
+  });
+}
+
+/** El coste real que Terminar guardó en el pedido (QC-305 R1). */
+async function actualCostOf(orderId: string): Promise<string | null> {
+  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { actualCost: true } });
+  return order.actualCost?.toFixed(4) ?? null;
+}
+
+/**
  * Un pedido `EN_EMPAQUE` del Empacador con una línea por `specs`: cada una con su presentación en
- * litros, su envase sembrado y el plan apartado de ese envase, como lo deja Comenzar.
+ * litros, su envase sembrado y el plan apartado de ese envase, como lo deja Comenzar. El
+ * ingrediente ya está consumido por `ingredientsCost`: el coste real al terminar es ese importe
+ * más los envases reales a `PACKAGING_UNIT_COST` (QC-305 R1, R2).
  */
 async function seedPackingOrder(
   offset: number,
@@ -263,6 +308,7 @@ async function seedPackingOrder(
     },
     select: { id: true },
   });
+  await seedIngredientConsumption(offset, order.id, ingredientsCost);
 
   const createdAt = Date.now();
   const lines: SeededLine[] = [];
@@ -517,10 +563,14 @@ test.describe('envases reales al terminar el empaque', () => {
     expect(await batchStock(more.packagingBatchId)).toBe(10 - 7);
     expect(await netReservedInBatch(order.id, more.packagingBatchId)).toBe(0);
 
-    // El coste se divide entre lo envasado de verdad (6,5 l), no entre el plan (7 l).
-    const expectedUnitCost = deriveUnitCost(cost, '6.5');
+    // QC-305 R1, R2: el coste real es el ingrediente (70) + los 10 envases reales × 0,5 = 75.
+    const actualCost = await actualCostOf(order.id);
+    expect(actualCost).toBe('75.0000');
+    // R21 (enmienda QC-305 R16): el coste real se divide entre lo envasado de verdad (6,5 l), no
+    // entre el plan (7 l).
+    const expectedUnitCost = deriveUnitCost(actualCost!, '6.5');
     expect(expectedUnitCost).not.toBeNull();
-    expect(expectedUnitCost).not.toBe(deriveUnitCost(cost, '7'));
+    expect(expectedUnitCost).not.toBe(deriveUnitCost(actualCost!, '7'));
     const lessBatch = await finishedBatchOf(order.id, less.presentationId);
     const moreBatch = await finishedBatchOf(order.id, more.presentationId);
     expect(lessBatch, 'nace el lote de la línea con menos').not.toBeNull();
@@ -530,7 +580,7 @@ test.describe('envases reales al terminar el empaque', () => {
     expect(lessBatch!.unitCost?.toFixed(4)).toBe(expectedUnitCost);
     expect(moreBatch!.unitCost?.toFixed(4)).toBe(expectedUnitCost);
     const lotsValue = lessBatch!.stock.mul(lessBatch!.unitCost!).add(moreBatch!.stock.mul(moreBatch!.unitCost!));
-    expect(Math.abs(lotsValue.toNumber() - Number(cost))).toBeLessThan(0.01);
+    expect(Math.abs(lotsValue.toNumber() - Number(actualCost))).toBeLessThan(0.01);
 
     await switchUser(page, adminUser);
     const lessDistribution = await distributionRow(page, lessBatch!.productId, less.id);
@@ -596,7 +646,12 @@ test.describe('envases reales al terminar el empaque', () => {
     const sameBatch = await finishedBatchOf(order.id, same.presentationId);
     expect(sameBatch).not.toBeNull();
     expect(sameBatch!.stock.equals('3')).toBe(true);
-    expect(sameBatch!.unitCost?.toFixed(4)).toBe(deriveUnitCost(cost, '3'));
+    // QC-305 R1, R2, R16: real = ingrediente (50) + 3 envases reales × 0,5 = 51,5, repartido
+    // sobre los 3 l envasados; la línea en 0 no consume envase ni recibe coste.
+    const actualCost = await actualCostOf(order.id);
+    expect(actualCost).toBe('51.5000');
+    expect(sameBatch!.unitCost?.toFixed(4)).toBe(deriveUnitCost(actualCost!, '3'));
+    expect(deriveUnitCost(actualCost!, '3')).not.toBe(deriveUnitCost(actualCost!, '5'));
 
     await prisma.order.update({
       where: { id: order.id },
@@ -729,7 +784,15 @@ test.describe('envases reales al terminar el empaque', () => {
     expect(gallonBatch, 'nace el lote de 5 l').not.toBeNull();
     expect(litreBatch!.stock.equals('7')).toBe(true);
     expect(gallonBatch!.stock.equals('5')).toBe(true);
-    expect(litreBatch!.unitCost?.toFixed(4)).toBe(deriveUnitCost(cost, '12'));
+    // QC-305 R1, R2, R16: real = ingrediente (100) + 8 envases reales × 0,5 = 104, sobre 12 l.
+    const actualCost = await actualCostOf(order.id);
+    expect(actualCost).toBe('104.0000');
+    const expectedUnitCost = deriveUnitCost(actualCost!, '12');
+    expect(expectedUnitCost).not.toBe(deriveUnitCost(actualCost!, '10'));
+    expect(litreBatch!.unitCost?.toFixed(4)).toBe(expectedUnitCost);
+    expect(gallonBatch!.unitCost?.toFixed(4)).toBe(expectedUnitCost);
+    const lotsValue = litreBatch!.stock.mul(litreBatch!.unitCost!).add(gallonBatch!.stock.mul(gallonBatch!.unitCost!));
+    expect(Math.abs(lotsValue.toNumber() - Number(actualCost))).toBeLessThan(0.01);
 
     // El acondicionamiento no es lo que se prueba: el pedido pasa a `TERMINADO` por la base.
     await prisma.order.update({

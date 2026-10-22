@@ -332,9 +332,11 @@ test.describe('requisitos tras un rechazo del servidor', () => {
 
     const visible = await credential.inputValue();
     const { unmet } = evaluateCredentialRules(visible);
-    const expected = CREDENTIAL_RULES.map((rule) => ({
+    // QC-273 enmienda R17 de QC-260: la lista solo pinta las seis reglas que se comprueban en
+    // vivo; «breached» la decide el servidor y la nombra el aviso de R18, no la lista.
+    const expected = CREDENTIAL_RULES.filter((rule) => rule !== 'breached').map((rule) => ({
       rule,
-      state: rule === 'breached' ? 'unknown' : unmet.includes(rule) ? 'unmet' : 'met',
+      state: unmet.includes(rule) ? 'unmet' : 'met',
     }));
 
     const list = page.locator(`#${await credential.getAttribute('id')}-requirements li`);

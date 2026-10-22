@@ -89,6 +89,7 @@ import {
   executionTraceRoute,
 } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -398,6 +399,8 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  // El Administrador revisa el dashboard, que es un añadido: la empresa nace sin ninguno (QC-277).
+  await enableAllAddons(companyId);
 
   await createUser(conditionerUser, roles.get(ROLE_ACONDICIONAMIENTO)!);
   const adminId = await createUser(adminUser, roles.get(ROLE_ADMINISTRADOR)!);
