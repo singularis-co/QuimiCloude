@@ -13,14 +13,14 @@ Implementer, 2026-10-21. Worktree `.worktrees/QC-306-pdf-status-panel`, rama
 | T3, T4 | Hechas | `75531528` |
 | T5 | Hecha **sin código nuevo**: `identity.getSessionContext()` ya existe | `75531528` |
 | T6 | Hecha | `75531528` |
-| T7, T8 | **PARADAS**: choque de R25 con tests congelados (ver Bloqueo) | — |
+| T7, T8 | Hechas tras la decisión humana (opción 1, design 2.4) | ver «Tanda 2» |
 | T9 | Hecha | `7a074b6d` |
-| T10 | Hecha **salvo R41** (contador y resumen en la cabecera del panel) | `75531528` |
+| T10 | Hecha; R41 en la cabecera del panel, en «Tanda 2» | `75531528` + «Tanda 2» |
 | T11, T12 | Hechas | `75531528` |
 | T13, T14 | Hechas (la fila del catálogo no menciona el almacén de sondeo ni el resumen) | `e4f42656` |
 | T15 | Esta bitácora; `./init.sh` lo corre el leader | — |
 
-## Bloqueo: T8 (R24, R25) y, por arrastre, R41 en el panel
+## Bloqueo (RESUELTO el 2026-10-21 con la opción 1): T8 (R24, R25) y R41 en el panel
 
 El almacén de sondeo por `batchId` (design 2.4) guarda en memoria del módulo las fotos finales para
 no volver a consultar (R25). Rompe 7 casos que el diseño exige no tocar, porque reutilizan
@@ -123,8 +123,8 @@ No hay dependencias nuevas, migraciones ni cambios en `docs/` o `eslint.config.m
 | R21 | `batch-memory.test.ts` › «R21 conserva solo las entradas válidas de una forma antigua o inválida» |
 | R22 | `batch-memory.test.ts` › «R22 conserva el registro en memoria sin lanzar si se rechaza la escritura» |
 | R23 | `batch-memory.test.ts` › «R23 arranca vacío y sin lanzar si el navegador rechaza la lectura» |
-| R24 | **PENDIENTE (T8 parada)**: sin test en la rama |
-| R25 | **PENDIENTE (T8 parada)**: sin test en la rama |
+| R24 | ver «Tanda 2 › Mapa R → test» (`batch-status-store.test.tsx`) |
+| R25 | ver «Tanda 2 › Mapa R → test» (`batch-status-store.test.tsx`) |
 | R26 | `batch-memory.test.ts` › «R26 lo registrado en u1:c1 no aparece en u1:c2 ni en u2:c1»; `formulas-upload.test.tsx` › «R26 — la tanda encolada queda en el registro del ambito usuario:empresa de la sesion» |
 | R27 | `batch-memory.test.ts` › «R27 guarda en la clave con userId y companyId en claro y solo las tres claves» |
 | R28 | **Retirado (P4)**: sin test |
@@ -139,7 +139,7 @@ No hay dependencias nuevas, migraciones ni cambios en `docs/` o `eslint.config.m
 | R38 | `document-upload-convenciones.test.ts` › «R38 — la fila de DocumentBatchPanel cita en Diseño el tablero del panel y no declara la sincronía entre pestañas como no cubierta» |
 | R39 | `document-batch-panel.test.tsx` › «R39 — arranca desplegado; plegar oculta la lista y deja titulo y control», «R39 — desplegar de nuevo vuelve a mostrar la lista» |
 | R40 | `labels.test.ts` › «R40 — «Reanudar» nombra su tanda: «Reanudar la tanda de hoy, 10:47»»; `document-batch-panel.test.tsx` › «R40 — con dos tandas en error de consulta, cada Reanudar tiene un nombre unico» |
-| R41 | **PARCIAL**: `labels.test.ts` › 9 casos «R41 — …» de `batchesSummary` («1 en curso», «Todas terminadas», «1 con errores», «1 en curso · 1 con errores», doble cuenta, desconocida sola). **Falta** el caso del panel (contador y resumen visibles con el panel plegado), que espera a T8. |
+| R41 | `labels.test.ts` › 9 casos «R41 — …» de `batchesSummary` («1 en curso», «Todas terminadas», «1 con errores», «1 en curso · 1 con errores», doble cuenta, desconocida sola). Los casos del panel están en «Tanda 2 › Mapa R → test». |
 
 ## Salida de los comandos (HEAD `e4f42656`)
 
@@ -190,3 +190,105 @@ Aviso: en una pasada con la máquina cargada, «R19 muestra tras la recarga…»
 
 No se corrió `./init.sh` ni la suite completa (lo corre el leader). No hay E2E: la feature no tiene
 specs E2E propios.
+
+## Tanda 2 (frontend_dev, 2026-10-21): T7, T8 y R41 de T10
+
+Decisión humana aplicada: opción 1 (`resetBatchStatusStore()` en `beforeEach`, design 2.4).
+MCP del grafo no usado: Grep y Read.
+
+### Archivos
+
+- T7/T8: `components/shared/document-upload/batch-status-store.ts` (nuevo),
+  `components/shared/document-upload/use-batch-status.ts`,
+  `tests/unit/documentos-ui/batch-status-store.test.tsx` (nuevo),
+  `tests/unit/documentos-ui/use-batch-status.test.tsx` y
+  `tests/unit/documentos-ui/document-upload-errors.test.tsx` (solo import y `beforeEach`).
+- R41: `components/shared/document-upload/document-batch-panel.tsx`,
+  `components/shared/document-upload/index.ts` (`PANEL_COUNT_TESTID`, `PANEL_SUMMARY_TESTID`),
+  `components/shared/CATALOGO.md` (fila de la pieza: cabecera y `Badge`),
+  `tests/unit/documentos-ui/document-batch-panel.test.tsx` (5 casos nuevos, ids de tanda propios).
+
+### Fuga de R25 en 3 archivos más (resuelta)
+
+Con el almacén fallaban, además de los 7 previstos, 9 casos que reutilizan `'batch-1'`. Cada uno
+pasaba corrido solo (`-t`), así que era la misma fuga:
+- `document-batch-panel.test.tsx`: R10, R12, R13 y «R10, R16 — FormulaBatchPanel…»;
+- `formula-pdf-upload.test.tsx`: los 3 «R10 — en estado…» y «R17 — FormulaBatchPanel…»;
+- `formulas-upload.test.tsx`: «R17 — el panel va a todo el ancho…».
+
+Los tres son tests **propios de esta feature**: T6, T10 y T11 ya los habían modificado, y no son
+los que el diseño congela. El implementer extendió a ellos la opción 1. Solo se tocó la
+preparación: `resetBatchStatusStore()` en el `beforeEach` que ya existía, sin cambiar ningún
+`it()`, aserción ni título.
+
+### Mapa R → test (esta tanda)
+
+| R | Test (archivo › caso) |
+|---|---|
+| R24 | `batch-status-store.test.tsx` › «la ventana y el panel siguiendo la misma tanda dan una sola llamada por intervalo (R24)», «con dos consumidores nunca hay dos consultas de la misma tanda en vuelo (R24)», «el sondeo sigue mientras quede un consumidor y se para con el ultimo (R24)» |
+| R25 | `batch-status-store.test.tsx` › «remontar una tanda ya vista terminada la sirve de memoria sin ninguna llamada (R25)», «remontar una tanda ya vista desaparecida no hace ninguna llamada (R25)», «tras recargar, una tanda terminada da exactamente una llamada y no arma el temporizador (R25)», «no guarda la foto de la tanda en el almacenamiento del navegador (R25)» |
+| resume | `batch-status-store.test.tsx` › «resume desde un consumidor vuelve a consultar y limpia el error en todos» |
+| R41 | `document-batch-panel.test.tsx` › «R41 — el contador coincide con las tandas visibles, incluidas las desconocidas», «R41 — la cabecera muestra el resumen del estado de las tandas», «R41 — con solo tandas terminadas o desconocidas el resumen dice «Todas terminadas»», «R41 — con el panel plegado, el contador y el resumen siguen visibles», «R41 — la cabecera no añade consultas: cada tanda se consulta una sola vez»; más los 9 de `labels.test.ts` |
+
+### Salida
+
+```
+# T7 en rojo contra el use-batch-status.ts de HEAD (copia temporal, restaurada)
+$ pnpm exec vitest run tests/unit/documentos-ui/batch-status-store.test.tsx
+ Tests  7 failed | 1 passed (8)     # pasa solo «no guarda la foto…»: es guardia
+
+# R41 en rojo antes de implementar
+$ pnpm exec vitest run tests/unit/documentos-ui/document-batch-panel.test.tsx -t R41
+ Tests  5 failed | 19 skipped (24)
+# después
+ Tests  5 passed | 19 skipped (24)
+
+$ pnpm run typecheck
+> tsc --noEmit                      # sin errores
+
+$ pnpm exec eslint <8 archivos tocados>
+ESLint: No issues found             # exit 0
+
+$ pnpm exec vitest run tests/unit/documentos-ui/
+ Test Files  3 failed | 16 passed (19)
+      Tests  9 failed | 165 passed (174)     # los 9 del choque abierto
+
+$ pnpm exec vitest related --run <4 archivos de producción>
+ Test Files  3 failed | 62 passed (65)
+      Tests  9 failed | 1047 passed | 1 skipped (1057)   # los mismos 9
+
+$ pnpm exec vitest run tests/guards/guard-catalogo-de-componentes.test.ts
+ Tests  59 passed (59)
+```
+
+`batch-memory.test.ts` › «R19 muestra tras la recarga…» volvió a fallar una vez con la máquina
+cargada y pasó solo (15/15): sigue intermitente.
+
+### Verificación final (implementer, tras extender el reinicio)
+
+Archivos: todos los `.ts`/`.tsx` del diff contra `952785c5`, más los nuevos.
+
+```
+$ pnpm run typecheck
+> tsc --noEmit                      # sin errores
+
+$ pnpm exec eslint <archivos tocados>
+(sin salida, exit 0)
+
+$ pnpm exec vitest related --run <archivos de producción>
+ Test Files  67 passed (67)
+      Tests  1094 passed | 1 skipped (1095)
+
+$ pnpm exec vitest run tests/unit/documentos-ui/ tests/unit/documentos/     tests/unit/recetas-ui/recipe-page.test.tsx tests/unit/paridad/recetas-paridad.test.tsx
+ Test Files  104 passed (104)
+      Tests  1203 passed | 30 skipped (1233)
+
+$ pnpm exec vitest run guard
+ Test Files  85 passed (85)
+      Tests  1253 passed | 22 skipped (1275)
+
+$ grep -rnE "\.subscribe\(|channel\(|EventSource|sessionStorage|localStorage"     components/shared/document-upload | grep -v batch-memory.ts
+(vacío)
+```
+
+Veredicto: T1–T14 hechas; `./init.sh` (T15) lo corre el leader.

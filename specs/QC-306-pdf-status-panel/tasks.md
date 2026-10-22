@@ -104,7 +104,7 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T7 [P] — Tests del almacén de sondeo (en rojo)
 
-- [ ] Crear `tests/unit/documentos-ui/batch-status-store.test.tsx` con casos para:
+- [x] Crear `tests/unit/documentos-ui/batch-status-store.test.tsx` con casos para:
   - dos consumidores de la misma tanda dan una sola llamada por intervalo y nunca dos en vuelo
     (R24);
   - remontar una tanda terminada o desaparecida no hace ninguna llamada (R25);
@@ -116,10 +116,10 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T8 — Implementar el almacén (Dep.: T7)
 
-- [ ] Crear `batch-status-store.ts` (sección 2.4 del diseño).
-- [ ] Hacer que `useBatchStatus` se apoye en él sin cambiar `UseBatchStatusResult`.
-- [ ] No persistir ninguna foto (P5).
-- [ ] Exportar `resetBatchStatusStore()` y llamarla en `beforeEach` de `use-batch-status.test.tsx`
+- [x] Crear `batch-status-store.ts` (sección 2.4 del diseño).
+- [x] Hacer que `useBatchStatus` se apoye en él sin cambiar `UseBatchStatusResult`.
+- [x] No persistir ninguna foto (P5).
+- [x] Exportar `resetBatchStatusStore()` y llamarla en `beforeEach` de `use-batch-status.test.tsx`
   y `document-upload-errors.test.tsx`. Solo cambia la preparación, no lo que se comprueba
   (decisión humana del 2026-10-21, `design.md` 2.4).
 
@@ -149,15 +149,15 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T10 — Panel accesible y plegable (Dep.: T0, T6, T9)
 
-- [ ] Escribir primero en `document-batch-panel.test.tsx` estos casos:
+- [x] Escribir primero en `document-batch-panel.test.tsx` estos casos:
   - R34: un nombre accesible único por «Descartar» y por bloque;
   - R40: un nombre accesible único por «Reanudar»;
   - R39: arranca desplegado; plegar oculta la lista y deja el título y el control; desplegar la
     muestra;
   - R41: el contador coincide con las tandas visibles, y el resumen sigue visible con el panel
     plegado.
-  - **Hecho salvo R41** (contador y resumen de la cabecera): espera la decisión sobre T8.
-- [ ] En `document-batch-panel.tsx`:
+  - R41 hecho tras la decisión sobre T8 (opción 1, 2026-10-21).
+- [x] En `document-batch-panel.tsx`:
   - `aria-labelledby` en cada bloque;
   - `aria-label` en «Descartar» y en «Reanudar»;
   - `Collapsible` abierto de partida;
@@ -219,7 +219,7 @@ verde y no hay `.subscribe(` en la carpeta.
 
 ### T15 — Informe y mapa de trazabilidad
 
-- [ ] Escribir `progress/impl_QC-306.md` con el mapa R1–R41 → test, sin entradas
+- [x] Escribir `progress/impl_QC-306.md` con el mapa R1–R41 → test, sin entradas
   vacías salvo R18 y R28, que están retirados.
 - [ ] Pasar `./init.sh` en verde.
 
