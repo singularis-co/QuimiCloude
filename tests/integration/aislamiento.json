@@ -54,6 +54,7 @@
     "integraciones/whatsapp-template-migration.int.test.ts",
     "integraciones/whatsapp-variable-keys-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",
+    "integraciones/ai-models-migration.int.test.ts",
     "inventario/company-scope.int.test.ts",
     "inventario/inventario-constraints.int.test.ts",
     "inventario/inventory-movements-constraints.int.test.ts",

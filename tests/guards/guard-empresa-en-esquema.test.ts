@@ -94,6 +94,7 @@ export const EXENTAS: readonly Exenta[] = [
   { tabla: 'recipe_lines', motivo: 'hereda la empresa de la receta a la que pertenece' },
   { tabla: 'recipe_tools', motivo: 'hereda la empresa de la receta a la que pertenece' },
   { tabla: 'ai_providers', motivo: 'catalogo de proveedores de IA, compartido por todas las empresas' },
+  { tabla: 'ai_models', motivo: 'catalogo de modelos de IA, compartido por todas las empresas' },
   { tabla: 'addons', motivo: 'catalogo de añadidos, compartido por todas las empresas' },
 ]
 
@@ -261,7 +262,7 @@ describe('guardia — company_id en el esquema', () => {
     ])
   })
 
-  it('R7 EXENTAS son exactamente las once y users no esta', () => {
+  it('R7 EXENTAS son exactamente las doce y users no esta', () => {
     const tablas = EXENTAS.map((exenta) => exenta.tabla)
     expect(new Set(tablas)).toEqual(
       new Set([
@@ -275,10 +276,11 @@ describe('guardia — company_id en el esquema', () => {
         'recipe_lines',
         'recipe_tools',
         'ai_providers',
+        'ai_models',
         'addons',
       ]),
     )
-    expect(tablas).toHaveLength(11)
+    expect(tablas).toHaveLength(12)
     expect(tablas).not.toContain('users')
   })
 
@@ -346,7 +348,7 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens` y',
-      '     `revoked_sessions`, `recipe_tools`, `ai_providers` y `addons`.',
+      '     `revoked_sessions`, `recipe_tools`, `ai_providers`, `ai_models` y `addons`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletSinRecipeLines, EXENTAS)).toEqual([
@@ -357,7 +359,7 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,',
-      '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers`, `addons` y `users`.',
+      '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers`, `ai_models`, `addons` y `users`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletConUsersDeMas, EXENTAS)).toEqual([

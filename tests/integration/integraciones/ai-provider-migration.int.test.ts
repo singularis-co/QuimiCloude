@@ -1,5 +1,9 @@
 // La migracion `db/migrations/*_ai_providers/` contra Postgres REAL.
 //
+// La migracion posterior `*_ai_models/` borra `recipe_model` y `catalog_model` y cuelga FK de estas
+// tablas. Los casos que miran esas columnas o bajan esta migracion aplican antes el DOWN de aquella
+// (`withoutAiModels`), para ver el esquema tal como lo dejo esta.
+//
 // Aislamiento: cada `it` corre dentro de `prisma.$transaction` interactiva y termina lanzando
 // `RollbackSignal`, asi que ninguna fila ni ningun DDL sobrevive. El SQL se lee del archivo.
 // Las violaciones esperadas van dentro de un SAVEPOINT para no abortar la transaccion. El mensaje
@@ -64,10 +68,19 @@ function statementsOf(sql: string): readonly string[] {
 const UP_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8'))
 const DOWN_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8'))
 
+const carpetasModelos = readdirSync(migrationsDir).filter((name) => /_ai_models$/.test(name))
+const AI_MODELS_DOWN = statementsOf(
+  readFileSync(join(migrationsDir, carpetasModelos[0] ?? '__falta__', 'down.sql'), 'utf8'),
+)
+
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
     await tx.$executeRawUnsafe(statement)
   }
+}
+
+async function withoutAiModels(tx: Prisma.TransactionClient): Promise<void> {
+  await applyStatements(tx, AI_MODELS_DOWN)
 }
 
 const CATALOG = 'ai_providers'
@@ -75,6 +88,7 @@ const CONNECTIONS = 'ai_provider_connections'
 const TABLES = [CATALOG, CONNECTIONS] as const
 
 async function tableSnapshot(tx: Prisma.TransactionClient, table: string) {
+  // Por nombre y no por posicion: el DOWN de `*_ai_models/` vuelve a anadir columnas al final.
   const columns = await tx.$queryRaw<
     {
       column_name: string
@@ -87,7 +101,7 @@ async function tableSnapshot(tx: Prisma.TransactionClient, table: string) {
     SELECT column_name, data_type, udt_name, is_nullable, column_default
     FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = ${table}
-    ORDER BY ordinal_position`
+    ORDER BY column_name`
   const indexes = await tx.$queryRaw<{ indexname: string; indexdef: string }[]>`
     SELECT indexname, indexdef FROM pg_indexes
     WHERE schemaname = 'public' AND tablename = ${table}
@@ -191,10 +205,12 @@ describe('migracion ai_providers contra Postgres real', () => {
   it('existe exactamente una carpeta de la migracion, con su down.sql', () => {
     expect(carpetas).toHaveLength(1)
     expect(existsSync(join(migrationDir, 'down.sql'))).toBe(true)
+    expect(carpetasModelos).toHaveLength(1)
   })
 
   it('R4: el catalogo trae exactamente los cuatro proveedores, en orden, con sus modelos no vacios', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await withoutAiModels(tx)
       const rows = await catalogRows(tx)
       expect(rows).toEqual(SEEDED)
       for (const row of rows) {
@@ -206,6 +222,7 @@ describe('migracion ai_providers contra Postgres real', () => {
 
   it('R4: el CHECK rechaza un modelo vacio', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await withoutAiModels(tx)
       expect(
         await failureOf(tx, `UPDATE "${CATALOG}" SET "recipe_model" = '' WHERE "code" = 'OPENAI'`),
       ).toMatch(/23514/)
@@ -268,6 +285,7 @@ describe('migracion ai_providers contra Postgres real', () => {
   it('R5: un proveedor con conexiones no se puede borrar del catalogo; sin conexiones, si', async () => {
     await inRolledBackTransaction(async (tx) => {
       const userId = await someUserId(tx)
+      await withoutAiModels(tx)
       const companyId = await newCompanyId(tx, 'qc_mig_ai_c')
       expect(await failureOf(tx, INSERT_CONNECTION, companyId, 'OPENAI', userId)).toBeNull()
 
@@ -279,6 +297,7 @@ describe('migracion ai_providers contra Postgres real', () => {
 
   it('R4, R5: el DOWN quita las dos tablas y los dos tipos, y el resto de tablas queda igual', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await withoutAiModels(tx)
       const tablasAntes = await publicTables(tx)
       expect(tablasAntes).toEqual(expect.arrayContaining([...TABLES]))
 
@@ -296,6 +315,7 @@ describe('migracion ai_providers contra Postgres real', () => {
 
   it('R4, R5: ida, vuelta e ida dejan el mismo esquema y las mismas cuatro filas', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await withoutAiModels(tx)
       const antes = await schemaSnapshot(tx)
       const filasAntes = await catalogRows(tx)
       expect(antes.connections.columns.length).toBeGreaterThan(0)
@@ -313,6 +333,7 @@ describe('migracion ai_providers contra Postgres real', () => {
     expect(upSinForce, 'la mutacion no quito las dos sentencias').toHaveLength(UP_STATEMENTS.length - 2)
 
     await inRolledBackTransaction(async (tx) => {
+      await withoutAiModels(tx)
       await applyStatements(tx, DOWN_STATEMENTS)
       await applyStatements(tx, upSinForce)
       const snapshot = await schemaSnapshot(tx)
