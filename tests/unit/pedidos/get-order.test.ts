@@ -333,7 +333,7 @@ describe('getOrder — el importe y su parte de envases', () => {
   })
 })
 
-// QC-305 T6 — el coste real sale por la ficha, que exige `pedidos.consultar`, y por ninguna otra
+// El coste real sale por la ficha, que exige `pedidos.consultar`, y por ninguna otra
 // puerta: sin el permiso, el rechazo llega antes que el repositorio y los catalogos.
 describe('QC-305 — getOrder: el coste real y quien lo ve (R24)', () => {
   it('R24: con pedidos.consultar la ficha trae actualCost como cadena de 4 decimales, tal como viene de la fila', async () => {

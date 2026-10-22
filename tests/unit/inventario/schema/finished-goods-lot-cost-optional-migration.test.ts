@@ -1,4 +1,4 @@
-// Contrato ESTATICO del SQL de `finished_goods_lot_cost_optional` (QC-305 R17, P2).
+// Contrato ESTATICO del SQL de `finished_goods_lot_cost_optional`.
 //
 // Se vigila que la migracion retire solo el CHECK que exigia `unit_cost` en todo lote con
 // `package_content`, que no toque `product_batches_unit_cost_positive` y que el `down.sql` lo

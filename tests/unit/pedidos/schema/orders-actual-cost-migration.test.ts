@@ -1,4 +1,4 @@
-// Contrato ESTATICO del SQL de `orders_actual_cost` (QC-305 R10, R25).
+// Contrato ESTATICO del SQL de `orders_actual_cost`.
 //
 // Se vigila que la columna nazca opcional y decimal(14,4) en el propio pedido, que los dos CHECK
 // la aten a un importe no negativo y a un pedido que ya paso por Terminar, que ninguna sentencia

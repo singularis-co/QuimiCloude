@@ -893,7 +893,7 @@ describe('R18 — el coste del lote', () => {
     }
   });
 
-  // QC-305 P1 retira la regla de QC-150 («el ingrediente sin costo cuenta cero»): un lote
+  // Ya no rige la regla «el ingrediente sin costo cuenta cero»: un lote
   // consumido sin coste deja el pedido sin coste real y su lote de producto terminado sin coste
   // unitario; nunca 0 ni el reparto de lo que si tiene coste.
   it('QC-305 P1 / R7, R17: un ingrediente con material pero sin costo deja el pedido sin coste real y su lote de producto terminado sin coste unitario', async () => {
@@ -920,8 +920,8 @@ describe('R18 — el coste del lote', () => {
         where: { productId: producto?.id },
         select: { unitCost: true, packageContent: true, stock: true },
       });
-      // R17: el lote nace igual (10 envases con su contenido), pero sin coste unitario: ni
-      // 0.0000 ni 3.5000, que seria contar la maquina como cero (la regla de QC-150 retirada).
+      // El lote nace igual (10 envases con su contenido), pero sin coste unitario: ni
+      // 0.0000 ni 3.5000, que seria contar la maquina como cero (la regla retirada).
       expect(lote.stock.toFixed(4)).toBe('10.0000');
       expect(lote.packageContent).not.toBeNull();
       expect(lote.unitCost).toBeNull();
@@ -930,7 +930,7 @@ describe('R18 — el coste del lote', () => {
         where: { id: creado.id },
         select: { ingredientsCost: true, actualCost: true },
       });
-      // R7 / P1: un lote consumido sin coste deja el real sin importe; el estimado sigue nulo.
+      // Un lote consumido sin coste deja el real sin importe; el estimado sigue nulo.
       expect(despues.actualCost).toBeNull();
       expect(despues.ingredientsCost).toBeNull();
     } finally {
@@ -1517,8 +1517,8 @@ describe('Terminar con el conteo real de envases', () => {
       const producto = await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId);
       const lote = await prisma.productBatch.findFirstOrThrow({ where: { productId: producto?.id }, select: { stock: true, unitCost: true } });
       expect(lote.stock.toFixed(4)).toBe('5.0000');
-      // QC-305 R16: se reparte el real -10 x 3.0000 consumidos + 5 envases consumidos a 0.5000 =
-      // 32.5000- entre los 5 envasados de verdad; el estimado (34.0000) no cambia (R6).
+      // Se reparte el real -10 x 3.0000 consumidos + 5 envases consumidos a 0.5000 =
+      // 32.5000- entre los 5 envasados de verdad; el estimado (34.0000) no cambia.
       const costes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true, actualCost: true } });
       expect(costes.actualCost?.toFixed(4)).toBe('32.5000');
       expect(lote.unitCost?.toFixed(4)).toBe('6.5000');
@@ -1659,7 +1659,7 @@ describe('Terminar con el conteo real de envases', () => {
       const [lote] = lotes;
       expect(lote?.stock.toFixed(4)).toBe('12.0000');
 
-      // R10 con QC-305 R16: el estimado no cambia y lo que se reparte entre los 12 L envasados es
+      // El estimado no cambia y lo que se reparte entre los 12 L envasados es
       // el real, que cuenta los 12 envases consumidos.
       const costes = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { ingredientsCost: true, actualCost: true } });
       expect(costes.ingredientsCost?.toFixed(4)).toBe(costeDelPedido.toFixed(4));

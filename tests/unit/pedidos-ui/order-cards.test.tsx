@@ -336,7 +336,7 @@ describe('los estados de la lista no cambian con las tarjetas', () => {
   });
 });
 
-// QC-305 R19 (decision 2026-10-21, opcion b) — la tarjeta de telefono lleva tambien los dos costes,
+// La tarjeta de telefono lleva tambien los dos costes,
 // con la MISMA celda que la tabla: rotulo de tarjeta delante, importe con `formatMoneyDisplay` y el
 // exacto en `title` si se redondea, o el guion «Sin dato».
 describe('R19: los costes en la tarjeta de telefono', () => {

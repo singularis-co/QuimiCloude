@@ -682,7 +682,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     return { ...doble, update, costo, packaging: catalogos.packaging };
   }
 
-  // QC-305 R13: desde Comenzar el importe ya no se recalcula; EN_CURSO salio de este caso.
+  // Desde Comenzar el importe ya no se recalcula; EN_CURSO salio de este caso.
   it.each<OrderStatus>(['PENDIENTE'])(
     'R45: en %s guarda el importe nuevo -ingredientes 20 + envases 1.2- con el apartado del propio pedido',
     async (status) => {
@@ -746,7 +746,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     expect(costo.findCostingBatches).not.toHaveBeenCalled();
   });
 
-  // QC-305 R13 sustituye a QC-195 R47: en POR_EMPACAR el importe ya no se recompone.
+  // En POR_EMPACAR el importe ya no se recompone.
   it.each<OrderStatus>(['EN_CURSO', 'POR_EMPACAR'])(
     'R13: en %s guardar el reparto y la unidad no escribe el estimado ni lo calcula',
     async (status) => {

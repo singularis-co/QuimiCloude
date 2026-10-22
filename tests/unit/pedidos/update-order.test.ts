@@ -1834,7 +1834,7 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
   });
 });
 
-// QC-305 — desde Comenzar la edicion general conserva el estimado guardado.
+// Desde Comenzar la edicion general conserva el estimado guardado.
 
 describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)', () => {
   const OTRA_RECETA_DE_A = '88888888-8888-4888-8888-888888888888';

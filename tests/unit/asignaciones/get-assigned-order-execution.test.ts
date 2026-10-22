@@ -962,7 +962,7 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
   });
 });
 
-// QC-305 T6 — R24: la pantalla de ejecucion no lleva NINGUN importe, ni el real ni el estimado.
+// La pantalla de ejecucion no lleva NINGUN importe, ni el real ni el estimado.
 // Se recorre la vista ENTERA (pasos, lineas, reparto, evidencia) buscando claves de importe, y el
 // resumen del doble trae a proposito esos campos colados -como si el catalogo de `pedidos` los
 // filtrara por error-: la vista no puede copiarlos.

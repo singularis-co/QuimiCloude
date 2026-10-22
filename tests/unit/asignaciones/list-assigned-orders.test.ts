@@ -671,7 +671,7 @@ describe('listAssignedOrders — sin `asignaciones.ejecutar` no hay pedidos prev
   });
 });
 
-// QC-305 T6 — R24: la lista del Operador no lleva NINGUN importe, ni el real ni el estimado. Se
+// La lista del Operador no lleva NINGUN importe, ni el real ni el estimado. Se
 // recorre cada fila entera (reparto y responsables incluidos) buscando claves de importe, con
 // resumenes que traen esos campos colados a proposito: la fila no puede copiarlos.
 const CLAVE_DE_IMPORTE = /cost|coste|importe|price|precio|amount/i;

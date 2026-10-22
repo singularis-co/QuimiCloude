@@ -222,7 +222,7 @@ function producedProductsOf(
  * Celda de importe. El estimado es `ingredientsCost` y NADA MAS: ya incluye los envases, y sumar
  * `packagingCost` los contaria dos veces. Sin importe, el marcador de ausencia; nunca `0`.
  *
- * QC-305 R19 — la misma celda va a la tarjeta de telefono con su rotulo delante
+ * La misma celda va a la tarjeta de telefono con su rotulo delante
  * (`withCardFieldLabel`), que dentro de la tabla se oculta: la cabecera ya lo dice.
  */
 export const PRODUCTION_COST_LABEL = 'Costo estimado';

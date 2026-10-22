@@ -493,7 +493,7 @@ describe('el pedido como fila completa', () => {
        WHERE table_schema = 'public' AND table_name = 'orders'`
     const names = columns.map((c) => c.column_name).sort()
     expect(names).toEqual([
-      // `actual_cost` la anade QC-305 (R25): el coste real de produccion, aparte del estimado. No es
+      // `actual_cost` es el coste real de produccion, aparte del estimado. No es
       // un precio de venta, un total, un impuesto ni un cliente. La primera por el `sort()`
       // lexicografico ('a' < 'c').
       'actual_cost',

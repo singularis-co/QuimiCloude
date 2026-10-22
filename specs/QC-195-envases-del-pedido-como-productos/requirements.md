@@ -339,3 +339,5 @@ de ingredientes: P6.)*
 | 2026-10-03 | Cálculo del reparto | Se mantiene `order-distribution.ts`: envases × contenido de la presentación, convertido a la unidad del pedido. |
 | 2026-10-03 | Pedidos existentes | Quedan como están, sin apartar envases. Si se edita su reparto, hay que elegir productos PACKAGING. |
 | 2026-10-03 | Costo | El costo del envase se suma a la cotización, con el costo promedio de QC-141 D22. |
+
+> **Enmienda QC-305 (2026-10-21):** R47 queda sin efecto en los pedidos comenzados: en `EN_CURSO` y `POR_EMPACAR` guardar el reparto ya no recompone el estimado (QC-305 R13). Ver `specs/QC-305-coste-real-de-produccion/requirements.md` R13-R14.

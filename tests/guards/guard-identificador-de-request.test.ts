@@ -339,6 +339,11 @@ export const E2E_ESPERADOS = [
   // plan y mira envases, lotes, coste y la tab «Reparto». No lee ni afirma nada sobre el
   // identificador de peticion.
   'envases-reales-empaque.spec.ts',
+  // Alta por el mismo motivo que las demas. Consume un ingrediente de dos lotes, edita el pedido en
+  // curso sin que cambie el estimado, termina el empaque con otros envases y mira el coste real en
+  // el listado y en el lote de producto terminado. No lee ni afirma nada sobre el identificador de
+  // peticion.
+  'coste-real-de-produccion.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
@@ -797,9 +802,9 @@ export const MIGRACIONES_ESPERADAS = [
   '20261020160000_order_presentation_lines_packed_surplus',
   // QC-242 2026-10-20: diccionario de variables de WhatsApp; no toca el identificador.
   '20261020180000_whatsapp_variable_keys',
-  // QC-305 2026-10-21: coste real de produccion en el pedido; no toca el identificador.
+  // 2026-10-21: coste real de produccion en el pedido; no toca el identificador.
   '20261021140000_orders_actual_cost',
-  // QC-305 2026-10-21: lote de producto terminado sin coste unitario; no toca el identificador.
+  // 2026-10-21: lote de producto terminado sin coste unitario; no toca el identificador.
   '20261021150000_finished_goods_lot_cost_optional',
 ] as const
 

@@ -504,7 +504,7 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     // abre `orderUnitOfWork` directamente -ya no cablea `OrderPackingRepository.finishPackingAlive`,
     // que T13 retiro del puerto- y necesita los mismos catalogos globales que `transitionAliveById`
     // usaba antes de R15/R16, mas `presentationCatalog` para la defensa en profundidad de R19.
-    // QC-305: el coste del lote ya no sale de los catalogos de productos ni de envases, sino de
+    // El coste del lote ya no sale de los catalogos de productos ni de envases, sino de
     // los consumos que lee la propia transaccion (`scope.consumption`).
     'finishPackingAliveById',
     /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,?\s*\}\s*\)$/,

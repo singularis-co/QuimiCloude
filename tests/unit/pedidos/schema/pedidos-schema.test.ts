@@ -139,7 +139,7 @@ const user = parseModel('User')
  *  tabla y las lleva a veintiuno: la decision [Q4] deroga la salida del 2026-09-07 (`design.md`
  *  seccion 0.6). El reparto por presentacion retira `presentationId` y `presentationContent`
  *  (pasan a `OrderPresentationLine`) y quedan diecinueve. QC-195 (P6) anade `packagingCost`, la parte de
- *  envases del importe, y son veinte. QC-156 anade `customerId`, el cliente opcional, y son veintiuno. QC-305 anade `actualCost`, el
+ *  envases del importe, y son veinte. QC-156 anade `customerId`, el cliente opcional, y son veintiuno. Despues entra `actualCost`, el
  *  coste real, y son veintidos. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
  *  test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
@@ -159,7 +159,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['deletedAt', 'deleted_at'],
   ['ingredientsCost', 'ingredients_cost'],
   ['packagingCost', 'packaging_cost'], // QC-195 R47: parte de envases incluida en ingredients_cost
-  ['actualCost', 'actual_cost'], // QC-305 R25: coste real, aparte del estimado, opcional
+  ['actualCost', 'actual_cost'], // coste real, aparte del estimado, opcional
   ['reservedAt', 'reserved_at'],
   ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
   ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
@@ -330,7 +330,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).not.toContain('unit_price')
 
     // Los CUATRO unicos decimales del modelo: la cantidad, el importe, su parte de envases
-    // (QC-195 R47) y el coste real (QC-305 R25). La copia del contenido de la presentacion vive
+    // (QC-195 R47) y el coste real. La copia del contenido de la presentacion vive
     // en la linea de reparto.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),

@@ -559,7 +559,7 @@ test.describe('coste real de producción', () => {
     await enterAndStartAssignedOrder(page, assignedRow.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
     expect((await savedCosts(order.id)).status).toBe('EN_CURSO');
 
-    // --- 3. R12: en `EN_CURSO` la cantidad pasa a 8 l y el estimado no se mueve.
+    // --- 3. En `EN_CURSO` la cantidad pasa a 8 l y el estimado no se mueve.
     await switchUser(page, adminUser);
     await openOrders(page);
     await (await openOrderRowMenu(page, orderMenuTrigger(page, order.id), ORDER_ACTION_EDIT_TESTID)).click();
@@ -602,7 +602,7 @@ test.describe('coste real de producción', () => {
     );
     expect((await savedCosts(order.id)).status).toBe('POR_EMPACAR');
 
-    // R26 (a): el ingrediente salió de sus dos lotes, de coste distinto.
+    // El ingrediente salió de sus dos lotes, de coste distinto.
     const ingredientLots = (await consumedLots(order.id)).filter((lot) => lotIds.includes(lot.batchId));
     expect(ingredientLots.map((lot) => lot.batchId).sort()).toEqual([...lotIds].sort());
     expect(new Set(ingredientLots.map((lot) => lot.unitCost)).size).toBe(2);
@@ -648,7 +648,7 @@ test.describe('coste real de producción', () => {
     });
     expect(packedLine).toEqual({ packages: PLANNED_PACKAGES, packedPackages: PACKED_PACKAGES });
 
-    // R1: el real es Σ cantidad × coste de TODOS los asientos de consumo (ingrediente y envases).
+    // El real es Σ cantidad × coste de TODOS los asientos de consumo (ingrediente y envases).
     const lots = await consumedLots(order.id);
     expect(lots.map((lot) => lot.batchId)).toContain(packaging.batchId);
     expect(lots.find((lot) => lot.batchId === packaging.batchId)?.quantity).toBe(`${PACKED_PACKAGES}.0000`);
@@ -659,7 +659,7 @@ test.describe('coste real de producción', () => {
     expect(finished.estimated, 'R6, R12: Terminar tampoco toca el estimado').toBe(estimated);
     expect(finished.actual).not.toBe(finished.estimated);
 
-    // --- 6. R19, R21: el listado, «Costo estimado» y «Costo real» contiguos y en ese orden.
+    // --- 6. El listado, «Costo estimado» y «Costo real» contiguos y en ese orden.
     await switchUser(page, adminUser);
     await openOrders(page);
     const row = orderRow(page, order.id);
@@ -688,7 +688,7 @@ test.describe('coste real de producción', () => {
       await page.screenshot({ path: join(screenshotsDir, 'escritorio.png') });
     }
 
-    // R19 (decision 2026-10-21, opcion b): la tarjeta de telefono lleva los dos costes rotulados.
+    // La tarjeta de telefono lleva los dos costes rotulados.
     await page.setViewportSize(PHONE_VIEWPORT);
     await openOrders(page);
     const card = page.getByTestId(`data-table-card-${order.id}`);
@@ -704,7 +704,7 @@ test.describe('coste real de producción', () => {
     }
     if (desktopViewport !== null) await page.setViewportSize(desktopViewport);
 
-    // --- 7. R16, R22: el lote de producto terminado cuesta real ÷ envasado (7 l).
+    // --- 7. El lote de producto terminado cuesta real ÷ envasado (7 l).
     const batch = await prisma.productBatch.findFirstOrThrow({
       where: {
         companyId,

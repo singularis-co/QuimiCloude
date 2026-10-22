@@ -1084,7 +1084,7 @@ describe('listOrders — por entregar', () => {
   })
 })
 
-// QC-305 T6 — el listado exige `pedidos.consultar` y es la otra salida por la que viaja el coste
+// El listado exige `pedidos.consultar` y es la otra salida por la que viaja el coste
 // real. Cada fila lo lleva tal como lo guarda el pedido: cadena de 4 decimales o `null`.
 describe('QC-305 — listOrders: el coste real y quien lo ve (R24)', () => {
   it('R24: con pedidos.consultar cada fila trae actualCost como cadena de 4 decimales o null', async () => {
