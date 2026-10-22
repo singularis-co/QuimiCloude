@@ -294,3 +294,34 @@ Detalle de cada caso en las secciones de mapa de cada tanda. Rutas bajo `tests/`
 - `pnpm exec vitest run guard`: 80 archivos, 1096 verdes, 20 skipped.
 - E2E: 2 passed (chromium + webkit), salida arriba.
 - `./init.sh`: lo corre el leader (criterio de hecho de T20).
+
+## Vuelta 2 — correcciones de la revisión 1 + F2.3 + pulsación larga
+
+HEAD antes del fix: `f4d5281d`.
+
+### Correcciones (commit `09730570`)
+- M1: `tests/unit/recetas-ui/recipe-route-contract.test.ts` — `PASOS_DE_ACONDICIONAMIENTO_QC299` (12 archivos de `lib/modules/recetas/`) en `RECETAS_PERMITIDAS` y `MIGRACION_QC299` (schema + 4 SQL) en `DB_PERMITIDAS`.
+- M2: `tests/unit/shared/data-table-alcance.test.ts` — alta de `e2e/pasos-de-acondicionamiento.spec.ts` en la lista cerrada.
+- m4: comentarios repartidos en `finish-conditioning.ts` y `evidence-target.ts`.
+- m5: `design.md` anota `optionalDescription` (5.1) y `stepsPending` en `conditioning-order-screen.tsx` (5.2).
+
+### F2.3 — merge de `origin/dev` (commit `62e137f8`, 411 commits de dev)
+- Conflictos resueltos conservando ambos lados: `error-codes.ts`/`error-catalog.ts` (121 códigos = 117 de dev + 4), `catalogo.test.ts`, `aislamiento.json`, guardia del identificador (E2E y migraciones de dev + QC-299), `data-table-alcance.test.ts` (cincuenta y cinco), `canvas.json` (148 tableros, 58 notas), fachada de asignaciones (35 = 34 tras QC-301 + `recordConditioningStep`), rol de acondicionamiento (13 rutas: sale `list-delivered-conditioned-orders.ts` que QC-301 borró).
+- Formulario de recetas: dev (QC-264) lo rediseñó con secciones en tarjetas; Acondicionamiento pasa a ser la tercera tarjeta (desaparece `recipe-form-conditioning-separator`, como dev quitó `recipe-form-steps-separator`). `recipe-step-editor.tsx` y `recipe-steps-field.tsx`: maquetación de dev + switches de QC-299. Tests ajustados sin rebajar: `recipe-form-conditioning-steps` (R8, tarjeta propia tras Envasado), `recipe-form-layout` (5 tarjetas), `recipe-steps-field` (nombre «… de Pasos»); fixtures `RecipeDetail` con `conditioningSteps: []` en `formulas-toasts`, `recipe-version-marks`, `recipe-form-layout`, `recipe-form-preview`.
+- Ninguna ambigüedad: QC-301 solo quitó `listDeliveredConditionedOrders`, que QC-299 no usa.
+- Migraciones del merge (13 de dev) verificadas sobre base efímera: `pnpm run db:test template` construyó `qct_tpl_bdf56c3e8ff5` con las 113 migraciones (las de QC-299 al final); `recipe-conditioning-steps-migration.int.test.ts` (UP/DOWN) verde contra una copia, borrada al terminar. `QuimiCloude` no se tocó.
+- Tras el merge hace falta `pnpm exec prisma generate` (el schema de dev cambió).
+- `tests/unit/marca/tablas-marca.test.tsx`: **verde** tras el merge.
+
+### Pulsación larga en táctil (decisión del humano 2026-10-21)
+- Anotada en `requirements.md > Decisiones cerradas` y en `design.md > 5.4`.
+- `app/(private)/produccion/formulas/components/recipe-step-editor.tsx`: `IconSwitch` controla el `open` del `Tooltip` con pointer events (touch/pen, 500 ms; mover > 10 px o cancelar aborta; el click al soltar tras la pulsación larga se descarta; sin menú contextual ni selección; se cierra al tocar fuera). El `Tooltip` compartido **no cambia**: ningún otro consumidor afectado. Sin dependencias.
+- Tests: `tests/unit/recetas-ui/recipe-step-editor.test.tsx`, bloque «ayuda de los switches por pulsación larga en táctil», 10 casos «R10: pulsación larga — …».
+- R10 → añade ese bloque al mapa.
+
+### Verificación local (implementer)
+- `pnpm run typecheck`: **0 errores**. `pnpm run lint`: 0 errores, 10 warnings (preexistentes).
+- `pnpm exec vitest run guard`: 85 archivos, 1253 verdes, 22 skipped.
+- `recipe-route-contract.test.ts` y `data-table-alcance.test.ts`: verdes.
+- `tests/unit/recetas` + `tests/unit/recetas-ui` + `tests/unit/shared` + `tablas-marca`: 162 archivos, 2292 verdes, 2 skipped.
+- Con la integración de la migración (base efímera): 163 archivos, 2290 verdes (corrida previa a la pulsación larga).

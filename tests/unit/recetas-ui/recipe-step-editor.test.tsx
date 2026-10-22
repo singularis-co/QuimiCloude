@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { RecipeStepEditor } from '@/app/(private)/produccion/formulas/components';
 import {
@@ -732,5 +732,163 @@ describe('RecipeStepEditor — «Asignación requerida» y switches solo-icono (
 
     await user.click(asignacion);
     expect(screen.queryByTestId(`${TEST_ID}-assignment-help`)).toBeNull();
+  });
+});
+
+/** Mantener pulsado con el dedo: los eventos de puntero van sobre el interruptor y suben al disparador. */
+function tocar(control: HTMLElement, tipo: 'pointerDown' | 'pointerMove' | 'pointerUp' | 'pointerCancel', x = 10, y = 10) {
+  fireEvent[tipo](control, { pointerId: 7, pointerType: 'touch', clientX: x, clientY: y, isPrimary: true });
+}
+
+describe('RecipeStepEditor — ayuda de los switches por pulsación larga en táctil', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function montarConRelojFalso() {
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    vi.useFakeTimers();
+    return {
+      evidencia: screen.getByTestId(`${TEST_ID}-evidence`),
+      asignacion: screen.getByTestId(`${TEST_ID}-assignment`),
+    };
+  }
+
+  it('R10: pulsación larga — mantener el dedo 500 ms abre la ayuda con su texto completo', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(499);
+    });
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByTestId(`${TEST_ID}-assignment-tooltip`)).toHaveTextContent(TOOLTIP_ASIGNACION);
+  });
+
+  it('R10: pulsación larga — soltar tras abrir la ayuda no cambia el switch y la ayuda sigue abierta', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    tocar(evidencia, 'pointerUp');
+    fireEvent.click(evidencia);
+
+    expect(evidencia).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+    expect(screen.getByTestId(`${TEST_ID}-evidence-tooltip`)).toHaveTextContent(TOOLTIP_EVIDENCIA);
+  });
+
+  it('R10: pulsación larga — tras soltar, el siguiente toque corto sí cambia el switch', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    tocar(evidencia, 'pointerUp');
+
+    tocar(evidencia, 'pointerDown');
+    tocar(evidencia, 'pointerUp');
+    fireEvent.click(evidencia);
+    expect(evidencia).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('R10: pulsación larga — un toque corto cambia el switch y no abre la ayuda', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    tocar(asignacion, 'pointerUp');
+    fireEvent.click(asignacion);
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(asignacion).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+  });
+
+  it('R10: pulsación larga — mover el dedo aborta y no abre la ayuda', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown', 10, 10);
+    tocar(asignacion, 'pointerMove', 10, 40);
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+  });
+
+  it('R10: pulsación larga — un temblor pequeño del dedo no la aborta', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown', 10, 10);
+    tocar(asignacion, 'pointerMove', 13, 14);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByTestId(`${TEST_ID}-assignment-tooltip`)).toHaveTextContent(TOOLTIP_ASIGNACION);
+  });
+
+  it('R10: pulsación larga — cancelar el puntero aborta y no abre la ayuda', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    tocar(evidencia, 'pointerCancel');
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-tooltip`)).toBeNull();
+  });
+
+  it('R10: pulsación larga — durante la pulsación se anula el menú contextual del sistema y no se selecciona texto', async () => {
+    const { evidencia } = await montarConRelojFalso();
+    const disparador = screen.getByTestId(`${TEST_ID}-evidence-trigger`);
+
+    expect(disparador.className).toContain('select-none');
+    expect(disparador.className).toContain('[-webkit-touch-callout:none]');
+    tocar(evidencia, 'pointerDown');
+    expect(fireEvent.contextMenu(evidencia)).toBe(false);
+  });
+
+  it('R10: pulsación larga — tocar fuera cierra la ayuda', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    tocar(evidencia, 'pointerUp');
+    expect(screen.getByTestId(`${TEST_ID}-evidence-tooltip`)).toBeInTheDocument();
+
+    vi.useRealTimers();
+    fireEvent.pointerDown(document.body, { pointerType: 'touch', pointerId: 8 });
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    await waitFor(() => {
+      expect(screen.queryByTestId(`${TEST_ID}-evidence-tooltip`)).toBeNull();
+    });
+  });
+
+  it('R10: pulsación larga — con el ratón no aplica: mantener pulsado no abre la ayuda por sí solo', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    fireEvent.pointerDown(evidencia, { pointerId: 1, pointerType: 'mouse', clientX: 10, clientY: 10 });
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-tooltip`)).toBeNull();
   });
 });

@@ -2,7 +2,15 @@
 
 import { EditorContent, useEditor, useEditorState, type Content } from '@tiptap/react';
 import { BoldIcon, CameraIcon, CheckIcon, ItalicIcon, ListChecksIcon, UserPlusIcon } from 'lucide-react';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -291,15 +299,85 @@ type IconSwitchProps = {
   readonly children: ReactNode;
 };
 
+/** Lo que hay que mantener el dedo para abrir la ayuda en táctil, y lo que puede moverse sin que cuente como desplazamiento. */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP_PX = 10;
+
+type PendingPress = {
+  readonly pointerId: number;
+  readonly x: number;
+  readonly y: number;
+  readonly timer: ReturnType<typeof setTimeout>;
+};
+
 /**
  * Interruptor que solo enseña su icono. El texto completo va en el nombre accesible y en un
  * tooltip; el envoltorio es el disparador para que el globo abra tanto al pasar el puntero como al
  * enfocar el interruptor con el teclado.
+ *
+ * En táctil no hay hover y en iOS Safari tocar no da el foco, así que el globo abre también al
+ * mantener pulsado. El `click` que el navegador pueda mandar al soltar esa pulsación se descarta
+ * para que leer la ayuda no cambie el interruptor; el globo queda abierto hasta tocar fuera.
  */
 function IconSwitch({ control, tooltip, helpId, testId, children }: IconSwitchProps) {
+  const [open, setOpen] = useState(false);
+  const pending = useRef<PendingPress | null>(null);
+  const swallowNextClick = useRef(false);
+
+  const cancelPress = () => {
+    if (pending.current === null) return;
+    clearTimeout(pending.current.timer);
+    pending.current = null;
+  };
+
+  useEffect(() => cancelPress, []);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    swallowNextClick.current = false;
+    cancelPress();
+    if (event.pointerType === 'mouse') return;
+    const timer = setTimeout(() => {
+      pending.current = null;
+      swallowNextClick.current = true;
+      setOpen(true);
+    }, LONG_PRESS_MS);
+    pending.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, timer };
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const press = pending.current;
+    if (press === null || press.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > LONG_PRESS_SLOP_PX) cancelPress();
+  };
+
+  const handleClickCapture = (event: ReactMouseEvent<HTMLSpanElement>) => {
+    if (!swallowNextClick.current) return;
+    swallowNextClick.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   return (
-    <Tooltip>
-      <TooltipTrigger render={<span className="inline-flex" data-testid={`${testId}-trigger`} />}>
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger
+        render={
+          <span
+            className="inline-flex select-none [-webkit-touch-callout:none]"
+            data-testid={`${testId}-trigger`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={cancelPress}
+            onPointerCancel={cancelPress}
+            onClickCapture={handleClickCapture}
+            onKeyDownCapture={() => {
+              swallowNextClick.current = false;
+            }}
+            onContextMenu={(event) => {
+              if (pending.current !== null || swallowNextClick.current) event.preventDefault();
+            }}
+          />
+        }
+      >
         <Switch
           checked={control.checked}
           onCheckedChange={(checked) => control.onCheckedChange(checked)}

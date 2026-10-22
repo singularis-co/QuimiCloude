@@ -373,6 +373,7 @@ o el `ErrorState` traducido, calco de `saveConditioningBatchDataAction`. Composi
 Sin excepción: el paso a paso es el modo `ejecucion` de `StepReader`; el selector usa objetivos de
 48 px y `aria-pressed` (no depende de hover); el tooltip de los switches abre también con foco y el
 nombre accesible lleva el texto completo, así que en táctil nada queda escondido tras un hover.
+  **Enmienda 2026-10-21 (decisión del humano tras la revisión 1):** en táctil la ayuda también abre al mantener pulsado el switch 500 ms (`IconSwitch` de `recipe-step-editor.tsx` controla el `open` del `Tooltip`; el componente compartido no cambia); soltar tras la pulsación larga no cambia el switch y la ayuda se cierra al tocar fuera.
 
 ## 6. Contratos (resumen)
 
