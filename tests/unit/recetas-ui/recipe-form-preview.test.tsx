@@ -58,7 +58,7 @@ const RECIPE_ID = '66666666-6666-4666-8666-666666666666';
 const PRODUCT_ID = '11111111-1111-4111-8111-111111111111';
 const EMPTY_PAGE = { items: [], totalPages: 1 };
 const DESCRIPTION =
-  'Así se leerá esta receta, paso a paso. Nada de lo que hagas aquí se guarda.';
+  'Así se leerá esta fórmula, paso a paso. Nada de lo que hagas aquí se guarda.';
 
 function paragraph(text: string): RecipeStepView {
   return { blocks: [{ kind: 'paragraph', spans: [{ text }] }] };

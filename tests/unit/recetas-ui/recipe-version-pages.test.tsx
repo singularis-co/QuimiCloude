@@ -346,7 +346,7 @@ describe('R10 — version que no cuelga de [id] o [id] que no es original', () =
   });
 });
 
-describe('R32 — «Volver a la receta» con flecha y el h1 debajo, dentro de PageShell', () => {
+describe('R32 — «Volver a la fórmula» con flecha y el h1 debajo, dentro de PageShell', () => {
   it.each([
     ['alta', abrirAlta, 'Nueva versión de Jabón'],
     ['version', abrirVersion, 'Jabón · Sin sal'],
@@ -357,7 +357,7 @@ describe('R32 — «Volver a la receta» con flecha y el h1 debajo, dentro de Pa
     expect(volver.tagName).toBe('A');
     expect(volver).toHaveAttribute('href', recipeEditRoute(ORIGINAL_ID));
     expect(volver).toHaveAttribute('data-direction', 'back');
-    expect(volver).toHaveTextContent('Volver a la receta');
+    expect(volver).toHaveTextContent('Volver a la fórmula');
     expect(volver.querySelector('svg')).not.toBeNull();
     expect(volver).toHaveClass('min-h-11');
 

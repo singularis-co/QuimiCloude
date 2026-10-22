@@ -86,7 +86,7 @@ export const PACKING_ORDER_START_CONFIRM_TEXTS = {
 
 export const PACKING_ORDER_TEXTS = {
   back: 'Volver a «Por empacar»',
-  recipeMissing: 'Esta receta está dada de baja.',
+  recipeMissing: 'Esta fórmula está dada de baja.',
   quantity: 'Cantidad:',
   distribution: 'Reparto',
   emptyDistribution: 'Sin presentación',

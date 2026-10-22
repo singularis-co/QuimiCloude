@@ -48,7 +48,7 @@ export const AI_PROVIDER_DISCONNECT_DISMISS_TESTID = 'ai-provider-disconnect-dis
 export const AI_PROVIDER_CARD_TEXTS = {
   keySavedBefore: 'Key guardada el ',
   keySavedAfter: ' · cifrada',
-  recipeModel: 'Receta (fórmula desde PDF)',
+  recipeModel: 'Fórmula (desde PDF)',
   catalogModel: 'Catálogo desde PDF',
   lastTest: 'Última prueba',
   lastTestOk: 'Correcta el ',

@@ -251,7 +251,7 @@ afterEach(() => {
 });
 
 describe('R46 — un único toast de éxito por cada guardado o borrado que termina bien', () => {
-  it('R46: guardar una receta nueva avisa «Receta creada.»', async () => {
+  it('R46: guardar una receta nueva avisa «Fórmula creada.»', async () => {
     const user = setupUser();
     renderCreateRecipe();
     await fillNewRecipe(user);
@@ -260,10 +260,10 @@ describe('R46 — un único toast de éxito por cada guardado o borrado que term
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
     expect(createRecipeActionMock).toHaveBeenCalledTimes(1);
-    expectOnlySuccessToast('Receta creada.');
+    expectOnlySuccessToast('Fórmula creada.');
   });
 
-  it('R46: guardar una receta editada avisa «Receta actualizada.»', async () => {
+  it('R46: guardar una receta editada avisa «Fórmula actualizada.»', async () => {
     const user = setupUser();
     renderEditRecipe();
 
@@ -271,10 +271,10 @@ describe('R46 — un único toast de éxito por cada guardado o borrado que term
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledTimes(1));
     expect(updateRecipeActionMock).toHaveBeenCalledTimes(1);
-    expectOnlySuccessToast('Receta actualizada.');
+    expectOnlySuccessToast('Fórmula actualizada.');
   });
 
-  it('R46: guardar una receta editada que deja una versión por revisar avisa «Receta actualizada.» una sola vez', async () => {
+  it('R46: guardar una receta editada que deja una versión por revisar avisa «Fórmula actualizada.» una sola vez', async () => {
     const user = setupUser();
     updateRecipeActionMock.mockResolvedValue({
       status: 'success',
@@ -291,10 +291,10 @@ describe('R46 — un único toast de éxito por cada guardado o borrado que term
 
     await screen.findByTestId('recipe-form-under-review');
     expect(routerMock.push).not.toHaveBeenCalled();
-    expectOnlySuccessToast('Receta actualizada.');
+    expectOnlySuccessToast('Fórmula actualizada.');
   });
 
-  it('R46: borrar una receta avisa «Receta borrada.»', async () => {
+  it('R46: borrar una receta avisa «Fórmula borrada.»', async () => {
     const user = setupUser();
     render(<DeleteRecipeDialog recipe={{ id: RECIPE_ID, name: 'Jabón' }} />);
 
@@ -302,7 +302,7 @@ describe('R46 — un único toast de éxito por cada guardado o borrado que term
 
     await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
     expect(deleteRecipeActionMock).toHaveBeenCalledTimes(1);
-    expectOnlySuccessToast('Receta borrada.');
+    expectOnlySuccessToast('Fórmula borrada.');
   });
 
   it('R46: crear una versión avisa «Versión creada.»', async () => {

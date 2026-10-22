@@ -434,7 +434,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit();
 
     const inherited = screen.getByTestId('recipe-version-inherited');
-    expect(inherited).toHaveTextContent('De la receta original');
+    expect(inherited).toHaveTextContent('De la fórmula original');
     const image = within(inherited).getByTestId('recipe-version-inherited-image');
     expect(image.tagName).toBe('IMG');
     expect(image).toHaveAttribute('src', 'https://cdn.example.test/jabon.png');
@@ -485,7 +485,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit(versionDetail({ steps: [], stepCount: 0 }));
 
     expect(screen.getByTestId('recipe-version-steps-empty')).toHaveTextContent(
-      'La receta original no tiene pasos.',
+      'La fórmula original no tiene pasos.',
     );
     expect(screen.queryByTestId('recipe-version-inherited-steps')).toBeNull();
   });
@@ -521,7 +521,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit(versionDetail({ packingSteps: [] }));
 
     expect(screen.getByTestId('recipe-version-packing-steps-empty')).toHaveTextContent(
-      'La receta original no tiene pasos de envasado.',
+      'La fórmula original no tiene pasos de envasado.',
     );
     expect(screen.queryByTestId('recipe-version-inherited-packing-steps')).toBeNull();
     expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
@@ -581,7 +581,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit(versionDetail({ conditioningSteps: [] }));
 
     expect(screen.getByTestId('recipe-version-conditioning-steps-empty')).toHaveTextContent(
-      'La receta original no tiene pasos de acondicionamiento.',
+      'La fórmula original no tiene pasos de acondicionamiento.',
     );
     expect(screen.queryByTestId('recipe-version-inherited-conditioning-steps')).toBeNull();
     expect(screen.queryByTestId('recipe-conditioning-steps-field')).toBeNull();

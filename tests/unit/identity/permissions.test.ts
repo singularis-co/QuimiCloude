@@ -108,13 +108,13 @@ const PERMISOS_PREVIOS = [
     code: 'recetas.consultar',
     module: 'recetas',
     action: 'consultar',
-    description: 'Consultar recetas y sus pasos.',
+    description: 'Consultar fórmulas y sus pasos.',
   },
   {
     code: 'recetas.modificar',
     module: 'recetas',
     action: 'modificar',
-    description: 'Crear, editar y borrar recetas y sus pasos.',
+    description: 'Crear, editar y borrar fórmulas y sus pasos.',
   },
   {
     code: 'unidades.consultar',

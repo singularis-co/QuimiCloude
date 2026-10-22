@@ -18,7 +18,7 @@ export function OrderRecipeImage({ imageUrl, name }: OrderRecipeImageProps) {
       path={imageUrl}
       name={name}
       testId={ORDER_RECIPE_IMAGE_TESTID}
-      emptyAlt="Sin receta elegida"
+      emptyAlt="Sin fórmula elegida"
     />
   );
 }

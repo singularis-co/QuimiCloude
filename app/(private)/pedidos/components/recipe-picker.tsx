@@ -64,10 +64,10 @@ const MAX_LIST_HEIGHT = 256;
 /** Margen para pedir la pagina siguiente antes de tocar el fondo, en px. */
 const SCROLL_THRESHOLD = 48;
 
-const PICKER_LABEL = 'Receta';
-const PLACEHOLDER = 'Busca una receta por su nombre';
-const EMPTY_LABEL = 'Ninguna receta coincide con la búsqueda.';
-const LOADING_LABEL = 'Cargando recetas...';
+const PICKER_LABEL = 'Fórmula';
+const PLACEHOLDER = 'Busca una fórmula por su nombre';
+const EMPTY_LABEL = 'Ninguna fórmula coincide con la búsqueda.';
+const LOADING_LABEL = 'Cargando fórmulas...';
 
 export type RecipePickerProps = {
   /** Primera pagina del catalogo, por props (R43). */
@@ -184,7 +184,7 @@ export function RecipePicker({
         slots={{
           inputTestId: RECIPE_PICKER_TESTID,
           inputClassName: `${touchTarget} ${FIELD_TEXT} w-full pr-8`,
-          clear: { label: 'Borrar receta', testId: `${RECIPE_PICKER_TESTID}-clear` },
+          clear: { label: 'Borrar fórmula', testId: `${RECIPE_PICKER_TESTID}-clear` },
           popupTestId: `${RECIPE_PICKER_TESTID}-popup`,
           optionTestId: `${RECIPE_PICKER_TESTID}-option`,
           optionClassName: `${touchTarget} ${FIELD_TEXT} items-center`,
