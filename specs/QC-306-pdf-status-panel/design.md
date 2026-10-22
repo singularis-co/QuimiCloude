@@ -162,6 +162,10 @@ configuración, y tocarlo sería tocar la política de reintentos, que está fue
   `resetBatchStatusStore()`, solo para tests, y esos dos archivos la llaman en `beforeEach`. Solo
   cambia la preparación: lo que comprueba cada caso no cambia. Registrada en
   `progress/features/QC-306.md > Decisiones`.
+  - La misma fuga alcanzaba los tests propios de esta feature, que también reutilizan
+    `'batch-1'`. `resetBatchStatusStore()` se llama igual en el `beforeEach` de
+    `document-batch-panel.test.tsx`, `formula-pdf-upload.test.tsx` y `formulas-upload.test.tsx`,
+    también solo en la preparación.
 - La memoria de fotos finales vive en el módulo: dura lo que dura la carga de la aplicación y no se
   persiste.
 - Se sigue el mismo criterio que hoy: el siguiente temporizador se arma cuando responde la consulta

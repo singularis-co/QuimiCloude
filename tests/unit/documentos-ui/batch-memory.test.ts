@@ -2,7 +2,7 @@
 // El registro de tandas recordadas en el almacenamiento del navegador. Cada caso importa el
 // modulo de cero tras `vi.resetModules()`: es lo mas parecido a recargar la pagina.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type BatchMemory = typeof import('@/components/shared/document-upload/batch-memory');
 
@@ -50,6 +50,13 @@ function avisarDesdeOtraPestana(clave: string, valor: string | null): void {
     }),
   );
 }
+
+// La primera carga transforma en frio el barrel `@/lib/modules/documentos`, que tarda segundos con
+// la maquina cargada. Se hace aqui, fuera del tiempo de cualquier caso; `recargar()` sigue
+// evaluando el modulo de cero en cada uno.
+beforeAll(async () => {
+  await import('@/components/shared/document-upload/batch-memory');
+}, 60_000);
 
 beforeEach(() => {
   window.localStorage.clear();
