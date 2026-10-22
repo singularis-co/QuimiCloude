@@ -28,6 +28,16 @@ _Pendiente: los escribe spec_author (F1.2)._
   `design.md` (con su fuente y fecha, como QC-275) y la aprueba el humano en F1.4. Incluye si los
   defaults actuales de `ai_providers` entran tal cual.
 - ¿Hace falta E2E? No es flujo crítico de `docs/checkpoints-proyecto.md`; lo decide el spec con motivo.
+- **BLOQUEANTE (spec_author, 2026-10-22): falta el pase `/design`** del selector de modelo por
+  tarea y de la lista de modelos de referencia en `/integraciones/proveedor-ia`. Es UI visible
+  nueva en una pantalla existente: los tableros aprobados (`docs/diseno/canvas/ProveedorIA.dc.html`,
+  `ProveedorIATablet.dc.html`, `ProveedorIAMovil.dc.html`, de QC-275) solo muestran los modelos
+  como texto fijo por proveedor (`[MODELO RECETA]`, `[MODELO CATÁLOGO]`), sin elección, sin la
+  lista de los cuatro proveedores ni el estado «modelo elegido ya no disponible». Por
+  `docs/perfil-agentes.md > Pase de diseño para componentes nuevos` y `> spec_author`, el spec no
+  se escribe hasta que el humano apruebe el tablero (escritorio, tablet y teléfono; estados: sin
+  elección/default, elegido, proveedor sin conectar con modelos solo de referencia, Error por
+  modelo retirado) y se copie a `docs/diseno/canvas/`.
 
 ## Decisiones cerradas (no reabrir)
 
