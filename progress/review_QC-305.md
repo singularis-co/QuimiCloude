@@ -113,3 +113,20 @@ La funcionalidad cumple R1–R26 y los seis puntos pedidos (migraciones, NULL nu
 2. **B2**: quitar las citas `QC-305`/`R<n>`/`P<n>` de los 5 comentarios de producción listados y de los comentarios añadidos en tests y E2E.
 
 La vuelta 2 puede acotarse al rango de esos commits.
+
+## Re-revisión (acotada a 03a77724..1467b340)
+
+Verificación ejecutada: typecheck verde; eslint sobre el diff, 0 errores (los mismos 2 warnings preexistentes); `vitest run tests/guards` 77/77 archivos, 1153 verdes, 16 skipped, 0 rojos.
+
+- [x] **B1 resuelto.** `coste-real-de-produccion.spec.ts` está dado de alta en `E2E_ESPERADOS` con su comentario de alta (qué ejercita, que no toca el identificador). `guard-identificador-de-request.test.ts` sale verde. De paso se quitó `QC-305` de los dos comentarios de `MIGRACIONES_ESPERADAS`.
+- [x] **B2 resuelto.** Las 5 citas de producción están quitadas: `order-columns.tsx`, `order-table.tsx`, `import-finished-goods.ts`, `migration.sql` y `down.sql`. Revisé `git diff origin/dev...HEAD` sobre `lib app db components hooks tests e2e`: no queda ningún comentario añadido por la rama que cite `QC-<n>`, `R<n>`, `P<n>` ni `design.md`, salvo la excepción de abajo.
+- [x] **m3 resuelto.** `order-form.tsx` usa `isStartedOrderStatus(order.status)` sin cast, y `lib/modules/pedidos/index.ts` reexporta `isStartedOrderStatus` junto a `STARTED_ORDER_STATUSES`. Las dos son funciones de dominio puro. Está limpio.
+- [x] **m4 resuelto.** Hay una nota de una línea al pie de `specs/QC-195-…/requirements.md` (R47 sin efecto en comenzados) y de `specs/QC-170-…/requirements.md` (R13).
+
+Los dos restos que el implementer dejó a propósito:
+- `(QC-195 R47)` en `tests/unit/pedidos/schema/pedidos-schema.test.ts:333`: **aceptable**. La cita está en `origin/dev` (`:331`), en una línea que la rama tocó solo para añadir «y el coste real». La regla manda limpiar las líneas que toca la rama, así que lo estricto sería quitarla. Pero la cita es de otra ficha y es preexistente, y la regla dice que lo preexistente no se arrastra. Queda como **menor**, no bloquea.
+- `"motivo": "QC-305 T4: …"` en `tests/integration/aislamiento.json`: **aceptable**. Es un JSON de datos, no un comentario. Ese campo es el censo de aislamiento que lee la guardia (`docs/verification.md > El censo de aislamiento`) y documenta el `desde`/motivo de cada archivo en modo `commit`. Hay 114 citas `QC-<n>` en ese archivo: es su formato. La regla de comentarios no aplica.
+
+Los menores m1 (los `.int` no se corrieron aquí, quedan para CI) y m2 (WebKit tras el cambio de la tarjeta) siguen como estaban. No bloquean.
+
+**Veredicto de la re-revisión: OK.** Sin bloqueantes. Queda pendiente que `gate-completo` salga verde en el PR.
