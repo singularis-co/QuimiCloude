@@ -1407,6 +1407,68 @@
       "w": 1440,
       "x": 0,
       "y": 15290
+    },
+    "PlantillasWhatsapp.dc.html": {
+      "page": "configuracion",
+      "x": 0,
+      "y": 13280,
+      "w": 1440,
+      "h": 1000,
+      "title": "PlantillasWhatsapp",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "PlantillasWhatsappVariables.dc.html": {
+      "page": "configuracion",
+      "x": 1520,
+      "y": 13280,
+      "w": 1440,
+      "h": 1000,
+      "title": "PlantillasWhatsappVariables",
+      "is_interactive": true
+    },
+    "PlantillasWhatsappTablet.dc.html": {
+      "page": "configuracion",
+      "x": 0,
+      "y": 14400,
+      "w": 904,
+      "h": 1300,
+      "title": "PlantillasWhatsappTablet",
+      "is_interactive": true
+    },
+    "PlantillasWhatsappMovil.dc.html": {
+      "page": "configuracion",
+      "x": 984,
+      "y": 14400,
+      "w": 960,
+      "h": 1300,
+      "title": "PlantillasWhatsappMovil",
+      "is_interactive": true
+    },
+    "ModalesPlantillasWhatsapp.dc.html": {
+      "page": "configuracion",
+      "x": 0,
+      "y": 15820,
+      "w": 1440,
+      "h": 4700,
+      "title": "ModalesPlantillasWhatsapp"
+    },
+    "PlantillaAlta.dc.html": {
+      "page": "configuracion",
+      "x": 1520,
+      "y": 15820,
+      "w": 1040,
+      "h": 920,
+      "title": "PlantillaAlta",
+      "is_interactive": true
+    },
+    "WaBurbuja.dc.html": {
+      "page": "configuracion",
+      "x": 2640,
+      "y": 15820,
+      "w": 380,
+      "h": 560,
+      "title": "WaBurbuja"
     }
   },
   "createdOnFiles": {
@@ -2178,7 +2240,14 @@
     "PanelTandas.dc.html",
     "PanelTandasTablet.dc.html",
     "PanelTandasMovil.dc.html",
-    "PanelTandasEstados.dc.html"
+    "PanelTandasEstados.dc.html",
+    "PlantillasWhatsapp.dc.html",
+    "PlantillasWhatsappVariables.dc.html",
+    "PlantillasWhatsappTablet.dc.html",
+    "PlantillasWhatsappMovil.dc.html",
+    "ModalesPlantillasWhatsapp.dc.html",
+    "PlantillaAlta.dc.html",
+    "WaBurbuja.dc.html"
   ],
   "pages": [
     {

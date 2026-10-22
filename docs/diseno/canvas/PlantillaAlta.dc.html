@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nueva plantilla de WhatsApp</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.alta{container-type:inline-size}
+.alta-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+.pane-prev{position:sticky;top:0}
+.cnt{font:400 12px 'IBM Plex Mono',monospace;color:var(--muted-fg)}
+.cnt.over{color:var(--d-fg)}
+.lim{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.catopt{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--border);border-radius:10px;cursor:pointer;background:var(--card);transition:border-color .15s ease,background-color .15s ease}
+.catopt.on{border-color:var(--primary);background:color-mix(in oklch,var(--primary) 6%,var(--card))}
+.catopt input{margin-top:3px;accent-color:var(--primary)}
+.varrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.btnrow{display:grid;grid-template-columns:150px minmax(0,1fr) minmax(0,1.2fr) 40px;gap:8px;align-items:start}
+.only-n{display:none}
+@container (max-width:760px){
+  .alta-grid{grid-template-columns:1fr}
+  .only-n{display:flex}
+  .alta.p-prev .pane-form{display:none}
+  .alta.p-form .pane-prev{display:none}
+  .pane-prev{position:static}
+  .btnrow{grid-template-columns:1fr 40px}
+  .btnrow .bt-type{grid-column:1 / -1}
+}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="position: relative; overflow: hidden; width: 100%; height: 100%; min-height: 920px; display: flex; flex-direction: column; background: var(--card); color: var(--fg)">
+  <div class="sheet-hd">
+    <div style="display: flex; flex-direction: column; gap: 4px"><h2 class="h2" id="alta-t">{{ title }}</h2><p class="sub">Cada plantilla pasa por autorización antes de poder usarla. Suele tardar unas horas.</p></div>
+    <button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ close }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+  </div>
+
+  <div class="sheet-bd" style="gap: 16px">
+    <div class="only-n tabs" role="tablist" aria-label="Formulario o vista previa"><button class="tab" type="button" role="tab" aria-selected="{{ tabForm }}" onClick="{{ showForm }}">Formulario</button><button class="tab" type="button" role="tab" aria-selected="{{ tabPrev }}" onClick="{{ showPrev }}">Vista previa</button></div>
+
+    <sc-if value="{{ metaError }}" hint-placeholder-val="{{ false }}">
+      <div class="box" role="alert" style="flex-direction: row; align-items: flex-start; text-align: left; gap: 10px; padding: 12px 14px; border-color: var(--d-fg); background: color-mix(in oklch, var(--d-fg) 6%, var(--card))"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--d-fg); flex: none; margin-top: 2px"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><div style="display: flex; flex-direction: column; gap: 2px"><span class="strong">No se pudo enviar la plantilla</span><span class="sub">[ERROR TRADUCIDO POR EL BACKEND]</span></div></div>
+    </sc-if>
+
+    <div class="alta-grid">
+      <div class="pane-form" style="display: flex; flex-direction: column; gap: 18px; min-width: 0">
+        <div class="f"><label for="pl-n">Nombre <span class="req">*</span></label>
+          <input id="pl-n" class="{{ nameCls }}" type="text" value="{{ name }}" onInput="{{ setName }}" autocomplete="off" spellcheck="false" aria-invalid="{{ nameBad }}" aria-describedby="pl-n-h">
+          <sc-if value="{{ nameOk }}" hint-placeholder-val="{{ true }}"><span id="pl-n-h" class="help">Solo minúsculas, números y guion bajo (_). Ejemplo: <span class="mono">pedido_listo</span>.</span></sc-if>
+          <sc-if value="{{ nameErr }}" hint-placeholder-val="{{ false }}"><span id="pl-n-h" class="err">Usa solo minúsculas, números y guion bajo (_), sin espacios ni tildes.</span></sc-if>
+        </div>
+
+        <div class="g2 cq-1">
+          <div class="f"><label for="pl-l">Idioma <span class="req">*</span></label>
+            <select id="pl-l" class="in"><optgroup label="Español"><option>Español (es)</option><option>Español · Ecuador (es_EC)</option><option>Español · Colombia (es_CO)</option><option>Español · México (es_MX)</option><option>Español · Perú (es_PE)</option><option>Español · España (es_ES)</option><option>[RESTO DE VARIANTES es_*]</option></optgroup><optgroup label="Inglés"><option>Inglés (en)</option><option>Inglés · Estados Unidos (en_US)</option><option>Inglés · Reino Unido (en_GB)</option></optgroup></select>
+            <span class="help">El idioma del texto: español o inglés.</span>
+          </div>
+          <div class="f"><label id="pl-c-l" for="pl-c">Categoría <span class="req">*</span></label>
+            <div class="anchor" style="position: relative">
+              <button id="pl-c" class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ catOpenStr }}" onClick="{{ toggleCat }}" style="width: 100%"><span>{{ catLabel }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+              <div class="{{ catPopCls }}" role="listbox" aria-labelledby="pl-c-l" style="top: 44px; left: 0; right: 0">
+                <sc-for list="{{ cats }}" as="c" hint-placeholder-count="2"><button class="opt" type="button" role="option" aria-selected="{{ c.selStr }}" onClick="{{ c.pick }}" style="align-items: flex-start; padding-top: 8px; padding-bottom: 8px; white-space: normal"><span style="display: flex; flex-direction: column; gap: 2px; flex: 1"><span class="strong">{{ c.label }}</span><span class="sub" style="font-size: 12px; line-height: 1.35">{{ c.desc }}</span></span><sc-if value="{{ c.sel }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--primary); flex: none"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button></sc-for>
+              </div>
+            </div>
+            <span class="help">{{ catHelp }}</span>
+          </div>
+        </div>
+
+        <div class="f"><div class="lim"><label for="pl-b">Mensaje <span class="req">*</span></label><span class="{{ bCntCls }}">{{ bCnt }}</span></div>
+          <textarea id="pl-b" class="in" rows="6" style="height: auto; padding-top: 10px; padding-bottom: 10px; resize: vertical; line-height: 1.45" onInput="{{ setBody }}">{{ body }}</textarea>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap" class="anchor">
+            <button class="b b-out b-sm" type="button" aria-haspopup="menu" aria-expanded="{{ varOpenStr }}" onClick="{{ toggleVar }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4c-2 0-3 1-3 3v2c0 1.5-1 2.5-2 3 1 .5 2 1.5 2 3v2c0 2 1 3 3 3M16 4c2 0 3 1 3 3v2c0 1.5 1 2.5 2 3-1 .5-2 1.5-2 3v2c0 2-1 3-3 3"></path></svg>Insertar variable</button>
+            <span class="help">Se escribe como <span class="mono">{{ exKey }}</span>.</span>
+            <div class="{{ varMenuCls }}" role="menu" aria-label="Variables del diccionario" style="top: 40px; left: 0; min-width: 300px">
+              <span class="grp" style="padding: 6px 10px 2px">Constantes del sistema</span>
+              <sc-for list="{{ consts }}" as="v" hint-placeholder-count="2"><button class="mi" type="button" role="menuitem" onClick="{{ v.ins }}"><span style="flex: 1">{{ v.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ v.key }}</span></button></sc-for>
+              <div class="sep"></div>
+              <span class="grp" style="padding: 6px 10px 2px">Variables propias</span>
+              <sc-for list="{{ owns }}" as="v" hint-placeholder-count="2"><button class="mi" type="button" role="menuitem" onClick="{{ v.ins }}"><span style="flex: 1">{{ v.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ v.key }}</span></button></sc-for>
+              <div class="sep"></div>
+              <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva variable propia</button>
+            </div>
+          </div>
+          <sc-if value="{{ hasVars }}" hint-placeholder-val="{{ true }}">
+            <div class="lbox" style="gap: 6px; padding: 8px 12px">
+              <span class="cap">Variables en el mensaje</span>
+              <sc-for list="{{ used }}" as="u" hint-placeholder-count="2"><div class="varrow"><span class="mono">{{ u.mark }}</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; color: var(--muted-fg)"><path d="M5 12h14M13 6l6 6-6 6"></path></svg><span>{{ u.label }}</span></div></sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ hasUnknown }}" hint-placeholder-val="{{ false }}"><span class="err">{{ unknownMsg }}</span></sc-if>
+        </div>
+
+        <div class="f"><div class="lim"><label for="pl-f">Pie <span class="cap" style="text-transform: none; letter-spacing: 0">(opcional)</span></label><span class="{{ fCntCls }}">{{ fCnt }}</span></div>
+          <input id="pl-f" class="in" type="text" value="{{ footer }}" onInput="{{ setFooter }}">
+          <span class="help">Texto gris al final del mensaje. Sin variables.</span>
+        </div>
+
+      </div>
+
+      <div class="pane-prev" style="min-width: 0; min-height: 420px; display: flex"><dc-import name="WaBurbuja" tpl="{{ tpl }}" oscuro="{{ dark }}" hint-size="100%,420px"></dc-import></div>
+    </div>
+  </div>
+
+  <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ close }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ submit }}" disabled="{{ cantSubmit }}"><sc-if value="{{ sending }}" hint-placeholder-val="{{ false }}"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg></sc-if>Enviar a revisión</button></div>
+
+  <div class="{{ cfOvCls }}" onClick="{{ cancelConfirm }}" style="position: absolute"></div>
+  <div class="{{ cfCls }}" role="alertdialog" aria-modal="true" aria-labelledby="alta-cf-t" aria-describedby="alta-cf-d">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"></path></svg></div>
+    <h2 id="alta-cf-t" class="h2">Enviar para autorización</h2>
+    <div id="alta-cf-d" style="display: flex; flex-direction: column; gap: 10px">
+      <p class="sub">La plantilla <span class="mono">{{ name }}</span> se va a enviar para autorización. <strong>No se puede cambiar mientras está en autorización</strong>; si hace falta otro texto, se duplica.</p>
+      <div class="lbox" style="gap: 6px; padding: 10px 12px; font-size: 13px">
+        <div class="varrow"><span class="cap" style="width: 84px">Idioma</span><span class="mono">es</span></div>
+        <div class="varrow"><span class="cap" style="width: 84px">Categoría</span><span>{{ catLabel }}</span></div>
+        <div class="varrow"><span class="cap" style="width: 84px">Variables</span><span>{{ usedSummary }}</span></div>
+      </div>
+      <p class="sub" style="font-size: 13px">Revisa el mensaje en la vista previa antes de enviarlo.</p>
+    </div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ cancelConfirm }}">Volver a revisar</button><button class="b b-pri" type="button" onClick="{{ confirmSend }}">Enviar</button></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"modo":{"editor":"enum","options":["nueva","duplicar"],"default":"nueva"},"errorMeta":{"editor":"boolean","default":false},"confirmar":{"editor":"boolean","default":false},"oscuro":{"editor":"boolean","default":false},"close":{"editor":null},"done":{"editor":null},"$preview":{"width":1040,"height":920}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dup = this.props.modo === 'duplicar';
+const CATS = [['UTILITY', 'Utilidad', 'Avisos sobre un pedido o una cuenta: confirmaciones, estados, recordatorios.'], ['MARKETING', 'Marketing', 'Promociones y novedades. Tiene un costo de envío distinto.']];
+const LIM = { name: 512, header: 60, body: 1024, footer: 60, btn: 25 };
+const CONSTS = [['nombre_del_cliente', 'Nombre del cliente'], ['numero_de_pedido', 'Número de pedido'], ['nombre_de_la_empresa', 'Nombre de la empresa']];
+const OWNS = [['numero_de_cuenta', 'Número de cuenta', '2200345678'], ['horario_de_atencion', 'Horario de atención', 'Lunes a viernes, 8:00 a 17:00']];
+const labels = {}; CONSTS.concat(OWNS).forEach((c) => { labels[c[0]] = c[1]; });
+const preview = {}; CONSTS.forEach((c) => { preview[c[0]] = c[1]; }); OWNS.forEach((c) => { preview[c[0]] = c[2]; });
+const init = dup
+  ? { name: 'pedido_listo_v2', header: '', body: 'Hola {{nombre_del_cliente}}, tu pedido ya está listo para recoger. Para el pago usa la cuenta {{numero_de_cuenta}}.', footer: 'QuimiCloude', cat: 'UTILITY', btns: [] }
+  : { name: 'pedido_listo', header: '', body: 'Hola {{nombre_del_cliente}}, tu pedido ya está listo para recoger.', footer: '', cat: 'UTILITY', btns: [] };
+const v = (k) => (s[k] !== undefined ? s[k] : init[k]);
+const name = v('name'); const header = v('header'); const body = v('body'); const footer = v('footer'); const cat = v('cat'); const btns = v('btns');
+const len = (t) => [...(t || '')].length;
+const cnt = (t, m) => len(t) + ' / ' + m;
+const cntCls = (t, m) => (len(t) > m ? 'cnt over' : 'cnt');
+const nameValid = /^[a-z0-9_]+$/.test(name);
+const marks = []; const re = /\{\{([^{}]+)\}\}/g; let m;
+while ((m = re.exec(header + ' ' + body))) { const k = m[1].trim(); if (marks.indexOf(k) < 0) marks.push(k); }
+const unknown = marks.filter((k) => !labels[k]);
+const isConst = (k) => CONSTS.some((c) => c[0] === k);
+const set = (k) => (e) => this.setState({ [k]: e && e.target ? e.target.value : '' });
+const ins = (key) => () => this.setState({ body: body + '{{' + key + '}}', varOpen: false });
+const setBtns = (list) => this.setState({ btns: list });
+const pane = s.pane || 'form';
+const over = len(header) > LIM.header || len(body) > LIM.body || len(footer) > LIM.footer;
+return {
+  rootCls: 'qc alta ' + (pane === 'prev' ? 'p-prev' : 'p-form') + (this.props.oscuro ? ' dk' : ''),
+  dark: !!this.props.oscuro,
+  title: dup ? 'Duplicar plantilla' : 'Nueva plantilla',
+  metaError: !!this.props.errorMeta,
+  tabForm: pane === 'form' ? 'true' : 'false', tabPrev: pane === 'prev' ? 'true' : 'false',
+  showForm: () => this.setState({ pane: 'form' }), showPrev: () => this.setState({ pane: 'prev' }),
+  name: name, setName: set('name'), nameOk: nameValid, nameErr: !nameValid, nameBad: nameValid ? 'false' : 'true', nameCls: nameValid ? 'in mono' : 'in mono bad',
+  catLabel: CATS.filter((c) => c[0] === cat)[0][1],
+  catHelp: CATS.filter((c) => c[0] === cat)[0][2],
+  catOpenStr: s.catOpen ? 'true' : 'false', catPopCls: s.catOpen ? 'pop open' : 'pop',
+  toggleCat: () => this.setState({ catOpen: !s.catOpen }),
+  cats: CATS.map((c) => ({ label: c[1], desc: c[2], sel: c[0] === cat, selStr: c[0] === cat ? 'true' : 'false', pick: () => this.setState({ cat: c[0], catOpen: false }) })),
+  header: header, setHeader: set('header'), hCnt: cnt(header, LIM.header), hCntCls: cntCls(header, LIM.header),
+  body: body, setBody: set('body'), bCnt: cnt(body, LIM.body), bCntCls: cntCls(body, LIM.body),
+  footer: footer, setFooter: set('footer'), fCnt: cnt(footer, LIM.footer), fCntCls: cntCls(footer, LIM.footer),
+  exKey: '{{clave}}',
+  varOpenStr: s.varOpen ? 'true' : 'false', toggleVar: () => this.setState({ varOpen: !s.varOpen }),
+  varMenuCls: s.varOpen ? 'pop open' : 'pop',
+  consts: CONSTS.map((c) => ({ key: c[0], label: c[1], ins: ins(c[0]) })),
+  owns: OWNS.map((c) => ({ key: c[0], label: c[1], ins: ins(c[0]) })),
+  hasVars: marks.length > 0,
+  used: marks.filter((k) => labels[k]).map((k) => ({ mark: '{{' + k + '}}', label: labels[k], kind: isConst(k) ? 'Constante' : 'Propia', tagCls: isConst(k) ? 'sb t-info' : 'sb t-neutral' })),
+  hasUnknown: unknown.length > 0,
+  unknownMsg: unknown.length ? 'La variable ' + unknown[0] + ' no está en el diccionario. Elígela con «Insertar variable» o créala como variable propia.' : '',
+  btnCnt: btns.length + ' / 10',
+  fullBtns: btns.length >= 10,
+  btns: btns.map((b, i) => ({
+    text: b.text, target: b.target, cnt: cnt(b.text, LIM.btn),
+    isReply: b.type === 'QUICK_REPLY', isUrl: b.type === 'URL', isPhone: b.type === 'PHONE_NUMBER',
+    hasTarget: b.type !== 'QUICK_REPLY', noTarget: b.type === 'QUICK_REPLY',
+    targetPh: b.type === 'URL' ? 'https:// (fija, igual para todos)' : '+593 99 123 4567',
+    typeLabel: 'Tipo del botón ' + (i + 1), textLabel: 'Texto del botón ' + (i + 1), rmLabel: 'Quitar el botón ' + (i + 1),
+    targetLabel: b.type === 'URL' ? 'Dirección del sitio web del botón ' + (i + 1) : 'Teléfono del botón ' + (i + 1),
+    setType: (e) => setBtns(btns.map((x, j) => (j === i ? Object.assign({}, x, { type: e.target.value }) : x))),
+    setText: (e) => setBtns(btns.map((x, j) => (j === i ? Object.assign({}, x, { text: e.target.value }) : x))),
+    rm: () => setBtns(btns.filter((x, j) => j !== i))
+  })),
+  addReply: () => setBtns(btns.concat([{ type: 'QUICK_REPLY', text: '', target: '' }])),
+  tpl: { header: header, body: body, footer: footer, buttons: btns, labels: preview },
+  cantSubmit: !nameValid || !body.trim() || over || unknown.length > 0 || !!s.sending,
+  sending: !!s.sending,
+  close: () => { if (this.props.close) this.props.close(); },
+  submit: () => this.setState({ confirm: true }),
+  cfCls: (s.confirm !== undefined ? s.confirm : !!this.props.confirmar) ? 'dlg open' : 'dlg',
+  cfOvCls: (s.confirm !== undefined ? s.confirm : !!this.props.confirmar) ? 'ov open' : 'ov',
+  cancelConfirm: () => this.setState({ confirm: false }),
+  usedSummary: marks.length ? marks.map((k) => (labels[k] || k)).join(', ') : 'Ninguna',
+  confirmSend: () => { this.setState({ confirm: false, sending: true }); clearTimeout(this.t); this.t = setTimeout(() => { this.setState({ sending: false }); if (this.props.done) this.props.done(); }, 1200); }
+};
+}
+}
+</script>
+</body>
+</html>

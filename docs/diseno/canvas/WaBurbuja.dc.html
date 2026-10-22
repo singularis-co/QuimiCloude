@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Burbuja de vista previa</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.wa{--wa-bg:#efeae2;--wa-bub:#ffffff;--wa-fg:#111b21;--wa-mut:#667781;--wa-link:#027eb5;--wa-var:#d9fdd3;--wa-var-fg:#0b5c52}
+.dk .wa,.wa.dk{--wa-bg:#0b141a;--wa-bub:#202c33;--wa-fg:#e9edef;--wa-mut:#8696a0;--wa-link:#53bdeb;--wa-var:#005c4b;--wa-var-fg:#d9fdd3}
+.wa-bub{position:relative;max-width:300px;background:var(--wa-bub);color:var(--wa-fg);border-radius:0 10px 10px 10px;padding:8px 10px 6px;box-shadow:0 1px .5px rgb(11 20 26 / .13);font:400 14.2px/1.38 'IBM Plex Sans',sans-serif;transition:height .2s ease}
+.wa-bub::before{content:"";position:absolute;left:-8px;top:0;border-width:0 8px 10px 0;border-style:solid;border-color:transparent var(--wa-bub) transparent transparent}
+.wa-v{background:var(--wa-var);color:var(--wa-var-fg);border-radius:4px;padding:0 3px;font-weight:500;animation:wa-in .24s ease}
+.wa-btn{max-width:300px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px;background:var(--wa-bub);color:var(--wa-link);border-radius:10px;font:500 14px 'IBM Plex Sans',sans-serif;box-shadow:0 1px .5px rgb(11 20 26 / .13);animation:wa-in .24s ease}
+@keyframes wa-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.wa-v,.wa-btn{animation:none}.wa-bub{transition:none}}
+</style>
+</helmet>
+<div class="{{ rootCls }}" style="box-sizing: border-box; width: 100%; height: 100%; min-height: 320px; padding: 20px 16px 20px 24px; background: var(--wa-bg); border-radius: 12px; display: flex; flex-direction: column; gap: 6px" role="img" aria-label="{{ aria }}">
+  <span style="align-self: center; font: 500 11px 'IBM Plex Sans', sans-serif; letter-spacing: .04em; text-transform: uppercase; color: var(--wa-mut); padding-bottom: 6px">Vista previa</span>
+  <div class="wa-bub" aria-hidden="true">
+    <sc-if value="{{ hasHeader }}" hint-placeholder-val="{{ true }}"><div style="font-weight: 600; padding-bottom: 4px; white-space: pre-wrap; overflow-wrap: anywhere"><sc-for list="{{ header }}" as="p" hint-placeholder-count="1"><sc-if value="{{ p.v }}" hint-placeholder-val="{{ false }}"><span class="wa-v">{{ p.t }}</span></sc-if><sc-if value="{{ p.plain }}" hint-placeholder-val="{{ true }}">{{ p.t }}</sc-if></sc-for></div></sc-if>
+    <div style="white-space: pre-wrap; overflow-wrap: anywhere"><sc-for list="{{ body }}" as="p" hint-placeholder-count="3"><sc-if value="{{ p.v }}" hint-placeholder-val="{{ false }}"><span class="wa-v">{{ p.t }}</span></sc-if><sc-if value="{{ p.plain }}" hint-placeholder-val="{{ true }}">{{ p.t }}</sc-if></sc-for></div>
+    <sc-if value="{{ isEmptyBody }}" hint-placeholder-val="{{ false }}"><div style="color: var(--wa-mut); font-style: italic">Escribe el mensaje para verlo aquí.</div></sc-if>
+    <sc-if value="{{ hasFooter }}" hint-placeholder-val="{{ true }}"><div style="padding-top: 4px; font-size: 13px; color: var(--wa-mut); white-space: pre-wrap; overflow-wrap: anywhere">{{ footer }}</div></sc-if>
+    <div style="text-align: right; font-size: 11px; color: var(--wa-mut); padding-top: 2px">{{ time }}</div>
+  </div>
+  <sc-for list="{{ buttons }}" as="b" hint-placeholder-count="2">
+    <div class="wa-btn" aria-hidden="true">
+      <sc-if value="{{ b.isReply }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"></path></svg></sc-if>
+      <sc-if value="{{ b.isUrl }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"></path></svg></sc-if>
+      <sc-if value="{{ b.isPhone }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg></sc-if>
+      <span>{{ b.text }}</span>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tpl":{"editor":null,"tsType":"object"},"oscuro":{"editor":"boolean","default":false},"$preview":{"width":380,"height":560}}'>
+class Component extends DCLogic {
+renderVals() {
+const sample = {
+  header: 'Tu pedido está listo',
+  body: 'Hola {{nombre_del_cliente}}, tu pedido ya está listo para recoger. Para el pago usa la cuenta {{numero_de_cuenta}}.',
+  footer: 'QuimiCloude',
+  buttons: [{ type: 'QUICK_REPLY', text: 'Confirmar' }, { type: 'URL', text: 'Ver pedido' }],
+  labels: { 'nombre_del_cliente': 'Nombre del cliente', numero_de_cuenta: 'Número de cuenta' }
+};
+const t = this.props.tpl || sample;
+const labels = t.labels || {};
+const split = (text) => {
+  const out = []; const re = /\{\{([^{}]+)\}\}/g; let last = 0; let m;
+  const src = text || '';
+  while ((m = re.exec(src))) {
+    if (m.index > last) out.push({ t: src.slice(last, m.index), v: false, plain: true });
+    const k = m[1].trim();
+    out.push({ t: labels[k] || ('[' + k + ']'), v: true, plain: false });
+    last = m.index + m[0].length;
+  }
+  if (last < src.length) out.push({ t: src.slice(last), v: false, plain: true });
+  return out;
+};
+const body = split(t.body);
+const btns = (t.buttons || []).filter((b) => b && b.text);
+const dark = this.props.oscuro !== undefined ? !!this.props.oscuro : false;
+return {
+  rootCls: dark ? 'qc wa dk' : 'qc wa',
+  header: split(t.header), hasHeader: !!(t.header && t.header.trim()),
+  body: body, isEmptyBody: !(t.body && t.body.trim()),
+  footer: t.footer || '', hasFooter: !!(t.footer && t.footer.trim()),
+  time: '09:41',
+  aria: 'Vista previa del mensaje: ' + [t.header, body.map((p) => p.t).join(''), t.footer].filter(Boolean).join('. '),
+  buttons: btns.map((b) => ({ text: b.text, isReply: b.type === 'QUICK_REPLY', isUrl: b.type === 'URL', isPhone: b.type === 'PHONE_NUMBER' }))
+};
+}
+}
+</script>
+</body>
+</html>
