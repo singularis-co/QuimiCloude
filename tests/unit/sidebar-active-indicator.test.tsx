@@ -203,6 +203,28 @@ describe('SidebarActiveIndicator', () => {
     expect(sub.style.opacity).toBe('0');
   });
 
+  it('R15: suma el borde de cada offsetParent intermedio, no el del contenedor', () => {
+    // El submenu real lleva `border-l` y es el `offsetParent` del `<li>`: `offsetLeft` no
+    // cuenta ese borde y, sin sumarlo, el indicador queda 1 px a la izquierda del boton.
+    const BORDE = 1;
+    const borde = function (this: HTMLElement) {
+      if (this.dataset.slot === 'sidebar-menu-sub') return BORDE;
+      // El contenedor tambien lleva borde: si se sumara, el indicador se iria de sitio.
+      if (this.querySelector(':scope > [data-slot="sidebar-active-indicator"]')) return 7;
+      return 0;
+    };
+    for (const nombre of ['clientLeft', 'clientTop']) {
+      originales.set(nombre, Object.getOwnPropertyDescriptor(Element.prototype, nombre));
+      Object.defineProperty(HTMLElement.prototype, nombre, { configurable: true, get: borde });
+    }
+
+    montar('/s2');
+
+    expect(indicadorDe('lista-sub').style.transform).toBe(
+      `translate(${SUB_INDENT + BORDE}px, ${ITEM_HEIGHT + BORDE}px)`,
+    );
+  });
+
   it('R14: el activo de un submenu no lo toma el indicador de la lista que lo contiene', () => {
     montar('/s1');
 
