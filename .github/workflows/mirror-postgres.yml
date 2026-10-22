@@ -42,15 +42,20 @@ jobs:
 
       - name: Construir y publicar ghcr.io/${{ github.repository_owner }}/postgres:17
         env:
-          SOURCE: public.ecr.aws/docker/library/postgres:17
+          # La misma imagen oficial en tres registros. ECR Public corto por cuota otra vez el
+          # 2026-10-22 (PR #223, 5 reintentos): si uno corta, se prueba el siguiente.
+          SOURCES: public.ecr.aws/docker/library/postgres:17 mirror.gcr.io/library/postgres:17 docker.io/library/postgres:17
           TARGET: ghcr.io/${{ github.repository_owner }}/postgres:17
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           set -euo pipefail
-          # Reintentos con espera creciente: el origen es justo el registro que corta por cuota.
-          for intento in 1 2 3 4 5; do
-            if docker pull "$SOURCE"; then break; fi
-            [ "$intento" = 5 ] && { echo "no se pudo bajar $SOURCE"; exit 1; }
+          # Reintentos con espera creciente; en cada ronda, un registro tras otro.
+          SOURCE=""
+          for intento in 1 2 3; do
+            for origen in $SOURCES; do
+              if docker pull "$origen"; then SOURCE="$origen"; break 2; fi
+            done
+            [ "$intento" = 3 ] && { echo "no se pudo bajar postgres:17 de ningun registro"; exit 1; }
             sleep $((intento * 30))
           done
           printf 'FROM %s\nLABEL org.opencontainers.image.source=%s\n' "$SOURCE" "$REPO_URL" \

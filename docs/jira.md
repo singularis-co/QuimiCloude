@@ -1,5 +1,8 @@
 # docs/jira.md — El board manda, el disco trabaja
 
+Aplica cuando `arnes.config.json > tracker.tipo` es `jira`, o cuando no hay bloque `tracker`. Para
+Trello, `docs/trello.md`.
+
 Las features se gestionan desde un board de Jira. El arnés **importa** ese board a
 `feature_list.json` y trabaja contra el disco; el gate nunca llama a Jira.
 
