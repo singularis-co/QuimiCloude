@@ -51,6 +51,7 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
+  startOpenedAssignedOrder,
 } from './helpers/confirm-dialog';
 import {
   DISTRIBUTION_ADD_PACKAGES_TESTID,
@@ -633,6 +634,13 @@ test.describe('envases del pedido como productos', () => {
       'title',
       new RegExp(escapeRegExp(`${JUGS} × ${JUG_NAME}`)),
     );
+
+    // Entrar no comienza: el pedido sigue `PENDIENTE` y el paso a paso llega tras «Comenzar».
+    expect(
+      (await prisma.order.findUniqueOrThrow({ where: { id: first.id }, select: { status: true } }))
+        .status,
+    ).toBe('PENDIENTE');
+    await startOpenedAssignedOrder(page);
 
     // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
     const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
