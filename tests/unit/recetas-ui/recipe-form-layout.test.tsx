@@ -19,7 +19,7 @@ import { setupUser } from '../../helpers/user-event';
 
 /**
  * Estructura del formulario de receta tras el rediseño (QC-264 T3a): cabecera con «Volver a la
- * lista», tarjetas, columna de versiones fuera del `<form>` y pie fijo con «Guardar» asociado por
+ * lista», tarjetas, versiones dentro del `<form>` antes de los ingredientes y pie fijo con «Guardar» asociado por
  * `form=`. En jsdom el Enter con el botón fuera del `<form>` no envía (límite del simulador,
  * T0c): aquí se prueba el clic y `requestSubmit()`; «Enter guarda» va en el E2E.
  */
@@ -133,7 +133,7 @@ const VERSION: RecipeVersionSummary = {
   updatedAt: new Date('2026-01-03T00:00:00.000Z'),
 };
 
-function renderEdit(options: { lockingOrders?: number; aside?: boolean } = {}) {
+function renderEdit(options: { lockingOrders?: number; versionSlots?: boolean } = {}) {
   return render(
     <RecipeForm
       mode="edit"
@@ -143,7 +143,16 @@ function renderEdit(options: { lockingOrders?: number; aside?: boolean } = {}) {
       units={[]}
       initialProductPage={EMPTY_PAGE}
       initialMachinePage={EMPTY_PAGE}
-      aside={options.aside === false ? undefined : <p data-testid="aside-probe">Lateral</p>}
+      versionList={
+        options.versionSlots === false ? undefined : <p data-testid="version-list-probe">Versiones</p>
+      }
+      newVersionAction={
+        options.versionSlots === false ? undefined : (
+          <button type="button" data-testid="new-version-probe">
+            Nueva versión
+          </button>
+        )
+      }
     />,
   );
 }
@@ -261,41 +270,63 @@ describe('formulario de receta — tarjetas (R11, R51)', () => {
   });
 });
 
-describe('formulario de receta — versiones al costado (R13, R14)', () => {
-  it('R13: el lateral es un <aside> hermano del <form>, fuera de él, en una fila que se parte por debajo de 880 px', () => {
+describe('formulario de receta — versiones dentro del formulario (R13, R14)', () => {
+  it('R13: no hay columna lateral: el <form> ocupa todo el ancho', () => {
     renderEdit();
 
     const form = screen.getByTestId('recipe-form');
-    const lateral = screen.getByTestId('aside-probe').closest('aside');
-    expect(lateral).not.toBeNull();
-    expect(form.contains(lateral)).toBe(false);
-    expect(lateral?.parentElement).toBe(form.parentElement);
-    expect(follows(form, lateral as HTMLElement)).toBe(true);
-    expect(form.parentElement).toHaveClass('flex', 'flex-wrap');
-    expect(form).toHaveClass('flex-[3_1_560px]', 'min-w-0');
-    expect(lateral).toHaveClass('flex-[1_1_300px]', 'min-w-0');
-  });
-
-  it('R13: sin lateral no se pinta <aside>', () => {
-    renderEdit({ aside: false });
-
     expect(document.querySelector('aside')).toBeNull();
+    expect(form).not.toHaveClass('flex-[3_1_560px]');
+    expect(form.parentElement).toHaveAttribute('data-slot', 'recipe-form-layout');
   });
 
-  it('R13: la edición pone la sección «Versiones» en el lateral con sus filas', async () => {
+  it('R13: la lista de versiones va dentro del <form>, tras los datos y justo antes de los ingredientes', () => {
+    renderEdit();
+
+    const form = screen.getByTestId('recipe-form');
+    const lista = screen.getByTestId('version-list-probe');
+    const [datos, lineas] = cardsOf(form);
+    expect(form.contains(lista)).toBe(true);
+    expect(follows(datos, lista)).toBe(true);
+    expect(follows(lista, lineas)).toBe(true);
+    expect(lista.parentElement?.nextElementSibling).toBe(lineas);
+  });
+
+  it('R13: sin lista de versiones no se pinta su hueco', () => {
+    renderEdit({ versionSlots: false });
+
+    expect(document.querySelector('[data-slot="recipe-form-versions"]')).toBeNull();
+  });
+
+  it('R13: la edición pone la sección «Versiones» antes de los ingredientes con sus filas', async () => {
     render(await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) }));
 
     const versiones = screen.getByTestId('recipe-versions');
-    expect(versiones.closest('aside')).not.toBeNull();
-    expect(screen.getByTestId('recipe-form').contains(versiones)).toBe(false);
+    const form = screen.getByTestId('recipe-form');
+    expect(form.contains(versiones)).toBe(true);
+    expect(follows(versiones, screen.getByTestId('recipe-lines-field'))).toBe(true);
     expect(within(versiones).getAllByTestId('recipe-version-row')).toHaveLength(1);
   });
 
-  it('R13: borrar una versión desde el lateral no envía el formulario de la receta', async () => {
+  it('R13: «Nueva versión» va en el pie, junto a «Vista previa», y enlaza al alta de versión', async () => {
+    render(await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) }));
+
+    const footer = screen.getByTestId('recipe-form-footer');
+    const nueva = within(footer).getByTestId('recipe-version-new');
+    const vistaPrevia = within(footer).getByTestId('recipe-form-preview-open');
+    expect(nueva).toHaveAttribute('href', `${FORMULAS_ROUTE}/${RECIPE_ID}/versiones/nueva`);
+    expect(nueva.parentElement).toBe(vistaPrevia.parentElement);
+    expect(follows(vistaPrevia, nueva)).toBe(true);
+    expect(within(screen.getByTestId('recipe-versions')).queryByTestId('recipe-version-new')).toBeNull();
+  });
+
+  it('R13: borrar una versión desde la lista no envía el formulario de la receta', async () => {
     const user = setupUser();
     render(await EditarRecetaPage({ params: Promise.resolve({ id: RECIPE_ID }) }));
 
-    await user.click(screen.getByRole('button', { name: 'Borrar Sin perfume' }));
+    const borrar = screen.getByRole('button', { name: 'Eliminar la versión Sin perfume' });
+    expect(borrar).toHaveAttribute('type', 'button');
+    await user.click(borrar);
     const dialogo = await screen.findByTestId('delete-recipe-dialog');
     await user.click(within(dialogo).getByTestId('delete-recipe-confirm'));
 
@@ -304,15 +335,27 @@ describe('formulario de receta — versiones al costado (R13, R14)', () => {
     expect(createRecipeActionMock).not.toHaveBeenCalled();
   });
 
-  it('R14: el alta pinta «Versiones» con «Nueva versión» deshabilitado y el texto de vacío', async () => {
+  it('R14: el alta pinta «Versiones» con el texto de vacío y «Nueva versión» deshabilitado en el pie', async () => {
     render(await NuevaRecetaPage());
 
     const versiones = screen.getByTestId('recipe-versions');
-    expect(versiones.closest('aside')).not.toBeNull();
-    expect(within(versiones).getByTestId('recipe-version-new')).toBeDisabled();
+    expect(screen.getByTestId('recipe-form').contains(versiones)).toBe(true);
     expect(within(versiones).getByTestId('recipe-versions-empty')).toHaveTextContent(
       'Esta receta todavía no tiene versiones.',
     );
+    expect(
+      within(screen.getByTestId('recipe-form-footer')).getByTestId('recipe-version-new'),
+    ).toBeDisabled();
+  });
+});
+
+describe('formulario de receta — descripción', () => {
+  it('la descripción deja ver al menos tres líneas y sigue creciendo y redimensionable', () => {
+    renderEdit();
+
+    const descripcion = screen.getByTestId('recipe-field-description');
+    expect(descripcion).toHaveClass('min-h-24', 'field-sizing-content', 'resize-y');
+    expect(descripcion).not.toHaveClass('min-h-11');
   });
 });
 

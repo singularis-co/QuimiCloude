@@ -1,13 +1,13 @@
 'use client';
 
-import { PlusIcon } from 'lucide-react';
+import { PencilIcon, PlusIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 
-import { ArrowLink } from '@/components/shared/arrow-link';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { RecipeVersionSummary } from '@/lib/modules/recetas';
 import { newRecipeVersionRoute, recipeVersionRoute } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
@@ -24,8 +24,46 @@ export type RecipeVersionListProps = {
   readonly versions: readonly RecipeVersionSummary[];
 };
 
+export type NewRecipeVersionButtonProps = {
+  /** `null` en el alta: sin receta guardada no hay de qué sacar una versión. */
+  readonly originalId: string | null;
+};
+
 const NEW_VERSION_LABEL = 'Nueva versión';
-const OPEN_LABEL = 'Abrir';
+const EDIT_LABEL = 'Editar';
+const DELETE_LABEL = 'Eliminar';
+
+// El disparador es el envoltorio: el diálogo de borrado ya monta su propio disparador dentro.
+function ActionTooltip({ label, children }: { readonly label: string; readonly children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" />}>{children}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function NewRecipeVersionButton({ originalId }: NewRecipeVersionButtonProps) {
+  if (originalId === null) {
+    return (
+      <Button type="button" variant="outline" touch disabled data-testid="recipe-version-new">
+        <PlusIcon aria-hidden />
+        {NEW_VERSION_LABEL}
+      </Button>
+    );
+  }
+  return (
+    <Link
+      href={newRecipeVersionRoute(originalId)}
+      data-slot="button"
+      className={cn(buttonVariants({ variant: 'outline', touch: true }))}
+      data-testid="recipe-version-new"
+    >
+      <PlusIcon aria-hidden />
+      {NEW_VERSION_LABEL}
+    </Link>
+  );
+}
 
 export function RecipeVersionList({ originalId, versions }: RecipeVersionListProps) {
   const headingId = useId();
@@ -37,27 +75,9 @@ export function RecipeVersionList({ originalId, versions }: RecipeVersionListPro
       className="gap-1 rounded-[14px] px-5 py-5"
       data-testid="recipe-versions"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
-        <h2 id={headingId} className="text-lg font-semibold">
-          Versiones
-        </h2>
-        {originalId === null ? (
-          <Button type="button" variant="outline" size="sm" touch disabled data-testid="recipe-version-new">
-            <PlusIcon aria-hidden />
-            {NEW_VERSION_LABEL}
-          </Button>
-        ) : (
-          <Link
-            href={newRecipeVersionRoute(originalId)}
-            data-slot="button"
-            className={cn(buttonVariants({ variant: 'outline', size: 'sm', touch: true }))}
-            data-testid="recipe-version-new"
-          >
-            <PlusIcon aria-hidden />
-            {NEW_VERSION_LABEL}
-          </Link>
-        )}
-      </div>
+      <h2 id={headingId} className="pb-2 text-lg font-semibold">
+        Versiones
+      </h2>
 
       {originalId === null || versions.length === 0 ? (
         <p
@@ -87,19 +107,26 @@ export function RecipeVersionList({ originalId, versions }: RecipeVersionListPro
                   data-testid="recipe-version-under-review"
                 />
               ) : null}
-              <ArrowLink
-                href={recipeVersionRoute(originalId, version.id)}
-                direction="forward"
-                variant="outline"
-                size="sm"
-                touch
-                testId="recipe-version-link"
-              >
-                {/* Nombre entero en el texto oculto: hay cálculos del nombre accesible que recortan su espacio inicial y pegarían «Abrirla». */}
-                <span aria-hidden="true">{OPEN_LABEL}</span>
-                <span className="sr-only">{`${OPEN_LABEL} la versión ${version.name}`}</span>
-              </ArrowLink>
-              <DeleteRecipeDialog recipe={{ id: version.id, name: version.name }} kind="version" />
+              <div className="flex items-center">
+                <ActionTooltip label={EDIT_LABEL}>
+                  <Link
+                    href={recipeVersionRoute(originalId, version.id)}
+                    data-slot="button"
+                    aria-label={`${EDIT_LABEL} la versión ${version.name}`}
+                    className={cn(buttonVariants({ variant: 'ghost', size: 'icon', touch: true }))}
+                    data-testid="recipe-version-link"
+                  >
+                    <PencilIcon aria-hidden />
+                  </Link>
+                </ActionTooltip>
+                <ActionTooltip label={DELETE_LABEL}>
+                  <DeleteRecipeDialog
+                    recipe={{ id: version.id, name: version.name }}
+                    kind="version"
+                    triggerLabel={`${DELETE_LABEL} la versión ${version.name}`}
+                  />
+                </ActionTooltip>
+              </div>
             </li>
           ))}
         </ul>

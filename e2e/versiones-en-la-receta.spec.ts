@@ -224,9 +224,9 @@ test.describe('versiones en la ficha de la receta', () => {
     const idC = productIds.get('c')!;
     const originalRoute = recipeEditRoute(originalId);
     const versions = page.getByTestId('recipe-versions');
-    // La version se abre con «Abrir»; su nombre accesible es «Abrir la versión <nombre>».
+    // La version se abre con el lapiz; su nombre accesible es «Editar la versión <nombre>».
     const versionLink = (name: string) =>
-      versions.getByRole('link', { name: `Abrir la versión ${name}`, exact: true });
+      versions.getByRole('link', { name: `Editar la versión ${name}`, exact: true });
 
     await loginAndLand(page, adminUser);
 
@@ -382,7 +382,7 @@ test.describe('versiones en la ficha de la receta', () => {
     const rowOf = (name: string) =>
       versions
         .getByTestId('recipe-version-row')
-        .filter({ has: page.getByRole('link', { name: `Abrir la versión ${name}`, exact: true }) });
+        .filter({ has: page.getByRole('link', { name: `Editar la versión ${name}`, exact: true }) });
     await expect(rowOf(CHANGED_RENAMED).getByTestId('recipe-version-under-review')).toBeVisible({
       timeout: 60_000,
     });

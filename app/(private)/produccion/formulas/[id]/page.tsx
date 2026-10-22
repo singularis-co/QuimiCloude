@@ -20,7 +20,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { RecipeForm, RecipeVersionList } from '../components';
+import { NewRecipeVersionButton, RecipeForm, RecipeVersionList } from '../components';
 
 export const metadata: Metadata = {
   title: `Editar fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
@@ -189,7 +189,8 @@ export default async function EditarRecetaPage({
         mode="edit"
         recipe={recipeResult.data}
         versions={versionsResult.data}
-        aside={<RecipeVersionList originalId={id} versions={versionsResult.data} />}
+        versionList={<RecipeVersionList originalId={id} versions={versionsResult.data} />}
+        newVersionAction={<NewRecipeVersionButton originalId={id} />}
         lockingOrders={lockResult.data.lockingOrders}
         units={unitsResult.data}
         initialProductPage={{

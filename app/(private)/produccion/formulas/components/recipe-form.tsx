@@ -187,11 +187,10 @@ export type RecipeFormProps = (
       readonly initialMachinePage: RecipeFormProductPage;
     }
 ) & {
-  /**
-   * Columna lateral (las versiones). Se pinta fuera del `<form>`: un envío desde un diálogo suyo
-   * subiría por el árbol de React hasta el `onSubmit` de la receta.
-   */
-  readonly aside?: ReactNode;
+  /** Lista de versiones: va entre los datos generales y los ingredientes. */
+  readonly versionList?: ReactNode;
+  /** Acción «Nueva versión»: va en el pie, junto a «Vista previa». */
+  readonly newVersionAction?: ReactNode;
 };
 
 type FieldErrors = {
@@ -428,216 +427,224 @@ export function RecipeForm(props: RecipeFormProps) {
 
   return (
     <div data-slot="recipe-form-layout" className="flex flex-col gap-5">
-      {/* Con 880 px o más caben las dos bases (560 + 20 + 300) y el lateral va a la derecha. */}
-      <div className="flex flex-wrap items-start gap-5">
-        <form
-          id={formId}
-          data-testid="recipe-form"
-          className="flex min-w-0 flex-[3_1_560px] flex-col gap-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            handleSubmit();
-          }}
-        >
-          {saveError === null ? null : saveError.code === 'recipe_not_found' ? (
-            <div role="alert" data-testid="recipe-form-not-found" className="rounded-lg border p-3 text-sm">
-              <p data-testid="recipe-form-not-found-message">{saveError.message}</p>
-              <Link href={FORMULAS_ROUTE} className="underline" data-testid="recipe-form-not-found-link">
-                Volver a la lista
-              </Link>
-            </div>
-          ) : (
-            <ErrorAlert
-              error={saveError}
-              className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-              testId="recipe-form-error"
-              renderCatalogued={(catalogued) => (
-                <>
-                  <p data-testid="recipe-form-error-message">{catalogued.message}</p>
-                  {catalogued.code === INVALID_INPUT_CODE ? null : (
-                    <p className="text-xs" data-testid="recipe-form-error-code">
-                      {catalogued.code}
-                    </p>
-                  )}
-                </>
-              )}
-            />
-          )}
-
-          {stepsLocked ? (
-            <Notice tone="warning" title={STEP_LOCK_TITLE(lockingOrders)} testId="recipe-form-steps-locked">
-              {STEP_LOCK_BODY}
-            </Notice>
-          ) : null}
-
-          {props.mode === 'edit' && underReview.length > 0 ? (
-            <div
-              role="status"
-              className="flex flex-col gap-2 rounded-lg border p-3 text-sm"
-              data-testid="recipe-form-under-review"
-            >
-              <p>{UNDER_REVIEW_MESSAGE}</p>
-              <ul className="flex flex-col">
-                {underReview.map((version) => (
-                  <li key={version.id}>
-                    <Link
-                      href={recipeVersionRoute(props.recipe.id, version.id)}
-                      className={cn('inline-flex items-center underline', touchTarget)}
-                      data-testid="recipe-form-under-review-link"
-                    >
-                      {version.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <Card className={CARD_CLASS}>
-            {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompañan (9). */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
-              <div className="sm:col-span-3">
-                <ImageField
-                  mode={props.mode}
-                  initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
-                  value={state.image}
-                  onChange={(image) => setState((previous) => ({ ...previous, image }))}
-                  maxBytes={MAX_IMAGE_BYTES}
-                  validate={validateRecipeImage}
-                  testIdPrefix="recipe-image"
-                />
-              </div>
-
-              <div className="flex flex-col gap-4 sm:col-span-9">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="recipe-field-name-input">Nombre</Label>
-                  <Input
-                    id="recipe-field-name-input"
-                    type="text"
-                    value={state.name}
-                    onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
-                    className={`${touchTarget} ${FIELD_TEXT}`}
-                    aria-invalid={fieldErrors.name === undefined ? undefined : true}
-                    aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
-                    data-testid="recipe-field-name"
-                  />
-                  {fieldErrors.name === undefined ? null : (
-                    <p id="recipe-error-name" className="text-sm text-destructive" data-testid="recipe-error-name">
-                      {fieldErrors.name}
-                    </p>
-                  )}
-              </div>
-
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="recipe-field-description-input">Descripción</Label>
-                  <Textarea
-                    id="recipe-field-description-input"
-                    rows={4}
-                    value={state.description}
-                    onChange={(event) =>
-                      setState((previous) => ({ ...previous, description: event.target.value }))
-                    }
-                    className={`${touchTarget} ${FIELD_TEXT}`}
-                    aria-invalid={fieldErrors.description === undefined ? undefined : true}
-                    aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
-                    data-testid="recipe-field-description"
-                  />
-                  {fieldErrors.description === undefined ? null : (
-                    <p
-                      id="recipe-error-description"
-                      className="text-sm text-destructive"
-                      data-testid="recipe-error-description"
-                    >
-                      {fieldErrors.description}
-                    </p>
-                  )}
-              </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className={CARD_CLASS}>
-            <RecipeLinesField
-              lines={state.lines}
-              onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
-              tools={state.tools}
-              onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
-              units={props.units}
-              initialProductPage={props.initialProductPage}
-              initialMachinePage={props.initialMachinePage}
-              errors={fieldErrors.lines}
-              generalError={fieldErrors.linesGeneral}
-              toolErrors={fieldErrors.tools}
-              toolsGeneralError={fieldErrors.toolsGeneral}
-            />
-          </Card>
-
-          <Card className={CARD_CLASS}>
-            <RecipeStepsField
-              steps={state.steps}
-              onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
-              errors={fieldErrors.steps}
-              showEvidenceSwitch
-              locked={stepsLocked}
-            />
-          </Card>
-
-          <Card className={CARD_CLASS}>
-            <RecipeStepsField
-              steps={state.packingSteps}
-              onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
-              errors={fieldErrors.packingSteps}
-              title={PACKING_STEPS_FIELD_TEXTS.title}
-              optionalHelp={{
-                text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
-                label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
-              }}
-              sectionName={PACKING_STEPS_FIELD_TEXTS.sectionName}
-              testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
-              showEvidenceSwitch
-              locked={stepsLocked}
-            />
-          </Card>
-
-          <Card className={CARD_CLASS}>
-            <RecipeStepsField
-              steps={state.conditioningSteps}
-              onChange={(conditioningSteps) =>
-                setState((previous) => ({ ...previous, conditioningSteps }))
-              }
-              errors={fieldErrors.conditioningSteps}
-              title={CONDITIONING_STEPS_FIELD_TEXTS.title}
-              optionalDescription={CONDITIONING_STEPS_FIELD_TEXTS.help}
-              testIdPrefix={CONDITIONING_STEPS_TESTID_PREFIX}
-              showEvidenceSwitch
-              showAssignmentSwitch
-              locked={stepsLocked}
-            />
-          </Card>
-
-          {props.mode === 'edit' && props.versions.length > 0 ? (
-            <PropagateVersionsDialog
-              open={pendingPayload !== null}
-              versions={props.versions}
-              onOpenChange={(open) => {
-                if (!open) setPendingPayload(null);
-              }}
-              onSave={(propagateToVersionIds) => {
-                if (pendingPayload === null) return;
-                setPendingPayload(null);
-                save(pendingPayload, propagateToVersionIds);
-              }}
-            />
-          ) : null}
-        </form>
-        {props.aside === undefined ? null : (
-          <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">{props.aside}</aside>
+      <form
+        id={formId}
+        data-testid="recipe-form"
+        className="flex min-w-0 flex-col gap-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleSubmit();
+        }}
+      >
+        {saveError === null ? null : saveError.code === 'recipe_not_found' ? (
+          <div role="alert" data-testid="recipe-form-not-found" className="rounded-lg border p-3 text-sm">
+            <p data-testid="recipe-form-not-found-message">{saveError.message}</p>
+            <Link href={FORMULAS_ROUTE} className="underline" data-testid="recipe-form-not-found-link">
+              Volver a la lista
+            </Link>
+          </div>
+        ) : (
+          <ErrorAlert
+            error={saveError}
+            className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            testId="recipe-form-error"
+            renderCatalogued={(catalogued) => (
+              <>
+                <p data-testid="recipe-form-error-message">{catalogued.message}</p>
+                {catalogued.code === INVALID_INPUT_CODE ? null : (
+                  <p className="text-xs" data-testid="recipe-form-error-code">
+                    {catalogued.code}
+                  </p>
+                )}
+              </>
+            )}
+          />
         )}
-      </div>
+
+        {stepsLocked ? (
+          <Notice tone="warning" title={STEP_LOCK_TITLE(lockingOrders)} testId="recipe-form-steps-locked">
+            {STEP_LOCK_BODY}
+          </Notice>
+        ) : null}
+
+        {props.mode === 'edit' && underReview.length > 0 ? (
+          <div
+            role="status"
+            className="flex flex-col gap-2 rounded-lg border p-3 text-sm"
+            data-testid="recipe-form-under-review"
+          >
+            <p>{UNDER_REVIEW_MESSAGE}</p>
+            <ul className="flex flex-col">
+              {underReview.map((version) => (
+                <li key={version.id}>
+                  <Link
+                    href={recipeVersionRoute(props.recipe.id, version.id)}
+                    className={cn('inline-flex items-center underline', touchTarget)}
+                    data-testid="recipe-form-under-review-link"
+                  >
+                    {version.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        <Card className={CARD_CLASS}>
+          {/* La imagen manda a la izquierda (3 de 12) y los datos de texto la acompañan (9). */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
+            <div className="sm:col-span-3">
+              <ImageField
+                mode={props.mode}
+                initialImageUrl={props.mode === 'edit' ? props.recipe.imageUrl : null}
+                value={state.image}
+                onChange={(image) => setState((previous) => ({ ...previous, image }))}
+                maxBytes={MAX_IMAGE_BYTES}
+                validate={validateRecipeImage}
+                testIdPrefix="recipe-image"
+              />
+            </div>
+
+            <div className="flex flex-col gap-4 sm:col-span-9">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="recipe-field-name-input">Nombre</Label>
+                <Input
+                  id="recipe-field-name-input"
+                  type="text"
+                  value={state.name}
+                  onChange={(event) => setState((previous) => ({ ...previous, name: event.target.value }))}
+                  className={`${touchTarget} ${FIELD_TEXT}`}
+                  aria-invalid={fieldErrors.name === undefined ? undefined : true}
+                  aria-describedby={fieldErrors.name === undefined ? undefined : 'recipe-error-name'}
+                  data-testid="recipe-field-name"
+                />
+                {fieldErrors.name === undefined ? null : (
+                  <p id="recipe-error-name" className="text-sm text-destructive" data-testid="recipe-error-name">
+                    {fieldErrors.name}
+                  </p>
+                )}
+            </div>
+
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="recipe-field-description-input">Descripción</Label>
+                <Textarea
+                  id="recipe-field-description-input"
+                  rows={4}
+                  value={state.description}
+                  onChange={(event) =>
+                    setState((previous) => ({ ...previous, description: event.target.value }))
+                  }
+                  // `field-sizing-content` ignora `rows`: el alto mínimo deja ver tres líneas.
+                  className={`min-h-24 ${FIELD_TEXT}`}
+                  aria-invalid={fieldErrors.description === undefined ? undefined : true}
+                  aria-describedby={fieldErrors.description === undefined ? undefined : 'recipe-error-description'}
+                  data-testid="recipe-field-description"
+                />
+                {fieldErrors.description === undefined ? null : (
+                  <p
+                    id="recipe-error-description"
+                    className="text-sm text-destructive"
+                    data-testid="recipe-error-description"
+                  >
+                    {fieldErrors.description}
+                  </p>
+                )}
+            </div>
+            </div>
+          </div>
+        </Card>
+
+        {props.versionList === undefined ? null : (
+          // Un envío desde un diálogo de la lista sube por el árbol de React hasta el `onSubmit`
+          // de la receta, aunque el diálogo esté en un portal.
+          <div data-slot="recipe-form-versions" onSubmit={(event) => event.stopPropagation()}>
+            {props.versionList}
+          </div>
+        )}
+
+        <Card className={CARD_CLASS}>
+          <RecipeLinesField
+            lines={state.lines}
+            onChange={(lines) => setState((previous) => ({ ...previous, lines }))}
+            tools={state.tools}
+            onToolsChange={(tools) => setState((previous) => ({ ...previous, tools }))}
+            units={props.units}
+            initialProductPage={props.initialProductPage}
+            initialMachinePage={props.initialMachinePage}
+            errors={fieldErrors.lines}
+            generalError={fieldErrors.linesGeneral}
+            toolErrors={fieldErrors.tools}
+            toolsGeneralError={fieldErrors.toolsGeneral}
+          />
+        </Card>
+
+        <Card className={CARD_CLASS}>
+          <RecipeStepsField
+            steps={state.steps}
+            onChange={(steps) => setState((previous) => ({ ...previous, steps }))}
+            errors={fieldErrors.steps}
+            showEvidenceSwitch
+            locked={stepsLocked}
+          />
+        </Card>
+
+        <Card className={CARD_CLASS}>
+          <RecipeStepsField
+            steps={state.packingSteps}
+            onChange={(packingSteps) => setState((previous) => ({ ...previous, packingSteps }))}
+            errors={fieldErrors.packingSteps}
+            title={PACKING_STEPS_FIELD_TEXTS.title}
+            optionalHelp={{
+              text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
+              label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
+            }}
+            sectionName={PACKING_STEPS_FIELD_TEXTS.sectionName}
+            testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
+            showEvidenceSwitch
+            locked={stepsLocked}
+          />
+        </Card>
+
+        <Card className={CARD_CLASS}>
+          <RecipeStepsField
+            steps={state.conditioningSteps}
+            onChange={(conditioningSteps) =>
+              setState((previous) => ({ ...previous, conditioningSteps }))
+            }
+            errors={fieldErrors.conditioningSteps}
+            title={CONDITIONING_STEPS_FIELD_TEXTS.title}
+            optionalDescription={CONDITIONING_STEPS_FIELD_TEXTS.help}
+            testIdPrefix={CONDITIONING_STEPS_TESTID_PREFIX}
+            showEvidenceSwitch
+            showAssignmentSwitch
+            locked={stepsLocked}
+          />
+        </Card>
+
+        {props.mode === 'edit' && props.versions.length > 0 ? (
+          <PropagateVersionsDialog
+            open={pendingPayload !== null}
+            versions={props.versions}
+            onOpenChange={(open) => {
+              if (!open) setPendingPayload(null);
+            }}
+            onSave={(propagateToVersionIds) => {
+              if (pendingPayload === null) return;
+              setPendingPayload(null);
+              save(pendingPayload, propagateToVersionIds);
+            }}
+          />
+        ) : null}
+      </form>
 
       <FormFooterBar
         testId="recipe-form-footer"
-        leading={previewDialog}
+        leading={
+          <>
+            {previewDialog}
+            {props.newVersionAction}
+          </>
+        }
       >
         <Link
           href={FORMULAS_ROUTE}

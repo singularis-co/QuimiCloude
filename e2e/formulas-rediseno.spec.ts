@@ -5,7 +5,7 @@
  *
  * Solo medidas y estado del DOM, sin capturas: jsdom no resuelve las consultas de contenedor que
  * pasan la tabla a tarjetas ni compila la hoja de Tailwind, así que el orden de la cabecera, la
- * columna lateral, el pie fijo y el tamaño de los diálogos solo existen aquí. Tampoco hace el envío
+ * sitio de «Versiones», el pie fijo y el tamaño de los diálogos solo existen aquí. Tampoco hace el envío
  * implícito de un formulario cuyo botón vive fuera de él (`form={id}`): «Enter guarda» va aquí.
  *
  * Casi nada se confirma: los diálogos se abren, se miden y se cierran con su botón de cancelar o
@@ -73,7 +73,6 @@ const TABLET = { width: 820, height: 1180 } as const;
 const DESKTOP = { width: 1440, height: 900 } as const;
 const MIN_TARGET_PX = 44;
 const MIN_MENU_ITEM_PX = 48;
-const MIN_ASIDE_PX = 300;
 const PREVIEW_MAX_WIDTH_PX = 920;
 const PREVIEW_MAX_HEIGHT_PX = 900;
 const PREVIEW_VIEWPORT_MARGIN_PX = 64;
@@ -515,7 +514,7 @@ function versionRow(page: Page, name: string): Locator {
   return page
     .getByTestId(TESTIDS.versions)
     .getByTestId(TESTIDS.versionRow)
-    .filter({ has: page.getByRole('link', { name: `Abrir la versión ${name}`, exact: true }) });
+    .filter({ has: page.getByRole('link', { name: `Editar la versión ${name}`, exact: true }) });
 }
 
 /** Abre «Acciones» de la tarjeta: el diálogo centrado que se titula con el nombre de la receta. */
@@ -648,7 +647,7 @@ test.describe('Fórmulas rediseñado', () => {
     await expect(dropdown).toHaveCount(0);
   });
 
-  test('a 1440 × 900: «Versiones» a la derecha, pie fijo visible, «Por revisar» en una línea, vista previa centrada y propagar en plural (R13, R15, R22, R23, R27, R30)', async ({
+  test('a 1440 × 900: «Versiones» antes de los ingredientes, pie fijo visible, «Por revisar» en una línea, vista previa centrada y propagar en plural (R13, R15, R22, R23, R27, R30)', async ({
     page,
   }) => {
     await openEdit(page, DESKTOP);
@@ -671,16 +670,22 @@ test.describe('Fórmulas rediseñado', () => {
     expect(cancel.x, '«Cancelar» a la derecha').toBeGreaterThan(footerBox.x + footerBox.width / 2);
     expect(submit.x, '«Guardar» tras «Cancelar»').toBeGreaterThanOrEqual(cancel.x + cancel.width);
 
-    // R13: «Versiones» a la derecha del formulario, en una columna de al menos 300 px.
+    // R13: «Versiones» dentro del formulario, a todo su ancho y justo antes de los ingredientes.
     const form = await box(page.getByTestId(TESTIDS.form));
     const versions = page.getByTestId(TESTIDS.versions);
     const versionsBox = await box(versions);
-    expect(versionsBox.x, '«Versiones» a la derecha del formulario').toBeGreaterThanOrEqual(form.x + form.width);
-    expect(versionsBox.width, '«Versiones» mide al menos 300 px').toBeGreaterThanOrEqual(MIN_ASIDE_PX);
-    expect(versionsBox.y, '«Versiones» arranca a la altura del formulario').toBeLessThan(form.y + form.height);
+    expect(Math.abs(versionsBox.x - form.x), '«Versiones» alineada con el formulario').toBeLessThanOrEqual(
+      EDGE_TOLERANCE_PX,
+    );
+    expect(Math.abs(versionsBox.width - form.width), '«Versiones» a todo el ancho').toBeLessThanOrEqual(
+      EDGE_TOLERANCE_PX,
+    );
+    expect(versionsBox.y + versionsBox.height, '«Versiones» antes de los ingredientes').toBeLessThanOrEqual(
+      (await box(page.getByTestId('recipe-lines-field'))).y,
+    );
 
     // R30: una fila por versión, nombre en una línea con `title`, «Por revisar» solo en la que lo
-    // está y en una línea, y «Abrir» con su nombre accesible y su destino.
+    // está y en una línea, y el lápiz «Editar» con su nombre accesible y su destino.
     await expect(versions.getByTestId(TESTIDS.versionRow)).toHaveCount(2);
     for (const [name, id] of [
       [COPY_NAME, copyId],
@@ -692,7 +697,7 @@ test.describe('Fórmulas rediseñado', () => {
       await expect(nameCell).toHaveText(name);
       expect(await textLineCount(nameCell), `${name}: nombre en una línea`).toBe(1);
       const link = versionLine.getByTestId(TESTIDS.versionLink);
-      await expect(link).toHaveAccessibleName(`Abrir la versión ${name}`);
+      await expect(link).toHaveAccessibleName(`Editar la versión ${name}`);
       await expect(link).toHaveAttribute('href', recipeVersionRoute(baseId, id));
     }
     await expect(versionRow(page, COPY_NAME).getByTestId(TESTIDS.versionUnderReview)).toHaveCount(0);
@@ -791,7 +796,7 @@ test.describe('Fórmulas rediseñado', () => {
     await expect(toast).toHaveCount(1);
   });
 
-  test('a 820 × 1180: «Versiones» debajo del formulario y antes del pie, y el listado en tarjetas (R5, R13)', async ({
+  test('a 820 × 1180: «Versiones» antes de los ingredientes y del pie, y el listado en tarjetas (R5, R13)', async ({
     page,
   }) => {
     await openList(page, TABLET);
@@ -814,14 +819,16 @@ test.describe('Fórmulas rediseñado', () => {
     await expectTarget(baseCard.getByTestId(TESTIDS.rowActions), '«Acciones» de la tarjeta');
     await expectNoHorizontalScroll(page, '820 listado');
 
-    // R13: con menos de 880 px, «Versiones» debajo del formulario y antes del pie.
+    // R13: también a 820 px, «Versiones» dentro del formulario, antes de los ingredientes y del pie.
     const response = await page.goto(recipeEditRoute(baseId));
     expect(response?.status()).toBe(200);
     await expect(page.getByTestId(TESTIDS.form)).toBeVisible({ timeout: 60_000 });
     const form = await box(page.getByTestId(TESTIDS.form));
     const versions = page.getByTestId(TESTIDS.versions);
     const versionsBox = await box(versions);
-    expect(versionsBox.y, '«Versiones» debajo del formulario').toBeGreaterThanOrEqual(form.y + form.height);
+    expect(versionsBox.y + versionsBox.height, '«Versiones» antes de los ingredientes').toBeLessThanOrEqual(
+      (await box(page.getByTestId('recipe-lines-field'))).y,
+    );
     expect(Math.abs(versionsBox.x - form.x), '«Versiones» alineada con el formulario').toBeLessThanOrEqual(
       EDGE_TOLERANCE_PX,
     );
