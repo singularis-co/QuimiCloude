@@ -1,20 +1,22 @@
 // El dialogo «Cliente» de la fila: guardar, quitar, exito y error, y que solo se monta abierto.
 // Las Server Actions que no le tocan son dobles que fallan si se les llama.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_CUSTOMER_DIALOG_DISMISS_TESTID,
   ORDER_CUSTOMER_DIALOG_ERROR_TESTID,
   ORDER_CUSTOMER_DIALOG_REMOVE_TESTID,
   ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID,
   ORDER_CUSTOMER_DIALOG_TESTID,
   ORDER_CUSTOMER_DIALOG_TOUCH_TARGET,
   OrderCustomerDialog,
-  OrderRowSheetActions,
+  OrderTable,
 } from '@/app/(private)/pedidos/components';
+import { createDefaultParams } from '@/components/shared/data-table';
 import { errorMessage } from '@/lib/modules/errores';
 import {
   formatOrderNumber,
@@ -27,6 +29,7 @@ import type {
   OrderMutationFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { setupUser } from '../../helpers/user-event';
+import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { setCustomerMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   setCustomerMock: vi.fn<(id: string, input: unknown) => Promise<OrderMutationFormState>>(),
@@ -97,6 +100,8 @@ function pedido(status: OrderStatus = 'ENTREGADO', overrides: Partial<OrderSumma
     status,
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -104,7 +109,9 @@ function pedido(status: OrderStatus = 'ENTREGADO', overrides: Partial<OrderSumma
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: ACTUAL,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -212,11 +219,17 @@ describe('dialogo «Cliente»', () => {
 });
 
 describe('montaje desde la fila', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
   it('R39: solo se monta mientras esta abierto, y la accion lo abre en un pedido TERMINADO, cerrado a la edicion', async () => {
     const user = setupUser();
     render(
-      <OrderRowSheetActions
-        order={pedido('TERMINADO')}
+      <OrderTable
+        orders={[pedido('TERMINADO')]}
+        params={createDefaultParams()}
+        totalPages={1}
         recipes={{ items: [], totalPages: 1 }}
         units={[]}
         bridge={null}
@@ -226,9 +239,20 @@ describe('montaje desde la fila', () => {
 
     expect(screen.queryByTestId(ORDER_CUSTOMER_DIALOG_TESTID)).toBeNull();
 
-    await user.click(screen.getByTestId('order-row-actions'));
+    await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID));
 
     expect(await screen.findByTestId(ORDER_CUSTOMER_DIALOG_TESTID)).toBeInTheDocument();
+  });
+});
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Cliente» con «Quitar cliente», «Cancelar» y «Guardar»', () => {
+    montarDialogo();
+
+    expect(screen.getByRole('dialog', { name: 'Cliente' })).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_CUSTOMER_DIALOG_REMOVE_TESTID)).toHaveTextContent(/^Quitar cliente$/);
+    expect(screen.getByTestId(ORDER_CUSTOMER_DIALOG_DISMISS_TESTID)).toHaveTextContent(/^Cancelar$/);
+    expect(screen.getByTestId(ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID)).toHaveTextContent(/^Guardar$/);
   });
 });

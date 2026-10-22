@@ -61,14 +61,21 @@ describe('package.json + scripts/build.mjs — el build corre el seed (R19, R20)
   // El build lleva `prisma generate` entre la migracion y el seed (b79a43c4; decision del
   // 2026-10-08 en specs/QC-6-seed-roles-y-usuario-inicial/requirements.md): el seed necesita
   // el cliente generado y Vercel cachea node_modules, asi que sin generar quedaria uno viejo.
-  const CUATRO = ['prisma migrate deploy', 'prisma generate', 'tsx scripts/seed.ts', 'next build']
+  // QC-236: el relleno de telefonos de clientes corre tras generar y antes del seed.
+  const CINCO = [
+    'prisma migrate deploy',
+    'prisma generate',
+    'tsx scripts/backfill-customer-phones.ts',
+    'tsx scripts/seed.ts',
+    'next build',
+  ]
 
   it.each([
     ['fuera de Vercel', {}],
     ['en Vercel production', { VERCEL: '1', VERCEL_ENV: 'production' }],
-  ])('%s: los cuatro pasos, en orden: migrar, generar, sembrar, compilar (R19)', (_nombre, env) => {
+  ])('%s: los cinco pasos, en orden: migrar, generar, rellenar telefonos, sembrar, compilar (R19; R28 de QC-236)', (_nombre, env) => {
     const { pasos } = pasosDelBuild(env)
-    expect(pasos).toEqual(CUATRO)
+    expect(pasos).toEqual(CINCO)
     expect(pasos.indexOf('tsx scripts/seed.ts'), 'el seed debe ir antes de next build').toBeLessThan(
       pasos.indexOf('next build'),
     )

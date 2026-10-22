@@ -89,3 +89,8 @@ export function withFilter(
 export function withSearch(params: DataTableParams, search: string): DataTableParams {
   return { ...params, search };
 }
+
+/** Quita todos los filtros de una vez. No toca la búsqueda, el orden ni la página. */
+export function withoutFilters(params: DataTableParams): DataTableParams {
+  return { ...params, filters: {} };
+}

@@ -38,8 +38,7 @@ import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
-  clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
 } from './helpers/confirm-dialog';
 
 // El primer `goto` hace que `next dev` compile la ruta bajo demanda, y bcrypt tarda a proposito.
@@ -324,7 +323,7 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
     if (primerFallo !== undefined) throw primerFallo;
   });
 
-  test('el Operador aterriza en asignacion, ve solo sus pedidos ejecutables, no ve los finales ni los de otra persona, y el en curso entra con aviso (R27)', async ({
+  test('el Operador abre asignacion, ve solo sus pedidos ejecutables, no ve los finales ni los de otra persona, y el en curso entra con aviso (R27)', async ({
     page,
   }) => {
     expect(orderPendingNumber, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -343,9 +342,9 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
       return;
     }
 
-    // Nunca una ruta escrita a mano: `loginAndLand` deriva el destino de los permisos reales del
-    // actor, que es justo lo que se esta midiendo.
+    // El Operador no aterriza en la lista: tras el login se abre por su ruta.
     await loginAndLand(page, actorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const pendingRow = rowByNumber(page, orderPendingNumber);
@@ -436,8 +435,6 @@ const ASSIGNED_ORDERS_TABLE_TESTID = 'assigned-orders-table';
 const ASSIGNED_ORDERS_EMPTY_TESTID = 'assigned-orders-empty';
 const FINISHED_ORDERS_SECTION_TESTID = 'finished-orders-list-section';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
-const PACKING_ORDER_ROW_TESTID = 'packing-order-row';
-const PACKING_ORDER_LINK_TESTID = 'packing-order-link';
 
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const EXECUTION_ERROR_TESTID = 'order-execution-error';
@@ -457,12 +454,22 @@ let deliveredOwn: SeededOrder | null = null;
 let deliveredOther: SeededOrder | null = null;
 let deliveredNoPacker: SeededOrder | null = null;
 
+/** La fila de «Por empacar», que es la tabla compartida dentro de su sección. */
 function packingRowByNumber(page: Page, numberText: string): Locator {
   return page
-    .getByTestId(PACKING_ORDER_ROW_TESTID)
+    .getByTestId(PACKING_ORDERS_SECTION_TESTID)
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({
-      has: page.getByTestId(PACKING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
+      has: page.getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
     });
+}
+
+/**
+ * Lo visible de un testid de las pestañas. Van en `Suspense` con ellas mismas, sin contador, de
+ * respaldo: mientras llega el contador conviven la de respaldo y la resuelta, oculta.
+ */
+function visibleTab(page: Page, testId: string): Locator {
+  return page.getByTestId(testId).filter({ visible: true });
 }
 
 function executionLinks(page: Page, orderId: string): Locator {
@@ -681,7 +688,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     if (primerFallo !== undefined) throw primerFallo;
   });
 
-  test('R18, R19a, R10 - el Empacador responsable de pedidos PENDIENTE y EN_CURSO no los ve en ninguna vista, no tiene «Mis asignados» y ?vista=asignados aterriza en «Terminados» sin enlaces a ejecucion', async ({
+  test('R18, R19a, R10 - el Empacador responsable de pedidos PENDIENTE y EN_CURSO no los ve en ninguna vista, no tiene «Mis asignados» y ?vista=asignados aterriza en «Por empacar» sin enlaces a ejecucion', async ({
     page,
   }) => {
     expect(hiddenPending, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
@@ -693,27 +700,27 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     await page.goto(assignmentViewUrl('asignados'));
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
-    await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TABS_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.terminados)).toBeVisible();
+    await expect(visibleTab(page, ASSIGNMENT_VIEW_TAB_TESTID.por_empacar)).toBeVisible();
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.asignados)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNMENT_VIEW_TAB_TESTID.todos)).toHaveCount(0);
 
-    // Pedir «Mis asignados» pinta «Terminados» y nada de la vista pedida.
-    await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
+    // Pedir «Mis asignados» pinta «Por empacar» (lo pendiente va primero) y nada de la vista pedida.
+    await expect(page.getByTestId(PACKING_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ASSIGNED_ORDERS_TABLE_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ASSIGNED_ORDERS_EMPTY_TESTID)).toHaveCount(0);
 
     for (const order of hiddenOrders) {
+      await expect(packingRowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(rowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(executionLinks(page, order.id)).toHaveCount(0);
     }
     await expect(page.getByTestId(ENTER_TESTID)).toHaveCount(0);
 
-    await page.goto(assignmentViewUrl('por_empacar'));
-    await expect(page.getByTestId(PACKING_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
+    await page.goto(assignmentViewUrl('terminados'));
+    await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
     for (const order of hiddenOrders) {
-      await expect(packingRowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(rowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(executionLinks(page, order.id)).toHaveCount(0);
     }
@@ -751,7 +758,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
 
     const row = rowByNumber(page, executable.numberText);
     await expect(row).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, row.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, row.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(executable!.id), {
       timeout: 60_000,
     });

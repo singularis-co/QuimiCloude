@@ -57,6 +57,7 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import {
   normalizeCompanyName,
   ROLE_ADMINISTRADOR,
@@ -77,6 +78,7 @@ import {
   openOrderRowMenu,
   packagingLine,
   rowMenuTrigger,
+  submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 
@@ -495,7 +497,8 @@ test.describe('pantalla de pedidos', () => {
 
     // --- 7. Guardar: la Server Action REAL de `pedidos` (QC-34) contra Postgres, sin `fetch` de
     // por medio (R41).
-    await page.getByTestId('order-form-submit').click();
+    // 12.5 en 12 envases de 1: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, orderForm);
 
     // --- 8. Con exito el panel se cierra y avisa por el `<Toaster />` que el layout privado YA
     // monta (R35, R36). Se afirma que HAY un aviso, no cual es su texto.
@@ -537,8 +540,18 @@ test.describe('pantalla de pedidos', () => {
     await expect(row.getByTestId('data-table-cell-recipeName')).toHaveText(recipeName);
     await expect(
       row.getByTestId('order-distribution'),
-      'la fila del listado muestra el reparto con el envase elegido (R29)',
-    ).toHaveText(`${ORDER_PACKAGES} × ${packagingName}`);
+      'la fila del listado muestra el reparto con el envase elegido y el volumen de su presentacion (R29)',
+    ).toHaveText(
+      // El mismo formateo que pinta la etiqueta compartida («12 × Envase · 1 ml»); la unidad de la
+      // fixture no tiene simbolo, asi que se nombra por su nombre (`unit.symbol ?? unit.name`).
+      orderDistributionLineText({
+        presentationName,
+        packagingName,
+        packages: Number(ORDER_PACKAGES),
+        presentationContent: PRESENTATION_CONTENT,
+        presentationUnitLabel: unitName,
+      }),
+    );
 
     // --- 11. Cancelacion con motivo (R37): el dialogo pide el motivo y solo entonces confirma.
     await (await openOrderRowMenu(page, rowMenuTrigger(row), 'order-action-cancel')).click();

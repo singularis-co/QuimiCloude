@@ -22,6 +22,7 @@ import {
   type RouteOrderStatus,
 } from './assignment-view-params';
 import {
+  COMPANY_ORDERS_CARD,
   COMPANY_ORDER_STATUS_COLUMN_ID,
   buildCompanyOrdersColumns,
 } from './company-orders-columns';
@@ -78,13 +79,23 @@ export type CompanyOrdersTableProps = {
   readonly totalPages: number;
   /** Ya acotado por `parseStatusFilter`: vacio significa «sin filtro», los cuatro estados. */
   readonly statuses: readonly RouteOrderStatus[];
+  readonly canViewTrace?: boolean;
 };
 
-export function CompanyOrdersTable({ rows, params, totalPages, statuses }: CompanyOrdersTableProps) {
+export function CompanyOrdersTable({
+  rows,
+  params,
+  totalPages,
+  statuses,
+  canViewTrace = false,
+}: CompanyOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const showFinishedAt = isExactlyDelivered(statuses);
-  const columns = useMemo(() => buildCompanyOrdersColumns({ showFinishedAt }), [showFinishedAt]);
+  const columns = useMemo(
+    () => buildCompanyOrdersColumns({ showFinishedAt, canViewTrace }),
+    [showFinishedAt, canViewTrace],
+  );
 
   // El filtro «Estado» de la barra refleja el `status` de la URL: es la unica columna cuyo valor
   // no viaja en `params`, el esquema compartido de pagina y tamano.
@@ -129,6 +140,7 @@ export function CompanyOrdersTable({ rows, params, totalPages, statuses }: Compa
         status="idle"
         texts={COMPANY_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={COMPANY_ORDERS_CARD}
       />
     </div>
   );

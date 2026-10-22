@@ -21,11 +21,12 @@ import { TableSkeleton } from '@/components/shared/table-skeleton';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
+import { DataTableCards } from './data-table-cards';
 import { DataTableColumnDivider } from './data-table-divider';
 import { DataTableFilters } from './data-table-filters';
 import { DataTableHeaderCell, DataTableHeaderMenu } from './data-table-header-menu';
 import { DataTablePagination } from './data-table-pagination';
-import { mergeCellStyle, toColumnTextClass, toWidthStyle } from './data-table-column-style';
+import { mergeCellStyle, toColumnAlignClass, toColumnTextClass, toWidthStyle } from './data-table-column-style';
 import { withSort } from './data-table-params';
 import {
   DataTableScrollNav,
@@ -127,6 +128,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     toolbarActions,
     searchable,
     states,
+    card,
   } = props;
 
   const columnIds = useMemo(() => columns.map((column) => column.id), [columns]);
@@ -255,7 +257,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
    * DOM (p. ej. dentro de un `Popover` cerrado): simplemente no mueve el foco.
    */
   function focusColumnFilter(columnId: string) {
-    const selector = `[data-testid="data-table-filter-${columnId}"], [data-testid="data-table-filter-date-${columnId}"], [data-testid="data-table-filter-min-${columnId}"]`;
+    const selector = `[data-testid="data-table-filter-${columnId}"], [data-testid="data-table-filter-date-${columnId}"], [data-testid="data-table-filter-chip-${columnId}"]`;
     document.querySelector<HTMLElement>(selector)?.focus();
   }
 
@@ -286,18 +288,8 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     return <EmptyState {...states.empty} />;
   }
 
-  const columnAlign = (align: 'start' | 'end' | 'center') => {
-    if (align === 'end') {
-      return 'text-right';
-    }
-    if (align === 'center') {
-      return 'text-center';
-    }
-    return '';
-  };
-
   return (
-    <div data-testid="data-table" className="flex flex-col gap-4">
+    <div data-testid="data-table" className={cn('flex flex-col gap-4', card !== undefined && '@container')}>
       {showToolbars ? (
         <DataTableFilters
           columns={columns}
@@ -316,7 +308,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
       ) : visibleState === 'empty' ? (
         <DataTableEmpty texts={texts} emptyAction={emptyAction} />
       ) : (
-        <div ref={tableWrapRef} className="relative">
+        <div ref={tableWrapRef} className={cn('relative', card !== undefined && '@max-[760px]:hidden')}>
           <Table>
             <TableHeader>
               <TableRow>
@@ -374,7 +366,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
                           toWidthStyle(column),
                         )}
                         className={cn(
-                          columnAlign(column.align),
+                          toColumnAlignClass(column),
                           pinnedSide !== false && 'bg-background',
                           toColumnTextClass(column),
                           column.tabular === true && 'font-mono tabular-nums',
@@ -400,6 +392,17 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
           />
         </div>
       )}
+
+      {card !== undefined && visibleState === 'rows' ? (
+        <DataTableCards
+          columns={columns}
+          rows={rows}
+          getRowId={getRowId}
+          layout={card}
+          texts={texts}
+          className="hidden @max-[760px]:flex"
+        />
+      ) : null}
 
       {showToolbars ? (
         <DataTablePagination

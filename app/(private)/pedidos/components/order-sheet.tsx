@@ -16,14 +16,16 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 import { CancelOrderDialog } from './cancel-order-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
 import { OrderCustomerDialog } from './order-customer-dialog';
+import { OrderDeliveriesSheet } from './order-deliveries-sheet';
 import { OrderDeliverySheet } from './order-delivery-sheet';
 import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
-import { OrderForm, type OrderSheetSection } from './order-form';
+import { OrderForm } from './order-form';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
-import { OrderRowActions } from './order-row-actions';
+import { OrderResponsiblesSheet } from './order-responsibles-sheet';
+import type { OrderRowAction } from './order-row-actions';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -58,7 +60,7 @@ import type { RecipePickerPage } from './recipe-picker';
  * **Dos modos de apertura, un solo panel.** Sin `open`, el panel trae su propio disparador y su
  * propio estado -es el alta, y es lo que la seccion pone en la cabecera de la lista y en el slot
  * del estado vacio-. Con `open`/`onOpenChange`, el panel es CONTROLADO y no monta disparador: es
- * el enganche de la edicion desde la fila, donde quien dispara es `OrderRowActions`.
+ * el enganche de la edicion desde el menu de la fila.
  */
 
 export const ORDER_CREATE_OPEN_TESTID = 'order-create-open';
@@ -81,21 +83,12 @@ export type OrderSheetProps = {
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
-  /** Los responsables que la fila ya trajo. Abrir el panel NO consulta nada. */
-  readonly responsibles?: readonly OrderResponsible[];
-  /** Catalogos y `canWrite`, por props desde el servidor. */
-  readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /**
    * La cobertura que la fila ya trajo. `undefined` cuando el lote fallo o el pedido es de alta
    * (no tiene id todavia): la hoja se degrada al marcador de ausencia, mismo criterio que
    * `responsibles`.
    */
   readonly coverage?: OrderCoverage;
-  /**
-   * EN QUE SECCION abre. **Es el mismo panel**: esta prop no crea otro, solo
-   * decide a donde va el foco. Por defecto, el formulario de siempre.
-   */
-  readonly section?: OrderSheetSection;
 };
 
 export function OrderSheet({
@@ -105,10 +98,7 @@ export function OrderSheet({
   bridge,
   open,
   onOpenChange,
-  responsibles = [],
-  responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
-  section = 'form',
 }: OrderSheetProps) {
   /** Instancia del formulario: cambia en cada apertura para que arranque SIEMPRE vacio (2026-09-09). */
   const [openKey, setOpenKey] = useState(0);
@@ -153,70 +143,59 @@ export function OrderSheet({
         units={units}
         bridge={bridge}
         onSaved={handleSaved}
-        responsibles={responsibles}
-        responsiblesCatalog={responsiblesCatalog}
         coverage={coverage}
-        section={section}
       />
     </Sheet>
   );
 }
 
 export type OrderRowSheetActionsProps = {
+  /** El pedido de la acción elegida. Se conserva al cerrar para que el panel anime su salida. */
   readonly order: OrderSummary;
+  readonly action: OrderRowAction;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
   readonly bridge: MassVolumeBridge | null;
-  /** Los responsables de ESTA fila, ya traidos por el lote de la seccion. */
+  /** Los responsables de este pedido, ya traídos por el lote de la sección. */
   readonly responsibles?: readonly OrderResponsible[];
-  /** Catalogos y `canWrite`, compuestos una vez en el servidor. */
+  /** Catálogos y `canWrite`, compuestos una vez en el servidor. */
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /** La cobertura de ESTA fila, ya traida por el lote de la seccion. */
+  /** La cobertura de este pedido, ya traída por el lote de la sección. */
   readonly coverage?: OrderCoverage;
-  /** Si el actor puede modificar pedidos; lo resuelve el servidor. */
-  readonly canEditDistribution?: boolean;
-  /** Si el actor puede cambiar el cliente; lo resuelve el servidor. */
-  readonly canEditCustomer?: boolean;
-  /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
-  readonly canDeliver?: boolean;
+  /** Si el actor puede anular entregas; lo resuelve el servidor. */
+  readonly canVoidDelivery?: boolean;
 };
 
 /**
- * Las acciones de la fila con **las tres ya cableadas**: editar al panel lateral, cancelar al
- * dialogo de motivo y borrar a la confirmacion.
+ * Monta el panel o el diálogo de la acción elegida en el menú de una fila. Uno por tabla: así
+ * nunca hay dos abiertos y la tarjeta y la fila abren lo mismo.
  *
- * Es la pieza que une las acciones de la fila con sus paneles y dialogos:
- * `OrderRowActions` emite `onEdit`/`onCancel`/`onDelete` y aqui cada uno abre su panel o su
- * dialogo, CONTROLADO, con ese mismo pedido. Con el pedido en estado final `OrderRowActions` no
- * llega a emitir nada, asi que **no se monta ninguno de los tres**.
- *
- * **Los dialogos de cancelar y borrar se montan en su primera apertura y ya no se desmontan**, para
- * que el cierre anime su salida. Su contenido si se desmonta al cerrar: cada apertura arranca con
- * el estado de accion limpio -un `not_cancellable` de un intento anterior no reaparece- y el arbol
- * de una fila cerrada no contiene ningun formulario de cancelacion ni de borrado.
- *
- * Es lo que la celda de acciones de `buildOrderColumns` renderiza por fila: sin esta pieza, los
- * tres botones de `OrderRowActions` no abririan nada.
+ * «Editar» abre el formulario y «Responsables», su propia hoja de solo lectura con la gestión de
+ * responsables.
+ * Cerrado, lo montado sigue en el árbol para animar la salida; cada apertura lo remonta para que
+ * arranque sin el estado de la anterior.
  */
 export function OrderRowSheetActions({
   order,
+  action,
+  open,
+  onOpenChange,
   recipes,
   units,
   bridge,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
-  canEditDistribution = false,
-  canEditCustomer = false,
-  canDeliver = false,
+  canVoidDelivery = false,
 }: OrderRowSheetActionsProps) {
-  const [editOpen, setEditOpen] = useState(false);
-  // `null` mientras no se ha abierto nunca; despues el dialogo queda montado para animar su cierre.
-  const [cancelOpen, setCancelOpen] = useState<boolean | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState<boolean | null>(null);
-  const [distributionOpen, setDistributionOpen] = useState(false);
-  const [customerOpen, setCustomerOpen] = useState(false);
-  const [deliverOpen, setDeliverOpen] = useState(false);
+  const [opening, setOpening] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setOpening((count) => count + 1);
+  }
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -224,108 +203,90 @@ export function OrderRowSheetActions({
   } | null>(null);
   const pendingDistribution =
     savedDistribution?.order === order ? savedDistribution.draft : undefined;
-  /**
-   * EN QUE SECCION abre el UNICO panel de esta fila. No hay un segundo `OrderSheet`
-   * para responsables: editar y responsables abren **el mismo**, y esto es lo que los distingue.
-   */
-  const [section, setSection] = useState<OrderSheetSection>('form');
 
-  const openSection = (next: OrderSheetSection) => {
-    setSection(next);
-    setEditOpen(true);
-  };
-
-  return (
-    <>
-      <OrderRowActions
-        order={order}
-        onEdit={() => openSection('form')}
-        onCancel={() => setCancelOpen(true)}
-        onDelete={() => setDeleteOpen(true)}
-        onResponsibles={() => openSection('responsibles')}
-        canEditDistribution={canEditDistribution}
-        onDistribution={() => setDistributionOpen(true)}
-        canEditCustomer={canEditCustomer}
-        onCustomer={() => setCustomerOpen(true)}
-        canDeliver={canDeliver}
-        onDeliver={() => setDeliverOpen(true)}
-      />
-      <OrderSheet
-        order={order}
-        recipes={recipes}
-        units={units}
-        bridge={bridge}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        responsibles={responsibles}
-        responsiblesCatalog={responsiblesCatalog}
-        coverage={coverage}
-        section={section}
-      />
-      {cancelOpen === null ? null : (
-        <CancelOrderDialog order={order} open={cancelOpen} onOpenChange={setCancelOpen} />
-      )}
-      {deleteOpen === null ? null : (
-        <DeleteOrderDialog order={order} open={deleteOpen} onOpenChange={setDeleteOpen} />
-      )}
-      {distributionOpen ? (
+  switch (action) {
+    case 'edit':
+      return (
+        <OrderSheet
+          key={opening}
+          order={order}
+          recipes={recipes}
+          units={units}
+          bridge={bridge}
+          open={open}
+          onOpenChange={onOpenChange}
+          coverage={coverage}
+        />
+      );
+    case 'responsibles':
+      return (
+        <OrderResponsiblesSheet
+          key={opening}
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          responsibles={responsibles}
+          responsiblesCatalog={responsiblesCatalog}
+        />
+      );
+    case 'cancel':
+      return <CancelOrderDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'delete':
+      return <DeleteOrderDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'distribution':
+      return (
         <OrderDistributionDialog
+          key={opening}
           order={order}
           units={units}
-          open
-          onOpenChange={setDistributionOpen}
+          open={open}
+          onOpenChange={onOpenChange}
           saved={pendingDistribution}
           onSaved={(draft) => setSavedDistribution({ order, draft })}
         />
-      ) : null}
-      {customerOpen ? (
-        <OrderCustomerDialog order={order} open onOpenChange={setCustomerOpen} />
-      ) : null}
-      {deliverOpen ? (
-        <OrderDeliverySheet order={order} open onOpenChange={setDeliverOpen} />
-      ) : null}
-    </>
-  );
+      );
+    case 'customer':
+      return <OrderCustomerDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
+    case 'deliver':
+      return (
+        <OrderDeliverySheet
+          key={opening}
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+        />
+      );
+    case 'deliveries':
+      return (
+        <OrderDeliveriesSheet
+          key={opening}
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          canVoid={canVoidDelivery}
+        />
+      );
+  }
 }
-
 
 export type OrderRowResponsiblesProps = {
   readonly order: OrderSummary;
-  readonly recipes: RecipePickerPage;
-  readonly units: readonly UnitView[];
-  readonly bridge: MassVolumeBridge | null;
   /** Los responsables de ESTA fila, del lote que la seccion pidio una sola vez. */
   readonly responsibles: readonly OrderResponsible[];
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
-  /** La cobertura de ESTA fila: el panel es el mismo, se abra por donde se abra. */
-  readonly coverage?: OrderCoverage;
 };
 
 /**
- * La CELDA de la columna de responsables.
+ * La celda de la columna de responsables: los avatares y, al pulsar el `+N`, la misma hoja que la
+ * entrada «Responsables» del menu, que no depende de `:hover` ni del tooltip en tactil.
  *
- * Pinta los avatares y, al pulsar el `+N`, abre **el panel que ya existe** en su seccion de
- * responsables: la segunda puerta al dato, la que no depende de `:hover` ni de que el
- * tooltip llegue a abrir en tactil.
- *
- * **Vive en ESTE archivo, junto a `OrderRowSheetActions`, y no en `ResponsibleAvatars`** por
- * una razon concreta: `components/shared/responsible-avatars.tsx` es la pieza de presentacion
- * pura —no conoce
- * paneles y no debe conocerlos—, y quien sabe abrir el panel de un pedido es este modulo. Asi la
- * columna de avatares y la de acciones abren **el mismo** `OrderSheet`, no dos.
- *
- * **El panel se monta SOLO mientras esta abierto** (`{open ? ... : null}`): con la celda cerrada
- * no hay ningun panel en el arbol de la fila, que es lo que el test del panel unico comprueba contando
- * instancias.
+ * Vive aqui y no en `ResponsibleAvatars`, que es presentacion pura y no conoce paneles. La hoja se
+ * monta solo mientras esta abierta: con la celda cerrada no hay ninguna en el arbol de la fila.
  */
 export function OrderRowResponsibles({
   order,
-  recipes,
-  units,
-  bridge,
   responsibles,
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
-  coverage,
 }: OrderRowResponsiblesProps) {
   const [open, setOpen] = useState(false);
 
@@ -333,17 +294,12 @@ export function OrderRowResponsibles({
     <>
       <ResponsibleAvatars responsibles={responsibles} onShowAll={() => setOpen(true)} />
       {open ? (
-        <OrderSheet
+        <OrderResponsiblesSheet
           order={order}
-          recipes={recipes}
-          units={units}
-          bridge={bridge}
           open
           onOpenChange={setOpen}
           responsibles={responsibles}
           responsiblesCatalog={responsiblesCatalog}
-          coverage={coverage}
-          section="responsibles"
         />
       ) : null}
     </>

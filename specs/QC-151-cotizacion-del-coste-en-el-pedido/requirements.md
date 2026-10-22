@@ -173,3 +173,5 @@ añade un requisito sin renumerar ni reescribir los anteriores.
 | 2026-09-23 | El selector retiraba la receta nueva al cambiarla en la edición (defecto previo a la ficha, arreglado en `395ff106`): ¿se queda en QC-151? | **Sí.** El arreglo y su test se quedan en esta ficha. |
 
 Cobertura: R23.
+
+> **Enmienda QC-305 (2026-10-21):** en un pedido comenzado (desde `EN_CURSO`) el formulario ya no recotiza (R12) y guardar no cambia el estimado; R1 se mantiene. Ver `specs/QC-305-coste-real-de-produccion/requirements.md` R12-R15.

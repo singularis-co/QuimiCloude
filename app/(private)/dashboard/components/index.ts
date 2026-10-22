@@ -14,22 +14,31 @@ export {
   type ExecutionTraceTableProps,
 } from './execution-trace-table';
 export {
-  ActiveOrderMark,
   DeletedOrderMark,
+  TRACE_ACTIONS_LABEL_PREFIX,
+  TRACE_FORMULA_COLUMN_ID,
+  TRACE_IMAGE_COLUMN_ID,
   TRACE_LINK_TEXT,
+  TRACE_MENU_TITLE_PREFIX,
+  TRACE_PRESENTATIONS_COLUMN_ID,
   buildExecutionTraceColumns,
   type ExecutionTraceColumnsDeps,
 } from './execution-trace-columns';
 export {
-  ACTIVE_ORDER_MARK,
+  CONDITIONING_TEXTS,
   DELETED_ORDER_MARK,
   EXECUTION_ACTION_LABELS,
   GO_BACK_MARK,
+  PHASE_DURATION_LABELS,
+  PHASE_OPEN_MARK,
+  PHASE_UNCLOSED_MARK,
   TRACE_DURATION_SUFFIXES,
   TRACE_ORDER_STATUS_LABELS,
   formatElapsed,
-  formatTraceDuration,
+  formatElapsedMinutes,
+  formatSnapshotDate,
   formatTraceInstant,
+  formatTraceTotal,
 } from './execution-trace-format';
 export {
   CANCELLED_ON_VALUE,

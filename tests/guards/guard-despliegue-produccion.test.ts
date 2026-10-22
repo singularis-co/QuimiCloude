@@ -132,3 +132,37 @@ describe('package.json > scripts.build', () => {
     expect(pkg.scripts?.build).toBe('node scripts/build.mjs')
   })
 })
+
+describe('scripts/build.mjs > relleno de telefonos de clientes', () => {
+  const RELLENAR = 'tsx scripts/backfill-customer-phones.ts'
+
+  it('R28 (QC-236) — en local, production y preview el relleno corre tras migrate y generate; en development o sin VERCEL_ENV no', async () => {
+    const { pasosDelBuild } = await import('@/scripts/build.mjs')
+    const preview = {
+      VERCEL: '1',
+      VERCEL_ENV: 'preview',
+      PREVIEW_SUPABASE_REF: 'refinventadopreviewx',
+      DATABASE_URL: 'postgresql://postgres.refinventadopreviewx:clave@aws-0-xx.pooler.supabase.com:6543/postgres',
+      DIRECT_URL: 'postgresql://postgres:clave@db.refinventadopreviewx.supabase.co:5432/postgres',
+      SUPABASE_STORAGE_URL: 'https://refinventadopreviewx.supabase.co',
+      MAIL_TRANSPORT: 'desactivado',
+      DOCUMENTS_E2E_DOUBLES: 'si',
+    }
+    for (const env of [{}, { VERCEL: '1', VERCEL_ENV: 'production' }, preview]) {
+      const { pasos } = pasosDelBuild(env)
+      expect(pasos.slice(0, 3), JSON.stringify(env.VERCEL_ENV ?? 'local')).toEqual([
+        'prisma migrate deploy',
+        'prisma generate',
+        RELLENAR,
+      ])
+    }
+    for (const env of [{ VERCEL: '1', VERCEL_ENV: 'development' }, { VERCEL: '1' }]) {
+      expect(pasosDelBuild(env).pasos).not.toContain(RELLENAR)
+    }
+  })
+
+  it('R28 (QC-236) — el script npm del relleno apunta al mismo archivo que el paso del build', () => {
+    const pkg = JSON.parse(readFileSync(join(RAIZ, 'package.json'), 'utf8')) as { scripts?: Record<string, string> }
+    expect(pkg.scripts?.['db:backfill:customer-phones']).toBe(RELLENAR)
+  })
+})

@@ -37,6 +37,7 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores';
 import { prisma } from '@/lib/shared/db/prisma';
 import { FORMULAS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -64,6 +65,9 @@ const FORMULA_FILES_IN_BATCH = 2;
  * vez de salir a la red. Que casa de verdad lo afirma el contador de mas abajo.
  */
 const STORAGE_ORIGIN = 'https://documentos-e2e.invalid';
+
+/** Valor de la columna cifrada de la conexion sembrada; nunca se descifra (ver `beforeAll`). */
+const E2E_AI_PROVIDER_KEY_ENC = 'v1:e2e-sin-descifrar';
 
 /** El tipo de contenido que admite el borde del modulo; el selector no acepta otro. */
 const PDF_MIME_TYPE = 'application/pdf';
@@ -141,6 +145,7 @@ test.beforeAll(async () => {
   if (orphanCompanyIds.length > 0) {
     await prisma.documentFile.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.documentBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.aiProviderConnection.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   await prisma.supplier.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -178,6 +183,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 
   // El rol tiene que llamarse EXACTAMENTE asi: lo siembra `pnpm run db:seed` y lleva
   // `proveedores.consultar` —que abre la pantalla— y `documentos.modificar` —que el caso de uso de
@@ -196,7 +202,7 @@ test.beforeAll(async () => {
 
   // Hash REAL: el objetivo es que bcrypt, el adaptador Prisma y la Server Action de login se
   // entiendan de verdad.
-  await createFixtureUser({
+  const admin = await createFixtureUser({
     data: {
       firstNames: `Qc107${RUN_ID.slice(0, 8)}`,
       lastNames: 'Documentos',
@@ -214,6 +220,21 @@ test.beforeAll(async () => {
       accountStatus: 'active',
     },
     select: { id: true },
+  });
+
+  // Sin conexion la subida no se abre: la pagina pinta el aviso de bloqueo en lugar del boton. La
+  // key no se descifra nunca: con el doble de lectura encendido la lectura no la usa.
+  await prisma.aiProviderConnection.create({
+    data: {
+      id: randomUUID(),
+      companyId: company.id,
+      provider: 'ANTHROPIC',
+      apiKeyEnc: E2E_AI_PROVIDER_KEY_ENC,
+      status: 'ACTIVE',
+      keyUpdatedAt: new Date(),
+      createdById: admin.id,
+      updatedById: admin.id,
+    },
   });
 
   // Con Prisma y no por la UI: el alta de proveedor ya la recorre `e2e/proveedores.spec.ts`, y lo
@@ -276,6 +297,8 @@ test.afterAll(async () => {
     if (companyId !== null) {
       await prisma.documentFile.deleteMany({ where: { companyId } });
       await prisma.documentBatch.deleteMany({ where: { companyId } });
+      // Antes que los usuarios (`created_by`) y que la empresa: las dos FK son RESTRICT.
+      await prisma.aiProviderConnection.deleteMany({ where: { companyId } });
     }
   } finally {
     try {

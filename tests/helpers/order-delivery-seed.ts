@@ -240,6 +240,18 @@ export async function escritoPorEntregas(
   };
 }
 
+// 2026-10-15: la entrega ya no guarda cliente; el de cada linea es la unica fuente.
+/** Los clientes distintos de las lineas de una entrega, ordenados. */
+export async function clientesDeEntrega(deliveryId: string): Promise<readonly string[]> {
+  const filas = await prisma.orderDeliveryLine.findMany({
+    where: { deliveryId },
+    distinct: ['customerId'],
+    select: { customerId: true },
+    orderBy: { customerId: 'asc' },
+  });
+  return filas.map((f) => f.customerId);
+}
+
 export async function borrarEmpresaDeEntrega(empresa: EmpresaDeEntrega): Promise<void> {
   const companyId = empresa.companyId;
   await prisma.inventoryMovement.deleteMany({ where: { companyId } });

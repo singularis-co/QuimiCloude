@@ -15,6 +15,7 @@ init.sh
 .claude/settings.json
 docs/specs.md
 docs/jira.md
+docs/trello.md
 docs/worktrees.md
 docs/gate.md
 docs/lectura.md
@@ -31,6 +32,7 @@ scripts/check-perfil.mjs
 scripts/archivos-en-vuelo.mjs
 scripts/arnes-sync.sh
 scripts/arnes-sync.mjs
+scripts/trello.mjs
 progress/README.md
 progress/features/_plantilla.md
 progress/sesion.local.example.md
@@ -44,3 +46,6 @@ tests/guards/guard-validador-equipo.test.ts
 tests/guards/guard-validador-estados.test.ts
 tests/guards/guard-unir-informes-vitest.test.ts
 tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts
+tests/guards/guard-hooks-anclados.test.ts
+tests/guards/guard-validador-tracker.test.ts
+tests/guards/guard-trello-cliente.test.ts

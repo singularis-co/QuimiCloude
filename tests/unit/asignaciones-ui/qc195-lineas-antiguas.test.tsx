@@ -20,14 +20,17 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
     quantity: '12.5',
-    presentationLines: [{ presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 }],
+    presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
     unitId: 'unit-1',
     unitLabel: 'l',
-    packages: '5',
     status: 'POR_EMPACAR',
+    priority: 'MEDIA',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     packedByName: null,
     packedById: null,
     packingSteps: [],
+    packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -38,7 +41,13 @@ afterEach(() => {
 
 describe('pantalla de empaque con lineas antiguas', () => {
   it('R33: la linea antigua se pinta con sus envases y el nombre de su presentacion', () => {
-    render(<PackingOrderScreen order={fila()} actorId="11111111-1111-4111-8111-111111111111" />);
+    render(
+      <PackingOrderScreen
+        order={fila()}
+        actorId="11111111-1111-4111-8111-111111111111"
+        backHref="/asignacion?vista=por_empacar"
+      />,
+    );
 
     expect(screen.getByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveTextContent(
       '5 × Botella 200 ml',

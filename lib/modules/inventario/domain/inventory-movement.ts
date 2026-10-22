@@ -2,7 +2,15 @@ import type { MovementReason } from './movement-reason';
 
 export type InventoryMovementView = {
   readonly id: string;
-  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery';
+  readonly kind:
+    | 'opening'
+    | 'adjustment'
+    | 'consumption'
+    | 'production'
+    | 'delivery'
+    | 'delivery_void'
+    | 'direct_delivery'
+    | 'direct_delivery_void';
   readonly quantity: string;
   readonly reason: MovementReason | null;
   readonly authorName: string | null;
@@ -15,14 +23,16 @@ export type InventoryMovementView = {
  *  puede dar varios asientos `production` por pedido, uno por linea. */
 export type NewInventoryMovement = {
   readonly batchId: string;
-  readonly kind: 'opening' | 'adjustment' | 'consumption' | 'production' | 'delivery';
+  readonly kind: InventoryMovementView['kind'];
   readonly quantity: string;
   readonly reason: MovementReason | null;
   readonly createdBy: string;
   readonly orderId: string | null;
   readonly orderPresentationLineId: string | null;
-  /** Solo lo lleva `delivery`, y siempre: opcional para que los demas escritores no lo nombren. */
+  /** Solo lo llevan `delivery` y `direct_delivery`, y siempre: opcional para que los demas escritores
+   *  no lo nombren. `orderDeliveryVoidId`, igual, con `delivery_void` y `direct_delivery_void`. */
   readonly orderDeliveryId?: string | null;
+  readonly orderDeliveryVoidId?: string | null;
   /** Solo los lleva un ajuste, y los dos juntos: el `CHECK` de la tabla rechaza uno sin el otro. */
   readonly previousStock?: string | null;
   readonly countedStock?: string | null;

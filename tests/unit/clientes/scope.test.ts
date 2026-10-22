@@ -115,15 +115,24 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'adapters/driven/persistence/company-scope.ts',
       // QC-156: el adaptador del servicio que `clientes` ofrece a otros modulos.
       'adapters/driven/persistence/customer-catalog-prisma.ts',
+      // QC-239 2026-10-20: telefonos de cliente.
+      'adapters/driven/persistence/customer-phone-prisma.ts',
       'adapters/driven/persistence/customer-prisma.ts',
+      // QC-239 2026-10-20: la transaccion de los telefonos del cliente.
+      'adapters/driven/persistence/customer-unit-of-work-prisma.ts',
+      'adapters/driven/persistence/legacy-phone-prisma.ts',
       'adapters/driven/persistence/list-query-sql.ts',
       'adapters/driving/customer-actions.ts',
       'domain/actor.ts',
+      'domain/backfill-legacy-phones.ts',
       'domain/create-customer.ts',
       // QC-156: el contrato de ese servicio.
       'domain/customer-catalog.ts',
       'domain/customer-id.ts',
       'domain/customer-input.ts',
+      // QC-239 2026-10-20: orquestacion de los telefonos de un cliente.
+      'domain/customer-phone-links.ts',
+      'domain/customer-phone.ts',
       'domain/customer-queryable.ts',
       'domain/customer-scope.ts',
       'domain/customer-text.ts',
@@ -132,12 +141,20 @@ describe('R20 — el modulo clientes nace con la forma hexagonal', () => {
       'domain/delete-customer.ts',
       'domain/errors.ts',
       'domain/get-customer.ts',
+      'domain/legacy-phone-backfill.ts',
       'domain/list-customers.ts',
       'domain/list-query.ts',
       'domain/page.ts',
+      'domain/phone-matches-wa-id.ts',
       'domain/update-customer.ts',
       'index.ts',
+      'ports/company-country-lookup.ts',
+      // QC-239 2026-10-20: telefonos, escritura transaccional y unidad de trabajo del cliente.
+      'ports/customer-phone-repository.ts',
       'ports/customer-repository.ts',
+      'ports/customer-unit-of-work.ts',
+      'ports/customer-write-repository.ts',
+      'ports/legacy-phone-repository.ts',
       'ports/list-query-log.ts',
     ]
     const archivosReales = filesIn(moduloDir, /\.tsx?$/)
@@ -194,18 +211,24 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
   }
 
   const PERMISO_YA_CUBIERTO = 'lib/modules/identity/domain/permissions.ts'
+  // Catalogo de anadidos: clasifica cada permiso como nucleo o anadido, y por eso lo nombra.
+  const CATALOGO_DE_ANADIDOS = 'lib/modules/identity/domain/company-addons.ts'
 
   /** Rutas de produccion donde el literal de permiso SI puede aparecer: el corte de la propia
    *  pantalla y el item del menu que la enlaza, cada uno acotado a su archivo exacto -nunca a la
    *  carpeta de componentes de la ruta, que sigue en rojo. */
   const PANTALLA_PERMITIDA = 'app/(private)/clientes/page.tsx'
+  // El corte de la pantalla hermana de contactos, tambien por ruta exacta.
+  const PANTALLA_CONTACTOS_PERMITIDA = 'app/(private)/clientes/contactos/page.tsx'
   const NAV_PERMITIDA = 'lib/shared/navigation/private-nav.ts'
 
   function permisoPermitidoEn(relativo: string): boolean {
     return (
       relativo === PERMISO_YA_CUBIERTO ||
+      relativo === CATALOGO_DE_ANADIDOS ||
       relativo.startsWith('lib/modules/clientes/domain/') ||
       relativo === PANTALLA_PERMITIDA ||
+      relativo === PANTALLA_CONTACTOS_PERMITIDA ||
       relativo === NAV_PERMITIDA
     )
   }
@@ -223,11 +246,11 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
     return hallazgos
   }
 
-  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx o en private-nav.ts', () => {
+  it('R26 (QC-153), R35 (QC-154), R37 (QC-155) — el literal de los dos permisos solo aparece en permissions.ts, en company-addons.ts, en lib/modules/clientes/domain, en app/(private)/clientes/page.tsx, en app/(private)/clientes/contactos/page.tsx o en private-nav.ts', () => {
     const hallazgos = detectarLiteralesDePermiso()
     expect(
       hallazgos,
-      'ningun archivo distinto de permissions.ts o de lib/modules/clientes/domain/** puede ' +
+      'ningun archivo distinto de permissions.ts, company-addons.ts o de lib/modules/clientes/domain/** puede ' +
         'nombrar clientes.consultar/modificar: ' + hallazgos.join(', '),
     ).toEqual([])
   })
@@ -282,6 +305,19 @@ describe('R26 — sin alta, consulta, edicion ni baja de clientes en esta ficha'
       rmSync(raiz, { recursive: true, force: true })
     }
   })
+
+  it('R3, R14 — el literal en app/(private)/clientes/contactos/components/ SI dispara: la admision es solo su page.tsx', () => {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc244-scope-'))
+    try {
+      const relativoFabricado = 'app/(private)/clientes/contactos/components/__sensibilidad_literal__.ts'
+      const rutaFabricada = join(raiz, relativoFabricado)
+      mkdirSync(dirname(rutaFabricada), { recursive: true })
+      writeFileSync(rutaFabricada, "export const puedeVer = (p: string) => p === 'clientes.consultar'\n")
+      expect(detectarLiteralesDePermiso(raiz)).toContain(relativoFabricado)
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------------------------
@@ -299,12 +335,42 @@ describe('R28 — los UNICOS E2E que nombran clientes son e2e/clientes.spec.ts y
   // para medir el movimiento de entrada y salida.
   // `marca-componentes.spec.ts` (QC-227) siembra un cliente para que la lista de Clientes tenga
   // una fila y mide en ella cabecera, celdas y foco del buscador con el navegador.
+  // 2026-10-13: entra `anular-entrega.spec.ts`, el E2E de anular una entrega. Siembra un cliente
+  // por Prisma -la entrega que se anula exige uno- con la normalizacion del barrel de `clientes`,
+  // la unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-13 (ficha de producto terminado): entra `detalle-de-producto-terminado.spec.ts`, el E2E de la ficha de
+  // producto terminado. Siembra un cliente por Prisma -la entrega exige uno y la ficha lo muestra
+  // en Entregas- con la normalizacion del barrel de `clientes`, la unica definicion. No recorre la
+  // pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-13 (QC-262): entra `pedidos-rediseno.spec.ts`, el E2E del rediseno de pedidos. Siembra
+  // un cliente por Prisma -el pedido pendiente lo lleva para medir el dialogo «Cliente»- con la
+  // normalizacion del barrel de `clientes`, la unica definicion. No recorre la pantalla de clientes.
+  // La lista sigue CERRADA.
+  // 2026-10-15 (QC-282): entra `entrega-a-varios-clientes.spec.ts`, el E2E de R47 de QC-282 (nombre
+  // fijado por specs/QC-282-entrega-a-varios-clientes/tasks.md > TI). Siembra dos clientes por
+  // Prisma -la entrega se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
+  // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-288): entra `entrega-sin-pedido.spec.ts`, el E2E de R56 de QC-288 (nombre
+  // fijado por specs/QC-288-entrega-sin-pedido/tasks.md). Siembra dos clientes por Prisma -la
+  // entrega sin pedido se reparte entre ellos- con la normalizacion del barrel de `clientes`, la
+  // unica definicion. No recorre la pantalla de clientes. La lista sigue CERRADA.
+  // 2026-10-19 (QC-236): entra `clientes-telefono.spec.ts`, el E2E del telefono de cliente con
+  // pais (nombre fijado por specs/QC-236-telefono-de-cliente-con-codigo-de-pais/tasks.md > T11).
+  // Recorre la pantalla de clientes: alta con el pais de la empresa, duplicado, empresa sin pais,
+  // avisos de los migrados en la lista y el campo en telefono. Siembra clientes por Prisma con la
+  // normalizacion del barrel de `clientes`, la unica definicion. La lista sigue CERRADA.
   const E2E_PERMITIDOS: ReadonlySet<string> = new Set([
     'clientes.spec.ts',
     'pedido-con-cliente.spec.ts',
     'entregar-producto-terminado.spec.ts',
     'movimiento.spec.ts',
     'marca-componentes.spec.ts',
+    'anular-entrega.spec.ts',
+    'detalle-de-producto-terminado.spec.ts',
+    'pedidos-rediseno.spec.ts',
+    'entrega-a-varios-clientes.spec.ts',
+    'entrega-sin-pedido.spec.ts',
+    'clientes-telefono.spec.ts',
   ])
   const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
 
@@ -488,6 +554,9 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       'lastNames',
       'city',
       'phone',
+      'phoneCountry',
+      'phoneE164',
+      'phoneIssue',
       'email',
       'address',
       // F1.4: las tres unicas columnas nuevas de esta ficha.
@@ -507,7 +576,7 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
     ])
   })
 
-  it('solo tres migraciones del repo tocan la tabla customers: la de QC-153, la de esta ficha y la de QC-156', () => {
+  it('solo las siete migraciones de la lista cerrada nombran la tabla customers, cada una con su motivo', () => {
     const migracionesDir = join(repoRoot, 'db', 'migrations')
     const tocanCustomers = readdirSync(migracionesDir, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
@@ -523,11 +592,18 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
       .sort()
     // QC-223 2026-10-08: + `order_deliveries`, que solo REFERENCIA `customers` con una FK
     // compuesta desde la tabla nueva; no altera `customers`.
+    // QC-282 2026-10-15: + `order_delivery_lines_customer`, que mueve esa FK compuesta de
+    // `order_deliveries` a `order_delivery_lines`; tampoco altera `customers`.
+    // QC-239 2026-10-20: + `customer_phone_numbers`, que copia los telefonos de `customers` a la
+    // tabla puente, la referencia con una FK compuesta y retira su indice unico de telefono.
     expect(tocanCustomers).toEqual([
       '20260924120000_customers',
       '20260924200000_customers_search_normalized',
       '20261006160000_orders_customer',
       '20261008150100_order_deliveries',
+      '20261015130000_order_delivery_lines_customer',
+      '20261019130000_customers_phone_e164',
+      '20261020120000_customer_phone_numbers',
     ])
   })
 
@@ -542,18 +618,94 @@ describe('R37 — una sola migracion nueva y solo tres campos normalizados en Cu
 })
 
 // ---------------------------------------------------------------------------------------------
+// Uso de la TABLA `customers` (compartido por R38 y R40)
+// ---------------------------------------------------------------------------------------------
+
+// QC-282 2026-10-15 (decision del humano): el contrato de entrega (design §2 de QC-282) tiene un
+// campo `customers`. Antes R38 y R40 cazaban la PALABRA `customers`, y un nombre de propiedad
+// (`.customers`, `customers:`, `customers?:`, `{ customers }` y la variable que esa
+// desestructuracion declara, y el acceso indexado `View['customers']`) no es la tabla. Ahora solo
+// cuenta lo que nombra la tabla: el literal entre comillas (`'customers'`, `"customers"` del SQL
+// con comillas) que no sea un acceso indexado, o el nombre tras una palabra clave de SQL
+// (`FROM customers`, `JOIN public.customers`, `REFERENCES "customers"`...). El modelo de Prisma,
+// la ruta y el import profundo siguen con su propio marcador.
+const TABLA_CUSTOMERS_ENTRE_COMILLAS = /(?<![\w$)\].]\[)['"`]customers['"`]/
+const TABLA_CUSTOMERS_EN_SQL = /\b(?:from|join|into|update|table|references)\s+(?:"?\w+"?\.)?"?customers\b/i
+
+function usaTablaCustomers(fuente: string): boolean {
+  return TABLA_CUSTOMERS_ENTRE_COMILLAS.test(fuente) || TABLA_CUSTOMERS_EN_SQL.test(fuente)
+}
+
+/** Nombres de propiedad `customers` que NO deben disparar (casos sinteticos de R38 y R40). */
+const CUSTOMERS_COMO_PROPIEDAD = [
+  'export const n = (delivery) => delivery.customers.length\n',
+  'export const m = (delivery) => delivery?.customers ?? []\n',
+  'export const body = { orderId, customers: blocks.map((b) => b.customerId) }\n',
+  'export type View = { readonly customers?: readonly string[] }\n',
+  'export const ok = ({ customers }) => customers.every((c) => c.allocations.length > 0)\n',
+  "export type Item = View['customers'][number]\n",
+  'const { customers, orderId } = input\nexport const total = customers.reduce((s, c) => s + c.n, 0)\n',
+] as const
+
+/** Usos reales de la tabla, el modelo, la ruta o el modulo de clientes, que SI deben disparar. */
+const USOS_REALES_DE_CLIENTES = [
+  "export const tabla = 'customers'\n",
+  'export const sql = `SELECT id FROM "customers" WHERE deleted_at IS NULL`\n',
+  'export const sql = `SELECT c.id FROM customers c JOIN orders o ON o.customer_id = c.id`\n',
+  'export const sql = `SELECT 1 FROM public.customers`\n',
+] as const
+
+// ---------------------------------------------------------------------------------------------
 // R38 — nada bajo app/ que nombre clientes
 // ---------------------------------------------------------------------------------------------
 
 describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombra clientes', () => {
-  const MARCADORES_DE_CLIENTES = /\bcustomers\b|\/clientes\b|clientes\.(consultar|modificar)|['"]Clientes['"]/
+  // QC-282 P7 2026-10-15 (decision del humano, opcion A): el marcador `['"]Clientes['"]` (QC-153,
+  // menor 5) buscaba el NOMBRE VISIBLE del modulo, el de la entrada del sidebar y el titulo de su
+  // pantalla (`CUSTOMERS_LABEL` de lib/shared/navigation/private-nav.ts): que ninguna pantalla
+  // fuera de (private)/clientes/ enlazara o se presentara como el modulo. Pero la palabra a secas
+  // tambien es una etiqueta de UI legitima (la columna «Clientes» de una entrega con varios). Ahora
+  // la etiqueta visible -constante local, texto JSX, prop de etiqueta- no cuenta; si cuenta lo que
+  // apunta al modulo: la constante de su ruta, la etiqueta del sidebar importada de la navegacion,
+  // una entrada de menu `{ label: 'Clientes', href }` y un enlace cuyo texto es «Clientes».
+  const MARCADORES_DE_CLIENTES = /\/clientes\b|clientes\.(consultar|modificar)|\bCUSTOMERS_ROUTE\b/
+  const ETIQUETA_DEL_SIDEBAR_IMPORTADA =
+    /import\s*(?:type\s*)?\{[^}]*\bCUSTOMERS_LABEL\b[^}]*\}\s*from\s*['"]@\/lib\/shared\/navigation\/private-nav['"]/
+  const ENTRADA_DE_MENU_A_CLIENTES =
+    /\{[^{}]*\b(?:href|route|path)\s*:[^{}]*['"`]Clientes['"`][^{}]*\}|\{[^{}]*['"`]Clientes['"`][^{}]*\b(?:href|route|path)\s*:[^{}]*\}/
+  const ENLACE_CON_TEXTO_CLIENTES = /<(Link|a)\b[^>]*>\s*(?:\{\s*)?['"`]?Clientes['"`]?(?:\s*\})?\s*<\/\1>/
+  const nombraClientes = (fuente: string): boolean =>
+    usaTablaCustomers(fuente) ||
+    MARCADORES_DE_CLIENTES.test(fuente) ||
+    ETIQUETA_DEL_SIDEBAR_IMPORTADA.test(fuente) ||
+    ENTRADA_DE_MENU_A_CLIENTES.test(fuente) ||
+    ENLACE_CON_TEXTO_CLIENTES.test(fuente)
   const CARPETA_PERMITIDA = '(private)/clientes/'
 
   function coincidenciasEnApp(appDir: string = join(repoRoot, 'app')): string[] {
     return filesIn(appDir)
       .map((ruta) => relative(appDir, ruta).split(sep).join('/'))
       .filter((relativa) => !relativa.startsWith(CARPETA_PERMITIDA))
-      .filter((relativa) => /cliente/i.test(relativa) || MARCADORES_DE_CLIENTES.test(leer(join(appDir, relativa))))
+      .filter((relativa) => /cliente/i.test(relativa) || nombraClientes(leer(join(appDir, relativa))))
+  }
+
+  /** Escribe cada fuente en una pantalla fabricada fuera de (private)/clientes/ y devuelve
+   *  cuales dispara el detector. */
+  function disparanEnApp(fuentes: readonly string[]): number[] {
+    const appDir = mkdtempSync(join(tmpdir(), 'qc282-scope-'))
+    try {
+      fuentes.forEach((fuente, i) => {
+        const ruta = join(appDir, '(private)', 'pedidos', 'components', `__sensibilidad_${i}__.tsx`)
+        mkdirSync(dirname(ruta), { recursive: true })
+        writeFileSync(ruta, fuente)
+      })
+      const coincidencias = coincidenciasEnApp(appDir)
+      return fuentes
+        .map((_, i) => i)
+        .filter((i) => coincidencias.includes(`(private)/pedidos/components/__sensibilidad_${i}__.tsx`))
+    } finally {
+      rmSync(appDir, { recursive: true, force: true })
+    }
   }
 
   it('ningun archivo de app/ fuera de app/(private)/clientes/ nombra ni el nombre, ni la tabla, ni el permiso ni la ruta de clientes', () => {
@@ -585,6 +737,47 @@ describe('R38 (QC-154), R37 (QC-155) — solo bajo app/(private)/clientes/ nombr
     } finally {
       rmSync(appDir, { recursive: true, force: true })
     }
+  })
+
+  it('QC-282 — `customers` como nombre de propiedad no dispara (casos sinteticos)', () => {
+    expect(disparanEnApp(CUSTOMERS_COMO_PROPIEDAD)).toEqual([])
+  })
+
+  it('QC-282 — la tabla, la ruta y el import profundo de clientes siguen disparando (casos sinteticos)', () => {
+    const usos = [
+      ...USOS_REALES_DE_CLIENTES,
+      'export const href = "/clientes"\n',
+      "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+    ]
+    expect(disparanEnApp(usos)).toEqual(usos.map((_, i) => i))
+  })
+
+  it('QC-282 P7 — «Clientes» como etiqueta visible no dispara (casos sinteticos)', () => {
+    const etiquetas = [
+      "const CUSTOMERS_LABEL = 'Clientes';\nexport const Th = () => <th>{CUSTOMERS_LABEL}</th>\n",
+      'const CUSTOMERS_LABEL = "Clientes"\nexport const L = CUSTOMERS_LABEL\n',
+      'export const Th = () => <th scope="col">Clientes</th>\n',
+      'export const D = () => <dt>Clientes</dt>\n',
+      'export const F = () => <Field label="Clientes" value={n} />\n',
+      "export const S = () => <section aria-label={'Clientes'}><h3>Clientes</h3></section>\n",
+    ]
+    expect(disparanEnApp(etiquetas)).toEqual([])
+  })
+
+  it('QC-282 P7 — ruta, permiso, import profundo, tabla, entrada de menu y enlace «Clientes» siguen disparando (casos sinteticos)', () => {
+    const usos = [
+      'export const href = "/clientes"\n',
+      "export const puede = can(user, 'clientes.consultar')\n",
+      "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+      "export const tabla = 'customers'\n",
+      "import { CUSTOMERS_ROUTE } from '@/lib/shared/routes'\nexport const h = CUSTOMERS_ROUTE\n",
+      "import { BRAND_LABEL, CUSTOMERS_LABEL } from '@/lib/shared/navigation/private-nav'\nexport const t = `${CUSTOMERS_LABEL} · ${BRAND_LABEL}`\n",
+      "export const items = [{ label: 'Clientes', href: ruta }]\n",
+      "export const items = [{ href: ruta, label: 'Clientes' }]\n",
+      'export const Menu = () => <Link href={ruta}>Clientes</Link>\n',
+      'export const Menu = () => <a href={ruta}>Clientes</a>\n',
+    ]
+    expect(disparanEnApp(usos)).toEqual(usos.map((_, i) => i))
   })
 })
 
@@ -625,7 +818,13 @@ describe('R40 — clientes no nombra pedidos, y pedidos solo usa clientes por su
     }
     for (const archivo of filesIn(pedidosDir, /\.tsx?$/)) {
       const fuente = leer(archivo)
-      if (importaModuloEnProfundidad(fuente, 'clientes') || nombraModeloOTabla(fuente, 'customer', 'customers')) {
+      // QC-282 2026-10-15: del lado de pedidos la tabla se busca por su USO (`usaTablaCustomers`),
+      // no por la palabra: el contrato de entrega tiene una propiedad `customers`.
+      if (
+        importaModuloEnProfundidad(fuente, 'clientes') ||
+        new RegExp('\\bprisma\\.customer\\b').test(fuente) ||
+        usaTablaCustomers(fuente)
+      ) {
         hallazgos.push(archivo)
       }
     }
@@ -696,6 +895,36 @@ describe('R40 — clientes no nombra pedidos, y pedidos solo usa clientes por su
       rmSync(raizClientes, { recursive: true, force: true })
       rmSync(raizPedidos, { recursive: true, force: true })
     }
+  })
+
+  /** Escribe cada fuente en un `pedidos` fabricado y devuelve cuales dispara el detector. */
+  function disparanEnPedidos(fuentes: readonly string[]): number[] {
+    const raiz = mkdtempSync(join(tmpdir(), 'qc282-scope-'))
+    try {
+      const rutas = fuentes.map((fuente, i) => {
+        const ruta = join(raiz, 'domain', `__sensibilidad_${i}__.ts`)
+        mkdirSync(dirname(ruta), { recursive: true })
+        writeFileSync(ruta, fuente)
+        return ruta
+      })
+      const hallazgos = hallazgosDeAcoplamiento(moduloDir, raiz)
+      return rutas.map((_, i) => i).filter((i) => hallazgos.includes(rutas[i] ?? ''))
+    } finally {
+      rmSync(raiz, { recursive: true, force: true })
+    }
+  }
+
+  it('QC-282 — `customers` como nombre de propiedad dentro de pedidos no dispara (casos sinteticos)', () => {
+    expect(disparanEnPedidos(CUSTOMERS_COMO_PROPIEDAD)).toEqual([])
+  })
+
+  it('QC-282 — la tabla, el modelo y el import profundo de clientes dentro de pedidos siguen disparando (casos sinteticos)', () => {
+    const usos = [
+      ...USOS_REALES_DE_CLIENTES,
+      'export const uno = (id) => prisma.customer.findUnique({ where: { id } })\n',
+      "import { x } from '@/lib/modules/clientes/domain/customer'\nexport { x }\n",
+    ]
+    expect(disparanEnPedidos(usos)).toEqual(usos.map((_, i) => i))
   })
 })
 

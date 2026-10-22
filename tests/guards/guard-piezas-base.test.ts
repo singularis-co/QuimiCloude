@@ -71,7 +71,6 @@ const TODAS: readonly Regla[] = [
   'marca-en-constante',
   'simbolo-borrado',
 ]
-const TALLA: readonly Regla[] = ['par-en-constante', 'par-literal']
 
 const CARPETAS = ['app', 'components', 'hooks'] as const
 
@@ -114,14 +113,8 @@ export const VACIOS_Y_ESQUELETOS_D7 = [
   'app/(private)/asignacion/components/packing-orders-skeleton.tsx',
 ] as const
 
-/**
- * Los de D7 que siguen exceptuados de la talla: el vacio de acondicionamiento, que es de QC-217
- * (QC-232 design.md > 7). QC-232 resolvio los de assigned, company, finished y packing (T4a); el
- * esqueleto de acondicionamiento ya no daba hallazgos y su exclusion se retiro (T5b).
- */
-export const VACIOS_Y_ESQUELETOS_D7_PENDIENTES = [
-  'app/(private)/asignacion/components/conditioning-orders-empty.tsx',
-] as const
+/** Los de D7 que siguen exceptuados de la talla: ninguno, ya delegan todos en las piezas. */
+export const VACIOS_Y_ESQUELETOS_D7_PENDIENTES: readonly string[] = []
 
 /**
  * Archivos D11 que ya no dan ningun hallazgo: su exclusion no mordia y QC-232 la retiro (T5b). Siguen
@@ -129,10 +122,20 @@ export const VACIOS_Y_ESQUELETOS_D7_PENDIENTES = [
  * lista no se recorre nunca (la guardia solo mira `app/`, `components/` y `hooks/`).
  */
 export const D11_SIN_HALLAZGOS = [
+  'app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-order-screen.tsx',
+  'app/(private)/asignacion/components/assignment-view-tabs.tsx',
   'app/(private)/asignacion/components/conditioned-orders-list-section.tsx',
+  'app/(private)/asignacion/components/conditioning-orders-columns.tsx',
   'app/(private)/asignacion/components/conditioning-orders-list-section.tsx',
+  'app/(private)/asignacion/components/order-distribution-full.tsx',
   'tests/unit/asignaciones-ui/conditioning-orders-list-section.test.tsx',
   'app/(private)/pedidos/components/order-list-section.tsx',
+  // Alta el 2026-10-12 (QC-265, R43): el barrel ya no reexporta `MISSING_VALUE_MARK`, asi que su
+  // exclusion estrecha sobraba y se retira; sin esta alta, `EXCLUSIONES` lo excluiria ENTERO.
+  'app/(private)/asignacion/components/index.ts',
+  // Alta el 2026-10-16 (QC-263, D41): el historial ya no tiene disparador propio y `TOUCH_TARGET`
+  // se borro, asi que la exclusion entera de `batch-history.tsx` sobraba y se retira.
+  'app/(private)/inventario/components/batch-history.tsx',
 ] as const
 
 /** La credencial sale de QC-231 (D3): solo `components/submit-button.tsx` se toca (D12). */
@@ -150,6 +153,8 @@ const COMPONENTES_CREDENCIAL = [
  */
 const CARPETA_ASISTENTE = ['components', 'shared', 'step-reader'].join('/')
 
+const BARREL_ASIGNACION = 'app/(private)/asignacion/components/index.ts'
+
 type Exclusion = {
   readonly archivo: string
   readonly reglas: readonly Regla[]
@@ -160,23 +165,25 @@ type Exclusion = {
   readonly motivo: string
 }
 
+/**
+ * Archivos D11 que no quedan limpios del todo: una exclusion por simbolo, no por archivo. Vacia
+ * desde el 2026-10-12 (QC-265, R43): la del barrel de asignacion se retiro con su alias.
+ */
+export const EXCLUSIONES_ESTRECHAS_D11: readonly Exclusion[] = []
+
 export const EXCLUSIONES: readonly Exclusion[] = [
-  ...ARCHIVOS_D11.filter((a) => !(D11_SIN_HALLAZGOS as readonly string[]).includes(a)).map(
+  ...ARCHIVOS_D11.filter(
+    (a) =>
+      !(D11_SIN_HALLAZGOS as readonly string[]).includes(a) &&
+      !EXCLUSIONES_ESTRECHAS_D11.some((e) => e.archivo === a),
+  ).map(
     (archivo): Exclusion => ({
       archivo,
       reglas: TODAS,
-      motivo: 'D11: choque de archivos con QC-217/QC-223; la adopcion de piezas es de QC-232',
+      motivo: 'D11: choque de archivos con QC-223; la adopcion de piezas es de QC-232',
     }),
   ),
-  ...VACIOS_Y_ESQUELETOS_D7_PENDIENTES.map(
-    (archivo): Exclusion => ({
-      archivo,
-      reglas: TALLA,
-      motivo:
-        'D7: el vacio de acondicionamiento iba en QC-232, pero es archivo de QC-217 ' +
-        '(QC-232 design.md > 7): se parametrizan cuando QC-217 cierre',
-    }),
-  ),
+  ...EXCLUSIONES_ESTRECHAS_D11,
   {
     archivo: `${CARPETA_ASISTENTE}/step-document-view.tsx`,
     reglas: ['par-en-constante'],
@@ -195,13 +202,6 @@ export const EXCLUSIONES: readonly Exclusion[] = [
     archivo: 'components/shared/unexpected-error-notice.tsx',
     reglas: ['compara-inesperado'],
     motivo: 'R12: `UnexpectedErrorNotice` es la otra pieza que la spec deja comparar',
-  },
-  // R31: alias de EMPTY_MARK que reexporta un barrel fuera de alcance.
-  {
-    archivo: 'app/(private)/asignacion/components/assigned-orders-columns.tsx',
-    reglas: ['simbolo-borrado'],
-    simbolo: 'MISSING_VALUE_MARK',
-    motivo: 'alias de EMPTY_MARK que reexporta el barrel de asignacion, que es D11',
   },
 ]
 
@@ -224,7 +224,6 @@ export const USOS_SOLO_LOGICA = [
  * fuera de la lista. NO estan excluidos: no son el literal `—`, asi que pasan la regla 5.
  */
 export const ALIAS_DE_EMPTY_MARK = [
-  ['app/(private)/asignacion/components/assigned-orders-columns.tsx', 'MISSING_VALUE_MARK'],
   ['components/shared/responsible-avatars.tsx', 'MISSING_RESPONSIBLES_MARK'],
   ['app/(private)/configuracion/unidades/components/unit-equivalence.ts', 'NO_EQUIVALENCE_LABEL'],
   ['app/(private)/dashboard/recorrido/[id]/components/execution-trace-detail.tsx', 'MISSING_PERSON_MARK'],
@@ -238,7 +237,8 @@ export const CONSTANTES_QUE_NO_SON_EL_PAR = [
   ['components/shared/row-actions-menu.tsx', 'ITEM_TOUCH_TARGET'],
   [`${CARPETA_ASISTENTE}/step-reader.tsx`, 'PRIMARY_TOUCH_TARGET_EJECUCION'],
   ['components/shared/supplier/supplier-field.tsx', 'TOUCH_TARGET'],
-  ['app/(private)/pedidos/components/order-customer-picker.tsx', 'OPTION_TOUCH_CLASSES'],
+  // 2026-10-16 (QC-288 F1): solo cambia la ruta; el buscador subio a components/shared con la misma API.
+  ['components/shared/order-customer-picker.tsx', 'OPTION_TOUCH_CLASSES'],
   ['app/(private)/proveedores/components/supplier-showcase-filters.tsx', 'TOUCH_TARGET'],
 ] as const
 
@@ -668,7 +668,7 @@ describe('QC-231 — las piezas base no vuelven a copiarse', () => {
       ['app/(private)/pedidos/components/order-list-empty.tsx', "from '@/components/shared/empty-state'"],
       ['app/(private)/pedidos/components/order-list-error.tsx', "from '@/components/shared/error-state'"],
       ['app/(private)/pedidos/components/order-list-skeleton.tsx', "from '@/components/shared/table-skeleton'"],
-      ['app/(private)/asignacion/components/assigned-orders-error.tsx', "from '@/components/shared/error-state'"],
+      ['app/(private)/asignacion/components/assignment-list-parts.tsx', "from '@/components/shared/error-state'"],
       ['app/(private)/pedidos/components/order-recipe-image.tsx', "from '@/components/shared/entity-image'"],
     ] as const
     for (const [archivo, importa] of delegaciones) {
@@ -822,6 +822,16 @@ describe('QC-231 — las reglas MUERDEN (muestras sinteticas)', () => {
       expect(reglasDe("const T = 'min-h-11 min-w-11'", archivo), archivo).toEqual(['par-en-constante'])
       expect(analizar(archivo, leer(archivo)), `${archivo} vuelve a dar hallazgos`).toEqual([])
     }
+  })
+
+  it('QC-265 R43: ningun archivo de /asignacion queda excluido, tampoco el barrel por su alias', () => {
+    const asignacion = EXCLUSIONES.filter((e) => e.archivo.startsWith('app/(private)/asignacion/'))
+    expect(asignacion).toEqual([])
+    expect(reglasDe("export { EMPTY_MARK as MISSING_VALUE_MARK } from 'x'", BARREL_ASIGNACION)).toEqual([
+      'simbolo-borrado',
+    ])
+    expect(reglasDe("const T = 'min-h-11 min-w-11'", BARREL_ASIGNACION)).toEqual(['par-en-constante'])
+    expect(reglasDe("export { EMPTY_CELL } from 'x'", BARREL_ASIGNACION)).toEqual(['simbolo-borrado'])
   })
 
   it('R33: el detector ve D11, credencial, la carpeta de establecer-contrasena y D7', () => {

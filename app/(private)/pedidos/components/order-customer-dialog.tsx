@@ -24,8 +24,8 @@ import {
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { orderCustomerChoiceId, type OrderCustomerChoice } from './order-customer-label';
-import { OrderCustomerPicker } from './order-customer-picker';
+import { orderCustomerChoiceId, type OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import { OrderCustomerPicker } from '@/components/shared/order-customer-picker';
 
 export const ORDER_CUSTOMER_DIALOG_TESTID = 'order-customer-dialog';
 export const ORDER_CUSTOMER_DIALOG_SUBMIT_TESTID = 'order-customer-dialog-submit';

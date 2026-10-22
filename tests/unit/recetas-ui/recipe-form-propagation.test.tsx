@@ -82,6 +82,7 @@ function recipeDetail(): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [lineView()],
     tools: [],
     original: null,

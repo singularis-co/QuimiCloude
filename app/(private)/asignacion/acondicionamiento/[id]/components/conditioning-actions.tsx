@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 
+import { CheckIcon, PlayIcon } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import type { ConditioningTeamCandidates } from '@/lib/modules/asignaciones';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { FinishConditioningDialog } from './finish-conditioning-dialog';
 import { StartConditioningDialog } from './start-conditioning-dialog';
@@ -17,66 +18,92 @@ export const CONDITIONING_ACTIONS_TEXTS = {
   finish: 'Terminar',
 } as const;
 
-export type ConditioningActionsProps =
-  | {
-      readonly kind: 'start';
-      readonly orderId: string;
-      readonly orderNumber: string;
-      readonly candidates: ConditioningTeamCandidates;
-    }
-  | {
-      readonly kind: 'finish';
-      readonly orderId: string;
-      readonly orderNumber: string;
-      /** Deshabilita «Terminar» sin abrir el modal; el servidor sigue siendo quien rechaza. */
-      readonly blocked?: boolean;
-      /** El aviso que explica por qué está deshabilitado. */
-      readonly describedBy?: string;
-    };
+export type ConditioningActionsProps = {
+  readonly orderId: string;
+  readonly orderNumber: string;
+  /** Con candidatos se habilita «Acondicionar»; sin ellos se pinta deshabilitado. */
+  readonly startCandidates?: ConditioningTeamCandidates | null;
+  /** Se habilita «Terminar» (salvo `finishBlocked`). */
+  readonly canFinish?: boolean;
+  /** Deshabilita «Terminar» sin abrir el modal; el servidor sigue siendo quien rechaza. */
+  readonly finishBlocked?: boolean;
+  /** El aviso que explica por qué «Terminar» está deshabilitado. */
+  readonly finishDescribedBy?: string;
+};
 
-export function ConditioningActions(props: ConditioningActionsProps) {
-  const [open, setOpen] = useState(false);
+/**
+ * Los dos botones del pie del acondicionamiento. Siempre se pintan los dos; se habilita, como
+ * mucho, el que toca por el estado del pedido, y solo ese monta su modal.
+ */
+export function ConditioningActions({
+  orderId,
+  orderNumber,
+  startCandidates = null,
+  canFinish = false,
+  finishBlocked = false,
+  finishDescribedBy,
+}: ConditioningActionsProps) {
+  const [openDialog, setOpenDialog] = useState<'start' | 'finish' | null>(null);
   // Cada apertura monta el modal de cero: la espera vuelve a empezar y no queda nada de la anterior.
   const [opening, setOpening] = useState(0);
 
-  function openDialog(): void {
+  function open(kind: 'start' | 'finish'): void {
     setOpening((current) => current + 1);
-    setOpen(true);
+    setOpenDialog(kind);
   }
 
-  const isStart = props.kind === 'start';
-  const blocked = props.kind === 'finish' && props.blocked === true;
+  function handleOpenChange(next: boolean): void {
+    if (!next) setOpenDialog(null);
+  }
+
+  const startEnabled = startCandidates !== null;
+  const finishEnabled = canFinish && !finishBlocked;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="grid w-full max-w-[520px] grid-cols-2 gap-3">
       <Button
         type="button"
-        className={`w-fit ${touchTarget}`}
-        onClick={blocked ? undefined : openDialog}
-        disabled={blocked}
-        aria-describedby={props.kind === 'finish' ? props.describedBy : undefined}
-        data-testid={isStart ? CONDITIONING_START_BUTTON_TESTID : CONDITIONING_FINISH_BUTTON_TESTID}
+        size="xl"
+        variant={startEnabled ? 'default' : 'outline'}
+        onClick={startEnabled ? () => open('start') : undefined}
+        disabled={!startEnabled}
+        data-testid={CONDITIONING_START_BUTTON_TESTID}
       >
-        {isStart ? CONDITIONING_ACTIONS_TEXTS.start : CONDITIONING_ACTIONS_TEXTS.finish}
+        <PlayIcon aria-hidden="true" />
+        {CONDITIONING_ACTIONS_TEXTS.start}
       </Button>
-      {props.kind === 'start' ? (
+      <Button
+        type="button"
+        size="xl"
+        variant={canFinish ? 'default' : 'outline'}
+        onClick={finishEnabled ? () => open('finish') : undefined}
+        disabled={!finishEnabled}
+        aria-describedby={canFinish ? finishDescribedBy : undefined}
+        data-testid={CONDITIONING_FINISH_BUTTON_TESTID}
+      >
+        <CheckIcon aria-hidden="true" />
+        {CONDITIONING_ACTIONS_TEXTS.finish}
+      </Button>
+
+      {startCandidates === null ? null : (
         <StartConditioningDialog
-          key={opening}
-          open={open}
-          onOpenChange={setOpen}
-          orderId={props.orderId}
-          orderNumber={props.orderNumber}
-          candidates={props.candidates}
-        />
-      ) : (
-        <FinishConditioningDialog
-          key={opening}
-          open={open}
-          onOpenChange={setOpen}
-          orderId={props.orderId}
-          orderNumber={props.orderNumber}
+          key={`start-${opening}`}
+          open={openDialog === 'start'}
+          onOpenChange={handleOpenChange}
+          orderId={orderId}
+          orderNumber={orderNumber}
+          candidates={startCandidates}
         />
       )}
+      {canFinish ? (
+        <FinishConditioningDialog
+          key={`finish-${opening}`}
+          open={openDialog === 'finish'}
+          onOpenChange={handleOpenChange}
+          orderId={orderId}
+          orderNumber={orderNumber}
+        />
+      ) : null}
     </div>
   );
 }

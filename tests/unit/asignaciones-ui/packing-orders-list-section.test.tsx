@@ -1,9 +1,19 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PackingOrdersListSection } from '@/app/(private)/asignacion/components';
 
-const { getSessionUserMock, getSessionContextMock, listPackingOrdersMock } = vi.hoisted(() => ({
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+
+const { routerMock, getSessionUserMock, getSessionContextMock, listPackingOrdersMock } = vi.hoisted(() => ({
+  routerMock: {
+    push: vi.fn<(href: string) => void>(),
+    replace: vi.fn<(href: string) => void>(),
+    refresh: vi.fn<() => void>(),
+    back: vi.fn<() => void>(),
+    forward: vi.fn<() => void>(),
+    prefetch: vi.fn<(href: string) => void>(),
+  },
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   getSessionContextMock: vi.fn<() => Promise<unknown>>(),
   listPackingOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
@@ -15,17 +25,10 @@ vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async (): Promise<string | null> => null) },
 }));
 
-// `AssignedOrdersError` llama `useRouter()` para el reintento y jsdom no monta el App Router.
+// La tabla y `AssignmentListError` llaman `useRouter()` y jsdom no monta el App Router.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
-    refresh: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    prefetch: vi.fn(),
-  }),
+  useRouter: () => routerMock,
 }));
 
 const ACTOR_SESSION = {
@@ -58,6 +61,8 @@ const ORDER_ROW = {
   unitLabel: null,
   packages: '4',
   status: 'POR_EMPACAR',
+  priority: 'ALTA',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
   packedByName: null,
 };
 
@@ -72,8 +77,9 @@ beforeEach(() => {
 });
 
 describe('R14, R16 - la seccion pide la pagina y pinta la fila con sus seis datos', () => {
-  it('pasa `page`/`pageSize` a `listPackingOrders` y pinta la fila', async () => {
+  it('pasa `page`/`pageSize` a `listPackingOrders` y pinta la fila en la tabla compartida', async () => {
     listPackingOrdersMock.mockResolvedValue(paginaCon([ORDER_ROW]));
+    const user = setupUser();
 
     render(await PackingOrdersListSection({ params: PARAMS }));
 
@@ -82,11 +88,12 @@ describe('R14, R16 - la seccion pide la pagina y pinta la fila con sus seis dato
       { page: 1, pageSize: 10 },
     );
     expect(screen.getByTestId('packing-orders-list-section')).toBeInTheDocument();
-    expect(screen.getAllByTestId('packing-order-row')).toHaveLength(1);
-    expect(screen.getByTestId('packing-order-link')).toHaveAttribute(
-      'href',
-      '/asignacion/empaque/order-1',
-    );
+    const tabla = screen.getByRole('table');
+    expect(within(tabla).getByTestId('data-table-row-order-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('packing-order-link')).toBeNull();
+    await user.click(within(tabla).getByRole('button', { name: 'Acciones del pedido 2026-0000030' }));
+    const entrar = await esperarInteractiva(await screen.findByTestId('assignment-row-enter'));
+    expect(entrar).toHaveAttribute('href', '/asignacion/empaque/order-1');
   });
 });
 
@@ -129,17 +136,20 @@ describe('fallo del caso de uso: se pinta el estado de error, no una tabla vacia
 });
 
 describe('R43 - paginacion con objetivos tactiles de 44x44, sin depender de hover', () => {
-  it('los enlaces de pagina anterior/siguiente cumplen el minimo tactil', async () => {
+  it('la paginacion de la tabla compartida cumple el minimo tactil y conserva ?vista=por_empacar', async () => {
     listPackingOrdersMock.mockResolvedValue(paginaCon([ORDER_ROW], { page: 1, totalPages: 2 }));
+    const user = setupUser();
 
     render(await PackingOrdersListSection({ params: PARAMS }));
 
-    const siguiente = screen.getByTestId('packing-orders-next-page');
+    const siguiente = screen.getByTestId('data-table-next');
     expect(siguiente.className).toContain('min-h-11');
     expect(siguiente.className).toContain('min-w-11');
-    expect(siguiente).toHaveAttribute('href', expect.stringContaining('page=2'));
+    expect(screen.getByTestId('data-table-previous')).toBeDisabled();
 
-    const anterior = screen.getByTestId('packing-orders-prev-page');
-    expect(anterior).toHaveAttribute('aria-disabled', 'true');
+    await user.click(siguiente);
+    const href = routerMock.push.mock.calls[0]?.[0] ?? '';
+    expect(href).toContain('vista=por_empacar');
+    expect(href).toContain('page=2');
   });
 });

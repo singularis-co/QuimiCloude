@@ -107,7 +107,8 @@ describe('sin `asignaciones.ejecutar` la tabla no emite «Entrar»', () => {
     expect(within(tabla).queryByRole('columnheader', { name: /Entrar/ })).toBeNull();
     expect(enlacesDeEjecucion()).toHaveLength(0);
     expect(disparadoresDeEntrar()).toHaveLength(0);
-    expect(screen.getByText('2026-000123')).toBeInTheDocument();
+    // Con tarjetas, cada celda está dos veces en el DOM: se mira la tabla.
+    expect(within(screen.getByRole('table')).getByText('2026-000123')).toBeInTheDocument();
   });
 
   it('R10: el esqueleto con `canExecute: false` pinta tantas columnas como la tabla', () => {

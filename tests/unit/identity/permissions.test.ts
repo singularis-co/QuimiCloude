@@ -49,6 +49,8 @@ const CODIGOS_DEL_REQUISITO = [
   'integraciones.modificar',
   // QC-223 2026-10-08: entra `entregas.modificar`, al final.
   'entregas.modificar',
+  // 2026-10-09: entra `entregas.anular`, al final.
+  'entregas.anular',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
@@ -60,7 +62,17 @@ const INTEGRACIONES = 'integraciones.modificar'
 // QC-223 2026-10-08: `entregas.modificar` entra al final del catalogo y del Administrador. Los
 // casos de fichas previas que fijan «el catalogo previo» lo comparan sin el.
 const ENTREGAS = 'entregas.modificar'
-const sinEntregas = (codigo: string): boolean => codigo !== ENTREGAS
+// 2026-10-09: `entregas.anular` entra detras de `entregas.modificar`. `sinEntregas` sigue
+// devolviendo el catalogo previo a `entregas`, ahora sin ninguno de los dos; los casos previos
+// comparan sin `entregas.anular` con `sinAnular`.
+const ANULAR = 'entregas.anular'
+const sinAnular = (codigo: string): boolean => codigo !== ANULAR
+const sinEntregas = (codigo: string): boolean => codigo !== ENTREGAS && sinAnular(codigo)
+// 2026-10-14: el Administrador deja de recibir `asignaciones.consultar` (pasa a
+// ADMIN_EXCLUDED_PERMISSIONS). Los casos previos que fijan su conjunto escrito a mano lo restan con
+// `sinConsultarAsignaciones`.
+const CONSULTAR_ASIGNACIONES = 'asignaciones.consultar'
+const sinConsultarAsignaciones = (codigo: string): boolean => codigo !== CONSULTAR_ASIGNACIONES
 
 const esDeEmpresas = (codigo: string): boolean => codigo.startsWith('empresas.')
 
@@ -229,8 +241,12 @@ const MODULOS_SOLO_ESCRITURA = ['empaque', 'acondicionamiento', 'integraciones',
 const codigos = PERMISSIONS.map((permiso) => permiso.code)
 
 /** Toda accion es `consultar` o `modificar`, salvo `ejecutar`, que solo se admite en `asignaciones`. */
+// 2026-10-09: y `anular`, que solo se admite en `entregas`.
+const esAnularEntregas = (permiso: { module: string; action: string }): boolean =>
+  permiso.action === 'anular' && permiso.module === 'entregas'
 function accionAdmitida(permiso: { module: string; action: string }): boolean {
   if (permiso.action === 'consultar' || permiso.action === 'modificar') return true
+  if (esAnularEntregas(permiso)) return true
   return permiso.action === 'ejecutar' && permiso.module === 'asignaciones'
 }
 
@@ -338,7 +354,10 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
 
   it('R34: `empaque` declara UNICAMENTE modificar, sin consultar', () => {
     for (const modulo of MODULOS_SOLO_ESCRITURA) {
-      const acciones = PERMISSIONS.filter((p) => p.module === modulo).map((p) => p.action)
+      // 2026-10-09: `entregas.anular` no es consulta; se compara sin ella.
+      const acciones = PERMISSIONS.filter((p) => p.module === modulo && !esAnularEntregas(p)).map(
+        (p) => p.action,
+      )
 
       expect(acciones).toEqual(['modificar'])
     }
@@ -551,8 +570,8 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.modificar')
   })
 
-  it('QC-86 R25: el Administrador tiene asignaciones.consultar Y asignaciones.modificar, escritos uno a uno', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('asignaciones.consultar')
+  it('QC-86 R25 (enmendado 2026-10-14): el Administrador conserva asignaciones.modificar y ya no tiene asignaciones.consultar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).not.toContain('asignaciones.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('asignaciones.modificar')
   })
 
@@ -774,7 +793,10 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
       CODIGOS_DEL_REQUISITO.filter(
         (codigo) =>
-          !esDeEmpresas(codigo) && codigo !== 'empaque.modificar' && codigo !== ACONDICIONAMIENTO,
+          !esDeEmpresas(codigo) &&
+          codigo !== 'empaque.modificar' &&
+          codigo !== ACONDICIONAMIENTO &&
+          sinConsultarAsignaciones(codigo),
       ),
     )
   })
@@ -878,7 +900,8 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
     expect(PERMISSIONS.filter((p) => p.action === 'ejecutar').map((p) => p.module)).toEqual([
       'asignaciones',
     ])
-    for (const permiso of PERMISSIONS.filter((p) => p.module !== 'asignaciones')) {
+    // 2026-10-09: `entregas.anular` es la otra excepcion; tiene su propio caso.
+    for (const permiso of PERMISSIONS.filter((p) => p.module !== 'asignaciones' && !esAnularEntregas(p))) {
       expect(['consultar', 'modificar'], permiso.code).toContain(permiso.action)
     }
   })
@@ -929,7 +952,6 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
       'pedidos.modificar',
       'usuarios.consultar',
       'usuarios.modificar',
-      'asignaciones.consultar',
       'asignaciones.modificar',
       'terminados.consultar',
       'clientes.consultar',
@@ -961,13 +983,14 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
     expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).not.toContain('asignaciones.ejecutar')
   })
 
-  it('R14: asignaciones.ejecutar no entra en ADMIN_EXCLUDED_PERMISSIONS, que no cambia', () => {
+  it('R14: asignaciones.ejecutar no entra en ADMIN_EXCLUDED_PERMISSIONS', () => {
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain('asignaciones.ejecutar')
     expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
       'acondicionamiento.modificar',
+      CONSULTAR_ASIGNACIONES,
     ])
   })
 })
@@ -1113,10 +1136,9 @@ describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador d
   it('R9: el Administrador no recibe acondicionamiento.modificar, que figura entre sus excluidos, y conserva exactamente su conjunto', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).not.toContain(ACONDICIONAMIENTO)
     expect(ADMIN_EXCLUDED_PERMISSIONS).toContain(ACONDICIONAMIENTO)
-    expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(sinEntregas)).toEqual([
-      ...PERMISOS_DEL_ADMINISTRADOR_PREVIOS,
-      INTEGRACIONES,
-    ])
+    expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(sinEntregas)).toEqual(
+      [...PERMISOS_DEL_ADMINISTRADOR_PREVIOS, INTEGRACIONES].filter(sinConsultarAsignaciones),
+    )
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
       CODIGOS_DEL_REQUISITO.filter((codigo) => !ADMIN_EXCLUDED_PERMISSIONS.includes(codigo)),
     )
@@ -1258,13 +1280,14 @@ describe('QC-221 — el permiso integraciones.modificar', () => {
 
     expect(admin.at(-1)).toBe(INTEGRACIONES)
     expect(admin.indexOf(INTEGRACIONES)).toBe(admin.lastIndexOf(INTEGRACIONES))
-    expect(admin.slice(0, -1)).toEqual([...PERMISOS_DEL_ADMINISTRADOR_PREVIOS])
+    expect(admin.slice(0, -1)).toEqual(PERMISOS_DEL_ADMINISTRADOR_PREVIOS.filter(sinConsultarAsignaciones))
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(INTEGRACIONES)
     expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
       'acondicionamiento.modificar',
+      CONSULTAR_ASIGNACIONES,
     ])
   })
 
@@ -1314,17 +1337,18 @@ describe('QC-223 — el permiso entregas.modificar', () => {
   }
 
   it('R1: el catalogo contiene entregas.modificar con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
-    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ENTREGAS)
-    expect(codigos.filter((codigo) => codigo.startsWith('entregas.'))).toEqual([ENTREGAS])
+    // 2026-10-09: se compara sin `entregas.anular`, que entra detras.
+    expect(PERMISSIONS.filter((permiso) => sinAnular(permiso.code)).at(-1)).toEqual(ENTRADA_DE_ENTREGAS)
+    expect(codigos.filter((codigo) => codigo.startsWith('entregas.') && sinAnular(codigo))).toEqual([ENTREGAS])
   })
 
   it('R1: el catalogo es el previo, en el mismo orden, mas entregas.modificar', () => {
-    expect(codigos).toEqual([...codigos.filter(sinEntregas), ENTREGAS])
+    expect(codigos.filter(sinAnular)).toEqual([...codigos.filter(sinEntregas), ENTREGAS])
     expect(codigos.filter(sinEntregas)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinEntregas))
   })
 
   it('R1: el Administrador recibe entregas.modificar al final, una vez, y no figura entre sus excluidos', () => {
-    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+    const admin = (SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(sinAnular)
     expect(admin.at(-1)).toBe(ENTREGAS)
     expect(admin.filter((codigo) => codigo === ENTREGAS)).toHaveLength(1)
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(ENTREGAS)
@@ -1342,5 +1366,103 @@ describe('QC-223 — el permiso entregas.modificar', () => {
     expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
     expect(parrafo).toContain('lib/modules/')
     expect(parrafo).not.toMatch(citaFichaORequisito)
+  })
+})
+
+describe('QC-224 — el permiso entregas.anular', () => {
+  const citaFichaORequisito = /QC-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADA_DE_ANULAR = {
+    code: 'entregas.anular',
+    module: 'entregas',
+    action: 'anular',
+    description: 'Anular entregas de producto terminado de los pedidos de la empresa.',
+  } as const
+
+  function parrafoDeAnular(): string | undefined {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .find((bloque) => bloque.includes(ANULAR))
+  }
+
+  it('R1: el catalogo contiene entregas.anular con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
+    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ANULAR)
+    expect(codigos.filter((codigo) => codigo === ANULAR)).toHaveLength(1)
+  })
+
+  it('R1: el catalogo es el previo, en el mismo orden y con los mismos campos, mas entregas.anular', () => {
+    expect(codigos).toEqual([...codigos.filter(sinAnular), ANULAR])
+    expect(codigos.filter(sinAnular)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinAnular))
+    expect(PERMISSIONS.slice(0, -1).map((permiso) => permiso.code)).toEqual(codigos.filter(sinAnular))
+  })
+
+  it('R1: anular solo existe en entregas', () => {
+    expect(PERMISSIONS.filter((p) => p.action === 'anular').map((p) => p.module)).toEqual(['entregas'])
+    expect(accionAdmitida({ module: 'entregas', action: 'anular' })).toBe(true)
+    expect(accionAdmitida({ module: 'pedidos', action: 'anular' })).toBe(false)
+  })
+
+  it('R1: el Administrador recibe entregas.anular al final, una vez, y no figura entre sus excluidos', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+    expect(admin.at(-1)).toBe(ANULAR)
+    expect(admin.filter((codigo) => codigo === ANULAR)).toHaveLength(1)
+    expect(admin.filter(sinAnular)).toEqual(CODIGOS_DEL_ADMINISTRADOR.filter(sinAnular))
+    expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(ANULAR)
+  })
+
+  it('R1: ningun otro rol recibe entregas.anular', () => {
+    for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO]) {
+      expect(SEED_ROLE_PERMISSIONS[rol], rol).not.toContain(ANULAR)
+    }
+  })
+
+  it('R1: el JSDoc del catalogo tiene el parrafo de entregas.anular, corto y sin citas', () => {
+    const parrafo = parrafoDeAnular()
+    expect(parrafo).toBeDefined()
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).not.toMatch(citaFichaORequisito)
+  })
+})
+
+describe('el Administrador no consulta la pantalla «Asignación»', () => {
+  it('no recibe asignaciones.consultar, que figura entre sus excluidos, y conserva lo que usa desde «Pedidos»', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+
+    expect(admin).not.toContain(CONSULTAR_ASIGNACIONES)
+    expect(ADMIN_EXCLUDED_PERMISSIONS).toContain(CONSULTAR_ASIGNACIONES)
+    expect(admin).toEqual(expect.arrayContaining(['pedidos.consultar', 'asignaciones.modificar']))
+  })
+
+  it('los roles operativos conservan asignaciones.consultar', () => {
+    for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO]) {
+      expect(SEED_ROLE_PERMISSIONS[rol], rol).toContain(CONSULTAR_ASIGNACIONES)
+    }
+  })
+})
+
+describe('QC-137 — las notificaciones no tienen permiso propio', () => {
+  // El catalogo y cada rol se comparan con listas escritas a mano: si alguien vuelve a sumar un
+  // permiso de consultar avisos, cambia la igualdad exacta sin tener que nombrarlo aqui.
+  it('QC-137 R21: el catálogo no tiene notificaciones.consultar y cada rol tiene los permisos de antes de QC-137', () => {
+    expect(PERMISSIONS.map((permiso) => permiso.code)).toEqual([...CODIGOS_DEL_REQUISITO])
+    expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual([...CODIGOS_DE_EMPRESAS])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([CONSULTAR_ASIGNACIONES, ACONDICIONAMIENTO])
   })
 })

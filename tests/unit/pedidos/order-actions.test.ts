@@ -598,7 +598,9 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // Uno por action, sin ninguno de mas y sin ninguno de menos.
     expect(traducciones.length).toBe(catches.length)
     // QC-223 2026-10-08: 15 y no 13, entran `getOrderDeliveryAction` y `deliverOrderAction`.
-    expect(catches.length).toBe(15)
+    // 2026-10-09: 17 y no 15, entran `listOrderDeliveriesAction` y `voidDeliveryAction`.
+    // QC-288 2026-10-16: 22 y no 17, entran las cinco de la entrega sin pedido.
+    expect(catches.length).toBe(22)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -833,6 +835,9 @@ describe('QC-60 R17 — sin las dos caras de la sesion no hay actor ni consulta'
         searchRefs: explota('customerCatalog.searchRefs'),
       } as unknown as CustomerCatalog,
       log,
+      deliveryProgress: {
+        listDeliveryProgressByIdsIncludingDeleted: explota('deliveryProgress.listDeliveryProgressByIdsIncludingDeleted'),
+      },
     }
 
     // Los casos de uso DE VERDAD detras de la composicion simulada.
@@ -901,15 +906,24 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['cancelOrderAction', 2],
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
+      // QC-288 2026-10-16: registrar una entrega sin pedido, argumento ya tipado.
+      ['deliverDirectAction', 1],
       // QC-223 2026-10-08: registrar una entrega, argumento ya tipado.
       ['deliverOrderAction', 1],
+      // QC-288 2026-10-16: lo que pintan el sheet y el dialogo de anular de la entrega sin pedido.
+      ['getDirectDeliveryAction', 1],
+      ['getDirectDeliveryForVoidAction', 1],
       ['getOrderAction', 1],
       // QC-156: el cliente que trae la direccion del filtro.
       ['getOrderCustomerFilterOptionAction', 1],
       // QC-223 2026-10-08: lo que pinta el sheet de entrega.
       ['getOrderDeliveryAction', 1],
+      // QC-288 2026-10-16: el excedente de una pagina del listado.
+      ['listDirectDeliverySurplusAction', 1],
       // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
+      // 2026-10-09: la lista de entregas del pedido.
+      ['listOrderDeliveriesAction', 1],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
       // T11: el disponible de solo lectura, argumento ya tipado.
@@ -921,6 +935,10 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       // T25: la edicion acotada, `id` + argumento ya tipado, ningun `FormData`.
       ['updateOrderAction', 3],
       ['updateOrderDistributionAction', 2],
+      // 2026-10-09: anular una entrega, argumento ya tipado.
+      ['voidDeliveryAction', 1],
+      // QC-288 2026-10-16: anular una entrega sin pedido, argumento ya tipado.
+      ['voidDirectDeliveryAction', 1],
     ])
   })
 
@@ -943,6 +961,15 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       // QC-223 2026-10-08
       getOrderDeliveryAction: 'orderId: string',
       deliverOrderAction: 'input: unknown',
+      // 2026-10-09
+      listOrderDeliveriesAction: 'orderId: string',
+      voidDeliveryAction: 'input: unknown',
+      // QC-288 2026-10-16
+      getDirectDeliveryAction: 'productId: string',
+      listDirectDeliverySurplusAction: 'productIds: readonly string[]',
+      deliverDirectAction: 'input: unknown',
+      getDirectDeliveryForVoidAction: 'deliveryId: string',
+      voidDirectDeliveryAction: 'input: unknown',
     }
     for (const [nombre, parametros] of Object.entries(FIRMAS)) {
       const desde = source.indexOf(`export async function ${nombre}(`)

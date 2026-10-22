@@ -38,6 +38,8 @@ on:
 
 permissions:
   contents: read
+  # Leer la imagen de Postgres de GHCR (QC-279).
+  packages: read
 
 # Un push nuevo al mismo PR cancela la corrida anterior: su veredicto ya no describe la punta.
 concurrency:
@@ -75,7 +77,7 @@ jobs:
 
     steps:
       - name: Checkout (historia completa)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -86,11 +88,11 @@ jobs:
           git branch --force dev origin/dev
 
       - name: pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         # Sin `version`: la toma de `packageManager` en package.json (pnpm@10.10.0).
 
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -121,9 +123,13 @@ jobs:
 
     services:
       postgres:
-        # Espejo publico de AWS de la imagen oficial: Docker Hub limita las descargas anonimas
-        # del runner (`toomanyrequests`, 2026-10-09, PR #193). Misma imagen, otro registro.
-        image: public.ecr.aws/docker/library/postgres:17
+        # Copia en GHCR de la imagen oficial (QC-279, `mirror-postgres.yml`): Docker Hub (2026-10-09,
+        # PR #193) y ECR Public (2026-10-14, PR #232) cortaron las descargas anonimas con
+        # `toomanyrequests`. GHCR se lee con el `GITHUB_TOKEN` del repo, sin ese limite.
+        image: ghcr.io/singularis-co/postgres:17
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           # Superusuario a proposito: la integracion hace CREATE/DROP DATABASE y
           # pg_advisory_lock contra la base `postgres` (tests/helpers/test-database.ts).
@@ -140,7 +146,7 @@ jobs:
 
     steps:
       - name: Checkout (historia completa)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Historia entera y todas las ramas remotas: varias guardias calculan el merge-base
           # con `dev`/`origin/dev` (tests/guards/guard-qc102-*, guard-pantalla-pedidos-*).
@@ -155,11 +161,11 @@ jobs:
           git branch --force dev origin/dev
 
       - name: pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         # Sin `version`: la toma de `packageManager` en package.json (pnpm@10.10.0).
 
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -198,7 +204,7 @@ jobs:
 
       - name: Informe del shard
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: informe-shard-${{ matrix.shard }}
           # `include-hidden-files`: desde upload-artifact v4.4 los archivos que empiezan por `.`
@@ -225,14 +231,17 @@ jobs:
       # Clon superficial: `--unir` solo lee los informes, el baseline y los dos scripts del
       # veredicto; no mira la historia.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # Solo Node, sin pnpm ni `pnpm install`: `./init.sh --unir` es Node puro sobre JSON y corre
       # antes de cualquier paso que pida pnpm o node_modules. Una instalacion menos por corrida.
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
+          # setup-node v5 activa la cache sola si package.json tiene `packageManager` (pnpm);
+          # aqui no hay pnpm y fallaria al pedir el store. Los jobs con pnpm fijan `cache: pnpm`.
+          package-manager-cache: false
 
       - name: El job estatico y los shards corrieron
         shell: bash
@@ -248,7 +257,7 @@ jobs:
           esac
 
       - name: Informes de los shards
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           # Cada artefacto en su carpeta, informes/informe-shard-<i>/ (sin `merge-multiple`).
           pattern: informe-shard-*
@@ -274,7 +283,7 @@ jobs:
 
       - name: Informe de vitest (unido)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gate-completo-informe
           # Mismo motivo que en los shards: sin esto `.vitest-rojos.json` no se sube.
@@ -307,9 +316,13 @@ jobs:
 
     services:
       postgres:
-        # Espejo publico de AWS de la imagen oficial: Docker Hub limita las descargas anonimas
-        # del runner (`toomanyrequests`, 2026-10-09, PR #193). Misma imagen, otro registro.
-        image: public.ecr.aws/docker/library/postgres:17
+        # Copia en GHCR de la imagen oficial (QC-279, `mirror-postgres.yml`): Docker Hub (2026-10-09,
+        # PR #193) y ECR Public (2026-10-14, PR #232) cortaron las descargas anonimas con
+        # `toomanyrequests`. GHCR se lee con el `GITHUB_TOKEN` del repo, sin ese limite.
+        image: ghcr.io/singularis-co/postgres:17
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -324,13 +337,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
 
       - name: Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
@@ -398,7 +411,7 @@ jobs:
 
       - name: Cache de navegadores
         id: pw-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-${{ matrix.project }}
@@ -419,7 +432,7 @@ jobs:
 
       - name: Trazas de Playwright
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-test-results-${{ matrix.project }}
           path: test-results/

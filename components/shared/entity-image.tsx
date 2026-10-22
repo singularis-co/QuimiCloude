@@ -2,28 +2,18 @@
 
 import { useState } from 'react';
 
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
 /**
- * Miniatura de la imagen de una fila, con marcador cuando no hay ninguna (2026-09-07, decision
- * humana).
+ * Miniatura de la imagen de una fila, con marcador cuando no hay ninguna.
  *
- * **Vive en `components/shared/` porque la usan DOS pantallas**: el catalogo de inventario y el
- * catalogo de un proveedor. Es la condicion que `docs/architecture.md > Regla: sin
- * sobre-ingenieria` pone para promover; con una sola habria vivido en su ruta.
+ * `path` va tal cual a `src`: el consumidor pasa una URL servible (la `imageUrl` que compone su
+ * modulo), no la ruta guardada en el bucket. El marcador cubre `path` vacio y el `src` que falla
+ * al cargar.
  *
- * **`path` es la RUTA guardada** (`products.image_path`, `supplier_catalog_lines.image_path`), no
- * una URL compuesta. Ninguno de los dos modulos tiene puerto de almacenamiento -a diferencia de
- * `recetas`, que si compone `imageUrl` con `getPublicUrl`-, asi que aqui NO se inventa ningun
- * esquema de URL: la ruta se pasa tal cual a `src`.
- *
- * **Y por eso el marcador cubre DOS casos, no uno**: `path` nulo -que hoy es el caso de todas las
- * filas, porque nada llena esas columnas todavia- y `path` que no resuelve, que es lo que pasara
- * mientras la ruta sea de almacenamiento y no una URL servible. Cuando alguien anada la subida y
- * la composicion de URL, esta miniatura empezara a mostrar imagenes sin tocar una linea.
- *
- * **`<img>` y no `next/image`**: el componente de Next exige o un dominio declarado en
- * `next.config.ts` o una ruta local, y la ruta de estas dos columnas no esta acordada en el repo
- * (P1 de QC-52). Declarar un dominio remoto aqui seria decidir por una ficha que no existe. El
- * marcador si es local y se sirve de `public/`.
+ * `<img>` y no `next/image`: este exige declarar en `next.config.ts` cada dominio de origen, que
+ * hoy no declara ninguno, y lo que protege -LCP y ancho de banda- no esta en juego en una
+ * miniatura con carga diferida.
  */
 
 /** Marcador de «sin imagen». Vive en `public/`, asi que se sirve por ruta absoluta. */
@@ -32,14 +22,19 @@ export const MISSING_IMAGE_SRC = '/inv_not_found.png';
 /**
  * Lado de la miniatura en px. Cuadrada para que ninguna fila cambie de alto segun su imagen.
  *
- * 60 y no 40 desde el 2026-09-07 (decision humana: «un 50% mas grande»). El numero vive aqui y
+ * 60 y no 40 desde el 2026-09-07 (decision humana: «un 50% mas grande»); 80 desde el 2026-10-14
+ * (decision humana: de 60 a 80, centrada en su columna). El numero vive aqui y
  * la clase de Tailwind se deriva de el en el `style`, para que no haya dos sitios que declaren el
  * tamano y puedan divergir -que es lo que pasaba con `size-10` y `width`/`height` a la vez-.
  */
-const THUMBNAIL_SIZE = 60;
+const THUMBNAIL_SIZE = 80;
+
+export const ENTITY_IMAGE_ZOOM_TRIGGER_TESTID = 'entity-image-zoom';
+export const ENTITY_IMAGE_ZOOM_TESTID = 'entity-image-zoom-view';
+export const ENTITY_IMAGE_ZOOM_LABEL = 'Ver imagen en grande';
 
 export type EntityImageProps = {
-  /** Ruta guardada de la imagen, o `null` si la fila no tiene. */
+  /** URL servible de la imagen, o `null` si la fila no tiene. */
   readonly path: string | null;
   /**
    * Nombre de la fila. Se usa para el texto alternativo, que describe A QUE pertenece la imagen;
@@ -83,13 +78,8 @@ export function EntityImage({
     );
   }
 
-  return (
-    /*
-      `next/image` exige o un dominio declarado en `next.config.ts` o una ruta local, y la forma
-      de la ruta de estas dos columnas no esta acordada en el repo (P1 de QC-52): declarar un
-      dominio remoto aqui seria decidir por una ficha que no existe. Lo que la regla protege -LCP
-      y ancho de banda- no esta en juego con una miniatura de 40x40 con carga diferida.
-    */
+  const thumbnail = (
+    // `<img>` y no `next/image`: ver el docblock.
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={usaMarcador ? MISSING_IMAGE_SRC : path}
@@ -98,13 +88,40 @@ export function EntityImage({
       height={THUMBNAIL_SIZE}
       loading="lazy"
       decoding="async"
-      // El marcador cubre tambien la ruta que no resuelve (ver el docblock). `onError` se
-      // desarma solo: una vez en marcador, `src` ya no vuelve a fallar.
+      // Una vez en marcador, `src` ya no vuelve a fallar: `onError` se desarma solo.
       onError={() => setFallo(true)}
       style={{ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE }}
       className="shrink-0 rounded-md border object-cover"
       data-testid={testId}
       data-missing={usaMarcador ? 'true' : undefined}
     />
+  );
+
+  // El boton envuelve SIEMPRE la miniatura, tambien al marcador: si el arbol cambiara al fallar la
+  // carga, la `<img>` se volveria a montar. Con marcador queda deshabilitado: no hay nada que ampliar.
+  return (
+    <Dialog>
+      <DialogTrigger
+        disabled={usaMarcador}
+        className="inline-flex shrink-0 cursor-zoom-in rounded-md align-middle focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-default"
+        aria-label={usaMarcador ? undefined : `${ENTITY_IMAGE_ZOOM_LABEL}: ${alt}`}
+        data-testid={ENTITY_IMAGE_ZOOM_TRIGGER_TESTID}
+      >
+        {thumbnail}
+      </DialogTrigger>
+      {/* El popup solo se monta al abrir: la imagen grande no se pide hasta entonces. */}
+      <DialogContent className="w-auto max-w-[calc(100vw-2rem)] p-2 pt-10 sm:max-w-[min(90vw,64rem)]">
+        <DialogTitle className="sr-only">{alt}</DialogTitle>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={path ?? ''}
+          alt={alt}
+          loading="lazy"
+          decoding="async"
+          className="mx-auto max-h-[80vh] w-auto max-w-full rounded-md object-contain"
+          data-testid={ENTITY_IMAGE_ZOOM_TESTID}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }

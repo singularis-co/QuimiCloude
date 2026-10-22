@@ -2,26 +2,27 @@
 
 import type { DataTableColumn } from '@/components/shared/data-table';
 import type { FinishedOrderView } from '@/lib/modules/asignaciones';
+import { conditioningOrderRoute } from '@/lib/shared/routes';
 
-import { ConditioningOrderLink } from './conditioning-orders-columns';
-import {
-  FINISHED_ORDER_NUMBER_COLUMN_ID,
-  buildFinishedOrdersColumns,
-} from './finished-orders-columns';
+import { assignmentActionsColumn } from './assignment-row-actions';
+import { buildFinishedOrdersColumns } from './finished-orders-columns';
+
+export type ConditionedOrdersColumnsOptions = {
+  readonly canViewTrace?: boolean;
+};
 
 /**
- * Las columnas de «Terminados» del acondicionador se derivan de las del Empacador y solo cambia la
- * celda del número, que abre el detalle. Así, si cambian las del Empacador, cambian estas.
+ * Las columnas de datos son las de «Terminados» del Empacador, para que cambien a la vez; solo se
+ * añade el menú, que lleva al detalle.
  */
-export function buildConditionedOrdersColumns(): readonly DataTableColumn<FinishedOrderView>[] {
-  return buildFinishedOrdersColumns().map((column) =>
-    column.id === FINISHED_ORDER_NUMBER_COLUMN_ID
-      ? {
-          ...column,
-          cell: (order: FinishedOrderView) => (
-            <ConditioningOrderLink id={order.id} numberText={order.numberText} />
-          ),
-        }
-      : column,
-  );
+export function buildConditionedOrdersColumns({
+  canViewTrace = false,
+}: ConditionedOrdersColumnsOptions = {}): readonly DataTableColumn<FinishedOrderView>[] {
+  return [
+    ...buildFinishedOrdersColumns(),
+    assignmentActionsColumn<FinishedOrderView>({
+      canViewTrace,
+      enterHref: (order) => conditioningOrderRoute(order.id),
+    }),
+  ];
 }

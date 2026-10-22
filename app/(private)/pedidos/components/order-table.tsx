@@ -2,9 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, useTransition, type MouseEvent } from 'react';
 
-import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
+import {
+  DataTable,
+  type DataTableCardLayout,
+  type DataTableParams,
+  type DataTableTexts,
+} from '@/components/shared/data-table';
 import { buttonVariants } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type { OrderSummary } from '@/lib/modules/pedidos';
@@ -13,11 +18,28 @@ import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
-import { buildOrderColumns } from './order-columns';
+import {
+  ACTUAL_COST_COLUMN_ID,
+  buildOrderColumns,
+  ORDER_CUSTOMER_NAME_COLUMN_ID,
+  ORDER_NUMBER_COLUMN_ID,
+  PRODUCTION_COST_COLUMN_ID,
+  RECIPE_NAME_COLUMN_ID,
+} from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
-import type { OrderCustomerChoice } from './order-customer-label';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
+import type { ProducedProductsByOrder } from './order-produced-presentations';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
-import { FIRST_PAGE, orderListHref, withSearchResetsPage } from './order-list-params';
+import type { OrderRowAction } from './order-row-actions';
+import { OrderRowSheetActions } from './order-sheet';
+import {
+  CREATED_AT_COLUMN_ID,
+  FIRST_PAGE,
+  orderListHref,
+  PRIORITY_COLUMN_ID,
+  STATUS_COLUMN_ID,
+  withSearchResetsPage,
+} from './order-list-params';
 import type { RecipePickerPage } from './recipe-picker';
 
 /**
@@ -81,6 +103,21 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   lastWeek: 'Última semana',
   lastMonth: 'Último mes',
   lastYear: 'Último año',
+  cardActions: 'Acciones',
+  closeMenu: 'Cerrar',
+};
+
+/**
+ * La tarjeta de telefono: los dos costes van en los datos secundarios, en el orden de
+ * la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion propia: la
+ * pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
+ */
+const ORDER_TABLE_CARD: DataTableCardLayout = {
+  primary: ORDER_NUMBER_COLUMN_ID,
+  status: STATUS_COLUMN_ID,
+  title: RECIPE_NAME_COLUMN_ID,
+  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, CREATED_AT_COLUMN_ID, PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID],
+  footer: PRIORITY_COLUMN_ID,
 };
 
 /** Copy del estado «sin coincidencias», distinto del de «no hay pedidos». */
@@ -95,6 +132,12 @@ const CLEAR_SEARCH_LABEL = 'Limpiar la búsqueda';
 function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
+
+type ActiveOrderAction = {
+  readonly order: OrderSummary;
+  readonly action: OrderRowAction;
+  readonly open: boolean;
+};
 
 export type OrderTableProps = {
   /** Las filas **ya resueltas** por la consulta, en el orden en que las entrega (R13). */
@@ -129,6 +172,10 @@ export type OrderTableProps = {
   readonly canEditCustomer?: boolean;
   /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
   readonly canDeliver?: boolean;
+  /** Si el actor puede anular entregas; lo resuelve el servidor. */
+  readonly canVoidDelivery?: boolean;
+  /** Por pedido, el producto terminado de cada presentación, ya resuelto en el servidor. */
+  readonly producedProductsByOrder?: ProducedProductsByOrder;
   /** El valor del filtro de cliente, ya resuelto por el servidor a partir de la direccion. */
   readonly customerFilter?: OrderCustomerChoice | null;
   /**
@@ -151,6 +198,8 @@ export function OrderTable({
   canEditDistribution,
   canEditCustomer,
   canDeliver,
+  canVoidDelivery,
+  producedProductsByOrder,
   customerFilter = null,
   noMatches,
 }: OrderTableProps) {
@@ -184,12 +233,23 @@ export function OrderTable({
     // vigente: `clearing` deja de forzarlo para no pisar un cambio externo posterior (Atras).
     if (clearing) setClearing(false);
   }
+  const [active, setActive] = useState<ActiveOrderAction | null>(null);
+  const handleAction = useCallback((action: OrderRowAction, order: OrderSummary) => {
+    setActive({ order, action, open: true });
+  }, []);
+  // Cerrar no suelta el pedido: el panel sigue montado para animar su salida.
+  const handleActiveOpenChange = useCallback((open: boolean) => {
+    setActive((current) => (current === null ? null : { ...current, open }));
+  }, []);
+  // Tras un refresco, el pedido activo es la fila nueva; si ya no esta en la pagina, el de antes.
+  const activeOrder =
+    active === null ? null : (orders.find((order) => order.id === active.order.id) ?? active.order);
+
   // Las columnas se construyen con sus dependencias (`buildOrderColumns`). `useMemo` para que la
   // identidad del array no cambie en cada render y la tabla compartida no se reconstruya entera.
   const columns = useMemo(
     () =>
       buildOrderColumns({
-        recipes,
         units,
         bridge,
         responsiblesByOrder,
@@ -198,9 +258,10 @@ export function OrderTable({
         canEditDistribution,
         canEditCustomer,
         canDeliver,
+        producedProductsByOrder,
+        onAction: handleAction,
       }),
     [
-      recipes,
       units,
       bridge,
       responsiblesByOrder,
@@ -209,6 +270,8 @@ export function OrderTable({
       canEditDistribution,
       canEditCustomer,
       canDeliver,
+      producedProductsByOrder,
+      handleAction,
     ],
   );
 
@@ -278,6 +341,7 @@ export function OrderTable({
         totalPages={totalPages}
         onParamsChange={handleParamsChange}
         status="idle"
+        card={ORDER_TABLE_CARD}
         toolbarActions={<OrderCustomerFilter params={visibleParams} value={customerFilter} />}
         texts={noMatches === undefined ? ORDER_TABLE_TEXTS : { ...ORDER_TABLE_TEXTS, empty: ORDER_NO_MATCHES_MESSAGE }}
         emptyAction={
@@ -299,6 +363,21 @@ export function OrderTable({
           )
         }
       />
+      {active === null || activeOrder === null ? null : (
+        <OrderRowSheetActions
+          order={activeOrder}
+          action={active.action}
+          open={active.open}
+          onOpenChange={handleActiveOpenChange}
+          recipes={recipes}
+          units={units}
+          bridge={bridge}
+          responsibles={responsiblesByOrder?.[activeOrder.id] ?? []}
+          responsiblesCatalog={responsiblesCatalog}
+          coverage={coverageByOrder?.[activeOrder.id]}
+          canVoidDelivery={canVoidDelivery}
+        />
+      )}
     </div>
   );
 }

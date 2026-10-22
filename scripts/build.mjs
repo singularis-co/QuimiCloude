@@ -4,7 +4,7 @@
  *
  * Dentro de Vercel (`VERCEL` definida: Vercel la pone en todo build) migrate y seed solo corren en
  * production y en preview, cada uno contra su propia base:
- * - production: migrate, generate, seed base y `next build`.
+ * - production: migrate, generate, relleno de telefonos de clientes, seed base y `next build`.
  * - preview: lo mismo mas el seed de demostracion, y solo si el scope Preview pasa la comprobacion
  *   previa de `scripts/entorno-de-preview.mjs` (base y storage del proyecto de preview, ningun
  *   efecto fuera de la app). Si no la pasa, el build falla antes del primer paso: una preview con
@@ -24,14 +24,16 @@ import { comprobarEntornoDePreview } from './entorno-de-preview.mjs';
 
 const MIGRAR = 'prisma migrate deploy';
 const GENERAR = 'prisma generate';
+// Despues de `generate`: lee las columnas nuevas, y Vercel cachea node_modules con el cliente viejo.
+const RELLENAR_TELEFONOS = 'tsx scripts/backfill-customer-phones.ts';
 const SEMBRAR = 'tsx scripts/seed.ts';
 const SEMBRAR_DEMO = 'tsx scripts/seed-demo.ts';
 const CONSTRUIR = 'next build';
 
-const CON_TODO = [MIGRAR, GENERAR, SEMBRAR, CONSTRUIR];
-const CON_TODO_Y_DEMO = [MIGRAR, GENERAR, SEMBRAR, SEMBRAR_DEMO, CONSTRUIR];
+const CON_TODO = [MIGRAR, GENERAR, RELLENAR_TELEFONOS, SEMBRAR, CONSTRUIR];
+const CON_TODO_Y_DEMO = [MIGRAR, GENERAR, RELLENAR_TELEFONOS, SEMBRAR, SEMBRAR_DEMO, CONSTRUIR];
 const SIN_BASE = [GENERAR, CONSTRUIR];
-const DE_BASE = [MIGRAR, SEMBRAR];
+const DE_BASE = [MIGRAR, RELLENAR_TELEFONOS, SEMBRAR];
 
 /**
  * Comandos del build, en orden, para un entorno dado, y la linea que explica la decision. Con

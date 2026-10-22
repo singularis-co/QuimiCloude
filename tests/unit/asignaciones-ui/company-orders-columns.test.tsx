@@ -6,6 +6,7 @@ import {
   COMPANY_ORDER_NUMBER_COLUMN_ID,
   COMPANY_ORDER_PRESENTATION_COLUMN_ID,
   COMPANY_ORDER_PRIORITY_COLUMN_ID,
+  COMPANY_ORDER_PRIORITY_LABELS,
   COMPANY_ORDER_QUANTITY_COLUMN_ID,
   COMPANY_ORDER_RECIPE_NAME_COLUMN_ID,
   COMPANY_ORDER_RESPONSIBLES_COLUMN_ID,
@@ -15,6 +16,7 @@ import {
   buildCompanyOrdersColumns,
 } from '@/app/(private)/asignacion/components';
 import type { CompanyOrderView } from '@/lib/modules/asignaciones';
+import { ORDER_PRIORITY_LEVELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 afterEach(() => {
   cleanup();
@@ -25,7 +27,7 @@ const BASE_ORDER: CompanyOrderView = {
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
   priority: 'ALTA',
@@ -207,6 +209,30 @@ describe('R25 - la presentación, la prioridad, el estado y los responsables', (
     renderCell(COMPANY_ORDER_RESPONSIBLES_COLUMN_ID, { ...BASE_ORDER, responsibles: [] });
     expect(screen.getByTestId('responsible-avatars')).toBeInTheDocument();
   });
+});
+
+describe('QC-265 R16, R17 - estado y prioridad con las piezas de la marca', () => {
+  it.each(['ENTREGADO', 'EN_CURSO', 'BLOQUEADO'] as const)(
+    'R16: %s es un `StatusBadge` con el tono de `ORDER_STATUS_TONES`',
+    (status) => {
+      renderCell(COMPANY_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status });
+      const badge = screen.getByTestId('company-order-status');
+      expect(badge).toHaveAttribute('data-status', status);
+      expect(badge).toHaveAttribute('data-tone', ORDER_STATUS_TONES[status]);
+      expect(badge.querySelector('[data-slot="status-dot"]')).not.toBeNull();
+    },
+  );
+
+  it.each(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'] as const)(
+    'R17: %s es un `PriorityMark` con el nivel de `ORDER_PRIORITY_LEVELS` y su etiqueta',
+    (priority) => {
+      renderCell(COMPANY_ORDER_PRIORITY_COLUMN_ID, { ...BASE_ORDER, priority });
+      const mark = screen.getByTestId('company-order-priority');
+      expect(mark).toHaveAttribute('data-priority', priority);
+      expect(mark).toHaveAttribute('data-level', String(ORDER_PRIORITY_LEVELS[priority]));
+      expect(mark).toHaveTextContent(COMPANY_ORDER_PRIORITY_LABELS[priority]);
+    },
+  );
 });
 
 describe('R34 - «Todos» muestra y filtra BLOQUEADO', () => {

@@ -15,6 +15,7 @@ import { AppSidebar } from '@/components/private/app-sidebar';
 import { SidebarMenuButton, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import type { SessionUser } from '@/lib/modules/identity';
 import { PRIVATE_NAV_ITEMS } from '@/lib/shared/navigation/private-nav';
+import { HOME_ROUTE } from '@/lib/shared/routes';
 
 const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn<() => string>() }));
 
@@ -73,8 +74,8 @@ const USER: SessionUser = {
   permissions: [],
 };
 
-const OPEN_ICON = 'lucide-panel-left-open';
-const CLOSE_ICON = 'lucide-panel-left-close';
+const ARROW_ICON = 'lucide-chevron-left';
+const ARROW_TURNED = 'rotate-180';
 const DEFAULT_TRIGGER_ICON = 'lucide-panel-left ';
 
 function decode(html: string): string {
@@ -127,6 +128,13 @@ describe('carril colapsado', () => {
     expect(classes).not.toContain(`${ICON_PREFIX}p-3.5!`);
   });
 
+  it('QC-277 R18 el enlace de marca del carril colapsado apunta a HOME_ROUTE', () => {
+    const html = render(false, createElement(AppSidebar, { user: USER, navItems: PRIVATE_NAV_ITEMS }));
+    const tag = html.match(/<a[^>]*data-testid="private-brand-link"[^>]*>/)?.[0];
+    expect(tag).toBeDefined();
+    expect(tag).toContain(`href="${HOME_ROUTE}"`);
+  });
+
   it('R36 las clases del boton de menu sin prefijo de modo icono son las de partida', () => {
     const expanded = menuButtonClasses().filter((c) => !c.startsWith(ICON_PREFIX));
     expect([...expanded].sort()).toEqual([...EXPANDED_CLASSES_FROZEN].sort());
@@ -141,19 +149,28 @@ describe('carril colapsado', () => {
 });
 
 describe('control de colapso', () => {
-  it('R39 la pastilla del borde pinta cerrar con el panel expandido y abrir con el colapsado', () => {
+  // ENMIENDA QC-257: los iconos de panel abrir/cerrar pasan a una sola flecha que gira 180 grados
+  // al plegar (D2 de QC-257, que enmienda D12 de QC-227).
+  it('R39 la pastilla del borde pinta la flecha sin girar con el panel expandido y girada con el colapsado', () => {
     const sidebar = createElement(AppSidebar, { user: USER, navItems: PRIVATE_NAV_ITEMS });
-    const expanded = iconClassIn(render(true, sidebar), 'private-sidebar-edge-toggle');
-    const collapsed = iconClassIn(render(false, sidebar), 'private-sidebar-edge-toggle');
-    expect(expanded).toContain(CLOSE_ICON);
-    expect(collapsed).toContain(OPEN_ICON);
+    const expanded = iconClassIn(render(true, sidebar), 'private-sidebar-edge-toggle').split(/\s+/);
+    const collapsed = iconClassIn(render(false, sidebar), 'private-sidebar-edge-toggle').split(/\s+/);
+    expect(expanded).toContain(ARROW_ICON);
+    expect(expanded).not.toContain(ARROW_TURNED);
+    expect(collapsed).toContain(ARROW_ICON);
+    expect(collapsed).toContain(ARROW_TURNED);
   });
 
-  it('R39 el control del encabezado pinta cerrar con el panel expandido y abrir con el colapsado', () => {
-    const expanded = iconClassIn(render(true, createElement(SidebarToggle)), 'private-sidebar-toggle');
-    const collapsed = iconClassIn(render(false, createElement(SidebarToggle)), 'private-sidebar-toggle');
-    expect(expanded).toContain(CLOSE_ICON);
-    expect(collapsed).toContain(OPEN_ICON);
+  // ENMIENDA QC-257: el control del encabezado pinta la misma flecha y la gira segun el panel movil
+  // (`openMobile`), no segun la barra de escritorio. En el servidor el panel movil esta cerrado, asi
+  // que la flecha sale girada (abrir) con la barra de escritorio expandida o colapsada.
+  it('R39 el control del encabezado pinta la flecha girada (abrir) con el panel movil cerrado', () => {
+    const expanded = iconClassIn(render(true, createElement(SidebarToggle)), 'private-sidebar-toggle').split(/\s+/);
+    const collapsed = iconClassIn(render(false, createElement(SidebarToggle)), 'private-sidebar-toggle').split(/\s+/);
+    for (const classes of [expanded, collapsed]) {
+      expect(classes).toContain(ARROW_ICON);
+      expect(classes).toContain(ARROW_TURNED);
+    }
   });
 
   it('R39 SidebarTrigger sin children sigue pintando PanelLeftIcon', () => {

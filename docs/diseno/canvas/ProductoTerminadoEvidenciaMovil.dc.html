@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ficha con evidencia en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ProductoTerminadoEvidencia" tab="Lotes" dialogo="{{ true }}" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Ficha con evidencia por lote · QC-271</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd>Todo lo de la ficha (QC-225) · <span class="mono">shared/data-table</span> con una columna más · <span class="mono">shared/step-evidence</span> en modo <span class="mono">readOnly</span> (R24 de QC-214) con su visor ampliado · <span class="mono">ui/dialog · ui/button · ui/skeleton</span></dd>
+      <dt>Librerías</dt><dd><span class="mono">lucide-react</span> (Camera, Image, TriangleAlert, X) · Dialog de shadcn ya existente · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>Pestaña Lotes: columna «Evidencia» al final, solo con <span class="mono">pedidos.consultar</span> (Administrador) · botón cámara + «6 fotos» en lotes con pedido de origen y fotos · «—» en lotes sin fotos o «Sin pedido» · el botón abre el diálogo ancho «Evidencia · Lote L-2026-1003 · Pedido 2026-0000013» con grupos Fabricación y Envasado (un grupo vacío no se pinta), filas «Paso N» con sus miniaturas 1–3 · miniatura → visor ampliado encima del diálogo</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · la tabla de 9 columnas se desplaza en horizontal dentro de su caja; «Evidencia» queda la última</dd>
+      <dt>Teléfono</dt><dd>La tabla NO pasa a tarjetas (decisión de QC-225): el botón queda en la última columna, alcanzable con el desplazamiento horizontal · el diálogo ocupa toda la pantalla (<span class="mono">dlg full-m</span>, mismo patrón que otros modales en teléfono) y se desplaza en vertical · Cerrar, Reintentar y Recargar a 44 px</dd>
+      <dt>Estados</dt><dd>Dentro del diálogo: Cargando (miniaturas esqueleto por paso) · Error («No se pudieron cargar las fotos.» + Reintentar) · Enlace vencido («Vista vencida · Recargar» en cada miniatura) · Operador (sin <span class="mono">pedidos.consultar</span>): la columna no existe y las fotos no se piden ni se firman</dd>
+      <dt>Animación</dt><dd>La del visor de QC-214 y de los diálogos del sistema: fundido y escala 0,96 → 1 (<span class="mono">--d-s</span>, <span class="mono">--e-in</span>), cierre con <span class="mono">--d-f</span> · miniaturas con qc-rise y 40 ms de desfase · sin toasts: solo consulta</dd>
+      <dt>Por confirmar</dt><dd>Si el conteo del botón cuenta fabricación + envasado juntos (aquí sí: 4 + 2 = 6) · nombre del paso de envasado en la fila (aquí «Envasar en galón 4 L»), solo si se conoce · si la columna se pinta para el Operador como «—» o no se pinta (aquí no se pinta)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
+import { PasswordField } from '@/components/shared/password-field';
 import { SubmitButton } from '@/components/shared/submit-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,6 @@ import { loginAction } from '@/lib/modules/identity/adapters/driving/login-actio
 import { LOGIN_INITIAL_STATE } from '@/lib/modules/identity/adapters/driving/login-form-state';
 
 const USERNAME_ERROR_ID = 'username-error';
-const PASSWORD_ERROR_ID = 'password-error';
 
 type LoginFormProps = {
   /**
@@ -105,6 +105,7 @@ export function LoginForm({ next = '' }: LoginFormProps) {
           aria-invalid={usernameError ? true : undefined}
           aria-describedby={usernameError ? USERNAME_ERROR_ID : undefined}
           data-testid="login-username"
+          className="h-11 text-base md:text-base"
         />
         {usernameError ? (
           <p
@@ -117,27 +118,14 @@ export function LoginForm({ next = '' }: LoginFormProps) {
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Contraseña</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={passwordError ? true : undefined}
-          aria-describedby={passwordError ? PASSWORD_ERROR_ID : undefined}
-          data-testid="login-password"
-        />
-        {passwordError ? (
-          <p
-            id={PASSWORD_ERROR_ID}
-            className="text-sm text-destructive"
-            data-testid="login-password-error"
-          >
-            {passwordError}
-          </p>
-        ) : null}
-      </div>
+      <PasswordField
+        name="password"
+        id="password"
+        label="Contraseña"
+        autoComplete="current-password"
+        error={passwordError}
+        testId="login-password"
+      />
 
       <SubmitButton label="Entrar" pendingLabel="Entrando…" testId="login-submit" className="w-full" />
     </form>

@@ -1,80 +1,24 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
+import {
+  ORDER_COVERAGE_LABELS,
+  ORDER_COVERAGE_TONES,
+  ORDER_PRIORITY_LABELS,
+  ORDER_PRIORITY_LEVELS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_TONES,
+} from '@/lib/shared/ui/order-status';
+import { PriorityMark } from '@/components/shared/priority-mark';
+import { StatusBadge } from '@/components/shared/status-badge';
 import {
   ORDER_PRIORITY_VALUES,
   ORDER_STATUS_FLOW,
   type OrderPriority,
   type OrderStatus,
 } from '@/lib/modules/pedidos';
-// Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
-/**
- * Estado y prioridad de un pedido como **etiqueta legible** (R8, `design.md > 7`).
- *
- * **Los mapas son exhaustivos y tipados** (`Record<OrderStatus, ...>` y
- * `Record<OrderPriority, ...>`): si manana el contrato publica un quinto estado, este archivo
- * deja de compilar en vez de pintar un hueco o el valor crudo del enum. Esa es la razon de que
- * sean mapas y no una funcion con `switch` y `default`, que taparia el caso nuevo en silencio.
- *
- * **Las claves salen del contrato, los textos son de esta capa.** El conjunto cerrado lo declara
- * `pedidos` (`ORDER_STATUS_VALUES`, `ORDER_PRIORITY_VALUES`); aqui solo se decide como se lee.
- * Por eso las opciones de los filtros (`order-columns.tsx`) se construyen recorriendo esos
- * valores y no una segunda lista escrita a mano.
- *
- * **Ningun test afirma sobre estos textos** (R44): las etiquetas se localizan por `data-testid`
- * y, cuando el test necesita el texto, lo toma **de estas constantes exportadas**, nunca de un
- * literal copiado.
- */
-
-/** Como se lee cada estado del contrato. Exhaustivo por tipo: falta una clave -> no compila. */
-export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
-  PENDIENTE: 'Pendiente',
-  EN_CURSO: 'En curso',
-  POR_EMPACAR: 'Por empacar',
-  EN_EMPAQUE: 'En empaque',
-  ENTREGADO: 'Entregado',
-  CANCELADO: 'Cancelado',
-  BLOQUEADO: 'Bloqueado',
-  POR_ACONDICIONAR: 'Por acondicionar',
-  EN_ACONDICIONAMIENTO: 'En acondicionamiento',
-  TERMINADO: 'Terminado',
-};
-
-/** Como se lee cada prioridad del contrato. Exhaustivo por tipo, mismo motivo. */
-export const ORDER_PRIORITY_LABELS: Readonly<Record<OrderPriority, string>> = {
-  BAJA: 'Baja',
-  MEDIA: 'Media',
-  ALTA: 'Alta',
-  CRITICA: 'Crítica',
-};
-
-/**
- * Variante visual por estado y por prioridad. Tambien exhaustivas: el color acompana a la
- * etiqueta, **nunca la sustituye** —el estado se lee, no se adivina por el tono—.
- */
-type StatusTone = 'success' | 'warning' | 'destructive' | 'info' | 'neutral';
-
-const STATUS_VARIANTS: Readonly<Record<OrderStatus, StatusTone>> = {
-  PENDIENTE: 'neutral',
-  EN_CURSO: 'info',
-  POR_EMPACAR: 'warning',
-  EN_EMPAQUE: 'info',
-  ENTREGADO: 'success',
-  CANCELADO: 'destructive',
-  BLOQUEADO: 'destructive',
-  POR_ACONDICIONAR: 'warning',
-  EN_ACONDICIONAMIENTO: 'info',
-  TERMINADO: 'success',
-};
-
-const PRIORITY_VARIANTS: Readonly<Record<OrderPriority, StatusTone>> = {
-  BAJA: 'neutral',
-  MEDIA: 'info',
-  ALTA: 'warning',
-  CRITICA: 'destructive',
-};
+export { ORDER_STATUS_LABELS, ORDER_PRIORITY_LABELS, ORDER_COVERAGE_LABELS };
 
 /**
  * Opciones de un filtro de seleccion, derivadas del conjunto cerrado del contrato (R14). Se
@@ -89,44 +33,33 @@ export const ORDER_PRIORITY_FILTER_OPTIONS: readonly { value: string; label: str
 
 export function OrderStatusBadge({ status }: { readonly status: OrderStatus }) {
   return (
-    <Badge variant={STATUS_VARIANTS[status]} data-testid="order-status" data-status={status}>
-      {ORDER_STATUS_LABELS[status]}
-    </Badge>
+    <StatusBadge
+      tone={ORDER_STATUS_TONES[status]}
+      label={ORDER_STATUS_LABELS[status]}
+      data-testid="order-status"
+      data-status={status}
+    />
   );
 }
 
 export function OrderPriorityBadge({ priority }: { readonly priority: OrderPriority }) {
   return (
-    <Badge variant={PRIORITY_VARIANTS[priority]} data-testid="order-priority" data-priority={priority}>
-      {ORDER_PRIORITY_LABELS[priority]}
-    </Badge>
+    <PriorityMark
+      level={ORDER_PRIORITY_LEVELS[priority]}
+      label={ORDER_PRIORITY_LABELS[priority]}
+      data-testid="order-priority"
+      data-priority={priority}
+    />
   );
 }
 
-/**
- * Exhaustivo por tipo, igual que `ORDER_STATUS_LABELS`: si `inventario` publica un cuarto valor,
- * este archivo deja de compilar.
- *
- * `ENTREGADO` y `CANCELADO` llegan con `coverage: 'none'` y se pintan con la MISMA etiqueta
- * «Sin apartar», no con un guion: el estado final apaga los controles de escritura, nunca oculta
- * un dato que sigue siendo consultable.
- */
-export const ORDER_COVERAGE_LABELS: Readonly<Record<OrderCoverage, string>> = {
-  full: 'Apartado',
-  none: 'Sin apartar',
-  partial: 'Sin cobertura completa',
-};
-
-const COVERAGE_VARIANTS: Readonly<Record<OrderCoverage, StatusTone>> = {
-  full: 'success',
-  none: 'neutral',
-  partial: 'warning',
-};
-
 export function OrderCoverageBadge({ coverage }: { readonly coverage: OrderCoverage }) {
   return (
-    <Badge variant={COVERAGE_VARIANTS[coverage]} data-testid="order-coverage" data-coverage={coverage}>
-      {ORDER_COVERAGE_LABELS[coverage]}
-    </Badge>
+    <StatusBadge
+      tone={ORDER_COVERAGE_TONES[coverage]}
+      label={ORDER_COVERAGE_LABELS[coverage]}
+      data-testid="order-coverage"
+      data-coverage={coverage}
+    />
   );
 }

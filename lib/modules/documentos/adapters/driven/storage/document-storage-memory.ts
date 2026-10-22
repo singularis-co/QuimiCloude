@@ -1,3 +1,6 @@
+import { prisma } from '@/lib/shared/db/prisma';
+
+import { companyIdOfPath } from '../../../domain/document-path';
 import {
   MILLISECONDS_PER_SECOND,
   PROVIDER_UPLOAD_LINK_TTL_SECONDS,
@@ -20,16 +23,48 @@ import type { DocumentStorage, SignedUpload } from '../../../ports/document-stor
  * **Los bytes no se guardan.** La subida la hace el navegador contra `uploadUrl`, que el propio
  * recorrido intercepta, asi que aqui nunca llega un byte: `download` devuelve siempre el mismo PDF
  * minimo valido, que es lo que la conversion necesita para abrir un documento de una pagina.
+ *
+ * **Salvo un archivo marcado.** Si el nombre original de la fila de esa ruta lleva
+ * `UNREADABLE_E2E_NAME_MARK`, `download` devuelve bytes que no son un PDF. Asi un recorrido puede
+ * hacer fallar, de forma determinista, un archivo de una tanda y no los demas. El nombre es lo
+ * unico del archivo que llega al servidor: los bytes no llegan y la ruta la pone el servidor.
+ * Falla al rasterizar, asi que solo afecta a la estrategia que lee por imagenes (catalogo). Es un
+ * fallo definitivo (`unexpected`), no un corte de almacenamiento, que la cola en linea no reintenta.
  */
+
+/** La marca, en el nombre original del archivo, que hace ilegible su descarga. */
+export const UNREADABLE_E2E_NAME_MARK = 'e2e-ilegible';
+
+/** Lo que devuelve la descarga de un archivo marcado: texto, sin cabecera `%PDF`. */
+const BYTES_ILEGIBLES = new TextEncoder().encode(`no es un PDF (${UNREADABLE_E2E_NAME_MARK})`);
+
+/** El nombre original que subio quien encolo esa ruta, o `null` si no lo hay. */
+export type OriginalNameOf = (path: string) => Promise<string | null>;
+
+/** Busca el nombre original de la fila `(companyId, path)`. */
+export type FindOriginalName = (where: { companyId: string; path: string }) => Promise<string | null>;
+
+/** Una ruta sin empresa valida al frente no tiene fila: se responde sin consultar. */
+export function createOriginalNameOf(find: FindOriginalName): OriginalNameOf {
+  return (path) => {
+    const companyId = companyIdOfPath(path);
+    return companyId === null ? Promise.resolve(null) : find({ companyId, path });
+  };
+}
+
+const originalNameInDatabase: OriginalNameOf = createOriginalNameOf(async (where) => {
+  const file = await prisma.documentFile.findFirst({
+    where: { companyId: where.companyId, path: where.path },
+    select: { originalName: true },
+  });
+  return file?.originalName ?? null;
+});
 
 /**
  * Dominio reservado por el estandar: NO resuelve en ningun DNS. Si alguien olvidara interceptar la
  * subida, la peticion falla ruidosamente en vez de salir a un servidor de verdad.
  */
 const E2E_STORAGE_ORIGIN = 'https://documentos-e2e.invalid';
-
-/** Las rutas firmadas, vivas mientras viva el proceso del servidor de pruebas. */
-const rutasFirmadas = new Set<string>();
 
 /** El cuerpo de un PDF de UNA pagina en blanco, un objeto por elemento y en orden de numeracion. */
 const OBJETOS_DEL_PDF_MINIMO = [
@@ -73,39 +108,55 @@ function armarPdfMinimo(): Uint8Array {
 
 const PDF_MINIMO = armarPdfMinimo();
 
-function exigirRutaFirmada(path: string, operacion: string): void {
-  if (!rutasFirmadas.has(path)) {
-    throw new Error(`el almacenamiento en memoria no firmo la ruta ${path}: ${operacion} imposible`);
+export type DocumentStorageMemoryDeps = {
+  readonly originalNameOf: OriginalNameOf;
+};
+
+export function createDocumentStorageMemory(deps: DocumentStorageMemoryDeps): DocumentStorage {
+  /** Las rutas firmadas, vivas mientras viva el proceso del servidor de pruebas. */
+  const rutasFirmadas = new Set<string>();
+
+  function exigirRutaFirmada(path: string, operacion: string): void {
+    if (!rutasFirmadas.has(path)) {
+      throw new Error(`el almacenamiento en memoria no firmo la ruta ${path}: ${operacion} imposible`);
+    }
   }
+
+  return {
+    createSignedUpload(path: string): Promise<SignedUpload> {
+      rutasFirmadas.add(path);
+      const expiresAt = new Date(
+        Date.now() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * MILLISECONDS_PER_SECOND,
+      ).toISOString();
+
+      return Promise.resolve({
+        path,
+        uploadUrl: `${E2E_STORAGE_ORIGIN}/upload/${path}`,
+        token: crypto.randomUUID(),
+        expiresAt,
+      });
+    },
+
+    createSignedReadUrl(path: string): Promise<string> {
+      exigirRutaFirmada(path, 'firmar la lectura');
+      return Promise.resolve(`${E2E_STORAGE_ORIGIN}/read/${path}`);
+    },
+
+    download(path: string): Promise<Uint8Array> {
+      exigirRutaFirmada(path, 'la descarga');
+      return deps
+        .originalNameOf(path)
+        .then((name) => (name?.includes(UNREADABLE_E2E_NAME_MARK) === true ? BYTES_ILEGIBLES : PDF_MINIMO));
+    },
+
+    remove(path: string): Promise<void> {
+      rutasFirmadas.delete(path);
+      return Promise.resolve();
+    },
+  };
 }
 
-export const documentStorageMemory: DocumentStorage = {
-  createSignedUpload(path: string): Promise<SignedUpload> {
-    rutasFirmadas.add(path);
-    const expiresAt = new Date(
-      Date.now() + PROVIDER_UPLOAD_LINK_TTL_SECONDS * MILLISECONDS_PER_SECOND,
-    ).toISOString();
-
-    return Promise.resolve({
-      path,
-      uploadUrl: `${E2E_STORAGE_ORIGIN}/upload/${path}`,
-      token: crypto.randomUUID(),
-      expiresAt,
-    });
-  },
-
-  createSignedReadUrl(path: string): Promise<string> {
-    exigirRutaFirmada(path, 'firmar la lectura');
-    return Promise.resolve(`${E2E_STORAGE_ORIGIN}/read/${path}`);
-  },
-
-  download(path: string): Promise<Uint8Array> {
-    exigirRutaFirmada(path, 'la descarga');
-    return Promise.resolve(PDF_MINIMO);
-  },
-
-  remove(path: string): Promise<void> {
-    rutasFirmadas.delete(path);
-    return Promise.resolve();
-  },
-};
+/** La que elige la composicion: busca el nombre original en la fila de la ruta. */
+export const documentStorageMemory: DocumentStorage = createDocumentStorageMemory({
+  originalNameOf: originalNameInDatabase,
+});

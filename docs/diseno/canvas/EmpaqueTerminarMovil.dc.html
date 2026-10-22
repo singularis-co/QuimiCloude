@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Terminar el empaque en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844 · «Otro» con texto</span><div class="frame-phone"><div class="frame-in"><dc-import name="EmpaqueTerminar" estado="otro" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Terminar el empaque · ficha (QC-281)</h2>
+    <dl class="spec">
+      <dt>Qué cambia</dt><dd>«¿Terminar el empaque?» pasa de confirmación simple a diálogo con una fila por línea del reparto: plan + campo «Envases reales» <strong>prellenado con el plan</strong>. El Empacador cambia solo las líneas que difieren. Conteo y motivo se guardan en la línea del reparto (envases reales, motivo y texto de «Otro»)</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">entity-image</span> (imagen del envase) · <span class="mono">packing-order-screen</span> (sustituye el <span class="mono">confirm-dialog</span> de Terminar) · <span class="mono">ui/dialog</span> · <span class="mono">ui/button</span> (−/+ y acciones, <span class="mono">touchTarget</span>) · <span class="mono">ui/input</span> (<span class="mono">inputMode="numeric"</span>) · <span class="mono">shared/select-field</span> (motivo) · <span class="mono">shared/text-field</span> (textarea de «Otro») · <span class="mono">shared/field-error</span> · <span class="mono">status-badge</span> (diferencia ±N) · <span class="mono">order-distribution-label</span> · <span class="mono">ui/sonner</span> · etiquetas de motivo con <span class="mono">movementReasonLabel</span> (QC-92)</dd>
+      <dt>Imagen del envase</dt><dd>Miniatura de 80 px con <span class="mono">shared/entity-image</span> (tamaño <span class="mono">thumbnail</span>, el de los listados) en lugar del icono genérico de 40 px de cada fila; la rejilla de la fila pasa a 80 px · con imagen: se toca y abre la imagen ampliada · sin imagen, envase dado de baja o línea antigua: el marcador de <span class="mono">entity-image</span> (aquí el icono de imagen tachada; en la app <span class="mono">inv_not_found.png</span>), sin ampliar · la imagen sale del envase de cada línea, no de la presentación</dd><dt>Imagen ampliada</dt><dd>Se abre como diálogo encima de «¿Terminar el empaque?» (estado «zoom» de EmpaqueTerminar), con su propio fondo; al cerrarlo se vuelve al conteo sin perder lo escrito</dd><dt>Librerías</dt><dd>Ninguna nueva: <span class="mono">@base-ui/react</span> (Dialog, Select) · <span class="mono">lucide-react</span> (minus, plus, circle-check, circle-alert, package) · <span class="mono">sonner</span></dd>
+      <dt>Motivos</dt><dd>Lista cerrada de QC-92 (<span class="mono">MOVEMENT_REASONS</span>) según el sentido, como en QC-92 (<span class="mono">STOCK_INCREASE_REASONS</span>): <strong>menos</strong> envases que el plan → Merma · Rotura · Conteo físico · Error de carga · Otro; <strong>más</strong> envases → solo Conteo físico · Error de carga · Otro (con la ayuda «Para envases de más solo valen…»). Si la línea cambia de sentido y el motivo ya no vale, se vacía y vuelve a pedirse. «Otro» abre un texto libre obligatorio</dd>
+      <dt>Tope</dt><dd>Lo envasado (suma de envases reales × contenido) se calcula con la misma conversión que ya usa el reparto (QC-170). Desde QC-290 puede superar la cantidad del pedido: no es error (ver la enmienda)</dd>
+      <dt>Pedidos anteriores</dt><dd>Los pedidos empacados antes de QC-281 quedan con envases reales = plan y sin motivo: no muestran diferencia</dd>
+      <dt>Estados</dt><dd>Por defecto (todo igual al plan: sin motivos, Terminar activo) · con diferencia (insignia ±N, motivo obligatorio, ayuda «Se libera 1 envase apartado.») · «Otro» con texto · sin motivo al pulsar Terminar («Elige un motivo.») · con excedente (lo envasado supera la cantidad del pedido: aviso informativo encima del pie, Terminar activo; QC-290) · error de stock del envase (faltan envases vacíos libres; Terminar deshabilitado) · línea en 0 (permitida: no da de alta lote y libera sus apartados) · más envases que el plan sin error (ayuda «Sale 1 envase vacío del stock libre»)</dd>
+      <dt>Escritorio</dt><dd>Diálogo ancho (720 px) centrado sobre la pantalla de empaque · cabecera fija, filas con desplazamiento propio, pie fijo con «Envasado: N L de 72,00 L» (visible siempre, también sin diferencias) y Cancelar / Terminar · fila: imagen 80 px · nombre + plan · − [n] + · insignia</dd>
+      <dt>Tablet</dt><dd>Mismo diálogo de 720 px · botones −/+ y campos de 48 px · el teclado numérico aparece al tocar el campo</dd>
+      <dt>Teléfono</dt><dd>Diálogo a pantalla completa (<span class="mono">full-m</span>) · el paso −/+ baja a su propia fila a todo el ancho · motivo y texto a todo el ancho · pie con <span class="mono">safe-area-inset-bottom</span> y Terminar al doble de ancho que Cancelar</dd>
+      <dt>Animación</dt><dd>Diálogo con zoom desde 96 % (300 ms al abrir, 150 ms al cerrar) · al diferir del plan, el bloque de motivo aparece desplegándose (alto 0 → auto con <span class="mono">grid-template-rows</span> + subida de 10 px, 200 ms, easing de entrada) y se pliega igual al volver al plan · «Otro» despliega su texto del mismo modo · errores con <span class="mono">qc-err</span> (150 ms) · la insignia ±N cambia de tono en 200 ms · lista del Select 200/150 ms · respeta <span class="mono">prefers-reduced-motion</span></dd>
+      <dt>Dónde se ve después</dt><dd>Tab «Reparto» del detalle de producto terminado (tablero ProductoTerminadoReparto)</dd>
+      <dt>Enmienda 2026-10-20 (QC-290)</dt><dd>Decisión del usuario. Envasar más que el pedido ya no es error ni bloquea: desaparece el estado «error de tope» de QC-281 (error rojo con el máximo de la línea y Terminar deshabilitado). En su lugar, <strong>un solo</strong> aviso informativo (<span class="mono">Notice</span>, tono información, <span class="mono">role="status"</span>) encima de «Envasado: N L de 72,00 L», solo si ninguna línea tiene error: «Sobran <span class="mono">&lt;excedente&gt;</span> sobre el pedido.» / «Quedan libres en stock: <span class="mono">&lt;N&gt;</span> envases de &lt;presentación&gt;[, <span class="mono">&lt;M&gt;</span> envases de &lt;otra&gt;].» Libres: envases enteros, de las líneas que pasaron su plan, mayor contenido primero, sin superar el excedente (mismo cálculo que el servidor). El total del pie no se pinta en rojo. La línea que pasa su plan sigue con insignia «+N» normal, motivo obligatorio (Conteo físico, Error de carga, Otro) y su ayuda de envases vacíos; el error de stock del envase sigue bloqueando. Estado «excedente» de EmpaqueTerminar</dd>
+      <dt>Por confirmar</dt><dd>P3: que el diálogo de la imagen anidado en «¿Terminar el empaque?» no dé problemas de foco ni de capas; si los da, en este diálogo la miniatura no se amplía</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

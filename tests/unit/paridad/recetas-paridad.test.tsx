@@ -74,14 +74,24 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 vi.mock('next/headers', () => ({ cookies: cookiesMock }));
 
+// La empresa tiene proveedor IA conectado: la pantalla pinta el boton de subida de siempre.
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: vi.fn(async () => ({ configured: true, canConfigure: true })),
+}));
+
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async () => null) },
-  identity: { getSessionUser: getSessionUserMock, endSession: vi.fn() },
+  identity: {
+    getSessionUser: getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    endSession: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipesAction: listRecipesActionMock,
   getRecipeAction: getRecipeActionMock,
+  getRecipeStepLockAction: vi.fn(async () => ({ status: 'success' as const, data: { lockingOrders: 0 } })),
   deleteRecipeAction: vi.fn(),
   listRecipeVersionsAction: listRecipeVersionsActionMock,
   createRecipeVersionAction: vi.fn(),

@@ -44,7 +44,12 @@ import { createListResponsiblesForOrders } from '@/lib/modules/asignaciones/doma
 import { createRemoveWorkGroupFromOrder } from '@/lib/modules/asignaciones/domain/remove-work-group-from-order';
 import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/unassign-responsible';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
-import { DOCUMENT_TYPE_CC, normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
+import {
+  DOCUMENT_TYPE_CC,
+  normalizeCompanyName,
+  normalizeWorkGroupName,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity';
 import {
   findAliveOrderTargetById,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
@@ -75,6 +80,9 @@ const orders: OrderCatalog = {
   listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
   listAliveSummariesInCompany: summaryReaders.listAliveSummariesInCompany,
   listSummariesByIdsIncludingDeleted: summaryReaders.listSummariesByIdsIncludingDeleted,
+  listDeliveryProgressByIdsIncludingDeleted: async () => {
+    throw new Error('los casos de uso de asignacion no leen el progreso de entrega');
+  },
   transitionAliveById: async () => {
     throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
   },
@@ -239,12 +247,21 @@ export async function createCompany(tx: Prisma.TransactionClient, prefix: string
   return company.id;
 }
 
-async function createRole(tx: Prisma.TransactionClient): Promise<string> {
-  const role = await tx.role.create({
-    data: { name: `rol-qc87-t14-${randomUUID()}`, description: 'Rol de prueba' },
-    select: { id: true },
-  });
+/**
+ * El rol SEMBRADO con ese nombre. QC-274: solo Operador y Empacador pueden ser responsables, y se
+ * decide por el nombre del rol; un rol efimero con otro nombre ya no se podria asignar. `name` es
+ * unico, asi que se lee el del seed en vez de crear otro.
+ */
+export async function findSeedRoleId(tx: Prisma.TransactionClient, name: string): Promise<string> {
+  const role = await tx.role.findUnique({ where: { name }, select: { id: true } });
+  if (role === null) {
+    throw new Error(`falta el rol base \`${name}\` en la base: corre \`pnpm run db:seed\` antes de este archivo.`);
+  }
   return role.id;
+}
+
+async function createRole(tx: Prisma.TransactionClient): Promise<string> {
+  return findSeedRoleId(tx, ROLE_OPERADOR);
 }
 
 /** Receta efimera SIN lineas: es solo el otro lado de `orders_recipe_id_fkey`. Es de la misma

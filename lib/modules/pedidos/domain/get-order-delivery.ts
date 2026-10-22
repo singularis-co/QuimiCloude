@@ -6,6 +6,7 @@ import { toOrderCustomer, type OrderCustomer } from './order-customer';
 import { remainingPackages } from './order-delivery';
 import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
+import { orderedPackages } from './packing-count';
 
 import type { OrderDeliveryRepository } from '../ports/order-delivery-repository';
 import type { OrderRepository } from '../ports/order-repository';
@@ -72,7 +73,7 @@ export function createGetOrderDelivery(
       deps.deliveries.sumDeliveredPackages(orderId, scope),
     ]);
     const states = lines.map((line) => {
-      const state = { presentationLineId: line.id, orderedPackages: line.packages, deliveredPackages: delivered.get(line.id) ?? 0 };
+      const state = { presentationLineId: line.id, orderedPackages: orderedPackages(line), deliveredPackages: delivered.get(line.id) ?? 0 };
       return { line, state, remaining: remainingPackages(state) };
     });
 

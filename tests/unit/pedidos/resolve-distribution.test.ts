@@ -104,7 +104,7 @@ function catalogos(
 
 /** Las lineas del pedido guardado antes de los envases: una antigua de 2 en `PRESENTACION_A`. */
 const GUARDADAS: readonly OrderPresentationLineRow[] = [
-  { presentationId: PRESENTACION_A, packages: 2, packagingProductId: null },
+  { presentationId: PRESENTACION_A, packages: 2, packagingProductId: null, presentationContent: null },
 ];
 
 describe('resolveDistribution', () => {
@@ -306,7 +306,7 @@ describe('QC-195 resolveDistribution — lineas antiguas', () => {
     const cat = catalogos();
     await expect(
       resolveDistribution(cat.catalogs, COMPANY_ID, '10', UNIT_ID, [{ presentationId: PRESENTACION_A, packages: 1 }], {
-        savedLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: ENVASE_1L }],
+        savedLines: [{ presentationId: PRESENTACION_A, packages: 1, packagingProductId: ENVASE_1L, presentationContent: null }],
       }),
     ).rejects.toBeInstanceOf(ValidationError);
   });

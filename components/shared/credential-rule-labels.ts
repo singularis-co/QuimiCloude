@@ -20,10 +20,10 @@ import {
 
 export const CREDENTIAL_RULE_LABELS: Readonly<Record<CredentialRule, string>> = {
   min_length: `Al menos ${CREDENTIAL_MIN_LENGTH} caracteres`,
-  max_length: `Como maximo ${CREDENTIAL_MAX_LENGTH} caracteres`,
-  no_uppercase: 'Al menos una letra mayuscula',
-  no_lowercase: 'Al menos una letra minuscula',
-  no_digit: 'Al menos un numero',
-  no_symbol: 'Al menos un simbolo que no sea letra ni numero',
+  max_length: `Como máximo ${CREDENTIAL_MAX_LENGTH} caracteres`,
+  no_uppercase: 'Al menos una letra mayúscula',
+  no_lowercase: 'Al menos una letra minúscula',
+  no_digit: 'Al menos un número',
+  no_symbol: 'Al menos un símbolo que no sea letra ni número',
   breached: 'No debe figurar en una lista de credenciales filtradas',
 };

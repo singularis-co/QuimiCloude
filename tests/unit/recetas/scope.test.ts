@@ -418,6 +418,10 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'description',
       'steps',
       'packingSteps',
+      // QC-299 (2026-10-21, migracion 20261021120001_conditioning_steps): pasos de
+      // acondicionamiento de la receta. Entra ENTRE `packingSteps` e `imagePath`, el lugar
+      // exacto donde `db/schema.prisma` lo coloco, porque esta lista compara el ORDEN.
+      'conditioningSteps',
       'imagePath',
       // QC-50: aislamiento por empresa de esta ficha. `companyId` entra ENTRE `imagePath` y
       // `createdBy`, que es el lugar exacto donde `db/schema.prisma` lo coloco -no al final-,

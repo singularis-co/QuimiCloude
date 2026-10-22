@@ -12,7 +12,8 @@ import { convertQuantity, IncompatibleUnitsError, type UnitConversion } from '@/
  *  `null` si falta) y la conversion de la unidad de esa presentacion. */
 export type DistributionLine = {
   readonly presentationId: string;
-  /** Entero positivo: validado rio arriba, esta funcion no lo repite. */
+  /** Entero >= 0: validado rio arriba, esta funcion no lo repite. El plan nunca es 0; el conteo
+   *  real al terminar el empaque si puede serlo. */
   readonly packages: number;
   readonly content: string | null;
   readonly unit: UnitConversion;
@@ -57,6 +58,15 @@ export function sameDecimal(a: string, b: string): boolean {
   const right = parseDecimal(b);
   const scale = Math.max(left.scale, right.scale);
   return rescale(left, scale) === rescale(right, scale);
+}
+
+export function compareDecimals(a: string, b: string): -1 | 0 | 1 {
+  const left = parseDecimal(a);
+  const right = parseDecimal(b);
+  const scale = Math.max(left.scale, right.scale);
+  const difference = rescale(left, scale) - rescale(right, scale);
+  if (difference === BigInt(0)) return 0;
+  return difference < BigInt(0) ? -1 : 1;
 }
 
 function addDecimals(a: Scaled, b: Scaled): Scaled {

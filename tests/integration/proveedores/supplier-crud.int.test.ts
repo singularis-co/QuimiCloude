@@ -701,7 +701,7 @@ describe('R18, R19, R21: el listado paginado contra la base', () => {
     }
   });
 
-  it('ordena por nombre ascendente y recorre las paginas sin repetir ni omitir ningun proveedor', async () => {
+  it('ordena por defecto los mas nuevos primero (QC-289) y recorre las paginas sin repetir ni omitir ningun proveedor', async () => {
     let ids: string[] = [];
     try {
       ids = await seedSuppliers(26, sharedActorId);
@@ -714,13 +714,13 @@ describe('R18, R19, R21: el listado paginado contra la base', () => {
       expect(mios).toHaveLength(ids.length);
       expect(new Set(mios.map((s) => s.id)).size).toBe(ids.length);
 
-      // Y el recorrido de paginas sale ordenado por nombre ascendente. Se compara contra
-      // la ordenacion de Postgres -un `ORDER BY name`- y no contra la de JavaScript, que
-      // usa otro criterio de intercalacion.
+      // Y el recorrido de paginas sale en el orden por defecto, `created_at DESC, id ASC`
+      // (QC-289). Se compara contra la ordenacion de Postgres y no contra una de JavaScript:
+      // dos altas del mismo instante las desempata el `id`, y eso lo resuelve el motor.
       const esperado = await prisma.supplier.findMany({
         where: { id: { in: ids } },
         select: { id: true },
-        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       });
       expect(mios.map((s) => s.id)).toEqual(esperado.map((s) => s.id));
     } finally {

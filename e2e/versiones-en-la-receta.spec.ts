@@ -224,8 +224,9 @@ test.describe('versiones en la ficha de la receta', () => {
     const idC = productIds.get('c')!;
     const originalRoute = recipeEditRoute(originalId);
     const versions = page.getByTestId('recipe-versions');
+    // La version se abre con el lapiz; su nombre accesible es «Editar la versión <nombre>».
     const versionLink = (name: string) =>
-      versions.getByRole('link', { name, exact: true });
+      versions.getByRole('link', { name: `Editar la versión ${name}`, exact: true });
 
     await loginAndLand(page, adminUser);
 
@@ -310,7 +311,8 @@ test.describe('versiones en la ficha de la receta', () => {
     await expect(page.getByTestId('recipes-title')).toBeVisible({ timeout: 60_000 });
     const table = page.getByTestId('recipe-table');
     await expect(table).toBeVisible({ timeout: 60_000 });
-    const rowActions = page.getByTestId('recipe-row-actions');
+    // El menu sale en la fila de la tabla y en la tarjeta: se cuentan solo las filas de la tabla.
+    const rowActions = page.getByRole('table').getByTestId('recipe-row-actions');
     await expect(rowActions).toHaveCount(1);
     await expect(rowActions).toHaveAttribute('aria-label', `Acciones de ${ORIGINAL_NAME}`);
     await expect(await openRowActionsMenuItem(page, rowActions, 'recipe-edit-open')).toHaveAttribute(
@@ -380,7 +382,7 @@ test.describe('versiones en la ficha de la receta', () => {
     const rowOf = (name: string) =>
       versions
         .getByTestId('recipe-version-row')
-        .filter({ has: page.getByRole('link', { name, exact: true }) });
+        .filter({ has: page.getByRole('link', { name: `Editar la versión ${name}`, exact: true }) });
     await expect(rowOf(CHANGED_RENAMED).getByTestId('recipe-version-under-review')).toBeVisible({
       timeout: 60_000,
     });

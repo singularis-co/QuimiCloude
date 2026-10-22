@@ -2,13 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 
+import { AccessScreen } from '@/components/shared/access-screen';
 import { BrandLogo } from '@/components/shared/brand-logo';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { buttonVariants } from '@/components/ui/button';
 import { RETURN_PARAM, resolveReturnPath } from '@/lib/modules/identity';
-import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { FORGOT_PASSWORD_ROUTE } from '@/lib/shared/routes';
 
-import { LoginBackground, LoginForm } from './components';
+import { LoginForm } from './components';
+
+const HEADING_ID = 'login-heading';
 
 export const metadata: Metadata = {
   title: 'Iniciar sesión · QuimiCloude',
@@ -88,15 +90,8 @@ async function pantallaConDestinoDeVuelta(
  * El marcado de la pantalla. Es una funcion que devuelve JSX, no un componente: no se monta con
  * `<... />` ni introduce una frontera nueva, solo evita repetir el arbol en las dos ramas.
  *
- * La clase `dark` del `<main>` pinta la pantalla con los tokens oscuros sea cual sea el tema; el
- * `Toaster` del layout queda fuera y sigue el tema del usuario.
- *
- * El `h1` de la tarjeta es el logo vertical: su nombre accesible sale del `alt` del logo, sin
- * texto oculto.
- *
- * El enlace de recuperacion va en el pie de la Card y FUERA del `<form>` (R22, `design.md > 5.4`):
- * no es un control del formulario y dentro estorbaria el orden de tabulacion entre la contrasena y
- * el boton de envio. Su ruta destino no existe todavia y hoy devuelve 404 (supuesto S6).
+ * El enlace de recuperacion queda fuera del `<form>`: dentro se colaria en el orden de tabulacion
+ * entre la contraseña y el botón de envío.
  *
  * `next` ya viene saneado, pero **esa validacion no protege de nada**: el campo oculto es entrada
  * externa y un POST fabricado puede traer cualquier cosa sin pasar por aqui. Solo sirve para no
@@ -104,30 +99,23 @@ async function pantallaConDestinoDeVuelta(
  */
 function pantallaDeLogin(next: string): ReactElement {
   return (
-    <main
-      data-login="screen"
-      className="dark flex min-h-svh items-center justify-center p-6"
-    >
-      <LoginBackground />
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <h1>
-            <BrandLogo variant="vertical" tone="on-dark" height={79} alt={BRAND_LABEL} preload />
-          </h1>
-        </CardHeader>
-        <CardContent>
-          <LoginForm next={next} />
-        </CardContent>
-        <CardFooter>
-          <Link
-            href={FORGOT_PASSWORD_ROUTE}
-            className="text-sm underline-offset-4 hover:underline"
-            data-testid="login-forgot-password"
-          >
-            ¿Olvidaste tu contraseña?
-          </Link>
-        </CardFooter>
-      </Card>
-    </main>
+    <AccessScreen width="default" labelledBy={HEADING_ID}>
+      <h1 id={HEADING_ID} className="flex flex-col items-center gap-2.5">
+        <BrandLogo variant="isotipo" tone="auto" height={56} alt="" />
+        <span className="text-2xl font-medium tracking-[-0.01em]">
+          Quimi<span className="font-semibold text-primary">Cloude</span>
+        </span>
+      </h1>
+      <LoginForm next={next} />
+      <div className="flex justify-center border-t pt-3">
+        <Link
+          href={FORGOT_PASSWORD_ROUTE}
+          className={buttonVariants({ variant: 'link', touch: true })}
+          data-testid="login-forgot-password"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </div>
+    </AccessScreen>
   );
 }

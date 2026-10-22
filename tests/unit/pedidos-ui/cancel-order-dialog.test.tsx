@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CANCEL_ORDER_CONFIRM_TESTID,
   CANCEL_ORDER_DIALOG_TESTID,
+  CANCEL_ORDER_DISMISS_TESTID,
   CANCEL_ORDER_ERROR_TESTID,
   CANCEL_ORDER_ID_FIELD,
   CANCEL_ORDER_ID_TESTID,
@@ -82,6 +83,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -89,7 +92,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -255,5 +260,18 @@ describe('el identificador del error inesperado (QC-71 R17, R18)', () => {
     const region = await screen.findByTestId(CANCEL_ORDER_ERROR_TESTID);
     expect(region).toHaveAttribute('data-code', 'not_cancellable');
     esperarSinIdentificador();
+  });
+});
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Cancelar el pedido» con «Motivo de la cancelación», «Volver» y «Cancelar el pedido»', () => {
+    montar();
+
+    expect(screen.getByRole('alertdialog', { name: 'Cancelar el pedido' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Motivo de la cancelación')).toBe(
+      screen.getByTestId(CANCEL_ORDER_REASON_TESTID),
+    );
+    expect(screen.getByTestId(CANCEL_ORDER_DISMISS_TESTID)).toHaveTextContent(/^Volver$/);
+    expect(screen.getByTestId(CANCEL_ORDER_CONFIRM_TESTID)).toHaveTextContent(/^Cancelar el pedido$/);
   });
 });

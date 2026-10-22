@@ -6,7 +6,8 @@ el cupo y qué estado es de quién.
 
 ## Quién soy: `.arnes.local.json`
 
-Archivo personal en la raíz del worktree principal, **fuera de git**. Lo escribe `/jira-connect`:
+Archivo personal en la raíz del worktree principal, **fuera de git**. Lo escribe `/tracker-connect`
+(con Trello, el campo es `trello_member_id`):
 
 ```json
 { "jira_account_id": "712020:…", "nombre": "Ana Pérez" }
@@ -22,7 +23,8 @@ Dos cerrojos, en este orden. El primero es visible para el equipo y el segundo e
 2. **Solo si el assignee es nadie o soy yo.** Si es otra persona, la feature no está disponible:
    se salta y se evalúa la siguiente.
 3. **Asignármela** (`editJiraIssue`, campo `assignee` con mi `jira_account_id`) y **releer** para
-   confirmar que quedó a mi nombre.
+   confirmar que quedó a mi nombre. En Trello, los pasos 1 a 3 los hace
+   `node scripts/trello.mjs tomar <key>`.
 4. **`./scripts/wt.sh new <key> <slug>`**. Crea un commit propio («feature tomada por …») y publica la
    rama con `git push --force-with-lease=refs/heads/<rama>:`, que **solo funciona si la rama no
    existe en el remoto**. El servidor lo comprueba de forma atómica, así que de dos personas en el
@@ -32,13 +34,13 @@ Dos cerrojos, en este orden. El primero es visible para el equipo y el segundo e
    - Si la rama es **tuya** y viene de otra máquina: `./scripts/wt.sh --retomar new <key> <slug>`.
    - `--sin-publicar` desactiva el candado. Úsalo solo si trabajas sin equipo o sin red.
 
-Jira no ofrece una operación atómica de "asignar si nadie la tiene". Por eso el assignee es el
+El tracker no ofrece una operación atómica de "asignar si nadie la tiene". Por eso el assignee es el
 aviso para las personas y la rama publicada es el cerrojo de verdad.
 
 ## Soltar una feature
 
 Si abandonas una feature sin terminarla:
-1. Quita tu assignee en Jira y devuelve la tarjeta a su estado anterior.
+1. Quita tu assignee en el tracker y devuelve la tarjeta a su estado anterior.
 2. Anota en `progress/features/<key>.md` hasta dónde llegaste y haz push.
 3. La rama queda publicada. Quien la retome debe asignársela y correr `wt.sh --retomar new`.
 
@@ -46,7 +48,7 @@ Si abandonas una feature sin terminarla:
 
 `arnes.config.json > cupos_por_persona` (por defecto: 2 `frontend`, 3 `backend`, 3 `fullstack`)
 es **tuyo**, no del equipo. `scripts/validate-features.mjs` cuenta solo las `in_progress` cuyo
-assignee es tu `jira_account_id`. Además, **toda feature en vuelo** (`spec_ready` o
+assignee es tu `jira_account_id` (o `trello_member_id`). Además, **toda feature en vuelo** (`spec_ready` o
 `in_progress`) **debe tener assignee**: si no, el gate se pone en rojo.
 
 ## Conflicto de archivos entre personas
@@ -71,9 +73,15 @@ Reglas de lectura:
   `progress/deudas.md`. La lista se amplía en `arnes.config.json > equipo.archivos_compartidos`
   (sustituye a la de por defecto). Edítalos añadiendo, sin reordenar, como `progress/deudas.md`.
 - `specs/` y `progress/` nunca cuentan: cada feature escribe en su carpeta.
+- **Mismo dueño: AVISO, no CHOCA.** Las fichas de una misma persona (mismo `assignee`) no se
+  bloquean entre sí: el dueño decide su orden y lo anota en cada `progress/features/<key>.md`.
+- **Otra persona: CHOCA, salvo aceptación del humano.** Con `--acepto <key>[,<key>]` el choque se
+  imprime como `CHOCA ACEPTADO` y no bloquea. Solo vale con una decisión humana escrita en
+  `progress/features/<candidata>.md > Decisiones` (fecha y frase). El conflicto lo resuelve quien
+  mergee segundo, en F2.3: integra la rama de integración, resuelve y regenera snapshots.
 
-Si choca, la candidata espera. Para que esto funcione, **cada tanda termina con `git push`**: una
-rama sin publicar es invisible para los demás, y el script lo avisa.
+Si choca sin aceptación, la candidata espera. Para que esto funcione, **cada tanda termina con
+`git push`**: una rama sin publicar es invisible para los demás, y el script lo avisa.
 
 ### Por qué
 
@@ -83,6 +91,11 @@ rama sin publicar es invisible para los demás, y el script lo avisa.
   candado se volvió ruido y dejó de distinguir el choque de verdad (QC-180 con QC-167 en
   `tests/unit/navegacion/pantallas-exigen-permiso.test.tsx`). Lo prueba
   `tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts`.
+- 2026-10-13: el script cuenta `spec_ready` como en vuelo, así que cinco specs aprobados de un
+  mismo dueño (QC-262/263/264/266/267), con orden acordado, chocaban entre sí y ninguno
+  arrancaba; y QC-262 quedaba parada por un solo test de paridad compartido con QC-214, de otra
+  persona. Humano: «necesito que podamos avanzar sin bloqueantes, ya si es necesario al final
+  podemos arreglar conflictos». Lo prueba la misma guardia.
 
 ## Dónde se edita `progress/deudas.md`
 

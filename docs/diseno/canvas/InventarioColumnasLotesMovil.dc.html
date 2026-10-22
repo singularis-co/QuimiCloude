@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inventario con lotes en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="InventarioColumnasLotes" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Lotes y columnas nuevas · ficha</h2>
+    <dl class="spec">
+      <dt>Origen</dt><dd>Lo que dev trajo después del tablero de Inventario: sub-filas de lote (f978ef29), columnas Tipo, Presentación y Costo (b0eaa866, 6f08e379, c2ac0e65) y «por vencer» (08b69744). Decisiones P17, P18 y P19 de QC-263.</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table</span> (sub-filas sin cambiar el componente compartido) · <span class="mono">status-badge · entity-image · row-actions-menu</span></dd>
+      <dt>Escritorio</dt><dd>Columnas Imagen · Nombre · Tipo (solo en «Todos», como ficha con el tono de cada tipo, QC-263 R53) · Presentación (no en la pestaña «Producto») · Existencia · Disponible · Reservado · Alerta de cantidad · Costo unitario (orden de dev fb140780; costo al final y solo para el Administrador, 6a665e3f, 5496bd16) · ⋯ · Costo unitario = promedio ponderado de los lotes con existencia (en el lote, su costo), en moneda redondeada con unidad y el exacto en el title, «—» si no hay, en mono a la derecha · todos los productos llevan el chevrón «Mostrar lotes de X» (los lotes se cargan al desplegar; «Cargando lotes…», «No se pudieron cargar los lotes.» + «Reintentar», «Sin lotes con existencia.») · el chevrón despliega los lotes vivos del producto: sub-filas con fondo suave y sangría, sin imagen ni menú, con código de lote, vencimiento relativo y fecha, existencia, reservado, disponible y costo del lote · el chevrón gira 90° y su nombre accesible dice «Ver / Ocultar los lotes de X»</dd>
+      <dt>Vencimiento</dt><dd>«Por vencer» (lote y nombre del producto) en ámbar · «Vencido» como ficha en color de error · los demás vencimientos en gris</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · a 820 px pasa a tarjetas, como en teléfono (P12)</dd>
+      <dt>Teléfono</dt><dd>Tarjeta del producto con Tipo (solo en «Todos», arriba a la derecha) y Presentación como primera cifra; cifras con rótulo en el orden Existencia, Alerta, Disponible y Costo (solo Administrador) · botón «Mostrar lotes» de 44 px que despliega una tarjeta por lote justo debajo, con sangría, fondo suave y la misma animación que en escritorio (sin movimiento si se pide movimiento reducido), sin imagen ni «Acciones»</dd>
+      <dt>Animación</dt><dd>Chevrón 150 ms · las sub-filas y tarjetas de lote suben 300 ms al desplegarse · fundido de filas al cambiar de pestaña</dd>
+      <dt>Por confirmar</dt><dd>Nada: costo y chevrón siguen lo que ya hace dev (b0eaa866, f978ef29)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

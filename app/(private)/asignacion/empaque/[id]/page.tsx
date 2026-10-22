@@ -7,6 +7,8 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+import { assignmentViewHref } from '../../components';
+
 import { PackingOrderScreen } from './components';
 
 export const metadata: Metadata = {
@@ -64,5 +66,11 @@ export default async function PackingOrderPage({
     throw error;
   }
 
-  return <PackingOrderScreen order={order} actorId={actor.id} />;
+  return (
+    <PackingOrderScreen
+      order={order}
+      actorId={actor.id}
+      backHref={assignmentViewHref('por_empacar')}
+    />
+  );
 }

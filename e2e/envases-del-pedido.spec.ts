@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import {
   DOCUMENT_TYPE_CC,
   normalizeCompanyName,
@@ -51,6 +52,7 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
+  startOpenedAssignedOrder,
 } from './helpers/confirm-dialog';
 import {
   DISTRIBUTION_ADD_PACKAGES_TESTID,
@@ -145,6 +147,9 @@ const BLOCKED_ORDER_CONFIRM_TESTID = 'blocked-order-confirm';
 /** Asignacion, ejecucion y empaque. */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
+/** La ejecución: el `h1` es solo la receta y el número va en el rótulo de la cabecera (R23 de QC-265). */
+const EXECUTION_SCREEN_TESTID = 'order-execution-screen';
+const EXECUTION_EYEBROW_SELECTOR = '[data-slot="operator-eyebrow"]';
 const EXECUTION_DISTRIBUTION_TESTID = 'order-execution-presentation';
 const ORDER_DISTRIBUTION_LABEL_TESTID = 'order-distribution';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
@@ -610,12 +615,13 @@ test.describe('envases del pedido como productos', () => {
       data: { orderId: first.id, userId: operatorUserId, companyId },
     });
     await switchUser(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await page.goto(assignedOrderRoute(first.id));
-    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(
-      `${firstNumber} - ${RECIPE_NAME}`,
-      { timeout: 60_000 },
-    );
+    await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME, { timeout: 60_000 });
+    await expect(
+      page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
+    ).toHaveText(firstNumber);
 
     // R44: la ejecucion nombra los envases.
     const executionLabel = page
@@ -629,6 +635,13 @@ test.describe('envases del pedido como productos', () => {
       'title',
       new RegExp(escapeRegExp(`${JUGS} × ${JUG_NAME}`)),
     );
+
+    // Entrar no comienza: el pedido sigue `PENDIENTE` y el paso a paso llega tras «Comenzar».
+    expect(
+      (await prisma.order.findUniqueOrThrow({ where: { id: first.id }, select: { status: true } }))
+        .status,
+    ).toBe('PENDIENTE');
+    await startOpenedAssignedOrder(page);
 
     // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
     const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
@@ -664,13 +677,36 @@ test.describe('envases del pedido como productos', () => {
     const packingScreen = page.getByTestId(PACKING_SCREEN_TESTID);
     await expect(packingScreen).toBeVisible({ timeout: 60_000 });
 
-    // R44: cada linea con su envase.
+    // R44: cada linea con su envase y, desde 9a330ab2, el volumen de su presentacion, con el mismo
+    // formateo que la etiqueta compartida (la unidad se pinta como `unit.symbol ?? unit.name`).
+    const unitLabels = new Map(
+      (
+        await prisma.unit.findMany({
+          where: { nameNormalized: { in: ['litro', 'mililitro'] }, companyId: null },
+          select: { nameNormalized: true, symbol: true, name: true },
+        })
+      ).map((unit) => [unit.nameNormalized, unit.symbol ?? unit.name]),
+    );
     const packingLines = packingScreen.getByTestId(PACKING_LINE_TESTID);
     await expect(packingLines).toHaveCount(2);
     await expect(packingLines.filter({ hasText: BOTTLE_NAME })).toHaveText(
-      `${BOTTLES} × ${BOTTLE_NAME}`,
+      orderDistributionLineText({
+        presentationName: HALF_LITER_PRESENTATION_NAME,
+        packagingName: BOTTLE_NAME,
+        packages: Number(BOTTLES),
+        presentationContent: HALF_LITER_CONTENT,
+        presentationUnitLabel: unitLabels.get('mililitro') ?? null,
+      }),
     );
-    await expect(packingLines.filter({ hasText: JUG_NAME })).toHaveText(`${JUGS} × ${JUG_NAME}`);
+    await expect(packingLines.filter({ hasText: JUG_NAME })).toHaveText(
+      orderDistributionLineText({
+        presentationName: LITER_PRESENTATION_NAME,
+        packagingName: JUG_NAME,
+        packages: Number(JUGS),
+        presentationContent: LITER_CONTENT,
+        presentationUnitLabel: unitLabels.get('litro') ?? null,
+      }),
+    );
 
     await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId(PACKING_FINISH_TESTID)).toBeVisible({ timeout: 60_000 });

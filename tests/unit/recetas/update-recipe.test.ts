@@ -5,14 +5,17 @@ import {
   ActionNotAllowedError,
   RecipeDuplicateNameError,
   RecipeNotFoundError,
+  RecipeStepsLockedError,
   UnauthorizedError,
   ValidationError,
 } from '@/lib/modules/recetas/domain/errors';
 import { createUpdateRecipe } from '@/lib/modules/recetas/domain/update-recipe';
 import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-image-storage';
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
+import type { RecipeStepLockReader } from '@/lib/modules/recetas/ports/recipe-step-lock-reader';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 const EMPRESA = 'empresa-1';
 const ACTOR: Actor = { id: 'actor-1', companyId: EMPRESA, permissions: ['recetas.consultar', 'recetas.modificar'] };
@@ -31,6 +34,7 @@ const ORIGINAL: RecipeRow = {
   description: null,
   steps: [PASO],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: null,
   updatedBy: null,
@@ -49,7 +53,7 @@ const VERSION: RecipeRow = {
   id: 'version-1',
   name: 'Sin perfume',
   steps: [],
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], steps: [PASO] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], conditioningSteps: [], steps: [PASO] },
 };
 
 const ENTRADA = {
@@ -80,6 +84,7 @@ function repositorio(fila: RecipeRow | null = ORIGINAL, overrides: Partial<Recip
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => [V_1, V_2]),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => ({
       kind: 'ok',
       propagated: [
@@ -91,7 +96,7 @@ function repositorio(fila: RecipeRow | null = ORIGINAL, overrides: Partial<Recip
   };
 }
 
-function montar(recipes = repositorio()) {
+function montar(recipes = repositorio(), stepLocks: RecipeStepLockReader = noEvidenceLocks) {
   const products: ProductCatalog = {
     findRefs: vi.fn<ProductCatalog['findRefs']>(async (ids) =>
       ids.map((id): ProductRef => ({ id, name: id, unitId: null, stockByUnit: [], type: 'PRODUCT' })),
@@ -108,7 +113,7 @@ function montar(recipes = repositorio()) {
     remove: vi.fn<RecipeImageStorage['remove']>(async () => undefined),
     publicUrl: vi.fn<RecipeImageStorage['publicUrl']>((path) => path),
   };
-  return { recipes, products, images, run: createUpdateRecipe({ recipes, products, images, now: () => AHORA }) };
+  return { recipes, products, images, run: createUpdateRecipe({ recipes, products, images, stepLocks, now: () => AHORA }) };
 }
 
 describe('updateRecipe frente a versiones', () => {
@@ -205,5 +210,110 @@ describe('updateRecipe frente a versiones', () => {
     });
     const { run } = montar(recipes);
     await expect(run(ORIGINAL.id, { ...ENTRADA, propagateToVersionIds: [V_1] }, ACTOR)).rejects.toBeInstanceOf(error);
+  });
+});
+
+describe('updateRecipe con pedidos en curso que ya tienen fotos', () => {
+  const PESAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Pesar' }] }] };
+  const ETIQUETAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Etiquetar' }] }] };
+  const CERRAR = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Cerrar' }] }] };
+  const CON_PASOS: RecipeRow = { ...ORIGINAL, steps: [PESAR, PASO], packingSteps: [ETIQUETAR, CERRAR] };
+
+  function lector(pedidos: number) {
+    return {
+      countOrdersWithEvidenceInProgress: vi.fn<RecipeStepLockReader['countOrdersWithEvidenceInProgress']>(
+        async () => pedidos,
+      ),
+    };
+  }
+
+  function entrada(steps: unknown[], packingSteps: unknown[] = [ETIQUETAR, CERRAR]) {
+    return { ...ENTRADA, steps, packingSteps };
+  }
+
+  it('R9: quitar un paso de fabricacion se rechaza con recipe_steps_locked sin persistir', async () => {
+    const { recipes, images, run } = montar(repositorio(CON_PASOS), lector(2));
+
+    const error = await run(ORIGINAL.id, entrada([PESAR]), ACTOR).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(RecipeStepsLockedError);
+    expect((error as RecipeStepsLockedError).code).toBe('recipe_steps_locked');
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
+    expect(recipes.replaceAliveWithPropagation).not.toHaveBeenCalled();
+    expect(images.upload).not.toHaveBeenCalled();
+  });
+
+  it('R9: quitar un paso de envasado tambien se rechaza', async () => {
+    const { recipes, run } = montar(repositorio(CON_PASOS), lector(1));
+
+    await expect(run(ORIGINAL.id, entrada([PESAR, PASO], [ETIQUETAR]), ACTOR)).rejects.toBeInstanceOf(
+      RecipeStepsLockedError,
+    );
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
+  });
+
+  it('R10: mover un paso intacto se rechaza sin persistir', async () => {
+    const { recipes, run } = montar(repositorio(CON_PASOS), lector(1));
+
+    await expect(run(ORIGINAL.id, entrada([PASO, PESAR]), ACTOR)).rejects.toBeInstanceOf(RecipeStepsLockedError);
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
+  });
+
+  it('R9, R10: cuenta los pedidos de la original y de todas sus versiones, tambien las dadas de baja', async () => {
+    const stepLocks = lector(1);
+    const { recipes, run } = montar(repositorio(CON_PASOS), stepLocks);
+
+    await expect(run(ORIGINAL.id, entrada([PESAR]), ACTOR)).rejects.toBeInstanceOf(RecipeStepsLockedError);
+
+    expect(recipes.listVersionIdsIncludingDeleted).toHaveBeenCalledWith(ORIGINAL.id, { companyId: EMPRESA });
+    expect(stepLocks.countOrdersWithEvidenceInProgress).toHaveBeenCalledWith([ORIGINAL.id, V_1, V_2], EMPRESA);
+  });
+
+  it('R11: cambiar texto, encender el switch y anadir al final se guarda sin consultar el lector', async () => {
+    const stepLocks = lector(3);
+    const { recipes, run } = montar(repositorio(CON_PASOS), stepLocks);
+
+    const pesarConEvidencia = { ...PESAR, requiresEvidence: true };
+    const mezclarMas = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Mezclar 10 min' }] }] };
+    const reposar = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Reposar' }] }] };
+    await run(ORIGINAL.id, entrada([pesarConEvidencia, mezclarMas, reposar], [ETIQUETAR, CERRAR, PESAR]), ACTOR);
+
+    expect(stepLocks.countOrdersWithEvidenceInProgress).not.toHaveBeenCalled();
+    expect(recipes.listVersionIdsIncludingDeleted).not.toHaveBeenCalled();
+    expect(recipes.replaceAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('R12: sin pedidos en curso con fotos, reordenar y quitar se guarda como siempre', async () => {
+    const stepLocks = lector(0);
+    const { recipes, run } = montar(repositorio(CON_PASOS), stepLocks);
+
+    await run(ORIGINAL.id, entrada([PASO], [CERRAR, ETIQUETAR]), ACTOR);
+
+    expect(stepLocks.countOrdersWithEvidenceInProgress).toHaveBeenCalledTimes(1);
+    expect(recipes.replaceAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('R7: sin recetas.modificar, ni un cambio solo del switch se guarda, y no se consulta nada', async () => {
+    const stepLocks = lector(0);
+    const { recipes, run } = montar(repositorio(CON_PASOS), stepLocks);
+    const actor = { ...ACTOR, permissions: ['recetas.consultar'] };
+
+    await expect(
+      run(ORIGINAL.id, entrada([{ ...PESAR, requiresEvidence: true }, PASO]), actor),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+
+    expect(recipes.findAliveById).not.toHaveBeenCalled();
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
+    expect(stepLocks.countOrdersWithEvidenceInProgress).not.toHaveBeenCalled();
+  });
+
+  it('R10: insertar un paso en medio desplaza los de detras y se rechaza', async () => {
+    const { recipes, run } = montar(repositorio(CON_PASOS), lector(1));
+    const nuevo = { blocks: [{ kind: 'paragraph' as const, spans: [{ text: 'Reposar' }] }] };
+
+    await expect(run(ORIGINAL.id, entrada([PESAR, nuevo, PASO]), ACTOR)).rejects.toBeInstanceOf(
+      RecipeStepsLockedError,
+    );
+    expect(recipes.replaceAlive).not.toHaveBeenCalled();
   });
 });

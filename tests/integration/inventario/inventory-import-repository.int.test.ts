@@ -164,11 +164,49 @@ describe('findBatchesByLots — R18, R19: lotes de la empresa por codigo', () =>
 
     expect([...lotes].sort((a, b) => a.lot.localeCompare(b.lot))).toEqual(
       [
-        { lot: loteVivo, productId: vivo },
-        { lot: loteBaja, productId: deBaja },
+        { lot: loteVivo, productId: vivo, presentationId: null },
+        { lot: loteBaja, productId: deBaja, presentationId: null },
       ].sort((a, b) => a.lot.localeCompare(b.lot)),
     );
     expect(await findBatchesByLots([], ambito(empresa))).toEqual([]);
+  });
+
+  it('QC-284 R9, R10: devuelve la presentacion de cada lote y todos los lotes que comparten codigo', async () => {
+    const empresa = await nuevaEmpresa();
+    const unitId = await sembrarUnidad(empresa);
+    const presentationId = await sembrarPresentacion(empresa, unitId);
+    const recipeId = await sembrarReceta(empresa);
+    const terminado = await sembrarProducto(empresa, `Terminado ${token()}`, {
+      type: PRODUCT_TYPES.FINISHED_PRODUCT,
+      unitId,
+      recipeId,
+      presentationId,
+    });
+    const insumo = await sembrarProducto(empresa, `Insumo ${token()}`, { unitId });
+    const codigo = `CR-${token().slice(0, 10)}`;
+    await sembrarLote(empresa, insumo, codigo);
+    await prisma.productBatch.create({
+      data: {
+        productId: terminado,
+        presentationId,
+        stock: '1',
+        unitCost: '1',
+        lot: codigo,
+        purchaseDate: new Date('2026-01-01T00:00:00Z'),
+        companyId: empresa.companyId,
+        createdBy: empresa.userId,
+        updatedBy: empresa.userId,
+      },
+    });
+
+    const lotes = await findBatchesByLots([codigo], ambito(empresa));
+
+    expect([...lotes].sort((a, b) => a.productId.localeCompare(b.productId))).toEqual(
+      [
+        { lot: codigo, productId: insumo, presentationId: null },
+        { lot: codigo, productId: terminado, presentationId },
+      ].sort((a, b) => a.productId.localeCompare(b.productId)),
+    );
   });
 });
 

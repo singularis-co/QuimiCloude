@@ -1,5 +1,6 @@
 /**
- * E2E del grupo «Integraciones» del menu privado y de sus tres paginas.
+ * E2E del grupo «Integraciones» del menu privado y de sus tres paginas. El recorrido de la conexion
+ * de WhatsApp vive en `integraciones-whatsapp.spec.ts`.
  *
  * Que aporta sobre unit e integracion:
  * - **El HTML servido de verdad.** Para quien no tiene el permiso se afirma con `toHaveCount(0)`
@@ -41,6 +42,7 @@ import {
   WHATSAPP_INTEGRATION_ROUTE,
 } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -172,6 +174,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 });
 
 test.afterAll(async () => {
@@ -203,7 +206,7 @@ test.describe('el menu de integraciones segun el permiso de quien entra', () => 
     ).toBeGreaterThan(0);
   });
 
-  test('R19: el Administrador ve el grupo, lo despliega, abre cada integracion con su titulo y su estado vacio, y cada ruta por URL responde 200', async ({
+  test('R19: el Administrador ve el grupo, lo despliega, abre cada integracion con su titulo y su contenido (estado vacio, las pestanas de WhatsApp o «Conecta tu proveedor»), y cada ruta por URL responde 200', async ({
     page,
   }) => {
     const credentials = await createUserWithRole(ROLE_ADMINISTRADOR, 'admin');
@@ -219,14 +222,27 @@ test.describe('el menu de integraciones segun el permiso de quien entra', () => 
       await expect(page.getByTestId(child.testId)).toBeVisible();
     }
 
-    // --- 3. Cada hijo, en el orden del menu: clic, su ruta, su titulo y su estado vacio.
+    // --- 3. Cada hijo, en el orden del menu: clic, su ruta, su titulo y su contenido. WhatsApp y
+    // Proveedor IA ya no son un estado vacio; sus recorridos viven en `integraciones-whatsapp.spec.ts`
+    // e `integraciones-proveedor-ia.spec.ts`.
     for (const child of INTEGRATION_CHILDREN) {
       await page.getByTestId(child.testId).click();
       await page.waitForURL((url) => url.pathname === child.route, { timeout: 60_000 });
       await expect(page.getByTestId('integration-title')).toHaveText(child.label, {
         timeout: 60_000,
       });
-      await expect(page.getByTestId('integration-empty')).toBeVisible();
+      if (child.route === WHATSAPP_INTEGRATION_ROUTE) {
+        await expect(page.getByTestId('whatsapp-integration-tabs')).toBeVisible();
+        await expect(page.getByTestId('integration-empty')).toHaveCount(0);
+      } else if (child.route === AI_PROVIDER_INTEGRATION_ROUTE) {
+        // La empresa del worker no tiene conexion: la pantalla abre el formulario de alta.
+        const form = page.getByTestId('ai-provider-form');
+        await expect(form).toBeVisible();
+        await expect(form.getByRole('heading', { level: 2 })).toHaveText('Conecta tu proveedor');
+        await expect(page.getByTestId('integration-empty')).toHaveCount(0);
+      } else {
+        await expect(page.getByTestId('integration-empty')).toBeVisible();
+      }
     }
 
     // --- 4. Pedida por URL, cada ruta responde 200.

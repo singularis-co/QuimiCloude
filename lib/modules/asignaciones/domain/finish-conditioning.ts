@@ -1,8 +1,9 @@
 // lib/modules/asignaciones/domain/finish-conditioning.ts
 /**
  * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO`, con `finished_at`, solo si el
- * actor es quien acondiciona el pedido y todas las lineas del reparto tienen sus datos de lote. No
- * toca inventario.
+ * actor es quien acondiciona el pedido, completo los pasos de acondicionamiento de la formula
+ * actual y todas las lineas del reparto tienen sus datos de lote. No toca inventario. La transicion
+ * y su anotacion en el registro de ejecucion van en una transaccion.
  *
  * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `TERMINADO`, el
  * filtro de estado con el que se leyo ya no lo encontraria.
@@ -14,16 +15,24 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { missingBatchDataLines } from './conditioning-batch-data';
+import { conditioningProgress } from './conditioning-steps';
 import {
   ConditioningBatchDataMissingError,
+  ConditioningStepsPendingError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
   OrderNotFoundError,
   ValidationError,
+  type AsignacionesError,
 } from './errors';
+import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
+
+import type { ExecutionLogRepository } from '../ports/execution-log-repository';
+import type { ExecutionTransaction } from '../ports/execution-transaction';
 
 import type { FinishedBatchLabels } from '@/lib/modules/inventario';
 import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
+import type { RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
 const finishConditioningSchema = z.strictObject({
   orderId: z.string().uuid(),
@@ -32,8 +41,32 @@ const finishConditioningSchema = z.strictObject({
 export type FinishConditioningDeps = {
   readonly orders: OrderCatalog;
   readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
+  readonly transaction: ExecutionTransaction;
+  readonly conditioningSteps: RecipeConditioningStepsReader;
+  readonly log: Pick<ExecutionLogRepository, 'listEntriesForOrders'>;
   readonly now?: () => Date;
 };
+
+async function assertConditioningStepsCompleted(
+  deps: FinishConditioningDeps,
+  companyId: string,
+  orderId: string,
+  recipeId: string,
+): Promise<void> {
+  const steps = (await deps.conditioningSteps.findConditioningStepsById(recipeId, companyId)) ?? [];
+  if (steps.length === 0) return;
+  const entries = await deps.log.listEntriesForOrders(companyId, [orderId]);
+  const { completedCount } = conditioningProgress(entries, steps.length);
+  if (completedCount < steps.length) {
+    throw new ConditioningStepsPendingError(`${String(completedCount)} de ${String(steps.length)} pasos`);
+  }
+}
+
+function finishConditioningError(outcome: ExecutionWriteOutcome): AsignacionesError {
+  if (outcome === 'not_conditioner') return new OrderConditioningTakenError();
+  if (outcome === 'not_conditionable') return new OrderNotConditionableError();
+  return new OrderNotFoundError();
+}
 
 export type FinishConditioningResult = {
   readonly numberText: string;
@@ -71,14 +104,30 @@ export function createFinishConditioning(
     if (target.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) throw new OrderConditioningTakenError();
 
+    await assertConditioningStepsCompleted(deps, actor.companyId, orderId, summary.recipeId);
+
     const batches = await deps.batches.listOfOrder(actor.companyId, orderId);
     if (missingBatchDataLines(summary.presentationLines, batches) > 0) throw new ConditioningBatchDataMissingError();
 
     const now = deps.now?.() ?? new Date();
-    const result = await deps.orders.finishConditioningAliveById(orderId, actor.companyId, actor.id, now);
-    if (result === 'ok') return { numberText };
-    if (result === 'not_conditioner') throw new OrderConditioningTakenError();
-    if (result === 'not_conditionable') throw new OrderNotConditionableError();
-    throw new OrderNotFoundError();
+    const companyId = actor.companyId;
+    try {
+      await deps.transaction.run(async ({ conditioning, log }) => {
+        const result = await conditioning.finishConditioningAliveById(orderId, companyId, actor.id, now);
+        if (result !== 'ok') throw new ExecutionAbortedError(result);
+        await log.append({
+          action: 'conditioning_finish',
+          companyId,
+          orderId,
+          userId: actor.id,
+          stepPosition: null,
+          occurredAt: now,
+        });
+      });
+    } catch (error) {
+      if (error instanceof ExecutionAbortedError) throw finishConditioningError(error.outcome);
+      throw error;
+    }
+    return { numberText };
   };
 }

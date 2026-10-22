@@ -59,7 +59,6 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma'
 
 import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
-import { resolveLotIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost'
 
 import type { Actor, NewOrder, OrderScope } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -433,6 +432,8 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
 
       const releido = await orders.findAliveById(orderId, ambitoDe(A))
       expect(releido?.ingredientsCost).toBe('30.0000')
+      // Sin reparto no hay envases: la parte de envases es cero, no null.
+      expect(releido?.packagingCost).toBe('0.0000')
     } finally {
       if (orderId !== null) await borrarPedido(orderId)
       await borrarReceta(recipeId)
@@ -461,6 +462,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
       // aunque el lote siga con existencia de sobra.
       const ficha = await orders.findAliveById(orderId, ambitoDe(A))
       expect(ficha?.ingredientsCost).toBeNull()
+      expect(ficha?.packagingCost).toBeNull()
 
       const listado = await orders.listAlive(
         { page: 1, pageSize: 25, sort: null, filters: {}, search: '' },
@@ -469,6 +471,7 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
       )
       const enListado = listado.items.find((row) => row.id === orderId)
       expect(enListado?.ingredientsCost).toBeNull()
+      expect(enListado?.packagingCost).toBeNull()
 
       // Y la lectura, en si misma, no escribio nada: sigue en NULL.
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
@@ -833,19 +836,6 @@ describe('QC-199 — los lotes de insumo sin presentacion cuentan en el costeo',
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
     } finally {
       if (orderId !== null) await borrarPedido(orderId)
-      await borrarReceta(recipeId)
-      await borrarProducto(productId)
-    }
-  })
-
-  it('R17 el coste del lote de producto terminado no cuenta ese ingrediente como cero', async () => {
-    const { productId } = await crearInsumoPorUnidad(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId)
-
-    try {
-      const coste = await resolveLotIngredientsCost(recipes, products, units, recipeId, '4.0000', null, A.companyId)
-      expect(coste).toBe('20.0000')
-    } finally {
       await borrarReceta(recipeId)
       await borrarProducto(productId)
     }

@@ -354,7 +354,15 @@ test.describe('pantalla de usuarios', () => {
     // cuenta: el formulario no los captura, asi que aqui no hay nada que teclear de ellos (R35).
     await page.getByTestId(FIELD_FIRST_NAMES_TESTID).fill(nuevoUsuario.firstNames);
     await page.getByTestId(FIELD_LAST_NAMES_TESTID).fill(nuevoUsuario.lastNames);
-    await page.getByTestId(FIELD_BIRTH_DATE_TESTID).fill(nuevoUsuario.birthDate);
+    // La fecha se elige en el calendario: el dia 1 del mes que abre, cualquier fecha pasada sirve.
+    const birthDay = page.locator('button[data-day]').filter({ hasText: /^1$/ }).first();
+    await expect(async () => {
+      if ((await birthDay.count()) === 0) await page.getByTestId(FIELD_BIRTH_DATE_TESTID).click();
+      await expect(birthDay).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
+    await birthDay.click();
+    await expect(page.getByTestId(`${FIELD_BIRTH_DATE_TESTID}-value`)).not.toHaveValue('');
+    await page.keyboard.press('Escape');
     await page.getByTestId(FIELD_EMAIL_TESTID).fill(nuevoUsuario.email);
     await page.getByTestId(FIELD_PHONE_TESTID).fill(nuevoUsuario.phone);
     await page.getByTestId(FIELD_DOCUMENT_NUMBER_TESTID).fill(nuevoUsuario.documentNumber);

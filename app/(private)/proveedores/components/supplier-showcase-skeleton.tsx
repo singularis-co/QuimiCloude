@@ -26,7 +26,7 @@ export function SupplierShowcaseSkeleton() {
                 data-testid="showcase-line-card-skeleton"
                 className="flex w-20 shrink-0 flex-col items-center gap-1"
               >
-                <div className="size-[60px] animate-pulse rounded-md bg-muted" />
+                <div className="size-[80px] animate-pulse rounded-md bg-muted" />
                 <div className="h-3 w-16 animate-pulse rounded bg-muted" />
               </div>
             ))}

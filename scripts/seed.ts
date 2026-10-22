@@ -52,10 +52,17 @@ async function main(): Promise<void> {
       // QC-47: la empresa inicial. El nombre no es un secreto (sale de una constante del
       // dominio, `design.md > 6.1`), asi que puede ir en la linea de resumen.
       const empresa =
-        outcome.createdCompany !== null
-          ? `empresa inicial: creada (${outcome.createdCompany})`
-          : 'empresa inicial: ya existia'
-      const admin = outcome.createdAdmin ? 'usuario inicial: creado' : 'usuario inicial: ya existia'
+        outcome.scope === 'platform-only'
+          ? 'empresa inicial: no se siembra en produccion'
+          : outcome.createdCompany !== null
+            ? `empresa inicial: creada (${outcome.createdCompany})`
+            : 'empresa inicial: ya existia'
+      const admin =
+        outcome.scope === 'platform-only'
+          ? 'usuario inicial: no se siembra en produccion'
+          : outcome.createdAdmin
+            ? 'usuario inicial: creado'
+            : 'usuario inicial: ya existia'
       // QC-74: los permisos creados se NOMBRAN (son codigos publicos del catalogo, no un
       // secreto) y las asignaciones se cuentan, que es lo unico que dice algo util de
       // ellas en una linea.

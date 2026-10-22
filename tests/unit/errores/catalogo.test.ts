@@ -19,6 +19,10 @@ import {
   type ErrorCode,
 } from '@/lib/modules/errores'
 import {
+  ConditioningResponsibleNotAllowedError,
+  ConditioningResponsiblesRequiredError,
+  ConditioningStepOutOfOrderError,
+  ConditioningStepsPendingError,
   ConditioningTeamEmptyError,
   ConditioningTeamMemberNotAllowedError,
 } from '@/lib/modules/asignaciones/domain/errors'
@@ -27,6 +31,21 @@ import {
   RecipeNotFoundError,
   RecipeVersionUnderReviewError,
 } from '@/lib/modules/pedidos/domain/errors'
+import {
+  WhatsappMetaRejectedError,
+  WhatsappMetaUnreachableError,
+  WhatsappTemplateNameTakenError,
+  WhatsappTemplateNotFoundError,
+  WhatsappTemplateRateLimitedError,
+  WhatsappTemplateRejectedError,
+} from '@/lib/modules/integraciones'
+import {
+  WhatsappTemplateNotMappableError,
+  WhatsappTemplateNotMappedError,
+  WhatsappVariableKeyInUseError,
+  WhatsappVariableKeyNotFoundError,
+  WhatsappVariableKeyTakenError,
+} from '@/lib/modules/integraciones/domain/errors'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
@@ -49,7 +68,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 79 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 82 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
       // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
@@ -66,7 +85,34 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-234 2026-10-09: 79 y no 78: entra `integration_secret_unreadable`.
       // QC-219 2026-10-09: 82 y no 79: entran `batch_expiry_not_future`,
       // `batch_production_date_future` y `conditioning_batch_data_missing`.
-      expect(ERROR_CODES).toHaveLength(82)
+      // QC-237 2026-10-09: 85 y no 82: entran `whatsapp_connection_not_found`,
+      // `whatsapp_connection_exists` y `whatsapp_phone_number_taken`.
+      // 2026-10-09: 87 y no 85: entran `delivery_not_found` y `delivery_already_voided`.
+      // QC-235 2026-10-13: 88 y no 87: entra `company_not_found`.
+      // QC-214 2026-10-13: 93 y no 88: entran `evidence_required`, `evidence_limit`,
+      // `evidence_invalid_file`, `evidence_not_found` y `recipe_steps_locked`.
+      // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
+      // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
+      // `company_name_mismatch` y `company_not_deleted`.
+      // 2026-10-14: 101 y no 99: entran dos errores de Terminar el empaque.
+      // 2026-10-16: 102 y no 101: entra `company_last_administrator`.
+      // QC-288 2026-10-19 (merge de dev): 103 y no 102: entra también `delivery_exceeds_surplus`.
+      // 2026-10-19: 106 y no 103: entran `customer_phone_country_required`,
+      // `customer_phone_invalid` y `customer_duplicate_phone`.
+      // 2026-10-20: 108 y no 106: entran `whatsapp_contact_not_found` y
+      // `whatsapp_contact_number_invalid`.
+      // QC-239 2026-10-20: 107 y no 108: sale `customer_duplicate_phone`.
+      // QC-242 2026-10-20: 112 y no 106: entran los seis codigos de plantillas y de Meta de WhatsApp.
+      // Merge de dev en QC-239 (2026-10-20): 113 = 106 + 2 de contactos - 1 retirado + 6 de plantillas.
+      // Merge de dev en QC-290 (2026-10-20): 112 = 113 - 1, sale el error de lo envasado por
+      // encima de la cantidad del pedido, que Terminar ya no produce.
+      // 2026-10-20: 117 y no 112: entran los cinco del diccionario de variables de WhatsApp.
+      // Merge de dev en QC-242 (2026-10-20): 117 = 112 + 5 del diccionario de variables de WhatsApp.
+      // QC-299 2026-10-21: 106 y no 102: entran `conditioning_step_out_of_order`,
+      // `conditioning_responsibles_required`, `conditioning_responsible_not_allowed` y
+      // `conditioning_steps_pending`.
+      // Merge de dev en QC-299 (2026-10-21): 121 = 117 + 4 de los pasos de acondicionamiento.
+      expect(ERROR_CODES).toHaveLength(121)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -189,12 +235,12 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   })
 
   describe('QC-81 R13 — el lote duplicado en la empresa tiene codigo y texto propios', () => {
-    it('batch_duplicate_lot esta en el catalogo con su clave y su texto exacto', () => {
+    it('QC-284 R8: batch_duplicate_lot conserva su codigo y su clave, con el texto por producto y presentacion', () => {
       const codigos: readonly string[] = ERROR_CODES
       expect(codigos).toContain('batch_duplicate_lot')
       expect(ERROR_MESSAGE_KEY.batch_duplicate_lot).toBe('errors.batch_duplicate_lot')
       expect(errorMessage('batch_duplicate_lot')).toBe(
-        'Ya existe un lote con ese valor en esta empresa.',
+        'Ya existe un lote con ese valor para ese producto y presentacion.',
       )
     })
 
@@ -614,5 +660,116 @@ describe('equipo de acondicionamiento — conditioning_team_member_not_allowed y
   it('R16, R17: las dos clases del modulo llevan esos codigos', () => {
     expect(new ConditioningTeamMemberNotAllowedError().code).toBe('conditioning_team_member_not_allowed')
     expect(new ConditioningTeamEmptyError().code).toBe('conditioning_team_empty')
+  })
+})
+
+describe('ultimo Administrador de una empresa — company_last_administrator', () => {
+  it('R23: company_last_administrator esta en el catalogo con su clave y su texto exactos', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('company_last_administrator')
+    expect(ERROR_MESSAGE_KEY.company_last_administrator).toBe('errors.company_last_administrator')
+    expect(errorMessage('company_last_administrator')).toBe(
+      'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
+    )
+  })
+
+  it('R23: es un codigo propio, distinto de last_administrator y con otro texto', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain('last_administrator')
+    expect(errorMessage('company_last_administrator')).not.toBe(errorMessage('last_administrator'))
+  })
+})
+
+describe('pasos de acondicionamiento — los cuatro codigos de QC-299', () => {
+  const TEXTOS = {
+    conditioning_step_out_of_order: 'La pantalla quedó desactualizada. Recárgala para seguir.',
+    conditioning_responsibles_required: 'Elige al menos un responsable para avanzar.',
+    conditioning_responsible_not_allowed: 'Solo puedes elegir a personas del equipo o a ti.',
+    conditioning_steps_pending: 'Completa los pasos de acondicionamiento antes de terminar.',
+  } as const
+
+  it.each(Object.entries(TEXTOS))('R23, R25, R27: %s esta en el catalogo con su clave y su texto exactos', (code, texto) => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain(code)
+    expect(ERROR_MESSAGE_KEY[code as ErrorCode]).toBe(`errors.${code}`)
+    expect(errorMessage(code as ErrorCode)).toBe(texto)
+  })
+
+  it('R23, R25, R27: las cuatro clases del modulo llevan esos codigos', () => {
+    expect(new ConditioningStepOutOfOrderError().code).toBe('conditioning_step_out_of_order')
+    expect(new ConditioningResponsiblesRequiredError().code).toBe('conditioning_responsibles_required')
+    expect(new ConditioningResponsibleNotAllowedError().code).toBe('conditioning_responsible_not_allowed')
+    expect(new ConditioningStepsPendingError().code).toBe('conditioning_steps_pending')
+  })
+})
+
+describe('plantillas de WhatsApp — codigos de plantilla y de Meta', () => {
+  const esperados = {
+    whatsapp_template_not_found: 'No se encontró la plantilla.',
+    whatsapp_template_name_taken: 'Ya existe una plantilla con ese nombre en ese idioma.',
+    whatsapp_template_rate_limited:
+      'Meta no permite crear más plantillas por ahora. Intenta de nuevo más tarde.',
+    whatsapp_template_rejected: 'Meta rechazó la plantilla. Revisa el contenido e intenta de nuevo.',
+    whatsapp_meta_rejected: 'Meta rechazó la solicitud. Intenta de nuevo o revisa la conexión.',
+    whatsapp_meta_unreachable: 'No se pudo contactar con Meta. Intenta de nuevo en unos minutos.',
+  } as const satisfies Partial<Record<ErrorCode, string>>
+
+  it('R51: los seis codigos estan en el catalogo con su clave y su texto en español', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    for (const [code, texto] of Object.entries(esperados) as [keyof typeof esperados, string][]) {
+      expect(codigos, `falta el codigo ${code}`).toContain(code)
+      expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+      expect(errorMessage(code)).toBe(texto)
+    }
+  })
+
+  it('R51: cada clase de integraciones lleva su codigo y su texto', () => {
+    const casos = [
+      [new WhatsappTemplateNotFoundError(), 'whatsapp_template_not_found'],
+      [new WhatsappTemplateNameTakenError(), 'whatsapp_template_name_taken'],
+      [new WhatsappTemplateRateLimitedError(), 'whatsapp_template_rate_limited'],
+      [new WhatsappTemplateRejectedError(), 'whatsapp_template_rejected'],
+      [new WhatsappMetaRejectedError(), 'whatsapp_meta_rejected'],
+      [new WhatsappMetaUnreachableError(), 'whatsapp_meta_unreachable'],
+    ] as const
+    for (const [error, code] of casos) {
+      expect(error.code).toBe(code)
+      expect(error.message).toBe(esperados[code])
+    }
+  })
+})
+
+describe('diccionario de variables de WhatsApp — codigos de variable y de mapeo', () => {
+  const esperados = {
+    whatsapp_variable_key_not_found: 'No se encontró la variable.',
+    whatsapp_variable_key_taken: 'Ya existe una variable con esa clave.',
+    whatsapp_variable_key_in_use:
+      'La variable se usa en una o más plantillas. Quítala de ellas antes de eliminarla o cambiar su clave.',
+    whatsapp_template_not_mapped: 'Relaciona todas las variables de la plantilla antes de habilitarla.',
+    whatsapp_template_not_mappable:
+      'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
+  } as const satisfies Partial<Record<ErrorCode, string>>
+
+  it('R85: los cinco codigos estan en el catalogo con su clave y su texto en español', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    for (const [code, texto] of Object.entries(esperados) as [keyof typeof esperados, string][]) {
+      expect(codigos, `falta el codigo ${code}`).toContain(code)
+      expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+      expect(errorMessage(code)).toBe(texto)
+    }
+  })
+
+  it('R85: cada clase de integraciones lleva su codigo y su texto', () => {
+    const casos = [
+      [new WhatsappVariableKeyNotFoundError(), 'whatsapp_variable_key_not_found'],
+      [new WhatsappVariableKeyTakenError(), 'whatsapp_variable_key_taken'],
+      [new WhatsappVariableKeyInUseError(), 'whatsapp_variable_key_in_use'],
+      [new WhatsappTemplateNotMappedError(), 'whatsapp_template_not_mapped'],
+      [new WhatsappTemplateNotMappableError(), 'whatsapp_template_not_mappable'],
+    ] as const
+    for (const [error, code] of casos) {
+      expect(error.code).toBe(code)
+      expect(error.message).toBe(esperados[code])
+    }
   })
 })

@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarIcon } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange, Matcher } from 'react-day-picker';
 
 import { Calendar } from '@/components/ui/calendar';
@@ -19,8 +19,20 @@ type DatePickerSingleProps = {
   readonly mode: 'single';
   readonly name: string;
   readonly label: ReactNode;
-  /** Solo se lee al montar: el día elegido vive después en estado. */
-  readonly defaultValue: Date;
+  /**
+   * Solo se lee al montar: el día elegido vive después en estado. Sin él, el campo arranca vacío
+   * (el input oculto viaja como cadena vacía); eso solo tiene sentido con `optional`.
+   */
+  readonly defaultValue?: Date;
+  /**
+   * Campo opcional: puede quedar vacío y volver a vaciarse pulsando otra vez el día elegido. Sin
+   * él, el día elegido no se puede deseleccionar.
+   */
+  readonly optional?: boolean;
+  /** Texto del disparador cuando no hay día elegido. */
+  readonly placeholder?: ReactNode;
+  /** Va junto a la etiqueta, en la misma fila (p. ej. un botón de ayuda). */
+  readonly labelAdornment?: ReactNode;
   readonly disabled?: Matcher | Matcher[];
   readonly triggerTestId?: string;
   readonly valueTestId?: string;
@@ -32,7 +44,9 @@ type DatePickerSingleProps = {
 type DatePickerRangeProps = {
   readonly mode: 'range';
   /** Contenido del disparador, detrás del icono. */
-  readonly triggerContent: ReactNode;
+  readonly triggerContent?: ReactNode;
+  /** Disparador propio, en lugar del botón con icono; debe pintar un `<button>`. */
+  readonly trigger?: ReactElement;
   readonly selected: DateRange | undefined;
   readonly onSelect: (range: DateRange | undefined) => void;
   readonly numberOfMonths?: number;
@@ -56,6 +70,9 @@ function SingleDatePicker({
   name,
   label,
   defaultValue,
+  optional = false,
+  placeholder,
+  labelAdornment,
   disabled,
   triggerTestId,
   valueTestId,
@@ -65,14 +82,25 @@ function SingleDatePicker({
 }: DatePickerSingleProps) {
   const labelId = useId();
   const errorId = useId();
-  const [selected, setSelected] = useState<Date>(defaultValue);
-  const value = formatDateLocalISO(selected);
+  const [selected, setSelected] = useState<Date | undefined>(defaultValue);
+  const value = selected === undefined ? '' : formatDateLocalISO(selected);
+
+  const labelNode = (
+    <span id={labelId} className="text-sm font-medium">
+      {label}
+    </span>
+  );
 
   return (
     <div className="flex flex-col gap-2">
-      <span id={labelId} className="text-sm font-medium">
-        {label}
-      </span>
+      {labelAdornment === undefined ? (
+        labelNode
+      ) : (
+        <div className="flex items-center gap-1.5">
+          {labelNode}
+          {labelAdornment}
+        </div>
+      )}
 
       <input
         type="hidden"
@@ -92,7 +120,7 @@ function SingleDatePicker({
           data-testid={triggerTestId}
         >
           <CalendarIcon className="size-4" aria-hidden="true" />
-          {value}
+          {value === '' ? placeholder : value}
         </PopoverTrigger>
 
         <PopoverContent className="w-auto">
@@ -101,7 +129,7 @@ function SingleDatePicker({
             selected={selected}
             disabled={disabled}
             onSelect={(date) => {
-              if (date === undefined) return;
+              if (date === undefined && !optional) return;
               setSelected(date);
             }}
           />
@@ -115,6 +143,7 @@ function SingleDatePicker({
 
 function RangeDatePicker({
   triggerContent,
+  trigger,
   selected,
   onSelect,
   numberOfMonths,
@@ -123,14 +152,18 @@ function RangeDatePicker({
 }: DatePickerRangeProps) {
   return (
     <Popover>
-      <PopoverTrigger
-        type="button"
-        className={cn(TRIGGER_CLASS, touchTarget)}
-        data-testid={triggerTestId}
-      >
-        <CalendarIcon className="size-4" aria-hidden="true" />
-        {triggerContent}
-      </PopoverTrigger>
+      {trigger === undefined ? (
+        <PopoverTrigger
+          type="button"
+          className={cn(TRIGGER_CLASS, touchTarget)}
+          data-testid={triggerTestId}
+        >
+          <CalendarIcon className="size-4" aria-hidden="true" />
+          {triggerContent}
+        </PopoverTrigger>
+      ) : (
+        <PopoverTrigger render={trigger} data-testid={triggerTestId} />
+      )}
 
       <PopoverContent className="w-auto">
         {header}

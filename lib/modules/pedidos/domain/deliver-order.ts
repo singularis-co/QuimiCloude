@@ -10,8 +10,15 @@ import {
   ValidationError,
 } from './errors';
 import { requireAliveCustomer } from './order-customer';
-import { checkDelivery, DELIVERY_MAX_ALLOCATIONS, type DeliveryAllocation } from './order-delivery';
+import {
+  checkDelivery,
+  checkDeliveryBlocks,
+  DELIVERY_MAX_ALLOCATIONS,
+  flattenBlocks,
+  type DeliveryAllocation,
+} from './order-delivery';
 import type { OrderScope } from './order-scope';
+import { orderedPackages } from './packing-count';
 import { assertTransition } from './order-transitions';
 
 import type { NewOrderDeliveryLine, OrderDeliveryRepository } from '../ports/order-delivery-repository';
@@ -36,25 +43,33 @@ export type DeliverOrderDeps = {
   readonly now?: () => Date;
 };
 
+const allocationSchema = z.strictObject({
+  presentationLineId: z.string().uuid(),
+  batchId: z.string().uuid(),
+  packages: z.number().int().min(1),
+});
+
 const deliverOrderSchema = z
   .strictObject({
     orderId: z.string().uuid(),
     deliveryKey: z.string().uuid(),
-    customerId: z.string(),
-    allocations: z
+    customers: z
       .array(
         z.strictObject({
-          presentationLineId: z.string().uuid(),
-          batchId: z.string().uuid(),
-          packages: z.number().int().min(1),
+          // Su forma la decide `requireAliveCustomer`: un id que no es uuid responde que no existe.
+          customerId: z.string(),
+          allocations: z.array(allocationSchema).min(1),
         }),
       )
-      .min(1)
-      .max(DELIVERY_MAX_ALLOCATIONS),
+      .min(1),
   })
-  .refine(
-    ({ allocations }) =>
-      new Set(allocations.map((a) => `${a.presentationLineId}:${a.batchId}`)).size === allocations.length,
+  .refine(({ customers }) => customers.reduce((sum, c) => sum + c.allocations.length, 0) <= DELIVERY_MAX_ALLOCATIONS)
+  .refine(({ customers }) => new Set(customers.map((c) => c.customerId.toLowerCase())).size === customers.length)
+  .refine(({ customers }) =>
+    customers.every(
+      ({ allocations }) =>
+        new Set(allocations.map((a) => `${a.presentationLineId}:${a.batchId}`)).size === allocations.length,
+    ),
   );
 
 type DeliverOrderInput = z.infer<typeof deliverOrderSchema>;
@@ -68,12 +83,17 @@ class DeliveryAlreadyRegisteredSignal extends Error {
   }
 }
 
-function groupByLine(allocations: readonly DeliveryAllocation[]): ReadonlyMap<string, DeliveryAllocation[]> {
-  const byLine = new Map<string, DeliveryAllocation[]>();
-  for (const allocation of allocations) {
-    const group = byLine.get(allocation.presentationLineId) ?? [];
-    group.push(allocation);
-    byLine.set(allocation.presentationLineId, group);
+type CustomerAllocation = DeliveryAllocation & { readonly customerId: string };
+
+/** Por linea del reparto, las asignaciones de todos los clientes en el orden cliente -> asignacion. */
+function groupByLine(input: DeliverOrderInput): ReadonlyMap<string, CustomerAllocation[]> {
+  const byLine = new Map<string, CustomerAllocation[]>();
+  for (const { customerId, allocations } of input.customers) {
+    for (const allocation of allocations) {
+      const group = byLine.get(allocation.presentationLineId) ?? [];
+      group.push({ ...allocation, customerId });
+      byLine.set(allocation.presentationLineId, group);
+    }
   }
   return byLine;
 }
@@ -95,7 +115,8 @@ async function deliverInTransaction(
 
   const lines = await tx.orders.findPresentationLinesForFinish(input.orderId, scope);
   const lineById = new Map<string, FinishPackingLine>(lines.map((line) => [line.id, line]));
-  if (input.allocations.some((a) => !lineById.has(a.presentationLineId))) throw new ValidationError();
+  const allocations = flattenBlocks(input.customers);
+  if (allocations.some((a) => !lineById.has(a.presentationLineId))) throw new ValidationError();
 
   // Antes de comprobar el tope. La lectura de arriba no basta: la clave es unica por empresa, asi
   // que otra peticion puede estar insertandola para OTRO pedido sin pasar por este bloqueo.
@@ -103,7 +124,6 @@ async function deliverInTransaction(
     {
       deliveryKey: input.deliveryKey,
       orderId: input.orderId,
-      customerId: input.customerId,
       actorId,
       now,
     },
@@ -115,16 +135,16 @@ async function deliverInTransaction(
   const check = checkDelivery(
     lines.map((line) => ({
       presentationLineId: line.id,
-      orderedPackages: line.packages,
+      orderedPackages: orderedPackages(line),
       deliveredPackages: delivered.get(line.id) ?? 0,
     })),
     null,
-    input.allocations,
+    allocations,
   );
   if (check.kind !== 'ok') throw new DeliveryExceedsRemainingError(`entrega de ${input.orderId}: ${check.kind}`);
 
   const deliveryLines: NewOrderDeliveryLine[] = [];
-  for (const [presentationLineId, allocations] of groupByLine(input.allocations)) {
+  for (const [presentationLineId, lineAllocations] of groupByLine(input)) {
     const line = lineById.get(presentationLineId);
     if (line === undefined) throw new ValidationError();
     const outcome = await tx.finishedGoods.dispatchForDelivery({
@@ -133,15 +153,18 @@ async function deliverInTransaction(
       orderDeliveryId: created.id,
       recipeId: order.recipeId,
       presentationId: line.presentationId,
-      allocations: allocations.map((a) => ({ batchId: a.batchId, packages: a.packages })),
+      allocations: lineAllocations.map((a) => ({ batchId: a.batchId, packages: a.packages })),
       actorId,
       now,
     });
     if (outcome.kind === 'batch_not_found') throw new DeliveryBatchNotFoundError(outcome.batchId);
     if (outcome.kind === 'insufficient') throw new DeliveryBatchInsufficientError(outcome.batchId);
-    for (const dispatched of outcome.lines) {
-      deliveryLines.push({ presentationLineId, ...dispatched });
+    if (outcome.lines.length !== lineAllocations.length) {
+      throw new Error('deliverOrder: la salida no devolvio una linea por asignacion');
     }
+    outcome.lines.forEach((dispatched, index) => {
+      deliveryLines.push({ customerId: lineAllocations[index].customerId, presentationLineId, ...dispatched });
+    });
   }
   await tx.deliveries.addLines(created.id, deliveryLines, scope);
 
@@ -157,9 +180,11 @@ async function deliverInTransaction(
  *  la entrega exige `TERMINADO` y `TERMINADO` no se cancela. */
 async function alreadyRegistered(
   orders: OrderRepository,
-  orderId: string,
+  orderId: string | null,
   scope: OrderScope,
 ): Promise<DeliverOrderResult> {
+  // La clave es de una entrega sin pedido: no es un reintento de esta.
+  if (orderId === null) throw new ValidationError();
   const order = await orders.findAliveById(orderId, scope);
   if (order === null) throw new OrderNotFoundError();
   if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();
@@ -178,6 +203,7 @@ export function createDeliverOrder(
     const parsed = deliverOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const data = parsed.data;
+    if (checkDeliveryBlocks(data.customers).size > 0) throw new ValidationError();
     const scope: OrderScope = { companyId: actor.companyId };
 
     // La clave antes que el cliente, el bloqueo y el estado: un reintento sobre un pedido que la
@@ -185,7 +211,9 @@ export function createDeliverOrder(
     const registered = await deps.deliveries.findByKey(data.deliveryKey, scope);
     if (registered !== null) return alreadyRegistered(deps.orders, registered.orderId, scope);
 
-    await requireAliveCustomer(deps.customerCatalog, data.customerId, actor.companyId);
+    for (const { customerId } of data.customers) {
+      await requireAliveCustomer(deps.customerCatalog, customerId, actor.companyId);
+    }
 
     assertTransition('TERMINADO', 'ENTREGADO');
 

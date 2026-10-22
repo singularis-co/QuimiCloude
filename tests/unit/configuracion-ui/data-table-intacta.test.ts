@@ -200,10 +200,29 @@ describe('la tabla compartida no gana ningun mecanismo nuevo de acciones de fila
   });
 
   it('el barrel publico no exporta ninguna pieza de acciones de fila', () => {
-    const barrel = fuenteSinComentarios('components/shared/data-table/index.ts');
+    // ENMIENDA QC-256: el barrel exporta ahora el TIPO `RowActionsSpec`, que es el contrato
+    // APROBADO de `actionsColumn({ menu })` (specs/QC-256 design.md § 7, D2, R32): la columna de
+    // acciones con menu de fila la publica la tabla compartida, no la inventa cada pantalla. Se
+    // descuenta SOLO ese nombre exacto (con limites de palabra) antes de buscar; cualquier otro
+    // export con `rowaction` —`RowActionsMenu`, `RowActionsSpecExtra`…— y `renderActions`
+    // siguen prohibidos. La intencion se conserva: las pantallas no inventan otro mecanismo de
+    // acciones en la tabla.
+    const sinContratoAprobado = (fuente: string): string =>
+      fuente.replace(/\bRowActionsSpec\b/g, '');
+    const barrel = sinContratoAprobado(
+      fuenteSinComentarios('components/shared/data-table/index.ts'),
+    );
 
     expect(barrel.toLowerCase()).not.toContain('rowaction');
     expect(barrel.toLowerCase()).not.toContain('renderactions');
+
+    // ENMIENDA QC-256 (sensibilidad): el descuento es estrecho; otro nombre con rowaction cae.
+    for (const sintetico of [
+      "export { RowActionsMenu } from './row-actions-menu';",
+      "export type { RowActionsSpecExtra } from './actions-column';",
+    ]) {
+      expect(sinContratoAprobado(sintetico).toLowerCase()).toContain('rowaction');
+    }
   });
 
   it('la columna de acciones cabe con lo que el contrato YA publica: `cell` devuelve ReactNode', () => {

@@ -19,7 +19,6 @@ import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
-import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma';
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma';
 import {
   findPresentationRefs,
@@ -44,16 +43,13 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
-import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
-import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
-
-const packagingCatalog: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBatches: findPackagingCostingBatches };
+import { packedCountsOfPlan } from '../../helpers/packed-counts';
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
@@ -79,9 +75,6 @@ const recipes: RecipeCatalog = {
   findIdsMatchingName: findRecipeIdsMatchingName,
   findAliveByNormalizedName: findAliveRecipeByNormalizedName,
 };
-const products: ProductCatalog = { findRefs: findProductRefs, findCostingBatches, findFinishedGoodsReceipts: async () => {
-  throw new Error('este archivo no ejercita "Por empacar"');
-} };
 const presentations: PresentationCatalog = {
   findRefs: findPresentationRefs,
   findByNormalizedNames: findPresentationsByNormalizedNames,
@@ -94,7 +87,7 @@ const units: UnitCatalog = {
 };
 
 const startPackingAliveById = createStartPacking({ packing: orderPackingRepository });
-const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, products, units, presentations, packaging: packagingCatalog });
+const finishPackingAliveById = createFinishPacking({ packing: orderPackingRepository, unitOfWork, recipes, units, presentations });
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -475,7 +468,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     try {
       const antes = await movementCountDe(fixture.companyId);
       const ahora = new Date();
-      const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora);
+      const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
       // T14: sin ninguna linea de reparto -este pedido no la tiene-, el `'ok'` vuelve con
       // `finishedGoods` vacio: no hay nada que dar de alta.
       expect(resultado).toEqual({ kind: 'ok', finishedGoods: [] });
@@ -498,7 +491,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
       const antes = await readOrder(pedido);
-      const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date());
+      const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date(), await packedCountsOfPlan(pedido));
       expect(resultado).toBe('not_packer');
 
       const despues = await readOrder(pedido);
@@ -519,7 +512,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     };
     try {
       for (const [estado, pedido] of Object.entries(pedidos)) {
-        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(pedido));
         expect(resultado, estado).toBe('not_packable');
       }
     } finally {
@@ -535,7 +528,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       for (const [estado, pedido] of Object.entries(pedidos)) {
         const antes = await readOrder(pedido);
         // El propio empacador: aun siendo quien empaco, el estado ya no admite Terminar.
-        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(pedido));
         expect(resultado, estado).toBe('not_packable');
         expect(await readOrder(pedido), estado).toEqual(antes);
       }
@@ -553,13 +546,13 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     const borrado = await createOrder(fixture, { status: 'PENDIENTE', deletedAt: new Date() });
     const propio = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
-      const inexistente = await finishPackingAliveById(randomUUID(), fixture.companyId, fixture.packerId, new Date());
+      const inexistente = await finishPackingAliveById(randomUUID(), fixture.companyId, fixture.packerId, new Date(), []);
       expect(inexistente).toBe('not_found');
 
-      const dadoDeBaja = await finishPackingAliveById(borrado, fixture.companyId, fixture.packerId, new Date());
+      const dadoDeBaja = await finishPackingAliveById(borrado, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(borrado));
       expect(dadoDeBaja).toBe('not_found');
 
-      const cruzado = await finishPackingAliveById(propio, otra.companyId, otra.packerId, new Date());
+      const cruzado = await finishPackingAliveById(propio, otra.companyId, otra.packerId, new Date(), await packedCountsOfPlan(propio));
       expect(cruzado).toBe('not_found');
     } finally {
       await borrarFixture(fixture, [borrado, propio]);
@@ -572,7 +565,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
       const ahora = new Date();
-      await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora);
+      await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
 
       const fila = await prisma.order.findUniqueOrThrow({
         where: { id: pedido },

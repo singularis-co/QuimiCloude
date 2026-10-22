@@ -1,20 +1,25 @@
 import type { Metadata } from 'next';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
 import { ErrorState } from '@/components/shared/error-state';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 
-import { RecipeForm } from '../components';
+import { NewRecipeVersionButton, RecipeForm, RecipeVersionList } from '../components';
 
 export const metadata: Metadata = {
   title: `Nueva fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
+const BACK_LABEL = 'Volver a la lista';
 
 // Los mismos testids que el error de la lista: los vigila el E2E de errores.
 const LOAD_ERROR = {
@@ -93,12 +98,23 @@ export default async function NuevaRecetaPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 data-testid="recipe-form-title" className="text-2xl font-semibold">
-        Nueva fórmula
-      </h1>
+    <PageShell>
+      <div className="flex flex-col gap-3">
+        <ArrowLink
+          direction="back"
+          href={FORMULAS_ROUTE}
+          touch
+          testId="recipe-form-back-link"
+          className="self-start"
+        >
+          {BACK_LABEL}
+        </ArrowLink>
+        <PageHeader title="Nueva fórmula" titleTestId="recipe-form-title" />
+      </div>
       <RecipeForm
         mode="create"
+        versionList={<RecipeVersionList originalId={null} versions={[]} />}
+        newVersionAction={<NewRecipeVersionButton originalId={null} />}
         units={unitsResult.data}
         initialProductPage={{
           items: productsResult.data.items.map((item) => ({
@@ -117,6 +133,6 @@ export default async function NuevaRecetaPage() {
           totalPages: machinesResult.data.totalPages,
         }}
       />
-    </div>
+    </PageShell>
   );
 }

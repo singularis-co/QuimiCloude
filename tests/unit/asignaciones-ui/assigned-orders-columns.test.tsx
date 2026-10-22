@@ -11,12 +11,17 @@ import {
   ASSIGNED_ORDER_RESPONSIBLES_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_COLUMN_ID,
   ASSIGNED_ORDER_STATUS_LABELS,
-  MISSING_VALUE_MARK,
   buildAssignedOrdersColumns,
 } from '@/app/(private)/asignacion/components';
 import { MISSING_VALUE_MARK as ORDER_MISSING_VALUE_MARK } from '@/app/(private)/pedidos/components';
 import type { AssignedOrderView } from '@/lib/modules/asignaciones';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+import {
+  ORDER_PRIORITY_LABELS,
+  ORDER_PRIORITY_LEVELS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_TONES,
+} from '@/lib/shared/ui/order-status';
 
 afterEach(() => {
   cleanup();
@@ -32,7 +37,7 @@ const BASE_ORDER: AssignedOrderView = {
   otherResponsibles: [
     { userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } },
   ],
-  presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 }],
+  presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],
   unitId: null,
   unitLabel: null,
 };
@@ -93,10 +98,6 @@ describe('R17 - la receta sin resolver pinta el marcador, NUNCA el uuid', () => 
   it('el marcador de esta pantalla es el MISMO glifo que el de /pedidos (un test lo ata)', () => {
     expect(EMPTY_MARK).toBe(ORDER_MISSING_VALUE_MARK);
   });
-
-  it('el barrel de la ruta sigue exportando el marcador con su nombre de antes', () => {
-    expect(MISSING_VALUE_MARK).toBe(EMPTY_MARK);
-  });
 });
 
 describe('la cantidad se pinta TAL CUAL (cadena, no formateada)', () => {
@@ -119,16 +120,27 @@ describe('la cantidad se pinta TAL CUAL (cadena, no formateada)', () => {
 });
 
 describe('R24: columna Presentación', () => {
-  it('QC-170 R26: pinta la primera linea del reparto y «+N» con el resto', () => {
+  it('QC-170 R26: pinta todas las lineas del reparto separadas por coma', () => {
     renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
       ...BASE_ORDER,
       presentationLines: [
-        { presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-        { presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1 },
+        { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+        { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-2', presentationName: 'Caja x 12', packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
       ],
     });
 
-    expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Botella 200 ml +1');
+    expect(screen.getByTestId('order-distribution').textContent).toBe('5 × Botella 200 ml, 1 × Caja x 12');
+  });
+
+  it('una linea con envase y volumen conocido pinta «envases × envase · volumen»', () => {
+    renderCell(ASSIGNED_ORDER_PRESENTATION_COLUMN_ID, {
+      ...BASE_ORDER,
+      presentationLines: [
+        { lineId: 'linea-4', packedPackages: null, presentationId: 'pres-3', presentationName: '300 ml', packagingName: 'Embase pequeño 2', packages: 9, presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+      ],
+    });
+
+    expect(screen.getByTestId('order-distribution').textContent).toBe('9 × Embase pequeño 2 · 300 ml');
   });
 
   it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {
@@ -158,6 +170,27 @@ describe('R20 - el propio actor no aparece (el dominio ya lo excluye de otherRes
 
     expect(screen.getByRole('img', { name: 'Beto Ruiz' })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Ana López García' })).not.toBeInTheDocument();
+  });
+});
+
+describe('QC-265 R16, R17 - estado y prioridad con las piezas de la marca', () => {
+  it('R16: el estado es un `StatusBadge` con el tono de `ORDER_STATUS_TONES` y conserva testid y `data-status`', () => {
+    renderCell(ASSIGNED_ORDER_STATUS_COLUMN_ID, { ...BASE_ORDER, status: 'EN_CURSO' });
+
+    const badge = screen.getByTestId('assigned-order-status');
+    expect(badge).toHaveAttribute('data-status', 'EN_CURSO');
+    expect(badge).toHaveAttribute('data-tone', ORDER_STATUS_TONES.EN_CURSO);
+    expect(badge).toHaveTextContent(ORDER_STATUS_LABELS.EN_CURSO);
+    expect(badge.querySelector('[data-slot="status-dot"]')).not.toBeNull();
+  });
+
+  it('R17: la prioridad es un `PriorityMark` con el nivel de `ORDER_PRIORITY_LEVELS` y conserva testid y `data-priority`', () => {
+    renderCell(ASSIGNED_ORDER_PRIORITY_COLUMN_ID, { ...BASE_ORDER, priority: 'CRITICA' });
+
+    const mark = screen.getByTestId('assigned-order-priority');
+    expect(mark).toHaveAttribute('data-priority', 'CRITICA');
+    expect(mark).toHaveAttribute('data-level', String(ORDER_PRIORITY_LEVELS.CRITICA));
+    expect(mark).toHaveTextContent(ORDER_PRIORITY_LABELS.CRITICA);
   });
 });
 

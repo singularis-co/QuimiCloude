@@ -52,7 +52,7 @@ const FILA_SIN_UNIDAD = {
   cells: celdas({ type: 'Insumo', name: 'Glicerina', unit: 'Galón', stock: '4,5,1' }),
   issues: [
     { code: 'unit_not_found', column: 'unit', message: 'Unidad: «Galón» no existe.' },
-    { code: 'number_format_invalid', column: 'stock', message: 'Existencia: «4,5,1» no es un número.' },
+    { code: 'number_format_invalid', column: 'stock', message: 'Cantidad: «4,5,1» no es un número.' },
   ],
 } as const;
 

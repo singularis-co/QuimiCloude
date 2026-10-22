@@ -237,6 +237,9 @@ describe('receiveFinishedGoods — R11, R13, R17, R41, R43: primera entrada', ()
       expect(batch.createdBy).toBe(empresa.userId);
       expect(batch.packageContent?.toFixed(4)).toBe('1.0000');
       expect(batch.unitCost?.toFixed(4)).toBe('2.0000');
+      // El lote de una produccion cuenta como lote cargado: mismo instante que su `created_at`.
+      expect(product.lastBatchAt).toEqual(batch.createdAt);
+      expect(product.lastBatchAt).toEqual(now);
 
       const movements = await prisma.inventoryMovement.findMany({ where: { batchId: batch.id } });
       expect(movements).toHaveLength(1);

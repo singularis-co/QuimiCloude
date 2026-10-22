@@ -58,6 +58,7 @@ import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import PrivateLayout from '@/app/(private)/layout';
+import { THEME_TOGGLE_LABEL } from '@/app/(private)/components/theme-toggle';
 import PedidosPage from '@/app/(private)/pedidos/page';
 import {
   ACTIONS_COLUMN_ID,
@@ -67,11 +68,9 @@ import {
   ORDER_FORM_TESTID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_SELECT_TESTID,
-  QUANTITY_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
   RECIPE_PICKER_TESTID,
   buildOrderColumns,
-  type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -197,6 +196,13 @@ vi.mock('@/lib/modules/identity/adapters/driving/work-group-actions', () => ({
   })),
 }));
 
+// 2026-10-13 — la seccion pide tambien los productos terminados de los pedidos producidos, y esa
+// action lee `observabilidad` de `@/lib/composition` al cargarse, que aqui solo trae `identity`.
+// El doble responde sin enlaces: esta suite no mira esa columna.
+vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
+  listProducedProductsAction: vi.fn(async () => ({ status: 'success' as const, data: [] })),
+}));
+
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
     throw new Error(`${nombre} no debe invocarse desde este archivo`);
@@ -285,7 +291,6 @@ const UNIDAD: UnitView = {
   factor: null,
   isSystem: true,
 };
-const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 /**
  * El pedido del caso: **PENDIENTE**, para que las tres acciones de fila esten habilitadas (R24),
@@ -307,6 +312,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -319,12 +326,16 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
         packages: 1,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
 
     ],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -388,6 +399,43 @@ function clases(elemento: Element): string[] {
   return Array.from(elemento.classList);
 }
 
+/** Clases que un control lleva puestas de salida para esconderse hasta que el puntero lo traiga. */
+const OCULTO_DE_SALIDA = new Set(['invisible', 'opacity-0']);
+
+/** Clases que solo el puntero activa para REVELAR algo (`hover:bg-muted` es decoracion y pasa). */
+const REVELA_CON_EL_PUNTERO = /^(group-)?hover:(flex|block|inline|inline-flex|visible|opacity-100)$/;
+
+/**
+ * ENMIENDA QC-257 (autorizada por el leader el 2026-10-10): el boton «Cambiar tema» del
+ * encabezado pinta sol y luna a la vez y la variante `dark:` decide cual se ve, asi que uno de
+ * los dos arranca con `opacity-0`. No es un control escondido tras el puntero: son iconos
+ * decorativos (`aria-hidden`) dentro de un boton que si esta visible. Se excluyen SOLO esos
+ * `svg[aria-hidden="true"]` dentro de ESE boton; cualquier otro `opacity-0` sigue en rojo (lo
+ * demuestra el caso «un opacity-0 fuera del boton de tema sigue haciendo fallar...»).
+ */
+function esIconoDelBotonDeTema(elemento: Element): boolean {
+  return (
+    elemento.matches('svg[aria-hidden="true"]') &&
+    elemento.closest(`button[aria-label="${THEME_TOGGLE_LABEL}"]`) !== null
+  );
+}
+
+/** R45 en las clases: ningun elemento usa el puntero para revelar nada. Lanza si alguno lo hace. */
+function comprobarQueNadaDependeDelPuntero(raiz: Element, ancho: number): void {
+  for (const elemento of Array.from(raiz.querySelectorAll('*'))) {
+    for (const clase of clases(elemento)) {
+      expect(clase, `${elemento.tagName} revela con el puntero a ${ancho}px`).not.toMatch(
+        REVELA_CON_EL_PUNTERO,
+      );
+      if (esIconoDelBotonDeTema(elemento)) continue;
+      expect(
+        OCULTO_DE_SALIDA.has(clase),
+        `${elemento.tagName} arranca oculto y solo el puntero lo trae a ${ancho}px`,
+      ).toBe(false);
+    }
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   usePathnameMock.mockReturnValue(ORDERS_ROUTE);
@@ -437,6 +485,7 @@ beforeEach(() => {
       updatedBy: null,
       steps: [],
       packingSteps: [],
+      conditioningSteps: [],
       lines: [],
       tools: [],
       original: null,
@@ -524,21 +573,38 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
 
     // 2) En las clases: ningun elemento de la pantalla usa el puntero para REVELAR nada. Un
     //    `hover:bg-muted` es decoracion y no molesta a nadie; lo que R45 prohibe es que la
-    //    existencia o la visibilidad de un control dependa del puntero.
-    const revelaConElPuntero = /^(group-)?hover:(flex|block|inline|inline-flex|visible|opacity-100)$/;
-    const ocultoDeSalida = new Set(['invisible', 'opacity-0']);
+    //    existencia o la visibilidad de un control dependa del puntero. ENMIENDA QC-257: la
+    //    unica excepcion son los iconos decorativos del boton «Cambiar tema» (ver
+    //    `esIconoDelBotonDeTema`).
+    comprobarQueNadaDependeDelPuntero(document.body, ancho);
+  });
 
-    for (const elemento of Array.from(document.body.querySelectorAll('*'))) {
-      for (const clase of clases(elemento)) {
-        expect(clase, `${elemento.tagName} revela con el puntero a ${ancho}px`).not.toMatch(
-          revelaConElPuntero,
-        );
-        expect(
-          ocultoDeSalida.has(clase),
-          `${elemento.tagName} arranca oculto y solo el puntero lo trae a ${ancho}px`,
-        ).toBe(false);
-      }
-    }
+  it('un opacity-0 fuera del boton de tema sigue haciendo fallar la comprobacion (R45, ENMIENDA QC-257)', async () => {
+    await renderPantalla();
+
+    // La pantalla real pasa: la excepcion cubre los iconos del boton de tema, que si estan.
+    const botonDeTema = screen.getByRole('button', { name: THEME_TOGGLE_LABEL });
+    expect(botonDeTema.querySelector('svg[aria-hidden="true"].opacity-0')).not.toBeNull();
+    expect(() => comprobarQueNadaDependeDelPuntero(document.body, ancho)).not.toThrow();
+
+    // Un elemento cualquiera con `opacity-0` fuera del boton de tema: rojo.
+    const intruso = document.createElement('span');
+    intruso.className = 'opacity-0';
+    document.body.appendChild(intruso);
+    expect(() => comprobarQueNadaDependeDelPuntero(document.body, ancho)).toThrow();
+    intruso.remove();
+
+    // Un `svg[aria-hidden]` con `opacity-0` dentro de OTRO boton: tambien rojo. La excepcion es
+    // del boton de tema, no de cualquier icono decorativo.
+    const otroBoton = document.createElement('button');
+    otroBoton.setAttribute('aria-label', 'Otro');
+    const icono = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icono.setAttribute('aria-hidden', 'true');
+    icono.setAttribute('class', 'opacity-0');
+    otroBoton.appendChild(icono);
+    document.body.appendChild(otroBoton);
+    expect(() => comprobarQueNadaDependeDelPuntero(document.body, ancho)).toThrow();
+    otroBoton.remove();
   });
 
   it('abrir el disparador con un CLIC (nunca hover) revela las cuatro acciones (R45)', async () => {
@@ -602,7 +668,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // El selector de presentacion del reparto solo aparece con unidad elegida; aqui se mide el de
     // la unidad, que esta siempre.
     const campos = [
-      screen.getByTestId(`order-field-${QUANTITY_COLUMN_ID}`),
+      screen.getByTestId('order-field-quantity'),
       screen.getByTestId(RECIPE_PICKER_TESTID),
       screen.getByTestId('presentation-unit-select'),
       screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
@@ -655,8 +721,8 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Solo `recipeName` declara el `width` del contrato
     // (decision humana: es el texto largo de la fila); ninguna declara las claves de
     // dimensionado de la libreria, asi que por esa via no impone nada.
-    const columnas = buildOrderColumns({ recipes: RECETAS, units: [], bridge: null });
-    expect(columnas).toHaveLength(12);
+    const columnas = buildOrderColumns({ units: [], bridge: null });
+    expect(columnas).toHaveLength(14);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {

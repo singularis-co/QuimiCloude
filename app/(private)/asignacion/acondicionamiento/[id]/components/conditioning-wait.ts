@@ -1,0 +1,1 @@
+export const CONDITIONING_WAIT_SECONDS = 5;

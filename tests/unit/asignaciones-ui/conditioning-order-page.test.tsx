@@ -84,6 +84,7 @@ const ROW = {
   conditionedById: null,
   team: [],
   batchData: null,
+  conditioningSteps: null,
 };
 
 const CANDIDATES = {
@@ -174,8 +175,8 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
       expect.objectContaining({ id: ACTOR_ID, companyId: 'company-1' }),
       {},
     );
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeEnabled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
   });
 
   it('R2: en EN_ACONDICIONAMIENTO del propio actor ofrece «Terminar» sin pedir candidatos', async () => {
@@ -189,8 +190,8 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     render(await invocar());
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeEnabled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
   });
 
   it('R3: en EN_ACONDICIONAMIENTO de otra persona no ofrece nada ni pide candidatos', async () => {
@@ -204,7 +205,9 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     render(await invocar());
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    // El pie pinta los dos botones del acondicionamiento; aquí ninguno está habilitado.
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
     expect(screen.getByText('Lo acondiciona Berta Ruiz.')).toBeInTheDocument();
   });
 
@@ -219,7 +222,9 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     render(await invocar());
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    // El pie pinta los dos botones del acondicionamiento; aquí ninguno está habilitado.
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
   });
 
   it('R1: si los candidatos fallan con un error del módulo, pinta el detalle sin «Acondicionar» y con el aviso', async () => {
@@ -229,7 +234,7 @@ describe('qué acción se ofrece y qué se lee para ella', () => {
     render(await invocar());
 
     expect(screen.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
     const aviso = screen.getByTestId(CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID);
     expect(aviso).toHaveAttribute('role', 'alert');
     expect(aviso).toHaveAttribute('data-code', 'unauthorized');
@@ -265,7 +270,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
   it('R4: con líneas sin datos, «Terminar» se pinta deshabilitado con el aviso', async () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
-      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2 },
+      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2, form: { kind: 'empty' } },
     });
 
     render(await invocar());
@@ -283,6 +288,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
       batchData: {
         lines: [{ ...LINE, provisionalLot: null, lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' }],
         missingCount: 0,
+        form: { kind: 'shared', lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' },
       },
     });
 
@@ -296,33 +302,33 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'TERMINADO',
-      batchData: { lines: [LINE], missingCount: 1 },
+      batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } },
     });
 
     render(await invocar());
 
     expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
   });
 
-  it('R21: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Entregados»', async () => {
+  it('R21, QC-301 R4: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Acondicionados»', async () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'ENTREGADO',
-      batchData: { lines: [LINE], missingCount: 1 },
+      batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } },
     });
 
     render(await invocar());
 
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
     expect(screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeNull();
-    expect(screen.queryByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeNull();
-    expect(screen.getAllByRole('button').map((boton) => boton.textContent)).toEqual(['Guardar datos de lote']);
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.start })).toBeDisabled();
+    expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar datos de lote' })).toBeEnabled();
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
-    expect(back).toHaveTextContent('Volver a «Entregados»');
-    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+    expect(back).toHaveTextContent('Volver a «Acondicionados»');
+    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados');
   });
 
   it('R21: un ENTREGADO que no deja ver el caso de uso sigue dando 404', async () => {

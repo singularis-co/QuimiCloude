@@ -14,7 +14,7 @@ function sheet(rows: string[][]): SpreadsheetReadResult {
 }
 
 function dataRow(header: string[]): string[] {
-  return header.map((name) => (name === 'Tipo' ? 'Insumo' : name === 'Existencia' ? '1' : 'x'));
+  return header.map((name) => (name === 'Tipo' ? 'Insumo' : name === 'Cantidad' ? '1' : 'x'));
 }
 
 function rejection(header: string[], rows: string[][] = [dataRow(header)]) {
@@ -35,17 +35,17 @@ describe('cabecera de la importacion', () => {
   });
 
   it('R5 acepta las columnas en cualquier orden y lee cada valor por su cabecera', () => {
-    const outcome = parseImportSheet(sheet([['Existencia', 'Nombre', 'Tipo'], ['7', 'Sal', 'Envase']]));
+    const outcome = parseImportSheet(sheet([['Cantidad', 'Nombre', 'Tipo'], ['7', 'Sal', 'Envase']]));
     expect(outcome.ok && outcome.sheet.rows[0]?.cells).toMatchObject({ type: 'Envase', name: 'Sal', stock: '7' });
   });
 
   it('R5 compara los nombres sin mayusculas, tildes ni espacios de los extremos', () => {
-    const header = ['  TIPO ', 'nombre', 'EXISTENCIA', 'presentacion', 'FORMULA', ' fecha  de compra '];
+    const header = ['  TIPO ', 'nombre', 'CANTIDAD', 'presentacion', 'FORMULA', ' fecha  de compra '];
     expect(rejection(header)).toBeNull();
   });
 
   it('R5 rechaza nombrando cada columna obligatoria que falta', () => {
-    expect(rejection(['Tipo', 'Unidad'])).toEqual({ code: 'missing_columns', columns: ['Nombre', 'Existencia'] });
+    expect(rejection(['Tipo', 'Unidad'])).toEqual({ code: 'missing_columns', columns: ['Nombre', 'Cantidad'] });
   });
 
   it('R5 rechaza nombrando la columna que no es de la plantilla, tal como viene escrita', () => {
@@ -96,6 +96,6 @@ describe('cabecera de la importacion', () => {
   });
 
   it('R5 falta antes que sobra: con las dos cosas se nombran las que faltan', () => {
-    expect(rejection(['Tipo', 'Nombre', 'Color'])).toEqual({ code: 'missing_columns', columns: ['Existencia'] });
+    expect(rejection(['Tipo', 'Nombre', 'Color'])).toEqual({ code: 'missing_columns', columns: ['Cantidad'] });
   });
 });

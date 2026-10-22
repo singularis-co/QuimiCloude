@@ -61,6 +61,19 @@ export interface MaterialReservations {
     readonly actorId: string;
     readonly now: Date;
   }): Promise<ConsumptionOutcome>;
+
+  /** Consume de cada producto de `requirement` exactamente su cantidad: primero de lo que el pedido
+   *  tiene apartado, y lo que exceda, del disponible que no aparta ningun otro pedido. Lo apartado
+   *  que sobra se libera. Un producto con cantidad 0 se libera entero; uno que no viene en
+   *  `requirement` no se toca. Con `insufficient` ya hay escrituras: quien llama deshace la
+   *  transaccion. */
+  settlePackagingForOrder(input: {
+    readonly orderId: string;
+    readonly companyId: string;
+    readonly requirement: readonly ReservationRequirementLine[];
+    readonly actorId: string;
+    readonly now: Date;
+  }): Promise<ConsumptionOutcome>;
 }
 
 /** Lectura, fuera de transaccion. */
@@ -89,6 +102,9 @@ export type BatchHistoryEntry = {
     | 'adjustment'
     | 'consumption'
     | 'delivery'
+    | 'delivery_void'
+    | 'direct_delivery'
+    | 'direct_delivery_void'
     | 'reserve'
     | 'release'
     | 'expire'
@@ -104,4 +120,15 @@ export type BatchHistoryEntry = {
   readonly previousStock: string | null;
   /** Mismo criterio que `previousStock`: o vienen los dos o ninguno. */
   readonly countedStock: string | null;
+  /** Solo en los asientos de entrega sin pedido y de su anulacion, por nombre ascendente; `null` en el
+   *  resto. */
+  readonly customerNames: readonly string[] | null;
+};
+
+/** Lo que devuelve la persistencia por asiento: la fila del historial con la entrega o la anulacion
+ *  que cita, para que el caso de uso resuelva sus clientes. Opcionales: los asientos del libro de la
+ *  reserva no los tienen. */
+export type BatchMovementRecord = BatchHistoryEntry & {
+  readonly orderDeliveryId?: string | null;
+  readonly orderDeliveryVoidId?: string | null;
 };

@@ -1,29 +1,30 @@
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic, { APIError } from '@anthropic-ai/sdk';
 
-import { readAnthropicConfigFromEnv } from '../config/ai-config-env';
+import { AiProviderError } from '../../../domain/errors';
 
-import type { AiDocumentPart, AiReadRequest } from '../../../ports/ai-reader';
+import { isAccountFailure } from '@/lib/modules/integraciones';
+
+import type { AiDocumentPart, AiReader, AiReadRequest } from '../../../ports/ai-reader';
+import type { AiProviderFailure, AiProviderProbeResult } from '@/lib/modules/integraciones';
 
 /**
- * Implementa el puerto `AiReader` contra Claude con `@anthropic-ai/sdk`. **Unico archivo del
- * repositorio que importa la libreria**: sustituirla es reescribir este archivo, no buscarla
- * por el arbol.
+ * Lectura y prueba de conexión contra Claude con `@anthropic-ai/sdk`. **Único archivo del
+ * repositorio que importa la librería**: sustituirla es reescribir este archivo.
  *
- * La configuracion se lee EN CADA LLAMADA, nunca al importar el modulo, y el cliente se
- * construye dentro de la funcion: importar este archivo sin invocar `readWithAnthropic` no
- * debe fallar con las variables vacias.
+ * La key y el modelo llegan por parámetro (son los de la empresa) y el cliente se construye en
+ * cada llamada. El SDK reintenta dos veces por defecto; `maxRetries: 0` mantiene una sola llamada.
+ * Abortar solo deja de esperar: la garantía real del plazo de lectura la da el dominio.
  *
- * El SDK reintenta dos veces por defecto; `maxRetries: 0` mantiene la promesa del puerto de
- * una sola llamada. El plazo se pide al cliente y ademas se aborta con un `AbortSignal`
- * propio, pero abortar solo deja de esperar: la garantia real del plazo la da el dominio.
- *
- * No se envian `thinking`, `temperature`, `top_p` ni prefill: varios modelos actuales los
+ * No se envían `thinking`, `temperature`, `top_p` ni prefill: varios modelos actuales los
  * rechazan con un 400.
  */
 
 const PDF_MEDIA_TYPE = 'application/pdf';
 const IMAGE_MEDIA_TYPE = 'image/png';
 const MAX_TOKENS = 16000;
+const PROBE_TIMEOUT_MS = 10_000;
+
+export type AnthropicReaderConfig = { readonly apiKey: string; readonly model: string };
 
 function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64');
@@ -73,14 +74,30 @@ export function textFromAnthropicMessage(message: Anthropic.Message): string {
   return textos.join('');
 }
 
-/** `AiReader.read`: una sola llamada, sin bucle ni reintento. */
-export async function readWithAnthropic(request: AiReadRequest): Promise<string> {
-  const config = readAnthropicConfigFromEnv();
-  const client = new Anthropic({
-    apiKey: config.apiKey,
-    maxRetries: 0,
-    timeout: request.timeoutMs,
-  });
+function isAbort(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+}
+
+/**
+ * El tipo del fallo, solo por el código HTTP: el texto del proveedor no se mira ni se guarda.
+ * `model` es el que se estaba consultando en la prueba; al leer va `null` y un 404 no es de cuenta.
+ */
+export function classifyAnthropicError(error: unknown, model: string | null): AiProviderFailure {
+  if (error instanceof APIError) {
+    // Las clases de conexión y de aborto del SDK son `APIError` sin código: no hubo respuesta.
+    if (typeof error.status !== 'number') return { kind: 'unreachable', httpStatus: null, model: null };
+    const status = error.status;
+    if (status === 401 || status === 403) return { kind: 'rejected_key', httpStatus: status, model: null };
+    if (status === 429) return { kind: 'quota', httpStatus: status, model: null };
+    if (status === 404 && model !== null) return { kind: 'model_unavailable', httpStatus: status, model };
+    return { kind: 'unexpected', httpStatus: status, model: null };
+  }
+  if (isAbort(error)) return { kind: 'unreachable', httpStatus: null, model: null };
+  return { kind: 'unexpected', httpStatus: null, model: null };
+}
+
+async function readWithAnthropic(config: AnthropicReaderConfig, request: AiReadRequest): Promise<string> {
+  const client = new Anthropic({ apiKey: config.apiKey, maxRetries: 0, timeout: request.timeoutMs });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), request.timeoutMs);
@@ -95,7 +112,45 @@ export async function readWithAnthropic(request: AiReadRequest): Promise<string>
       { signal: controller.signal },
     );
     return textFromAnthropicMessage(message);
+  } catch (error) {
+    const failure = classifyAnthropicError(error, null);
+    if (isAccountFailure(failure)) {
+      throw new AiProviderError(failure, `claude messages.create respondió ${failure.httpStatus}`);
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** `AiReader` con la key y el modelo de la empresa: una sola llamada por lectura, sin reintento. */
+export function createAnthropicReader(config: AnthropicReaderConfig): AiReader {
+  return { read: (request) => readWithAnthropic(config, request) };
+}
+
+/**
+ * La prueba de la conexión: consulta cada modelo sin generar texto, así no gasta cuota. Los
+ * modelos van en paralelo y la prueba entera tiene un solo plazo.
+ */
+export async function probeAnthropic(input: {
+  readonly apiKey: string;
+  readonly models: readonly string[];
+}): Promise<AiProviderProbeResult> {
+  const client = new Anthropic({ apiKey: input.apiKey, maxRetries: 0, timeout: PROBE_TIMEOUT_MS });
+  const signal = AbortSignal.timeout(PROBE_TIMEOUT_MS);
+  const started = Date.now();
+  const failures: AiProviderFailure[] = [];
+
+  await Promise.all(
+    [...new Set(input.models)].map(async (model) => {
+      try {
+        await client.models.retrieve(model, {}, { signal });
+      } catch (error) {
+        failures.push(classifyAnthropicError(error, model));
+      }
+    }),
+  );
+
+  const failure = failures[0];
+  return failure === undefined ? { ok: true, elapsedMs: Date.now() - started } : { ok: false, failure };
 }

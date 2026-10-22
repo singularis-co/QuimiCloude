@@ -41,6 +41,7 @@ async function inRolledBackTransaction(
 const FOREIGN_KEY_VIOLATION = '23503'
 const UNIQUE_VIOLATION = '23505'
 const CHECK_VIOLATION = '23514'
+const NOT_NULL_VIOLATION = '23502'
 
 let savepointSeq = 0
 
@@ -194,13 +195,13 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
 
 async function rawInsertDelivery(
   tx: Prisma.TransactionClient,
-  row: { companyId: string; orderId: string; customerId: string; createdBy: string; deliveryKey?: string },
+  row: { companyId: string; orderId: string; createdBy: string; deliveryKey?: string },
 ): Promise<string> {
   const id = randomUUID()
   await tx.$executeRaw`
-    INSERT INTO "order_deliveries" ("id", "company_id", "order_id", "customer_id", "delivery_key", "created_by")
+    INSERT INTO "order_deliveries" ("id", "company_id", "order_id", "delivery_key", "created_by")
     VALUES (
-      ${asUuid(id)}, ${asUuid(row.companyId)}, ${asUuid(row.orderId)}, ${asUuid(row.customerId)},
+      ${asUuid(id)}, ${asUuid(row.companyId)}, ${asUuid(row.orderId)},
       ${asUuid(row.deliveryKey ?? randomUUID())}, ${asUuid(row.createdBy)}
     )`
   return id
@@ -211,6 +212,7 @@ async function rawInsertDeliveryLine(
   row: {
     companyId: string
     deliveryId: string
+    customerId: string | null
     presentationLineId: string
     batchId: string
     packages?: number
@@ -218,9 +220,10 @@ async function rawInsertDeliveryLine(
   },
 ): Promise<void> {
   await tx.$executeRaw`
-    INSERT INTO "order_delivery_lines" ("company_id", "delivery_id", "order_presentation_line_id", "batch_id", "packages", "quantity")
+    INSERT INTO "order_delivery_lines" ("company_id", "delivery_id", "customer_id", "order_presentation_line_id", "batch_id", "packages", "quantity")
     VALUES (
-      ${asUuid(row.companyId)}, ${asUuid(row.deliveryId)}, ${asUuid(row.presentationLineId)}, ${asUuid(row.batchId)},
+      ${asUuid(row.companyId)}, ${asUuid(row.deliveryId)}, ${row.customerId === null ? null : asUuid(row.customerId)},
+      ${asUuid(row.presentationLineId)}, ${asUuid(row.batchId)},
       ${row.packages ?? 2}, CAST(${row.quantity ?? '2'} AS decimal(14,4))
     )`
 }
@@ -253,12 +256,12 @@ async function validDelivery(tx: Prisma.TransactionClient, t: Tenant): Promise<s
   const deliveryId = await rawInsertDelivery(tx, {
     companyId: t.companyId,
     orderId: t.orderId,
-    customerId: t.customerId,
     createdBy: t.userId,
   })
   await rawInsertDeliveryLine(tx, {
     companyId: t.companyId,
     deliveryId,
+    customerId: t.customerId,
     presentationLineId: t.presentationLineId,
     batchId: t.batchId,
   })
@@ -292,19 +295,29 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
     })
   })
 
+  // QC-282 2026-10-15: el cliente paso de la entrega a la linea; la asercion del cliente de otra
+  // empresa se conserva, ahora sobre la linea de una entrega de A.
   it('R31: la entrega no puede apuntar al pedido, al cliente ni a la empresa de otra', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
       const b = await createTenant(tx, 'B')
-      const base = { companyId: a.companyId, orderId: a.orderId, customerId: a.customerId, createdBy: a.userId }
+      const base = { companyId: a.companyId, orderId: a.orderId, createdBy: a.userId }
 
       expect(
         await expectRejectedByDatabase(tx, () => rawInsertDelivery(tx, { ...base, orderId: b.orderId }), 'pedido de B'),
       ).toBe(FOREIGN_KEY_VIOLATION)
+      const deliveryA = await rawInsertDelivery(tx, base)
       expect(
         await expectRejectedByDatabase(
           tx,
-          () => rawInsertDelivery(tx, { ...base, customerId: b.customerId }),
+          () =>
+            rawInsertDeliveryLine(tx, {
+              companyId: a.companyId,
+              deliveryId: deliveryA,
+              customerId: b.customerId,
+              presentationLineId: a.presentationLineId,
+              batchId: a.batchId,
+            }),
           'cliente de B',
         ),
       ).toBe(FOREIGN_KEY_VIOLATION)
@@ -338,7 +351,6 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
             rawInsertDelivery(tx, {
               companyId: a.companyId,
               orderId: a.orderId,
-              customerId: a.customerId,
               createdBy: b.userId,
             }),
           'usuario de B',
@@ -355,7 +367,6 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
       await rawInsertDelivery(tx, {
         companyId: a.companyId,
         orderId: a.orderId,
-        customerId: a.customerId,
         createdBy: a.userId,
         deliveryKey,
       })
@@ -367,7 +378,6 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
             rawInsertDelivery(tx, {
               companyId: a.companyId,
               orderId: a.orderId,
-              customerId: a.customerId,
               createdBy: a.userId,
               deliveryKey,
             }),
@@ -378,7 +388,6 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
       await rawInsertDelivery(tx, {
         companyId: b.companyId,
         orderId: b.orderId,
-        customerId: b.customerId,
         createdBy: b.userId,
         deliveryKey,
       })
@@ -392,12 +401,12 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
       const deliveryA = await rawInsertDelivery(tx, {
         companyId: a.companyId,
         orderId: a.orderId,
-        customerId: a.customerId,
         createdBy: a.userId,
       })
       const base = {
         companyId: a.companyId,
         deliveryId: deliveryA,
+        customerId: a.customerId,
         presentationLineId: a.presentationLineId,
         batchId: a.batchId,
       }
@@ -405,7 +414,14 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
       expect(
         await expectRejectedByDatabase(
           tx,
-          () => rawInsertDeliveryLine(tx, { ...base, companyId: b.companyId, presentationLineId: b.presentationLineId, batchId: b.batchId }),
+          () =>
+            rawInsertDeliveryLine(tx, {
+              ...base,
+              companyId: b.companyId,
+              customerId: b.customerId,
+              presentationLineId: b.presentationLineId,
+              batchId: b.batchId,
+            }),
           'linea de B sobre la entrega de A',
         ),
       ).toBe(FOREIGN_KEY_VIOLATION)
@@ -422,16 +438,23 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
     })
   })
 
-  it('R31: envases y cantidad positivos, y un lote una sola vez por entrega', async () => {
+  // QC-282 2026-10-15: la unicidad pasa de (entrega, lote) a (entrega, cliente, lote); el rechazo
+  // del mismo lote dos veces se conserva, ahora con el mismo cliente.
+  it('R31: envases y cantidad positivos, y un lote una sola vez por entrega y cliente', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
       const deliveryId = await rawInsertDelivery(tx, {
         companyId: a.companyId,
         orderId: a.orderId,
-        customerId: a.customerId,
         createdBy: a.userId,
       })
-      const base = { companyId: a.companyId, deliveryId, presentationLineId: a.presentationLineId, batchId: a.batchId }
+      const base = {
+        companyId: a.companyId,
+        deliveryId,
+        customerId: a.customerId,
+        presentationLineId: a.presentationLineId,
+        batchId: a.batchId,
+      }
 
       for (const [packages, quantity, what] of [
         [0, '2', 'cero envases'],
@@ -451,6 +474,116 @@ describe('order_deliveries y order_delivery_lines contra Postgres real', () => {
       ).toBe(UNIQUE_VIOLATION)
     })
   })
+
+  it('QC-282 R30: la base rechaza una linea sin cliente, con un cliente inexistente o con el de otra empresa', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const deliveryId = await rawInsertDelivery(tx, { companyId: a.companyId, orderId: a.orderId, createdBy: a.userId })
+      const base = {
+        companyId: a.companyId,
+        deliveryId,
+        customerId: a.customerId as string | null,
+        presentationLineId: a.presentationLineId,
+        batchId: a.batchId,
+      }
+
+      expect(
+        await expectRejectedByDatabase(tx, () => rawInsertDeliveryLine(tx, { ...base, customerId: null }), 'sin cliente'),
+      ).toBe(NOT_NULL_VIOLATION)
+      expect(
+        await expectRejectedByDatabase(
+          tx,
+          () => rawInsertDeliveryLine(tx, { ...base, customerId: b.customerId }),
+          'cliente de B en una linea de A',
+        ),
+      ).toBe(FOREIGN_KEY_VIOLATION)
+      expect(
+        await expectRejectedByDatabase(
+          tx,
+          () => rawInsertDeliveryLine(tx, { ...base, customerId: randomUUID() }),
+          'cliente inexistente',
+        ),
+      ).toBe(FOREIGN_KEY_VIOLATION)
+
+      await rawInsertDeliveryLine(tx, base)
+      expect(await tx.orderDeliveryLine.findMany({ where: { deliveryId }, select: { customerId: true } })).toEqual([
+        { customerId: a.customerId },
+      ])
+    })
+  })
+
+  it('QC-282 R30: el mismo lote en la misma entrega se acepta con clientes distintos y se rechaza repetido para un cliente', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const { id: otroCliente } = await tx.customer.create({
+        data: {
+          firstNames: 'Marta',
+          firstNamesNormalized: 'marta',
+          lastNames: 'Diaz',
+          lastNamesNormalized: 'diaz',
+          city: 'Cali',
+          cityNormalized: 'cali',
+          companyId: a.companyId,
+        },
+        select: { id: true },
+      })
+      const deliveryId = await rawInsertDelivery(tx, { companyId: a.companyId, orderId: a.orderId, createdBy: a.userId })
+      const base = {
+        companyId: a.companyId,
+        deliveryId,
+        presentationLineId: a.presentationLineId,
+        batchId: a.batchId,
+      }
+
+      await rawInsertDeliveryLine(tx, { ...base, customerId: a.customerId, packages: 2, quantity: '2' })
+      await rawInsertDeliveryLine(tx, { ...base, customerId: otroCliente, packages: 3, quantity: '3' })
+
+      expect(
+        await expectRejectedByDatabase(
+          tx,
+          () => rawInsertDeliveryLine(tx, { ...base, customerId: otroCliente, packages: 1, quantity: '1' }),
+          'el mismo cliente y lote dos veces en la entrega',
+        ),
+      ).toBe(UNIQUE_VIOLATION)
+
+      const lineas = await tx.orderDeliveryLine.findMany({
+        where: { deliveryId },
+        select: { customerId: true, batchId: true, packages: true },
+        orderBy: { packages: 'asc' },
+      })
+      expect(lineas).toEqual([
+        { customerId: a.customerId, batchId: a.batchId, packages: 2 },
+        { customerId: otroCliente, batchId: a.batchId, packages: 3 },
+      ])
+    })
+  })
+
+  it('QC-282 R30: la entrega no guarda cliente propio; la linea lo exige con FK compuesta y unicidad por cliente', async () => {
+    const columnas = await prisma.$queryRaw<Array<{ table_name: string; is_nullable: string }>>`
+      SELECT table_name::text, is_nullable::text FROM information_schema.columns
+      WHERE table_schema = 'public' AND column_name = 'customer_id'
+        AND table_name IN ('order_deliveries', 'order_delivery_lines')
+      ORDER BY table_name`
+    expect(columnas).toEqual([{ table_name: 'order_delivery_lines', is_nullable: 'NO' }])
+
+    const restricciones = await prisma.$queryRaw<Array<{ conname: string; def: string }>>`
+      SELECT conname::text, pg_get_constraintdef(oid) AS def FROM pg_constraint
+      WHERE conrelid = 'public.order_delivery_lines'::regclass
+        AND conname IN (
+          'order_delivery_lines_customer_id_fkey',
+          'order_delivery_lines_delivery_customer_batch_unique',
+          'order_delivery_lines_delivery_batch_unique'
+        )
+      ORDER BY conname`
+    expect(restricciones).toEqual([
+      {
+        conname: 'order_delivery_lines_customer_id_fkey',
+        def: 'FOREIGN KEY (company_id, customer_id) REFERENCES customers(company_id, id) ON UPDATE CASCADE ON DELETE RESTRICT',
+      },
+      { conname: 'order_delivery_lines_delivery_customer_batch_unique', def: 'UNIQUE (delivery_id, customer_id, batch_id)' },
+    ])
+  })
 })
 
 describe('el asiento delivery de inventory_movements contra Postgres real', () => {
@@ -460,7 +593,6 @@ describe('el asiento delivery de inventory_movements contra Postgres real', () =
       const deliveryId = await rawInsertDelivery(tx, {
         companyId: a.companyId,
         orderId: a.orderId,
-        customerId: a.customerId,
         createdBy: a.userId,
       })
       const base = {
@@ -524,7 +656,6 @@ describe('el asiento delivery de inventory_movements contra Postgres real', () =
       const deliveryB = await rawInsertDelivery(tx, {
         companyId: b.companyId,
         orderId: b.orderId,
-        customerId: b.customerId,
         createdBy: b.userId,
       })
 

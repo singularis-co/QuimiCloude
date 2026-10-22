@@ -65,10 +65,15 @@ export type RecipeToolView = {
  */
 export type RecipeStepView = RecipeStepDocument;
 
+/** Paso del acondicionador: el mismo documento con la marca de asignacion; ausente = apagada. */
+export type ConditioningStepView = RecipeStepView & { readonly requiresAssignment?: boolean };
+
 export type RecipeDetail = RecipeSummary & {
   readonly steps: readonly RecipeStepView[];
   /** Los del empacador; en una version, los de su original. */
   readonly packingSteps: readonly RecipeStepView[];
+  /** Los del acondicionador; en una version, los de su original. */
+  readonly conditioningSteps: readonly ConditioningStepView[];
   readonly lines: readonly RecipeLineView[];
   readonly tools: readonly RecipeToolView[];
   /** `null` en una original. */

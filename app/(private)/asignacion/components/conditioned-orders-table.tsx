@@ -4,10 +4,11 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useTransition } from 'react';
 
 import { DataTable, type DataTableParams, type DataTableTexts } from '@/components/shared/data-table';
-import type { FinishedOrderView } from '@/lib/modules/asignaciones';
+import type { AssignmentViewKind, FinishedOrderView } from '@/lib/modules/asignaciones';
 
+import { assignedOrdersListHref } from './assigned-orders-list-params';
 import { buildConditionedOrdersColumns } from './conditioned-orders-columns';
-import { conditionedOrdersHref, deliveredConditionedOrdersHref } from './conditioning-orders-href';
+import { FINISHED_ORDERS_CARD } from './finished-orders-columns';
 
 export const CONDITIONED_ORDERS_TABLE_ID = 'asignacion-acondicionados';
 
@@ -38,24 +39,21 @@ export type ConditionedOrdersTableProps = {
   readonly rows: readonly FinishedOrderView[];
   readonly params: DataTableParams;
   readonly totalPages: number;
-  /** La vista a la que vuelve al paginar: «Terminados» y «Entregados» comparten tabla. */
-  readonly view?: 'acondicionados' | 'acondicionados_entregados';
+  /** La vista a la que vuelve al paginar. */
+  readonly view?: Extract<AssignmentViewKind, 'acondicionados'>;
+  readonly canViewTrace?: boolean;
 };
-
-const PAGE_HREF = {
-  acondicionados: conditionedOrdersHref,
-  acondicionados_entregados: deliveredConditionedOrdersHref,
-} as const;
 
 export function ConditionedOrdersTable({
   rows,
   params,
   totalPages,
   view = 'acondicionados',
+  canViewTrace = false,
 }: ConditionedOrdersTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => buildConditionedOrdersColumns(), []);
+  const columns = useMemo(() => buildConditionedOrdersColumns({ canViewTrace }), [canViewTrace]);
 
   const navigate = (href: string) => {
     startTransition(() => {
@@ -79,10 +77,11 @@ export function ConditionedOrdersTable({
         getRowId={(order) => order.id}
         params={params}
         totalPages={totalPages}
-        onParamsChange={(next) => navigate(PAGE_HREF[view](next))}
+        onParamsChange={(next) => navigate(assignedOrdersListHref(next, view))}
         status="idle"
         texts={CONDITIONED_ORDERS_TABLE_TEXTS}
         searchable={false}
+        card={FINISHED_ORDERS_CARD}
       />
     </div>
   );

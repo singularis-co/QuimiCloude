@@ -33,7 +33,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { normalizeCompanyName, ROLE_ADMINISTRADOR, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
@@ -48,7 +48,7 @@ import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, permissionsForUsername } from './helpers/landing';
-import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc92_e2e_';
 
@@ -95,7 +95,7 @@ const INITIAL_STOCK = '12';
 const REASON_OPTION_LABELS: Readonly<Record<MovementReason, string>> = {
   merma: 'Merma',
   rotura: 'Rotura',
-  conteo_fisico: 'Conteo fisico',
+  conteo_fisico: 'Conteo físico',
   error_de_carga: 'Error de carga',
 };
 
@@ -203,12 +203,37 @@ async function openBatchesOf(page: Page, user: Credentials, seeded: SeededBatch)
   await openBatchesPanel(page, seeded);
 }
 
+/**
+ * Fila de un lote en el panel «Lotes». El panel pinta cada lote como fila y como tarjeta (oculta
+ * en un contenedor ancho), y sus celdas repiten los mismos `data-testid`: se acota a la fila.
+ */
+function batchRowInSheet(page: Page, batchId: string): Locator {
+  return page.getByTestId('product-batches-sheet').getByTestId(`data-table-row-${batchId}`);
+}
+
+/**
+ * La fila del producto en la lista. La lista pinta cada producto como fila y como tarjeta (oculta
+ * en un contenedor ancho) con los mismos `data-testid` dentro: se acota a la fila.
+ */
+function productRow(page: Page, seeded: SeededBatch) {
+  return page.getByTestId(`data-table-row-${seeded.productId}`);
+}
+
 async function openBatchesPanel(page: Page, seeded: SeededBatch): Promise<void> {
   await (
-    await openRowActionsMenuItem(page, page.getByTestId('product-row-actions'), 'product-batches-open')
+    await openRowActionsMenuItem(
+      page,
+      productRow(page, seeded).getByTestId('product-row-actions'),
+      'product-batches-open',
+    )
   ).click();
   await expect(page.getByTestId('product-batches-sheet')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId(`product-batch-${seeded.batchId}`)).toBeVisible({ timeout: 60_000 });
+  await expect(batchRowInSheet(page, seeded.batchId)).toBeVisible({ timeout: 60_000 });
+}
+
+/** La cantidad del lote del caso, en su fila del panel «Lotes». */
+function batchQuantity(page: Page, seeded: SeededBatch) {
+  return batchRowInSheet(page, seeded.batchId).getByTestId('product-batch-quantity');
 }
 
 /** Cierra el panel de lotes por su boton de cierre: es lo que desmonta el historial. */
@@ -217,9 +242,17 @@ async function closeBatchesPanel(page: Page): Promise<void> {
   await expect(page.getByTestId('product-batches-sheet')).toHaveCount(0, { timeout: 60_000 });
 }
 
-async function openBatchHistory(page: Page): Promise<void> {
-  await page.getByTestId('batch-history-trigger').click();
+/** El historial se abre desde el menu del lote, en un dialogo encima del panel. */
+async function openBatchHistory(page: Page, seeded: SeededBatch): Promise<void> {
+  const trigger = batchActionsTrigger(batchRowInSheet(page, seeded.batchId));
+  await (await openRowActionsMenuItem(page, trigger, 'batch-history-trigger')).click();
+  await expect(page.getByTestId('batch-history-dialog')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('batch-history-list')).toBeVisible({ timeout: 60_000 });
+}
+
+/** Fila de un asiento en la tabla del historial: `kind` + `id` es lo unico en los dos libros. */
+function historyEntryRow(page: Page, kind: 'opening' | 'adjustment', movementId: string) {
+  return page.getByTestId('batch-history-list').getByTestId(`data-table-row-${kind}-${movementId}`);
 }
 
 async function chooseReason(page: Page, reason: MovementReason): Promise<void> {
@@ -236,10 +269,16 @@ async function chooseReason(page: Page, reason: MovementReason): Promise<void> {
  * Abre el dialogo, escribe el total contado y elige el motivo. El total va como CADENA: la
  * columna admite cuatro decimales y un `number` arriesgaria el redondeo binario.
  */
-async function fillAdjustDialog(page: Page, counted: string, reason: MovementReason): Promise<void> {
-  await page.getByTestId('adjust-batch-open').click();
+async function fillAdjustDialog(
+  page: Page,
+  seeded: SeededBatch,
+  counted: string,
+  reason: MovementReason,
+): Promise<void> {
+  const trigger = batchActionsTrigger(batchRowInSheet(page, seeded.batchId));
+  await (await openRowActionsMenuItem(page, trigger, 'adjust-batch-open')).click();
   await expect(page.getByTestId('adjust-batch-dialog')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('adjust-batch-recorded-stock')).toHaveText(INITIAL_STOCK);
+  await expect(page.getByTestId('adjust-batch-recorded-stock')).toHaveValue(INITIAL_STOCK);
   await page.getByTestId('adjust-batch-counted').fill(counted);
   await chooseReason(page, reason);
 }
@@ -364,16 +403,16 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
   }) => {
     const seeded = await seedBatch('aumento');
     await openBatchesOf(page, adminUser, seeded);
-    await expect(page.getByTestId('product-batch-quantity')).toContainText(INITIAL_STOCK);
+    await expect(batchQuantity(page, seeded)).toContainText(INITIAL_STOCK);
 
-    await fillAdjustDialog(page, '15.5', 'conteo_fisico');
+    await fillAdjustDialog(page, seeded, '15.5', 'conteo_fisico');
     const difference = page.getByTestId('adjust-batch-difference');
     await expect(difference).toHaveAttribute('data-direction', 'increase');
     await expect(difference).toHaveText('Aumento de 3.5');
 
     await page.getByTestId('adjust-batch-confirm').click();
     await expect(page.getByTestId('adjust-batch-dialog')).toHaveCount(0, { timeout: 60_000 });
-    await expect(page.getByTestId('product-batch-quantity')).toContainText('15.5');
+    await expect(batchQuantity(page, seeded)).toContainText('15.5');
 
     expect(await batchStockOf(seeded.batchId), 'el lote queda en el total contado').toBe('15.5000');
 
@@ -390,8 +429,8 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
     // Reabrir el panel remonta el historial y lo pide de nuevo, con el asiento recien escrito.
     await closeBatchesPanel(page);
     await openBatchesPanel(page, seeded);
-    await openBatchHistory(page);
-    const entry = page.getByTestId(`batch-history-entry-${adjustment.id}`);
+    await openBatchHistory(page, seeded);
+    const entry = historyEntryRow(page, 'adjustment', adjustment.id);
     await expect(entry).toBeVisible({ timeout: 60_000 });
     await expect(entry.getByTestId('batch-history-entry-quantity')).toHaveText('3.5');
     await expect(entry.getByTestId('batch-history-entry-previous-stock')).toHaveText('12');
@@ -400,7 +439,7 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
       REASON_OPTION_LABELS.conteo_fisico,
     );
     // El asiento de alta no tiene existencia anterior ni total contado: se pinta como siempre.
-    const opening = page.getByTestId(`batch-history-entry-${seeded.openingMovementId}`);
+    const opening = historyEntryRow(page, 'opening', seeded.openingMovementId);
     await expect(opening).toBeVisible();
     await expect(opening.getByTestId('batch-history-entry-previous-stock')).toHaveCount(0);
     await expect(opening.getByTestId('batch-history-entry-counted-stock')).toHaveCount(0);
@@ -412,14 +451,14 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
     const seeded = await seedBatch('disminucion');
     await openBatchesOf(page, adminUser, seeded);
 
-    await fillAdjustDialog(page, '9.25', 'merma');
+    await fillAdjustDialog(page, seeded, '9.25', 'merma');
     const difference = page.getByTestId('adjust-batch-difference');
     await expect(difference).toHaveAttribute('data-direction', 'decrease');
     await expect(difference).toHaveText('Disminución de 2.75');
 
     await page.getByTestId('adjust-batch-confirm').click();
     await expect(page.getByTestId('adjust-batch-dialog')).toHaveCount(0, { timeout: 60_000 });
-    await expect(page.getByTestId('product-batch-quantity')).toContainText('9.25');
+    await expect(batchQuantity(page, seeded)).toContainText('9.25');
 
     expect(await batchStockOf(seeded.batchId)).toBe('9.2500');
 
@@ -434,7 +473,7 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
 
     // La lista de detras se refresca sola al confirmar, sin recargar la pagina.
     await closeBatchesPanel(page);
-    await expect(page.getByTestId('product-stock')).toHaveText(`9.25 ${unitName}`, {
+    await expect(productRow(page, seeded).getByTestId('product-stock')).toHaveText(`9.25 ${unitName}`, {
       timeout: 60_000,
     });
     const product = await prisma.product.findUnique({
@@ -450,7 +489,7 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
     const seeded = await seedBatch('cambiada');
     await openBatchesOf(page, adminUser, seeded);
 
-    await fillAdjustDialog(page, '10', 'merma');
+    await fillAdjustDialog(page, seeded, '10', 'merma');
     await expect(page.getByTestId('adjust-batch-difference')).toHaveText('Disminución de 2');
 
     // Otro movimiento llega mientras el dialogo esta abierto: el lote pasa de 12 a 15.
@@ -468,7 +507,7 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
     await expect(stockChanged).toBeVisible({ timeout: 60_000 });
     await expect(stockChanged).toHaveAttribute('data-code', 'batch_stock_changed');
     await expect(page.getByTestId('adjust-batch-dialog')).toBeVisible();
-    await expect(page.getByTestId('adjust-batch-recorded-stock')).toHaveText('15');
+    await expect(page.getByTestId('adjust-batch-recorded-stock')).toHaveValue('15');
     const difference = page.getByTestId('adjust-batch-difference');
     await expect(difference).toHaveAttribute('data-direction', 'decrease');
     await expect(difference).toHaveText('Disminución de 5');
@@ -484,7 +523,7 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
     await expect(page.getByTestId('adjust-batch-reason')).toContainText(REASON_OPTION_LABELS.merma);
     await page.getByTestId('adjust-batch-confirm').click();
     await expect(page.getByTestId('adjust-batch-dialog')).toHaveCount(0, { timeout: 60_000 });
-    await expect(page.getByTestId('product-batch-quantity')).toContainText('10');
+    await expect(batchQuantity(page, seeded)).toContainText('10');
 
     expect(await batchStockOf(seeded.batchId)).toBe('10.0000');
     const movements = await movementsOf(seeded.batchId);
@@ -512,10 +551,18 @@ test.describe('ajuste de existencia de un lote por total contado', () => {
 
     const seeded = await seedBatch('operador');
     await openBatchesOf(page, operatorUser, seeded);
-    await expect(page.getByTestId('product-batch-quantity')).toBeVisible();
+    await expect(batchQuantity(page, seeded)).toBeVisible();
 
-    await openBatchHistory(page);
-    await expect(page.getByTestId(`batch-history-entry-${seeded.openingMovementId}`)).toBeVisible({
+    // Con el menu del lote abierto: «Historial» esta y «Ajustar existencia» no existe en el DOM.
+    const historyItem = await openRowActionsMenuItem(
+      page,
+      batchActionsTrigger(batchRowInSheet(page, seeded.batchId)),
+      'batch-history-trigger',
+    );
+    await expect(page.getByTestId('adjust-batch-open')).toHaveCount(0);
+    await historyItem.click();
+    await expect(page.getByTestId('batch-history-list')).toBeVisible({ timeout: 60_000 });
+    await expect(historyEntryRow(page, 'opening', seeded.openingMovementId)).toBeVisible({
       timeout: 60_000,
     });
 

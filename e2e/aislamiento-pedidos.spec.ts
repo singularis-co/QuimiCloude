@@ -32,7 +32,12 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { addPackagingLine, openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import {
+  addPackagingLine,
+  openOrderRowMenu,
+  orderMenuTrigger,
+  submitOrderWithLeftover,
+} from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc60_e2e_';
@@ -98,7 +103,6 @@ const UNIT_OPTION = 'presentation-unit-option';
 const DISTRIBUTION_FIELD = 'order-distribution-field';
 const DISTRIBUTION_AVAILABLE = 'order-distribution-available';
 const QUANTITY_FIELD = 'order-field-quantity';
-const FORM_SUBMIT = 'order-form-submit';
 
 /** El codigo de «el pedido no existe» del catalogo cerrado (R20, R21): nunca `unauthorized`. */
 const ORDER_NOT_FOUND_CODE = 'order_not_found';
@@ -518,7 +522,8 @@ test.describe('aislamiento por empresa de pedidos', () => {
       { timeout: 60_000 },
     );
 
-    await page.getByTestId(FORM_SUBMIT).click();
+    // 7.25 en un envase de 1: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, page.getByTestId(ORDER_FORM));
     await expect(page.getByTestId(ORDER_FORM)).toHaveCount(0, { timeout: 60_000 });
 
     const createdInA = await prisma.order.findMany({

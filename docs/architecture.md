@@ -31,8 +31,8 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de nueve tablas: los catalogos compartidos por todas las empresas
-     (`document_types`, `roles`, `permissions`, `role_permissions`), la propia empresa
+     y cerrada de once tablas: los catalogos compartidos por todas las empresas
+     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`, `addons`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
      (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
      receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
@@ -40,8 +40,10 @@ consecuencias de arquitectura que no son opinables:
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Nada de infraestructura «por si acaso».** Es sobre-ingenieria —y el reviewer la
      rechaza— todo lo que no esta pedido: jerarquias de empresas, empresas anidadas, un
-     usuario en varias empresas, permisos por empresa mas alla de su rol, o un selector de
-     empresa antes de que exista su ficha.
+     usuario en varias empresas, permisos por empresa **que amplíen** su rol, o un selector de
+     empresa antes de que exista su ficha. Lo único por empresa son sus **añadidos activos**
+     (`company_addon_overrides`), que solo **recortan**: el permiso efectivo es rol ∩ añadidos activos
+     (QC-277).
    - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
      empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es
      gratis y no es opcional.
@@ -257,7 +259,8 @@ guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya
 - **Deploy:** Vercel. Secretos en variables de entorno, nunca en repo.
 - **Integraciones externas** (cada una con su cliente en `lib/modules/<modulo>/adapters/driven/` y
   su fila en `docs/dependencias.md`):
-  - Anthropic (`@anthropic-ai/sdk`) y Google Gemini (`@google/genai`): lectura de PDFs con IA.
+  - Anthropic, Google Gemini y OpenAI/OpenRouter (`openai`): lectura de PDF con la key de cada
+    empresa.
   - Upstash QStash (`@upstash/qstash`): cola de procesamiento de PDFs.
   - Supabase Storage (`@supabase/storage-js`): imagenes de recetas.
   - Resend (`resend`): correo para establecer la contrasena.
@@ -342,7 +345,7 @@ lib/modules/<modulo>/
 
 - **Dominio** (`domain/`): casos de uso y tipos. Solo puede importar de su propio
   `domain/`/`ports/`, el contrato (`index.ts`) de otro modulo, y paquetes puros (hoy:
-  `zod`, `papaparse`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
+  `zod`, `papaparse`, `libphonenumber-js` y su subpath `libphonenumber-js/max`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
   `app/`, `components/` ni las tripas de otro modulo.
 - **Puertos** (`ports/`): la superficie hacia adentro. Los implementa el adaptador
   driven correspondiente y los cablea el punto de composicion. Nadie mas los importa.
@@ -389,7 +392,7 @@ un adaptador driven: recibe datos por props y llama a la Server Action por su ru
 
 | Origen | PUEDE importar | NO PUEDE importar |
 | --- | --- | --- |
-| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`, `papaparse`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`, `papaparse`, `libphonenumber-js`, `libphonenumber-js/max`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
 | `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel), **otro driven del MISMO modulo** (ver nota) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo), **un driven de OTRO modulo** |
 | `lib/modules/M/adapters/driving/**` | `lib/composition`, `@/lib/modules/M` (barrel), su propia carpeta, `next/*`, `react*`, `lib/shared/**` | `@prisma/client`, el cliente Prisma compartido, `../driven/**`, `../../domain`/`../../ports` por ruta profunda |
 | `lib/composition/**` | `@/lib/modules/*` (barrel), `*/ports/**`, `*/adapters/driven/**`, `lib/shared/**` | `*/adapters/driving/**`, `app/**`, `components/**` |
@@ -554,9 +557,13 @@ error mas comun al montar Prisma sobre Supabase.
   pinta `nav-user`). **Un permiso implementado solo como corte de ruta no cuenta como implementado**,
   igual que no cuenta uno implementado solo como policy de RLS: el 404 de la pagina decide si se
   **enseña** una pantalla, y el service decide si se puede **hacer**.
-- **Los permisos de la sesion son una foto del instante del login** y envejecen hasta 8 h: una
-  pantalla puede pintarse para alguien a quien el service ya deniega. La invalidacion inmediata es
-  QC-23.
+- **Los permisos se resuelven en cada petición, en la misma lectura de sesión**: los del rol actual
+  menos los de los añadidos no activos de la empresa. Un cambio de rol o de añadidos vale desde la
+  siguiente petición; lo ya pintado en pantalla no se repinta solo.
+- **Añadidos por empresa.** El catálogo de añadidos vive en `identity/domain/company-addons.ts`. Las
+  operaciones de un añadido que no tienen permiso propio se cortan con `requireAddon` en el caso de
+  uso y con `requirePageAddon` en la pantalla. Lo que corre sin sesión comprueba el añadido en la
+  empresa del trabajo, y lo vigila `tests/guards/guard-rutas-fuera-de-sesion.test.ts`.
 
 ### Por qué
 
@@ -574,8 +581,10 @@ y que el test se ponga rojo si aparece una accion con las dos caras de la sesion
 lista o sin ambito, es lo que detecta la que llegue en el proximo merge, aunque venga en un
 **modulo nuevo** o en una **subcarpeta**.
 
-**Permisos que envejecen:** un cambio de permisos no llega a la pantalla hasta que la sesion
-caduca.
+**Permisos en cada petición:** la sesión ya relee el rol y la empresa en cada petición con una sola
+consulta, y los añadidos salen en esa misma lectura: el recorte no añade consultas ni obliga a volver
+a iniciar sesión. Lo que no hace es repintar una pantalla ya abierta; el cambio se ve en la siguiente
+petición.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |
@@ -594,6 +603,8 @@ caduca.
 - El proceso no actua en nombre de ninguna empresa, pero **tampoco lee varias a la vez**: recorre
   las empresas y busca los candidatos de cada una por separado, de modo que la regla de ambito de
   empresa de las consultas se cumple sin excepciones.
+- Los crons son **núcleo** y no miran añadidos; el webhook de un añadido sí, en la empresa del
+  trabajo, antes de actuar.
 
 ### Por qué
 
@@ -658,6 +669,12 @@ migracion se aplica sobre un estado que Prisma cree que es otro.
   - *Nota 2026-10-09 (QC-249):* desde QC-249 `VERCEL_ENV=preview` tambien migra y siembra, contra
     la base de preview y tras una comprobacion previa; ver `## Previews (QC-249)`. Con
     development, vacio o ausente sigue sin tocar la base.
+  - *Nota 2026-10-13 (QC-162):* el seed lee su alcance de `VERCEL_ENV`
+    (`lib/modules/identity/adapters/driven/config/seed-scope-env.ts`). Con `production` (recortado)
+    solo siembra roles, permisos y el Maestro: no lee `SEED_ADMIN_*`, no lee ni crea la empresa
+    inicial y no crea el Administrador inicial; las empresas las da de alta el Maestro. Nunca borra
+    ni modifica: la QuimiCloud que ya exista en produccion se queda. Con cualquier otro valor
+    (preview, development, vacio o ausente) siembra todo, como antes. `scripts/build.mjs` no cambia.
 
 `tests/guards/guard-despliegue-produccion.test.ts` lo fija.
 
@@ -724,7 +741,8 @@ Con `VERCEL` definida y `VERCEL_ENV=preview`, `scripts/build.mjs` primero llama 
   `DOCUMENTS_E2E_DOUBLES` tiene valor; `RESEND_API_KEY`, `SMTP_PASS`, `ANTHROPIC_API_KEY`,
   `GEMINI_API_KEY` y `QSTASH_TOKEN` estan vacias o ausentes. Elegir los dobles y quitar las
   credenciales son dos cerrojos independientes: aunque uno falle, no hay con que llamar al
-  proveedor.
+  proveedor. `ANTHROPIC_API_KEY` y `GEMINI_API_KEY` ya no las lee la app; se siguen rechazando por
+  si quedan en Vercel.
 
 Si cumple, corre en orden `prisma migrate deploy`, `prisma generate`, el seed base, el seed de
 demostracion (`tsx scripts/seed-demo.ts`, sin `--forzar`) y `next build`, y para en el primer paso
@@ -776,7 +794,8 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `DATABASE_URL`, `DIRECT_URL` | base de produccion | base del proyecto de preview (contienen `PREVIEW_SUPABASE_REF`) | base local |
 | `PREVIEW_SUPABASE_REF` | ausente | Reference ID del proyecto de Supabase de preview | ausente |
 | `SESSION_SECRET` | propio | **propio de preview**, distinto del de produccion | propio |
-| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
+| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL` | no se leen: en produccion el seed solo crea al Maestro (QC-162) | propias de preview | propias |
+| `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
 | `SEED_DEMO_OPERADOR_PASSWORD`, `SEED_DEMO_EMPACADOR_PASSWORD`, `SEED_DEMO_ACONDICIONAMIENTO_PASSWORD` | ausentes | **obligatorias** (el seed de demostracion falla sin ellas) | en el entorno del comando |
 | `SUPABASE_STORAGE_URL`, `SUPABASE_STORAGE_KEY` | de produccion | del proyecto de preview (la URL contiene `PREVIEW_SUPABASE_REF`) | segun dev |
 | `SUPABASE_STORAGE_BUCKET`, `SUPABASE_DOCUMENTS_BUCKET`, `SUPABASE_CROPS_BUCKET` | de produccion | buckets del proyecto de preview | segun dev |
@@ -784,8 +803,6 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `RESEND_API_KEY`, `SMTP_PASS` | de produccion | **ausentes** (comprobacion previa) | segun dev |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM_ADDRESS`, `APP_BASE_URL` | de produccion | ausentes (solo las lee el correo) | segun dev |
 | `MAIL_OUTBOX_DIR` | ausente | ausente | solo con `outbox` |
-| `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` | de produccion | **ausentes** (comprobacion previa) | segun dev |
-| `ANTHROPIC_MODEL`, `GEMINI_MODEL` | de produccion | ausentes | segun dev |
 | `QSTASH_TOKEN` | de produccion | **ausente** (comprobacion previa) | segun dev |
 | `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `QSTASH_TARGET_URL` | de produccion | ausentes (sin ellas, el webhook rechaza todo) | segun dev |
 | `DOCUMENT_PROCESSING_TIMEOUT_SECONDS`, `DOCUMENT_PROCESSING_MAX_RETRIES` | opcionales | vacias (valores por defecto) | vacias |
@@ -793,22 +810,31 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `CRON_SECRET` | de produccion | ausente (Vercel no ejecuta crons en previews) | segun dev |
 | `INTEGRATIONS_ENCRYPTION_KEYS`, `INTEGRATIONS_ENCRYPTION_ACTIVE` | de produccion | **propias de preview** (la base ya no se comparte) | propias |
 | `DOCUMENTS_E2E_DOUBLES` | ausente | **con valor** (comprobacion previa) | vacia; solo la pone `playwright.config.ts` |
+| `WHATSAPP_GRAPH_API_VERSION` | la fija quien despliega (no es secreto) | la misma que production (no es secreto; decidido por el humano el 2026-10-09, QC-237) | segun dev |
+| `INTEGRATIONS_E2E_DOUBLES` | ausente (cliente real de Graph) | ausente (cliente real de Graph; decidido por el humano el 2026-10-09, QC-237) | vacia; solo la pone `playwright.config.ts` |
+| `SUPABASE_EVIDENCE_BUCKET` | bucket privado de produccion | bucket privado del proyecto de preview | segun dev |
+| `EVIDENCE_E2E_DOUBLES` | ausente | ausente (bucket real del proyecto de preview, QC-214) | vacia; solo la pone `playwright.config.ts` |
 
 `VERCEL` y `VERCEL_ENV` las pone Vercel y no se cargan a mano; `NODE_ENV` la ponen Next y Vercel.
 Las del bloque de servidores MCP de `.env.example` (`ATLASSIAN_MCP_AUTH`, `CONTEXT7_API_KEY`,
 `SUPABASE_PROJECT_REF`) no las lee la app: las lee `.mcp.json` del entorno del proceso.
 
 ## Componentes
+Todo componente nuevo o cambio visual lleva un pase de diseño aprobado antes del spec
+(`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`; fuente en `docs/diseno/`).
+
 - `components/ui/`: primitivas de shadcn/ui. **Nunca crees un componente si ya existe en shadcn/ui.**
   Agregas con: `pnpm exec shadcn add <component>`.
-- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre features.
+- `components/shared/`: compuestos construidos con primitivas ui/. Reutilizables entre rutas.
 - `components/private/`: contienen datos sensibles. El padre (Server Component) valida permisos y
   pasa datos por props. No fetchean datos por si mismos.
 
 ### Regla: sin sobre-ingenieria
 Si un componente se usa en UN SOLO lugar y no tiene logica reutilizable, vive junto
-a la pagina que lo usa. Solo se promueve a `shared/` cuando al menos DOS features
-lo necesitan con la misma API.
+a la pagina que lo usa. Sube a `shared/` cuando la necesita una **segunda ruta** con la misma
+API (orden completo: `docs/perfil-agentes.md > Todos los agentes > Regla de decisión para
+componentes`). Lo que hay en `ui/`, `shared/`, `lib/shared/ui/` y `hooks/` está en
+`components/shared/CATALOGO.md`.
 
 ### Regla: componentes de ruta en `components/` con barrel `index.ts`
 

@@ -8,6 +8,13 @@
 // La Server Action se mockea: importarla de verdad arrastraria `'use server'` y el punto de
 // composicion —o sea Prisma y la configuracion de correo— a un test de interfaz. Mismo patron que
 // `tests/unit/login-form.test.tsx` con `loginAction`.
+//
+// ENMIENDA QC-260 (design.md > 3.4 y 10): los campos pasan a ser el `PasswordField` compartido.
+// El «no coinciden» es el error de campo de «Repite la contraseña» y su testid pasa de
+// `set-credential-mismatch` a `set-credential-confirmation-error`; `aria-describedby` se comprueba
+// por inclusion, porque «Contraseña nueva» cita ademas su lista de requisitos. No habia casos que
+// ejercieran `CredentialInput` como pieza local: el del mostrar/ocultar se queda y ahora ejerce el
+// ojo de `PasswordField` dentro de la pagina.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 
@@ -41,7 +48,7 @@ const testId = {
   confirmation: 'set-credential-confirmation',
   submit: 'set-credential-submit',
   unmet: 'set-credential-unmet',
-  mismatch: 'set-credential-mismatch',
+  confirmationError: 'set-credential-confirmation-error',
   error: 'set-credential-error',
   reference: 'set-credential-error-reference',
   success: 'set-credential-success',
@@ -288,7 +295,9 @@ describe('los cinco estados de SetCredentialFormState', () => {
 
     // El aviso se anuncia y el campo lo cita: el canal no es solo el color (R25 y WAI-ARIA).
     const aviso = screen.getByRole('alert');
-    expect(screen.getByTestId(testId.credential)).toHaveAttribute('aria-describedby', aviso.id);
+    expect(aviso.id).not.toBe('');
+    const describedBy = screen.getByTestId(testId.credential).getAttribute('aria-describedby') ?? '';
+    expect(describedBy.split(' ')).toContain(aviso.id);
 
     // El enlace sigue vivo: el formulario se puede reintentar sin recargar (R23).
     expect(screen.getByTestId(testId.secret)).toHaveValue(SECRETO);
@@ -298,9 +307,10 @@ describe('los cinco estados de SetCredentialFormState', () => {
   it('mismatch: se dice que no coinciden y no se dice nada mas de la contrasena', async () => {
     await enviarCon({ status: 'mismatch' });
 
-    const aviso = screen.getByTestId(testId.mismatch);
+    const aviso = screen.getByTestId(testId.confirmationError);
     expect(aviso).toHaveAttribute('role', 'alert');
-    expect(screen.getByTestId(testId.confirmation)).toHaveAttribute('aria-describedby', aviso.id);
+    const describedBy = screen.getByTestId(testId.confirmation).getAttribute('aria-describedby') ?? '';
+    expect(describedBy.split(' ')).toContain(aviso.id);
     expect(screen.queryByTestId(testId.unmet)).toBeNull();
   });
 

@@ -20,8 +20,9 @@ const DOC = 'docs/architecture.md'
 const SECCION = '## Previews'
 const SUBSECCION = '### Variables por entorno'
 
-/** Las del bloque MCP: no las lee la app, las interpola `.mcp.json` del entorno del proceso. */
-const VARIABLES_MCP = ['ATLASSIAN_MCP_AUTH', 'CONTEXT7_API_KEY', 'SUPABASE_PROJECT_REF']
+/** Las del bloque MCP: no las lee la app, las interpola `.mcp.json` (o `scripts/trello.mjs`) del
+ *  entorno del proceso. */
+const VARIABLES_MCP = ['ATLASSIAN_MCP_AUTH', 'TRELLO_KEY', 'TRELLO_TOKEN', 'CONTEXT7_API_KEY', 'SUPABASE_PROJECT_REF']
 const TITULO_BLOQUE_MCP = 'Servidores MCP'
 
 function leer(ruta: string): string {
@@ -89,7 +90,7 @@ describe(`guardia: ${PLANTILLA} y la tabla de ${DOC} > Previews > Variables por 
     ).toBeGreaterThan(30)
   })
 
-  it('R17: el bloque MCP de .env.example se reconoce y contiene exactamente sus tres variables', () => {
+  it('R17: el bloque MCP de .env.example se reconoce y contiene exactamente sus variables', () => {
     // Si el bloque se delimitara mal, podria tragarse variables de la app y dejarlas fuera del control.
     const mcp = declaraciones(plantilla)
       .filter((d) => d.enBloqueMcp)

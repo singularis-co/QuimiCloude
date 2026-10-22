@@ -11,12 +11,13 @@ import { ejecutarBuild, pasosDelBuild } from '@/scripts/build.mjs'
 
 const MIGRAR = 'prisma migrate deploy'
 const GENERAR = 'prisma generate'
+const RELLENAR = 'tsx scripts/backfill-customer-phones.ts'
 const SEMBRAR = 'tsx scripts/seed.ts'
 const SEMBRAR_DEMO = 'tsx scripts/seed-demo.ts'
 const CONSTRUIR = 'next build'
 
-const TODO = [MIGRAR, GENERAR, SEMBRAR, CONSTRUIR]
-const TODO_Y_DEMO = [MIGRAR, GENERAR, SEMBRAR, SEMBRAR_DEMO, CONSTRUIR]
+const TODO = [MIGRAR, GENERAR, RELLENAR, SEMBRAR, CONSTRUIR]
+const TODO_Y_DEMO = [MIGRAR, GENERAR, RELLENAR, SEMBRAR, SEMBRAR_DEMO, CONSTRUIR]
 const SIN_BASE = [GENERAR, CONSTRUIR]
 
 const MOTIVO_PREVIEW = '[build] Vercel preview -> con migrate, seed y seed de demostracion (base de preview)'
@@ -42,7 +43,7 @@ function previewCorrecta(): Record<string, string | undefined> {
 }
 
 describe('pasosDelBuild', () => {
-  it('Vercel con VERCEL_ENV=production corre los cuatro pasos, migrate y seed incluidos, sin seed de demo (R8)', () => {
+  it('Vercel con VERCEL_ENV=production corre los cinco pasos, migrate, relleno y seed incluidos, sin seed de demo (R8)', () => {
     const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'production' })
     expect(r.pasos).toEqual(TODO)
     expect(r.pasos).not.toContain(SEMBRAR_DEMO)
@@ -50,7 +51,7 @@ describe('pasosDelBuild', () => {
     expect(r.motivo).toBe('[build] Vercel production -> con migrate y seed')
   })
 
-  it('Vercel con VERCEL_ENV=preview y configuracion correcta corre migrate, generate, seed, seed de demo y next build (R7)', () => {
+  it('Vercel con VERCEL_ENV=preview y configuracion correcta corre migrate, generate, relleno, seed, seed de demo y next build (R7)', () => {
     const r = pasosDelBuild(previewCorrecta())
     expect(r.pasos).toEqual(TODO_Y_DEMO)
     expect(r.saltados).toEqual([])
@@ -69,7 +70,7 @@ describe('pasosDelBuild', () => {
   it('Vercel con VERCEL_ENV=development se salta migrate y seed (R8)', () => {
     const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'development' })
     expect(r.pasos).toEqual(SIN_BASE)
-    expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
+    expect(r.saltados).toEqual([MIGRAR, RELLENAR, SEMBRAR])
     expect(r.motivo).toBe(
       '[build] Vercel development -> sin migrate ni seed (solo production y preview tocan la base)',
     )
@@ -78,31 +79,31 @@ describe('pasosDelBuild', () => {
   it('Vercel con otro VERCEL_ENV cualquiera tampoco toca la base (R8)', () => {
     const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: 'staging' })
     expect(r.pasos).toEqual(SIN_BASE)
-    expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
+    expect(r.saltados).toEqual([MIGRAR, RELLENAR, SEMBRAR])
   })
 
   it('Vercel con VERCEL_ENV vacio falla hacia el lado seguro: sin migrate ni seed (R8)', () => {
     const r = pasosDelBuild({ VERCEL: '1', VERCEL_ENV: '' })
     expect(r.pasos).toEqual(SIN_BASE)
-    expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
+    expect(r.saltados).toEqual([MIGRAR, RELLENAR, SEMBRAR])
     expect(r.motivo).toBe('[build] Vercel sin VERCEL_ENV -> sin migrate ni seed (lado seguro)')
   })
 
   it('Vercel sin VERCEL_ENV falla hacia el lado seguro: sin migrate ni seed (R8)', () => {
     const r = pasosDelBuild({ VERCEL: '1' })
     expect(r.pasos).toEqual(SIN_BASE)
-    expect(r.saltados).toEqual([MIGRAR, SEMBRAR])
+    expect(r.saltados).toEqual([MIGRAR, RELLENAR, SEMBRAR])
     expect(r.motivo).toBe('[build] Vercel sin VERCEL_ENV -> sin migrate ni seed (lado seguro)')
   })
 
-  it('fuera de Vercel (local, CI) sin VERCEL_ENV el build es el de siempre: los cuatro pasos (R8)', () => {
+  it('fuera de Vercel (local, CI) sin VERCEL_ENV el build es el de siempre: los cinco pasos (R8)', () => {
     const r = pasosDelBuild({})
     expect(r.pasos).toEqual(TODO)
     expect(r.saltados).toEqual([])
     expect(r.motivo).toBe('[build] fuera de Vercel -> con migrate y seed')
   })
 
-  it('fuera de Vercel corre los cuatro pasos, sin seed de demo, aunque VERCEL_ENV diga preview (R8)', () => {
+  it('fuera de Vercel corre los cinco pasos, sin seed de demo, aunque VERCEL_ENV diga preview (R8)', () => {
     const r = pasosDelBuild({ VERCEL_ENV: 'preview' })
     expect(r.pasos).toEqual(TODO)
     expect(r.pasos).not.toContain(SEMBRAR_DEMO)
@@ -170,7 +171,7 @@ function salidaFalsa() {
 const PRODUCCION = { VERCEL: '1', VERCEL_ENV: 'production' }
 
 describe('ejecutarBuild: corre los pasos en orden y para en el primero que falla', () => {
-  it('todos ok: devuelve 0 y llama a los cuatro pasos en orden', () => {
+  it('todos ok: devuelve 0 y llama a los cinco pasos en orden', () => {
     const { ejecutar, llamados } = ejecutorFalso()
     const { salida } = salidaFalsa()
     expect(ejecutarBuild(PRODUCCION, ejecutar, salida)).toBe(0)
@@ -181,7 +182,7 @@ describe('ejecutarBuild: corre los pasos en orden y para en el primero que falla
     const { ejecutar, llamados } = ejecutorFalso({ [SEMBRAR]: { status: 3 } })
     const { salida } = salidaFalsa()
     expect(ejecutarBuild(PRODUCCION, ejecutar, salida)).toBe(3)
-    expect(llamados).toEqual([MIGRAR, GENERAR, SEMBRAR])
+    expect(llamados).toEqual([MIGRAR, GENERAR, RELLENAR, SEMBRAR])
     expect(llamados).not.toContain(CONSTRUIR)
   })
 
@@ -220,7 +221,7 @@ describe('ejecutarBuild: corre los pasos en orden y para en el primero que falla
 })
 
 describe('ejecutarBuild en una preview de Vercel', () => {
-  it('configuracion correcta: corre los cinco pasos en orden, la demo sin --forzar, y devuelve 0 (R7)', () => {
+  it('configuracion correcta: corre los seis pasos en orden, la demo sin --forzar, y devuelve 0 (R7)', () => {
     const { ejecutar, llamados } = ejecutorFalso()
     const { salida, log, error } = salidaFalsa()
     expect(ejecutarBuild(previewCorrecta(), ejecutar, salida)).toBe(0)
@@ -234,7 +235,7 @@ describe('ejecutarBuild en una preview de Vercel', () => {
     const { ejecutar, llamados } = ejecutorFalso({ [SEMBRAR_DEMO]: { status: 4 } })
     const { salida } = salidaFalsa()
     expect(ejecutarBuild(previewCorrecta(), ejecutar, salida)).toBe(4)
-    expect(llamados).toEqual([MIGRAR, GENERAR, SEMBRAR, SEMBRAR_DEMO])
+    expect(llamados).toEqual([MIGRAR, GENERAR, RELLENAR, SEMBRAR, SEMBRAR_DEMO])
   })
 
   it('falla migrate: para ahi con su codigo (R7)', () => {
@@ -297,5 +298,37 @@ describe('ejecutarBuild en una preview de Vercel', () => {
       expect(linea).not.toContain(SECRETO)
       expect(linea).not.toContain(REF)
     }
+  })
+})
+
+describe('R28 (QC-236) — el relleno de telefonos de clientes corre tras migrate y su fallo tumba el build', () => {
+  const CON_BASE = [
+    ['fuera de Vercel', {}],
+    ['Vercel production', { VERCEL: '1', VERCEL_ENV: 'production' }],
+    ['Vercel preview', previewCorrecta()],
+  ] as const
+
+  it.each(CON_BASE)('R28 — %s: el relleno va despues de migrate y de generate y antes del seed', (_nombre, env) => {
+    const { pasos } = pasosDelBuild(env)
+    expect(pasos).toContain(RELLENAR)
+    expect(pasos.slice(0, 3)).toEqual([MIGRAR, GENERAR, RELLENAR])
+    expect(pasos.indexOf(RELLENAR)).toBeLessThan(pasos.indexOf(SEMBRAR))
+  })
+
+  it.each([
+    ['Vercel development', { VERCEL: '1', VERCEL_ENV: 'development' }],
+    ['Vercel sin VERCEL_ENV', { VERCEL: '1' }],
+    ['Vercel con VERCEL_ENV vacio', { VERCEL: '1', VERCEL_ENV: '' }],
+  ] as const)('R28 — %s: no se rellena, como no se migra', (_nombre, env) => {
+    const r = pasosDelBuild(env)
+    expect(r.pasos).not.toContain(RELLENAR)
+    expect(r.saltados).toContain(RELLENAR)
+  })
+
+  it('R28 — si el relleno falla, el build sale con su codigo y no siembra ni compila', () => {
+    const { ejecutar, llamados } = ejecutorFalso({ [RELLENAR]: { status: 1 } })
+    const { salida } = salidaFalsa()
+    expect(ejecutarBuild({ VERCEL: '1', VERCEL_ENV: 'production' }, ejecutar, salida)).toBe(1)
+    expect(llamados).toEqual([MIGRAR, GENERAR, RELLENAR])
   })
 })

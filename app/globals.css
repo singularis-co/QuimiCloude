@@ -57,6 +57,28 @@
   --color-info-foreground: var(--info-foreground);
   --color-info-subtle: var(--info-subtle);
   --color-info-text: var(--info-text);
+  --color-status-neutral-subtle: var(--status-neutral-subtle);
+  --color-status-neutral-text: var(--status-neutral-text);
+  --color-status-neutral-dot: var(--status-neutral-dot);
+  --color-status-progress-subtle: var(--status-progress-subtle);
+  --color-status-progress-text: var(--status-progress-text);
+  --color-status-progress-dot: var(--status-progress-dot);
+  --color-success-border: var(--success-border);
+  --color-warning-border: var(--warning-border);
+  --color-destructive-border: var(--destructive-border);
+  --color-info-border: var(--info-border);
+  --color-avatar-1: var(--avatar-1);
+  --color-avatar-1-text: var(--avatar-1-text);
+  --color-avatar-2: var(--avatar-2);
+  --color-avatar-2-text: var(--avatar-2-text);
+  --color-avatar-3: var(--avatar-3);
+  --color-avatar-3-text: var(--avatar-3-text);
+  --color-avatar-4: var(--avatar-4);
+  --color-avatar-4-text: var(--avatar-4-text);
+  --color-avatar-5: var(--avatar-5);
+  --color-avatar-5-text: var(--avatar-5-text);
+  --color-avatar-6: var(--avatar-6);
+  --color-avatar-6-text: var(--avatar-6-text);
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -119,6 +141,28 @@
   --info-foreground: oklch(1 0 0);
   --info-subtle: oklch(0.95 0.024 285);
   --info-text: oklch(0.42 0.11 285);
+  --status-neutral-subtle: oklch(0.94 0.008 215);
+  --status-neutral-text: oklch(0.35 0.013 215);
+  --status-neutral-dot: oklch(0.6 0.013 215);
+  --status-progress-subtle: oklch(0.95 0.025 248);
+  --status-progress-text: oklch(0.32 0.075 248);
+  --status-progress-dot: oklch(0.54 0.16 255);
+  --success-border: oklch(0.85 0.07 145);
+  --warning-border: oklch(0.86 0.07 60);
+  --destructive-border: oklch(0.86 0.06 27);
+  --info-border: oklch(0.86 0.05 285);
+  --avatar-1: oklch(0.9 0.05 188);
+  --avatar-1-text: oklch(0.3 0.06 188);
+  --avatar-2: oklch(0.9 0.05 248);
+  --avatar-2-text: oklch(0.32 0.075 248);
+  --avatar-3: oklch(0.92 0.05 60);
+  --avatar-3-text: oklch(0.42 0.099 60);
+  --avatar-4: oklch(0.91 0.05 300);
+  --avatar-4-text: oklch(0.36 0.09 300);
+  --avatar-5: oklch(0.92 0.05 145);
+  --avatar-5-text: oklch(0.38 0.09 145);
+  --avatar-6: oklch(0.92 0.05 0);
+  --avatar-6-text: oklch(0.42 0.11 0);
   --sidebar-muted-foreground: oklch(0.78 0.03 195);
 }
 
@@ -169,6 +213,28 @@
   --info-foreground: oklch(0.15 0.01 215);
   --info-subtle: oklch(0.29 0.055 285);
   --info-text: oklch(0.87 0.066 285);
+  --status-neutral-subtle: oklch(0.27 0.013 215);
+  --status-neutral-text: oklch(0.85 0.01 215);
+  --status-neutral-dot: oklch(0.65 0.013 215);
+  --status-progress-subtle: oklch(0.31 0.055 248);
+  --status-progress-text: oklch(0.93 0.035 248);
+  --status-progress-dot: oklch(0.75 0.13 250);
+  --success-border: oklch(0.4 0.07 145);
+  --warning-border: oklch(0.4 0.07 60);
+  --destructive-border: oklch(0.4 0.07 27);
+  --info-border: oklch(0.4 0.06 285);
+  --avatar-1: oklch(0.34 0.05 188);
+  --avatar-1-text: oklch(0.9 0.05 188);
+  --avatar-2: oklch(0.34 0.05 248);
+  --avatar-2-text: oklch(0.9 0.05 248);
+  --avatar-3: oklch(0.36 0.05 60);
+  --avatar-3-text: oklch(0.92 0.05 60);
+  --avatar-4: oklch(0.34 0.05 300);
+  --avatar-4-text: oklch(0.91 0.05 300);
+  --avatar-5: oklch(0.34 0.05 145);
+  --avatar-5-text: oklch(0.92 0.05 145);
+  --avatar-6: oklch(0.34 0.05 0);
+  --avatar-6-text: oklch(0.92 0.05 0);
   --sidebar-muted-foreground: oklch(0.72 0.025 195);
 }
 
@@ -437,176 +503,131 @@
   }
 }
 
-/* ══ Pantalla de login — INICIO ══ */
+/* ══ Pantallas de acceso — INICIO ══ */
 
 /* Sin `@layer` a propósito: en Tailwind v4 las utilidades viven en capas y una regla sin capa
-   les gana. Dentro de una capa, los 44 px perderían contra el `h-8` de los primitivos. */
+   les gana; así la tarjeta pisa el relleno, el radio y el anillo del primitivo. */
 
-[data-login='screen'] {
-  --login-screen-background: radial-gradient(90% 60% at 20% 0%, rgba(72,204,191,.22), rgba(72,204,191,0) 60%), linear-gradient(166deg, #004141 0%, #002828 55%, #031515 100%);
-  --login-card-glass: rgba(18,26,28,.72);
-  --login-card-shadow: 0 0 0 1px rgba(72,204,191,.16), inset 0 1px 0 rgba(230,241,241,.10), 0 34px 70px -24px rgba(0,0,0,.8);
-  /* El primitivo pinta el pie opaco y cortaría el vidrio en horizontal. */
-  --login-footer-background: transparent;
-  --login-footer-border: rgba(72,204,191,.16);
+[data-access='screen'] {
+  --shadow-dlg: 0 24px 64px -16px rgb(0 30 30 / 0.4);
+  padding: 40px 16px;
+  background: var(--sidebar-panel-gradient);
 }
 
-[data-login='screen'] {
-  position: relative;
-  color-scheme: dark;
-  background: var(--login-screen-background);
-}
-
-[data-login='screen'] [data-slot='input'] {
-  min-height: 44px;
-}
-
-[data-login='screen'] [data-slot='button'] {
-  min-height: 44px;
-}
-
-[data-login='screen'] [data-slot='card'] {
-  max-width: 400px;
-  border-radius: 18px;
-  --card-spacing: 28px;
-}
-
-/* El primitivo redondea cabecera y pie a 14 px; se alinean al radio de la tarjeta. */
-[data-login='screen'] [data-slot='card-header'] {
-  border-top-left-radius: 18px;
-  border-top-right-radius: 18px;
-}
-
-[data-login='screen'] [data-slot='card-footer'] {
-  border-bottom-left-radius: 18px;
-  border-bottom-right-radius: 18px;
-}
-
-/* Base opaca: translúcido sin desenfoque se lee peor que opaco sobre el fondo animado. */
-[data-login='screen'] [data-slot='card'] {
-  position: relative;
-  z-index: 2;
-  background-color: var(--card);
-  background-image: none;
-  box-shadow: var(--login-card-shadow);
-}
-
-[data-login='screen'] [data-slot='card-footer'] {
-  background-color: var(--login-footer-background);
-  border-top-color: var(--login-footer-border);
-}
-
-/* El prefijo va también en la condición: sin él, WebKit entraría aquí y no desenfocaría. */
-@supports ((backdrop-filter: blur(14px)) or (-webkit-backdrop-filter: blur(14px))) {
-  [data-login='screen'] [data-slot='card'] {
-    background-color: var(--login-card-glass);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-  }
-}
-
-/* Va después del `@supports`: a igual especificidad gana la última. */
-@media (prefers-reduced-transparency: reduce) {
-  [data-login='screen'] [data-slot='card'] {
-    background-color: var(--card);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow: var(--login-card-shadow);
-  }
-
-  [data-login='screen'] [data-slot='card-footer'] {
-    background-color: var(--muted);
-    border-top-color: var(--border);
-  }
-}
-
-[data-login='screen'] [data-slot='card'] {
-  animation: login-card-enter var(--dur-slow) var(--ease-enter) both;
-}
-
-@keyframes login-card-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-[data-login='screen'] [data-login='molecules'] {
+[data-access='molecules'] {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  z-index: 1;
+  color: rgb(255 255 255 / 0.13);
 }
 
-[data-login='screen'] [data-login='molecule'] {
+[data-access='molecule'] {
   position: absolute;
   display: block;
-  will-change: transform;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-[data-login='screen'] [data-login-index='1'] {
-  width: 150px;
-  height: 150px;
-  left: -30px;
-  top: 40px;
-  opacity: 0.22;
-  animation: login-molecule-float 22s cubic-bezier(0.2, 0, 0, 1) infinite alternate;
+[data-access-index='1'] {
+  left: 4%;
+  top: 8%;
+  width: 140px;
+  height: 140px;
+  animation: access-molecule-spin 70s linear infinite;
 }
 
-[data-login='screen'] [data-login-index='2'] {
-  width: 110px;
-  height: 110px;
-  right: 10px;
-  top: 120px;
-  opacity: 0.18;
-  animation: login-molecule-float 30s cubic-bezier(0.2, 0, 0, 1) infinite alternate-reverse;
+[data-access-index='2'] {
+  right: 7%;
+  top: 12%;
+  width: 96px;
+  height: 96px;
+  animation: access-molecule-spin 55s linear infinite reverse;
 }
 
-[data-login='screen'] [data-login-index='3'] {
-  width: 190px;
-  height: 190px;
-  right: -50px;
-  bottom: 30px;
-  opacity: 0.14;
-  animation: login-molecule-float 26s cubic-bezier(0.2, 0, 0, 1) infinite alternate;
+[data-access-index='3'] {
+  right: 4%;
+  bottom: 6%;
+  width: 170px;
+  height: 170px;
+  animation: access-molecule-spin 90s linear infinite;
 }
 
-@keyframes login-molecule-float {
-  from {
-    transform: translateY(0) rotate(0deg);
-  }
+[data-access-index='4'] {
+  left: 10%;
+  bottom: 10%;
+  width: 80px;
+  height: 80px;
+  animation: access-molecule-spin 48s linear infinite reverse;
+}
+
+[data-access-index='5'] {
+  left: 46%;
+  top: 3%;
+  width: 60px;
+  height: 60px;
+  animation: access-molecule-spin 40s linear infinite;
+}
+
+@keyframes access-molecule-spin {
   to {
-    transform: translateY(-36px) rotate(24deg);
+    transform: rotate(360deg);
   }
 }
 
-/* Las moléculas se quedan visibles y quietas; la tarjeta entra solo con un fundido, sin
-   desplazamiento. */
+[data-access='card'] {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  gap: 20px;
+  padding: 32px 28px 20px;
+  border-radius: 18px;
+  box-shadow: var(--shadow-dlg);
+}
+
+[data-access='card'][data-width='wide'] {
+  max-width: 440px;
+  gap: 18px;
+  padding: 28px 28px 24px;
+}
+
+[data-access='card'] > * {
+  animation: screen-enter var(--dur-slow) var(--ease-enter) both;
+}
+
+[data-access='card'] > :nth-child(2) {
+  animation-delay: 40ms;
+}
+
+[data-access='card'] > :nth-child(3) {
+  animation-delay: 80ms;
+}
+
+[data-access='card'] > :nth-child(4) {
+  animation-delay: 120ms;
+}
+
+[data-access='card'] > :nth-child(5) {
+  animation-delay: 160ms;
+}
+
+[data-access='card'] > :nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+
+/* Las moléculas se quedan visibles y quietas, y los bloques aparecen en su sitio: sin esto, la
+   regla global acortaría la entrada pero conservaría los retardos, y los bloques saltarían. */
 @media (prefers-reduced-motion: reduce) {
-  [data-login='screen'] [data-login='molecule'] {
+  [data-access='molecule'] {
     animation: none;
   }
 
-  [data-login='screen'] [data-slot='card'] {
-    animation: login-card-fade 150ms linear both;
+  [data-access='card'] > :nth-child(n) {
+    animation: none;
   }
 }
 
-@keyframes login-card-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* ══ Pantalla de login — FIN ══ */
+/* ══ Pantallas de acceso — FIN ══ */
 
 /* Entrada de pantalla al cambiar de módulo: entran los bloques de primer nivel de la página
    (hijos de su raíz), escalonados; las filas de una tabla entran con su bloque, nunca solas. */
@@ -634,3 +655,58 @@
 }
 
 /* Con movimiento reducido el retardo se anula en el bloque global de arriba. */
+
+/* Pulso del punto de un estado en curso: un halo que se abre y se apaga. */
+@keyframes status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--status-progress-dot) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+/* Pulso del conteo de avisos cuando llega uno nuevo. */
+@keyframes notification-count-bump {
+  0%,
+  100% {
+    scale: 1;
+  }
+  40% {
+    scale: 1.3;
+  }
+}
+
+/* Balanceo de la campana cuando llega un aviso nuevo. Dura más que el tope de la guía por
+   decisión del humano; la guardia de movimiento lo admite con nombre. */
+@keyframes notification-bell-swing {
+  0%,
+  100% {
+    rotate: 0deg;
+  }
+  20% {
+    rotate: 14deg;
+  }
+  40% {
+    rotate: -12deg;
+  }
+  60% {
+    rotate: 8deg;
+  }
+  80% {
+    rotate: -4deg;
+  }
+}
+
+@utility animate-notification-bell-swing {
+  animation: notification-bell-swing 700ms var(--ease-standard) both;
+  transform-origin: 50% 10%;
+}
+
+/* Las pantallas del operario ocupan todo el ancho: fuera la barra lateral (con su hueco) y la
+   cabecera privada. Sin soporte de `:has()` se siguen viendo, como antes. */
+body:has([data-operator-screen]) [data-slot="sidebar"],
+body:has([data-operator-screen]) [data-testid="private-header"] {
+  display: none;
+}

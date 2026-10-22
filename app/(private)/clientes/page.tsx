@@ -1,3 +1,4 @@
+import type { CountryCode } from 'libphonenumber-js';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
@@ -44,6 +45,13 @@ async function canModifyCustomers(): Promise<boolean> {
   }
 }
 
+/** El país viene de la sesión firmada, nunca de la entrada. */
+async function readCompanyCountry(): Promise<CountryCode | null> {
+  const context = await identity.getSessionContext();
+  if (context === null) return null;
+  return identity.getCompanyCountry(context.companyId);
+}
+
 /**
  * Pantalla de la lista de clientes.
  *
@@ -81,6 +89,7 @@ export default async function ClientesPage({
 
   const resolved = await searchParams;
   const canModify = await canModifyCustomers();
+  const companyCountry = await readCompanyCountry();
   const params = parseCustomerListParams(resolved);
 
   return (
@@ -98,10 +107,11 @@ export default async function ClientesPage({
             params={params}
             totalPages={0}
             canModify={canModify}
+            companyCountry={companyCountry}
           />
         }
       >
-        <CustomerListSection params={params} canModify={canModify} />
+        <CustomerListSection params={params} canModify={canModify} companyCountry={companyCountry} />
       </Suspense>
     </div>
   );

@@ -4,6 +4,21 @@
  */
 
 export {
+  DOCUMENT_BATCH_PANEL_TESTID,
+  DocumentBatchPanel,
+  PANEL_COUNT_TESTID,
+  PANEL_READ_ONLY_NOTICE_TESTID,
+  PANEL_ROW_SCOPE,
+  PANEL_SUMMARY_TESTID,
+  panelBatchTestId,
+  panelDiscardTestId,
+  panelErrorTestId,
+  panelMissingTestId,
+  panelResumeTestId,
+  type DocumentBatchPanelProps,
+} from './document-batch-panel';
+
+export {
   DOCUMENT_UPLOAD_CLOSE_TESTID,
   DOCUMENT_UPLOAD_DIALOG_TESTID,
   DOCUMENT_UPLOAD_OPEN_TESTID,
@@ -27,7 +42,9 @@ export {
 } from './document-upload';
 
 export {
+  DEFAULT_ROW_SCOPE,
   DocumentUploadRow,
+  rowAttemptTestId,
   rowErrorTestId,
   rowNameTestId,
   rowPhaseTestId,
@@ -40,16 +57,32 @@ export {
 
 export {
   BROWSER_PHASE_LABELS,
+  BROWSER_PHASE_TONES,
   CLOSE_LABEL,
   DIALOG_TITLE,
+  DISCARD_BATCH_LABEL,
   FILE_STATUS_LABELS,
+  FILE_STATUS_TONES,
   OPEN_LABEL,
+  PANEL_TITLE,
   REVIEW_LABEL,
+  attemptLabel,
   dialogDescription,
   fileErrorMessage,
   tooManyFilesMessage,
   type BrowserPhase,
 } from './labels';
 
+export {
+  MAX_REMEMBERED_BATCHES,
+  REMEMBERED_BATCHES_STORAGE_KEY,
+  forgetBatch,
+  onRememberedBatchesChange,
+  rememberBatch,
+  rememberedBatches,
+  type RememberedBatch,
+} from './batch-memory';
+
+export { useRememberedBatches } from './use-remembered-batches';
 export { BATCH_STATUS_POLL_INTERVAL_MS, useBatchStatus } from './use-batch-status';
 export { PDF_CONTENT_TYPE, uploadFile } from './upload-file';

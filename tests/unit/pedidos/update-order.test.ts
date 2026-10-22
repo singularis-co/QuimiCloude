@@ -24,7 +24,7 @@ import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
 import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
-import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import { STARTED_ORDER_STATUSES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -64,6 +64,8 @@ function filaExistente(): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: 'admin-0',
@@ -78,8 +80,8 @@ function filaExistente(): OrderRow {
  *  no existe (contrato de `RecipeCatalog.findRefsIncludingDeleted`). */
 function catalogoDeRecetas(lineasPorReceta: ReadonlyMap<string, readonly RecipeExecutionLine[]> = new Map()) {
   const recetas = new Map<string, { companyId: string; ref: RecipeRef }>([
-    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false } }],
-    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false } }],
+    [RECETA_DE_A, { companyId: EMPRESA_A, ref: { id: RECETA_DE_A, name: 'Acido citrico 50%', ownName: 'Acido citrico 50%', isUnderReview: false, original: null, isDeleted: false, imageUrl: null } }],
+    [RECETA_DE_B, { companyId: EMPRESA_B, ref: { id: RECETA_DE_B, name: 'Formula de B', ownName: 'Formula de B', isUnderReview: false, original: null, isDeleted: false, imageUrl: null } }],
   ]);
   const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
     ids.flatMap((id) => {
@@ -649,7 +651,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const repo = repositorioDePedidos();
     repo.lockAliveById.mockResolvedValue({
       ...filaExistente(),
-      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null }],
+      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null, presentationContent: null }],
       reservedAt: null,
       packagingCost: null,
     });
@@ -682,7 +684,7 @@ describe('QC-170 — el reparto en la edicion (R2, R7, R9, R35, R36, R38, R41, R
     const repo = repositorioDePedidos();
     repo.lockAliveById.mockResolvedValue({
       ...filaExistente(),
-      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null }],
+      presentationLines: [{ presentationId: PRESENTACION_DE_A, packages: 1, packagingProductId: null, presentationContent: null }],
       reservedAt: null,
       packagingCost: null,
     });
@@ -1390,7 +1392,7 @@ describe('edicion con version de receta', () => {
   const PRODUCTO_Y = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
   function ref(id: string, overrides: Partial<RecipeRef> = {}): RecipeRef {
-    return { id, name: id, ownName: id, isDeleted: false, isUnderReview: false, original: null, ...overrides };
+    return { id, name: id, ownName: id, isDeleted: false, isUnderReview: false, original: null, imageUrl: null, ...overrides };
   }
 
   /** Lo que no esta en `refs` no vuelve del catalogo, como una receta de otra empresa. */
@@ -1830,4 +1832,157 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
     expect(m.syncForOrder).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();
   });
+});
+
+// Desde Comenzar la edicion general conserva el estimado guardado.
+
+describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)', () => {
+  const OTRA_RECETA_DE_A = '88888888-8888-4888-8888-888888888888';
+  const SCOPE = { companyId: EMPRESA_A };
+
+  /** Las dos recetas de la empresa A con la misma linea, para poder cambiar de receta. */
+  function recetasDeA() {
+    const refs = new Map<string, RecipeRef>(
+      [RECETA_DE_A, OTRA_RECETA_DE_A].map((id) => [
+        id,
+        { id, name: 'Receta', ownName: 'Receta', isUnderReview: false, original: null, isDeleted: false, imageUrl: null },
+      ]),
+    );
+    const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[], companyId: string) =>
+      companyId === EMPRESA_A ? ids.flatMap((id) => (refs.has(id) ? [refs.get(id) as RecipeRef] : [])) : [],
+    );
+    const findExecutionContentById = vi.fn(async (id: string) => ({
+      id,
+      name: 'Receta',
+      isDeleted: false,
+      steps: [],
+      lines: [lineaDeReceta()],
+    }));
+    return { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog;
+  }
+
+  function edicionEn(filaStatus: OrderStatus, lockedStatus: OrderStatus = filaStatus) {
+    const fila: OrderRow = { ...filaExistente(), status: filaStatus, ingredientsCost: '99.0000', packagingCost: '9.0000' };
+    const orders = {
+      findAliveById: vi.fn(async () => fila),
+      listAlive: vi.fn(),
+    } as unknown as OrderRepository;
+    const lockAliveById = vi.fn(async () => ({ ...fila, status: lockedStatus, reservedAt: null }));
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const setStatus = vi.fn(async () => 'ok' as const);
+    const setIngredientsCost = vi.fn(async () => 'ok' as const);
+    const create = vi.fn();
+    const setReservedAt = vi.fn(async () => undefined);
+    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const { unitOfWork } = fakeUnitOfWork({
+      orders: { lockAliveById, updateAlive, setStatus, setIngredientsCost, create, setReservedAt },
+      reservations: { syncForOrder },
+    });
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
+    const envases = fakePackagingCatalog(
+      [packagingRef({ id: ENVASE_DE_A, name: 'Bidon 20L', presentationId: PRESENTACION_DE_A, content: '7.0000', unitId: UNIT_ID })],
+      [{ productId: ENVASE_DE_A, unitCost: '0.5000', available: '100' }],
+    );
+    const updateOrder = createUpdateOrder({
+      customerCatalog: fakeCustomerCatalog(),
+      orders,
+      unitOfWork,
+      recipes: recetasDeA(),
+      products: prod.products,
+      units: catalogoDeUnidades(new Map([[LITRO.id, LITRO]])).units,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: envases,
+      now: () => AHORA,
+    });
+    return {
+      updateOrder,
+      updateAlive,
+      setIngredientsCost,
+      create,
+      setReservedAt,
+      syncForOrder,
+      findCostingBatches: prod.findCostingBatches,
+      packagingCostingBatches: envases.findCostingBatches,
+    };
+  }
+
+  const BASE = { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID };
+  const CAMBIOS: readonly (readonly [string, Record<string, unknown>])[] = [
+    ['otra receta', { ...BASE, recipeId: OTRA_RECETA_DE_A }],
+    ['otra cantidad', { ...BASE, quantity: '20.0000' }],
+    ['otro reparto', { ...BASE, presentationLines: [{ packagingProductId: ENVASE_DE_A, packages: 1 }] }],
+    ['otra prioridad', { ...BASE, priority: 'ALTA' }],
+  ];
+
+  it('R14: STARTED_ORDER_STATUSES son los estados de «comenzado», sin PENDIENTE, BLOQUEADO ni CANCELADO', () => {
+    expect([...STARTED_ORDER_STATUSES].sort()).toEqual(
+      ['EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].sort(),
+    );
+  });
+
+  it.each<OrderStatus>(['PENDIENTE', 'BLOQUEADO'])(
+    'R11: en %s la edicion sigue recalculando y escribe el estimado nuevo',
+    async (status) => {
+      const caso = edicionEn(status);
+
+      await caso.updateOrder(ORDER_ID, { ...BASE, quantity: '20.0000' }, ACTOR_A);
+
+      expect(caso.findCostingBatches).toHaveBeenCalledTimes(1);
+      expect((caso.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({
+        total: '60.0000',
+        packaging: '0.0000',
+      });
+    },
+  );
+
+  it.each(CAMBIOS)('R12: en EN_CURSO, con %s, el estimado no cambia y el resto de la edicion si', async (_, entrada) => {
+    const caso = edicionEn('EN_CURSO');
+
+    await caso.updateOrder(ORDER_ID, entrada, ACTOR_A);
+
+    expect(caso.updateAlive).toHaveBeenCalledTimes(1);
+    const [id, data, actorId, instante, cost, scope] = caso.updateAlive.mock.calls[0] as unknown as readonly unknown[];
+    expect(cost).toBe('keep');
+    expect([id, actorId, instante, scope]).toEqual([ORDER_ID, ACTOR_A.id, AHORA, SCOPE]);
+    expect(data).toMatchObject({
+      recipeId: entrada.recipeId,
+      quantity: entrada.quantity,
+      priority: entrada.priority ?? 'BAJA',
+    });
+    expect((data as { presentationLines: readonly unknown[] }).presentationLines).toHaveLength(
+      entrada.presentationLines === undefined ? 0 : 1,
+    );
+    expect(caso.setIngredientsCost).not.toHaveBeenCalled();
+    expect(caso.findCostingBatches).not.toHaveBeenCalled();
+    expect(caso.packagingCostingBatches).not.toHaveBeenCalled();
+    // Lo apartado se sigue sincronizando con los datos nuevos.
+    expect(caso.syncForOrder).toHaveBeenCalledTimes(1);
+    expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, AHORA, SCOPE);
+  });
+
+  it('R12, R14: si el pedido se Comenzo entre la lectura y el bloqueo, tampoco se escribe el estimado', async () => {
+    const caso = edicionEn('PENDIENTE', 'EN_CURSO');
+
+    await caso.updateOrder(ORDER_ID, { ...BASE, quantity: '20.0000' }, ACTOR_A);
+
+    expect((caso.updateAlive.mock.calls[0] as unknown as readonly unknown[])[4]).toBe('keep');
+    expect(caso.setIngredientsCost).not.toHaveBeenCalled();
+  });
+
+  it.each([...STARTED_ORDER_STATUSES])(
+    'R14: con el pedido en %s ningun escritor del estimado se llama desde la edicion general',
+    async (status) => {
+      for (const [, entrada] of CAMBIOS) {
+        const caso = edicionEn(status);
+
+        await caso.updateOrder(ORDER_ID, entrada, ACTOR_A).catch(() => undefined);
+
+        expect(caso.setIngredientsCost).not.toHaveBeenCalled();
+        expect(caso.create).not.toHaveBeenCalled();
+        for (const llamada of caso.updateAlive.mock.calls as unknown as readonly (readonly unknown[])[]) {
+          expect(llamada[4]).toBe('keep');
+        }
+      }
+    },
+  );
 });

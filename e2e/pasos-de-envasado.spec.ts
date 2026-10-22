@@ -36,7 +36,7 @@ import {
 } from '@/lib/shared/routes';
 
 import {
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
@@ -107,12 +107,14 @@ const STEP_DOCUMENT_TESTID = 'step-reader-document';
 const STEP_POSITION_TESTID = 'step-reader-position';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-1-0';
 const STEP_BLOCKED_REASON_TESTID = 'step-reader-blocked-reason';
+const STEP_BUTTON_COUNTDOWN_TESTID = 'step-reader-button-countdown';
 const STEP_WAIT_REASON_TESTID = 'step-reader-wait-reason';
 const STEP_NEXT_TESTID = 'step-reader-next';
 const STEP_FINISH_TESTID = 'step-reader-finish';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
-const PACKING_ORDER_ROW_TESTID = 'packing-order-row';
-const PACKING_ORDER_LINK_TESTID = 'packing-order-link';
+/** El menú ⋯ de la fila (`assignment-row-actions.tsx`) y su ítem «Entrar». */
+const ROW_ACTIONS_TESTID = 'assignment-row-actions';
+const ROW_ENTER_TESTID = 'assignment-row-enter';
 const PACKING_ORDER_SCREEN_TESTID = 'packing-order-screen';
 const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 const PACKING_ORDER_START_BUTTON_TESTID = 'packing-order-start-button';
@@ -142,11 +144,13 @@ function rowByNumber(page: Page, numberText: string): Locator {
     });
 }
 
+/** La fila de «Por empacar», que es la tabla compartida dentro de su sección. */
 function packingRowByNumber(page: Page, numberText: string): Locator {
   return page
-    .getByTestId(PACKING_ORDER_ROW_TESTID)
+    .getByTestId(PACKING_ORDERS_SECTION_TESTID)
+    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({
-      has: page.getByTestId(PACKING_ORDER_LINK_TESTID).filter({ hasText: exactText(numberText) }),
+      has: page.getByTestId(ORDER_NUMBER_CELL_TESTID).filter({ hasText: exactText(numberText) }),
     });
 }
 
@@ -451,8 +455,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expect(page.getByTestId('recipe-form')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('recipe-packing-steps-field')).toBeVisible({ timeout: 60_000 });
 
-    // Que aparezca la fila del paso acredita que React ya hidrato: antes, lo escrito se pierde.
-    await page.getByTestId('recipe-step-add').click();
+    // El editor solo se monta en el cliente: verlo acredita que React ya hidrato.
     const operatorEditable = page.getByTestId('recipe-step-text-0');
     await expect(operatorEditable).toBeVisible({ timeout: 60_000 });
 
@@ -463,7 +466,6 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await typeInEditor(page, operatorEditable, OPERATOR_STEP_TEXT);
 
     // Primer paso de envasado: un parrafo y una lista de verificacion de un elemento.
-    await page.getByTestId('recipe-packing-step-add').click();
     const packingEditable1 = page.getByTestId('recipe-packing-step-text-0');
     await typeInEditor(page, packingEditable1, PACKING_STEP_1_TEXT);
     await page.keyboard.press('Enter');
@@ -474,7 +476,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expect(packingEditable1.locator('li[data-type="taskItem"]')).toHaveCount(1);
 
     // Segundo paso de envasado: solo texto.
-    await page.getByTestId('recipe-packing-step-add').click();
+    await page.getByTestId('recipe-packing-step-add-0').click();
     await typeInEditor(page, page.getByTestId('recipe-packing-step-text-1'), PACKING_STEP_2_TEXT);
 
     await page.getByTestId('recipe-form-submit').click();
@@ -536,12 +538,13 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     // --- 3. El Operario ejecuta el pedido: ve su paso y ninguno de envasado.
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     expect(await orderStatus(orderId)).toBe('PENDIENTE');
-    await clickAndConfirm(page, assignedRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRow.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId), {
       timeout: 60_000,
     });
@@ -569,7 +572,8 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
 
     const packingRow = packingRowByNumber(page, orderNumber);
     await expect(packingRow).toHaveCount(1, { timeout: 60_000 });
-    await packingRow.getByTestId(PACKING_ORDER_LINK_TESTID).click();
+    await packingRow.getByTestId(ROW_ACTIONS_TESTID).click();
+    await page.getByTestId(ROW_ENTER_TESTID).click();
     await page.waitForURL((url) => url.pathname === packingOrderRoute(orderId), {
       timeout: 60_000,
     });
@@ -618,7 +622,14 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     const finish = steps.getByTestId(STEP_FINISH_TESTID);
     await expect(finish).toBeDisabled();
     await expect(steps.getByTestId(STEP_WAIT_REASON_TESTID)).toBeVisible();
-    await expect(finish).toHaveText('Terminar');
+    // Mientras espera, el boton lleva dentro la cuenta regresiva, oculta a la tecnologia de apoyo:
+    // su nombre accesible sigue siendo «Terminar» y no cambia con cada segundo.
+    await expect(finish).toHaveAccessibleName('Terminar');
+    await expect(finish.getByTestId(STEP_BUTTON_COUNTDOWN_TESTID)).toBeVisible();
+    await expect(finish.getByTestId(STEP_BUTTON_COUNTDOWN_TESTID)).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
     await expect(steps.getByTestId(STEP_NEXT_TESTID)).toHaveCount(0);
 
     await expect(steps.getByTestId(STEP_DOCUMENT_TESTID)).toContainText(PACKING_STEP_2_TEXT);
@@ -626,6 +637,8 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expectNoneOf(page, [OPERATOR_STEP_TEXT]);
 
     await expect(finish).toBeEnabled({ timeout: PACKING_WAIT_MS + 30_000 });
+    await expect(finish.getByTestId(STEP_BUTTON_COUNTDOWN_TESTID)).toHaveCount(0);
+    await expect(finish).toHaveText('Terminar');
 
     // --- 7. Terminar desde el ultimo paso, con su confirmacion.
     await clickAndConfirm(page, finish, PACKING_ORDER_FINISH_CONFIRM_TESTID);

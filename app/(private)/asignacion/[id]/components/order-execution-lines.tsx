@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { ApproximateMark, NotConvertibleNotice } from '@/components/shared/unit-conversion-marks';
+import { NotConvertibleNotice } from '@/components/shared/unit-conversion-marks';
 import {
   Select,
   SelectContent,
@@ -29,12 +29,12 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 export const ORDER_EXECUTION_LINES_TESTID = 'order-execution-lines';
 export const ORDER_EXECUTION_LINE_TESTID = 'order-execution-line';
+export const ORDER_EXECUTION_LINE_NAME_TESTID = 'order-execution-line-name';
 export const ORDER_EXECUTION_LINE_PERCENTAGE_TESTID = 'order-execution-line-percentage';
 export const ORDER_EXECUTION_LINE_QUANTITY_TESTID = 'order-execution-line-quantity';
 export const ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID = 'order-execution-line-unit-select';
 export const ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID = 'order-execution-line-unit-option';
 export const ORDER_EXECUTION_LINE_UNIT_TESTID = 'order-execution-line-unit';
-export const ORDER_EXECUTION_LINE_APPROXIMATE_TESTID = 'order-execution-line-approximate';
 export const ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID = 'order-execution-line-not-convertible';
 export const PRODUCT_NAME_FALLBACK = 'Producto no disponible';
 
@@ -64,75 +64,80 @@ function OrderExecutionLineRow({ line, index }: OrderExecutionLineRowProps) {
 
   return (
     <li data-testid={rowTestId} className="flex flex-wrap items-center gap-3 py-2">
-      <span className="min-w-0 flex-1 text-base">{productLabel}</span>
-      <span aria-hidden="true" className="text-base text-muted-foreground">
-        {' · '}
-      </span>
+      {/* Base de 12 rem: el nombre manda y, si no cabe con las cifras, las cifras bajan enteras
+          a la linea siguiente. */}
       <span
-        data-testid={`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-${index}`}
-        className="text-base"
+        data-testid={`${ORDER_EXECUTION_LINE_NAME_TESTID}-${index}`}
+        className="min-w-0 flex-[1_1_12rem] break-words text-base"
       >
-        {formatPercentage(line.percentage)} %
+        {productLabel}
       </span>
-      <span aria-hidden="true" className="text-base text-muted-foreground">
-        {' · '}
-      </span>
-      {line.need === 'not_convertible' ? (
-        <NotConvertibleNotice
-          testId={`${ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID}-${index}`}
-          className="text-base"
-        />
-      ) : (
-        <span
-          data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
-          className="text-base font-medium"
-          title={displayedQuantity === null ? undefined : exactDecimalTitle(displayedQuantity)}
-        >
-          {displayedQuantity === null ? null : formatDecimalDisplay(displayedQuantity)}
+      {/* Crece para ocupar el resto de la fila (o la fila entera cuando baja de linea): la unidad,
+          con `ml-auto`, queda siempre en el extremo derecho, opuesta al nombre. */}
+      <span className="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-3">
+        <span aria-hidden="true" className="text-base text-muted-foreground">
+          {' · '}
         </span>
-      )}
-      {line.unit === null || line.need === 'not_convertible' ? null : line.alternativeUnits.length > 0 ? (
-        <Select
-          value={selectedUnitId ?? line.unit.id}
-          onValueChange={(next) => {
-            if (next !== null) setSelectedUnitId(next);
-          }}
-          items={availableUnits.map((unit) => ({ label: unitLabel(unit), value: unit.id }))}
+        <span
+          data-testid={`${ORDER_EXECUTION_LINE_PERCENTAGE_TESTID}-${index}`}
+          className="text-base"
         >
-          <SelectTrigger
-            aria-label={`Unidad de ${productLabel}`}
-            className={`${touchTarget} ${FIELD_TEXT}`}
-            data-testid={`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-${index}`}
+          {formatPercentage(line.percentage)} %
+        </span>
+        <span aria-hidden="true" className="text-base text-muted-foreground">
+          {' · '}
+        </span>
+        {line.need === 'not_convertible' ? (
+          <NotConvertibleNotice
+            testId={`${ORDER_EXECUTION_LINE_NOT_CONVERTIBLE_TESTID}-${index}`}
+            className="text-base"
+          />
+        ) : (
+          <span
+            data-testid={`${ORDER_EXECUTION_LINE_QUANTITY_TESTID}-${index}`}
+            className="text-base font-medium"
+            title={displayedQuantity === null ? undefined : exactDecimalTitle(displayedQuantity)}
           >
-            <SelectValue data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`} />
-          </SelectTrigger>
-          <SelectContent>
-            {availableUnits.map((unit) => (
-              <SelectItem
-                key={unit.id}
-                value={unit.id}
-                data-testid={ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID}
-              >
-                {unitLabel(unit)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <span
-          data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`}
-          className="text-base text-muted-foreground"
-        >
-          {' '}
-          {unitLabel(line.unit)}
-        </span>
-      )}
-      {line.need === 'approximate' ? (
-        <ApproximateMark
-          testId={`${ORDER_EXECUTION_LINE_APPROXIMATE_TESTID}-${index}`}
-          className="text-base"
-        />
-      ) : null}
+            {displayedQuantity === null ? null : formatDecimalDisplay(displayedQuantity)}
+          </span>
+        )}
+        {line.unit === null || line.need === 'not_convertible' ? null : line.alternativeUnits.length > 0 ? (
+          <Select
+            value={selectedUnitId ?? line.unit.id}
+            onValueChange={(next) => {
+              if (next !== null) setSelectedUnitId(next);
+            }}
+            items={availableUnits.map((unit) => ({ label: unitLabel(unit), value: unit.id }))}
+          >
+            <SelectTrigger
+              aria-label={`Unidad de ${productLabel}`}
+              className={`ml-auto ${touchTarget} ${FIELD_TEXT}`}
+              data-testid={`${ORDER_EXECUTION_LINE_UNIT_SELECT_TESTID}-${index}`}
+            >
+              <SelectValue data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableUnits.map((unit) => (
+                <SelectItem
+                  key={unit.id}
+                  value={unit.id}
+                  data-testid={ORDER_EXECUTION_LINE_UNIT_OPTION_TESTID}
+                >
+                  {unitLabel(unit)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <span
+            data-testid={`${ORDER_EXECUTION_LINE_UNIT_TESTID}-${index}`}
+            className="ml-auto text-base text-muted-foreground"
+          >
+            {' '}
+            {unitLabel(line.unit)}
+          </span>
+        )}
+      </span>
     </li>
   );
 }

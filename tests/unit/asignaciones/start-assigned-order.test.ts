@@ -28,6 +28,8 @@ import type {
   ExecutionWriters,
 } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
+import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type { AssignedOrderSummary, OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -58,6 +60,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '250.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: null,
     finishedAt: null,
@@ -122,6 +125,7 @@ function montar(options?: {
   const append = vi.fn(async (entry: NewExecutionEntry) => {
     if (options?.appendFalla === true) throw new Error('la base no acepto la anotacion');
     anotaciones.push({ entry, dentroDeRun });
+    return 'ok' as const;
   });
   const findLastStepPosition = vi.fn(async () => options?.ultimaPosicion ?? null);
   const log: ExecutionLogRepository = {
@@ -178,6 +182,10 @@ function montar(options?: {
     log,
     transaction: { run } as unknown as ExecutionTransaction,
     now: () => new Date('2026-09-17T10:00:00.000Z'),
+    // Ningun paso de estas recetas pide evidencia: las fotos al retomar se prueban en
+    // get-assigned-order-execution.test.ts.
+    evidence: { listByOrder: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
+    storage: { createSignedReadUrl: vi.fn() } as unknown as EvidenceStorage,
   };
 
   return {

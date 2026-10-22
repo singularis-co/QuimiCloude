@@ -54,6 +54,7 @@ import {
   USER_ACTION_DELETE_TESTID,
   USER_ACTION_EDIT_TESTID,
   USER_ACTION_STATUS_TESTID,
+  USER_BIRTH_DATE_FIELD,
   USER_BUSINESS_FIELDS,
   USER_COLUMN_COUNT,
   USER_CREATE_OPEN_TESTID,
@@ -604,11 +605,17 @@ describe.each(VIEWPORTS)('pantalla de usuarios en viewport %s (%i px)', (_nombre
 
     // Los NUEVE campos de negocio (R23): fuente de 16 px y alto tactil. Los dos selectores entran
     // en la cuenta: son controles que se tocan, no solo campos que se leen.
+    // La fecha de nacimiento se elige en un calendario: su disparador es un boton, no un campo que
+    // se enfoca para teclear, asi que el zoom de iOS no le aplica.
     for (const campo of USER_BUSINESS_FIELDS) {
       const control = screen.getByTestId(USER_FIELD_TESTIDS[campo]);
       expect(control, `${campo} a ${ancho}px`).toBeVisible();
-      for (const token of FUENTE_DE_CAMPO) {
-        expect(control.className, `${campo} a ${ancho}px`).toContain(token);
+      if (campo === USER_BIRTH_DATE_FIELD) {
+        expect(control.tagName, `${campo} a ${ancho}px`).toBe('BUTTON');
+      } else {
+        for (const token of FUENTE_DE_CAMPO) {
+          expect(control.className, `${campo} a ${ancho}px`).toContain(token);
+        }
       }
       expect(control.className, `${campo} a ${ancho}px`).toContain('min-h-11');
     }

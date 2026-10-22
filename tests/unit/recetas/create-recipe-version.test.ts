@@ -31,6 +31,7 @@ const ORIGINAL: RecipeRow = {
   description: 'Base',
   steps: [{ blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] }],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: 'recetas/crema.jpg',
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -51,7 +52,7 @@ const VERSION: RecipeRow = {
   description: null,
   steps: [],
   imagePath: null,
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: 'Base', imagePath: null, packingSteps: [], steps: [] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: 'Base', imagePath: null, packingSteps: [], conditioningSteps: [], steps: [] },
 };
 
 function repositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepository {
@@ -63,6 +64,7 @@ function repositorio(overrides: Partial<RecipeRepository> = {}): RecipeRepositor
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => ({ id: 'version-nueva' })),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
     ...overrides,
   };

@@ -146,9 +146,8 @@ const RESPONSIBLE_CANDIDATE_TESTID = 'order-responsible-candidate';
 const RESPONSIBLE_WORK_GROUP_TESTID = 'order-responsible-work-group';
 const RESPONSIBLE_CONFIRM_TESTID = 'order-responsible-confirm';
 const RESPONSIBLE_ERROR_TESTID = 'order-responsible-error';
-/** Cierra el panel de formulario (`components/ui/sheet.tsx`: `isForm` desactiva Escape a
- * proposito, para no tirar un formulario a medio llenar de un gesto sin querer). */
-const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
+/** Cierra la hoja de responsables. */
+const RESPONSIBLES_CLOSE_TESTID = 'order-responsibles-close';
 
 /** Valor de `data-section` con el que el panel abre en responsables (QC-102 R24). */
 const RESPONSIBLES_SECTION_VALUE = 'responsibles';
@@ -637,12 +636,7 @@ test.describe('responsables en la pantalla de pedidos', () => {
     // --- 5. CERRAR el panel y volver a pedir el LISTADO AL SERVIDOR. Lo que se afirma a partir de
     // aqui es el resultado de la CONSULTA EN LOTE de la pagina (R16), no estado de cliente que
     // sobreviviera al panel.
-    //
-    // Se cierra con «Cancelar» y NO con Escape: el panel es `isForm` y `components/ui/sheet.tsx`
-    // desactiva a proposito el cierre por Escape en ese caso, para no tirar un formulario a medio
-    // llenar de un gesto sin querer (vease su comentario). Escape aqui no cerraria nada y el test
-    // se quedaria esperando el `toHaveCount(0)` hasta el timeout.
-    await page.getByTestId(ORDER_FORM_CANCEL_TESTID).click();
+    await page.getByTestId(RESPONSIBLES_CLOSE_TESTID).click();
     await expect(page.getByTestId(SHEET_RESPONSIBLES_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     row = await openOrdersListAndFindRow(page, numberText);

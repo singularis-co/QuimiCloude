@@ -86,6 +86,13 @@ function directorioDePedidosVacio(): OrderNumberDirectory {
   return { findNumberTexts: vi.fn(async () => new Map()) };
 }
 
+// 2026-10-16 (QC-288): el historial gana los clientes de las entregas sin pedido. Estos casos no
+// tienen ninguna, asi que los dos directorios nuevos no responden nada.
+const SIN_CLIENTES_DE_ENTREGA = {
+  deliveryCustomers: { findCustomerIds: vi.fn(async () => new Map<string, readonly string[]>()) },
+  customers: { findRefsIncludingDeleted: vi.fn(async () => []) },
+};
+
 /** Una disminucion de 10 a 7: admite cualquiera de los cuatro motivos. */
 const ENTRADA_VALIDA = { batchId: LOTE, countedStock: '7', seenStock: '10', reason: 'merma' };
 
@@ -352,6 +359,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       createdAt: '2026-09-18T10:00:00.000Z',
       previousStock: null,
       countedStock: null,
+      customerNames: null,
     },
     {
       id: 'asiento-2',
@@ -363,6 +371,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       createdAt: '2026-09-17T10:00:00.000Z',
       previousStock: null,
       countedStock: null,
+      customerNames: null,
     },
   ];
 
@@ -389,6 +398,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       people: directorioQueExplota(),
       orders: directorioDePedidosVacio(),
       now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
     });
 
     await expect(listar(LOTE, actorCon(['inventario.modificar']))).rejects.toBeInstanceOf(
@@ -409,6 +419,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       people,
       orders: directorioDePedidosVacio(),
       now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
     });
     const salida = await listar(LOTE, OPERADOR);
 
@@ -437,6 +448,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       people,
       orders: directorioDePedidosVacio(),
       now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
     });
     const salida = await listar(LOTE, OPERADOR);
 
@@ -454,6 +466,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       people,
       orders: directorioDePedidosVacio(),
       now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
     });
 
     await expect(listar(LOTE, OPERADOR)).resolves.toEqual([]);
@@ -469,6 +482,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       people: directorioQueExplota(),
       orders: directorioDePedidosVacio(),
       now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
     });
 
     await expect(listar(LOTE, OPERADOR)).rejects.toBeInstanceOf(BatchNotFoundError);
@@ -481,6 +495,7 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
       people: directorioQueExplota(),
       orders: directorioDePedidosVacio(),
       now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
     });
 
     await listar(LOTE, actorCon(['inventario.consultar'], 'company-a'));
@@ -502,7 +517,13 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const findNumberTexts = vi.fn(async () => new Map([['pedido-conocido', '2026-A-0007']]));
     const orders: OrderNumberDirectory = { findNumberTexts };
 
-    const listar = createListBatchMovements({ products: dobles.products, people, orders, now: () => AHORA });
+    const listar = createListBatchMovements({
+      products: dobles.products,
+      people,
+      orders,
+      now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
+    });
     const salida = await listar(LOTE, OPERADOR);
 
     expect(salida.map((asiento) => asiento.orderNumberText)).toEqual([
@@ -520,7 +541,13 @@ describe('QC-92 R21/R23 — el historial del lote y el nombre de su autor', () =
     const findNumberTexts = vi.fn(async () => new Map());
     const orders: OrderNumberDirectory = { findNumberTexts };
 
-    const listar = createListBatchMovements({ products: dobles.products, people, orders, now: () => AHORA });
+    const listar = createListBatchMovements({
+      products: dobles.products,
+      people,
+      orders,
+      now: () => AHORA,
+      ...SIN_CLIENTES_DE_ENTREGA,
+    });
     await listar(LOTE, OPERADOR);
 
     expect(findNumberTexts).not.toHaveBeenCalled();

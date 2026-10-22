@@ -52,7 +52,7 @@ function fromScaledInteger(scaled: bigint): string {
 export function planFinishedGoodsLine(input: {
   readonly packages: number;
   readonly content: string | null;
-  readonly unitCost: string;
+  readonly unitCost: string | null;
 }): FinishedGoodsLinePlan {
   if (input.content === null) {
     return { kind: 'no_content' };
@@ -83,7 +83,8 @@ export interface FinishedGoodsIntake {
     readonly orderPresentationLineId: string;
     readonly packages: number;
     readonly orderContent: string | null;
-    readonly unitCost: string;
+    /** `null` = el lote nace sin coste. */
+    readonly unitCost: string | null;
     readonly actorId: string;
     readonly now: Date;
   }): Promise<FinishedGoodsOutcome>;

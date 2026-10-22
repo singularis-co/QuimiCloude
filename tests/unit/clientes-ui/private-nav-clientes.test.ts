@@ -1,168 +1,249 @@
-// El item de navegacion de clientes.
+// El grupo «Clientes» del menu privado y sus dos hijos.
 //
-// Se ITERA `PRIVATE_NAV_ITEMS` y se afirma sobre `CUSTOMERS_ROUTE`, `CUSTOMERS_LABEL` y el
-// `testId`, nunca sobre el literal del copy. Mismo patron que `private-nav-usuarios.test.ts` y
-// `private-nav-pedidos.test.ts`.
+// Se ITERA `PRIVATE_NAV_ITEMS` y se afirma sobre las constantes de ruta y de etiqueta y sobre los
+// `testId`, nunca sobre el literal del copy. El permiso de cada hijo se compara con el que exige
+// la `page.tsx` de su destino, leido de su fuente.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
+import { ROLE_ADMINISTRADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 import { NAV_ICONS } from '@/lib/shared/navigation/nav-icons';
 import {
+  CUSTOMER_CONTACTS_LABEL,
   CUSTOMERS_LABEL,
-  NAV_SECTION_CHAIN,
+  NAV_SECTION_DIRECTORY,
   PRIVATE_NAV_ITEMS,
   filterNavItemsByPermissions,
   firstVisibleNavHref,
   groupNavItemsBySection,
+  type NavGroup,
   type NavItem,
   type NavLink,
 } from '@/lib/shared/navigation/private-nav';
-import { CUSTOMERS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
+import { CUSTOMER_CONTACTS_ROUTE, CUSTOMERS_ROUTE, SUPPLIERS_ROUTE } from '@/lib/shared/routes';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
-/** La pantalla, DERIVADA de la constante de ruta. */
-const PAGE_PATH = join(
-  RAIZ,
-  'app',
-  '(private)',
-  ...CUSTOMERS_ROUTE.split('/').filter(Boolean),
-  'page.tsx',
-);
+const PERMISO = 'clientes.consultar';
+const TESTID_GRUPO = 'nav-clientes';
+const TESTID_LISTA = 'nav-clientes-lista';
+const TESTID_CONTACTOS = 'nav-clientes-contactos';
 
-/** Todos los items de navegacion, aplanando los grupos en sus hijos. */
+/** La `page.tsx` de un destino, DERIVADA de su `href`: el route group no aporta segmento. */
+function paginaDe(href: string): string {
+  return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
+}
+
+/** Los codigos que exige una pantalla, LEIDOS DE SU FUENTE y sin comentarios. */
+function permisosDeLaPantalla(href: string): readonly string[] {
+  return [
+    ...readFileSync(paginaDe(href), 'utf8')
+      .replace(/\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .matchAll(/requirePagePermission\(([^)]*)\)/g),
+  ].map((coincidencia) => (coincidencia[1] as string).replace(/^'([^']*)'$/, '$1'));
+}
+
 const NAV_APLANADO: readonly NavLink[] = PRIVATE_NAV_ITEMS.flatMap((item) =>
   item.kind === 'group' ? item.items : [item],
 );
 
-/** Los codigos que exige la pantalla, LEIDOS DE SU FUENTE. No se repiten como literal a
- *  proposito: si cambiara el corte de `page.tsx`, este test se mueve con el. */
-function permisosDeLaPantalla(): readonly string[] {
-  return [
-    ...readFileSync(PAGE_PATH, 'utf8')
-      .replace(/\/\/.*$/gm, '')
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .matchAll(/requirePagePermission\('([^']+)'\)/g),
-  ].map((coincidencia) => coincidencia[1] as string);
-}
+const GRUPOS_DE_CLIENTES = PRIVATE_NAV_ITEMS.filter(
+  (item): item is NavGroup => item.kind === 'group' && item.testId === TESTID_GRUPO,
+);
+const GRUPO = GRUPOS_DE_CLIENTES[0];
 
-/** El item de clientes, buscado por su `href` -la constante-, nunca por el texto visible. */
-const ITEMS_DE_CLIENTES = PRIVATE_NAV_ITEMS.filter(
-  (item): item is NavLink => item.kind === 'link' && item.href === CUSTOMERS_ROUTE,
+/** El menu tal como era antes del grupo: un enlace de nivel superior en su misma posicion. */
+const MENU_DE_ANTES: readonly NavItem[] = PRIVATE_NAV_ITEMS.map(
+  (item): NavItem =>
+    item.kind === 'group' && item === GRUPO
+      ? {
+          kind: 'link',
+          href: CUSTOMERS_ROUTE,
+          label: CUSTOMERS_LABEL,
+          testId: TESTID_GRUPO,
+          permission: PERMISO,
+          icon: item.icon,
+          section: item.section,
+        }
+      : item,
 );
 
-/** Las secciones de un menu ya filtrado, por su etiqueta. */
-function seccionesDe(items: readonly NavItem[]): readonly (string | null)[] {
-  return groupNavItemsBySection(items).map((seccion) => seccion.label);
+const ROLES_DEL_SEED = Object.keys(SEED_ROLE_PERMISSIONS);
+const ROLES_SIN_PERMISO = ROLES_DEL_SEED.filter(
+  (rol) => !(SEED_ROLE_PERMISSIONS[rol] ?? []).includes(PERMISO),
+);
+
+function permisosDe(rol: string): readonly string[] {
+  const permisos = SEED_ROLE_PERMISSIONS[rol];
+  if (permisos === undefined) throw new Error(`el seed no tiene el rol "${rol}"`);
+  return permisos;
 }
 
-const PERMISOS_ADMINISTRADOR: readonly string[] = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [];
-const PERMISOS_OPERADOR: readonly string[] = SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? [];
-const PERMISOS_EMPACADOR: readonly string[] = SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR] ?? [];
-
-describe('la navegacion privada lleva a clientes (R4)', () => {
-  it('hay un item de NIVEL SUPERIOR cuyo destino es CUSTOMERS_ROUTE', () => {
-    expect(ITEMS_DE_CLIENTES).toHaveLength(1);
-    expect(ITEMS_DE_CLIENTES[0]?.label).toBe(CUSTOMERS_LABEL);
-    expect(ITEMS_DE_CLIENTES[0]?.testId).toBe('nav-clientes');
-    expect(ITEMS_DE_CLIENTES[0]?.permission).toBe('clientes.consultar');
-    expect(ITEMS_DE_CLIENTES[0]?.icon).toBe('contact');
-    expect(ITEMS_DE_CLIENTES[0]?.section).toBe(NAV_SECTION_CHAIN);
+describe('el grupo «Clientes» del menu', () => {
+  it('R1: hay un solo NavGroup con testId nav-clientes, con su etiqueta, icono y seccion', () => {
+    expect(GRUPOS_DE_CLIENTES).toHaveLength(1);
+    expect(PRIVATE_NAV_ITEMS.filter((item) => item.testId === TESTID_GRUPO)).toHaveLength(1);
+    expect(GRUPO?.kind).toBe('group');
+    expect(GRUPO?.label).toBe(CUSTOMERS_LABEL);
+    expect(GRUPO?.icon).toBe('square-user');
+    expect(GRUPO?.section).toBe(NAV_SECTION_DIRECTORY);
+    if (GRUPO?.icon) expect(NAV_ICONS[GRUPO.icon]).toBeDefined();
   });
 
-  it('el item es el ULTIMO de la seccion «Cadena», tras proveedores', () => {
-    const cadena = groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
-      (seccion) => seccion.label === NAV_SECTION_CHAIN,
-    )?.items ?? [];
+  it('R1: va justo detras del enlace de proveedores y es el ultimo de «Directorio»', () => {
+    const indiceProveedores = PRIVATE_NAV_ITEMS.findIndex(
+      (item) => item.kind === 'link' && item.href === SUPPLIERS_ROUTE,
+    );
+    expect(indiceProveedores).toBeGreaterThanOrEqual(0);
+    expect(PRIVATE_NAV_ITEMS[indiceProveedores + 1]).toBe(GRUPO);
 
-    const ultimo = cadena[cadena.length - 1];
-    expect(ultimo?.kind === 'link' ? ultimo.href : undefined).toBe(CUSTOMERS_ROUTE);
-
-    const proveedores = NAV_APLANADO.find((item) => item.href === SUPPLIERS_ROUTE);
-    expect(proveedores?.section).toBe(NAV_SECTION_CHAIN);
+    const directorio =
+      groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
+        (seccion) => seccion.label === NAV_SECTION_DIRECTORY,
+      )?.items ?? [];
+    expect(directorio[directorio.length - 1]).toBe(GRUPO);
   });
 
-  it('el item es el PENULTIMO de todo el array, y el ultimo es el grupo nav-integraciones', () => {
-    expect(PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 2]).toBe(ITEMS_DE_CLIENTES[0]);
-
-    const ultimo = PRIVATE_NAV_ITEMS[PRIVATE_NAV_ITEMS.length - 1];
-    expect(ultimo?.kind).toBe('group');
-    expect(ultimo?.testId).toBe('nav-integraciones');
+  it('R1: ningun enlace de nivel superior apunta ya a CUSTOMERS_ROUTE', () => {
+    expect(
+      PRIVATE_NAV_ITEMS.filter((item) => item.kind === 'link' && item.href === CUSTOMERS_ROUTE),
+    ).toEqual([]);
   });
 
-  it('su icono tiene fila en NAV_ICONS', () => {
-    const icono = ITEMS_DE_CLIENTES[0]?.icon;
-    expect(icono).toBeDefined();
-    if (icono) expect(NAV_ICONS[icono]).toBeDefined();
+  it('R2: el grupo tiene exactamente dos hijos, en orden, sin icono ni seccion', () => {
+    expect(GRUPO?.items).toEqual([
+      {
+        kind: 'link',
+        href: CUSTOMERS_ROUTE,
+        label: CUSTOMERS_LABEL,
+        testId: TESTID_LISTA,
+        permission: PERMISO,
+      },
+      {
+        kind: 'link',
+        href: CUSTOMER_CONTACTS_ROUTE,
+        label: CUSTOMER_CONTACTS_LABEL,
+        testId: TESTID_CONTACTOS,
+        permission: PERMISO,
+      },
+    ]);
+    for (const hijo of GRUPO?.items ?? []) {
+      expect(hijo.icon, hijo.testId).toBeUndefined();
+      expect(hijo.section, hijo.testId).toBeUndefined();
+    }
   });
 
-  it('el destino y el testId son unicos en toda la navegacion', () => {
-    expect(NAV_APLANADO.filter((item) => item.href === CUSTOMERS_ROUTE)).toHaveLength(1);
-    expect(NAV_APLANADO.filter((item) => item.testId === 'nav-clientes')).toHaveLength(1);
+  it('R2: cada destino y cada testId del grupo aparece una sola vez en el menu aplanado', () => {
+    expect(NAV_APLANADO.filter((enlace) => enlace.href === CUSTOMERS_ROUTE)).toHaveLength(1);
+    expect(NAV_APLANADO.filter((enlace) => enlace.href === CUSTOMER_CONTACTS_ROUTE)).toHaveLength(1);
+    expect(NAV_APLANADO.filter((enlace) => enlace.testId === TESTID_LISTA)).toHaveLength(1);
+    expect(NAV_APLANADO.filter((enlace) => enlace.testId === TESTID_CONTACTOS)).toHaveLength(1);
+  });
+});
+
+describe('el permiso de cada hijo es EL MISMO que exige su pantalla', () => {
+  it('R3: el grupo tiene hijos que comparar', () => {
+    expect(GRUPO?.items.length).toBe(2);
   });
 
-  it('los items que ya existian siguen en pie: se anadio uno, no se sustituyo', () => {
-    expect(NAV_APLANADO.map((item) => item.href)).toEqual(
-      expect.arrayContaining([SUPPLIERS_ROUTE, CUSTOMERS_ROUTE]),
+  it.each(GRUPO?.items.map((hijo) => [hijo.testId, hijo] as const) ?? [])(
+    'R3, R12, R14: %s declara el mismo y unico codigo que exige la page.tsx de su destino',
+    (_testId, hijo) => {
+      const permisos = permisosDeLaPantalla(hijo.href);
+
+      expect(permisos).toEqual([hijo.permission]);
+      expect(hijo.permission).toBe(PERMISO);
+    },
+  );
+});
+
+describe('el grupo se ve con el permiso y desaparece sin el', () => {
+  it('R4: con los permisos del Administrador el menu filtrado tiene el grupo con sus dos hijos', () => {
+    const visible = filterNavItemsByPermissions(
+      PRIVATE_NAV_ITEMS,
+      permisosDe(ROLE_ADMINISTRADOR),
+    );
+    const grupo = visible.find(
+      (item): item is NavGroup => item.kind === 'group' && item.testId === TESTID_GRUPO,
+    );
+
+    expect(grupo?.items.map((hijo) => hijo.testId)).toEqual([TESTID_LISTA, TESTID_CONTACTOS]);
+  });
+
+  it('R5: ancla: el Administrador tiene el permiso y al menos un rol del seed no lo tiene', () => {
+    expect(permisosDe(ROLE_ADMINISTRADOR)).toContain(PERMISO);
+    expect(ROLES_SIN_PERMISO.length).toBeGreaterThan(0);
+    for (const rol of ROLES_SIN_PERMISO) {
+      expect(permisosDe(rol).length, rol).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(ROLES_SIN_PERMISO)(
+    'R5: %s, sin el permiso, no recibe el grupo ni nada suyo en lo serializado',
+    (rol) => {
+      const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisosDe(rol));
+      const serializado = JSON.stringify(visible);
+
+      expect(visible.map((item) => item.testId)).not.toContain(TESTID_GRUPO);
+      for (const prohibido of [
+        CUSTOMERS_LABEL,
+        CUSTOMER_CONTACTS_LABEL,
+        CUSTOMERS_ROUTE,
+        CUSTOMER_CONTACTS_ROUTE,
+        TESTID_GRUPO,
+        TESTID_LISTA,
+        TESTID_CONTACTOS,
+      ]) {
+        expect(serializado, prohibido).not.toContain(prohibido);
+      }
+    },
+  );
+});
+
+describe('lo que no cambia', () => {
+  it.each(ROLES_DEL_SEED)('R13: %s aterriza igual con el grupo, sin el y con el enlace de antes', (rol) => {
+    const permisos = permisosDe(rol);
+    const conGrupo = firstVisibleNavHref(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisos));
+    const sinGrupo = firstVisibleNavHref(
+      filterNavItemsByPermissions(
+        PRIVATE_NAV_ITEMS.filter((item) => item !== GRUPO),
+        permisos,
+      ),
+    );
+    const antes = firstVisibleNavHref(filterNavItemsByPermissions(MENU_DE_ANTES, permisos));
+
+    expect(conGrupo).toBe(sinGrupo);
+    expect(conGrupo).toBe(antes);
+  });
+
+  it('R13: el orden y los testId de los items de nivel superior son los de antes', () => {
+    expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual([
+      'nav-dashboard',
+      'nav-inventario',
+      'nav-pedidos',
+      'nav-asignacion',
+      'nav-produccion-recetas',
+      'nav-proveedores',
+      'nav-clientes',
+      'nav-usuarios',
+      'nav-presentaciones',
+      'nav-unidades',
+      'nav-integraciones',
+      'nav-empresas',
+      'nav-administradores',
+    ]);
+    expect(PRIVATE_NAV_ITEMS.map((item) => item.testId)).toEqual(
+      MENU_DE_ANTES.map((item) => item.testId),
     );
   });
-});
 
-describe('el permiso del item es EL MISMO que exige la pantalla (R6)', () => {
-  it('item y pagina declaran el MISMO codigo, no uno contenido en el otro', () => {
-    const permisos = permisosDeLaPantalla();
-    expect(permisos).toHaveLength(1);
-    expect(ITEMS_DE_CLIENTES[0]?.permission).toBe(permisos[0]);
-  });
-});
-
-describe('el item se oculta a quien no tiene el permiso (R4, R6)', () => {
-  it('ancla: los tres conjuntos del seed son reales, y solo el Administrador tiene el permiso', () => {
-    expect(PERMISOS_ADMINISTRADOR).toContain('clientes.consultar');
-    expect(PERMISOS_OPERADOR).not.toContain('clientes.consultar');
-    expect(PERMISOS_EMPACADOR).not.toContain('clientes.consultar');
-    expect(PERMISOS_OPERADOR.length).toBeGreaterThan(0);
-    expect(PERMISOS_EMPACADOR.length).toBeGreaterThan(0);
-  });
-
-  it('con los permisos del Administrador se ve el item, dentro de «Cadena»', () => {
-    const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_ADMINISTRADOR);
-    expect(visible.map((item) => item.testId)).toContain('nav-clientes');
-    expect(seccionesDe(visible)).toContain(NAV_SECTION_CHAIN);
-  });
-
-  it('con los del Operador no aparece el item', () => {
-    const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_OPERADOR);
-    expect(visible.map((item) => item.testId)).not.toContain('nav-clientes');
-  });
-
-  it('con los del Empacador tampoco aparece el item', () => {
-    const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_EMPACADOR);
-    expect(visible.map((item) => item.testId)).not.toContain('nav-clientes');
-  });
-
-  it('sin el permiso, del item no sale NI etiqueta, NI destino, NI testId', () => {
-    const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_OPERADOR);
-    const serializado = JSON.stringify(visible);
-
-    expect(serializado).not.toContain(CUSTOMERS_ROUTE);
-    expect(serializado).not.toContain(CUSTOMERS_LABEL);
-    expect(serializado).not.toContain('nav-clientes');
-  });
-
-  it('firstVisibleNavHref no cambia para ninguno de los tres roles del seed', () => {
-    for (const permisos of [PERMISOS_ADMINISTRADOR, PERMISOS_OPERADOR, PERMISOS_EMPACADOR]) {
-      const visibleSinClientes = filterNavItemsByPermissions(
-        PRIVATE_NAV_ITEMS.filter((item) => item !== ITEMS_DE_CLIENTES[0]),
-        permisos,
-      );
-      const visibleConClientes = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisos);
-
-      expect(firstVisibleNavHref(visibleConClientes)).toBe(firstVisibleNavHref(visibleSinClientes));
-    }
+  it('R13: el orden de las secciones es el de antes', () => {
+    expect(groupNavItemsBySection(PRIVATE_NAV_ITEMS).map((seccion) => seccion.label)).toEqual(
+      groupNavItemsBySection(MENU_DE_ANTES).map((seccion) => seccion.label),
+    );
   });
 });

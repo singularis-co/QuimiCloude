@@ -1,13 +1,4 @@
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
+import { AssignmentListSkeleton } from './assignment-list-parts';
 import { FINISHED_ORDERS_SKELETON_COLUMN_COUNT } from './finished-orders-skeleton';
 
 /**
@@ -25,10 +16,6 @@ const SKELETON_SHAPE = {
     columnCount: FINISHED_ORDERS_SKELETON_COLUMN_COUNT,
     label: 'Cargando pedidos terminados…',
   },
-  acondicionados_entregados: {
-    columnCount: FINISHED_ORDERS_SKELETON_COLUMN_COUNT,
-    label: 'Cargando pedidos entregados…',
-  },
 } as const;
 
 export type ConditioningOrdersSkeletonProps = {
@@ -37,41 +24,17 @@ export type ConditioningOrdersSkeletonProps = {
   readonly list: keyof typeof SKELETON_SHAPE;
 };
 
-/** El esqueleto de las tres tablas del acondicionador. */
+/** El esqueleto de las dos tablas del acondicionador. */
 export function ConditioningOrdersSkeleton({ rows, list }: ConditioningOrdersSkeletonProps) {
   const { columnCount, label } = SKELETON_SHAPE[list];
-  const columns = Array.from({ length: columnCount }, (_, index) => index);
 
   return (
-    <div
-      role="status"
-      aria-busy="true"
-      data-testid="conditioning-orders-skeleton"
-      data-list={list}
-    >
-      <span className="sr-only">{label}</span>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((column) => (
-              <TableHead key={column} scope="col">
-                <Skeleton className="h-4 w-full" />
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Array.from({ length: rows }, (_, index) => index).map((index) => (
-            <TableRow key={index} data-testid="conditioning-order-row-skeleton">
-              {columns.map((column) => (
-                <TableCell key={column}>
-                  <Skeleton className="h-4 w-full" />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <AssignmentListSkeleton
+      columns={columnCount}
+      rows={rows}
+      label={label}
+      testId="conditioning-orders-skeleton"
+      rowTestId="conditioning-order-row-skeleton"
+    />
   );
 }

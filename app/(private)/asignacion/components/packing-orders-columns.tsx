@@ -1,68 +1,93 @@
-import Link from 'next/link';
-
-import type { DataTableColumn } from '@/components/shared/data-table';
+import type { DataTableCardLayout, DataTableColumn } from '@/components/shared/data-table';
+import { PriorityMark } from '@/components/shared/priority-mark';
+import { StatusBadge } from '@/components/shared/status-badge';
 import type { PackingOrderRow } from '@/lib/modules/asignaciones';
 import { packingOrderRoute } from '@/lib/shared/routes';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import {
+  ORDER_PRIORITY_LABELS,
+  ORDER_PRIORITY_LEVELS,
+  ORDER_STATUS_TONES,
+} from '@/lib/shared/ui/order-status';
 
-import { MissingValue, presentationColumn, recipeColumn } from './assignment-list-parts';
+import { MissingValue, presentationColumn, quantityColumn, recipeColumn } from './assignment-list-parts';
+import { assignmentActionsColumn } from './assignment-row-actions';
 import { COMPANY_ORDER_STATUS_LABELS } from './company-orders-columns';
 
 /**
- * Las seis columnas de «Por empacar»: número -que abre la pantalla del pedido-, receta,
- * presentación, envases enteros, estado y quién empaca -vacío en `POR_EMPACAR`-. Sin `'use
- * client'`: nada de aquí usa un hook, y `packing-orders-list-section.tsx` las consume directamente
- * desde un componente de servidor.
+ * Las siete columnas de «Por empacar»: número, receta, cantidad, presentación, prioridad, estado y
+ * quién empaca -vacío en `POR_EMPACAR`-; y el menú, que abre la pantalla del pedido. Cantidad y
+ * prioridad salen de las mismas piezas que «Todos» y «Terminados». Las filas llegan ya ordenadas del
+ * servidor (prioridad y antigüedad): aquí no se reordenan. Sin `'use client'`:
+ * `packing-orders-skeleton.tsx`, de servidor, lee de aquí el número de columnas.
  */
 
 const MISSING_TEST_ID_PREFIX = 'packing-order';
 
 export const PACKING_ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 export const PACKING_ORDER_RECIPE_NAME_COLUMN_ID = 'recipeName';
+export const PACKING_ORDER_QUANTITY_COLUMN_ID = 'quantity';
 export const PACKING_ORDER_PRESENTATION_COLUMN_ID = 'presentationName';
-export const PACKING_ORDER_PACKAGES_COLUMN_ID = 'packages';
+export const PACKING_ORDER_PRIORITY_COLUMN_ID = 'priority';
 export const PACKING_ORDER_STATUS_COLUMN_ID = 'status';
 export const PACKING_ORDER_PACKER_COLUMN_ID = 'packedByName';
 
-/** Copia a mano el numero de columnas de `buildPackingOrdersColumns()`; un test ata las dos. */
-export const PACKING_ORDERS_COLUMN_COUNT = 6;
+/** Las columnas de datos de `buildPackingOrdersColumns()`, sin el menú; un test ata las dos. */
+export const PACKING_ORDERS_COLUMN_COUNT = 7;
 
-export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrderRow>[] {
+export const PACKING_ORDERS_CARD: DataTableCardLayout = {
+  primary: PACKING_ORDER_NUMBER_COLUMN_ID,
+  status: PACKING_ORDER_STATUS_COLUMN_ID,
+  title: PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
+  meta: [
+    PACKING_ORDER_QUANTITY_COLUMN_ID,
+    PACKING_ORDER_PRESENTATION_COLUMN_ID,
+    PACKING_ORDER_PRIORITY_COLUMN_ID,
+    PACKING_ORDER_PACKER_COLUMN_ID,
+  ],
+};
+
+export type PackingOrdersColumnsOptions = {
+  readonly canViewTrace?: boolean;
+};
+
+export function buildPackingOrdersColumns({
+  canViewTrace = false,
+}: PackingOrdersColumnsOptions = {}): readonly DataTableColumn<PackingOrderRow>[] {
   return [
     {
       id: PACKING_ORDER_NUMBER_COLUMN_ID,
       label: 'Nº de pedido',
       align: 'start',
-      cell: (order) => (
-        <Link
-          href={packingOrderRoute(order.id)}
-          data-testid="packing-order-link"
-          className={`flex ${touchTarget} items-center underline-offset-4 hover:underline focus-visible:underline`}
-        >
-          {order.numberText}
-        </Link>
-      ),
+      cell: (order) => order.numberText,
     },
     recipeColumn(PACKING_ORDER_RECIPE_NAME_COLUMN_ID, MISSING_TEST_ID_PREFIX),
+    quantityColumn(PACKING_ORDER_QUANTITY_COLUMN_ID, formatDecimalDisplay),
     presentationColumn(PACKING_ORDER_PRESENTATION_COLUMN_ID),
     {
-      id: PACKING_ORDER_PACKAGES_COLUMN_ID,
-      label: 'Envases',
-      tabular: true,
-      align: 'end',
-      cell: (order) =>
-        order.packages ?? (
-          <MissingValue testIdPrefix={MISSING_TEST_ID_PREFIX} field={PACKING_ORDER_PACKAGES_COLUMN_ID} />
-        ),
+      id: PACKING_ORDER_PRIORITY_COLUMN_ID,
+      label: 'Prioridad',
+      align: 'start',
+      cell: (order) => (
+        <PriorityMark
+          level={ORDER_PRIORITY_LEVELS[order.priority]}
+          label={ORDER_PRIORITY_LABELS[order.priority]}
+          data-testid="packing-order-priority"
+          data-priority={order.priority}
+        />
+      ),
     },
     {
       id: PACKING_ORDER_STATUS_COLUMN_ID,
       label: 'Estado',
       align: 'start',
       cell: (order) => (
-        <span data-testid="packing-order-status" data-status={order.status}>
-          {COMPANY_ORDER_STATUS_LABELS[order.status]}
-        </span>
+        <StatusBadge
+          tone={ORDER_STATUS_TONES[order.status]}
+          label={COMPANY_ORDER_STATUS_LABELS[order.status]}
+          data-testid="packing-order-status"
+          data-status={order.status}
+        />
       ),
     },
     {
@@ -74,5 +99,9 @@ export function buildPackingOrdersColumns(): readonly DataTableColumn<PackingOrd
           <MissingValue testIdPrefix={MISSING_TEST_ID_PREFIX} field={PACKING_ORDER_PACKER_COLUMN_ID} />
         ),
     },
+    assignmentActionsColumn<PackingOrderRow>({
+      canViewTrace,
+      enterHref: (order) => packingOrderRoute(order.id),
+    }),
   ];
 }

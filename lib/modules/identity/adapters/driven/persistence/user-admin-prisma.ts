@@ -192,7 +192,7 @@ function targetsOf(error: Prisma.PrismaClientKnownRequestError): readonly string
  * todavia, se anunciara con un mensaje que es mentira y que no deja rastro
  * (`docs/conventions.md > Manejo de errores`).
  */
-function duplicateKeyOf(error: Prisma.PrismaClientKnownRequestError): DuplicateKey | null {
+export function duplicateKeyOf(error: Prisma.PrismaClientKnownRequestError): DuplicateKey | null {
   const targets = targetsOf(error);
   const mentions = (marker: string): boolean => targets.some((target) => target.includes(marker));
 
@@ -361,12 +361,13 @@ export async function findAliveInCompany(
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.UserOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: `last_names ASC, first_names ASC, id ASC` (R30). Se construye en CADA llamada y
- * no como constante compartida: Prisma exige un array mutable en `orderBy`, y devolver siempre la
- * misma instancia dejaria que un llamante la mutara para todos.
+ * Orden POR DEFECTO: mas nuevos primero, `created_at DESC, id ASC`, para
+ * que lo recien dado de alta se vea sin buscarlo. Se construye en CADA llamada y no como
+ * constante compartida: Prisma exige un array mutable en `orderBy`, y devolver siempre la misma
+ * instancia dejaria que un llamante la mutara para todos.
  */
 function defaultOrderBy(): Prisma.UserOrderByWithRelationInput[] {
-  return [{ lastNames: 'asc' }, { firstNames: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**

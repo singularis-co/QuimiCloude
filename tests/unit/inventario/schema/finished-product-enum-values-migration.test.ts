@@ -62,12 +62,26 @@ describe('db/migrations/*_finished_product_enum_values', () => {
       'consumption',
       'production',
     ])
+    // 2026-10-09: `delivery_void` se anade al final, detras de `delivery`, sin reordenar.
+    // QC-288 2026-10-16: `direct_delivery` y `direct_delivery_void` se anaden al final, detras de
+    // `delivery_void`, sin reordenar; los seis primeros siguen siendo exactamente estos.
+    expect(parseEnum('InventoryMovementKind').slice(0, 6)).toEqual([
+      'opening',
+      'adjustment',
+      'consumption',
+      'production',
+      'delivery',
+      'delivery_void',
+    ])
     expect(parseEnum('InventoryMovementKind')).toEqual([
       'opening',
       'adjustment',
       'consumption',
       'production',
       'delivery',
+      'delivery_void',
+      'direct_delivery',
+      'direct_delivery_void',
     ])
   })
 

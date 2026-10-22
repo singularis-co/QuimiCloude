@@ -308,11 +308,13 @@ const CASOS_DE_USO: ReadonlyArray<{
   },
 ];
 
-/** El ultimo argumento que recibio un doble del puerto: por contrato, el ambito. */
+/** El ambito que recibio un doble del puerto en su ultima llamada: el ultimo argumento con
+ *  `companyId`. Casi siempre es el ultimo argumento; `listAlive` lleva detras sus opciones de
+ *  lectura (`{ withUnitCosts }`), que no son ambito. */
 function ambitoRecibido(doble: { mock: { calls: unknown[][] } }): unknown {
   const llamada = doble.mock.calls.at(-1);
   if (llamada === undefined) throw new Error('el puerto no fue llamado');
-  return llamada.at(-1);
+  return llamada.findLast((arg) => typeof arg === 'object' && arg !== null && 'companyId' in arg);
 }
 
 describe('QC-49 R11 — el ambito sale del ACTOR y de ningun otro sitio', () => {
@@ -406,7 +408,7 @@ describe('QC-49 R15/R16 — lo ajeno se responde como lo inexistente, nunca como
     await expect(m.getProduct(PRODUCTO_DE_A, ACTOR_A)).resolves.toMatchObject({
       id: PRODUCTO_DE_A,
     });
-    await expect(m.updateProduct(PRODUCTO_DE_A, EDICION_VALIDA, ACTOR_A)).resolves.toBeUndefined();
+    await expect(m.updateProduct(PRODUCTO_DE_A, EDICION_VALIDA, ACTOR_A)).resolves.toEqual({ warnings: [] });
     await expect(
       m.updatePresentation(PRESENTACION_DE_A, PRESENTACION_VALIDA, ACTOR_A),
     ).resolves.toBeUndefined();

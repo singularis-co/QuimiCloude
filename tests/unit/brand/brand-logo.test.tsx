@@ -135,15 +135,18 @@ describe('BrandLogo', () => {
 describe('logo del login', () => {
   const LOGO_LOGIN = '/brand/logo-vertical-dark.svg';
 
-  it('R26: el login pide el logo vertical por precarga y sin carga diferida', async () => {
+  // ENMIENDA QC-260 (R9; `design.md > 5`): el login ya no pinta el logo vertical sino el isotipo
+  // con `tone="auto"`, que pinta dos imágenes y no admite `preload`. Se deja sin precarga hasta
+  // medir cuál es el LCP con el `h1` de texto; lo que se conserva es que nada precargue un logo
+  // que la pantalla ya no usa.
+  it('R26 (ENMIENDA QC-260): el login pinta el isotipo y no precarga el logo vertical que ya no usa', async () => {
     const { container } = render(await LoginPage({ searchParams: Promise.resolve({}) }));
 
-    const logo = container.querySelector(`img[src="${LOGO_LOGIN}"]`);
-    expect(logo).not.toBeNull();
-    expect(logo).not.toHaveAttribute('loading', 'lazy');
+    expect(container.querySelector(`img[src="${LOGO_LOGIN}"]`)).toBeNull();
+    expect(container.querySelectorAll('h1 img[src*="isotipo"]').length).toBeGreaterThan(0);
     expect(
       document.head.querySelector(`link[rel="preload"][as="image"][href="${LOGO_LOGIN}"]`),
-    ).not.toBeNull();
+    ).toBeNull();
   });
 
   it('R26: los usos de la barra lateral y del encabezado privado siguen en carga diferida y sin precarga', () => {

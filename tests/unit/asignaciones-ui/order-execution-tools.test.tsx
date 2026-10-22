@@ -13,6 +13,8 @@ import type { ExecutionToolView, StartedOrderExecution } from '@/lib/modules/asi
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-execution-actions', () => ({
   finishAssignedOrderAction: vi.fn(),
+  recordStepMoveAction: vi.fn(),
+  cancelAssignedOrderAction: vi.fn(),
 }));
 
 afterEach(() => {
@@ -37,6 +39,7 @@ function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): 
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    evidence: [],
     resumeStepPosition: null,
   };
 }
@@ -77,6 +80,19 @@ describe('bloque de herramientas del operador', () => {
 
     expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('QC-265 R24 — con labelledBy no pinta su titulo y toma el nombre de quien lo titula', () => {
+    render(
+      <>
+        <span id="titulo-panel">Herramientas del panel</span>
+        <OrderExecutionTools tools={TOOLS} labelledBy="titulo-panel" />
+      </>,
+    );
+
+    const block = screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID);
+    expect(within(block).queryByRole('heading')).toBeNull();
+    expect(block).toHaveAccessibleName('Herramientas del panel');
   });
 
   it('R33 — el texto del bloque va a 16 px', () => {

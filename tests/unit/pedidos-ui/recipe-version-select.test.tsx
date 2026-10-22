@@ -4,7 +4,7 @@
 // `<form>` real, que es lo que leera la action. Sin asserts sobre copy, salvo la nota de la
 // version del pedido editado, que es justo lo que se quiere ver.
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -216,6 +216,43 @@ describe('selector de version: edicion de un pedido con version', () => {
     await waitFor(() => expect(trigger()).toHaveTextContent('dada de baja'));
     expect(trigger()).toHaveTextContent(baja.name);
     expect(trigger()).toBeEnabled();
+    expect(enviado().get(RECIPE_VERSION_FIELD)).toBe(baja.id);
+  });
+
+  it('R9: «por revisar» es un StatusBadge en tono `waiting`, en el control y en su opcion, y el valor enviado no cambia', async () => {
+    const user = setupUser();
+    listRecipeVersionsActionMock.mockResolvedValue(exito([POR_REVISAR]));
+    render(
+      <Selector recipeId={RECETA} initialVersion={{ id: POR_REVISAR.id, name: POR_REVISAR.name }} />,
+    );
+
+    const marca = await waitFor(() =>
+      within(trigger()).getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-mark`),
+    );
+    expect(marca).toHaveAttribute('data-slot', 'badge');
+    expect(marca).toHaveAttribute('data-tone', 'waiting');
+    expect(marca).toHaveTextContent('por revisar');
+    expect(enviado().get(RECIPE_VERSION_FIELD)).toBe(POR_REVISAR.id);
+
+    const lista = await opciones(user);
+    const opcion = lista.find((o) => o.getAttribute('data-value') === POR_REVISAR.id);
+    expect(
+      within(opcion!).getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-mark`),
+    ).toHaveAttribute('data-tone', 'waiting');
+    expect(within(lista[0]!).queryByTestId(`${RECIPE_VERSION_SELECT_TESTID}-mark`)).toBeNull();
+  });
+
+  it('R9: «dada de baja» es un StatusBadge en tono `muted` y el valor enviado no cambia', async () => {
+    const baja = version('Retirada');
+    listRecipeVersionsActionMock.mockResolvedValue(exito([VIVA]));
+    render(<Selector recipeId={RECETA} initialVersion={{ id: baja.id, name: baja.name }} />);
+
+    const marca = await waitFor(() =>
+      within(trigger()).getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-mark`),
+    );
+    expect(marca).toHaveAttribute('data-slot', 'badge');
+    expect(marca).toHaveAttribute('data-tone', 'muted');
+    expect(marca).toHaveTextContent('dada de baja');
     expect(enviado().get(RECIPE_VERSION_FIELD)).toBe(baja.id);
   });
 

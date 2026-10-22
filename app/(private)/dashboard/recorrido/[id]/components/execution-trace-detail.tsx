@@ -1,125 +1,140 @@
-import Link from 'next/link';
+import type { ReactNode } from 'react';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
 import { ErrorState } from '@/components/shared/error-state';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
+import { StatusBadge } from '@/components/shared/status-badge';
 import {
-  ActiveOrderMark,
   DeletedOrderMark,
-  EXECUTION_ACTION_LABELS,
-  GO_BACK_MARK,
+  PHASE_DURATION_LABELS,
+  PHASE_OPEN_MARK,
+  PHASE_UNCLOSED_MARK,
   TRACE_ORDER_STATUS_LABELS,
   formatElapsed,
-  formatTraceDuration,
-  formatTraceInstant,
 } from '@/app/(private)/dashboard/components';
-import type { ExecutionTraceDetail as ExecutionTraceDetailData, ExecutionTraceDetailStep } from '@/lib/modules/asignaciones';
+import type {
+  ExecutionPhase,
+  ExecutionTraceDetail as ExecutionTraceDetailData,
+  TraceDuration,
+} from '@/lib/modules/asignaciones';
+import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
-import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
-import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
+
+import { ExecutionTimeline } from './execution-timeline';
+import { TracePackingEvidence } from './trace-packing-evidence';
 
 export const BACK_TO_LIST_TEXT = 'Volver a la lista';
 export { EMPTY_MARK as MISSING_PERSON_MARK } from '@/lib/shared/ui/empty-mark';
 
-const BACK_LINK_CLASS = `inline-flex ${touchTarget} items-center self-start rounded-md px-2 text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring`;
+const TITLE_PREFIX = 'Recorrido del pedido';
+const ERROR_TITLE = 'Recorrido';
+const ERROR_MESSAGE = 'No se pudo cargar el recorrido.';
+const STAT_LABELS = {
+  status: 'Estado',
+  goBacks: 'Vueltas atrás',
+} as const;
+const PHASE_ORDER: readonly ExecutionPhase[] = ['production', 'packing', 'conditioning'];
 
-function BackLink({ href }: { readonly href: string }) {
+function BackToList({ href }: { readonly href: string }) {
   return (
-    <Link href={href} data-testid="execution-trace-back" className={BACK_LINK_CLASS}>
+    <ArrowLink direction="back" touch href={href} testId="execution-trace-back" className="self-start">
       {BACK_TO_LIST_TEXT}
-    </Link>
+    </ArrowLink>
   );
 }
 
-function TraceStepItem({ step }: { readonly step: ExecutionTraceDetailStep }) {
+type StatProps = {
+  readonly label: string;
+  readonly children: ReactNode;
+  readonly testId?: string;
+  readonly phase?: ExecutionPhase;
+  readonly kind?: TraceDuration['kind'];
+};
+
+function Stat({ label, children, testId = 'execution-trace-stat', phase, kind }: StatProps) {
   return (
-    <li
-      data-testid="execution-trace-step"
-      data-action={step.action}
-      data-go-back={step.isGoBack ? 'true' : undefined}
-      className={
-        step.isGoBack
-          ? 'flex flex-col gap-1 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-3 dark:bg-amber-950/30'
-          : 'flex flex-col gap-1 rounded-lg border p-3'
-      }
+    <div
+      data-testid={testId}
+      data-phase={phase}
+      data-kind={kind}
+      className="flex min-w-0 flex-col gap-1.5 rounded-xl border bg-card px-[18px] py-4"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium" data-testid="execution-trace-step-action">
-          {EXECUTION_ACTION_LABELS[step.action]}
-        </span>
-        {step.isGoBack ? (
-          <span
-            data-testid="execution-trace-step-go-back"
-            className="rounded-md border border-amber-500 px-1.5 py-0.5 text-xs font-medium"
-          >
-            {GO_BACK_MARK}
-          </span>
-        ) : null}
-        {step.stepPosition === null ? null : (
-          <span className="text-sm text-muted-foreground" data-testid="execution-trace-step-position">
-            Paso {step.stepPosition}
-          </span>
-        )}
-      </div>
-      <p className="text-sm">
-        <time dateTime={step.occurredAt.toISOString()} data-testid="execution-trace-step-instant">
-          {formatTraceInstant(step.occurredAt)}
-        </time>
-        {' · '}
-        {step.userDisplayName === null ? (
-          <span aria-label="Sin dato" data-testid="execution-trace-step-person">
-            {EMPTY_MARK}
-          </span>
-        ) : (
-          <span data-testid="execution-trace-step-person">{step.userDisplayName}</span>
-        )}
-      </p>
-      {step.action === 'cancel' && step.reason !== null ? (
-        <p className="text-sm" data-testid="execution-trace-step-reason">
-          Motivo: {step.reason}
-        </p>
-      ) : null}
-      {step.gapToNextMs === null ? null : (
-        <p className="text-sm text-muted-foreground" data-testid="execution-trace-step-gap">
-          Hasta la siguiente: {formatElapsed(step.gapToNextMs)}
-        </p>
-      )}
-    </li>
+      <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
+      <dd className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-[22px] font-semibold">{children}</dd>
+    </div>
   );
+}
+
+function PhaseDuration({ phase, duration }: { readonly phase: ExecutionPhase; readonly duration: TraceDuration }) {
+  return (
+    <Stat label={PHASE_DURATION_LABELS[phase]} testId="execution-trace-duration" phase={phase} kind={duration.kind}>
+      <span className="font-mono">{formatElapsed(duration.ms)}</span>
+      {duration.kind === 'open' ? (
+        <StatusBadge tone="progress" label={PHASE_OPEN_MARK} data-testid="execution-trace-phase-open" />
+      ) : null}
+      {duration.kind === 'unclosed' ? (
+        <StatusBadge tone="muted" label={PHASE_UNCLOSED_MARK} data-testid="execution-trace-phase-unclosed" />
+      ) : null}
+    </Stat>
+  );
+}
+
+function GoBackCount({ count }: { readonly count: number }) {
+  if (count === 0) {
+    return (
+      <span data-testid="execution-trace-go-backs" className="font-mono text-muted-foreground tabular-nums">
+        {count}
+      </span>
+    );
+  }
+  return <StatusBadge tone="waiting" label={String(count)} data-testid="execution-trace-go-backs" />;
 }
 
 export type ExecutionTraceDetailProps = {
   readonly trace: ExecutionTraceDetailData;
+  readonly evidence?: ExecutionEvidenceResult;
   readonly backHref: string;
 };
 
-export function ExecutionTraceDetail({ trace, backHref }: ExecutionTraceDetailProps) {
+export function ExecutionTraceDetail({ trace, evidence, backHref }: ExecutionTraceDetailProps) {
   return (
-    <div data-testid="execution-trace-detail" className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <BackLink href={backHref} />
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-semibold" data-testid="execution-trace-title">
-          Recorrido del pedido {trace.numberText}
-        </h1>
-        {trace.deleted ? <DeletedOrderMark /> : null}
-        {trace.duration.kind === 'open' ? <ActiveOrderMark /> : null}
+    <PageShell>
+      <div data-testid="execution-trace-detail" className="contents">
+        <BackToList href={backHref} />
+        <PageHeader
+          title={
+            <>
+              {TITLE_PREFIX} <span className="font-mono">{trace.numberText}</span>
+            </>
+          }
+          titleTestId="execution-trace-title"
+        />
+        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))] gap-3">
+          <Stat label={STAT_LABELS.status}>
+            <StatusBadge
+              tone={ORDER_STATUS_TONES[trace.status]}
+              label={TRACE_ORDER_STATUS_LABELS[trace.status]}
+              data-testid="execution-trace-status"
+              data-status={trace.status}
+            />
+            {trace.deleted ? <DeletedOrderMark /> : null}
+          </Stat>
+          {PHASE_ORDER.map((phase) => {
+            const duration = trace.durations[phase];
+            return duration === null ? null : <PhaseDuration key={phase} phase={phase} duration={duration} />;
+          })}
+          <Stat label={STAT_LABELS.goBacks}>
+            <GoBackCount count={trace.goBackCount} />
+          </Stat>
+        </dl>
+        <ExecutionTimeline steps={trace.steps} evidence={evidence} />
+        {evidence?.status === 'success' && evidence.data.packing.length > 0 ? (
+          <TracePackingEvidence groups={evidence.data.packing} />
+        ) : null}
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">Estado</dt>
-        <dd data-testid="execution-trace-status" data-status={trace.status}>
-          {TRACE_ORDER_STATUS_LABELS[trace.status]}
-        </dd>
-        <dt className="text-muted-foreground">Duración</dt>
-        <dd data-testid="execution-trace-duration" data-kind={trace.duration.kind}>
-          {formatTraceDuration(trace.duration)}
-        </dd>
-        <dt className="text-muted-foreground">Vueltas atrás</dt>
-        <dd data-testid="execution-trace-go-backs">{trace.goBackCount}</dd>
-      </dl>
-      <ol className="flex flex-col gap-2" aria-label="Anotaciones">
-        {trace.steps.map((step) => (
-          <TraceStepItem key={step.id} step={step} />
-        ))}
-      </ol>
-    </div>
+    </PageShell>
   );
 }
 
@@ -131,16 +146,16 @@ export function ExecutionTraceDetailError({
   readonly backHref: string;
 }) {
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <BackLink href={backHref} />
-      <h1 className="text-2xl font-semibold">Recorrido</h1>
+    <PageShell>
+      <BackToList href={backHref} />
+      <PageHeader title={ERROR_TITLE} />
       <ErrorState
         error={error}
-        title="No se pudo cargar el recorrido."
+        title={ERROR_MESSAGE}
         testId="execution-trace-detail-error"
         withCode={false}
         className="flex flex-col items-start gap-2 rounded-lg border border-destructive/40 p-4"
       />
-    </div>
+    </PageShell>
   );
 }

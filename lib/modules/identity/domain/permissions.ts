@@ -77,6 +77,9 @@ import {
  * Como `empaque`, su modulo no es una carpeta de `lib/modules/` y solo escribe. Lo recibe el
  * Administrador.
  *
+ * `entregas.anular` es la segunda accion que no es `consultar` ni `modificar`: separa entregar de
+ * deshacer una entrega, que devuelve producto al inventario. Lo recibe el Administrador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -244,6 +247,12 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Entregar al cliente el producto terminado de los pedidos de la empresa.',
   },
+  {
+    code: 'entregas.anular',
+    module: 'entregas',
+    action: 'anular',
+    description: 'Anular entregas de producto terminado de los pedidos de la empresa.',
+  },
 ] as const;
 
 /**
@@ -284,7 +293,6 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'pedidos.modificar',
     'usuarios.consultar',
     'usuarios.modificar',
-    'asignaciones.consultar',
     'asignaciones.modificar',
     'asignaciones.ejecutar',
     'terminados.consultar',
@@ -294,6 +302,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'documentos.modificar',
     'integraciones.modificar',
     'entregas.modificar',
+    'entregas.anular',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
@@ -308,11 +317,16 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
  * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
  *
  * El acondicionamiento es tarea del Administrador de acondicionamiento; el Administrador lo
- * supervisa desde «Todos».
+ * supervisa desde «Pedidos».
+ *
+ * `asignaciones.consultar` abre la pantalla «Asignación» (`/asignacion`), la cola de trabajo de
+ * los roles operativos. El Administrador ya ve y asigna todos los pedidos desde «Pedidos»
+ * (`pedidos.consultar` + `asignaciones.modificar`), asi que no la recibe: duplicaria esa vista.
  */
 export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = [
   'empaque.modificar',
   'empresas.consultar',
   'empresas.modificar',
   'acondicionamiento.modificar',
+  'asignaciones.consultar',
 ];

@@ -4,11 +4,12 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
+import { trabajoConProveedor } from './run-document-job-doubles';
+
 
 import type {
-  BatchStatus,
   DocumentFileStatusEntry,
+  ReadBatch,
 } from '@/lib/modules/documentos/domain/batch-status';
 import type { CropCatalogImagesResult } from '@/lib/modules/documentos/domain/crop-catalog-images';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
@@ -40,13 +41,13 @@ function dobleDeRepositorio(strategy: 'catalogo' | 'formula' = 'catalogo') {
     reclamada = true;
     return fila();
   });
-  const batch: BatchStatus = {
+  const batch: ReadBatch = {
     id: TANDA,
     companyId: EMPRESA,
     strategy,
     files: [] as readonly DocumentFileStatusEntry[],
   };
-  const readBatch = vi.fn(async (): Promise<BatchStatus | null> => batch);
+  const readBatch = vi.fn(async (): Promise<ReadBatch | null> => batch);
 
   const repository: DocumentBatchRepository = {
     createBatch: vi.fn(async () => {
@@ -109,7 +110,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -136,7 +137,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -163,7 +164,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -192,7 +193,7 @@ describe('documentos — runDocumentJob', () => {
       reason: 'el proveedor no respondio',
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -223,7 +224,7 @@ describe('documentos — runDocumentJob', () => {
       reason: 'PDF corrupto',
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -253,7 +254,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -279,7 +280,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -305,7 +306,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -325,7 +326,7 @@ describe('documentos — runDocumentJob', () => {
     const repoFormula = dobleDeRepositorio('formula');
     const storageFormula = dobleDeAlmacenamiento();
     const cropCatalogImagesFormula = dobleDeRecorte();
-    const runDocumentJobFormula = createRunDocumentJob({
+    const runDocumentJobFormula = trabajoConProveedor({
       repository: repoFormula.repository,
       storage: storageFormula.storage,
       processPdfByStrategy: dobleDeProcesamiento({
@@ -345,7 +346,7 @@ describe('documentos — runDocumentJob', () => {
     const repoCatalogo = dobleDeRepositorio('catalogo');
     const storageCatalogo = dobleDeAlmacenamiento();
     const cropCatalogImagesCatalogo = dobleDeRecorte();
-    const runDocumentJobCatalogo = createRunDocumentJob({
+    const runDocumentJobCatalogo = trabajoConProveedor({
       repository: repoCatalogo.repository,
       storage: storageCatalogo.storage,
       processPdfByStrategy: dobleDeProcesamiento({
@@ -380,7 +381,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte({ ok: true, uploaded: 0, skipped: 0 });
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -409,7 +410,7 @@ describe('documentos — runDocumentJob', () => {
       code: 'invalid_input',
       reason: 'el texto de la IA no traia un JSON interpretable',
     });
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,
@@ -438,7 +439,7 @@ describe('documentos — runDocumentJob', () => {
       text: TEXTO_DE_LA_IA,
     });
     const cropCatalogImages = dobleDeRecorte({ ok: true, uploaded: 2, skipped: 1 });
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: storage.storage,
       processPdfByStrategy,

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ClipboardListIcon,
   PackageIcon,
   PencilIcon,
   TrashIcon,
@@ -10,7 +11,12 @@ import {
   XCircleIcon,
 } from 'lucide-react';
 
-import { RowActionsMenu, type RowActionMenuItem } from '@/components/shared/row-actions-menu';
+import type { RowActionsSpec } from '@/components/shared/data-table';
+import {
+  RowActionsMenu,
+  type RowActionMenuItem,
+  type RowActionsMenuProps,
+} from '@/components/shared/row-actions-menu';
 import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
 
 /**
@@ -51,16 +57,15 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
  * `PENDIENTE`, y bajar su cantidad puede bastar para desbloquearlo. Lo que no admite es el
  * trabajo, y eso lo rechazan el backend y la lista del Operador, no este menu.
  *
- * **Reparto y unidad (QC-170)**: item QUINTO, condicional. Solo aparece si `canEditDistribution`
+ * **Reparto y unidad**: item condicional. Solo aparece si `canEditDistribution`
  * -lo decide el servidor con el permiso de modificar pedidos- Y el estado admite esa edicion
  * acotada (`acceptsDistributionEdit`). Antes de `POR_EMPACAR` la edicion general ya cubre reparto
  * y unidad; desde `EN_EMPAQUE` el reparto queda fijado; en `BLOQUEADO` la edicion general sigue
  * abierta y ya los cubre.
  *
- * **Puntos de enganche de T10, T11 y T12.** Los tres primeros items emiten por callback opcional
- * (`onEdit`, `onCancel`, `onDelete`) con el pedido entero. Quien compone la fila decide si abre el
- * panel/dialogo desde esos callbacks. Con el pedido en estado final, el item va `disabled` y el
- * primitivo del menu no llega a invocar su `onSelect`.
+ * **Los items emiten `onAction` con la accion y el pedido entero.** Quien compone la tabla decide
+ * que panel o dialogo abre. Con el pedido en estado final, el item va `disabled` y el primitivo
+ * del menu no llega a invocar su `onSelect`.
  */
 
 /**
@@ -148,22 +153,154 @@ export function acceptsDelivery(status: OrderStatus): boolean {
   return ORDER_STATUS_ACCEPTS_DELIVERY[status];
 }
 
+// No pide permiso propio: ver la lista ya lo cubre el permiso de consultar la pantalla.
+const ORDER_STATUS_HAS_DELIVERIES: Readonly<Record<OrderStatus, boolean>> = {
+  PENDIENTE: false,
+  EN_CURSO: false,
+  POR_EMPACAR: false,
+  EN_EMPAQUE: false,
+  ENTREGADO: true,
+  CANCELADO: false,
+  BLOQUEADO: false,
+  POR_ACONDICIONAR: false,
+  EN_ACONDICIONAMIENTO: false,
+  TERMINADO: true,
+};
+
 export const ORDER_ACTION_DISTRIBUTION_TESTID = 'order-action-distribution';
 export const ORDER_ACTION_DELIVER_TESTID = 'order-action-deliver';
 export const ORDER_ACTION_CUSTOMER_TESTID = 'order-action-customer';
+export const ORDER_ACTION_DELIVERIES_TESTID = 'order-action-deliveries';
+
+export type OrderRowAction =
+  | 'edit'
+  | 'responsibles'
+  | 'customer'
+  | 'distribution'
+  | 'deliveries'
+  | 'deliver'
+  | 'cancel'
+  | 'delete';
+
+export type OrderRowActionsSpecInput = {
+  readonly order: OrderSummary;
+  readonly canEditDistribution: boolean;
+  readonly canEditCustomer: boolean;
+  readonly canDeliver: boolean;
+  readonly onAction: (action: OrderRowAction, order: OrderSummary) => void;
+};
+
+// `RowActionsMenu` recibe la especificación por propagación, así que `data-order-id` llega al
+// disparador tanto en la fila como en la tarjeta.
+export type OrderRowActionsSpec = RowActionsSpec & Pick<RowActionsMenuProps, 'triggerDataAttributes'>;
+
+export function orderRowActionsSpec({
+  order,
+  canEditDistribution,
+  canEditCustomer,
+  canDeliver,
+  onAction,
+}: OrderRowActionsSpecInput): OrderRowActionsSpec {
+  const isFinal = isFinalOrderStatus(order.status);
+  const emit = (action: OrderRowAction) => () => onAction(action, order);
+
+  const items: RowActionMenuItem[] = [
+    {
+      key: 'edit',
+      label: 'Editar',
+      icon: PencilIcon,
+      onSelect: emit('edit'),
+      disabled: isFinal,
+      testId: 'order-action-edit',
+    },
+    // Sin `disabled`: ver quién prepara un pedido no lo modifica, así que sigue abierto en estado final.
+    {
+      key: 'responsibles',
+      label: 'Responsables',
+      icon: UsersIcon,
+      onSelect: emit('responsibles'),
+      testId: 'order-action-responsibles',
+    },
+  ];
+
+  if (canEditCustomer) {
+    items.push({
+      key: 'customer',
+      label: 'Cliente',
+      icon: UserIcon,
+      onSelect: emit('customer'),
+      disabled: !ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE[order.status],
+      testId: ORDER_ACTION_CUSTOMER_TESTID,
+    });
+  }
+
+  if (canEditDistribution && acceptsDistributionEdit(order.status)) {
+    items.push({
+      key: 'distribution',
+      label: 'Reparto y unidad',
+      icon: PackageIcon,
+      onSelect: emit('distribution'),
+      testId: ORDER_ACTION_DISTRIBUTION_TESTID,
+    });
+  }
+
+  if (ORDER_STATUS_HAS_DELIVERIES[order.status]) {
+    items.push({
+      key: 'deliveries',
+      label: 'Entregas',
+      icon: ClipboardListIcon,
+      onSelect: emit('deliveries'),
+      testId: ORDER_ACTION_DELIVERIES_TESTID,
+    });
+  }
+
+  if (canDeliver && acceptsDelivery(order.status)) {
+    items.push({
+      key: 'deliver',
+      label: 'Entregar',
+      icon: TruckIcon,
+      onSelect: emit('deliver'),
+      testId: ORDER_ACTION_DELIVER_TESTID,
+    });
+  }
+
+  items.push(
+    {
+      key: 'cancel',
+      label: 'Cancelar',
+      icon: XCircleIcon,
+      onSelect: emit('cancel'),
+      disabled: isFinal,
+      destructive: true,
+      separatorBefore: true,
+      testId: 'order-action-cancel',
+    },
+    {
+      key: 'delete',
+      label: 'Eliminar',
+      icon: TrashIcon,
+      onSelect: emit('delete'),
+      disabled: isFinal,
+      destructive: true,
+      testId: 'order-action-delete',
+    },
+  );
+
+  return {
+    items,
+    triggerLabel: `Acciones del pedido ${order.numberText}`,
+    triggerTestId: 'order-row-actions',
+    triggerDataAttributes: { 'data-order-id': order.id },
+    title: `Pedido ${order.numberText}`,
+  };
+}
 
 export type OrderRowActionsProps = {
   readonly order: OrderSummary;
-  /** Punto de enganche de T10 (panel lateral de edicion). */
+  readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
   readonly onEdit?: (order: OrderSummary) => void;
-  /** Punto de enganche de T11 (dialogo de cancelacion con motivo). */
   readonly onCancel?: (order: OrderSummary) => void;
-  /** Punto de enganche de T12 (dialogo de confirmacion de borrado). */
   readonly onDelete?: (order: OrderSummary) => void;
-  /**
-   * QC-102 R24 — abre el panel que YA existe en su seccion de responsables. Es la unica de las
-   * acciones que sigue viva con el pedido cerrado.
-   */
   readonly onResponsibles?: (order: OrderSummary) => void;
   /** Lo decide el servidor con el permiso de modificar pedidos; sin el, la accion no se pinta. */
   readonly canEditDistribution?: boolean;
@@ -174,10 +311,12 @@ export type OrderRowActionsProps = {
   /** Lo decide el servidor con el permiso de entregas; sin el, la accion no se pinta. */
   readonly canDeliver?: boolean;
   readonly onDeliver?: (order: OrderSummary) => void;
+  readonly onDeliveries?: (order: OrderSummary) => void;
 };
 
 export function OrderRowActions({
   order,
+  onAction,
   onEdit,
   onCancel,
   onDelete,
@@ -188,85 +327,31 @@ export function OrderRowActions({
   onCustomer,
   canDeliver = false,
   onDeliver,
+  onDeliveries,
 }: OrderRowActionsProps) {
-  const isFinal = isFinalOrderStatus(order.status);
-  const showDistribution = canEditDistribution && acceptsDistributionEdit(order.status);
-
-  const items: RowActionMenuItem[] = [
-    {
-      key: 'edit',
-      label: 'Editar',
-      icon: PencilIcon,
-      onSelect: () => onEdit?.(order),
-      disabled: isFinal,
-      testId: 'order-action-edit',
-    },
-    {
-      key: 'cancel',
-      label: 'Cancelar',
-      icon: XCircleIcon,
-      onSelect: () => onCancel?.(order),
-      disabled: isFinal,
-      testId: 'order-action-cancel',
-    },
-    {
-      key: 'delete',
-      label: 'Eliminar',
-      icon: TrashIcon,
-      onSelect: () => onDelete?.(order),
-      disabled: isFinal,
-      destructive: true,
-      testId: 'order-action-delete',
-    },
-    // QC-102 R24: sin `disabled`. Ver quien prepara un pedido no es modificarlo, asi que un
-    // pedido ENTREGADO o CANCELADO se sigue pudiendo consultar. No exige pasar por el formulario
-    // de edicion: abre el MISMO panel en su seccion.
-    {
-      key: 'responsibles',
-      label: 'Responsables',
-      icon: UsersIcon,
-      onSelect: () => onResponsibles?.(order),
-      testId: 'order-action-responsibles',
-    },
-  ];
-
-  if (canEditCustomer) {
-    items.push({
-      key: 'customer',
-      label: 'Cliente',
-      icon: UserIcon,
-      onSelect: () => onCustomer?.(order),
-      disabled: !ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE[order.status],
-      testId: ORDER_ACTION_CUSTOMER_TESTID,
-    });
-  }
-
-  if (showDistribution) {
-    items.push({
-      key: 'distribution',
-      label: 'Reparto y unidad',
-      icon: PackageIcon,
-      onSelect: () => onDistribution?.(order),
-      testId: ORDER_ACTION_DISTRIBUTION_TESTID,
-    });
-  }
-
-  if (canDeliver && acceptsDelivery(order.status)) {
-    items.push({
-      key: 'deliver',
-      label: 'Entregar',
-      icon: TruckIcon,
-      onSelect: () => onDeliver?.(order),
-      testId: ORDER_ACTION_DELIVER_TESTID,
-    });
-  }
+  const handlers: Readonly<Record<OrderRowAction, ((order: OrderSummary) => void) | undefined>> = {
+    edit: onEdit,
+    responsibles: onResponsibles,
+    customer: onCustomer,
+    distribution: onDistribution,
+    deliveries: onDeliveries,
+    deliver: onDeliver,
+    cancel: onCancel,
+    delete: onDelete,
+  };
 
   return (
     <RowActionsMenu
-      items={items}
-      triggerLabel={`Acciones del pedido ${order.numberText}`}
-      triggerTestId="order-row-actions"
-      triggerDataAttributes={{ 'data-order-id': order.id }}
+      {...orderRowActionsSpec({
+        order,
+        canEditDistribution,
+        canEditCustomer,
+        canDeliver,
+        onAction: (action, target) => {
+          onAction?.(action, target);
+          handlers[action]?.(target);
+        },
+      })}
     />
   );
 }

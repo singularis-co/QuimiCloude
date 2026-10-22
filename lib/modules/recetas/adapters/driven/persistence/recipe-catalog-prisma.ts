@@ -1,12 +1,15 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { recipeStepSchema } from '../../../domain/recipe-input';
+import { conditioningStepSchema, recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { isVersionUnderReview, recipeDisplayName } from '../../../domain/recipe-version';
 
 import type { RecipeCatalog, RecipeExecutionContent, RecipeId, RecipeRef } from '../../../domain/recipe-catalog';
 import type { RecipeScope } from '../../../domain/recipe-scope';
-import type { RecipeStepView } from '../../../domain/recipe-view';
+import type { ConditioningStepView, RecipeStepView } from '../../../domain/recipe-view';
+import type { RecipeImageStorage } from '../../../ports/recipe-image-storage';
+
+import { recipeImagePublicUrl } from '../storage/recipe-image-supabase';
 
 import { recipeCompanyScope, type PrismaLike } from './company-scope';
 import { normalizedSearchCondition } from './list-query-sql';
@@ -41,13 +44,29 @@ type RecipeCatalogRow = {
   readonly id: string;
   readonly name: string;
   readonly deletedAt: Date | null;
-  readonly parent: { readonly id: string; readonly name: string } | null;
+  readonly imagePath: string | null;
+  readonly parent: { readonly id: string; readonly name: string; readonly imagePath: string | null } | null;
   readonly lines: ReadonlyArray<{ readonly percentage: DecimalLike }>;
 };
 
-/** Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base. */
-export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
+/**
+ * Solo la composicion de la URL: el catalogo no sube ni borra imagenes. Opcional, mismo patron
+ * que `inventario/.../packaging-catalog-prisma.ts`: solo `lib/composition` lo cablea
+ * (`findRecipeRefsWithImageIncludingDeleted`), para quien muestra la foto. Sin `images` no se toca la configuracion del bucket (R43): quien solo lee
+ * referencias -crear un pedido, importar formulas- no depende del almacenamiento.
+ */
+export type RecipeImageUrls = Pick<RecipeImageStorage, 'publicUrl'>;
+
+/**
+ * Fila de Prisma -> `RecipeRef` del contrato publico. Funcion pura, testeable sin base.
+ *
+ * La RUTA se compone a URL aqui, al leer, nunca se persiste la URL. Sin `images` la URL sale
+ * `null` aunque la receta tenga imagen.
+ */
+export function toRecipeRef(row: RecipeCatalogRow, images?: RecipeImageUrls): RecipeRef {
   const original = row.parent === null ? null : { id: row.parent.id, name: row.parent.name };
+  // Una version no guarda imagen: muestra la de su original, igual que la ficha de receta.
+  const imagePath = row.parent === null ? row.imagePath : row.parent.imagePath;
   return {
     id: row.id,
     name: recipeDisplayName(row.name, original?.name ?? null),
@@ -58,12 +77,14 @@ export function toRecipeRef(row: RecipeCatalogRow): RecipeRef {
       row.lines.map((line) => line.percentage.toFixed(2)),
     ),
     original,
+    imageUrl: imagePath === null || images === undefined ? null : images.publicUrl(imagePath),
   };
 }
 
 export async function findRecipeRefsIncludingDeleted(
   ids: readonly RecipeId[],
   companyId: string,
+  images?: RecipeImageUrls,
 ): Promise<readonly RecipeRef[]> {
   if (ids.length === 0) return [];
 
@@ -74,12 +95,26 @@ export async function findRecipeRefsIncludingDeleted(
       id: true,
       name: true,
       deletedAt: true,
-      parent: { select: { id: true, name: true } },
+      imagePath: true,
+      parent: { select: { id: true, name: true, imagePath: true } },
       lines: { select: { percentage: true } },
     },
   });
 
-  return rows.map(toRecipeRef);
+  return rows.map((row) => toRecipeRef(row, images));
+}
+
+/**
+ * La variante CON foto, para `lib/composition`: el mismo almacenamiento que la ficha de receta
+ * (driven del MISMO modulo, permitido). Funcion con nombre y no lambda en la composicion porque
+ * la guardia de ambito (`guard-ambito-empresa-recetas`) sigue el cableado por nombre. Quien
+ * llama a `findRecipeRefsIncludingDeleted` sin `images` no toca el bucket (R43).
+ */
+export async function findRecipeRefsWithImageIncludingDeleted(
+  ids: readonly RecipeId[],
+  companyId: string,
+): Promise<readonly RecipeRef[]> {
+  return findRecipeRefsIncludingDeleted(ids, companyId, { publicUrl: recipeImagePublicUrl });
 }
 
 /**
@@ -135,6 +170,18 @@ export async function findAliveRecipeByNormalizedName(
   });
 
   return row === null ? null : { id: row.id, name: row.name };
+}
+
+/** Los nombres de las formulas ORIGINALES VIVAS de la empresa, tal como estan guardados. */
+export async function listAliveOriginalRecipeNames(companyId: string): Promise<readonly string[]> {
+  const scope: RecipeScope = { companyId };
+  const rows = await prisma.recipe.findMany({
+    where: { AND: [recipeCompanyScope(scope), { deletedAt: null, parentRecipeId: null }] },
+    select: { name: true },
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+  });
+
+  return rows.map((row) => row.name);
 }
 
 /**
@@ -265,4 +312,37 @@ export async function findRecipePackingStepsById(
   });
 
   return row === null ? null : toRecipePackingSteps(row);
+}
+
+type RecipeConditioningStepsRow = {
+  readonly conditioningSteps: unknown;
+  readonly parent: { readonly conditioningSteps: unknown } | null;
+};
+
+/** Fila de Prisma -> pasos de acondicionamiento. Una version se acondiciona con los de su
+ *  original; el elemento invalido se descarta conservando el orden. */
+export function toRecipeConditioningSteps(row: RecipeConditioningStepsRow): readonly ConditioningStepView[] {
+  const steps = row.parent === null ? row.conditioningSteps : row.parent.conditioningSteps;
+  if (!Array.isArray(steps)) return [];
+
+  const parsed: ConditioningStepView[] = [];
+  for (const step of steps) {
+    const result = conditioningStepSchema.safeParse(step);
+    if (result.success) parsed.push(result.data);
+  }
+  return parsed;
+}
+
+/** Sin `deleted_at IS NULL`: una receta dada de baja se sigue acondicionando. */
+export async function findRecipeConditioningStepsById(
+  id: RecipeId,
+  companyId: string,
+): Promise<readonly ConditioningStepView[] | null> {
+  const scope: RecipeScope = { companyId };
+  const row = await prisma.recipe.findFirst({
+    where: { AND: [recipeCompanyScope(scope), { id }] },
+    select: { conditioningSteps: true, parent: { select: { conditioningSteps: true } } },
+  });
+
+  return row === null ? null : toRecipeConditioningSteps(row);
 }

@@ -3,13 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CONDITIONING_ACTIONS_TEXTS,
-  COUNTDOWN_GATED_BUTTON_TESTID,
   ConditioningActions,
   FINISH_CONDITIONING_DIALOG_TESTID,
   FINISH_CONDITIONING_ERROR_TESTID,
   FINISH_CONDITIONING_ORDER_ID_FIELD,
   FINISH_CONDITIONING_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
+import { COUNTDOWN_GATED_BUTTON_TESTID } from '@/components/shared/countdown-gated-button';
+import { COUNTDOWN_RING_TESTID } from '@/components/shared/countdown-ring';
 import type { FinishConditioningResult } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
 
 const { finishConditioningActionMock } = vi.hoisted(() => ({
@@ -36,7 +37,7 @@ afterEach(() => {
 });
 
 function pintar() {
-  return render(<ConditioningActions kind="finish" orderId={ORDER_ID} orderNumber="2026-0000040" />);
+  return render(<ConditioningActions orderId={ORDER_ID} orderNumber="2026-0000040" canFinish />);
 }
 
 function abrir(): HTMLElement {
@@ -85,6 +86,21 @@ describe('el modal de Terminar', () => {
     expect(confirmar()).toBeDisabled();
     avanzar(1000);
     expect(confirmar()).toBeEnabled();
+  });
+
+  it('R36: «Terminar el acondicionamiento», con su texto, y «Terminar» bloqueado 5 s con el anillo', () => {
+    pintar();
+    const dialogo = abrir();
+
+    expect(within(dialogo).getByRole('heading', { name: 'Terminar el acondicionamiento' })).toBeInTheDocument();
+    expect(dialogo).toHaveTextContent('El pedido 2026-0000040 pasará a Terminado.');
+    expect(within(dialogo).getByRole('button', { name: 'Cancelar' })).toBeEnabled();
+    expect(confirmar()).toBeDisabled();
+    expect(within(confirmar()).getByTestId(COUNTDOWN_RING_TESTID)).toHaveAttribute('aria-hidden', 'true');
+
+    avanzar(5000);
+    expect(confirmar()).toBeEnabled();
+    expect(within(confirmar()).queryByTestId(COUNTDOWN_RING_TESTID)).toBeNull();
   });
 
   it('R10: al reabrir la cuenta empieza otra vez', () => {

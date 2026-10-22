@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  ACTIVE_ORDER_MARK,
   CANCELLED_ONLY_LABEL,
   DELETED_ORDER_MARK,
   EXECUTION_TRACE_SECTION_TESTID,
@@ -12,14 +11,22 @@ import {
   ExecutionTraceTable,
   LAST_AT_COLUMN_ID,
   PERSON_COLUMN_ID,
+  TRACE_ACTIONS_LABEL_PREFIX,
   TRACE_LINK_TEXT,
   createDefaultExecutionTraceListParams,
   executionTraceListHref,
-  formatTraceDuration,
+  formatTraceTotal,
   type ExecutionTraceListParams,
 } from '@/app/(private)/dashboard/components';
 import { SEARCH_DEBOUNCE_MS } from '@/components/shared/data-table';
 import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import {
+  ACTIVE_CLOSED_TOTAL_ROW,
+  CLOSED_TOTAL_ROW,
+  CONDITIONING_TRACE_ROWS,
+  OPEN_TOTAL_ROW,
+  UNCLOSED_TOTAL_ROW,
+} from '../../fixtures/execution-trace-conditioning';
 import { executionTraceRoute } from '@/lib/shared/routes';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
@@ -57,8 +64,15 @@ const ACTIVO: ExecutionTraceRow = {
   people: [ANA],
   firstAt: new Date('2026-10-07T08:00:00.000Z'),
   lastAt: new Date('2026-10-07T08:30:00.000Z'),
-  duration: { kind: 'open', ms: 45 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 45 * 60 * 1000 },
   goBackCount: 2,
+  formulaName: 'Gel antibacterial',
+  formulaImageUrl: 'https://cdn.example.test/gel.png',
+  presentations: [
+    { label: 'galones', quantity: 10 },
+    { label: 'vasos', quantity: 5 },
+  ],
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -69,8 +83,12 @@ const DE_BAJA: ExecutionTraceRow = {
   people: [ANA, LUIS],
   firstAt: new Date('2026-10-06T08:00:00.000Z'),
   lastAt: new Date('2026-10-06T09:00:00.000Z'),
-  duration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'unclosed', ms: 60 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 const CERRADO: ExecutionTraceRow = {
@@ -81,8 +99,12 @@ const CERRADO: ExecutionTraceRow = {
   people: [LUIS],
   firstAt: new Date('2026-10-05T08:00:00.000Z'),
   lastAt: new Date('2026-10-05T09:05:00.000Z'),
-  duration: { kind: 'closed', ms: 65 * 60 * 1000 },
+  active: false,
+  totalDuration: { kind: 'closed', ms: 65 * 60 * 1000 },
   goBackCount: 1,
+  formulaName: 'Jabón líquido',
+  formulaImageUrl: null,
+  presentations: [{ label: 'galones', quantity: 3 }],
 };
 
 const ROWS = [ACTIVO, DE_BAJA, CERRADO];
@@ -95,8 +117,12 @@ const ACTIVO_POR_EMPACAR: ExecutionTraceRow = {
   people: [LUIS],
   firstAt: new Date('2026-10-07T07:00:00.000Z'),
   lastAt: new Date('2026-10-07T07:40:00.000Z'),
-  duration: { kind: 'open', ms: 50 * 60 * 1000 },
+  active: true,
+  totalDuration: { kind: 'open', ms: 50 * 60 * 1000 },
   goBackCount: 0,
+  formulaName: null,
+  formulaImageUrl: null,
+  presentations: [],
 };
 
 function params(overrides: Partial<ExecutionTraceListParams> = {}): ExecutionTraceListParams {
@@ -128,8 +154,10 @@ afterEach(() => {
   resetViewport();
 });
 
+// ENMIENDA QC-261 (2026-10-12): el enlace «Ver recorrido» de la fila pasa a ser el ítem del menú de
+// acciones (QC-261 R7). La columna «Recorrido» es ahora «Acciones»; las URL no cambian.
 describe('R2 - columnas de la fila', () => {
-  it('R2 - numero, estado, personas, primera y ultima anotacion, una duracion, vueltas y enlace', () => {
+  it('R2 - numero, estado, personas, primera y ultima anotacion, una duracion, vueltas y acciones', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     for (const etiqueta of [
@@ -140,7 +168,7 @@ describe('R2 - columnas de la fila', () => {
       'Última anotación',
       'Duración',
       'Vueltas atrás',
-      'Recorrido',
+      'Acciones',
     ]) {
       expect(cabeceras.some((texto) => texto.includes(etiqueta))).toBe(true);
     }
@@ -151,6 +179,51 @@ describe('R2 - columnas de la fila', () => {
     expect(within(activa).getByText('2026-10-07 08:00:00')).toBeInTheDocument();
     expect(within(activa).getByText('2026-10-07 08:30:00')).toBeInTheDocument();
     expect(within(activa).getByRole('img', { name: ANA.displayName })).toBeInTheDocument();
+  });
+
+  it('R2 - tras «Nº de pedido» van Foto, Fórmula, Presentaciones y Estado', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const desde = cabeceras.findIndex((texto) => texto.includes('Nº de pedido'));
+    ['Foto', 'Fórmula', 'Presentaciones', 'Estado'].forEach((etiqueta, i) =>
+      expect(cabeceras[desde + 1 + i]).toContain(etiqueta),
+    );
+  });
+
+  it('«Por entregar» ya no es columna del dashboard: vive en la lista de pedidos', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    expect(cabeceras.some((texto) => texto.includes('Por entregar'))).toBe(false);
+    expect(screen.queryByTestId('execution-trace-pending')).toBeNull();
+  });
+
+  it('R2 - la fila pinta la foto, la fórmula y las presentaciones', () => {
+    montar();
+    const activa = fila(ACTIVO.orderId);
+    const foto = within(activa).getByTestId('execution-trace-image');
+    expect(foto).toHaveAttribute('src', 'https://cdn.example.test/gel.png');
+    expect(foto).toHaveAttribute('alt', 'Gel antibacterial');
+    expect(within(activa).getByTestId('execution-trace-formula')).toHaveTextContent('Gel antibacterial');
+    expect(within(activa).getByTestId('execution-trace-presentations')).toHaveTextContent(
+      '10 galones, 5 vasos',
+    );
+  });
+
+  it('R2 - sin imagen sale el marcador', () => {
+    montar();
+    const cerrada = fila(CERRADO.orderId);
+    expect(within(cerrada).getByTestId('execution-trace-image')).toHaveAttribute('data-missing', 'true');
+  });
+
+  it('R2 - sin fórmula ni presentaciones, la raya atenuada', () => {
+    montar();
+    const baja = fila(DE_BAJA.orderId);
+    expect(within(baja).getByTestId('execution-trace-image')).toHaveAttribute('alt', 'Pedido sin fórmula');
+    for (const testId of ['execution-trace-formula', 'execution-trace-presentations']) {
+      const celda = within(baja).getByTestId(testId);
+      expect(celda).toHaveTextContent('—');
+      expect(celda).toHaveClass('text-muted-foreground');
+    }
   });
 
   it('R2 - la fila dada de baja lleva el texto «Dado de baja» visible, sin depender de hover', () => {
@@ -168,15 +241,16 @@ describe('R2 - columnas de la fila', () => {
   });
 });
 
+// El total de la lista se trunca a minutos, sin segundos.
 describe('R3 - R15 - en curso y duracion', () => {
-  it('R3 - la fila activa se marca «En curso» y su duracion es abierta', () => {
+  it('R3 - la fila activa muestra su estado y su duracion abierta', () => {
     montar();
     const activa = fila(ACTIVO.orderId);
-    expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
-    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min 00 s (en curso)');
+    expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
+    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('45 min (en curso)');
   });
 
-  it('R3 - una fila activa en POR_EMPACAR lleva la marca «En curso» aparte del estado y su duracion abierta', () => {
+  it('R3 - una fila activa en POR_EMPACAR no lleva chip «En curso»: el estado ya dice el paso; su duracion es abierta', () => {
     render(
       <ExecutionTraceTable
         rows={[ACTIVO_POR_EMPACAR, ...ROWS]}
@@ -186,17 +260,16 @@ describe('R3 - R15 - en curso y duracion', () => {
       />,
     );
     const activa = fila(ACTIVO_POR_EMPACAR.orderId);
-    expect(within(activa).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
+    expect(within(activa).queryByTestId('execution-trace-active')).toBeNull();
     expect(within(activa).getByTestId('execution-trace-status')).toHaveTextContent('Por empacar');
-    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min 00 s (en curso)');
-    expect(within(fila(ACTIVO.orderId)).getByTestId('execution-trace-active')).toHaveTextContent(ACTIVE_ORDER_MARK);
-  });
+    expect(within(activa).getByTestId('execution-trace-duration')).toHaveTextContent('50 min (en curso)');
+    expect(within(fila(ACTIVO.orderId)).queryByTestId('execution-trace-active')).toBeNull();  });
 
-  it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En curso»', () => {
+  it('R3 - la fila dada de baja en EN_CURSO no lleva la marca de actividad aunque su estado diga «En fabricación»', () => {
     montar();
     const baja = fila(DE_BAJA.orderId);
     expect(within(baja).queryByTestId('execution-trace-active')).toBeNull();
-    expect(within(baja).getByTestId('execution-trace-status')).toHaveTextContent('En curso');
+    expect(within(baja).getByTestId('execution-trace-status')).toHaveTextContent('En fabricación');
     expect(within(baja).getByTestId('execution-trace-deleted')).toBeInTheDocument();
   });
 
@@ -208,11 +281,68 @@ describe('R3 - R15 - en curso y duracion', () => {
   it('R15 - una sola cifra por fila, la del formateador, con su marca de cierre', () => {
     montar();
     expect(within(fila(CERRADO.orderId)).getByTestId('execution-trace-duration')).toHaveTextContent(
-      formatTraceDuration(CERRADO.duration),
+      formatTraceTotal(CERRADO.totalDuration),
     );
     expect(within(fila(DE_BAJA.orderId)).getByTestId('execution-trace-duration')).toHaveTextContent(
       '1 h 00 min (sin cierre anotado)',
     );
+  });
+});
+
+describe('R26 - R28 - total por fila con acondicionamiento, sin chip «En curso»', () => {
+  function montarAcondicionamiento() {
+    render(
+      <ExecutionTraceTable rows={CONDITIONING_TRACE_ROWS} personOptions={[]} params={params()} totalPages={1} />,
+    );
+  }
+
+  it('R26 - celda de duracion con total y sufijo', () => {
+    montarAcondicionamiento();
+    const abierta = within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(abierta).toHaveTextContent('4 h 33 min (en curso)');
+    expect(abierta).toHaveAttribute('data-kind', 'open');
+    const cerrada = within(fila(CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(cerrada.textContent).toBe('5 h 29 min');
+    expect(cerrada).toHaveAttribute('data-kind', 'closed');
+    const sinCierre = within(fila(UNCLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(sinCierre.textContent).toBe(formatTraceTotal(UNCLOSED_TOTAL_ROW.totalDuration));
+    expect(sinCierre.textContent).toBe('3 h 46 min (sin cierre anotado)');
+  });
+
+  it('R26 - la cifra es la de la columna monoespaciada y el sufijo va pequeno y atenuado', () => {
+    montarAcondicionamiento();
+    const abierta = within(fila(OPEN_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(abierta.closest('td')).toHaveClass('font-mono');
+    const sufijo = within(abierta).getByText('(en curso)');
+    expect(sufijo).toHaveClass('text-xs', 'text-muted-foreground');
+    const cerrada = within(fila(CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration');
+    expect(cerrada.children).toHaveLength(0);
+  });
+
+  it('R28 - ninguna fila lleva chip «En curso», ni activa ni dada de baja', () => {
+    montarAcondicionamiento();
+    expect(within(fila(OPEN_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(fila(ACTIVE_CLOSED_TOTAL_ROW.orderId)).getByTestId('execution-trace-duration')).toHaveAttribute(
+      'data-kind',
+      'closed',
+    );
+    expect(within(fila(CLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
+    const baja = fila(UNCLOSED_TOTAL_ROW.orderId);
+    expect(within(baja).queryByTestId('execution-trace-active')).toBeNull();
+    expect(within(baja).getByTestId('execution-trace-deleted')).toBeInTheDocument();
+  });
+
+  it('R28 - una fila dada de baja con active a true tampoco lleva la marca', () => {
+    render(
+      <ExecutionTraceTable
+        rows={[{ ...UNCLOSED_TOTAL_ROW, active: true }]}
+        personOptions={[]}
+        params={params()}
+        totalPages={1}
+      />,
+    );
+    expect(within(fila(UNCLOSED_TOTAL_ROW.orderId)).queryByTestId('execution-trace-active')).toBeNull();
   });
 });
 
@@ -284,10 +414,21 @@ describe('R6 - R7 - R8 - R9 - R11 - los filtros navegan a la URL desde la pagina
   });
 });
 
+function disparador(row: ExecutionTraceRow): HTMLElement {
+  return within(fila(row.orderId)).getByRole('button', {
+    name: `${TRACE_ACTIONS_LABEL_PREFIX}${row.numberText}`,
+  });
+}
+
+// ENMIENDA QC-261 (2026-10-12): el enlace vive en el ítem «Ver recorrido» del menú de la fila
+// (QC-261 R7); se abre el menú y se mide el mismo href, con las mismas aserciones.
 describe('R12 - R17 - el enlace de cada fila', () => {
-  it('R12 - el enlace es executionTraceRoute(id) con la consulta actual', () => {
+  it('R12 - el enlace es executionTraceRoute(id) con la consulta actual', async () => {
+    const user = setupUser();
     const p = montar(params({ page: 2, orderNumber: '42' }));
-    const enlace = within(fila(ACTIVO.orderId)).getByRole('link', { name: new RegExp(TRACE_LINK_TEXT) });
+    await user.click(disparador(ACTIVO));
+    const enlace = await screen.findByTestId('execution-trace-link');
+    expect(enlace).toHaveTextContent(TRACE_LINK_TEXT);
     const href = enlace.getAttribute('href') ?? '';
     expect(href.startsWith(`${executionTraceRoute(ACTIVO.orderId)}?`)).toBe(true);
     expect(href.split('?')[1]).toBe(executionTraceListHref(p).split('?')[1]);
@@ -305,12 +446,14 @@ describe('R26 - controles tactiles y de teclado', () => {
     expect(ultimoDestino()).toContain('cancelados=1');
   });
 
-  it('R26 - el enlace de cada fila mide 44x44 y es enfocable', () => {
+  // ENMIENDA QC-261 (2026-10-12): el control táctil de la fila es el disparador del menú de
+  // acciones, no el enlace (QC-261 R7).
+  it('R26 - el disparador del menu de cada fila mide 44x44 y es enfocable', () => {
     montar();
-    const enlace = within(fila(ACTIVO.orderId)).getByRole('link', { name: new RegExp(TRACE_LINK_TEXT) });
-    expect(enlace).toHaveClass('min-h-11', 'min-w-11');
-    enlace.focus();
-    expect(enlace).toHaveFocus();
+    const boton = disparador(ACTIVO);
+    expect(boton).toHaveClass('min-h-11', 'min-w-11');
+    boton.focus();
+    expect(boton).toHaveFocus();
   });
 });
 

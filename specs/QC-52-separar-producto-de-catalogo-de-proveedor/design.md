@@ -289,6 +289,28 @@ afirmar después que crearla no perdió lo escrito. Al quitar el costo, esa afir
 seguir apoyándose en un campo real — se conserva sobre `product-field-name` y `product-field-stock`,
 que es lo que ya hace el assert de la línea 219.
 
+### 5.2 Enmienda del 2026-10-16: costo de los lotes y «Presentación» (R6 nota, R35–R37)
+
+Aprobada por el usuario, sin tarjeta (commits `b0eaa866` (#261) y `6a665e3f`). No devuelve ninguna
+columna a `products`: el costo es el `unit_cost` de `product_batches`.
+
+- **Servidor.** `canViewUnitCosts(actor)` (`inventario/domain/actor.ts`, hoy `inventario.modificar`)
+  decide. `listProducts` pide al puerto `{ withUnitCosts }`; sin él, `listAliveProducts` no lanza la
+  consulta de costos y `ProductView.averageUnitCost` no viaja. `listProductBatches` y
+  `listOrderBatches` quitan `unitCost` con `withoutUnitCost`. El promedio lo calcula
+  `weightedAverageUnitCost` sobre los lotes con existencia y costo.
+- **Pantalla.** El Server Component calcula `canSeeCost` y lo baja a `ProductTable`
+  (`showCost`, por defecto `false`); la columna `averageUnitCost` va tras la existencia y pinta
+  `product-cost` / `product-batch-row-cost`. `showPresentation` (por defecto `true`) se apaga en la
+  pestaña «Producto».
+
+| R | Test |
+|---|---|
+| R35 | `tests/unit/inventario/product-batch-rows.test.tsx` › describe «columna «Costo» de la tabla de productos» (cabecera tras la existencia, «$», miles y dos decimales con `title` exacto, «—» sin costo, costo propio del lote); `tests/unit/inventario/weighted-average-unit-cost.test.ts`; `tests/unit/inventario/unit-cost-visibility.test.ts` › «con withUnitCosts: true lanza UNA consulta de costos, con el ambito de empresa, y pondera»; `tests/unit/inventario/product-page.test.tsx` › «la columna «Costo» la ve el Administrador y no el Operador, aunque el costo venga» |
+| R36 | `tests/unit/inventario/unit-cost-visibility.test.ts` (los cuatro describe); `tests/unit/inventario/product-batch-rows.test.tsx` › «sin `canSeeCost` (cualquier rol que no sea el Administrador) la columna no existe»; `tests/unit/inventario/product-page.test.tsx` (la misma de R35, rama del Operador) |
+| R37 | `tests/unit/inventario/product-type-column.test.tsx` › describe «columna «Presentación» segun la pestana de tipo» |
+| R6 (sigue) | `tests/unit/inventario/product-page.test.tsx` › «el costo, la compra minima y el tiempo de entrega no aparecen en la lista por ninguna via» |
+
 ---
 
 ## 6. Módulo `proveedores`: qué cae, qué cambia

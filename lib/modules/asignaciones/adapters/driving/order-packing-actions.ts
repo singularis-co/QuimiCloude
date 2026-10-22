@@ -41,6 +41,21 @@ function orderIdFromFormData(formData: FormData): unknown {
   return { orderId: formData.get('orderId') };
 }
 
+// `lines` llega como JSON porque es una lista de objetos; uno roto o ausente se deja `undefined`
+// para que lo rechace el zod del caso de uso, no esta capa.
+function finishPackingInputFromFormData(formData: FormData): unknown {
+  const raw = formData.get('lines');
+  let lines: unknown;
+  if (typeof raw === 'string') {
+    try {
+      lines = JSON.parse(raw);
+    } catch {
+      lines = undefined;
+    }
+  }
+  return { orderId: formData.get('orderId'), lines };
+}
+
 export type StartPackingResult = { status: 'success' } | ErrorState;
 
 /** Comienza el empaque —`POR_EMPACAR` a `EN_EMPAQUE`— y vuelve a la MISMA pantalla del pedido. */
@@ -72,7 +87,7 @@ export async function finishPackingAction(
 
   let numberText: string;
   try {
-    ({ numberText } = await asignaciones.finishPacking(actor, orderIdFromFormData(formData)));
+    ({ numberText } = await asignaciones.finishPacking(actor, finishPackingInputFromFormData(formData)));
   } catch (error) {
     return toErrorState(error);
   }

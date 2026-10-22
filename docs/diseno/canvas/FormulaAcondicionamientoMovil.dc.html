@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fórmula con acondicionamiento en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="FormulaAcondicionamiento" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Fórmula · sección Acondicionamiento (QC-299)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">recipe-steps-field · recipe-step-editor</span> (editor de pasos, filas con «+» / «×», QC-211 D14) · switch «Requiere evidencia» de QC-214 · <span class="mono">card · help · num-dot</span></dd>
+      <dt>Nuevo</dt><dd>Tercera sección «Acondicionamiento (opcional)» tras Pasos y Envasado, separada por un divisor · switch «Asignación requerida» solo en esta sección · nota bajo el paso cuando un switch está encendido · los switches muestran solo icono (cámara = evidencia, persona = asignación; nombre completo en aria-label); cada switch muestra su tooltip con el texto completo al pasar el ratón o con foco (switch o icono); en táctil, al mantener pulsado</dd>
+      <dt>Librerías</dt><dd><span class="mono">@tiptap/*</span> (editor ya aprobado) · <span class="mono">lucide-react</span> (<span class="mono">Camera</span>, <span class="mono">UserPlus</span>) · tooltip del design system existente · sin librería nueva</dd>
+      <dt>Escritorio</dt><dd>Los dos switches, solo con icono, en la barra de la fila, a la derecha; después «+» y «×» · tooltip debajo, alineado a la derecha, 260 px de ancho · el resumen de la sección cuenta pasos, evidencias y responsables</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio; la barra de la fila salta de línea si no cabe</dd>
+      <dt>Teléfono</dt><dd>Switches de 44 px de alto · el tooltip abre al mantener pulsado el switch · la barra de la fila salta de línea: formato arriba, switches y «+» / «×» abajo</dd>
+      <dt>Animación</dt><dd>Fila nueva con subida corta (qc-rise) · el switch desliza en 200 ms · la nota aparece con la fila</dd>
+      <dt>Versiones</dt><dd>El formulario de versión muestra la sección en solo lectura con los switches visibles y deshabilitados (heredado de QC-211 D4)</dd>
+      <dt>Por confirmar</dt><dd>Nada</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

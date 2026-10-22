@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { errorMessage } from '@/lib/modules/errores';
 import {
   DOCUMENT_TYPE_CC,
@@ -57,8 +58,9 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
+  startOpenedAssignedOrder,
 } from './helpers/confirm-dialog';
-import { addPackagingLine, openOrderRowMenu } from './helpers/order-distribution';
+import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
@@ -153,6 +155,9 @@ const DISTRIBUTION_DIALOG_ERROR_TESTID = 'order-distribution-dialog-error';
 /** Asignacion y ejecucion. */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
+/** La ejecución: el `h1` es solo la receta y el número va en el rótulo de la cabecera (R23 de QC-265). */
+const EXECUTION_SCREEN_TESTID = 'order-execution-screen';
+const EXECUTION_EYEBROW_SELECTOR = '[data-slot="operator-eyebrow"]';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
 
@@ -210,8 +215,11 @@ function ordersUrl(): string {
   return `${ORDERS_ROUTE}?${query.toString()}`;
 }
 
+/** Dentro de la fila: la tarjeta de la lista repite el disparador con el mismo `data-order-id`. */
 function rowActions(page: Page, orderId: string): Locator {
-  return page.locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
+  return page
+    .getByTestId(`data-table-row-${orderId}`)
+    .locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${orderId}"]`);
 }
 
 function distributionLine(scope: Locator, presentationId: string): Locator {
@@ -308,13 +316,22 @@ async function expectAvailability(scope: Locator, exceeds: boolean): Promise<voi
 /** El Operador entra al pedido asignado y lo finaliza; queda `POR_EMPACAR`. */
 async function finishProduction(page: Page, orderId: string, numberText: string): Promise<void> {
   await switchUser(page, operatorUser);
+  await page.goto(ASSIGNED_ORDERS_ROUTE);
   await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
   await page.goto(assignedOrderRoute(orderId));
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(
-    `${numberText} - ${RECIPE_NAME}`,
-  );
+  await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME);
+  await expect(
+    page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
+  ).toHaveText(numberText);
+
+  // Entrar no comienza: un pedido `PENDIENTE` muestra el paso a paso tras «Comenzar».
+  const { status } = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    select: { status: true },
+  });
+  if (status === 'PENDIENTE') await startOpenedAssignedOrder(page);
 
   // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
   const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
@@ -614,7 +631,8 @@ test.describe('pedido en varias presentaciones', () => {
     await expectAvailability(createForm, false);
     await expect(createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
 
-    await createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
+    // 4 x 1 + 6 x 0.5 = 7 de 10: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, createForm);
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findFirstOrThrow({
@@ -689,11 +707,30 @@ test.describe('pedido en varias presentaciones', () => {
     const packingScreen = await openPackingScreen(page, orderId);
     const packingLines = packingScreen.getByTestId(PACKING_LINE_TESTID);
     await expect(packingLines).toHaveCount(2);
+    // Cada linea nombra el envase y el volumen de su presentacion (9a330ab2), con el mismo formateo
+    // que la etiqueta compartida; las dos presentaciones van en litros (`unit.symbol ?? unit.name`).
+    const litreUnit = await prisma.unit.findUniqueOrThrow({
+      where: { id: litroUnitId! },
+      select: { symbol: true, name: true },
+    });
+    const litreLabel = litreUnit.symbol ?? litreUnit.name;
     await expect(packingLines.filter({ hasText: PACKAGING_A_NAME })).toHaveText(
-      `${PACKAGES_A} × ${PACKAGING_A_NAME}`,
+      orderDistributionLineText({
+        presentationName: PRESENTATION_A_NAME,
+        packagingName: PACKAGING_A_NAME,
+        packages: Number(PACKAGES_A),
+        presentationContent: PRESENTATION_A_CONTENT,
+        presentationUnitLabel: litreLabel,
+      }),
     );
     await expect(packingLines.filter({ hasText: PACKAGING_B_NAME })).toHaveText(
-      `${PACKAGES_B} × ${PACKAGING_B_NAME}`,
+      orderDistributionLineText({
+        presentationName: PRESENTATION_B_NAME,
+        packagingName: PACKAGING_B_NAME,
+        packages: Number(PACKAGES_B),
+        presentationContent: PRESENTATION_B_CONTENT,
+        presentationUnitLabel: litreLabel,
+      }),
     );
 
     await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
@@ -878,10 +915,15 @@ test.describe('pedido en varias presentaciones', () => {
       );
       await expect(staleLine).toHaveValue(BARE_PACKAGES);
 
-      // --- 5. R47: el Empacador ve el reparto en solo lectura y comienza.
+      // --- 5. R47: el Empacador ve el reparto en solo lectura y comienza. La linea nombra el
+      // envase y el volumen de su presentacion, sembrados aqui: contenido y unidad del litro.
+      const litro = await prisma.unit.findUniqueOrThrow({
+        where: { id: litroUnitId! },
+        select: { symbol: true, name: true },
+      });
       packingScreen = await openPackingScreen(page, orderId);
       await expect(packingScreen.getByTestId(PACKING_LINE_TESTID)).toHaveText([
-        `${BARE_PACKAGES} × ${PACKAGING_A_NAME}`,
+        `${BARE_PACKAGES} × ${PACKAGING_A_NAME} · ${PRESENTATION_A_CONTENT} ${litro.symbol ?? litro.name}`,
       ]);
       await expect(packingScreen.getByTestId(PACKING_MISSING_DISTRIBUTION_TESTID)).toHaveCount(0);
       await expect(packingScreen.locator(EDITING_CONTROLS)).toHaveCount(0);

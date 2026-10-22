@@ -89,3 +89,13 @@ describe('el aviso de pedido que no alcanza', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 });
+
+describe('los textos del aviso son los de hoy (QC-262 R20)', () => {
+  it('R20: «Material insuficiente» con «Volver» y «Guardar bloqueado»', async () => {
+    renderAviso();
+
+    expect(await screen.findByRole('alertdialog', { name: 'Material insuficiente' })).toBeInTheDocument();
+    expect(screen.getByTestId(BLOCKED_ORDER_DISMISS_TESTID)).toHaveTextContent(/^Volver$/);
+    expect(screen.getByTestId(BLOCKED_ORDER_CONFIRM_TESTID)).toHaveTextContent(/^Guardar bloqueado$/);
+  });
+});

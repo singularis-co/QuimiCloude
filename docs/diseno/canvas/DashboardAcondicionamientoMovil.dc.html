@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Dashboard con acondicionamiento en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="DashboardAcondicionamiento" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Dashboard con acondicionamiento · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · status-badge · responsible-avatars (límite 3 + «+N») · row-actions-menu · ui/checkbox · shared/empty-state · shared/error-state · formatTraceDuration · ACTIVE_ORDER_MARK</span> · ninguna pieza nueva</dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Checkbox, Tooltip) · <span class="mono">lucide-react</span> · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>Mismas columnas que hoy · «Duración» sigue siendo una sola cifra: el TOTAL = suma de las etapas que tenga el pedido (producción + empaque + acondicionamiento), sin contar las esperas entre etapas; una etapa sin anotación que la abra (null) suma 0 · si alguna etapa sigue abierta, el total va con « (en curso)» como hoy (formatTraceDuration) · el desglose por etapa solo está en el detalle del recorrido · Estado lleva «En curso» si el pedido está vivo · Personas: primero quien firma anotaciones, después el equipo de acondicionamiento en su orden, sin repetir; más de 3 → «+N» con los nombres en el tooltip</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono (78 px) · la tabla hace scroll horizontal dentro de su caja</dd>
+      <dt>Teléfono</dt><dd>Tarjetas: nº + estado (+ «En curso») · primera anotación, duración total y vueltas atrás en la línea de datos, como hoy · personas con «+N» y botón «Acciones» de 44 px</dd>
+      <dt>Animación</dt><dd>Sin cambios: entrada escalonada, fundido de 200 ms al filtrar, menú ⋯ 200/150 ms, tooltip del avatar y del «+N»</dd>
+      <dt>Por confirmar</dt><dd>Total con una etapa «sin cierre anotado»: ¿lleva ese sufijo o ninguno? · ¿distinguir al equipo de los firmantes en el tooltip? (el contrato solo trae nombre)</dd>
+      <dt>Enmienda 2026-10-16</dt><dd>Aprobada por el usuario, sin tarjeta. Commit 0f135128: se quita el chip «En curso» del pedido (bajo el número, en la tarjeta y junto al estado); ACTIVE_ORDER_MARK ya no se pinta. Siguen «Dado de baja» y el sufijo « (en curso)» de la duración. Commit 440ff5b2: el estado EN_CURSO se lee «En fabricación». Specs: QC-261 R6, QC-283 R28, QC-167 R3</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

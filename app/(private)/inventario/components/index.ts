@@ -4,8 +4,59 @@
 // Sin `'use client'`: la frontera cliente/servidor se declara en CADA archivo de componente,
 // nunca aqui. Asi `page.tsx` sigue siendo Server Component aunque importe desde el barrel.
 export { AdjustBatchDialog, type AdjustBatchDialogProps } from './adjust-batch-dialog';
-export { BatchHistory, movementKindLabel, movementReasonLabel } from './batch-history';
+export { BatchHistory, movementKindLabel } from './batch-history';
 export { DeleteProductDialog } from './delete-product-dialog';
+export {
+  DIRECT_DELIVERY_OPEN_TESTID,
+  DirectDeliveryButton,
+  type DirectDeliveryButtonProps,
+} from './direct-delivery-button';
+export {
+  DIRECT_DELIVERY_CANCEL_TESTID,
+  DIRECT_DELIVERY_DRAFT_ADJUSTED_TESTID,
+  DIRECT_DELIVERY_ERROR_TESTID,
+  DIRECT_DELIVERY_NOTE_ERROR_TESTID,
+  DIRECT_DELIVERY_NOTE_TESTID,
+  DIRECT_DELIVERY_NO_SURPLUS_TESTID,
+  DIRECT_DELIVERY_OVER_SURPLUS_TESTID,
+  DIRECT_DELIVERY_REJECTED_TESTID,
+  DIRECT_DELIVERY_SHEET_TESTID,
+  DIRECT_DELIVERY_SKELETON_TESTID,
+  DIRECT_DELIVERY_STOCK_OVER_TESTID,
+  DIRECT_DELIVERY_SUBMIT_TESTID,
+  DirectDeliverySheet,
+  type DirectDeliverySheetProps,
+} from './direct-delivery-sheet';
+export {
+  DIRECT_DELIVERY_COUNTER_TAG_TESTID,
+  DIRECT_DELIVERY_COUNTER_TESTID,
+  DIRECT_DELIVERY_SURPLUS_CARD_LABELS,
+  DIRECT_DELIVERY_SURPLUS_TESTID,
+  DIRECT_DELIVERY_WAITING_ORDER_TESTID,
+  DIRECT_DELIVERY_WAITING_TESTID,
+  DirectDeliverySurplusCard,
+  type DirectDeliverySurplusCardLabels,
+  type DirectDeliverySurplusCardProps,
+} from './direct-delivery-surplus-card';
+export {
+  addDirectDraftBlock,
+  adjustDirectDeliveryDraft,
+  clearDirectDeliveryDraft,
+  directDeliveryDraftKey,
+  loadDirectDeliveryDraft,
+  newDirectDeliveryDraft,
+  parseDirectDeliveryDraft,
+  removeDirectDraftBlock,
+  saveDirectDeliveryDraft,
+  setDirectDraftBlockCustomer,
+  setDirectDraftBlockPackages,
+  setDirectDraftNote,
+  type DirectDeliveryDraft,
+  type DirectDeliveryDraftBlock,
+  type DirectDeliveryDraftStorage,
+  type LoadedDirectDeliveryDraft,
+} from './direct-delivery-draft';
+export { useDirectDeliveryDraft, type DirectDeliveryDraftStore } from './use-direct-delivery-draft';
 export {
   buildFinishedStockColumns,
   finishedStockRowName,
@@ -15,6 +66,7 @@ export {
   type FinishedStockTableRow,
 } from './finished-stock-columns';
 export { FinishedStockListSection } from './finished-stock-list-section';
+export { movementReasonLabel } from './movement-reason-label';
 export {
   FINISHED_STOCK_TABLE_ID,
   FINISHED_STOCK_TABLE_TEXTS,
@@ -28,42 +80,87 @@ export {
 export { PRESENTATION_FIELD, PresentationSelect } from '@/components/shared/presentation-select';
 export {
   ACTIONS_COLUMN_ID,
+  BATCHES_TOGGLE_COLUMN_ID,
+  PRODUCT_CARD_LABELS,
+  BELOW_ALERT_LABEL,
   IMAGE_COLUMN_ID,
+  PRODUCT_BATCH_ROW_TEXTS,
   buildProductColumns,
   productUnitLabel,
+  type ProductBatchesStatus,
   type ProductColumn,
   type ProductColumnId,
   type ProductColumnsDeps,
+  type ProductTableRow,
 } from './product-columns';
-export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
 export {
+  daysUntil,
+  EXPIRY_RELATIVE_TEXTS,
+  EXPIRY_WARNING_DAYS,
+  expiryRelativeLabel,
+  isExpired,
+  isExpiringSoon,
+} from './expiry-warning';
+export { ExpiryDate, type ExpiryDateProps, useLocalToday } from './expiry-date';
+export { PRODUCT_SKELETON_COLUMN_COUNT } from './product-columns-skeleton';
+export { productNameWithoutPresentation } from './product-base-name';
+export {
+  PRODUCT_ACTION_ADJUST_TESTID,
   PRODUCT_ACTION_BATCHES_TESTID,
   PRODUCT_ACTION_DELETE_TESTID,
+  PRODUCT_ACTION_DIRECT_DELIVERY_TESTID,
   PRODUCT_ACTION_EDIT_TESTID,
+  PRODUCT_ACTION_HISTORY_TESTID,
+  PRODUCT_ROW_ACTION_LABELS,
   PRODUCT_ROW_ACTIONS_TESTID,
   ProductRowActions,
   productRowActionsLabel,
+  productRowActionsSpec,
+  type ProductRowAction,
   type ProductRowActionsProps,
+  type ProductRowActionsSpec,
+  type ProductRowActionsSpecInput,
 } from './product-row-actions';
+export {
+  ProductRowDialogs,
+  batchTarget,
+  type BatchTarget,
+  type ProductRowDialogsActive,
+  type ProductRowDialogsProps,
+} from './product-row-dialogs';
 export {
   COST_INPUT_SCALE,
   divideCost,
   multiplyCost,
   sanitizeCostInput,
 } from './product-cost-amount';
-export { COST_QUANTITY_FIELD, ProductCostFields } from './product-cost-fields';
-export { ProductField } from './product-field';
+export { ProductCostFields } from './product-cost-fields';
+export { ProductField, ProductFieldHelper } from './product-field';
 export { ProductForm } from './product-form';
 export {
+  EXPIRY_DATE_FIELD,
   PURCHASE_DATE_FIELD,
   ProductBatchDateField,
+  type ProductBatchDateFieldName,
 } from './product-batch-date-field';
+export {
+  PRODUCT_BATCHES_CARD,
+  PRODUCT_BATCHES_TABLE_ID,
+  PRODUCT_BATCHES_TABLE_TEXTS,
+  PRODUCT_BATCH_COLUMN_LABELS,
+  buildProductBatchColumns,
+  type ProductBatchColumnsDeps,
+  type ProductBatchColumnsProduct,
+} from './product-batch-columns';
 export {
   ProductBatchesPanel,
   type ProductBatchesPanelProps,
 } from './product-batches-panel';
 export {
+  BATCH_ADJUST_ITEM_TESTID,
+  BATCH_HISTORY_ITEM_TESTID,
   ProductBatchesSheet,
+  batchActionsLabel,
   type ProductBatchesSheetProps,
 } from './product-batches-sheet';
 export {
@@ -91,15 +188,26 @@ export {
   buildProductListQuery,
   parseProductListParams,
   productListHref,
+  productTypeTabHref,
   type ProductListSearchParams,
   type ProductPageSize,
 } from './product-list-params';
-export { ProductTypeTabs, type ProductTypeTabsProps } from './product-type-tabs';
+export { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_TONES } from './product-type-label';
+export {
+  ALL_TYPES_TAB_LABEL,
+  PRODUCT_TYPE_TABS_LABEL,
+  PRODUCT_TYPE_TABS_TESTID,
+  ProductTypeTabs,
+  type ProductTypeTabsProps,
+} from './product-type-tabs';
 export { ProductListSection } from './product-list-section';
 export { ProductSheet } from './product-sheet';
 export {
   PRODUCT_TABLE_ID,
+  PRODUCT_TABLE_SCOPE_CLASS,
   PRODUCT_TABLE_TEXTS,
   ProductTable,
+  productTableCard,
+  type ProductTableCardOptions,
   type ProductTableProps,
 } from './product-table';

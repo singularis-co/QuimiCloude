@@ -1,9 +1,7 @@
 // QC-67 T2 — El item «Usuarios» del menu privado (R2, R3).
 //
-// Nacio dentro de la seccion «Configuración» (QC-67) y paso a «Operación» por decision humana del
-// 2026-09-21: usuarios es operacion de la organizacion, no configuracion del producto. El objeto
-// NO se movio de sitio en `PRIVATE_NAV_ITEMS` —solo cambio su `section`—, asi que sigue siendo el
-// ULTIMO del array.
+// Vive en la seccion «Configuración», como su primer item, delante de presentaciones, unidades e
+// integraciones.
 //
 // El ocultado es por PERMISO y se decide en el servidor (QC-75): el layout privado filtra
 // `PRIVATE_NAV_ITEMS` con los permisos de la sesion (`filterNavItemsByPermissions`). Aqui se
@@ -91,40 +89,38 @@ function paginaDe(href: string): string {
   return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
 }
 
-describe('la seccion Configuración lleva presentaciones, unidades e integraciones, sin usuarios (R2, 2026-09-21)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente TRES items', () => {
+describe('la seccion Configuración abre con usuarios (R2)', () => {
+  it('hay exactamente UNA seccion Configuración y lleva exactamente CUATRO items', () => {
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
       (seccion) => seccion.label === NAV_SECTION_CONFIGURATION,
     );
 
     expect(secciones).toHaveLength(1);
-    expect(secciones[0]?.items).toHaveLength(3);
+    expect(secciones[0]?.items).toHaveLength(4);
   });
 
-  it('el orden de Configuración es presentaciones, unidades e integraciones, sin usuarios', () => {
+  it('el orden de Configuración es usuarios, presentaciones, unidades e integraciones', () => {
     const items = seccionConfiguracion() ?? [];
 
     expect(items.map((item) => (item.kind === 'link' ? item.href : item.label))).toEqual([
+      USERS_ROUTE,
       PRESENTATIONS_ROUTE,
       UNITS_ROUTE,
       INTEGRATIONS_LABEL,
     ]);
   });
 
-  it('usuarios es el ULTIMO item de la seccion Operación', () => {
-    // El objeto no se movio de sitio en el array (solo cambio su `section`), asi que sigue siendo
-    // el ultimo enlace declarado dentro de «Operación».
+  it('usuarios ya no aparece en la seccion Operación', () => {
     const operacion =
       groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
         (seccion) => seccion.label === NAV_SECTION_OPERATION,
       )?.items ?? [];
 
-    const ultimo = operacion[operacion.length - 1];
-    expect(ultimo?.kind === 'link' ? ultimo.href : undefined).toBe(USERS_ROUTE);
+    expect(operacion.map((item) => item.testId)).not.toContain('nav-usuarios');
   });
 
-  it('los dos items que ya existian siguen intactos, campo por campo', () => {
-    const [presentaciones, unidades] = (seccionConfiguracion() ?? []) as readonly NavLink[];
+  it('presentaciones y unidades siguen intactos, campo por campo', () => {
+    const [, presentaciones, unidades] = (seccionConfiguracion() ?? []) as readonly NavLink[];
 
     expect(presentaciones?.label).toBe(PRESENTATIONS_LABEL);
     expect(presentaciones?.testId).toBe('nav-presentaciones');
@@ -134,15 +130,15 @@ describe('la seccion Configuración lleva presentaciones, unidades e integracion
     expect(unidades?.label).toBe(UNITS_LABEL);
     expect(unidades?.testId).toBe('nav-unidades');
     expect(unidades?.permission).toBe('unidades.consultar');
-    expect(unidades?.icon).toBe('flask-conical');
+    expect(unidades?.icon).toBe('ruler');
   });
 
-  it('el item nuevo apunta a USERS_ROUTE y declara etiqueta, testId, permiso, icono y seccion', () => {
+  it('el item apunta a USERS_ROUTE y declara etiqueta, testId, permiso, icono y seccion', () => {
     expect(ITEMS_DE_USUARIOS).toHaveLength(1);
     expect(ITEMS_DE_USUARIOS[0]?.label).toBe(USERS_LABEL);
     expect(ITEMS_DE_USUARIOS[0]?.testId).toBe('nav-usuarios');
     expect(ITEMS_DE_USUARIOS[0]?.permission).toBe('usuarios.consultar');
-    expect(ITEMS_DE_USUARIOS[0]?.section).toBe(NAV_SECTION_OPERATION);
+    expect(ITEMS_DE_USUARIOS[0]?.section).toBe(NAV_SECTION_CONFIGURATION);
     expect(ITEMS_DE_USUARIOS[0]?.icon).toBe('users');
   });
 
@@ -220,15 +216,14 @@ describe('el item se oculta a quien no tiene el permiso (R3)', () => {
     expect(seccionesDe(visible)).toContain(NAV_SECTION_OPERATION);
   });
 
-  it('con los del Operador no aparece usuarios, pero Operación no desaparece', () => {
+  it('con los del Operador no aparece usuarios y Configuración desaparece entera', () => {
     const visible = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, PERMISOS_OPERADOR);
     const testIds = visible.map((item) => item.testId);
 
     expect(testIds).not.toContain('nav-usuarios');
-    // Usuarios vive en «Operación», que le sigue mostrando al Operador el resto de sus items: la
-    // seccion no desaparece por perder este uno.
+    // El Operador sigue viendo «Operación» por inventario y asignacion.
     expect(seccionesDe(visible)).toContain(NAV_SECTION_OPERATION);
-    // Configuración si desaparece entera: el Operador tampoco tiene presentaciones ni unidades.
+    // Configuración desaparece entera: tampoco tiene presentaciones, unidades ni integraciones.
     expect(seccionesDe(visible)).not.toContain(NAV_SECTION_CONFIGURATION);
     // Y el Operador sigue viendo lo suyo: el filtrado quita, no vacia el menu.
     expect(visible.length).toBeGreaterThan(0);

@@ -1,5 +1,6 @@
 'use client';
 
+import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, ReactElement, ReactNode } from 'react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
@@ -11,12 +12,14 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import type { ErrorState } from '@/lib/modules/errores';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
+import { cn } from '@/lib/utils';
 
 export type ConfirmDialogTexts = {
   readonly title: ReactNode;
@@ -68,6 +71,38 @@ export type ConfirmDialogLayout = 'error-before-form' | 'error-in-form' | 'form-
  */
 export type ConfirmDialogErrorStyle = 'region' | 'inline';
 
+/**
+ * `header`: bajo el título. `after-aside`: tras `aside` y antes del error y del form; con
+ * `form-wraps-all`, dentro del form tras la cabecera.
+ */
+export type ConfirmDialogDescriptionPlacement = 'header' | 'after-aside';
+
+export type ConfirmDialogIconTone = 'neutral' | 'danger' | 'warning' | 'info' | 'success';
+
+export type ConfirmDialogIcon = {
+  readonly glyph: LucideIcon;
+  /** Sin él, el fondo neutro de `AlertDialogMedia`. */
+  readonly tone?: ConfirmDialogIconTone;
+  readonly testId?: string;
+};
+
+// Recuadro de 44 px, radio 12 e icono de 20 px, con los fondos y tintas de los tonos del tablero.
+const ICON_BOX_CLASS = 'size-11 rounded-xl';
+const ICON_TONE_CLASS: Readonly<Record<ConfirmDialogIconTone, string>> = {
+  neutral: '',
+  danger: 'bg-destructive-subtle text-destructive-text',
+  warning: 'bg-warning-subtle text-warning-text',
+  info: 'bg-accent text-accent-foreground',
+  success: 'bg-success-subtle text-success-text',
+};
+
+// Sin la descripción en la cabecera, las dos columnas implícitas se reparten el sobrante y el título
+// se aleja del icono: la del icono se ajusta a él y la del título se queda el resto.
+const HEADER_WITHOUT_DESCRIPTION_CLASS =
+  'sm:group-data-[size=default]/alert-dialog-content:grid-cols-[auto_1fr]';
+// Fuera de la cabecera ocupa el ancho del cuerpo: el `text-pretty` de la cabecera recorta las líneas.
+const LATE_DESCRIPTION_CLASS = 'text-left text-wrap md:text-wrap';
+
 const ERROR_REGION_CLASS = 'rounded-lg border border-destructive/40 p-3 text-sm text-destructive';
 const ERROR_INLINE_CLASS = 'text-sm text-destructive';
 
@@ -77,6 +112,8 @@ export type ConfirmDialogFrameProps = {
   /** Disparador propio. Sin él la apertura la decide quien pasa `open`. */
   readonly trigger?: { readonly render: ReactElement; readonly children: ReactNode };
   readonly testId: string;
+  /** Se suma a la clase del contenido. */
+  readonly contentClassName?: string;
   readonly children: ReactNode;
 };
 
@@ -90,6 +127,7 @@ export function ConfirmDialogFrame({
   onOpenChange,
   trigger,
   testId,
+  contentClassName,
   children,
 }: ConfirmDialogFrameProps) {
   return (
@@ -97,14 +135,24 @@ export function ConfirmDialogFrame({
       {trigger === undefined ? null : (
         <AlertDialogTrigger render={trigger.render}>{trigger.children}</AlertDialogTrigger>
       )}
-      <AlertDialogContent data-testid={testId}>{children}</AlertDialogContent>
+      <AlertDialogContent className={contentClassName} data-testid={testId}>
+        {children}
+      </AlertDialogContent>
     </AlertDialog>
   );
 }
 
-export type ConfirmDialogBodyProps = {
+/** Con `confirmSlot` el testid del botón lo pone quien pasa el slot: `testIds.confirm` no se admite. */
+export type ConfirmSlotChoice<TTestIds extends { readonly confirm: string }> =
+  | { readonly confirmSlot?: undefined; readonly testIds: TTestIds }
+  | {
+      /** Sustituye al botón de confirmar; su `type`, `disabled` y `data-testid` los pone quien lo pasa. */
+      readonly confirmSlot: NonNullable<ReactNode>;
+      readonly testIds: Omit<TTestIds, 'confirm'> & { readonly confirm?: never };
+    };
+
+export type ConfirmDialogBodyBaseProps = {
   readonly texts: ConfirmDialogTexts;
-  readonly testIds: Omit<ConfirmDialogTestIds, 'dialog'>;
   readonly variant?: 'default' | 'destructive';
   /** Con form (Server Action) o con transición. Sin él, se usa `onConfirm`. */
   readonly submit?: ConfirmDialogSubmit;
@@ -128,9 +176,16 @@ export type ConfirmDialogBodyProps = {
   readonly layout?: ConfirmDialogLayout;
   /** Entre la cabecera y el error, fuera del form. */
   readonly aside?: ReactNode;
+  /** Sin ella, la descripción va en la cabecera. */
+  readonly descriptionPlacement?: ConfirmDialogDescriptionPlacement;
+  /** Icono decorativo delante del título; sin él la cabecera no cambia. */
+  readonly icon?: ConfirmDialogIcon;
   /** Dentro del form tras los campos ocultos; sin form, antes del pie. */
   readonly children?: ReactNode;
 };
+
+export type ConfirmDialogBodyProps = ConfirmDialogBodyBaseProps &
+  ConfirmSlotChoice<Omit<ConfirmDialogTestIds, 'dialog'>>;
 
 /** Cabecera, error, form y pie. No guarda estado: el de la operación es de cada diálogo. */
 export function ConfirmDialogBody({
@@ -145,6 +200,7 @@ export function ConfirmDialogBody({
   confirmDisabled = false,
   confirmDescribedBy,
   confirmAs = 'action',
+  confirmSlot,
   dismissDisabled,
   error,
   errorId,
@@ -152,17 +208,39 @@ export function ConfirmDialogBody({
   errorAlertProps,
   layout = 'error-before-form',
   aside,
+  descriptionPlacement = 'header',
+  icon,
   children,
 }: ConfirmDialogBodyProps) {
   const pending = isPending === true;
   const showPendingText = pending && texts.pending !== undefined;
 
+  const descriptionInHeader = descriptionPlacement === 'header';
+  const description = (
+    <AlertDialogDescription
+      className={descriptionInHeader ? undefined : LATE_DESCRIPTION_CLASS}
+      data-testid={testIds.message}
+    >
+      {texts.description}
+    </AlertDialogDescription>
+  );
+  const lateDescription = descriptionInHeader ? null : description;
+
   const header = (
-    <AlertDialogHeader>
+    <AlertDialogHeader
+      className={descriptionInHeader || icon === undefined ? undefined : HEADER_WITHOUT_DESCRIPTION_CLASS}
+    >
+      {icon === undefined ? null : (
+        <AlertDialogMedia
+          className={cn(ICON_BOX_CLASS, ICON_TONE_CLASS[icon.tone ?? 'neutral'])}
+          data-tone={icon.tone ?? 'neutral'}
+          data-testid={icon.testId}
+        >
+          <icon.glyph aria-hidden className="size-5" />
+        </AlertDialogMedia>
+      )}
       <AlertDialogTitle>{texts.title}</AlertDialogTitle>
-      <AlertDialogDescription data-testid={testIds.message}>
-        {texts.description}
-      </AlertDialogDescription>
+      {descriptionInHeader ? description : null}
     </AlertDialogHeader>
   );
 
@@ -217,18 +295,20 @@ export function ConfirmDialogBody({
       >
         {texts.dismiss}
       </AlertDialogCancel>
-      <ConfirmButton
-        {...confirmType}
-        variant={variant}
-        touch
-        disabled={pending || confirmDisabled}
-        aria-busy={isPending === undefined || !announceBusy ? undefined : pending}
-        aria-describedby={confirmDescribedBy}
-        data-testid={testIds.confirm}
-        onClick={handleConfirm}
-      >
-        {showPendingText ? texts.pending : texts.confirm}
-      </ConfirmButton>
+      {confirmSlot ?? (
+        <ConfirmButton
+          {...confirmType}
+          variant={variant}
+          touch
+          disabled={pending || confirmDisabled}
+          aria-busy={isPending === undefined || !announceBusy ? undefined : pending}
+          aria-describedby={confirmDescribedBy}
+          data-testid={testIds.confirm}
+          onClick={handleConfirm}
+        >
+          {showPendingText ? texts.pending : texts.confirm}
+        </ConfirmButton>
+      )}
     </AlertDialogFooter>
   );
 
@@ -237,6 +317,7 @@ export function ConfirmDialogBody({
       <>
         {header}
         {aside}
+        {lateDescription}
         {errorRegion}
         {children}
         {footer}
@@ -257,6 +338,7 @@ export function ConfirmDialogBody({
   const form = (
     <form action={submit.action} className={submit.formClassName} data-testid={testIds.form}>
       {layout === 'form-wraps-all' ? header : null}
+      {layout === 'form-wraps-all' ? lateDescription : null}
       {hiddenFields}
       {children}
       {layout === 'error-before-form' ? null : errorRegion}
@@ -270,26 +352,38 @@ export function ConfirmDialogBody({
     <>
       {header}
       {aside}
+      {lateDescription}
       {layout === 'error-before-form' ? errorRegion : null}
       {form}
     </>
   );
 }
 
-export type ConfirmDialogProps = Omit<ConfirmDialogFrameProps, 'testId' | 'children'> &
-  Omit<ConfirmDialogBodyProps, 'testIds' | 'onOpenChange'> & {
-    readonly testIds: ConfirmDialogTestIds;
-  };
+export type ConfirmDialogBaseProps = Omit<ConfirmDialogFrameProps, 'testId' | 'children'> &
+  Omit<ConfirmDialogBodyBaseProps, 'onOpenChange'>;
+
+export type ConfirmDialogProps = ConfirmDialogBaseProps & ConfirmSlotChoice<ConfirmDialogTestIds>;
 
 /**
  * Base de los diálogos de confirmación. Pinta; el `useActionState`, la transición y el efecto de
  * éxito se quedan en quien la usa.
  */
-export function ConfirmDialog({ open, onOpenChange, trigger, testIds, ...body }: ConfirmDialogProps) {
-  const { dialog, ...bodyTestIds } = testIds;
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  trigger,
+  contentClassName,
+  ...body
+}: ConfirmDialogProps) {
   return (
-    <ConfirmDialogFrame open={open} onOpenChange={onOpenChange} trigger={trigger} testId={dialog}>
-      <ConfirmDialogBody {...body} testIds={bodyTestIds} onOpenChange={onOpenChange} />
+    <ConfirmDialogFrame
+      open={open}
+      onOpenChange={onOpenChange}
+      trigger={trigger}
+      contentClassName={contentClassName}
+      testId={body.testIds.dialog}
+    >
+      <ConfirmDialogBody {...body} onOpenChange={onOpenChange} />
     </ConfirmDialogFrame>
   );
 }

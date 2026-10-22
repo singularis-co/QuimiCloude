@@ -133,6 +133,18 @@ exports[`acciones por fila — producto terminado > R20 R21 R23 — con permiso:
       "testid": "product-batches-open",
     },
     {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-history-open",
+    },
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-adjust-open",
+    },
+    {
       "abre": "product-sheet",
       "deshabilitada": false,
       "href": null,
@@ -157,6 +169,12 @@ exports[`acciones por fila — producto terminado > R22 — solo con permisos de
       "deshabilitada": false,
       "href": null,
       "testid": "product-batches-open",
+    },
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-history-open",
     },
     {
       "abre": "product-sheet",
@@ -184,6 +202,18 @@ exports[`acciones por fila — productos > R20 R21 R23 — con permiso: mismas a
       "testid": "product-batches-open",
     },
     {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-history-open",
+    },
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-adjust-open",
+    },
+    {
       "abre": "product-sheet",
       "deshabilitada": false,
       "href": null,
@@ -207,6 +237,12 @@ exports[`acciones por fila — productos > R22 — solo con permisos de consulta
       "deshabilitada": false,
       "href": null,
       "testid": "product-batches-open",
+    },
+    {
+      "abre": "product-batches-sheet",
+      "deshabilitada": false,
+      "href": null,
+      "testid": "product-history-open",
     },
     {
       "abre": "product-sheet",

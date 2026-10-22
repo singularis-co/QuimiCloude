@@ -80,6 +80,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -87,7 +89,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -232,5 +236,15 @@ describe('el identificador del error inesperado (QC-71 R17, R18)', () => {
     const region = await screen.findByTestId(DELETE_ORDER_ERROR_TESTID);
     expect(region).toHaveAttribute('data-code', 'not_deletable');
     esperarSinIdentificador();
+  });
+});
+
+describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
+  it('R20: «Eliminar el pedido» con «Volver» y «Eliminar»', () => {
+    montar();
+
+    expect(screen.getByRole('alertdialog', { name: 'Eliminar el pedido' })).toBeInTheDocument();
+    expect(screen.getByTestId(DELETE_ORDER_DISMISS_TESTID)).toHaveTextContent(/^Volver$/);
+    expect(screen.getByTestId(DELETE_ORDER_CONFIRM_TESTID)).toHaveTextContent(/^Eliminar$/);
   });
 });

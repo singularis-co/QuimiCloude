@@ -34,7 +34,7 @@ function read(...segments: readonly string[]): string {
 const NEW_FILES: ReadonlyArray<{ path: string; source: string }> = [
   { path: 'components/shared/credential-rule-labels.ts', source: read('components', 'shared', 'credential-rule-labels.ts') },
   { path: 'components/shared/credential-requirements.tsx', source: read('components', 'shared', 'credential-requirements.tsx') },
-  { path: 'components/shared/credential-field.tsx', source: read('components', 'shared', 'credential-field.tsx') },
+  { path: 'components/shared/password-field.tsx', source: read('components', 'shared', 'password-field.tsx') },
 ];
 
 /** Quita comentarios de bloque y de linea: se vigila lo declarado, no lo explicado. */
