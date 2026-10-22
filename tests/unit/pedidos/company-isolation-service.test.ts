@@ -57,6 +57,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades'
 
 import {
   fakeFinishedGoodsIntake,
+  fakeOrderConsumptionLedger,
   fakeOrderUnitOfWork,
   fakeScopeProducts,
   fakeScopeUnits,
@@ -110,6 +111,7 @@ function fila(id: string): OrderRow {
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'u-0',
@@ -221,6 +223,7 @@ function almacen() {
     finishedGoods: fakeFinishedGoodsIntake(),
     products: fakeScopeProducts(),
     units: fakeScopeUnits(),
+    consumption: fakeOrderConsumptionLedger(),
   })
   const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
   const units = {

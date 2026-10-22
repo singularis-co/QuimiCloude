@@ -2,11 +2,17 @@
 // y las tarjetas estan las dos en el arbol: aqui se mira la tarjeta y su menu centrado, y que los
 // estados de la lista no cambian por tenerla.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ACTUAL_COST_COLUMN_ID,
+  ACTUAL_COST_TESTID,
   CANCEL_ORDER_ID_TESTID,
+  MISSING_VALUE_MARK,
   ORDER_ACTION_CUSTOMER_TESTID,
   ORDER_CUSTOMER_DIALOG_TESTID,
   ORDER_LIST_NO_MATCHES_TESTID,
@@ -16,6 +22,8 @@ import {
   ORDER_TABLE_TEXTS,
   OrderTable,
   PAGE_PARAM,
+  PRODUCTION_COST_COLUMN_ID,
+  PRODUCTION_COST_TESTID,
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -91,6 +99,7 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -324,5 +333,66 @@ describe('los estados de la lista no cambian con las tarjetas', () => {
 
     const href = routerMock.push.mock.calls.at(-1)?.[0] ?? '';
     expect(new URLSearchParams(href.slice(href.indexOf('?') + 1)).get(PAGE_PARAM)).toBe('2');
+  });
+});
+
+// La tarjeta de telefono lleva tambien los dos costes,
+// con la MISMA celda que la tabla: rotulo de tarjeta delante, importe con `formatMoneyDisplay` y el
+// exacto en `title` si se redondea, o el guion «Sin dato».
+describe('R19: los costes en la tarjeta de telefono', () => {
+  const CON_COSTES = pedido('o3', 9, { ingredientsCost: '120.0000', actualCost: '12752.5512' });
+
+  it('R19: con valor, «Costo estimado» y «Costo real» con su importe, en ese orden, tras la fecha', () => {
+    montar({ orders: [CON_COSTES] });
+    const card = tarjeta(CON_COSTES);
+
+    const estimado = campo(card, PRODUCTION_COST_COLUMN_ID);
+    const real = campo(card, ACTUAL_COST_COLUMN_ID);
+    expect(within(estimado).getByText('Costo estimado')).toHaveAttribute('data-card-label');
+    expect(within(real).getByText('Costo real')).toHaveAttribute('data-card-label');
+
+    const importeEstimado = within(estimado).getByTestId(PRODUCTION_COST_TESTID);
+    expect(importeEstimado.textContent).toBe('$120.00');
+    expect(importeEstimado).not.toHaveAttribute('title');
+    const importeReal = within(real).getByTestId(ACTUAL_COST_TESTID);
+    expect(importeReal.textContent).toBe('$12,752.55');
+    expect(importeReal).toHaveAttribute('title', '12752.5512');
+
+    const fecha = campo(card, 'createdAt');
+    expect(fecha.compareDocumentPosition(estimado) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(estimado.compareDocumentPosition(real) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('R19: sin valor, el guion con el rotulo accesible «Sin dato», nunca 0', () => {
+    montar({ orders: [SIN_CLIENTE] });
+    const card = tarjeta(SIN_CLIENTE);
+
+    for (const id of [PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID]) {
+      const celda = campo(card, id);
+      const guion = within(celda).getByTestId(`order-missing-${id}`);
+      expect(guion, id).toHaveTextContent(MISSING_VALUE_MARK);
+      expect(guion, id).toHaveAccessibleName('Sin dato');
+      expect(celda, id).not.toHaveTextContent('0');
+    }
+  });
+
+  it('R19: el rotulo de tarjeta no cambia el texto del importe en la fila de la tabla', () => {
+    montar({ orders: [CON_COSTES] });
+    const fila = screen.getByTestId(`data-table-row-${CON_COSTES.id}`);
+
+    expect(within(fila).getByTestId(ACTUAL_COST_TESTID).textContent).toBe('$12,752.55');
+    expect(within(fila).getByText('Costo real')).toHaveClass('[table_&]:hidden');
+  });
+
+  // Sin `pedidos.consultar` la pantalla entera da 404 antes de pintar nada: es la misma condicion
+  // que decide las columnas. La tarjeta no tiene otra: sus costes salen de esas mismas columnas.
+  it('R19: sin pedidos.consultar no aparecen: la pagina corta antes de pintar la lista', () => {
+    const fuente = readFileSync(join(process.cwd(), 'app/(private)/pedidos/page.tsx'), 'utf8');
+    const corte = fuente.indexOf("await requirePagePermission('pedidos.consultar');");
+    expect(corte).toBeGreaterThan(-1);
+    expect(corte).toBeLessThan(fuente.indexOf('<OrderListSection'));
+
+    const tabla = readFileSync(join(process.cwd(), 'app/(private)/pedidos/components/order-table.tsx'), 'utf8');
+    expect(tabla).not.toMatch(/canSee\w*Cost|hasPermission|requirePermission/);
   });
 });

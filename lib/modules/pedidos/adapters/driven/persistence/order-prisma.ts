@@ -78,6 +78,7 @@ const ORDER_SELECT = {
   cancellationReason: true,
   ingredientsCost: true,
   packagingCost: true,
+  actualCost: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -128,6 +129,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     // valor.
     ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
     packagingCost: row.packagingCost === null ? null : fromDecimal(row.packagingCost),
+    actualCost: row.actualCost === null ? null : fromDecimal(row.actualCost),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -527,8 +529,8 @@ async function replacePresentationLines(
  * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
  * el reloj sea el mismo que fijo el caso de uso.
  *
- * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`: la edicion recalcula, y
- * el valor nuevo reemplaza al anterior aunque sea `null`.
+ * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`, aunque sea `null`; con
+ * `'keep'` las dos columnas del importe quedan fuera del `UPDATE`.
  *
  * `presentationId`/`presentationContent` de la fila YA NO SE ESCRIBEN: el
  * reparto vive en `order_presentation_lines` (`replacePresentationLines`, misma transaccion) y
@@ -540,7 +542,7 @@ export async function updateAliveOrder(
   data: OrderEdit,
   actorId: string,
   now: Date,
-  cost: StoredOrderCost | null,
+  cost: StoredOrderCost | null | 'keep',
   scope: OrderScope,
   tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
@@ -550,7 +552,7 @@ export async function updateAliveOrder(
       recipeId: data.recipeId,
       quantity: toDecimalInput(data.quantity),
       priority: data.priority,
-      ...costColumns(cost),
+      ...(cost === 'keep' ? {} : costColumns(cost)),
       updatedAt: now,
       updatedBy: actorId,
       unitId: data.unitId,
@@ -758,6 +760,7 @@ async function insertAliveOrder(
     cancellationReason: null,
     ingredientsCost: cost === null ? null : fromDecimal(toDecimalInput(cost.total)),
     packagingCost: cost === null ? null : fromDecimal(toDecimalInput(cost.packaging)),
+    actualCost: null,
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,
@@ -822,6 +825,20 @@ async function setAliveOrderIngredientsCost(
     data: { ...costColumns(cost), updatedAt: now, updatedBy: actorId },
   });
   return count === 1 ? 'ok' : 'not_found';
+}
+
+/** `setActualCost` de `OrderWriteRepository`. `$executeRaw` por lo mismo que `setReservedAt`: el
+ *  `update` tipado moveria `updated_at`. */
+async function setOrderActualCost(id: string, cost: string | null, scope: OrderScope, tx: PrismaLike): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  const value = cost === null ? null : toDecimalInput(cost);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "orders"
+       SET "actual_cost" = ${value}::numeric
+     WHERE "id" = ${id}::uuid
+       AND "company_id" = ${companyId}::uuid
+       AND "deleted_at" IS NULL
+  `);
 }
 
 /**
@@ -938,6 +955,7 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     softDeleteAlive: (id, actorId, now, scope) => softDeleteAliveOrder(id, actorId, now, scope, tx),
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
     setIngredientsCost: (id, cost, actorId, now, scope) => setAliveOrderIngredientsCost(id, cost, actorId, now, scope, tx),
+    setActualCost: (id, cost, scope) => setOrderActualCost(id, cost, scope, tx),
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
     setCustomerAlive: (id, customerId, actorId, now, scope) =>
       setAliveOrderCustomer(id, customerId, actorId, now, scope, tx),
@@ -1135,7 +1153,7 @@ export function createOrderConditioningRepository(db: PrismaLike = prisma): Orde
  * `finished_at`: el pedido aun no esta terminado. Corre sobre `tx` -la transaccion
  * compartida de `OrderUnitOfWork`, no el cliente global- para que el alta de los lotes que hace
  * el dominio despues comparta la MISMA transaccion y un fallo posterior deshaga tambien este
- * `UPDATE`. Si `count === 1`, relee la receta/cantidad/coste guardado que Terminar necesita, ya
+ * `UPDATE`. Si `count === 1`, relee la receta, la cantidad y la unidad que Terminar necesita, ya
  * de esta transaccion -la fila sigue bloqueada desde el `UPDATE` de arriba, ninguna otra
  * conexion pudo moverla-; si no, relee para clasificar «no existe» de «lo tiene otro empacador»
  * de «no admite Terminar».
@@ -1156,13 +1174,12 @@ async function finishPackingAliveOrder(
   if (count === 1) {
     const row = await tx.order.findUniqueOrThrow({
       where: { id },
-      select: { recipeId: true, quantity: true, ingredientsCost: true, unitId: true },
+      select: { recipeId: true, quantity: true, unitId: true },
     });
     return {
       kind: 'ok',
       recipeId: row.recipeId,
       quantity: fromDecimal(row.quantity),
-      ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
       unitId: row.unitId,
     };
   }

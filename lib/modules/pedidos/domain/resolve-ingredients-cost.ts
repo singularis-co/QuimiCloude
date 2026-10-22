@@ -1,8 +1,5 @@
 import {
   calculateIngredientsCost,
-  calculateLotIngredientsCost,
-  calculateLotPackagingCost,
-  calculateOrderCost,
   calculatePackagingCost,
   storedOrderCost,
   type CostInput,
@@ -85,23 +82,6 @@ export async function resolveIngredientsCost(
   return calculateIngredientsCost(input);
 }
 
-/** Coste del LOTE de producto terminado: comparte las mismas lecturas que
- *  `resolveIngredientsCost` pero cuenta como cero cada ingrediente sin costo en vez de dejar
- *  el resultado entero sin importe. Nunca devuelve `null`. */
-export async function resolveLotIngredientsCost(
-  recipes: RecipeCatalog,
-  products: ProductCatalog,
-  units: UnitCatalog,
-  recipeId: string,
-  orderQuantity: string,
-  orderUnitId: string | null,
-  companyId: string,
-  options?: { readonly orderId?: string },
-): Promise<string> {
-  const input = await loadCostInput(recipes, products, units, recipeId, orderQuantity, orderUnitId, companyId, options);
-  return calculateLotIngredientsCost(input);
-}
-
 /** Los catalogos de lectura que necesita el importe completo del pedido. */
 export type OrderCostCatalogs = {
   readonly recipes: RecipeCatalog;
@@ -171,23 +151,4 @@ export async function resolvePackagingCost(
 ): Promise<string | null> {
   const batches = await loadPackagingBatches(packaging, packagingLines, companyId, options);
   return calculatePackagingCost(packagingLines, batches);
-}
-
-/** Coste del LOTE de producto terminado con sus envases: nunca `null`. */
-export async function resolveLotCost(
-  catalogs: OrderCostCatalogs,
-  recipeId: string,
-  orderQuantity: string,
-  orderUnitId: string | null,
-  packagingLines: readonly PackagingCostLine[],
-  companyId: string,
-  options?: { readonly orderId?: string },
-): Promise<string> {
-  const [ingredientsCost, batches] = await Promise.all([
-    resolveLotIngredientsCost(catalogs.recipes, catalogs.products, catalogs.units, recipeId, orderQuantity, orderUnitId, companyId, options),
-    loadPackagingBatches(catalogs.packaging, packagingLines, companyId, options),
-  ]);
-  const total = calculateOrderCost(ingredientsCost, calculateLotPackagingCost(packagingLines, batches));
-  if (total === null) throw new Error('resolveLotCost: el costo del lote desborda decimal(14,4)');
-  return total;
 }

@@ -670,3 +670,56 @@ describe('listAssignedOrders — sin `asignaciones.ejecutar` no hay pedidos prev
     expect(pagina.items.map((item) => item.id)).toEqual(ids);
   });
 });
+
+// La lista del Operador no lleva NINGUN importe, ni el real ni el estimado. Se
+// recorre cada fila entera (reparto y responsables incluidos) buscando claves de importe, con
+// resumenes que traen esos campos colados a proposito: la fila no puede copiarlos.
+const CLAVE_DE_IMPORTE = /cost|coste|importe|price|precio|amount/i;
+
+function clavesDeImporte(valor: unknown, ruta = ''): string[] {
+  if (Array.isArray(valor)) return valor.flatMap((item, i) => clavesDeImporte(item, `${ruta}[${String(i)}]`));
+  if (valor === null || typeof valor !== 'object' || valor instanceof Date) return [];
+  return Object.entries(valor).flatMap(([clave, hijo]) => [
+    ...(CLAVE_DE_IMPORTE.test(clave) ? [`${ruta}.${clave}`] : []),
+    ...clavesDeImporte(hijo, `${ruta}.${clave}`),
+  ]);
+}
+
+describe('QC-305 — la lista de pedidos asignados no lleva el coste real (R24)', () => {
+  it('R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en ninguna fila, aunque el resumen las traiga', async () => {
+    const ids = [pedidoId(1), pedidoId(2)];
+    const items = [
+      {
+        ...resumen(pedidoId(1), {
+          status: 'EN_CURSO',
+          presentationLines: [{ id: uuid('5'), presentationId: PRESENTACION, packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }],
+          unitId: UNIDAD,
+        }),
+        actualCost: '27.1250',
+        ingredientsCost: '30.0000',
+        packagingCost: '4.5000',
+      },
+      { ...resumen(pedidoId(2)), actualCost: null, ingredientsCost: null, packagingCost: null },
+    ] as unknown as AssignedOrderSummary[];
+    const { deps } = montar({
+      ids,
+      page: { items, total: 2 },
+      refs: [receta()],
+      rows: [filaSuelta(pedidoId(1), BEA)],
+      people: [persona(BEA)],
+      presentations: [presentacion()],
+      units: [unidad()],
+    });
+
+    const pagina = await createListAssignedOrders(deps)(ACTOR, { page: 1 });
+
+    expect(pagina.items).toHaveLength(2);
+    expect(clavesDeImporte(pagina)).toEqual([]);
+  });
+
+  it('R24: el contrato del resumen asignado no declara actualCost (comprobacion de tipo)', () => {
+    const sinReal: 'actualCost' extends keyof AssignedOrderSummary ? false : true = true;
+    const sinEnvases: 'packagingCost' extends keyof AssignedOrderSummary ? false : true = true;
+    expect([sinReal, sinEnvases]).toEqual([true, true]);
+  });
+});

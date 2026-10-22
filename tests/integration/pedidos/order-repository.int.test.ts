@@ -950,3 +950,35 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
     }
   })
 })
+
+describe('QC-305 — updateAlive con keep conserva el estimado guardado', () => {
+  it('R12, R14: con keep el UPDATE escribe la edicion y deja ingredients_cost y packaging_cost como estaban', async () => {
+    const creados: string[] = []
+    try {
+      const now = instantIn(YEAR_DISCRIMINANTES, 5, 1)
+      const despues = instantIn(YEAR_DISCRIMINANTES, 5, 2)
+      const pedido = await altaReal(creados, YEAR_DISCRIMINANTES, now)
+      await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '45.6700', packaging: '5.6700' }, actorId, now, scope()),
+      )
+
+      const editado = baseOrder({ quantity: '77.0000', priority: 'ALTA' })
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, 'keep', scope())).toBe('ok')
+
+      const cruda = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(cruda.quantity.toFixed(4)).toBe('77.0000')
+      expect(cruda.priority).toBe('ALTA')
+      expect(cruda.updatedAt.toISOString()).toBe(despues.toISOString())
+      expect(cruda.ingredientsCost?.toFixed(4)).toBe('45.6700')
+      expect(cruda.packagingCost?.toFixed(4)).toBe('5.6700')
+
+      // Control: sin keep, el mismo UPDATE si sustituye el importe.
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
+      const sustituida = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(sustituida.ingredientsCost).toBeNull()
+      expect(sustituida.packagingCost).toBeNull()
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})

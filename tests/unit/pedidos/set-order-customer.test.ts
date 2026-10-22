@@ -53,6 +53,7 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
     cancellationReason: null,
     ingredientsCost: '12.5000',
     packagingCost: '0.0000',
+    actualCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
