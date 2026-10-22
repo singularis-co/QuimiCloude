@@ -743,13 +743,13 @@ describe('R13: la tabla monta un solo panel o dialogo, el del pedido elegido', (
 });
 
 describe('la lista de pedidos lleva la columna «Por entregar», traida del dashboard', () => {
-  it('su cabecera aparece, justo despues de «Presentación»', () => {
+  it('su cabecera aparece justo antes de «Presentación» (2026-10-22)', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     const presentacion = cabeceras.findIndex((texto) => texto.includes('Presentación'));
 
-    expect(presentacion).toBeGreaterThanOrEqual(0);
-    expect(cabeceras[presentacion + 1]).toContain('Por entregar');
+    expect(presentacion).toBeGreaterThanOrEqual(1);
+    expect(cabeceras[presentacion - 1]).toContain('Por entregar');
   });
 });
 

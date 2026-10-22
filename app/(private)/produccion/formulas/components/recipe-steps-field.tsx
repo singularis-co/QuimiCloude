@@ -224,7 +224,7 @@ export function RecipeStepsField({
   steps,
   onChange,
   errors,
-  title = 'Pasos',
+  title = 'Pasos de producción',
   sectionName = title,
   optionalHelp,
   optionalDescription,

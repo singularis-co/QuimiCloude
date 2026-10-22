@@ -315,6 +315,12 @@ export function buildOrderColumns({
           orderCustomerLabel(order.customer)
         ),
     },
+        {
+      id: PENDING_DELIVERY_COLUMN_ID,
+      label: 'Por entregar',
+      align: 'start',
+      cell: (order) => <PendingDelivery order={order} />,
+    },
     {
       id: PRESENTATION_NAME_COLUMN_ID,
       label: 'Presentación',
@@ -331,12 +337,6 @@ export function buildOrderColumns({
           />
         );
       },
-    },
-    {
-      id: PENDING_DELIVERY_COLUMN_ID,
-      label: 'Por entregar',
-      align: 'start',
-      cell: (order) => <PendingDelivery order={order} />,
     },
     {
       id: CREATED_AT_COLUMN_ID,

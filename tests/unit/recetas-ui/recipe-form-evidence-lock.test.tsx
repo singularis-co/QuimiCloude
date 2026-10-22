@@ -139,7 +139,7 @@ function withEvidence(step: RecipeStepView): RecipeStepView {
 
 function evidenceSwitch(field: HTMLElement, position: number): HTMLElement {
   const section =
-    field.getAttribute('data-testid') === 'recipe-packing-steps-field' ? 'Envasado' : 'Pasos';
+    field.getAttribute('data-testid') === 'recipe-packing-steps-field' ? 'Envasado' : 'Pasos de producción';
   return within(field).getByRole('switch', {
     name: `Requiere evidencia en el paso ${position} de ${section}`,
   });

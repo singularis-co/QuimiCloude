@@ -98,7 +98,7 @@ describe('RecipeStepsField reutilizable (QC-211)', () => {
     render(<SingleHarness />);
 
     const field = screen.getByTestId('recipe-steps-field');
-    expect(within(field).getByRole('heading', { name: 'Pasos' })).toBeInTheDocument();
+    expect(within(field).getByRole('heading', { name: 'Pasos de producción' })).toBeInTheDocument();
     expect(screen.queryByTestId('recipe-step-add')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Añadir paso' })).toBeNull();
     expect(screen.queryByTestId('recipe-steps-optional')).toBeNull();
@@ -198,7 +198,7 @@ function EvidenceHarness({
 }
 
 function evidenceSwitch(position: number): HTMLElement {
-  return screen.getByRole('switch', { name: `Requiere evidencia en el paso ${position} de Pasos` });
+  return screen.getByRole('switch', { name: `Requiere evidencia en el paso ${position} de Pasos de producción` });
 }
 
 describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
@@ -500,7 +500,7 @@ describe('RecipeStepsField — tarjeta del paso y estados de arrastre (rediseño
     expect(tools.className).toContain('md:w-auto');
     expect(within(tools).getByRole('button', { name: 'Quitar paso 1' })).toBeInTheDocument();
     expect(within(tools).getByRole('button', { name: 'Añadir un paso después del 1' })).toBeInTheDocument();
-    expect(within(tools).getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos' })).toBeInTheDocument();
+    expect(within(tools).getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos de producción' })).toBeInTheDocument();
   });
 
   it('R17: no hay «Añadir paso» al final de ninguna lista; el «+» de cada paso conserva su regla', async () => {
@@ -733,7 +733,7 @@ describe('RecipeStepsField — sección «Acondicionamiento» (QC-299)', () => {
     expect(screen.getAllByRole('switch')).toHaveLength(2);
     expect(screen.queryByRole('switch', { name: /Asignación requerida/ })).toBeNull();
     expect(
-      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos' }),
+      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos de producción' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Envasado' }),

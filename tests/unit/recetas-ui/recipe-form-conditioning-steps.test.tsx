@@ -399,7 +399,7 @@ describe('QC-299 R9 — switches por sección en el formulario', () => {
     );
 
     expect(
-      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos' }),
+      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos de producción' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Envasado' }),

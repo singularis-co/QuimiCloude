@@ -223,7 +223,7 @@ describe('QC-211 R7 — sección «Pasos de envasado» en el formulario de fórm
 
     const operator = screen.getByTestId('recipe-steps-field');
     const packing = screen.getByTestId('recipe-packing-steps-field');
-    expect(within(operator).getByRole('heading', { name: 'Pasos' })).toBeInTheDocument();
+    expect(within(operator).getByRole('heading', { name: 'Pasos de producción' })).toBeInTheDocument();
     expect(
       within(packing).getByRole('heading', { name: /^Pasos de envasado/ }),
     ).toBeInTheDocument();

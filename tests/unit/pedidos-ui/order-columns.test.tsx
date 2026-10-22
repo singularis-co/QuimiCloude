@@ -128,7 +128,8 @@ afterEach(() => {
 // acordada baja a ocho. Luego sube a diez con RESPONSABLES, a ONCE con COBERTURA, a DOCE con
 // CLIENTE y a TRECE con POR ENTREGAR, que llega desde el dashboard. El 2026-10-16 baja a DOCE: sale
 // CANTIDAD (decision humana). El 2026-10-20 sube a TRECE con el costo y despues a CATORCE con el
-// costo real. Sigue siendo cerrada y en un orden acordado.
+// costo real. El 2026-10-22 POR ENTREGAR pasa delante de PRESENTACION. Sigue siendo cerrada y en un
+// orden acordado.
 describe('las columnas declaradas son exactamente las catorce acordadas (R8, R20, R35)', () => {
   it('en positivo: los catorce ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
@@ -137,8 +138,8 @@ describe('las columnas declaradas son exactamente las catorce acordadas (R8, R20
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
-      PRESENTATION_NAME_COLUMN_ID,
       PENDING_DELIVERY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
@@ -194,8 +195,8 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
-      PRESENTATION_NAME_COLUMN_ID,
       PENDING_DELIVERY_COLUMN_ID,
+      PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
@@ -932,9 +933,11 @@ describe('la columna «Presentación» enlaza al producto terminado del pedido p
 });
 
 describe('la columna «Por entregar», traida del dashboard', () => {
-  it('va despues de Presentación y no ordena ni filtra', () => {
+  // 2026-10-22: pasa delante de «Presentación», justo despues de «Cliente» (decision humana).
+  it('va despues de Cliente, antes de Presentación, y no ordena ni filtra', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
-    expect(ids.indexOf(PENDING_DELIVERY_COLUMN_ID)).toBe(ids.indexOf(PRESENTATION_NAME_COLUMN_ID) + 1);
+    expect(ids.indexOf(PENDING_DELIVERY_COLUMN_ID)).toBe(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID) + 1);
+    expect(ids.indexOf(PRESENTATION_NAME_COLUMN_ID)).toBe(ids.indexOf(PENDING_DELIVERY_COLUMN_ID) + 1);
 
     const columna = ORDER_COLUMNS.find((column) => column.id === PENDING_DELIVERY_COLUMN_ID);
     expect(columna?.sortable).not.toBe(true);
