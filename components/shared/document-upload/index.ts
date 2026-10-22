@@ -6,8 +6,10 @@
 export {
   DOCUMENT_BATCH_PANEL_TESTID,
   DocumentBatchPanel,
+  PANEL_COUNT_TESTID,
   PANEL_READ_ONLY_NOTICE_TESTID,
   PANEL_ROW_SCOPE,
+  PANEL_SUMMARY_TESTID,
   panelBatchTestId,
   panelDiscardTestId,
   panelErrorTestId,

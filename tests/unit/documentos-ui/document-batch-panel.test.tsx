@@ -40,7 +40,9 @@ import {
   DocumentBatchPanel,
   DocumentUpload,
   MAX_REMEMBERED_BATCHES,
+  PANEL_COUNT_TESTID,
   PANEL_ROW_SCOPE,
+  PANEL_SUMMARY_TESTID,
   REMEMBERED_BATCHES_STORAGE_KEY,
   forgetBatch,
   panelBatchTestId,
@@ -64,6 +66,7 @@ import {
   discardBatchLabel,
   resumeBatchLabel,
 } from '@/components/shared/document-upload/labels';
+import { resetBatchStatusStore } from '@/components/shared/document-upload/batch-status-store';
 import { errorMessage } from '@/lib/modules/errores';
 import { formulaImportRoute } from '@/lib/shared/routes';
 
@@ -79,6 +82,7 @@ beforeEach(() => {
   issueUploadLinksActionMock.mockReset();
   enqueueBatchActionMock.mockReset();
   getBatchStatusActionMock.mockReset();
+  resetBatchStatusStore();
   fetchMock.mockReset();
 
   vi.stubGlobal('fetch', fetchMock);
@@ -444,6 +448,123 @@ describe('el panel accesible y plegable', () => {
 
     await waitFor(() => expect(screen.getByTestId(panelBatchTestId(0))).toBeVisible());
     expect(control).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+/**
+ * El almacen de sondeo recuerda las tandas terminadas o desaparecidas durante toda la carga: estos
+ * casos usan tandas propias para no heredar la foto de otro caso.
+ */
+function responderPorTanda(respuestas: Record<string, GetBatchStatusResult>): void {
+  getBatchStatusActionMock.mockImplementation(async (batchId) => {
+    const respuesta = respuestas[batchId];
+    if (respuesta === undefined) throw new Error(`tanda sin respuesta: ${batchId}`);
+    return respuesta;
+  });
+}
+
+const DESAPARECIDA: GetBatchStatusResult = { status: 'success', data: null };
+const EN_PROCESO: GetBatchStatusResult = {
+  status: 'success',
+  data: batch([entry({ status: 'processing' })]),
+};
+const TERMINADA: GetBatchStatusResult = {
+  status: 'success',
+  data: batch([entry({ status: 'done' })]),
+};
+const TERMINADA_CON_ERROR: GetBatchStatusResult = {
+  status: 'success',
+  data: batch([entry({ id: 'a', status: 'done' }), entry({ id: 'b', status: 'error' })]),
+};
+
+describe('la cabecera del panel', () => {
+  it('R41 — el contador coincide con las tandas visibles, incluidas las desconocidas', async () => {
+    rememberBatch(AMBITO, 'r41-contador-catalogo', 'catalogo');
+    rememberBatch(AMBITO, 'r41-contador-desconocida', 'formula');
+    rememberBatch(AMBITO, 'r41-contador-en-curso', 'formula');
+    rememberBatch(AMBITO, 'r41-contador-terminada', 'formula');
+    responderPorTanda({
+      'r41-contador-desconocida': DESAPARECIDA,
+      'r41-contador-en-curso': EN_PROCESO,
+      'r41-contador-terminada': TERMINADA,
+    });
+
+    render(<DocumentBatchPanel strategy="formula" registryScope={AMBITO} />);
+
+    expect(await screen.findByTestId(panelMissingTestId(2))).toBeVisible();
+    expect(screen.getAllByRole('listitem', { name: /^Tanda/ })).toHaveLength(3);
+    expect(screen.getByTestId(PANEL_COUNT_TESTID)).toHaveTextContent(/^3$/);
+  });
+
+  it('R41 — la cabecera muestra el resumen del estado de las tandas', async () => {
+    rememberBatch(AMBITO, 'r41-resumen-con-error', 'formula');
+    rememberBatch(AMBITO, 'r41-resumen-en-curso', 'formula');
+    responderPorTanda({
+      'r41-resumen-con-error': TERMINADA_CON_ERROR,
+      'r41-resumen-en-curso': EN_PROCESO,
+    });
+
+    render(<DocumentBatchPanel strategy="formula" registryScope={AMBITO} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId(PANEL_SUMMARY_TESTID)).toHaveTextContent(
+        '1 en curso · 1 con errores',
+      ),
+    );
+    expect(screen.getByTestId(PANEL_COUNT_TESTID)).toHaveTextContent(/^2$/);
+  });
+
+  it('R41 — con solo tandas terminadas o desconocidas el resumen dice «Todas terminadas»', async () => {
+    rememberBatch(AMBITO, 'r41-todas-desconocida', 'formula');
+    rememberBatch(AMBITO, 'r41-todas-terminada', 'formula');
+    responderPorTanda({
+      'r41-todas-desconocida': DESAPARECIDA,
+      'r41-todas-terminada': TERMINADA,
+    });
+
+    render(<DocumentBatchPanel strategy="formula" registryScope={AMBITO} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId(PANEL_SUMMARY_TESTID)).toHaveTextContent('Todas terminadas'),
+    );
+    expect(screen.getByTestId(PANEL_COUNT_TESTID)).toHaveTextContent(/^2$/);
+  });
+
+  it('R41 — con el panel plegado, el contador y el resumen siguen visibles', async () => {
+    rememberBatch(AMBITO, 'r41-plegado', 'formula');
+    responderPorTanda({ 'r41-plegado': EN_PROCESO });
+
+    render(<DocumentBatchPanel strategy="formula" registryScope={AMBITO} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId(PANEL_SUMMARY_TESTID)).toHaveTextContent('1 en curso'),
+    );
+    const user = setupUser();
+    await user.click(screen.getByRole('button', { name: PANEL_TITLE }));
+
+    await waitFor(() => expect(screen.queryByTestId(panelBatchTestId(0))).not.toBeVisible());
+    expect(screen.getByTestId(PANEL_COUNT_TESTID)).toBeVisible();
+    expect(screen.getByTestId(PANEL_COUNT_TESTID)).toHaveTextContent(/^1$/);
+    expect(screen.getByTestId(PANEL_SUMMARY_TESTID)).toBeVisible();
+    expect(screen.getByTestId(PANEL_SUMMARY_TESTID)).toHaveTextContent('1 en curso');
+  });
+
+  it('R41 — la cabecera no añade consultas: cada tanda se consulta una sola vez', async () => {
+    rememberBatch(AMBITO, 'r41-consultas-terminada', 'formula');
+    rememberBatch(AMBITO, 'r41-consultas-con-error', 'formula');
+    responderPorTanda({
+      'r41-consultas-terminada': TERMINADA,
+      'r41-consultas-con-error': TERMINADA_CON_ERROR,
+    });
+
+    render(<DocumentBatchPanel strategy="formula" registryScope={AMBITO} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId(PANEL_SUMMARY_TESTID)).toHaveTextContent('1 con errores'),
+    );
+    expect(getBatchStatusActionMock).toHaveBeenCalledTimes(2);
+    expect(getBatchStatusActionMock).toHaveBeenCalledWith('r41-consultas-terminada');
+    expect(getBatchStatusActionMock).toHaveBeenCalledWith('r41-consultas-con-error');
   });
 });
 

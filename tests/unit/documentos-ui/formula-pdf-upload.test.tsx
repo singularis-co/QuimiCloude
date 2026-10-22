@@ -53,6 +53,7 @@ import {
   REVIEW_LABEL,
   discardBatchLabel,
 } from '@/components/shared/document-upload/labels';
+import { resetBatchStatusStore } from '@/components/shared/document-upload/batch-status-store';
 import { formulaImportRoute } from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
@@ -71,6 +72,7 @@ beforeEach(() => {
   issueUploadLinksActionMock.mockReset();
   enqueueBatchActionMock.mockReset();
   getBatchStatusActionMock.mockReset();
+  resetBatchStatusStore();
   fetchMock.mockReset();
 
   vi.stubGlobal('fetch', fetchMock);

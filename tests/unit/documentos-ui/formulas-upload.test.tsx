@@ -103,6 +103,7 @@ import {
   rememberedBatches,
   rowReviewLinkTestId,
 } from '@/components/shared/document-upload';
+import { resetBatchStatusStore } from '@/components/shared/document-upload/batch-status-store';
 import {
   PERMISSIONS,
   ROLE_ADMINISTRADOR,
@@ -160,6 +161,7 @@ const ARCHIVO_ID = '22222222-2222-4222-8222-222222222222';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetBatchStatusStore();
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockResolvedValue(okResponse());
 

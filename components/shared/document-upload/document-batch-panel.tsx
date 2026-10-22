@@ -1,14 +1,20 @@
 'use client';
 
 import { ChevronRightIcon, TriangleAlertIcon } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { PdfStrategy } from '@/lib/modules/documentos';
 import { cn } from '@/lib/utils';
 
 import { forgetBatch, type RememberedBatch } from './batch-memory';
+import {
+  batchStatusSnapshot,
+  listenBatchStatus,
+  type BatchStatusSnapshot,
+} from './batch-status-store';
 import { DocumentUploadRow } from './document-upload-row';
 import {
   DISCARD_BATCH_LABEL,
@@ -17,6 +23,7 @@ import {
   RESUME_LABEL,
   UNKNOWN_BATCH_LABEL,
   batchLabel,
+  batchesSummary,
   discardBatchLabel,
   resumeBatchLabel,
 } from './labels';
@@ -29,6 +36,8 @@ export const DOCUMENT_BATCH_PANEL_TESTID = 'document-upload-panel';
 export const PANEL_ROW_SCOPE = 'document-upload-panel';
 
 export const PANEL_READ_ONLY_NOTICE_TESTID = 'document-upload-panel-read-only';
+export const PANEL_COUNT_TESTID = 'document-upload-panel-count';
+export const PANEL_SUMMARY_TESTID = 'document-upload-panel-summary';
 
 export const panelBatchTestId = (index: number): string => `document-upload-panel-batch-${index}`;
 export const panelDiscardTestId = (index: number): string =>
@@ -49,6 +58,38 @@ export type DocumentBatchPanelProps = {
   /** Con la subida deshabilitada el panel sigue a la vista, en solo lectura y con un aviso. */
   readonly disabled?: boolean;
 };
+
+const NO_SNAPSHOTS: readonly BatchStatusSnapshot[] = [];
+
+const serverSnapshots = (): readonly BatchStatusSnapshot[] => NO_SNAPSHOTS;
+
+/**
+ * La ultima foto de cada tanda. Se engancha al mismo bucle de sondeo que sus bloques, asi que no
+ * lanza consultas propias.
+ */
+function useBatchSnapshots(batchIds: readonly string[]): readonly BatchStatusSnapshot[] {
+  const last = useRef(NO_SNAPSHOTS);
+  const listen = useCallback(
+    (onChange: () => void) => {
+      const stops = batchIds.map((batchId) => listenBatchStatus(batchId, onChange));
+      return () => {
+        for (const stop of stops) stop();
+      };
+    },
+    [batchIds],
+  );
+  // useSyncExternalStore exige la misma referencia mientras ninguna foto cambie.
+  const snapshot = useCallback(() => {
+    const next = batchIds.map(batchStatusSnapshot);
+    const previous = last.current;
+    const same =
+      next.length === previous.length && next.every((item, index) => item === previous[index]);
+    if (same) return previous;
+    last.current = next;
+    return next;
+  }, [batchIds]);
+  return useSyncExternalStore(listen, snapshot, serverSnapshots);
+}
 
 type PanelBatchProps = {
   readonly registryScope: string;
@@ -151,6 +192,8 @@ export function DocumentBatchPanel({
 }: DocumentBatchPanelProps) {
   const titleId = useId();
   const remembered = useRememberedBatches(registryScope, strategy);
+  const batchIds = useMemo(() => remembered.map(({ batchId }) => batchId), [remembered]);
+  const snapshots = useBatchSnapshots(batchIds);
 
   if (remembered.length === 0) return null;
 
@@ -161,23 +204,31 @@ export function DocumentBatchPanel({
       className="w-full rounded-xl border bg-card text-left"
     >
       <Collapsible defaultOpen>
-        <h2 className="flex items-center px-2 py-1">
-          <CollapsibleTrigger
-            className={cn(
-              buttonVariants({ variant: 'ghost', touch: true }),
-              'group text-base font-semibold',
-            )}
-          >
-            <ChevronRightIcon
-              aria-hidden="true"
+        <div className="flex flex-wrap items-center gap-2 py-1 pr-4 pl-2">
+          <h2 className="flex items-center">
+            <CollapsibleTrigger
               className={cn(
-                'transition-transform duration-(--dur-base) motion-reduce:transition-none',
-                'group-data-[panel-open]:rotate-90',
+                buttonVariants({ variant: 'ghost', touch: true }),
+                'group text-base font-semibold',
               )}
-            />
-            <span id={titleId}>{PANEL_TITLE}</span>
-          </CollapsibleTrigger>
-        </h2>
+            >
+              <ChevronRightIcon
+                aria-hidden="true"
+                className={cn(
+                  'transition-transform duration-(--dur-base) motion-reduce:transition-none',
+                  'group-data-[panel-open]:rotate-90',
+                )}
+              />
+              <span id={titleId}>{PANEL_TITLE}</span>
+            </CollapsibleTrigger>
+          </h2>
+          <Badge variant="neutral" data-testid={PANEL_COUNT_TESTID}>
+            {remembered.length}
+          </Badge>
+          <p data-testid={PANEL_SUMMARY_TESTID} className="ml-auto text-base text-muted-foreground">
+            {batchesSummary(snapshots)}
+          </p>
+        </div>
         <CollapsibleContent keepMounted>
           {disabled ? (
             <p
