@@ -221,6 +221,7 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [LINEA_INGREDIENTE],
     tools: [],
     original: null,

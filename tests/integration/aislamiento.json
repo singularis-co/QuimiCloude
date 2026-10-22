@@ -94,6 +94,7 @@
     "recetas/recipe-crud.int.test.ts",
     "recetas/recipe-lines-percentage.int.test.ts",
     "recetas/recipe-lines.int.test.ts",
+    "recetas/recipe-conditioning-steps-migration.int.test.ts",
     "recetas/recipe-packing-steps-migration.int.test.ts",
     "recetas/recipe-versions-constraints.int.test.ts",
     "unidades/mass-volume-bridge.int.test.ts",
@@ -479,6 +480,11 @@
       "desde": "2026-09-25"
     },
     {
+      "archivo": "recetas/conditioning-steps.int.test.ts",
+      "motivo": "QC-299 T7: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `replaceAliveRecipeWithPropagation`, `softDeleteAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipeConditioningStepsById` / `findRecipePackingStepsById` / `findRecipeExecutionContentById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-21"
+    },
+    {
       "archivo": "recetas/packing-steps.int.test.ts",
       "motivo": "QC-211 T6: ejercita `createRecipe`, `createRecipeVersion`, `replaceAliveRecipe`, `softDeleteAliveRecipe` y `findAliveRecipeById` de `recipe-prisma.ts` y `findRecipePackingStepsById` / `findRecipeExecutionContentById` de `recipe-catalog-prisma.ts`, que usan el cliente Prisma GLOBAL y abren su PROPIA `prisma.$transaction`, asi que una transaccion del test no las envolveria. Dos empresas efimeras (randomUUID) nacen en `beforeAll` y mueren en `afterAll` en el orden de las FK: versiones -> originales (sus lineas caen con ON DELETE CASCADE) -> productos -> usuario -> rol y tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-05"
@@ -792,6 +798,11 @@
       "archivo": "pedidos/direct-delivery-void-concurrency.int.test.ts",
       "motivo": "QC-288 B4: anulaciones sin pedido reales a la vez por la fachada de 'lib/composition' (y, en el caso de la misma clave, por 'createVoidDirectDelivery' cableado con los mismos adaptadores reales y solo la lectura previa de la clave sincronizada): cada 'withOrderTransaction' tiene que CONFIRMAR para que la otra choque con el unico de 'delivery_line_id' o de la clave, asi que una transaccion del test con ROLLBACK no puede envolverlas. Cada caso fabrica su empresa efimera con randomUUID (tests/helpers/direct-delivery-seed.ts) y la borra en un 'finally' por 'company_id' en orden de FK (asientos -> lineas de anulacion -> anulaciones -> lineas de entrega -> entregas -> lotes -> productos -> lineas -> pedidos -> clientes -> receta -> presentaciones -> unidad -> usuarios -> roles -> tipos de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-16"
+    },
+    {
+      "archivo": "asignaciones/conditioning-steps-progress.int.test.ts",
+      "motivo": "QC-299 T14 (R27, R28, R32): completar, revisitar y cambiar responsables de los pasos de acondicionamiento con la composicion real ('asignaciones' de '@/lib/composition'), que escribe con el cliente GLOBAL; lo que se mide en R27 es que el indice unico 'order_execution_entries_conditioning_step_once' rechace el segundo completado del mismo paso, incluida la carrera de dos llamadas simultaneas, que necesita conexiones distintas, asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso fabrica sus empresas efimeras con randomUUID y las borra en su 'finally' en orden de FK (anotaciones -> equipo -> pedidos -> recetas -> usuarios -> roles -> tipos de documento -> empresas).",
+      "desde": "2026-10-21"
     }
   ]
 }

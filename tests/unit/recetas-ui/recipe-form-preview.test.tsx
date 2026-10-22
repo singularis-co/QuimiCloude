@@ -77,6 +77,7 @@ function recipeDetail(steps: readonly RecipeStepView[]): RecipeDetail {
     updatedBy: null,
     steps: [...steps],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [
       {
         id: 'line-1',

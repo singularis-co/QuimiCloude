@@ -45,6 +45,7 @@ function anotacion(action: ExecutionAction, offsetMin: number, userId = ANA, ste
     stepPosition,
     reason: action === 'cancel' ? 'sin material' : null,
     batchLines: null,
+    responsibleUserIds: null,
     occurredAt: new Date(T0 + offsetMin * MIN),
   } satisfies ExecutionEntryRecord;
 }
@@ -406,5 +407,192 @@ describe('getExecutionTrace — las anotaciones del acondicionamiento', () => {
     const m = montar({ team: equipo });
     await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
     expect(m.listByOrdersInCompany).not.toHaveBeenCalled();
+  });
+});
+
+describe('getExecutionTrace — pasos de acondicionamiento y responsables', () => {
+  const CARLA = uuid('4');
+  const DIEGO = uuid('5');
+  const ELENA = uuid('6');
+  const directorio: readonly PersonRef[] = [
+    { id: ANA, displayName: 'Ana Perez', isActive: true, permissions: [], roleName: 'Supervisor' },
+    { id: BEA, displayName: 'Bea Gomez', isActive: true, permissions: [], roleName: 'Operador' },
+    { id: CARLA, displayName: 'Carla Diaz', isActive: true, permissions: [], roleName: 'Operador' },
+    { id: DIEGO, displayName: 'Diego Sanz', isActive: false, permissions: [], roleName: 'Operador' },
+  ];
+
+  function paso(
+    action: 'conditioning_step_advance' | 'conditioning_steps_complete' | 'conditioning_responsibles_change',
+    offsetMin: number,
+    stepPosition: number,
+    responsibleUserIds: readonly string[] | null,
+    userId = BEA,
+  ): ExecutionEntryRecord {
+    return { ...anotacion(action, offsetMin, userId, stepPosition), responsibleUserIds };
+  }
+
+  it('R35: «Avanzar» y «Completar pasos» traen paso y responsables con nombre; sin asignacion, lista vacia', async () => {
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 1, [CARLA, ELENA]),
+      paso('conditioning_steps_complete', 12, 2, null),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    const [, avanzar, completar] = recorrido.steps;
+    expect(avanzar).toEqual({
+      id: entries[1]!.id,
+      orderId: PEDIDO,
+      userId: BEA,
+      userDisplayName: 'Bea Gomez',
+      occurredAt: entries[1]!.occurredAt,
+      gapToNextMs: 7 * MIN,
+      isGoBack: false,
+      action: 'conditioning_step_advance',
+      stepPosition: 1,
+      reason: null,
+      responsibles: [
+        { userId: CARLA, displayName: 'Carla Diaz' },
+        // El directorio no la devuelve: sin nombre, sin romper el recorrido.
+        { userId: ELENA, displayName: null },
+      ],
+    });
+    expect(completar).toMatchObject({ action: 'conditioning_steps_complete', stepPosition: 2, responsibles: [] });
+  });
+
+  it('R35: los responsables entran en la misma lectura del directorio que los firmantes', async () => {
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 1, [CARLA]),
+      paso('conditioning_responsibles_change', 9, 1, [DIEGO], ANA),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledTimes(1);
+    expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [ANA, BEA, CARLA, DIEGO], NOW);
+  });
+
+  it('R35: las anotaciones de paso cuentan dentro de la fase de acondicionamiento', async () => {
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 1, null),
+      paso('conditioning_steps_complete', 12, 2, null),
+      anotacion('conditioning_finish', 30, ANA, null),
+    ];
+    const m = montar({ order: resumen({ status: 'TERMINADO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(recorrido.durations.conditioning).toEqual({ kind: 'closed', ms: 30 * MIN });
+  });
+
+  it('R36: el cambio trae quien lo hizo, el paso, el conjunto anterior y el nuevo', async () => {
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 1, [CARLA, ELENA]),
+      paso('conditioning_responsibles_change', 9, 1, [DIEGO], ANA),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(recorrido.steps[2]).toEqual({
+      id: entries[2]!.id,
+      orderId: PEDIDO,
+      userId: ANA,
+      userDisplayName: 'Ana Perez',
+      occurredAt: entries[2]!.occurredAt,
+      gapToNextMs: null,
+      isGoBack: false,
+      action: 'conditioning_responsibles_change',
+      stepPosition: 1,
+      reason: null,
+      previous: [
+        { userId: CARLA, displayName: 'Carla Diaz' },
+        { userId: ELENA, displayName: null },
+      ],
+      responsibles: [{ userId: DIEGO, displayName: 'Diego Sanz' }],
+    });
+  });
+
+  it('R36: el anterior es el vigente de esa posicion: encadena cambios y no mezcla pasos', async () => {
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 1, [CARLA]),
+      paso('conditioning_step_advance', 8, 2, [BEA]),
+      paso('conditioning_responsibles_change', 10, 1, [DIEGO], ANA),
+      paso('conditioning_responsibles_change', 11, 1, [ELENA, CARLA], ANA),
+      paso('conditioning_responsibles_change', 12, 2, [ANA], ANA),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    const cambios = recorrido.steps.flatMap((step) =>
+      step.action === 'conditioning_responsibles_change'
+        ? [
+            {
+              paso: step.stepPosition,
+              antes: step.previous.map((person) => person.userId),
+              despues: step.responsibles.map((person) => person.userId),
+            },
+          ]
+        : [],
+    );
+    expect(cambios).toEqual([
+      { paso: 1, antes: [CARLA], despues: [DIEGO] },
+      { paso: 1, antes: [DIEGO], despues: [ELENA, CARLA] },
+      { paso: 2, antes: [BEA], despues: [ANA] },
+    ]);
+  });
+
+  it('R36: un cambio sobre un paso sin responsables anotados trae el anterior vacio', async () => {
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 1, null),
+      paso('conditioning_responsibles_change', 9, 1, [CARLA], ANA),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(recorrido.steps[2]).toMatchObject({
+      previous: [],
+      responsibles: [{ userId: CARLA, displayName: 'Carla Diaz' }],
+    });
+  });
+
+  it('R36: una anotacion de paso sin posicion o un cambio sin responsables es un registro corrupto y lanza', async () => {
+    const comenzar = anotacion('conditioning_start', 0, ANA, null);
+    const sinPosicion = { ...paso('conditioning_step_advance', 5, 1, null), stepPosition: null };
+    const m1 = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries: [comenzar, sinPosicion] });
+    await expect(m1.abrir(ACTOR, { orderId: PEDIDO }, NOW)).rejects.toThrow(/no tiene paso/);
+
+    const sinResponsables = paso('conditioning_responsibles_change', 5, 1, null);
+    const m2 = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries: [comenzar, sinResponsables] });
+    await expect(m2.abrir(ACTOR, { orderId: PEDIDO }, NOW)).rejects.toThrow(/no tiene los responsables/);
+  });
+
+  it('R35, R36: el recorrido sigue mostrando como historia los responsables de posiciones que la formula ya no tiene', async () => {
+    // La formula actual tiene menos pasos que los anotados: el recorrido no la lee ni recorta.
+    const entries = [
+      anotacion('conditioning_start', 0, ANA, null),
+      paso('conditioning_step_advance', 5, 7, [CARLA]),
+      paso('conditioning_responsibles_change', 9, 7, [DIEGO], ANA),
+    ];
+    const m = montar({ order: resumen({ status: 'EN_ACONDICIONAMIENTO' }), entries, people: directorio });
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    expect(recorrido.steps[1]).toMatchObject({
+      action: 'conditioning_step_advance',
+      stepPosition: 7,
+      responsibles: [{ userId: CARLA, displayName: 'Carla Diaz' }],
+    });
+    expect(recorrido.steps[2]).toMatchObject({
+      action: 'conditioning_responsibles_change',
+      stepPosition: 7,
+      previous: [{ userId: CARLA, displayName: 'Carla Diaz' }],
+      responsibles: [{ userId: DIEGO, displayName: 'Diego Sanz' }],
+    });
+  });
+
+  it('R37: los pasos de produccion siguen sin campos de responsables', async () => {
+    const m = montar();
+    const recorrido = await m.abrir(ACTOR, { orderId: PEDIDO }, NOW);
+    for (const step of recorrido.steps) {
+      expect(step).not.toHaveProperty('responsibles');
+      expect(step).not.toHaveProperty('previous');
+    }
   });
 });

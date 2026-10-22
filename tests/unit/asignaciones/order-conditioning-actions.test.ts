@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   finishConditioningAction,
+  recordConditioningStepAction,
   saveConditioningBatchDataAction,
   startConditioningAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
@@ -15,7 +16,12 @@ import {
   ConditioningBatchDataMissingError,
   ConditioningBatchDuplicateLotError,
   ConditioningBatchNotFoundError,
+  ConditioningResponsibleNotAllowedError,
+  ConditioningResponsiblesRequiredError,
+  ConditioningStepOutOfOrderError,
   ConditioningTeamEmptyError,
+  EvidenceRequiredError,
+  OrderNotFoundError,
   ConditioningTeamMemberNotAllowedError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
@@ -30,9 +36,11 @@ const {
   startConditioningMock,
   finishConditioningMock,
   saveConditioningBatchDataMock,
+  recordConditioningStepMock,
   redirectMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
+  recordConditioningStepMock: vi.fn(),
   saveConditioningBatchDataMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
@@ -52,6 +60,7 @@ vi.mock('@/lib/composition', () => ({
     startConditioning: startConditioningMock,
     finishConditioning: finishConditioningMock,
     saveConditioningBatchData: saveConditioningBatchDataMock,
+    recordConditioningStep: recordConditioningStepMock,
   },
 }));
 
@@ -335,4 +344,61 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
       expect(revalidatePathMock).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('QC-299 T13 — recordConditioningStepAction: dejar atras un paso de acondicionamiento', () => {
+  const INPUT = { orderId: ORDER_ID, stepPosition: 2, responsibleUserIds: [BETO] };
+
+  it('R31: pasa el actor de la sesion y la entrada tal cual; exito -> devuelve el avance y revalida el detalle', async () => {
+    recordConditioningStepMock.mockResolvedValue({ completedCount: 2, allCompleted: false });
+
+    const resultado = await recordConditioningStepAction(INPUT);
+
+    expect(recordConditioningStepMock).toHaveBeenCalledWith(
+      { id: 'user-1', companyId: 'company-1', permissions: SESSION_USER.permissions },
+      INPUT,
+    );
+    expect(resultado).toEqual({ status: 'success', data: { completedCount: 2, allCompleted: false } });
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}`);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('R31: sin sesion el actor llega `null` y el caso de uso rechaza con `unauthorized`', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    recordConditioningStepMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await recordConditioningStepAction(INPUT);
+
+    expect(recordConditioningStepMock).toHaveBeenCalledWith(null, INPUT);
+    expect(resultado).toEqual({ status: 'error', code: 'unauthorized', message: errorMessage('unauthorized') });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['unauthorized', new UnauthorizedError()],
+    ['invalid_input', new ValidationError()],
+    ['order_not_found', new OrderNotFoundError()],
+    ['order_not_conditionable', new OrderNotConditionableError()],
+    ['order_conditioning_taken', new OrderConditioningTakenError()],
+    ['conditioning_step_out_of_order', new ConditioningStepOutOfOrderError()],
+    ['conditioning_responsibles_required', new ConditioningResponsiblesRequiredError()],
+    ['conditioning_responsible_not_allowed', new ConditioningResponsibleNotAllowedError()],
+    ['evidence_required', new EvidenceRequiredError()],
+  ] as const)('R31: %s se traduce a ErrorState con el texto del catalogo y no revalida', async (_n, error) => {
+    recordConditioningStepMock.mockRejectedValue(error);
+
+    const resultado = await recordConditioningStepAction(INPUT);
+
+    expect(resultado).toEqual({ status: 'error', code: error.code, message: errorMessage(error.code) });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('R31: una entrada sin `orderId` de texto no revalida nada', async () => {
+    recordConditioningStepMock.mockResolvedValue({ completedCount: 1, allCompleted: true });
+
+    const resultado = await recordConditioningStepAction(null);
+
+    expect(resultado).toEqual({ status: 'success', data: { completedCount: 1, allCompleted: true } });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
 });

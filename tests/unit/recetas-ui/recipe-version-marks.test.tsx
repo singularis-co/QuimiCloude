@@ -90,6 +90,7 @@ function versionDetail(isUnderReview: boolean): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [],
     tools: [],
     original: { id: ORIGINAL_ID, name: 'Jabón' },

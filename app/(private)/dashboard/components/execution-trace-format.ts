@@ -21,6 +21,9 @@ export const EXECUTION_ACTION_LABELS: Readonly<Record<ExecutionAction, string>> 
   conditioning_start: 'Comenzar acondicionamiento',
   conditioning_batch_save: 'Guardado de datos de lote',
   conditioning_finish: 'Terminar acondicionamiento',
+  conditioning_step_advance: 'Avanzar',
+  conditioning_steps_complete: 'Completar pasos',
+  conditioning_responsibles_change: 'Cambio de responsables',
 };
 
 export const TRACE_ORDER_STATUS_LABELS: Readonly<Record<ExecutionTraceRow['status'], string>> =
@@ -100,7 +103,11 @@ export const CONDITIONING_TEXTS = {
   expiresPrefix: 'Vence',
   producedPrefix: 'Producido',
   snapshotNotice: 'Datos tal como se guardaron en ese momento',
+  responsibles: 'Responsables',
+  responsiblesBefore: 'Antes:',
+  evidencePhotos: (count: number) => (count === 1 ? '1 foto de evidencia' : `${count} fotos de evidencia`),
 } as const;
+
 
 /** UTC y sin configuracion regional: servidor y navegador pintan la misma cadena. */
 export function formatTraceInstant(value: Date): string {

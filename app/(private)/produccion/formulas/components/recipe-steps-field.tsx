@@ -24,7 +24,7 @@ import { useId, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import type { ConditioningStepInput, RecipeStepDocument } from '@/lib/modules/recetas';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
@@ -93,6 +93,12 @@ export const PACKING_STEPS_FIELD_TEXTS = {
   optionalHelp:
     'Opcional. Pasos que sigue el empacador uno a uno al empacar el pedido.',
   optionalHelpLabel: 'Qué son los pasos de envasado',
+  sectionName: 'Envasado',
+} as const;
+
+export const CONDITIONING_STEPS_FIELD_TEXTS = {
+  title: 'Acondicionamiento',
+  help: 'Opcional. Pasos que sigue el acondicionador uno a uno al acondicionar el pedido. «Asignación requerida» le pide elegir quién del equipo hizo el paso.',
 } as const;
 
 const FIELD_TEXTS = {
@@ -110,22 +116,57 @@ const EVIDENCE_TEXTS = {
       : count === 1
         ? '1 paso pide evidencia'
         : `${count} pasos piden evidencia`,
-  switchLabel: (position: number) => `Requiere evidencia en el paso ${position}`,
+  switchLabel: (position: number, section: string) =>
+    `Requiere evidencia en el paso ${position} de ${section}`,
   lockedHandle: (position: number) =>
     `No se puede mover el paso ${position}: hay pedidos en curso con fotos`,
   lockedRemove: (position: number) =>
     `No se puede quitar el paso ${position}: hay pedidos en curso con fotos`,
 } as const;
 
+const ASSIGNMENT_TEXTS = {
+  switchLabel: (position: number, section: string) =>
+    `Asignación requerida en el paso ${position} de ${section}`,
+} as const;
+
+const SECTION_SUMMARY_TEXTS = {
+  steps: (count: number) => (count === 1 ? '1 paso' : `${count} pasos`),
+  evidence: (count: number) => (count === 1 ? '1 pide evidencia' : `${count} piden evidencia`),
+  assignment: (count: number) =>
+    count === 1 ? '1 pide responsables' : `${count} piden responsables`,
+  separator: ' · ',
+} as const;
+
+type StepMarks = { readonly evidence: boolean; readonly assignment: boolean };
+
+function marksOf(document: ConditioningStepInput): StepMarks {
+  return {
+    evidence: document.requiresEvidence === true,
+    assignment: document.requiresAssignment === true,
+  };
+}
+
 /**
- * El editor devuelve solo el contenido del paso; la marca se copia aparte para que escribir no la
- * apague. Apagada, la clave desaparece: el JSON de una fórmula que nunca la usó no cambia.
+ * El editor devuelve solo el contenido del paso; las marcas se copian aparte para que escribir no
+ * las apague. Apagada, la clave desaparece: el JSON de una fórmula que nunca la usó no cambia.
  */
-function withEvidence(document: RecipeStepDocument, on: boolean): RecipeStepDocument {
-  const next: RecipeStepDocument = { ...document };
-  if (on) next.requiresEvidence = true;
+function withMarks(document: RecipeStepDocument, marks: StepMarks): ConditioningStepInput {
+  const next: ConditioningStepInput = { ...document };
+  if (marks.evidence) next.requiresEvidence = true;
   else delete next.requiresEvidence;
+  if (marks.assignment) next.requiresAssignment = true;
+  else delete next.requiresAssignment;
   return next;
+}
+
+function sectionSummary(steps: number, evidence: number, assignment: number): string {
+  return [
+    steps === 0 ? null : SECTION_SUMMARY_TEXTS.steps(steps),
+    evidence === 0 ? null : SECTION_SUMMARY_TEXTS.evidence(evidence),
+    assignment === 0 ? null : SECTION_SUMMARY_TEXTS.assignment(assignment),
+  ]
+    .filter((part): part is string => part !== null)
+    .join(SECTION_SUMMARY_TEXTS.separator);
 }
 
 export type RecipeStepsFieldProps = {
@@ -133,13 +174,19 @@ export type RecipeStepsFieldProps = {
   readonly onChange: (steps: readonly RecipeStepFormValue[]) => void;
   readonly errors?: RecipeStepErrors;
   readonly title?: string;
+  /** Nombre de la sección en el nombre accesible de cada interruptor; por defecto, `title`. */
+  readonly sectionName?: string;
   /** Marca la sección como opcional junto al título y explica para qué sirve en un tooltip. */
   readonly optionalHelp?: { readonly text: string; readonly label: string };
+  /** Marca la sección como opcional y pinta la ayuda como texto visible bajo el título. */
+  readonly optionalDescription?: string;
   /** Raiz de los `data-testid` y de los `id` de error: dos instancias en la misma pagina no
    *  deben colisionar. */
   readonly testIdPrefix?: string;
   /** Pinta el interruptor «Requiere evidencia» en cada paso y el resumen de la lista. */
   readonly showEvidenceSwitch?: boolean;
+  /** Pinta el interruptor «Asignación requerida» en cada paso y lo cuenta en el resumen. */
+  readonly showAssignmentSwitch?: boolean;
   /** Deshabilita mover y quitar pasos; editar el texto y la marca siguen activos, y añadir solo
    *  al final (añadir se apaga mientras haya un paso vacío, con o sin `locked`). */
   readonly locked?: boolean;
@@ -178,9 +225,12 @@ export function RecipeStepsField({
   onChange,
   errors,
   title = 'Pasos',
+  sectionName = title,
   optionalHelp,
+  optionalDescription,
   testIdPrefix = 'recipe-step',
   showEvidenceSwitch = false,
+  showAssignmentSwitch = false,
   locked = false,
 }: RecipeStepsFieldProps) {
   const headingId = useId();
@@ -193,6 +243,8 @@ export function RecipeStepsField({
     ? [{ key: ghostKey, document: emptyStepDocument() }]
     : steps;
   const evidenceCount = steps.filter((step) => step.document.requiresEvidence === true).length;
+  const assignmentCount = steps.filter((step) => marksOf(step.document).assignment).length;
+  const isOptional = optionalHelp !== undefined || optionalDescription !== undefined;
   // Con algún paso vacío no se añade otro: primero se rellena el que ya está.
   const canAddStep = !rows.some((step) => isStepDocumentEmpty(step.document));
 
@@ -250,7 +302,7 @@ export function RecipeStepsField({
         <div className="flex items-center gap-1">
           <h2 id={headingId} className="text-lg font-medium">
             {title}
-            {optionalHelp === undefined ? null : (
+            {!isOptional ? null : (
               <span
                 className="ml-1 text-sm font-normal text-muted-foreground"
                 data-testid={`${testIdPrefix}s-optional`}
@@ -284,9 +336,16 @@ export function RecipeStepsField({
             className="text-xs text-muted-foreground"
             data-testid={`${testIdPrefix}-evidence-summary`}
           >
-            {EVIDENCE_TEXTS.summary(evidenceCount)}
+            {showAssignmentSwitch
+              ? sectionSummary(rows.length, evidenceCount, assignmentCount)
+              : EVIDENCE_TEXTS.summary(evidenceCount)}
           </p>
         ) : null}
+        {optionalDescription === undefined ? null : (
+          <p className="text-sm text-muted-foreground" data-testid={`${testIdPrefix}s-description`}>
+            {optionalDescription}
+          </p>
+        )}
       </div>
 
       <DndContext
@@ -305,18 +364,25 @@ export function RecipeStepsField({
                 total={rows.length}
                 testIdPrefix={testIdPrefix}
                 error={errors?.[index]}
+                sectionName={sectionName}
                 showEvidenceSwitch={showEvidenceSwitch}
+                showAssignmentSwitch={showAssignmentSwitch}
                 locked={locked}
                 // Bloqueado solo se añade al final: insertar en medio movería los pasos siguientes.
                 canAdd={canAddStep && (!locked || index === rows.length - 1)}
                 onAdd={() => addStepAfter(index)}
                 onChangeDocument={(document) =>
-                  updateStep(index, {
-                    document: withEvidence(document, step.document.requiresEvidence === true),
-                  })
+                  updateStep(index, { document: withMarks(document, marksOf(step.document)) })
                 }
                 onChangeEvidence={(on) =>
-                  updateStep(index, { document: withEvidence(step.document, on) })
+                  updateStep(index, {
+                    document: withMarks(step.document, { ...marksOf(step.document), evidence: on }),
+                  })
+                }
+                onChangeAssignment={(on) =>
+                  updateStep(index, {
+                    document: withMarks(step.document, { ...marksOf(step.document), assignment: on }),
+                  })
                 }
                 onRemove={() => removeStep(index)}
               />
@@ -334,12 +400,15 @@ type RecipeStepRowProps = {
   readonly total: number;
   readonly testIdPrefix: string;
   readonly error?: string;
+  readonly sectionName: string;
   readonly showEvidenceSwitch: boolean;
+  readonly showAssignmentSwitch: boolean;
   readonly locked: boolean;
   readonly canAdd: boolean;
   readonly onAdd: () => void;
   readonly onChangeDocument: (document: RecipeStepDocument) => void;
   readonly onChangeEvidence: (on: boolean) => void;
+  readonly onChangeAssignment: (on: boolean) => void;
   readonly onRemove: () => void;
 };
 
@@ -349,12 +418,15 @@ function RecipeStepRow({
   total,
   testIdPrefix,
   error,
+  sectionName,
   showEvidenceSwitch,
+  showAssignmentSwitch,
   locked,
   canAdd,
   onAdd,
   onChangeDocument,
   onChangeEvidence,
+  onChangeAssignment,
   onRemove,
 }: RecipeStepRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -363,6 +435,7 @@ function RecipeStepRow({
   });
   const { active } = useDndContext();
   const evidenceOn = showEvidenceSwitch && step.document.requiresEvidence === true;
+  const assignmentOn = showAssignmentSwitch && marksOf(step.document).assignment;
   const lifted = !locked && isDragging;
   const dropTarget = !locked && !isDragging && active !== null;
   // El estilo en línea de dnd-kit pisaría la transición de la clase mientras se reordena.
@@ -375,7 +448,7 @@ function RecipeStepRow({
     ? 'z-10 border-primary shadow-lg scale-[1.01] motion-reduce:scale-100'
     : dropTarget
       ? 'border-dashed border-primary'
-      : evidenceOn
+      : evidenceOn || assignmentOn
         ? 'border-[color-mix(in_oklch,var(--primary)_45%,var(--border))]'
         : '';
 
@@ -436,7 +509,16 @@ function RecipeStepRow({
               ? {
                   checked: evidenceOn,
                   onCheckedChange: onChangeEvidence,
-                  label: EVIDENCE_TEXTS.switchLabel(index + 1),
+                  label: EVIDENCE_TEXTS.switchLabel(index + 1, sectionName),
+                }
+              : undefined
+          }
+          assignment={
+            showAssignmentSwitch
+              ? {
+                  checked: assignmentOn,
+                  onCheckedChange: onChangeAssignment,
+                  label: ASSIGNMENT_TEXTS.switchLabel(index + 1, sectionName),
                 }
               : undefined
           }

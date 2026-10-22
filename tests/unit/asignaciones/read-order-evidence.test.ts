@@ -92,7 +92,10 @@ describe('readOrderEvidence — la firma', () => {
 
     const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
 
-    expect(lectura).toEqual({ evidence: { manufacturing: [], packing: [] }, signingFailure: null });
+    expect(lectura).toEqual({
+      evidence: { manufacturing: [], packing: [], conditioning: [] },
+      signingFailure: null,
+    });
     expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
     expect(m.storage.createSignedReadUrl).not.toHaveBeenCalled();
   });
@@ -134,6 +137,7 @@ describe('readOrderEvidence — la firma', () => {
         { stepPosition: 3, photoCount: 1, photos: null },
       ],
       packing: [{ stepPosition: 1, photoCount: 1, photos: null }],
+      conditioning: [],
     });
   });
 
@@ -172,5 +176,46 @@ describe('readOrderEvidence — el pedido tiene que ser de la empresa', () => {
     await expect(readOrderEvidence(m.deps, OTRA_EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
     expect(m.repo.listByOrder).not.toHaveBeenCalled();
     expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
+  });
+});
+
+describe('readOrderEvidence — acondicionamiento (QC-299: R21, R32)', () => {
+  const FILAS_ACONDICIONAMIENTO = [
+    filaFoto({ id: 'c2-2', slot: 2, stepPosition: 2, phase: 'conditioning' }),
+    filaFoto({ id: 'c2-1', slot: 1, stepPosition: 2, phase: 'conditioning' }),
+    filaFoto({ id: 'c1-1', slot: 1, stepPosition: 1, phase: 'conditioning' }),
+  ];
+
+  it('R21: lee la fase conditioning y la devuelve aparte, por paso y por casilla, firmada en la misma llamada', async () => {
+    const m = montarLectura({ filas: [...FILAS_DEL_PEDIDO, ...FILAS_ACONDICIONAMIENTO] });
+
+    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+
+    expect(m.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'conditioning');
+    expect(evidence.conditioning.map((grupo) => [grupo.stepPosition, grupo.photoCount])).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
+    expect(evidence.conditioning[1]!.photos!.map((foto) => foto.id)).toEqual(['c2-1', 'c2-2']);
+    expect(evidence.manufacturing.map((grupo) => grupo.stepPosition)).toEqual([1, 3]);
+    expect(m.storage.createSignedReadUrls).toHaveBeenCalledTimes(1);
+  });
+
+  it('R21: si la firma cae, los grupos de acondicionamiento salen con su cantidad y sin fotos', async () => {
+    const m = montarLectura({ filas: FILAS_ACONDICIONAMIENTO, firmaFalla: new Error('storage caido') });
+
+    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+
+    expect(evidence.conditioning).toEqual([
+      { stepPosition: 1, photoCount: 1, photos: null },
+      { stepPosition: 2, photoCount: 2, photos: null },
+    ]);
+  });
+
+  it('R32: las fotos de acondicionamiento de un pedido de otra empresa no se leen', async () => {
+    const m = montarLectura({ filas: FILAS_ACONDICIONAMIENTO });
+
+    await expect(readOrderEvidence(m.deps, OTRA_EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(m.repo.listByOrder).not.toHaveBeenCalled();
   });
 });

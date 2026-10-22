@@ -14,6 +14,7 @@ import {
 } from '@/lib/modules/asignaciones/domain/finish-conditioning';
 import {
   ConditioningBatchDataMissingError,
+  ConditioningStepsPendingError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
   OrderNotFoundError,
@@ -22,12 +23,13 @@ import {
 } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
-import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
+import type { ExecutionEntryRecord, NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
 import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type { FinishedBatchLabels, FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { ConditioningStepView } from '@/lib/modules/recetas';
 
-import { transaccionDeAcondicionamiento } from './conditioning-doubles';
+import { anotacionDePaso, transaccionDeAcondicionamiento } from './conditioning-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -38,6 +40,7 @@ const ANA = uuid('1');
 const BETO = uuid('2');
 const LOTE = uuid('8');
 const PEDIDO = uuid('7');
+const RECETA = uuid('9');
 const AHORA = new Date('2026-10-08T12:00:00.000Z');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['acondicionamiento.modificar'] };
@@ -51,6 +54,8 @@ function montar(
     readonly summaryItems?: readonly unknown[];
     readonly batches?: readonly FinishedBatchOfOrderLine[];
     readonly append?: (entry: NewExecutionEntry) => Promise<void>;
+    readonly pasos?: readonly ConditioningStepView[] | null;
+    readonly anotaciones?: readonly ExecutionEntryRecord[];
   },
 ): {
   readonly deps: FinishConditioningDeps;
@@ -61,13 +66,15 @@ function montar(
   readonly run: ReturnType<typeof vi.fn>;
   readonly append: ReturnType<typeof vi.fn>;
   readonly pasos: readonly string[];
+  readonly findConditioningStepsById: ReturnType<typeof vi.fn>;
+  readonly listEntriesForOrders: ReturnType<typeof vi.fn>;
 } {
   const findAliveById = vi.fn(async () =>
     options?.target === undefined ? { id: PEDIDO, status: 'EN_ACONDICIONAMIENTO' } : options.target,
   );
   const listAliveSummariesByIds = vi.fn(async () => ({
     items: options?.summaryItems ?? [
-      { id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: [] },
+      { id: PEDIDO, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: ANA, presentationLines: [] },
     ],
     total: 1,
     page: 1,
@@ -78,13 +85,28 @@ function montar(
     append: options?.append,
   });
   const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => options?.batches ?? []);
+  const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
+  const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
     batches: { listOfOrder },
     transaction,
+    conditioningSteps: { findConditioningStepsById },
+    log: { listEntriesForOrders },
     now: () => AHORA,
   } satisfies FinishConditioningDeps;
-  return { deps, findAliveById, listAliveSummariesByIds, finishConditioningAliveById, listOfOrder, run, append, pasos };
+  return {
+    deps,
+    findAliveById,
+    listAliveSummariesByIds,
+    finishConditioningAliveById,
+    listOfOrder,
+    run,
+    append,
+    pasos,
+    findConditioningStepsById,
+    listEntriesForOrders,
+  };
 }
 
 /** Un catalogo que falla en cuanto se lee cualquiera de sus miembros. */
@@ -109,6 +131,16 @@ function depsIntocables(): FinishConditioningDeps {
         throw new Error(`se toco la transaccion: ${String(prop)}`);
       },
     }),
+    conditioningSteps: {
+      findConditioningStepsById: () => {
+        throw new Error('se toco el puerto: findConditioningStepsById');
+      },
+    },
+    log: {
+      listEntriesForOrders: () => {
+        throw new Error('se toco el puerto: listEntriesForOrders');
+      },
+    },
     now: () => {
       throw new Error('se pidio la hora');
     },
@@ -456,5 +488,98 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
       ConditioningBatchDataMissingError,
     );
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
+  });
+});
+
+describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', () => {
+  const PASOS: readonly ConditioningStepView[] = [{ blocks: [] }, { blocks: [] }];
+
+  it('R25: con un paso sin completar rechaza con conditioning_steps_pending sin leer lotes ni abrir la transaccion', async () => {
+    const { deps, listOfOrder, run, findConditioningStepsById, listEntriesForOrders } = montar('ok', {
+      pasos: PASOS,
+      anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null)],
+    });
+
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConditioningStepsPendingError);
+    expect((error as ConditioningStepsPendingError).code).toBe('conditioning_steps_pending');
+    expect(findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
+    expect(listEntriesForOrders).toHaveBeenCalledWith(EMPRESA, [PEDIDO]);
+    expect(listOfOrder).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('R25: sin ningun paso completado tambien rechaza sin cambiar el pedido', async () => {
+    const { deps, finishConditioningAliveById, append } = montar('ok', { pasos: PASOS, anotaciones: [] });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      ConditioningStepsPendingError,
+    );
+    expect(finishConditioningAliveById).not.toHaveBeenCalled();
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R25: con todos los pasos completados termina como hoy', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok', {
+      pasos: PASOS,
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, null),
+        anotacionDePaso('conditioning_steps_complete', 2, null),
+      ],
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+  });
+
+  it.each([
+    ['sin pasos', []],
+    ['que ya no se encuentra', null],
+  ] as const)('R19, R25: una receta %s termina como hoy sin leer el registro', async (_n, pasos) => {
+    const { deps, listEntriesForOrders, finishConditioningAliveById } = montar('ok', { pasos });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+      numberText: '2026-0000007',
+    });
+    expect(listEntriesForOrders).not.toHaveBeenCalled();
+    expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R25: quien no acondiciona el pedido recibe su error sin que se lean los pasos', async () => {
+    const { deps, findConditioningStepsById } = montar('ok', {
+      pasos: PASOS,
+      summaryItems: [
+        { id: PEDIDO, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: BETO, presentationLines: [] },
+      ],
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      OrderConditioningTakenError,
+    );
+    expect(findConditioningStepsById).not.toHaveBeenCalled();
+  });
+
+  it('R31: sin acondicionamiento.modificar rechaza antes de validar y sin leer pasos ni registro', async () => {
+    const finishConditioning = createFinishConditioning(depsIntocables());
+    await expect(
+      finishConditioning({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: 'x' }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+  });
+
+  it('R32: pasos y registro se leen con la empresa del actor', async () => {
+    const otra = uuid('4');
+    const { deps, findConditioningStepsById, listEntriesForOrders } = montar('ok', {
+      pasos: PASOS,
+      anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null)],
+    });
+
+    await expect(
+      createFinishConditioning(deps)({ ...ACTOR, companyId: otra }, { orderId: PEDIDO }),
+    ).rejects.toBeInstanceOf(ConditioningStepsPendingError);
+    expect(findConditioningStepsById).toHaveBeenCalledWith(RECETA, otra);
+    expect(listEntriesForOrders).toHaveBeenCalledWith(otra, [PEDIDO]);
   });
 });

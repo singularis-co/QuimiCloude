@@ -13,7 +13,7 @@ import { redirect } from 'next/navigation';
 
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
-import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
+import { AsignacionesError, type Actor, type RecordConditioningStepResult } from '@/lib/modules/asignaciones';
 import { ASSIGNED_ORDERS_ROUTE, CONDITIONED_ORDER_PARAM, conditioningOrderRoute } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
@@ -103,4 +103,24 @@ export async function saveConditioningBatchDataAction(
 
   if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
   return { status: 'success' };
+}
+
+export type RecordConditioningStepActionResult =
+  | { status: 'success'; data: RecordConditioningStepResult }
+  | ErrorState;
+
+/** Deja atras un paso: lo completa o anota el cambio de responsables, y se queda en el detalle. */
+export async function recordConditioningStepAction(input: unknown): Promise<RecordConditioningStepActionResult> {
+  const actor = await currentActor();
+
+  let data: RecordConditioningStepResult;
+  try {
+    data = await asignaciones.recordConditioningStep(actor, input);
+  } catch (error) {
+    return toErrorState(error);
+  }
+
+  const orderId = typeof input === 'object' && input !== null ? (input as { orderId?: unknown }).orderId : undefined;
+  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  return { status: 'success', data };
 }

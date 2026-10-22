@@ -14,6 +14,7 @@ import {
   ExecutionAbortedError,
   isExecutionSuccess,
   type ExecutionAction,
+  type ExecutionAppendOutcome,
   type ExecutionEntryRecord,
   type NewExecutionEntry,
 } from '@/lib/modules/asignaciones/domain/execution-entry'
@@ -38,9 +39,9 @@ const PUERTO_REGISTRO_ABS = join(PUERTOS_ABS, 'execution-log-repository.ts')
 class RegistroDoble implements ExecutionLogRepository {
   readonly anotadas: NewExecutionEntry[] = []
 
-  append(entry: NewExecutionEntry): Promise<void> {
+  append(entry: NewExecutionEntry): Promise<ExecutionAppendOutcome> {
     this.anotadas.push(entry)
-    return Promise.resolve()
+    return Promise.resolve('ok')
   }
 
   findLastStepPosition(companyId: string, orderId: string): Promise<number | null> {
@@ -116,11 +117,11 @@ describe('NewExecutionEntry: el empaque va sin posicion (R5bis)', () => {
   })
 })
 
-describe('ExecutionAction: total sobre las once del enum (R1)', () => {
-  it('R1: el dominio declara exactamente once acciones, y el enum de Prisma tambien', () => {
-    expect(EXECUTION_ACTIONS).toHaveLength(11)
-    expect(new Set(EXECUTION_ACTIONS).size).toBe(11)
-    expect(Object.values(OrderExecutionAction)).toHaveLength(11)
+describe('ExecutionAction: total sobre las catorce del enum (R1)', () => {
+  it('R1: el dominio declara exactamente catorce acciones, y el enum de Prisma tambien', () => {
+    expect(EXECUTION_ACTIONS).toHaveLength(14)
+    expect(new Set(EXECUTION_ACTIONS).size).toBe(14)
+    expect(Object.values(OrderExecutionAction)).toHaveLength(14)
   })
 
   it.each(EXECUTION_ACTIONS)('R1: la accion %s tiene su valor en el enum de Prisma', (action) => {
@@ -132,7 +133,7 @@ describe('ExecutionAction: total sobre las once del enum (R1)', () => {
     expect([...Object.values(OrderExecutionAction)].sort()).toEqual(delDominio)
   })
 
-  it('R1: `ExecutionAction` es la union de las once, ni una mas', () => {
+  it('R1: `ExecutionAction` es la union de las catorce, ni una mas', () => {
     const exhaustivo = (a: ExecutionAction): number => {
       switch (a) {
         case 'start':
@@ -146,6 +147,9 @@ describe('ExecutionAction: total sobre las once del enum (R1)', () => {
         case 'conditioning_start':
         case 'conditioning_batch_save':
         case 'conditioning_finish':
+        case 'conditioning_step_advance':
+        case 'conditioning_steps_complete':
+        case 'conditioning_responsibles_change':
           return 1
         default: {
           const nunca: never = a
@@ -153,7 +157,7 @@ describe('ExecutionAction: total sobre las once del enum (R1)', () => {
         }
       }
     }
-    expect(EXECUTION_ACTIONS.map(exhaustivo)).toHaveLength(11)
+    expect(EXECUTION_ACTIONS.map(exhaustivo)).toHaveLength(14)
   })
 })
 

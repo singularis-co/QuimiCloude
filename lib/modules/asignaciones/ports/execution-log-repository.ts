@@ -1,4 +1,4 @@
-import type { ExecutionEntryRecord, NewExecutionEntry } from '../domain/execution-entry';
+import type { ExecutionAppendOutcome, ExecutionEntryRecord, NewExecutionEntry } from '../domain/execution-entry';
 
 export type ExecutedOrdersFilter = {
   readonly userId?: string;
@@ -10,7 +10,7 @@ export type ExecutedOrdersFilter = {
 
 /** Registro de solo anexar: una anotacion no se corrige ni se borra. */
 export interface ExecutionLogRepository {
-  append(entry: NewExecutionEntry): Promise<void>;
+  append(entry: NewExecutionEntry): Promise<ExecutionAppendOutcome>;
   /** La posicion de la ultima anotacion con posicion de ese pedido en esa empresa, o `null`. */
   findLastStepPosition(companyId: string, orderId: string): Promise<number | null>;
   /** Ids distintos de los pedidos con alguna anotacion que cumpla el filtro. Sin orden prometido.

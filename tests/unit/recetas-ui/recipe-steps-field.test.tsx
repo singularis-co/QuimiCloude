@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { RecipeStepsField } from '@/app/(private)/produccion/formulas/components';
 import type { RecipeStepFormValue } from '@/app/(private)/produccion/formulas/components/recipe-form-state';
 import { isStepDocumentEmpty } from '@/app/(private)/produccion/formulas/components/recipe-steps-field';
-import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import type { ConditioningStepInput, RecipeStepDocument } from '@/lib/modules/recetas';
 
 import { setupUser } from '../../helpers/user-event';
 
@@ -198,7 +198,7 @@ function EvidenceHarness({
 }
 
 function evidenceSwitch(position: number): HTMLElement {
-  return screen.getByRole('switch', { name: `Requiere evidencia en el paso ${position}` });
+  return screen.getByRole('switch', { name: `Requiere evidencia en el paso ${position} de Pasos` });
 }
 
 describe('RecipeStepsField — «Requiere evidencia» (QC-214)', () => {
@@ -500,7 +500,7 @@ describe('RecipeStepsField — tarjeta del paso y estados de arrastre (rediseño
     expect(tools.className).toContain('md:w-auto');
     expect(within(tools).getByRole('button', { name: 'Quitar paso 1' })).toBeInTheDocument();
     expect(within(tools).getByRole('button', { name: 'Añadir un paso después del 1' })).toBeInTheDocument();
-    expect(within(tools).getByRole('switch', { name: 'Requiere evidencia en el paso 1' })).toBeInTheDocument();
+    expect(within(tools).getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos' })).toBeInTheDocument();
   });
 
   it('R17: no hay «Añadir paso» al final de ninguna lista; el «+» de cada paso conserva su regla', async () => {
@@ -639,5 +639,185 @@ describe('RecipeStepsField — sección opcional con ayuda', () => {
     expect(await screen.findByTestId('recipe-packing-steps-help-text')).toHaveTextContent(
       'Ayuda de envasado',
     );
+  });
+});
+
+const CONDITIONING_HELP =
+  'Opcional. Pasos que sigue el acondicionador uno a uno al acondicionar el pedido. «Asignación requerida» le pide elegir quién del equipo hizo el paso.';
+
+function stepWithMarks(
+  key: string,
+  text: string,
+  marks: { readonly evidence?: boolean; readonly assignment?: boolean },
+): RecipeStepFormValue {
+  const document: ConditioningStepInput = { ...doc(text) };
+  if (marks.evidence === true) document.requiresEvidence = true;
+  if (marks.assignment === true) document.requiresAssignment = true;
+  return { key, document };
+}
+
+function ConditioningHarness({ initial }: { readonly initial: RecipeStepFormValue[] }) {
+  const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>(initial);
+  return (
+    <RecipeStepsField
+      steps={steps}
+      onChange={(next) => {
+        lastSteps = next;
+        setSteps(next);
+      }}
+      title="Acondicionamiento"
+      optionalDescription={CONDITIONING_HELP}
+      testIdPrefix="recipe-conditioning-step"
+      showEvidenceSwitch
+      showAssignmentSwitch
+    />
+  );
+}
+
+function conditioningSwitch(kind: 'evidence' | 'assignment', position: number): HTMLElement {
+  const name =
+    kind === 'evidence'
+      ? `Requiere evidencia en el paso ${position} de Acondicionamiento`
+      : `Asignación requerida en el paso ${position} de Acondicionamiento`;
+  return screen.getByRole('switch', { name });
+}
+
+function assignmentOf(step: RecipeStepFormValue | undefined): boolean | undefined {
+  const document: ConditioningStepInput | undefined = step?.document;
+  return document?.requiresAssignment;
+}
+
+describe('RecipeStepsField — sección «Acondicionamiento» (QC-299)', () => {
+  it('R8: la sección se marca «(opcional)» y muestra su ayuda como texto, sin icono «!»', () => {
+    render(<ConditioningHarness initial={[]} />);
+
+    const field = screen.getByTestId('recipe-conditioning-steps-field');
+    expect(within(field).getByRole('heading', { name: /^Acondicionamiento/ })).toBeInTheDocument();
+    expect(screen.getByTestId('recipe-conditioning-steps-optional')).toHaveTextContent('(opcional)');
+    expect(screen.getByTestId('recipe-conditioning-steps-description')).toHaveTextContent(
+      CONDITIONING_HELP,
+    );
+    expect(screen.queryByTestId('recipe-conditioning-steps-help')).toBeNull();
+    expect(within(field).getAllByTestId('recipe-conditioning-step-row')).toHaveLength(1);
+  });
+
+  it('R9: cada fila ofrece «Requiere evidencia» y «Asignación requerida», apagados en una fila nueva', async () => {
+    const user = setupUser();
+    render(<ConditioningHarness initial={[step('a', 'Sellar')]} />);
+
+    expect(conditioningSwitch('evidence', 1)).toHaveAttribute('aria-checked', 'false');
+    expect(conditioningSwitch('assignment', 1)).toHaveAttribute('aria-checked', 'false');
+
+    await user.click(screen.getByTestId('recipe-conditioning-step-add-0'));
+    expect(conditioningSwitch('evidence', 2)).toHaveAttribute('aria-checked', 'false');
+    expect(conditioningSwitch('assignment', 2)).toHaveAttribute('aria-checked', 'false');
+    expect(assignmentOf(lastSteps[1])).toBeUndefined();
+    expect(lastSteps[1]?.document.requiresEvidence).toBeUndefined();
+  });
+
+  it('R9: «Pasos» y «Envasado» siguen ofreciendo solo «Requiere evidencia»', () => {
+    render(
+      <>
+        <RecipeStepsField steps={[step('a', 'Pesar')]} onChange={() => undefined} showEvidenceSwitch />
+        <RecipeStepsField
+          steps={[step('b', 'Etiquetar')]}
+          onChange={() => undefined}
+          title="Pasos de envasado"
+          sectionName="Envasado"
+          testIdPrefix="recipe-packing-step"
+          showEvidenceSwitch
+        />
+      </>,
+    );
+
+    expect(screen.getAllByRole('switch')).toHaveLength(2);
+    expect(screen.queryByRole('switch', { name: /Asignación requerida/ })).toBeNull();
+    expect(
+      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Pasos' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1 de Envasado' }),
+    ).toBeInTheDocument();
+  });
+
+  it('R10: el nombre accesible de cada switch lleva el número de paso y la sección', () => {
+    render(<ConditioningHarness initial={[step('a', 'Sellar'), step('b', 'Etiquetar')]} />);
+
+    expect(conditioningSwitch('evidence', 2)).toBeInTheDocument();
+    expect(conditioningSwitch('assignment', 2)).toBeInTheDocument();
+    for (const control of screen.getAllByRole('switch')) expect(control.textContent).toBe('');
+  });
+
+  it('R9, R10: las dos marcas son independientes, escribir no las apaga y apagarlas quita la clave', async () => {
+    const user = setupUser();
+    render(<ConditioningHarness initial={[step('a', 'Sellar'), step('b', 'Etiquetar')]} />);
+
+    await user.click(conditioningSwitch('assignment', 2));
+    expect(assignmentOf(lastSteps[1])).toBe(true);
+    expect(lastSteps[1]?.document.requiresEvidence).toBeUndefined();
+    expect(assignmentOf(lastSteps[0])).toBeUndefined();
+    expect(screen.getByTestId('recipe-conditioning-step-text-1-assignment-help')).toHaveTextContent(
+      'Al ejecutar, hay que elegir uno o más responsables del equipo antes de avanzar.',
+    );
+
+    await user.click(conditioningSwitch('evidence', 2));
+    expect(lastSteps[1]?.document.requiresEvidence).toBe(true);
+    expect(assignmentOf(lastSteps[1])).toBe(true);
+
+    await user.click(conditioningSwitch('assignment', 2));
+    expect('requiresAssignment' in (lastSteps[1]?.document ?? {})).toBe(false);
+    expect(lastSteps[1]?.document.requiresEvidence).toBe(true);
+  });
+
+  it('R11: la cabecera resume pasos, evidencias y responsables, omitiendo las cifras en cero', async () => {
+    const user = setupUser();
+    render(
+      <ConditioningHarness
+        initial={[
+          step('a', 'Revisar'),
+          stepWithMarks('b', 'Etiquetar', { evidence: true, assignment: true }),
+          stepWithMarks('c', 'Armar cajas', { assignment: true }),
+          step('d', 'Contar'),
+        ]}
+      />,
+    );
+    const summary = screen.getByTestId('recipe-conditioning-step-evidence-summary');
+    expect(summary.textContent).toBe('4 pasos · 1 pide evidencia · 2 piden responsables');
+
+    await user.click(conditioningSwitch('assignment', 2));
+    await user.click(conditioningSwitch('assignment', 3));
+    expect(summary.textContent).toBe('4 pasos · 1 pide evidencia');
+
+    await user.click(conditioningSwitch('evidence', 2));
+    expect(summary.textContent).toBe('4 pasos');
+
+    await user.click(conditioningSwitch('assignment', 1));
+    expect(summary.textContent).toBe('4 pasos · 1 pide responsables');
+  });
+
+  it('R11: con la fila en blanco de arranque el resumen cuenta un paso', () => {
+    render(<ConditioningHarness initial={[]} />);
+    expect(screen.getByTestId('recipe-conditioning-step-evidence-summary').textContent).toBe('1 paso');
+  });
+
+  it('R12: el error de un paso de acondicionamiento se pinta junto a ese paso, con su id propio', () => {
+    render(
+      <RecipeStepsField
+        steps={[step('a', 'Sellar'), step('b', '')]}
+        onChange={() => undefined}
+        errors={{ 1: 'Un paso no puede quedar vacio.' }}
+        testIdPrefix="recipe-conditioning-step"
+        showEvidenceSwitch
+        showAssignmentSwitch
+      />,
+    );
+    expect(screen.getByTestId('recipe-conditioning-step-field-error-1')).toHaveTextContent(
+      'Un paso no puede quedar vacio.',
+    );
+    expect(screen.getByTestId('recipe-conditioning-step-field-error-1')).toHaveAttribute(
+      'id',
+      'recipe-conditioning-step-error-1',
+    );
+    expect(screen.queryByTestId('recipe-conditioning-step-field-error-0')).toBeNull();
   });
 });

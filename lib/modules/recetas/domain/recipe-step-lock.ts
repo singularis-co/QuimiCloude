@@ -14,8 +14,8 @@ type StepContent = { readonly blocks: readonly RecipeStepBlock[] };
 
 /**
  * Forma canonica de los bloques: claves ordenadas y sin las marcas apagadas, porque `jsonb`
- * reordena las claves al guardar y `bold: false` pinta igual que no traerlo. `requiresEvidence`
- * queda fuera a proposito: encender o apagar el switch nunca es mover.
+ * reordena las claves al guardar y `bold: false` pinta igual que no traerlo. Solo cuentan los
+ * bloques: las marcas del paso (evidencia, asignacion) quedan fuera, encender un switch nunca es mover.
  */
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;

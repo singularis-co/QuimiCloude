@@ -574,6 +574,34 @@ const MIGRACION_QC277 = [
   'db/migrations/20261015190000_company_addons/down.sql',
 ];
 
+// QC-299 (2026-10-21): pasos de acondicionamiento. Exactamente los archivos que el diff de esta
+// rama toca bajo `lib/modules/recetas/`, ninguno mas: la formula guarda sus pasos de
+// acondicionamiento y los expone al recorrido por `recipe-conditioning-steps-reader.ts`.
+const PASOS_DE_ACONDICIONAMIENTO_QC299 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-conditioning-steps-reader.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-step-lock.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe-version.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// Las tablas de acciones y de pasos de acondicionamiento y `db/schema.prisma` con los modelos
+// nuevos. Lista nombrada como las demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC299 = [
+  'db/schema.prisma',
+  'db/migrations/20261021120000_conditioning_step_actions/migration.sql',
+  'db/migrations/20261021120000_conditioning_step_actions/down.sql',
+  'db/migrations/20261021120001_conditioning_steps/migration.sql',
+  'db/migrations/20261021120001_conditioning_steps/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -583,6 +611,7 @@ export const RECETAS_PERMITIDAS: readonly string[] = [
   ...HERRAMIENTAS_DE_LA_RECETA_QC194,
   ...PASOS_DE_ENVASADO_QC211,
   ...EVIDENCIA_POR_PASO_QC214,
+  ...PASOS_DE_ACONDICIONAMIENTO_QC299,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -606,6 +635,7 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC214,
   ...MIGRACION_QC275,
   ...MIGRACION_QC277,
+  ...MIGRACION_QC299,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -1330,6 +1360,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx';
 
   /**
+   * CUARTO montador (QC-299 design.md 5.2, T17): el panel de pasos de acondicionamiento reutiliza
+   * el asistente en modo ejecucion («Reutiliza StepReader mode=ejecucion»). Lo monta por props desde
+   * una pantalla, no le da ruta propia, asi que R12 sigue intacta. Archivo EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_ACONDICIONAMIENTO =
+    'app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-steps-panel.tsx';
+
+  /**
    * La edicion de una version pinta el documento con la vista sin estado del asistente, no con el
    * asistente: se acepta solo ese archivo y solo ese import exacto.
    */
@@ -1496,7 +1534,7 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     );
   });
 
-  it('el asistente solo se importa desde sus tres montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
+  it('el asistente solo se importa desde sus cuatro montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
     const importadores: string[] = [];
 
     const vista = fuenteSinComentarios(MONTADOR_DE_LA_VISTA);
@@ -1519,7 +1557,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     }
 
     expect(importadores.sort()).toEqual(
-      [MONTADOR_DE_EJECUCION, MONTADOR_DE_EMPAQUE, UNICO_MONTADOR].sort(),
+      [
+        MONTADOR_DE_EJECUCION,
+        MONTADOR_DE_EMPAQUE,
+        MONTADOR_DE_ACONDICIONAMIENTO,
+        UNICO_MONTADOR,
+      ].sort(),
     );
   });
 

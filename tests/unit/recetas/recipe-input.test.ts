@@ -626,3 +626,133 @@ describe('requiresEvidence en el paso — evidencia por paso (QC-214)', () => {
     }
   });
 });
+
+describe('conditioningSteps en los esquemas de receta — pasos de acondicionamiento (QC-299)', () => {
+  const pasos = (n: number, prefijo: string) => Array.from({ length: n }, (_, i) => paso(`${prefijo} ${i}`));
+  const parrafos = (n: number) => ({
+    blocks: Array.from({ length: n }, (_, i) => ({ kind: 'paragraph', spans: [{ text: `Linea ${i}` }] })),
+  });
+
+  it('R1: el alta sin conditioningSteps los deja en lista vacia; la edicion sin la clave la deja ausente (conservar)', () => {
+    expect(createRecipeSchema.parse(RECETA_VALIDA).conditioningSteps).toEqual([]);
+    const edicion = updateRecipeSchema.parse(RECETA_VALIDA);
+    expect(edicion.conditioningSteps).toBeUndefined();
+    expect(updateRecipeSchema.parse({ ...RECETA_VALIDA, conditioningSteps: [] }).conditioningSteps).toEqual([]);
+  });
+
+  it('R3: 50 pasos del operador, 50 de envasado y 50 de acondicionamiento se aceptan; 51 de acondicionamiento se rechazan', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.safeParse({
+        ...RECETA_VALIDA,
+        steps: pasos(50, 'Mezclar'),
+        packingSteps: pasos(50, 'Envasar'),
+        conditioningSteps: pasos(50, 'Acondicionar'),
+      });
+      expect(parsed.success).toBe(true);
+      const result = schema.safeParse({ ...RECETA_VALIDA, conditioningSteps: pasos(51, 'Acondicionar') });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map((issue) => issue.path[0])).toEqual(['conditioningSteps']);
+      }
+    }
+  });
+
+  it('R2: rechaza el paso de acondicionamiento vacio, con mas de 30 elementos o con una clave desconocida', () => {
+    const invalidos: readonly unknown[] = [
+      paso(''),
+      paso('   '),
+      { blocks: [] },
+      parrafos(MAX_STEP_ELEMENTS + 1),
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Rotular' }], color: 'rojo' }] },
+      { ...paso('Rotular'), responsables: ['x'] },
+      'Rotular',
+    ];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      expect(schema.safeParse({ ...RECETA_VALIDA, conditioningSteps: [parrafos(MAX_STEP_ELEMENTS)] }).success).toBe(true);
+      for (const invalido of invalidos) {
+        const result = schema.safeParse({ ...RECETA_VALIDA, conditioningSteps: [paso('Rotular'), invalido] });
+        expect(result.success, JSON.stringify(invalido)).toBe(false);
+        if (!result.success) {
+          for (const issue of result.error.issues) expect(issue.path.slice(0, 2)).toEqual(['conditioningSteps', 1]);
+        }
+      }
+      expect(schema.safeParse({ ...RECETA_VALIDA, conditioningSteps: 'no es una lista' }).success).toBe(false);
+    }
+  });
+
+  it('R4: los pasos de acondicionamiento salen en su orden y separados de steps y packingSteps', () => {
+    const acondicionamiento = [paso('Rotular'), paso('Paletizar')];
+    const envasado = [paso('Envasar')];
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.parse({ ...RECETA_VALIDA, packingSteps: envasado, conditioningSteps: acondicionamiento });
+      expect(parsed.conditioningSteps).toEqual(acondicionamiento);
+      expect(parsed.packingSteps).toEqual(envasado);
+      expect(parsed.steps).toEqual(RECETA_VALIDA.steps);
+    }
+  });
+
+  it('R5: requiresAssignment y requiresEvidence se aceptan en acondicionamiento; ausentes salen sin la clave', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const parsed = schema.parse({
+        ...RECETA_VALIDA,
+        conditioningSteps: [
+          paso('Rotular'),
+          { ...paso('Paletizar'), requiresAssignment: true, requiresEvidence: true },
+          { ...paso('Sellar'), requiresAssignment: false, requiresEvidence: false },
+        ],
+      });
+      const [sinMarcas, encendidas, apagadas] = parsed.conditioningSteps ?? [];
+      expect(sinMarcas).not.toHaveProperty('requiresAssignment');
+      expect(sinMarcas).not.toHaveProperty('requiresEvidence');
+      expect(encendidas).toMatchObject({ requiresAssignment: true, requiresEvidence: true });
+      expect(apagadas).toMatchObject({ requiresAssignment: false, requiresEvidence: false });
+    }
+  });
+
+  it('R5: rechaza requiresAssignment no booleano en acondicionamiento', () => {
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      for (const valor of ['true', 1, null, {}]) {
+        const result = schema.safeParse({
+          ...RECETA_VALIDA,
+          conditioningSteps: [{ ...paso('Rotular'), requiresAssignment: valor }],
+        });
+        expect(result.success, JSON.stringify(valor)).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues.map((issue) => issue.path)).toContainEqual([
+            'conditioningSteps',
+            0,
+            'requiresAssignment',
+          ]);
+        }
+      }
+    }
+  });
+
+  it('R5: un paso del operador o de envasado con requiresAssignment rechaza el guardado entero', () => {
+    const conAsignacion = { ...paso('Mezclar'), requiresAssignment: true };
+    for (const schema of [createRecipeSchema, updateRecipeSchema]) {
+      const enSteps = schema.safeParse({ ...RECETA_VALIDA, steps: [conAsignacion] });
+      expect(enSteps.success).toBe(false);
+      if (!enSteps.success) expect(enSteps.error.issues[0]?.path.slice(0, 2)).toEqual(['steps', 0]);
+      const enEnvasado = schema.safeParse({ ...RECETA_VALIDA, packingSteps: [conAsignacion] });
+      expect(enEnvasado.success).toBe(false);
+      if (!enEnvasado.success) expect(enEnvasado.error.issues[0]?.path.slice(0, 2)).toEqual(['packingSteps', 0]);
+    }
+  });
+
+  it('R14: los esquemas de version descartan conditioningSteps sin rechazar la entrada', () => {
+    const alta = createRecipeVersionSchema.parse({ name: 'Version A', conditioningSteps: [paso('Rotular')] });
+    const edicion = updateRecipeVersionSchema.parse({
+      name: 'Version A',
+      lines: [LINEA_VALIDA],
+      conditioningSteps: [paso('Rotular')],
+    });
+    expect(alta).not.toHaveProperty('conditioningSteps');
+    expect(edicion).not.toHaveProperty('conditioningSteps');
+  });
+
+  it('R2: el contrato publica conditioningStepSchema', () => {
+    expect(contrato.conditioningStepSchema.safeParse({ ...paso('Rotular'), requiresAssignment: true }).success).toBe(true);
+    expect(contrato.recipeStepSchema.safeParse({ ...paso('Rotular'), requiresAssignment: true }).success).toBe(false);
+  });
+});

@@ -123,6 +123,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [lineView('line-1', '100.00')],
     tools: [],
     original: null,

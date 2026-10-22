@@ -70,6 +70,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [paragraph('Mezclar')],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [
       {
         id: 'line-1',
@@ -137,7 +138,11 @@ function withEvidence(step: RecipeStepView): RecipeStepView {
 }
 
 function evidenceSwitch(field: HTMLElement, position: number): HTMLElement {
-  return within(field).getByRole('switch', { name: `Requiere evidencia en el paso ${position}` });
+  const section =
+    field.getAttribute('data-testid') === 'recipe-packing-steps-field' ? 'Envasado' : 'Pasos';
+  return within(field).getByRole('switch', {
+    name: `Requiere evidencia en el paso ${position} de ${section}`,
+  });
 }
 
 /** Pegado real en el editor: así cambia el texto del paso como lo haría quien escribe. */

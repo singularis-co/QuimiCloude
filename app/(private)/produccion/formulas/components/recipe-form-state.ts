@@ -5,6 +5,7 @@ import type { ImageFieldState } from '@/components/shared/image-field';
 
 import {
   formatPercentage,
+  type ConditioningStepInput,
   type RecipeLineView,
   type RecipeStepDocument,
   type RecipeToolView,
@@ -92,6 +93,7 @@ export type RecipeFormState = {
   readonly tools: readonly RecipeToolFormValue[];
   readonly steps: readonly RecipeStepFormValue[];
   readonly packingSteps: readonly RecipeStepFormValue[];
+  readonly conditioningSteps: readonly RecipeStepFormValue[];
   readonly image: ImageFieldState;
 };
 
@@ -114,6 +116,9 @@ export type RecipeLinePayload = {
  */
 export type RecipeStepPayload = RecipeStepDocument;
 
+/** Paso del acondicionador: el mismo documento con la marca «Asignación requerida». */
+export type ConditioningStepPayload = ConditioningStepInput;
+
 /** Herramienta tal como la espera el contrato: sin `key` ni `productName`, cantidad numérica. */
 export type RecipeToolPayload = {
   readonly productId: string;
@@ -125,6 +130,7 @@ export type RecipePayload = {
   readonly description: string | null;
   readonly steps: readonly RecipeStepPayload[];
   readonly packingSteps: readonly RecipeStepPayload[];
+  readonly conditioningSteps: readonly ConditioningStepPayload[];
   readonly lines: readonly RecipeLinePayload[];
   readonly tools: readonly RecipeToolPayload[];
   readonly image?: { readonly bytes: Uint8Array } | null;
@@ -175,6 +181,7 @@ export function buildRecipePayload(mode: RecipeFormMode, state: RecipeFormState)
     description: state.description.trim() === '' ? null : state.description,
     steps: toStepPayloads(state.steps),
     packingSteps: toStepPayloads(state.packingSteps),
+    conditioningSteps: toStepPayloads(state.conditioningSteps),
     lines: toLinePayloads(state.lines),
     tools: toToolPayloads(state.tools),
   };
@@ -372,12 +379,12 @@ function stepMessage(issue: ZodIssue, messages: RecipeStepErrorMessages): string
  * Extrae de `error.issues` los mensajes que identifican un paso concreto, sea cual sea la
  * profundidad del `path` dentro del documento. Si un paso trae varios, gana el primero que
  * escribió el esquema: es el más concreto.
- * `root` separa los pasos del operador de los de envasado: comparten índices.
+ * `root` separa cada sección de pasos de las demás: comparten índices.
  */
 export function extractStepErrors(
   issues: readonly ZodIssue[],
   messages: RecipeStepErrorMessages,
-  root: 'steps' | 'packingSteps' = 'steps',
+  root: 'steps' | 'packingSteps' | 'conditioningSteps' = 'steps',
 ): RecipeStepErrors {
   const result: Record<number, string> = {};
   const fromSchema = new Set<number>();

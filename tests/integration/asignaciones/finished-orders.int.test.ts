@@ -33,7 +33,10 @@ import {
   findPresentationRefs,
   findPresentationsByNormalizedNames,
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
-import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
+import {
+  findRecipeConditioningStepsById,
+  findRecipeRefsIncludingDeleted,
+} from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findAliveOrderTargetById,
@@ -201,6 +204,8 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
           })),
       },
       transaction: execution.transaction,
+      conditioningSteps: { findConditioningStepsById: findRecipeConditioningStepsById },
+      log: execution.log,
       now: () => NOW,
     }),
   };

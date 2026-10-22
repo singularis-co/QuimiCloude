@@ -34,6 +34,7 @@ function state(tools: readonly RecipeToolFormValue[]): RecipeFormState {
     tools,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     image: { kind: 'untouched' },
   };
 }

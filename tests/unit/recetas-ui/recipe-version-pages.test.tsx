@@ -91,6 +91,7 @@ function detail(overrides: Partial<RecipeDetail>): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [lineView('l-a', PRODUCT_A, 'Agua', '60.00'), lineView('l-b', PRODUCT_B, 'Sal', '40.00')],
     tools: [],
     original: null,

@@ -44,6 +44,7 @@ const ORIGINAL: RecipeRow = {
   description: null,
   steps: [MEZCLAR],
   packingSteps: [ENVASAR, ETIQUETAR],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: null,
   updatedBy: null,
@@ -70,6 +71,7 @@ const VERSION: RecipeRow = {
     imagePath: null,
     steps: [MEZCLAR],
     packingSteps: [ENVASAR, ETIQUETAR],
+    conditioningSteps: [],
   },
 };
 

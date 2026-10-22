@@ -22,6 +22,7 @@ const ORIGINAL: RecipeRow = {
   description: null,
   steps: [],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: null,
   updatedBy: null,
@@ -35,7 +36,7 @@ const ORIGINAL: RecipeRow = {
 const VERSION: RecipeRow = {
   ...ORIGINAL,
   id: 'version-1',
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, steps: [], packingSteps: [] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, steps: [], packingSteps: [], conditioningSteps: [] },
 };
 
 function noUsado(): never {

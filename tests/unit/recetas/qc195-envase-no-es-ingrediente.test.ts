@@ -37,6 +37,7 @@ const ORIGINAL_CON_ENVASE: RecipeRow = {
   description: null,
   steps: [],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -54,7 +55,7 @@ const VERSION_CON_ENVASE: RecipeRow = {
   ...ORIGINAL_CON_ENVASE,
   id: 'version-1',
   name: 'Sin perfume',
-  original: { id: ORIGINAL_CON_ENVASE.id, name: ORIGINAL_CON_ENVASE.name, description: null, imagePath: null, packingSteps: [], steps: [] },
+  original: { id: ORIGINAL_CON_ENVASE.id, name: ORIGINAL_CON_ENVASE.name, description: null, imagePath: null, packingSteps: [], conditioningSteps: [], steps: [] },
 };
 
 function repositorio(fila: RecipeRow): RecipeRepository {

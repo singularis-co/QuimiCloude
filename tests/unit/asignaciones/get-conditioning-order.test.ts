@@ -15,6 +15,8 @@ import { ROLE_ADMINISTRADOR, ROLE_EMPACADOR, ROLE_OPERADOR, SEED_ROLE_PERMISSION
 import type { FinishedBatchLabels, FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
 import type { ConditioningTeamMemberRow } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
+import type { ConditioningStepView } from '@/lib/modules/recetas';
+import type { ExecutionEntryRecord } from '@/lib/modules/asignaciones/domain/execution-entry';
 
 import {
   ACONDICIONADOR,
@@ -22,8 +24,11 @@ import {
   BETO,
   EMPRESA,
   PEDIDO_1,
+  RECETA,
   UNIDAD,
   actoresSinElPermiso,
+  anotacionDePaso,
+  fotoDeAcondicionamiento,
   loteDeLinea,
   montar,
   persona,
@@ -122,13 +127,15 @@ describe('R15 — el detalle muestra la misma fila que la lista', () => {
     const detalle = montarCon(item);
     const lista = montarCon(item);
 
-    const { team, batchData, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
+    const { team, batchData, conditioningSteps, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
       orderId: PEDIDO_1,
     });
     const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila).toEqual(deLaLista);
     expect(team).toEqual([]);
+    // La receta de estos dobles no tiene pasos de acondicionamiento.
+    expect(conditioningSteps).toBeNull();
     // QC-219 R3: los datos de lote solo viajan a quien acondiciona, desde que comenzo.
     expect(batchData === null).toBe(item.status === 'POR_ACONDICIONAR' || item.conditionedBy !== ANA);
     expect(fila.status).toBe(item.status);
@@ -462,5 +469,207 @@ describe('QC-281 — acondicionamiento con los envases reales', () => {
       [4, null],
     ]);
     expect(order.batchData?.missingCount).toBe(1);
+  });
+});
+
+describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
+  const CARLA = uuid('c');
+  const PASOS: readonly ConditioningStepView[] = [
+    { blocks: [] },
+    { blocks: [], requiresAssignment: true },
+    { blocks: [], requiresEvidence: true },
+  ];
+  const EQUIPO: readonly ConditioningTeamMemberRow[] = [
+    { userId: CARLA, workGroupId: null, workGroupName: null },
+    { userId: BETO, workGroupId: null, workGroupName: null },
+  ];
+  const MIO = resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA });
+
+  function montarPasos(
+    item: AssignedOrderSummary,
+    options?: {
+      readonly pasos?: readonly ConditioningStepView[] | null;
+      readonly anotaciones?: readonly ExecutionEntryRecord[];
+      readonly fotos?: ReturnType<typeof fotoDeAcondicionamiento>[];
+      readonly equipo?: readonly ConditioningTeamMemberRow[];
+    },
+  ) {
+    return montar({
+      items: [item],
+      refs: [receta()],
+      people: [persona(ANA, 'Ana Lopez'), persona(BETO, 'Beto Ruiz'), persona(CARLA, 'Carla Diaz')],
+      units: [{ id: UNIDAD, name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null }],
+      team: options?.equipo ?? EQUIPO,
+      pasos: options?.pasos === undefined ? PASOS : options.pasos,
+      anotaciones: options?.anotaciones,
+      fotos: options?.fotos,
+    });
+  }
+
+  it.each([
+    ['POR_ACONDICIONAR', resumen(PEDIDO_1)],
+    ['EN_ACONDICIONAMIENTO de otra persona', resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: BETO })],
+    ['TERMINADO propio', resumen(PEDIDO_1, { status: 'TERMINADO', conditionedBy: ANA, finishedAt: new Date() })],
+    ['ENTREGADO propio', resumen(PEDIDO_1, { status: 'ENTREGADO', conditionedBy: ANA, finishedAt: new Date() })],
+  ])('R17: en %s no entrega pasos ni avance, y no llama al lector, al registro ni a las fotos', async (_n, item) => {
+    const dobles = montarPasos(item);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps).toBeNull();
+    expect(dobles.findConditioningStepsById).not.toHaveBeenCalled();
+    expect(dobles.listEntriesForOrders).not.toHaveBeenCalled();
+    expect(dobles.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(dobles.createSignedReadUrl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['sin pasos de acondicionamiento', []],
+    ['que ya no se encuentra', null],
+  ] as const)('R19: con una receta %s, `conditioningSteps` es null y no se lee el registro', async (_n, pasos) => {
+    const dobles = montarPasos(MIO, { pasos });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps).toBeNull();
+    expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
+    expect(dobles.listEntriesForOrders).not.toHaveBeenCalled();
+    expect(dobles.listEvidenceByOrder).not.toHaveBeenCalled();
+  });
+
+  it('R19: sin pasos, el resto del detalle es el mismo que sin la ficha', async () => {
+    const sinPasos = montarPasos(MIO, { pasos: [] });
+    const conPasos = montarPasos(MIO);
+
+    const { conditioningSteps: nulo, ...uno } = await createGetConditioningOrder(sinPasos.deps)(ACONDICIONADOR, {
+      orderId: PEDIDO_1,
+    });
+    const { conditioningSteps: vista, ...otro } = await createGetConditioningOrder(conPasos.deps)(ACONDICIONADOR, {
+      orderId: PEDIDO_1,
+    });
+
+    expect(nulo).toBeNull();
+    expect(vista).not.toBeNull();
+    expect(uno).toEqual(otro);
+  });
+
+  it('R31, R18: EN_ACONDICIONAMIENTO propio entrega los pasos en su orden, el avance y los responsables vigentes', async () => {
+    const dobles = montarPasos(MIO, {
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, null),
+        anotacionDePaso('conditioning_step_advance', 2, [BETO]),
+        anotacionDePaso('conditioning_responsibles_change', 2, [CARLA, ANA], 10),
+      ],
+    });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
+    expect(dobles.listEntriesForOrders).toHaveBeenCalledWith(EMPRESA, [PEDIDO_1]);
+    expect(detalle.conditioningSteps).toMatchObject({
+      steps: PASOS,
+      completedCount: 2,
+      responsibles: [{ stepPosition: 2, userIds: [CARLA, ANA] }],
+    });
+  });
+
+  it('R28, R26: si la formula perdio pasos, la vista ignora los responsables de posiciones que ya no existen', async () => {
+    const dobles = montarPasos(MIO, {
+      pasos: PASOS.slice(0, 2),
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, [BETO]),
+        anotacionDePaso('conditioning_step_advance', 2, [CARLA]),
+        anotacionDePaso('conditioning_step_advance', 3, [ANA]),
+        anotacionDePaso('conditioning_responsibles_change', 3, [BETO, CARLA], 10),
+      ],
+    });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps).toMatchObject({
+      completedCount: 2,
+      responsibles: [
+        { stepPosition: 1, userIds: [BETO] },
+        { stepPosition: 2, userIds: [CARLA] },
+      ],
+    });
+  });
+
+  it('R31: un acondicionador sin recetas.consultar recibe los pasos', async () => {
+    const actor = { ...ACONDICIONADOR, permissions: ['acondicionamiento.modificar'] };
+    const dobles = montarPasos(MIO);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(actor, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps?.steps).toEqual(PASOS);
+    expect(detalle.conditioningSteps?.completedCount).toBe(0);
+  });
+
+  it('R22: los candidatos son el propio acondicionador primero, marcado, y despues el equipo en su orden', async () => {
+    const dobles = montarPasos(MIO);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps?.candidates).toEqual([
+      { userId: ANA, displayName: 'Ana Lopez', isSelf: true },
+      { userId: CARLA, displayName: 'Carla Diaz', isSelf: false },
+      { userId: BETO, displayName: 'Beto Ruiz', isSelf: false },
+    ]);
+  });
+
+  it('R22: si el acondicionador tambien esta en el equipo, aparece una sola vez, como el mismo', async () => {
+    const dobles = montarPasos(MIO, {
+      equipo: [...EQUIPO, { userId: ANA, workGroupId: null, workGroupName: null }],
+    });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps?.candidates.map((c) => [c.userId, c.isSelf])).toEqual([
+      [ANA, true],
+      [CARLA, false],
+      [BETO, false],
+    ]);
+  });
+
+  it('R21, R26: las fotos guardadas de acondicionamiento viajan firmadas, por paso', async () => {
+    const dobles = montarPasos(MIO, { fotos: [fotoDeAcondicionamiento(3, 1)] });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(dobles.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, 'conditioning');
+    expect(detalle.conditioningSteps?.evidence).toEqual([
+      {
+        stepPosition: 3,
+        photos: [{ id: 'foto-3-1', slot: 1, url: `firmada:${EMPRESA}/${PEDIDO_1}/foto-3-1` }],
+      },
+    ]);
+  });
+
+  it('R30: el detalle no lee los pasos del operador ni los de envasado', async () => {
+    const dobles = montarPasos(MIO);
+    const findExecutionContentById = vi.fn();
+    const findPackingStepsById = vi.fn();
+    const deps = {
+      ...dobles.deps,
+      recipes: { ...dobles.deps.recipes, findExecutionContentById },
+      packingSteps: { findPackingStepsById },
+    };
+
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps?.steps).toEqual(PASOS);
+    expect(findExecutionContentById).not.toHaveBeenCalled();
+    expect(findPackingStepsById).not.toHaveBeenCalled();
+  });
+
+  it('R32: pasos, registro y fotos se leen con la empresa del actor', async () => {
+    const otra = uuid('4');
+    const dobles = montarPasos(MIO);
+
+    await createGetConditioningOrder(dobles.deps)({ ...ACONDICIONADOR, companyId: otra }, { orderId: PEDIDO_1 });
+
+    expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, otra);
+    expect(dobles.listEntriesForOrders).toHaveBeenCalledWith(otra, [PEDIDO_1]);
+    expect(dobles.listEvidenceByOrder).toHaveBeenCalledWith(otra, PEDIDO_1, 'conditioning');
   });
 });

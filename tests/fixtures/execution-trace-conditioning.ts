@@ -2,6 +2,7 @@
 // `docs/diseno/canvas/RecorridoAcondicionamiento.dc.html` (variantes `terminado`, `en_curso` y
 // `anterior`) y `DashboardAcondicionamiento.dc.html`.
 import type {
+  ConditioningAction,
   ConditioningBatchSnapshotLine,
   ExecutionTraceDetail,
   ExecutionTraceDetailStep,
@@ -80,10 +81,7 @@ const IN_PROGRESS_SAVE_LINES: readonly ConditioningBatchSnapshotLine[] = [
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type StepDraft = DistributiveOmit<ExecutionTraceDetailStep, 'id' | 'orderId' | 'gapToNextMs'>;
 
-type ProductionAction = Exclude<
-  ExecutionTraceDetailStep['action'],
-  'conditioning_start' | 'conditioning_batch_save' | 'conditioning_finish'
->;
+type ProductionAction = Exclude<ExecutionTraceDetailStep['action'], ConditioningAction>;
 
 function at(time: string): Date {
   return new Date(`2026-10-02T${time}:00.000Z`);

@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CONDITIONING_ACTIONS_TEXTS,
   CONDITIONING_BATCH_DATA_DIVERGENT_TESTID,
+  CONDITIONING_BATCH_DATA_LOCKED_TESTID,
+  CONDITIONING_STEPS_DONE_TESTID,
+  CONDITIONING_STEPS_PANEL_TESTID,
   CONDITIONING_FINISH_BUTTON_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_ORDER_BACK_LINK_TESTID,
@@ -35,14 +38,23 @@ import { RESPONSIBLE_AVATAR_TESTID, RESPONSIBLE_OVERFLOW_TESTID } from '@/compon
 import type {
   ConditioningBatchLineView,
   ConditioningOrderDetail,
+  ConditioningStepsView,
   ConditioningTeamCandidates,
 } from '@/lib/modules/asignaciones';
+import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions', () => ({
   startConditioningAction: vi.fn(),
   finishConditioningAction: vi.fn(),
   saveConditioningBatchDataAction: vi.fn(),
+  recordConditioningStepAction: vi.fn(),
+}));
+
+vi.mock('@/lib/modules/asignaciones/adapters/driving/step-evidence-actions', () => ({
+  registerEvidenceAction: vi.fn(),
+  removeEvidenceAction: vi.fn(),
+  requestEvidenceUploadAction: vi.fn(),
 }));
 
 afterEach(() => {
@@ -67,6 +79,7 @@ const ROW: ConditioningOrderDetail = {
   conditionedById: 'user-2',
   team: [],
   batchData: null,
+  conditioningSteps: null,
 };
 
 const CANDIDATES: ConditioningTeamCandidates = {
@@ -581,5 +594,102 @@ describe('QC-252: la etiqueta de estado sale del mapa compartido', () => {
     const estado = screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID);
     expect(estado.textContent).toBe(ORDER_STATUS_LABELS.PENDIENTE);
     expect(estado.textContent).toBe('Pendiente');
+  });
+});
+
+describe('QC-299: pasos de acondicionamiento en la pantalla', () => {
+  const MINE: ConditioningOrderDetail = {
+    ...ROW,
+    conditionedById: 'user-1',
+    conditionedByName: 'Ana Ruiz',
+    team: [{ userId: 'user-3', displayName: 'Carla Gómez', origin: { kind: 'direct' } }],
+    batchData: { lines: [], missingCount: 0, form: { kind: 'empty' } },
+  };
+
+  const STEPS: ConditioningStepsView = {
+    steps: [
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Sellar las garrafas' }] }] },
+      { blocks: [{ kind: 'paragraph', spans: [{ text: 'Contar las cajas' }] }] },
+    ],
+    completedCount: 0,
+    responsibles: [],
+    candidates: [
+      { userId: 'user-1', displayName: 'Ana Ruiz', isSelf: true },
+      { userId: 'user-3', displayName: 'Carla Gómez', isSelf: false },
+    ],
+    evidence: [],
+  };
+
+  it('QC-299 R19: sin pasos la pantalla es la de hoy: sin paso a paso, con «Terminar» en el pie y «Datos de lote» abierta', () => {
+    render(<ConditioningOrderScreen order={MINE} canFinish />);
+
+    expect(screen.queryByTestId(CONDITIONING_STEPS_PANEL_TESTID)).toBeNull();
+    expect(screen.queryByTestId('step-reader')).toBeNull();
+    expect(screen.getByTestId(CONDITIONING_FINISH_BUTTON_TESTID)).toBeEnabled();
+    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Guardar datos de lote' })).toBeEnabled();
+    const grid = screen.getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID).closest('.grid');
+    expect(grid?.className).toContain('@min-[1101px]:grid-cols-2');
+  });
+
+  it('QC-299 R19: el mismo marcado con `conditioningSteps: null` en cualquier estado', () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const) {
+      const { container } = render(<ConditioningOrderScreen order={{ ...MINE, status }} canFinish />);
+      expect(container.querySelector('[data-testid="conditioning-order-steps"]')).toBeNull();
+      expect(container.querySelector('[data-slot="operator-footer"]')).not.toBeNull();
+      cleanup();
+    }
+  });
+
+  it('QC-299 R18: con pasos, el paso a paso va a la izquierda y «Equipo» y «Datos de lote» a la derecha', () => {
+    render(<ConditioningOrderScreen order={{ ...MINE, conditioningSteps: STEPS }} canFinish />);
+
+    const panel = screen.getByTestId(CONDITIONING_STEPS_PANEL_TESTID);
+    const grid = panel.parentElement as HTMLElement;
+    expect(grid.className).toContain('@min-[1101px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]');
+    expect(grid.firstElementChild).toBe(panel);
+    const lateral = grid.lastElementChild as HTMLElement;
+    expect(within(lateral).getByRole('heading', { name: 'Equipo' })).toBeInTheDocument();
+    expect(within(lateral).getByTestId(CONDITIONING_BATCH_DATA_SECTION_TESTID)).toBeInTheDocument();
+    expect(lateral.className.split(/\s+/)).toContain(STEP_READER_SIDE_COLUMN_RESERVE);
+  });
+
+  it('QC-299 R25: con pasos pendientes «Datos de lote» va bloqueada y «Terminar» no se ofrece', () => {
+    render(<ConditioningOrderScreen order={{ ...MINE, conditioningSteps: { ...STEPS, completedCount: 1 } }} canFinish />);
+
+    expect(screen.getByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID)).toHaveTextContent('Al completar los pasos');
+    expect(screen.getByLabelText('Lote')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Guardar datos de lote' })).toBeDisabled();
+    expect(screen.queryByTestId(CONDITIONING_FINISH_BUTTON_TESTID)).toBeNull();
+    expect(screen.queryByTestId(CONDITIONING_START_BUTTON_TESTID)).toBeNull();
+    expect(document.querySelector('[data-slot="operator-footer"]')).toBeNull();
+  });
+
+  it('QC-299 R25: con todos los pasos completos «Datos de lote» se abre y «Terminar» vuelve al pie', () => {
+    render(<ConditioningOrderScreen order={{ ...MINE, conditioningSteps: { ...STEPS, completedCount: 2 } }} canFinish />);
+
+    expect(screen.getByTestId(CONDITIONING_STEPS_DONE_TESTID)).toBeInTheDocument();
+    expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID)).toBeNull();
+    expect(screen.getByLabelText('Lote')).toBeEnabled();
+    expect(screen.getByTestId(CONDITIONING_FINISH_BUTTON_TESTID)).toBeEnabled();
+  });
+
+  it('QC-299 R25: «Terminar» sigue deshabilitado por los datos de lote que faltan, como hoy', () => {
+    render(
+      <ConditioningOrderScreen
+        order={{
+          ...MINE,
+          batchData: { lines: [], missingCount: 1, form: { kind: 'empty' } },
+          conditioningSteps: { ...STEPS, completedCount: 2 },
+        }}
+        canFinish
+        finishBlocked
+      />,
+    );
+
+    expect(screen.getByTestId(CONDITIONING_FINISH_BUTTON_TESTID)).toBeDisabled();
+    expect(screen.getByTestId(CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID)).toHaveTextContent(
+      'Faltan los datos de lote de 1 línea.',
+    );
   });
 });

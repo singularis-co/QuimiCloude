@@ -52,7 +52,7 @@ const FILA_RECETA: RecipeRow = {
   id: 'receta-1',
   name: 'Desengrasante 5%',
   description: 'Formula base',
-  packingSteps: [], steps: [
+  packingSteps: [], conditioningSteps: [], steps: [
     { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] },
     { blocks: [{ kind: 'paragraph', spans: [{ text: 'Envasar' }] }] },
   ],

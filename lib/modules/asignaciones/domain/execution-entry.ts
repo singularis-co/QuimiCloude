@@ -1,4 +1,8 @@
-import type { ConditioningAction, ConditioningBatchSnapshotLine } from './conditioning-trace';
+import type {
+  ConditioningAction,
+  ConditioningBatchSnapshotLine,
+  ConditioningStepCompletingAction,
+} from './conditioning-trace';
 
 export const EXECUTION_ACTIONS = [
   'start',
@@ -12,6 +16,9 @@ export const EXECUTION_ACTIONS = [
   'conditioning_start',
   'conditioning_batch_save',
   'conditioning_finish',
+  'conditioning_step_advance',
+  'conditioning_steps_complete',
+  'conditioning_responsibles_change',
 ] as const;
 
 export type ExecutionAction = (typeof EXECUTION_ACTIONS)[number];
@@ -27,7 +34,7 @@ type Base = {
   readonly occurredAt: Date;
 };
 
-/** El empaque y el acondicionamiento no recorren los pasos de la receta: van siempre sin posicion. */
+/** Comenzar, Terminar y el guardado de lote del acondicionamiento van sin posicion; sus pasos, con ella. */
 export type NewExecutionEntry =
   | (Base & { readonly action: StepAction; readonly stepPosition: number | null })
   | (Base & { readonly action: 'cancel'; readonly stepPosition: number | null; readonly reason: string })
@@ -37,6 +44,16 @@ export type NewExecutionEntry =
       readonly action: 'conditioning_batch_save';
       readonly stepPosition: null;
       readonly batchLines: readonly ConditioningBatchSnapshotLine[];
+    })
+  | (Base & {
+      readonly action: ConditioningStepCompletingAction;
+      readonly stepPosition: number;
+      readonly responsibleUserIds: readonly string[] | null;
+    })
+  | (Base & {
+      readonly action: 'conditioning_responsibles_change';
+      readonly stepPosition: number;
+      readonly responsibleUserIds: readonly string[];
     });
 
 /** Una anotacion leida del registro. `id` desempata dos anotaciones con el mismo instante. */
@@ -49,8 +66,13 @@ export type ExecutionEntryRecord = {
   readonly reason: string | null;
   /** No nulo solo en `conditioning_batch_save`. */
   readonly batchLines: readonly ConditioningBatchSnapshotLine[] | null;
+  /** Solo en las anotaciones de paso de acondicionamiento; siempre en el cambio de responsables. */
+  readonly responsibleUserIds: readonly string[] | null;
   readonly occurredAt: Date;
 };
+
+/** `step_already_completed`: otra escritura ya completo ese paso de acondicionamiento. */
+export type ExecutionAppendOutcome = 'ok' | 'step_already_completed';
 
 /** Lo que devuelven las escrituras de `pedidos` que corren dentro de la transaccion de ejecucion. */
 export type ExecutionWriteOutcome = string | { readonly kind: string };

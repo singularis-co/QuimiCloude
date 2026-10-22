@@ -69,7 +69,7 @@ describe('R13 - instantes, acciones y estados', () => {
     expect(formatTraceInstant(new Date('2026-10-07T23:05:09.123Z'))).toBe('2026-10-07 23:05:09');
   });
 
-  it('R13 - las once acciones tienen su etiqueta en espanol', () => {
+  it('R13 - las catorce acciones tienen su etiqueta en espanol', () => {
     expect(EXECUTION_ACTION_LABELS).toEqual({
       start: 'Arrancar',
       resume: 'Retomar',
@@ -82,6 +82,9 @@ describe('R13 - instantes, acciones y estados', () => {
       conditioning_start: 'Comenzar acondicionamiento',
       conditioning_batch_save: 'Guardado de datos de lote',
       conditioning_finish: 'Terminar acondicionamiento',
+      conditioning_step_advance: 'Avanzar',
+      conditioning_steps_complete: 'Completar pasos',
+      conditioning_responsibles_change: 'Cambio de responsables',
     });
   });
 

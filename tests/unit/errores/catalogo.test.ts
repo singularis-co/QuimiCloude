@@ -19,6 +19,10 @@ import {
   type ErrorCode,
 } from '@/lib/modules/errores'
 import {
+  ConditioningResponsibleNotAllowedError,
+  ConditioningResponsiblesRequiredError,
+  ConditioningStepOutOfOrderError,
+  ConditioningStepsPendingError,
   ConditioningTeamEmptyError,
   ConditioningTeamMemberNotAllowedError,
 } from '@/lib/modules/asignaciones/domain/errors'
@@ -104,7 +108,11 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // encima de la cantidad del pedido, que Terminar ya no produce.
       // 2026-10-20: 117 y no 112: entran los cinco del diccionario de variables de WhatsApp.
       // Merge de dev en QC-242 (2026-10-20): 117 = 112 + 5 del diccionario de variables de WhatsApp.
-      expect(ERROR_CODES).toHaveLength(117)
+      // QC-299 2026-10-21: 106 y no 102: entran `conditioning_step_out_of_order`,
+      // `conditioning_responsibles_required`, `conditioning_responsible_not_allowed` y
+      // `conditioning_steps_pending`.
+      // Merge de dev en QC-299 (2026-10-21): 121 = 117 + 4 de los pasos de acondicionamiento.
+      expect(ERROR_CODES).toHaveLength(121)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -669,6 +677,29 @@ describe('ultimo Administrador de una empresa — company_last_administrator', (
     const codigos: readonly string[] = ERROR_CODES
     expect(codigos).toContain('last_administrator')
     expect(errorMessage('company_last_administrator')).not.toBe(errorMessage('last_administrator'))
+  })
+})
+
+describe('pasos de acondicionamiento — los cuatro codigos de QC-299', () => {
+  const TEXTOS = {
+    conditioning_step_out_of_order: 'La pantalla quedó desactualizada. Recárgala para seguir.',
+    conditioning_responsibles_required: 'Elige al menos un responsable para avanzar.',
+    conditioning_responsible_not_allowed: 'Solo puedes elegir a personas del equipo o a ti.',
+    conditioning_steps_pending: 'Completa los pasos de acondicionamiento antes de terminar.',
+  } as const
+
+  it.each(Object.entries(TEXTOS))('R23, R25, R27: %s esta en el catalogo con su clave y su texto exactos', (code, texto) => {
+    const codigos: readonly string[] = ERROR_CODES
+    expect(codigos).toContain(code)
+    expect(ERROR_MESSAGE_KEY[code as ErrorCode]).toBe(`errors.${code}`)
+    expect(errorMessage(code as ErrorCode)).toBe(texto)
+  })
+
+  it('R23, R25, R27: las cuatro clases del modulo llevan esos codigos', () => {
+    expect(new ConditioningStepOutOfOrderError().code).toBe('conditioning_step_out_of_order')
+    expect(new ConditioningResponsiblesRequiredError().code).toBe('conditioning_responsibles_required')
+    expect(new ConditioningResponsibleNotAllowedError().code).toBe('conditioning_responsible_not_allowed')
+    expect(new ConditioningStepsPendingError().code).toBe('conditioning_steps_pending')
   })
 })
 

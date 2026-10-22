@@ -23,6 +23,7 @@ const ORIGINAL: RecipeRow = {
   description: 'Descripcion de la original',
   steps: [PASO_ORIGINAL, PASO_ENVASAR],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: 'recetas/crema.jpg',
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -52,6 +53,7 @@ function version(percentages: readonly string[]): RecipeRow {
       imagePath: ORIGINAL.imagePath,
       steps: ORIGINAL.steps,
       packingSteps: [],
+      conditioningSteps: [],
     },
   };
 }

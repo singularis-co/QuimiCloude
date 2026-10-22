@@ -131,6 +131,9 @@ const TEXTOS = {
     conditioning_start: 'Comenzar acondicionamiento',
     conditioning_batch_save: 'Guardado de datos de lote',
     conditioning_finish: 'Terminar acondicionamiento',
+    conditioning_step_advance: 'Avanzar',
+    conditioning_steps_complete: 'Completar pasos',
+    conditioning_responsibles_change: 'Cambio de responsables',
   } satisfies Record<ExecutionAction, string>,
   noEncontrada: {
     etiqueta: '404',

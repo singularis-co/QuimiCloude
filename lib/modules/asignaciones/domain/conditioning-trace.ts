@@ -3,8 +3,25 @@ import { z } from 'zod';
 import type { ConditioningTeamMemberView } from './conditioning-order-view';
 import type { TraceDuration } from './execution-trace';
 
-export const CONDITIONING_ACTIONS = ['conditioning_start', 'conditioning_batch_save', 'conditioning_finish'] as const;
+export const CONDITIONING_ACTIONS = [
+  'conditioning_start',
+  'conditioning_batch_save',
+  'conditioning_finish',
+  'conditioning_step_advance',
+  'conditioning_steps_complete',
+  'conditioning_responsibles_change',
+] as const;
 export type ConditioningAction = (typeof CONDITIONING_ACTIONS)[number];
+
+/** Las dos anotaciones que completan un paso; el cambio de responsables no completa nada. */
+export const CONDITIONING_STEP_COMPLETING_ACTIONS = ['conditioning_step_advance', 'conditioning_steps_complete'] as const;
+export type ConditioningStepCompletingAction = (typeof CONDITIONING_STEP_COMPLETING_ACTIONS)[number];
+
+/** Valida `responsible_user_ids` al escribir y al leer. */
+export const conditioningResponsiblesSchema = z
+  .array(z.string().uuid())
+  .min(1)
+  .refine((ids) => new Set(ids).size === ids.length, { message: 'responsables repetidos' });
 
 /** Una línea de la foto de un guardado de lote. Fechas `AAAA-MM-DD`. */
 export type ConditioningBatchSnapshotLine = {

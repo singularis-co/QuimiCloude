@@ -543,6 +543,16 @@ export const E2E_ESPERADOS = [
   // propagar enteros, la vista previa a pantalla completa y formulario, version y revision sin
   // desborde. No lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'formulas-rediseno.spec.ts',
+  // Alta el 2026-10-21 (QC-299 R39) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita: el
+  // Administrador crea por el formulario una formula con un paso del operador, uno de envasado y dos
+  // de acondicionamiento, el primero con «Asignación requerida»; el Operario la ejecuta y el
+  // Empacador la empaca sin ver ningun paso de acondicionamiento; el acondicionador pulsa
+  // «Acondicionar» con equipo, elige un responsable en el primer paso, avanza, recarga y retoma en el
+  // segundo, completa los pasos, guarda los datos de lote y termina; y el recorrido muestra el
+  // responsable del paso. No lee ni afirma nada sobre el identificador de peticion ni sobre
+  // `reference`.
+  'pasos-de-acondicionamiento.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -802,6 +812,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20261020160000_order_presentation_lines_packed_surplus',
   // QC-242 2026-10-20: diccionario de variables de WhatsApp; no toca el identificador.
   '20261020180000_whatsapp_variable_keys',
+  // QC-299 2026-10-21: los pasos de acondicionamiento (valores de enum, columnas, CHECK e indice);
+  // no tocan el identificador.
+  '20261021120000_conditioning_step_actions',
+  '20261021120001_conditioning_steps',
   // 2026-10-21: coste real de produccion en el pedido; no toca el identificador.
   '20261021140000_orders_actual_cost',
   // 2026-10-21: lote de producto terminado sin coste unitario; no toca el identificador.

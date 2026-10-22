@@ -34,6 +34,7 @@ const ORIGINAL: RecipeRow = {
   description: null,
   steps: [PASO],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: null,
   updatedBy: null,
@@ -52,7 +53,7 @@ const VERSION: RecipeRow = {
   id: 'version-1',
   name: 'Sin perfume',
   steps: [],
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], steps: [PASO] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], conditioningSteps: [], steps: [PASO] },
 };
 
 const ENTRADA = {

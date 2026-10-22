@@ -122,6 +122,10 @@ export const ERROR_MESSAGE_KEY = {
   whatsapp_variable_key_in_use: 'errors.whatsapp_variable_key_in_use',
   whatsapp_template_not_mapped: 'errors.whatsapp_template_not_mapped',
   whatsapp_template_not_mappable: 'errors.whatsapp_template_not_mappable',
+  conditioning_step_out_of_order: 'errors.conditioning_step_out_of_order',
+  conditioning_responsibles_required: 'errors.conditioning_responsibles_required',
+  conditioning_responsible_not_allowed: 'errors.conditioning_responsible_not_allowed',
+  conditioning_steps_pending: 'errors.conditioning_steps_pending',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -307,4 +311,8 @@ export const ERROR_MESSAGES_ES = {
     'Relaciona todas las variables de la plantilla antes de habilitarla.',
   'errors.whatsapp_template_not_mappable':
     'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
+  'errors.conditioning_step_out_of_order': 'La pantalla quedó desactualizada. Recárgala para seguir.',
+  'errors.conditioning_responsibles_required': 'Elige al menos un responsable para avanzar.',
+  'errors.conditioning_responsible_not_allowed': 'Solo puedes elegir a personas del equipo o a ti.',
+  'errors.conditioning_steps_pending': 'Completa los pasos de acondicionamiento antes de terminar.',
 } as const satisfies Record<ErrorMessageKey, string>;

@@ -106,6 +106,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [paragraph('Mezclar')],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [
       {
         id: 'line-1',
@@ -228,14 +229,16 @@ describe('formulario de receta — cabecera (R10)', () => {
 });
 
 describe('formulario de receta — tarjetas (R11, R51)', () => {
-  it('R11: cuatro tarjetas en orden: datos, ingredientes y herramientas, pasos y pasos de envasado', () => {
+  // QC-299 (merge 2026-10-21): la sección «Acondicionamiento» añade una quinta tarjeta, tras
+  // la de envasado.
+  it('R11: cinco tarjetas en orden: datos, ingredientes y herramientas, pasos, pasos de envasado y acondicionamiento', () => {
     renderEdit();
 
     const form = screen.getByTestId('recipe-form');
     const tarjetas = cardsOf(form);
-    expect(tarjetas).toHaveLength(4);
+    expect(tarjetas).toHaveLength(5);
 
-    const [datos, lineas, pasos, envasado] = tarjetas;
+    const [datos, lineas, pasos, envasado, acondicionamiento] = tarjetas;
     expect(within(datos).getByTestId('recipe-image-field')).toBeInTheDocument();
     expect(within(datos).getByTestId('recipe-field-name')).toBeInTheDocument();
     expect(within(datos).getByTestId('recipe-field-description')).toBeInTheDocument();
@@ -243,6 +246,9 @@ describe('formulario de receta — tarjetas (R11, R51)', () => {
     expect(within(lineas).getByTestId('recipe-lines-field')).toBeInTheDocument();
     expect(within(pasos).getByTestId('recipe-steps-field')).toBeInTheDocument();
     expect(within(envasado).getByTestId('recipe-packing-steps-field')).toBeInTheDocument();
+    expect(
+      within(acondicionamiento).getByTestId('recipe-conditioning-steps-field'),
+    ).toBeInTheDocument();
   });
 
   it('R51: el aviso de bloqueo queda dentro del <form>, encima de las tarjetas', () => {

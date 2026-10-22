@@ -125,6 +125,7 @@ function montar(options?: {
   const append = vi.fn(async (entry: NewExecutionEntry) => {
     if (options?.appendFalla === true) throw new Error('la base no acepto la anotacion');
     anotaciones.push({ entry, dentroDeRun });
+    return 'ok' as const;
   });
   const findLastStepPosition = vi.fn(async () => options?.ultimaPosicion ?? null);
   const log: ExecutionLogRepository = {

@@ -454,3 +454,40 @@ export class EvidenceNotFoundError extends AsignacionesError {
     super('evidence_not_found', diagnostic);
   }
 }
+
+/** El paso no es el siguiente al ultimo completado, ya no existe en la formula, u otra pestana lo
+ *  completo antes. */
+export class ConditioningStepOutOfOrderError extends AsignacionesError {
+  readonly code = 'conditioning_step_out_of_order';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_step_out_of_order', diagnostic);
+  }
+}
+
+/** Un paso con asignacion requerida llega sin ningun responsable. */
+export class ConditioningResponsiblesRequiredError extends AsignacionesError {
+  readonly code = 'conditioning_responsibles_required';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_responsibles_required', diagnostic);
+  }
+}
+
+/** Algun responsable no es del equipo del pedido ni quien lo acondiciona. */
+export class ConditioningResponsibleNotAllowedError extends AsignacionesError {
+  readonly code = 'conditioning_responsible_not_allowed';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_responsible_not_allowed', diagnostic);
+  }
+}
+
+/** Terminar con pasos de acondicionamiento sin completar. */
+export class ConditioningStepsPendingError extends AsignacionesError {
+  readonly code = 'conditioning_steps_pending';
+
+  constructor(diagnostic?: string) {
+    super('conditioning_steps_pending', diagnostic);
+  }
+}

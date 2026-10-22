@@ -56,6 +56,7 @@ import {
   RecipeLinesField,
 } from './recipe-lines-field';
 import {
+  CONDITIONING_STEPS_FIELD_TEXTS,
   PACKING_STEPS_FIELD_TEXTS,
   RECIPE_STEP_ERROR_MESSAGES,
   RecipeStepsField,
@@ -122,6 +123,7 @@ import {
 const FIELD_TEXT = 'text-base';
 
 const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
+const CONDITIONING_STEPS_TESTID_PREFIX = 'recipe-conditioning-step';
 
 const PREVIEW_OPEN_LABEL = 'Vista previa';
 const PREVIEW_TITLE = 'Vista previa';
@@ -201,6 +203,7 @@ type FieldErrors = {
   readonly toolsGeneral?: string;
   readonly steps?: RecipeStepErrors;
   readonly packingSteps?: RecipeStepErrors;
+  readonly conditioningSteps?: RecipeStepErrors;
 };
 
 /**
@@ -229,6 +232,7 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
       tools: [],
       steps: [],
       packingSteps: [],
+      conditioningSteps: [],
       image: { kind: 'untouched' },
     };
   }
@@ -248,6 +252,9 @@ function buildInitialState(props: RecipeFormProps): RecipeFormState {
     // El tipo la exige, pero un detalle sin la clave debe abrir la sección vacía, no romper.
     packingSteps: (recipe.packingSteps ?? []).map(
       (step): RecipeStepFormValue => ({ key: createLocalKey('packing-step'), document: step }),
+    ),
+    conditioningSteps: (recipe.conditioningSteps ?? []).map(
+      (step): RecipeStepFormValue => ({ key: createLocalKey('conditioning-step'), document: step }),
     ),
     image: { kind: 'untouched' },
   };
@@ -308,6 +315,11 @@ export function RecipeForm(props: RecipeFormProps) {
         toolsGeneral: extractGeneralToolsError(issues, RECIPE_TOOLS_GENERAL_ERROR_MESSAGE),
         steps: extractStepErrors(issues, RECIPE_STEP_ERROR_MESSAGES),
         packingSteps: extractStepErrors(issues, RECIPE_STEP_ERROR_MESSAGES, 'packingSteps'),
+        conditioningSteps: extractStepErrors(
+          issues,
+          RECIPE_STEP_ERROR_MESSAGES,
+          'conditioningSteps',
+        ),
       });
       // R23: la validación previa rechazada tampoco invoca la operación, pero SÍ es un rechazo
       // que el usuario tiene que ver -no un silencio-, así que también alimenta la región de error
@@ -580,8 +592,25 @@ export function RecipeForm(props: RecipeFormProps) {
                 text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
                 label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
               }}
+              sectionName={PACKING_STEPS_FIELD_TEXTS.sectionName}
               testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
               showEvidenceSwitch
+              locked={stepsLocked}
+            />
+          </Card>
+
+          <Card className={CARD_CLASS}>
+            <RecipeStepsField
+              steps={state.conditioningSteps}
+              onChange={(conditioningSteps) =>
+                setState((previous) => ({ ...previous, conditioningSteps }))
+              }
+              errors={fieldErrors.conditioningSteps}
+              title={CONDITIONING_STEPS_FIELD_TEXTS.title}
+              optionalDescription={CONDITIONING_STEPS_FIELD_TEXTS.help}
+              testIdPrefix={CONDITIONING_STEPS_TESTID_PREFIX}
+              showEvidenceSwitch
+              showAssignmentSwitch
               locked={stepsLocked}
             />
           </Card>

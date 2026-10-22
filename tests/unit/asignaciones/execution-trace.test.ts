@@ -25,6 +25,7 @@ function entry(action: ExecutionAction, offsetMs: number, userId = ANA): Executi
     stepPosition: sinPaso ? null : 1,
     reason: action === 'cancel' ? 'sin material' : null,
     batchLines: null,
+    responsibleUserIds: null,
     occurredAt: new Date(T0 + offsetMs),
   }
 }
@@ -426,5 +427,97 @@ describe('buildExecutionTrace: personas', () => {
 
   it('R2: sin anotaciones lanza (el caso de uso nunca la llama asi)', () => {
     expect(() => buildExecutionTrace([], vivo('EN_CURSO'), NOW)).toThrow()
+  })
+})
+
+type StepAction = 'conditioning_step_advance' | 'conditioning_steps_complete' | 'conditioning_responsibles_change'
+
+function pasoDeAcondicionamiento(action: StepAction, offsetMs: number, stepPosition: number): ExecutionEntryRecord {
+  return { ...entry(action, offsetMs, LUIS), stepPosition, responsibleUserIds: [LUIS] }
+}
+
+describe('buildExecutionTrace: anotaciones de paso de acondicionamiento (R38)', () => {
+  /** Lo de `recorridoAcondicionado` mas pasos, un cambio de responsables y el cierre de pasos. */
+  function conPasos(): ExecutionEntryRecord[] {
+    const base = recorridoAcondicionado()
+    const terminar = base[base.length - 1]
+    return [
+      ...base.slice(0, -1),
+      pasoDeAcondicionamiento('conditioning_step_advance', 5 * HOUR + 25 * MIN, 1),
+      pasoDeAcondicionamiento('conditioning_responsibles_change', 5 * HOUR + 30 * MIN, 1),
+      pasoDeAcondicionamiento('conditioning_steps_complete', 5 * HOUR + 40 * MIN, 2),
+      ...(terminar === undefined ? [] : [terminar]),
+    ]
+  }
+
+  it('R38: con la fase cerrada, las duraciones y el total no cambian por las anotaciones de paso', () => {
+    const sin = buildExecutionTrace(recorridoAcondicionado(), vivo('TERMINADO'), NOW)
+    const con = buildExecutionTrace(conPasos(), vivo('TERMINADO'), NOW)
+    expect(con.durations).toEqual(sin.durations)
+    expect(con.durations.conditioning).toEqual({ kind: 'closed', ms: 45 * MIN })
+    expect(con.totalDuration).toEqual(sin.totalDuration)
+  })
+
+  it('R38: con la fase abierta, se mide desde Comenzar hasta now', () => {
+    const trace = buildExecutionTrace(
+      [
+        entry('conditioning_start', 4 * HOUR),
+        pasoDeAcondicionamiento('conditioning_step_advance', 5 * HOUR, 1),
+        pasoDeAcondicionamiento('conditioning_steps_complete', 6 * HOUR, 2),
+      ],
+      vivo('EN_ACONDICIONAMIENTO'),
+      NOW,
+    )
+    expect(trace.durations.conditioning).toEqual({ kind: 'open', ms: 96 * HOUR })
+    expect(trace.durations.production).toBeNull()
+  })
+
+  it('R38: las anotaciones de paso cuentan dentro de la fase: sin cierre, la fase llega hasta la ultima', () => {
+    const trace = buildExecutionTrace(
+      [
+        entry('conditioning_start', 0),
+        pasoDeAcondicionamiento('conditioning_step_advance', 10 * MIN, 1),
+        pasoDeAcondicionamiento('conditioning_responsibles_change', 25 * MIN, 1),
+      ],
+      { status: 'EN_ACONDICIONAMIENTO', deleted: true },
+      NOW,
+    )
+    expect(trace.durations.conditioning).toEqual({ kind: 'unclosed', ms: 25 * MIN })
+  })
+
+  it('R38: ni abren ni cierran la fase: sin Comenzar la fase es null', () => {
+    const trace = buildExecutionTrace(
+      [
+        pasoDeAcondicionamiento('conditioning_step_advance', 0, 1),
+        pasoDeAcondicionamiento('conditioning_steps_complete', HOUR, 2),
+      ],
+      vivo('EN_ACONDICIONAMIENTO'),
+      NOW,
+    )
+    expect(trace.durations.conditioning).toBeNull()
+  })
+
+  it('R38: un cancel tras una anotacion de paso no cierra el acondicionamiento', () => {
+    const trace = buildExecutionTrace(
+      [
+        entry('conditioning_start', 0),
+        pasoDeAcondicionamiento('conditioning_step_advance', 10 * MIN, 1),
+        entry('cancel', 20 * MIN),
+      ],
+      vivo('EN_ACONDICIONAMIENTO'),
+      NOW,
+    )
+    expect(trace.durations.conditioning?.kind).toBe('open')
+  })
+
+  it('R38: las anotaciones de paso son pasos del recorrido, con su posicion y sin vuelta atras', () => {
+    const trace = buildExecutionTrace(conPasos(), vivo('TERMINADO'), NOW)
+    const pasos = trace.steps.filter((step) => step.stepPosition !== null && step.action.startsWith('conditioning_'))
+    expect(pasos.map((step) => [step.action, step.stepPosition, step.isGoBack])).toEqual([
+      ['conditioning_step_advance', 1, false],
+      ['conditioning_responsibles_change', 1, false],
+      ['conditioning_steps_complete', 2, false],
+    ])
+    expect(trace.goBackCount).toBe(0)
   })
 })

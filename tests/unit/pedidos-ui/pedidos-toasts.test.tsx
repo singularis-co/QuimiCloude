@@ -237,6 +237,7 @@ function recetaDetalle(): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [],
     tools: [],
     original: null,

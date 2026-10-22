@@ -85,6 +85,7 @@ function recipeDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [paragraph('Mezclar')],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [
       {
         id: 'line-1',

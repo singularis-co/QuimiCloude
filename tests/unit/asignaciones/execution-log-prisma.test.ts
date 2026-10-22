@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { PrismaClient } from '@prisma/client'
-import { OrderExecutionAction } from '@prisma/client'
+import { OrderExecutionAction, Prisma } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { transaction } = vi.hoisted(() => ({ transaction: vi.fn() }))
@@ -65,17 +65,23 @@ function entradaDe(action: (typeof EXECUTION_ACTIONS)[number]): NewExecutionEntr
   ) {
     return { ...base, action, stepPosition: null }
   }
+  if (action === 'conditioning_step_advance' || action === 'conditioning_steps_complete') {
+    return { ...base, action, stepPosition: 2, responsibleUserIds: null }
+  }
+  if (action === 'conditioning_responsibles_change') {
+    return { ...base, action, stepPosition: 2, responsibleUserIds: [USER] }
+  }
   return { ...base, action, stepPosition: 3 }
 }
 
 describe('execution-log-prisma: el mapa al enum (R1)', () => {
-  it('R1: el mapa tiene exactamente once pares, uno por accion del dominio', () => {
-    expect(Object.keys(EXECUTION_ACTION_TO_PRISMA)).toHaveLength(11)
+  it('R1: el mapa tiene exactamente catorce pares, uno por accion del dominio', () => {
+    expect(Object.keys(EXECUTION_ACTION_TO_PRISMA)).toHaveLength(14)
     expect(Object.keys(EXECUTION_ACTION_TO_PRISMA).sort()).toEqual([...EXECUTION_ACTIONS].sort())
   })
 
-  it('R1: los once valores del mapa son los once del enum de Prisma, sin repetir', () => {
-    expect(new Set(Object.values(EXECUTION_ACTION_TO_PRISMA)).size).toBe(11)
+  it('R1: los catorce valores del mapa son los catorce del enum de Prisma, sin repetir', () => {
+    expect(new Set(Object.values(EXECUTION_ACTION_TO_PRISMA)).size).toBe(14)
     expect(Object.values(EXECUTION_ACTION_TO_PRISMA).sort()).toEqual(
       [...Object.values(OrderExecutionAction)].sort(),
     )
@@ -170,9 +176,9 @@ describe('execution-log-prisma: el mapa inverso del enum (QC-167 T4a)', () => {
     expect(EXECUTION_ACTION_TO_PRISMA[action]).toBe(value)
   })
 
-  it('R14: el mapa inverso tiene exactamente once pares', () => {
+  it('R14: el mapa inverso tiene exactamente catorce pares', () => {
     expect(Object.keys(EXECUTION_ACTION_FROM_PRISMA).sort()).toEqual([...Object.values(OrderExecutionAction)].sort())
-    expect(new Set(Object.values(EXECUTION_ACTION_FROM_PRISMA)).size).toBe(11)
+    expect(new Set(Object.values(EXECUTION_ACTION_FROM_PRISMA)).size).toBe(14)
   })
 
   it('R14: el inverso se deriva del mapa de ida, no se escribe a mano', () => {
@@ -274,6 +280,7 @@ describe('execution-log-prisma: las tres lecturas', () => {
         stepPosition: 2,
         reason: null,
         batchLines: null,
+        responsibleUserIds: null,
         occurredAt: NOW,
       },
     ])
@@ -287,6 +294,7 @@ describe('execution-log-prisma: las tres lecturas', () => {
         stepPosition: 2,
         reason: null,
         batchLines: null,
+        responsibleUserIds: null,
         occurredAt: NOW,
       },
     ])
@@ -313,6 +321,7 @@ describe('execution-log-prisma: la foto del guardado de lote', () => {
     stepPosition: null,
     reason: null,
     batchLines,
+    responsibleUserIds: null,
     occurredAt: NOW,
   })
 
@@ -377,6 +386,157 @@ describe('execution-log-prisma: la foto del guardado de lote', () => {
     findMany.mockResolvedValue([fila(sinNombre)])
     const entries = await createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])
     expect(entries[0]?.batchLines).toEqual(sinNombre)
+  })
+})
+
+const BEA = '66666666-6666-4666-8666-666666666666'
+
+function choqueUnico(target: unknown, code = 'P2002') {
+  return new Prisma.PrismaClientKnownRequestError('duplicate key value violates unique constraint', {
+    code,
+    clientVersion: '6.19.3',
+    meta: { target },
+  })
+}
+
+describe('execution-log-prisma: anotaciones de paso de acondicionamiento', () => {
+  const filaDePaso = (action: string, responsibleUserIds: unknown) => ({
+    id: 'e7',
+    orderId: ORDER,
+    userId: USER,
+    action,
+    stepPosition: 2,
+    reason: null,
+    batchLines: null,
+    responsibleUserIds,
+    occurredAt: NOW,
+  })
+
+  it.each(['conditioning_step_advance', 'conditioning_steps_complete'] as const)(
+    'R27: %s escribe su posicion y los responsables validados, sin motivo ni foto de lote',
+    async (action) => {
+      const { db, create } = clienteDoble()
+      const resultado = await createExecutionLogRepository(db).append({
+        ...base,
+        action,
+        stepPosition: 2,
+        responsibleUserIds: [USER, BEA],
+      })
+      expect(resultado).toBe('ok')
+      expect(create.mock.calls[0][0].data).toEqual({
+        companyId: COMPANY,
+        orderId: ORDER,
+        userId: USER,
+        action: action.toUpperCase(),
+        stepPosition: 2,
+        reason: null,
+        responsibleUserIds: [USER, BEA],
+        occurredAt: NOW,
+      })
+    },
+  )
+
+  it('R27: completar un paso sin marca de asignacion no manda la columna, asi que queda en NULL', async () => {
+    const { db, create } = clienteDoble()
+    await createExecutionLogRepository(db).append({
+      ...base,
+      action: 'conditioning_step_advance',
+      stepPosition: 1,
+      responsibleUserIds: null,
+    })
+    expect(create.mock.calls[0][0].data).not.toHaveProperty('responsibleUserIds')
+    expect(create.mock.calls[0][0].data).not.toHaveProperty('batchLines')
+  })
+
+  it('R28: el cambio de responsables es una fila nueva con el conjunto nuevo; el registro solo crea', async () => {
+    const { db, create } = clienteDoble()
+    await createExecutionLogRepository(db).append({
+      ...base,
+      action: 'conditioning_responsibles_change',
+      stepPosition: 1,
+      responsibleUserIds: [BEA],
+    })
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create.mock.calls[0][0].data).toMatchObject({
+      action: 'CONDITIONING_RESPONSIBLES_CHANGE',
+      stepPosition: 1,
+      responsibleUserIds: [BEA],
+    })
+  })
+
+  it.each([
+    ['una lista vacia', []],
+    ['un id que no es uuid', ['ana']],
+    ['un responsable repetido', [USER, USER]],
+  ])('R28: append no escribe responsables invalidos (%s)', async (_caso, responsibleUserIds) => {
+    const { db, create } = clienteDoble()
+    const repo = createExecutionLogRepository(db)
+    await expect(
+      repo.append({ ...base, action: 'conditioning_responsibles_change', stepPosition: 1, responsibleUserIds }),
+    ).rejects.toThrow()
+    await expect(
+      repo.append({ ...base, action: 'conditioning_step_advance', stepPosition: 1, responsibleUserIds }),
+    ).rejects.toThrow()
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['las columnas del indice', ['order_id', 'step_position']],
+    ['el nombre del indice', 'order_execution_entries_conditioning_step_once'],
+  ])('R27: el choque con el indice de paso unico (%s) se traduce a step_already_completed', async (_caso, target) => {
+    const { db, create } = clienteDoble()
+    create.mockRejectedValue(choqueUnico(target))
+    await expect(
+      createExecutionLogRepository(db).append({
+        ...base,
+        action: 'conditioning_steps_complete',
+        stepPosition: 3,
+        responsibleUserIds: null,
+      }),
+    ).resolves.toBe('step_already_completed')
+  })
+
+  it.each([
+    ['un P2002 de otro indice', choqueUnico(['id'])],
+    ['un P2002 sin target', choqueUnico(undefined)],
+    ['otro codigo de Prisma', choqueUnico(['step_position'], 'P2010')],
+    ['un error cualquiera', new Error('se cayo la conexion')],
+  ])('R27: %s no se disfraza de paso ya completado: se relanza', async (_caso, fallo) => {
+    const { db, create } = clienteDoble()
+    create.mockRejectedValue(fallo)
+    await expect(
+      createExecutionLogRepository(db).append({
+        ...base,
+        action: 'conditioning_step_advance',
+        stepPosition: 1,
+        responsibleUserIds: null,
+      }),
+    ).rejects.toBe(fallo)
+  })
+
+  it('R28: listEntriesForOrders selecciona los responsables y los devuelve validados', async () => {
+    const { db, findMany } = clienteDeLectura()
+    findMany.mockResolvedValue([
+      filaDePaso('CONDITIONING_STEP_ADVANCE', [USER, BEA]),
+      filaDePaso('CONDITIONING_STEP_ADVANCE', null),
+    ])
+    const entries = await createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])
+    expect(findMany.mock.calls[0][0].select).toMatchObject({ responsibleUserIds: true })
+    expect(entries.map((entry) => [entry.action, entry.responsibleUserIds])).toEqual([
+      ['conditioning_step_advance', [USER, BEA]],
+      ['conditioning_step_advance', null],
+    ])
+  })
+
+  it.each([
+    ['un objeto en vez de un array', { userId: USER }],
+    ['un array vacio', []],
+    ['un id que no es uuid', ['ana']],
+    ['un responsable repetido', [USER, USER]],
+  ])('R28: responsables corruptos lanzan al leer (%s)', async (_caso, responsibleUserIds) => {
+    const { db, findMany } = clienteDeLectura()
+    findMany.mockResolvedValue([filaDePaso('CONDITIONING_RESPONSIBLES_CHANGE', responsibleUserIds)])
+    await expect(createExecutionLogRepository(db).listEntriesForOrders(COMPANY, [ORDER])).rejects.toThrow(/e7/)
   })
 })
 

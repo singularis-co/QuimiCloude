@@ -72,6 +72,7 @@ export function createGetRecipe(
       updatedBy: row.updatedBy,
       steps: shared.steps,
       packingSteps: shared.packingSteps,
+      conditioningSteps: shared.conditioningSteps,
       original: row.original === null ? null : { id: row.original.id, name: row.original.name },
       isUnderReview: isVersionUnderReview(
         row.original !== null,

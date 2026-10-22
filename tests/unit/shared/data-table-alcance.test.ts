@@ -725,7 +725,13 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // `data-table-row-<id>`, las cabeceras de coste estimado y real por `data-table-head-<id>` y sus
   // celdas por `data-table-cell-<id>`. El centinela pasa de CINCUENTA Y CUATRO a CINCUENTA Y CINCO;
   // la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y cinco', () => {
+  //
+  // 2026-10-21: entra `e2e/pasos-de-acondicionamiento.spec.ts` (QC-299), y no afloja la lista. No
+  // estrena tabla: recorre la pantalla de asignacion, ya en esta lista, y localiza la fila del
+  // pedido por `data-table-row-<id>` y `data-table-cell-orderNumber`. El centinela pasa de
+  // CINCUENTA Y CINCO a CINCUENTA Y SEIS; la lista sigue CERRADA, y un spec mas que referencie
+  // `data-table` vuelve a ponerla en rojo.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y seis', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -735,7 +741,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta y cinco E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -827,6 +833,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-12, QC-265). Entre `movimiento` y `pasos-de-envasado` porque
       // la lista esta ORDENADA: 'o' va entre 'm' y 'p'.
       'e2e/operario-rediseno.spec.ts',
+      // Ver la nota de arriba (2026-10-21, QC-299). Antes que `pasos-de-envasado` porque la lista
+      // esta ORDENADA: 'a' precede a 'e'.
+      'e2e/pasos-de-acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-05, QC-211). Va antes que `pedido-bloqueado` porque la
       // lista esta ORDENADA y 'a' precede a 'e'.
       'e2e/pasos-de-envasado.spec.ts',

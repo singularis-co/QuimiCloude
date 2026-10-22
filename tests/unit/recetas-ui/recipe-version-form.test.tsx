@@ -109,6 +109,7 @@ function versionDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [CHECKLIST_STEP],
     packingSteps: [],
+    conditioningSteps: [],
     lines: VERSION_LINES,
     tools: [],
     original: { id: ORIGINAL_ID, name: 'Jabón' },
@@ -532,6 +533,58 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     expect(screen.queryByTestId('recipe-version-inherited-packing-steps')).toBeNull();
     expect(screen.queryByTestId('recipe-version-packing-steps-empty')).toBeNull();
     expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
+  });
+
+  it('R16 — los pasos de acondicionamiento heredados se leen dentro de un contenedor inert, sin controles ni switches', async () => {
+    const user = setupUser();
+    renderEdit(
+      versionDetail({
+        conditioningSteps: [
+          { ...PACKING_STEP, requiresEvidence: true, requiresAssignment: true },
+          { ...PACKING_PLAIN_STEP, requiresAssignment: true },
+        ],
+      }),
+    );
+
+    const conditioning = screen.getByTestId('recipe-version-inherited-conditioning-steps');
+    expect(conditioning).toHaveAttribute('inert');
+    expect(conditioning).toHaveAttribute('aria-readonly', 'true');
+    expect(within(conditioning).getByText('Etiquetar el envase')).toBeInTheDocument();
+    expect(within(conditioning).getByText('Etiquetar el envase').closest('strong')).not.toBeNull();
+    expect(within(conditioning).getByText('Sellar la tapa')).toBeInTheDocument();
+    expect(within(conditioning).getByText('Lote impreso')).toBeInTheDocument();
+    expect(
+      within(conditioning).getByTestId('recipe-version-conditioning-step-0-evidence'),
+    ).toHaveTextContent('Requiere evidencia');
+    expect(
+      within(conditioning).getByTestId('recipe-version-conditioning-step-0-assignment'),
+    ).toHaveTextContent('Asignación requerida');
+    expect(within(conditioning).queryByTestId('recipe-version-conditioning-step-1-evidence')).toBeNull();
+
+    expect(
+      conditioning.querySelector('[contenteditable], input:not([type="checkbox"]), textarea, select'),
+    ).toBeNull();
+    expect(within(conditioning).queryByRole('switch')).toBeNull();
+    expect(within(conditioning).queryByRole('button')).toBeNull();
+    expect(within(conditioning).queryByRole('toolbar')).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByTestId('recipe-conditioning-steps-field')).toBeNull();
+    expect(screen.queryByTestId('recipe-version-conditioning-steps-empty')).toBeNull();
+
+    const checkbox = within(conditioning).getByRole('checkbox');
+    await user.click(checkbox);
+    expect(checkbox).toHaveAttribute('aria-checked', 'false');
+    expect(updateVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('R16 — sin pasos de acondicionamiento en la original se muestra el aviso y ningún bloque', () => {
+    renderEdit(versionDetail({ conditioningSteps: [] }));
+
+    expect(screen.getByTestId('recipe-version-conditioning-steps-empty')).toHaveTextContent(
+      'La receta original no tiene pasos de acondicionamiento.',
+    );
+    expect(screen.queryByTestId('recipe-version-inherited-conditioning-steps')).toBeNull();
+    expect(screen.queryByTestId('recipe-conditioning-steps-field')).toBeNull();
   });
 
   it('R23 — la versión por revisar lleva la marca «Por revisar»', () => {

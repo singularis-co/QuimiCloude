@@ -71,6 +71,10 @@ export {
   ConditioningBatchDataMissingError,
   ConditioningBatchDuplicateLotError,
   ConditioningBatchNotFoundError,
+  ConditioningStepOutOfOrderError,
+  ConditioningResponsiblesRequiredError,
+  ConditioningResponsibleNotAllowedError,
+  ConditioningStepsPendingError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -254,6 +258,7 @@ export {
   type ExecutionTraceDetail,
   type ExecutionTraceDetailStep,
   type GetExecutionTraceDeps,
+  type TracePerson,
 } from './domain/get-execution-trace';
 export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
 export type {
@@ -295,7 +300,17 @@ export {
   createGetConditioningOrder,
   type GetConditioningOrderDeps,
 } from './domain/get-conditioning-order';
-export type { ConditioningBatchData, ConditioningBatchLineView } from './domain/conditioning-order-view';
+export type {
+  ConditioningBatchData,
+  ConditioningBatchLineView,
+  ConditioningStepCandidateView,
+  ConditioningStepsView,
+} from './domain/conditioning-order-view';
+export {
+  createRecordConditioningStep,
+  type RecordConditioningStepDeps,
+  type RecordConditioningStepResult,
+} from './domain/record-conditioning-step';
 export {
   createSaveConditioningBatchData,
   saveConditioningBatchDataSchema,

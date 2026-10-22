@@ -13,6 +13,7 @@ import {
 import type {
   ConditioningAction,
   ConditioningBatchSnapshotLine,
+  ConditioningStepCompletingAction,
   ExecutionTraceTeamMember,
   TraceDurations,
 } from './conditioning-trace';
@@ -22,6 +23,9 @@ import type { PersonRef } from '@/lib/modules/identity';
 import { formatOrderNumber, ORDER_STATUS_VALUES, type OrderStatus } from '@/lib/modules/pedidos';
 
 const getExecutionTraceSchema = z.strictObject({ orderId: z.string().uuid() });
+
+/** `displayName` `null` si el directorio ya no devuelve a esa persona. */
+export type TracePerson = { readonly userId: string; readonly displayName: string | null };
 
 type DetailStepBase = {
   readonly id: string;
@@ -59,6 +63,21 @@ export type ExecutionTraceDetailStep =
       readonly action: 'conditioning_finish';
       readonly stepPosition: null;
       readonly reason: null;
+    })
+  | (DetailStepBase & {
+      readonly action: ConditioningStepCompletingAction;
+      readonly stepPosition: number;
+      readonly reason: null;
+      /** Vacio si el paso no pide asignacion. */
+      readonly responsibles: readonly TracePerson[];
+    })
+  | (DetailStepBase & {
+      readonly action: 'conditioning_responsibles_change';
+      readonly stepPosition: number;
+      readonly reason: null;
+      /** Los vigentes en esa posicion justo antes del cambio. */
+      readonly previous: readonly TracePerson[];
+      readonly responsibles: readonly TracePerson[];
     });
 
 export type ExecutionTraceDetail = {
@@ -77,10 +96,24 @@ export type ExecutionTraceDetail = {
 /** El detalle no pinta receta ni reparto: sin los catalogos que solo usa la lista. */
 export type GetExecutionTraceDeps = Omit<ListExecutionTracesDeps, 'recipes' | 'presentations'>;
 
+function toTracePeople(userIds: readonly string[], refs: ReadonlyMap<string, PersonRef>): readonly TracePerson[] {
+  return userIds.map((userId) => ({ userId, displayName: refs.get(userId)?.displayName ?? null }));
+}
+
+function conditioningStepPosition(step: TraceStep): number {
+  if (step.stepPosition === null) throw new Error(`La anotacion ${step.id} (${step.action}) no tiene paso`);
+  return step.stepPosition;
+}
+
+/**
+ * El cambio de responsables solo guarda el conjunto nuevo: el anterior se reconstruye recorriendo
+ * las anotaciones en orden, de ahi que el mapa de vigentes se arrastre de un paso al siguiente.
+ */
 function toDetailStep(
   step: TraceStep,
   refs: ReadonlyMap<string, PersonRef>,
   team: readonly ConditioningTeamMemberRow[],
+  currentResponsibles: Map<number, readonly string[]>,
 ): ExecutionTraceDetailStep {
   const base: DetailStepBase = {
     id: step.id,
@@ -105,6 +138,33 @@ function toDetailStep(
       return { ...base, action: step.action, stepPosition: null, reason: null, lines: step.batchLines };
     case 'conditioning_finish':
       return { ...base, action: step.action, stepPosition: null, reason: null };
+    case 'conditioning_step_advance':
+    case 'conditioning_steps_complete': {
+      const stepPosition = conditioningStepPosition(step);
+      const responsibleUserIds = step.responsibleUserIds ?? [];
+      currentResponsibles.set(stepPosition, responsibleUserIds);
+      return {
+        ...base,
+        action: step.action,
+        stepPosition,
+        reason: null,
+        responsibles: toTracePeople(responsibleUserIds, refs),
+      };
+    }
+    case 'conditioning_responsibles_change': {
+      const stepPosition = conditioningStepPosition(step);
+      if (step.responsibleUserIds === null) throw new Error(`La anotacion ${step.id} no tiene los responsables nuevos`);
+      const previous = currentResponsibles.get(stepPosition) ?? [];
+      currentResponsibles.set(stepPosition, step.responsibleUserIds);
+      return {
+        ...base,
+        action: step.action,
+        stepPosition,
+        reason: null,
+        previous: toTracePeople(previous, refs),
+        responsibles: toTracePeople(step.responsibleUserIds, refs),
+      };
+    }
     default:
       return { ...base, action: step.action, stepPosition: step.stepPosition, reason: step.reason };
   }
@@ -147,9 +207,16 @@ export function createGetExecutionTrace(
     const refs = await findPeopleByIds(
       deps.people,
       companyId,
-      [...new Set([...trace.userIds, ...team.map((member) => member.userId)])],
+      [
+        ...new Set([
+          ...trace.userIds,
+          ...team.map((member) => member.userId),
+          ...entries.flatMap((entry) => entry.responsibleUserIds ?? []),
+        ]),
+      ],
       now,
     );
+    const currentResponsibles = new Map<number, readonly string[]>();
 
     return {
       orderId: order.id,
@@ -157,7 +224,7 @@ export function createGetExecutionTrace(
       status: order.status,
       deleted: order.deleted,
       active: trace.active,
-      steps: trace.steps.map((step) => toDetailStep(step, refs, team)),
+      steps: trace.steps.map((step) => toDetailStep(step, refs, team, currentResponsibles)),
       firstAt: trace.firstAt,
       lastAt: trace.lastAt,
       durations: trace.durations,

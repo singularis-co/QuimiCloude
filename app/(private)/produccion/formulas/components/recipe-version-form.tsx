@@ -1,6 +1,6 @@
 'use client';
 
-import { CameraIcon } from 'lucide-react';
+import { CameraIcon, UserPlusIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -72,6 +72,7 @@ const NAME_ERROR_MESSAGES: RecipeFieldErrorMessages = {
   tooLong: 'El nombre admite como máximo 120 caracteres.',
 };
 const REQUIRES_EVIDENCE_MARK = 'Requiere evidencia';
+const REQUIRES_ASSIGNMENT_MARK = 'Asignación requerida';
 
 export type RecipeVersionFormOriginal = {
   readonly id: string;
@@ -124,6 +125,18 @@ function RequiresEvidenceMark({ testId }: { readonly testId: string }) {
     >
       <CameraIcon aria-hidden="true" className="size-4" />
       {REQUIRES_EVIDENCE_MARK}
+    </span>
+  );
+}
+
+function RequiresAssignmentMark({ testId }: { readonly testId: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary"
+      data-testid={testId}
+    >
+      <UserPlusIcon aria-hidden="true" className="size-4" />
+      {REQUIRES_ASSIGNMENT_MARK}
     </span>
   );
 }
@@ -212,6 +225,49 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
                   isItemChecked={() => false}
                   onToggleItem={noop}
                   idPrefix={`recipe-version-packing-step-${index}`}
+                />
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {version.conditioningSteps.length === 0 ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="recipe-version-conditioning-steps-empty"
+        >
+          La receta original no tiene pasos de acondicionamiento.
+        </p>
+      ) : (
+        <div
+          inert
+          aria-readonly="true"
+          data-testid="recipe-version-inherited-conditioning-steps"
+          className="flex flex-col gap-2"
+        >
+          <h3 className="text-sm font-semibold">Pasos de acondicionamiento</h3>
+          <ol className="flex flex-col gap-4">
+            {version.conditioningSteps.map((step, index) => (
+              <li key={index} className="flex flex-col gap-2">
+                <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  Paso {index + 1}
+                  {step.requiresEvidence === true ? (
+                    <RequiresEvidenceMark
+                      testId={`recipe-version-conditioning-step-${index}-evidence`}
+                    />
+                  ) : null}
+                  {step.requiresAssignment === true ? (
+                    <RequiresAssignmentMark
+                      testId={`recipe-version-conditioning-step-${index}-assignment`}
+                    />
+                  ) : null}
+                </span>
+                <StepDocumentView
+                  document={step}
+                  isItemChecked={() => false}
+                  onToggleItem={noop}
+                  idPrefix={`recipe-version-conditioning-step-${index}`}
                 />
               </li>
             ))}
