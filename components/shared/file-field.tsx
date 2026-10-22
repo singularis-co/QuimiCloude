@@ -30,11 +30,12 @@
 // **La validacion de dominio no vive aqui**: `validateBytes` deja que el consumidor imponga lo
 // suyo -la deteccion por FIRMA de `validateRecipeImage`, por ejemplo- sobre los bytes finales.
 
-import { FileIcon, UploadCloudIcon } from 'lucide-react';
+import { FileIcon, UploadCloudIcon, XIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 import { compressImage } from './compress-image';
@@ -100,7 +101,10 @@ export type FileFieldProps = {
    * miniatura y nombre y tamaño del archivo.
    */
   readonly variant?: 'file' | 'image';
-  /** Prefijo de los `data-testid`: `<prefijo>-field`, `-input`, `-error`, `-preview`, `-clear`. */
+  /**
+   * Prefijo de los `data-testid`: `<prefijo>-field`, `-input`, `-error`, `-preview`, `-clear`.
+   * Con `image` y vista previa, quitar es una X sobre la esquina de la imagen.
+   */
   readonly testIdPrefix: string;
 };
 
@@ -116,6 +120,8 @@ const DROPZONE_IMAGE_PADDING = 'p-2';
 const IMAGE_PREVIEW_FRAME = 'flex h-48 w-full items-center justify-center';
 const IMAGE_PREVIEW_FILL = 'h-full w-full rounded-lg object-contain';
 const CHANGE_HINT = 'Haz clic o arrastra otro para cambiarla';
+const IMAGE_CLEAR_BUTTON =
+  'absolute top-1 right-1 z-10 rounded-full bg-black/60 text-white hover:bg-black/75 hover:text-white focus-visible:outline-offset-1';
 
 export function FileField({
   label,
@@ -235,6 +241,7 @@ export function FileField({
 
   const displayUrl = localPreviewUrl ?? previewUrl;
   const canOfferClear = clearable && onClear !== undefined && (displayUrl !== null || chosen !== null);
+  const clearOverImage = canOfferClear && isImageVariant && displayUrl !== null;
 
   const dropzoneState = isDragging
     ? DROPZONE_DRAGGING
@@ -262,6 +269,32 @@ export function FileField({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {clearOverImage ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  touch
+                  aria-label={clearLabel}
+                  className={IMAGE_CLEAR_BUTTON}
+                  data-testid={`${testIdPrefix}-clear`}
+                  // Sin esto el clic llega a la zona, que abriría el diálogo de elegir archivo.
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleClear();
+                  }}
+                />
+              }
+            >
+              <XIcon aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>{clearLabel}</TooltipContent>
+          </Tooltip>
+        ) : null}
+
         {displayUrl !== null && isImageVariant ? (
           <div className={IMAGE_PREVIEW_FRAME}>
             {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia */}
@@ -369,7 +402,7 @@ export function FileField({
         </p>
       )}
 
-      {canOfferClear ? (
+      {canOfferClear && !clearOverImage ? (
         <Button
           type="button"
           variant="outline"
