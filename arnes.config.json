@@ -7,7 +7,7 @@
   },
   "tracker": {
     "tipo": "trello",
-    "board": "EtlRPFbu",
+    "board": "6ada16caf4b469c97391123d",
     "prefijo": "QT",
     "prefijos_historicos": ["QC"],
     "estados": {
