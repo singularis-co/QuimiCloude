@@ -108,7 +108,12 @@ export {
   type RecipeVersionFormOriginal,
   type RecipeVersionFormProps,
 } from './recipe-version-form';
-export { RecipeVersionList, type RecipeVersionListProps } from './recipe-version-list';
+export {
+  NewRecipeVersionButton,
+  RecipeVersionList,
+  type NewRecipeVersionButtonProps,
+  type RecipeVersionListProps,
+} from './recipe-version-list';
 export {
   RECIPE_VERSION_MARK_TONES,
   RECIPE_VERSION_UNDER_REVIEW_LABEL,

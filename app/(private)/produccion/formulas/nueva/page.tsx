@@ -12,7 +12,7 @@ import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE } from '@/lib/shared/routes';
 
-import { RecipeForm, RecipeVersionList } from '../components';
+import { NewRecipeVersionButton, RecipeForm, RecipeVersionList } from '../components';
 
 export const metadata: Metadata = {
   title: `Nueva fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
@@ -113,7 +113,8 @@ export default async function NuevaRecetaPage() {
       </div>
       <RecipeForm
         mode="create"
-        aside={<RecipeVersionList originalId={null} versions={[]} />}
+        versionList={<RecipeVersionList originalId={null} versions={[]} />}
+        newVersionAction={<NewRecipeVersionButton originalId={null} />}
         units={unitsResult.data}
         initialProductPage={{
           items: productsResult.data.items.map((item) => ({
