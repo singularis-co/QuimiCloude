@@ -97,10 +97,13 @@ Cerrada: 4.** La historia de cada una esta en el `### Por qué` de esta seccion.
    FDS/SDS, clasificacion GHS, o restricciones de almacenamiento/transporte por
    incompatibilidad? Eso decide si hay gestion de archivos (Supabase Storage) y reglas de
    validacion.
-4. **Contabilidad e impuestos — CERRADA (QC-33, corregida en QC-123).** Estado vigente:
+4. **Contabilidad e impuestos — CERRADA (QC-33, corregida en QC-123 y en QC-307).** Estado vigente:
    - El ERP **no factura ni liquida impuestos**.
    - El dinero va en `decimal(14,4)` y **nunca `float`**.
-   - **No existe ningun precio de venta**, ni en el pedido ni en la receta.
+   - Existe un **precio de venta** del **pedido entero**, opcional, escrito a mano al registrarlo
+     o editarlo (`orders.sale_price`, `decimal(14,4)`, nunca negativo; 0 vale y no es lo mismo
+     que vacio). **No sustituye al coste** ni se deriva de el: el margen es QC-308. La receta
+     sigue sin precio. La moneda sigue implicita (punto 5).
    - Lo que si existe es el **coste de los ingredientes** que la receta del pedido consume,
      leido de los **lotes de inventario con existencia** y promediado por lote usado. **Se
      guarda**, y se recalcula **en cada edicion del pedido** y en ningun otro momento.
@@ -232,6 +235,10 @@ naturaleza: el **coste de los ingredientes**. Y **se guarda**, al reves de lo qu
 original: sus factores —que lotes habia y a que costo— cambian cada dia, asi que calcularlo al
 leer haria que el importe de un pedido de marzo cambiara solo. Detalle en
 `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`.
+**CORREGIDA el 2026-10-22 (QC-307): vuelve a existir un precio de venta**, por decision humana
+de QC-307, que **deroga QC-123 `[D1]`** («no hay precio de venta en ninguna parte»). Es del
+**pedido entero**, opcional y escrito a mano; no sustituye al coste de QC-123 ni se deriva de el
+(el margen es QC-308). Detalle en `specs/QC-307-precio-de-venta-del-pedido/requirements.md`.
 
 **5. Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y no se
 guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no vale.

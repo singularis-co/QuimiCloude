@@ -7,7 +7,7 @@
 
 ## Tanda 1 — base
 
-- [ ] **T1 · Migración y esquema** (backend) — R2, R9, R18
+- [x] **T1 · Migración y esquema** (backend) — R2, R9, R18
   - `db/migrations/20261022120000_orders_sale_price/migration.sql` y `down.sql`, exactamente como
     `design.md > 1.2`.
   - `db/schema.prisma`: `salePrice` en `Order`, con su comentario (`design.md > 1.1`).
@@ -149,7 +149,7 @@
 
 ## Tanda 4 — documentación (puede ir en paralelo desde la tanda 1)
 
-- [ ] **T9 · Enmiendas** [P] — cierra la decisión 1
+- [x] **T9 · Enmiendas** [P] — cierra la decisión 1
   - `docs/architecture.md > Preguntas abiertas del dominio`: punto 4 y `### Por qué`
     (`design.md > 9`).
   - `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`: la nota
