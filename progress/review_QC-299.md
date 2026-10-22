@@ -238,3 +238,110 @@ del caso de uso y la UI del panel.
 3. Con los cambios ya commiteados, correr los tests que comparan contra `origin/dev...HEAD` y los
    que recorren `e2e/`, y anotar la salida en la bitácora.
 4. Opcional: m4 (reajustar los dos comentarios) y m5 (anotar los desvíos en el design).
+
+## Vuelta 2 (acotada a f4d5281d..2a47d780)
+
+Commits: `09730570` (arreglos de la vuelta 1), `62e137f8` (merge de `origin/dev`, 12 conflictos) y
+`2a47d780` (pulsación larga, decisión del humano). A petición del leader, también reviso el
+resultado del merge contra `origin/dev`. No rehago la trazabilidad completa.
+
+### Veredicto vuelta 2: OK
+
+0 hallazgos mayores y 3 menores.
+
+### Verificación ejecutada por el reviewer
+
+| Qué | Resultado |
+|---|---|
+| `pnpm exec prisma generate` | ok |
+| `pnpm run typecheck` | 0 errores |
+| `pnpm run lint` | 0 errores, 10 warnings anteriores |
+| `pnpm exec vitest run guard` | 85 archivos, 1253 verdes, 22 skipped |
+| 126 archivos: los tests que el diff con `origin/dev` añade o cambia, más todos los que comparan contra `origin/dev...HEAD` o recorren `e2e/`/`app/` | 126/126 archivos, 2576 verdes, 100 skipped. Incluye `recipe-route-contract` y `data-table-alcance` |
+| Carpetas `recetas`, `recetas-ui`, `asignaciones`, `asignaciones-ui`, `dashboard` (unit/ui), `paridad`, `documentos`, `errores`, `composition` e `identity/roles` | 349 archivos, 6012 verdes. Un rojo: timeout de 20 s en `formula-import-review.test.tsx` («más de 500 caracteres»). Pasa 34/34 corrido solo; la vuelta 1 ya lo anotó lento también en HEAD. No es de la feature |
+| Integración en base efímera (`qct_tpl_bdf56c3e8ff5`, plantilla nueva tras el merge): los 6 `.int` de la vuelta 1 | 6 archivos, 57/57 |
+
+`vitest related` no sirve dentro del worktree: el `exclude` del config lleva `.worktrees/**`, así
+que termina con «No test files found». Por eso lo sustituí por las carpetas de arriba.
+
+### Hallazgos de la vuelta 1
+
+- **M1, cerrado.** `PASOS_DE_ACONDICIONAMIENTO_QC299` lista los 12 archivos de
+  `lib/modules/recetas/` del diff. `MIGRACION_QC299` lista el schema y las 4 migraciones. Las dos
+  entran en `RECETAS_PERMITIDAS` y `DB_PERMITIDAS`. El test está verde.
+- **M2, cerrado.** El spec entra ordenado en la lista cerrada. Tras el merge con dev, el centinela
+  queda en «cincuenta y cinco» (54 de dev + este). El test está verde.
+- **m4, cerrado.** Los dos comentarios están repartidos en líneas.
+- **m5, cerrado.** El `design.md` anota `optionalDescription` y que `stepsPending` vive en la
+  pantalla.
+- **m2, cerrado por decisión del humano** (anotada en `requirements.md` y `design.md`).
+  - `2a47d780` solo toca `IconSwitch`, dentro de `recipe-step-editor.tsx`. Pasa a controlar
+    `open` del `Tooltip` y abre con 500 ms de pulsación por Pointer Events, y no con el ratón.
+  - Descarta movimientos de más de 10 px y la cancelación del puntero.
+  - Se traga el `click` que llega al soltar la pulsación larga, anula el menú contextual y la
+    selección de texto, y se cierra al tocar fuera.
+  - Lo cubren 10 tests nuevos «R10: pulsación larga».
+  - **El Tooltip compartido no cambia:** `git diff origin/dev 2a47d780 -- components/ hooks/ lib/shared`
+    sale vacío.
+- **m1 y m3:** siguen pendientes de que el humano los confirme. Son menores y no bloquean.
+
+### Merge 62e137f8
+
+- **No se perdió nada de QC-299.**
+  - Comparé, archivo por archivo, el conjunto de líneas que QC-299 cambiaba contra la base
+    (`0f71d5af..09730570`) con las que cambia el merge contra `origin/dev`. En los 39 archivos que
+    tocaban los dos lados coinciden en 30.
+  - Los 9 restantes son adaptaciones legítimas:
+    - `recipe-form.tsx`: el `Separator` pasa a `<Card>`.
+    - `recipe-step-editor.tsx`: une los imports de iconos y el padding del rediseño.
+    - `recipe-steps-field.tsx`: `evidenceOn || assignmentOn` en la estructura nueva.
+    - Censos re-sumados sobre los de dev:
+      - errores: 121 = 117 + 4;
+      - fachada: 35 = 34 de QC-301 + `recordConditioningStep`;
+      - rol de acondicionamiento: 13 = 11 + 2;
+      - data-table: 55.
+    - `recipe-steps-field.test.tsx`: el nombre accesible de dev pasa a «… de Pasos».
+    - `canvas.json`: los tableros de QC-299 están ahí.
+- **No se perdió nada de dev.**
+  - `git diff origin/dev 2a47d780` solo añade en `db/` (las 6 líneas del schema y las 2 carpetas de
+    migración, que siguen siendo las últimas).
+  - En `error-codes.ts`, `aislamiento.json` y `guard-identificador-de-request` solo hay altas de
+    QC-299.
+  - En `lib/composition/index.ts` y el barrel de `asignaciones` se quita una sola línea: el
+    re-export de `ConditioningBatchData` y `ConditioningBatchLineView`, que se reagrupa y sigue
+    exportado (`index.ts:304-305`).
+- **Formulario rediseñado por QC-264.**
+  - «Acondicionamiento» es la quinta `<Card className={CARD_CLASS}>`, tras «Envasado» y antes del
+    diálogo de propagar.
+  - Lleva `title`, `optionalDescription`, `testIdPrefix`, `showEvidenceSwitch`,
+    `showAssignmentSwitch` y `locked={stepsLocked}`, igual que las otras tarjetas.
+- **Tests ajustados al rediseño, sin comprobaciones quitadas.**
+  - `recipe-form-layout.test.tsx`: pasa de 4 tarjetas a 5. Conserva todas las aserciones y añade
+    la de la quinta.
+  - `formulas-toasts`, `recipe-form-preview` y `recipe-version-marks`: solo añaden
+    `conditioningSteps: []` al fixture.
+  - `recipe-form-conditioning-steps.test.tsx` (R8): cambia la comprobación del divisor por
+    «tarjeta propia distinta de la de Envasado y posterior a ella». Es la misma garantía en la
+    estructura nueva.
+- **`listDeliveredConditionedOrders`.**
+  - Ningún archivo de `app/`, `lib/` ni `e2e/` lo usa.
+  - Solo aparece en dos tests de dev que afirman que ya no existe (`asignaciones-facade.test.ts:261`)
+    o que no se llama.
+  - Las 42 apariciones en `82066774..2a47d780` vienen del lado de dev del merge, no de QC-299.
+- Ninguna línea de producción añadida en el rango cita `QC-<n>`, `R<n>` ni `design.md`. La única
+  que aparece, en `order-columns.tsx`, viene de dev.
+
+### Hallazgos nuevos (menores)
+
+- **n1 — menor. El spec dice «divisor» y ahora es una tarjeta.**
+  - `requirements.md:78` (R8, «separada por un divisor»), `design.md > 5.1`
+    (`Separator`, `recipe-form-conditioning-separator`) y `tasks.md:93` siguen hablando del
+    divisor.
+  - Tras QC-264 es una tarjeta propia, y el test ya lo refleja.
+  - Falta una enmienda de una línea en el spec, como las de m5.
+- **n2 — menor. Comentario impreciso en `recipe-route-contract.test.ts`.** El comentario de
+  `MIGRACION_QC299` habla de «tablas de acciones y de pasos de acondicionamiento» y de «modelos
+  nuevos». En realidad son valores de enum y columnas, sin tabla ni modelo nuevo. Es un archivo de
+  test.
+- **n3 — menor. Línea de comentario de 132 caracteres.** La cabecera de `LONG_PRESS_MS` en
+  `recipe-step-editor.tsx:302` no está repartida, como en m4. El lint pasa.
