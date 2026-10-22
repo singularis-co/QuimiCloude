@@ -114,6 +114,7 @@ let nextSequence = 1
 
 function baseOrder(e: Empresa): NewOrder {
   return {
+    salePrice: null,
     recipeId: e.recipeId,
     quantity: '10.0000',
     priority: 'MEDIA',

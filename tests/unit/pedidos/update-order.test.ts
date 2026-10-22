@@ -56,6 +56,7 @@ const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
 function filaExistente(): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId: RECETA_DE_A,

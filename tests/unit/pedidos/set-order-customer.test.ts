@@ -44,6 +44,7 @@ const CLIENTES: readonly { readonly companyId: string; readonly ref: CustomerRef
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId: '22222222-2222-4222-8222-222222222222',

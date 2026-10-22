@@ -71,6 +71,7 @@ function codigoDe(...ruta: readonly string[]): string {
 /** Una fila del puerto que, en EJECUCION, trae `companyId` de contrabando. */
 function filaConEmpresa(): OrderRow {
   const row = {
+    salePrice: null,
     id: PEDIDO,
     number: { year: 2026, sequence: 78 },
     recipeId: RECETA,

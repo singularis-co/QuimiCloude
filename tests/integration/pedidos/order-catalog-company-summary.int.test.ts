@@ -121,6 +121,7 @@ function scopeOf(e: Empresa): OrderScope {
 
 function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
   return {
+    salePrice: null,
     recipeId: e.recipeId,
     quantity: '10.0000',
     priority: 'MEDIA',

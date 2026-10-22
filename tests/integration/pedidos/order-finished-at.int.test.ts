@@ -138,6 +138,7 @@ let nextSequence = 1
 
 function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
   return {
+    salePrice: null,
     recipeId,
     quantity: '10.0000',
     priority: 'MEDIA',
@@ -312,6 +313,7 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
     const id = await seedOrder({ status: 'PENDIENTE' })
     try {
       const edit: OrderEdit = {
+        salePrice: null,
         recipeId,
         quantity: '20.0000',
         priority: 'ALTA',

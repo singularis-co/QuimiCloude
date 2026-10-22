@@ -62,6 +62,7 @@ const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
 function filaCreada(): OrderRow {
   return {
+    salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA_DE_A,

@@ -43,6 +43,7 @@ const REF_VERSION: RecipeRef = {
 
 function fila(recipeId: string): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId,

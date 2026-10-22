@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import type { AssignedOrderSummary } from '@/lib/modules/pedidos/domain/order-catalog'
 import type {
   NewOrder,
   OrderRow,
@@ -28,6 +29,7 @@ const NEW_ORDER: NewOrder = {
   unitId: '33333333-3333-4333-8333-333333333333',
   customerId: null,
   presentationLines: [],
+  salePrice: null,
 }
 
 /** `true` si el tipo declara esa clave. Se evalua en COMPILACION; el `expect` de abajo solo
@@ -142,12 +144,13 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
 })
 
 describe('pedidos — el coste de ingredientes en la salida', () => {
-  it('la salida del pedido no declara ningun campo de precio de venta (R1)', () => {
+  it('la salida del pedido no declara precio por unidad ni total (R1)', () => {
+    // QC-307: el precio del pedido entero SI existe (`salePrice`, abajo); lo que sigue sin
+    // existir es un precio por unidad, un `price` generico o un total derivado.
     const precio: Declara<OrderView, 'price'> = false
     const precioUnitario: Declara<OrderView, 'unitPrice'> = false
-    const precioDeVenta: Declara<OrderView, 'salePrice'> = false
     const total: Declara<OrderView, 'total'> = false
-    expect([precio, precioUnitario, precioDeVenta, total]).toEqual([false, false, false, false])
+    expect([precio, precioUnitario, total]).toEqual([false, false, false])
   })
 
   it('OrderRow y OrderView llevan ingredientsCost', () => {
@@ -173,6 +176,49 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
     const moneda: Declara<OrderView, 'currency'> = false
     const codigoDeMoneda: Declara<OrderView, 'currencyCode'> = false
     expect([moneda, codigoDeMoneda]).toEqual([false, false])
+  })
+})
+
+describe('QC-307 — el precio de venta del pedido entero en el contrato', () => {
+  it('R1, R2: NewOrder, OrderRow y OrderView declaran salePrice como cadena o null', () => {
+    const enLaEscritura: Declara<NewOrder, 'salePrice'> = true
+    const enLaFila: Declara<OrderRow, 'salePrice'> = true
+    const enLaVista: Declara<OrderView, 'salePrice'> = true
+    const enElListado: Declara<OrderSummary, 'salePrice'> = true
+    expect([enLaEscritura, enLaFila, enLaVista, enElListado]).toEqual([true, true, true, true])
+
+    // Cadena decimal, nunca `number` (R2).
+    const conPrecio: NewOrder = { ...NEW_ORDER, salePrice: '1250.5000' }
+    const sinPrecio: OrderView['salePrice'] = null
+    // @ts-expect-error salePrice no admite number (R2)
+    const comoNumero: NewOrder = { ...NEW_ORDER, salePrice: 1250.5 }
+    expect([conPrecio.salePrice, sinPrecio, comoNumero.salePrice]).toEqual(['1250.5000', null, 1250.5])
+  })
+
+  it('R1, R2: salePrice es obligatorio en el tipo, no opcional', () => {
+    const sinLaClave: Omit<NewOrder, 'salePrice'> = {
+      recipeId: NEW_ORDER.recipeId,
+      quantity: NEW_ORDER.quantity,
+      priority: NEW_ORDER.priority,
+      status: NEW_ORDER.status,
+      unitId: NEW_ORDER.unitId,
+      customerId: NEW_ORDER.customerId,
+      presentationLines: NEW_ORDER.presentationLines,
+    }
+    // @ts-expect-error NewOrder exige salePrice: la ausencia se escribe `null`, no se omite
+    const incompleto: NewOrder = sinLaClave
+    expect(incompleto).not.toHaveProperty('salePrice')
+  })
+
+  it('R17: AssignedOrderSummary, lo que recibe asignaciones, NO declara salePrice', () => {
+    const enLoAsignado: Declara<AssignedOrderSummary, 'salePrice'> = false
+    expect(enLoAsignado).toBe(false)
+  })
+
+  it('R23: OrderView no declara nada derivado del precio: ni margin ni profit', () => {
+    const margen: Declara<OrderView, 'margin'> = false
+    const beneficio: Declara<OrderView, 'profit'> = false
+    expect([margen, beneficio]).toEqual([false, false])
   })
 })
 

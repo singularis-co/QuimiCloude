@@ -26,7 +26,7 @@
 
 ## Tanda 2 — dominio (depende de T1)
 
-- [ ] **T2 · Esquema de entrada** (backend) [P] — R3, R4, R5, R6, R7, R8, R14
+- [x] **T2 · Esquema de entrada** (backend) [P] — R3, R4, R5, R6, R7, R8, R14
   - `order-input.ts`: `salePriceSchema` y `createOrderSchema.salePrice` (`design.md > 2.1`).
   - `tests/unit/pedidos/order-input.test.ts`, un caso por cada uno de estos:
     - ausente, `''` y `'   '` dan `null`;
@@ -43,7 +43,7 @@
     - `updateOrderDistributionSchema` con `salePrice` falla por `.strict()`.
   - **Hecho:** los casos en verde. Los de `unitPrice` que ya existen siguen en verde sin tocarlos.
 
-- [ ] **T3 · Tipos y comentarios del contrato** (backend) [P] — R1, R2, R17
+- [x] **T3 · Tipos y comentarios del contrato** (backend) [P] — R1, R2, R17
   - `order-view.ts`: `salePrice` en `NewOrder`, `OrderRow` y `OrderView`. Se ajustan los tres
     comentarios «No es un precio de venta» (`design.md > 2.3`).
   - `order-input.ts:18-24`: «el precio **unitario** sigue fuera».
@@ -57,7 +57,7 @@
     - se añade el negativo de `margin` y `profit` en `OrderView` (R23).
   - **Hecho:** `typecheck` en verde **después** de T4 (los fixtures). El test de tipos está en verde.
 
-- [ ] **T4 · Fixtures** (backend + frontend) — depende de T3
+- [x] **T4 · Fixtures** (backend + frontend) — depende de T3
   - Se añade `salePrice: null` a cada literal de `OrderRow` / `OrderView` / `OrderSummary` de los
     tests y helpers listados en `## Archivos esperados > Fixtures`. **No** se cambia ninguna
     aserción.

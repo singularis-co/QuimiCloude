@@ -12,13 +12,15 @@ import type { OrderDeliveryState } from './order-pending-delivery';
  * La cantidad viaja como CADENA decimal en las dos direcciones, nunca `number`
  * (`docs/architecture.md > Anti-patrones`): el adaptador driven la devuelve con `.toFixed(4)`.
  *
- * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio sigue fuera.
+ * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio **unitario**
+ * sigue fuera -el precio del pedido entero es `salePrice` (QC-307)-.
  * Devuelve la UNIDAD (`unitId`), porque la cantidad se interpreta siempre en ella,
  * con o sin reparto, y el reparto en si mismo -`presentationLines`- sustituye a la presentacion
  * unica.
  *
  * `OrderRow` y `OrderView` SI llevan `ingredientsCost`: el pedido guarda el coste de sus propios
- * ingredientes, opcional, calculado al escribirlo. No es un precio de venta.
+ * ingredientes, opcional, calculado al escribirlo. Es el COSTE; el precio de venta es
+ * `salePrice`, va aparte, lo escribe el usuario y no se deriva del coste (QC-307).
  */
 
 /**
@@ -87,6 +89,8 @@ export type NewOrder = {
   readonly presentationLines: readonly OrderPresentationLineWrite[];
   /** `null` = pedido sin cliente. */
   readonly customerId: string | null;
+  /** Precio de venta del pedido entero (QC-307). `null` = sin precio. Cadena decimal(14,4). */
+  readonly salePrice: string | null;
 };
 
 /**
@@ -106,7 +110,8 @@ export type OrderEdit = Omit<NewOrder, 'status'>;
  * y solo invitaria a filtrar en memoria lo que ya filtro el puerto.
  *
  * `ingredientsCost` es el coste de los ingredientes de la receta con los lotes del momento en
- * que se escribio el pedido, o `null` si no se pudo calcular. No es un precio de venta.
+ * que se escribio el pedido, o `null` si no se pudo calcular. Es el COSTE; el precio de venta
+ * es `salePrice`, aparte, y no se deriva de el (QC-307).
  */
 export type OrderRow = {
   readonly id: string;
@@ -134,6 +139,8 @@ export type OrderRow = {
   readonly unitId: string | null;
   /** Solo el id: el nombre lo resuelve el caso de uso con el catalogo de clientes. */
   readonly customerId: string | null;
+  /** Precio de venta del pedido entero (QC-307); `null` = sin precio. Cadena con 4 decimales. */
+  readonly salePrice: string | null;
 };
 
 /**
@@ -149,10 +156,11 @@ export type OrderRow = {
  * `createdBy`/`updatedBy` son IDENTIFICADORES, no nombres (R46): este modulo no consulta el
  * modelo `User`. Resolverlos es de QC-35.
  *
- * `ingredientsCost` **no es un precio de venta**: es el coste de los ingredientes de la receta,
- * calculado con los lotes que habia en el momento de ESCRIBIR el pedido (alta o edicion), nunca
- * al leerlo. Puede ser `null` cuando no se pudo calcular; `null` y `0` no significan lo mismo, y
- * esta salida no tiene ningun otro campo de precio ni de moneda.
+ * `ingredientsCost` es el COSTE de los ingredientes de la receta, calculado con los lotes que
+ * habia en el momento de ESCRIBIR el pedido (alta o edicion), nunca al leerlo. Puede ser `null`
+ * cuando no se pudo calcular; `null` y `0` no significan lo mismo. El precio de venta es
+ * `salePrice`, aparte: lo escribe el usuario, no se deriva del coste y de el no sale ni margen ni
+ * total (QC-307 R23). Esta salida no tiene moneda.
  */
 export type OrderView = {
   readonly id: string;
@@ -198,6 +206,8 @@ export type OrderView = {
   readonly unitLabel: string | null;
   /** `null` = pedido sin cliente. Un cliente dado de baja vuelve con `isDeleted: true`. */
   readonly customer: OrderCustomer | null;
+  /** Precio de venta del pedido entero (QC-307); `null` = sin precio, distinto de `'0.0000'`. */
+  readonly salePrice: string | null;
 };
 
 /**

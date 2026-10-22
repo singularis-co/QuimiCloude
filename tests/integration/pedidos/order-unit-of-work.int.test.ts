@@ -173,6 +173,7 @@ async function createProductWithBatch(fixture: Fixture, stock: string): Promise<
 
 function newOrder(fixture: Fixture, quantity = '1.0000'): NewOrder {
   return {
+    salePrice: null,
     recipeId: fixture.recipeId,
     quantity,
     priority: 'BAJA',

@@ -31,6 +31,7 @@ const AHORA = new Date('2026-09-23T12:00:00Z');
 
 function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
   return {
+    salePrice: null,
     id: 'o-1',
     number: { year: 2026, sequence: 7 },
     recipeId: 'r-1',

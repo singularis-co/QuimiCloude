@@ -20,6 +20,7 @@ const PRES_ANTIGUA = '79797979-7979-4979-8979-797979797979'
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
   return {
+    salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,

@@ -71,6 +71,7 @@ const REFS_RECETA: readonly RecipeRef[] = [
 ]
 function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow {
   return {
+    salePrice: null,
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA_A,
     quantity: '10.0000',

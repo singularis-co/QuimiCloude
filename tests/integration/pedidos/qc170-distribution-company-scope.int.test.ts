@@ -447,6 +447,7 @@ describe('R29 — aislamiento: la edicion general (cantidad, unidad y reparto) n
       const resultado = await createOrderWriteRepository(prisma).updateAlive(
         pedidoA,
         {
+          salePrice: null,
           recipeId: b.recipeId,
           quantity: '80.0000',
           priority: 'BAJA',

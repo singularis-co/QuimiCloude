@@ -42,6 +42,7 @@ const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
 function fila(status: OrderStatus, cancellationReason: string | null = null): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId: '22222222-2222-4222-8222-222222222222',
