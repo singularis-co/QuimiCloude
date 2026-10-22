@@ -10,12 +10,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { identity } from '@/lib/composition';
 import { canUploadDocuments } from '@/lib/modules/documentos';
-import {
-  requirePagePermission,
-} from '@/lib/modules/identity/adapters/driving/require-page-permission';
-import {
-  getAiProviderReadinessAction,
-} from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
+import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
+import { getAiProviderReadinessAction } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 

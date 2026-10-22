@@ -200,6 +200,12 @@ configuración, y tocarlo sería tocar la política de reintentos, que está fue
 - Ninguna línea de más de 100 columnas en los archivos de producción que toca esta feature (P8).
   - El límite lo comprueba un caso del test de convenciones, limitado a esa lista de archivos.
   - No se tocan los documentos ni ESLint.
+  - **Excepción explícita (2026-10-21, PR #288):** un import de un solo nombre en una línea
+    (`import { x } from '…';`) puede pasar de 100 columnas.
+    - `tests/unit/integraciones/module-shape.test.ts` (R19 de integraciones) busca esa línea
+      exacta en `page.tsx` para `getAiProviderReadinessAction`, y partirla rompía
+      `gate-completo`.
+    - `requirePagePermission` sigue la misma forma, por coherencia.
 - En la fila del catálogo:
   - se añade el punto que falta en «permite descartarla. No cubre»;
   - se quita «ni la sincronización del registro entre pestañas»;

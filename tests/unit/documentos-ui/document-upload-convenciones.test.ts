@@ -312,12 +312,19 @@ const ARCHIVOS_CON_FORMATO = [
   PAGINA_DE_FORMULAS,
 ];
 
+/**
+ * Excepción explícita al ancho máximo: un import de un solo nombre, en una línea. Otras guardias
+ * leen esos imports como línea exacta (`tests/unit/integraciones/module-shape.test.ts`, R19 de
+ * integraciones: la acción de readiness «por su ruta exacta»), y partirlos las rompe.
+ */
+const IMPORT_DE_UN_NOMBRE = /^import \{ \w+ \} from '[^']+';$/;
+
 /** Las líneas de una fuente que superan el ancho máximo, como `archivo:línea (columnas)`. */
 function lineasLargas(ruta: string, fuente: string): string[] {
   return fuente
     .split(/\r?\n/)
-    .map((linea, indice) => ({ numero: indice + 1, columnas: [...linea].length }))
-    .filter(({ columnas }) => columnas > ANCHO_MAXIMO)
+    .map((linea, indice) => ({ linea, numero: indice + 1, columnas: [...linea].length }))
+    .filter(({ linea, columnas }) => columnas > ANCHO_MAXIMO && !IMPORT_DE_UN_NOMBRE.test(linea))
     .map(({ numero, columnas }) => `${ruta}:${numero} (${columnas})`);
 }
 
@@ -335,6 +342,13 @@ describe('formato de los archivos de producción de la pieza (QC-306)', () => {
   it('el detector de líneas largas muerde con 101 columnas y no con 100', () => {
     expect(lineasLargas('x.ts', `${'a'.repeat(100)}\n`)).toEqual([]);
     expect(lineasLargas('x.ts', `ok\n${'a'.repeat(101)}\n`)).toEqual(['x.ts:2 (101)']);
+  });
+
+  it('la única excepción es un import de un solo nombre en una línea', () => {
+    const ruta = `@/lib/${'m'.repeat(100)}`;
+    expect(lineasLargas('x.ts', `import { accion } from '${ruta}';\n`)).toEqual([]);
+    expect(lineasLargas('x.ts', `import { a, b } from '${ruta}';\n`)).toHaveLength(1);
+    expect(lineasLargas('x.ts', `const x = '${ruta}';\n`)).toHaveLength(1);
   });
 });
 
