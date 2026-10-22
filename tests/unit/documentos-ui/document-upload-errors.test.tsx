@@ -38,6 +38,7 @@ import {
   rowErrorTestId,
   rowReasonTestId,
 } from '@/components/shared/document-upload';
+import { resetBatchStatusStore } from '@/components/shared/document-upload/batch-status-store';
 import { errorMessage } from '@/lib/modules/errores';
 
 import { setupUser } from '../../helpers/user-event';
@@ -49,6 +50,7 @@ beforeEach(() => {
   issueUploadLinksActionMock.mockReset();
   enqueueBatchActionMock.mockReset();
   getBatchStatusActionMock.mockReset();
+  resetBatchStatusStore();
   fetchMock.mockReset();
 
   vi.stubGlobal('fetch', fetchMock);

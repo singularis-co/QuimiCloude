@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { MAX_FILES_PER_BATCH, type PdfStrategy } from '@/lib/modules/documentos';
+import { cn } from '@/lib/utils';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { DocumentUpload } from './document-upload';
@@ -28,16 +29,20 @@ export type DocumentUploadDialogProps = {
   readonly strategy: PdfStrategy;
   /** Opcional: se pasa tal cual a `DocumentUpload`. */
   readonly reviewHrefFor?: (documentFileId: string) => string;
+  /** Opcional: se pasa tal cual a `DocumentUpload`. */
+  readonly registryScope?: string;
   readonly disabled?: boolean;
 };
 
 /**
- * Ventana emergente que envuelve `DocumentUpload`. `keepMounted` mantiene la subida montada mientras
- * la ventana esta cerrada, para que una tanda en curso siga sondeandose y se vea igual al reabrir.
+ * Ventana emergente que envuelve `DocumentUpload`. `keepMounted` mantiene la subida montada
+ * mientras la ventana esta cerrada, para que una tanda en curso siga sondeandose y se vea igual al
+ * reabrir.
  */
 export function DocumentUploadDialog({
   strategy,
   reviewHrefFor,
+  registryScope,
   disabled = false,
 }: DocumentUploadDialogProps) {
   return (
@@ -59,14 +64,21 @@ export function DocumentUploadDialog({
         keepMounted
         showCloseButton={false}
         data-testid={DOCUMENT_UPLOAD_DIALOG_TESTID}
-        className="max-sm:w-[calc(100vw-32px)] sm:max-w-[640px] max-h-[calc(100dvh-32px)] overflow-y-auto"
+        className={cn(
+          'max-sm:w-[calc(100vw-32px)] sm:max-w-[640px]',
+          'max-h-[calc(100dvh-32px)] overflow-y-auto',
+        )}
       >
         <DialogHeader>
           <DialogTitle>{DIALOG_TITLE}</DialogTitle>
           <DialogDescription>{dialogDescription(MAX_FILES_PER_BATCH)}</DialogDescription>
         </DialogHeader>
 
-        <DocumentUpload strategy={strategy} reviewHrefFor={reviewHrefFor} />
+        <DocumentUpload
+          strategy={strategy}
+          reviewHrefFor={reviewHrefFor}
+          registryScope={registryScope}
+        />
 
         <DialogFooter>
           <DialogClose

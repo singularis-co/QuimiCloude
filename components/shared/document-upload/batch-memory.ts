@@ -1,13 +1,11 @@
 import { pdfStrategySchema, type PdfStrategy } from '@/lib/modules/documentos';
 
 /**
- * La MEMORIA de tandas: los batchIds que este navegador ya encolo, con la estrategia de cada uno.
- * Vive en `localStorage` para sobrevivir a cerrar la ventana y a navegar dentro de la app, y en
- * memoria para que quien este montado se entere en el acto.
+ * La clave de antes, sin ámbito, y el prefijo de la de cada ámbito
+ * (`<prefijo>:<userId>:<companyId>`).
  */
 export const REMEMBERED_BATCHES_STORAGE_KEY = 'document-upload-remembered-batches';
 
-/** Tope del registro: mas alla, se descartan las tandas mas viejas. */
 export const MAX_REMEMBERED_BATCHES = 20;
 
 export type RememberedBatch = {
@@ -16,11 +14,26 @@ export type RememberedBatch = {
   readonly rememberedAt: number;
 };
 
-const EMPTY: readonly RememberedBatch[] = [];
+type Batches = readonly RememberedBatch[];
 
-let current: readonly RememberedBatch[] = EMPTY;
-let hydrated = false;
-const listeners = new Set<() => void>();
+const EMPTY: Batches = [];
+
+const snapshots = new Map<string, Batches>();
+const listeners = new Map<string, Set<() => void>>();
+const detached = new Set<string>();
+let legacyCleared = false;
+let listening = false;
+
+const keyFor = (scope: string): string => `${REMEMBERED_BATCHES_STORAGE_KEY}:${scope}`;
+
+function storage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function isRememberedBatch(value: unknown): value is RememberedBatch {
   if (typeof value !== 'object' || value === null) return false;
@@ -33,72 +46,141 @@ function isRememberedBatch(value: unknown): value is RememberedBatch {
   );
 }
 
-/**
- * Lo guardado puede venir de una version vieja de la propia pieza o estar corrupto: se conservan
- * solo las entradas que siguen teniendo la forma de una tanda recordada.
- */
-function sanitize(parsed: unknown): readonly RememberedBatch[] {
-  if (!Array.isArray(parsed)) return EMPTY;
-  return parsed.filter(isRememberedBatch);
+function toRememberedBatch({ batchId, strategy, rememberedAt }: RememberedBatch): RememberedBatch {
+  return { batchId, strategy, rememberedAt };
 }
 
-function ensureHydrated(): void {
-  if (hydrated) return;
-  hydrated = true;
-  if (typeof window === 'undefined') return;
+/** `null` cuando el navegador no deja leer: quien llama decide con qué seguir. */
+function readStored(scope: string): Batches | null {
+  const store = storage();
+  if (store === null) return null;
+  let raw: string | null;
   try {
-    const raw = window.localStorage.getItem(REMEMBERED_BATCHES_STORAGE_KEY);
-    if (raw !== null) current = sanitize(JSON.parse(raw));
+    raw = store.getItem(keyFor(scope));
   } catch {
-    // Registro ilegible: arrancar vacio es lo unico seguro, y la memoria de la sesion sigue viva.
+    return null;
+  }
+  if (raw === null) return EMPTY;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isRememberedBatch).map(toRememberedBatch) : EMPTY;
+  } catch {
+    return EMPTY;
   }
 }
 
-function persist(): void {
-  if (typeof window === 'undefined') return;
+function writeStored(scope: string, batches: Batches): boolean {
+  const store = storage();
+  if (store === null) return false;
   try {
-    window.localStorage.setItem(REMEMBERED_BATCHES_STORAGE_KEY, JSON.stringify(current));
+    store.setItem(keyFor(scope), JSON.stringify(batches));
+    return true;
   } catch {
-    // Almacenamiento bloqueado o lleno (p. ej. modo privado): la sesion pierde la continuidad
-    // entre pantallas, no la lista viva.
+    return false;
   }
 }
 
-function notify(): void {
-  for (const listener of listeners) listener();
+function clearLegacyKey(): void {
+  if (legacyCleared) return;
+  const store = storage();
+  if (store === null) return;
+  legacyCleared = true;
+  try {
+    store.removeItem(REMEMBERED_BATCHES_STORAGE_KEY);
+  } catch {
+    legacyCleared = false;
+  }
 }
 
-/** Las tandas recordadas, la mas reciente primero. */
-export function rememberedBatches(): readonly RememberedBatch[] {
-  ensureHydrated();
-  return current;
-}
-
-/** Recuerda una tanda: la pone la primera y recorta el registro a su tope. */
-export function rememberBatch(batchId: string, strategy: PdfStrategy): void {
-  ensureHydrated();
-  const rest = current.filter((batch) => batch.batchId !== batchId);
-  current = [{ batchId, strategy, rememberedAt: Date.now() }, ...rest].slice(
-    0,
-    MAX_REMEMBERED_BATCHES,
+function sameBatches(a: Batches, b: Batches): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (batch, index) =>
+        batch.batchId === b[index]?.batchId &&
+        batch.strategy === b[index]?.strategy &&
+        batch.rememberedAt === b[index]?.rememberedAt,
+    )
   );
-  persist();
-  notify();
 }
 
-/** Quita una tanda del registro; no pasa nada si ya no estaba. */
-export function forgetBatch(batchId: string): void {
-  ensureHydrated();
-  if (!current.some((batch) => batch.batchId === batchId)) return;
-  current = current.filter((batch) => batch.batchId !== batchId);
-  persist();
-  notify();
+function notify(scope: string): void {
+  for (const listener of listeners.get(scope) ?? []) listener();
 }
 
-/** Aviso de que el registro cambio; devuelve como deshacerse del aviso. */
-export function onRememberedBatchesChange(listener: () => void): () => void {
-  listeners.add(listener);
+function replace(scope: string, next: Batches): void {
+  const before = snapshots.get(scope);
+  if (before !== undefined && sameBatches(before, next)) return;
+  snapshots.set(scope, next);
+  notify(scope);
+}
+
+/**
+ * Con la escritura rechazada, lo guardado ya no es la verdad: la sesión sigue con su copia en
+ * memoria hasta que una escritura vuelva a entrar.
+ */
+function update(scope: string, change: (batches: Batches) => Batches): void {
+  const current = rememberedBatches(scope);
+  const base = detached.has(scope) ? current : (readStored(scope) ?? current);
+  const next = change(base);
+  if (writeStored(scope, next)) detached.delete(scope);
+  else detached.add(scope);
+  replace(scope, next);
+}
+
+function onStorage(event: StorageEvent): void {
+  for (const scope of listeners.keys()) {
+    if (event.key !== null && event.key !== keyFor(scope)) continue;
+    if (detached.has(scope)) continue;
+    const stored = readStored(scope);
+    if (stored !== null) replace(scope, stored);
+  }
+}
+
+/** Las tandas del ámbito, la más reciente primero. La referencia solo cambia al mutar. */
+export function rememberedBatches(scope: string): Batches {
+  const cached = snapshots.get(scope);
+  if (cached !== undefined) return cached;
+  if (storage() === null) return EMPTY;
+  clearLegacyKey();
+  const hydrated = readStored(scope) ?? EMPTY;
+  snapshots.set(scope, hydrated);
+  return hydrated;
+}
+
+export function rememberBatch(scope: string, batchId: string, strategy: PdfStrategy): void {
+  update(scope, (batches) =>
+    [
+      { batchId, strategy, rememberedAt: Date.now() },
+      ...batches.filter((batch) => batch.batchId !== batchId),
+    ].slice(0, MAX_REMEMBERED_BATCHES),
+  );
+}
+
+export function forgetBatch(scope: string, batchId: string): void {
+  update(scope, (batches) => batches.filter((batch) => batch.batchId !== batchId));
+}
+
+/** Avisa cuando cambia el registro del ámbito, también desde otra pestaña. */
+export function onRememberedBatchesChange(scope: string, listener: () => void): () => void {
+  const ofScope = listeners.get(scope) ?? new Set<() => void>();
+  ofScope.add(listener);
+  listeners.set(scope, ofScope);
+  if (!listening && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
+    listening = true;
+  }
+
   return () => {
-    listeners.delete(listener);
+    ofScope.delete(listener);
+    if (ofScope.size === 0) {
+      listeners.delete(scope);
+      // Sin oyentes, nadie atiende el evento `storage`: la próxima lectura vuelve a hidratar.
+      if (!detached.has(scope)) snapshots.delete(scope);
+    }
+    if (listeners.size === 0 && listening) {
+      window.removeEventListener('storage', onStorage);
+      listening = false;
+    }
   };
 }
