@@ -56,11 +56,11 @@ describe('PropagateVersionsDialog — rediseño (QC-264)', () => {
     const { dialogo } = await abrir(UNA);
 
     const titulo = within(dialogo).getByTestId('propagate-versions-title');
-    expect(titulo).toHaveTextContent('1 versión parte de esta receta');
+    expect(titulo).toHaveTextContent('1 versión parte de esta fórmula');
     const cifra = within(titulo).getByTestId('propagate-versions-count');
     expect(cifra).toHaveTextContent('1');
     expect(cifra).toHaveClass('font-mono');
-    expect(within(dialogo).getByRole('heading', { name: '1 versión parte de esta receta' })).toBe(
+    expect(within(dialogo).getByRole('heading', { name: '1 versión parte de esta fórmula' })).toBe(
       titulo,
     );
   });
@@ -69,7 +69,7 @@ describe('PropagateVersionsDialog — rediseño (QC-264)', () => {
     const { dialogo } = await abrir(TRES);
 
     const titulo = within(dialogo).getByTestId('propagate-versions-title');
-    expect(titulo).toHaveTextContent('3 versiones parten de esta receta');
+    expect(titulo).toHaveTextContent('3 versiones parten de esta fórmula');
     expect(within(titulo).getByTestId('propagate-versions-count')).toHaveClass('font-mono');
   });
 

@@ -156,7 +156,7 @@ describe('DeleteRecipeDialog — borrar una original', () => {
 
     const dialogo = await abrir(user);
     await waitFor(() => expect(screen.getByTestId(id.confirmar)).toBeEnabled());
-    expect(within(dialogo).getByRole('heading', { name: 'Borrar receta' })).toBeInTheDocument();
+    expect(within(dialogo).getByRole('heading', { name: 'Borrar fórmula' })).toBeInTheDocument();
     expect(within(dialogo).getByTestId(id.mensaje).textContent).toBe(TEXTO_DE_HOY);
     expect(screen.queryByTestId(id.aviso)).toBeNull();
     expect(listRecipeVersionsActionMock).toHaveBeenCalledTimes(1);
@@ -269,7 +269,7 @@ describe('DeleteRecipeDialog — borrar una original', () => {
     expect(deleteRecipeActionMock).toHaveBeenCalledTimes(1);
     expect(deleteRecipeActionMock).toHaveBeenCalledWith(ORIGINAL.id);
     expect(toastExito).toHaveBeenCalledTimes(1);
-    expect(toastExito).toHaveBeenCalledWith('Receta borrada.');
+    expect(toastExito).toHaveBeenCalledWith('Fórmula borrada.');
   });
 
   it('R35: si falla el borrado de la original el diálogo sigue abierto con el error a la vista', async () => {
@@ -312,7 +312,7 @@ describe('DeleteRecipeDialog — objetivos táctiles', () => {
 
 describe('DeleteRecipeDialog — icono de borrado', () => {
   it.each([
-    { kind: 'recipe' as const, receta: ORIGINAL, titulo: 'Borrar receta' },
+    { kind: 'recipe' as const, receta: ORIGINAL, titulo: 'Borrar fórmula' },
     { kind: 'version' as const, receta: VERSION, titulo: 'Borrar versión' },
   ])(
     'R50: con $kind pinta el icono de borrado en tono danger delante del título',
@@ -335,7 +335,7 @@ describe('DeleteRecipeDialog — icono de borrado', () => {
     {
       kind: 'recipe' as const,
       receta: ORIGINAL,
-      titulo: 'Borrar receta',
+      titulo: 'Borrar fórmula',
       mensaje: TEXTO_DE_HOY,
     },
     {

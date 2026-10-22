@@ -1,7 +1,7 @@
 'use client';
 
 import { CircleAlert } from 'lucide-react';
-import { useActionState, useId, useState } from 'react';
+import { startTransition, useActionState, useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
@@ -105,8 +105,9 @@ export type AiProviderFormProps = {
 };
 
 /**
- * La key nunca tiene valor inicial y el campo se vuelve a montar vacío tras cada respuesta: ni lo
- * escrito vuelve del servidor ni depende del reinicio automático del `<form>`.
+ * La key nunca tiene valor inicial y el campo se vuelve a montar vacío tras cada respuesta de
+ * guardar: ni lo escrito vuelve del servidor ni depende del reinicio automático del `<form>`. Tras
+ * probar, la key escrita se queda en el campo para poder guardarla sin pegarla otra vez.
  */
 export function AiProviderForm({ providers, initialProvider, onSaved }: AiProviderFormProps) {
   const baseId = useId();
@@ -126,10 +127,10 @@ export function AiProviderForm({ providers, initialProvider, onSaved }: AiProvid
     setFieldGeneration((previous) => previous + 1);
   }
 
+  // La prueba no vacía el campo: se despacha a mano para que React no reinicie el `<form>`.
   const [testFeedback, testAction, testPending] = useActionState(
     async (_previous: AiProviderFeedback, formData: FormData): Promise<AiProviderFeedback> => {
       const result = await testAiProviderKeyAction({ status: 'idle' }, formData);
-      afterResponse();
       if (result.status === 'error') return { kind: 'error', error: result };
       if (result.status === 'tested') {
         return result.ok
@@ -239,13 +240,18 @@ export function AiProviderForm({ providers, initialProvider, onSaved }: AiProvid
 
         <div className="flex flex-wrap justify-end gap-3 @max-[760px]:flex-col @max-[760px]:items-stretch">
           <Button
-            type="submit"
+            type="button"
             variant="outline"
             touch
-            formAction={testAction}
             disabled={disabled}
             aria-busy={testPending}
-            onClick={() => setShown('test')}
+            onClick={(event) => {
+              const form = event.currentTarget.form;
+              if (form === null) return;
+              setShown('test');
+              const formData = new FormData(form);
+              startTransition(() => testAction(formData));
+            }}
             data-testid={AI_PROVIDER_FORM_TEST_TESTID}
           >
             {testPending ? <Spinner size="sm" /> : null}

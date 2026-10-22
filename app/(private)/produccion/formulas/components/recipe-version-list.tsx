@@ -84,7 +84,7 @@ export function RecipeVersionList({ originalId, versions }: RecipeVersionListPro
           className="border-t py-2.5 text-sm text-muted-foreground"
           data-testid="recipe-versions-empty"
         >
-          Esta receta todavía no tiene versiones.
+          Esta fórmula todavía no tiene versiones.
         </p>
       ) : (
         <ul

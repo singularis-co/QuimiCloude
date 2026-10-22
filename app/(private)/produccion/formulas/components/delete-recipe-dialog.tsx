@@ -15,7 +15,7 @@ import {
 
 export const DELETE_RECIPE_ICON_TESTID = 'delete-recipe-icon';
 
-const DELETE_SUCCESS = 'Receta borrada.';
+const DELETE_SUCCESS = 'Fórmula borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
 
 type DeleteKind = 'recipe' | 'version';
@@ -149,7 +149,7 @@ export function DeleteRecipeDialog({
             }
       }
       texts={{
-        title: isVersion ? 'Borrar versión' : 'Borrar receta',
+        title: isVersion ? 'Borrar versión' : 'Borrar fórmula',
         description: (
           <>
             {isVersion

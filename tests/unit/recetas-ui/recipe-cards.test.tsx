@@ -188,7 +188,7 @@ describe('estados del listado con tarjetas', () => {
     render(<RecipeTable recipes={[]} params={PARAMS} totalPages={1} empty={{}} />);
 
     const vacio = screen.getByTestId('recipe-list-empty');
-    expect(vacio).toHaveTextContent('Todavía no hay recetas en el catálogo.');
+    expect(vacio).toHaveTextContent('Todavía no hay fórmulas en el catálogo.');
     expect(within(vacio).getByTestId('recipe-create-open')).toHaveTextContent('Nueva fórmula');
     expect(screen.getAllByTestId('recipe-list-empty')).toHaveLength(1);
     expect(screen.queryByTestId('data-table-cards')).toBeNull();
@@ -204,7 +204,7 @@ describe('estados del listado con tarjetas', () => {
       />,
     );
 
-    expect(screen.getByText('Ninguna receta coincide con la búsqueda o los filtros.')).toBeInTheDocument();
+    expect(screen.getByText('Ninguna fórmula coincide con la búsqueda o los filtros.')).toBeInTheDocument();
     expect(screen.getAllByTestId('recipe-list-no-results')).toHaveLength(1);
     expect(screen.getByTestId('recipe-list-clear-search')).toHaveTextContent('Limpiar búsqueda y filtros');
     expect(screen.queryByTestId('data-table-cards')).toBeNull();

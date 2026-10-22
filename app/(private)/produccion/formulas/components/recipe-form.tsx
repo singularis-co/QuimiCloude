@@ -128,7 +128,7 @@ const CONDITIONING_STEPS_TESTID_PREFIX = 'recipe-conditioning-step';
 const PREVIEW_OPEN_LABEL = 'Vista previa';
 const PREVIEW_TITLE = 'Vista previa';
 const PREVIEW_DESCRIPTION =
-  'Así se leerá esta receta, paso a paso. Nada de lo que hagas aquí se guarda.';
+  'Así se leerá esta fórmula, paso a paso. Nada de lo que hagas aquí se guarda.';
 const PREVIEW_CLOSE_LABEL = 'Cerrar';
 // Por debajo de 768 px ocupa la pantalla visible entera; desde ahí, centrado con tope de 920 × 900.
 // `dvh` y no `vh`: en el móvil la barra del navegador se come parte del alto de ventana.
@@ -142,8 +142,8 @@ const STEP_LOCK_TITLE = (orders: number) =>
 const STEP_LOCK_BODY =
   'Mientras sigan en curso no puedes mover ni quitar pasos. Sí puedes cambiar el texto, encender o apagar «Requiere evidencia» y añadir pasos al final.';
 
-const SAVE_SUCCESS_CREATE = 'Receta creada.';
-const SAVE_SUCCESS_EDIT = 'Receta actualizada.';
+const SAVE_SUCCESS_CREATE = 'Fórmula creada.';
+const SAVE_SUCCESS_EDIT = 'Fórmula actualizada.';
 /**
  * QC-70 (R21): el código que el formulario FABRICA para su propio rechazo sale del catálogo
  * -`satisfies` conserva el literal y a la vez obliga a que siga estando en la lista cerrada-. El
