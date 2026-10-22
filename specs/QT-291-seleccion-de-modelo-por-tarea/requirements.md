@@ -30,9 +30,6 @@ _Pendiente: los escribe spec_author (F1.2)._
   `catalog_model`) que no siempre coinciden (Gemini); el spec propone cómo queda un solo
   predeterminado.
 - ¿Hace falta E2E? No es flujo crítico de `docs/checkpoints-proyecto.md`; lo decide el spec con motivo.
-- Pase `/design`: tableros `docs/diseno/canvas/ProveedorIAModelos.dc.html`,
-  `ProveedorIAModelosTablet.dc.html` y `ProveedorIAModelosMovil.dc.html`, pendientes de aprobación
-  del humano (`docs/perfil-agentes.md > Pase de diseño para componentes nuevos`).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -46,5 +43,6 @@ _Pendiente: los escribe spec_author (F1.2)._
 | 2026-10-22 | ¿Qué pasa al cambiar de proveedor? | Se borra la elección: vuelve el predeterminado del nuevo proveedor. |
 | 2026-10-22 | ¿Y si el modelo elegido desaparece del proveedor? | La lectura falla y la conexión queda en Error con su aviso hasta que elija otro (patrón QC-275). Sin vuelta automática al predeterminado. |
 | 2026-10-22 | ¿«Probar conexión» verifica el modelo elegido? | Sí: prueba el modelo en uso (elegido o predeterminado). |
+| 2026-10-22 | ¿Diseño? | Tableros `docs/diseno/canvas/ProveedorIAModelos.dc.html`, `ProveedorIAModelosTablet.dc.html` y `ProveedorIAModelosMovil.dc.html`, aprobados por el humano («aprobado», 2026-10-22). Un solo selector en la tarjeta «conectado» de QC-275; estados predeterminado, elegido y modelo retirado. |
 | 2026-10-22 | ¿Quién elige el modelo? | `integraciones.modificar` (heredado de QC-275 D2). |
 | — | Identificadores de DB | En inglés (heredado de QC-4). |
