@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { errorMessage } from '@/lib/modules/errores';
 import {
   DOCUMENT_TYPE_CC,
@@ -706,11 +707,30 @@ test.describe('pedido en varias presentaciones', () => {
     const packingScreen = await openPackingScreen(page, orderId);
     const packingLines = packingScreen.getByTestId(PACKING_LINE_TESTID);
     await expect(packingLines).toHaveCount(2);
+    // Cada linea nombra el envase y el volumen de su presentacion (9a330ab2), con el mismo formateo
+    // que la etiqueta compartida; las dos presentaciones van en litros (`unit.symbol ?? unit.name`).
+    const litreUnit = await prisma.unit.findUniqueOrThrow({
+      where: { id: litroUnitId! },
+      select: { symbol: true, name: true },
+    });
+    const litreLabel = litreUnit.symbol ?? litreUnit.name;
     await expect(packingLines.filter({ hasText: PACKAGING_A_NAME })).toHaveText(
-      `${PACKAGES_A} × ${PACKAGING_A_NAME}`,
+      orderDistributionLineText({
+        presentationName: PRESENTATION_A_NAME,
+        packagingName: PACKAGING_A_NAME,
+        packages: Number(PACKAGES_A),
+        presentationContent: PRESENTATION_A_CONTENT,
+        presentationUnitLabel: litreLabel,
+      }),
     );
     await expect(packingLines.filter({ hasText: PACKAGING_B_NAME })).toHaveText(
-      `${PACKAGES_B} × ${PACKAGING_B_NAME}`,
+      orderDistributionLineText({
+        presentationName: PRESENTATION_B_NAME,
+        packagingName: PACKAGING_B_NAME,
+        packages: Number(PACKAGES_B),
+        presentationContent: PRESENTATION_B_CONTENT,
+        presentationUnitLabel: litreLabel,
+      }),
     );
 
     await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);

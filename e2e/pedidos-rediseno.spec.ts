@@ -397,11 +397,17 @@ async function box(locator: Locator): Promise<Box> {
   return found as Box;
 }
 
+function toHundredthPx(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 async function expectTarget(locator: Locator, label: string, minHeight = MIN_TARGET_PX): Promise<Box> {
   await expect(locator, label).toBeVisible();
   const found = await box(locator);
-  expect(found.width, `${label}: ancho`).toBeGreaterThanOrEqual(MIN_TARGET_PX);
-  expect(found.height, `${label}: alto`).toBeGreaterThanOrEqual(minHeight);
+  // El motor devuelve la caja con error de coma flotante (43.99996... para un alto de 44 px): se
+  // redondea a la centesima de pixel antes de comparar, sin tocar el umbral.
+  expect(toHundredthPx(found.width), `${label}: ancho`).toBeGreaterThanOrEqual(MIN_TARGET_PX);
+  expect(toHundredthPx(found.height), `${label}: alto`).toBeGreaterThanOrEqual(minHeight);
   return found;
 }
 
