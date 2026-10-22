@@ -43,15 +43,16 @@ Se declara en `arnes.config.json > tracker`, que se versiona:
 }
 ```
 
-- `board` es el id del board (el de la URL `trello.com/b/<id>/…` sirve).
+- `board` es el id **completo** del board (24 caracteres hex). El corto de la URL
+  (`trello.com/b/<corto>/…`) sirve para leer, pero `POST /labels` lo rechaza con `400 Invalid id`
+  y `crear` falla. Se saca con `GET /boards/<corto>?fields=id`.
 - `prefijo` da la key de las tarjetas nuevas: `<prefijo>-<idShort>`.
 - `prefijos_historicos` son los prefijos de las features migradas de otro tracker, que conservan
   su key (`## Migrar desde Jira`). El validador acepta los dos.
 - Con `tracker` presente, el bloque `jira` ya no se lee.
 
-Este bloque es el ejemplo listo para pegar en QuimiCloude el día del corte: hoy el perfil sigue en
-`jira` porque el board de Trello todavía no existe. Los nombres de las listas son los del board
-real; los de arriba son el supuesto a confirmar.
+QuimiCloude cortó a Trello el 2026-10-22 con este bloque; los nombres de las listas son los del
+board real.
 
 ## Montar el board (una vez)
 
