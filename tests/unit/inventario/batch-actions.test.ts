@@ -1,5 +1,6 @@
 import {
   adjustBatchStockAction,
+  listAliveProductBatchesAction,
   listBatchMovementsAction,
   listProductBatchesAction,
   type AdjustBatchStockFormState,
@@ -363,6 +364,55 @@ describe('listProductBatchesAction', () => {
     listProductBatchesMock.mockRejectedValue(new ValidationError());
 
     const result = await listProductBatchesAction('no-es-un-uuid');
+
+    expect(result).toEqual({
+      status: 'error',
+      code: 'invalid_input',
+      message: errorMessage('invalid_input'),
+    });
+  });
+});
+
+describe('listAliveProductBatchesAction', () => {
+  const vivo = { id: BATCH_ID, lot: 'L-2026-001', stock: '3.5000' };
+  const agotado = { id: 'b-0', lot: 'L-2026-000', stock: '0.0000' };
+  const minimo = { id: 'b-min', lot: 'L-2026-002', stock: '0.0001' };
+
+  it('devuelve solo los lotes con existencia mayor que cero', async () => {
+    listProductBatchesMock.mockResolvedValue([agotado, vivo, minimo]);
+
+    const result = await listAliveProductBatchesAction(PRODUCT_ID);
+
+    expect(result).toEqual({ status: 'success', data: [vivo, minimo] });
+    expect(listProductBatchesMock).toHaveBeenCalledWith(PRODUCT_ID, ADMIN_ACTOR);
+  });
+
+  it('listProductBatchesAction sigue devolviendo tambien los agotados', async () => {
+    listProductBatchesMock.mockResolvedValue([agotado, vivo]);
+
+    const result = await listProductBatchesAction(PRODUCT_ID);
+
+    expect(result).toEqual({ status: 'success', data: [agotado, vivo] });
+  });
+
+  it('sin contexto de empresa propaga unauthorized igual que la lectura completa', async () => {
+    getSessionContextMock.mockResolvedValue(null);
+    listProductBatchesMock.mockRejectedValue(new UnauthorizedError());
+
+    const result = await listAliveProductBatchesAction(PRODUCT_ID);
+
+    expect(listProductBatchesMock).toHaveBeenCalledWith(PRODUCT_ID, null);
+    expect(result).toEqual({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+  });
+
+  it('traduce el identificador invalido a invalid_input', async () => {
+    listProductBatchesMock.mockRejectedValue(new ValidationError());
+
+    const result = await listAliveProductBatchesAction('no-es-un-uuid');
 
     expect(result).toEqual({
       status: 'error',

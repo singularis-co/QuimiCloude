@@ -17,7 +17,7 @@ const OTRA_ORIGINAL = '22222222-2222-4222-8222-222222222222'
 const VERSION = '33333333-3333-4333-8333-333333333333'
 
 function original(id = ORIGINAL, overrides: Partial<RecipeRef> = {}): RecipeRef {
-  return { id, name: 'Base', ownName: 'Base', isDeleted: false, isUnderReview: false, original: null, ...overrides }
+  return { id, name: 'Base', ownName: 'Base', isDeleted: false, isUnderReview: false, original: null, imageUrl: null, ...overrides }
 }
 
 function version(overrides: Partial<RecipeRef> = {}, padre = ORIGINAL): RecipeRef {
@@ -28,6 +28,7 @@ function version(overrides: Partial<RecipeRef> = {}, padre = ORIGINAL): RecipeRe
     isDeleted: false,
     isUnderReview: false,
     original: { id: padre, name: 'Base' },
+    imageUrl: null,
     ...overrides,
   }
 }

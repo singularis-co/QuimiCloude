@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido con acondicionamiento en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844 · acondicionamiento terminado</span><div class="frame-phone"><div class="frame-in"><dc-import name="RecorridoAcondicionamiento" variante="terminado" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Recorrido con acondicionamiento · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">ExecutionTimeline · shared/status-badge · ui/avatar · ui/card · shared/data-table (tabla ⇄ tarjetas) · ui/skeleton · shared/arrow-link · formatTraceDuration · formatTraceInstant · EMPTY_MARK</span> · ninguna pieza nueva del catálogo</dd>
+      <dt>Librerías</dt><dd><span class="mono">lucide-react</span> (ClipboardList, Download, ClipboardCheck, Users, Camera) · ninguna nueva</dd>
+      <dt>Escritorio</dt><dd>Los datos de arriba pasan de 3 a 5 en una sola rejilla: Estado (con «En curso» si el pedido está vivo) · Duración de producción · Duración de empaque · Duración de acondicionamiento · Vueltas atrás. Cada duración en monoespaciada; «En curso» (azul) si la fase está abierta, «Sin cierre anotado» (gris) si quedó sin cierre. Sin Comenzar anotado (pedido anterior a la feature) la tarjeta de acondicionamiento no se pinta y la rejilla se reparte en 4 · tres anotaciones nuevas: <strong>Comenzar acondicionamiento</strong> (azul, portapapeles): supervisor + «Equipo de trabajo · N» en lista, con el grupo a la derecha si entró por grupo; sin equipo: «Se comenzó sin equipo de trabajo.» · <strong>Guardado de datos de lote</strong> (neutro, flecha a bandeja): quién guardó y cuántas presentaciones + tabla Lote · Presentación · Vencimiento · Día de producción + aviso «Datos tal como se guardaron en ese momento»; una corrección es otro guardado completo · <strong>Terminar acondicionamiento</strong> (verde, portapapeles con check): quién terminó</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · 5 datos en 3 + 2 columnas · la tabla del guardado conserva columnas</dd>
+      <dt>Teléfono</dt><dd>Los datos van en 2 columnas · el equipo es una lista de filas de 40 px; el grupo baja debajo del nombre si no cabe · cada línea del guardado pasa a tarjeta: lote + presentación arriba, «Vence» y «Producido» abajo · presentación sin nombre: «—» con nombre accesible «Sin dato»</dd>
+      <dt>Animación</dt><dd>La misma de hoy: esqueleto 700 ms · cada anotación entra subiendo (40 ms de desfase, también las nuevas) · realce de la tarjeta al pasar · nada nuevo</dd>
+      <dt>Por confirmar</dt><dd>Formato de fechas de vencimiento y día de producción (aquí dd/mm/aaaa; la foto guarda AAAA-MM-DD) · etiqueta exacta de las tres duraciones · «En curso» como insignia frente al sufijo « (en curso)» de formatTraceDuration · si «Terminar acondicionamiento» muestra algo más que quién terminó · nombre del icono de las tres anotaciones</dd>
+      <dt>Enmienda 2026-10-16</dt><dd>Aprobada por el usuario, sin tarjeta. Commit 0f135128: «Estado» ya no lleva el chip «En curso» del pedido; la insignia «En curso» de una fase abierta en su tarjeta de duración se queda. Commit 440ff5b2: EN_CURSO se lee «En fabricación». Specs: QC-283 R28, QC-261 R6</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

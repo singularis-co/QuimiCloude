@@ -18,3 +18,8 @@ export async function openRowActionsMenuItem(
   }).toPass({ timeout: 60_000 });
   return item;
 }
+
+/** Disparador del menu de un lote, dentro de su fila del panel «Lotes». */
+export function batchActionsTrigger(batchRow: Locator): Locator {
+  return batchRow.getByRole('button', { name: /^Acciones del lote / });
+}

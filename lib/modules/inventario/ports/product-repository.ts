@@ -4,7 +4,7 @@ import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
-import type { BatchHistoryEntry } from '../domain/reservation';
+import type { BatchMovementRecord } from '../domain/reservation';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../domain/stock-adjustment';
 
 /**
@@ -46,6 +46,15 @@ import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../domain/st
  * tipo no se puede escribir por accidente ni elegir desde la entrada del llamante. Al crear,
  * la escribe el adaptador desde este `scope` y de ningun otro sitio.
  */
+/**
+ * Que lee `listAlive` ademas de la fila. Cerrado por defecto: sin `withUnitCosts: true` el
+ * adaptador NO consulta los costos y `averageUnitCost` no sale en ninguna fila. Lo decide el caso
+ * de uso con `canViewUnitCosts`, nunca quien llama desde fuera.
+ */
+export type ListAliveOptions = {
+  readonly withUnitCosts?: boolean;
+};
+
 export interface ProductRepository {
   create(data: NewProduct, now: Date, scope: InventoryScope): Promise<{ id: string }>;
   findAliveById(id: string, scope: InventoryScope): Promise<ProductView | null>;
@@ -63,7 +72,7 @@ export interface ProductRepository {
   softDeleteAlive(id: string, now: Date, scope: InventoryScope): Promise<boolean>;
   /** QC-57 (R24): recibe el CONTRATO GENERICO ya saneado por el caso de uso, no la
    *  consulta cruda del llamante. Traducir `columnId`/filtros a SQL es del adaptador. */
-  listAlive(query: ListQuery, scope: InventoryScope): Promise<Page<ProductView>>;
+  listAlive(query: ListQuery, scope: InventoryScope, options?: ListAliveOptions): Promise<Page<ProductView>>;
 
   /**
    * ¿Hay ya un producto VIVO con este nombre EN LA UNIDAD de esta presentacion?
@@ -238,5 +247,5 @@ export interface ProductRepository {
   findBatchMovements(
     batchId: string,
     scope: InventoryScope,
-  ): Promise<readonly BatchHistoryEntry[] | null>;
+  ): Promise<readonly BatchMovementRecord[] | null>;
 }

@@ -38,6 +38,7 @@ import {
   rowErrorTestId,
   rowReasonTestId,
 } from '@/components/shared/document-upload';
+import { resetBatchStatusStore } from '@/components/shared/document-upload/batch-status-store';
 import { errorMessage } from '@/lib/modules/errores';
 
 import { setupUser } from '../../helpers/user-event';
@@ -49,6 +50,7 @@ beforeEach(() => {
   issueUploadLinksActionMock.mockReset();
   enqueueBatchActionMock.mockReset();
   getBatchStatusActionMock.mockReset();
+  resetBatchStatusStore();
   fetchMock.mockReset();
 
   vi.stubGlobal('fetch', fetchMock);
@@ -111,6 +113,51 @@ describe('los errores de la subida', () => {
     // El motivo se muestra como detalle, pero no es el texto del error.
     expect(screen.getByTestId(rowReasonTestId(0))).toHaveTextContent(MISMO_MOTIVO);
     expect(screen.getByTestId(rowErrorTestId(0)).textContent).not.toContain(MISMO_MOTIVO);
+  });
+
+  it.each(['ai_provider_missing', 'ai_provider_error'] as const)(
+    'R39: un archivo que termina en %s muestra en su fila el texto del catalogo de ese codigo',
+    (code) => {
+      const MOTIVO = 'detalle libre del proveedor';
+      render(
+        <DocumentUploadRow
+          index={0}
+          fileName="uno.pdf"
+          phase="uploaded"
+          entry={entry({ status: 'error', errorCode: code, errorReason: MOTIVO })}
+        />,
+      );
+
+      const texto = screen.getByTestId(rowErrorTestId(0));
+      expect(errorMessage(code).trim()).not.toBe('');
+      expect(texto).toHaveTextContent(errorMessage(code));
+      expect(texto.textContent).not.toContain(MOTIVO);
+    },
+  );
+
+  it('R39: los dos codigos del proveedor IA pintan textos distintos en su fila', () => {
+    render(
+      <ul>
+        <DocumentUploadRow
+          index={0}
+          fileName="uno.pdf"
+          phase="uploaded"
+          entry={entry({ status: 'error', errorCode: 'ai_provider_missing', errorReason: null })}
+        />
+        <DocumentUploadRow
+          index={1}
+          fileName="dos.pdf"
+          phase="uploaded"
+          entry={entry({ status: 'error', errorCode: 'ai_provider_error', errorReason: null })}
+        />
+      </ul>,
+    );
+
+    expect(screen.getByTestId(rowErrorTestId(0))).toHaveTextContent(errorMessage('ai_provider_missing'));
+    expect(screen.getByTestId(rowErrorTestId(1))).toHaveTextContent(errorMessage('ai_provider_error'));
+    expect(screen.getByTestId(rowErrorTestId(0)).textContent).not.toBe(
+      screen.getByTestId(rowErrorTestId(1)).textContent,
+    );
   });
 
   it('un error de la consulta detiene el sondeo y se muestra por su code (R12)', async () => {

@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { useState } from 'react';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { RecipeStepEditor } from '@/app/(private)/produccion/formulas/components';
 import {
@@ -473,6 +473,35 @@ describe('RecipeStepEditor', () => {
       }
     });
 
+    it('R16: los tres botones miden 44 x 44, llevan aria-pressed y un icono oculto a lectores, sin glifo de texto ni borde propio', async () => {
+      await montar();
+
+      for (const nombre of ['Negrilla', 'Cursiva', 'Lista de verificacion']) {
+        const boton = screen.getByRole('button', { name: nombre });
+        expect(boton.className).toContain('min-h-11');
+        expect(boton.className).toContain('min-w-11');
+        expect(boton).toHaveAttribute('aria-pressed', 'false');
+        expect(boton.className.split(/\s+/)).not.toContain('border');
+        expect(boton.textContent).toBe('');
+        const icono = boton.querySelector('svg');
+        expect(icono).not.toBeNull();
+        expect(icono).toHaveAttribute('aria-hidden', 'true');
+      }
+    });
+
+    it('R16: el botón activo toma el fondo de tarjeta sobre la barra', async () => {
+      const usuario = setupUser();
+      await montar();
+      const negrilla = screen.getByRole('button', { name: 'Negrilla' });
+      expect(negrilla.className).not.toMatch(/(^|\s)bg-card(\s|$)/);
+
+      await activarConElTeclado(usuario, negrilla, '{Enter}');
+      await waitFor(() => {
+        expect(negrilla).toHaveAttribute('aria-pressed', 'true');
+      });
+      expect(negrilla.className).toMatch(/(^|\s)bg-card(\s|$)/);
+    });
+
     it('R26: no se usa 100vh y ninguna accion vive detras de :hover', async () => {
       for (const fuente of [FUENTE_EDITOR, FUENTE_ESQUEMA]) {
         expect(fuente).not.toContain('100vh');
@@ -493,5 +522,373 @@ describe('RecipeStepEditor', () => {
         expect(screen.getByRole('button', { name: nombre })).toBeVisible();
       }
     });
+  });
+});
+
+function EvidenceHarness({ inicial = false }: { readonly inicial?: boolean }) {
+  const [documento, setDocumento] = useState<RecipeStepDocument>(DOC_VACIO);
+  const [marcado, setMarcado] = useState(inicial);
+  return (
+    <RecipeStepEditor
+      document={documento}
+      onChange={setDocumento}
+      label="Paso 1"
+      editableTestId={TEST_ID}
+      evidence={{
+        checked: marcado,
+        onCheckedChange: setMarcado,
+        label: 'Requiere evidencia en el paso 1',
+      }}
+    />
+  );
+}
+
+describe('RecipeStepEditor — «Requiere evidencia»', () => {
+  it('R1: sin la prop evidence no hay interruptor', async () => {
+    await montar();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText('Requiere evidencia')).toBeNull();
+  });
+
+  it('R2: con la prop evidence apagada, el interruptor sale apagado y sin línea de ayuda', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    // Solo icono: el texto va en el nombre accesible y en el tooltip.
+    expect(control.textContent).toBe('');
+    expect(control.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+  });
+
+  it('R1, R5: se enciende con teclado y muestra la línea de ayuda; se apaga y la quita', async () => {
+    const user = setupUser();
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+    const control = screen.getByRole('switch', { name: 'Requiere evidencia en el paso 1' });
+
+    control.focus();
+    await user.keyboard(' ');
+    expect(control).toHaveAttribute('aria-checked', 'true');
+    const ayuda = screen.getByTestId(`${TEST_ID}-evidence-help`);
+    expect(ayuda).toHaveTextContent('Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.');
+    expect(control).toHaveAttribute('aria-describedby', ayuda.id);
+
+    await user.click(control);
+    expect(control).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+  });
+
+  it('R16: la barra lleva fondo apagado y borde inferior; formato a la izquierda y el interruptor en su grupo, que baja de línea en teléfono', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const barra = screen.getByTestId(`${TEST_ID}-bar`);
+    expect(barra.className).toContain('bg-muted');
+    expect(barra.className).toContain('border-b');
+    expect(barra.className).toContain('flex-wrap');
+    const formato = screen.getByTestId(`${TEST_ID}-toolbar`);
+    const grupo = screen.getByTestId(`${TEST_ID}-row-tools`);
+    expect(barra.firstElementChild).toBe(formato);
+    expect(grupo).toContainElement(screen.getByTestId(`${TEST_ID}-evidence`));
+    expect(grupo.className).toContain('w-full');
+    expect(grupo.className).toContain('md:ml-auto');
+    expect(grupo.className).toContain('md:w-auto');
+  });
+
+  it('R20: el grupo del interruptor y las acciones se parte en líneas para no desbordar a 390 px', async () => {
+    render(<EvidenceHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const grupo = screen.getByTestId(`${TEST_ID}-row-tools`);
+    expect(grupo.className).toContain('flex-wrap');
+  });
+
+  it('R1: el interruptor no entra en la barra de formato, que sigue con tres acciones', async () => {
+    render(<EvidenceHarness inicial />);
+    const barra = await screen.findByTestId(`${TEST_ID}-toolbar`);
+    expect(barra.querySelector('[role="switch"]')).toBeNull();
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+});
+
+function SwitchesHarness({ conAsignacion = true }: { readonly conAsignacion?: boolean }) {
+  const [documento, setDocumento] = useState<RecipeStepDocument>(DOC_VACIO);
+  const [evidencia, setEvidencia] = useState(false);
+  const [asignacion, setAsignacion] = useState(false);
+  return (
+    <RecipeStepEditor
+      document={documento}
+      onChange={setDocumento}
+      label="Paso 2"
+      editableTestId={TEST_ID}
+      evidence={{
+        checked: evidencia,
+        onCheckedChange: setEvidencia,
+        label: 'Requiere evidencia en el paso 2 de Acondicionamiento',
+      }}
+      assignment={
+        conAsignacion
+          ? {
+              checked: asignacion,
+              onCheckedChange: setAsignacion,
+              label: 'Asignación requerida en el paso 2 de Acondicionamiento',
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+const TOOLTIP_EVIDENCIA =
+  'Requiere evidencia: al ejecutar, el paso pide de 1 a 3 fotos antes de avanzar.';
+const TOOLTIP_ASIGNACION =
+  'Asignación requerida: al ejecutar, hay que elegir uno o más responsables del equipo que hicieron el paso.';
+const AYUDA_ASIGNACION =
+  'Al ejecutar, hay que elegir uno o más responsables del equipo antes de avanzar.';
+
+describe('RecipeStepEditor — «Asignación requerida» y switches solo-icono (QC-299)', () => {
+  it('R9: sin la prop assignment no hay interruptor de asignación; con ella, los dos salen apagados', async () => {
+    const { unmount } = render(<SwitchesHarness conAsignacion={false} />);
+    await screen.findByTestId(TEST_ID);
+    expect(screen.getAllByRole('switch')).toHaveLength(1);
+    expect(screen.queryByRole('switch', { name: /Asignación requerida/ })).toBeNull();
+    unmount();
+
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    expect(
+      screen.getByRole('switch', { name: 'Requiere evidencia en el paso 2 de Acondicionamiento' }),
+    ).toHaveAttribute('aria-checked', 'false');
+    expect(
+      screen.getByRole('switch', { name: 'Asignación requerida en el paso 2 de Acondicionamiento' }),
+    ).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('R10: cada switch muestra solo su icono, sin texto visible ni icono «!» aparte', async () => {
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    const herramientas = screen.getByTestId(`${TEST_ID}-row-tools`);
+    for (const control of screen.getAllByRole('switch')) {
+      expect(control.textContent).toBe('');
+      expect(control.querySelectorAll('svg')).toHaveLength(1);
+    }
+    expect(herramientas.textContent).toBe('');
+    expect(within(herramientas).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getByTestId(`${TEST_ID}-evidence`).querySelector('svg')?.getAttribute('class')).toContain(
+      'lucide-camera',
+    );
+    expect(
+      screen.getByTestId(`${TEST_ID}-assignment`).querySelector('svg')?.getAttribute('class'),
+    ).toContain('lucide-user-plus');
+  });
+
+  it('R10: el tooltip con el texto completo abre al pasar el ratón', async () => {
+    const user = setupUser();
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+    await user.hover(screen.getByTestId(`${TEST_ID}-assignment`));
+    expect(await screen.findByTestId(`${TEST_ID}-assignment-tooltip`)).toHaveTextContent(
+      TOOLTIP_ASIGNACION,
+    );
+  });
+
+  it('R10: el tooltip con el texto completo abre al recibir el foco del teclado', async () => {
+    const user = setupUser();
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    const evidencia = screen.getByTestId(`${TEST_ID}-evidence`);
+
+    while (document.activeElement !== evidencia) await user.tab();
+    expect(await screen.findByTestId(`${TEST_ID}-evidence-tooltip`)).toHaveTextContent(
+      TOOLTIP_EVIDENCIA,
+    );
+  });
+
+  it('R10: encendido, cada switch pinta su línea de ayuda debajo del editor y la referencia', async () => {
+    const user = setupUser();
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    const asignacion = screen.getByTestId(`${TEST_ID}-assignment`);
+
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-help`)).toBeNull();
+    await user.click(asignacion);
+    expect(asignacion).toHaveAttribute('aria-checked', 'true');
+    const ayuda = screen.getByTestId(`${TEST_ID}-assignment-help`);
+    expect(ayuda).toHaveTextContent(AYUDA_ASIGNACION);
+    expect(asignacion).toHaveAttribute('aria-describedby', ayuda.id);
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+    const editable = screen.getByTestId(TEST_ID);
+    expect(editable.compareDocumentPosition(ayuda) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+
+    await user.click(screen.getByTestId(`${TEST_ID}-evidence`));
+    expect(screen.getByTestId(`${TEST_ID}-evidence-help`)).toHaveTextContent(
+      'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
+    );
+
+    await user.click(asignacion);
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-help`)).toBeNull();
+  });
+});
+
+/** Mantener pulsado con el dedo: los eventos de puntero van sobre el interruptor y suben al disparador. */
+function tocar(control: HTMLElement, tipo: 'pointerDown' | 'pointerMove' | 'pointerUp' | 'pointerCancel', x = 10, y = 10) {
+  fireEvent[tipo](control, { pointerId: 7, pointerType: 'touch', clientX: x, clientY: y, isPrimary: true });
+}
+
+describe('RecipeStepEditor — ayuda de los switches por pulsación larga en táctil', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function montarConRelojFalso() {
+    render(<SwitchesHarness />);
+    await screen.findByTestId(TEST_ID);
+    vi.useFakeTimers();
+    return {
+      evidencia: screen.getByTestId(`${TEST_ID}-evidence`),
+      asignacion: screen.getByTestId(`${TEST_ID}-assignment`),
+    };
+  }
+
+  it('R10: pulsación larga — mantener el dedo 500 ms abre la ayuda con su texto completo', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(499);
+    });
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByTestId(`${TEST_ID}-assignment-tooltip`)).toHaveTextContent(TOOLTIP_ASIGNACION);
+  });
+
+  it('R10: pulsación larga — soltar tras abrir la ayuda no cambia el switch y la ayuda sigue abierta', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    tocar(evidencia, 'pointerUp');
+    fireEvent.click(evidencia);
+
+    expect(evidencia).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-help`)).toBeNull();
+    expect(screen.getByTestId(`${TEST_ID}-evidence-tooltip`)).toHaveTextContent(TOOLTIP_EVIDENCIA);
+  });
+
+  it('R10: pulsación larga — tras soltar, el siguiente toque corto sí cambia el switch', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    tocar(evidencia, 'pointerUp');
+
+    tocar(evidencia, 'pointerDown');
+    tocar(evidencia, 'pointerUp');
+    fireEvent.click(evidencia);
+    expect(evidencia).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('R10: pulsación larga — un toque corto cambia el switch y no abre la ayuda', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    tocar(asignacion, 'pointerUp');
+    fireEvent.click(asignacion);
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(asignacion).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+  });
+
+  it('R10: pulsación larga — mover el dedo aborta y no abre la ayuda', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown', 10, 10);
+    tocar(asignacion, 'pointerMove', 10, 40);
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.queryByTestId(`${TEST_ID}-assignment-tooltip`)).toBeNull();
+  });
+
+  it('R10: pulsación larga — un temblor pequeño del dedo no la aborta', async () => {
+    const { asignacion } = await montarConRelojFalso();
+
+    tocar(asignacion, 'pointerDown', 10, 10);
+    tocar(asignacion, 'pointerMove', 13, 14);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.getByTestId(`${TEST_ID}-assignment-tooltip`)).toHaveTextContent(TOOLTIP_ASIGNACION);
+  });
+
+  it('R10: pulsación larga — cancelar el puntero aborta y no abre la ayuda', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    tocar(evidencia, 'pointerCancel');
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-tooltip`)).toBeNull();
+  });
+
+  it('R10: pulsación larga — durante la pulsación se anula el menú contextual del sistema y no se selecciona texto', async () => {
+    const { evidencia } = await montarConRelojFalso();
+    const disparador = screen.getByTestId(`${TEST_ID}-evidence-trigger`);
+
+    expect(disparador.className).toContain('select-none');
+    expect(disparador.className).toContain('[-webkit-touch-callout:none]');
+    tocar(evidencia, 'pointerDown');
+    expect(fireEvent.contextMenu(evidencia)).toBe(false);
+  });
+
+  it('R10: pulsación larga — tocar fuera cierra la ayuda', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    tocar(evidencia, 'pointerDown');
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    tocar(evidencia, 'pointerUp');
+    expect(screen.getByTestId(`${TEST_ID}-evidence-tooltip`)).toBeInTheDocument();
+
+    vi.useRealTimers();
+    fireEvent.pointerDown(document.body, { pointerType: 'touch', pointerId: 8 });
+    fireEvent.mouseDown(document.body);
+    fireEvent.click(document.body);
+    await waitFor(() => {
+      expect(screen.queryByTestId(`${TEST_ID}-evidence-tooltip`)).toBeNull();
+    });
+  });
+
+  it('R10: pulsación larga — con el ratón no aplica: mantener pulsado no abre la ayuda por sí solo', async () => {
+    const { evidencia } = await montarConRelojFalso();
+
+    fireEvent.pointerDown(evidencia, { pointerId: 1, pointerType: 'mouse', clientX: 10, clientY: 10 });
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(screen.queryByTestId(`${TEST_ID}-evidence-tooltip`)).toBeNull();
   });
 });

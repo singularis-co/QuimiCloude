@@ -46,10 +46,9 @@ const listQuerySchema = createListQuerySchema();
  * `'supplier_not_found'` se conserva y se traduce a «no encontrado»: un proveedor dado de baja
  * no devuelve una pagina vacia, devuelve que no existe (R23 de QC-52).
  *
- * El orden por defecto sigue siendo `created_at ASC, id ASC` y NO cambia a `name ASC` (R11):
- * sin `sort`, la lista no se mueve. `cost` y `minPurchase` son `Decimal(14,4)` en la base y el
- * `numberRange` del contrato viaja como `number`: convertir es del ADAPTADOR, aqui no se
- * compara ni un importe.
+ * El orden por defecto es mas nuevas primero, `created_at DESC, id ASC`, y NO `name ASC`.
+ * `cost` y `minPurchase` son `Decimal(14,4)` en la base y el `numberRange` del contrato viaja como
+ * `number`: convertir es del ADAPTADOR, aqui no se compara ni un importe.
  */
 export function createListCatalogLines(
   deps: ListCatalogLinesDeps,

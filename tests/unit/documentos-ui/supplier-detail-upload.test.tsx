@@ -7,6 +7,7 @@ import type {
   GetBatchStatusResult,
 } from '@/lib/modules/documentos/adapters/driving/document-batch-actions';
 import type { IssueUploadLinksResult } from '@/lib/modules/documentos/adapters/driving/document-upload-actions';
+import type { AiProviderReadiness } from '@/lib/modules/integraciones';
 import type { CatalogLineListResult } from '@/lib/modules/proveedores/adapters/driving/supplier-catalog-actions';
 import type {
   CreateSupplierFormState,
@@ -30,6 +31,7 @@ const {
   issueUploadLinksActionMock,
   enqueueBatchActionMock,
   getBatchStatusActionMock,
+  getAiProviderReadinessActionMock,
 } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   usePathnameMock: vi.fn<() => string>(),
@@ -61,6 +63,7 @@ const {
   issueUploadLinksActionMock: vi.fn<(input: unknown) => Promise<IssueUploadLinksResult>>(),
   enqueueBatchActionMock: vi.fn<(input: unknown) => Promise<EnqueueBatchResult>>(),
   getBatchStatusActionMock: vi.fn<(batchId: string) => Promise<GetBatchStatusResult>>(),
+  getAiProviderReadinessActionMock: vi.fn<() => Promise<AiProviderReadiness>>(),
 }));
 
 // `requirePagePermission` resuelve la sesion por `@/lib/composition`; sin este doble la pantalla
@@ -108,16 +111,30 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-batch-actions', () =
   getBatchStatusAction: getBatchStatusActionMock,
 }));
 
+vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () => ({
+  getAiProviderReadinessAction: getAiProviderReadinessActionMock,
+}));
+
 import ProveedorDetallePage from '@/app/(private)/proveedores/[id]/page';
+import {
+  AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TESTID,
+  AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID,
+} from '@/components/shared/ai-provider-required-tooltip';
 import {
   DOCUMENT_UPLOAD_INPUT_TESTID,
   DOCUMENT_UPLOAD_OPEN_TESTID,
   DOCUMENT_UPLOAD_SUBMIT_TESTID,
   DOCUMENT_UPLOAD_TESTID,
 } from '@/components/shared/document-upload';
-import { PERMISSIONS } from '@/lib/modules/identity';
+import {
+  PERMISSIONS,
+  ROLE_ADMINISTRADOR,
+  SEED_ROLE_PERMISSIONS,
+  effectivePermissions,
+} from '@/lib/modules/identity';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { supplierDetailRoute } from '@/lib/shared/routes';
+import { AI_PROVIDER_INTEGRATION_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
 import { batch, entry, okResponse, pdf, signedUploads } from './helpers';
@@ -244,6 +261,7 @@ beforeEach(() => {
     data: { uploads: signedUploads(1) },
   });
   enqueueBatchActionMock.mockResolvedValue({ status: 'success', data: { batchId: 'batch-1' } });
+  getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: true });
   getBatchStatusActionMock.mockResolvedValue({
     status: 'success',
     data: batch([entry({ path: signedUploads(1)[0]?.path, status: 'done' })]),
@@ -280,6 +298,7 @@ describe('el montaje en la pantalla de proveedores', () => {
     expect(encolado).toEqual({
       strategy: 'catalogo',
       paths: signedUploads(1).map((upload) => upload.path),
+      names: ['catalogo.pdf'],
     });
   });
 
@@ -290,6 +309,33 @@ describe('el montaje en la pantalla de proveedores', () => {
 
     await renderPantalla();
 
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
+  });
+
+  it('R38: sin documentos.modificar no hay aviso de proveedor IA aunque la empresa no lo tenga, y ni se consulta', async () => {
+    getSessionUserMock.mockResolvedValue(
+      sesionCon(['proveedores.consultar', 'proveedores.modificar', 'integraciones.modificar']),
+    );
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
+    expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R15 R23 con los permisos del Administrador recortados por la empresa sin lectura de PDF no hay boton ni subida', async () => {
+    // Con `proveedores` prendido: sin él la pantalla entera responde 404 y no habría botón que buscar.
+    getSessionUserMock.mockResolvedValue({
+      ...sesionCon(effectivePermissions(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [], ['proveedores'])),
+      addons: ['proveedores'],
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('supplier-detail')).toBeInTheDocument();
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_OPEN_TESTID)).not.toBeInTheDocument();
     expect(screen.queryByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeInTheDocument();
   });
@@ -319,5 +365,83 @@ describe('el montaje en la pantalla de proveedores', () => {
     expect(boton.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
+  });
+});
+
+describe('el boton de subida sin proveedor IA en el detalle de proveedor', () => {
+  const conSubida = ['proveedores.consultar', 'documentos.modificar'];
+
+  it('con la empresa conectada el boton esta habilitado y sin globo de proveedor IA', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: true, canConfigure: false });
+
+    await renderPantalla();
+
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeVisible();
+    expect(abrir).toBeEnabled();
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
+    expect(getAiProviderReadinessActionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin conexion el boton deshabilitado va donde siempre, entre la cabecera y el catalogo, y no abre la ventana', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    const abrir = screen.getByTestId(DOCUMENT_UPLOAD_OPEN_TESTID);
+    expect(abrir).toBeDisabled();
+    const envoltorio = screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID);
+    expect(envoltorio).toContainElement(abrir);
+    expect(envoltorio.parentElement).toHaveClass('flex', 'justify-end');
+    expect(screen.queryByTestId('ai-provider-required-notice')).not.toBeInTheDocument();
+
+    const cabecera = screen.getByTestId('supplier-detail');
+    const catalogo = screen.getByTestId('catalog-list');
+    expect(cabecera.compareDocumentPosition(abrir) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(abrir.compareDocumentPosition(catalogo) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    const user = setupUser();
+    await user.click(abrir);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId(DOCUMENT_UPLOAD_TESTID)).not.toBeVisible();
+  });
+
+  it('sin conexion, al pasar el puntero por el boton bloqueado, el globo enlaza a Proveedor IA aunque falte integraciones.modificar', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(conSubida));
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: false });
+
+    await renderPantalla();
+
+    const envoltorio = screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID);
+    const user = setupUser();
+    await user.hover(envoltorio);
+
+    expect(await screen.findByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TESTID)).toHaveTextContent(
+      'Para leer PDF, conecta el proveedor IA de tu empresa',
+    );
+    expect(screen.getByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_LINK_TESTID)).toHaveAttribute(
+      'href',
+      AI_PROVIDER_INTEGRATION_ROUTE,
+    );
+  });
+
+  it('R38: proveedor inexistente: ni boton ni aviso, y no se consulta', async () => {
+    getAiProviderReadinessActionMock.mockResolvedValue({ configured: false, canConfigure: true });
+    getSupplierActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'supplier_not_found',
+      message: 'Proveedor no encontrado',
+    });
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(AI_PROVIDER_REQUIRED_TOOLTIP_TRIGGER_TESTID)).not.toBeInTheDocument();
+    expect(getAiProviderReadinessActionMock).not.toHaveBeenCalled();
   });
 });

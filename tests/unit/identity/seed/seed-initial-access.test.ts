@@ -12,6 +12,7 @@ import {
   SEED_ADMIN_ACCOUNT_STATUS,
 } from '@/lib/modules/identity/domain/account-status';
 import { INITIAL_COMPANY_NAME } from '@/lib/modules/identity/domain/companies';
+import { ADDONS } from '@/lib/modules/identity/domain/company-addons';
 import { normalizeCompanyName } from '@/lib/modules/identity/domain/company-name';
 import { DOCUMENT_TYPE_CC } from '@/lib/modules/identity/domain/document-type';
 import { PERMISSIONS, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity/domain/permissions';
@@ -28,6 +29,9 @@ import { seedInitialAccess } from '@/lib/modules/identity/domain/seed-initial-ac
 import type { CredentialRule } from '@/lib/modules/identity/domain/credential-policy';
 import type { InitialAdminCredentials } from '@/lib/modules/identity/ports/initial-access-credentials';
 import type { InitialAccessRepository } from '@/lib/modules/identity/ports/initial-access-repository';
+import { createInitialAccessRepository } from '@/lib/modules/identity/adapters/driven/persistence/initial-access-repository-prisma';
+
+vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 /** Credencial de test evidentemente ficticia: nunca se persiste (R8). */
 const CREDENCIAL_DE_PRUEBA = 'credencial-de-prueba-no-real';
@@ -300,7 +304,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
     // El seed asegura todos los roles de `SEED_ROLES`, no solo los historicos.
@@ -325,7 +329,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const creacionDeAdmin = repository.llamadas.find((llamada) => llamada.metodo === 'createInitialAdmin');
     expect(creacionDeAdmin).toBeDefined();
@@ -357,7 +361,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Una vez por usuario inicial, el Administrador y el Maestro.
     expect(passwordHasher.hash).toHaveBeenCalledTimes(2);
@@ -381,7 +385,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const creacionesDeRol = repository.llamadas.filter((llamada) => llamada.metodo === 'createRole');
     expect(creacionesDeRol.length).toBeGreaterThan(0);
@@ -410,7 +414,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la lectura si ocurrio, para que un doble mal cableado no pase en verde.
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
@@ -438,7 +442,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
     expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
@@ -467,7 +471,7 @@ describe('seedInitialAccess', () => {
     });
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await expect(seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy })).rejects.toThrow(
+    await expect(seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy })).rejects.toThrow(
       'falta SEED_ADMIN_PASSWORD',
     );
 
@@ -480,7 +484,7 @@ describe('seedInitialAccess', () => {
     // stack (caso 9 lo vuelve a comprobar sobre la salida acumulada de consola).
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+      await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -503,7 +507,7 @@ describe('seedInitialAccess', () => {
 
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+      await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -537,7 +541,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     expect(repository.llamadas.length).toBeGreaterThan(0);
 
@@ -565,7 +569,7 @@ describe('seedInitialAccess', () => {
 
     let errorCapturado: Error | null = null;
     try {
-      await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+      await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
     } catch (error) {
       errorCapturado = error as Error;
     }
@@ -602,7 +606,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la empresa SI se creo, con el nombre de la constante del dominio y con su
     // normalizado calculado por `normalizeCompanyName` (R3, R21).
@@ -654,7 +658,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la busqueda SI ocurrio, y por el nombre NORMALIZADO, no por el original.
     const busquedas = repository.llamadas.filter((llamada) => llamada.metodo === 'findCompanyIdByNormalizedName');
@@ -688,7 +692,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: el seed SI corrio y SI leyo el estado.
     expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
@@ -720,7 +724,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la lectura SI ocurrio, exactamente una vez y con el nombre del rol
     // Administrador. Es la unica fuente de `needsAdmin`.
@@ -742,6 +746,7 @@ describe('seedInitialAccess', () => {
       usuariosVivosConAdministrador: 0,
     });
     const otroDesenlace = await seedInitialAccess({
+      scope: 'full',
       repository: repositorioSinAdministrador,
       passwordHasher: crearHasherFalso(),
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -770,7 +775,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: el catalogo SI se creo, entero y derivado de `PERMISSIONS`.
     const creacionesDePermisos = repository.llamadas.filter((llamada) => llamada.metodo === 'createPermissions');
@@ -853,7 +858,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
       ?.args[0] as readonly { roleId: string; permissionCode: string }[];
@@ -879,7 +884,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     const paresCreados = repository.llamadas.find((llamada) => llamada.metodo === 'createRolePermissions')
       ?.args[0] as readonly { roleId: string; permissionCode: string }[];
@@ -933,6 +938,7 @@ describe('seedInitialAccess', () => {
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     const primeraCorrida = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher,
       credentials,
@@ -958,6 +964,7 @@ describe('seedInitialAccess', () => {
     // Y la segunda corrida, sobre el MISMO repositorio ya completo, no escribe nada.
     const llamadasTrasLaPrimera = repository.llamadas.length;
     const segundaCorrida = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher,
       credentials,
@@ -994,6 +1001,7 @@ describe('seedInitialAccess', () => {
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     const primeraCorrida = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher,
       credentials,
@@ -1013,6 +1021,7 @@ describe('seedInitialAccess', () => {
 
     const llamadasTrasLaPrimera = repository.llamadas.length;
     const segundaCorrida = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher,
       credentials,
@@ -1037,7 +1046,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: las dos LECTURAS del paso de permisos si ocurrieron, y con el catalogo
     // real y los ids de los dos roles sembrados. Sin esto, un doble mal cableado que
@@ -1081,7 +1090,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: SI se crearon las que faltaban — las once del Administrador.
     const creaciones = repository.llamadas.filter((llamada) => llamada.metodo === 'createRolePermissions');
@@ -1123,7 +1132,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    const outcome = await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    const outcome = await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: se creo lo que faltaba, y solo eso.
     expect(outcome.createdPermissions).toEqual([codigoQueFalta]);
@@ -1143,7 +1152,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
-    await seedInitialAccess({ repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
+    await seedInitialAccess({ scope: 'full', repository, passwordHasher, credentials, maestroCredentials, checkCredentialPolicy });
 
     // Primero: la escritura SI ocurrio, una sola vez (un doble mal cableado no pasa en verde).
     const creacionesDeAdmin = repository.llamadas.filter((llamada) => llamada.metodo === 'createInitialAdmin');
@@ -1205,6 +1214,7 @@ describe('seedInitialAccess', () => {
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     const outcome = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher,
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1245,6 +1255,7 @@ describe('seedInitialAccess', () => {
     const repository = crearRepositorioFalso();
 
     await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher: crearHasherFalso(),
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1279,6 +1290,7 @@ describe('seedInitialAccess', () => {
     });
 
     const outcome = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher: crearHasherFalso(),
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1306,6 +1318,7 @@ describe('seedInitialAccess', () => {
 
     await expect(
       seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: crearHasherFalso(),
         credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1330,6 +1343,7 @@ describe('seedInitialAccess', () => {
 
     const mensaje = await mensajeDelRechazo(
       seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher,
         credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1351,6 +1365,7 @@ describe('seedInitialAccess', () => {
     const credentials = vi.fn(() => CREDENCIALES_POR_DEFECTO);
 
     const outcome = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher: crearHasherFalso(),
       credentials,
@@ -1372,6 +1387,7 @@ describe('seedInitialAccess', () => {
     const maestroCredentials = vi.fn(() => CREDENCIALES_DEL_MAESTRO);
 
     const outcome = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher: crearHasherFalso(),
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1391,6 +1407,7 @@ describe('seedInitialAccess', () => {
 
     const mensaje = await mensajeDelRechazo(
       seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: crearHasherFalso(),
         credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1416,6 +1433,7 @@ describe('seedInitialAccess', () => {
 
     const mensaje = await mensajeDelRechazo(
       seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: crearHasherFalso(),
         credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1435,6 +1453,7 @@ describe('seedInitialAccess', () => {
 
     const mensaje = await mensajeDelRechazo(
       seedInitialAccess({
+        scope: 'full',
         repository,
         passwordHasher: crearHasherFalso(),
         credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1457,6 +1476,7 @@ describe('seedInitialAccess', () => {
     const repository = crearRepositorioFalso();
 
     const outcome = await seedInitialAccess({
+      scope: 'full',
       repository,
       passwordHasher: crearHasherFalso(),
       credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
@@ -1468,6 +1488,117 @@ describe('seedInitialAccess', () => {
     expect(outcome.createdMaestro).toBe(true);
     const maestro = altasDelMaestro(repository.llamadas)[0]?.args[0] as { email: string };
     expect(maestro.email).toBe(CREDENCIALES_POR_DEFECTO.email);
+  });
+
+  // QC-162: alcance del seed por entorno.
+  function depsDelSeed(repository: InitialAccessRepository) {
+    return {
+      repository,
+      passwordHasher: crearHasherFalso(),
+      credentials: vi.fn(() => CREDENCIALES_POR_DEFECTO),
+      maestroCredentials: vi.fn(() => CREDENCIALES_DEL_MAESTRO),
+      checkCredentialPolicy: crearPoliticaFalsa(),
+    };
+  }
+
+  it('QC-162 R40: platform-only sobre una base vacia crea roles, permisos y Maestro, y nada de la empresa inicial', async () => {
+    const repository = crearRepositorioFalso();
+    const deps = depsDelSeed(repository);
+
+    const outcome = await seedInitialAccess({ ...deps, scope: 'platform-only' });
+
+    expect(altasDelMaestro(repository.llamadas)).toHaveLength(1);
+    expect(deps.maestroCredentials).toHaveBeenCalledTimes(1);
+    expect(outcome.createdMaestro).toBe(true);
+    expect(outcome.createdRoles.slice().sort()).toEqual([...NOMBRES_DE_SEED_ROLES].sort());
+    expect(outcome.createdPermissions.slice().sort()).toEqual([...TODOS_LOS_CODIGOS_DEL_CATALOGO].sort());
+    expect(outcome.createdRolePermissions).toBe(TOTAL_DE_ASIGNACIONES_DEL_SEED);
+
+    expect(outcome.createdAdmin).toBe(false);
+    expect(outcome.createdCompany).toBeNull();
+    expect(outcome.scope).toBe('platform-only');
+    expect(deps.credentials).not.toHaveBeenCalled();
+    // La comprobacion del correo del Maestro mira `users` sin empresa, no `companies`.
+    expect(
+      llamadasSobreEmpresas(repository.llamadas).filter(
+        (llamada) => llamada.metodo !== 'countLiveUsersWithoutCompanyWithEmail',
+      ),
+    ).toEqual([]);
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createInitialAdmin')).toEqual([]);
+    expect(
+      repository.llamadas.filter(
+        (llamada) => llamada.metodo === 'countLiveUsersWithRole' && llamada.args[0] === ROLE_ADMINISTRADOR,
+      ),
+    ).toEqual([]);
+  });
+
+  it('QC-162 R40, R42: platform-only sobre una base sembrada no escribe nada ni toca companies', async () => {
+    const repository = crearRepositorioFalso({
+      rolesExistentes: ROLES_YA_SEMBRADOS,
+      usuariosVivosConAdministrador: 1,
+      usuariosVivosConMaestro: 1,
+      empresasVivas: new Map([[NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL, 'empresa-quimicloud']]),
+      permisosExistentes: TODOS_LOS_CODIGOS_DEL_CATALOGO,
+      asignacionesExistentes: asignacionesDelSeed(ROLES_YA_SEMBRADOS),
+    });
+    const deps = depsDelSeed(repository);
+
+    const outcome = await seedInitialAccess({ ...deps, scope: 'platform-only' });
+
+    expect(llamadasDeLectura(repository.llamadas).length).toBeGreaterThan(0);
+    expect(llamadasDeEscritura(repository.llamadas)).toEqual([]);
+    expect(llamadasSobreEmpresas(repository.llamadas)).toEqual([]);
+    expect(repository.empresasVivas.get(NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL)).toBe('empresa-quimicloud');
+    expect(deps.credentials).not.toHaveBeenCalled();
+    expect(deps.maestroCredentials).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({ createdAdmin: false, createdMaestro: false, createdCompany: null });
+  });
+
+  it('QC-162 R41: full hace las mismas llamadas y devuelve lo mismo que sin alcance', async () => {
+    const sinAlcance = crearRepositorioFalso();
+    const conFull = crearRepositorioFalso();
+
+    const esperado = await seedInitialAccess({ ...depsDelSeed(sinAlcance), scope: 'full' });
+    const obtenido = await seedInitialAccess({ ...depsDelSeed(conFull), scope: 'full' });
+
+    expect(conFull.llamadas.length).toBeGreaterThan(0);
+    expect(conFull.llamadas).toEqual(sinAlcance.llamadas);
+    expect(obtenido).toEqual(esperado);
+    expect(obtenido.scope).toBe('full');
+    expect(obtenido.createdAdmin).toBe(true);
+    expect(obtenido.createdCompany).toBe(INITIAL_COMPANY_NAME);
+    expect(obtenido.createdMaestro).toBe(true);
+  });
+
+  it('R7: full crea la empresa inicial una vez por el puerto, y el adaptador la crea con las cinco excepciones prendidas y sin autor', async () => {
+    const repository = crearRepositorioFalso();
+    await seedInitialAccess({ ...depsDelSeed(repository), scope: 'full' });
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany')).toHaveLength(1);
+
+    const create = vi.fn(async () => ({ id: 'empresa-nueva' }));
+    const db = { company: { create } } as unknown as Parameters<typeof createInitialAccessRepository>[0];
+    const id = await createInitialAccessRepository(db).createCompany({
+      name: INITIAL_COMPANY_NAME,
+      nameNormalized: NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL,
+    });
+
+    expect(id).toBe('empresa-nueva');
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        name: INITIAL_COMPANY_NAME,
+        nameNormalized: NOMBRE_NORMALIZADO_DE_LA_EMPRESA_INICIAL,
+        // Las cinco excepciones prendidas en el mismo `create`, sin autor: las siembra el sistema.
+        addonOverrides: { create: ADDONS.map((addonKey) => ({ addonKey, enabled: true })) },
+      },
+    });
+  });
+
+  it('R7: platform-only no crea ninguna empresa, así que tampoco prende añadidos', async () => {
+    const repository = crearRepositorioFalso();
+    await seedInitialAccess({ ...depsDelSeed(repository), scope: 'platform-only' });
+    expect(repository.llamadas.length).toBeGreaterThan(0);
+    expect(repository.llamadas.filter((llamada) => llamada.metodo === 'createCompany')).toEqual([]);
   });
 
   // Caso 9 (R18) — corre AL FINAL a proposito: revisa lo acumulado por todos los casos

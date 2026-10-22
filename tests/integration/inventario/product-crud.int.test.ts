@@ -209,15 +209,18 @@ describe('R26: la paginacion es estable con homonimos', () => {
   });
 });
 
-describe('R35: orden name ASC, id ASC', () => {
-  it('ordena por nombre ascendente y desempata por identificador ascendente', async () => {
+describe('R35: el orden por defecto desempata por id ASC', () => {
+  it('con el mismo ultimo lote y la misma alta, desempata por identificador ascendente', async () => {
     const homonymName = `Zzz-Orden ${token()}`;
     const createdIds: string[] = [];
+    // Desde QC-289 el orden por defecto es ultimo lote y alta, ambos descendentes: el mismo instante
+    // para los cuatro deja el desempate como unico criterio.
+    const sameInstant = new Date();
 
     try {
       for (let i = 0; i < 4; i += 1) {
         const input: NewProduct = { ...baseProductInput({ name: homonymName }) };
-        const created = await createProduct(input, new Date(), ambito());
+        const created = await createProduct(input, sameInstant, ambito());
         createdIds.push(created.id);
       }
 
@@ -225,7 +228,7 @@ describe('R35: orden name ASC, id ASC', () => {
       const own = all.filter((item) => item.name === homonymName);
 
       expect(own).toHaveLength(createdIds.length);
-      // Mismo nombre para todos: lo unico que puede ordenarlos es el desempate por id.
+      // Sin lote y con la misma alta: lo unico que puede ordenarlos es el desempate por id.
       const orderedIds = own.map((item) => item.id);
       const expectedOrder = [...orderedIds].sort();
       expect(orderedIds).toEqual(expectedOrder);

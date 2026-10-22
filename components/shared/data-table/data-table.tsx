@@ -26,7 +26,7 @@ import { DataTableColumnDivider } from './data-table-divider';
 import { DataTableFilters } from './data-table-filters';
 import { DataTableHeaderCell, DataTableHeaderMenu } from './data-table-header-menu';
 import { DataTablePagination } from './data-table-pagination';
-import { mergeCellStyle, toColumnTextClass, toWidthStyle } from './data-table-column-style';
+import { mergeCellStyle, toColumnAlignClass, toColumnTextClass, toWidthStyle } from './data-table-column-style';
 import { withSort } from './data-table-params';
 import {
   DataTableScrollNav,
@@ -288,16 +288,6 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
     return <EmptyState {...states.empty} />;
   }
 
-  const columnAlign = (align: 'start' | 'end' | 'center') => {
-    if (align === 'end') {
-      return 'text-right';
-    }
-    if (align === 'center') {
-      return 'text-center';
-    }
-    return '';
-  };
-
   return (
     <div data-testid="data-table" className={cn('flex flex-col gap-4', card !== undefined && '@container')}>
       {showToolbars ? (
@@ -376,7 +366,7 @@ export function DataTable<TRow>(props: DataTableProps<TRow>) {
                           toWidthStyle(column),
                         )}
                         className={cn(
-                          columnAlign(column.align),
+                          toColumnAlignClass(column),
                           pinnedSide !== false && 'bg-background',
                           toColumnTextClass(column),
                           column.tabular === true && 'font-mono tabular-nums',

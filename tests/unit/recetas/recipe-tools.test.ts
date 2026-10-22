@@ -12,6 +12,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog, ProductRef } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 const EMPRESA = 'empresa-1';
 const ACTOR: Actor = { id: 'actor-1', companyId: EMPRESA, permissions: ['recetas.consultar', 'recetas.modificar'] };
@@ -44,6 +45,7 @@ const ORIGINAL: RecipeRow = {
   description: null,
   steps: [],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: null,
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -61,7 +63,7 @@ const VERSION: RecipeRow = {
   ...ORIGINAL,
   id: 'version-1',
   name: 'Sin perfume',
-  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], steps: [] },
+  original: { id: ORIGINAL.id, name: ORIGINAL.name, description: null, imagePath: null, packingSteps: [], conditioningSteps: [], steps: [] },
 };
 
 function repositorio(row: RecipeRow = ORIGINAL): RecipeRepository {
@@ -73,6 +75,7 @@ function repositorio(row: RecipeRow = ORIGINAL): RecipeRepository {
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => ({ id: 'version-nueva' })),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => ({
       kind: 'ok',
       propagated: [],
@@ -108,7 +111,7 @@ function montar(row: RecipeRow = ORIGINAL, refs: readonly ProductRef[] = VIVOS) 
     recipes,
     products,
     create: createCreateRecipe({ recipes, products, images, now: () => AHORA }),
-    update: createUpdateRecipe({ recipes, products, images, now: () => AHORA }),
+    update: createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now: () => AHORA }),
     createVersion: createCreateRecipeVersion({ recipes, products, now: () => AHORA }),
     updateVersion: createUpdateRecipeVersion({ recipes, products, now: () => AHORA }),
     get: createGetRecipe({ recipes, products, images }),

@@ -7,8 +7,8 @@
  * cambiar de idioma sin romper a quien lo muestra.
  *
  * `unauthorized` e `invalid_input` ya existen y significan aqui exactamente lo mismo que donde ya
- * viven: mismo caso, mismo codigo, misma frase. `ai_unavailable` es el unico codigo que este
- * modulo aporta al catalogo.
+ * viven: mismo caso, mismo codigo, misma frase. `ai_unavailable`, `ai_provider_missing` y
+ * `ai_provider_error` son los codigos que este modulo aporta al catalogo.
  *
  * El `code` es un `ErrorCode` —uno mal escrito no compila— y el MENSAJE SALE DEL CATALOGO, no del
  * sitio que lanza. Por eso ninguna clase admite un `message` por parametro.
@@ -18,6 +18,8 @@
  * este ajuste. Mismo patron que el resto de los modulos.
  */
 import { errorMessage, type ErrorCode } from '@/lib/modules/errores';
+
+import type { AiProviderFailure } from '@/lib/modules/integraciones';
 
 export abstract class DocumentosError extends Error {
   abstract readonly code: ErrorCode;
@@ -83,5 +85,28 @@ export class UnexpectedError extends DocumentosError {
 
   constructor(diagnostic?: string) {
     super('unexpected', diagnostic);
+  }
+}
+
+/** La empresa no tiene proveedor IA conectado: sin él no hay key con la que leer. */
+export class AiProviderMissingError extends DocumentosError {
+  readonly code = 'ai_provider_missing';
+
+  constructor(diagnostic?: string) {
+    super('ai_provider_missing', diagnostic);
+  }
+}
+
+/**
+ * El proveedor rechazó la cuenta de la empresa (key o cuota). Lleva el fallo tipado para que el
+ * trabajo marque la conexión; el `diagnostic` nunca lleva la key ni el cuerpo de la respuesta.
+ */
+export class AiProviderError extends DocumentosError {
+  readonly code = 'ai_provider_error';
+  readonly failure: AiProviderFailure;
+
+  constructor(failure: AiProviderFailure, diagnostic?: string) {
+    super('ai_provider_error', diagnostic);
+    this.failure = failure;
   }
 }

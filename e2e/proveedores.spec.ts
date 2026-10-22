@@ -67,6 +67,7 @@ import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/secur
 import { prisma } from '@/lib/shared/db/prisma';
 import { SUPPLIERS_ROUTE, supplierDetailRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -303,6 +304,7 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  await enableAllAddons(companyId);
 
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);

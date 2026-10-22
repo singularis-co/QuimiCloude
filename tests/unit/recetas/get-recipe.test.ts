@@ -23,6 +23,7 @@ const ORIGINAL: RecipeRow = {
   description: 'Descripcion de la original',
   steps: [PASO_ORIGINAL, PASO_ENVASAR],
   packingSteps: [],
+  conditioningSteps: [],
   imagePath: 'recetas/crema.jpg',
   createdBy: 'actor-1',
   updatedBy: 'actor-1',
@@ -52,6 +53,7 @@ function version(percentages: readonly string[]): RecipeRow {
       imagePath: ORIGINAL.imagePath,
       steps: ORIGINAL.steps,
       packingSteps: [],
+      conditioningSteps: [],
     },
   };
 }
@@ -65,6 +67,7 @@ function montar(fila: RecipeRow | null) {
     softDeleteAlive: vi.fn<RecipeRepository['softDeleteAlive']>(async () => 'ok'),
     createVersion: vi.fn<RecipeRepository['createVersion']>(async () => 'not_found'),
     listAliveVersions: vi.fn<RecipeRepository['listAliveVersions']>(async () => []),
+    listVersionIdsIncludingDeleted: vi.fn<RecipeRepository['listVersionIdsIncludingDeleted']>(async () => []),
     replaceAliveWithPropagation: vi.fn<RecipeRepository['replaceAliveWithPropagation']>(async () => 'not_found'),
   };
   const products: ProductCatalog = {

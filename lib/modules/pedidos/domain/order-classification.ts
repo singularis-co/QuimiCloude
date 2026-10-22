@@ -23,6 +23,29 @@ export const ORDER_STATUS_VALUES = [
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
 
+// Un pedido sin borrar en cualquier otro estado sigue en curso: `TERMINADO` y `BLOQUEADO` cuentan
+// porque todavia no se entregaron.
+export const ORDER_STATUSES_NOT_IN_PROGRESS = [
+  'ENTREGADO',
+  'CANCELADO',
+] as const satisfies readonly OrderStatus[];
+
+// Desde Comenzar el estimado queda congelado: ningun escritor del importe estimado acepta un pedido
+// en uno de estos estados.
+export const STARTED_ORDER_STATUSES = [
+  'EN_CURSO',
+  'POR_EMPACAR',
+  'EN_EMPAQUE',
+  'POR_ACONDICIONAR',
+  'EN_ACONDICIONAMIENTO',
+  'TERMINADO',
+  'ENTREGADO',
+] as const satisfies readonly OrderStatus[];
+
+export function isStartedOrderStatus(status: OrderStatus): boolean {
+  return (STARTED_ORDER_STATUSES as readonly OrderStatus[]).includes(status);
+}
+
 /** El mismo conjunto, en el orden del FLUJO de trabajo, con `CANCELADO` y `BLOQUEADO` al final
  *  porque no son pasos del flujo sino salidas laterales. Lo usan las pantallas que pintan filtros
  *  o columnas de estado; ninguna lectura de la base ni ninguna regla de transicion depende de este

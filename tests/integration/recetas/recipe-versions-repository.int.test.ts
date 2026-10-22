@@ -291,6 +291,7 @@ describe('findAliveById y listAliveVersions', () => {
       imagePath: 'recetas/crema.jpg',
       steps: PASOS,
       packingSteps: [],
+      conditioningSteps: [],
     });
 
     expect((await findAliveRecipeById(crema, A.scope))?.original).toBeNull();

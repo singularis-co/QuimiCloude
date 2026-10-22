@@ -10,7 +10,18 @@
 <x-dc>
 <helmet>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
-<style>body{margin:0}</style>
+<style>
+body{margin:0}
+.env-img{width:80px;height:80px;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;flex:none;overflow:hidden;padding:0;font:inherit}
+.env-img .ic{width:30px;height:30px}
+.env-img.photo{background:linear-gradient(160deg,oklch(0.93 0.03 200),oklch(0.84 0.06 190));border-color:transparent;color:oklch(0.38 0.06 190);cursor:zoom-in;transition:box-shadow var(--d-i)}
+.env-img.photo:hover{box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 35%,transparent)}
+.env-img.photo:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.ov.zoom-ov{z-index:44}
+.dlg.zoom-dlg{z-index:45;width:min(420px,calc(100% - 32px))}
+.zoom-pic{width:100%;aspect-ratio:1;border-radius:12px;background:linear-gradient(160deg,oklch(0.93 0.03 200),oklch(0.84 0.06 190));color:oklch(0.38 0.06 190);display:flex;align-items:center;justify-content:center}
+.zoom-pic .ic{width:96px;height:96px;stroke-width:1.2}
+</style>
 </helmet>
 <div class="{{ rootCls }}">
   <div class="scroller" style="padding-bottom: 112px">
@@ -33,11 +44,12 @@
       </sc-if>
       <div class="cq-2" style="display: grid; grid-template-columns: 300px minmax(0, 720px); gap: 20px 24px; justify-content: center; align-items: start">
         <section class="card" style="padding: 18px; gap: 14px" aria-labelledby="em-rep">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px"><span class="dim">Cantidad:</span><span class="mono strong" style="font-size: 18px">80,50 kg</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 15px"><span class="dim">Cantidad:</span><span class="mono strong" style="font-size: 18px">72,00 L</span></div>
           <div class="sep" style="margin: 0"></div>
           <h2 id="em-rep" class="h3">Reparto</h2>
           <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 15px">
-            <li style="display: flex; align-items: center; gap: 12px"><span class="thumb"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Galón 3,78 L</span><span class="cap"><span class="mono">22</span> envases</span></span></li>
+            <li style="display: flex; align-items: center; gap: 12px"><button class="env-img photo" type="button" aria-label="Ver imagen de Galón 3,78 L" onClick="{{ zoomG }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></button><span style="display: flex; flex-direction: column"><span class="strong">Galón 3,78 L</span><span class="cap"><span class="mono">14</span> envases</span></span></li>
+            <li style="display: flex; align-items: center; gap: 12px"><span class="env-img" role="img" aria-label="Botella 1 L: sin imagen" title="Sin imagen"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20M9 3h10a2 2 0 0 1 2 2v10M21 19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 .6-1.4M14.1 14.1 11 17l-2-2-4 4"></path></svg></span><span style="display: flex; flex-direction: column"><span class="strong">Botella 1 L</span><span class="cap"><span class="mono">15</span> envases</span></span></li>
           </ul>
         </section>
 
@@ -59,7 +71,8 @@
         <div></div>
         <div class="g2">
           <button class="{{ comCls }}" type="button" disabled="{{ comDis }}" onClick="{{ askStart }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>Comenzar</button>
-          <button class="{{ terCls }}" type="button" disabled="{{ terDis }}" onClick="{{ askEnd }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button>
+          <sc-if value="{{ canEnd }}" hint-placeholder-val="{{ false }}"><a class="b b-pri b-xl" href="EmpaqueTerminar.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</a></sc-if>
+          <sc-if value="{{ noEnd }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-xl" type="button" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg>Terminar</button></sc-if>
         </div>
       </div>
     </div>
@@ -74,11 +87,10 @@
     <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doStart }}">Comenzar</button></div>
   </div>
 
-  <div class="{{ endCls }}" role="alertdialog" aria-modal="true" aria-labelledby="em-t">
-    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></div>
-    <h2 id="em-t" class="h2">¿Terminar el empaque?</h2>
-    <p class="sub"><span class="mono">2026-0000004</span> · Limpiador multiusos limón · [DESCRIPCIÓN DEL DIÁLOGO]</p>
-    <div class="actions"><button class="b b-out b-touch" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri b-touch" type="button" onClick="{{ doEnd }}">Terminar</button></div>
+  <div class="{{ zovCls }}" onClick="{{ zoomClose }}"></div>
+  <div class="{{ zoomCls }}" role="dialog" aria-modal="true" aria-labelledby="em-z">
+    <div class="dlg-hd"><h2 id="em-z" class="h3">{{ zoomName }}</h2><button class="xbtn" type="button" aria-label="Cerrar la imagen" onClick="{{ zoomClose }}" style="width: 44px; height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="zoom-pic" role="img" aria-label="{{ zoomAlt }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8"></path></svg></div>
   </div>
 
   <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
@@ -96,6 +108,8 @@ const phase = s.phase || 'por';
 const ST = { por: ['Por empacar', 'waiting'], en: ['En empaque', 'progress'], fin: ['Por acondicionar', 'waiting'] };
 const canStart = !busy && phase === 'por';
 const canEnd = !busy && phase === 'en';
+const NAMES = { g: 'Galón 3,78 L' };
+const zoom = s.zoom || null;
 return {
 rootCls: dark ? 'qc app dk' : 'qc app',
 toggleDark: () => this.setState({ dark: !dark }),
@@ -103,7 +117,7 @@ busy: busy,
 st: ST[phase][0], stCls: 'sb t-' + ST[phase][1],
 pasos: ['[PASO DE ENVASADO DE LA RECETA]', '[PASO DE ENVASADO DE LA RECETA]', '[PASO DE ENVASADO DE LA RECETA]'].map((t, i) => ({ n: i + 1, t: t })),
 comCls: canStart ? 'b b-pri b-xl' : 'b b-out b-xl', comDis: !canStart,
-terCls: canEnd ? 'b b-pri b-xl' : 'b b-out b-xl', terDis: !canEnd,
+canEnd: canEnd, noEnd: !canEnd,
 askStart: () => { if (canStart) this.setState({ dlg: 'start' }); },
 askEnd: () => { if (canEnd) this.setState({ dlg: 'end' }); },
 doStart: () => this.setState({ dlg: null, phase: 'en' }),
@@ -112,6 +126,11 @@ startCls: s.dlg === 'start' ? 'dlg open' : 'dlg',
 endCls: s.dlg === 'end' ? 'dlg open' : 'dlg',
 ovCls: s.dlg ? 'ov open' : 'ov',
 closeAll: () => this.setState({ dlg: null }),
+zovCls: zoom ? 'ov zoom-ov open' : 'ov zoom-ov',
+zoomCls: zoom ? 'dlg zoom-dlg open' : 'dlg zoom-dlg',
+zoomName: zoom ? NAMES[zoom] : '', zoomAlt: zoom ? 'Imagen de ' + NAMES[zoom] : '',
+zoomClose: () => this.setState({ zoom: null }),
+zoomG: () => this.setState({ zoom: 'g' }),
 toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || ''
 };
 }

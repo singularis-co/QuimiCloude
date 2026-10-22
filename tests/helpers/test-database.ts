@@ -652,6 +652,32 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Fija `lc_messages = 'C'` en la base de la corrida, para que los errores de Postgres salgan
+ * en ingles sea cual sea el idioma del servidor.
+ *
+ * Por que: Prisma 6.19.3 solo rellena `meta.constraint` en un `P2003` si el servidor responde
+ * en ingles. Con un Postgres en espanol (`lc_messages = Spanish_Colombia.1252`, sondeado el
+ * 2026-10-20) llega `meta = { modelName, constraint: null }`, y el caso R32 de
+ * `proveedores/catalog-line.int.test.ts` (D33) se ponia rojo en local aunque en CI
+ * (`postgres:17`, en ingles) pasara. Asi la corrida local ve el mismo idioma que la de CI.
+ *
+ * Va en la base de la corrida y no en la plantilla: los ajustes de `ALTER DATABASE ... SET`
+ * son de esa base y `CREATE DATABASE ... TEMPLATE` no los copia. Pide superusuario; si el rol
+ * no lo es, se avisa por consola y se sigue: la corrida no se rompe, pero los tests que lean
+ * el nombre de una restriccion pueden fallar si el servidor no responde en ingles.
+ */
+async function pinServerMessagesLanguage(client: Client, database: string): Promise<void> {
+  try {
+    await client.query(`ALTER DATABASE ${quoteIdentifier(database)} SET lc_messages = 'C'`)
+  } catch (error) {
+    log(
+      `no se pudo fijar lc_messages = 'C' en ${database} (${errorCode(error) ?? 'sin codigo'}): ` +
+        'los errores de Postgres saldran en el idioma del servidor.',
+    )
+  }
+}
+
+/**
  * Crea la base de esta corrida copiando la plantilla (R1, R10).
  *
  * `CREATE DATABASE ... TEMPLATE` es una copia de ficheros: no vuelve a correr las 27
@@ -674,7 +700,7 @@ export async function createRunDatabase(ctx: TestDatabaseContext): Promise<RunDa
         await client.query(
           `CREATE DATABASE ${quoteIdentifier(name)} TEMPLATE ${quoteIdentifier(template)}`,
         )
-        return
+        break
       } catch (error) {
         const wait = TEMPLATE_COPY_BACKOFF_MS[attempt]
         if (errorCode(error) !== SQLSTATE_SOURCE_DATABASE_IN_USE || wait === undefined) throw error
@@ -682,6 +708,7 @@ export async function createRunDatabase(ctx: TestDatabaseContext): Promise<RunDa
         await sleep(wait)
       }
     }
+    await pinServerMessagesLanguage(client, name)
   })
 
   const tracePath = writeTrace(ctx.worktreePath, {

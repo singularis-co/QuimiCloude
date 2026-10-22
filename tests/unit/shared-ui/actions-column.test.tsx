@@ -6,6 +6,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { DataTableHeaderCell } from '@/components/shared/data-table/data-table-header-menu';
 
 type Fila = { readonly id: string; readonly nombre: string };
 
@@ -77,5 +78,34 @@ describe('actionsColumn con valores propios de la tabla', () => {
 
   it('R24: con align end explicito sigue alineada al final', () => {
     expect(actionsColumn<Fila>({ align: 'end', cell: celda }).align).toBe('end');
+  });
+});
+
+describe('actionsColumn: cabecera visible o solo para lector', () => {
+  const cabecera = (col: DataTableColumn<Fila>) =>
+    render(
+      <table>
+        <thead>
+          <tr>
+            <DataTableHeaderCell column={col} sort={null} onSortChange={() => {}} />
+          </tr>
+        </thead>
+      </table>,
+    );
+
+  it('por defecto la cabecera «Acciones» es visible y la columna no declara srOnlyLabel', () => {
+    const col = actionsColumn<Fila>({ cell: celda });
+    cabecera(col);
+
+    expect(col.srOnlyLabel).toBeUndefined();
+    expect(screen.getByRole('columnheader', { name: 'Acciones' })).toBeInTheDocument();
+    expect(screen.getByText('Acciones')).not.toHaveClass('sr-only');
+  });
+
+  it('con srOnlyLabel la cabecera conserva su nombre accesible y queda oculta a la vista', () => {
+    cabecera(actionsColumn<Fila>({ srOnlyLabel: true, cell: celda }));
+
+    expect(screen.getByRole('columnheader', { name: 'Acciones' })).toBeInTheDocument();
+    expect(screen.getByText('Acciones')).toHaveClass('sr-only');
   });
 });

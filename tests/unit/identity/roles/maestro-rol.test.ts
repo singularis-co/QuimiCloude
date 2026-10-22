@@ -197,10 +197,52 @@ describe('R4 — el rol Maestro es global: Role no lleva campo de empresa', () =
   });
 });
 
-describe('R17 — ningun archivo de produccion fuera del catalogo nombra los permisos de empresas', () => {
-  it('R17: empresas.consultar y empresas.modificar solo aparecen en el catalogo de permisos', () => {
+/**
+ * Enmienda QC-235 (2026-10-13): `set-company-country.ts` es el caso de uso que fija el pais de la
+ * empresa y exige `empresas.modificar` en su primera linea (R4/R5 de QC-235), por eso necesita
+ * nombrarlo. Se abre SOLO esa ruta exacta; cualquier otro archivo que nombre los codigos sigue
+ * siendo una infraccion.
+ */
+const RUTAS_ABIERTAS_EMPRESAS = new Set([
+  CATALOGO_DE_PERMISOS,
+  // Catalogo de anadidos: clasifica cada permiso como nucleo o anadido.
+  'lib/modules/identity/domain/company-addons.ts',
+  'lib/modules/identity/domain/set-company-country.ts',
+  // Enmienda QC-162 (2026-10-14): los ocho casos de uso de gestion de empresas exigen
+  // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.
+  'lib/modules/identity/domain/create-company.ts',
+  'lib/modules/identity/domain/update-company.ts',
+  'lib/modules/identity/domain/delete-company.ts',
+  'lib/modules/identity/domain/reactivate-company.ts',
+  'lib/modules/identity/domain/list-companies.ts',
+  'lib/modules/identity/domain/get-company.ts',
+  'lib/modules/identity/domain/get-company-deletion-impact.ts',
+  'lib/modules/identity/domain/list-company-events.ts',
+  // Enmienda QC-277 (design §10.3.1): los tres casos de uso de añadidos exigen `empresas.*`.
+  'lib/modules/identity/domain/get-company-addons.ts',
+  'lib/modules/identity/domain/set-company-addon.ts',
+  'lib/modules/identity/domain/set-all-company-addons.ts',
+  // Enmienda QC-165 (design §3.6): los seis casos de uso de Administradores por el Maestro exigen
+  // `empresas.*` en su primera linea. Se abren solo sus rutas exactas.
+  'lib/modules/identity/domain/list-administrators.ts',
+  'lib/modules/identity/domain/get-administrator.ts',
+  'lib/modules/identity/domain/create-administrator.ts',
+  'lib/modules/identity/domain/update-administrator.ts',
+  'lib/modules/identity/domain/delete-administrator.ts',
+  'lib/modules/identity/domain/resend-administrator-link.ts',
+  // Enmienda QC-166 (2026-10-16): el area del Maestro. El menu declara `empresas.consultar` como
+  // permiso de sus enlaces; las tres paginas cortan con el en su primera linea y sus acciones
+  // de servidor exigen `empresas.modificar`. Se abren solo sus rutas exactas.
+  'lib/shared/navigation/private-nav.ts',
+  'app/(private)/maestro/empresas/page.tsx',
+  'app/(private)/maestro/empresas/[id]/page.tsx',
+  'app/(private)/maestro/administradores/page.tsx',
+]);
+
+describe('R17 — ningun archivo de produccion fuera del catalogo (y las rutas abiertas) nombra los permisos de empresas', () => {
+  it('R17: empresas.consultar y empresas.modificar solo aparecen en el catalogo de permisos y en las rutas abiertas', () => {
     const conElCodigo = findProductionFilesWhere(repoRoot, mentionsEmpresasCode);
-    const inesperados = conElCodigo.filter((ruta) => ruta !== CATALOGO_DE_PERMISOS);
+    const inesperados = conElCodigo.filter((ruta) => !RUTAS_ABIERTAS_EMPRESAS.has(ruta));
 
     expect(
       inesperados,
@@ -209,8 +251,8 @@ describe('R17 — ningun archivo de produccion fuera del catalogo nombra los per
         'Si eres QC-162 (o la ficha que empiece a exigir estos permisos), relaja este barrido ' +
         'abriendo aqui las rutas exactas que los exigen, como hizo empacador-rol.test.ts.',
     ).toEqual([]);
-    // Anti-cegado: el barrido si ve el catalogo, que declara los dos codigos.
-    expect(conElCodigo).toEqual([CATALOGO_DE_PERMISOS]);
+    // Anti-cegado: el barrido ve el catalogo y todas las rutas abiertas, y ninguna sobra.
+    expect([...conElCodigo].sort()).toEqual([...RUTAS_ABIERTAS_EMPRESAS].sort());
   });
 
   it('R17: dispara con un fuente sintetico que exige cualquiera de los dos codigos', () => {

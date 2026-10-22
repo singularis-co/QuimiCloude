@@ -114,8 +114,9 @@ export class PresentationNotFoundError extends PedidosError {
   }
 }
 
-/** El envase de una linea del reparto no existe, es de otra empresa, esta dado de baja, no es un
- *  envase o no tiene presentacion fija. Codigo compartido con `inventario`. */
+/** El envase de una linea del reparto, o el producto terminado de una entrega sin pedido, no
+ *  existe, es de otra empresa, esta dado de baja o no es de ese tipo. Codigo compartido con
+ *  `inventario`. */
 export class ProductNotFoundError extends PedidosError {
   readonly code = 'product_not_found';
 
@@ -347,5 +348,15 @@ export class DeliveryAlreadyVoidedError extends PedidosError {
 
   constructor(diagnostic?: string) {
     super('delivery_already_voided', diagnostic);
+  }
+}
+
+/** Una entrega sin pedido pide mas envases de los que quedan tras apartar lo que esperan los
+ *  pedidos terminados del producto. */
+export class DeliveryExceedsSurplusError extends PedidosError {
+  readonly code = 'delivery_exceeds_surplus';
+
+  constructor(diagnostic?: string) {
+    super('delivery_exceeds_surplus', diagnostic);
   }
 }

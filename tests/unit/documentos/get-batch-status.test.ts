@@ -7,7 +7,7 @@ import { DOCUMENT_UPLOAD_PERMISSION, type Actor } from '@/lib/modules/documentos
 import { UnauthorizedError } from '@/lib/modules/documentos/domain/errors';
 import { createGetBatchStatus } from '@/lib/modules/documentos/domain/get-batch-status';
 
-import type { BatchStatus } from '@/lib/modules/documentos/domain/batch-status';
+import type { ReadBatch } from '@/lib/modules/documentos/domain/batch-status';
 import type { DocumentBatchRepository } from '@/lib/modules/documentos/ports/document-batch-repository';
 import type { ProcessingConfig } from '@/lib/modules/documentos/ports/processing-config';
 
@@ -27,14 +27,14 @@ function config(): ProcessingConfig {
   return { timeoutSeconds: () => TIMEOUT_SEGUNDOS, maxRetries: () => 3 };
 }
 
-function tandaGuardada(companyId: string = EMPRESA): BatchStatus {
+function tandaGuardada(companyId: string = EMPRESA): ReadBatch {
   return { id: TANDA, companyId, strategy: 'catalogo', files: [] };
 }
 
 /** Doble en memoria: `readBatch` solo devuelve lo que sea de LA MISMA empresa que se pide. */
-function dobleDeRepositorio(guardada: BatchStatus | null) {
+function dobleDeRepositorio(guardada: ReadBatch | null) {
   const expireStale = vi.fn<DocumentBatchRepository['expireStale']>(async () => {});
-  const readBatch = vi.fn(async (batchId: string, companyId: string): Promise<BatchStatus | null> => {
+  const readBatch = vi.fn(async (batchId: string, companyId: string): Promise<ReadBatch | null> => {
     if (!guardada || guardada.id !== batchId || guardada.companyId !== companyId) return null;
     return guardada;
   });
@@ -61,7 +61,7 @@ function dobleDeRepositorio(guardada: BatchStatus | null) {
 }
 
 describe('documentos — getBatchStatus', () => {
-  it('R18 — sin permiso rechaza, sin llamar a expireStale ni a readBatch', async () => {
+  it('R3, QC-111 R18 — sin permiso rechaza, sin llamar a expireStale ni a readBatch', async () => {
     const doble = dobleDeRepositorio(tandaGuardada());
     const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
     const sinPermiso: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [] };
@@ -71,7 +71,7 @@ describe('documentos — getBatchStatus', () => {
     expect(doble.readBatch).not.toHaveBeenCalled();
   });
 
-  it('R18 — una tanda de OTRA empresa da EXACTAMENTE el mismo rechazo que una inexistente', async () => {
+  it('R3, QC-111 R18 — una tanda de OTRA empresa da EXACTAMENTE el mismo rechazo que una inexistente', async () => {
     const doble = dobleDeRepositorio(tandaGuardada(OTRA_EMPRESA));
     const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
     const dobleInexistente = dobleDeRepositorio(null);
@@ -89,8 +89,8 @@ describe('documentos — getBatchStatus', () => {
     expect(deOtraEmpresa).toEqual(inexistente);
   });
 
-  it('R19 — una fila queued mas vieja que el plazo vuelve como error con su motivo, y QUEDA GUARDADA', async () => {
-    const CADUCADA: BatchStatus = {
+  it('QC-111 R19 — una fila queued mas vieja que el plazo vuelve como error con su motivo, y QUEDA GUARDADA', async () => {
+    const CADUCADA: ReadBatch = {
       id: TANDA,
       companyId: EMPRESA,
       strategy: 'catalogo',
@@ -98,6 +98,8 @@ describe('documentos — getBatchStatus', () => {
         {
           id: 'archivo-1',
           path: `${EMPRESA}/documento.pdf`,
+          attempts: 1,
+          name: 'documento.pdf',
           status: 'error',
           extractedText: null,
           errorCode: 'unexpected',
@@ -122,7 +124,7 @@ describe('documentos — getBatchStatus', () => {
     expect(resultado?.files[0]?.errorReason).toBe('se agoto el tiempo de espera');
   });
 
-  it('R19 — el instante lo da la dependencia inyectada, nunca `new Date()`', async () => {
+  it('QC-111 R19 — el instante lo da la dependencia inyectada, nunca `new Date()`', async () => {
     const doble = dobleDeRepositorio(tandaGuardada());
     const now = vi.fn(() => AHORA);
     const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now });
@@ -134,8 +136,8 @@ describe('documentos — getBatchStatus', () => {
     expect((olderThan as Date).getTime()).toBe(AHORA.getTime() - TIMEOUT_SEGUNDOS * 1000);
   });
 
-  it('R19 — una fila mas joven que el plazo no se toca: sigue queued y sin motivo', async () => {
-    const RECIENTE: BatchStatus = {
+  it('QC-111 R19 — una fila mas joven que el plazo no se toca: sigue queued y sin motivo', async () => {
+    const RECIENTE: ReadBatch = {
       id: TANDA,
       companyId: EMPRESA,
       strategy: 'catalogo',
@@ -143,6 +145,8 @@ describe('documentos — getBatchStatus', () => {
         {
           id: 'archivo-1',
           path: `${EMPRESA}/documento.pdf`,
+          attempts: 0,
+          name: 'documento.pdf',
           status: 'queued',
           extractedText: null,
           errorCode: null,
@@ -162,7 +166,7 @@ describe('documentos — getBatchStatus', () => {
     expect(resultado?.files[0]?.errorReason).toBeNull();
   });
 
-  it('R19 — el plazo sale de la configuracion inyectada, no de un literal', async () => {
+  it('QC-111 R19 — el plazo sale de la configuracion inyectada, no de un literal', async () => {
     const doble = dobleDeRepositorio(tandaGuardada());
     const otroTimeout: ProcessingConfig = { timeoutSeconds: () => 60, maxRetries: () => 1 };
     const getBatchStatus = createGetBatchStatus({
@@ -177,8 +181,35 @@ describe('documentos — getBatchStatus', () => {
     expect((olderThan as Date).getTime()).toBe(AHORA.getTime() - 60 * 1000);
   });
 
-  describe('documentos.modificar decide, nunca proveedores.* (R14, R15, R16)', () => {
-    it('R15 — proveedores.modificar y proveedores.consultar, sin documentos.modificar, rechazan sin tocar el repositorio', async () => {
+  it('R2 — maxAttempts es la primera entrega mas los reintentos del config, no un literal', async () => {
+    const doble = dobleDeRepositorio(tandaGuardada());
+    const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
+
+    const resultado = await getBatchStatus(actorAutorizado(), TANDA);
+
+    expect(resultado?.maxAttempts).toBe(4);
+  });
+
+  it('R2 — maxAttempts sigue al config: cambia con el tope y no existe si no hay tanda', async () => {
+    const otroTope: ProcessingConfig = { timeoutSeconds: () => TIMEOUT_SEGUNDOS, maxRetries: () => 5 };
+    const doble = dobleDeRepositorio(tandaGuardada());
+    const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: otroTope, now: () => AHORA });
+    const getBatchStatusInexistente = createGetBatchStatus({
+      repository: dobleDeRepositorio(null).repository,
+      config: otroTope,
+      now: () => AHORA,
+    });
+
+    const resultado = await getBatchStatus(actorAutorizado(), TANDA);
+    const inexistente = await getBatchStatusInexistente(actorAutorizado(), TANDA);
+
+    expect(resultado?.maxAttempts).toBe(6);
+    expect(resultado?.files).toEqual([]);
+    expect(inexistente).toBeNull();
+  });
+
+  describe('documentos.modificar decide, nunca proveedores.* (QC-142 R14, R15, R16)', () => {
+    it('QC-142 R15 — proveedores.modificar y proveedores.consultar, sin documentos.modificar, rechazan sin tocar el repositorio', async () => {
       const doble = dobleDeRepositorio(tandaGuardada());
       const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
       const actor: Actor = {
@@ -192,7 +223,7 @@ describe('documentos — getBatchStatus', () => {
       expect(doble.readBatch).not.toHaveBeenCalled();
     });
 
-    it('R15 — solo documentos.consultar, sin documentos.modificar, tambien rechaza', async () => {
+    it('QC-142 R15 — solo documentos.consultar, sin documentos.modificar, tambien rechaza', async () => {
       const doble = dobleDeRepositorio(tandaGuardada());
       const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
       const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.consultar'] };
@@ -201,7 +232,7 @@ describe('documentos — getBatchStatus', () => {
       expect(doble.readBatch).not.toHaveBeenCalled();
     });
 
-    it('R16 — documentos.modificar sin ningun permiso de proveedores autoriza la consulta', async () => {
+    it('QC-142 R16 — documentos.modificar sin ningun permiso de proveedores autoriza la consulta', async () => {
       const doble = dobleDeRepositorio(tandaGuardada());
       const getBatchStatus = createGetBatchStatus({ repository: doble.repository, config: config(), now: () => AHORA });
       const actor: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['documentos.modificar'] };

@@ -67,6 +67,7 @@ import {
   addPackagingLine,
   openOrderRowMenu,
   orderMenuTrigger,
+  submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 
@@ -480,7 +481,8 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     // El reparto cambia la cotizacion: el envase se suma a los ingredientes.
     await expect(quoteValue).toHaveText(AMOUNT_B_WITH_PACKAGING, { timeout: 60_000 });
 
-    await page.getByTestId('order-form-submit').click();
+    // 5001 en un envase de 1: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, page.getByTestId('order-form'));
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findFirstOrThrow({

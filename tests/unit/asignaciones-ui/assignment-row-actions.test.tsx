@@ -86,8 +86,9 @@ const PACKING: PackingOrderRow = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
-  packages: '8',
   status: 'POR_EMPACAR',
+  priority: 'MEDIA',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
   packedByName: null,
   packedById: null,
 };
@@ -237,14 +238,15 @@ describe('R18 — en «Mis asignados» «Entrar» es la única acción visible',
     expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveAttribute('href', '/asignacion/order-a');
   });
 
-  it('R18: pendiente, «Entrar» pide «¿Comenzar el pedido?» antes de entrar', async () => {
-    const user = setupUser();
+  it('R18: pendiente, «Entrar» es un enlace directo: se comienza dentro de la pantalla', () => {
     const entrar = buildAssignedOrdersColumns({ canExecute: true }).find((column) => column.id === 'enter');
     if (entrar === undefined) throw new Error('falta la columna «Entrar»');
     render(<>{entrar.cell(ASSIGNED)}</>);
 
-    await user.click(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent('¿Comenzar el pedido?');
+    const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    expect(trigger.tagName).toBe('A');
+    expect(trigger).toHaveAttribute('href', '/asignacion/order-a');
+    expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });
 
@@ -264,7 +266,7 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
     const tarjeta = screen.getByTestId('data-table-card-order-a');
     const campo = (id: string) => within(tarjeta).getByTestId(`data-table-card-field-${id}`);
     expect(campo('orderNumber')).toHaveTextContent('2026-0000010');
-    expect(within(campo('status')).getByTestId('assigned-order-status')).toHaveTextContent('En curso');
+    expect(within(campo('status')).getByTestId('assigned-order-status')).toHaveTextContent('En fabricación');
     expect(campo('recipeName')).toHaveTextContent('Jarabe simple');
     expect(campo('quantity')).toHaveTextContent('12.500');
     expect(within(campo('priority')).getByTestId('assigned-order-priority')).toHaveTextContent('Alta');

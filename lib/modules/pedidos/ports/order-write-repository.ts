@@ -1,23 +1,18 @@
 import type { OrderStatus } from '../domain/order-classification';
 import type { StoredOrderCost } from '../domain/order-cost';
 import type { OrderScope } from '../domain/order-scope';
+import type { PackedLineCount } from '../domain/packing-count';
 import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../domain/order-view';
 
 /** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
- *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. `packagingCost` es la
- *  parte de envases incluida en `ingredientsCost`, y es `null` solo cuando este lo es. */
-export type LockedOrderRow = OrderRow & {
-  readonly reservedAt: Date | null;
-  readonly packagingCost: string | null;
-};
+ *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
+export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
 
-/** Lo que Terminar el empaque necesita del pedido cuando el
- *  `UPDATE` condicional SI lo mueve: la receta para el nombre del lote y el coste guardado -o
- *  su ausencia, que hace recalcularlo-. */
+/** Lo que Terminar el empaque necesita del pedido cuando el `UPDATE` condicional SI lo mueve: la
+ *  receta para el nombre del lote y la cantidad y unidad con que se reparte el coste. */
 export type FinishPackingOrderRow = {
   readonly recipeId: string;
   readonly quantity: string;
-  readonly ingredientsCost: string | null;
   /** La unidad en que se reparte el coste entre los lotes; `null` solo con una fila escrita
    *  fuera de la aplicacion. */
   readonly unitId: string | null;
@@ -39,7 +34,14 @@ export type FinishPackingLine = {
   readonly presentationContent: string | null;
   /** `null` en una linea antigua, sin envase. */
   readonly packagingProductId: string | null;
+  /** `null` = todavia sin contar. */
+  readonly packedPackages: number | null;
+  /** Envases del conteo real que el pedido no espera; 0 sin contar o sin excedente. */
+  readonly packedSurplusPackages: number;
 };
+
+/** El conteo de una linea con los envases que, de ese conteo, quedan libres en el lote. */
+export type RecordedPackedLine = PackedLineCount & { readonly packedSurplusPackages: number };
 
 /**
  * Puerto de escritura del pedido DENTRO de una transaccion compartida con `inventario`
@@ -69,13 +71,14 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<OrderRow>;
 
-  /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. */
+  /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. Con `'keep'` el
+   *  importe guardado no se toca. */
   updateAlive(
     id: string,
     data: OrderEdit,
     actorId: string,
     now: Date,
-    cost: StoredOrderCost | null,
+    cost: StoredOrderCost | null | 'keep',
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
@@ -112,6 +115,10 @@ export interface OrderWriteRepository {
     now: Date,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
+
+  /** Escribe SOLO `actual_cost`, sin mover `updated_at`: Terminar ya lo sello en la misma
+   *  transaccion. `null` = sin importe, nunca `0`. */
+  setActualCost(id: string, cost: string | null, scope: OrderScope): Promise<void>;
 
   /** Escribe `reserved_at` SIN mover `updated_at`: apartar o liberar material no es una edicion
    *  que el usuario deba ver en esa columna. */
@@ -154,4 +161,9 @@ export interface OrderWriteRepository {
    *  transaccion de `finishPackingAlive`, para que un fallo tras leerlas deshaga tambien el
    *  `UPDATE`. */
   findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;
+
+  /** Escribe el conteo y los libres de cada linea sin tocar `packages`. Una linea que no sea de
+   *  ese pedido y esa empresa no se escribe; quien llama ya comprobo los conteos contra las
+   *  lineas leidas. */
+  recordPackedCounts(id: string, counts: readonly RecordedPackedLine[], scope: OrderScope): Promise<void>;
 }

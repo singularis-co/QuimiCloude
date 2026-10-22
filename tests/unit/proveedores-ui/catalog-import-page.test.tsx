@@ -72,13 +72,14 @@ const PERMISOS_DE_LA_PANTALLA = ['proveedores.consultar', 'proveedores.modificar
 const SUPPLIER_ID = 'PROVEEDOR-ID-NO-VISIBLE';
 const DOCUMENT_FILE_ID = 'ARCHIVO-ID-NO-VISIBLE';
 
-function sesionCon(permissions: readonly string[]) {
+function sesionCon(permissions: readonly string[], addons: readonly string[] = ['lectura_pdf', 'integraciones']) {
   return {
     id: '99999999-9999-4999-8999-999999999999',
     username: 'admin.prueba',
     displayName: 'Admin De Prueba',
     roleName: 'Administrador',
     permissions,
+    addons,
   };
 }
 
@@ -175,6 +176,18 @@ describe('el corte por permiso ocurre antes de leer nada (R32)', () => {
       expect(previewCatalogImportActionMock).not.toHaveBeenCalled();
     });
   }
+
+  it('R13 R15 R23 con los dos permisos y sin el añadido lectura_pdf responde 404 y no llega a leer el proveedor ni el documento', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(PERMISOS_DE_LA_PANTALLA, ['integraciones']));
+
+    await expect(arbolDeLaPantalla()).rejects.toThrow();
+
+    expect(notFoundMock).toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(getSupplierActionMock).not.toHaveBeenCalled();
+    expect(listUnitsActionMock).not.toHaveBeenCalled();
+    expect(previewCatalogImportActionMock).not.toHaveBeenCalled();
+  });
 
   it('con los DOS permisos entra y pide el proveedor, las unidades y la vista previa en paralelo', async () => {
     await renderPantalla();

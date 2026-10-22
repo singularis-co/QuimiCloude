@@ -2,12 +2,14 @@ import Papa from 'papaparse';
 import { describe, expect, it } from 'vitest';
 
 import { readCsv } from '@/lib/modules/inventario/adapters/driven/spreadsheet/csv-reader';
+import type { SpreadsheetReadResult } from '@/lib/modules/inventario/ports/spreadsheet-reader';
 import { parseImportSheet } from '@/lib/modules/inventario/domain/import-sheet';
 import {
-  IMPORT_EXAMPLE_ROW,
+  IMPORT_EXAMPLE_ROWS,
+  IMPORT_TYPE_LABELS,
   INVENTORY_IMPORT_COLUMNS,
   buildInventoryImportErrorFile,
-  buildInventoryImportTemplate,
+  buildInventoryImportTemplateSheets,
   type ImportCells,
   type ImportPreviewRow,
   type ImportResultRow,
@@ -45,7 +47,7 @@ const ROWS: (ImportPreviewRow | ImportResultRow)[] = [
     productName: null,
     status: 'error',
     issues: [
-      { code: 'number_format_invalid', column: 'stock', message: 'Existencia: usa un solo separador decimal.' },
+      { code: 'number_format_invalid', column: 'stock', message: 'Cantidad: usa un solo separador decimal.' },
       { code: 'unit_not_found', column: 'unit', message: 'Unidad: no existe.' },
     ],
   },
@@ -68,37 +70,68 @@ const ROWS: (ImportPreviewRow | ImportResultRow)[] = [
   },
 ];
 
+const VALUES = { units: ['gramo', 'kilogramo'], presentations: ['Bidón 20 L'], formulas: ['Desengrasante', 'Jabón', 'Cloro'] };
+
+function toSheet(rows: readonly (readonly string[])[]): SpreadsheetReadResult {
+  return { kind: 'ok', rows: rows.map((row) => row.map((value) => ({ text: value, origin: 'text' as const }))) };
+}
+
 describe('plantilla', () => {
-  it('R3 es un .csv con BOM, separador ; y el nombre fijo', () => {
-    const template = buildInventoryImportTemplate();
-    expect(template.fileName).toBe('plantilla-inventario.csv');
-    expect(template.mimeType).toBe('text/csv;charset=utf-8');
-    expect(template.content.startsWith(`${BOM}Tipo;Nombre;`)).toBe(true);
+  it('R3 tiene dos hojas: la plantilla que se importa y los valores disponibles', () => {
+    const sheets = buildInventoryImportTemplateSheets(VALUES);
+    expect(sheets.map((sheet) => sheet.name)).toEqual(['Plantilla', 'Valores disponibles']);
   });
 
-  it('R3 trae exactamente las columnas de la plantilla, en orden, y una sola fila de ejemplo', () => {
-    const [header, ...rows] = parse(buildInventoryImportTemplate().content);
+  it('R3 trae exactamente las columnas de la plantilla, en orden, sin «Costo total», y un ejemplo por tipo', () => {
+    const [template] = buildInventoryImportTemplateSheets(VALUES);
+    const [header, ...rows] = template.rows;
     expect(header).toEqual([
       'Tipo',
       'Nombre',
       'Unidad',
       'Presentación',
       'Fórmula',
-      'Existencia',
+      'Cantidad',
       'Costo unitario',
-      'Costo total',
       'Lote',
       'Fecha de compra',
       'Fecha de vencimiento',
       'Alerta de cantidad',
     ]);
     expect(header).toEqual(HEADERS);
-    expect(rows).toEqual([INVENTORY_IMPORT_COLUMNS.map((column) => IMPORT_EXAMPLE_ROW[column.key])]);
+    expect(rows).toEqual(IMPORT_EXAMPLE_ROWS.map((example) => INVENTORY_IMPORT_COLUMNS.map((column) => example[column.key])));
+    expect(rows.map((row) => row[0])).toEqual(Object.values(IMPORT_TYPE_LABELS));
   });
 
-  it('R3 R8 la plantilla sin tocar vuelve a leerse como solo la fila de ejemplo', () => {
-    const read = readCsv(new TextEncoder().encode(buildInventoryImportTemplate().content));
-    expect(parseImportSheet(read)).toEqual({ ok: false, rejection: { code: 'empty' } });
+  it('R3 cada ejemplo respeta las columnas obligatorias y prohibidas de su tipo', () => {
+    for (const example of IMPORT_EXAMPLE_ROWS) {
+      const type = (Object.keys(IMPORT_TYPE_LABELS) as (keyof typeof IMPORT_TYPE_LABELS)[]).find(
+        (key) => IMPORT_TYPE_LABELS[key] === example.type,
+      );
+      expect(type).toBeDefined();
+      for (const column of INVENTORY_IMPORT_COLUMNS) {
+        const rule = type === undefined ? 'optional' : column.rules[type];
+        const filled = example[column.key].trim() !== '';
+        if (rule === 'required') expect(filled, `${example.type} · ${column.header}`).toBe(true);
+        if (rule === 'forbidden') expect(filled, `${example.type} · ${column.header}`).toBe(false);
+      }
+    }
+  });
+
+  it('R3 R8 la plantilla sin tocar vuelve a leerse como solo filas de ejemplo', () => {
+    const [template] = buildInventoryImportTemplateSheets(VALUES);
+    expect(parseImportSheet(toSheet(template.rows))).toEqual({ ok: false, rejection: { code: 'empty' } });
+  });
+
+  it('R3 la segunda hoja lista tipos, unidades, presentaciones y fórmulas tal como están guardados', () => {
+    const [, values] = buildInventoryImportTemplateSheets(VALUES);
+    expect(values.rows).toEqual([
+      ['Tipo', 'Unidad', 'Presentación', 'Fórmula'],
+      ['Insumo', 'gramo', 'Bidón 20 L', 'Desengrasante'],
+      ['Envase', 'kilogramo', '', 'Jabón'],
+      ['Instrumento', '', '', 'Cloro'],
+      ['Producto terminado', '', '', ''],
+    ]);
   });
 });
 
@@ -121,7 +154,7 @@ describe('archivo de errores', () => {
       [
         '3',
         ...INVENTORY_IMPORT_COLUMNS.map((column) => TRICKY[column.key]),
-        'Existencia: usa un solo separador decimal. | Unidad: no existe.',
+        'Cantidad: usa un solo separador decimal. | Unidad: no existe.',
       ],
       ['7', 'Maquina', ...HEADERS.slice(1).map(() => ''), 'Tipo: no es uno de los tipos.'],
     ]);

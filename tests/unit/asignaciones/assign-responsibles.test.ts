@@ -32,9 +32,15 @@ import type {
   NewAssignment,
   OrderAssignmentRepository,
 } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import {
+  ROLE_ACONDICIONAMIENTO,
+  ROLE_ADMINISTRADOR,
+  ROLE_EMPACADOR,
+  ROLE_OPERADOR,
+} from '@/lib/modules/identity';
+
 import type {
   PeopleDirectory,
-  PermissionCode,
   PersonRef,
   WorkGroupDirectory,
   WorkGroupSnapshot,
@@ -58,8 +64,8 @@ const AHORA = new Date('2026-09-13T10:00:00.000Z');
 
 const ACTOR: Actor = { id: uuid('9'), companyId: EMPRESA, permissions: ['asignaciones.modificar'] };
 
-function persona(id: string, isActive = true, permissions: readonly PermissionCode[] = []): PersonRef {
-  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive, permissions };
+function persona(id: string, isActive = true, roleName: string = ROLE_OPERADOR): PersonRef {
+  return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive, permissions: [], roleName };
 }
 
 function grupo(id: string, name: string, activeMemberIds: readonly string[]): WorkGroupSnapshot {
@@ -353,10 +359,28 @@ describe('QC-87 — `assignResponsibles`', () => {
     });
   });
 
-  /** Una persona SUELTA con `pedidos.consultar` no se puede asignar como responsable. */
-  describe('personas sueltas con `pedidos.consultar` (R33)', () => {
-    it("una sola persona con `pedidos.consultar` -> 'user_cannot_be_responsible', ninguna fila", async () => {
-      const m = montar({ personas: [persona(ANA, true, ['pedidos.consultar'])] });
+  /** QC-274: una persona SUELTA cuyo rol no es Operador ni Empacador no se puede asignar. */
+  describe('personas sueltas sin rol de responsable (R33, QC-274)', () => {
+    it('QC-274: asignar a un Administrador de acondicionamiento se rechaza en el servidor, ninguna fila', async () => {
+      const m = montar({ personas: [persona(ANA, true, ROLE_ACONDICIONAMIENTO)] });
+
+      expect(
+        await codigoDelFallo(m.assign(ACTOR, { orderId: PEDIDO, userIds: [ANA], workGroupIds: [] }, AHORA)),
+      ).toBe('user_cannot_be_responsible');
+      expect(m.assignments.insertMissing).not.toHaveBeenCalled();
+    });
+
+    it('QC-274: un Operador y un Empacador sueltos se asignan', async () => {
+      const m = montar({ personas: [persona(ANA, true, ROLE_OPERADOR), persona(BEA, true, ROLE_EMPACADOR)] });
+
+      const outcome = await m.assign(ACTOR, { orderId: PEDIDO, userIds: [ANA, BEA], workGroupIds: [] }, AHORA);
+
+      expect(outcome).toEqual({ added: 2 });
+      expect(m.filas().map((fila) => fila.userId)).toEqual([ANA, BEA]);
+    });
+
+    it("QC-274: un Administrador suelto -> 'user_cannot_be_responsible', ninguna fila", async () => {
+      const m = montar({ personas: [persona(ANA, true, ROLE_ADMINISTRADOR)] });
 
       expect(
         await codigoDelFallo(m.assign(ACTOR, { orderId: PEDIDO, userIds: [ANA], workGroupIds: [] }, AHORA)),
@@ -367,7 +391,7 @@ describe('QC-87 — `assignResponsibles`', () => {
 
     it('el rechazo es ENTERO: no se escribe ni la que iba delante y era elegible', async () => {
       const m = montar({
-        personas: [persona(ANA), persona(BEA, true, ['pedidos.consultar'])],
+        personas: [persona(ANA), persona(BEA, true, ROLE_ADMINISTRADOR)],
       });
 
       await codigoDelFallo(
@@ -379,12 +403,12 @@ describe('QC-87 — `assignResponsibles`', () => {
 
     it('el orden de rechazos es: no existe -> cuenta inactiva -> no elegible', async () => {
       const noExiste = montar({ personas: [] });
-      const inactiva = montar({ personas: [persona(ANA, false, ['pedidos.consultar'])] });
-      const noElegible = montar({ personas: [persona(ANA, true, ['pedidos.consultar'])] });
+      const inactiva = montar({ personas: [persona(ANA, false, ROLE_ADMINISTRADOR)] });
+      const noElegible = montar({ personas: [persona(ANA, true, ROLE_ADMINISTRADOR)] });
       const entrada = { orderId: PEDIDO, userIds: [ANA], workGroupIds: [] };
 
       expect(await codigoDelFallo(noExiste.assign(ACTOR, entrada, AHORA))).toBe('user_not_found');
-      // Inactiva Y con `pedidos.consultar`: gana la inactividad, que se comprueba antes.
+      // Inactiva Y sin rol de responsable: gana la inactividad, que se comprueba antes.
       expect(await codigoDelFallo(inactiva.assign(ACTOR, entrada, AHORA))).toBe('user_not_assignable');
       expect(await codigoDelFallo(noElegible.assign(ACTOR, entrada, AHORA))).toBe(
         'user_cannot_be_responsible',
@@ -483,15 +507,15 @@ describe('QC-87 — `assignResponsibles`', () => {
   });
 
   /**
-   * Un grupo con un miembro no elegible (`pedidos.consultar`) no rechaza la operacion:
+   * Un grupo con un miembro no elegible (rol distinto de Operador o Empacador) no rechaza la operacion:
    * se le omite EN SILENCIO, igual que a un inactivo, y el resto del grupo se asigna.
    */
-  describe('grupos con un miembro que tiene `pedidos.consultar` (R34, R36)', () => {
+  describe('grupos con un miembro sin rol de responsable (R34, R36, QC-274)', () => {
     it('un Administrador y un Operador en el mismo grupo: el Operador queda asignado, el Administrador sin fila', async () => {
       const ADMINISTRADOR = CARLOS;
       const OPERADOR = BEA;
       const m = montar({
-        personas: [persona(ADMINISTRADOR, true, ['pedidos.consultar'])],
+        personas: [persona(ADMINISTRADOR, true, ROLE_ADMINISTRADOR)],
         gruposVivos: [grupo(TURNO_NOCHE, 'Turno noche', [ADMINISTRADOR, OPERADOR])],
       });
 
@@ -539,7 +563,7 @@ describe('QC-87 — `assignResponsibles`', () => {
     it('un grupo formado ENTERO por gente no elegible termina con EXITO y cero anadidas, como uno sin activos', async () => {
       const ADMINISTRADOR = CARLOS;
       const m = montar({
-        personas: [persona(ADMINISTRADOR, true, ['pedidos.consultar'])],
+        personas: [persona(ADMINISTRADOR, true, ROLE_ADMINISTRADOR)],
         gruposVivos: [grupo(TURNO_NOCHE, 'Turno noche', [ADMINISTRADOR])],
       });
 
@@ -779,6 +803,9 @@ function montarSobreBase(
         throw new Error('QC-145: no lo usa `assignResponsibles`');
       },
       listSummariesByIdsIncludingDeleted: async () => {
+        throw new Error('no lo usa `assignResponsibles`');
+      },
+      listDeliveryProgressByIdsIncludingDeleted: async () => {
         throw new Error('no lo usa `assignResponsibles`');
       },
       transitionAliveById: async () => {

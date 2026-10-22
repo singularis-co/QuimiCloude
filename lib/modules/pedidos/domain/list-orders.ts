@@ -9,10 +9,12 @@ import {
   ORDER_CUSTOMER_PRESENCE_FILTER_FIELD,
   ORDER_CUSTOMER_PRESENCE_VALUES,
 } from './order-customer';
+import { deliveryStateOf } from './order-pending-delivery';
 import { ORDER_QUERYABLE } from './order-queryable';
 import type { OrderScope } from './order-scope';
 
 import type { ListFilterValue, ListQuery } from './list-query';
+import type { OrderCatalog } from './order-catalog';
 import type { OrderSummary } from './order-view';
 import type { Page } from './page';
 
@@ -24,8 +26,10 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 import {
   findOrderCustomers,
   findPackagingNames,
+  orderAndPresentationUnitIds,
   orderPackagingIds,
   orderPresentationIds,
+  toPresentationDisplays,
   unitLabelOf,
 } from './get-order';
 
@@ -36,6 +40,8 @@ import type { OrderRepository } from '../ports/order-repository';
  *  llamada por pagina con los ids UNICOS. */
 export type ListOrdersDeps = {
   readonly orders: OrderRepository;
+  /** Lo entregado por linea de los pedidos de la pagina, una llamada por pagina. */
+  readonly deliveryProgress: Pick<OrderCatalog, 'listDeliveryProgressByIdsIncludingDeleted'>;
   readonly recipes: RecipeCatalog;
   /** Contrato PUBLICO de `inventario`: resuelve los nombres de presentacion de la pagina. */
   readonly presentations: PresentationCatalog;
@@ -199,24 +205,33 @@ export function createListOrders(
     const presentationIds = orderPresentationIds(page.items);
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
-    const presentationNames = new Map(presentations.map((presentation) => [presentation.id, presentation.name]));
 
-    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS.
-    const unitIds = [
-      ...new Set(page.items.map((row) => row.unitId).filter((id): id is string => id !== null)),
-    ];
+    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS: los de los pedidos
+    // y los de sus presentaciones (la etiqueta del contenido de cada linea).
+    const unitIds = orderAndPresentationUnitIds(page.items, presentations);
     const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
     const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
+    const presentationDisplays = toPresentationDisplays(presentations, unitLabels);
 
     // Los envases de la pagina, deduplicados: una sola llamada.
     const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds(page.items), actor.companyId);
 
     const orderCustomers = await findOrderCustomers(deps.customerCatalog, page.items, actor.companyId);
 
+    const progress =
+      page.items.length === 0
+        ? []
+        : await deps.deliveryProgress.listDeliveryProgressByIdsIncludingDeleted(
+            actor.companyId,
+            page.items.map((row) => row.id),
+          );
+    const progressById = new Map(progress.map((order) => [order.id, order]));
+
     return {
-      items: page.items.map((row) =>
-        toOrderView(row, recipesById, presentationNames, unitLabels, packagingNames, orderCustomers),
-      ),
+      items: page.items.map((row) => ({
+        ...toOrderView(row, recipesById, presentationDisplays, unitLabels, packagingNames, orderCustomers),
+        pendingDelivery: deliveryStateOf(progressById.get(row.id), row.status, presentationDisplays),
+      })),
       total: page.total,
       page: page.page,
       pageSize: page.pageSize,

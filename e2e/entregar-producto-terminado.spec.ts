@@ -7,9 +7,15 @@
  *   2. cambia el cliente al segundo y escribe envases en dos lotes, uno de cada presentacion;
  *   3. recarga la pagina, reabre el panel y el borrador sigue ahi: cliente y envases;
  *   4. confirma; en Postgres los lotes siguen existiendo con su existencia rebajada, hay un asiento
- *      `delivery` por lote, la fila de `order_deliveries` lleva el cliente elegido y el pedido sigue
+ *      `delivery` por lote, las lineas de la entrega llevan el cliente elegido y el pedido sigue
  *      `TERMINADO` con su cliente de siempre;
  *   5. una segunda entrega completa lo que falta: el pedido queda `ENTREGADO` y la fila lo pinta.
+ *
+ * ENMIENDA 2026-10-15 (QC-282): el cliente de una entrega ya no vive en `order_deliveries` sino en
+ * cada linea (`order_delivery_lines.customer_id`), asi que el paso 4 y el 5 lo leen de las lineas.
+ * El sheet va por bloques de cliente: con un solo bloque, el selector de cliente y los campos de
+ * envases siguen siendo unicos en el panel, y el recorrido no cambia. Las aserciones previas se
+ * conservan.
  * Un segundo `test()` entra con el Operador, que no tiene permiso de entregas, y no ve la accion.
  *
  * QUE APORTA SOBRE UNIT E INTEGRACION: el panel, el borrador en `localStorage` y las dos Server
@@ -539,11 +545,17 @@ test.describe('entregar el producto terminado de un pedido', () => {
       .toBe(1);
     const firstDelivery = await prisma.orderDelivery.findFirstOrThrow({
       where: { orderId: id },
-      select: { id: true, customerId: true, lines: { select: { batchId: true, packages: true } } },
+      // 2026-10-15 (QC-282): el cliente va en cada linea de la entrega.
+      select: { id: true, lines: { select: { batchId: true, packages: true, customerId: true } } },
     });
-    expect(firstDelivery.customerId, 'la entrega lleva el cliente elegido').toBe(deliveryCustomer);
     expect(
-      [...firstDelivery.lines].sort((a, b) => a.batchId.localeCompare(b.batchId)),
+      firstDelivery.lines.map((line) => line.customerId),
+      'cada linea de la entrega lleva el cliente elegido',
+    ).toEqual([deliveryCustomer, deliveryCustomer]);
+    expect(
+      firstDelivery.lines
+        .map(({ batchId, packages }) => ({ batchId, packages }))
+        .sort((a, b) => a.batchId.localeCompare(b.batchId)),
     ).toEqual(
       [
         { batchId: oneA, packages: Number(FIRST_ONE_A_PACKAGES) },
@@ -596,12 +608,16 @@ test.describe('entregar el producto terminado de un pedido', () => {
         { timeout: 30_000 },
       )
       .toBe('ENTREGADO');
+    // 2026-10-15 (QC-282): el cliente de cada entrega se lee de sus lineas.
     const deliveries = await prisma.orderDelivery.findMany({
       where: { orderId: id },
-      select: { customerId: true },
+      select: { lines: { select: { customerId: true } } },
     });
     expect(deliveries).toHaveLength(2);
-    expect(new Set(deliveries.map((d) => d.customerId))).toEqual(new Set([deliveryCustomer, originalCustomer]));
+    expect(
+      deliveries.map((d) => [...new Set(d.lines.map((line) => line.customerId))]),
+      'cada entrega tiene un solo cliente en todas sus lineas',
+    ).toEqual(expect.arrayContaining([[deliveryCustomer], [originalCustomer]]));
 
     await expect(orderRow(page, id).getByTestId(ORDER_STATUS_TESTID)).toHaveAttribute(
       'data-status',
@@ -619,7 +635,7 @@ test.describe('entregar el producto terminado de un pedido', () => {
     await page.goto(ordersUrl());
     await expect(page.getByTestId(PRIVATE_NOT_FOUND_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(ORDERS_TITLE_TESTID)).toHaveCount(0);
-    await expect(page.locator(`[data-testid="${ORDER_ROW_ACTIONS_TESTID}"][data-order-id="${id}"]`)).toHaveCount(0);
+    await expect(orderRow(page, id).getByTestId(ORDER_ROW_ACTIONS_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(ORDER_ACTION_DELIVER_TESTID)).toHaveCount(0);
   });
 });

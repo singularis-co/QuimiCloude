@@ -531,6 +531,9 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
  *
  * QC-223 2026-10-08: `20261008150100_order_deliveries` anadio una quinta,
  * `order_deliveries_order_id_fkey`, con la misma forma; se retira y restaura igual.
+ *
+ * QC-214 2026-10-13: `20261013120000_order_step_evidence` anadio una sexta,
+ * `order_step_evidence_order_id_company_id_fkey`, con la misma forma; se retira y restaura igual.
  */
 const RESERVATION_ORDER_FK =
   'ALTER TABLE "reservation_movements" ADD CONSTRAINT "reservation_movements_order_id_fkey" ' +
@@ -552,6 +555,10 @@ const DELIVERY_ORDER_FK =
   'ALTER TABLE "order_deliveries" ADD CONSTRAINT "order_deliveries_order_id_fkey" ' +
   'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
   'ON DELETE RESTRICT ON UPDATE CASCADE'
+const STEP_EVIDENCE_ORDER_FK =
+  'ALTER TABLE "order_step_evidence" ADD CONSTRAINT "order_step_evidence_order_id_company_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
 
 async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
   await tx.$executeRawUnsafe(
@@ -567,6 +574,9 @@ async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transaction
     'ALTER TABLE "order_conditioning_team_members" DROP CONSTRAINT "order_conditioning_team_members_order_id_company_id_fkey"',
   )
   await tx.$executeRawUnsafe('ALTER TABLE "order_deliveries" DROP CONSTRAINT "order_deliveries_order_id_fkey"')
+  await tx.$executeRawUnsafe(
+    'ALTER TABLE "order_step_evidence" DROP CONSTRAINT "order_step_evidence_order_id_company_id_fkey"',
+  )
 }
 
 async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
@@ -575,6 +585,7 @@ async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transact
   await tx.$executeRawUnsafe(EXECUTION_ENTRY_ORDER_FK)
   await tx.$executeRawUnsafe(CONDITIONING_TEAM_ORDER_FK)
   await tx.$executeRawUnsafe(DELIVERY_ORDER_FK)
+  await tx.$executeRawUnsafe(STEP_EVIDENCE_ORDER_FK)
 }
 
 afterAll(async () => {

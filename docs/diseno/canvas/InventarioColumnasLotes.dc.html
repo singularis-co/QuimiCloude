@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Inventario: lotes y columnas nuevas</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}
+.xp{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none;border:0;border-radius:6px;background:none;color:var(--muted-fg);cursor:pointer}
+.xp:hover{background:var(--muted);color:var(--fg)}
+.xp:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.xp svg{transition:rotate var(--d-b) var(--e-std)}
+.xp[aria-expanded="true"] svg{rotate:90deg}
+.nm{display:flex;align-items:center;gap:8px;min-width:0}
+tr.lot td{background:color-mix(in oklch,var(--muted) 55%,var(--card));font-size:13px;animation:qc-rise var(--d-s) var(--e-in) both}
+tr.lot td.lot-n{padding-left:48px}
+.lot-id{display:flex;flex-direction:column;gap:2px}
+.soon{color:var(--w-fg);font-weight:600}
+.lot-m{margin:0 0 0 20px;padding:10px 12px;border-radius:10px;background:var(--muted);display:flex;flex-direction:column;gap:6px;animation:qc-rise var(--d-s) var(--e-in) both}
+.xp-m{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;border:0;background:none;color:var(--primary);font:500 13px 'IBM Plex Sans',sans-serif;cursor:pointer}
+.xp-m svg{transition:rotate var(--d-b) var(--e-std)}
+.xp-m[aria-expanded="true"] svg{rotate:90deg}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="inventario" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right"><button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button></div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph"><div class="ph-t"><h1 class="h1">Inventario</h1></div></div>
+        <nav class="tabs" aria-label="Tipo de producto">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2"><button class="tab" type="button" aria-current="{{ t.cur }}" onClick="{{ t.pick }}">{{ t.label }}</button></sc-for>
+        </nav>
+
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr>
+                <th scope="col" style="width: 68px">Imagen</th>
+                <th scope="col">Nombre</th>
+                <sc-if value="{{ all }}" hint-placeholder-val="{{ true }}"><th scope="col">Tipo</th></sc-if>
+                <sc-if value="{{ all }}" hint-placeholder-val="{{ true }}"><th scope="col">Presentación</th></sc-if>
+                <th scope="col" class="num">Existencia</th>
+                <th scope="col" class="num">Disponible</th>
+                <th scope="col" class="num">Reservado</th>
+                <th scope="col" class="num">Alerta de cantidad</th>
+                <th scope="col" class="num">Costo unitario</th>
+                <th scope="col"><span class="sr">Acciones</span></th>
+              </tr></thead>
+              <tbody class="{{ bodyCls }}">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                  <tr>
+                    <td><span class="{{ r.thumbCls }}" role="img" aria-label="{{ r.imgLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span></td>
+                    <td><span class="nm"><button class="xp" type="button" aria-expanded="{{ r.openStr }}" aria-label="{{ r.xpLabel }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="m9 6 6 6-6 6"></path></svg></button><span class="{{ r.nameCls }}">{{ r.name }}</span></span></td>
+                    <sc-if value="{{ all }}" hint-placeholder-val="{{ true }}"><td><span class="{{ r.tipoCls }}"><i></i>{{ r.tipo }}</span></td><td>{{ r.pres }}</td></sc-if>
+                    <td class="num mono"><span class="{{ r.exCls }}"><sc-if value="{{ r.low }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 3 22 20H2zM12 10v4M12 17h.01"></path></svg></sc-if>{{ r.ex }}</span></td>
+                    <td class="num mono strong">{{ r.disp }}</td>
+                    <td class="num mono">{{ r.res }}</td>
+                    <td class="num mono dim">{{ r.al }}</td>
+                    <td class="num mono" title="{{ r.costExact }}">{{ r.cost }}</td>
+                    <td class="rowact"><button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button></td>
+                  </tr>
+                  <sc-if value="{{ r.openEmpty }}" hint-placeholder-val="{{ false }}">
+                    <tr class="lot"><td></td><td class="lot-n cap" colspan="{{ emptySpan }}">Sin lotes con existencia.</td></tr>
+                  </sc-if>
+                  <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                    <sc-for list="{{ r.lots }}" as="l" hint-placeholder-count="2">
+                      <tr class="lot">
+                        <td></td>
+                        <td class="lot-n"><span class="lot-id"><span class="mono">{{ l.code }}</span><span style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span class="{{ l.expCls }}">{{ l.exp }}</span><sc-if value="{{ l.expired }}" hint-placeholder-val="{{ false }}"><span class="sb t-danger"><i></i>Vencido</span></sc-if></span></span></td>
+                        <sc-if value="{{ all }}" hint-placeholder-val="{{ true }}"><td></td><td></td></sc-if>
+                        <td class="num mono">{{ l.qty }}</td>
+                        <td class="num mono">{{ l.disp }}</td>
+                        <td class="num mono">{{ l.res }}</td>
+                        <td></td>
+                        <td class="num mono">{{ l.cost }}</td>
+                        <td></td>
+                      </tr>
+                    </sc-for>
+                  </sc-if>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                <div class="rm">
+                  <div style="display: flex; align-items: center; gap: 12px; min-width: 0">
+                    <span class="{{ r.thumbCls }}" role="img" aria-label="{{ r.imgLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM21 16l-5-5-9 9"></path></svg></span>
+                    <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span class="{{ r.nameCls }}">{{ r.name }}</span><span style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center"><sc-if value="{{ all }}" hint-placeholder-val="{{ true }}"><span class="{{ r.tipoCls }}"><i></i>{{ r.tipo }}</span><span class="cap">{{ r.pres }}</span></sc-if></span></div>
+                  </div>
+                  <div class="rm-meta"><span>Existencia <span class="mono" style="color: {{ r.exColor }}">{{ r.ex }}</span></span><span>Alerta <span class="mono">{{ r.al }}</span></span><span>Disponible <span class="mono strong" style="color: var(--fg)">{{ r.disp }}</span></span><span>Costo <span class="mono" style="color: var(--fg)">{{ r.cost }}</span></span></div>
+                  <div class="rm-top"><button class="xp-m" type="button" aria-expanded="{{ r.openStr }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px"><path d="m9 6 6 6-6 6"></path></svg>{{ r.lotsLabel }}</button><span style="flex: 1"></span><button class="b b-out b-sm" type="button" aria-label="{{ r.menuLabel }}" style="height: 44px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                  <sc-if value="{{ r.openEmpty }}" hint-placeholder-val="{{ false }}"><div class="lot-m cap">Sin lotes con existencia.</div></sc-if>
+                  <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                    <sc-for list="{{ r.lots }}" as="l" hint-placeholder-count="2">
+                      <div class="lot-m">
+                        <div class="rm-top"><span class="mono strong">{{ l.code }}</span><sc-if value="{{ l.expired }}" hint-placeholder-val="{{ false }}"><span class="sb t-danger"><i></i>Vencido</span></sc-if></div>
+                        <span class="{{ l.expCls }}" style="font-size: 13px">{{ l.exp }}</span>
+                        <div class="rm-meta"><span>Existencia <span class="mono" style="color: var(--fg)">{{ l.qty }}</span></span><span>Disponible <span class="mono" style="color: var(--fg)">{{ l.disp }}</span></span><span>Costo <span class="mono" style="color: var(--fg)">{{ l.cost }}</span></span></div>
+                      </div>
+                    </sc-for>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>Página <span class="mono">1</span> de <span class="mono">1</span> · <span class="mono">{{ count }}</span> en total</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú"><dc-import name="Sidebar" active="inventario" sheet="{{ true }}" hint-size="100%,100%"></dc-import></aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"pestana":{"editor":"enum","options":["todos","producto"],"default":"todos"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const tab = s.tab || this.props.pestana || 'todos';
+const P = [
+{ id: 'hip', name: 'Hipoclorito de sodio 13 %', tipo: 'Producto', pres: 'Bidón 20 L', ex: '84 L', al: '100 L', res: '20 L', disp: '64 L', cost: '$ 3.200 / L', costExact: '3200.40', low: true, soon: true, photo: true,
+lots: [{ code: 'L-2026-031', exp: 'Vence en 12 días · 22/10/2026', soon: true, qty: '40 L', res: '20 L', disp: '20 L', cost: '$ 3.150 / L' }, { code: 'L-2026-044', exp: 'Vence en 4 meses · 18/02/2027', qty: '44 L', res: '0 L', disp: '44 L', cost: '$ 3.240 / L' }] },
+{ id: 'soda', name: 'Soda cáustica en escamas', tipo: 'Producto', pres: 'Saco 25 kg', ex: '350 kg', al: '100 kg', res: '50 kg', disp: '300 kg', cost: '$ 4.796 / kg', costExact: '4795.5',
+lots: [{ code: 'L-2025-118', exp: 'Venció hace 6 días · 10/10/2026', expired: true, qty: '25 kg', res: '0 kg', disp: '25 kg', cost: '$ 4.500 / kg' }, { code: 'L-2026-012', exp: 'Vence en 8 meses · 30/06/2027', qty: '325 kg', res: '50 kg', disp: '275 kg', cost: '$ 4.820 / kg' }] },
+{ id: 'env', name: 'Garrafa PEAD 4 L', tipo: 'Envase', pres: 'Unidad', ex: '1.200 u', al: '300 u', res: '0 u', disp: '1.200 u', cost: '—', lots: [] },
+{ id: 'mez', name: 'Mezcladora 200 L', tipo: 'Máquina', pres: 'Unidad', ex: '2 u', al: '1 u', res: '1 u', disp: '1 u', cost: '—', lots: [] }
+];
+const open = Object.assign({ hip: true }, s.open || {});
+const k = s.k || 0;
+const list = tab === 'todos' ? P : P.filter((p) => p.tipo === 'Producto');
+const rows = list.map((p) => {
+const isOpen = !!open[p.id]; const n = p.lots.length;
+return { name: p.name, tipo: p.tipo, tipoCls: 'sb t-' + ({ Producto: 'info', 'Máquina': 'neutral', Envase: 'waiting', 'Producto terminado': 'success' }[p.tipo] || 'neutral'), costExact: p.costExact || '', pres: p.pres, ex: p.ex, al: p.al, res: p.res, disp: p.disp, cost: p.cost, low: !!p.low,
+exCls: p.low ? 'low' : '', exColor: p.low ? 'var(--w-fg)' : 'inherit', nameCls: p.soon ? 'strong soon' : 'strong',
+thumbCls: p.photo ? 'thumb photo' : 'thumb', imgLabel: 'Imagen de ' + p.name, menuLabel: 'Acciones de ' + p.name,
+open: isOpen && n > 0, openEmpty: isOpen && n === 0, openStr: isOpen ? 'true' : 'false',
+xpLabel: 'Mostrar lotes de ' + p.name,
+lotsLabel: isOpen ? 'Ocultar lotes' : 'Mostrar lotes',
+toggle: () => this.setState({ open: Object.assign({}, open, { [p.id]: !isOpen }) }),
+lots: p.lots.map((l) => ({ code: l.code, exp: l.exp, expCls: l.soon ? 'soon' : (l.expired ? 'cap' : 'cap'), expired: !!l.expired, qty: l.qty, res: l.res, disp: l.disp, cost: l.cost })) };
+});
+return {
+rootCls: dark ? 'qc app dk' : 'qc app', toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l', ovCls: s.menu ? 'ov open' : 'ov', closeAll: () => this.setState({ menu: false }),
+tabs: [['todos', 'Todos'], ['producto', 'Producto']].map((t) => ({ label: t[1], cur: t[0] === tab ? 'page' : 'false', pick: () => this.setState({ tab: t[0], k: k + 1 }) })),
+all: tab === 'todos', emptySpan: tab === 'todos' ? 8 : 6, rows: rows, count: rows.length, bodyCls: k % 2 ? 'fade' : ''
+};
+}
+}
+</script>
+</body>
+</html>

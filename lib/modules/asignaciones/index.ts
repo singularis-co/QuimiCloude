@@ -58,6 +58,7 @@ export {
   NoWholePackageError,
   OrderPackingTakenError,
   OrderNotPackableError,
+  PackagingStockInsufficientError,
   OrderProducedFrozenError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
@@ -70,6 +71,10 @@ export {
   ConditioningBatchDataMissingError,
   ConditioningBatchDuplicateLotError,
   ConditioningBatchNotFoundError,
+  ConditioningStepOutOfOrderError,
+  ConditioningResponsiblesRequiredError,
+  ConditioningResponsibleNotAllowedError,
+  ConditioningStepsPendingError,
 } from './domain/errors';
 
 // Los TRES esquemas del borde (R14, R29, R31, R32, R42) y sus tipos inferidos. Se publican para
@@ -159,6 +164,10 @@ export {
   type StartAssignedOrderDeps,
 } from './domain/start-assigned-order';
 export {
+  createOpenAssignedOrder,
+  type OpenAssignedOrderDeps,
+} from './domain/open-assigned-order';
+export {
   createFinishAssignedOrder,
   type FinishAssignedOrderDeps,
 } from './domain/finish-assigned-order';
@@ -183,10 +192,9 @@ export {
 } from './domain/list-finished-orders';
 export type { FinishedOrderView } from './domain/finished-order-view';
 
-// Quien puede ser responsable de un pedido, por permiso. Se publica para que
-// `list-responsible-candidates.ts` (mismo modulo) y cualquier lector externo apliquen el
-// MISMO criterio que usa `assign-responsibles.ts`.
-export { canBeResponsible } from './domain/responsible-eligibility';
+// Quien puede ser responsable de un pedido, por nombre de rol. Se publica para que
+// cualquier lector externo aplique el MISMO criterio que usa `assign-responsibles.ts`.
+export { canBeResponsible, ORDER_RESPONSIBLE_FILTERS } from './domain/responsible-eligibility';
 
 // La vista «Todos»: los pedidos de la empresa en cualquier estado, sin filtro por usuario.
 export {
@@ -241,6 +249,7 @@ export {
   type ExecutionTraceList,
   type ExecutionTraceListInput,
   type ExecutionTracePerson,
+  type ExecutionTracePresentation,
   type ExecutionTraceRow,
   type ListExecutionTracesDeps,
 } from './domain/list-execution-traces';
@@ -249,8 +258,16 @@ export {
   type ExecutionTraceDetail,
   type ExecutionTraceDetailStep,
   type GetExecutionTraceDeps,
+  type TracePerson,
 } from './domain/get-execution-trace';
 export type { ExecutionTrace, TraceDuration, TraceStep } from './domain/execution-trace';
+export type {
+  ConditioningAction,
+  ConditioningBatchSnapshotLine,
+  ExecutionPhase,
+  TraceDurations,
+  ExecutionTraceTeamMember,
+} from './domain/conditioning-trace';
 
 // ---------------------------------------------------------------------------------------
 // El acondicionamiento: Comenzar y Terminar. Bloque NUEVO al final.
@@ -283,18 +300,24 @@ export {
   createGetConditioningOrder,
   type GetConditioningOrderDeps,
 } from './domain/get-conditioning-order';
-export type { ConditioningBatchData, ConditioningBatchLineView } from './domain/conditioning-order-view';
+export type {
+  ConditioningBatchData,
+  ConditioningBatchLineView,
+  ConditioningStepCandidateView,
+  ConditioningStepsView,
+} from './domain/conditioning-order-view';
 export {
-  createListDeliveredConditionedOrders,
-  type ListDeliveredConditionedOrdersDeps,
-} from './domain/list-delivered-conditioned-orders';
+  createRecordConditioningStep,
+  type RecordConditioningStepDeps,
+  type RecordConditioningStepResult,
+} from './domain/record-conditioning-step';
 export {
   createSaveConditioningBatchData,
   saveConditioningBatchDataSchema,
   type SaveConditioningBatchDataDeps,
   type SaveConditioningBatchDataInput,
 } from './domain/save-conditioning-batch-data';
-export { missingBatchDataLines } from './domain/conditioning-batch-data';
+export { missingBatchDataLines, type ConditioningBatchForm } from './domain/conditioning-batch-data';
 
 // ---------------------------------------------------------------------------------------
 // El equipo de acondicionamiento: la entrada de Comenzar y los candidatos del modal.
@@ -307,3 +330,67 @@ export {
   type ConditioningTeamCandidates,
   type ListConditioningTeamCandidatesDeps,
 } from './domain/list-conditioning-team-candidates';
+
+// ---------------------------------------------------------------------------------------
+// Evidencia por paso: tope, ruta y pasos sin fotos. Puro, tambien para la pantalla.
+// ---------------------------------------------------------------------------------------
+export {
+  EVIDENCE_PHASES,
+  EVIDENCE_READ_LINK_TTL_SECONDS,
+  MAX_EVIDENCE_PER_STEP,
+  buildEvidencePath,
+  isEvidencePathOf,
+  missingEvidencePositions,
+  stepRequiresEvidence,
+  type EvidencePhase,
+  type EvidenceStep,
+  type StepEvidencePhotoView,
+  type StepEvidenceView,
+} from './domain/step-evidence';
+export {
+  EvidenceInvalidFileError,
+  EvidenceLimitError,
+  EvidenceNotFoundError,
+  EvidenceRequiredError,
+} from './domain/errors';
+export {
+  createRequestEvidenceUpload,
+  type RequestEvidenceUploadDeps,
+  type RequestEvidenceUploadResult,
+} from './domain/request-evidence-upload';
+export type { EvidenceTargetDeps } from './domain/evidence-target';
+export type { EvidenceStorageWarning } from './domain/evidence-photos';
+export {
+  createRegisterEvidence,
+  type RegisterEvidenceDeps,
+  type RegisterEvidenceResult,
+} from './domain/register-evidence';
+export {
+  createRemoveEvidence,
+  type RemoveEvidenceDeps,
+  type RemoveEvidenceResult,
+} from './domain/remove-evidence';
+export {
+  createCountEvidenceLockingOrders,
+  type CountEvidenceLockingOrders,
+  type CountEvidenceLockingOrdersDeps,
+} from './domain/count-evidence-locking-orders';
+
+// ---------------------------------------------------------------------------------------
+// Consulta de las fotos de un pedido ya ejecutado. Las Server Actions no salen por aqui.
+// ---------------------------------------------------------------------------------------
+export {
+  groupEvidenceRows,
+  type OrderEvidence,
+  type OrderEvidenceCount,
+  type OrderEvidenceGroup,
+  type OrderEvidenceRead,
+} from './domain/order-evidence';
+export type { ReadOrderEvidenceDeps } from './domain/read-order-evidence';
+export {
+  createGetExecutionEvidence,
+  type GetExecutionEvidenceDeps,
+} from './domain/get-execution-evidence';
+export { createGetOrderEvidence, type GetOrderEvidenceDeps } from './domain/get-order-evidence';
+export { createCountOrderEvidence, type CountOrderEvidenceDeps } from './domain/count-order-evidence';
+export { canConsultOrderEvidence } from './domain/actor';

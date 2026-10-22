@@ -496,6 +496,20 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       'lib/modules/recetas/domain/recipe-packing-steps-reader.ts',
       'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
     ]
+    // QC-214 (2026-10-13): evidencia por paso (`design.md` § 5.8). Solo los TRES archivos NUEVOS
+    // de `lib/modules/recetas/`: el bloqueo de mover y quitar pasos con pedidos en curso con fotos
+    // (regla pura y caso de uso) y el puerto que lo lee. Los existentes que la feature toca ya
+    // estan admitidos por las ampliaciones de arriba.
+    const EVIDENCIA_POR_PASO_QC214 = [
+      'lib/modules/recetas/domain/get-recipe-step-lock.ts',
+      'lib/modules/recetas/domain/recipe-step-lock.ts',
+      'lib/modules/recetas/ports/recipe-step-lock-reader.ts',
+    ]
+    // QC-299 (2026-10-21): pasos de acondicionamiento. Solo el archivo NUEVO de
+    // `lib/modules/recetas/`: el lector de los pasos de acondicionamiento de la formula para
+    // `asignaciones` (`design.md` § 3.3). Los existentes que la feature toca ya estan admitidos
+    // por las ampliaciones de arriba.
+    const PASOS_DE_ACONDICIONAMIENTO_QC299 = ['lib/modules/recetas/domain/recipe-conditioning-steps-reader.ts']
     const AMPLIACIONES_APROBADAS = [
       ...AMPLIACION_QC34,
       ...CAMBIO_DE_FORMA_DEL_PASO_QC62,
@@ -505,12 +519,14 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
       ...VERSIONES_DE_RECETA_QC172,
       ...HERRAMIENTAS_DE_RECETA_QC194,
       ...PASOS_DE_ENVASADO_QC211,
+      ...EVIDENCIA_POR_PASO_QC214,
+      ...PASOS_DE_ACONDICIONAMIENTO_QC299,
     ]
     expect(
       diff
         .filter((ruta) => ruta.startsWith('lib/modules/recetas/'))
         .filter((ruta) => !AMPLIACIONES_APROBADAS.includes(ruta)),
-      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10), del cambio de forma del paso de QC-62 (T1-T3), del aislamiento por empresa de QC-50, de las cantidades en porcentaje de QC-147 y de las versiones de receta de QC-172 puede estar en el diff',
+      'ningun archivo de lib/modules/recetas/ fuera de la ampliacion de contrato de QC-34 (T10), del cambio de forma del paso de QC-62 (T1-T3), de la autorizacion por permiso de QC-74, del aislamiento por empresa de QC-50, de las cantidades en porcentaje de QC-147, de las versiones de receta de QC-172, de las herramientas de QC-194, de los pasos de envasado de QC-211, de la evidencia por paso de QC-214 y de los pasos de acondicionamiento de QC-299 puede estar en el diff',
     ).toEqual([])
 
     // Defensa redundante de ubicacion, desde el angulo del modulo: la carpeta permitida se

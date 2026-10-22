@@ -81,6 +81,7 @@ function montar(options?: {
   const append = vi.fn<ExecutionLogRepository['append']>(async () => {
     eventos.push('append');
     if (options?.appendFalla) throw options.appendFalla;
+    return 'ok';
   });
   const transitionAliveById = vi.fn();
   const runRejections: unknown[] = [];

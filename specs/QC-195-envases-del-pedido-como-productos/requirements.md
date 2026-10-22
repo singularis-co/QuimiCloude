@@ -145,6 +145,7 @@ misma transacción que da de alta el producto terminado, los envases que el pedi
 SI el disponible no alcanza para consumirlos todos, ENTONCES DEBE rechazar Terminar con
 `insufficient_material` sin mover el estado ni dar de alta producto terminado `[D2]` `[D4]` `[P3]`.
 *(Acotado por la Enmienda 1: no se aplica a lo que R43 deja sin consumir.)*
+*(Desde QC-281 R18, el error es `packaging_stock_insufficient`.)*
 
 **R26.** CUANDO un pedido pase a `POR_EMPACAR`, el sistema DEBE consumir sus materias primas como
 hoy y NO DEBE consumir sus envases `[P3]`. *(Enmienda 1: un envase que fuera también ingrediente
@@ -338,3 +339,5 @@ de ingredientes: P6.)*
 | 2026-10-03 | Cálculo del reparto | Se mantiene `order-distribution.ts`: envases × contenido de la presentación, convertido a la unidad del pedido. |
 | 2026-10-03 | Pedidos existentes | Quedan como están, sin apartar envases. Si se edita su reparto, hay que elegir productos PACKAGING. |
 | 2026-10-03 | Costo | El costo del envase se suma a la cotización, con el costo promedio de QC-141 D22. |
+
+> **Enmienda QC-305 (2026-10-21):** R47 queda sin efecto en los pedidos comenzados: en `EN_CURSO` y `POR_EMPACAR` guardar el reparto ya no recompone el estimado (QC-305 R13). Ver `specs/QC-305-coste-real-de-produccion/requirements.md` R13-R14. Tests reescritos para afirmar el congelado (no borrados): en `qc195-packaging-reservation.int.test.ts`, el caso R45/R27/R29 en `EN_CURSO` pasa a «R13, R27, R29: …el estimado guardado no cambia…» (el de `PENDIENTE` sigue igual) y el de R47 en `POR_EMPACAR` pasa a «R13, R47: …no cambia el estimado guardado y aparta las tapas»; en `update-order-presentation-lines.test.ts`, los tres de R47 en `POR_EMPACAR` los sustituyen los casos R13/R14.

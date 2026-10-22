@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Teléfono del cliente</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ph-row{display:grid;grid-template-columns:200px minmax(0,1fr);gap:8px}
+.ph-row.m{grid-template-columns:112px minmax(0,1fr)}
+.ph-pin{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-fg);padding:8px 10px 4px}
+.ph-sep{height:1px;background:var(--border);margin:4px 2px}
+</style>
+</helmet>
+<div class="qc" style="width: 1440px; height: 2140px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px; position: relative; overflow: hidden">
+  <div style="display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; align-items: center; gap: 12px"><h1 class="h1">Teléfono del cliente</h1><span class="sb t-info"><i></i>Cambio · QC-236</span></div>
+    <p class="sub" style="max-width: 980px">El campo «Teléfono» del formulario de cliente (alta y edición) deja de ser texto libre: pasa a <b>país</b> (<span class="mono">CountrySelect</span> de QC-235) más <b>número</b>. Sigue siendo opcional. El país de la empresa viene marcado al crear y aparece primero en la lista. Se guarda como número internacional (<span class="mono">573001234567</span>) y la lista de clientes lo muestra formateado (<span class="mono">+57 300 123 4567</span>).</p>
+  </div>
+
+  <!-- Fila 1: estados normales -->
+  <div class="g3" style="gap: 20px">
+    <section class="card" aria-labelledby="tc-a">
+      <span id="tc-a" class="lab">Alta · empresa con país</span>
+      <div class="f">
+        <span class="fl" id="tc-al">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-al">
+          <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" inputmode="tel" autocomplete="tel-national" aria-label="Número de teléfono" placeholder="300 123 4567">
+        </div>
+        <span class="help">Opcional. El país viene marcado con el de la empresa.</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="tc-b">
+      <span id="tc-b" class="lab">Alta · empresa sin país</span>
+      <div class="f">
+        <span class="fl" id="tc-bl">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-bl">
+          <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="País del teléfono"><span style="color: var(--muted-fg)">Sin país</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" inputmode="tel" aria-label="Número de teléfono" placeholder="Número">
+        </div>
+        <span class="help">Opcional. Elige el país antes de escribir el número.</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="tc-c">
+      <span id="tc-c" class="lab">Lleno · formateado al salir del campo</span>
+      <div class="f">
+        <span class="fl" id="tc-cl">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-cl">
+          <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" aria-label="Número de teléfono" value="300 123 4567">
+        </div>
+        <span class="help">Se escribe con o sin espacios; al salir queda en formato del país. Pegar <span class="mono">+57 300…</span> elige el país solo.</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Fila 2: errores -->
+  <div class="g3" style="gap: 20px">
+    <section class="card" aria-labelledby="tc-e1">
+      <span id="tc-e1" class="lab">Error · número sin país</span>
+      <div class="f">
+        <span class="fl" id="tc-e1l">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-e1l">
+          <button class="in trig" type="button" aria-invalid="true" aria-describedby="tc-e1m" aria-label="País del teléfono"><span style="color: var(--muted-fg)">Sin país</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" aria-label="Número de teléfono" value="3001234567">
+        </div>
+        <span id="tc-e1m" class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige el país del teléfono.</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="tc-e2">
+      <span id="tc-e2" class="lab">Error · número no válido para el país</span>
+      <div class="f">
+        <span class="fl" id="tc-e2l">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-e2l">
+          <button class="in trig" type="button" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" aria-invalid="true" aria-describedby="tc-e2m" aria-label="Número de teléfono" value="300 12">
+        </div>
+        <span id="tc-e2m" class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Este número no es válido para Colombia (+57).</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="tc-e3">
+      <span id="tc-e3" class="lab">Error al guardar · duplicado en la empresa</span>
+      <div class="f">
+        <span class="fl" id="tc-e3l">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-e3l">
+          <button class="in trig" type="button" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" aria-invalid="true" aria-describedby="tc-e3m" aria-label="Número de teléfono" value="300 123 4567">
+        </div>
+        <span id="tc-e3m" class="err"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Este teléfono ya está registrado en otro cliente.</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Fila 3: edición de un cliente migrado -->
+  <div class="g2" style="gap: 20px">
+    <section class="card" aria-labelledby="tc-m1">
+      <span id="tc-m1" class="lab">Edición · teléfono antiguo sin formato válido</span>
+      <div class="f">
+        <span class="fl" id="tc-m1l">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-m1l">
+          <button class="in trig" type="button" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" aria-describedby="tc-m1m" aria-label="Número de teléfono" value="">
+        </div>
+        <span id="tc-m1m" class="help" style="display: flex; gap: 6px; align-items: center"><span class="sb t-waiting"><i></i>Teléfono sin formato válido</span>Antes: <span class="mono">ext 204 oficina</span>. Escribe el número o déjalo vacío.</span>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="tc-m2">
+      <span id="tc-m2" class="lab">Edición · teléfono antiguo duplicado</span>
+      <div class="f">
+        <span class="fl" id="tc-m2l">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-m2l">
+          <button class="in trig" type="button" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <input class="in mono" type="tel" aria-describedby="tc-m2m" aria-label="Número de teléfono" value="">
+        </div>
+        <span id="tc-m2m" class="help" style="display: flex; gap: 6px; align-items: center"><span class="sb t-waiting"><i></i>Teléfono duplicado: revisar</span>Antes: <span class="mono">300 123 4567</span>, que ya tiene otro cliente.</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Fila 4: escritorio abierto, tablet, teléfono -->
+  <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 390px; gap: 20px; align-items: start">
+    <section class="card" aria-labelledby="tc-d" style="min-height: 520px">
+      <span id="tc-d" class="lab">Escritorio · lista abierta, país de la empresa primero</span>
+      <div class="f">
+        <span class="fl" id="tc-dl">Teléfono</span>
+        <div class="ph-row" role="group" aria-labelledby="tc-dl">
+          <div class="anchor">
+            <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="true" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true" style="rotate: 180deg"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <div class="pop open" style="padding: 6px; width: 320px">
+              <label class="wrap-ic" style="display: block; margin-bottom: 6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" aria-label="Buscar país por nombre o prefijo" placeholder="Busca por nombre o prefijo" style="padding-left: 36px"></label>
+              <div role="listbox" aria-label="Países" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px">
+                <div role="group" aria-label="País de la empresa">
+                  <div class="ph-pin" aria-hidden="true">País de la empresa</div>
+                  <button class="opt hl" type="button" role="option" aria-selected="true"><span style="flex: 1">Colombia</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+57</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+                </div>
+                <div class="ph-sep" role="separator"></div>
+                <div role="group" aria-label="Todos los países">
+                  <div class="ph-pin" aria-hidden="true">Todos</div>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span style="flex: 1; color: var(--muted-fg)">Sin país</span></button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span style="flex: 1">Argentina</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+54</span></button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span style="flex: 1">Bolivia</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+591</span></button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span style="flex: 1">Brasil</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+55</span></button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span style="flex: 1">Chile</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+56</span></button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span style="flex: 1">Colombia</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+57</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <input class="in mono" type="tel" aria-label="Número de teléfono" placeholder="300 123 4567">
+        </div>
+      </div>
+      <span class="cap" style="margin-top: 380px">El país de la empresa va arriba con su rótulo y se repite en su sitio alfabético. Al buscar desaparecen los rótulos y queda una sola lista filtrada. Sin país de empresa no hay grupo de arriba.</span>
+    </section>
+
+    <section class="card" aria-labelledby="tc-t" style="min-height: 520px">
+      <span id="tc-t" class="lab">Tablet · Sheet «Nuevo cliente»</span>
+      <div style="display: flex; flex-direction: column; gap: 18px">
+        <div class="g2"><div class="f"><label>Nombres <span class="req">*</span></label><input class="in in-touch" type="text" value="Laura"></div><div class="f"><label>Apellidos <span class="req">*</span></label><input class="in in-touch" type="text" value="Gómez"></div></div>
+        <div class="f"><label>Ciudad</label><input class="in in-touch" type="text" value="Medellín"></div>
+        <div class="f">
+          <span class="fl" id="tc-tl">Teléfono</span>
+          <div class="ph-row" role="group" aria-labelledby="tc-tl">
+            <button class="in in-touch trig" type="button" aria-label="País del teléfono"><span>Colombia <span class="mono" style="color: var(--muted-fg)">(+57)</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <input class="in in-touch mono" type="tel" aria-label="Número de teléfono" value="300 123 4567">
+          </div>
+        </div>
+        <div class="f"><label>Correo</label><input class="in in-touch" type="email" value="laura@correo.co"></div>
+      </div>
+      <span class="cap">Misma fila que en escritorio, controles de 48 px. El popup del país es el de <span class="mono">CountrySelect</span> en tablet.</span>
+    </section>
+
+    <section class="card" aria-labelledby="tc-p" style="min-height: 520px; padding: 0; overflow: hidden">
+      <div style="padding: 16px 16px 0"><span id="tc-p" class="lab">Teléfono · hoja del país</span></div>
+      <div style="position: relative; flex: 1; min-height: 480px">
+        <div style="padding: 16px; display: flex; flex-direction: column; gap: 6px">
+          <span class="fl" id="tc-pl">Teléfono</span>
+          <div class="ph-row m" role="group" aria-labelledby="tc-pl">
+            <button class="in in-touch trig" type="button" aria-expanded="true" aria-label="País del teléfono: Colombia"><span class="mono">CO +57</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true" style="rotate: 180deg"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <input class="in in-touch mono" type="tel" aria-label="Número de teléfono" placeholder="300 123 4567">
+          </div>
+        </div>
+        <div style="position: absolute; inset: 0; background: color-mix(in oklch, var(--fg) 30%, transparent)"></div>
+        <div role="dialog" aria-label="País del teléfono" style="position: absolute; left: 0; right: 0; bottom: 0; background: var(--popover); border-radius: 16px 16px 0 0; padding: 8px 12px 16px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-pop)">
+          <span aria-hidden="true" style="align-self: center; width: 40px; height: 4px; border-radius: 2px; background: var(--border)"></span>
+          <div style="display: flex; align-items: center; justify-content: space-between"><span class="h3">País del teléfono</span><button class="b b-gho b-ico" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+          <label class="wrap-ic" style="display: block"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="text" aria-label="Buscar país por nombre o prefijo" placeholder="Busca por nombre o prefijo" style="padding-left: 36px; height: 48px"></label>
+          <div role="listbox" aria-label="Países" style="display: flex; flex-direction: column; gap: 2px">
+            <div class="ph-pin" aria-hidden="true">País de la empresa</div>
+            <button class="opt hl" type="button" role="option" aria-selected="true" style="min-height: 48px"><span style="flex: 1">Colombia</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+57</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+            <div class="ph-sep" role="separator"></div>
+            <div class="ph-pin" aria-hidden="true">Todos</div>
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1; color: var(--muted-fg)">Sin país</span></button>
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1">Argentina</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+54</span></button>
+            <button class="opt" type="button" role="option" aria-selected="false" style="min-height: 48px"><span style="flex: 1">Bolivia</span><span class="mono" style="color: var(--muted-fg); font-size: 13px">+591</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Fila 5: lista de clientes -->
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 20px; align-items: start">
+    <section class="card" aria-labelledby="tc-l">
+      <span id="tc-l" class="lab">Lista de clientes · columna Teléfono</span>
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+        <thead><tr style="text-align: left; color: var(--muted-fg); font-size: 12px"><th scope="col" style="padding: 8px">Apellidos</th><th scope="col" style="padding: 8px">Nombres</th><th scope="col" style="padding: 8px">Ciudad</th><th scope="col" style="padding: 8px">Teléfono</th></tr></thead>
+        <tbody>
+          <tr style="border-top: 1px solid var(--border)"><td style="padding: 10px 8px">Gómez</td><td style="padding: 10px 8px">Laura</td><td style="padding: 10px 8px">Medellín</td><td class="mono" style="padding: 10px 8px">+57 300 123 4567</td></tr>
+          <tr style="border-top: 1px solid var(--border)"><td style="padding: 10px 8px">Ramírez</td><td style="padding: 10px 8px">Jorge</td><td style="padding: 10px 8px">Quito</td><td class="mono" style="padding: 10px 8px">+593 99 123 4567</td></tr>
+          <tr style="border-top: 1px solid var(--border)"><td style="padding: 10px 8px">Torres</td><td style="padding: 10px 8px">Ana</td><td style="padding: 10px 8px">Cali</td><td style="padding: 10px 8px"><span style="display: inline-flex; gap: 8px; align-items: center"><span class="mono" style="color: var(--muted-fg)">ext 204 oficina</span><span class="sb t-waiting"><i></i>Sin formato válido</span></span></td></tr>
+          <tr style="border-top: 1px solid var(--border)"><td style="padding: 10px 8px">Vélez</td><td style="padding: 10px 8px">Mario</td><td style="padding: 10px 8px">Bogotá</td><td style="padding: 10px 8px"><span style="display: inline-flex; gap: 8px; align-items: center"><span class="mono" style="color: var(--muted-fg)">300 123 4567</span><span class="sb t-waiting"><i></i>Duplicado: revisar</span></span></td></tr>
+          <tr style="border-top: 1px solid var(--border)"><td style="padding: 10px 8px">Zapata</td><td style="padding: 10px 8px">Luis</td><td style="padding: 10px 8px">Pereira</td><td style="padding: 10px 8px; color: var(--muted-fg)">—</td></tr>
+        </tbody>
+      </table>
+      <span class="cap">Válido: formato internacional. Migrado sin número válido: el texto antiguo en gris y su aviso, hasta que alguien lo corrija en «Editar».</span>
+    </section>
+    <section class="card" aria-labelledby="tc-lm">
+      <span id="tc-lm" class="lab">Lista en teléfono · tarjeta</span>
+      <div class="rm" style="border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div class="rm-top"><b>Laura Gómez</b> · <span style="color: var(--muted-fg)">Medellín</span></div>
+        <div class="rm-meta"><span class="mono">+57 300 123 4567</span> <span>laura@correo.co</span></div>
+      </div>
+      <div class="rm" style="border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+        <div class="rm-top"><b>Ana Torres</b> · <span style="color: var(--muted-fg)">Cali</span></div>
+        <div class="rm-meta" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap"><span class="mono" style="color: var(--muted-fg)">ext 204 oficina</span><span class="sb t-waiting"><i></i>Sin formato válido</span></div>
+      </div>
+    </section>
+  </div>
+
+  <dl class="spec" style="margin-top: auto">
+    <dt>Componente</dt><dd>Campo compuesto dentro de <span class="mono">CustomerForm</span> (alta y edición): <span class="mono">CountrySelect</span> (QC-235, sin cambios de forma) + <span class="mono">input type="tel"</span> del catálogo, bajo un solo rótulo «Teléfono» con <span class="mono">role="group"</span>. Errores con <span class="mono">field-error</span>. <span class="mono">CountrySelect</span> gana una prop para fijar un país arriba de la lista (rótulo «País de la empresa»).</dd>
+    <dt>Datos</dt><dd>Guarda <span class="mono">phone_country</span> (ISO alfa-2) y <span class="mono">phone_e164</span> (solo dígitos, <span class="mono">573001234567</span>); <span class="mono">phone</span> conserva la forma legible. Validación y formato con <span class="mono">libphonenumber-js</span>: <span class="mono">isValidPhoneNumber(n, país)</span> y formato nacional al salir del campo, internacional en la lista.</dd>
+    <dt>Reglas</dt><dd>Número vacío = sin teléfono (el país se ignora). Número sin país: error en el país. Número no válido: error en el número, al salir del campo y al guardar. Duplicado: lo responde el servidor al guardar y se pinta bajo el campo. Pegar un número con <span class="mono">+</span> elige el país que indique.</dd>
+    <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (lo que ya usa <span class="mono">CountrySelect</span>) · <span class="mono">libphonenumber-js</span> · <span class="mono">lucide-react</span></dd>
+    <dt>Animación</dt><dd>Las de <span class="mono">CountrySelect</span> y Campos: popup .96 → 1 en 200 ms · el error entra con <span class="mono">qc-err</span> · el número se reformatea al salir del campo, sin animar.</dd>
+    <dt>Escritorio · tablet · teléfono</dt><dd>Escritorio: fila país 200 px + número, controles de 40 px, popup anclado. Tablet: la misma fila con controles de 48 px. Teléfono (≤ 640 px): país compacto de 112 px (<span class="mono">CO +57</span>, con nombre completo en <span class="mono">aria-label</span>) + número, 48 px; la lista sale en la hoja inferior titulada «País del teléfono».</dd>
+    <dt>Decidido</dt><dd>El país de la empresa aparece primero en la lista del teléfono del cliente (humano, 2026-10-19). Cierra el «Por confirmar» de <span class="mono">CountrySelect.dc.html</span>.</dd>
+  </dl>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2140}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

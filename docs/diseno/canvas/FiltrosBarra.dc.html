@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Barra de filtros</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.fb-page{max-width:1200px;margin:0 auto;padding:32px 28px 48px;display:flex;flex-direction:column;gap:28px}
+.fb-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fb-q{position:relative;flex:1 1 250px;min-width:250px}
+.fb-q > .ic{position:absolute;left:12px;top:50%;margin-top:-8px;color:var(--muted-fg);pointer-events:none}
+.fb-q > .in{padding-left:36px;padding-right:40px}
+.fb-q > .in::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.fb-qx{position:absolute;right:2px;top:50%;margin-top:-18px;animation:qc-fade var(--d-f) var(--e-in)}
+.fb-warn{flex-basis:100%;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-fg);animation:qc-fade var(--d-f) var(--e-in)}
+.fb-ctl{position:relative;display:inline-flex;align-items:stretch;animation:qc-fade var(--d-b) var(--e-in)}
+.fb-ctl.has > .chip{border-top-right-radius:0;border-bottom-right-radius:0}
+.fb-x{height:40px;width:36px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:1px solid var(--primary);border-left:0;border-radius:0 8px 8px 0;background:color-mix(in oklch,var(--primary) 6%,var(--card));color:var(--primary);cursor:pointer;animation:qc-fade var(--d-f) var(--e-in);transition:background-color var(--d-i)}
+.fb-x:hover{background:color-mix(in oklch,var(--primary) 14%,var(--card))}
+.fb-x .ic{width:14px;height:14px}
+.fb-fbtn{height:40px}
+.chip.hov{background-size:100% 100%;background-position:0 0;border-color:var(--primary);color:var(--primary)}
+.fb-pop{top:calc(100% + 6px);left:0;padding:8px;display:flex;flex-direction:column;gap:8px}
+.fb-pop.w-sm{width:224px}.fb-pop.w-md{width:260px}.fb-pop.w-lg{width:288px}.fb-pop.w-xl{width:328px}
+.fb-static{position:relative;top:auto;left:auto;margin-top:6px}
+.fb-sh,.fb-ft{display:none}
+.fb-sh{align-items:center;justify-content:space-between;gap:12px;padding:4px 0 4px 4px}
+.fb-ft{padding-top:4px}
+.fb-hd{padding:4px 6px 0;font-size:12px;font-weight:600;color:var(--muted-fg)}
+.fb-list{display:flex;flex-direction:column;gap:2px}
+.fb-list .opt[aria-selected=true]{font-weight:600}
+.fb-ck{margin-left:auto;color:var(--primary)}
+.cb.on{background:var(--primary);border-color:var(--primary)}
+.cb.on .ic{stroke-dashoffset:0}
+.fb-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px 0;border-top:1px solid var(--border);padding-top:8px}
+.fb-sw{position:relative;width:30px;height:18px;border-radius:999px;background:var(--input);flex:none;transition:background-color var(--d-b) var(--e-std)}
+.fb-sw::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:999px;background:var(--card);box-shadow:0 1px 2px rgb(0 30 30 / .25);transition:translate var(--d-b) var(--e-std)}
+[aria-checked=true] > .fb-sw{background:var(--primary)}
+[aria-checked=true] > .fb-sw::after{translate:12px 0}
+.fb-sc{display:flex;flex-wrap:wrap;gap:6px}
+.fb-rg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.fb-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px 0}
+.fb-cal-hd{display:flex;align-items:center;justify-content:space-between;padding:0 2px;font-size:13px;font-weight:600}
+.fb-wd{height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--muted-fg)}
+.fb-d{height:36px;border:0;padding:0;border-radius:8px;background:transparent;color:var(--fg);font:400 13px 'IBM Plex Mono',ui-monospace,monospace;cursor:pointer;transition:background-color var(--d-i),color var(--d-i)}
+.fb-d:hover{background:var(--muted)}
+.fb-d.mid{border-radius:0;background:color-mix(in oklch,var(--primary) 10%,var(--card))}
+.fb-d.edge{background:var(--primary);color:var(--primary-fg)}
+.fb-d.today{box-shadow:inset 0 0 0 1px var(--input)}
+.fb-d.blank{cursor:default;background:transparent}
+.fb-out{display:flex;flex-direction:column;gap:4px;font-size:12.5px}
+.fb-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;align-items:start}
+.fb-gal > .card{gap:12px;padding:16px}
+.fb-gal > .card.wide{grid-column:span 2}
+.fb-scrim{position:absolute;inset:0;z-index:15;border:0;padding:0;background:transparent;cursor:default}
+@container (max-width: 760px){
+.fb-page{padding:16px 16px 32px;gap:20px}
+.fb-gal > .card.wide{grid-column:auto}
+.fb-live .fb-q{flex-basis:100%;min-width:0}
+.fb-live .fb-ctl{position:static}
+.fb-live .chip,.fb-live .fb-x,.fb-live .fb-fbtn{height:44px}
+.fb-live .fb-x{width:44px}
+.fb-live .fb-pop{position:absolute;top:auto;left:0;right:0;bottom:0;width:auto;max-height:85%;overflow:auto;z-index:41;border-radius:20px 20px 0 0;padding:12px 16px calc(16px + env(safe-area-inset-bottom));scale:1;opacity:1;translate:0 100%;transform-origin:bottom center;transition:translate var(--d-f) var(--e-out)}
+.fb-live .fb-pop.open{translate:0 0;transition-duration:var(--d-s);transition-timing-function:var(--e-in)}
+.fb-live .fb-sh,.fb-live .fb-ft{display:flex}
+.fb-live .opt{min-height:48px;font-size:16px}
+.fb-live .fb-d{height:44px}
+.fb-live .in{height:48px;font-size:16px}
+.fb-scrim{z-index:40;background:rgb(0 20 20 / .45);animation:qc-fade var(--d-s) var(--e-in)}
+}
+</style>
+</helmet>
+<div class="qc app" style="background: var(--bg); color: var(--fg); font-family: 'IBM Plex Sans', sans-serif">
+  <div class="scroller">
+    <main class="fb-page enter">
+      <header style="display: flex; flex-direction: column; gap: 8px">
+        <span class="lab">Inventario · componente nuevo</span>
+        <h1 class="h1">Barra de filtros</h1>
+        <p class="sub" style="max-width: 860px">Un buscador con un único parámetro <span class="mono">q</span> sobre varios campos, el botón «Filtros» para elegir qué controles se montan y un control por filtro: selección única, selección múltiple, texto, sí/no y rango de fechas. El valor es controlado y sale entero por <span class="mono">onChange</span>. Arriba, la barra funcionando; abajo, cada estado fijo.</p>
+      </header>
+
+      <section class="card fb-live" aria-labelledby="fb-live-t">
+        <div class="card-hd"><h2 id="fb-live-t" class="h2">Inventario</h2><span class="cap">Prueba: abre «Filtros», monta controles y cambia valores.</span></div>
+
+        <div class="fb-bar" role="search" aria-label="Buscar y filtrar el inventario">
+          <label class="fb-q">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg>
+            <input class="in" type="search" placeholder="Buscar por nombre, código o lote" aria-label="Buscar por nombre, código o lote" aria-describedby="fb-qw" value="{{ q }}" onChange="{{ onQ }}">
+            <sc-if value="{{ hasQ }}" hint-placeholder-val="{{ false }}"><button class="xbtn fb-qx" type="button" aria-label="Borrar búsqueda" onClick="{{ clearQ }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></sc-if>
+          </label>
+
+          <div class="fb-ctl">
+            <button class="b b-out fb-fbtn" type="button" aria-haspopup="listbox" aria-expanded="{{ filOpenStr }}" onClick="{{ toggleFil }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Filtros<sc-if value="{{ hasActive }}" hint-placeholder-val="{{ true }}"><span class="count">{{ activeCount }}</span></sc-if></button>
+            <div class="{{ filPopCls }}" role="dialog" aria-label="Elegir filtros">
+              <div class="fb-sh"><h3 class="h3">Filtros</h3><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ close }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+              <span class="fb-hd">Mostrar en la barra</span>
+              <div class="fb-list" role="listbox" aria-multiselectable="true" aria-label="Filtros disponibles">
+                <sc-for list="{{ defs }}" as="o" hint-placeholder-count="5">
+                  <button class="opt" type="button" role="option" aria-selected="{{ o.onStr }}" onClick="{{ o.pick }}"><span class="{{ o.cbCls }}" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>{{ o.label }}</button>
+                </sc-for>
+              </div>
+              <div class="fb-ft"><button class="b b-pri b-touch" type="button" style="width: 100%" onClick="{{ close }}">Listo</button></div>
+            </div>
+          </div>
+
+          <sc-for list="{{ chips }}" as="c" hint-placeholder-count="3">
+            <div class="{{ c.ctlCls }}">
+              <sc-if value="{{ c.isBool }}" hint-placeholder-val="{{ false }}">
+                <button class="{{ c.chipCls }}" type="button" role="switch" aria-checked="{{ c.onStr }}" onClick="{{ c.toggle }}"><span class="fb-sw" aria-hidden="true"></span>{{ c.label }}</button>
+              </sc-if>
+              <sc-if value="{{ c.notBool }}" hint-placeholder-val="{{ true }}">
+                <button class="{{ c.chipCls }}" type="button" aria-haspopup="dialog" aria-expanded="{{ c.openStr }}" onClick="{{ c.toggle }}">
+                  <sc-if value="{{ c.isDate }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg></sc-if>
+                  <sc-if value="{{ c.notDate }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></sc-if>
+                  {{ c.label }}<sc-if value="{{ c.hasVal }}" hint-placeholder-val="{{ false }}"><span class="v">{{ c.valueText }}</span></sc-if>
+                </button>
+                <sc-if value="{{ c.hasVal }}" hint-placeholder-val="{{ false }}"><button class="fb-x" type="button" aria-label="{{ c.clearLabel }}" onClick="{{ c.clear }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></sc-if>
+                <div class="{{ c.popCls }}" role="dialog" aria-label="{{ c.label }}">
+                  <div class="fb-sh"><h3 class="h3">{{ c.label }}</h3><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ close }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+
+                  <sc-if value="{{ c.isSelect }}" hint-placeholder-val="{{ false }}">
+                    <div class="fb-list" role="listbox" aria-label="{{ c.label }}">
+                      <sc-for list="{{ c.options }}" as="o" hint-placeholder-count="4">
+                        <button class="opt" type="button" role="option" aria-selected="{{ o.onStr }}" onClick="{{ o.pick }}">{{ o.label }}<sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg class="ic fb-ck" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ c.isMulti }}" hint-placeholder-val="{{ false }}">
+                    <div class="fb-list" role="listbox" aria-multiselectable="true" aria-label="{{ c.label }}">
+                      <sc-for list="{{ c.options }}" as="o" hint-placeholder-count="3">
+                        <button class="opt" type="button" role="option" aria-selected="{{ o.onStr }}" onClick="{{ o.pick }}"><span class="{{ o.cbCls }}" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                    <div class="fb-row"><span class="cap">{{ c.multiCount }}</span><button class="b b-gho b-sm" type="button" onClick="{{ c.clear }}">Quitar selección</button></div>
+                  </sc-if>
+
+                  <sc-if value="{{ c.isText }}" hint-placeholder-val="{{ false }}">
+                    <div class="f" style="padding: 4px">
+                      <label for="fb-t-live">{{ c.label }}</label>
+                      <input id="fb-t-live" class="in" type="text" placeholder="{{ c.textPh }}" value="{{ c.draft }}" onChange="{{ c.onText }}">
+                      <sc-if value="{{ c.textWarn }}" hint-placeholder-val="{{ false }}"><span class="fb-warn" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg>{{ c.textWarnMsg }}</span></sc-if>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{ c.isDate }}" hint-placeholder-val="{{ false }}">
+                    <div class="fb-sc" role="group" aria-label="Atajos">
+                      <sc-for list="{{ c.shortcuts }}" as="o" hint-placeholder-count="4">
+                        <button class="{{ o.cls }}" type="button" aria-pressed="{{ o.onStr }}" onClick="{{ o.pick }}">{{ o.label }}</button>
+                      </sc-for>
+                    </div>
+                    <div class="fb-rg">
+                      <div class="f"><label for="fb-d1">Desde</label><input id="fb-d1" class="in mono" type="text" placeholder="dd/mm/aaaa" value="{{ c.fromTxt }}" onChange="{{ noop }}"></div>
+                      <div class="f"><label for="fb-d2">Hasta</label><input id="fb-d2" class="in mono" type="text" placeholder="dd/mm/aaaa" value="{{ c.toTxt }}" onChange="{{ noop }}"></div>
+                    </div>
+                    <span class="cap" style="padding: 0 4px">Deja un extremo vacío para un rango abierto.</span>
+                    <div class="fb-cal-hd"><button class="b b-gho b-ico b-sm" type="button" aria-label="Mes anterior"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><span>octubre 2026</span><button class="b b-gho b-ico b-sm" type="button" aria-label="Mes siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></div>
+                    <div class="fb-cal">
+                      <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><span class="fb-wd" aria-hidden="true">{{ w }}</span></sc-for>
+                      <sc-for list="{{ c.days }}" as="d" hint-placeholder-count="34">
+                        <sc-if value="{{ d.blank }}" hint-placeholder-val="{{ false }}"><span class="fb-d blank" aria-hidden="true"></span></sc-if>
+                        <sc-if value="{{ d.notBlank }}" hint-placeholder-val="{{ true }}"><button class="{{ d.cls }}" type="button" aria-label="{{ d.lab }}" aria-pressed="{{ d.sel }}" onClick="{{ d.pick }}">{{ d.txt }}</button></sc-if>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+
+                  <div class="fb-ft"><button class="b b-pri b-touch" type="button" style="width: 100%" onClick="{{ close }}">Listo</button></div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+
+          <sc-if value="{{ anyApplied }}" hint-placeholder-val="{{ true }}"><button class="b b-gho fb-fbtn" type="button" onClick="{{ clearAll }}" style="animation: qc-fade var(--d-f) var(--e-in)">Limpiar todo</button></sc-if>
+
+          <sc-if value="{{ qWarn }}" hint-placeholder-val="{{ false }}"><span id="fb-qw" class="fb-warn" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg>Escribe al menos 3 caracteres para buscar.</span></sc-if>
+        </div>
+
+        <div class="panel fb-out" aria-label="Valor que sale por onChange">
+          <span class="lab">Valor (onChange)</span>
+          <sc-for list="{{ outLines }}" as="l" hint-placeholder-count="4"><span class="mono">{{ l }}</span></sc-for>
+          <span class="cap">La tabla todavía no se filtra: el esqueleto no está cableado.</span>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 14px" aria-labelledby="fb-st-t">
+        <h2 id="fb-st-t" class="h2">Estados</h2>
+        <div class="fb-gal">
+
+          <div class="card">
+            <span class="lab">1 · Vacío</span>
+            <div class="fb-bar">
+              <label class="fb-q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar por nombre, código o lote" aria-label="Buscar por nombre, código o lote"></label>
+              <button class="b b-out fb-fbtn" type="button" aria-haspopup="listbox" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Filtros</button>
+            </div>
+            <span class="cap">Sin filtros montados ni «Limpiar todo».</span>
+          </div>
+
+          <div class="card">
+            <span class="lab">2 · Con filtros aplicados</span>
+            <div class="fb-bar">
+              <label class="fb-q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" value="desengrasante" aria-label="Buscar por nombre, código o lote"><button class="xbtn fb-qx" type="button" aria-label="Borrar búsqueda"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></label>
+              <button class="b b-out fb-fbtn" type="button" aria-haspopup="listbox" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Filtros<span class="count">4</span></button>
+              <div class="fb-ctl has"><button class="chip on" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Tipo de producto<span class="v">Producto</span></button><button class="fb-x" type="button" aria-label="Quitar Tipo de producto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+              <div class="fb-ctl has"><button class="chip on" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado de stock<span class="v">Bajo alerta +1</span></button><button class="fb-x" type="button" aria-label="Quitar Estado de stock"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+              <div class="fb-ctl"><button class="chip" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg>Vencimiento</button></div>
+              <div class="fb-ctl"><button class="chip on" type="button" role="switch" aria-checked="true"><span class="fb-sw" aria-hidden="true"></span>Próximo a vencer</button></div>
+              <button class="b b-gho fb-fbtn" type="button">Limpiar todo</button>
+            </div>
+            <span class="cap">Con valor: borde sólido y «Etiqueta | valor» con X para quitar. Sin valor: punteado.</span>
+          </div>
+
+          <div class="card">
+            <span class="lab">3 · Foco y mínimo de caracteres</span>
+            <div class="fb-bar">
+              <label class="fb-q"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in focus" type="search" value="de" aria-label="Buscar por nombre, código o lote"><button class="xbtn fb-qx" type="button" aria-label="Borrar búsqueda"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></label>
+              <span class="fb-warn" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg>Escribe al menos 3 caracteres para buscar.</span>
+            </div>
+            <span class="cap">Por debajo del mínimo, <span class="mono">q</span> no sale y el aviso se anuncia en una región de estado.</span>
+          </div>
+
+          <div class="card">
+            <span class="lab">4 · Hover y foco de un control</span>
+            <div class="fb-bar">
+              <div class="fb-ctl"><button class="chip hov" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Tipo de producto</button></div>
+              <div class="fb-ctl"><button class="chip foc" type="button" aria-haspopup="dialog" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado de stock</button></div>
+            </div>
+            <span class="cap">Hover: velo de izquierda a derecha, 200 ms. Foco de teclado: anillo de 2 px.</span>
+          </div>
+
+          <div class="card">
+            <span class="lab">5 · «Filtros» abierto</span>
+            <div class="fb-ctl" style="flex-direction: column; align-items: flex-start">
+              <button class="b b-out fb-fbtn" type="button" aria-haspopup="listbox" aria-expanded="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Filtros<span class="count">2</span></button>
+              <div class="pop open fb-pop fb-static w-md" role="dialog" aria-label="Elegir filtros">
+                <span class="fb-hd">Mostrar en la barra</span>
+                <div class="fb-list" role="listbox" aria-multiselectable="true" aria-label="Filtros disponibles">
+                  <button class="opt" type="button" role="option" aria-selected="true"><span class="cb on" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Tipo de producto</button>
+                  <button class="opt hl" type="button" role="option" aria-selected="true"><span class="cb on" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Estado de stock</button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span class="cb" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Vencimiento</button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span class="cb" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Próximo a vencer</button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span class="cb" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Proveedor</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <span class="lab">6 · Selección única abierta</span>
+            <div class="fb-ctl has" style="flex-wrap: wrap">
+              <button class="chip on" type="button" aria-haspopup="dialog" aria-expanded="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Tipo de producto<span class="v">Producto</span></button><button class="fb-x" type="button" aria-label="Quitar Tipo de producto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+              <div class="pop open fb-pop fb-static w-sm" role="dialog" aria-label="Tipo de producto" style="flex-basis: 100%">
+                <div class="fb-list" role="listbox" aria-label="Tipo de producto">
+                  <button class="opt" type="button" role="option" aria-selected="true">Producto<svg class="ic fb-ck" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button>
+                  <button class="opt hl" type="button" role="option" aria-selected="false">Máquina</button>
+                  <button class="opt" type="button" role="option" aria-selected="false">Envase</button>
+                  <button class="opt" type="button" role="option" aria-selected="false">Producto terminado</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <span class="lab">7 · Selección múltiple abierta</span>
+            <div class="fb-ctl has" style="flex-wrap: wrap">
+              <button class="chip on" type="button" aria-haspopup="dialog" aria-expanded="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado de stock<span class="v">Sin stock +1</span></button><button class="fb-x" type="button" aria-label="Quitar Estado de stock"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+              <div class="pop open fb-pop fb-static w-md" role="dialog" aria-label="Estado de stock" style="flex-basis: 100%">
+                <div class="fb-list" role="listbox" aria-multiselectable="true" aria-label="Estado de stock">
+                  <button class="opt" type="button" role="option" aria-selected="true"><span class="cb on" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Sin stock</button>
+                  <button class="opt" type="button" role="option" aria-selected="true"><span class="cb on" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Bajo alerta</button>
+                  <button class="opt" type="button" role="option" aria-selected="false"><span class="cb" aria-hidden="true"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"></path></svg></span>Con stock</button>
+                </div>
+                <div class="fb-row"><span class="cap">2 seleccionados</span><button class="b b-gho b-sm" type="button">Quitar selección</button></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <span class="lab">8 · Texto abierto, bajo el mínimo</span>
+            <div class="fb-ctl" style="flex-wrap: wrap">
+              <button class="chip" type="button" aria-haspopup="dialog" aria-expanded="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Proveedor</button>
+              <div class="pop open fb-pop fb-static w-lg" role="dialog" aria-label="Proveedor" style="flex-basis: 100%">
+                <div class="f" style="padding: 4px">
+                  <label for="fb-t-st">Proveedor</label>
+                  <input id="fb-t-st" class="in focus" type="text" value="Q" placeholder="Escribe al menos 2 caracteres">
+                  <span class="fb-warn" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg>Escribe al menos 2 caracteres.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <span class="lab">9 · Sí/no apagado y encendido</span>
+            <div class="fb-bar">
+              <div class="fb-ctl"><button class="chip" type="button" role="switch" aria-checked="false"><span class="fb-sw" aria-hidden="true"></span>Próximo a vencer</button></div>
+              <div class="fb-ctl"><button class="chip on" type="button" role="switch" aria-checked="true"><span class="fb-sw" aria-hidden="true"></span>Próximo a vencer</button></div>
+            </div>
+            <span class="cap">No abre panel: el propio control alterna. Apagado = filtro sin valor.</span>
+          </div>
+
+          <div class="card wide">
+            <span class="lab">10 · Rango de fechas abierto</span>
+            <div class="fb-ctl has" style="flex-wrap: wrap">
+              <button class="chip on" type="button" aria-haspopup="dialog" aria-expanded="true"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg>Vencimiento<span class="v">12/10 – 25/10</span></button><button class="fb-x" type="button" aria-label="Quitar Vencimiento"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+              <div class="pop open fb-pop fb-static w-xl" role="dialog" aria-label="Vencimiento" style="flex-basis: 100%">
+                <div class="fb-sc" role="group" aria-label="Atajos">
+                  <button class="b b-out b-sm" type="button" aria-pressed="false">Vencidos</button>
+                  <button class="b b-out b-sm" type="button" aria-pressed="false">Próximos 7 días</button>
+                  <button class="b b-out b-sm" type="button" aria-pressed="false">Próximos 30 días</button>
+                  <button class="b b-out b-sm" type="button" aria-pressed="false">Este mes</button>
+                </div>
+                <div class="fb-rg">
+                  <div class="f"><label for="fb-s1">Desde</label><input id="fb-s1" class="in mono" type="text" value="12/10/2026"></div>
+                  <div class="f"><label for="fb-s2">Hasta</label><input id="fb-s2" class="in mono" type="text" value="25/10/2026"></div>
+                </div>
+                <span class="cap" style="padding: 0 4px">Deja un extremo vacío para un rango abierto.</span>
+                <div class="fb-cal-hd"><button class="b b-gho b-ico b-sm" type="button" aria-label="Mes anterior"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><span>octubre 2026</span><button class="b b-gho b-ico b-sm" type="button" aria-label="Mes siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></div>
+                <div class="fb-cal">
+                  <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><span class="fb-wd" aria-hidden="true">{{ w }}</span></sc-for>
+                  <sc-for list="{{ staticDays }}" as="d" hint-placeholder-count="34">
+                    <sc-if value="{{ d.blank }}" hint-placeholder-val="{{ false }}"><span class="fb-d blank" aria-hidden="true"></span></sc-if>
+                    <sc-if value="{{ d.notBlank }}" hint-placeholder-val="{{ true }}"><button class="{{ d.cls }}" type="button" aria-label="{{ d.lab }}" aria-pressed="{{ d.sel }}">{{ d.txt }}</button></sc-if>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+            <span class="cap">Atajos arriba; «Vencidos» deja abierto el inicio (hasta hoy). Un solo extremo se muestra como «Desde 12/10» o «Hasta 15/10».</span>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+  <sc-if value="{{ isOpen }}" hint-placeholder-val="{{ false }}"><button class="fb-scrim" type="button" tabindex="-1" aria-label="Cerrar panel" onClick="{{ close }}"></button></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2100}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const DEFS = [
+  { key: 'tipo', type: 'select', label: 'Tipo de producto', options: [['PRODUCT', 'Producto'], ['MACHINE', 'Máquina'], ['PACKAGING', 'Envase'], ['FINISHED_PRODUCT', 'Producto terminado']] },
+  { key: 'stock', type: 'multiselect', label: 'Estado de stock', options: [['sin', 'Sin stock'], ['bajo', 'Bajo alerta'], ['con', 'Con stock']] },
+  { key: 'venc', type: 'dateRange', label: 'Vencimiento' },
+  { key: 'prox', type: 'boolean', label: 'Próximo a vencer' },
+  { key: 'prov', type: 'text', label: 'Proveedor', minChars: 2 }
+];
+const MIN_Q = 3;
+const active = s.active || ['tipo', 'stock', 'venc', 'prox'];
+const vals = s.vals || { stock: ['bajo'] };
+const drafts = s.drafts || {};
+const q = s.q || '';
+const open = s.open || null;
+const close = () => this.setState({ open: null });
+const setVal = (k, v) => {
+  const nv = Object.assign({}, vals);
+  if (v === undefined) delete nv[k]; else nv[k] = v;
+  this.setState({ vals: nv });
+};
+const two = (n) => (n < 10 ? '0' : '') + n;
+const fmt = (d) => two(d) + '/10';
+
+const hasVal = (d) => {
+  const v = vals[d.key];
+  if (d.type === 'select') return v != null;
+  if (d.type === 'multiselect') return !!(v && v.length);
+  if (d.type === 'text') return !!(v && v.length >= d.minChars);
+  if (d.type === 'dateRange') return !!(v && (v.fromTxt || v.toTxt));
+  if (d.type === 'boolean') return v === true;
+  return false;
+};
+const labelOf = (d, id) => { const o = d.options.find((x) => x[0] === id); return o ? o[1] : id; };
+const valueText = (d) => {
+  const v = vals[d.key];
+  if (d.type === 'select') return labelOf(d, v);
+  if (d.type === 'multiselect') return v.length === 1 ? labelOf(d, v[0]) : labelOf(d, v[0]) + ' +' + (v.length - 1);
+  if (d.type === 'text') return v;
+  if (d.type === 'dateRange') {
+    if (v.fromTxt && v.toTxt) return v.fromTxt + ' – ' + v.toTxt;
+    return v.fromTxt ? 'Desde ' + v.fromTxt : 'Hasta ' + v.toTxt;
+  }
+  return '';
+};
+
+const days = (fromD, toD, onPick) => {
+  const out = [];
+  for (let i = 0; i < 3; i++) out.push({ blank: true, notBlank: false });
+  for (let d = 1; d <= 31; d++) {
+    const edge = d === fromD || d === toD;
+    const mid = !!(fromD && toD && d > fromD && d < toD) || (!fromD && toD && d < toD);
+    out.push({
+      blank: false, notBlank: true, txt: String(d),
+      cls: 'fb-d' + (edge ? ' edge' : mid ? ' mid' : '') + (d === 15 ? ' today' : ''),
+      lab: d + ' de octubre de 2026' + (d === 15 ? ', hoy' : ''),
+      sel: edge ? 'true' : 'false',
+      pick: onPick ? () => onPick(d) : null
+    });
+  }
+  return out;
+};
+
+const SHORTCUTS = [
+  ['Vencidos', { toTxt: '15/10', toD: 15 }],
+  ['Próximos 7 días', { fromTxt: '15/10', fromD: 15, toTxt: '22/10', toD: 22 }],
+  ['Próximos 30 días', { fromTxt: '15/10', fromD: 15, toTxt: '14/11', toD: 32 }],
+  ['Este mes', { fromTxt: '01/10', fromD: 1, toTxt: '31/10', toD: 31 }]
+];
+
+const mounted = DEFS.filter((d) => active.indexOf(d.key) >= 0);
+const chips = mounted.map((d) => {
+  const v = vals[d.key];
+  const hv = hasVal(d);
+  const isOpen = open === d.key;
+  const c = {
+    label: d.label, hasVal: hv, onStr: hv ? 'true' : 'false', openStr: isOpen ? 'true' : 'false',
+    isBool: d.type === 'boolean', notBool: d.type !== 'boolean',
+    isSelect: d.type === 'select', isMulti: d.type === 'multiselect', isText: d.type === 'text',
+    isDate: d.type === 'dateRange', notDate: d.type !== 'dateRange',
+    chipCls: hv ? 'chip on' : 'chip',
+    ctlCls: 'fb-ctl' + (hv && d.type !== 'boolean' ? ' has' : ''),
+    valueText: hv ? valueText(d) : '',
+    clearLabel: 'Quitar ' + d.label,
+    clear: () => { setVal(d.key, undefined); if (d.type === 'text') this.setState({ drafts: Object.assign({}, drafts, { [d.key]: '' }) }); },
+    popCls: 'pop fb-pop ' + (d.type === 'dateRange' ? 'w-xl' : d.type === 'text' ? 'w-lg' : d.type === 'multiselect' ? 'w-md' : 'w-sm') + (isOpen ? ' open' : ''),
+    toggle: d.type === 'boolean'
+      ? () => setVal(d.key, v ? undefined : true)
+      : () => this.setState({ open: isOpen ? null : d.key })
+  };
+  if (d.type === 'select') {
+    c.options = d.options.map((o) => ({ label: o[1], on: v === o[0], onStr: v === o[0] ? 'true' : 'false', pick: () => this.setState({ vals: Object.assign({}, vals, { [d.key]: o[0] }), open: null }) }));
+  }
+  if (d.type === 'multiselect') {
+    const arr = v || [];
+    c.options = d.options.map((o) => {
+      const on = arr.indexOf(o[0]) >= 0;
+      return { label: o[1], onStr: on ? 'true' : 'false', cbCls: on ? 'cb on' : 'cb', pick: () => {
+        const next = on ? arr.filter((x) => x !== o[0]) : d.options.map((x) => x[0]).filter((x) => x === o[0] || arr.indexOf(x) >= 0);
+        setVal(d.key, next.length ? next : undefined);
+      } };
+    });
+    c.multiCount = arr.length === 1 ? '1 seleccionado' : arr.length + ' seleccionados';
+  }
+  if (d.type === 'text') {
+    const dr = drafts[d.key] != null ? drafts[d.key] : (v || '');
+    c.draft = dr;
+    c.textPh = 'Escribe al menos ' + d.minChars + ' caracteres';
+    c.textWarn = dr.length > 0 && dr.length < d.minChars;
+    c.textWarnMsg = 'Escribe al menos ' + d.minChars + ' caracteres.';
+    c.onText = (e) => {
+      const t = e.target.value;
+      const nv = Object.assign({}, vals);
+      if (t.length >= d.minChars) nv[d.key] = t; else delete nv[d.key];
+      this.setState({ drafts: Object.assign({}, drafts, { [d.key]: t }), vals: nv });
+    };
+  }
+  if (d.type === 'dateRange') {
+    const r = v || {};
+    c.fromTxt = r.fromTxt ? r.fromTxt + '/2026' : '';
+    c.toTxt = r.toTxt ? r.toTxt + '/2026' : '';
+    c.shortcuts = SHORTCUTS.map((sc) => {
+      const on = r.sc === sc[0];
+      return { label: sc[0], onStr: on ? 'true' : 'false', cls: on ? 'b b-sec b-sm' : 'b b-out b-sm', pick: () => setVal(d.key, Object.assign({ sc: sc[0] }, sc[1])) };
+    });
+    c.days = days(r.fromD, r.toD, (day) => {
+      let n;
+      if (!r.fromD || (r.fromD && r.toD) || r.sc) n = { fromD: day, fromTxt: fmt(day) };
+      else if (day < r.fromD) n = { fromD: day, fromTxt: fmt(day), toD: r.fromD, toTxt: fmt(r.fromD) };
+      else n = { fromD: r.fromD, fromTxt: r.fromTxt, toD: day, toTxt: fmt(day) };
+      setVal(d.key, n);
+    });
+  }
+  return c;
+});
+
+const defs = DEFS.map((d) => {
+  const on = active.indexOf(d.key) >= 0;
+  return { label: d.label, onStr: on ? 'true' : 'false', cbCls: on ? 'cb on' : 'cb', pick: () => {
+    const next = on ? active.filter((k) => k !== d.key) : DEFS.map((x) => x.key).filter((k) => k === d.key || active.indexOf(k) >= 0);
+    const nv = Object.assign({}, vals);
+    if (on) delete nv[d.key];
+    this.setState({ active: next, vals: nv });
+  } };
+});
+
+const qOk = q.length >= MIN_Q;
+const applied = mounted.filter(hasVal);
+const outLines = ['q: ' + (qOk ? '"' + q + '"' : '—')].concat(applied.length ? applied.map((d) => d.key + ': ' + JSON.stringify(d.type === 'dateRange' ? { from: vals[d.key].fromTxt || null, to: vals[d.key].toTxt || null } : vals[d.key])) : ['filtros: {}']);
+
+return {
+  q, hasQ: q.length > 0, qWarn: q.length > 0 && !qOk,
+  onQ: (e) => this.setState({ q: e.target.value }),
+  clearQ: () => this.setState({ q: '' }),
+  activeCount: active.length, hasActive: active.length > 0,
+  filOpenStr: open === 'fil' ? 'true' : 'false',
+  filPopCls: 'pop fb-pop w-md' + (open === 'fil' ? ' open' : ''),
+  toggleFil: () => this.setState({ open: open === 'fil' ? null : 'fil' }),
+  defs, chips, close, isOpen: !!open,
+  anyApplied: q.length > 0 || applied.length > 0,
+  clearAll: () => this.setState({ q: '', vals: {}, drafts: {}, open: null }),
+  weekdays: ['L', 'M', 'X', 'J', 'V', 'S', 'D'],
+  staticDays: days(12, 25, null),
+  outLines,
+  noop: () => {}
+};
+}
+}
+</script>
+</body>
+</html>

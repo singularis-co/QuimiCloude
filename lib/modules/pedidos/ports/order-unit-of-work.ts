@@ -1,4 +1,9 @@
-import type { FinishedGoodsIntake, MaterialReservations, ProductCatalog } from '@/lib/modules/inventario';
+import type {
+  FinishedGoodsIntake,
+  MaterialReservations,
+  OrderConsumptionLedger,
+  ProductCatalog,
+} from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -19,6 +24,9 @@ export type OrderTransactionScope = {
   readonly finishedGoods: FinishedGoodsIntake;
   readonly products: Pick<ProductCatalog, 'findRefs'>;
   readonly units: Pick<UnitCatalog, 'findRefs' | 'findMassVolumeBridge'>;
+  /** Lo que el pedido consumio de cada lote, leido en esta transaccion: ve los asientos que ella
+   *  misma acaba de escribir. */
+  readonly consumption: OrderConsumptionLedger;
 };
 
 /**

@@ -1,18 +1,29 @@
 'use client';
 
 import { RouteIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { EntityImage } from '@/components/shared/entity-image';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { StatusBadge } from '@/components/shared/status-badge';
-import type { ExecutionTracePerson, ExecutionTraceRow } from '@/lib/modules/asignaciones';
+import type {
+  ExecutionTracePerson,
+  ExecutionTraceRow,
+  TraceDuration,
+} from '@/lib/modules/asignaciones';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
+import {
+  formatPresentationQuantities,
+  type PresentationQuantity,
+} from '@/lib/shared/ui/presentation-quantities';
 
 import {
-  ACTIVE_ORDER_MARK,
   DELETED_ORDER_MARK,
+  TRACE_DURATION_SUFFIXES,
   TRACE_ORDER_STATUS_LABELS,
-  formatTraceDuration,
+  formatElapsedMinutes,
   formatTraceInstant,
 } from './execution-trace-format';
 import {
@@ -23,7 +34,12 @@ import {
 } from './execution-trace-list-params';
 
 export const TRACE_NUMBER_COLUMN_ID = 'orderNumber';
+export const TRACE_IMAGE_COLUMN_ID = 'formulaImage';
+export const TRACE_FORMULA_COLUMN_ID = 'formulaName';
+export const TRACE_PRESENTATIONS_COLUMN_ID = 'presentations';
 export const TRACE_STATUS_COLUMN_ID = 'status';
+
+export const TRACE_IMAGE_EMPTY_ALT = 'Pedido sin fórmula';
 export const TRACE_FIRST_AT_COLUMN_ID = 'firstAt';
 export const TRACE_DURATION_COLUMN_ID = 'duration';
 export const TRACE_GO_BACK_COLUMN_ID = 'goBackCount';
@@ -36,9 +52,42 @@ export function DeletedOrderMark() {
   return <StatusBadge tone="muted" label={DELETED_ORDER_MARK} data-testid="execution-trace-deleted" />;
 }
 
-/** Solo la lleva un pedido cuya duración sigue abierta, nunca uno dado de baja. */
-export function ActiveOrderMark() {
-  return <StatusBadge tone="progress" label={ACTIVE_ORDER_MARK} data-testid="execution-trace-active" />;
+function TraceTotal({ duration }: { readonly duration: TraceDuration }) {
+  const suffix = TRACE_DURATION_SUFFIXES[duration.kind];
+  return (
+    <span data-testid="execution-trace-duration" data-kind={duration.kind}>
+      {formatElapsedMinutes(duration.ms)}
+      {suffix === '' ? null : <span className="text-xs text-muted-foreground">{suffix}</span>}
+    </span>
+  );
+}
+
+function MutedText({ testId, children }: { readonly testId: string; readonly children: ReactNode }) {
+  return (
+    <span data-testid={testId} data-empty="true" className="text-muted-foreground">
+      {children}
+    </span>
+  );
+}
+
+/** Como `OrderDistributionLabel`: con varias presentaciones salta de linea en vez de ensanchar la celda. */
+function PresentationsText({
+  testId,
+  items,
+}: {
+  readonly testId: string;
+  readonly items: readonly PresentationQuantity[];
+}) {
+  const text = formatPresentationQuantities(items);
+  return (
+    <span
+      data-testid={testId}
+      title={text}
+      className="inline-block max-w-xs align-middle break-words whitespace-normal"
+    >
+      {text}
+    </span>
+  );
 }
 
 export type ExecutionTraceColumnsDeps = {
@@ -60,9 +109,44 @@ export function buildExecutionTraceColumns({
         <span className="flex flex-wrap items-center gap-2">
           <span data-testid="execution-trace-number">{row.numberText}</span>
           {row.deleted ? <DeletedOrderMark /> : null}
-          {!row.deleted && row.duration.kind === 'open' ? <ActiveOrderMark /> : null}
         </span>
       ),
+    },
+    {
+      id: TRACE_IMAGE_COLUMN_ID,
+      label: 'Foto',
+      align: 'center',
+      // `formulaImageUrl` ya es una URL servible; sin imagen, `EntityImage` pinta su marcador.
+      cell: (row) => (
+        <EntityImage
+          path={row.formulaImageUrl}
+          name={row.formulaName ?? ''}
+          emptyAlt={TRACE_IMAGE_EMPTY_ALT}
+          testId="execution-trace-image"
+        />
+      ),
+    },
+    {
+      id: TRACE_FORMULA_COLUMN_ID,
+      label: 'Fórmula',
+      align: 'start',
+      cell: (row) =>
+        row.formulaName === null ? (
+          <MutedText testId="execution-trace-formula">{EMPTY_MARK}</MutedText>
+        ) : (
+          <span data-testid="execution-trace-formula">{row.formulaName}</span>
+        ),
+    },
+    {
+      id: TRACE_PRESENTATIONS_COLUMN_ID,
+      label: 'Presentaciones',
+      align: 'start',
+      cell: (row) =>
+        row.presentations.length === 0 ? (
+          <MutedText testId="execution-trace-presentations">{EMPTY_MARK}</MutedText>
+        ) : (
+          <PresentationsText testId="execution-trace-presentations" items={row.presentations} />
+        ),
     },
     {
       id: TRACE_STATUS_COLUMN_ID,
@@ -107,11 +191,7 @@ export function buildExecutionTraceColumns({
       label: 'Duración',
       tabular: true,
       align: 'end',
-      cell: (row) => (
-        <span data-testid="execution-trace-duration" data-kind={row.duration.kind}>
-          {formatTraceDuration(row.duration)}
-        </span>
-      ),
+      cell: (row) => <TraceTotal duration={row.totalDuration} />,
     },
     {
       id: TRACE_GO_BACK_COLUMN_ID,

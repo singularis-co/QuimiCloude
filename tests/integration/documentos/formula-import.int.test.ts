@@ -42,6 +42,7 @@ import {
   replaceAliveRecipe,
   replaceAliveRecipeWithPropagation,
   softDeleteAliveRecipe,
+  listRecipeVersionIdsIncludingDeleted,
 } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-prisma';
 import {
   createRecipeExecutionReader,
@@ -76,6 +77,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -105,6 +107,7 @@ const recipeRepository: RecipeRepository = {
   softDeleteAlive: softDeleteAliveRecipe,
   createVersion: createRecipeVersion,
   listAliveVersions: listAliveRecipeVersions,
+  listVersionIdsIncludingDeleted: listRecipeVersionIdsIncludingDeleted,
   replaceAliveWithPropagation: replaceAliveRecipeWithPropagation,
 };
 
@@ -129,7 +132,7 @@ const recipeCatalog: RecipeCatalog = {
 };
 
 const createRecipeUseCase = createCreateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage });
-const updateRecipeUseCase = createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage });
+const updateRecipeUseCase = createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage, stepLocks: noEvidenceLocks });
 const createRawMaterial = createCreateRawMaterial({ products: { create: createProduct } });
 
 function crearDeps(overrides: Partial<FormulaImportDeps> = {}): FormulaImportDeps {
@@ -259,7 +262,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 function actorDe(empresa: Empresa, permissions: readonly string[] = ['recetas.modificar']): Actor {
-  return { id: empresa.userId, companyId: empresa.companyId, permissions };
+  return { id: empresa.userId, companyId: empresa.companyId, permissions, addons: ['lectura_pdf'] };
 }
 
 async function crearArchivoListoFormula(companyId: string): Promise<string> {
@@ -405,7 +408,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
           return replaceAliveRecipe(id, { ...data, lines: lineasRotas }, actorId, now, scope);
         },
       };
-      const updateRecipeRoto = createUpdateRecipe({ recipes: repositorioRoto, products: productCatalog, images: recipeImageStorage });
+      const updateRecipeRoto = createUpdateRecipe({ recipes: repositorioRoto, products: productCatalog, images: recipeImageStorage, stepLocks: noEvidenceLocks });
       const confirmRoto = createConfirmFormulaImport(crearDeps({ updateRecipe: updateRecipeRoto }));
 
       await expect(

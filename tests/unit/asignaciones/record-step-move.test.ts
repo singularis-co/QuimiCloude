@@ -16,8 +16,10 @@ import {
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
+import type { StepEvidenceRepository } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 import type { PermissionCode } from '@/lib/modules/identity';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -52,12 +54,22 @@ function montar(options?: {
   const findAliveById = vi.fn(async () => (status === null ? null : { id: PEDIDO, status }));
   const append = vi.fn<ExecutionLogRepository['append']>(async () => {
     if (options?.appendFalla) throw options.appendFalla;
+    return 'ok';
   });
   const findLastStepPosition = vi.fn(async () => null);
 
   const deps: RecordStepMoveDeps = {
     assignments: { listOrderIdsByUserInCompany } as unknown as OrderAssignmentRepository,
-    orders: { findAliveById } as unknown as OrderCatalog,
+    orders: {
+      findAliveById,
+      listAliveSummariesByIds: vi.fn(async () => ({
+        items: [{ id: PEDIDO, recipeId: 'receta-1', status: 'EN_CURSO' }],
+        total: 1,
+        page: 1,
+        pageSize: 1,
+        totalPages: 1,
+      })),
+    } as unknown as OrderCatalog,
     log: {
       append,
       findLastStepPosition,
@@ -66,6 +78,11 @@ function montar(options?: {
       listUserIdsWithEntries: vi.fn(async () => []),
     } satisfies ExecutionLogRepository,
     now: () => AHORA,
+    // Sin pasos que pidan evidencia: el bloqueo por fotos se prueba en record-step-move-evidence.test.ts.
+    recipes: {
+      findExecutionContentById: vi.fn(async () => ({ steps: [{ blocks: [] }, { blocks: [] }, { blocks: [] }] })),
+    } as unknown as RecipeCatalog,
+    evidence: { listByOrder: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
   };
   return { deps, listOrderIdsByUserInCompany, findAliveById, append, findLastStepPosition };
 }

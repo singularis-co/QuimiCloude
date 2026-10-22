@@ -6,19 +6,31 @@
  * el mismo error que un pedido inexistente, para no revelar que existe en otro estado o de otra
  * persona.
  *
- * Los datos de lote solo los ve quien acondiciona, que es el unico que puede escribirlos.
+ * Los datos de lote solo los ve quien acondiciona, que es el unico que puede escribirlos. Los pasos
+ * de acondicionamiento y su avance, solo mientras lo acondiciona: en cualquier otro caso ni se leen.
  */
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { composeConditioningOrderDetail, type ConditioningOrderDetail } from './conditioning-order-view';
+import {
+  composeConditioningOrderDetail,
+  composeConditioningStepsView,
+  type ConditioningOrderDetail,
+  type ConditioningStepsView,
+} from './conditioning-order-view';
+import { conditioningProgress } from './conditioning-steps';
 import { OrderNotFoundError, ValidationError } from './errors';
+import { readStepEvidence } from './evidence-photos';
 
 import type { ComposeOrderRowsDeps } from './compose-order-rows';
 import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
+import type { EvidenceStorage } from '../ports/evidence-storage';
+import type { ExecutionLogRepository } from '../ports/execution-log-repository';
+import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 
 import type { FinishedBatchLabels } from '@/lib/modules/inventario';
-import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
+import type { RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
 const DETAIL_STATUSES = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const;
 const CLOSED_STATUSES: ReadonlySet<string> = new Set(['TERMINADO', 'ENTREGADO']);
@@ -32,7 +44,27 @@ export type GetConditioningOrderDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
   readonly team: ConditioningTeamRepository;
   readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
+  readonly conditioningSteps: RecipeConditioningStepsReader;
+  readonly log: Pick<ExecutionLogRepository, 'listEntriesForOrders'>;
+  readonly evidence: StepEvidenceRepository;
+  readonly storage: EvidenceStorage;
 };
+
+async function readConditioningSteps(
+  deps: GetConditioningOrderDeps,
+  actor: Actor,
+  summary: AssignedOrderSummary,
+  detail: Pick<ConditioningOrderDetail, 'conditionedByName' | 'team'>,
+): Promise<ConditioningStepsView | null> {
+  if (summary.status !== 'EN_ACONDICIONAMIENTO' || summary.conditionedBy !== actor.id) return null;
+  const steps = (await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, actor.companyId)) ?? [];
+  if (steps.length === 0) return null;
+  const [entries, evidence] = await Promise.all([
+    deps.log.listEntriesForOrders(actor.companyId, [summary.id]),
+    readStepEvidence(deps.evidence, deps.storage, actor.companyId, summary.id, 'conditioning', steps),
+  ]);
+  return composeConditioningStepsView(detail, actor.id, steps, conditioningProgress(entries, steps.length), evidence);
+}
 
 export function createGetConditioningOrder(
   deps: GetConditioningOrderDeps,
@@ -63,6 +95,6 @@ export function createGetConditioningOrder(
         : null;
     const detail = await composeConditioningOrderDetail(deps, actor.companyId, summary, team, batches);
     if (detail === undefined) throw new OrderNotFoundError();
-    return detail;
+    return { ...detail, conditioningSteps: await readConditioningSteps(deps, actor, summary, detail) };
   };
 }

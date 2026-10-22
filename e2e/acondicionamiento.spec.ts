@@ -66,6 +66,8 @@ const PACKAGING_2_LOT = `${SHARED_TOKEN}_le2`;
 const PACKAGING_STOCK = '10';
 const PACKAGING_UNIT_COST = '0.5000';
 const PRESENTATION_CONTENT = '1';
+/** El volumen que el reparto pinta tras el envase (9a330ab2): contenido de la presentación + «l» de litro. */
+const PRESENTATION_VOLUME = `${PRESENTATION_CONTENT} l`;
 const LINE_1_PACKAGES = 2;
 const LINE_2_PACKAGES = 3;
 const ORDER_QUANTITY = String(LINE_1_PACKAGES + LINE_2_PACKAGES);
@@ -401,7 +403,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
   }) => {
     const { A, B, C, D, E } = seeded();
 
-    // --- 1. Aterriza en `/asignacion` con exactamente «Por acondicionar», «Acondicionados» y «Entregados», cada una con su contador.
+    // --- 1. Aterriza en `/asignacion` con exactamente «Por acondicionar» y «Acondicionados», cada una con su contador (QC-301 R2).
     const landing = await loginAndLand(page, conditioner1User);
     expect(landing).toBe(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -410,16 +412,11 @@ test.describe('las pestañas del acondicionador (R22)', () => {
       .getByTestId(ASSIGNMENT_VIEW_TABS_TESTID)
       .locator(`[data-testid^="${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}"]`)
       .filter({ visible: true });
-    await expect(tabs).toHaveCount(3);
+    await expect(tabs).toHaveCount(2);
     await expect(tabs.nth(0)).toHaveAttribute('data-testid', TAB_POR_ACONDICIONAR_TESTID);
     await expect(tabs.nth(0)).toHaveText(tabLabel('Por acondicionar'));
     await expect(tabs.nth(1)).toHaveAttribute('data-testid', TAB_ACONDICIONADOS_TESTID);
     await expect(tabs.nth(1)).toHaveText(tabLabel('Acondicionados'));
-    await expect(tabs.nth(2)).toHaveAttribute(
-      'data-testid',
-      `${ASSIGNMENT_VIEW_TAB_TESTID_PREFIX}acondicionados_entregados`,
-    );
-    await expect(tabs.nth(2)).toHaveText(tabLabel('Entregados'));
 
     // --- 2. «Por acondicionar»: A con su reparto entero y B con el nombre de quien lo acondiciona.
     await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -428,7 +425,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
     await expect(rowA).toHaveCount(1, { timeout: 60_000 });
     await expect(rowA.getByTestId(ORDER_DISTRIBUTION_FULL_TESTID)).toHaveText(
       exactText(
-        `${LINE_1_PACKAGES} × ${PACKAGING_1_NAME} / ${LINE_2_PACKAGES} × ${PACKAGING_2_NAME}`,
+        `${LINE_1_PACKAGES} × ${PACKAGING_1_NAME} · ${PRESENTATION_VOLUME} / ${LINE_2_PACKAGES} × ${PACKAGING_2_NAME} · ${PRESENTATION_VOLUME}`,
       ),
     );
     await expect(rowA.getByTestId(ROW_STATUS_TESTID)).toHaveAttribute('data-status', 'POR_ACONDICIONAR');
@@ -484,12 +481,21 @@ test.describe('las pestañas del acondicionador (R22)', () => {
     await expect(screenC).toBeVisible({ timeout: 60_000 });
     await expect(screenC.getByTestId(SCREEN_NUMBER_TESTID)).toHaveText(exactText(C.numberText));
     await expect(screenC.getByTestId(SCREEN_STATUS_TESTID)).toHaveAttribute('data-status', 'TERMINADO');
+
+    // --- 6. QC-301 R3: `?vista=acondicionados_entregados` aterriza en «Por acondicionar», sin pestaña de entregados.
+    await page.goto(`${ASSIGNED_ORDERS_ROUTE}?vista=acondicionados_entregados`);
+    await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId(CONDITIONED_SECTION_TESTID)).toHaveCount(0);
+    await expect(rowByNumber(page, A.numberText)).toHaveCount(1, { timeout: 60_000 });
+    await expect(rowByNumber(page, E.numberText)).toHaveCount(0);
+    await expect(tabs).toHaveCount(2);
   });
 });
 
 test.describe('quien no tiene acondicionamiento.modificar no ve las pestañas (R23)', () => {
+  // El Administrador no entra a `/asignacion` (no tiene `asignaciones.consultar`); ese corte lo
+  // cubre `e2e/pedidos-terminados.spec.ts`.
   const ROLES_WITHOUT_PERMISSION: ReadonlyArray<{ readonly role: string; readonly user: Credentials }> = [
-    { role: ROLE_ADMINISTRADOR, user: adminUser },
     { role: ROLE_OPERADOR, user: operatorUser },
     { role: ROLE_EMPACADOR, user: empacadorUser },
   ];
@@ -512,8 +518,6 @@ test.describe('quien no tiene acondicionamiento.modificar no ve las pestañas (R
       await page.goto(porAcondicionarUrl());
       await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
       await expect(page.getByTestId(TAB_POR_ACONDICIONAR_TESTID)).toHaveCount(0);
-      // Sin afirmar sobre la fila de A: el Administrador cae en «Todos», que lista los pedidos
-      // de la empresa en cualquier estado.
       await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toHaveCount(0);
 
       // --- 3. El detalle de un POR_ACONDICIONAR de su empresa responde el 404 de la zona privada.

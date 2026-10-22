@@ -84,10 +84,18 @@ function canQuote(
  * efecto. `orderId` solo lo pasa la edicion, para que el pedido cuente como disponible lo que el
  * mismo tiene apartado; el alta no lo envia.
  */
+export type OrderCostQuoteOptions = {
+  /** El estimado de un pedido comenzado ya no cambia: se pinta el guardado y no se cotiza. */
+  readonly frozen?: boolean;
+};
+
+function ignoreChange(): void {}
+
 export function useOrderCostQuote(
   initialAmount: string | null,
   orderId?: string,
   initialLines: readonly OrderDistributionLine[] = [],
+  { frozen = false }: OrderCostQuoteOptions = {},
 ): OrderCostQuoteHandlers {
   const [amount, setAmount] = useState<string | null>(initialAmount);
   const [quoting, setQuoting] = useState(false);
@@ -187,6 +195,16 @@ export function useOrderCostQuote(
     },
     [schedule],
   );
+
+  if (frozen) {
+    return {
+      state: { amount, quoting, error },
+      onRecipeChange: ignoreChange,
+      onQuantityChange: ignoreChange,
+      onUnitChange: ignoreChange,
+      onDistributionChange: ignoreChange,
+    };
+  }
 
   return {
     state: { amount, quoting, error },

@@ -9,7 +9,13 @@ import {
   finishPackingAction,
   startPackingAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-packing-actions';
-import { OrderNotPackableError, OrderPackingTakenError, UnauthorizedError } from '@/lib/modules/asignaciones';
+import {
+  OrderNotPackableError,
+  OrderPackingTakenError,
+  PackagingStockInsufficientError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/modules/asignaciones';
 
 const {
   getSessionUserMock,
@@ -152,6 +158,58 @@ describe('finishPackingAction — la confirmacion viaja en la URL de vuelta, no 
     const resultado = await finishPackingAction({ status: 'success' }, formDataConPedido(ORDER_ID));
 
     expect(resultado).toMatchObject({ status: 'error', code: 'unauthorized' });
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('finishPackingAction — conteo real de envases en `lines` (QC-281)', () => {
+  const LINEAS = [
+    { lineId: '9a1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38', packedPackages: 3, reason: null, reasonOther: null },
+    { lineId: '9b1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38', packedPackages: 1, reason: 'otro', reasonOther: 'Se cayo' },
+  ];
+
+  function formDataConLineas(lines: string | null): FormData {
+    const formData = formDataConPedido(ORDER_ID);
+    if (lines !== null) formData.append('lines', lines);
+    return formData;
+  }
+
+  it('R13: un FormData valido pasa `orderId` y `lines` parseado al caso de uso y redirige como hoy', async () => {
+    finishPackingMock.mockResolvedValue({ numberText: '2026-0000007' });
+
+    await expect(
+      finishPackingAction({ status: 'success' }, formDataConLineas(JSON.stringify(LINEAS))),
+    ).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(finishPackingMock).toHaveBeenCalledWith(
+      { id: 'user-1', companyId: 'company-1', permissions: ['empaque.modificar'] },
+      { orderId: ORDER_ID, lines: LINEAS },
+    );
+    expect(redirectMock).toHaveBeenCalledWith('/asignacion?vista=por_empacar&empacado=2026-0000007');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/asignacion');
+  });
+
+  it.each([
+    ['sin `lines`', null],
+    ['`lines` con JSON roto', '[{"lineId":'],
+  ])('R13: %s llega al caso de uso como `lines: undefined`; esta capa no decide', async (_caso, lines) => {
+    finishPackingMock.mockRejectedValue(new ValidationError());
+
+    const resultado = await finishPackingAction({ status: 'success' }, formDataConLineas(lines));
+
+    expect(finishPackingMock).toHaveBeenCalledWith(expect.anything(), { orderId: ORDER_ID, lines: undefined });
+    expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new PackagingStockInsufficientError(), 'packaging_stock_insufficient', 'No alcanza el stock del envase.'],
+  ] as const)('R13: el rechazo del servidor se traduce por su `code` %s y no redirige', async (error, code, message) => {
+    finishPackingMock.mockRejectedValue(error);
+
+    const resultado = await finishPackingAction({ status: 'success' }, formDataConLineas(JSON.stringify(LINEAS)));
+
+    expect(resultado).toMatchObject({ status: 'error', code, message });
     expect(redirectMock).not.toHaveBeenCalled();
   });
 });

@@ -46,5 +46,6 @@ tests/guards/guard-validador-equipo.test.ts
 tests/guards/guard-validador-estados.test.ts
 tests/guards/guard-unir-informes-vitest.test.ts
 tests/guards/guard-archivos-en-vuelo-sin-ruido.test.ts
+tests/guards/guard-hooks-anclados.test.ts
 tests/guards/guard-validador-tracker.test.ts
 tests/guards/guard-trello-cliente.test.ts

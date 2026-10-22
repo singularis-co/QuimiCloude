@@ -389,7 +389,9 @@ rechaza, se sube `execution-trace-format.ts` a `lib/shared/ui/`, que es hoja y p
 y ninguna ruta importa de otra. Se declara uno propio, **exhaustivo por tipo**
 (`Record<OrderStatus, string>`), con «En curso» para `EN_CURSO` (R3). Promover los tres a
 `components/shared/` tocaría dos rutas de otras fichas en vuelo: queda anotado como deuda, no se hace
-aquí.
+aquí. **Enmienda 2026-10-16 (`440ff5b2`, #256):** el mapa ya es único (`lib/shared/ui/order-status.ts`,
+QC-256 R10) y `EN_CURSO` se lee «En fabricación»; el chip de actividad «En curso» de la fila se quitó
+(`0f135128`, R3 enmendado).
 
 **Formato de duración (R15, D17).** `formatTraceDuration(d)`:
 - **< 24 h**: `«1 h 05 min»`, `«12 min 30 s»`, `«45 s»`, `«0 s»` (una noche: `«15 h 20 min»`).

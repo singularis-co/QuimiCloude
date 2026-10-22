@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido con pasos de acondicionamiento</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}
+.resp{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.chg{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;color:var(--muted-fg)}
+.chg .old{text-decoration:line-through}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="dashboard" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div><a class="b b-out b-back" href="DashboardAcondicionamiento.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</a></div>
+        <div class="ph"><div class="ph-t"><h1 class="h1">Recorrido del pedido <span class="mono">2026-0000006</span></h1><p class="sub">Tramo de acondicionamiento. Producción y empaque siguen igual que hoy (QC-283).</p></div></div>
+
+        <section class="card fade" aria-labelledby="rp-an">
+          <div class="card-hd"><h2 id="rp-an" class="h2">Anotaciones del acondicionamiento</h2><span class="count">{{ count }}</span></div>
+          <ol class="tl">
+            <sc-for list="{{ events }}" as="e" hint-placeholder-count="8">
+              <li class="{{ e.cls }}" style="animation-delay: {{ e.delay }}ms">
+                <span class="ev-dot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ e.icon }}"></path></svg></span>
+                <div class="ev-body">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap"><span class="strong">{{ e.act }}</span><time class="mono cap">{{ e.time }}</time></div>
+                  <div class="rm-meta" style="align-items: center"><sc-if value="{{ e.hasPos }}" hint-placeholder-val="{{ true }}"><span>{{ e.pos }}</span></sc-if><span style="display: inline-flex; align-items: center; gap: 6px; color: var(--fg)"><span class="{{ e.avCls }}">{{ e.ini }}</span>{{ e.name }}</span></div>
+                  <sc-if value="{{ e.hasResp }}" hint-placeholder-val="{{ false }}">
+                    <div class="resp"><span class="lab">Responsables</span><sc-for list="{{ e.resp }}" as="r" hint-placeholder-count="2"><span class="person" style="min-height: 32px; font-size: 13px"><span class="{{ r.avCls }}">{{ r.ini }}</span>{{ r.name }}</span></sc-for></div>
+                  </sc-if>
+                  <sc-if value="{{ e.hasChg }}" hint-placeholder-val="{{ false }}">
+                    <div class="chg"><span>Antes:</span><span class="old">{{ e.before }}</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M5 12h14M13 6l6 6-6 6"></path></svg><span style="color: var(--fg)">{{ e.after }}</span></div>
+                  </sc-if>
+                  <sc-if value="{{ e.hasEv }}" hint-placeholder-val="{{ false }}"><p class="cap" style="margin: 0">{{ e.ev }}</p></sc-if>
+                </div>
+              </li>
+            </sc-for>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="dashboard" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const P = { LG: ['LG','av sm','Laura Gómez'], MS: ['MS','av sm c2','Mateo Sánchez'], VH: ['VH','av sm c3','Valentina Herrera'], SV: ['SV','av sm c4','Santiago Vargas'] };
+const I = {
+cstart: 'M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M12 11h4M12 16h4M8 11h.01M8 16h.01',
+fwd: 'M5 12h14M13 6l6 6-6 6',
+resp: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6',
+csave: 'M12 4v11M7 10l5 5 5-5M4 20h16',
+cend: 'M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 14l2 2 4-4'
+};
+const names = (ks) => ks.map((k) => P[k][2]).join(', ');
+const E = [
+{ cls: 'ev k-start', icon: I.cstart, act: 'Comenzar acondicionamiento', time: '02/10/2026 13:02', pos: 'Equipo: Laura Gómez, Mateo Sánchez, Valentina Herrera' },
+{ cls: 'ev', icon: I.fwd, act: 'Avanzar', time: '02/10/2026 13:10', pos: 'Paso 1 de 4' },
+{ cls: 'ev', icon: I.fwd, act: 'Avanzar', time: '02/10/2026 13:31', pos: 'Paso 2 de 4', resp: ['LG', 'SV'], ev: '2 fotos de evidencia' },
+{ cls: 'ev', icon: I.fwd, act: 'Avanzar', time: '02/10/2026 13:55', pos: 'Paso 3 de 4', resp: ['MS'] },
+{ cls: 'ev k-back', icon: I.resp, act: 'Cambio de responsables', time: '02/10/2026 14:02', pos: 'Paso 3 de 4', before: ['MS'], after: ['MS', 'VH'] },
+{ cls: 'ev', icon: I.fwd, act: 'Completar pasos', time: '02/10/2026 14:10', pos: 'Paso 4 de 4' },
+{ cls: 'ev', icon: I.csave, act: 'Guardado de datos de lote', time: '02/10/2026 14:26', pos: 'Lote L-2026-1043' },
+{ cls: 'ev k-end', icon: I.cend, act: 'Terminar acondicionamiento', time: '02/10/2026 15:10', pos: '' }
+];
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false }),
+count: String(E.length),
+events: E.map((e, i) => ({
+cls: e.cls, icon: e.icon, act: e.act, time: e.time, pos: e.pos, hasPos: !!e.pos,
+ini: P.SV[0], avCls: P.SV[1], name: P.SV[2],
+hasResp: !!e.resp, resp: (e.resp || []).map((k) => ({ ini: P[k][0], avCls: P[k][1], name: P[k][2] })),
+hasChg: !!e.before, before: e.before ? names(e.before) : '', after: e.after ? names(e.after) : '',
+hasEv: !!e.ev, ev: e.ev || '',
+delay: String(i * 40)
+}))
+};
+}
+}
+</script>
+</body>
+</html>

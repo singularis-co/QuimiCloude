@@ -217,34 +217,6 @@ export function calculateIngredientsCost(input: CostInput): string | null {
   return formatFixedOutputScale(roundedOutput)
 }
 
-/**
- * Costo de los ingredientes de un LOTE de producto terminado: recorre las mismas
- * lineas con `calculateLineCost`, pero un ingrediente sin costo cuenta como CERO en vez de
- * invalidar el total entero -a diferencia de `calculateIngredientsCost`, que esta funcion no
- * toca-. Una receta sin lineas, o en la que ningun ingrediente tiene costo, da `'0.0000'`:
- * nunca `null`, porque el lote SIEMPRE entra con un costo unitario.
- */
-export function calculateLotIngredientsCost(input: CostInput): string {
-  if (input.lines.length === 0) {
-    return '0.0000'
-  }
-
-  let totalInternal = ZERO
-  for (const line of input.lines) {
-    const lineCostInternal = calculateLineCost(line, input)
-    if (lineCostInternal !== null) {
-      totalInternal += lineCostInternal
-    }
-  }
-
-  const roundedOutput = roundHalfUpToOutputScale(totalInternal)
-  if (roundedOutput > MAX_OUTPUT_UNSCALED) {
-    throw new Error('calculateLotIngredientsCost: el costo del lote desborda decimal(14,4)')
-  }
-
-  return formatFixedOutputScale(roundedOutput)
-}
-
 /** Un envase del reparto y cuantos lleva. */
 export type PackagingCostLine = {
   readonly productId: ProductId
@@ -252,12 +224,10 @@ export type PackagingCostLine = {
 }
 
 /** Costo (escalado a `INTERNAL_SCALE`) de un envase: sus envases por el promedio simple del
- *  costo de sus lotes. `null` si no tiene lotes o, con `requireCoverage`, si su disponible no
- *  alcanza. */
+ *  costo de sus lotes. `null` si no tiene lotes o si su disponible no alcanza. */
 function calculatePackagingLineCost(
   line: PackagingCostLine,
   batches: readonly PackagingCostingBatch[],
-  requireCoverage: boolean,
 ): bigint | null {
   let coveredInternal = ZERO
   const unitCostsInternal: bigint[] = []
@@ -273,7 +243,7 @@ function calculatePackagingLineCost(
 
   if (unitCostsInternal.length === 0) return null
   const packagesInternal = BigInt(line.packages) * pow10(INTERNAL_SCALE)
-  if (requireCoverage && coveredInternal < packagesInternal) return null
+  if (coveredInternal < packagesInternal) return null
   return multiplyInternal(averageInternal(unitCostsInternal), packagesInternal)
 }
 
@@ -285,29 +255,12 @@ export function calculatePackagingCost(
 ): string | null {
   let totalInternal = ZERO
   for (const line of lines) {
-    const lineCostInternal = calculatePackagingLineCost(line, batches, true)
+    const lineCostInternal = calculatePackagingLineCost(line, batches)
     if (lineCostInternal === null) return null
     totalInternal += lineCostInternal
   }
   const roundedOutput = roundHalfUpToOutputScale(totalInternal)
   if (roundedOutput > MAX_OUTPUT_UNSCALED) return null
-  return formatFixedOutputScale(roundedOutput)
-}
-
-/** Lo mismo para el lote de producto terminado: un envase sin lote con costo cuenta cero, como
- *  un ingrediente sin costo en `calculateLotIngredientsCost`. Nunca `null`. */
-export function calculateLotPackagingCost(
-  lines: readonly PackagingCostLine[],
-  batches: readonly PackagingCostingBatch[],
-): string {
-  let totalInternal = ZERO
-  for (const line of lines) {
-    totalInternal += calculatePackagingLineCost(line, batches, false) ?? ZERO
-  }
-  const roundedOutput = roundHalfUpToOutputScale(totalInternal)
-  if (roundedOutput > MAX_OUTPUT_UNSCALED) {
-    throw new Error('calculateLotPackagingCost: el costo del lote desborda decimal(14,4)')
-  }
   return formatFixedOutputScale(roundedOutput)
 }
 

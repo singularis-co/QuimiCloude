@@ -19,7 +19,7 @@ import {
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import type { ImportCells } from '@/lib/modules/inventario';
 
-const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar', 'unidades.modificar'] };
+const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar', 'unidades.modificar'], addons: ['importacion_excel'] };
 
 function build(rows: readonly Partial<ImportCells>[], state: Parameters<typeof fakeReadPorts>[0] = {}) {
   const ports = fakeReadPorts(state);
@@ -57,7 +57,7 @@ describe('previewInventoryImport — resultado', () => {
     const existing = productRef({ id: 'p-sal', nameNormalized: 'salfina', unitId: KG.id });
     const { preview, imports } = build(
       [ROW_INSUMO, { ...ROW_INSUMO, lot: 'L-1' }, ROW_ENVASE, ROW_INSTRUMENTO, ROW_TERMINADO, { ...ROW_INSUMO, stock: 'x' }],
-      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal' }] },
+      { products: [existing], batches: [{ lot: 'L-1', productId: 'p-sal', presentationId: null }] },
     );
 
     const outcome = await preview(CSV_FILE, ADMIN);

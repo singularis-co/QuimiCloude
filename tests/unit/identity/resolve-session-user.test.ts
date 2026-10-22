@@ -11,6 +11,7 @@ import type { ResolveSessionDeps } from '@/lib/modules/identity/domain/resolve-s
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionReader } from '@/lib/modules/identity/ports/session-reader';
 import type { SessionUserReader, SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS } from '@/lib/modules/identity';
 
 const SUB = '3f2b1c9e-0d4a-4c8b-9e77-2a5f6c1d8b40';
 const AHORA = new Date('2026-09-01T10:00:00.000Z');
@@ -56,6 +57,7 @@ const RECORD: SessionUserRecord = {
   roleName: 'operador',
   companyId: COMPANY_ID,
   companyDeletedAt: null,
+  companyAddons: [...ADDONS],
   // QC-74 T8 (R7, R11): el record trae los permisos del rol, leidos en la MISMA consulta. Van a
   // proposito en un orden que no es el alfabetico y con dos modulos distintos: asi un `sort()`
   // o una deduplicacion metida de contrabando en el camino se ve en el `toEqual`.
@@ -170,9 +172,10 @@ describe('createResolveSessionUser', () => {
       roleName: 'operador',
       // QC-74 T8: `permissions` es campo del `SessionUser` desde esta ficha.
       permissions: ['recetas.modificar', 'inventario.consultar'],
+      addons: [...ADDONS],
     });
     expect(Object.keys(resultado ?? {}).sort()).toEqual(
-      ['displayName', 'id', 'permissions', 'roleName', 'username'].sort(),
+      ['addons', 'displayName', 'id', 'permissions', 'roleName', 'username'].sort(),
     );
   });
 

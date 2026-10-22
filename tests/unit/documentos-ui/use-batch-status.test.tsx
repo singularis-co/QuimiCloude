@@ -17,6 +17,7 @@ vi.mock('@/lib/modules/documentos/adapters/driving/document-upload-actions', () 
 }));
 
 import { BATCH_STATUS_POLL_INTERVAL_MS, useBatchStatus } from '@/components/shared/document-upload';
+import { resetBatchStatusStore } from '@/components/shared/document-upload/batch-status-store';
 
 import { batch, entry } from './helpers';
 
@@ -31,6 +32,7 @@ async function avanzar(ms: number): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers();
   getBatchStatusActionMock.mockReset();
+  resetBatchStatusStore();
 });
 
 afterEach(() => {

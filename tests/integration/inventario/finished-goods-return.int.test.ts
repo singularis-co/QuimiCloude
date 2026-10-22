@@ -69,7 +69,7 @@ type Tenant = {
   readonly productId: string
 }
 
-/** Empresa con usuario, cliente, receta, presentacion, pedido, producto terminado y una entrega. */
+/** Empresa con usuario, receta, presentacion, pedido, producto terminado y una entrega. */
 async function createTenant(db: Db, label: string): Promise<Tenant> {
   const marca = token()
   const name = `Empresa ${label} ${marca}`
@@ -97,18 +97,6 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
       username: `ana.${marca}`,
       passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
       roleId,
-      companyId,
-    },
-    select: { id: true },
-  })
-  const { id: customerId } = await db.customer.create({
-    data: {
-      firstNames: 'Luis',
-      firstNamesNormalized: 'luis',
-      lastNames: 'Rojas',
-      lastNamesNormalized: 'rojas',
-      city: 'Cali',
-      cityNormalized: 'cali',
       companyId,
     },
     select: { id: true },
@@ -145,7 +133,8 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
     select: { id: true },
   })
   const { id: deliveryId } = await db.orderDelivery.create({
-    data: { companyId, orderId, customerId, deliveryKey: randomUUID(), createdBy: userId },
+    // 2026-10-15: la entrega ya no lleva cliente (va en sus lineas), y esta devolucion no lee lineas.
+    data: { companyId, orderId, deliveryKey: randomUUID(), createdBy: userId },
     select: { id: true },
   })
   return { companyId, userId, roleId, documentTypeCode, unitId, orderId, deliveryId, presentationId, productId }
@@ -306,6 +295,38 @@ describe('returnFinishedGoods contra Postgres real', () => {
     })
   })
 
+  // 2026-10-15: las lineas pueden repetir lote (una por cliente); el lote recibe la suma una vez.
+  it('R42: un lote repetido entre lineas de dos clientes recibe la suma en un incremento y un solo asiento', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const lote1 = await createBatch(tx, a, '5.0000')
+      const lote2 = await createBatch(tx, a, '0.0000')
+      const voidId = await createVoid(tx, a)
+
+      const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid(
+        returnInput(a, voidId, [
+          { batchId: lote1.id, quantity: '15.0000' },
+          { batchId: lote2.id, quantity: '2.5000' },
+          { batchId: lote1.id, quantity: '20.0000' },
+        ]),
+      )
+
+      expect(outcome).toEqual({ kind: 'returned' })
+      expect(await stockOf(tx, lote1.id)).toBe('40.0000')
+      expect(await stockOf(tx, lote2.id)).toBe('2.5000')
+      expect(await productStockOf(tx, a.productId)).toBe('42.5000')
+      const asientos = await tx.inventoryMovement.findMany({
+        where: { orderDeliveryVoidId: voidId },
+        orderBy: { quantity: 'desc' },
+        select: { batchId: true, kind: true, quantity: true },
+      })
+      expect(asientos.map((m) => [m.batchId, m.kind, m.quantity.toFixed(4)])).toEqual([
+        [lote1.id, 'delivery_void', '35.0000'],
+        [lote2.id, 'delivery_void', '2.5000'],
+      ])
+    })
+  })
+
   it('R31: el producto dado de baja recupera igual sus envases y su existencia se recalcula', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
@@ -381,5 +402,172 @@ describe('batchLotDirectoryPrisma.findLots y el historial del lote, sobre filas 
     } finally {
       for (const t of tenants) await dropTenant(t)
     }
+  })
+
+  it('QC-284 R12: con dos lotes que comparten codigo, la devolucion vuelve solo al lote de origen y findLots da el codigo de cada uno', async () => {
+    const tenants: Tenant[] = []
+    try {
+      const a = await createTenant(prisma, 'A')
+      tenants.push(a)
+      const marca = token()
+      const otraPresentacion = await prisma.presentation.create({
+        data: { name: `Otra ${marca}`, nameNormalized: `otra${marca}`, unitId: a.unitId, companyId: a.companyId },
+        select: { id: true },
+      })
+      const recipe = await prisma.product.findUniqueOrThrow({ where: { id: a.productId }, select: { recipeId: true } })
+      const otroProducto = await prisma.product.create({
+        data: {
+          name: `Terminado otro ${marca}`,
+          nameNormalized: `terminadootro${marca}`,
+          type: 'FINISHED_PRODUCT',
+          unitId: a.unitId,
+          recipeId: recipe.recipeId,
+          presentationId: otraPresentacion.id,
+          companyId: a.companyId,
+        },
+        select: { id: true },
+      })
+      const codigo = `CR-${marca.slice(0, 10)}`
+      const nuevoLote = (productId: string, presentationId: string, stock: string) =>
+        prisma.productBatch.create({
+          data: {
+            productId,
+            presentationId,
+            stock: new Prisma.Decimal(stock),
+            unitCost: new Prisma.Decimal('1.0000'),
+            packageContent: new Prisma.Decimal('5.0000'),
+            lot: codigo,
+            purchaseDate: new Date('2026-09-01T00:00:00Z'),
+            companyId: a.companyId,
+          },
+          select: { id: true },
+        })
+      const origen = await nuevoLote(a.productId, a.presentationId, '1.0000')
+      const otro = await nuevoLote(otroProducto.id, otraPresentacion.id, '6.0000')
+      const voidId = await createVoid(prisma, a)
+
+      const outcome = await prisma.$transaction((tx) =>
+        createFinishedGoodsReturn(tx).returnForDeliveryVoid(
+          returnInput(a, voidId, [{ batchId: origen.id, quantity: '3.0000' }]),
+        ),
+      )
+
+      expect(outcome).toEqual({ kind: 'returned' })
+      expect(await stockOf(prisma, origen.id)).toBe('4.0000')
+      expect(await stockOf(prisma, otro.id)).toBe('6.0000')
+      // Sembrado sin recalcular: si la devolucion tocara el otro producto, su existencia dejaria de ser 0.
+      expect(await productStockOf(prisma, otroProducto.id)).toBe('0.0000')
+      expect(await prisma.inventoryMovement.count({ where: { batchId: otro.id } })).toBe(0)
+      expect(
+        await prisma.inventoryMovement.findMany({ where: { orderDeliveryVoidId: voidId }, select: { batchId: true } }),
+      ).toEqual([{ batchId: origen.id }])
+
+      const lots = await batchLotDirectoryPrisma.findLots([origen.id, otro.id], a.companyId)
+      expect(new Map(lots)).toEqual(
+        new Map([
+          [origen.id, codigo],
+          [otro.id, codigo],
+        ]),
+      )
+    } finally {
+      for (const t of tenants) await dropTenant(t)
+    }
+  })
+})
+
+// 2026-10-16 (QC-288): la anulacion de una entrega sin pedido devuelve igual, con orderId nulo y
+// asiento direct_delivery_void, aunque el producto este dado de baja.
+async function createDirectVoid(db: Db, t: Tenant): Promise<string> {
+  const { id: deliveryId } = await db.orderDelivery.create({
+    data: { companyId: t.companyId, productId: t.productId, deliveryKey: randomUUID(), createdBy: t.userId },
+    select: { id: true },
+  })
+  const { id } = await db.orderDeliveryVoid.create({
+    data: {
+      companyId: t.companyId,
+      deliveryId,
+      voidKey: randomUUID(),
+      reason: 'Cliente devolvio la entrega',
+      createdBy: t.userId,
+    },
+    select: { id: true },
+  })
+  return id
+}
+
+describe('returnFinishedGoods con orderId nulo contra Postgres real', () => {
+  it('R50: un asiento direct_delivery_void por lote con la suma en positivo, la anulacion, el autor, sin pedido ni motivo, y products.stock recalculado', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const lote1 = await createBatch(tx, a, '5.0000')
+      const lote2 = await createBatch(tx, a, '0.0000')
+      const voidId = await createDirectVoid(tx, a)
+      const now = new Date('2026-10-16T15:30:00.000Z')
+
+      const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
+        ...returnInput(a, voidId, [
+          { batchId: lote1.id, quantity: '15.0000' },
+          { batchId: lote2.id, quantity: '2.5000' },
+          { batchId: lote1.id, quantity: '5.0000' },
+        ]),
+        orderId: null,
+        now,
+      })
+
+      expect(outcome).toEqual({ kind: 'returned' })
+      expect(await stockOf(tx, lote1.id)).toBe('25.0000')
+      expect(await stockOf(tx, lote2.id)).toBe('2.5000')
+      expect(await productStockOf(tx, a.productId)).toBe('27.5000')
+      const asientos = await tx.inventoryMovement.findMany({
+        where: { orderDeliveryVoidId: voidId },
+        orderBy: { quantity: 'desc' },
+        select: { batchId: true, kind: true, quantity: true, orderId: true, reason: true, createdBy: true, createdAt: true },
+      })
+      expect(
+        asientos.map((m) => [m.batchId, m.kind, m.quantity.toFixed(4), m.orderId, m.reason, m.createdBy, m.createdAt.toISOString()]),
+      ).toEqual([
+        [lote1.id, 'direct_delivery_void', '20.0000', null, null, a.userId, now.toISOString()],
+        [lote2.id, 'direct_delivery_void', '2.5000', null, null, a.userId, now.toISOString()],
+      ])
+    })
+  })
+
+  it('R50: el producto dado de baja recupera igual sus envases y su existencia se recalcula', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const lote = await createBatch(tx, a, '1.0000')
+      const voidId = await createDirectVoid(tx, a)
+      await tx.product.update({ where: { id: a.productId }, data: { deletedAt: new Date() } })
+
+      const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
+        ...returnInput(a, voidId, [{ batchId: lote.id, quantity: '4.0000' }]),
+        orderId: null,
+      })
+
+      expect(outcome).toEqual({ kind: 'returned' })
+      expect(await stockOf(tx, lote.id)).toBe('5.0000')
+      expect(await productStockOf(tx, a.productId)).toBe('5.0000')
+      expect(await tx.inventoryMovement.count({ where: { batchId: lote.id, kind: 'direct_delivery_void' } })).toBe(1)
+      const product = await tx.product.findUniqueOrThrow({ where: { id: a.productId }, select: { deletedAt: true } })
+      expect(product.deletedAt).not.toBeNull()
+    })
+  })
+
+  it('R50: un lote de la empresa B da batch_not_found y no toca nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const b = await createTenant(tx, 'B')
+      const loteB = await createBatch(tx, b, '20.0000')
+      const voidId = await createDirectVoid(tx, a)
+
+      const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
+        ...returnInput(a, voidId, [{ batchId: loteB.id, quantity: '5.0000' }]),
+        orderId: null,
+      })
+
+      expect(outcome).toEqual({ kind: 'batch_not_found', batchId: loteB.id })
+      expect(await stockOf(tx, loteB.id)).toBe('20.0000')
+      expect(await tx.inventoryMovement.count({ where: { orderDeliveryVoidId: voidId } })).toBe(0)
+    })
   })
 })

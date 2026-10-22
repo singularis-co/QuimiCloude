@@ -4,10 +4,11 @@ import { startTransition, useActionState, useEffect, useId, useState, type FormE
 import { toast } from 'sonner';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
+import { Notice } from '@/components/shared/notice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { ConditioningBatchLineView } from '@/lib/modules/asignaciones';
+import type { ConditioningBatchForm } from '@/lib/modules/asignaciones';
 import {
   saveConditioningBatchDataAction,
   type SaveConditioningBatchDataResult,
@@ -15,15 +16,13 @@ import {
 
 export const CONDITIONING_BATCH_DATA_SECTION_TESTID = 'conditioning-batch-data';
 export const CONDITIONING_BATCH_DATA_FORM_TESTID = 'conditioning-batch-data-form';
-export const CONDITIONING_BATCH_DATA_LINE_TESTID = 'conditioning-batch-data-line';
-export const CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID = 'conditioning-batch-data-provisional';
+export const CONDITIONING_BATCH_DATA_DIVERGENT_TESTID = 'conditioning-batch-data-divergent';
 export const CONDITIONING_BATCH_DATA_SUBMIT_TESTID = 'conditioning-batch-data-submit';
 export const CONDITIONING_BATCH_DATA_ERROR_TESTID = 'conditioning-batch-data-error';
+export const CONDITIONING_BATCH_DATA_LOCKED_TESTID = 'conditioning-batch-data-locked';
 
-/** Los nombres que lee la acción, emparejados por posición. */
 export const CONDITIONING_BATCH_DATA_FIELDS = {
   orderId: 'orderId',
-  batchId: 'batchId',
   lot: 'lot',
   expiryDate: 'expiryDate',
   productionDate: 'productionDate',
@@ -35,38 +34,55 @@ export const CONDITIONING_BATCH_DATA_TEXTS = {
   expiryDate: 'Vencimiento',
   productionDate: 'Día de producción',
   submit: 'Guardar datos de lote',
+  locked: 'Al completar los pasos',
   saved: 'Datos de lote guardados.',
-  provisional: (lot: string) => `Lote provisional: ${lot}.`,
+  divergentTitle: 'Hoy las líneas tienen lotes distintos.',
+  divergentClosing: 'Al guardar, el lote, el vencimiento y el día de producción pasan a todas las líneas.',
+  noLot: 'sin lote',
+  divergentLine: (label: string, lot: string) => `${label}: ${lot}`,
 } as const;
+
+type FieldName = 'lot' | 'expiryDate' | 'productionDate';
+
+type Values = Readonly<Record<FieldName, string>>;
 
 const FIELD_CLASS = 'min-h-11 text-base md:text-base';
 
-type LineValues = { readonly lot: string; readonly expiryDate: string; readonly productionDate: string };
-
 const INITIAL_STATE: SaveConditioningBatchDataResult = { status: 'idle' };
 
-/** `label` llega ya escrita como en el reparto: la compone la pantalla de servidor. */
-export type ConditioningBatchFormLine = ConditioningBatchLineView & { readonly label: string };
+const CULPRIT_BY_CODE: Readonly<Partial<Record<string, FieldName>>> = {
+  batch_duplicate_lot: 'lot',
+  batch_expiry_not_future: 'expiryDate',
+  batch_production_date_future: 'productionDate',
+};
 
-function initialValues(lines: readonly ConditioningBatchFormLine[]): LineValues[] {
-  return lines.map((line) => ({
-    lot: line.lot ?? '',
-    expiryDate: line.expiryDate ?? '',
-    productionDate: line.productionDate ?? '',
-  }));
+function initialValues(form: ConditioningBatchForm): Values {
+  if (form.kind === 'shared') {
+    return { lot: form.lot, expiryDate: form.expiryDate, productionDate: form.productionDate };
+  }
+  return { lot: '', expiryDate: '', productionDate: '' };
 }
 
 export type ConditioningBatchDataFormProps = {
   readonly orderId: string;
-  /** En orden de alta. */
-  readonly lines: readonly ConditioningBatchFormLine[];
+  readonly form: ConditioningBatchForm;
+  /** Cada línea ya escrita como en el reparto, por `presentationId`; la compone la pantalla de servidor. */
+  readonly divergentLabels: Readonly<Record<string, string>>;
+  /** Campos y botón deshabilitados hasta completar los pasos de acondicionamiento. */
+  readonly locked?: boolean;
 };
 
-export function ConditioningBatchDataForm({ orderId, lines }: ConditioningBatchDataFormProps) {
+export function ConditioningBatchDataForm({
+  orderId,
+  form,
+  divergentLabels,
+  locked = false,
+}: ConditioningBatchDataFormProps) {
   const baseId = useId();
   const headingId = `${baseId}-heading`;
   const errorId = `${baseId}-error`;
-  const [values, setValues] = useState<LineValues[]>(() => initialValues(lines));
+  const lockedId = `${baseId}-locked`;
+  const [values, setValues] = useState<Values>(() => initialValues(form));
   const [state, formAction, isPending] = useActionState(saveConditioningBatchDataAction, INITIAL_STATE);
 
   // Cada envío devuelve un estado nuevo: un toast por guardado, sobre el `<Toaster/>` del layout privado.
@@ -76,11 +92,8 @@ export function ConditioningBatchDataForm({ orderId, lines }: ConditioningBatchD
   }, [state]);
 
   const error = state.status === 'error' ? state : undefined;
-  const culpritBatchId = error?.batchId;
-
-  function update(index: number, field: keyof LineValues, value: string): void {
-    setValues((current) => current.map((line, i) => (i === index ? { ...line, [field]: value } : line)));
-  }
+  const culprit = error === undefined ? undefined : CULPRIT_BY_CODE[error.code];
+  const disabled = form.kind === 'no_batches' || locked;
 
   // Sin el reinicio automático de `<form action>`: tras un rechazo, lo escrito se queda.
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
@@ -91,102 +104,83 @@ export function ConditioningBatchDataForm({ orderId, lines }: ConditioningBatchD
     });
   }
 
+  function field(name: FieldName, type: 'text' | 'date') {
+    const id = `${baseId}-${name}`;
+    const invalid = culprit === name;
+    return (
+      <div className="flex flex-col gap-1">
+        <Label htmlFor={id} className="text-base">
+          {CONDITIONING_BATCH_DATA_TEXTS[name]}
+        </Label>
+        <Input
+          id={id}
+          type={type}
+          name={CONDITIONING_BATCH_DATA_FIELDS[name]}
+          value={values[name]}
+          onChange={(event) => setValues((current) => ({ ...current, [name]: event.target.value }))}
+          required
+          disabled={disabled}
+          aria-invalid={invalid ? true : undefined}
+          aria-describedby={invalid ? errorId : locked ? lockedId : undefined}
+          className={FIELD_CLASS}
+        />
+      </div>
+    );
+  }
+
   return (
     <section
       aria-labelledby={headingId}
       className="flex flex-col gap-3"
       data-testid={CONDITIONING_BATCH_DATA_SECTION_TESTID}
     >
-      <h2 id={headingId} className="text-base font-medium">
-        {CONDITIONING_BATCH_DATA_TEXTS.title}
-      </h2>
+      {locked ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id={headingId} className="text-base font-medium">
+            {CONDITIONING_BATCH_DATA_TEXTS.title}
+          </h2>
+          <p id={lockedId} className="text-sm text-muted-foreground" data-testid={CONDITIONING_BATCH_DATA_LOCKED_TESTID}>
+            {CONDITIONING_BATCH_DATA_TEXTS.locked}
+          </p>
+        </div>
+      ) : (
+        <h2 id={headingId} className="text-base font-medium">
+          {CONDITIONING_BATCH_DATA_TEXTS.title}
+        </h2>
+      )}
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
+        className={locked ? 'flex flex-col gap-4 opacity-55' : 'flex flex-col gap-4'}
         data-testid={CONDITIONING_BATCH_DATA_FORM_TESTID}
+        data-locked={locked ? 'true' : undefined}
       >
         <input type="hidden" name={CONDITIONING_BATCH_DATA_FIELDS.orderId} value={orderId} />
 
-        {lines.map((line, index) => {
-          const lineValues = values[index] ?? { lot: '', expiryDate: '', productionDate: '' };
-          const invalid = line.batchId !== null && line.batchId === culpritBatchId;
-          // Sin lote de producción no hay nada que guardar: deshabilitado, no viaja en el envío.
-          const disabled = line.batchId === null;
-          const anyValue =
-            lineValues.lot !== '' || lineValues.expiryDate !== '' || lineValues.productionDate !== '';
-          const fieldId = (field: string) => `${baseId}-${index}-${field}`;
+        {form.kind === 'divergent' ? (
+          <Notice
+            tone="warning"
+            title={CONDITIONING_BATCH_DATA_TEXTS.divergentTitle}
+            testId={CONDITIONING_BATCH_DATA_DIVERGENT_TESTID}
+          >
+            <ul className="list-disc pl-5">
+              {form.lines.map((line) => (
+                <li key={line.presentationId}>
+                  {CONDITIONING_BATCH_DATA_TEXTS.divergentLine(
+                    divergentLabels[line.presentationId] ?? '',
+                    line.lot ?? CONDITIONING_BATCH_DATA_TEXTS.noLot,
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1">{CONDITIONING_BATCH_DATA_TEXTS.divergentClosing}</p>
+          </Notice>
+        ) : null}
 
-          return (
-            <fieldset
-              key={line.batchId ?? `${line.presentationId}-${index}`}
-              disabled={disabled}
-              aria-invalid={invalid ? true : undefined}
-              className="flex flex-col gap-3 rounded-lg border p-3 aria-invalid:border-destructive"
-              data-testid={CONDITIONING_BATCH_DATA_LINE_TESTID}
-              data-batch-id={line.batchId ?? undefined}
-            >
-              <legend className="px-1 text-base font-medium">{line.label}</legend>
-              {line.batchId === null ? null : (
-                <input type="hidden" name={CONDITIONING_BATCH_DATA_FIELDS.batchId} value={line.batchId} />
-              )}
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor={fieldId('lot')} className="text-base">
-                    {CONDITIONING_BATCH_DATA_TEXTS.lot}
-                  </Label>
-                  <Input
-                    id={fieldId('lot')}
-                    type="text"
-                    name={CONDITIONING_BATCH_DATA_FIELDS.lot}
-                    value={lineValues.lot}
-                    onChange={(event) => update(index, 'lot', event.target.value)}
-                    required={anyValue}
-                    aria-invalid={invalid ? true : undefined}
-                    aria-describedby={invalid ? errorId : undefined}
-                    className={FIELD_CLASS}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor={fieldId('expiry')} className="text-base">
-                    {CONDITIONING_BATCH_DATA_TEXTS.expiryDate}
-                  </Label>
-                  <Input
-                    id={fieldId('expiry')}
-                    type="date"
-                    name={CONDITIONING_BATCH_DATA_FIELDS.expiryDate}
-                    value={lineValues.expiryDate}
-                    onChange={(event) => update(index, 'expiryDate', event.target.value)}
-                    required={anyValue}
-                    aria-invalid={invalid ? true : undefined}
-                    aria-describedby={invalid ? errorId : undefined}
-                    className={FIELD_CLASS}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor={fieldId('production')} className="text-base">
-                    {CONDITIONING_BATCH_DATA_TEXTS.productionDate}
-                  </Label>
-                  <Input
-                    id={fieldId('production')}
-                    type="date"
-                    name={CONDITIONING_BATCH_DATA_FIELDS.productionDate}
-                    value={lineValues.productionDate}
-                    onChange={(event) => update(index, 'productionDate', event.target.value)}
-                    required={anyValue}
-                    aria-invalid={invalid ? true : undefined}
-                    aria-describedby={invalid ? errorId : undefined}
-                    className={FIELD_CLASS}
-                  />
-                </div>
-              </div>
-              {line.provisionalLot === null ? null : (
-                <p className="text-base text-muted-foreground" data-testid={CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID}>
-                  {CONDITIONING_BATCH_DATA_TEXTS.provisional(line.provisionalLot)}
-                </p>
-              )}
-            </fieldset>
-          );
-        })}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {field('lot', 'text')}
+          {field('expiryDate', 'date')}
+          {field('productionDate', 'date')}
+        </div>
 
         {error === undefined ? null : (
           <ErrorAlert
@@ -202,8 +196,9 @@ export function ConditioningBatchDataForm({ orderId, lines }: ConditioningBatchD
           type="submit"
           touch
           className="w-fit"
-          disabled={isPending}
+          disabled={disabled || isPending}
           aria-busy={isPending}
+          aria-describedby={locked ? lockedId : undefined}
           data-testid={CONDITIONING_BATCH_DATA_SUBMIT_TESTID}
         >
           {CONDITIONING_BATCH_DATA_TEXTS.submit}

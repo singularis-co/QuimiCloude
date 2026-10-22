@@ -199,14 +199,14 @@ describe('R15 — los dos campos con su ojo', () => {
 });
 
 describe('R16 — la lista de requisitos se marca mientras se escribe', () => {
-  it('R16 — siete requisitos enlazados al campo y marcados en cada pulsación con texto accesible', async () => {
+  it('R16 — seis requisitos en vivo enlazados al campo y marcados en cada pulsación con texto accesible', async () => {
     const user = setupUser();
     await pintarPagina();
 
     const nueva = screen.getByTestId('set-credential-credential');
     const lista = document.getElementById('credential-requirements') as HTMLElement;
     expect(idsDescritos(nueva)).toContain('credential-requirements');
-    expect(within(lista).getAllByRole('listitem')).toHaveLength(7);
+    expect(within(lista).getAllByRole('listitem')).toHaveLength(6);
 
     await user.type(nueva, 'a');
     expect(estadosDeLaLista(lista)).toEqual(estadosEsperadosPara('a'));
@@ -219,15 +219,16 @@ describe('R16 — la lista de requisitos se marca mientras se escribe', () => {
   });
 });
 
-describe('R17 — «filtradas» queda pendiente', () => {
-  it('R17 — con las seis comprobables cumplidas, «filtradas» sigue pendiente', async () => {
+describe('R17 — «filtradas» no figura en la lista en vivo (enmienda QC-273)', () => {
+  it('R17 — con las seis comprobables cumplidas, la lista no muestra «filtradas»', async () => {
     const user = setupUser();
     await pintarPagina();
 
     await user.type(screen.getByTestId('set-credential-credential'), CANDIDATA_QUE_CUMPLE_LAS_SEIS);
-    const filtradas = document.querySelector('#credential-requirements [data-rule="breached"]');
-    expect(filtradas).toHaveAttribute('data-state', 'unknown');
-    expect(filtradas).toHaveTextContent(CREDENTIAL_RULE_LABELS.breached);
+    const lista = document.getElementById('credential-requirements') as HTMLElement;
+    expect(lista.querySelector('[data-rule="breached"]')).toBeNull();
+    expect(within(lista).queryByText(CREDENTIAL_RULE_LABELS.breached)).toBeNull();
+    expect(within(lista).getAllByRole('listitem')).toHaveLength(6);
   });
 });
 

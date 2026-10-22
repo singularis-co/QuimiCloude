@@ -36,10 +36,13 @@ export type TextFieldProps = {
    */
   readonly remountOnDefault?: boolean;
   readonly required?: boolean;
+  /** Valor que se ve, se enfoca y viaja en el `FormData`, pero no se edita (p. ej. un derivado). */
+  readonly readOnly?: boolean;
   readonly ariaRequired?: boolean;
   readonly inputMode?: HTMLAttributes<HTMLInputElement>['inputMode'];
   readonly autoComplete?: string;
   readonly maxLength?: number;
+  readonly placeholder?: string;
   readonly pattern?: string;
   readonly step?: string | number;
   readonly min?: string | number;
@@ -59,6 +62,11 @@ export type TextFieldProps = {
   readonly errorId?: string;
   readonly errorTestId?: string;
   readonly errorAlert?: boolean;
+  /**
+   * El error lo pinta el consumidor fuera del campo, p. ej. bajo una fila de controles: `error`
+   * solo marca el `input` como inválido y lo enlaza con `errorId`.
+   */
+  readonly errorOutside?: boolean;
   /** Va después del error. */
   readonly children?: ReactNode;
 };
@@ -80,10 +88,12 @@ export function TextField({
   onBlur,
   remountOnDefault = false,
   required,
+  readOnly,
   ariaRequired,
   inputMode,
   autoComplete,
   maxLength,
+  placeholder,
   pattern,
   step,
   min,
@@ -100,6 +110,7 @@ export function TextField({
   errorId = `${id}-error`,
   errorTestId,
   errorAlert = true,
+  errorOutside = false,
   children,
 }: TextFieldProps) {
   const controlled = value !== undefined;
@@ -125,8 +136,10 @@ export function TextField({
       inputMode={inputMode}
       autoComplete={autoComplete}
       required={required}
+      readOnly={readOnly}
       aria-required={ariaRequired}
       maxLength={maxLength}
+      placeholder={placeholder}
       pattern={pattern}
       step={step}
       min={min}
@@ -170,7 +183,9 @@ export function TextField({
         </p>
       ) : null}
 
-      <FieldError id={errorId} message={error} testId={errorTestId} alert={errorAlert} />
+      {errorOutside ? null : (
+        <FieldError id={errorId} message={error} testId={errorTestId} alert={errorAlert} />
+      )}
 
       {children}
     </div>

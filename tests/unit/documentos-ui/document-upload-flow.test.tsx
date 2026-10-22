@@ -125,6 +125,7 @@ describe('el camino de subida de una tanda', () => {
     expect(enqueueBatchActionMock).toHaveBeenCalledWith({
       strategy: 'formula',
       paths: uploads.map((upload) => upload.path),
+      names: ['uno.pdf', 'dos.pdf', 'tres.pdf'],
     });
   });
 
@@ -142,6 +143,7 @@ describe('el camino de subida de una tanda', () => {
     expect(enqueueBatchActionMock).toHaveBeenCalledWith({
       strategy: 'catalogo',
       paths: [uploads[0]?.path],
+      names: ['uno.pdf'],
     });
 
     expect(await screen.findByTestId(rowPhaseTestId(1))).toHaveAttribute('data-phase', 'failed');

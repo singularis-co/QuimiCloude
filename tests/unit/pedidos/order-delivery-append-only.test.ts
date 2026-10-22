@@ -11,6 +11,18 @@
 // rojo. Ademas, ningun camino modifica ni borra una anulacion ni sus lineas: `PRISMA_MUTANTE` y
 // `SQL_MUTANTE` cubren `orderDeliveryVoid`/`orderDeliveryVoidLine` y sus tablas
 // `order_delivery_voids`/`order_delivery_void_lines`. Las aserciones previas se conservan.
+//
+// QC-282 2026-10-15 (TC) — Verificado sin cambio: el `UPDATE "order_delivery_lines"` que copia el
+// cliente de la entrega a sus lineas vive en la migracion `order_delivery_lines_customer`, bajo
+// `db/migrations`, que este barrido no recorre (`CARPETAS` es `lib` y `app`).
+//
+// QC-288 2026-10-19 (TC) — La entrega sin pedido (R41) es una `order_deliveries` con `order_id`
+// nulo y se anula con la misma tabla de anulaciones: el barrido ya cubria sus tablas. Se admiten
+// exactamente DOS nombres `void…Deliver` mas, el caso de uso `createVoidDirectDelivery` y la Server
+// Action `voidDirectDeliveryAction`, que anulan insertando (design.md §4); cualquier otro nombre
+// sigue en rojo. Ademas, el adaptador `direct-delivery-prisma.ts` tiene que estar en el barrido y
+// solo leer o insertar. Las aserciones previas se conservan: los dos nombres de QC-224 siguen
+// admitidos y exportados una sola vez en `lib/`.
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -50,7 +62,12 @@ const NOMBRE_MUTANTE = /\bexport\s+(?:async\s+)?(?:function|const)\s+(\w*(?:upda
  * Los unicos nombres `void…Deliver` admitidos: el caso de uso y la Server Action que anulan una
  * entrega insertando la anulacion, sus lineas y el asiento que compensa. Ninguno modifica ni borra.
  */
-const NOMBRES_ADMITIDOS: ReadonlySet<string> = new Set(['createVoidDelivery', 'voidDeliveryAction'])
+const NOMBRES_ADMITIDOS_QC224 = ['createVoidDelivery', 'voidDeliveryAction'] as const
+
+/** QC-288 2026-10-19: la anulacion de una entrega sin pedido, que tambien solo inserta (R41, R50). */
+const NOMBRES_ADMITIDOS_QC288 = ['createVoidDirectDelivery', 'voidDirectDeliveryAction'] as const
+
+const NOMBRES_ADMITIDOS: ReadonlySet<string> = new Set([...NOMBRES_ADMITIDOS_QC224, ...NOMBRES_ADMITIDOS_QC288])
 
 /** Cada infraccion como `<archivo>: <texto>`, para que el rojo diga donde mirar. */
 function infracciones(nombre: string, fuente: string): string[] {
@@ -115,7 +132,14 @@ describe('la anulacion de una entrega es solo de insercion (R33)', () => {
   const relativa = (archivo: string): string => relative(RAIZ, archivo).replace(/\\/g, '/')
 
   it('R33: los dos nombres admitidos existen como export en lib/ y su archivo no modifica ni borra nada', () => {
-    expect([...NOMBRES_ADMITIDOS].sort()).toEqual(['createVoidDelivery', 'voidDeliveryAction'])
+    expect([...NOMBRES_ADMITIDOS_QC224].sort()).toEqual(['createVoidDelivery', 'voidDeliveryAction'])
+    // QC-288 2026-10-19: la lista se AMPLIA con dos nombres, cerrada: cuatro y solo cuatro.
+    expect([...NOMBRES_ADMITIDOS].sort()).toEqual([
+      'createVoidDelivery',
+      'createVoidDirectDelivery',
+      'voidDeliveryAction',
+      'voidDirectDeliveryAction',
+    ])
     for (const nombre of NOMBRES_ADMITIDOS) {
       const exportacion = new RegExp(`\\bexport\\s+(?:async\\s+)?(?:function|const)\\s+${nombre}\\b`)
       const donde = archivos.filter((archivo) => exportacion.test(soloCodigo(readFileSync(archivo, 'utf8'))))
@@ -162,5 +186,44 @@ describe('la anulacion de una entrega es solo de insercion (R33)', () => {
     ].join('\n')
 
     expect(infracciones('legitimo.ts', legitimo)).toEqual([])
+  })
+})
+
+describe('la entrega sin pedido es solo de insercion (QC-288 R41)', () => {
+  const archivos = CARPETAS.flatMap((carpeta) => fuentes(join(RAIZ, carpeta)))
+  const relativa = (archivo: string): string => relative(RAIZ, archivo).replace(/\\/g, '/')
+
+  it('R41: el adaptador de la entrega sin pedido esta en el barrido y solo lee o inserta', () => {
+    const adaptador = archivos.find((a) =>
+      a.endsWith(join('pedidos', 'adapters', 'driven', 'persistence', 'direct-delivery-prisma.ts')),
+    )
+    expect(adaptador, 'el adaptador de la entrega sin pedido tiene que estar en el barrido').toBeDefined()
+    const codigo = soloCodigo(readFileSync(adaptador as string, 'utf8'))
+    expect(codigo).toMatch(/\borderDelivery\s*\.\s*create\b/)
+    expect(codigo).toMatch(/\borderDeliveryLine\s*\.\s*createMany\b/)
+    expect(codigo).not.toMatch(/\.\s*(update|updateMany|delete|deleteMany|upsert)\s*\(/)
+    expect(infracciones('direct-delivery-prisma.ts', codigo)).toEqual([])
+  })
+
+  it('R41: los dos nombres de la anulacion sin pedido se exportan una sola vez en lib/ y su archivo no modifica ni borra nada', () => {
+    for (const nombre of NOMBRES_ADMITIDOS_QC288) {
+      const exportacion = new RegExp(`\\bexport\\s+(?:async\\s+)?(?:function|const)\\s+${nombre}\\b`)
+      const donde = archivos.filter((archivo) => exportacion.test(soloCodigo(readFileSync(archivo, 'utf8'))))
+      expect(donde.map(relativa), `${nombre} se exporta una sola vez`).toHaveLength(1)
+      const archivo = donde[0] as string
+      expect(relativa(archivo).startsWith('lib/'), `${nombre} vive en lib/`).toBe(true)
+      expect(infracciones(relativa(archivo), readFileSync(archivo, 'utf8'))).toEqual([])
+    }
+  })
+
+  it('R41: un tercer nombre que anule o borre una entrega sin pedido sigue en rojo (caso sintetico)', () => {
+    const sintetico = [
+      'export async function deleteDirectDeliveryAction(id: string) {}',
+      'export const updateDirectDelivery = async () => {}',
+      'export function voidDirectDeliveries(deps: Deps) {}',
+      'await tx.orderDelivery.update({ where: { id }, data: { orderId: null } })',
+    ].join('\n')
+
+    expect(infracciones('sintetico.ts', sintetico)).toHaveLength(4)
   })
 })

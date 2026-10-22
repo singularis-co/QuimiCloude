@@ -151,11 +151,11 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
     expect(screen.queryByTestId(NOTICE_TEST_ID)).not.toBeInTheDocument();
   });
 
-  it('(f) la línea de baja no deja añadir otra después: su `+` está deshabilitado', () => {
+  it('(f) una línea de baja no deja añadir otra: todos los `+` están deshabilitados', () => {
     render(<Harness initialLines={[unavailableLine('l1'), availableLine('l2', 'Glicerina')]} />);
 
     expect(screen.getByTestId('recipe-line-add-0')).toBeDisabled();
-    expect(screen.getByTestId('recipe-line-add-1')).toBeEnabled();
+    expect(screen.getByTestId('recipe-line-add-1')).toBeDisabled();
   });
 
   it('(e) el payload enviado sigue conteniendo la línea marcada, intacta (R21, R22)', () => {
@@ -175,6 +175,7 @@ describe('aviso y marcador de líneas con producto dado de baja', () => {
       tools: [],
       steps: [],
       packingSteps: [],
+      conditioningSteps: [],
       image: { kind: 'untouched' },
     });
 

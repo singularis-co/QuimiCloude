@@ -68,15 +68,33 @@ export {
   type ConditioningTeamListProps,
 } from './conditioning-team-list';
 export {
+  CONDITIONING_BATCH_DATA_DIVERGENT_TESTID,
   CONDITIONING_BATCH_DATA_ERROR_TESTID,
   CONDITIONING_BATCH_DATA_FIELDS,
   CONDITIONING_BATCH_DATA_FORM_TESTID,
-  CONDITIONING_BATCH_DATA_LINE_TESTID,
-  CONDITIONING_BATCH_DATA_PROVISIONAL_TESTID,
+  CONDITIONING_BATCH_DATA_LOCKED_TESTID,
   CONDITIONING_BATCH_DATA_SECTION_TESTID,
   CONDITIONING_BATCH_DATA_SUBMIT_TESTID,
   CONDITIONING_BATCH_DATA_TEXTS,
   ConditioningBatchDataForm,
   type ConditioningBatchDataFormProps,
-  type ConditioningBatchFormLine,
 } from './conditioning-batch-data-form';
+export {
+  CONDITIONING_STEPS_BACK_TESTID,
+  CONDITIONING_STEPS_DONE_TESTID,
+  CONDITIONING_STEPS_ERROR_TESTID,
+  CONDITIONING_STEPS_PANEL_TESTID,
+  CONDITIONING_STEPS_RESUMED_TESTID,
+  CONDITIONING_STEPS_TEXTS,
+  ConditioningStepsPanel,
+  type ConditioningStepsPanelProps,
+  type ConditioningStepsPanelView,
+} from './conditioning-steps-panel';
+export {
+  CONDITIONING_STEP_RESPONSIBLE_TESTID,
+  CONDITIONING_STEP_RESPONSIBLES_COUNT_TESTID,
+  CONDITIONING_STEP_RESPONSIBLES_TESTID,
+  CONDITIONING_STEP_RESPONSIBLES_TEXTS,
+  ConditioningStepResponsiblesPicker,
+  type ConditioningStepResponsiblesPickerProps,
+} from './conditioning-step-responsibles-picker';

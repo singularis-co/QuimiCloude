@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { ThemeToggle } from '../../components/theme-toggle';
 
 export type OperatorScreenFrameProps = {
-  readonly back?: { readonly href: string; readonly label: string; readonly testId: string };
+  readonly back?: OperatorScreenBack;
   readonly eyebrow: string;
   readonly eyebrowTestId?: string;
   readonly title: string;
@@ -19,7 +19,20 @@ export type OperatorScreenFrameProps = {
   readonly children: ReactNode;
 };
 
+export type OperatorScreenBack = {
+  readonly href: string;
+  readonly label: string;
+  readonly testId: string;
+  /** Pedido ya comenzado por quien lo mira: la vuelta se ve, pero no navega hasta terminarlo. */
+  readonly disabled?: boolean;
+};
+
 const CONTENT_WIDTH = 'mx-auto w-full max-w-[1064px]';
+
+/** Reserva del pie fijo de `StepReader` (`mode="ejecucion"`) en la columna lateral, solo con dos
+ *  columnas. Mismo `calc` que el `pb-[…]` de `step-reader.tsx`: lo vigila order-execution-screen.test.tsx. */
+export const STEP_READER_SIDE_COLUMN_RESERVE =
+  '@min-[1101px]:mb-[calc(140px+env(safe-area-inset-bottom,0px))]';
 
 /**
  * Marco de pantalla del operario: cabecera pegada arriba, pie fijo abajo y, entre ambos, el
@@ -80,7 +93,13 @@ export function OperatorScreenFrame({
           {back ? (
             <>
               <div className="flex items-center justify-between gap-3">
-                <ArrowLink href={back.href} direction="back" touch testId={back.testId}>
+                <ArrowLink
+                  href={back.href}
+                  direction="back"
+                  touch
+                  testId={back.testId}
+                  disabled={back.disabled}
+                >
                   {back.label}
                 </ArrowLink>
                 {controls}

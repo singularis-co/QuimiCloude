@@ -71,15 +71,15 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine } from './helpers/order-distribution';
+import { addPackagingLine, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
-import { exactProductNameCellText } from './helpers/product-name-cell';
-import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
+import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -292,12 +292,17 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
     { timeout: 60_000 },
   );
 
-  await page.getByTestId('order-form-submit').click();
+  // 50.5 en 50 envases de 1: queda sobrante y Guardar pregunta antes.
+  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
 
 /** Abre el panel de lotes del producto terminado del fixture, ya en la pestana correcta. */
-async function openFinishedGoodsBatchesPanel(page: Page, productName: string): Promise<Locator> {
+async function openFinishedGoodsBatchesPanel(
+  page: Page,
+  productName: string,
+  presentationName: string,
+): Promise<Locator> {
   await gotoSettled(page, inventoryUrl(SHARED_TOKEN));
   await expect(page.getByTestId('inventario-title')).toBeVisible({ timeout: 60_000 });
 
@@ -308,14 +313,15 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
     { timeout: 60_000 },
   );
 
-  // La pestana lista pedidos: el producto aparece al desplegar el pedido de la receta.
+  // La pestana lista pedidos: el producto aparece al desplegar el pedido de la receta. Se cuenta
+  // la fila: la tarjeta del pedido (oculta en una lista ancha) repite su nombre.
   const orderName = page
     .getByTestId(ORDER_GROUP_NAME_TESTID)
     .filter({ hasText: exactOrderGroupText(RECIPE_NAME) });
-  await expect(orderName).toHaveCount(1, { timeout: 60_000 });
   const orderRow = page
     .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
     .filter({ has: orderName });
+  await expect(orderRow).toHaveCount(1, { timeout: 60_000 });
   const toggle = orderRow.getByTestId(ORDER_GROUP_TOGGLE_TESTID);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -323,11 +329,8 @@ async function openFinishedGoodsBatchesPanel(page: Page, productName: string): P
   const nameCell = page
     .getByTestId(NAME_CELL_TESTID)
     .filter({ hasText: exactProductNameCellText(productName) });
-  await expect(nameCell).toHaveCount(1, { timeout: 60_000 });
-
-  const row = page
-    .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-    .filter({ has: nameCell });
+  const row = productRowByNameAndPresentation(page, nameCell, presentationName);
+  await expect(row).toHaveCount(1, { timeout: 60_000 });
   await (
     await openRowActionsMenuItem(page, row.getByTestId('product-row-actions'), 'product-batches-open')
   ).click();
@@ -656,11 +659,12 @@ test.describe('producto terminado', () => {
     await page.goto('about:blank');
     await page.context().clearCookies();
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
-    await clickAndConfirm(page, assignedRow.getByTestId('assigned-order-enter'), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, assignedRow.getByTestId('assigned-order-enter'));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), {
       timeout: 60_000,
     });
@@ -735,8 +739,9 @@ test.describe('producto terminado', () => {
     await page.context().clearCookies();
     await loginAndLand(page, adminUser);
 
-    let batchesSheet = await openFinishedGoodsBatchesPanel(page, finishedProductName);
-    const batchRow = batchesSheet.locator('[data-testid^="product-batch-"]').first();
+    let batchesSheet = await openFinishedGoodsBatchesPanel(page, RECIPE_NAME, PRESENTATION_NAME);
+    // La fila de la tabla de lotes: la tarjeta (oculta en un panel ancho) repite sus celdas.
+    const batchRow = batchesSheet.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`).first();
     await expect(batchRow.getByTestId('product-batch-quantity')).toContainText('50');
     await expect(batchRow.getByTestId('product-batch-packages')).toHaveText(EXPECTED_PACKAGES_LABEL);
 
@@ -744,15 +749,17 @@ test.describe('producto terminado', () => {
     // vigente de la presentacion.
     await setPresentationContent(page, PRESENTATION_CONTENT_CHANGED);
 
-    batchesSheet = await openFinishedGoodsBatchesPanel(page, finishedProductName);
-    const batchRowAfter = batchesSheet.locator('[data-testid^="product-batch-"]').first();
+    batchesSheet = await openFinishedGoodsBatchesPanel(page, RECIPE_NAME, PRESENTATION_NAME);
+    const batchRowAfter = batchesSheet.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`).first();
     await expect(batchRowAfter.getByTestId('product-batch-quantity')).toContainText('50');
     await expect(batchRowAfter.getByTestId('product-batch-packages')).toHaveText(
       EXPECTED_PACKAGES_LABEL,
     );
 
     // --- 7. El dialogo de ajuste del lote avisa que solo se admiten cantidades que restan.
-    await batchRowAfter.getByTestId('adjust-batch-open').click();
+    await (
+      await openRowActionsMenuItem(page, batchActionsTrigger(batchRowAfter), 'adjust-batch-open')
+    ).click();
     await expect(page.getByTestId('adjust-batch-dialog')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('adjust-batch-finished-product-notice')).toHaveText(
       'Solo se admiten ajustes que restan.',

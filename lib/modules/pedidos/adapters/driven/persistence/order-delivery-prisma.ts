@@ -16,12 +16,6 @@ type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
 type CreateOutcome = { readonly kind: 'created'; readonly id: string } | { readonly kind: 'duplicate_key' };
 
-/** El `INSERT` no escribe `id`, asi que el unico indice unico con el que puede chocar es el de la
- *  clave de entrega por empresa. El choque aborta la transaccion de quien llama. */
-function isDuplicateDeliveryKey(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-}
-
 /** Lee por el indice unico `(company_id, delivery_key)`: la empresa va en el `where`, asi que la
  *  clave de otra empresa no aparece. */
 async function findOrderDeliveryByKey(
@@ -36,6 +30,12 @@ async function findOrderDeliveryByKey(
   });
 }
 
+/** El `INSERT` no escribe `id`, asi que el unico indice unico con el que puede chocar es el de la
+ *  clave de entrega por empresa. El choque aborta la transaccion de quien llama. */
+function isDuplicateDeliveryKey(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+}
+
 async function createOrderDelivery(
   delivery: NewOrderDelivery,
   scope: OrderScope,
@@ -46,7 +46,6 @@ async function createOrderDelivery(
       data: {
         ...companyScopeColumns(scope),
         orderId: delivery.orderId,
-        customerId: delivery.customerId,
         deliveryKey: delivery.deliveryKey,
         createdBy: delivery.actorId,
         createdAt: delivery.now,
@@ -60,8 +59,8 @@ async function createOrderDelivery(
   }
 }
 
-/** La empresa de cada linea la fijan las claves foraneas compuestas: una entrega, una linea del
- *  reparto o un lote de otra empresa hacen fallar el `INSERT`. */
+/** La empresa de cada linea la fijan las claves foraneas compuestas: una entrega, un cliente, una
+ *  linea del reparto o un lote de otra empresa hacen fallar el `INSERT`. */
 async function addOrderDeliveryLines(
   deliveryId: string,
   lines: readonly NewOrderDeliveryLine[],
@@ -74,6 +73,7 @@ async function addOrderDeliveryLines(
     data: lines.map((line) => ({
       companyId,
       deliveryId,
+      customerId: line.customerId,
       orderPresentationLineId: line.presentationLineId,
       batchId: line.batchId,
       packages: line.packages,
@@ -94,7 +94,12 @@ async function sumOrderDeliveredPackages(
     where: { ...columns, delivery: { ...columns, orderId }, voidLine: null },
     _sum: { packages: true },
   });
-  return new Map(rows.map((row) => [row.orderPresentationLineId, row._sum.packages ?? 0]));
+  // Las lineas de una entrega de pedido siempre tienen linea del reparto: el disparador lo exige.
+  return new Map(
+    rows.flatMap((row) =>
+      row.orderPresentationLineId === null ? [] : [[row.orderPresentationLineId, row._sum.packages ?? 0] as const],
+    ),
+  );
 }
 
 /** Sobre el cliente global para la lectura del sheet, o sobre el `tx` de la entrega. Sin `update`,

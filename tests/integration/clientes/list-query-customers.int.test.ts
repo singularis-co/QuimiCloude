@@ -29,7 +29,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { CustomerScope } from '@/lib/modules/clientes/domain/customer-scope';
 import type { ListFilterValue, ListQuery } from '@/lib/modules/clientes/domain/list-query';
-import type { NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
+import type { CustomerPhoneColumns, NewCustomer } from '@/lib/modules/clientes/domain/customer-view';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -46,7 +46,9 @@ type CustomerOverrides = Partial<{
   deletedAt: Date | null;
 }>;
 
-function customerInput(overrides: CustomerOverrides = {}): NewCustomer {
+function customerInput(
+  overrides: CustomerOverrides = {},
+): NewCustomer & { readonly phone: CustomerPhoneColumns } {
   const firstNames = overrides.firstNames ?? `Nombre ${MARCA}`;
   const lastNames = overrides.lastNames ?? `Apellido ${MARCA}`;
   const city = overrides.city ?? `Ciudad ${MARCA}`;
@@ -57,7 +59,7 @@ function customerInput(overrides: CustomerOverrides = {}): NewCustomer {
     lastNamesNormalized: normalizeCustomerText(lastNames),
     city,
     cityNormalized: normalizeCustomerText(city),
-    phone: null,
+    phone: { phone: null, phoneCountry: null, phoneE164: null, phoneIssue: null },
     email: null,
     address: null,
   };
@@ -135,6 +137,7 @@ async function sembrar(
   const ids: string[] = [];
   for (const semilla of semillas) {
     const created = await createCustomer(
+      prisma,
       customerInput(semilla),
       actorId,
       semilla.createdAt ?? new Date('2026-01-01T00:00:00Z'),
@@ -201,15 +204,18 @@ describe('R26: pagina por defecto y tope de 25', () => {
   });
 });
 
-describe('R29: sin orden pedido ordena por apellidos y nombres, y el recorrido de paginas no repite ni omite, con empates', () => {
-  it('R29 — sin orden pedido ordena por apellidos y nombres y recorre las paginas sin repetir ni omitir', async () => {
+describe('R29: sin orden pedido van los mas nuevos primero (QC-289), y el recorrido de paginas no repite ni omite, con empates', () => {
+  it('R29 — sin orden pedido ordena por created_at DESC (QC-289) y recorre las paginas sin repetir ni omitir', async () => {
     const marca = `r29${token().slice(0, 8)}`;
+    // `created_at` creciente con el apellido: el orden por defecto (mas nuevos primero) es el
+    // INVERSO del alfabetico, asi que este caso distingue un orden del otro.
     const ids = await sembrar(
       empresaA.actorId,
       empresaA.scope,
       Array.from({ length: 12 }, (_, i) => ({
         firstNames: `Nombre ${MARCA} ${marca}`,
         lastNames: `Apellido ${MARCA} ${marca} ${String(i).padStart(2, '0')}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)),
       })),
     );
     const sembrados = new Set(ids);
@@ -231,12 +237,13 @@ describe('R29: sin orden pedido ordena por apellidos y nombres, y el recorrido d
     const esperado = await prisma.customer.findMany({
       where: { id: { in: ids } },
       select: { id: true },
-      orderBy: [{ lastNames: 'asc' }, { firstNames: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
     expect(mios).toEqual(esperado.map((c) => c.id));
+    expect(mios).toEqual([...ids].reverse());
   });
 
-  it('cuatro filas empatadas en apellidos y nombres no se repiten ni se pierden entre paginas (desempate por id)', async () => {
+  it('cuatro filas empatadas en created_at no se repiten ni se pierden entre paginas (desempate por id)', async () => {
     const marca = `r29empate${token().slice(0, 8)}`;
     const ids = await sembrar(
       empresaA.actorId,
@@ -255,7 +262,8 @@ describe('R29: sin orden pedido ordena por apellidos y nombres, y el recorrido d
 
     expect(vistos).toHaveLength(4);
     expect(new Set(vistos).size).toBe(4);
-    // Todas empatan en apellidos y nombres: solo el desempate por id define el orden.
+    // Todas empatan en `created_at` (el mismo instante por defecto de `sembrar`): solo el
+    // desempate por id define el orden.
     expect([...vistos].sort()).toEqual(vistos);
     expect(vistos.sort()).toEqual([...ids].sort());
   });

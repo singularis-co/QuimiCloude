@@ -33,6 +33,9 @@ function cliente(overrides: Partial<CustomerView> = {}): CustomerView {
     lastNames: 'Gómez',
     city: 'Bogotá',
     phone: '3001234567',
+    phoneCountry: 'CO',
+    phoneE164: '573001234567',
+    phoneIssue: null,
     email: 'maria@example.com',
     address: 'Calle 1 # 2-3',
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
@@ -132,7 +135,8 @@ describe('telefono, correo y direccion pintan un marcador identificable cuando f
     'sin valor, la columna %s pinta el marcador y nunca `null`/`undefined`',
     (columnId) => {
       const key = columnId as 'phone' | 'email' | 'address';
-      const { container } = pintarCelda(columnId, cliente({ [key]: null }));
+      const sinTelefono = key === 'phone' ? { phoneCountry: null, phoneE164: null } : {};
+      const { container } = pintarCelda(columnId, cliente({ [key]: null, ...sinTelefono }));
 
       expect(screen.getByTestId(`customer-missing-${columnId}`)).toHaveTextContent(EMPTY_MARK);
       expect(container.textContent).not.toContain('null');

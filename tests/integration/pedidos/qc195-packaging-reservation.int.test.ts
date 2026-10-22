@@ -661,32 +661,48 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
     return botella;
   }
 
-  it.each(['PENDIENTE', 'EN_CURSO'] as const)(
-    'R45, R27, R29: en %s, tras anadir 40 botellas por el dialogo el importe guardado es el de quoteOrderCost con ese reparto y orderId',
-    async (estado) => {
-      const f = await crearFixture();
-      try {
-        const botella = await botellaDeDosLotes(f);
-        const creado = await createOrder(entrada(f, '40', []), actorDe(f));
-        expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '40.0000', packaging: '0.0000' });
-        if (estado === 'EN_CURSO') {
-          expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
-        }
+  it('R45, R27, R29: en PENDIENTE, tras anadir 40 botellas por el dialogo el importe guardado es el de quoteOrderCost con ese reparto y orderId', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await botellaDeDosLotes(f);
+      const creado = await createOrder(entrada(f, '40', []), actorDe(f));
+      expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '40.0000', packaging: '0.0000' });
 
-        const lineas = [{ packagingProductId: botella, packages: 40 }];
-        expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
+      const lineas = [{ packagingProductId: botella, packages: 40 }];
+      expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
 
-        const cotizacion = await quoteOrderCost(
-          { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
-          actorDe(f),
-        );
-        expect(cotizacion.ingredientsCost).toBe('64.0000');
-        expect(await costoDe(creado.id)).toEqual({ status: estado, total: cotizacion.ingredientsCost, packaging: '24.0000' });
-      } finally {
-        await borrarFixture(f);
-      }
-    },
-  );
+      const cotizacion = await quoteOrderCost(
+        { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
+        actorDe(f),
+      );
+      expect(cotizacion.ingredientsCost).toBe('64.0000');
+      expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: cotizacion.ingredientsCost, packaging: '24.0000' });
+    } finally {
+      await borrarFixture(f);
+    }
+  });
+
+  it('R13, R27, R29: en EN_CURSO, tras anadir 40 botellas por el dialogo el estimado guardado no cambia y las 40 botellas quedan en el reparto y apartadas', async () => {
+    const f = await crearFixture();
+    try {
+      const botella = await botellaDeDosLotes(f);
+      const creado = await createOrder(entrada(f, '40', []), actorDe(f));
+      expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
+      const antes = await costoDe(creado.id);
+      expect(antes).toEqual({ status: 'EN_CURSO', total: '40.0000', packaging: '0.0000' });
+
+      const lineas = [{ packagingProductId: botella, packages: 40 }];
+      expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
+
+      expect(await costoDe(creado.id)).toEqual(antes);
+      expect(
+        await prisma.orderPresentationLine.findMany({ where: { orderId: creado.id }, select: { packagingProductId: true, packages: true } }),
+      ).toEqual(lineas);
+      expect((await apartadoPorProducto(creado.id))[botella]).toBe('40.0000');
+    } finally {
+      await borrarFixture(f);
+    }
+  });
 
   it('R45: si el envase nuevo no tiene lote con costo, el dialogo guarda «sin importe», igual que la cotizacion', async () => {
     const f = await crearFixture();
@@ -732,7 +748,7 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
     }
   });
 
-  it('R47: en POR_EMPACAR, el importe es la parte de ingredientes guardada mas los envases nuevos, y no el de quoteOrderCost', async () => {
+  it('R13, R47: en POR_EMPACAR, cambiar las botellas por 30 tapas por el dialogo no cambia el estimado guardado y aparta las tapas', async () => {
     const f = await crearFixture();
     try {
       const botella = await botellaDeDosLotes(f);
@@ -742,7 +758,9 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
       expect(await costoDe(creado.id)).toEqual({ status: 'PENDIENTE', total: '64.0000', packaging: '24.0000' });
       expect(await transition(creado.id, f.companyId, 'PENDIENTE', 'EN_CURSO', f.actorId, new Date())).toBe('ok');
       expect(await transition(creado.id, f.companyId, 'EN_CURSO', 'POR_EMPACAR', f.actorId, new Date())).toBe('ok');
-      // Un lote de materia mas caro, posterior al consumo: la cotizacion de hoy cambia, lo guardado no.
+      const antes = await costoDe(creado.id);
+      expect(antes).toEqual({ status: 'POR_EMPACAR', total: '64.0000', packaging: '24.0000' });
+      // Un lote de materia mas caro: la cotizacion de hoy cambia, lo guardado no.
       await addBatchToAlive(
         f.materialId,
         { presentationId: f.presentationId, stock: '100', unitCost: '3.0000', lot: null, purchaseDate: '2026-09-03', expiryDate: null, createdBy: f.actorId },
@@ -753,13 +771,11 @@ describe('QC-195 — Reparto y unidad guarda el importe', () => {
       const lineas = [{ packagingProductId: tapa, packages: 30 }];
       expect(await updateDistribution(creado.id, actorDe(f), { unitId: f.unitId, lines: lineas })).toBe('ok');
 
-      // (64 - 24) de ingredientes guardados + 30 x 0.90 de envases.
-      expect(await costoDe(creado.id)).toEqual({ status: 'POR_EMPACAR', total: '67.0000', packaging: '27.0000' });
-      const cotizacion = await quoteOrderCost(
-        { recipeId: f.recipeId, quantity: '40', unitId: f.unitId, orderId: creado.id, presentationLines: lineas },
-        actorDe(f),
-      );
-      expect(cotizacion.ingredientsCost).not.toBe('67.0000');
+      expect(await costoDe(creado.id)).toEqual(antes);
+      expect(
+        await prisma.orderPresentationLine.findMany({ where: { orderId: creado.id }, select: { packagingProductId: true, packages: true } }),
+      ).toEqual(lineas);
+      expect((await apartadoPorProducto(creado.id))[tapa]).toBe('30.0000');
     } finally {
       await borrarFixture(f);
     }

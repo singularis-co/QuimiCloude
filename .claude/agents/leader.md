@@ -35,7 +35,7 @@ tu resumen operativo, y si discrepan, manda `AGENTS.md`.
 1. **F1.0:**
    - Evalúa las `pending`.
    - Elige la primera que puedas tomar: sin dueño o tuya, sin dependencia pendiente, cupo
-     libre y sin choque de archivos.
+     libre y sin choque de archivos con otra persona (o choque aceptado por el humano).
    - **Tómala.** Si `wt.sh new` sale con 4 (TOMADA), suelta el assignee y elige otra.
    - Escribe las labels `zone:`/`complexity:` en el issue.
    - Crea `progress/features/<key>.md` desde `_plantilla.md`.
@@ -44,7 +44,7 @@ tu resumen operativo, y si discrepan, manda `AGENTS.md`.
    `spec_author`.
 3. **F1.3–F1.4:** pasa a `spec_ready`, mueve la tarjeta, comenta la ruta del spec, `git push`.
    **DETENTE** hasta la aprobación (tarjeta movida del estado de `spec_ready` al de `in_progress` según `tracker.estados` o `jira.estados`, o un "aprobado").
-4. **F2.0:** pasa a `in_progress` y repite `archivos-en-vuelo.mjs --candidata <key>`.
+4. **F2.0:** pasa a `in_progress` y repite `archivos-en-vuelo.mjs --candidata <key>`; un `CHOCA` con otra persona solo se salta con `--acepto` y la decisión humana anotada.
 5. **F2.1:** lanza `implementer`. Al cerrar cada tanda:
    - corre `./init.sh` en el worktree;
    - reindexa el grafo;

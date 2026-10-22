@@ -4,7 +4,13 @@
 //
 // Se importa por el BARREL, NUNCA por ruta profunda (`docs/architecture.md > La regla de
 // dependencias`): de otro modulo solo se consume su contrato.
-import { assertPermission, type PermissionBearer, type PermissionCode } from '@/lib/modules/identity';
+import {
+  assertAddon,
+  assertPermission,
+  type Addon,
+  type PermissionBearer,
+  type PermissionCode,
+} from '@/lib/modules/identity';
 
 import { UnauthorizedError } from './errors';
 
@@ -27,6 +33,7 @@ export type Actor = {
   readonly id: string;
   readonly companyId: string;
   readonly permissions: readonly string[];
+  readonly addons?: readonly string[];
 };
 
 /**
@@ -70,6 +77,15 @@ export function requirePermission(
   permission: PermissionCode,
 ): asserts actor is Actor {
   assertPermission(actor, permission, () => new UnauthorizedError());
+}
+
+/**
+ * Va justo después del permiso, antes de validar y de tocar un puerto. Lanza el mismo error que
+ * sin permiso, para que «añadido apagado» y «sin permiso» no se distingan; un actor sin `addons`
+ * falla cerrado.
+ */
+export function requireAddon(actor: Actor, addon: Addon): void {
+  assertAddon(actor, addon, () => new UnauthorizedError());
 }
 
 /** Error centinela, privado: assertPermission exige una fabrica pero esto nunca lanza afuera. */

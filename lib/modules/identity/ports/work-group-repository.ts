@@ -140,8 +140,9 @@ export interface WorkGroupRepository {
    * `buildPage` viven en `lib/shared/pagination`, que `domain/` no puede importar, asi que **quien
    * pagina este listado es el adaptador driven**.
    *
-   * El defecto de 10 y el tope de 25 (R24), el orden `name ASC, id ASC` con desempate estable (R25)
-   * y la columna que toca la busqueda —el nombre— son del adaptador, el unico que conoce la base.
+   * El defecto de 10 y el tope de 25 (R24), el orden por defecto `created_at DESC, id ASC` con
+   * desempate estable y la columna que toca la busqueda —el nombre— son del adaptador, el unico que
+   * conoce la base.
    *
    * El tipo del parametro es `ListQuery` —la consulta viva— y no `SanitizedListQuery`, que en
    * `domain/list-query.ts` es el par `{ query, ignored }` que DEVUELVE `sanitizeListQuery`. Lo que

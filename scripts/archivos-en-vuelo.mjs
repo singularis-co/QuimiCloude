@@ -5,6 +5,8 @@
  *
  *   node scripts/archivos-en-vuelo.mjs                     inventario por feature en vuelo
  *   node scripts/archivos-en-vuelo.mjs --candidata QC-12   interseccion con la candidata; exit 1 si choca
+ *   node scripts/archivos-en-vuelo.mjs --candidata QC-12 --acepto QC-7,QC-9
+ *                                                          choques con esas keys aceptados por el humano
  *
  * Por que existe: antes la validacion leia `progress/impl_<feature>.md` del disco local, pero
  * las features de los companeros viven en SUS ramas, no en tu disco. Aqui la fuente es el
@@ -21,6 +23,17 @@
  * ampliable en `arnes.config.json > equipo.archivos_compartidos`) dan AVISO, no CHOCA.
  * Por que (2026-10-08): `./init.sh` citado como comando y el baseline compartido hacian que
  * toda candidata chocara con todo lo que estaba en vuelo (`docs/equipo.md`).
+ *
+ * Solo CHOCA con OTRA persona. Fichas del mismo dueno (mismo `assignee.accountId`, no nulo)
+ * dan AVISO: el dueno decide su orden. Un choque con otra persona sigue siendo CHOCA (exit 1)
+ * salvo que su key venga en `--acepto` (lista por comas o la opcion repetida): entonces sale
+ * `CHOCA ACEPTADO` y no cuenta. La aceptacion es del humano y se anota en
+ * `progress/features/<candidata>.md > Decisiones`; el conflicto lo resuelve quien mergee
+ * segundo (AGENTS.md > F2.3). Una key de `--acepto` que no choca da AVISO.
+ * Por que (2026-10-13): `spec_ready` cuenta como en vuelo, y cinco specs aprobados de un mismo
+ * dueno con orden acordado chocaban entre si y ninguno arrancaba; y una feature quedaba parada
+ * por un solo test compartido con otra persona. Humano: avanzar sin bloqueantes y arreglar los
+ * conflictos al final si hace falta (`docs/equipo.md`).
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -44,6 +57,12 @@ const { features } = JSON.parse(readFileSync(listaPath, 'utf8'));
 const args = process.argv.slice(2);
 const iCand = args.indexOf('--candidata');
 const candidata = iCand >= 0 ? args[iCand + 1] : null;
+// `--acepto QC-a,QC-b`, `--acepto=QC-a` o la opcion repetida: keys cuyo choque acepto el humano.
+const aceptadas = new Set();
+args.forEach((a, i) => {
+  const valor = a === '--acepto' ? args[i + 1] : a.startsWith('--acepto=') ? a.slice('--acepto='.length) : null;
+  for (const k of (valor ?? '').split(',')) if (k.trim()) aceptadas.add(k.trim());
+});
 
 gitOpcional('fetch', '--quiet', '--prune', 'origin');
 
@@ -129,6 +148,11 @@ const { rutas: mios, sinSeccion: candSinSeccion } = esperados(tasksCand);
 const SIN_SECCION = 'su tasks.md no tiene `## Archivos esperados`: se leen las rutas de todo el archivo (docs/specs.md > tasks.md)';
 if (candSinSeccion) console.log(`AVISO: ${candidata}: ${SIN_SECCION}`);
 
+// Mismo dueno: mismo `assignee.accountId` y no nulo (sin assignee nunca es "el mismo").
+const duenoCand = fichaCand.assignee?.accountId ?? null;
+const mismoDueno = (f) => duenoCand != null && f.assignee?.accountId === duenoCand;
+const usadas = new Set();
+
 let choques = 0;
 for (const { f, publicada, sinSeccion, archivos } of inventario) {
   if (!publicada) {
@@ -142,10 +166,20 @@ for (const { f, publicada, sinSeccion, archivos } of inventario) {
   if (compartidos.length > 0) {
     console.log(`AVISO: comparte con ${f.key ?? f.id} (${quien(f)}) archivos de apendice, no choca: ${compartidos.join(', ')}`);
   }
-  if (reales.length > 0) {
+  if (reales.length === 0) continue;
+  const key = f.key ?? String(f.id);
+  if (mismoDueno(f)) {
+    console.log(`AVISO: mismo dueño que ${key} (${quien(f)}), no choca: ${reales.join(', ')} — el dueño decide el orden y lo anota en progress/features/<key>.md`);
+  } else if (aceptadas.has(key)) {
+    usadas.add(key);
+    console.log(`CHOCA ACEPTADO con ${key} (${quien(f)}): ${reales.join(', ')} — anotalo en progress/features/${candidata}.md > Decisiones`);
+  } else {
     choques++;
-    console.log(`CHOCA con ${f.key ?? f.id} (${quien(f)}): ${reales.join(', ')}`);
+    console.log(`CHOCA con ${key} (${quien(f)}): ${reales.join(', ')}`);
   }
+}
+for (const k of aceptadas) {
+  if (!usadas.has(k)) console.log(`AVISO: --acepto ${k}: no hay choque con otra persona que aceptar, no se aplica`);
 }
 if (choques === 0) console.log(`${candidata}: sin conflicto de archivos con ${inventario.length} feature(s) en vuelo`);
 process.exit(choques > 0 ? 1 : 0);

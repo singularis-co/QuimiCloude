@@ -196,7 +196,13 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
 
 // --- INSERT crudos --------------------------------------------------------------------------
 
-/** Una entrega de la empresa con una linea por lote dado; devuelve la entrega y sus lineas. */
+/**
+ * Una entrega de la empresa con una linea por lote dado; devuelve la entrega y sus lineas.
+ *
+ * Nota 2026-10-15: desde `20261015130000_order_delivery_lines_customer` el cliente vive en cada
+ * linea (`order_delivery_lines.customer_id`) y `order_deliveries` ya no tiene esa columna. El
+ * fixture pone el cliente del tenant en cada linea; las aserciones de antes se conservan.
+ */
 async function insertDelivery(
   tx: Prisma.TransactionClient,
   t: Tenant,
@@ -204,19 +210,19 @@ async function insertDelivery(
 ): Promise<{ deliveryId: string; lineIds: readonly string[] }> {
   const deliveryId = randomUUID()
   await tx.$executeRaw`
-    INSERT INTO "order_deliveries" ("id", "company_id", "order_id", "customer_id", "delivery_key", "created_by")
+    INSERT INTO "order_deliveries" ("id", "company_id", "order_id", "delivery_key", "created_by")
     VALUES (
-      ${asUuid(deliveryId)}, ${asUuid(t.companyId)}, ${asUuid(t.orderId)}, ${asUuid(t.customerId)},
+      ${asUuid(deliveryId)}, ${asUuid(t.companyId)}, ${asUuid(t.orderId)},
       ${asUuid(randomUUID())}, ${asUuid(t.userId)}
     )`
   const lineIds: string[] = []
   for (const batchId of batchIds) {
     const lineId = randomUUID()
     await tx.$executeRaw`
-      INSERT INTO "order_delivery_lines" ("id", "company_id", "delivery_id", "order_presentation_line_id", "batch_id", "packages", "quantity")
+      INSERT INTO "order_delivery_lines" ("id", "company_id", "delivery_id", "customer_id", "order_presentation_line_id", "batch_id", "packages", "quantity")
       VALUES (
-        ${asUuid(lineId)}, ${asUuid(t.companyId)}, ${asUuid(deliveryId)}, ${asUuid(t.presentationLineId)},
-        ${asUuid(batchId)}, 2, CAST('2' AS decimal(14,4))
+        ${asUuid(lineId)}, ${asUuid(t.companyId)}, ${asUuid(deliveryId)}, ${asUuid(t.customerId)},
+        ${asUuid(t.presentationLineId)}, ${asUuid(batchId)}, 2, CAST('2' AS decimal(14,4))
       )`
     lineIds.push(lineId)
   }

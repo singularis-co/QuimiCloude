@@ -504,10 +504,10 @@ const METODOS_DELEGADOS_EN_DOMINIO: ReadonlyMap<string, RegExp> = new Map([
     // abre `orderUnitOfWork` directamente -ya no cablea `OrderPackingRepository.finishPackingAlive`,
     // que T13 retiro del puerto- y necesita los mismos catalogos globales que `transitionAliveById`
     // usaba antes de R15/R16, mas `presentationCatalog` para la defensa en profundidad de R19.
-    // QC-195 (R31): y `packagingCatalog`, para costear los envases del lote; filtra por empresa en
-    // `inventario` (lo vigila `guard-ambito-empresa-inventario`).
+    // El coste del lote ya no sale de los catalogos de productos ni de envases, sino de
+    // los consumos que lee la propia transaccion (`scope.consumption`).
     'finishPackingAliveById',
-    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*products\s*:\s*productCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,\s*packaging\s*:\s*packagingCatalog\s*,?\s*\}\s*\)$/,
+    /^createFinishPacking\s*\(\s*\{\s*packing\s*:\s*orderPackingRepository\s*,\s*unitOfWork\s*:\s*orderUnitOfWork\s*,\s*recipes\s*:\s*recipeCatalog\s*,\s*units\s*:\s*unitCatalog\s*,\s*presentations\s*:\s*presentationCatalog\s*,?\s*\}\s*\)$/,
   ],
   // QC-195 (R44): los dos listados de resumen resuelven el nombre del envase en
   // `pedidos/domain`, sobre `OrderSummaryReader`. Quien toca la base son
@@ -965,9 +965,9 @@ function mutar(real: string, buscado: string, nuevo: string, desde = 0): string 
 }
 
 describe('QC-82 — el ambito de la unidad de trabajo se construye en un solo sitio', () => {
-  it('R24: el ambito de la unidad de trabajo tiene exactamente seis miembros y las dos unidades lo construyen igual', () => {
+  it('R24: el ambito de la unidad de trabajo tiene exactamente siete miembros y las dos unidades lo construyen igual', () => {
     const real = readFileSync(COMPOSICION, 'utf8')
-    expect(miembrosDelAmbito(real)).toEqual(['finishedGoods', 'orders', 'products', 'recipes', 'reservations', 'units'])
+    expect(miembrosDelAmbito(real)).toEqual(['consumption', 'finishedGoods', 'orders', 'products', 'recipes', 'reservations', 'units'])
     const codigo = sinEspacios(legible(real))
     expect(codigo).toContain('withOrderTransaction((tx)=>work(orderTransactionScopeOn(tx)))')
     expect(codigo).toContain('{run:(work)=>work(orderTransactionScopeOn(tx))}')
@@ -975,7 +975,7 @@ describe('QC-82 — el ambito de la unidad de trabajo se construye en un solo si
 
   it('R24 ANTI-PLACEBO: quitar `units` del ambito sale en rojo', () => {
     const mutado = mutar(readFileSync(COMPOSICION, 'utf8'), '    units: createUnitCatalogReader(tx),\n', '')
-    expect(miembrosDelAmbito(mutado)).toEqual(['finishedGoods', 'orders', 'products', 'recipes', 'reservations'])
+    expect(miembrosDelAmbito(mutado)).toEqual(['consumption', 'finishedGoods', 'orders', 'products', 'recipes', 'reservations'])
   })
 })
 

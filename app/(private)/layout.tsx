@@ -17,7 +17,14 @@ import {
 import { LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 
-import { LogoutButton, ScreenEnter, SidebarToggle, ThemeToggle } from './components';
+import {
+  LogoutButton,
+  NotificationBell,
+  NotificationsProvider,
+  ScreenEnter,
+  SidebarToggle,
+  ThemeToggle,
+} from './components';
 
 /**
  * Layout compartido por toda la zona privada (R1, `design.md > 5.2`).
@@ -133,6 +140,9 @@ export default async function PrivateLayout({ children }: { children: ReactNode 
               antes de mostrar los tooltips. */}
           <TooltipProvider>
             <div className="ml-auto flex items-center gap-2">
+              <NotificationsProvider userId={user.id}>
+                <NotificationBell />
+              </NotificationsProvider>
               <ThemeToggle />
               <LogoutButton />
             </div>

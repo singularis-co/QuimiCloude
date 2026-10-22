@@ -14,7 +14,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { InvalidTransitionError } from '@/lib/modules/pedidos/domain/errors';
 import { createTransitionOrder } from '@/lib/modules/pedidos/domain/transition-order';
-import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import {
+  fakeOrderConsumptionLedger,
+  fakeScopeProducts,
+  fakeScopeUnits,
+  fakeUnitOfWork,
+} from '@/tests/helpers/order-unit-of-work-double';
 
 import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -43,6 +48,7 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
     customerId: null,
     reservedAt: null,
     packagingCost: null,
+    actualCost: null,
     ...overrides,
   };
 }
@@ -300,7 +306,7 @@ describe('createTransitionOrder', () => {
     const unitOfWork: OrderUnitOfWork = {
       run: async <T>(work: (scope: OrderTransactionScope) => Promise<T>) => {
         try {
-          return await work({ orders, reservations, recipes: scopeRecipes, finishedGoods, products, units });
+          return await work({ orders, reservations, recipes: scopeRecipes, finishedGoods, products, units, consumption: fakeOrderConsumptionLedger() });
         } catch (err) {
           vioLaExcepcion = true;
           throw err;
@@ -350,7 +356,7 @@ describe('QC-195 — pasar a POR_EMPACAR consume solo la receta', () => {
     const lockAliveById = vi.fn(async () =>
       filaBloqueada({
         status: 'EN_CURSO',
-        presentationLines: [{ presentationId: 'pres-1', packages: 40, packagingProductId: 'envase-1' }],
+        presentationLines: [{ presentationId: 'pres-1', packages: 40, packagingProductId: 'envase-1', presentationContent: null }],
       }),
     );
     const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));

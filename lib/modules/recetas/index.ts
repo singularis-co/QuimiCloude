@@ -39,6 +39,7 @@ export type {
   RecipeExecutionTool,
 } from './domain/recipe-catalog';
 export type { RecipePackingStepsReader } from './domain/recipe-packing-steps-reader';
+export type { RecipeConditioningStepsReader } from './domain/recipe-conditioning-steps-reader';
 export { normalizeRecipeName } from './domain/recipe-name';
 export {
   RECIPE_TOTAL_PERCENTAGE,
@@ -67,6 +68,8 @@ export {
 // publican aqui para que el tope viva en UNA sola constante (R11) y nadie lo reescriba a mano.
 export {
   recipeStepSchema,
+  conditioningStepSchema,
+  type ConditioningStepInput,
   recipeStepBlockSchema,
   recipeStepSpanSchema,
   recipeStepChecklistItemSchema,
@@ -98,6 +101,7 @@ export {
   type RecipeLineView,
   type RecipeToolView,
   type RecipeStepView,
+  type ConditioningStepView,
   type RecipeDetail,
   type RecipeVersionSummary,
 } from './domain/recipe-view';
@@ -125,3 +129,12 @@ export {
   createListRecipeVersions,
   type ListRecipeVersionsDeps,
 } from './domain/list-recipe-versions';
+
+// Mover o quitar pasos con pedidos en curso que ya tienen fotos de evidencia.
+export { RecipeStepsLockedError } from './domain/errors';
+export { detectLockedStepChange, type LockedStepChange } from './domain/recipe-step-lock';
+export {
+  createGetRecipeStepLock,
+  type GetRecipeStepLockDeps,
+  type RecipeStepLock,
+} from './domain/get-recipe-step-lock';

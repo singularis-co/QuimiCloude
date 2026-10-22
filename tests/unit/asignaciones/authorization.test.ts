@@ -676,7 +676,10 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
     const { deps, finishPackingAliveById } = montarDeps();
     const finishPacking = createFinishPacking(deps);
 
-    await finishPacking(conPermisos(PERMISO_EMPAQUE), { orderId: PEDIDO });
+    await finishPacking(conPermisos(PERMISO_EMPAQUE), {
+      orderId: PEDIDO,
+      lines: [{ lineId: PEDIDO, packedPackages: 1, reason: null, reasonOther: null }],
+    });
 
     expect(finishPackingAliveById).toHaveBeenCalledTimes(1);
   });

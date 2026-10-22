@@ -1,10 +1,18 @@
 import type { OrderScope } from '../domain/order-scope';
 
-export type DeliveryForVoid = { readonly id: string; readonly orderId: string };
+/** Una entrega tiene pedido o producto, nunca los dos. */
+export type DeliveryForVoid = {
+  readonly id: string;
+  readonly orderId: string | null;
+  readonly productId: string | null;
+  readonly createdAt: Date;
+};
 
 export type DeliveryLineForVoid = {
   readonly id: string;
-  readonly presentationLineId: string;
+  readonly customerId: string;
+  /** `null` en una entrega sin pedido. */
+  readonly presentationLineId: string | null;
   readonly batchId: string;
   readonly packages: number;
   /** decimal(14,4), positiva. */
@@ -21,7 +29,7 @@ export type NewDeliveryVoid = {
   readonly now: Date;
 };
 
-export type RegisteredDeliveryVoid = { readonly id: string; readonly orderId: string };
+export type RegisteredDeliveryVoid = { readonly id: string; readonly orderId: string | null };
 
 /** Las anulaciones de entregas y sus lineas. Solo se insertan: ni se editan ni se borran. */
 export interface OrderDeliveryVoidRepository {
@@ -47,10 +55,10 @@ export interface OrderDeliveryVoidRepository {
 
 export type DeliveryHistoryRow = {
   readonly id: string;
-  readonly customerId: string;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly lines: readonly {
+    readonly customerId: string;
     readonly presentationLineId: string;
     readonly batchId: string;
     readonly packages: number;

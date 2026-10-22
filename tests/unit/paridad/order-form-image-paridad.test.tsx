@@ -113,6 +113,7 @@ function detalle(receta: { id: string; name: string; imageUrl: string | null }):
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [],
     tools: [],
     original: null,

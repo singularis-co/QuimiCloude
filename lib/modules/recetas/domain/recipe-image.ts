@@ -9,8 +9,9 @@
  * comparaciones de prefijo son ~15 lineas que no envejecen (`design.md > 9.2`).
  */
 
-/** Limite de tamano de la imagen: 5 MB (R23). */
-export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/** Limite de tamano de la imagen: 4.4 MB decimales (R23). El cuerpo de una Server Action en Vercel
+ *  se corta en 4.5 MB y el resto de la peticion necesita margen. */
+export const MAX_IMAGE_BYTES = 4_400_000;
 
 export type RecipeImageFormat = {
   readonly contentType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -57,7 +58,7 @@ function detectFormat(bytes: Uint8Array): RecipeImageFormat | null {
 }
 
 /**
- * Valida el archivo de imagen recibido (R23): rechaza por tamano (> 5 MB) y por formato
+ * Valida el archivo de imagen recibido (R23): rechaza por tamano (> 4.4 MB) y por formato
  * -detectado por el contenido-. El `contentType` y la `extension` devueltos SIEMPRE salen
  * de la firma detectada, nunca del dato que declaro el cliente.
  */

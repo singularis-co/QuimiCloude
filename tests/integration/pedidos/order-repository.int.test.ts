@@ -471,7 +471,7 @@ describe('R35 — el tamano de pagina: defecto de 10 y tope de 25', () => {
 })
 
 describe('R41 — el orden del listado, con las filas sembradas EN DESORDEN', () => {
-  it('prioridad DESC, antiguedad ASC dentro de cada prioridad, y el correlativo desempata', async () => {
+  it('prioridad DESC, mas nuevos primero dentro de cada prioridad (QC-289), y el correlativo DESC desempata', async () => {
     const creados: string[] = []
     try {
       // Tres instantes del ano de prueba. `t1 < t2 < t3`, y `t1` se repite AL MILISEGUNDO en
@@ -492,20 +492,20 @@ describe('R41 — el orden del listado, con las filas sembradas EN DESORDEN', ()
       const altaT1 = await altaReal(creados, YEAR_ORDEN, t1, { priority: 'ALTA' })
 
       // Los dos CRITICA de `t1` comparten instante al milisegundo: lo unico que los separa es
-      // el correlativo, y el que lo tiene menor va primero.
+      // el correlativo, y desde QC-289 el que lo tiene MAYOR -el ultimo creado- va primero.
       expect(criticaT1a.createdAt.getTime()).toBe(criticaT1b.createdAt.getTime())
       expect(criticaT1a.number.sequence).toBeLessThan(criticaT1b.number.sequence)
 
       const mios = (await recorrerTodo()).filter((row) => creados.includes(row.id))
 
       expect(mios.map((row) => row.id)).toEqual([
-        criticaT1a.id,
-        criticaT1b.id,
         criticaT3.id,
-        altaT1.id,
+        criticaT1b.id,
+        criticaT1a.id,
         altaT2.id,
-        mediaT1.id,
+        altaT1.id,
         mediaT2.id,
+        mediaT1.id,
         bajaT1.id,
       ])
       // Y la prioridad baja de mayor a menor: `priority DESC` sobre el enum da el orden de
@@ -732,7 +732,7 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
 
       const resumenConReparto = pagina.items.find((item) => item.id === conReparto.id)
       const resumenSinReparto = pagina.items.find((item) => item.id === filaSinReparto.id)
-      expect(resumenConReparto?.presentationLines).toEqual([{ presentationId, packages: 3, packagingName: null }])
+      expect(resumenConReparto?.presentationLines).toEqual([{ id: expect.any(String), presentationId, packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null, packagingImageUrl: null }])
       expect(resumenConReparto?.unitId).toBe(unitId)
       expect(resumenSinReparto?.presentationLines).toEqual([])
       expect(resumenSinReparto?.unitId).toBeNull()
@@ -757,10 +757,10 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
       const pagina = await listAliveOrderSummariesByIds(companyId, [conEnvase.id, antiguo.id], ['PENDIENTE'], 1)
 
       expect(pagina.items.find((item) => item.id === conEnvase.id)?.presentationLines).toEqual([
-        { presentationId, packages: 2, packagingName: nombreEnvase },
+        { id: expect.any(String), presentationId, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: envaseId, packagingName: nombreEnvase, packagingImageUrl: null },
       ])
       expect(pagina.items.find((item) => item.id === antiguo.id)?.presentationLines).toEqual([
-        { presentationId, packages: 5, packagingName: null },
+        { id: expect.any(String), presentationId, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null, packagingImageUrl: null },
       ])
     } finally {
       await limpiar(creados)
@@ -778,10 +778,10 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
       })
       const sinReparto = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 11))
 
-      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
+      expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
 
       const ficha = await findAliveOrderById(conReparto.id, scope())
-      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, packagingProductId: null }])
+      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
       // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
       expect(ficha).toEqual(conReparto)
 
@@ -790,9 +790,26 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
       const todos = await recorrerTodo()
       expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
-        { presentationId, packages: 4, packagingProductId: null },
+        { presentationId, packages: 4, presentationContent: null, packagingProductId: null },
       ])
       expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
+    } finally {
+      await limpiar(creados)
+    }
+  })
+
+  it('la linea devuelve el contenido copiado al guardarla, igual en el alta y en la relectura', async () => {
+    const creados: string[] = []
+    try {
+      const conCopia = await altaReal(creados, YEAR_CATALOGO, instantIn(YEAR_CATALOGO, 2, 12), {
+        presentationLines: [{ presentationId, packages: 9, content: '300', packagingProductId: null }],
+      })
+
+      expect(conCopia.presentationLines).toEqual([
+        { presentationId, packages: 9, presentationContent: '300.0000', packagingProductId: null },
+      ])
+      const ficha = await findAliveOrderById(conCopia.id, scope())
+      expect(ficha?.presentationLines).toEqual(conCopia.presentationLines)
     } finally {
       await limpiar(creados)
     }
@@ -928,6 +945,38 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
         createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '1', packaging: '0' }, null, despues, scope()),
       )
       expect(borrado).toBe('not_found')
+    } finally {
+      await limpiar(creados)
+    }
+  })
+})
+
+describe('QC-305 — updateAlive con keep conserva el estimado guardado', () => {
+  it('R12, R14: con keep el UPDATE escribe la edicion y deja ingredients_cost y packaging_cost como estaban', async () => {
+    const creados: string[] = []
+    try {
+      const now = instantIn(YEAR_DISCRIMINANTES, 5, 1)
+      const despues = instantIn(YEAR_DISCRIMINANTES, 5, 2)
+      const pedido = await altaReal(creados, YEAR_DISCRIMINANTES, now)
+      await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '45.6700', packaging: '5.6700' }, actorId, now, scope()),
+      )
+
+      const editado = baseOrder({ quantity: '77.0000', priority: 'ALTA' })
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, 'keep', scope())).toBe('ok')
+
+      const cruda = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(cruda.quantity.toFixed(4)).toBe('77.0000')
+      expect(cruda.priority).toBe('ALTA')
+      expect(cruda.updatedAt.toISOString()).toBe(despues.toISOString())
+      expect(cruda.ingredientsCost?.toFixed(4)).toBe('45.6700')
+      expect(cruda.packagingCost?.toFixed(4)).toBe('5.6700')
+
+      // Control: sin keep, el mismo UPDATE si sustituye el importe.
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
+      const sustituida = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(sustituida.ingredientsCost).toBeNull()
+      expect(sustituida.packagingCost).toBeNull()
     } finally {
       await limpiar(creados)
     }

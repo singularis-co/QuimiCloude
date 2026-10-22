@@ -41,6 +41,7 @@ import type { RecipeImageStorage } from '@/lib/modules/recetas/ports/recipe-imag
 import type { NewRecipe, RecipeRepository, RecipeRow } from '@/lib/modules/recetas/ports/recipe-repository';
 
 import type { ProductCatalog } from '@/lib/modules/inventario';
+import { noEvidenceLocks } from '../../helpers/evidence-off';
 
 /** Los dos codigos que este modulo puede exigir. Ninguno nuevo nace en esta ficha (R28). */
 const CONSULTAR = 'recetas.consultar';
@@ -86,6 +87,7 @@ function filaBase(id: string, overrides: Partial<RecipeRow> = {}): RecipeRow {
     description: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     imagePath: null,
     createdBy: 'actor-0',
     updatedBy: 'actor-0',
@@ -128,6 +130,7 @@ function almacen() {
         description: data.description,
         steps: data.steps,
         packingSteps: [],
+        conditioningSteps: [],
         imagePath: data.imagePath,
         createdBy: actorId,
         updatedBy: actorId,
@@ -229,7 +232,7 @@ function casosDeUso(recipes: RecipeRepository, products: ProductCatalog, images:
       toOffsetLimit: () => ({ offset: 0, limit: 10 }),
       buildPage: (items, total, page, pageSize) => ({ items, total, page, pageSize, totalPages: 1 }),
     }),
-    updateRecipe: createUpdateRecipe({ recipes, products, images, now }),
+    updateRecipe: createUpdateRecipe({ recipes, products, images, stepLocks: noEvidenceLocks, now }),
     deleteRecipe: createDeleteRecipe({ recipes, now }),
   };
 }
@@ -404,7 +407,7 @@ describe('QC-50 R28 — el PERMISO se exige ANTES que el ambito', () => {
     [
       'updateRecipe',
       (d: Explosivos, actor: Actor | null | undefined) =>
-        createUpdateRecipe(d)(RECETA_A, ENTRADA_EDICION_VALIDA, actor),
+        createUpdateRecipe({ ...d, stepLocks: noEvidenceLocks })(RECETA_A, ENTRADA_EDICION_VALIDA, actor),
     ],
     ['deleteRecipe', (d: Explosivos, actor: Actor | null | undefined) => createDeleteRecipe(d)(RECETA_A, actor)],
   ] as const;

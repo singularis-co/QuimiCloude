@@ -68,6 +68,11 @@ const ENTREGAS = 'entregas.modificar'
 const ANULAR = 'entregas.anular'
 const sinAnular = (codigo: string): boolean => codigo !== ANULAR
 const sinEntregas = (codigo: string): boolean => codigo !== ENTREGAS && sinAnular(codigo)
+// 2026-10-14: el Administrador deja de recibir `asignaciones.consultar` (pasa a
+// ADMIN_EXCLUDED_PERMISSIONS). Los casos previos que fijan su conjunto escrito a mano lo restan con
+// `sinConsultarAsignaciones`.
+const CONSULTAR_ASIGNACIONES = 'asignaciones.consultar'
+const sinConsultarAsignaciones = (codigo: string): boolean => codigo !== CONSULTAR_ASIGNACIONES
 
 const esDeEmpresas = (codigo: string): boolean => codigo.startsWith('empresas.')
 
@@ -565,8 +570,8 @@ describe('QC-74 — los permisos sembrados por rol (R8, R9, R6)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).not.toContain('unidades.modificar')
   })
 
-  it('QC-86 R25: el Administrador tiene asignaciones.consultar Y asignaciones.modificar, escritos uno a uno', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('asignaciones.consultar')
+  it('QC-86 R25 (enmendado 2026-10-14): el Administrador conserva asignaciones.modificar y ya no tiene asignaciones.consultar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).not.toContain('asignaciones.consultar')
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toContain('asignaciones.modificar')
   })
 
@@ -788,7 +793,10 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
       CODIGOS_DEL_REQUISITO.filter(
         (codigo) =>
-          !esDeEmpresas(codigo) && codigo !== 'empaque.modificar' && codigo !== ACONDICIONAMIENTO,
+          !esDeEmpresas(codigo) &&
+          codigo !== 'empaque.modificar' &&
+          codigo !== ACONDICIONAMIENTO &&
+          sinConsultarAsignaciones(codigo),
       ),
     )
   })
@@ -944,7 +952,6 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
       'pedidos.modificar',
       'usuarios.consultar',
       'usuarios.modificar',
-      'asignaciones.consultar',
       'asignaciones.modificar',
       'terminados.consultar',
       'clientes.consultar',
@@ -976,13 +983,14 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
     expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).not.toContain('asignaciones.ejecutar')
   })
 
-  it('R14: asignaciones.ejecutar no entra en ADMIN_EXCLUDED_PERMISSIONS, que no cambia', () => {
+  it('R14: asignaciones.ejecutar no entra en ADMIN_EXCLUDED_PERMISSIONS', () => {
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain('asignaciones.ejecutar')
     expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
       'acondicionamiento.modificar',
+      CONSULTAR_ASIGNACIONES,
     ])
   })
 })
@@ -1128,10 +1136,9 @@ describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador d
   it('R9: el Administrador no recibe acondicionamiento.modificar, que figura entre sus excluidos, y conserva exactamente su conjunto', () => {
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).not.toContain(ACONDICIONAMIENTO)
     expect(ADMIN_EXCLUDED_PERMISSIONS).toContain(ACONDICIONAMIENTO)
-    expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(sinEntregas)).toEqual([
-      ...PERMISOS_DEL_ADMINISTRADOR_PREVIOS,
-      INTEGRACIONES,
-    ])
+    expect((SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []).filter(sinEntregas)).toEqual(
+      [...PERMISOS_DEL_ADMINISTRADOR_PREVIOS, INTEGRACIONES].filter(sinConsultarAsignaciones),
+    )
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual(
       CODIGOS_DEL_REQUISITO.filter((codigo) => !ADMIN_EXCLUDED_PERMISSIONS.includes(codigo)),
     )
@@ -1273,13 +1280,14 @@ describe('QC-221 — el permiso integraciones.modificar', () => {
 
     expect(admin.at(-1)).toBe(INTEGRACIONES)
     expect(admin.indexOf(INTEGRACIONES)).toBe(admin.lastIndexOf(INTEGRACIONES))
-    expect(admin.slice(0, -1)).toEqual([...PERMISOS_DEL_ADMINISTRADOR_PREVIOS])
+    expect(admin.slice(0, -1)).toEqual(PERMISOS_DEL_ADMINISTRADOR_PREVIOS.filter(sinConsultarAsignaciones))
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(INTEGRACIONES)
     expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
       'acondicionamiento.modificar',
+      CONSULTAR_ASIGNACIONES,
     ])
   })
 
@@ -1420,5 +1428,41 @@ describe('QC-224 — el permiso entregas.anular', () => {
     expect(parrafo).toBeDefined()
     expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
     expect(parrafo).not.toMatch(citaFichaORequisito)
+  })
+})
+
+describe('el Administrador no consulta la pantalla «Asignación»', () => {
+  it('no recibe asignaciones.consultar, que figura entre sus excluidos, y conserva lo que usa desde «Pedidos»', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+
+    expect(admin).not.toContain(CONSULTAR_ASIGNACIONES)
+    expect(ADMIN_EXCLUDED_PERMISSIONS).toContain(CONSULTAR_ASIGNACIONES)
+    expect(admin).toEqual(expect.arrayContaining(['pedidos.consultar', 'asignaciones.modificar']))
+  })
+
+  it('los roles operativos conservan asignaciones.consultar', () => {
+    for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO]) {
+      expect(SEED_ROLE_PERMISSIONS[rol], rol).toContain(CONSULTAR_ASIGNACIONES)
+    }
+  })
+})
+
+describe('QC-137 — las notificaciones no tienen permiso propio', () => {
+  // El catalogo y cada rol se comparan con listas escritas a mano: si alguien vuelve a sumar un
+  // permiso de consultar avisos, cambia la igualdad exacta sin tener que nombrarlo aqui.
+  it('QC-137 R21: el catálogo no tiene notificaciones.consultar y cada rol tiene los permisos de antes de QC-137', () => {
+    expect(PERMISSIONS.map((permiso) => permiso.code)).toEqual([...CODIGOS_DEL_REQUISITO])
+    expect(Object.keys(SEED_ROLE_PERMISSIONS).sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR]).toEqual([...PERMISOS_DEL_OPERADOR])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).toEqual([
+      'asignaciones.consultar',
+      'terminados.consultar',
+      'empaque.modificar',
+    ])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual([...CODIGOS_DE_EMPRESAS])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([CONSULTAR_ASIGNACIONES, ACONDICIONAMIENTO])
   })
 })

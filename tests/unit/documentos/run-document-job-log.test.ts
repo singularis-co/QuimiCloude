@@ -6,11 +6,12 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createRunDocumentJob } from '@/lib/modules/documentos/domain/run-document-job';
+import { trabajoConProveedor } from './run-document-job-doubles';
+
 
 import type {
-  BatchStatus,
   DocumentFileStatusEntry,
+  ReadBatch,
 } from '@/lib/modules/documentos/domain/batch-status';
 import type { CropCatalogImagesResult } from '@/lib/modules/documentos/domain/crop-catalog-images';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
@@ -49,7 +50,7 @@ function dobleDeLog() {
 function dobleDeRepositorio() {
   const finish = vi.fn<DocumentBatchRepository['finish']>(async () => {});
   const claim = vi.fn(async (): Promise<ClaimedFile | null> => fila());
-  const batch: BatchStatus = {
+  const batch: ReadBatch = {
     id: TANDA,
     companyId: EMPRESA,
     strategy: 'catalogo',
@@ -67,7 +68,7 @@ function dobleDeRepositorio() {
     expireStale: vi.fn(async () => {
       throw new Error('este test no caduca nada');
     }),
-    readBatch: vi.fn(async (): Promise<BatchStatus | null> => batch),
+    readBatch: vi.fn(async (): Promise<ReadBatch | null> => batch),
     readFileForReview: vi.fn(async () => {
       throw new Error('este test no lee para revision');
     }),
@@ -111,7 +112,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -140,7 +141,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -161,7 +162,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -181,7 +182,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const almacenamiento = dobleDeAlmacenamiento();
     almacenamiento.remove.mockRejectedValueOnce(new Error('corte del bucket'));
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -206,7 +207,7 @@ describe('documentos — runDocumentJob con registro', () => {
     repo.claim.mockRejectedValueOnce(new Error('corte de base'));
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoOk()),
@@ -231,7 +232,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const repo = dobleDeRepositorio();
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: vi.fn(async () => trabajoFallidoReintentable()),
@@ -262,7 +263,7 @@ describe('documentos — runDocumentJob con registro', () => {
     const almacenamiento = dobleDeAlmacenamiento();
     const espia = dobleDeLog();
     const proceso = vi.fn(async () => trabajoOk());
-    const runDocumentJob = createRunDocumentJob({
+    const runDocumentJob = trabajoConProveedor({
       repository: repo.repository,
       storage: almacenamiento.storage,
       processPdfByStrategy: proceso,

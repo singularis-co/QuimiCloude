@@ -31,7 +31,6 @@ import {
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
-  DeliveredConditionedOrdersListSection,
   FinishedOrdersListSection,
   FinishedOrdersSkeleton,
   OrderOutcomeNotice,
@@ -188,21 +187,6 @@ export default async function AsignacionPage({
           }
         >
           <ConditionedOrdersListSection params={genericListParams} canViewTrace={canViewTrace} />
-        </Suspense>
-      ) : null}
-      {vista === 'acondicionados_entregados' ? (
-        <Suspense
-          fallback={
-            <ConditioningOrdersSkeleton
-              rows={genericListParams.pageSize}
-              list="acondicionados_entregados"
-            />
-          }
-        >
-          <DeliveredConditionedOrdersListSection
-            params={genericListParams}
-            canViewTrace={canViewTrace}
-          />
         </Suspense>
       ) : null}
     </PageShell>

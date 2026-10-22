@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   finishConditioningAction,
+  recordConditioningStepAction,
   saveConditioningBatchDataAction,
   startConditioningAction,
 } from '@/lib/modules/asignaciones/adapters/driving/order-conditioning-actions';
@@ -15,7 +16,12 @@ import {
   ConditioningBatchDataMissingError,
   ConditioningBatchDuplicateLotError,
   ConditioningBatchNotFoundError,
+  ConditioningResponsibleNotAllowedError,
+  ConditioningResponsiblesRequiredError,
+  ConditioningStepOutOfOrderError,
   ConditioningTeamEmptyError,
+  EvidenceRequiredError,
+  OrderNotFoundError,
   ConditioningTeamMemberNotAllowedError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
@@ -30,9 +36,11 @@ const {
   startConditioningMock,
   finishConditioningMock,
   saveConditioningBatchDataMock,
+  recordConditioningStepMock,
   redirectMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
+  recordConditioningStepMock: vi.fn(),
   saveConditioningBatchDataMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
@@ -52,6 +60,7 @@ vi.mock('@/lib/composition', () => ({
     startConditioning: startConditioningMock,
     finishConditioning: finishConditioningMock,
     saveConditioningBatchData: saveConditioningBatchDataMock,
+    recordConditioningStep: recordConditioningStepMock,
   },
 }));
 
@@ -221,85 +230,89 @@ describe('QC-219 — finishConditioningAction traduce la falta de datos de lote'
   });
 });
 
-describe('QC-219 T12 — saveConditioningBatchDataAction', () => {
+describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos por pedido', () => {
   const LOTE_A = '7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a';
-  const LOTE_B = '7b7b7b7b-7b7b-4b7b-8b7b-7b7b7b7b7b7b';
-  const LOTE_C = '7c7c7c7c-7c7c-4c7c-8c7c-7c7c7c7c7c7c';
   const VACIO = '';
 
-  function lineaFd(batchId: string, lot: string, expiryDate: string, productionDate: string) {
+  function datosFd(lot: string, expiryDate: string, productionDate: string) {
     return [
-      ['batchId', batchId],
       ['lot', lot],
       ['expiryDate', expiryDate],
       ['productionDate', productionDate],
     ] as const;
   }
 
-  it('R6: empareja las cuatro listas por posicion y pasa el actor de la sesion', async () => {
+  it('R19: lee un valor por campo y pasa el actor de la sesion, sin lineas ni batchId', async () => {
     saveConditioningBatchDataMock.mockResolvedValue(undefined);
 
     await saveConditioningBatchDataAction(
       { status: 'idle' },
-      formData([
-        ['orderId', ORDER_ID],
-        ...lineaFd(LOTE_A, 'CR-A', '2027-04-30', '2026-10-01'),
-        ...lineaFd(LOTE_B, 'CR-B', '2027-05-31', '2026-10-02'),
-      ]),
+      formData([['orderId', ORDER_ID], ...datosFd('CR-2610', '2027-04-30', '2026-10-01')]),
     );
 
     expect(saveConditioningBatchDataMock).toHaveBeenCalledWith(
       { id: 'user-1', companyId: 'company-1', permissions: SESSION_USER.permissions },
-      {
-        orderId: ORDER_ID,
-        lines: [
-          { batchId: LOTE_A, lot: 'CR-A', expiryDate: '2027-04-30', productionDate: '2026-10-01' },
-          { batchId: LOTE_B, lot: 'CR-B', expiryDate: '2027-05-31', productionDate: '2026-10-02' },
-        ],
-      },
+      { orderId: ORDER_ID, lot: 'CR-2610', expiryDate: '2027-04-30', productionDate: '2026-10-01' },
     );
   });
 
-  it('R6: omite la linea con los tres datos vacios; la que viene a medias viaja tal cual (R7)', async () => {
+  it('R19: un `batchId` o datos repetidos del formulario no viajan: solo el primer valor de cada campo', async () => {
     saveConditioningBatchDataMock.mockResolvedValue(undefined);
 
     await saveConditioningBatchDataAction(
       { status: 'idle' },
       formData([
         ['orderId', ORDER_ID],
-        ...lineaFd(LOTE_A, VACIO, VACIO, VACIO),
-        ...lineaFd(LOTE_B, 'CR-B', VACIO, '2026-10-02'),
-        ...lineaFd(LOTE_C, 'CR-C', '2027-05-31', '2026-10-02'),
+        ['batchId', LOTE_A],
+        ...datosFd('CR-A', '2027-04-30', '2026-10-01'),
+        ...datosFd('CR-B', '2027-05-31', '2026-10-02'),
       ]),
     );
 
     expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
       orderId: ORDER_ID,
-      lines: [
-        { batchId: LOTE_B, lot: 'CR-B', expiryDate: VACIO, productionDate: '2026-10-02' },
-        { batchId: LOTE_C, lot: 'CR-C', expiryDate: '2027-05-31', productionDate: '2026-10-02' },
-      ],
+      lot: 'CR-A',
+      expiryDate: '2027-04-30',
+      productionDate: '2026-10-01',
     });
   });
 
-  it('R7: sin ninguna linea con datos llega una lista vacia, y el caso de uso decide', async () => {
+  it('R19: un campo ausente llega como `null` y el caso de uso decide', async () => {
     saveConditioningBatchDataMock.mockRejectedValue(new ValidationError());
 
-    const resultado = await saveConditioningBatchDataAction(
-      { status: 'idle' },
-      formData([['orderId', ORDER_ID], ...lineaFd(LOTE_A, VACIO, VACIO, VACIO)]),
-    );
+    const resultado = await saveConditioningBatchDataAction({ status: 'idle' }, formData([['orderId', ORDER_ID]]));
 
-    expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({ orderId: ORDER_ID, lines: [] });
+    expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
+      orderId: ORDER_ID,
+      lot: null,
+      expiryDate: null,
+      productionDate: null,
+    });
     expect(resultado).toEqual({ status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') });
   });
 
-  it('R6: exito -> revalida el detalle y no redirige', async () => {
+  it('R19: campos vacios viajan tal cual, sin filtrar', async () => {
+    saveConditioningBatchDataMock.mockRejectedValue(new ValidationError());
+
+    await saveConditioningBatchDataAction(
+      { status: 'idle' },
+      formData([['orderId', ORDER_ID], ...datosFd(VACIO, VACIO, VACIO)]),
+    );
+
+    expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
+      orderId: ORDER_ID,
+      lot: VACIO,
+      expiryDate: VACIO,
+      productionDate: VACIO,
+    });
+  });
+
+  it('R18: exito -> revalida el detalle y no redirige', async () => {
     saveConditioningBatchDataMock.mockResolvedValue(undefined);
 
     const resultado = await saveConditioningBatchDataAction(
       { status: 'idle' },
-      formData([['orderId', ORDER_ID], ...lineaFd(LOTE_A, 'CR-A', '2027-04-30', '2026-10-01')]),
+      formData([['orderId', ORDER_ID], ...datosFd('CR-A', '2027-04-30', '2026-10-01')]),
     );
 
     expect(resultado).toEqual({ status: 'success' });
@@ -308,39 +321,84 @@ describe('QC-219 T12 — saveConditioningBatchDataAction', () => {
   });
 
   it.each([
-    ['batch_expiry_not_future', new BatchExpiryNotFutureError(LOTE_B)],
-    ['batch_production_date_future', new BatchProductionDateFutureError(LOTE_B)],
-    ['batch_duplicate_lot', new ConditioningBatchDuplicateLotError(LOTE_B)],
-    ['batch_not_found', new ConditioningBatchNotFoundError(LOTE_B)],
+    ['batch_expiry_not_future', new BatchExpiryNotFutureError()],
+    ['batch_production_date_future', new BatchProductionDateFutureError()],
+    ['batch_duplicate_lot', new ConditioningBatchDuplicateLotError(LOTE_A)],
+    ['batch_duplicate_lot en carrera', new ConditioningBatchDuplicateLotError()],
+    ['batch_not_found', new ConditioningBatchNotFoundError()],
+    ['unauthorized', new UnauthorizedError()],
+    ['order_conditioning_taken', new OrderConditioningTakenError()],
+    ['order_not_conditionable', new OrderNotConditionableError()],
   ] as const)(
-    'R5: %s se traduce a ErrorState con el texto del catalogo y la linea culpable, sin revalidar',
-    async (code, error) => {
+    'R25: %s se traduce a ErrorState con el codigo y el texto del catalogo, sin `batchId` y sin revalidar',
+    async (_n, error) => {
       saveConditioningBatchDataMock.mockRejectedValue(error);
 
       const resultado = await saveConditioningBatchDataAction(
         { status: 'idle' },
-        formData([['orderId', ORDER_ID], ...lineaFd(LOTE_B, 'CR-B', '2027-04-30', '2026-10-01')]),
+        formData([['orderId', ORDER_ID], ...datosFd('CR-A', '2027-04-30', '2026-10-01')]),
       );
 
-      expect(resultado).toEqual({ status: 'error', code, message: errorMessage(code), batchId: LOTE_B });
+      expect(resultado).toEqual({ status: 'error', code: error.code, message: errorMessage(error.code) });
+      expect(resultado).not.toHaveProperty('batchId');
       expect(revalidatePathMock).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('QC-299 T13 — recordConditioningStepAction: dejar atras un paso de acondicionamiento', () => {
+  const INPUT = { orderId: ORDER_ID, stepPosition: 2, responsibleUserIds: [BETO] };
+
+  it('R31: pasa el actor de la sesion y la entrada tal cual; exito -> devuelve el avance y revalida el detalle', async () => {
+    recordConditioningStepMock.mockResolvedValue({ completedCount: 2, allCompleted: false });
+
+    const resultado = await recordConditioningStepAction(INPUT);
+
+    expect(recordConditioningStepMock).toHaveBeenCalledWith(
+      { id: 'user-1', companyId: 'company-1', permissions: SESSION_USER.permissions },
+      INPUT,
+    );
+    expect(resultado).toEqual({ status: 'success', data: { completedCount: 2, allCompleted: false } });
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}`);
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('R31: sin sesion el actor llega `null` y el caso de uso rechaza con `unauthorized`', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+    recordConditioningStepMock.mockRejectedValue(new UnauthorizedError());
+
+    const resultado = await recordConditioningStepAction(INPUT);
+
+    expect(recordConditioningStepMock).toHaveBeenCalledWith(null, INPUT);
+    expect(resultado).toEqual({ status: 'error', code: 'unauthorized', message: errorMessage('unauthorized') });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
 
   it.each([
-    ['batch_duplicate_lot en carrera, sin linea', 'batch_duplicate_lot', new ConditioningBatchDuplicateLotError()],
-    ['unauthorized', 'unauthorized', new UnauthorizedError()],
-    ['order_conditioning_taken', 'order_conditioning_taken', new OrderConditioningTakenError()],
-    ['order_not_conditionable', 'order_not_conditionable', new OrderNotConditionableError()],
-  ] as const)('R5: %s llega sin `batchId`', async (_n, code, error) => {
-    saveConditioningBatchDataMock.mockRejectedValue(error);
+    ['unauthorized', new UnauthorizedError()],
+    ['invalid_input', new ValidationError()],
+    ['order_not_found', new OrderNotFoundError()],
+    ['order_not_conditionable', new OrderNotConditionableError()],
+    ['order_conditioning_taken', new OrderConditioningTakenError()],
+    ['conditioning_step_out_of_order', new ConditioningStepOutOfOrderError()],
+    ['conditioning_responsibles_required', new ConditioningResponsiblesRequiredError()],
+    ['conditioning_responsible_not_allowed', new ConditioningResponsibleNotAllowedError()],
+    ['evidence_required', new EvidenceRequiredError()],
+  ] as const)('R31: %s se traduce a ErrorState con el texto del catalogo y no revalida', async (_n, error) => {
+    recordConditioningStepMock.mockRejectedValue(error);
 
-    const resultado = await saveConditioningBatchDataAction(
-      { status: 'idle' },
-      formData([['orderId', ORDER_ID], ...lineaFd(LOTE_A, 'CR-A', '2027-04-30', '2026-10-01')]),
-    );
+    const resultado = await recordConditioningStepAction(INPUT);
 
-    expect(resultado).toEqual({ status: 'error', code, message: errorMessage(code) });
+    expect(resultado).toEqual({ status: 'error', code: error.code, message: errorMessage(error.code) });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('R31: una entrada sin `orderId` de texto no revalida nada', async () => {
+    recordConditioningStepMock.mockResolvedValue({ completedCount: 1, allCompleted: true });
+
+    const resultado = await recordConditioningStepAction(null);
+
+    expect(resultado).toEqual({ status: 'success', data: { completedCount: 1, allCompleted: true } });
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });

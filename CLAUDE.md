@@ -24,7 +24,8 @@ Cuando abres Claude Code en la raíz de este repo, actúas como **leader**. El l
    `frontend`, 3 en `backend` y 3 en `fullstack`). Además:
    - toda feature en vuelo tiene **assignee** en el tracker;
    - ninguna feature se toma sin pasar el candado (`docs/equipo.md > Tomar una feature`);
-   - ninguna feature se toma si choca en archivos con otra en vuelo de cualquier persona.
+   - ninguna feature se toma si choca en archivos con otra en vuelo **de otra persona**, salvo
+     que el humano acepte el choque (`docs/equipo.md > Conflicto de archivos entre personas`).
 
    `./init.sh` lo valida. Si el board incumple la regla, **gana la regla**: el leader deja fuera
    la feature sobrante y lo dice.

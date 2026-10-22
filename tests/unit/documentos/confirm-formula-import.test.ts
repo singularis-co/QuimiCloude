@@ -11,7 +11,7 @@ import type { FormulaImportDeps } from '@/lib/modules/documentos/domain/preview-
 
 import { PRODUCT_TYPES, type ProductRef } from '@/lib/modules/inventario';
 import { ActionNotAllowedError, RecipeDuplicateNameError, RecipeNotFoundError } from '@/lib/modules/recetas';
-import type { RecipeStepDocument } from '@/lib/modules/recetas';
+import { createRecipeSchema, updateRecipeSchema, type RecipeStepDocument } from '@/lib/modules/recetas';
 
 import type { DocumentBatchRepository, FileForReview } from '@/lib/modules/documentos/ports/document-batch-repository';
 
@@ -28,7 +28,7 @@ const ARCHIVO_LISTO: FileForReview = { status: 'done', strategy: 'formula', extr
 const PASO: RecipeStepDocument = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Mezclar' }] }] };
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'], addons: ['lectura_pdf'] };
 }
 
 function filaExistente(productId: string, percentage: string | null = '100.00') {
@@ -720,11 +720,54 @@ describe('QC-211 — confirmar con pasos de envasado', () => {
     const bitacora: Bitacora = [];
     const deps = crearDeps(bitacora);
     const confirm = createConfirmFormulaImport(deps);
-    const sinPermiso: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.modificar'] };
+    const sinPermiso: Actor = { id: PERSONA, companyId: EMPRESA, permissions: ['inventario.modificar'], addons: ['lectura_pdf'] };
 
     await expect(confirm(sinPermiso, entradaBase({ packingSteps: [ENVASAR] }))).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
     expect(bitacora).toEqual([]);
+  });
+});
+
+describe('QC-299 — la importacion no toca los pasos de acondicionamiento', () => {
+  const ROTULAR = { blocks: [{ kind: 'paragraph', spans: [{ text: 'Rotular cajas' }] }], requiresAssignment: true };
+
+  it('R7: crear no manda conditioningSteps y el alta los deja en lista vacia', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+
+    await confirm(actorConPermiso(), entradaBase());
+
+    const entrada = (deps.createRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(entrada).not.toHaveProperty('conditioningSteps');
+    expect(createRecipeSchema.parse(entrada).conditioningSteps).toEqual([]);
+  });
+
+  it('R7: reemplazar no manda conditioningSteps, asi que la edicion conserva los que tenia', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora, {
+      recipes: dobleDeRecetas(bitacora, { id: RECETA_VIVA, name: 'Detergente X' }) as unknown as FormulaImportDeps['recipes'],
+    });
+    const confirm = createConfirmFormulaImport(deps);
+
+    await confirm(actorConPermiso(), entradaBase({ replaceRecipeId: RECETA_VIVA }));
+
+    const entrada = (deps.updateRecipe as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(entrada).not.toHaveProperty('conditioningSteps');
+    expect(updateRecipeSchema.parse(entrada).conditioningSteps).toBeUndefined();
+  });
+
+  it('R7: la confirmacion no admite pasos de acondicionamiento en su entrada, sin leer ni escribir', async () => {
+    const bitacora: Bitacora = [];
+    const deps = crearDeps(bitacora);
+    const confirm = createConfirmFormulaImport(deps);
+
+    await expect(confirm(actorConPermiso(), entradaBase({ conditioningSteps: [ROTULAR] }))).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+    expect(bitacora).toEqual([]);
+    expect(deps.createRecipe).not.toHaveBeenCalled();
+    expect(deps.updateRecipe).not.toHaveBeenCalled();
   });
 });

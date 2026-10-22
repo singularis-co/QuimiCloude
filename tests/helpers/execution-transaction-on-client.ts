@@ -9,26 +9,31 @@
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
-import type { ExecutionTransaction } from '@/lib/modules/asignaciones/ports/execution-transaction';
+import type { ExecutionTransaction, ExecutionWriters } from '@/lib/modules/asignaciones/ports/execution-transaction';
 import type { OrderCancellation, OrderCatalog } from '@/lib/modules/pedidos';
 
 type ExecutionClient = Parameters<typeof createExecutionLogRepository>[0];
 
 type OrderWrites = Pick<OrderCatalog, 'transitionAliveById' | 'startPackingAliveById' | 'finishPackingAliveById'> &
-  Partial<Pick<OrderCatalog, 'startConditioningAliveById'>>;
+  Partial<Pick<OrderCatalog, 'startConditioningAliveById' | 'finishConditioningAliveById'>>;
 
 export type ExecutionDeps = {
   readonly log: ExecutionLogRepository;
   readonly transaction: ExecutionTransaction;
 };
 
-/** `log` y `transaction` sobre `db`, con las escrituras de `pedidos` que el propio test ya cablea. */
+function unused(what: string): () => Promise<never> {
+  return async () => {
+    throw new Error(`este archivo no ${what}`);
+  };
+}
+
+/** `log` y `transaction` sobre `db`, con las escrituras de `pedidos` e `inventario` que el propio test ya cablea. */
 export function executionOnClient(
   db: ExecutionClient,
   orders: OrderWrites,
-  cancelAliveById: OrderCancellation['cancelAliveById'] = async () => {
-    throw new Error('este archivo no cancela pedidos desde la ejecucion');
-  },
+  cancelAliveById: OrderCancellation['cancelAliveById'] = unused('cancela pedidos desde la ejecucion'),
+  batches: ExecutionWriters['batches'] = { writeForOrder: unused('guarda datos de lote') },
 ): ExecutionDeps {
   const log = createExecutionLogRepository(db);
   return {
@@ -44,12 +49,11 @@ export function executionOnClient(
           log,
           conditioning: {
             startConditioningAliveById:
-              orders.startConditioningAliveById ??
-              (async () => {
-                throw new Error('este archivo no comienza el acondicionamiento');
-              }),
+              orders.startConditioningAliveById ?? unused('comienza el acondicionamiento'),
+            finishConditioningAliveById: orders.finishConditioningAliveById ?? unused('termina el acondicionamiento'),
           },
           team: createConditioningTeamRepository(db),
+          batches,
         }),
     },
   };

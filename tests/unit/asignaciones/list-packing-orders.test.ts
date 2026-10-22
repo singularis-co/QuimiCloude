@@ -25,6 +25,7 @@ const RESUMEN_1 = {
   quantity: '10.0000',
   priority: 'ALTA',
   status: 'POR_EMPACAR',
+  createdAt: new Date('2026-09-01T08:00:00.000Z'),
   presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
   unitId: 'unidad-1',
   finishedAt: null,
@@ -39,6 +40,7 @@ const RESUMEN_2 = {
   quantity: '20.0000',
   priority: 'MEDIA',
   status: 'EN_EMPAQUE',
+  createdAt: new Date('2026-08-15T08:00:00.000Z'),
   presentationLines: [{ presentationId: 'presentacion-1', packages: 1, packagingName: null }],
   unitId: null,
   finishedAt: null,
@@ -52,7 +54,6 @@ type Dobles = {
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
   readonly findRefsUnits: ReturnType<typeof vi.fn>;
-  readonly findFinishedGoodsReceipts: ReturnType<typeof vi.fn>;
   readonly findRefsIncludingDeletedInCompany: ReturnType<typeof vi.fn>;
   readonly listByOrdersInCompany: ReturnType<typeof vi.fn>;
 };
@@ -71,11 +72,7 @@ function montar(): Dobles {
   ]);
   const findRefsPresentations = vi.fn(async () => [{ id: 'presentacion-1', name: 'Botella 1L' }]);
   const findRefsUnits = vi.fn(async () => [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }]);
-  const findFinishedGoodsReceipts = vi.fn(async () => [
-    { orderId: PEDIDO_1, packages: '5' },
-    { orderId: PEDIDO_2, packages: '3' },
-  ]);
-  const findRefsIncludingDeletedInCompany = vi.fn(async () => [{ id: BETO, displayName: 'Beto', isActive: true, permissions: [] }]);
+  const findRefsIncludingDeletedInCompany = vi.fn(async () => [{ id: BETO, displayName: 'Beto', isActive: true, permissions: [], roleName: 'Operador' }]);
   const listByOrdersInCompany = vi.fn(async () => []);
 
   const deps = {
@@ -85,7 +82,6 @@ function montar(): Dobles {
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations },
     units: { findRefs: findRefsUnits },
-    products: { findFinishedGoodsReceipts },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
   } as unknown as ListPackingOrdersDeps;
 
@@ -95,7 +91,6 @@ function montar(): Dobles {
     findRefsIncludingDeleted,
     findRefsPresentations,
     findRefsUnits,
-    findFinishedGoodsReceipts,
     findRefsIncludingDeletedInCompany,
     listByOrdersInCompany,
   };
@@ -103,12 +98,11 @@ function montar(): Dobles {
 
 describe('listPackingOrders — autorizacion (R13)', () => {
   it('actor ausente rechaza sin tocar ningun puerto', async () => {
-    const { deps, listAliveSummariesInCompany, findFinishedGoodsReceipts } = montar();
+    const { deps, listAliveSummariesInCompany } = montar();
     const listPackingOrders = createListPackingOrders(deps);
 
     await expect(listPackingOrders(null, { page: 1 })).rejects.toBeInstanceOf(AsignacionesError);
     expect(listAliveSummariesInCompany).not.toHaveBeenCalled();
-    expect(findFinishedGoodsReceipts).not.toHaveBeenCalled();
   });
 
   it('actor sin conjunto de permisos rechaza sin tocar ningun puerto', async () => {
@@ -156,7 +150,7 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
     );
   });
 
-  it('cada fila trae numero, receta, presentacion, envases, estado y quien empaca (vacio en POR_EMPACAR)', async () => {
+  it('cada fila trae numero, receta, presentacion, estado y quien empaca (vacio en POR_EMPACAR)', async () => {
     const { deps } = montar();
     const listPackingOrders = createListPackingOrders(deps);
 
@@ -168,11 +162,12 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         numberText: expect.any(String),
         recipeName: 'Desengrasante',
         quantity: '10.0000',
-        presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null }],
+        presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
         unitId: 'unidad-1',
         unitLabel: 'L',
-        packages: '5',
         status: 'POR_EMPACAR',
+        priority: 'ALTA',
+        createdAt: new Date('2026-09-01T08:00:00.000Z'),
         packedByName: null,
         packedById: null,
       },
@@ -181,14 +176,35 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
         numberText: expect.any(String),
         recipeName: 'Limpiador',
         quantity: '20.0000',
-        presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null }],
+        presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
         unitId: null,
         unitLabel: null,
-        packages: '3',
         status: 'EN_EMPAQUE',
+        priority: 'MEDIA',
+        createdAt: new Date('2026-08-15T08:00:00.000Z'),
         packedByName: 'Beto',
         packedById: BETO,
       },
+    ]);
+  });
+
+  it('las filas salen en el orden del catalogo, sin reordenar en memoria', async () => {
+    const { deps, listAliveSummariesInCompany } = montar();
+    // El catalogo ya ordeno por prioridad desc: el pedido mas antiguo de prioridad menor va despues.
+    listAliveSummariesInCompany.mockResolvedValueOnce({
+      items: [RESUMEN_1, RESUMEN_2],
+      total: 2,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+    });
+    const listPackingOrders = createListPackingOrders(deps);
+
+    const page = await listPackingOrders(ACTOR, { page: 1 });
+
+    expect(page.items.map((item) => [item.id, item.priority])).toEqual([
+      [PEDIDO_1, 'ALTA'],
+      [PEDIDO_2, 'MEDIA'],
     ]);
   });
 
@@ -222,17 +238,15 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
   });
 });
 
-describe('listPackingOrders — R25: ningun puerto de escritura de inventario', () => {
-  it('solo llama a la lectura `findFinishedGoodsReceipts`, nunca una escritura', async () => {
-    const { deps, findFinishedGoodsReceipts } = montar();
+describe('listPackingOrders — QC-281 R12: «Por empacar» ya no trae envases', () => {
+  it('ninguna fila lleva `packages` y la lista no depende de ningun catalogo de inventario de productos', async () => {
+    const { deps } = montar();
     const listPackingOrders = createListPackingOrders(deps);
 
-    await listPackingOrders(ACTOR, { page: 1 });
+    const page = await listPackingOrders(ACTOR, { page: 1 });
 
-    expect(findFinishedGoodsReceipts).toHaveBeenCalledWith([PEDIDO_1, PEDIDO_2], EMPRESA);
-    // `deps.products` solo declara la lectura en este test: no hay ninguna funcion de escritura
-    // que pudiera haberse llamado por error.
-    expect(Object.keys(deps.products)).toEqual(['findFinishedGoodsReceipts']);
+    for (const item of page.items) expect(item).not.toHaveProperty('packages');
+    expect(deps).not.toHaveProperty('products');
   });
 });
 

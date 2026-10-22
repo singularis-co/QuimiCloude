@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { listRecipesAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import {
@@ -122,13 +124,12 @@ export default async function PedidosPage({
   ]);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 data-testid="pedidos-title" className="text-2xl font-semibold">
-          {ORDERS_LABEL}
-        </h1>
-        <OrderSheet recipes={recipes} units={units} bridge={bridge} />
-      </div>
+    <PageShell>
+      <PageHeader
+        title={ORDERS_LABEL}
+        titleTestId="pedidos-title"
+        actions={<OrderSheet recipes={recipes} units={units} bridge={bridge} />}
+      />
       {/*
         SIN `key`: remontar este limite en cada cambio de consulta destruia la barra de filtros y
         con ella el foco del campo en el que se estaba escribiendo. La senal de R21 la da ahora
@@ -138,6 +139,6 @@ export default async function PedidosPage({
       <Suspense fallback={<OrderListSkeleton rows={params.pageSize} />}>
         <OrderListSection params={params} recipes={recipes} units={units} bridge={bridge} />
       </Suspense>
-    </div>
+    </PageShell>
   );
 }

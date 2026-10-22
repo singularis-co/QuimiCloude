@@ -98,7 +98,7 @@ const ASIGNADO: AssignedOrderView = {
   status: 'PENDIENTE',
   otherResponsibles: [{ userId: 'user-2', displayName: 'Ana López García', origin: { kind: 'direct' } }],
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
   ],
   unitId: null,
   unitLabel: null,
@@ -110,7 +110,7 @@ const TERMINADO: FinishedOrderView = {
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
   ],
   unitId: null,
   unitLabel: null,
@@ -124,7 +124,7 @@ const DE_LA_EMPRESA: CompanyOrderView = {
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5 },
+    { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
   ],
   unitId: null,
   unitLabel: null,
@@ -144,6 +144,8 @@ const POR_EMPACAR = {
   unitLabel: null,
   packages: '4',
   status: 'POR_EMPACAR',
+  priority: 'ALTA',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
   packedByName: null,
 };
 

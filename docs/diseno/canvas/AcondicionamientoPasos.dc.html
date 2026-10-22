@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Acondicionamiento paso a paso</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.pp-bar{display:flex;gap:6px}
+.pp-bar span{flex:1;height:6px;border-radius:999px;background:var(--muted);transition:background-color var(--d-b) var(--e-std)}
+.pp-bar span.done{background:var(--primary)}
+.pp-bar span.cur{background:color-mix(in oklch,var(--primary) 45%,var(--muted))}
+.pp-txt{font-size:18px;line-height:1.5;margin:0}
+.pp-chk{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.pp-chk li{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 12px;border:1px solid var(--border);border-radius:10px;font-size:15px}
+.pp-blk{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:12px;border:1px solid var(--border);background:color-mix(in oklch,var(--fg) 2%,var(--card))}
+.pp-blk.need{border-color:color-mix(in oklch,var(--primary) 45%,var(--border))}
+.pp-blk.err{border-color:var(--d-b)}
+.pp-blk-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.who{display:flex;flex-wrap:wrap;gap:8px}
+.who-b{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:0 14px 0 6px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--fg);font:500 14px 'IBM Plex Sans',sans-serif;cursor:pointer;transition:border-color var(--d-i),background-color var(--d-i)}
+.who-b:hover{border-color:var(--primary)}
+.who-b:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.who-b[aria-pressed="true"]{border-color:var(--primary);background:color-mix(in oklch,var(--primary) 10%,var(--card))}
+.who-b .ck{width:18px;height:18px;color:var(--primary);opacity:0;transition:opacity var(--d-i)}
+.who-b[aria-pressed="true"] .ck{opacity:1}
+.ph-slot{width:88px;height:88px;border-radius:10px;border:1px dashed var(--input);display:inline-flex;align-items:center;justify-content:center;color:var(--muted-fg);background:transparent;cursor:pointer;font:inherit}
+.ph-slot.on{border-style:solid;border-color:transparent;background:linear-gradient(160deg,oklch(0.93 0.03 200),oklch(0.84 0.06 190));color:oklch(0.38 0.06 190)}
+.lot-lock{opacity:.55}
+.pp-err{display:flex;gap:6px;align-items:center;margin:0;color:var(--d-fg);font-size:13px}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="scroller" style="padding-bottom: 112px">
+    <header class="op-hd">
+      <div style="max-width: 1064px; margin: 0 auto; padding: 12px 20px 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px">
+          <a class="b b-out b-back b-touch" href="Asignacion.dc.html"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a «Por acondicionar»</a>
+          <button class="b b-out b-ico b-touch" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap">
+          <div class="ph-t" style="gap: 2px"><span class="mono cap">2026-0000006</span><h1 class="op-t">Limpiador multiusos limón</h1><p class="sub">Cantidad: <span class="mono">72,00 L</span> · 14 × Galón 3,78 L · 15 × Botella 1 L</p></div>
+          <span class="{{ stCls }}"><i></i>{{ st }}</span>
+        </div>
+      </div>
+    </header>
+
+    <div style="max-width: 1064px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+      <sc-if value="{{ retomado }}" hint-placeholder-val="{{ false }}">
+        <div class="nt n-i enter" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg><div><b>Retomaste donde ibas</b>Paso {{ cur }} de {{ total }}. Los responsables y las fotos de los pasos anteriores siguen guardados.</div></div>
+      </sc-if>
+
+      <div class="g2 cq-2 enter" style="gap: 20px; align-items: start; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr)">
+        <section class="card" aria-labelledby="pp-t">
+          <sc-if value="{{ inSteps }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 14px">
+              <div class="card-hd"><h2 id="pp-t" class="h2">Paso {{ cur }} de {{ total }}</h2><span class="cap">Pasos de acondicionamiento</span></div>
+              <div class="pp-bar" aria-hidden="true"><sc-for list="{{ bar }}" as="b" hint-placeholder-count="4"><span class="{{ b.cls }}"></span></sc-for></div>
+              <p class="pp-txt">{{ step.text }}</p>
+              <sc-if value="{{ step.hasChk }}" hint-placeholder-val="{{ true }}">
+                <ul class="pp-chk">
+                  <sc-for list="{{ step.chk }}" as="c" hint-placeholder-count="2">
+                    <li><button class="cb" type="button" role="checkbox" aria-checked="{{ c.on }}" aria-label="{{ c.t }}" onClick="{{ c.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button><span onClick="{{ c.toggle }}">{{ c.t }}</span></li>
+                  </sc-for>
+                </ul>
+              </sc-if>
+
+              <sc-if value="{{ step.ev }}" hint-placeholder-val="{{ false }}">
+                <div class="{{ evCls }}">
+                  <div class="pp-blk-hd"><span class="strong" style="display: inline-flex; align-items: center; gap: 8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Evidencia</span><span class="cap">{{ photosLabel }}</span></div>
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap">
+                    <sc-for list="{{ slots }}" as="p" hint-placeholder-count="3"><button class="{{ p.cls }}" type="button" aria-label="{{ p.label }}" onClick="{{ p.toggle }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ p.icon }}"></path></svg></button></sc-for>
+                  </div>
+                  <sc-if value="{{ evErr }}" hint-placeholder-val="{{ false }}"><p class="pp-err" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Sube al menos una foto para avanzar.</p></sc-if>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ step.asg }}" hint-placeholder-val="{{ false }}">
+                <div class="{{ asgCls }}" role="group" aria-labelledby="pp-who">
+                  <div class="pp-blk-hd"><span id="pp-who" class="strong" style="display: inline-flex; align-items: center; gap: 8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"></path></svg>Responsables del paso</span><span class="cap">{{ whoLabel }}</span></div>
+                  <p class="cap" style="margin: 0">Elige uno o más del equipo que hicieron este paso. Puedes elegirte a ti.</p>
+                  <div class="who">
+                    <sc-for list="{{ who }}" as="w" hint-placeholder-count="4"><button class="who-b" type="button" aria-pressed="{{ w.on }}" onClick="{{ w.toggle }}"><span class="{{ w.avCls }}">{{ w.ini }}</span>{{ w.name }}<sc-if value="{{ w.me }}" hint-placeholder-val="{{ false }}"><span class="cap">(tú)</span></sc-if><svg class="ic ck" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"></path></svg></button></sc-for>
+                  </div>
+                  <sc-if value="{{ asgErr }}" hint-placeholder-val="{{ false }}"><p class="pp-err" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>Elige al menos un responsable para avanzar.</p></sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ stepsDone }}" hint-placeholder-val="{{ false }}">
+            <div class="box fade" style="border: 0; padding: 24px 12px"><span class="bi" style="background: var(--s-bg); color: var(--s-fg)"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg></span><h2 class="h3" style="margin: 0">Pasos completos</h2><p class="sub">Guarda los datos de lote y pulsa «Terminar».</p><button class="b b-out b-sm" type="button" onClick="{{ backToSteps }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>Volver a los pasos</button></div>
+          </sc-if>
+        </section>
+
+        <div style="display: flex; flex-direction: column; gap: 20px">
+          <section class="card" aria-labelledby="pp-eq">
+            <div class="card-hd"><h2 id="pp-eq" class="h2">Equipo</h2><span class="cap">Elegido al comenzar</span></div>
+            <ul class="lbox" style="margin: 0; list-style: none; padding: 2px 12px">
+              <sc-for list="{{ team }}" as="m" hint-placeholder-count="3"><li class="lrow" style="min-height: 44px"><span class="person"><span class="{{ m.avCls }}">{{ m.ini }}</span>{{ m.name }}</span></li></sc-for>
+            </ul>
+          </section>
+          <section class="{{ lotCls }}" aria-labelledby="pp-lote">
+            <div class="card-hd"><h2 id="pp-lote" class="h2">Datos de lote</h2><sc-if value="{{ lotLocked }}" hint-placeholder-val="{{ true }}"><span class="cap">Al completar los pasos</span></sc-if></div>
+            <div class="f"><label for="pp-l">Lote</label><input id="pp-l" class="in in-touch mono" type="text" value="L-2026-1043" disabled="{{ lotLocked }}"></div>
+            <div class="f"><label for="pp-v">Vencimiento</label><input id="pp-v" class="in in-touch mono" type="text" value="10/10/2028" disabled="{{ lotLocked }}"></div>
+            <div class="actions"><button class="b b-out b-touch" type="button" disabled="{{ lotLocked }}" onClick="{{ saveLot }}">Guardar datos de lote</button></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="op-ft">
+    <div style="max-width: 1064px; margin: 0 auto; display: flex; justify-content: flex-end">
+      <div class="g2" style="width: min(520px, 100%)">
+        <button class="b b-out b-xl" type="button" disabled="{{ prevDis }}" onClick="{{ prev }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>Anterior</button>
+        <button class="{{ nextCls }}" type="button" disabled="{{ nextDis }}" onClick="{{ next }}" aria-describedby="pp-cd">
+          <sc-if value="{{ counting }}" hint-placeholder-val="{{ false }}"><svg class="ring" viewBox="0 0 44 44" aria-hidden="true" style="width: 28px; height: 28px"><circle class="bgc" cx="22" cy="22" r="17"></circle><circle class="fgc" cx="22" cy="22" r="17" stroke-dasharray="106.8" stroke-dashoffset="{{ dash }}" transform="rotate(-90 22 22)"></circle></svg></sc-if>
+          {{ nextTxt }}<sc-if value="{{ counting }}" hint-placeholder-val="{{ false }}"><span id="pp-cd" class="mono" style="font-weight: 500">{{ leftTxt }}</span></sc-if>
+          <sc-if value="{{ notCounting }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></sc-if>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 104px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"paso":{"editor":"number","default":2},"retomado":{"editor":"boolean","default":false},"error":{"editor":"enum","options":["ninguno","responsables","evidencia"],"default":"ninguno"},"completo":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+componentDidMount() { this.count(); }
+componentWillUnmount() { clearInterval(this.iv); clearTimeout(this.t); }
+count() { clearInterval(this.iv); this.end = Date.now() + 5000; this.setState({ left: 5 }); this.iv = setInterval(() => { const l = Math.max(0, Math.ceil((this.end - Date.now()) / 1000)); this.setState({ left: l }); if (!l) clearInterval(this.iv); }, 250); }
+toast(t) { clearTimeout(this.t); this.setState({ toast: t }); this.t = setTimeout(() => this.setState({ toast: null }), 3000); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const P = { SV: ['SV', 'av c4', 'Santiago Vargas'], LG: ['LG', 'av', 'Laura Gómez'], MS: ['MS', 'av c2', 'Mateo Sánchez'], VH: ['VH', 'av c3', 'Valentina Herrera'] };
+const ME = 'SV';
+const TEAM = ['LG', 'MS', 'VH'];
+const STEPS = [
+{ text: 'Revisa que cada garrafa esté sellada y sin fugas.', chk: ['Tapas selladas', 'Sin fugas'], ev: false, asg: false },
+{ text: 'Etiqueta cada garrafa con el lote y la fecha de vencimiento.', chk: ['Etiquetas pegadas en las 29 unidades'], ev: true, asg: true },
+{ text: 'Arma las cajas de despacho: 4 garrafas por caja.', chk: [], ev: false, asg: true },
+{ text: 'Verifica el conteo final contra el pedido.', chk: ['Conteo coincide con el pedido'], ev: false, asg: false }
+];
+const total = STEPS.length;
+const done = s.done !== undefined ? s.done : !!this.props.completo;
+const cur = Math.min(total, Math.max(1, s.cur || Number(this.props.paso) || 1));
+const step = STEPS[cur - 1];
+const chk = (s.chk || {})[cur] || (this.props.paso && !s.cur ? step.chk.map(() => this.props.error === 'ninguno') : step.chk.map(() => false));
+const who = (s.who || { 2: [], 3: [] })[cur] || [];
+const ph = (s.ph || {})[cur] !== undefined ? s.ph[cur] : (this.props.error === 'evidencia' ? 0 : (cur === 2 ? 1 : 0));
+const forcedErr = !s.touched ? (this.props.error || 'ninguno') : 'ninguno';
+const err = s.err || forcedErr;
+const left = s.left === undefined ? 0 : s.left;
+const counting = !done && left > 0;
+const chkOk = chk.every((x) => x);
+const setChk = (i) => () => { const all = Object.assign({}, s.chk || {}); const arr = chk.slice(); arr[i] = !arr[i]; all[cur] = arr; this.setState({ chk: all, touched: true }); };
+const setWho = (k) => () => { const all = Object.assign({ 2: [], 3: [] }, s.who || {}); const arr = who.indexOf(k) >= 0 ? who.filter((x) => x !== k) : who.concat([k]); all[cur] = arr; this.setState({ who: all, err: null, touched: true }); };
+const setPh = (n) => () => { const all = Object.assign({}, s.ph || {}); all[cur] = n; this.setState({ ph: all, err: null, touched: true }); };
+const go = (n) => { this.setState({ cur: n, err: null, touched: true }); this.count(); };
+const next = () => {
+if (counting || !chkOk) return;
+if (step.ev && ph < 1) { this.setState({ err: 'evidencia', touched: true }); return; }
+if (step.asg && who.length < 1) { this.setState({ err: 'responsables', touched: true }); return; }
+if (cur < total) go(cur + 1); else { this.setState({ done: true, touched: true }); this.toast('Pasos completos.'); }
+};
+const people = [ME].concat(TEAM);
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+st: 'En acondicionamiento', stCls: 'sb t-progress',
+retomado: !!this.props.retomado && !s.touched,
+inSteps: !done, stepsDone: done,
+cur: String(cur), total: String(total),
+bar: STEPS.map((x, i) => ({ cls: done || i + 1 < cur ? 'done' : (i + 1 === cur ? 'cur' : '') })),
+step: { text: step.text, hasChk: step.chk.length > 0, ev: step.ev, asg: step.asg, chk: step.chk.map((t, i) => ({ t: t, on: chk[i] ? 'true' : 'false', toggle: setChk(i) })) },
+evCls: 'pp-blk' + (err === 'evidencia' ? ' err' : (ph < 1 ? ' need' : '')),
+photosLabel: ph + ' de 3 fotos · mínimo 1',
+slots: [0, 1, 2].map((i) => ({ cls: i < ph ? 'ph-slot on' : 'ph-slot', label: i < ph ? 'Quitar la foto ' + (i + 1) : 'Añadir foto', icon: i < ph ? 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' : 'M12 5v14M5 12h14', toggle: setPh(i < ph ? i : Math.min(3, ph + 1)) })),
+evErr: err === 'evidencia',
+asgCls: 'pp-blk' + (err === 'responsables' ? ' err' : (who.length < 1 ? ' need' : '')),
+whoLabel: who.length ? who.length + (who.length === 1 ? ' elegido' : ' elegidos') : 'Ninguno elegido',
+who: people.map((k) => ({ ini: P[k][0], avCls: P[k][1] + ' sm', name: P[k][2], me: k === ME, on: who.indexOf(k) >= 0 ? 'true' : 'false', toggle: setWho(k) })),
+asgErr: err === 'responsables',
+team: [ME].concat(TEAM).map((k) => ({ ini: P[k][0], avCls: P[k][1] + ' sm', name: P[k][2] + (k === ME ? ' (acondiciona)' : '') })),
+lotLocked: !done, lotCls: done ? 'card' : 'card lot-lock',
+saveLot: () => this.toast('Datos de lote guardados.'),
+backToSteps: () => { this.setState({ done: false, cur: total, touched: true }); this.count(); },
+prevDis: done || cur === 1, prev: () => { if (cur > 1) go(cur - 1); },
+nextTxt: done ? 'Terminar' : (cur === total ? 'Completar pasos' : 'Siguiente'),
+nextCls: (!counting && (done || chkOk)) ? 'b b-pri b-xl' : 'b b-out b-xl',
+nextDis: counting || (!done && !chkOk),
+next: done ? () => this.toast('Acondicionamiento terminado.') : next,
+counting: counting, notCounting: !counting,
+leftTxt: '00:0' + left,
+dash: (106.8 * (1 - left / 5)).toFixed(1),
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

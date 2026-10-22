@@ -2,9 +2,16 @@
 // Solo reexporta simbolos de ./domain. Nada de 'use server', @prisma/client ni next/* en su
 // cierre de imports. El adaptador driving no pasa por aqui.
 export { type Customer } from './domain/customer';
-export { requirePermission, type Actor } from './domain/actor';
+export { requirePermission, CUSTOMER_MODIFY_PERMISSION, type Actor } from './domain/actor';
 export { type CustomerScope } from './domain/customer-scope';
-export { ClientesError, UnauthorizedError, CustomerNotFoundError, ValidationError } from './domain/errors';
+export {
+  ClientesError,
+  UnauthorizedError,
+  CustomerNotFoundError,
+  ValidationError,
+  CustomerPhoneCountryRequiredError,
+  CustomerPhoneInvalidError,
+} from './domain/errors';
 export { type Page } from './domain/page';
 export { CUSTOMER_QUERYABLE } from './domain/customer-queryable';
 export { normalizeCustomerText } from './domain/customer-text';
@@ -21,7 +28,43 @@ export {
   type CreateCustomerInput,
   type UpdateCustomerInput,
 } from './domain/customer-input';
-export { type NewCustomer, type CustomerView } from './domain/customer-view';
+export {
+  type NewCustomer,
+  type NewCustomerPhone,
+  type CustomerPhoneColumns,
+  type KeepLegacyOrClearPhone,
+  type CustomerView,
+} from './domain/customer-view';
+export {
+  parseCustomerPhone,
+  parseCustomerPhoneText,
+  formatPhoneNational,
+  formatPhoneInternational,
+  countryFromInternationalInput,
+  describeCustomerPhone,
+  parseWaIdPhone,
+  type CustomerPhoneIssue,
+  type ParsedCustomerPhone,
+  type ParsedLegacyPhone,
+  type CustomerPhoneDescription,
+} from './domain/customer-phone';
+export { phoneMatchesWaId, waIdCandidates } from './domain/phone-matches-wa-id';
+export {
+  createCustomerPhoneLinks,
+  type CustomerPhoneLinksDeps,
+  type CustomerPhoneLinksService,
+} from './domain/customer-phone-links';
+export {
+  planLegacyPhoneBackfill,
+  type LegacyPhoneRow,
+  type LegacyPhoneOutcome,
+  type LegacyPhonePlan,
+} from './domain/legacy-phone-backfill';
+export {
+  createBackfillLegacyPhones,
+  type BackfillLegacyPhonesDeps,
+  type BackfillLegacyPhonesSummary,
+} from './domain/backfill-legacy-phones';
 // Servicio de solo lectura para otros modulos; lo implementa un adaptador driven y lo ata
 // `lib/composition`.
 export type { CustomerCatalog, CustomerRef, CustomerRefSearch } from './domain/customer-catalog';

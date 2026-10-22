@@ -787,6 +787,9 @@ describe('baja, marcas de tiempo y forma de la tabla (R14, R15, R16, R17)', () =
         'last_names',
         'last_names_normalized',
         'phone',
+        'phone_country',
+        'phone_e164',
+        'phone_issue',
         'updated_at',
         'updated_by',
       ])
