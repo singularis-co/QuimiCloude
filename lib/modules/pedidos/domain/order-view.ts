@@ -120,6 +120,9 @@ export type OrderRow = {
   /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
    *  solo si `ingredientsCost` lo es. */
   readonly packagingCost: string | null;
+  /** Coste real de lo consumido, fijado al Terminar el empaque; `null` sin terminar o sin
+   *  calculo posible, nunca `0`. Va aparte del estimado y no lo sustituye. */
+  readonly actualCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
@@ -176,6 +179,9 @@ export type OrderView = {
   /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
    *  solo si `ingredientsCost` lo es. */
   readonly packagingCost: string | null;
+  /** Coste real de lo consumido, fijado al Terminar el empaque; `null` sin terminar o sin
+   *  calculo posible, nunca `0`. Va aparte del estimado y no lo sustituye. */
+  readonly actualCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;

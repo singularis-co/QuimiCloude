@@ -121,3 +121,47 @@ describe('useOrderCostQuote — la unidad del pedido', () => {
     expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(MISSING_VALUE_MARK);
   });
 });
+
+describe('useOrderCostQuote — estimado congelado', () => {
+  it('R15: con frozen ningun manejador pide cotizacion y queda el importe inicial', async () => {
+    const { result } = renderHook(() =>
+      useOrderCostQuote('40.0000', 'order-1', [], { frozen: true }),
+    );
+
+    act(() => result.current.onRecipeChange(RECIPE_ID, '5', GRAMO));
+    act(() => result.current.onQuantityChange(RECIPE_ID, '8', GRAMO));
+    act(() => result.current.onUnitChange(RECIPE_ID, '8', KILO));
+    act(() => result.current.onDistributionChange(RECIPE_ID, '8', KILO, []));
+    await advance(1000);
+
+    expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
+    expect(result.current.state).toEqual({ amount: '40.0000', quoting: false, error: null });
+  });
+
+  it('R15: con frozen y sin importe guardado queda el guion, no 0', async () => {
+    const { result } = renderHook(() => useOrderCostQuote(null, 'order-1', [], { frozen: true }));
+
+    act(() => result.current.onRecipeChange(RECIPE_ID, '5', GRAMO));
+    await advance(1000);
+
+    expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
+    expect(result.current.state.amount).toBeNull();
+    render(createElement(OrderCostQuote, { ...result.current.state, approximate: false }));
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(MISSING_VALUE_MARK);
+  });
+
+  it('R15: sin frozen se cotiza como hoy', async () => {
+    quoteOrderCostActionMock.mockResolvedValue({ status: 'success', data: { ingredientsCost: '55.0000' } });
+    const { result } = renderHook(() =>
+      useOrderCostQuote('40.0000', 'order-1', [], { frozen: false }),
+    );
+
+    await act(async () => {
+      result.current.onRecipeChange(RECIPE_ID, '5', GRAMO);
+      await Promise.resolve();
+    });
+
+    expect(quoteOrderCostActionMock).toHaveBeenCalledTimes(1);
+    expect(result.current.state.amount).toBe('55.0000');
+  });
+});

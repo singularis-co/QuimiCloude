@@ -193,3 +193,5 @@ aprobados el 2026-10-14 (`docs/diseno/canvas/EmpaqueTerminar*.dc.html`,
 ## Preguntas abiertas
 
 Ninguna. Las cinco que dejó el spec las cerró el humano el 2026-10-14 (D19–D23).
+
+> **Enmienda QC-305 (2026-10-21):** el total que se reparte entre los lotes de producto terminado (D20, R21) es el coste real del pedido, no el estimado; sin coste real el lote nace sin coste unitario. El reparto por cantidad (D9) no cambia. Ver `specs/QC-305-coste-real-de-produccion/requirements.md` R16-R17.

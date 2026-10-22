@@ -325,3 +325,9 @@ HEAD antes del fix: `f4d5281d`.
 - `recipe-route-contract.test.ts` y `data-table-alcance.test.ts`: verdes.
 - `tests/unit/recetas` + `tests/unit/recetas-ui` + `tests/unit/shared` + `tablas-marca`: 162 archivos, 2292 verdes, 2 skipped.
 - Con la integración de la migración (base efímera): 163 archivos, 2290 verdes (corrida previa a la pulsación larga).
+
+## Vuelta 3 — F2.3 de nuevo (PR #290 en conflicto con `dev`, +42 commits)
+- Conflictos (listas cerradas), ambos lados conservados: `tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS`: las dos de QC-299 y después `20261021140000_orders_actual_cost` y `20261021150000_finished_goods_lot_cost_optional`, por timestamp); `tests/unit/shared/data-table-alcance.test.ts` (nota de `coste-real-de-produccion.spec.ts` de dev y después la de QC-299; recuento 55 → **cincuenta y seis**).
+- `dev` cambió `db/schema.prisma` → `pnpm exec prisma generate`.
+- Dos migraciones nuevas de dev verificadas en base efímera: plantilla `qct_tpl_37cac790cc7c` con 115 migraciones; `QuimiCloude` no se tocó.
+- Verificación: typecheck **0 errores**; lint 0 errores, 10 warnings; guardias 85 archivos, 1255 verdes, 22 skipped; `tests/unit/{shared,pedidos,pedidos-ui,documentos,documentos-ui,paridad,asignaciones,inventario,recetas,recetas-ui,marca}` + `tests/integration/pedidos` + int de migración y de progreso de QC-299 → 770 archivos, 12896 verdes, 40 skipped (base efímera borrada).

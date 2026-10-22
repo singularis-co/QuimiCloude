@@ -6,9 +6,10 @@
 //
 // `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar):
 // abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive`, guarda
-// el conteo real y los envases libres de cada linea, liquida los envases con ese conteo y da de
-// alta, por cada linea con envases, un lote de producto terminado con un unico coste por unidad
-// del pedido, expresado en la unidad de cada lote; todo en la MISMA transaccion. `asignaciones`
+// el conteo real y los envases libres de cada linea, liquida los envases con ese conteo, guarda el
+// coste real de lo consumido y da de alta, por cada linea con envases, un lote de producto
+// terminado con ese coste repartido en un unico coste por unidad del pedido, expresado en la
+// unidad de cada lote; todo en la MISMA transaccion. `asignaciones`
 // solo conoce la firma de `OrderCatalog`, nunca este archivo.
 
 import { planFinishedGoodsLine } from '@/lib/modules/inventario';
@@ -22,9 +23,9 @@ import {
   RecipeNotFoundError,
 } from './errors';
 import { sumInOrderUnit } from './order-distribution';
+import { calculateActualOrderCost } from './actual-order-cost';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
 import { checkPackingCounts, packingSurplusByLine, type PackedLineCount } from './packing-count';
-import { resolveLotCost } from './resolve-ingredients-cost';
 import { assertTransition } from './order-transitions';
 
 import type { FinishedGoodsReceipt, OrderCatalog } from './order-catalog';
@@ -33,7 +34,7 @@ import type { OrderPackingRepository } from '../ports/order-packing-repository';
 import type { FinishPackingLine, RecordedPackedLine } from '../ports/order-write-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '../ports/order-unit-of-work';
 
-import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
+import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -44,19 +45,14 @@ export type StartPackingDeps = {
 export type FinishPackingDeps = {
   readonly packing: OrderPackingRepository;
   readonly unitOfWork: OrderUnitOfWork;
-  /** Nombre de la receta y coste del lote cuando el pedido no tiene importe guardado: las dos
-   *  lecturas van por los catalogos publicos, sobre el cliente global -la misma foto que veria
-   *  una edicion en ese instante-, nunca sobre `scope.recipes`. Mismo criterio que tenia
-   *  `transition-order.ts` cuando Finalizar daba de alta el lote. */
+  /** Nombre de la receta del lote: lectura por el catalogo publico, sobre el cliente global,
+   *  nunca sobre `scope.recipes`. */
   readonly recipes: RecipeCatalog;
-  readonly products: ProductCatalog;
   readonly units: UnitCatalog;
   /** La unidad de cada presentacion, para repartir el coste en la unidad del pedido, y el
    *  contenido vigente con el que rescatar una linea sin contenido copiado. Lectura global,
-   *  fuera de la transaccion, igual que `recipes`/`products`. */
+   *  fuera de la transaccion, igual que `recipes`. */
   readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
-  /** El costo de los envases del reparto, para el lote sin importe guardado. */
-  readonly packaging: PackagingCatalog;
 };
 
 /** Firma exacta de `OrderCatalog['startPackingAliveById']`. `'without_distribution'` sale
@@ -291,6 +287,14 @@ async function settlePackaging(
   }
 }
 
+/** Calcula el coste real con lo que el pedido consumio hasta este instante y lo guarda. */
+async function saveActualCost(scope: OrderTransactionScope, orderId: string, companyId: string): Promise<string | null> {
+  const lots = await scope.consumption.findConsumedLots({ orderId, companyId });
+  const actualCost = calculateActualOrderCost(lots);
+  await scope.orders.setActualCost(orderId, actualCost, { companyId });
+  return actualCost;
+}
+
 function packedByLineId(counts: readonly PackedLineCount[]): ReadonlyMap<string, number> {
   return new Map(counts.map((count) => [count.lineId, count.packedPackages] as const));
 }
@@ -309,7 +313,11 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         if (checkPackingCounts(lines, counts).kind !== 'ok') {
           throw new FinishPackingRejectedSignal('invalid_packing_count');
         }
-        if (lines.length === 0) return { kind: 'ok' as const, finishedGoods: [] };
+        // Sin reparto no hay envases que liquidar: el real sale solo de los ingredientes.
+        if (lines.length === 0) {
+          await saveActualCost(scope, id, companyId);
+          return { kind: 'ok' as const, finishedGoods: [] };
+        }
 
         if (updated.unitId === null) throw new OrderWithoutUnitError(id);
         const resolvedLines = await resolveLines(deps.presentations, companyId, lines, packedByLineId(counts));
@@ -330,27 +338,18 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
           now,
         });
 
+        // Despues de liquidar los envases: sus asientos ya estan escritos en esta transaccion.
+        const actualCost = await saveActualCost(scope, id, companyId);
+
         const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([updated.recipeId], companyId);
         if (recipeRef === undefined) throw new RecipeNotFoundError();
 
-        // El coste del pedido sale del plan, envases incluidos: el conteo real solo cambia entre
-        // cuantas unidades se reparte.
-        const lotCost =
-          updated.ingredientsCost !== null
-            ? updated.ingredientsCost
-            : await resolveLotCost(
-                deps,
-                updated.recipeId,
-                updated.quantity,
-                updated.unitId,
-                packagingLinesOf(lines),
-                companyId,
-                { orderId: id },
-              );
-
         const packedLines = resolvedLines.filter((line) => line.packedPackages > 0);
         if (packedLines.length === 0) return { kind: 'ok' as const, finishedGoods: [] };
-        const unitCosts = unitCostByPresentationUnit(lotCost, orderUnit, unitById, resolvedLines);
+
+        // Sin coste real los lotes nacen sin coste: ni el estimado ni `0` ocupan su lugar.
+        const unitCosts =
+          actualCost === null ? null : unitCostByPresentationUnit(actualCost, orderUnit, unitById, resolvedLines);
 
         const finishedGoods: FinishedGoodsReceipt[] = [];
         for (const { line, content, unitId, packedPackages } of packedLines) {
@@ -363,7 +362,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
             orderPresentationLineId: line.id,
             packages: packedPackages,
             orderContent: content,
-            unitCost: unitCosts.get(unitId) ?? '0.0000',
+            unitCost: unitCosts === null ? null : (unitCosts.get(unitId) ?? '0.0000'),
             actorId: packerId,
             now,
           });

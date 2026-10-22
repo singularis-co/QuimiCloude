@@ -18,6 +18,7 @@ import {
   PACKAGING_OPTION_TESTID,
   PACKAGING_SELECT_TESTID,
   ORDER_COST_QUOTE_APPROXIMATE_TESTID,
+  ORDER_COST_QUOTE_DEBOUNCE_MS,
   ORDER_COST_QUOTE_ERROR_TESTID,
   ORDER_COST_QUOTE_TESTID,
   ORDER_COST_QUOTE_VALUE_TESTID,
@@ -240,10 +241,11 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     recipeVersion: null,
     quantity: '5',
     priority: 'ALTA',
-    status: 'EN_CURSO',
+    status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -421,6 +423,64 @@ describe('R12 — en la edicion, cambiar receta o cantidad recotiza', () => {
     );
     await waitFor(() =>
       expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 30.00'),
+    );
+  });
+});
+
+describe('R15 — en EN_CURSO el estimado esta congelado', () => {
+  it('R15: se ve el guardado y cambiar cantidad, receta o unidad no pide cotizacion', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '20.0000' },
+    });
+    renderFormulario(pedido({ status: 'EN_CURSO', ingredientsCost: '40.0000' }));
+
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 40.00');
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '7');
+    await elegirReceta(user, RECETA2);
+    await new Promise((resolve) => setTimeout(resolve, ORDER_COST_QUOTE_DEBOUNCE_MS + 100));
+
+    expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 40.00');
+  });
+
+  it('R15: sin estimado guardado se ve el guion y tampoco se cotiza', async () => {
+    const user = setupUser();
+    renderFormulario(pedido({ status: 'EN_CURSO', ingredientsCost: null }));
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '9');
+    await new Promise((resolve) => setTimeout(resolve, ORDER_COST_QUOTE_DEBOUNCE_MS + 100));
+
+    expect(quoteOrderCostActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe(MISSING_VALUE_MARK);
+  });
+
+  it('R15: en PENDIENTE la edicion sigue cotizando como hoy', async () => {
+    const user = setupUser();
+    quoteOrderCostActionMock.mockResolvedValue({
+      status: 'success',
+      data: { ingredientsCost: '20.0000' },
+    });
+    const elPedido = pedido({ status: 'PENDIENTE', ingredientsCost: '40.0000' });
+    renderFormulario(elPedido);
+
+    await user.clear(cantidad());
+    await user.type(cantidad(), '7');
+
+    await waitFor(() =>
+      expect(quoteOrderCostActionMock).toHaveBeenCalledWith({
+        recipeId: elPedido.recipeId,
+        quantity: '7',
+        orderId: elPedido.id,
+        unitId: UNIDAD.id,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID).textContent).toBe('$ 20.00'),
     );
   });
 });

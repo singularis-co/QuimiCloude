@@ -88,6 +88,7 @@ function filaConEmpresa(): OrderRow {
     presentationLines: [],
     unitId: null,
     customerId: null,
+    actualCost: null,
   }
   return row as OrderRow
 }
@@ -155,6 +156,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
       cancellationReason: null,
       ingredientsCost: null,
       packagingCost: null,
+      actualCost: null,
       createdAt: new Date('2026-09-15T10:00:00.000Z'),
       updatedAt: new Date('2026-09-15T10:00:00.000Z'),
       createdBy: 'u-1',

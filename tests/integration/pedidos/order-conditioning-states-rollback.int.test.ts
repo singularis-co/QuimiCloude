@@ -6,7 +6,8 @@
  * abortada, asi que va dentro de un SAVEPOINT para poder seguir consultando.
  *
  * El SQL se lee de los archivos, no se copia: si alguien reordena el `down.sql`, esto lo nota.
- * Orden de una reversion real: primero el DOWN del indice, que compara contra `TERMINADO`, y
+ * Orden de una reversion real: primero el DOWN del coste real (`orders_actual_cost`, posterior, con
+ * un CHECK que nombra `TERMINADO`), luego el del indice, que compara contra `TERMINADO`, y
  * despues el de los estados.
  */
 import { randomUUID } from 'node:crypto'
@@ -116,6 +117,9 @@ const STATES_DOWN_STATEMENTS: readonly string[] = [
   ...plainStatementsOf(STATES_DOWN_SQL.slice(STATES_DOWN_SQL.indexOf(ABORT_BLOCK) + ABORT_BLOCK.length)),
 ]
 const INDEX_DOWN_STATEMENTS = plainStatementsOf(INDEX_DOWN_SQL)
+const ACTUAL_COST_DOWN_STATEMENTS = plainStatementsOf(
+  readFileSync(join(locateMigrationDir('_orders_actual_cost'), 'down.sql'), 'utf8'),
+)
 
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) await tx.$executeRawUnsafe(statement)
@@ -251,6 +255,7 @@ describe('down.sql de order_conditioning_states', () => {
       ).toBe(0)
       expect(await indexNames(tx)).toContain('orders_company_terminated_idx')
 
+      await applyStatements(tx, ACTUAL_COST_DOWN_STATEMENTS)
       await applyStatements(tx, INDEX_DOWN_STATEMENTS)
       expect(await indexNames(tx)).not.toContain('orders_company_terminated_idx')
 

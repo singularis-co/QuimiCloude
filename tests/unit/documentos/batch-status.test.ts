@@ -46,16 +46,16 @@ const LECTURA: ReadBatch = {
 const TANDA: BatchStatus = { ...LECTURA, maxAttempts: 4 };
 
 describe('documentos — las claves del estado de una tanda, congeladas', () => {
-  it('R1 — DocumentFileStatusEntry lleva exactamente las claves previstas', () => {
+  it('R1, R4 — DocumentFileStatusEntry lleva exactamente las claves previstas', () => {
     expect(Object.keys(ARCHIVO).sort()).toEqual([...CLAVES_DE_ARCHIVO].sort());
   });
 
-  it('R2 — ReadBatch y BatchStatus llevan exactamente las claves previstas', () => {
+  it('R2, R4 — ReadBatch y BatchStatus llevan exactamente las claves previstas', () => {
     expect(Object.keys(LECTURA).sort()).toEqual([...CLAVES_DE_LECTURA].sort());
     expect(Object.keys(TANDA).sort()).toEqual([...CLAVES_DE_TANDA].sort());
   });
 
-  it('R1, R2 — la regla MUERDE: una clave de mas o de menos da lista distinta', () => {
+  it('R4 — la regla MUERDE: una clave de mas o de menos da lista distinta', () => {
     expect(Object.keys({ ...TANDA, sorpresa: 1 }).sort()).not.toEqual([...CLAVES_DE_TANDA].sort());
     expect(Object.keys(ARCHIVO).filter((clave) => clave !== 'name').sort()).not.toEqual([
       ...CLAVES_DE_ARCHIVO,

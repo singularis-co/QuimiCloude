@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fórmulas con panel de tandas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.qc{--bg:oklch(0.985 0.004 215);--fg:oklch(0.15 0.01 215);--card:oklch(1 0 0);--primary:oklch(0.44 0.076 188);--primary-fg:oklch(1 0 0);--muted:oklch(0.965 0.006 215);--muted-fg:oklch(0.45 0.013 215);--border:oklch(0.925 0.009 215);--ring:oklch(0.44 0.076 188);--n-bg:oklch(0.94 0.008 215);--n-fg:oklch(0.35 0.013 215);--n-dot:oklch(0.6 0.013 215);--i-bg:oklch(0.95 0.024 285);--i-fg:oklch(0.42 0.11 285);--i-dot:oklch(0.53 0.13 285);--s-bg:oklch(0.95 0.04 145);--s-fg:oklch(0.42 0.11 145);--s-dot:oklch(0.52 0.14 145);--d-bg:oklch(0.95 0.024 27);--d-fg:oklch(0.42 0.11 27);--d-dot:oklch(0.55 0.21 27);--side:linear-gradient(166deg,#0A4A47 0%,#003634 38%,#002828 70%,#021E1E 100%);--sb-fg:oklch(0.95 0.012 195);--sb-muted:oklch(0.78 0.03 195);--sb-acc:oklch(0.34 0.058 195);font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--fg);background:var(--bg);font-size:14px;line-height:1.45}
+.qc *{box-sizing:border-box}
+.qc button{font:inherit}
+.qc button:focus-visible,.qc a:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn-pri{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.btn-ghost{border-color:transparent;background:transparent;color:var(--muted-fg)}
+.btn-ghost:hover{background:var(--muted);color:var(--fg)}
+.btn-sm{min-height:32px;padding:0 10px;font-size:13px}
+.link{color:var(--primary);font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.pill i{width:6px;height:6px;border-radius:50%;display:inline-block}
+.t-n{background:var(--n-bg);color:var(--n-fg)}.t-n i{background:var(--n-dot)}
+.t-i{background:var(--i-bg);color:var(--i-fg)}.t-i i{background:var(--i-dot)}
+.t-s{background:var(--s-bg);color:var(--s-fg)}.t-s i{background:var(--s-dot)}
+.t-d{background:var(--d-bg);color:var(--d-fg)}.t-d i{background:var(--d-dot)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px}
+.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.side{background:var(--side);color:var(--sb-fg);width:248px;flex:none;padding:20px 12px;display:flex;flex-direction:column;gap:4px}
+.side a{color:var(--sb-muted);text-decoration:none;padding:9px 12px;border-radius:8px;font-weight:500}
+.side a.on{background:var(--sb-acc);color:var(--sb-fg)}
+.panel{border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.panel-h{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px}
+.batch{border-top:1px solid var(--border);padding:12px 16px 14px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:8px 0;border-top:1px dashed var(--border)}
+.row:first-of-type{border-top:0}
+.sub{color:var(--muted-fg);font-size:13px}
+.err{color:var(--d-fg);font-size:13px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.04em;padding:10px 16px;border-bottom:1px solid var(--border)}
+td{padding:12px 16px;border-bottom:1px solid var(--border)}
+</style>
+</helmet>
+<div class="qc" style="display: flex; min-height: 1000px">
+  <nav class="side" aria-label="Menú principal">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 12px 18px; font-weight: 700; font-size: 16px">QuimiCloud</div>
+    <a href="#">Pedidos</a>
+    <a href="#">Inventario</a>
+    <a href="#" class="on" aria-current="page">Fórmulas</a>
+    <a href="#">Proveedores</a>
+    <a href="#">Usuarios</a>
+  </nav>
+  <main style="flex: 1 1 auto; min-width: 0; padding: 28px 32px 48px; display: flex; flex-direction: column; gap: 20px; max-width: 1240px">
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px">
+      <div style="flex: 1 1 320px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 600">Fórmulas</h1>
+        <p class="sub" style="margin: 4px 0 0">Fórmulas maestras de la empresa y sus versiones.</p>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button class="btn" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v4h16v-4"></path></svg>Subir PDFs</button>
+        <button class="btn btn-pri" type="button">Nueva fórmula</button>
+      </div>
+    </header>
+
+    <section class="panel" aria-labelledby="tandas-h">
+      <div class="panel-h">
+        <button class="btn btn-ghost btn-sm" type="button" aria-expanded="{{ openStr }}" aria-controls="tandas-body" onClick="{{ toggle }}" style="padding-left: 4px">
+          <sc-if value="{{ open }}" hint-placeholder-val="{{ true }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></sc-if>
+          <sc-if value="{{ closed }}" hint-placeholder-val="{{ false }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></sc-if>
+          <span id="tandas-h" style="font-weight: 600; color: var(--fg)">Tandas de PDFs</span>
+        </button>
+        <span class="pill t-n">{{ count }}</span>
+        <span class="sub" style="margin-left: auto">{{ summary }}</span>
+      </div>
+      <sc-if value="{{ open }}" hint-placeholder-val="{{ true }}">
+        <div id="tandas-body">
+          <sc-for list="{{ batches }}" as="b" hint-placeholder-count="2">
+            <section class="batch" aria-label="{{ b.label }}">
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px">
+                <h2 style="margin: 0; font-size: 14px; font-weight: 600">{{ b.label }}</h2>
+                <span class="pill {{ b.tone }}"><i></i>{{ b.state }}</span>
+                <button class="btn btn-ghost btn-sm" type="button" aria-label="{{ b.discardLabel }}" onClick="{{ b.discard }}" style="margin-left: auto">Descartar</button>
+              </div>
+              <sc-for list="{{ b.files }}" as="f" hint-placeholder-count="2">
+                <div class="row">
+                  <div style="min-width: 0">
+                    <div class="mono" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ f.name }}</div>
+                    <sc-if value="{{ f.hasNote }}" hint-placeholder-val="{{ false }}"><div class="{{ f.noteCls }}">{{ f.note }}</div></sc-if>
+                  </div>
+                  <span class="pill {{ f.tone }}"><i></i>{{ f.status }}</span>
+                  <div style="min-width: 64px; text-align: right">
+                    <sc-if value="{{ f.review }}" hint-placeholder-val="{{ false }}"><a class="link" href="#">Revisar</a></sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </section>
+          </sc-for>
+        </div>
+      </sc-if>
+    </section>
+
+    <section class="panel" aria-label="Lista de fórmulas" style="overflow-x: auto">
+      <table>
+        <thead><tr><th scope="col">Código</th><th scope="col">Nombre</th><th scope="col">Versión</th><th scope="col">Actualizada</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">[CÓDIGO]</td><td>[NOMBRE DE FÓRMULA]</td><td>v3</td><td class="sub">[FECHA]</td></tr>
+          <tr><td class="mono">[CÓDIGO]</td><td>[NOMBRE DE FÓRMULA]</td><td>v1</td><td class="sub">[FECHA]</td></tr>
+          <tr><td class="mono">[CÓDIGO]</td><td>[NOMBRE DE FÓRMULA]</td><td>v2</td><td class="sub">[FECHA]</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: true, gone: [] };
+  }
+  renderVals() {
+    var self = this;
+    var all = [
+      { id: 'a', label: 'Tanda de hoy, 14:32 · 3 archivos', state: 'En curso', tone: 't-i', files: [
+        { name: 'formula-desengrasante.pdf', status: 'Listo', tone: 't-s', review: true },
+        { name: 'formula-jabon-liquido.pdf', status: 'Procesando', tone: 't-i', note: 'Intento 2 de 4', noteCls: 'sub' },
+        { name: 'formula-suavizante.pdf', status: 'En cola', tone: 't-n' }
+      ] },
+      { id: 'b', label: 'Tanda de ayer, 18:05 · 2 archivos', state: 'Terminada', tone: 't-s', files: [
+        { name: 'formula-cloro-gel.pdf', status: 'Listo', tone: 't-s', review: true },
+        { name: 'escaneo-ilegible.pdf', status: 'Error', tone: 't-d', note: '[MENSAJE DEL CATÁLOGO DE ERRORES] · Intento 4 de 4', noteCls: 'err' }
+      ] }
+    ];
+    var batches = all.filter(function (b) { return self.state.gone.indexOf(b.id) < 0; }).map(function (b) {
+      return Object.assign({}, b, {
+        discardLabel: 'Descartar la ' + b.label.split(' · ')[0].toLowerCase(),
+        discard: function () { self.setState({ gone: self.state.gone.concat([b.id]) }); },
+        files: b.files.map(function (f) { return Object.assign({ review: false, note: '', noteCls: 'sub' }, f, { hasNote: !!f.note }); })
+      });
+    });
+    var running = batches.filter(function (b) { return b.state === 'En curso'; }).length;
+    return {
+      open: this.state.open,
+      closed: !this.state.open,
+      openStr: this.state.open ? 'true' : 'false',
+      toggle: function () { self.setState({ open: !self.state.open }); },
+      batches: batches,
+      count: String(batches.length),
+      summary: running ? running + ' en curso' : 'Todas terminadas'
+    };
+  }
+}
+</script>
+</body>
+</html>

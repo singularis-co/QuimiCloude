@@ -780,6 +780,11 @@ model Order {
   /// Parte de envases incluida en `ingredientsCost`, que sigue siendo el total. NULL si y solo si
   /// `ingredientsCost` lo es: CHECK `orders_packaging_cost_matches_ingredients_cost`.
   packagingCost       Decimal?      @map("packaging_cost") @db.Decimal(14, 4)
+  /// Coste real: suma de (cantidad consumida x coste unitario del lote) de los asientos
+  /// `consumption` del pedido, calculada una sola vez al Terminar el empaque. NULL = sin terminar,
+  /// terminado antes de existir la columna o sin calculo posible; nunca 0. Los CHECK
+  /// `orders_actual_cost_non_negative` y `orders_actual_cost_requires_packed` son drift.
+  actualCost          Decimal?      @map("actual_cost") @db.Decimal(14, 4)
   /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.

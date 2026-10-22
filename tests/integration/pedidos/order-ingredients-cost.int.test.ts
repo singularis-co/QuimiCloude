@@ -59,7 +59,6 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma'
 
 import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
-import { resolveLotIngredientsCost } from '@/lib/modules/pedidos/domain/resolve-ingredients-cost'
 
 import type { Actor, NewOrder, OrderScope } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -837,19 +836,6 @@ describe('QC-199 — los lotes de insumo sin presentacion cuentan en el costeo',
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
     } finally {
       if (orderId !== null) await borrarPedido(orderId)
-      await borrarReceta(recipeId)
-      await borrarProducto(productId)
-    }
-  })
-
-  it('R17 el coste del lote de producto terminado no cuenta ese ingrediente como cero', async () => {
-    const { productId } = await crearInsumoPorUnidad(A, { stock: '10', unitCost: '5.0000' })
-    const recipeId = await crearReceta(A, productId)
-
-    try {
-      const coste = await resolveLotIngredientsCost(recipes, products, units, recipeId, '4.0000', null, A.companyId)
-      expect(coste).toBe('20.0000')
-    } finally {
       await borrarReceta(recipeId)
       await borrarProducto(productId)
     }

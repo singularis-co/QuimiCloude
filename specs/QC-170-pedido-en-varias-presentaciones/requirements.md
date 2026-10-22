@@ -295,3 +295,5 @@
 | 2026-09-25 | ¿E2E? | **Sí**: mueve inventario (`CHECKPOINTS.md`). |
 | 2026-09-26 | D2' — ¿Quién lo define? (sustituye a D2) | **Solo quien tiene `pedidos.modificar`** («el administrador»). El **Empacador ya no define ni cambia el reparto**: solo lo ve. Sin permiso nuevo. |
 | 2026-09-26 | D3' — ¿Se puede cambiar en empaque? (sustituye a D3) | **Editable hasta pulsar Comenzar empaque**; una vez comenzado, el reparto queda fijo (ni el administrador lo edita). Quien tiene `pedidos.modificar` puede definir/cambiar el reparto **y la unidad** en cualquier estado anterior a comenzar el empaque, incluido `POR_EMPACAR`. El tope de Q3 se reafirma. |
+
+> **Enmienda QC-305 (2026-10-21):** la edición de reparto y unidad de un pedido en `EN_CURSO` o `POR_EMPACAR` ya no recalcula el estimado (`ingredients_cost` / `packaging_cost`). Ver `specs/QC-305-coste-real-de-produccion/requirements.md` R13.

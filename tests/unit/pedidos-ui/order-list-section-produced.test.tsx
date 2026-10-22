@@ -162,6 +162,7 @@ function pedido(id: string, sequence: number, status: OrderSummary['status']): O
     cancellationReason: status === 'CANCELADO' ? 'Sin stock' : null,
     ingredientsCost: null,
     packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,

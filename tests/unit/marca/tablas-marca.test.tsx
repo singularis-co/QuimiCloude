@@ -241,9 +241,8 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
     archivo: 'order-columns.tsx',
     construir: async () =>
       buildOrderColumns({ units: [], bridge: null }),
-    // «Cantidad» salio de la lista el 2026-10-16 (decision humana). «Costo de producción» entra el
-    // 2026-10-20 (decision humana): una cifra, como el «Costo unitario» de inventario.
-    esperadas: ['Fecha de solicitud', 'Costo de producción'],
+    // Los dos costes son cifras, como el «Costo unitario» de inventario.
+    esperadas: ['Fecha de solicitud', 'Costo estimado', 'Costo real'],
   },
   {
     archivo: 'customer-columns.tsx',
