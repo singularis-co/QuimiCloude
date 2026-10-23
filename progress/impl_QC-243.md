@@ -58,3 +58,33 @@ Salida:
 - `pnpm exec vitest run guard-movimiento guard-anillo` → 2 passed, 19 tests
 
 Veredicto: T3 hecha; WaBubble recibe el diccionario por props, sin acoplarse a T1.
+
+## T4 — pestañas y página
+
+Archivos:
+- `app/(private)/integraciones/whatsapp/components/whatsapp-integration-tabs.tsx` (modificado): lista de pestañas `TabSpec[]` (valor, texto, testid, `disabled`, `describedBy`, `refreshOnEnter`, panel); QC-248 añade la suya como una entrada más.
+- `app/(private)/integraciones/whatsapp/page.tsx` (modificado): conexión → plantillas (solo con conexión) en paralelo con el diccionario.
+- `app/(private)/integraciones/whatsapp/components/whatsapp-templates-panel.tsx` (nuevo, esqueleto para T5).
+- `app/(private)/integraciones/whatsapp/components/whatsapp-variables-panel.tsx` (nuevo, esqueleto para T11).
+- `tests/unit/integraciones-ui/whatsapp-page.test.tsx` (modificado).
+- `e2e/integraciones-whatsapp.spec.ts` (modificado, solo la aserción de la pestaña: `WHATSAPP_TABS_TEXTS.comingSoon` desaparece y el typecheck lo exige). No ejecutado.
+
+Los paneles no van al barrel: `page.tsx` no los usa.
+
+| R | Test (`whatsapp-page.test.tsx`) |
+|---|---|
+| R1 | `QC-243 R1`: una sola tablist, orden Conexión/Plantillas/Variables, Conexión activa |
+| R2 | `QC-243 R2`: Plantillas deshabilitada con `aria-describedby` → «Conecta tu número primero para ver Plantillas.», Variables habilitada, sin llamada a plantillas |
+| R3 | `QC-243 R3`: con conexión habilitada, sin pista, panel con el listado cargado |
+| R4 | `QC-243 R4, R36` y `QC-243 R4, R37` + los casos de QC-237 sin cambios (R35 44 px ahora con tres pestañas) |
+| R5 | `QC-243 R5`: refresh al entrar en Plantillas y Variables; no en Conexión |
+| R6 | `QC-243 R6` ×3: error de plantillas, error del diccionario, error de la conexión |
+
+Salida:
+- `pnpm exec vitest related --run <page, tabs, 2 paneles, test>` → Test Files 5 passed, Tests 67 passed
+- `pnpm run typecheck` → `tsc --noEmit` sin errores
+- `pnpm run lint` → 0 errors, 10 warnings (ninguno en archivos tocados)
+
+Supuestos a validar: títulos de `ErrorState` «No se pudo cargar la lista de plantillas.» / «… de variables.» (no están en el spec ni en el tablero; siguen el patrón del repo). Si falla la consulta de la conexión, Plantillas queda deshabilitada con la pista de R2.
+
+Veredicto: T4 hecha; tres pestañas con refresco y error por pestaña, paneles listos para T5 y T11.

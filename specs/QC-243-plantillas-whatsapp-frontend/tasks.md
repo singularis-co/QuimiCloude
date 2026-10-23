@@ -36,7 +36,7 @@ hasta que el backend la guarde (R58).
 
 ## Tanda 2 — pestañas y carga (depende de T1)
 
-- [ ] **T4 Pestañas y página.** `whatsapp-integration-tabs.tsx` con «Conexión | Plantillas |
+- [x] **T4 Pestañas y página.** `whatsapp-integration-tabs.tsx` con «Conexión | Plantillas |
   Variables», `aria-describedby` y texto de R2, `router.refresh()` al activar Plantillas o Variables;
   `page.tsx` carga plantillas (con conexión) y diccionario en paralelo y los pasa por props; error por
   pestaña con `ErrorState`.

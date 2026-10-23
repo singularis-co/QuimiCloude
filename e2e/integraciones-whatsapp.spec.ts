@@ -146,7 +146,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('la conexion de WhatsApp de la empresa', () => {
-  test('R35: la pantalla muestra «Conexión» activa y «Plantillas» deshabilitada con «Disponible próximamente»', async ({
+  test('R35, QC-243 R2: la pantalla muestra «Conexión» activa y, sin conexion, «Plantillas» deshabilitada con su texto', async ({
     page,
   }) => {
     const credentials = await createAdministrador('tabs');
@@ -163,9 +163,10 @@ test.describe('la conexion de WhatsApp de la empresa', () => {
     await expect(page.getByTestId('whatsapp-connection-panel')).toBeVisible();
 
     const templatesTab = page.getByTestId('whatsapp-tab-templates');
-    await expect(templatesTab).toContainText(WHATSAPP_TABS_TEXTS.templates);
-    await expect(templatesTab).toContainText(WHATSAPP_TABS_TEXTS.comingSoon);
-    await expect(templatesTab.getByText(WHATSAPP_TABS_TEXTS.comingSoon)).toBeVisible();
+    await expect(templatesTab).toHaveText(WHATSAPP_TABS_TEXTS.templates);
+    await expect(page.getByTestId('whatsapp-no-connection-hint')).toHaveText(
+      WHATSAPP_TABS_TEXTS.noConnection,
+    );
     await expect(templatesTab).toBeDisabled();
   });
 
