@@ -125,3 +125,36 @@ Esto no sustituye la confirmación contra la documentación oficial: queda como 
 y `design.md` de los tres archivos de producción. Lo demás está bien: funcionalidad, trazabilidad, ámbito por empresa, migraciones,
 verificación ejecutable y desvíos. Los hallazgos 2–4 son menores y conviene resolverlos en la misma vuelta. En la vuelta 2 basta
 revisar el rango del arreglo.
+
+## Vuelta 2 (acotada a 5fed67ee..c6573610)
+
+Solo se revisan los hallazgos de la vuelta 1 y posibles regresiones en ese rango. El commit 42a3e419, posterior y solo con la
+nota de deuda E2E, queda fuera del rango por indicación del leader.
+
+### Verificación (salida real)
+
+- `pnpm run typecheck` → exit 0.
+- `eslint` sobre los 4 archivos de código y test tocados → `No issues found`.
+- `vitest run` sobre `send-whatsapp-message.test.ts`, `whatsapp-send-log-console.test.ts` y `module-shape.test.ts` →
+  `Tests 172 passed | 1 skipped (173)`.
+- `pnpm exec vitest run guard` → `Test Files 87 passed (87)` / `Tests 1303 passed | 22 skipped (1325)`.
+
+### Hallazgos de la vuelta 1
+
+- [x] **1 (BLOQUEANTE) resuelto.** El commit 01f8fb50 quita las citas en los tres archivos: `ports/whatsapp-send-log.ts`,
+  `adapters/driven/observability/whatsapp-send-log-console.ts` y el comentario de `WhatsappSendOutcome` en
+  `domain/send-whatsapp-message.ts`. Los comentarios que quedan explican el porqué y no citan nada. Repetí el barrido de
+  `origin/dev...c6573610` sobre `lib/` y `db/`: ninguna línea añadida cita `QC-<n>`, `R<n>`, `design.md` ni «decisión cerrada».
+- [x] **2 (menor) resuelto.** c6573610 añade el caso S «R31: si el mensaje ya no esta en SENDING, markFailed no cambia nada y el
+  envio igual responde con el fallo de Meta». Es un caso con contenido: Meta rechaza con 131026 y `markFailed` devuelve `null`.
+  El test comprueba que la vista sale `FAILED` con `errorCode` `'131026'` y el `errorReason` traducido, que `markSent` no se llama
+  y que la fila sigue en `SENDING` sin código ni motivo. Así queda cubierta la decisión del humano (design §9). La fila R31 del
+  mapa en `progress/impl_QC-240.md` lo incluye.
+- [x] **4 (menor) resuelto.** El bloque de `ports/whatsapp-send-log.ts` pasó de 8 a 3 líneas.
+- **3 (nota):** la deuda de E2E se registra en 42a3e419, fuera del rango.
+
+No hay regresiones en el rango.
+
+### Veredicto vuelta 2
+
+**OK.**
