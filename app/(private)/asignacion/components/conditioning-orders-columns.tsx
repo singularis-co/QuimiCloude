@@ -45,7 +45,7 @@ export function buildConditioningOrdersColumns({
     },
     {
       id: CONDITIONING_ORDER_RECIPE_NAME_COLUMN_ID,
-      label: 'Receta',
+      label: 'Fórmula',
       align: 'start',
       cell: (order) =>
         order.recipeName ?? <MissingValue testIdPrefix="conditioning-order" field={CONDITIONING_ORDER_RECIPE_NAME_COLUMN_ID} />,

@@ -167,11 +167,11 @@ describe('el detalle muestra los datos del pedido', () => {
     expect(screen.getByTestId(CONDITIONING_ORDER_CONDITIONER_TESTID)).toHaveTextContent(quien ?? '');
   });
 
-  it('R15: sin receta dice «Esta receta está dada de baja.» y sin reparto «Sin presentación»', () => {
+  it('R15: sin receta dice «Esta fórmula está dada de baja.» y sin reparto «Sin presentación»', () => {
     render(<ConditioningOrderScreen order={{ ...ROW, recipeName: null, presentationLines: [] }} />);
 
     expect(screen.getByTestId(CONDITIONING_ORDER_RECIPE_TESTID)).toHaveTextContent(
-      'Esta receta está dada de baja.',
+      'Esta fórmula está dada de baja.',
     );
     expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toHaveTextContent('Sin presentación');
   });

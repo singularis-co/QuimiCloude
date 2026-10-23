@@ -431,6 +431,7 @@ describe('AiProviderCard', () => {
     const ultima = screen.getByTestId(AI_PROVIDER_CARD_LAST_TEST_TESTID);
     expect(aviso.compareDocumentPosition(seccion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(seccion.compareDocumentPosition(ultima) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tarjeta().textContent).not.toContain('Fórmula (desde PDF)');
     expect(tarjeta().textContent).not.toContain('Receta (fórmula desde PDF)');
     expect(tarjeta().textContent).not.toContain('Catálogo desde PDF');
     expect(tarjeta().textContent).not.toMatch(/predeterminado/i);

@@ -298,7 +298,7 @@ test.describe('el proveedor IA de la empresa', () => {
       await page.getByTestId(TESTIDS.formTest).click();
 
       await expect(formResult).toContainText(TEXTS.testOk, { timeout: 60_000 });
-      await expect(keyField).toHaveValue('');
+      await expect(keyField).toHaveValue(VALID_KEY);
       expect(
         await prisma.aiProviderConnection.count({ where: { companyId: fixtureCompanyId } }),
         'probar una key no guarda nada',

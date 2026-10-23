@@ -69,7 +69,7 @@ describe('«Por acondicionar»: cinco columnas y el menú', () => {
     ]);
     expect(columns.map((column) => column.label)).toEqual([
       'Nº de pedido',
-      'Receta',
+      'Fórmula',
       'Envases',
       'Estado',
       'Quién acondiciona',
@@ -201,7 +201,7 @@ describe('«Acondicionados»: las columnas del Empacador y el menú', () => {
     );
     expect(own.map((column) => column.label)).toEqual([
       'Nº de pedido',
-      'Receta',
+      'Fórmula',
       'Cantidad',
       'Presentación',
       'Fecha de terminado',

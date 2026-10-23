@@ -121,7 +121,7 @@ describe('RecipeVersionList', () => {
     render(<RecipeVersionList originalId={ORIGINAL_ID} versions={[]} />);
 
     expect(screen.getByTestId('recipe-versions-empty')).toHaveTextContent(
-      'Esta receta todavía no tiene versiones.',
+      'Esta fórmula todavía no tiene versiones.',
     );
     expect(screen.queryByRole('list')).toBeNull();
     expect(screen.queryAllByTestId('recipe-version-row')).toHaveLength(0);
@@ -280,7 +280,7 @@ describe('RecipeVersionList — rediseño (QC-264)', () => {
     expect(nueva).toHaveClass(...AREA_TACTIL);
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.getByTestId('recipe-versions-empty')).toHaveTextContent(
-      'Esta receta todavía no tiene versiones.',
+      'Esta fórmula todavía no tiene versiones.',
     );
     expect(screen.queryAllByTestId('recipe-version-row')).toHaveLength(0);
     expect(screen.getByRole('region', { name: 'Versiones' })).toBeInTheDocument();

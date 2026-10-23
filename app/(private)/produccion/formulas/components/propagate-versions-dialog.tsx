@@ -29,7 +29,7 @@ const CANCEL_LABEL = 'Cancelar';
 
 // Solo el texto tras la cifra: la cifra se pinta aparte, en monoespaciada.
 function dialogTitle(count: number): string {
-  return count === 1 ? 'versión parte de esta receta' : 'versiones parten de esta receta';
+  return count === 1 ? 'versión parte de esta fórmula' : 'versiones parten de esta fórmula';
 }
 
 export type PropagateVersionsDialogProps = {

@@ -312,18 +312,32 @@ describe('AiProviderForm', () => {
   });
 
   it.each([
-    ['probar bien', 'test', { status: 'tested', ok: true, elapsedMs: 500 }],
-    ['probar mal', 'test', { status: 'tested', ok: false, message: RECHAZADA }],
-    ['guardar mal', 'save', { status: 'test_failed', message: RECHAZADA }],
-    ['guardar con error', 'save', { status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') }],
-  ] as const)('R8: tras %s el campo de la key vuelve vacio, los botones se deshabilitan y la key no esta en el HTML', async (_caso, accion, respuesta) => {
+    ['probar bien', { status: 'tested', ok: true, elapsedMs: 500 }],
+    ['probar mal', { status: 'tested', ok: false, message: RECHAZADA }],
+  ] as const)('R8: tras %s la key escrita se queda en el campo y los botones siguen habilitados', async (_caso, respuesta) => {
     testKeyMock.mockResolvedValue(respuesta as TestAiProviderKeyFormState);
+    const user = setupUser();
+    render(<AiProviderForm providers={PROVEEDORES} />);
+
+    await user.type(campo(), KEY);
+    await user.click(botonProbar());
+
+    await waitFor(() => expect(resultado().textContent).not.toBe(''));
+    expect(campo().value).toBe(KEY);
+    expect(botonProbar()).toBeEnabled();
+    expect(botonGuardar()).toBeEnabled();
+  });
+
+  it.each([
+    ['guardar mal', { status: 'test_failed', message: RECHAZADA }],
+    ['guardar con error', { status: 'error', code: 'invalid_input', message: errorMessage('invalid_input') }],
+  ] as const)('R8: tras %s el campo de la key vuelve vacio, los botones se deshabilitan y la key no esta en el HTML', async (_caso, respuesta) => {
     saveMock.mockResolvedValue(respuesta as SaveAiProviderConnectionFormState);
     const user = setupUser();
     const { container } = render(<AiProviderForm providers={PROVEEDORES} />);
 
     await user.type(campo(), KEY);
-    await user.click(accion === 'test' ? botonProbar() : botonGuardar());
+    await user.click(botonGuardar());
 
     await waitFor(() => expect(resultado().textContent).not.toBe(''));
     expect(campo().value).toBe('');

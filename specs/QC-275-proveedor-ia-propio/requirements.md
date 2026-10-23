@@ -80,7 +80,8 @@ ninguna key en claro DEBE llegar a la base. [D9]
 
 **R8.** El sistema NO DEBE incluir la key ni su valor cifrado en ninguna respuesta de Server Action,
 ninguna prop de componente, ningún HTML renderizado ni ninguna línea de log; el campo de la key
-DEBE llegar vacío a la pantalla al cargarla y tras cualquier respuesta. [D9]
+DEBE llegar vacío a la pantalla al cargarla y tras cualquier respuesta de guardar. Tras «Probar
+conexión», la key que el usuario escribió se queda en el campo (no vuelve del servidor). [D9]
 
 **R9.** SI la key guardada no se puede descifrar al probar la conexión guardada o al leer un PDF,
 ENTONCES el sistema NO DEBE llamar al proveedor, DEBE dejar la conexión en `ERROR` con el último
