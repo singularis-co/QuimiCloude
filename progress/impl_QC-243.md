@@ -153,3 +153,15 @@ las mismas fases que cubre el gate rápido; su salida está en el bloque de arri
 - **Dependencias del worktree:** no traía `node_modules`. Se instalaron con `pnpm install --frozen-lockfile`, más `prisma generate` y `next typegen`; ni `package.json` ni el lockfile cambiaron.
 - **`.env` del E2E:** el worktree no tiene `.env`. Los E2E se corrieron cargando `../../.env` solo en la shell, sin copiar archivos.
 - **Disco:** C: está casi lleno (0–190 MB libres). Con varios workers de Playwright los navegadores se caían, así que los E2E se corrieron con `--workers=1`.
+
+## Vuelta de menores de la revisión (2026-10-22)
+
+- **M1**: `design.md`, la fila «Pestaña Variables y panel de variable» pasa a `Table` y se añade una nota: `DataTable` siempre pinta paginación y filtros, y el tablero no los trae.
+- **M2**: `tests/unit/shared-ui/form-sheet.test.tsx` gana dos casos para `showCloseButton`: sin la prop sigue la X de `SheetContent` y con `false` desaparece. «Cancelar» sigue en los dos casos.
+- **M3**: singular con N = 1 en `valueHintInUse` y `confirmDescription` (`whatsapp-variable-form-sheet.tsx`) y en `deleteBlocked` (`whatsapp-variables-panel.tsx`). Los textos quedan «Lo usa 1 plantilla», «se envía en 1 plantilla» y «la usa 1 plantilla. Quítala de esa plantilla primero.». Tests nuevos con N = 1 para R55, R56 y R59; los de N > 1 ya existían. Revisé el resto de contadores de la pantalla (tabla, R17 y barra de sincronización) y ya distinguían singular y plural.
+- **F2.3**: merge de `origin/dev` (`10c4589d`) sin conflictos. No trae migraciones ni cambios en `package.json` o en el lockfile.
+- **Verificación** tras el merge:
+  - `pnpm run typecheck`: rc=0.
+  - `pnpm run lint`: 0 errores y 10 warnings, todos en archivos ajenos.
+  - `vitest related --run` sobre los 2 componentes y `components/shared/form-sheet.tsx`: 220 archivos, 3849 tests pasados y 1 skipped.
+  - E2E: no se corre porque no se tocaron sus specs y ningún E2E usa estos textos.
