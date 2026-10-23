@@ -19,7 +19,11 @@ vi.mock('@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connec
 }))
 
 import { integraciones } from '@/lib/composition'
-import { CANNED_GRAPH_ERROR_MESSAGE } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned'
+import {
+  CANNED_GRAPH_ERROR_MESSAGE,
+  whatsappGraphClientCanned,
+} from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned'
+import { whatsappGraphClientFetch } from '@/lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-fetch'
 
 const ACTOR = {
   id: 'user-admin-1',
@@ -108,10 +112,17 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('R29 — el cliente real y el doble exponen los mismos cinco metodos, sendMessage incluido', () => {
+    const metodos = ['createTemplate', 'deleteTemplate', 'fetchPhoneNumber', 'listTemplatesPage', 'sendMessage']
+    expect(Object.keys(whatsappGraphClientFetch).sort()).toEqual(metodos)
+    expect(Object.keys(whatsappGraphClientCanned).sort()).toEqual(metodos)
+  })
+
   it('la fachada expone exactamente el cifrado y los casos de uso de las dos conexiones', () => {
     // Enmendado el 2026-10-20 (QC-239): la fachada gana `linkWhatsappContact`,
     // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
     // Merge de dev (2026-10-20): se suman los siete de plantillas de QC-242 y `verifyCronSecret`.
+    // QC-240: se suman `sendWhatsappMessage` y `retryWhatsappMessage`.
     expect(Object.keys(integraciones).sort()).toEqual([
       'createWhatsappConnection',
       'createWhatsappTemplate',
@@ -133,10 +144,12 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'reportAiProviderOutcome',
       'resolveAiProviderForReading',
       'resyncWhatsappTemplates',
+      'retryWhatsappMessage',
       'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
       'selectAiModel',
+      'sendWhatsappMessage',
       'setWhatsappConnectionEnabled',
       'setWhatsappContactBlocked',
       'setWhatsappTemplateEnabled',

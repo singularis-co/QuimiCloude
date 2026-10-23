@@ -37,7 +37,7 @@ describe('catálogo de añadidos', () => {
       proveedores: ['proveedores.consultar', 'proveedores.modificar'],
       lectura_pdf: ['documentos.consultar', 'documentos.modificar'],
       importacion_excel: [],
-      integraciones: ['integraciones.modificar'],
+      integraciones: ['integraciones.modificar', 'whatsapp.enviar'],
     })
   })
 
@@ -147,5 +147,24 @@ describe('QC-137 — las notificaciones son núcleo', () => {
     expect([...ADDONS]).toEqual(['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'])
     expect(Object.keys(ADDON_PERMISSIONS).sort()).toEqual([...ADDONS].sort())
     expect(Object.keys(ADDON_REQUIRES).sort()).toEqual([...ADDONS].sort())
+  })
+})
+
+describe('el permiso whatsapp.enviar viaja con el añadido integraciones', () => {
+  const ENVIAR = 'whatsapp.enviar'
+
+  it('R3 — whatsapp.enviar es de integraciones, de ningún otro añadido y no es núcleo', () => {
+    expect(ADDON_PERMISSIONS.integraciones).toContain(ENVIAR)
+    for (const addon of ADDONS.filter((a) => a !== 'integraciones')) {
+      expect(ADDON_PERMISSIONS[addon] as readonly string[], addon).not.toContain(ENVIAR)
+    }
+    expect(CORE_PERMISSIONS as readonly string[]).not.toContain(ENVIAR)
+  })
+
+  it('R3 — con integraciones apagado la sesión pierde whatsapp.enviar; encendido lo conserva', () => {
+    const rol = ['clientes.consultar', ENVIAR]
+    expect(effectivePermissions(rol, [])).toEqual(['clientes.consultar'])
+    expect(effectivePermissions(rol, ['dashboard', 'proveedores'])).toEqual(['clientes.consultar'])
+    expect(effectivePermissions(rol, ['integraciones'])).toEqual(rol)
   })
 })

@@ -48,9 +48,11 @@
     "identity/notifications-addon-migration.int.test.ts",
     "identity/packer-role-migration.int.test.ts",
     "identity/packing-permission-migration.int.test.ts",
+    "identity/whatsapp-send-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
     "integraciones/whatsapp-messages-migration.int.test.ts",
+    "integraciones/whatsapp-outbound-messages-migration.int.test.ts",
     "integraciones/whatsapp-template-migration.int.test.ts",
     "integraciones/whatsapp-variable-keys-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",
@@ -714,6 +716,16 @@
       "archivo": "integraciones/whatsapp-contact-links.int.test.ts",
       "motivo": "T7 (QC-239): recorre vincular, desvincular y bloquear contactos, y el alta y la edicion de clientes, por la fachada real de lib/composition: withWhatsappContactTransaction y withCustomerTransaction abren su PROPIA 'prisma.$transaction' sobre el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no las envolveria, y el caso del fallo forzado necesita que la transaccion real se deshaga. Cada caso siembra sus numeros irrepetibles en dos empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-20"
+    },
+    {
+      "archivo": "integraciones/whatsapp-outbox-prisma.int.test.ts",
+      "motivo": "Ejercita createWhatsappOutboxRepository() de whatsapp-outbox-prisma.ts construido sobre el cliente Prisma GLOBAL, como en lib/composition, asi que una transaccion del test con ROLLBACK no lo envolveria; ademas el caso de varios ensureContact a la vez del mismo numero necesita conexiones que confirmen de verdad contra el unico (connection_id, wa_id). Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra mensajes -> contactos -> conexiones -> clientes por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-23"
+    },
+    {
+      "archivo": "integraciones/whatsapp-send-flow.int.test.ts",
+      "motivo": "T10 (QC-240): recorre sendWhatsappMessage y retryWhatsappMessage por la fachada real de lib/composition (Prisma, cifrado AES-GCM, telefonos de clientes y el doble canned de Graph con un espia), que escriben con el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria; ademas dos envios a la vez al mismo cliente sin contacto necesitan confirmar de verdad contra el unico (connection_id, wa_id). Cada caso siembra en cuatro empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> relaciones -> plantillas -> variables -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-23"
     },
     {
       "archivo": "integraciones/whatsapp-template-prisma.int.test.ts",

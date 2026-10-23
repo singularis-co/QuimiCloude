@@ -21,6 +21,18 @@ export type GraphTemplatePage =
 
 export type GraphTemplateDeleted = { readonly ok: true } | ({ readonly ok: false } & GraphFailure);
 
+/** `components` viaja con la forma de Meta, ya armada por el dominio. */
+export type GraphOutboundMessage =
+  | { readonly type: 'text'; readonly body: string }
+  | {
+      readonly type: 'template';
+      readonly name: string;
+      readonly language: string;
+      readonly components: readonly unknown[];
+    };
+
+export type GraphMessageSent = { readonly ok: true; readonly wamid: string } | ({ readonly ok: false } & GraphFailure);
+
 /** Un fallo de Meta o de red es un resultado, no una excepción: el caso de uso decide qué guardar. */
 export interface WhatsappGraphClient {
   fetchPhoneNumber(input: {
@@ -47,4 +59,11 @@ export interface WhatsappGraphClient {
     readonly hsmId: string;
     readonly name: string;
   }): Promise<GraphTemplateDeleted>;
+  /** `to` es el `waId` del contacto. Sin `wamid` en la respuesta no hay prueba de entrega: es un fallo. */
+  sendMessage(input: {
+    readonly phoneNumberId: string;
+    readonly accessToken: string;
+    readonly to: string;
+    readonly message: GraphOutboundMessage;
+  }): Promise<GraphMessageSent>;
 }

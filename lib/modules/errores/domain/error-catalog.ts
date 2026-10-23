@@ -124,6 +124,16 @@ export const ERROR_MESSAGE_KEY = {
   whatsapp_variable_key_in_use: 'errors.whatsapp_variable_key_in_use',
   whatsapp_template_not_mapped: 'errors.whatsapp_template_not_mapped',
   whatsapp_template_not_mappable: 'errors.whatsapp_template_not_mappable',
+  whatsapp_connection_not_active: 'errors.whatsapp_connection_not_active',
+  whatsapp_recipient_not_customer: 'errors.whatsapp_recipient_not_customer',
+  whatsapp_customer_without_phone: 'errors.whatsapp_customer_without_phone',
+  whatsapp_contact_linked_elsewhere: 'errors.whatsapp_contact_linked_elsewhere',
+  whatsapp_contact_blocked: 'errors.whatsapp_contact_blocked',
+  whatsapp_window_closed: 'errors.whatsapp_window_closed',
+  whatsapp_template_not_sendable: 'errors.whatsapp_template_not_sendable',
+  whatsapp_template_values_missing: 'errors.whatsapp_template_values_missing',
+  whatsapp_message_not_found: 'errors.whatsapp_message_not_found',
+  whatsapp_message_not_retryable: 'errors.whatsapp_message_not_retryable',
   conditioning_step_out_of_order: 'errors.conditioning_step_out_of_order',
   conditioning_responsibles_required: 'errors.conditioning_responsibles_required',
   conditioning_responsible_not_allowed: 'errors.conditioning_responsible_not_allowed',
@@ -317,6 +327,21 @@ export const ERROR_MESSAGES_ES = {
     'Relaciona todas las variables de la plantilla antes de habilitarla.',
   'errors.whatsapp_template_not_mappable':
     'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
+  'errors.whatsapp_connection_not_active':
+    'La conexión de WhatsApp no está activa. Revísala en Integraciones.',
+  'errors.whatsapp_recipient_not_customer':
+    'Solo se pueden enviar mensajes a clientes de la empresa.',
+  'errors.whatsapp_customer_without_phone': 'El cliente no tiene un teléfono válido para WhatsApp.',
+  'errors.whatsapp_contact_linked_elsewhere':
+    'Ese número está vinculado a otro cliente. Cámbialo desde Contactos.',
+  'errors.whatsapp_contact_blocked': 'El contacto está bloqueado.',
+  'errors.whatsapp_window_closed':
+    'Pasaron más de 24 horas desde el último mensaje del cliente: usa una plantilla.',
+  'errors.whatsapp_template_not_sendable':
+    'La plantilla no está habilitada o no está aprobada por Meta.',
+  'errors.whatsapp_template_values_missing': 'Faltan valores de la plantilla.',
+  'errors.whatsapp_message_not_found': 'No se encontró el mensaje.',
+  'errors.whatsapp_message_not_retryable': 'Solo se puede reintentar un mensaje que falló.',
   'errors.conditioning_step_out_of_order': 'La pantalla quedó desactualizada. Recárgala para seguir.',
   'errors.conditioning_responsibles_required': 'Elige al menos un responsable para avanzar.',
   'errors.conditioning_responsible_not_allowed': 'Solo puedes elegir a personas del equipo o a ti.',

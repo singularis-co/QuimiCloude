@@ -52,6 +52,10 @@
  * `whatsapp_variable_key_in_use`, `whatsapp_template_not_mapped`, `whatsapp_template_not_mappable`.
  * **2026-10-21**: `conditioning_step_out_of_order`, `conditioning_responsibles_required`,
  * `conditioning_responsible_not_allowed`, `conditioning_steps_pending`.
+ * **2026-10-23**: `whatsapp_connection_not_active`, `whatsapp_recipient_not_customer`,
+ * `whatsapp_customer_without_phone`, `whatsapp_contact_linked_elsewhere`, `whatsapp_contact_blocked`,
+ * `whatsapp_window_closed`, `whatsapp_template_not_sendable`, `whatsapp_template_values_missing`,
+ * `whatsapp_message_not_found`, `whatsapp_message_not_retryable`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -264,6 +268,16 @@ export const ERROR_CODES = [
   'whatsapp_variable_key_in_use',
   'whatsapp_template_not_mapped',
   'whatsapp_template_not_mappable',
+  'whatsapp_connection_not_active',
+  'whatsapp_recipient_not_customer',
+  'whatsapp_customer_without_phone',
+  'whatsapp_contact_linked_elsewhere',
+  'whatsapp_contact_blocked',
+  'whatsapp_window_closed',
+  'whatsapp_template_not_sendable',
+  'whatsapp_template_values_missing',
+  'whatsapp_message_not_found',
+  'whatsapp_message_not_retryable',
   // Distinto de `invalid_input`: la peticion es valida, pero la pantalla quedo atras del avance
   // guardado o de la formula.
   'conditioning_step_out_of_order',
