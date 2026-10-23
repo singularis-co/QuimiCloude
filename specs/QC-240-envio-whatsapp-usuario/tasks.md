@@ -29,7 +29,7 @@
   - **Hecho:** FK rechaza un `sent_by` inexistente; down + up dejan el mismo esquema;
     `prisma validate` sin cambios inesperados.
 
-- [ ] **T3 [P] Errores** (design §8).
+- [x] **T3 [P] Errores** (design §8).
   - 10 códigos en `error-codes.ts` (con su línea en el comentario de fechas) y `error-catalog.ts`;
     10 clases en `integraciones/domain/errors.ts`; `WhatsappTemplateValuesMissingError` lleva
     `missing: { key, label }[]`.
