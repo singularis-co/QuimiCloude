@@ -95,3 +95,28 @@ La fila `SharedSelect` sigue con `previo al rediseño` en `Diseño` y cita `Prov
 **RECHAZADO** — 2 bloqueantes (B1, B2), 3 menores (m1–m3).
 
 Para pasar: arreglar B1 y B2 y volver a correr `tests/unit/integraciones/module-shape.test.ts`, `pnpm exec vitest run guard` y el lint de `ai-provider-actions.ts`. El resto de la feature (migración, autorización, que la key no se filtre, el 400 de OpenRouter, R12, la ampliación del select y la trazabilidad) está correcto. La vuelta 2 puede limitarse al diff de esos dos arreglos.
+
+## Vuelta 2 (acotada a 1ef0ce5b)
+
+El rango que dio el leader (`git diff 1fa45a06~1`) sale vacío, porque `1fa45a06~1` es el propio `1ef0ce5b` y el árbol de trabajo ya está en HEAD. Por eso reviso `git show 1ef0ce5b`. m3 queda como está, por indicación del leader.
+
+| Hallazgo | Arreglo | Estado |
+|---|---|---|
+| B1 | `module-shape.test.ts` añade `app/(private)/integraciones/proveedor-ia/components/ai-model-select.tsx` a la lista R19, en el orden que devuelve `filesImportingTheModule()` | Cerrado: el archivo pasa en verde |
+| B2 | Comentario de `selectAiModelAction` reescrito sin `R34` ni «guardia R23»; dice el motivo («elegir no marca la conexión…») | Cerrado |
+| m1 | `log.error(...)` con `forModule('integraciones')` de `lib/shared/observability/logger` en vez de `console.error`. Pasa solo `companyId` (`LogFields` de primitivas). Importar `lib/shared` desde un adaptador driving está permitido | Cerrado |
+| m2 | `design.md`: la fila `SharedSelectControl` pasa a «2, se amplía» con las cinco props, y §12.1 anota «Aplicado en T9 (paso 2)» | Cerrado |
+
+**¿Se pierde cobertura al dejar de comprobar la línea `{ code, diagnostic }` del traductor? No.**
+- Esa línea es del traductor común (`createErrorStateTranslator`), no de esta feature. Su contrato lo prueba `tests/unit/errores/to-error-state.test.ts › «R28, R29 — el diagnostico va al log y NUNCA al estado»`, que no depende de qué acción lo use.
+- El test de R34 sigue probando lo que es suyo: una sola línea del evento en el logger del módulo, solo con `companyId`, y que ni esa línea ni **ninguna** llamada a `console` (incluida la del traductor, que se silencia pero se captura) llevan `API_KEY`, `API_KEY_ENC`, `apiKey` ni `apiKeyEnc`. Ese era el riesgo de seguridad, y sigue cubierto.
+- Lo que deja de afirmar es que el traductor escribe exactamente una línea en `console` con ese diagnóstico. Es un detalle del traductor que ya fijan sus propios tests.
+
+**Verificación ejecutada**
+- `vitest run` de `ai-provider-actions.test.ts` y `module-shape.test.ts`: 2 archivos, 126 pass, 1 skip.
+- `eslint` de los 3 archivos tocados: sin problemas.
+- `vitest run guard`: 87 archivos, 1276 pass, 22 skipped.
+
+Sin regresiones ni hallazgos nuevos en el diff.
+
+**Veredicto vuelta 2: OK.** 0 bloqueantes, 1 menor abierto (m3, que se queda como está por indicación del leader).
