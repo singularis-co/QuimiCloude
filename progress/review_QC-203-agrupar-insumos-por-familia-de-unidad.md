@@ -130,3 +130,35 @@ no tocan la lógica:
 
 Para la vuelta 2 basta el diff acotado a esas dos correcciones, más typecheck, lint y
 `vitest run guard`.
+
+## Vuelta 2 (acotada a HEAD = 6901b74a)
+
+### Checklist
+- [x] **Hallazgo 1 (regla 9) resuelto.** Se quitaron las citas `QC-`/`R<n>`/`design.md` de:
+  - `formula-import-review.tsx` (5 comentarios);
+  - `formula-import-summary.tsx:35`;
+  - `formula-ingredient-row.tsx` (3 comentarios);
+  - `supply-family.ts:38-40`.
+
+  Cada comentario conserva el porqué.
+- [x] **Barrido de la rama entera.** En `git diff 977f9aeb..HEAD -- app lib components`, ninguna
+  línea añadida cita `QC-<n>`, `R<n>` ni `design.md`; el grep salió vacío.
+- [x] **Hallazgo 2 (regla 11) resuelto.** La celda `Diseño` de `PresentationUnitSelect` en
+  `components/shared/CATALOGO.md:82` cita ahora `docs/diseno/canvas/AltaConversion.dc.html`, y
+  ese archivo existe.
+- [x] **Sin regresiones.** El commit solo cambia comentarios y una celda del catálogo: no toca
+  lógica.
+- [x] **Typecheck** (`tsc --noEmit`): exit 0.
+- [x] **Lint:** exit 0, con 0 errores y 7 warnings ajenos al diff.
+- [x] **Guardias** (`vitest run guard`).
+  - La primera pasada dio 7 archivos rojos, todos por timeout o EBUSY: corría a la vez que tsc y
+    lint.
+  - Al correr esos 7 archivos solos: 7/7 en verde, 121/121 tests.
+
+### Hallazgos
+- **menor (sigue abierto el 3 de la vuelta 1).** En
+  `lib/modules/inventario/domain/plan-inventory-import.ts:433`, `resolveSupplyIdentity` arma
+  `SupplyHomonym` con `name: product.nameNormalized`. No bloquea.
+
+### Veredicto
+**OK**.
