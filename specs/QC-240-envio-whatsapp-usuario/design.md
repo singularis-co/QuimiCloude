@@ -484,11 +484,20 @@ y los tipos `WhatsappOutboundMessageView`. `module-shape.test.ts` se tensa (§10
 
 - Ningún `console.*` en el dominio. La acción no registra nada salvo lo que ya hace `toErrorState`
   con el `diagnostic` del error.
-- Un fallo de Meta no es una excepción (se devuelve el mensaje `FAILED`). El caso de uso devuelve,
-  junto a la vista, un `diagnostic` interno `Graph enviar mensaje: <kind>; code=<n>; subcode=<n>`, y
-  la acción lo escribe con `console.warn('whatsapp_send_failed', { messageId, diagnostic })`. **No**
-  lleva el texto de Meta: puede repetir el número del destinatario o parte del mensaje (R46). Nunca
-  el texto, los valores, el `waId` ni el token.
+- Un fallo de Meta no es una excepción (se devuelve el mensaje `FAILED`). El caso de uso arma un
+  `diagnostic` interno `Graph enviar mensaje: <kind>; code=<n>; subcode=<n>` y se lo entrega a un
+  **puerto de log** inyectado en sus dependencias (`ports/whatsapp-send-log.ts`,
+  `WhatsappSendLog`). Su única implementación es un adaptador driven
+  (`adapters/driven/observability/whatsapp-send-log-console.ts`, precedente
+  `identity/adapters/driven/observability/session-check-log-console.ts`) que escribe
+  `console.warn('whatsapp_send_failed', { messageId, diagnostic })`; la composición lo cablea.
+  **No** lleva el texto de Meta: puede repetir el número del destinatario o parte del mensaje (R46).
+  Nunca el texto, los valores, el `waId` ni el token.
+- **La Server Action no lee `.diagnostic`** (guardia `guard-catalogo-de-errores`, caso 9): solo
+  traduce la vista y los errores. Un test comprueba que el puerto recibe el diagnóstico.
+- *Enmienda del 2026-10-23 (decisión del humano, `progress/features/QC-240.md > Decisiones`):* la
+  versión aprobada hacía que la acción escribiera el `console.warn` con el `diagnostic`, lo que
+  choca con el caso 9 de esa guardia.
 
 ---
 
@@ -524,6 +533,8 @@ el humano los ve al aprobar.
   9, y los siguientes (`delivered`/`read`) sí se aplican. Se acepta: el caso de un `delivered`
   perdido es raro y no rompe nada.
 - **`markSent`/`markFailed` condicionados a `SENDING`**: no retroceden un estado ya movido.
+  **Decisión cerrada (humano, 2026-10-23):** si devuelven `null` (la fila ya salió de `SENDING`), el
+  caso de uso responde con el resultado de Meta de esa llamada y la fila no se toca.
 - **Reintento tras timeout**: puede duplicar el mensaje si Meta sí lo recibió (P6).
 
 ---
