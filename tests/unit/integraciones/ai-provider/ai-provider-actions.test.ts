@@ -295,6 +295,42 @@ describe('accion de elegir modelo (QT-291)', () => {
     expect(revalidatePathMock).not.toHaveBeenCalled()
   })
 
+  it('QT-291 R34 — con la key ilegible registra el error en el log del servidor, sin datos sensibles, y no toca la conexion', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      // El diagnostico real del cifrado (`secret-cipher-aes-gcm.ts`): nunca lleva la key ni el valor cifrado.
+      selectMock.mockRejectedValueOnce(new SecretUnreadableError('no autentica'))
+      await ACTIONS.select()
+
+      // La linea del evento, con la empresa para saber cual mirar...
+      expect(consoleError).toHaveBeenCalledWith('ai_provider_select_secret_unreadable', { companyId: COMPANY_ID })
+      // ...y la del traductor de errores con codigo y diagnostico (QC-70 R28), que ya existia.
+      expect(consoleError).toHaveBeenCalledWith({ code: 'integration_secret_unreadable', diagnostic: 'no autentica' })
+      expect(consoleError).toHaveBeenCalledTimes(2)
+      const logged = JSON.stringify(consoleError.mock.calls)
+      for (const forbidden of [API_KEY, API_KEY_ENC, 'apiKey', 'apiKeyEnc']) {
+        expect(logged, `el log lleva ${forbidden}`).not.toContain(forbidden)
+      }
+      // La accion solo eligio: ningun otro caso de uso (probar, guardar, desconectar) cambio la conexion.
+      expect(selectMock).toHaveBeenCalledTimes(1)
+      for (const other of [testSavedMock, saveMock, disconnectMock]) expect(other).not.toHaveBeenCalled()
+      expect(revalidatePathMock).not.toHaveBeenCalled()
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it('QT-291 R34 — otro error al elegir no se registra como key ilegible', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      selectMock.mockRejectedValueOnce(new ValidationError('modelo fuera del catalogo'))
+      await ACTIONS.select()
+      expect(consoleError).not.toHaveBeenCalledWith('ai_provider_select_secret_unreadable', expect.anything())
+    } finally {
+      consoleError.mockRestore()
+    }
+  })
+
   it('QT-291 R13 — la consulta copia la vista y el catalogo campo a campo, tambien cada opcion de modelo', async () => {
     const leakyOption = { modelId: 'modelo-mejor', isDefault: false, apiKey: API_KEY }
     getMock.mockResolvedValueOnce({

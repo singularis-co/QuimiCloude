@@ -224,7 +224,14 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
   const closeEditor = useCallback(() => setEditing(false), []);
 
   if (editing) {
-    return <AiProviderForm providers={providers} initialProvider={connection.provider} onSaved={closeEditor} />;
+    return (
+      <AiProviderForm
+        providers={providers}
+        initialProvider={connection.provider}
+        connected
+        onSaved={closeEditor}
+      />
+    );
   }
 
   const isError = connection.status === 'ERROR';

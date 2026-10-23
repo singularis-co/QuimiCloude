@@ -25,6 +25,7 @@ import {
   AI_PROVIDER_DISCONNECT_CONFIRM_TESTID,
   AI_PROVIDER_DISCONNECT_DIALOG_TESTID,
   AI_PROVIDER_DISCONNECT_DISMISS_TESTID,
+  AI_PROVIDER_FORM_HELP_TESTID,
   AI_PROVIDER_FORM_TESTID,
   AI_PROVIDER_KEY_FIELD_TESTID,
   AI_PROVIDER_LOGO_TESTID,
@@ -334,6 +335,17 @@ describe('AiProviderCard', () => {
     expect(screen.getByTestId(`${AI_PROVIDER_OPTION_TESTID_PREFIX}GOOGLE`)).toHaveAttribute('aria-checked', 'true');
     expect((screen.getByTestId(AI_PROVIDER_KEY_FIELD_TESTID) as HTMLInputElement).value).toBe('');
     expect(screen.getByLabelText('API key de Gemini')).toBe(screen.getByTestId(AI_PROVIDER_KEY_FIELD_TESTID));
+  });
+
+  it('QT-291 R30: al pulsar «Cambiar key o proveedor» la ayuda del formulario no dice «Después de conectar podrás elegir el modelo.»', async () => {
+    const user = setupUser();
+    montar(enError());
+
+    await user.click(screen.getByTestId(AI_PROVIDER_CARD_CHANGE_TESTID));
+
+    const ayuda = screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID);
+    expect(ayuda.textContent).toBe('Créala en la consola de Gemini: aistudio.google.com/apikey.');
+    expect(screen.queryByText(/Después de conectar podrás elegir el modelo/)).toBeNull();
   });
 
   it('R33: «Desconectar» pide confirmacion con el titulo y el texto del tablero; cancelar no cambia nada', async () => {

@@ -226,7 +226,14 @@ export async function selectAiModelAction(
     refreshScreen();
     return { status: 'saved' };
   } catch (error) {
-    return toErrorState(error);
+    const state = await toErrorState(error);
+    if (state.code === 'integration_secret_unreadable') {
+      // La conexión no pasa a Error al elegir (R34): sin este registro nadie fuera de la pantalla
+      // se enteraría. Solo la empresa: ni la key ni su valor cifrado. Se decide por el estado ya
+      // traducido: mirar la clase del error es cosa del traductor único (guardia R23).
+      console.error('ai_provider_select_secret_unreadable', { companyId: actor?.companyId ?? null });
+    }
+    return state;
   }
 }
 

@@ -186,6 +186,22 @@ describe('AiProviderForm', () => {
     );
   });
 
+  it('QT-291 R30: con la empresa ya conectada, la ayuda solo enlaza la consola, sin «Después de conectar podrás elegir el modelo.»', async () => {
+    const user = setupUser();
+    render(<AiProviderForm providers={PROVEEDORES} initialProvider="GOOGLE" connected />);
+
+    const ayuda = screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID);
+    expect(campo()).toHaveAccessibleDescription(ayuda.textContent ?? '');
+    expect(ayuda.textContent).not.toContain('Después de conectar podrás elegir el modelo.');
+    expect(within(ayuda).getByRole('link')).toBeTruthy();
+
+    await user.click(opcion('OPENAI'));
+
+    expect(screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID).textContent).toBe(
+      'Créala en la consola de OpenAI: platform.openai.com/api-keys.',
+    );
+  });
+
   it('R30: las flechas mueven la eleccion entre proveedores', async () => {
     const user = setupUser();
     render(<AiProviderForm providers={PROVEEDORES} />);

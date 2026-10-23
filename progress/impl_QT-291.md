@@ -532,3 +532,36 @@ elegir `gemini-4-argon` por la pantalla (toast) y fijar los tres estados por SQL
   El resto, 1275 pass, 22 skipped.
 
 **Veredicto:** T9, T10 y T11 hechas y en verde; T12 pendiente por disco lleno; queda T13 (E2E).
+
+## F2: R30 ayuda solo en alta
+
+Decisión del humano (requirements.md > Decisiones cerradas, fila «(F2) Ayuda … al abrir «Cambiar key
+o proveedor»»): la frase «Después de conectar podrás elegir el modelo.» solo sale en el alta.
+
+**Archivos modificados**
+- `app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx`: prop opcional
+  `connected` (por defecto `false`); con ella la ayuda termina en el enlace a la consola, sin la frase.
+- `app/(private)/integraciones/proveedor-ia/components/ai-provider-card.tsx`: al abrir el formulario
+  desde «Cambiar key o proveedor» le pasa `connected`. `page.tsx` no cambia (el alta monta el
+  formulario sin la prop).
+- `tests/unit/integraciones-ui/ai-provider-form.test.tsx`: nuevo caso con `connected`.
+- `tests/unit/integraciones-ui/ai-provider-card.test.tsx`: nuevo caso tras pulsar «Cambiar key o proveedor».
+
+**R → test**
+- R30 (alta: sale) → ai-provider-form.test.tsx «R30, QT-291 R30: la ayuda enlaza la consola del elegido y dice …» (existente).
+- R30 (con conexión: no sale) → ai-provider-form.test.tsx «QT-291 R30: con la empresa ya conectada, la ayuda solo enlaza la consola …»
+  y ai-provider-card.test.tsx «QT-291 R30: al pulsar «Cambiar key o proveedor» la ayuda del formulario no dice …».
+
+**Salida**
+- `pnpm run typecheck`: 3 errores, todos en `e2e/integraciones-proveedor-ia.spec.ts` (rojo esperado).
+- `pnpm exec eslint` de los 4 archivos: No issues found.
+- `pnpm exec vitest run` de los 4 `tests/unit/integraciones-ui/ai-*.test.tsx`: 4 archivos, 72 pass.
+- `pnpm exec vitest run guard`: 86 archivos pass, 1 fail ajeno: `guard-catalogo-de-errores` > «ningun
+  archivo define su propio traductor (R23)» señala `lib/modules/integraciones/adapters/driving/ai-provider-actions.ts`
+  (archivo del backend en edición por otro agente; no tocado aquí). 1275 pass, 22 skipped.
+
+**Veredicto:** R30 ajustada (ayuda solo en alta) y en verde; queda el rojo de guardia del backend.
+
+## F2: R34 log
+
+- `selectAiModelAction` registra `console.error('ai_provider_select_secret_unreadable', { companyId })` cuando el estado traducido es `integration_secret_unreadable` (decide por el estado, no por `instanceof`: guardia R23); la conexión no pasa a Error y el aviso no cambia. Sin key, valor cifrado ni diagnóstico propio. Archivos: `lib/modules/integraciones/adapters/driving/ai-provider-actions.ts`, `tests/unit/integraciones/ai-provider/ai-provider-actions.test.ts` (2 tests «QT-291 R34 —»). Salida: typecheck solo 3 errores en `e2e/integraciones-proveedor-ia.spec.ts` (esperado); eslint sin problemas; `vitest run tests/unit/integraciones/ai-provider/` 12 archivos, 214 pass; `vitest run guard` 1276 pass, 22 skipped, 0 fail (el rojo R23 anotado arriba queda resuelto). **Veredicto:** R34 log en verde.

@@ -94,6 +94,8 @@ export type AiProviderFormProps = {
   readonly providers: readonly AiProviderEntry[];
   /** Al cambiar de proveedor desde la tarjeta, el que ya estaba. */
   readonly initialProvider?: AiProviderCode;
+  /** Con la empresa ya conectada (al cambiar desde la tarjeta) la ayuda no anuncia la elección de modelo. */
+  readonly connected?: boolean;
   /** Tras guardar con éxito, para que la tarjeta vuelva a su vista. */
   readonly onSaved?: () => void;
 };
@@ -102,7 +104,12 @@ export type AiProviderFormProps = {
  * La key nunca tiene valor inicial y el campo se vuelve a montar vacío tras cada respuesta: ni lo
  * escrito vuelve del servidor ni depende del reinicio automático del `<form>`.
  */
-export function AiProviderForm({ providers, initialProvider, onSaved }: AiProviderFormProps) {
+export function AiProviderForm({
+  providers,
+  initialProvider,
+  connected = false,
+  onSaved,
+}: AiProviderFormProps) {
   const baseId = useId();
   const keyId = `${baseId}-key`;
   const helpId = `${baseId}-help`;
@@ -217,8 +224,8 @@ export function AiProviderForm({ providers, initialProvider, onSaved }: AiProvid
             >
               {linkText(brand.consoleUrl)}
             </a>
-            {'. '}
-            {AI_PROVIDER_FORM_TEXTS.helpModel}
+            {'.'}
+            {connected ? null : ` ${AI_PROVIDER_FORM_TEXTS.helpModel}`}
           </p>
         </div>
 
