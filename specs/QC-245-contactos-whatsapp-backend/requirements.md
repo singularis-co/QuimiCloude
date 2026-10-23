@@ -304,11 +304,12 @@ Vocabulario añadido:
 
 - **R60.** El valor de `pedido.estado` DEBE ser el estado del pedido elegido en lenguaje del
   cliente: `recibido` para `PENDIENTE`; `en preparación` para `EN_CURSO`, `POR_EMPACAR`,
-  `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`, `TERMINADO` y `BLOQUEADO` (P20);
-  `entregado` para `ENTREGADO`; `cancelado` para `CANCELADO`. Todo estado del sistema DEBE tener
-  exactamente una de esas cuatro etiquetas.
+  `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`, `TERMINADO` y `BLOQUEADO`;
+  `entregado` para `ENTREGADO`; `cancelado` para `CANCELADO` (D15). Todo estado del sistema DEBE
+  tener exactamente una de esas cuatro etiquetas, y la correspondencia estado → texto del cliente
+  DEBE estar definida en un único mapa constante, del que la toma toda lógica que la necesite.
 - **R61.** El valor de `pedido.fecha_solicitud` DEBE ser la fecha de solicitud del pedido elegido
-  como `DD/MM/AAAA`, con el día civil que muestra Pedidos (P21).
+  como `DD/MM/AAAA`, con el día civil UTC, el mismo que muestra Pedidos (D16).
 - **R62.** El valor de `pedido.detalle` DEBE ser una línea de texto por cada línea del reparto del
   pedido elegido, en el orden de R51, con la forma `<pedidos> × <presentación> (entregado
   <entregados>, falta|faltan <por entregar>)` —«falta» cuando es 1— y con los números de R52,
@@ -336,6 +337,9 @@ Vocabulario añadido:
 | D12 Selector: solo pedidos abiertos, el más reciente primero | Vocabulario «Pedidos del cliente», R51, R54 |
 | D13 Objeto de valores: cliente, empresa y pedido elegido | R55, R56, R60–R62 |
 | D14 Basta `whatsapp.consultar` para ver los pedidos en el chat | R50, R63 |
+| D15 Cuatro etiquetas del cliente en un único mapa constante | R60 |
+| D16 Fecha `DD/MM/AAAA`, día civil UTC | R61 |
+| D17 El catálogo de constantes del front entra en QC-246 | Sin requisito aquí: es alcance de QC-246 (`design.md > 11`) |
 
 ## Preguntas abiertas
 
@@ -388,16 +392,13 @@ Abiertas por la Enmienda 1 (2026-10-23):
 - **P17 — Total del pedido.** Cerrada por el humano el 2026-10-23: D11.
 - **P18 — Catálogo de constantes del sistema.** Cerrada por el humano el 2026-10-23: D13. Las claves
   nuevas (`pedido.estado`, `pedido.fecha_solicitud`, `pedido.total`, `pedido.detalle`) tiene que
-  aprenderlas también el front de plantillas: seguimiento anotado en `design.md > 11`.
+  aprenderlas también el front de plantillas: entra en el alcance de QC-246 (D17).
 - **P19 — Pedidos con solo `whatsapp.consultar`.** Cerrada por el humano el 2026-10-23: D14.
 
 Abiertas al aplicar D12–D14 (2026-10-23):
 
-- **P20 — `TERMINADO` y `BLOQUEADO` para el cliente.** El humano dio cuatro etiquetas y el sistema
-  tiene diez estados. **Default:** los dos son `en preparación`: todavía no se entregaron, igual que
-  los cuenta Pedidos «en curso» (R60).
-- **P21 — Formato y día de `pedido.fecha_solicitud`.** **Default:** `DD/MM/AAAA` del día civil UTC,
-  el mismo día que pinta Pedidos (`formatCivilDate`); la empresa no tiene huso guardado (R61).
+- **P20 — `TERMINADO` y `BLOQUEADO` para el cliente.** Cerrada por el humano el 2026-10-23: D15.
+- **P21 — Formato y día de `pedido.fecha_solicitud`.** Cerrada por el humano el 2026-10-23: D16.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -419,3 +420,6 @@ Copiadas de la ficha (`feature_list.json > QC-245`).
 | D12 | (2026-10-23, decisión del humano, cierra P15) El selector de pedidos muestra solo los pedidos **abiertos** del cliente (ni entregados ni cancelados), el más reciente primero, con el tope de 20. Sin pedidos abiertos, `pedido.*` llega nulo. Reemplaza el default «vivos salvo cancelados, 20» | Decisión del humano (sin motivo escrito). |
 | D13 | (2026-10-23, decisión del humano, cierra P18) El back devuelve un objeto de valores con el nombre del cliente, el nombre de la empresa y los datos del pedido elegido (por defecto, el abierto más reciente): `cliente.nombre`, `empresa.nombre` (se mantiene para no romper plantillas), `pedido.numero`, `pedido.estado` en lenguaje del cliente (recibido, en preparación, entregado, cancelado), `pedido.fecha_solicitud`, `pedido.total` (nulo hasta QC-307) y las líneas del pedido (presentaciones, entregado y faltante) | `empresa.nombre` se conserva para que no se rompan las plantillas que ya la usan; el resto, decisión del humano. |
 | D14 | (2026-10-23, decisión del humano, cierra P19) Basta `whatsapp.consultar` para ver los pedidos del cliente en el contexto del chat | Decisión del humano (sin motivo escrito). Hoy solo el Administrador tiene el permiso (D1). |
+| D15 | (2026-10-23, decisión del humano, cierra P20) `pedido.estado` usa cuatro etiquetas: `PENDIENTE` → «recibido»; `EN_CURSO`, `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`, `TERMINADO` y `BLOQUEADO` → «en preparación»; `ENTREGADO` → «entregado»; `CANCELADO` → «cancelado». La correspondencia vive en **un único** mapa constante `OrderStatus` → texto del cliente | El cliente no entra a la plataforma: los estados internos son internos. Un solo mapa deja cambiar el texto del cliente sin tocar lógica. |
+| D16 | (2026-10-23, decisión del humano, cierra P21) `pedido.fecha_solicitud` = `DD/MM/AAAA` del día civil UTC, el mismo que pinta Pedidos | La empresa no tiene huso guardado; coincide con lo que ve Pedidos. |
+| D17 | (2026-10-23, decisión del humano) Que el catálogo de constantes del front de QC-243 aprenda `pedido.estado`, `pedido.fecha_solicitud`, `pedido.total` y `pedido.detalle` entra en el alcance de QC-246; el leader lo añade a su ficha | Sin eso ninguna plantilla puede usar las claves nuevas. |

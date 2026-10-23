@@ -74,7 +74,7 @@ del sistema», `cliente.nombre`, «pedidos del cliente», «nombre de la empresa
 | QC-307 (`in_progress`, sin mergear): precio de venta del pedido | Total del pedido | No se espera: `total: null` (D11) |
 | D12–D14: `ORDER_STATUSES_NOT_IN_PROGRESS` (`pedidos/domain/order-classification.ts`, `['ENTREGADO', 'CANCELADO']`) | Los estados que no son «en curso» | Es exactamente «no abierto» (D12): se exporta del barril de `pedidos` y se pasa como `excludedStatuses` (§15.8) |
 | `ORDER_STATUS_LABELS` (`lib/shared/ui/order-status.ts`) | Etiquetas internas de Pedidos («En fabricación», «Por empacar»…) | **No sirven** para el cliente (alternativa 19). No hay ninguna agrupación en lenguaje del cliente: nace aquí desde el `enum OrderStatus` (R60) |
-| `formatCivilDate` (`lib/shared/ui/date-civil.ts`) | Día civil UTC con que Pedidos pinta fechas | Misma regla para `pedido.fecha_solicitud` (R61, P21), reescrita en el dominio (que no importa `lib/shared`) |
+| `formatCivilDate` (`lib/shared/ui/date-civil.ts`) | Día civil UTC con que Pedidos pinta fechas | Misma regla para `pedido.fecha_solicitud` (R61, D16), reescrita en el dominio (que no importa `lib/shared`) |
 
 ---
 
@@ -649,17 +649,16 @@ mensaje (si aún no está cargado, al cargarlo). Del mismo lado al mismo mensaje
   | `cliente.nombre` | «Laura Gómez» |
   | `empresa.nombre` | «Agua Pura» |
   | `pedido.numero` | «2026-0000128» |
-  | `pedido.estado` | `recibido`, `en preparación`, `entregado` o `cancelado` [ABIERTO P20] |
-  | `pedido.fecha_solicitud` | «23/10/2026» [ABIERTO P21] |
+  | `pedido.estado` | `recibido`, `en preparación`, `entregado` o `cancelado` |
+  | `pedido.fecha_solicitud` | «23/10/2026» (día UTC) |
   | `pedido.total` | siempre `null` (QC-307) |
   | `pedido.detalle` | «10 × Bidón 20 L (entregado 6, faltan 4); 5 × Garrafa 5 L (entregado 5, faltan 0)»: una línea de texto, sin saltos |
 
   Para resolver una plantilla: `values[variable.key]`; si es `null` o no está, el texto muestra
   `[falta <clave>]`. Al enviar, `constants` = las constantes de la plantilla con valor no nulo, y
   `constantLabels` de su catálogo de etiquetas.
-- **Seguimiento de front:** el catálogo de constantes de QC-243 (y su traducción
-  `nombre_del_cliente` ↔ `cliente.nombre`) aún no tiene las cuatro `pedido.*` nuevas; hasta
-  añadirlas, ninguna plantilla las usa.
+- **Alcance de esta ficha (D17):** el catálogo de constantes de QC-243 (y su traducción
+  `nombre_del_cliente` ↔ `cliente.nombre`) aprende las cuatro `pedido.*` nuevas.
 - `orderId` que no está en `orders` (también entregado o cancelado) ⇒ `order_not_found`.
 
 ---
@@ -748,14 +747,13 @@ Mapa `R<n> → test` completo en `tasks.md`.
 - **QC-240**: no se modifica salvo exportar `sendFailureReasonOf`.
 - **QC-241** (envíos del sistema): sus mensajes `origin = SYSTEM` aparecen en el chat con `sentBy:
   null`.
-- **Front de plantillas (seguimiento de D13, no se especifica aquí).** El catálogo de constantes
-  del front de QC-243 (`design.md > 5`) y su traducción de clave visible a clave con punto
+- **Front de plantillas (D17, no se especifica aquí).** El catálogo de constantes del front de
+  QC-243 (`design.md > 5`) y su traducción de clave visible a clave con punto
   (`nombre_del_cliente` ↔ `cliente.nombre`) solo conocen `cliente.nombre`, `empresa.nombre` y
-  `pedido.numero`. Para que una plantilla pueda usar `pedido.estado`, `pedido.fecha_solicitud`,
-  `pedido.total` y `pedido.detalle`, el front tiene que aprender esas cuatro (clave visible,
-  etiqueta, descripción y ejemplo). Hasta entonces el back las devuelve y ninguna plantilla las usa.
-  **Nota para el leader:** anotarlo en la ficha de QC-246 si esa pantalla toca el catálogo de
-  constantes; si no, abrir una ficha nueva de front. Lo decide el humano.
+  `pedido.numero`. Que aprenda `pedido.estado`, `pedido.fecha_solicitud`, `pedido.total` y
+  `pedido.detalle` (clave visible, etiqueta, descripción y ejemplo) **entra en el alcance de
+  QC-246**; el leader lo añade a su ficha. Hasta entonces el back las devuelve y ninguna plantilla
+  las usa.
 
 | Archivo | Con quién | Cómo se resuelve |
 |---|---|---|
@@ -1132,11 +1130,16 @@ export const CUSTOMER_ORDER_STAGE: Readonly<Record<OrderStatus, CustomerOrderSta
   PENDIENTE: 'recibido',
   EN_CURSO: 'en preparación', POR_EMPACAR: 'en preparación', EN_EMPAQUE: 'en preparación',
   POR_ACONDICIONAR: 'en preparación', EN_ACONDICIONAMIENTO: 'en preparación',
-  TERMINADO: 'en preparación', BLOQUEADO: 'en preparación',   // P20
+  TERMINADO: 'en preparación', BLOQUEADO: 'en preparación',
   ENTREGADO: 'entregado', CANCELADO: 'cancelado',
 };
 ```
 
+**Un solo lugar (D15).** `CUSTOMER_ORDER_STAGE` es la **única** definición del texto que ve el
+cliente por estado: `contextValuesOf` lo lee y ninguna otra función repite etiquetas ni compara
+estados para elegir un texto. Cambiar lo que lee el cliente es editar ese mapa, sin tocar lógica; el
+test de R60 recorre `ORDER_STATUS_VALUES` contra el mapa, no contra textos copiados. Los estados
+internos no salen al cliente porque no entra a la plataforma.
 `Record<OrderStatus, …>` hace que un estado nuevo en el `enum` no compile hasta tener etiqueta
 (R60). Con D12 el elegido nunca está entregado ni cancelado; las cuatro etiquetas se definen igual
 para que el mapa sea total.
@@ -1145,7 +1148,7 @@ para que el mapa sea total.
 |---|---|
 | `pedido.numero` | `formatOrderNumber` (sin cambios) |
 | `pedido.estado` | `CUSTOMER_ORDER_STAGE[status]` (R60) |
-| `pedido.fecha_solicitud` | `customerDateOf(createdAt)`: `DD/MM/AAAA` del día UTC, igual que `formatCivilDate` de Pedidos (R61, P21) |
+| `pedido.fecha_solicitud` | `customerDateOf(createdAt)`: `DD/MM/AAAA` del día UTC, igual que `formatCivilDate` de Pedidos (R61, D16) |
 | `pedido.total` | siempre `null` (D11) |
 | `pedido.detalle` | `orderDetailTextOf(lines)` (R62) |
 

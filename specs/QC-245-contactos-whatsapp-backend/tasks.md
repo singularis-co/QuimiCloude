@@ -158,7 +158,7 @@
   - **Hecho:** sin imports prohibidos en `domain/`; `media_id` y `wamid` no salen en ningún tipo;
     envases iguales a `orderedPackages`/`remainingPackages`; valores nulos, nunca `''` ni ausentes;
     sin pedido elegido, las cinco `pedido.*` nulas; los diez estados con una de las cuatro
-    etiquetas; fecha `DD/MM/AAAA` del día UTC; `pedido.detalle` con «falta» en singular, «presentación
+    etiquetas, leídas solo de `CUSTOMER_ORDER_STAGE` (ningún otro texto de estado en el código, D15); fecha `DD/MM/AAAA` del día UTC; `pedido.detalle` con «falta» en singular, «presentación
     sin nombre», `null` sin líneas y sin `\n` ni `\t`; tipos idénticos al §B v2 del contrato.
 
 - [ ] **T14 Adaptador de conversaciones** (R44, R49, R57). Depende de T5 y T13.
@@ -210,7 +210,7 @@
   - Repetir T9 sobre todo el diff y actualizar el mapa `R<n> → test` de `progress/impl_QC-245.md`
     con R44–R63.
   - **Hecho:** todo verde; ningún R44–R63 sin test. El leader republica el §«Contrato para la
-    pantalla» en QC-246 y anota el seguimiento del catálogo de constantes del front (design §11).
+    pantalla» en QC-246, cuya ficha ya incluye el catálogo de constantes del front (D17, design §11).
 
 ## Mapa R → test (previsto)
 
