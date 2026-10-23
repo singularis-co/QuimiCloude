@@ -331,6 +331,10 @@ export const E2E_ESPERADOS = [
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
   'insumo-por-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas (QC-203 R30). Recorre el alta de «Glicerina» en ml sobre
+  // la misma en l: aviso de conversion, guardado y existencia sumada en l. No lee ni afirma nada
+  // sobre el identificador de peticion.
+  'inventario-familia-de-unidad.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un pedido en g y otro en ml sobre un
   // insumo en kg: cantidad requerida, marca de aproximacion, costo cotizado y guardado y cantidad
   // apartada. No lee ni afirma nada sobre el identificador de peticion.

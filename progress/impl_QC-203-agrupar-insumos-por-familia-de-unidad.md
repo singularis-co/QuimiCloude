@@ -269,3 +269,71 @@ Tests:
 - Finales de línea: `git ls-files --eol` da `w/lf` en todos; `file` no marca CRLF.
 
 Veredicto: T11 verde; typecheck del repo en verde.
+
+## Tanda 6 — T12 E2E, T13 revisión de E2E, T15 gate y trazabilidad
+
+### Archivos
+- Nuevo: `e2e/inventario-familia-de-unidad.spec.ts`, con un solo caso: `R30 alta de Glicerina 500 ml sobre Glicerina en l avisa, guarda y la existencia sube 0,5 l`.
+  - Fixture: empresa y Administrador propios por corrida (`createFixtureUser`, prefijo `qc203_e2e_`). «Glicerina» en l se siembra por Prisma con un lote de 2 l y su asiento `opening`.
+  - El recorrido:
+    1. El listado parte de `2 l`.
+    2. Se abre «Nuevo producto», se elige ml, existencia 500.
+    3. `supply-conversion-notice-stock` = `500 ml = 0,5 l`.
+    4. Al guardar, la fila muestra `2.5 l`, y sigue así tras recargar; hay una sola fila.
+  - En Postgres: un solo producto vivo «Glicerina» en l, y su lote nuevo tiene `stock.toFixed(4) === '0.5000'`.
+  - El listado muestra `2.5 l` con punto porque `formatDecimalDisplay` no usa coma; el test afirma lo que se pinta.
+- Modificado: `tests/guards/guard-identificador-de-request.test.ts`. Se da de alta `inventario-familia-de-unidad.spec.ts` en `E2E_ESPERADOS`, con su comentario, como hicieron QC-262 y los demás. Sin esa línea, la guardia R21 de QC-71 se ponía roja con «archivo nuevo en e2e/».
+
+### T13 — sin diff
+- `e2e/inventario.spec.ts` (caso R26 de QC-121): homónimos en kg y L, que son dos familias distintas. La regla nueva no lo afecta.
+- `e2e/insumo-por-unidad.spec.ts`: los dos altas son en kg. Es la misma unidad y ya esperaba un solo producto.
+- `e2e/inventario-importar.spec.ts`: las filas del homónimo `insumo_existente` van en kilogramo, igual que el sembrado. Las dos filas de `tambor` usan la misma unidad.
+- Ninguno crea el mismo nombre en dos unidades de una misma familia esperando dos productos.
+
+### Mapa R1..R30 → test (consolidado)
+| R | Tests nombrados |
+|---|---|
+| R1 | `supply-family.test.ts`: `R1 solo cuentan homónimos con unidad de la misma familia`; `unit-family.test.ts`: `R1 una derivada pertenece a la familia de su base`; `supply-homonyms.int.test.ts`: `R1 devuelve los vivos con unidad del mismo nombre normalizado…`, `R1 no devuelve los dados de baja ni los sin unidad`; `create-product-familia.test.ts`: `R1 un homónimo de otra familia no cuenta y crea` |
+| R2 | `supply-family.test.ts`: `R2 una unidad suelta es su propia familia`; `unit-family.test.ts`: `R2 una unidad suelta, sin base ni derivadas, es su propia familia` |
+| R3 | `create-product-familia.test.ts`: `R3 sin homónimo crea con la unidad del alta` |
+| R4 | `supply-family.test.ts`: `R4 500 ml pasan a 0.5 l`; `create-product-familia.test.ts`: `R4 con homónimo en otra unidad agrega el lote convertido y no crea`, `R4 con homónimo en la misma unidad agrega sin convertir` |
+| R5 | `supply-family.test.ts`: `R5 gana el de más existencia comparada en la base sin truncar`, `R5 en empate gana el primero (más antiguo)`; `create-product-familia.test.ts`: `R5 entre varios va al de más existencia` |
+| R6 | `supply-family.test.ts`: `R6 0.004 por ml pasa a 4 por l`; `create-product-familia.test.ts`: `R6 convierte el costo unitario` |
+| R7 | `create-product-familia.test.ts`: `R7 con solo costo total deriva sobre la existencia convertida`, `R7 si el derivado queda en 0 rechaza como hoy` |
+| R8 | `supply-family.test.ts`: `R8 0.25 ml a l no cabe y no se redondea`, `R8 más de 10 cifras enteras no cabe`; `create-product-familia.test.ts`: `R8 existencia que no cabe: ConvertedStockOutOfRangeError sin escribir` |
+| R9 | `supply-family.test.ts`: `R9 0.25 por l a ml no cabe`; `create-product-familia.test.ts`: `R9 costo que no cabe: ConvertedCostOutOfRangeError sin escribir` |
+| R10 | `create-product-familia.test.ts`: `R10 destino terminado: action_not_allowed sin escribir` |
+| R11 | `create-product-familia.test.ts`: `R11 sin inventario.modificar no consulta ni escribe`; `find-supply-homonyms.test.ts`: `R11 sin inventario.modificar responde unauthorized sin consultar` |
+| R12 | `find-supply-homonyms.test.ts`: `R12 pasa al puerto la empresa del actor y nunca la de la entrada`; `supply-homonyms.int.test.ts`: `R12 no devuelve el homónimo de otra empresa` |
+| R13 | `product-form-conversion.test.tsx`: `R13 con homónimo en l y alta en ml muestra aviso…`, `R13 se recalcula al cambiar la unidad o la existencia sin volver a pedir`, `R13 sin costo unitario el aviso no trae la línea de costo`; E2E `R30 alta de Glicerina 500 ml…` |
+| R14 | `product-form-conversion.test.tsx`: `R14 con varios homónimos nombra cada uno y el destino` |
+| R15 | `product-form-conversion.test.tsx`: `R15 sin homónimo o con uno en la misma unidad no hay aviso` |
+| R16 | `product-form-conversion.test.tsx`: `R16 cantidad que no cabe: error bajo Existencia y no envía`, `R16 costo que no cabe: error bajo Costo unitario`, `R16 el rechazo del servidor con converted_stock_out_of_range va a Existencia` |
+| R17 | `product-form-conversion.test.tsx`: `R17 el toast nombra la cantidad convertida y el destino` |
+| R18 | `plan-inventory-import-familia.test.ts`: `R18 fila en ml con homónimo en l queda en sumar lote sobre ese producto`, `R18 segunda fila del archivo en otra unidad de la familia suma sobre la primera`, `R18 otra familia queda en crear` |
+| R19 | `confirm-inventory-import-familia.test.ts`: `R19 la confirmación escribe el lote convertido sobre el destino`; `inventory-import-repository.int.test.ts`: `R19 findAliveProductsByNormalizedNames devuelve la existencia` |
+| R20 | `plan-inventory-import-familia.test.ts`: `R20 existencia convertida que no cabe…`, `R20 costo convertido que no cabe…`, `R20 total derivado en 0 tras convertir…`; `confirm-inventory-import-familia.test.ts`: `R20 la confirmación no escribe la fila que no cabe` |
+| R21 | `formula-import-unidad.test.tsx`: `R21 con «kg» leído preselecciona kg y dice que se sugirió del PDF`; `formula-import-page.test.tsx`: `R21 una fila «Crear materia prima» sugiere la unidad leida entre las de listUnitsAction` |
+| R22 | `formula-import-unidad.test.tsx`: `R22 con «gotas» queda vacía con su ayuda`, `R22 sin unidad en el PDF…`, `R22 con dos coincidencias…`, `R22 al elegir a mano dice Elegida por ti` |
+| R23 | `review-formula-import.test.ts`: `R23 una fila nueva sin unidad da new_unit_missing y no se puede confirmar`; `formula-import-unidad.test.tsx`: `R23 Confirmar con una vacía marca el error en esa fila y no llama a la action` |
+| R24 | `confirm-formula-import-unidad.test.ts`: `R24 sin unidad rechaza invalid_input sin crear`, `R24 unidad no visible rechaza sin crear`; `create-raw-material.test.ts`: `R24 unidad de otra empresa da ValidationError`, `R24 sin unidad da ValidationError sin tocar el puerto` |
+| R25 | `confirm-formula-import-unidad.test.ts`: `R25 crea la materia prima con la unidad elegida`; `create-raw-material.test.ts`: `R25 guarda la unidad`; `create-raw-material.int.test.ts`: `R25 products.unit_id queda escrito` |
+| R26 | `confirm-formula-import-unidad.test.ts`: `R26 reutiliza el único homónimo de la familia`, `R26 más de uno de la familia rechaza`, `R26 un homónimo sin unidad o de otra familia no cuenta y crea` |
+| R27 | `confirm-formula-import-unidad.test.ts`: `R27 el resumen trae creadas con unidad y reutilizadas`; `formula-import-unidad.test.tsx`: `R27 el resumen lista las creadas con su unidad`, `R27 sin creadas ni reutilizadas el resumen pinta una raya` |
+| R28 | `confirm-formula-import-unidad.test.ts`: `R28 sin inventario.modificar no crea` |
+| R29 | `create-product-familia.test.ts`: `R29 solo llama a addBatchToAlive sobre el destino`; `supply-homonyms.int.test.ts`: `R29 tras el alta convertida el otro homónimo conserva unidad, existencia y lotes` |
+| R30 | `e2e/inventario-familia-de-unidad.spec.ts`: `R30 alta de Glicerina 500 ml sobre Glicerina en l avisa, guarda y la existencia sube 0,5 l` |
+
+Todos los R1..R30 tienen al menos un test nombrado. Ningún R queda sin test.
+
+### Verificación (Tanda 6)
+- `pnpm exec playwright test e2e/inventario-familia-de-unidad.spec.ts` dio `2 passed (1.5m)`: chromium 44.9s y webkit 45.8s.
+- `pnpm exec playwright test e2e/inventario.spec.ts e2e/insumo-por-unidad.spec.ts e2e/inventario-importar.spec.ts` se corrió a la vez que el typecheck y dio `4 failed, 16 passed`. Los 4 rojos estaban en `inventario.spec.ts`, todos con `PrismaClientInitializationError … The paging file is too small for this operation to complete`: la máquina se quedó sin memoria, no falló una aserción. Al repetir `inventario.spec.ts` solo, sin nada en paralelo, dio `16 passed (3.7m)`. Los otros dos specs ya habían quedado verdes en la primera corrida. Ningún caso se saltó.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 ajenos de antes.
+- `pnpm exec vitest related --run e2e/inventario-familia-de-unidad.spec.ts`: «No test files found». El archivo es de Playwright y Vitest excluye `e2e/**`.
+- `pnpm exec vitest run guard`: la primera pasada dio 1 rojo, `guard-identificador-de-request > no hay ningun archivo nuevo en e2e/… (R21)`. Tras dar de alta el spec en `E2E_ESPERADOS`, dio 76 archivos, 1064 verdes y 20 saltados.
+- No se corrió `./init.sh`, ni el rápido ni el `--completo`, por indicación del leader. Se corrieron por separado las piezas que el leader pidió.
+- Finales de línea: LF.
+
+Veredicto: Tanda 6 verde. T12, T13 y T15 quedan marcadas.

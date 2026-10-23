@@ -181,7 +181,7 @@
 
 ## Tanda 6 — recorrido, documentación y cierre
 
-- [ ] **T12 — E2E** `e2e/inventario-familia-de-unidad.spec.ts`. Depende de T8.
+- [x] **T12 — E2E** `e2e/inventario-familia-de-unidad.spec.ts`. Depende de T8.
   - Caso `R30 alta de Glicerina 500 ml sobre Glicerina en l avisa, guarda y la existencia sube 0,5 l`.
   - Usuario de fixture con `createFixtureUser`. «Glicerina» en l se siembra por Prisma con un lote.
   - Pasos: abrir «Nuevo producto», escribir nombre, elegir ml y existencia 500, y ver
@@ -190,7 +190,7 @@
   - Contra Postgres: un solo producto vivo «Glicerina», y su nuevo lote con existencia `0.5000`.
 
   *Hecho:* `pnpm exec playwright test e2e/inventario-familia-de-unidad.spec.ts` verde.
-- [ ] **T13 — Revisar los E2E que daban por partidos los homónimos de una misma familia.** Hay que
+- [x] **T13 — Revisar los E2E que daban por partidos los homónimos de una misma familia.** Hay que
   leer `e2e/inventario.spec.ts`, `e2e/insumo-por-unidad.spec.ts` y `e2e/inventario-importar.spec.ts`.
   - Si alguno crea el mismo nombre en dos unidades de la misma familia y espera dos productos, se
     adapta a la regla nueva o se cambia a dos familias.
@@ -202,7 +202,7 @@
   …» bajo QC-159 R25 y R26, QC-199 R10, QC-121 R5 y R6, y QC-209 R14 y R15, en sus
   `requirements.md`. No se reescribe el requisito original. [P]
   *Hecho:* las seis anotaciones presentes.
-- [ ] **T15 — Gate y trazabilidad.** `./init.sh` en verde, y el mapa `R1..R30 -> test` en
+- [x] **T15 — Gate y trazabilidad.** `./init.sh` en verde, y el mapa `R1..R30 -> test` en
   `progress/impl_QC-203-agrupar-insumos-por-familia-de-unidad.md`. Depende de todo lo anterior.
   *Hecho:* cada `R<n>` con al menos un test nombrado.
 
