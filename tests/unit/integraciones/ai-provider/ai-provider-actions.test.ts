@@ -36,6 +36,7 @@ const {
   getSessionContextMock,
   revalidatePathMock,
   readRequestIdHeaderMock,
+  logErrorMock,
 } = vi.hoisted(() => ({
   getMock: vi.fn(),
   testKeyMock: vi.fn(),
@@ -48,9 +49,14 @@ const {
   getSessionContextMock: vi.fn(),
   revalidatePathMock: vi.fn(),
   readRequestIdHeaderMock: vi.fn(async () => '7c9e6679-7425-40de-944b-e07fc1f90ae7'),
+  logErrorMock: vi.fn(),
 }))
 
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }))
+
+vi.mock('@/lib/shared/observability/logger', () => ({
+  forModule: () => ({ info: vi.fn(), warn: vi.fn(), error: logErrorMock }),
+}))
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: readRequestIdHeaderMock },
@@ -296,18 +302,17 @@ describe('accion de elegir modelo (QT-291)', () => {
   })
 
   it('QT-291 R34 — con la key ilegible registra el error en el log del servidor, sin datos sensibles, y no toca la conexion', async () => {
+    // El traductor de errores escribe su propia linea en consola (QC-70 R28): se silencia.
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       // El diagnostico real del cifrado (`secret-cipher-aes-gcm.ts`): nunca lleva la key ni el valor cifrado.
       selectMock.mockRejectedValueOnce(new SecretUnreadableError('no autentica'))
       await ACTIONS.select()
 
-      // La linea del evento, con la empresa para saber cual mirar...
-      expect(consoleError).toHaveBeenCalledWith('ai_provider_select_secret_unreadable', { companyId: COMPANY_ID })
-      // ...y la del traductor de errores con codigo y diagnostico (QC-70 R28), que ya existia.
-      expect(consoleError).toHaveBeenCalledWith({ code: 'integration_secret_unreadable', diagnostic: 'no autentica' })
-      expect(consoleError).toHaveBeenCalledTimes(2)
-      const logged = JSON.stringify(consoleError.mock.calls)
+      // La linea del evento en el logger del modulo, con la empresa para saber cual mirar.
+      expect(logErrorMock).toHaveBeenCalledWith('ai_provider_select_secret_unreadable', { companyId: COMPANY_ID })
+      expect(logErrorMock).toHaveBeenCalledTimes(1)
+      const logged = JSON.stringify([logErrorMock.mock.calls, consoleError.mock.calls])
       for (const forbidden of [API_KEY, API_KEY_ENC, 'apiKey', 'apiKeyEnc']) {
         expect(logged, `el log lleva ${forbidden}`).not.toContain(forbidden)
       }
@@ -325,7 +330,7 @@ describe('accion de elegir modelo (QT-291)', () => {
     try {
       selectMock.mockRejectedValueOnce(new ValidationError('modelo fuera del catalogo'))
       await ACTIONS.select()
-      expect(consoleError).not.toHaveBeenCalledWith('ai_provider_select_secret_unreadable', expect.anything())
+      expect(logErrorMock).not.toHaveBeenCalledWith('ai_provider_select_secret_unreadable', expect.anything())
     } finally {
       consoleError.mockRestore()
     }

@@ -54,7 +54,7 @@ Buscado `modelo`/`model`, `elegir modelo`, `ai_models`/`AiModel`, `recipeModel`/
 
 | Fila consultada | Uso | Paso |
 |---|---|---|
-| `SharedSelect`, `SharedSelectControl` | Disparador y lista del selector en ventanas > 640 px: modo controlado (`value`, `onValueChange`), contenido propio del disparador (`children`), `invalid`, `labelledBy`, `describedBy`, `triggerTestId`, `optionTestId` | 1, reutiliza |
+| `SharedSelect`, `SharedSelectControl` | Disparador y lista del selector en ventanas > 640 px: modo controlado (`value`, `onValueChange`), contenido propio del disparador (`children`), `invalid`, `labelledBy`, `describedBy`, `triggerTestId`, `optionTestId` | 2, se amplía (aplicado en T9): cinco props opcionales (`disabled`, `busy`, `alignItemWithTrigger`, `renderOption`, `optionClassName`), sin cambio para sus consumidores, anotadas en su fila de `CATALOGO.md` |
 | `SelectField` | La ficha del tablero lo nombra, pero **no cubre modo controlado** (su fila) y aquí se guarda al elegir | No se usa; `SharedSelectControl` es la pieza que envuelve |
 | `CountrySelect` | Patrón de hoja inferior a ≤ 640 px (`Sheet`, `useIsMobile`) que pide el tablero de teléfono | Se copia el **patrón** (no la pieza: es de países, con buscador) |
 | `StatusBadge` | «Recomendado» (`neutral`), «No disponible» (`danger`); «Error» de la tarjeta ya existe | 1, reutiliza |
@@ -527,6 +527,9 @@ Props: `providerName`, `options: AiModelOption[]`, `value: string` (modelo en us
 - Con `pending` (consulta de R32 en curso): disparador deshabilitado, `aria-busy="true"` y `Spinner`
   en el disparador; no abre la lista ni la hoja (R29). Que `SharedSelectControl` admita deshabilitar
   el disparador `[POR VERIFICAR en T9]`; si no, se pide en su fila del catálogo, no se reimplementa.
+  **Aplicado en T9 (paso 2):** `SharedSelectControl` se amplió con cinco props opcionales
+  (`disabled`, `busy`, `alignItemWithTrigger`, `renderOption`, `optionClassName`), sin cambio para
+  sus consumidores, anotadas en su fila de `CATALOGO.md`.
 - Con `unavailable`, el valor mostrado no está entre las opciones: el disparador pinta `children` con
   el id tachado; `SharedSelectControl` admite contenido propio del disparador (su fila).
 

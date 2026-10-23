@@ -23,6 +23,7 @@ import {
   type AiProviderReadiness,
   type AiProviderTestResult,
 } from '@/lib/modules/integraciones';
+import { forModule } from '@/lib/shared/observability/logger';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 import { AI_PROVIDER_INTEGRATION_ROUTE } from '@/lib/shared/routes';
 
@@ -67,6 +68,8 @@ export type DisconnectAiProviderFormState =
 const NOT_READY: AiProviderReadiness = { configured: false, canConfigure: false };
 
 const toErrorState = createErrorStateTranslator(IntegracionesError, observabilidad.readRequestIdHeader);
+
+const log = forModule('integraciones');
 
 async function currentActor(): Promise<Actor | null> {
   const [sessionUser, sessionContext] = await runInRequestScope(() =>
@@ -228,10 +231,10 @@ export async function selectAiModelAction(
   } catch (error) {
     const state = await toErrorState(error);
     if (state.code === 'integration_secret_unreadable') {
-      // La conexión no pasa a Error al elegir (R34): sin este registro nadie fuera de la pantalla
-      // se enteraría. Solo la empresa: ni la key ni su valor cifrado. Se decide por el estado ya
-      // traducido: mirar la clase del error es cosa del traductor único (guardia R23).
-      console.error('ai_provider_select_secret_unreadable', { companyId: actor?.companyId ?? null });
+      // Elegir no marca la conexión: sin este registro nadie fuera de la pantalla se entera.
+      // Solo la empresa, nunca la key. Se decide por el estado traducido porque mirar la clase
+      // del error es cosa del traductor único.
+      log.error('ai_provider_select_secret_unreadable', { companyId: actor?.companyId ?? null });
     }
     return state;
   }

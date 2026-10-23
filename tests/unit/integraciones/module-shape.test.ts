@@ -626,6 +626,7 @@ describe('la forma del modulo integraciones', () => {
       'lib/modules/documentos/domain/errors.ts',
       'lib/modules/documentos/domain/run-document-job.ts',
       'lib/modules/documentos/ports/ai-provider-gateway.ts',
+      'app/(private)/integraciones/proveedor-ia/components/ai-model-select.tsx',
       'app/(private)/integraciones/proveedor-ia/components/ai-provider-brand.ts',
       'app/(private)/integraciones/proveedor-ia/components/ai-provider-card.tsx',
       'app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx',

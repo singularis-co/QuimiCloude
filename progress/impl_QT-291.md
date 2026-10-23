@@ -683,3 +683,13 @@ E2E = `e2e/integraciones-proveedor-ia.spec.ts`. Ningún R<n> sin test.
 sí se corrió: `pnpm run typecheck` 0 errores (T13); `pnpm run lint` 0 errores y 10 warnings, todos en
 archivos que esta feature no toca; `vitest run guard` 1276 pass, 0 fail (tras F2 y T13); tests de
 `integraciones-ui` 154 pass; `ip/` 214 pass; E2E 6/6 contra base migrada (ver T13).
+
+## Revisión vuelta 1: arreglos (2026-10-22)
+
+- B1: `module-shape.test.ts` caso R19 incluye `ai-model-select.tsx`.
+- B2: comentario de `selectAiModelAction` sin citas de requisitos ni guardias.
+- m1: el registro de key ilegible usa `forModule('integraciones')` (`lib/shared/observability/logger.ts`), mismo evento y solo `companyId`; tests «QT-291 R34 —» mockean el logger.
+- m2: `design.md` («Lo que ya existe» y §12.1) refleja el paso 2: `SharedSelectControl` se amplía con cinco props opcionales.
+- m3: sin cambios, a decisión del humano.
+
+Salida: `vitest run module-shape.test.ts ai-provider-actions.test.ts` 2 archivos, 126 pass, 1 skip; eslint de los tres archivos 0; `pnpm run typecheck` 0.
