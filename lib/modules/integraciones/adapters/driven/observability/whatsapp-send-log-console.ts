@@ -1,7 +1,4 @@
-/**
- * La única implementación de `WhatsappSendLog` (QC-240 R46, `design.md > 7`): escribe el aviso en
- * el registro del servidor con `console.warn`. Al navegador no llega nada de esto.
- */
+/** Escribe en el registro del servidor, no en la respuesta: al navegador no llega nada de esto. */
 import type { WhatsappSendFailure, WhatsappSendLog } from '../../../ports/whatsapp-send-log';
 
 /** Etiqueta fija de la línea, localizable con una búsqueda exacta. */

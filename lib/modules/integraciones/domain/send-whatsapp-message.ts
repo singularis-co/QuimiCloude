@@ -43,7 +43,7 @@ export type SendWhatsappMessageDeps = WhatsappSendRecipientDeps & {
   readonly now?: () => Date;
 };
 
-/** El diagnóstico de un fallo de Meta no viaja aquí: va al puerto de log (`design.md > 7`). */
+/** El diagnóstico de un fallo de Meta no viaja aquí: va al puerto de log. */
 export type WhatsappSendOutcome = {
   readonly message: WhatsappOutboundMessageView;
 };
