@@ -55,7 +55,7 @@
 
 ## Tanda 2 — dominio puro y adaptador (dependen de T2/T3)
 
-- [ ] **T6 [P] Dominio puro** (R15–R17, R21–R25, R33–R36). Depende de T3.
+- [x] **T6 [P] Dominio puro** (R15–R17, R21–R25, R33–R36). Depende de T3.
   - `whatsapp-send-input.ts`, `whatsapp-send-window.ts`, `whatsapp-template-message.ts`,
     `whatsapp-send-failure.ts`, `whatsapp-outbound-message.ts`.
   - Tests `whatsapp-send-window.test.ts`, `whatsapp-template-message.test.ts`,
