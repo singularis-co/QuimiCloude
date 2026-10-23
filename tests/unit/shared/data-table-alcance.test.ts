@@ -743,7 +743,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // pedido por `data-table-row-<id>` y `data-table-cell-orderNumber`. El centinela pasa de
   // CINCUENTA Y CINCO a CINCUENTA Y SEIS; la lista sigue CERRADA, y un spec mas que referencie
   // `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y seis', () => {
+  //
+  // 2026-10-23: entra `e2e/inventario-familia-de-unidad.spec.ts` (QC-203), y no afloja la lista. No
+  // estrena tabla: recorre la lista de inventario, ya en esta lista, y lee el nombre del producto
+  // por `data-table-cell-name` para comprobar que el lote convertido entro en el homonimo. El
+  // centinela pasa de CINCUENTA Y SEIS a CINCUENTA Y SIETE; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y siete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -753,7 +758,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -826,6 +831,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/helpers/product-name-cell.ts',
       // QC-199: ver la nota de arriba.
       'e2e/insumo-por-unidad.spec.ts',
+      // Ver la nota de arriba (2026-10-23, QC-203). Antes de `inventario-importar` porque la lista
+      // esta ORDENADA: 'f' precede a 'i'.
+      'e2e/inventario-familia-de-unidad.spec.ts',
       // Ver la nota de arriba (2026-10-06, QC-209). Va antes que `inventario.spec.ts` porque la
       // lista esta ORDENADA y '-' precede a '.'.
       'e2e/inventario-importar.spec.ts',

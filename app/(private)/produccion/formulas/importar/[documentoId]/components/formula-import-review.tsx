@@ -17,6 +17,7 @@ import {
 } from '@/lib/modules/documentos/adapters/driving/formula-import-actions';
 import {
   reviewFormulaImport,
+  suggestUnitId,
   type ConfirmFormulaImportInput,
   type DraftLine,
   type FormulaImportPreview,
@@ -27,7 +28,7 @@ import {
 } from '@/lib/modules/documentos';
 import type { ErrorState } from '@/lib/modules/errores';
 import { createRecipeSchema, formatPercentage } from '@/lib/modules/recetas';
-import type { UnitRef } from '@/lib/modules/unidades';
+import { normalizeUnitName, type UnitRef } from '@/lib/modules/unidades';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
@@ -53,6 +54,10 @@ const CARD_CLASS = 'gap-4 overflow-visible rounded-[14px] px-5 py-5';
  *  `preselected` sigue siendo `existing` para el borrador, pero se pinta sin selector. */
 export type IngredientRowMode = 'preselected' | 'choose' | 'create';
 
+/** De donde sale la unidad de la materia prima nueva: sugerida desde el PDF,
+ *  sin coincidencia, con mas de una, sin unidad en el PDF o elegida a mano por el revisor. */
+export type NewUnitSource = 'suggested' | 'none' | 'ambiguous' | 'missing' | 'picked';
+
 /** El estado de UNA fila de la revision, en forma de FORMULARIO: separa lo leido (informativo,
  *  nunca editado) de lo que el revisor elige o corrige. */
 export type IngredientRowState = {
@@ -70,6 +75,9 @@ export type IngredientRowState = {
   readonly productLabel: string;
   /** Nombre editable de la materia prima a crear, precargado con el leido. */
   readonly newProductName: string;
+  /** Unidad de la materia prima a crear. Cadena vacia = ninguna (no se puede confirmar). */
+  readonly newUnitId: string;
+  readonly newUnitSource: NewUnitSource;
   /** Cuantos productos vivos coinciden con el nombre leido cuando `match.kind === 'several'`. */
   readonly severalCount: number | null;
 };
@@ -79,8 +87,35 @@ function percentageToDraft(percentage: string): string | null {
   return trimmed === '' ? null : trimmed.replace(',', '.');
 }
 
+/**
+ * La unidad inicial de la materia prima nueva a partir de la leida. La
+ * sugerencia es la misma `suggestUnitId` de la revision de catalogo, sin tocarla; para distinguir
+ * «mas de una» de «ninguna» se cuentan aqui las coincidencias con la misma normalizacion.
+ */
+function initialNewUnit(
+  unitRead: string | null,
+  units: readonly UnitRef[],
+): Pick<IngredientRowState, 'newUnitId' | 'newUnitSource'> {
+  const suggested = suggestUnitId(unitRead, units);
+  if (suggested !== null) return { newUnitId: suggested, newUnitSource: 'suggested' };
+
+  const normalizedRead = unitRead === null ? '' : normalizeUnitName(unitRead);
+  if (normalizedRead === '') return { newUnitId: '', newUnitSource: 'missing' };
+
+  const matches = units.filter(
+    (unit) =>
+      normalizeUnitName(unit.name) === normalizedRead ||
+      (unit.symbol !== null && normalizeUnitName(unit.symbol) === normalizedRead),
+  ).length;
+  return { newUnitId: '', newUnitSource: matches > 1 ? 'ambiguous' : 'none' };
+}
+
 /** La fila inicial de un ingrediente leido, con el modo que le corresponde segun `match`. */
-function toIngredientRowState(ingredient: FormulaImportPreviewIngredient, index: number): IngredientRowState {
+function toIngredientRowState(
+  ingredient: FormulaImportPreviewIngredient,
+  index: number,
+  units: readonly UnitRef[],
+): IngredientRowState {
   const base = {
     key: `formula-ingredient-${index}`,
     readName: ingredient.readName,
@@ -89,6 +124,9 @@ function toIngredientRowState(ingredient: FormulaImportPreviewIngredient, index:
     quantityRead: ingredient.quantityRead,
     unitRead: ingredient.unitRead,
     newProductName: ingredient.readName ?? '',
+    // Se calcula para TODAS las filas: una que pasa a «Crear materia prima» despues arranca con
+    // la misma sugerencia.
+    ...initialNewUnit(ingredient.unitRead, units),
   };
 
   if (ingredient.match.kind === 'one') {
@@ -123,20 +161,31 @@ function blankIngredientRow(): IngredientRowState {
     productId: '',
     productLabel: '',
     newProductName: '',
+    newUnitId: '',
+    newUnitSource: 'missing',
     severalCount: null,
   };
 }
 
 function toDraftLine(row: IngredientRowState): DraftLine {
   const percentage = percentageToDraft(row.percentage);
-  if (row.mode === 'create') return { kind: 'new', newProductName: row.newProductName, percentage };
+  if (row.mode === 'create') {
+    return {
+      kind: 'new',
+      newProductName: row.newProductName,
+      unitId: row.newUnitId === '' ? null : row.newUnitId,
+      percentage,
+    };
+  }
   if (row.productId !== '') return { kind: 'existing', productId: row.productId, percentage };
   return { kind: 'unassigned', percentage };
 }
 
 function toConfirmLine(row: IngredientRowState): ConfirmFormulaImportInput['lines'][number] {
   const percentage = percentageToDraft(row.percentage) ?? '';
-  if (row.mode === 'create') return { kind: 'new', newProductName: row.newProductName, percentage };
+  if (row.mode === 'create') {
+    return { kind: 'new', newProductName: row.newProductName, unitId: row.newUnitId, percentage };
+  }
   return { kind: 'existing', productId: row.productId, percentage };
 }
 
@@ -145,6 +194,7 @@ const ROW_PROBLEM_LABELS: Record<RowProblem, string> = {
   percentage_missing: 'porcentaje vacío',
   percentage_invalid: 'porcentaje inválido (mayor que 0, hasta 2 decimales)',
   new_name_invalid: 'nombre de materia prima inválido',
+  new_unit_missing: 'sin unidad',
   repeated: 'ingrediente repetido',
 };
 
@@ -188,6 +238,15 @@ function buildConfirmReasons(
   return reasons;
 }
 
+/** Las mismas incidencias sin `new_unit_missing`: la unidad vacia no deshabilita «Confirmar»,
+ *  se marca en su fila al pulsarlo. */
+function withoutMissingUnit(issues: FormulaReviewIssues): FormulaReviewIssues {
+  const rows = issues.rows
+    .map((row) => ({ ...row, problems: row.problems.filter((problem) => problem !== 'new_unit_missing') }))
+    .filter((row) => row.problems.length > 0);
+  return { ...issues, rows };
+}
+
 type FormulaImportReviewProps = {
   readonly documentFileId: string;
   readonly units: readonly UnitRef[];
@@ -206,7 +265,9 @@ type FormulaImportReviewProps = {
 export function FormulaImportReview({ documentFileId, units, initialProductPage, preview }: FormulaImportReviewProps) {
   const [name, setName] = useState(preview.name ?? '');
   const [description, setDescription] = useState(preview.description ?? '');
-  const [rows, setRows] = useState<readonly IngredientRowState[]>(() => preview.ingredients.map(toIngredientRowState));
+  const [rows, setRows] = useState<readonly IngredientRowState[]>(() =>
+    preview.ingredients.map((ingredient, index) => toIngredientRowState(ingredient, index, units)),
+  );
   const [steps, setSteps] = useState<readonly RecipeStepFormValue[]>(() =>
     preview.steps.map((document) => ({ key: createLocalKey('formula-step'), document })),
   );
@@ -224,6 +285,9 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   const [summary, setSummary] = useState<FormulaImportSummaryData | null>(null);
   const [confirmError, setConfirmError] = useState<ErrorState | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
+  // Se enciende al pulsar «Confirmar» con alguna materia prima nueva sin unidad: desde ahi cada
+  // fila sin unidad muestra su error.
+  const [showUnitErrors, setShowUnitErrors] = useState(false);
 
   const issues = useMemo(
     () =>
@@ -237,12 +301,21 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
     [name, description, rows, steps, packingSteps],
   );
 
+  const shownIssues = useMemo(() => (showUnitErrors ? issues : withoutMissingUnit(issues)), [issues, showUnitErrors]);
+
   const reasons = useMemo(
-    () => buildConfirmReasons(issues, nameClash, replaceChoice, isCheckingName),
+    () => buildConfirmReasons(shownIssues, nameClash, replaceChoice, isCheckingName),
+    [shownIssues, nameClash, replaceChoice, isCheckingName],
+  );
+
+  // Lo que deshabilita «Confirmar» es todo menos la unidad vacia: esa se avisa al pulsarlo.
+  const blockingReasons = useMemo(
+    () => buildConfirmReasons(withoutMissingUnit(issues), nameClash, replaceChoice, isCheckingName),
     [issues, nameClash, replaceChoice, isCheckingName],
   );
 
-  const canConfirm = issues.canConfirm && reasons.length === 0;
+  const canPressConfirm = blockingReasons.length === 0;
+  const hasMissingUnit = issues.rows.some((row) => row.problems.includes('new_unit_missing'));
 
   function updateRow(index: number, patch: Partial<IngredientRowState>) {
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -299,7 +372,14 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   }
 
   async function handleConfirm() {
-    if (!canConfirm || isConfirming) return;
+    if (!canPressConfirm || isConfirming) return;
+
+    // Alguna materia prima nueva sin unidad: no se confirma y cada fila vacia muestra su error.
+    if (hasMissingUnit) {
+      setShowUnitErrors(true);
+      return;
+    }
+    if (!issues.canConfirm) return;
 
     setConfirmError(null);
     setIsConfirming(true);
@@ -325,7 +405,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   }
 
   if (summary !== null) {
-    return <FormulaImportSummary summary={summary} />;
+    return <FormulaImportSummary summary={summary} units={units} />;
   }
 
   const usedProductIds = rows.flatMap((row) => (row.productId === '' ? [] : [row.productId]));
@@ -399,7 +479,8 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
               <FormulaIngredientRow
                 index={index}
                 row={row}
-                problems={issues.rows.find((item) => item.index === index)?.problems ?? []}
+                problems={shownIssues.rows.find((item) => item.index === index)?.problems ?? []}
+                showUnitError={showUnitErrors}
                 units={units}
                 initialProductPage={initialProductPage}
                 excludedIds={usedProductIds.filter((id) => id !== row.productId)}
@@ -472,7 +553,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
         <Button
           type="button"
           touch
-          disabled={!canConfirm || isConfirming}
+          disabled={!canPressConfirm || isConfirming}
           aria-busy={isConfirming}
           onClick={handleConfirm}
           data-testid="formula-import-confirm"

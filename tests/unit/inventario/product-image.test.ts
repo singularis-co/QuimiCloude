@@ -68,7 +68,7 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
     findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(
       async () => null,
     ),
-    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+    findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => []),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-nuevo',
@@ -217,16 +217,15 @@ describe('alta de producto con imagen', () => {
       ValidationError,
     );
     expect(storage.upload).not.toHaveBeenCalled();
-    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   });
 
   it('a un homonimo vivo solo se le agrega el lote: la imagen no se sube', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({
-        id: 'producto-existente',
-        type: PRODUCT_TYPES.PRODUCT,
-      })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [
+        { id: 'producto-existente', name: 'acido citrico', type: PRODUCT_TYPES.PRODUCT, unitId: UNIDAD_KG, stock: '1' },
+      ]),
     });
     const { storage } = montarAlmacenamiento();
     const createProduct = createCreateProduct({ products, units: unidades(), images: storage, now: () => AHORA });

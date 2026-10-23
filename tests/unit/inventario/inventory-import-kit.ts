@@ -24,6 +24,8 @@ export const NOW = new Date(`${TODAY}T15:00:00.000Z`);
 
 export const KG: UnitRef = { id: '11111111-1111-4111-8111-111111111111', name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null };
 export const LITRO: UnitRef = { id: '22222222-2222-4222-8222-222222222222', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null };
+/** De la familia del litro: 1 ml = 0,001 L. */
+export const ML: UnitRef = { id: '77777777-7777-4777-8777-777777777777', name: 'Mililitro', symbol: 'ml', baseUnitId: LITRO.id, factor: '0.001' };
 
 export const BIDON = {
   id: '33333333-3333-4333-8333-333333333333',
@@ -97,7 +99,7 @@ export function sheet(...rows: Partial<ImportCells>[]): ParsedImportSheet {
 
 export function snapshot(overrides: Partial<ImportCatalogSnapshot> = {}): ImportCatalogSnapshot {
   return {
-    units: [KG, LITRO],
+    units: [KG, LITRO, ML],
     presentations: [BIDON, BOTELLA, SIN_CONTENIDO],
     formulas: new Map([['desengrasante', FORMULA]]),
     products: [],
@@ -108,7 +110,7 @@ export function snapshot(overrides: Partial<ImportCatalogSnapshot> = {}): Import
 }
 
 export function productRef(overrides: Partial<ImportProductRef> & Pick<ImportProductRef, 'id' | 'nameNormalized'>): ImportProductRef {
-  return { type: 'PRODUCT', unitId: null, presentationId: null, recipeId: null, ...overrides };
+  return { type: 'PRODUCT', unitId: null, presentationId: null, recipeId: null, stock: '0.0000', ...overrides };
 }
 
 /** Un lector que devuelve siempre esta hoja, con la cabecera de la plantilla delante. */
@@ -146,7 +148,7 @@ export function fakeReadPorts(state: CatalogState = {}) {
       created: true,
     })),
   };
-  const units = { listVisibleRefs: vi.fn(async () => [KG, LITRO]) };
+  const units = { listVisibleRefs: vi.fn(async () => [KG, LITRO, ML]) };
   const presentations = {
     findByNormalizedNames: vi.fn(async (names: readonly string[]) =>
       [BIDON, BOTELLA, SIN_CONTENIDO]

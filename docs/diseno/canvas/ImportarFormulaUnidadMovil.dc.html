@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Unidad de materia prima en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="ImportarFormulaUnidad" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Unidad de la materia prima nueva · ficha</h2>
+    <dl class="spec">
+      <dt>Dónde</dt><dd>«Revisar fórmula» (importar fórmula desde PDF), fila de ingrediente en modo «Crear materia prima». El modo «Elegir producto existente» no cambia</dd>
+      <dt>Reutiliza</dt><dd>La fila de ingrediente de <span class="mono">ImportarFormula</span> · selector de unidad (<span class="mono">in trig</span> + listbox, el mismo de «Nuevo producto») · <span class="mono">suggestUnitId</span> de la importación de catálogo para la sugerencia · ayuda (<span class="mono">help</span>) y error de campo (<span class="mono">err</span> + <span class="mono">aria-invalid</span>)</dd>
+      <dt>Pieza nueva</dt><dd>Ninguna: un campo más en la fila existente</dd>
+      <dt>Librerías</dt><dd>Ninguna nueva: <span class="mono">@base-ui/react</span> (Select) · <span class="mono">lucide-react</span></dd>
+      <dt>Estados</dt><dd>Sugerida (unidad puesta, ayuda «Sugerida del PDF: «kg»») · sin coincidencia (vacía, ayuda «El PDF dice «gotas»: no coincide con ninguna unidad. Elige una.») · sin unidad en el PDF (vacía, «El PDF no trae unidad. Elige una.») · elegida a mano («Elegida por ti.») · Confirmar con alguna vacía (error en cada fila vacía, no confirma) · resumen (cada materia prima creada con su unidad)</dd>
+      <dt>Obligatoria</dt><dd>Sin unidad no se confirma: la materia prima nueva ya no nace sin unidad</dd>
+      <dt>Escritorio</dt><dd>Nombre y Unidad en la misma línea que Porcentaje (Unidad ~200 px)</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio; si no cabe, Unidad baja a la línea siguiente (la fila ya hace wrap)</dd>
+      <dt>Teléfono</dt><dd>Porcentaje, Nombre y Unidad uno debajo de otro, a todo el ancho · el selector abre la lista con opciones de 44 px</dd>
+      <dt>Animación</dt><dd>El campo entra con <span class="mono">fade</span>, igual que el nombre · el error con <span class="mono">qc-err</span></dd>
+      <dt>Por confirmar</dt><dd>Texto exacto de ayudas y error · las unidades listadas son las de sistema más las de la empresa</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

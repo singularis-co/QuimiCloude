@@ -6,10 +6,11 @@ import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
 import { useEntitySheet } from '@/hooks/use-entity-sheet';
-import type { ProductFormUnits, ProductView } from '@/lib/modules/inventario';
+import type { ProductFormUnits, ProductView, SupplyConversion } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 
-import { ProductForm } from './product-form';
+import { ProductForm, type ProductSaved } from './product-form';
+import { displayDecimal, unitDisplayLabel } from './supply-conversion-notice';
 
 const CREATE_SUCCESS = 'Producto creado.';
 const UPDATE_SUCCESS = 'Producto actualizado.';
@@ -20,6 +21,17 @@ const UPDATE_SUCCESS = 'Producto actualizado.';
  */
 function createSuccessMessage(lot: string): string {
   return `${CREATE_SUCCESS} Lote ${lot}.`;
+}
+
+/** `null` si la unidad del destino no esta entre las del formulario: queda el aviso de siempre. */
+function conversionSuccessMessage(
+  conversion: SupplyConversion,
+  formUnits: ProductFormUnits | undefined,
+): string | null {
+  const unit = formUnits?.find((candidate) => candidate.id === conversion.unitId);
+  if (unit === undefined) return null;
+  const label = unitDisplayLabel(unit);
+  return `Se agregó un lote de ${displayDecimal(conversion.stock)} ${label} a ${conversion.productName} · ${label}.`;
 }
 
 /**
@@ -57,10 +69,16 @@ export function ProductSheet({
   });
 
   const handleProductSaved = useCallback(
-    (lot?: string) => {
-      handleSaved(isEdit || lot === undefined ? undefined : createSuccessMessage(lot));
+    (saved?: ProductSaved) => {
+      if (isEdit || saved === undefined) {
+        handleSaved();
+        return;
+      }
+      const converted =
+        saved.conversion === undefined ? null : conversionSuccessMessage(saved.conversion, formUnits);
+      handleSaved(converted ?? (saved.lot === undefined ? undefined : createSuccessMessage(saved.lot)));
     },
-    [isEdit, handleSaved],
+    [isEdit, handleSaved, formUnits],
   );
 
   return (

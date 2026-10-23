@@ -9,6 +9,8 @@ export type ImportProductRef = {
   readonly unitId: string | null;
   readonly presentationId: string | null;
   readonly recipeId: string | null;
+  /** Existencia del producto en su unidad, como texto decimal. */
+  readonly stock: string;
 };
 
 /** Un lote de producto terminado que entra por importacion, ya validado y con el costo resuelto. */

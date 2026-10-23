@@ -97,7 +97,28 @@ describe('findAliveProductsByNormalizedNames — R14, R15, R17: identidad por no
     const refs = await findAliveProductsByNormalizedNames(['jabon botella', 'otro'], ambito(empresa));
 
     expect(refs).toEqual([
-      { id, nameNormalized: 'jabonbotella', type: PRODUCT_TYPES.FINISHED_PRODUCT, unitId, presentationId, recipeId },
+      {
+        id,
+        nameNormalized: 'jabonbotella',
+        type: PRODUCT_TYPES.FINISHED_PRODUCT,
+        unitId,
+        presentationId,
+        recipeId,
+        stock: '0.0000',
+      },
+    ]);
+  });
+
+  it('R19 findAliveProductsByNormalizedNames devuelve la existencia', async () => {
+    const empresa = await nuevaEmpresa();
+    const unitId = await sembrarUnidad(empresa);
+    const id = await sembrarProducto(empresa, 'Glicerina', { unitId });
+    await prisma.product.update({ where: { id }, data: { stock: '12.5' } });
+
+    const refs = await findAliveProductsByNormalizedNames(['glicerina'], ambito(empresa));
+
+    expect(refs).toEqual([
+      { id, nameNormalized: 'glicerina', type: PRODUCT_TYPES.PRODUCT, unitId, presentationId: null, recipeId: null, stock: '12.5000' },
     ]);
   });
 

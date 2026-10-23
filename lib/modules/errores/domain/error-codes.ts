@@ -35,6 +35,7 @@
  * **2026-10-13**: `company_not_found`.
  * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
  * `evidence_not_found`, `recipe_steps_locked`.
+ * **2026-10-14**: `converted_stock_out_of_range`, `converted_cost_out_of_range`.
  * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
  * `company_not_deleted`.
  * **2026-10-14**: `packaging_stock_insufficient`.
@@ -230,6 +231,10 @@ export const ERROR_CODES = [
   'recipe_steps_locked',
   'ai_provider_missing',
   'ai_provider_error',
+  // Distintos de `invalid_input`: la entrada tiene forma valida y lo que no cabe en 4 decimales es
+  // el resultado de convertirla a la unidad del producto.
+  'converted_stock_out_of_range',
+  'converted_cost_out_of_range',
   'company_duplicate_name',
   'company_duplicate_tax_id',
   'company_name_mismatch',

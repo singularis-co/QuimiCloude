@@ -6,6 +6,7 @@ import type { ProductBatchView } from '../domain/product-batch-view';
 import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
 import type { BatchMovementRecord } from '../domain/reservation';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../domain/stock-adjustment';
+import type { SupplyHomonym } from '../domain/supply-family';
 
 /**
  * Puerto de acceso a datos de producto (`design.md > 7`). El sufijo `Alive` en los
@@ -112,13 +113,12 @@ export interface ProductRepository {
     scope: InventoryScope,
   ): Promise<{ id: string; type: ProductType } | null>;
 
-  /** Como `findAliveIdByNameInPresentationUnit`, con la unidad ya dada: mismo ambito, mismo filtro
-   *  de vivos y mismo desempate. */
-  findAliveIdByNameInUnit(
-    name: string,
-    unitId: string,
-    scope: InventoryScope,
-  ): Promise<{ id: string; type: ProductType } | null>;
+  /**
+   * Los vivos de la empresa con este nombre y con unidad, de cualquier tipo y unidad, del mas
+   * antiguo al mas nuevo (desempate por `id`). Decidir cuales son de la familia del alta es del
+   * dominio, que conoce las unidades. Normalizar el nombre es del adaptador, como arriba.
+   */
+  findAliveSupplyHomonyms(name: string, scope: InventoryScope): Promise<readonly SupplyHomonym[]>;
 
   /**
    * Alta de un producto NUEVO junto con su primer lote, en UNA sola transaccion. Devuelve los

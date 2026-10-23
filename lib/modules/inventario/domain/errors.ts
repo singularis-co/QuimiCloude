@@ -125,6 +125,22 @@ export class AdjustmentReasonNotAllowedError extends InventarioError {
   }
 }
 
+export class ConvertedStockOutOfRangeError extends InventarioError {
+  readonly code = 'converted_stock_out_of_range';
+
+  constructor(diagnostic?: string) {
+    super('converted_stock_out_of_range', diagnostic);
+  }
+}
+
+export class ConvertedCostOutOfRangeError extends InventarioError {
+  readonly code = 'converted_cost_out_of_range';
+
+  constructor(diagnostic?: string) {
+    super('converted_cost_out_of_range', diagnostic);
+  }
+}
+
 /** El vencimiento del alta no es posterior a hoy. Codigo propio y no `invalid_input` para que el
  *  formulario lo pinte junto al campo de vencimiento. */
 export class ExpiryDateNotFutureError extends InventarioError {

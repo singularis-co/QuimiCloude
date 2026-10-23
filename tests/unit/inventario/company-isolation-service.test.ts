@@ -145,20 +145,18 @@ function montar() {
       ),
     ),
     // R18: solo los homonimos VIVOS de la empresa del ambito. Es el filtro entero de la regla.
-    // La unidad no la mide este doble: el fixture
-    // solo tiene un producto y una unidad, y lo que este archivo cubre es el aislamiento por
-    // empresa, no la busqueda por unidad (eso es `create-product.test.ts`).
-    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async (name, _unitId, scope) => {
-      const fila = productos.find(
-        (candidata) =>
-          candidata.alive &&
-          candidata.companyId === scope.companyId &&
-          normalizeProductName(candidata.name) === normalizeProductName(name),
-      );
-      // El fixture de este archivo solo siembra tipo PRODUCT: el aislamiento por tipo lo
-      // cubre `create-product.test.ts`.
-      return fila === undefined ? null : { id: fila.id, type: PRODUCT_TYPES.PRODUCT };
-    }),
+    // La familia de unidad no la mide este doble: lo que este archivo cubre es el aislamiento
+    // por empresa (la familia es `create-product-familia.test.ts`).
+    findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async (name, scope) =>
+      productos
+        .filter(
+          (candidata) =>
+            candidata.alive &&
+            candidata.companyId === scope.companyId &&
+            normalizeProductName(candidata.name) === normalizeProductName(name),
+        )
+        .map((fila) => ({ id: fila.id, name: fila.name, type: PRODUCT_TYPES.PRODUCT, unitId: UNIDAD, stock: '1.0000' })),
+    ),
     findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => null),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(
@@ -264,7 +262,7 @@ const CASOS_DE_USO: ReadonlyArray<{
   {
     nombre: 'create-product',
     invocar: (m, actor) => m.createProduct(ALTA_VALIDA, actor),
-    puerto: (m) => m.products.findAliveIdByNameInUnit,
+    puerto: (m) => m.products.findAliveSupplyHomonyms,
   },
   {
     nombre: 'update-product',
@@ -579,15 +577,15 @@ describe('QC-49 R17 — la empresa de la entrada no se escribe, no cuenta y se r
 describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de alta', () => {
   it('el alta en B con el nombre de un producto de A crea uno NUEVO en B', async () => {
     // El fixture tiene «Acido sulfurico» VIVO en la empresa A. Quien da de alta desde B escribe
-    // el mismo nombre: si `findAliveIdByNameInUnit` no estuviera acotado, el caso de
+    // el mismo nombre: si `findAliveSupplyHomonyms` no estuviera acotado, el caso de
     // uso le colgaria el lote al producto de A -una escritura en la empresa ajena, por el
     // camino mas tonto-.
     const m = montar();
 
     const resultado = await m.createProduct(ALTA_VALIDA, ACTOR_B);
 
-    expect(m.products.findAliveIdByNameInUnit).toHaveBeenCalledTimes(1);
-    expect(ambitoRecibido(m.products.findAliveIdByNameInUnit)).toEqual({
+    expect(m.products.findAliveSupplyHomonyms).toHaveBeenCalledTimes(1);
+    expect(ambitoRecibido(m.products.findAliveSupplyHomonyms)).toEqual({
       companyId: EMPRESA_B,
     });
     expect(m.products.addBatchToAlive).not.toHaveBeenCalled();
@@ -605,8 +603,8 @@ describe('QC-49 R18 — el homonimo de otra empresa no existe para quien da de a
 
   it('el mismo alta en A SI encuentra su homonimo y le agrega el lote', async () => {
     // La mitad simetrica, y lo que impide leer el caso de arriba como «el alta nunca reusa».
-    // Si esto no estuviera, un `findAliveIdByNameInUnit` que devolviera siempre
-    // `null` -o sea, el ambito roto por el otro lado- pasaria el test anterior sin despeinarse.
+    // Si esto no estuviera, un `findAliveSupplyHomonyms` que devolviera siempre
+    // la lista vacia -o sea, el ambito roto por el otro lado- pasaria el test anterior sin despeinarse.
     const m = montar();
 
     const resultado = await m.createProduct(ALTA_VALIDA, ACTOR_A);

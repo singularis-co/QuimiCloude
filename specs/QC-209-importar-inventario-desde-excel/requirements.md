@@ -83,9 +83,13 @@ la forma exacta de su entrada y su salida está en `design.md > 1. Contrato de s
   existe un producto vivo con esa identidad en la empresa, ENTONCES el estado DEBE ser
   `sumar lote`; SI NO, `crear`. SI la fila es un envase cuyo homónimo vivo tiene otra presentación,
   ENTONCES la fila DEBE quedar en `error`.
+  *Enmendado por QC-203 (2026-10-14): en los insumos, la identidad es nombre + **familia** de la
+  unidad (QC-203 R18).*
 - **R15** (D8) SI dos o más filas del mismo archivo tienen la misma identidad de producto y ese
   producto no existe todavía, ENTONCES la primera DEBE quedar en `crear` y las siguientes en
   `sumar lote` sobre el producto que crea la primera.
+  *Enmendado por QC-203 (2026-10-14): en los insumos, «misma identidad» es nombre + **familia** de
+  la unidad (QC-203 R18).*
 - **R16** (D4) CUANDO una fila es de tipo producto terminado, el sistema DEBE exigir la columna
   «Fórmula», que DEBE nombrar una fórmula original viva de la empresa, y la columna «Presentación»,
   que DEBE nombrar una presentación de la empresa con contenido declarado; DEBE identificar el

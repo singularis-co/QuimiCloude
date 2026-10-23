@@ -10,8 +10,10 @@ import {
   PresentationUnitSelect,
 } from '@/app/(private)/configuracion/presentaciones/components';
 import {
+  PRESENTATION_UNIT_ERROR_TESTID,
   PRESENTATION_UNIT_HELPER_TESTID,
   PRESENTATION_UNIT_HELPER_TEXT_TESTID,
+  PRESENTATION_UNIT_HINT_TESTID,
 } from '@/components/shared/presentation-unit-select';
 import type { UnitRef } from '@/lib/modules/unidades';
 
@@ -230,5 +232,62 @@ describe('selector de unidad · ayuda de la etiqueta', () => {
     await user.click(disparador);
 
     expect(alEnviar).not.toHaveBeenCalled();
+  });
+});
+
+// La ayuda visible bajo el campo solo la pasa el alta de insumo cuando el lote se convierte.
+describe('selector de unidad · ayuda visible bajo el campo', () => {
+  const AYUDA_VISIBLE = 'Misma familia que l: se convierte al guardar.';
+  const ERROR = 'Elige una unidad.';
+
+  /** `useId` numera por montaje: dos montajes iguales solo difieren en esos identificadores. */
+  function sinIdsGenerados(html: string): string {
+    return html.replace(/_r_[0-9a-z]+_|«r[0-9a-z]+»|:r[0-9a-z]+:/g, 'ID');
+  }
+
+  it('con `hint` pinta el texto visible y el campo lo referencia por aria-describedby', () => {
+    renderSelector({ hint: AYUDA_VISIBLE });
+
+    const ayuda = screen.getByTestId(PRESENTATION_UNIT_HINT_TESTID);
+    expect(ayuda).toBeVisible();
+    expect(ayuda).toHaveTextContent(AYUDA_VISIBLE);
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toHaveAttribute(
+      'aria-describedby',
+      ayuda.id,
+    );
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toHaveAccessibleDescription(
+      AYUDA_VISIBLE,
+    );
+  });
+
+  it('con `hint` y error el campo referencia los dos', () => {
+    renderSelector({ hint: AYUDA_VISIBLE, error: ERROR });
+
+    const ayuda = screen.getByTestId(PRESENTATION_UNIT_HINT_TESTID);
+    const error = screen.getByTestId(PRESENTATION_UNIT_ERROR_TESTID);
+    expect(
+      screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID).getAttribute('aria-describedby')?.split(' '),
+    ).toEqual([ayuda.id, error.id]);
+  });
+
+  it('sin `hint` el árbol no cambia: ni texto de ayuda ni descripción añadida', () => {
+    const { container, unmount } = renderSelector();
+    const sinAyuda = sinIdsGenerados(container.innerHTML);
+    expect(screen.queryByTestId(PRESENTATION_UNIT_HINT_TESTID)).toBeNull();
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).not.toHaveAttribute(
+      'aria-describedby',
+    );
+    unmount();
+
+    const { container: conHintIndefinido } = renderSelector({ hint: undefined });
+    expect(sinIdsGenerados(conHintIndefinido.innerHTML)).toBe(sinAyuda);
+    cleanup();
+
+    renderSelector({ error: ERROR });
+    expect(screen.queryByTestId(PRESENTATION_UNIT_HINT_TESTID)).toBeNull();
+    expect(screen.getByTestId(PRESENTATION_UNIT_SELECT_TESTID)).toHaveAttribute(
+      'aria-describedby',
+      screen.getByTestId(PRESENTATION_UNIT_ERROR_TESTID).id,
+    );
   });
 });

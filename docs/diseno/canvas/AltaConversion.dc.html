@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Alta con conversión de unidad</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}" style="min-height: 1000px; display: flex; flex-direction: column">
+  <div class="stage for-sheet" style="flex: 1; border-radius: 0; min-height: 1000px">
+    <span class="stage-cap">Sheet · Nuevo producto · {{ estadoCap }}</span>
+    <aside class="sheet wide static" role="dialog" aria-labelledby="ac-np">
+      <div class="sheet-hd"><h2 id="ac-np" class="h2">Nuevo producto</h2><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+      <div class="sheet-bd">
+        <div class="f"><label for="ac-n">Nombre</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="ac-n" class="in" type="text" value="{{ nombre }}"></label></div>
+        <div class="f"><label for="ac-t">Tipo</label><button id="ac-t" class="in trig" type="button"><span>Producto</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+
+        <sc-if value="{{ hayAviso }}" hint-placeholder-val="{{ true }}">
+          <div class="nt n-i enter" role="status" aria-live="polite"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01"></path></svg><div><b>{{ avisoTit }}</b>{{ avisoTxt }}<br><span class="mono">{{ avisoCant }}</span><br><span class="mono">{{ avisoCosto }}</span></div></div>
+        </sc-if>
+
+        <div class="g2">
+          <div class="f"><label class="fl" for="ac-e">Existencia</label><input id="ac-e" class="in mono" type="text" value="{{ existencia }}" aria-invalid="{{ errCantStr }}" aria-describedby="ac-e-err"><sc-if value="{{ errCant }}" hint-placeholder-val="{{ false }}"><span id="ac-e-err" class="err" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>{{ errCantTxt }}</span></sc-if></div>
+          <div class="f"><label class="fl" for="ac-a">Alerta de cantidad</label><input id="ac-a" class="in mono" type="text" value="{{ alerta }}" disabled></div>
+          <div class="f"><label for="ac-p">Presentación</label><button id="ac-p" class="in trig" type="button"><span class="dim">[Elegir]</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+          <div class="f"><label for="ac-u">Unidad</label><button id="ac-u" class="in trig" type="button" aria-describedby="ac-u-h"><span>{{ unidad }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button><sc-if value="{{ hayAviso }}" hint-placeholder-val="{{ true }}"><span id="ac-u-h" class="help">{{ unidadHelp }}</span></sc-if></div>
+          <div class="f"><label for="ac-cu">Costo unitario</label><input id="ac-cu" class="in mono" type="text" value="{{ costo }}" aria-invalid="{{ errCostoStr }}" aria-describedby="ac-cu-err"><sc-if value="{{ errCosto }}" hint-placeholder-val="{{ false }}"><span id="ac-cu-err" class="err" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg>{{ errCostoTxt }}</span></sc-if></div>
+          <div class="f"><label class="fl" for="ac-ct">Costo total</label><input id="ac-ct" class="in mono" type="text"></div>
+        </div>
+        <div class="f"><label for="ac-l">Lote</label><input id="ac-l" class="in mono" type="text" value="[Se genera al guardar]" disabled></div>
+        <div class="g2">
+          <div class="f"><label for="ac-fx">Fecha de expiración</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="ac-fx" class="in mono" type="text"></label></div>
+          <div class="f"><label for="ac-fc">Fecha de compra</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg><input id="ac-fc" class="in mono" type="text" value="14/10/2026"></label></div>
+        </div>
+      </div>
+      <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button" onClick="{{ guardar }}">Guardar</button></div>
+    </aside>
+  </div>
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div class="toast show" role="status" style="position: absolute; left: 24px; bottom: 24px; z-index: 60"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastTxt }}</span></div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["convierte","varios","cantidad-no-cabe","costo-no-cabe","sin-homonimo"],"default":"convierte"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const est = this.props.estado || 'convierte';
+const E = {
+'convierte': { cap: 'convierte', nombre: 'Glicerina', unidad: 'ml', existencia: '500', costo: '0,004', alerta: '',
+  aviso: true, tit: 'Ya existe Glicerina en l', txt: 'El lote se agregará a ese producto, convertido a l:',
+  cant: '500 ml = 0,5 l', cst: '0,004 por ml = 4,0000 por l', help: 'Misma familia que l: se convierte al guardar.',
+  toast: 'Se agregó un lote de 0,5 l a Glicerina · l.' },
+'varios': { cap: 'varios homónimos', nombre: 'Glicerina', unidad: 'ml', existencia: '200', costo: '0,004', alerta: '',
+  aviso: true, tit: 'Ya existen Glicerina en l (2 l) y en ml (500 ml)', txt: 'El lote va a la que tiene más existencia, Glicerina · l, convertido:',
+  cant: '200 ml = 0,2 l', cst: '0,004 por ml = 4,0000 por l', help: 'Misma familia que l: se convierte al guardar.',
+  toast: 'Se agregó un lote de 0,2 l a Glicerina · l.' },
+'cantidad-no-cabe': { cap: 'la cantidad no cabe (tras Guardar)', nombre: 'Glicerina', unidad: 'ml', existencia: '0,25', costo: '0,004', alerta: '',
+  aviso: true, tit: 'Ya existe Glicerina en l', txt: 'El lote se agregará a ese producto, convertido a l:',
+  cant: '0,25 ml = 0,00025 l', cst: '0,004 por ml = 4,0000 por l', help: 'Misma familia que l: se convierte al guardar.',
+  errCant: '0,25 ml son 0,00025 l y no caben en 4 decimales. Ingresa la existencia en l.' },
+'costo-no-cabe': { cap: 'el costo no cabe (tras Guardar)', nombre: 'Glicerina', unidad: 'l', existencia: '2', costo: '0,25', alerta: '',
+  aviso: true, tit: 'Ya existe Glicerina en ml', txt: 'El lote se agregará a ese producto, convertido a ml:',
+  cant: '2 l = 2000 ml', cst: '0,25 por l = 0,00025 por ml', help: 'Misma familia que ml: se convierte al guardar.',
+  errCosto: 'El costo por ml quedaría en 0,00025 y no cabe en 4 decimales. Ingresa el lote en ml.' },
+'sin-homonimo': { cap: 'sin homónimo (como hoy)', nombre: 'Glicerina', unidad: 'ml', existencia: '500', costo: '0,004', alerta: '',
+  aviso: false, toast: 'Producto creado.' }
+};
+const e = E[est] || E.convierte;
+const errCant = !!e.errCant, errCosto = !!e.errCosto;
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+estadoCap: e.cap,
+nombre: e.nombre, unidad: e.unidad, existencia: e.existencia, costo: e.costo, alerta: e.alerta,
+hayAviso: e.aviso, avisoTit: e.tit || '', avisoTxt: e.txt || '', avisoCant: e.cant || '', avisoCosto: e.cst || '', unidadHelp: e.help || '',
+errCant: errCant, errCantStr: errCant ? 'true' : 'false', errCantTxt: e.errCant || '',
+errCosto: errCosto, errCostoStr: errCosto ? 'true' : 'false', errCostoTxt: e.errCosto || '',
+guardar: () => this.setState({ toast: !(errCant || errCosto) }),
+toast: !!s.toast && !(errCant || errCosto), toastTxt: e.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

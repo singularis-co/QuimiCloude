@@ -89,8 +89,8 @@ function greatestCommonDivisor(a: bigint, b: bigint): bigint {
   return left
 }
 
-/** La base efectiva de una unidad: la que declara, o ella misma si no deriva de nadie. */
-function effectiveBaseId(unit: UnitConversion): UnitId {
+/** La familia de una unidad: la base que declara, o ella misma si no deriva de nadie. */
+export function unitFamilyId(unit: Pick<UnitConversion, 'id' | 'baseUnitId'>): UnitId {
   return unit.baseUnitId ?? unit.id
 }
 
@@ -194,7 +194,7 @@ export function convertQuantity(
   const fromFactor = effectiveFactor(from, 'la unidad de origen')
   const toFactor = effectiveFactor(to, 'la unidad de destino')
 
-  if (effectiveBaseId(from) !== effectiveBaseId(to)) {
+  if (unitFamilyId(from) !== unitFamilyId(to)) {
     // Los ids de las dos unidades son DIAGNOSTICO (R28, R29): el navegador ve el mensaje del
     // catalogo -«Las dos unidades no comparten unidad base: no son convertibles.»- y el log
     // recibe ademas cuales eran.

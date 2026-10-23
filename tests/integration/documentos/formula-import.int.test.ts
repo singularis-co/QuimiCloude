@@ -133,7 +133,7 @@ const recipeCatalog: RecipeCatalog = {
 
 const createRecipeUseCase = createCreateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage });
 const updateRecipeUseCase = createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage, stepLocks: noEvidenceLocks });
-const createRawMaterial = createCreateRawMaterial({ products: { create: createProduct } });
+const createRawMaterial = createCreateRawMaterial({ products: { create: createProduct }, units: { findRefs: findUnitRefs } });
 
 function crearDeps(overrides: Partial<FormulaImportDeps> = {}): FormulaImportDeps {
   return {
@@ -141,6 +141,7 @@ function crearDeps(overrides: Partial<FormulaImportDeps> = {}): FormulaImportDep
     recipes: recipeCatalog,
     products: productCatalog,
     productNames: productNameLookup,
+    units: { findRefs: findUnitRefs },
     createRawMaterial,
     createRecipe: createRecipeUseCase,
     updateRecipe: updateRecipeUseCase,
@@ -374,7 +375,14 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
         replaceRecipeId: sembrada.id,
       });
 
-      expect(resumen).toEqual({ recipeId: sembrada.id, outcome: 'replaced', rawMaterialsCreated: 0, rawMaterialsReused: 0 });
+      expect(resumen).toEqual({
+        recipeId: sembrada.id,
+        outcome: 'replaced',
+        rawMaterialsCreated: 0,
+        rawMaterialsReused: 0,
+        created: [],
+        reused: [],
+      });
 
       const receta = await prisma.recipe.findUniqueOrThrow({
         where: { id: sembrada.id },
@@ -537,7 +545,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
         documentFileId,
         name: nombreReceta,
         description: 'Descripcion',
-        lines: [{ kind: 'new' as const, newProductName: nombreMateria, percentage: '100.00' }],
+        lines: [{ kind: 'new' as const, newProductName: nombreMateria, unitId: empresa.unitId, percentage: '100.00' }],
         steps: [],
         replaceRecipeId: null,
       };
@@ -560,6 +568,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
       });
       expect(materiasCreadas).toHaveLength(1);
       expect(materiasCreadas[0]?.type).toBe(PRODUCT_TYPES.PRODUCT);
+      expect(materiasCreadas[0]?.unitId).toBe(empresa.unitId);
 
       const recetaTrasFallo = await prisma.recipe.count({
         where: { companyId: empresa.companyId, nameNormalized: normalizeRecipeName(nombreReceta) },
@@ -590,11 +599,18 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
         documentFileId,
         name: nombreReceta,
         description: 'Primera confirmacion',
-        lines: [{ kind: 'new', newProductName: nombreMateria, percentage: '100.00' }],
+        lines: [{ kind: 'new', newProductName: nombreMateria, unitId: empresa.unitId, percentage: '100.00' }],
         steps: [],
         replaceRecipeId: null,
       });
-      expect(primera).toEqual({ recipeId: primera.recipeId, outcome: 'created', rawMaterialsCreated: 1, rawMaterialsReused: 0 });
+      expect(primera).toEqual({
+        recipeId: primera.recipeId,
+        outcome: 'created',
+        rawMaterialsCreated: 1,
+        rawMaterialsReused: 0,
+        created: [{ name: nombreMateria, unitId: empresa.unitId }],
+        reused: [],
+      });
 
       // Reconfirma sobre la MISMA receta que acaba de crear -el patron de `design.md > 7.2`,
       // fila «Reemplazar»-, con el mismo contenido.
@@ -602,11 +618,18 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
         documentFileId,
         name: nombreReceta,
         description: 'Primera confirmacion',
-        lines: [{ kind: 'new', newProductName: nombreMateria, percentage: '100.00' }],
+        lines: [{ kind: 'new', newProductName: nombreMateria, unitId: empresa.unitId, percentage: '100.00' }],
         steps: [],
         replaceRecipeId: primera.recipeId,
       });
-      expect(segunda).toEqual({ recipeId: primera.recipeId, outcome: 'replaced', rawMaterialsCreated: 0, rawMaterialsReused: 1 });
+      expect(segunda).toEqual({
+        recipeId: primera.recipeId,
+        outcome: 'replaced',
+        rawMaterialsCreated: 0,
+        rawMaterialsReused: 1,
+        created: [],
+        reused: [{ name: nombreMateria }],
+      });
 
       const recetas = await prisma.recipe.count({
         where: { companyId: empresa.companyId, nameNormalized: normalizeRecipeName(nombreReceta), deletedAt: null },

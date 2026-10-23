@@ -207,6 +207,46 @@ describe('el corte por permiso ocurre antes de leer nada (R32)', () => {
   });
 });
 
+describe('las unidades de la pantalla llegan a la materia prima nueva (QC-203 R21)', () => {
+  it('R21 una fila «Crear materia prima» sugiere la unidad leida entre las de listUnitsAction', async () => {
+    listUnitsActionMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          name: 'Kilogramo',
+          symbol: 'kg',
+          baseUnitId: null,
+          factor: null,
+          isSystem: true,
+        },
+      ],
+    });
+    previewFormulaImportActionMock.mockResolvedValue({
+      status: 'success',
+      data: {
+        ...vistaPreviaVacia(),
+        ingredients: [
+          {
+            readName: 'Tensoactivo',
+            percentage: '100.00',
+            percentageRead: '100',
+            quantityRead: null,
+            unitRead: 'kg',
+            match: { kind: 'none' },
+          },
+        ],
+      },
+    });
+
+    await renderPantalla();
+
+    expect(screen.getByTestId('formula-import-row-mode-0')).toHaveAttribute('data-mode', 'create');
+    expect(screen.getByTestId('presentation-unit-select')).toHaveTextContent('kg');
+    expect(screen.getByTestId('presentation-unit-hint')).toHaveTextContent('Sugerida del PDF: «kg».');
+  });
+});
+
 /**
  * Quita los identificadores que React (`useId`, también los de Base UI) y `dnd-kit` regeneran en cada montaje -nunca
  * estables entre dos renders de la MISMA suite, aunque si lo son entre dos peticiones reales a la
@@ -215,6 +255,7 @@ describe('el corte por permiso ocurre antes de leer nada (R32)', () => {
  */
 function sinIdentificadoresVolatiles(html: string): string {
   return html
+    // `useId` cuenta en base 32: tras unos cuantos montajes el contador ya lleva letras.
     .replace(/id="(base-ui-)?_r_[0-9a-z]+_"/g, 'id="$1_r_"')
     .replace(/aria-labelledby="_r_[0-9a-z]+_"/g, 'aria-labelledby="_r_"')
     .replace(/id="Dnd(DescribedBy|LiveRegion)-\d+"/g, 'id="Dnd$1"')

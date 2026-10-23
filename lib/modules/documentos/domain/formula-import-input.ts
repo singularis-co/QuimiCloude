@@ -19,7 +19,9 @@ export type PreviewFormulaImportInput = z.infer<typeof previewFormulaImportInput
 
 const draftLineInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('existing'), productId: z.string().uuid(), percentage: z.string() }).strict(),
-  z.object({ kind: z.literal('new'), newProductName: z.string(), percentage: z.string() }).strict(),
+  z
+    .object({ kind: z.literal('new'), newProductName: z.string(), unitId: z.string().uuid(), percentage: z.string() })
+    .strict(),
 ]);
 
 export const confirmFormulaImportInputSchema = z
