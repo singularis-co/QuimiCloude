@@ -366,7 +366,7 @@ describe('whatsapp-outbox-prisma — el mensaje saliente', () => {
     expect(await filaDelMensaje(id)).toMatchObject({ status: 'SENT', wamid, errorCode: null, errorReason: null })
   })
 
-  it('R31 — findOutbound relee el saliente, y un entrante no es un saliente', async () => {
+  it('R31, R40 — findOutbound relee el saliente, y tambien devuelve un entrante de la empresa con su direccion', async () => {
     const empresa = await crearEmpresa()
     const contactId = await contactoNuevo(empresa)
     const { id } = await outbox.insertSending(texto(empresa, contactId), empresa.scope)
@@ -387,7 +387,13 @@ describe('whatsapp-outbox-prisma — el mensaje saliente', () => {
       },
       select: { id: true },
     })
-    expect(await outbox.findOutbound(entrante.id, empresa.scope)).toBeNull()
+    expect(await outbox.findOutbound(entrante.id, empresa.scope)).toMatchObject({
+      id: entrante.id,
+      direction: 'IN',
+      status: 'RECEIVED',
+      origin: null,
+      sentById: null,
+    })
   })
 })
 

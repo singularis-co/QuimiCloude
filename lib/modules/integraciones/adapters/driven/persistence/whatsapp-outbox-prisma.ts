@@ -6,12 +6,7 @@ import { companyScopeColumns, whatsappContactCompanyScope, whatsappMessageCompan
 
 import type { IntegracionesScope } from '../../../domain/integraciones-scope';
 import type { ContactLink } from '../../../domain/whatsapp-contact-link';
-import type {
-  NewOutboundMessage,
-  OutboundContact,
-  OutboundMessageRecord,
-  OutboundMessageType,
-} from '../../../domain/whatsapp-outbound-message';
+import type { NewOutboundMessage, OutboundContact, OutboundMessageRecord } from '../../../domain/whatsapp-outbound-message';
 import type { WhatsappOutboxRepository } from '../../../ports/whatsapp-outbox-repository';
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
@@ -45,40 +40,11 @@ const MESSAGE_COLUMNS = {
 
 type MessageColumns = Prisma.WhatsappMessageGetPayload<{ select: typeof MESSAGE_COLUMNS }>;
 
-const OUTBOUND_TYPES: readonly OutboundMessageType[] = ['TEXT', 'TEMPLATE'];
-
-/**
- * Solo las filas que caben en un saliente: los entrantes no tienen origen ni, a veces, texto, y un
- * tipo que no es texto ni plantilla no lo escribe este envío.
- */
-const OUTBOUND_ROW = {
-  direction: 'OUT',
-  origin: { not: null },
-  sentById: { not: null },
-  body: { not: null },
-  type: { in: [...OUTBOUND_TYPES] },
-} as const satisfies Prisma.WhatsappMessageWhereInput;
-
-function toRecord(row: MessageColumns): OutboundMessageRecord | null {
-  const { origin, sentById, body, type, payload } = row;
-  if (origin === null || sentById === null || body === null) return null;
-  if (type !== 'TEXT' && type !== 'TEMPLATE') return null;
+function toRecord(row: MessageColumns): OutboundMessageRecord {
+  const { payload } = row;
   return {
-    id: row.id,
-    connectionId: row.connectionId,
-    contactId: row.contactId,
-    sentById,
-    type,
-    body,
-    templateName: row.templateName,
-    templateLanguage: row.templateLanguage,
+    ...row,
     payload: payload !== null && typeof payload === 'object' && !Array.isArray(payload) ? { ...payload } : {},
-    status: row.status,
-    direction: row.direction,
-    origin,
-    errorCode: row.errorCode,
-    errorReason: row.errorReason,
-    createdAt: row.createdAt,
   };
 }
 
@@ -167,9 +133,7 @@ export async function insertWhatsappSendingMessage(
     },
     select: MESSAGE_COLUMNS,
   });
-  const record = toRecord(created);
-  if (record === null) throw new Error('El mensaje de WhatsApp recién creado no es un saliente.');
-  return record;
+  return toRecord(created);
 }
 
 /** La condición de `SENDING` va en el `where`: no pisa un estado que ya movió otra escritura. */
@@ -209,7 +173,7 @@ export async function findWhatsappOutboundMessage(
   scope: IntegracionesScope,
 ): Promise<OutboundMessageRecord | null> {
   const row = await db.whatsappMessage.findFirst({
-    where: { id, ...OUTBOUND_ROW, ...whatsappMessageCompanyScope(scope) },
+    where: { id, ...whatsappMessageCompanyScope(scope) },
     select: MESSAGE_COLUMNS,
   });
   return row === null ? null : toRecord(row);

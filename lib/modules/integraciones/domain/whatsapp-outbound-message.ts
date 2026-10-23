@@ -1,4 +1,9 @@
-import type { WhatsappMessageDirection, WhatsappMessageOrigin, WhatsappMessageStatus } from './whatsapp-message';
+import type {
+  WhatsappMessageDirection,
+  WhatsappMessageOrigin,
+  WhatsappMessageStatus,
+  WhatsappMessageType,
+} from './whatsapp-message';
 
 export type OutboundMessageType = 'TEXT' | 'TEMPLATE';
 
@@ -22,11 +27,20 @@ export type NewOutboundMessage = {
   readonly payload: Record<string, unknown>;
 };
 
-export type OutboundMessageRecord = NewOutboundMessage & {
+/** Un mensaje de la empresa tal como está guardado: puede ser un entrante, sin origen ni autor. */
+export type OutboundMessageRecord = {
   readonly id: string;
+  readonly connectionId: string;
+  readonly contactId: string;
+  readonly sentById: string | null;
+  readonly type: WhatsappMessageType;
+  readonly body: string | null;
+  readonly templateName: string | null;
+  readonly templateLanguage: string | null;
+  readonly payload: Record<string, unknown>;
   readonly status: WhatsappMessageStatus;
   readonly direction: WhatsappMessageDirection;
-  readonly origin: WhatsappMessageOrigin;
+  readonly origin: WhatsappMessageOrigin | null;
   readonly errorCode: string | null;
   readonly errorReason: string | null;
   readonly createdAt: Date;
