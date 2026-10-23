@@ -107,6 +107,7 @@ const STEP_DOCUMENT_TESTID = 'step-reader-document';
 const STEP_POSITION_TESTID = 'step-reader-position';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-1-0';
 const STEP_BLOCKED_REASON_TESTID = 'step-reader-blocked-reason';
+const STEP_BUTTON_COUNTDOWN_TESTID = 'step-reader-button-countdown';
 const STEP_WAIT_REASON_TESTID = 'step-reader-wait-reason';
 const STEP_NEXT_TESTID = 'step-reader-next';
 const STEP_FINISH_TESTID = 'step-reader-finish';
@@ -621,7 +622,14 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     const finish = steps.getByTestId(STEP_FINISH_TESTID);
     await expect(finish).toBeDisabled();
     await expect(steps.getByTestId(STEP_WAIT_REASON_TESTID)).toBeVisible();
-    await expect(finish).toHaveText('Terminar');
+    // Mientras espera, el boton lleva dentro la cuenta regresiva, oculta a la tecnologia de apoyo:
+    // su nombre accesible sigue siendo «Terminar» y no cambia con cada segundo.
+    await expect(finish).toHaveAccessibleName('Terminar');
+    await expect(finish.getByTestId(STEP_BUTTON_COUNTDOWN_TESTID)).toBeVisible();
+    await expect(finish.getByTestId(STEP_BUTTON_COUNTDOWN_TESTID)).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
     await expect(steps.getByTestId(STEP_NEXT_TESTID)).toHaveCount(0);
 
     await expect(steps.getByTestId(STEP_DOCUMENT_TESTID)).toContainText(PACKING_STEP_2_TEXT);
@@ -629,6 +637,8 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     await expectNoneOf(page, [OPERATOR_STEP_TEXT]);
 
     await expect(finish).toBeEnabled({ timeout: PACKING_WAIT_MS + 30_000 });
+    await expect(finish.getByTestId(STEP_BUTTON_COUNTDOWN_TESTID)).toHaveCount(0);
+    await expect(finish).toHaveText('Terminar');
 
     // --- 7. Terminar desde el ultimo paso, con su confirmacion.
     await clickAndConfirm(page, finish, PACKING_ORDER_FINISH_CONFIRM_TESTID);

@@ -46,7 +46,7 @@ import { StepDocumentView } from './step-document-view';
 const PRIMARY_TOUCH_TARGET_EJECUCION = 'w-full min-w-11';
 
 const TEXTS = {
-  empty: 'Esta receta no tiene ningún paso que leer.',
+  empty: 'Esta fórmula no tiene ningún paso que leer.',
   previous: 'Anterior',
   next: 'Siguiente',
   finish: 'Finalizar',

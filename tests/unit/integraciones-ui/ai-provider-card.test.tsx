@@ -150,7 +150,7 @@ describe('AiProviderCard', () => {
     const terminos = within(tarjeta())
       .getAllByRole('term')
       .map((dt) => dt.textContent);
-    expect(terminos).toEqual(['Receta (fórmula desde PDF)', 'Catálogo desde PDF', 'Última prueba']);
+    expect(terminos).toEqual(['Fórmula (desde PDF)', 'Catálogo desde PDF', 'Última prueba']);
     expect(within(tarjeta()).getByRole('button', { name: 'Desconectar' })).toBeTruthy();
     expect(within(tarjeta()).getByRole('button', { name: 'Probar conexión' })).toBeTruthy();
     expect(within(tarjeta()).getByRole('button', { name: 'Cambiar key o proveedor' })).toBeTruthy();

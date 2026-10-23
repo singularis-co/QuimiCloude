@@ -512,12 +512,12 @@ describe('pantalla de ejecucion — QC-265 R23: cabecera fija con número, recet
     expect(within(cabecera!).getByRole('button', { name: 'Cambiar tema' })).toBeVisible();
   });
 
-  it('QC-265 R23: con la receta dada de baja el h1 dice «Esta receta está dada de baja.»', () => {
+  it('QC-265 R23: con la receta dada de baja el h1 dice «Esta fórmula está dada de baja.»', () => {
     render(<OrderExecutionScreen execution={{ ...EXECUTION, recipeName: null }} />);
 
     const titulo = screen.getByRole('heading', { level: 1 });
-    expect(ORDER_EXECUTION_TEXTS.recipeMissing).toBe('Esta receta está dada de baja.');
-    expect(titulo.textContent).toBe('Esta receta está dada de baja.');
+    expect(ORDER_EXECUTION_TEXTS.recipeMissing).toBe('Esta fórmula está dada de baja.');
+    expect(titulo.textContent).toBe('Esta fórmula está dada de baja.');
     expect(titulo).toHaveAttribute('data-testid', ORDER_EXECUTION_TITLE_TESTID);
   });
 

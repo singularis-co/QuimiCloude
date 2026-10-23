@@ -87,7 +87,7 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay pedidos que mostrar.',
   loading: 'Cargando pedidos…',
   error: 'No se pudo cargar la lista de pedidos.',
-  search: 'Buscar por receta',
+  search: 'Buscar por fórmula',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',
   previousPage: 'Página anterior',

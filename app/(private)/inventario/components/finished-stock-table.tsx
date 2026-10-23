@@ -34,7 +34,7 @@ const FINISHED_STOCK_CARD: DataTableCardLayout = {
 
 export const FINISHED_STOCK_TABLE_TEXTS: DataTableTexts = {
   ...PRODUCT_TABLE_TEXTS,
-  search: 'Buscar por número de pedido o receta',
+  search: 'Buscar por número de pedido o fórmula',
 };
 
 export type FinishedStockTableProps = {

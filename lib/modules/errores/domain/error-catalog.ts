@@ -146,7 +146,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.presentation_duplicate_name': 'Ya existe una presentacion con un nombre equivalente.',
   'errors.presentation_in_use': 'La presentacion tiene productos asignados y no se puede borrar.',
   'errors.order_not_found': 'El pedido solicitado no existe.',
-  'errors.recipe_not_found': 'La receta indicada no existe o esta dada de baja.',
+  'errors.recipe_not_found': 'La fórmula indicada no existe o esta dada de baja.',
   'errors.invalid_transition': 'El pedido no admite ese cambio de estado.',
   'errors.not_cancellable': 'El pedido no se puede cancelar en su estado actual.',
   'errors.not_deletable': 'El pedido no se puede borrar en su estado actual.',
@@ -155,7 +155,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.catalog_line_not_found': 'La linea de catalogo solicitada no existe.',
   'errors.supplier_duplicate_name': 'Ya existe un proveedor con un nombre equivalente.',
   'errors.duplicate_catalog_line': 'Ese proveedor ya tiene una linea con ese nombre y esa presentacion.',
-  'errors.recipe_duplicate_name': 'Ya existe una receta con un nombre equivalente.',
+  'errors.recipe_duplicate_name': 'Ya existe una fórmula con un nombre equivalente.',
   'errors.unit_not_found': 'La unidad no existe.',
   'errors.unit_duplicate_name': 'Ya existe una unidad con ese nombre.',
   'errors.duplicate_symbol': 'Ya existe una unidad con ese simbolo.',
@@ -215,7 +215,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.insufficient_material':
     'No hay material suficiente en inventario para entregar el pedido.',
   'errors.recipe_without_lines':
-    'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
+    'La fórmula del pedido no tiene ingredientes: completala antes de entregarlo.',
   'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
   'errors.customer_not_found': 'El cliente solicitado no existe.',
   'errors.presentation_without_content':
@@ -243,7 +243,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_version_under_review':
     'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
   'errors.order_unit_not_convertible':
-    'La unidad del pedido no se puede convertir a la de algún insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
+    'La unidad del pedido no se puede convertir a la de algún insumo de la fórmula: revisa los insumos marcados en la tabla o elige otra unidad.',
   'errors.batch_stock_changed':
     'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
   'errors.adjustment_reason_not_allowed':

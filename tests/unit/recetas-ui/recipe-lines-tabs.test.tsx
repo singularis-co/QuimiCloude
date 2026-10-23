@@ -208,7 +208,7 @@ describe('pestañas con contador', () => {
   it('R12: la pastilla activa es TabsIndicator dentro de una lista con relative', () => {
     render(<Harness />);
 
-    const list = screen.getByRole('tablist', { name: 'Líneas de la receta por tipo' });
+    const list = screen.getByRole('tablist', { name: 'Líneas de la fórmula por tipo' });
     expect(list).toHaveClass('relative');
     const indicator = list.querySelector('[data-slot="tabs-indicator"]');
     expect(indicator).not.toBeNull();

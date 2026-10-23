@@ -130,7 +130,7 @@ export function recipeColumn<TRow extends { readonly recipeName: string | null }
 ): DataTableColumn<TRow> {
   return {
     id,
-    label: 'Receta',
+    label: 'Fórmula',
     align: 'start',
     cell: (order) => order.recipeName ?? <MissingValue testIdPrefix={missingTestIdPrefix} field={id} />,
   };

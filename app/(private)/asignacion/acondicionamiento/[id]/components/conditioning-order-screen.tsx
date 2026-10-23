@@ -45,7 +45,7 @@ export const CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID = 'conditioning-order-ca
 export const CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID = 'conditioning-order-batch-data-missing';
 
 export const CONDITIONING_ORDER_SCREEN_TEXTS = {
-  recipeMissing: 'Esta receta está dada de baja.',
+  recipeMissing: 'Esta fórmula está dada de baja.',
   quantityLabel: 'Cantidad:',
   conditionedBy: (name: string) => `Lo acondiciona ${name}.`,
   backToQueue: 'Volver a «Por acondicionar»',

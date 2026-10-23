@@ -149,7 +149,7 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
       className="flex flex-col gap-3"
     >
       <h2 id="recipe-version-inherited-heading" className="text-base font-semibold">
-        De la receta original
+        De la fórmula original
       </h2>
 
       {version.imageUrl === null ? null : (
@@ -173,7 +173,7 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
 
       {version.steps.length === 0 ? (
         <p className="text-sm text-muted-foreground" data-testid="recipe-version-steps-empty">
-          La receta original no tiene pasos.
+          La fórmula original no tiene pasos.
         </p>
       ) : (
         // `inert` deja las casillas fuera del foco y del puntero; la vista no guarda marcado.
@@ -201,7 +201,7 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
 
       {version.packingSteps.length === 0 ? (
         <p className="text-sm text-muted-foreground" data-testid="recipe-version-packing-steps-empty">
-          La receta original no tiene pasos de envasado.
+          La fórmula original no tiene pasos de envasado.
         </p>
       ) : (
         <div
@@ -237,7 +237,7 @@ function InheritedFromOriginal({ version }: { readonly version: RecipeDetail }) 
           className="text-sm text-muted-foreground"
           data-testid="recipe-version-conditioning-steps-empty"
         >
-          La receta original no tiene pasos de acondicionamiento.
+          La fórmula original no tiene pasos de acondicionamiento.
         </p>
       ) : (
         <div

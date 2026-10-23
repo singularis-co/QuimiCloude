@@ -735,7 +735,7 @@ test.describe('Fórmulas rediseñado', () => {
 
     // R27: con dos versiones, el título en plural y el número en monoespaciada. Se cancela.
     const propagate = await openPropagate(page);
-    await expect(propagate.getByTestId(TESTIDS.propagateTitle)).toHaveText('2 versiones parten de esta receta');
+    await expect(propagate.getByTestId(TESTIDS.propagateTitle)).toHaveText('2 versiones parten de esta fórmula');
     const count = propagate.getByTestId(TESTIDS.propagateCount);
     await expect(count).toHaveText('2');
     expect(await count.evaluate((el) => getComputedStyle(el).fontFamily), 'número en monoespaciada').toMatch(
@@ -784,7 +784,7 @@ test.describe('Fórmulas rediseñado', () => {
 
     await nameField.press('Enter');
     await page.waitForURL((url) => url.pathname === FORMULAS_ROUTE, { timeout: 60_000 });
-    const toast = page.locator('[data-sonner-toast]').filter({ hasText: 'Receta actualizada.' });
+    const toast = page.locator('[data-sonner-toast]').filter({ hasText: 'Fórmula actualizada.' });
     await expect(toast).toHaveCount(1, { timeout: 30_000 });
 
     await expect
