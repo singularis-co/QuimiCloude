@@ -2895,6 +2895,10 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.deleteTemplate(input)
       : whatsappGraphClientFetch.deleteTemplate(input),
+  sendMessage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.sendMessage(input)
+      : whatsappGraphClientFetch.sendMessage(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {

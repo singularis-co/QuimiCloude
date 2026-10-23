@@ -4,6 +4,8 @@ import { readGraphApiVersion } from '../config/whatsapp-config-env';
 
 import type { GraphFailure } from '../../../domain/graph-failure';
 import type {
+  GraphMessageSent,
+  GraphOutboundMessage,
   GraphProbeResult,
   GraphTemplateCreated,
   GraphTemplateDeleted,
@@ -52,6 +54,10 @@ const templatePageBody = z.object({
 });
 
 const deletedTemplateBody = z.object({ success: z.literal(true) });
+
+const sentMessageBody = z.object({
+  messages: z.array(z.object({ id: z.string().min(1) })).min(1),
+});
 
 type TemplateFailure = { readonly ok: false } & GraphFailure;
 
@@ -228,9 +234,36 @@ async function deleteTemplate(input: {
   return deletedTemplateBody.safeParse(reply.body).success ? { ok: true } : TEMPLATE_REJECTED_WITHOUT_DETAIL;
 }
 
+function outboundBodyOf(to: string, message: GraphOutboundMessage): Record<string, unknown> {
+  const envelope = { messaging_product: 'whatsapp', recipient_type: 'individual', to };
+  if (message.type === 'text') {
+    return { ...envelope, type: 'text', text: { body: message.body, preview_url: false } };
+  }
+  return {
+    ...envelope,
+    type: 'template',
+    template: { name: message.name, language: { code: message.language }, components: message.components },
+  };
+}
+
+async function sendMessage(input: {
+  readonly phoneNumberId: string;
+  readonly accessToken: string;
+  readonly to: string;
+  readonly message: GraphOutboundMessage;
+}): Promise<GraphMessageSent> {
+  const url = `${GRAPH_BASE_URL}/${readGraphApiVersion()}/${encodeURIComponent(input.phoneNumberId)}/messages`;
+  const reply = await callGraph(url, 'POST', input.accessToken, outboundBodyOf(input.to, input.message));
+  if (!reply.reached || !isSuccess(reply.status)) return templateFailureOf(reply);
+  const parsed = sentMessageBody.safeParse(reply.body);
+  const first = parsed.success ? parsed.data.messages[0] : undefined;
+  return first === undefined ? TEMPLATE_UNREACHABLE : { ok: true, wamid: first.id };
+}
+
 export const whatsappGraphClientFetch = {
   fetchPhoneNumber,
   createTemplate,
   listTemplatesPage,
   deleteTemplate,
+  sendMessage,
 } satisfies WhatsappGraphClient;

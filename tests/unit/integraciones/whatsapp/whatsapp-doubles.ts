@@ -131,6 +131,7 @@ export function makeRandom(tokens: string[] = ['verify-token-1', 'verify-token-2
 }
 
 export const CREATED_META_TEMPLATE_ID = '1234567890123456'
+export const SENT_WAMID = 'wamid.HBgMNTczMDAxMjM0NTY3FQIAERgS'
 
 export function makeGraph(result: GraphProbeResult = GOOD_PROBE) {
   const fetchPhoneNumber = vi.fn<WhatsappGraphClient['fetchPhoneNumber']>(async () => result)
@@ -146,8 +147,9 @@ export function makeGraph(result: GraphProbeResult = GOOD_PROBE) {
     next: null,
   }))
   const deleteTemplate = vi.fn<WhatsappGraphClient['deleteTemplate']>(async () => ({ ok: true }))
-  const graph: WhatsappGraphClient = { fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate }
-  return { graph, fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate }
+  const sendMessage = vi.fn<WhatsappGraphClient['sendMessage']>(async () => ({ ok: true, wamid: SENT_WAMID }))
+  const graph: WhatsappGraphClient = { fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate, sendMessage }
+  return { graph, fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate, sendMessage }
 }
 
 /** Repositorio en memoria que respeta el ambito: una fila de otra empresa o borrada no se ve. */
@@ -364,12 +366,16 @@ export function makeCustomerPhoneLinks(
   results: {
     add?: Awaited<ReturnType<CustomerPhoneLinks['addWaId']>>
     remove?: Awaited<ReturnType<CustomerPhoneLinks['removeWaId']>>
+    mainPhone?: Awaited<ReturnType<CustomerPhoneLinks['mainPhoneOf']>>
+    alive?: boolean
   } = {},
 ) {
   const addWaId = vi.fn<CustomerPhoneLinks['addWaId']>(async () => results.add ?? { numbers: [] })
   const removeWaId = vi.fn<CustomerPhoneLinks['removeWaId']>(async () => results.remove ?? { numbers: [] })
-  const customerPhones: CustomerPhoneLinks = { addWaId, removeWaId }
-  return { customerPhones, addWaId, removeWaId }
+  const mainPhoneOf = vi.fn<CustomerPhoneLinks['mainPhoneOf']>(async () => results.mainPhone ?? 'no_phone')
+  const isCustomerAlive = vi.fn<CustomerPhoneLinks['isCustomerAlive']>(async () => results.alive ?? true)
+  const customerPhones: CustomerPhoneLinks = { addWaId, removeWaId, mainPhoneOf, isCustomerAlive }
+  return { customerPhones, addWaId, removeWaId, mainPhoneOf, isCustomerAlive }
 }
 
 /** Unidad de trabajo sin base: corre el trabajo con los puertos dados y cuenta las aperturas. */

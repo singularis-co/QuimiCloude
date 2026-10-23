@@ -118,6 +118,20 @@ export function ownersOfWaId(
   return phones.findAliveOwners(waId, scope);
 }
 
+/**
+ * El principal vivo del cliente vivo. Un telefono antiguo con aviso no tiene vinculo, asi que
+ * cuenta como sin telefono.
+ */
+export async function mainPhoneOfCustomer(
+  phones: CustomerPhoneRepository,
+  customerId: string,
+  scope: CustomerScope,
+): Promise<'customer_not_found' | 'no_phone' | { readonly e164: string }> {
+  if (!(await phones.isAlive(customerId, scope))) return 'customer_not_found';
+  const main = (await phones.listAliveLinks(customerId, scope)).find((link) => link.main);
+  return main === undefined ? 'no_phone' : { e164: main.e164 };
+}
+
 export type CustomerPhoneLinksDeps = { readonly phones: CustomerPhoneRepository };
 
 /** Servicio que `clientes` ofrece a otros modulos. Recibe la empresa como cadena: `CustomerScope`
@@ -138,6 +152,11 @@ export type CustomerPhoneLinksService = {
     companyId: string,
   ): Promise<{ readonly numbers: readonly string[] }>;
   ownersOf(waId: string, companyId: string): Promise<readonly string[]>;
+  mainPhoneOf(
+    customerId: string,
+    companyId: string,
+  ): Promise<'customer_not_found' | 'no_phone' | { readonly e164: string }>;
+  isCustomerAlive(customerId: string, companyId: string): Promise<boolean>;
 };
 
 export function createCustomerPhoneLinks(deps: CustomerPhoneLinksDeps): CustomerPhoneLinksService {
@@ -147,5 +166,7 @@ export function createCustomerPhoneLinks(deps: CustomerPhoneLinksDeps): Customer
     removeWaId: (customerId, waId, actorId, now, companyId) =>
       removeWaIdFromCustomer(deps.phones, { customerId, waId, actorId, now }, { companyId }),
     ownersOf: (waId, companyId) => ownersOfWaId(deps.phones, waId, { companyId }),
+    mainPhoneOf: (customerId, companyId) => mainPhoneOfCustomer(deps.phones, customerId, { companyId }),
+    isCustomerAlive: (customerId, companyId) => deps.phones.isAlive(customerId, { companyId }),
   };
 }
