@@ -632,3 +632,54 @@ o proveedor»»): la frase «Después de conectar podrás elegir el modelo.» so
 
 **Veredicto:** T12 y T13 hechas; un defecto de alineación corregido; E2E en verde contra una base migrada, con un
 rojo intermitente de WebKit en un paso de QC-275 y la base local de `.env` sin migrar.
+
+## T14. Trazabilidad R -> test (2026-10-22, implementer)
+
+Casos con «R<n>» en archivos nuevos de la feature o «QT-291 R<n>» en archivos compartidos con QC-275.
+Rutas: `int/` = `tests/integration/integraciones/`, `ip/` = `tests/unit/integraciones/ai-provider/`,
+`doc/` = `tests/unit/documentos/`, `ui/` = `tests/unit/integraciones-ui/`, `comp/` = `tests/unit/composition/`.
+
+| R | Test(s) |
+|---|---|
+| R1 | `int/ai-models-migration.int.test.ts` |
+| R2 | `int/ai-models-migration.int.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R3 | `int/ai-models-migration.int.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R4 | `int/ai-models-migration.int.test.ts` |
+| R5 | `comp/ai-provider-wiring.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R6 | `doc/ai-model-literals.test.ts` (preexistente, sigue en verde con la tabla nueva) |
+| R7 | `int/ai-models-migration.int.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R8 | `ip/select-ai-model.test.ts` |
+| R9 | `ip/select-ai-model.test.ts`, `ip/ai-provider-actions.test.ts`, E2E |
+| R10 | `ip/select-ai-model.test.ts`, `ip/ai-provider-actions.test.ts` |
+| R11 | `ip/select-ai-model.test.ts`, `ip/ai-provider-actions.test.ts` |
+| R12 | `ip/select-ai-model.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R13 | `ip/ai-provider-actions.test.ts` |
+| R14 | `ip/save-ai-provider-connection.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R15 | `ui/ai-provider-card.test.tsx` |
+| R16 | `ip/resolve-and-report.test.ts`, `comp/ai-provider-wiring.test.ts` |
+| R17 | `ip/resolve-and-report.test.ts`, `ip/test-saved-ai-provider.test.ts`, `int/ai-provider-connection-prisma.int.test.ts` |
+| R18 | `ip/test-saved-ai-provider.test.ts` |
+| R19 | `ip/test-ai-provider-key.test.ts`, `ip/save-ai-provider-connection.test.ts`, `comp/ai-provider-wiring.test.ts` |
+| R20 | `ip/test-ai-provider-key.test.ts`, `ip/test-saved-ai-provider.test.ts`, `ip/ai-provider-failure.test.ts`, `ui/ai-provider-card.test.tsx`, `ui/ai-provider-form.test.tsx`, E2E |
+| R21 | `ip/test-saved-ai-provider.test.ts` |
+| R22 | `ip/test-saved-ai-provider.test.ts` |
+| R23 | `doc/ai-reader-adapter.test.ts`, `doc/ai-reader-anthropic-adapter.test.ts`, `doc/ai-reader-openai-adapter.test.ts` (incluye el 400 de OpenRouter), `doc/run-document-job-ai-provider.test.ts`, `ip/resolve-and-report.test.ts` |
+| R24 | `ip/resolve-and-report.test.ts` |
+| R25 | `doc/run-document-job-ai-provider.test.ts`, `ip/resolve-and-report.test.ts` |
+| R26 | `ui/ai-model-select.test.tsx`, `ui/ai-provider-card.test.tsx`, `ui/ai-provider-page.test.tsx`, E2E |
+| R27 | `ui/ai-model-select.test.tsx`, `ui/ai-provider-card.test.tsx`, E2E |
+| R28 | `ui/ai-model-select.test.tsx`, `ui/ai-provider-card.test.tsx`, `ip/connection-view.test.ts` |
+| R29 | `ui/ai-model-select.test.tsx`, `ui/ai-provider-card.test.tsx`, E2E |
+| R30 | `ui/ai-provider-form.test.tsx`, `ui/ai-provider-card.test.tsx`, E2E |
+| R31 | `ui/ai-model-select.test.tsx` (+ capturas T12) |
+| R32 | `ip/select-ai-model.test.ts`, `comp/ai-provider-wiring.test.ts`, `ui/ai-provider-card.test.tsx`, E2E |
+| R33 | `ip/select-ai-model.test.ts`, `ip/ai-provider-actions.test.ts`, `comp/ai-provider-wiring.test.ts` |
+| R34 | `ip/select-ai-model.test.ts`, `ip/ai-provider-actions.test.ts` (incluye el log, F2) |
+
+E2E = `e2e/integraciones-proveedor-ia.spec.ts`. Ningún R<n> sin test.
+
+**Verificación de cierre (2026-10-22).** Por indicación del leader no se corre en local el gate
+(`./init.sh`) ni el `vitest related` completo: lo corre `gate-completo` en el PR. Estado con lo que
+sí se corrió: `pnpm run typecheck` 0 errores (T13); `pnpm run lint` 0 errores y 10 warnings, todos en
+archivos que esta feature no toca; `vitest run guard` 1276 pass, 0 fail (tras F2 y T13); tests de
+`integraciones-ui` 154 pass; `ip/` 214 pass; E2E 6/6 contra base migrada (ver T13).

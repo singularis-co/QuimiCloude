@@ -115,7 +115,7 @@
   añadir el de elegir modelo con Gemini (`design.md > 13`).
   *Hecho:* `pnpm exec playwright test e2e/integraciones-proveedor-ia.spec.ts` en verde.
 
-- [ ] **T14. Trazabilidad y gate** (dep. todo). Mapa `R<n> -> test` (R1–R34) en
+- [x] **T14. Trazabilidad y gate** (dep. todo). Mapa `R<n> -> test` (R1–R34) en
   `progress/impl_QT-291.md`; ids de T0 que sigan «pendiente (sin key)» listados para el humano;
   `./init.sh` en verde.
   *Hecho:* ningún `R<n>` sin test; el leader lista los ids pendientes y el humano los acepta por
