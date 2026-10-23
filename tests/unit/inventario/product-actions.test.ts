@@ -13,6 +13,7 @@ import {
 import { errorMessage } from '@/lib/modules/errores';
 import {
   BatchDuplicateLotError,
+  PACKAGING_SUBTYPES,
   PRODUCT_TYPES,
   ProductNotFoundError,
   UnauthorizedError,
@@ -924,5 +925,38 @@ describe('imagen del producto en las Server Actions', () => {
     const result = await updateProductAction('product-1', MUTATION_INITIAL, formDataOf(VALID_PRODUCT_FIELDS), null);
 
     expect(result).toEqual({ status: 'success' });
+  });
+});
+
+describe('QT-296 — el subtipo de empaque viaja del FormData al caso de uso', () => {
+  const EMPAQUE = {
+    name: 'Tapa rosca',
+    type: PRODUCT_TYPES.PACKAGING,
+    stock: '200',
+    qtyAlert: '0',
+    unitCost: '0.1000',
+  };
+
+  it('R7 — pasa packagingSubtype tal cual al caso de uso', async () => {
+    createProductMock.mockResolvedValue({ id: 'producto-1' });
+
+    await createProductAction(CREATE_INITIAL, formDataOf({ ...EMPAQUE, packagingSubtype: PACKAGING_SUBTYPES.CAP }));
+
+    const [candidato] = createProductMock.mock.calls[0] as [Record<string, unknown>];
+    expect(candidato).toEqual({ ...EMPAQUE, packagingSubtype: PACKAGING_SUBTYPES.CAP });
+  });
+
+  it('R5 — sin packagingSubtype en el FormData, o vacio, la clave no viaja y el caso de uso decide', async () => {
+    createProductMock.mockResolvedValue({ id: 'producto-1' });
+
+    await createProductAction(CREATE_INITIAL, formDataOf({ ...EMPAQUE, presentationId: PRESENTACION }));
+    await createProductAction(
+      CREATE_INITIAL,
+      formDataOf({ ...EMPAQUE, presentationId: PRESENTACION, packagingSubtype: '' }),
+    );
+
+    for (const [candidato] of createProductMock.mock.calls as [Record<string, unknown>][]) {
+      expect(Object.keys(candidato)).not.toContain('packagingSubtype');
+    }
   });
 });

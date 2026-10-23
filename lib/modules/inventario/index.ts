@@ -38,6 +38,12 @@ export {
   PRODUCT_PRESENTATION_UNIT_FILTER,
 } from './domain/product-queryable';
 export { isIngredientType, PRODUCT_TYPES, type ProductType } from './domain/product-type';
+export {
+  PACKAGING_SUBTYPES,
+  PACKAGING_SUBTYPE_VALUES,
+  requiresPresentation,
+  type PackagingSubtype,
+} from './domain/packaging-subtype';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
 export {

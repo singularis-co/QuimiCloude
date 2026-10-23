@@ -832,6 +832,9 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-22: el catalogo de modelos de IA y la eleccion de modelo en la conexion; no toca el
   // identificador.
   '20261022120000_ai_models',
+  // 2026-10-23: subtipo de empaque en productos y tipo en la linea de catalogo; no toca el
+  // identificador.
+  '20261023150000_packaging_subtype',
 ] as const
 
 export function hallazgosDeMigraciones(

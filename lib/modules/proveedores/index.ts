@@ -51,6 +51,14 @@ export {
   type CatalogLineMeasurement,
   type CatalogLineMeasurements,
 } from './domain/catalog-line-input';
+export {
+  CATALOG_LINE_TYPES,
+  CATALOG_LINE_TYPE_VALUES,
+  CATALOG_LINE_PACKAGING_SUBTYPES,
+  CATALOG_LINE_PACKAGING_SUBTYPES_VALUES,
+  type CatalogLineType,
+  type CatalogLinePackagingSubtype,
+} from './domain/catalog-line-type';
 export { type NewSupplier, type SupplierView } from './domain/supplier-view';
 // QC-52: `CatalogLineTerms` desaparece y lo sustituye `CatalogLineFields`. No es un
 // renombrado cosmetico: la edicion paso de tres campos comerciales a los SIETE de negocio

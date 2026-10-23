@@ -1,5 +1,6 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
+import type { PackagingSubtype } from './packaging-subtype';
 import type { ProductType } from './product-type';
 
 /**
@@ -85,8 +86,10 @@ export type ProductView = {
   readonly presentationUnitId?: UnitId | null;
 };
 
-/** Lo que fija el alta de un envase: su presentacion y la unidad en que se cuenta su existencia. */
+/** Lo que fija el alta de un empaque: su presentacion (solo el envase la lleva), la unidad en que
+ *  se cuenta su existencia y su subtipo, que sin indicar es envase. */
 export type PackagingIdentity = {
-  readonly presentationId: string;
+  readonly presentationId: string | null;
   readonly unitId: UnitId;
+  readonly packagingSubtype?: PackagingSubtype;
 };

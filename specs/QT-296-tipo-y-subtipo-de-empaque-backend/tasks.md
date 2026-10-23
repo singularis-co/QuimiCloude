@@ -12,7 +12,7 @@
 > caso. El código de producción no cita fichas ni requisitos (`docs/conventions.md > Comentarios`).
 > `[P]` marca lo que puede ir en paralelo.
 
-## [ ] T0 — Recontraste `[backend_dev]`
+## [x] T0 — Recontraste `[backend_dev]`
 
 - Confirmar que las referencias `archivo:línea` de `design.md` siguen valiendo en la punta de
   `dev`. Las que se hayan movido se anotan en `progress/impl_QT-296.md`.
@@ -22,7 +22,7 @@
 **Hecho cuando:** `progress/impl_QT-296.md` tiene el recontraste y los rojos de partida, si los
 hay.
 
-## [ ] T1 — Migración, esquema y espejos del enum `[depende de T0]`
+## [x] T1 — Migración, esquema y espejos del enum `[depende de T0]`
 
 - `db/migrations/<ts>_packaging_subtype/migration.sql` y `down.sql` (`design.md > 2.3`).
 - `db/schema.prisma`: los enums `PackagingSubtype` y `CatalogLineType`, `Product.packagingSubtype`
@@ -52,7 +52,7 @@ hay.
 `_prisma_migrations` coherente sobre la base del worktree; R1–R4 y R23–R25 en verde;
 `guard-arquitectura-modulos`, `guard-tipos-de-producto` y `guard-empresa-en-esquema` en verde.
 
-## [ ] T2 — Alta de empaque con subtipo `[depende de T1]` `[P con T3, T4, T5, T6]`
+## [x] T2 — Alta de empaque con subtipo `[depende de T1]` `[P con T3, T4, T5, T6]`
 
 - `product-input.ts`, `create-product.ts`, `product-view.ts` (`PackagingIdentity`),
   `ports/product-repository.ts`, `product-prisma.ts` (`findAlivePackagingByName`,

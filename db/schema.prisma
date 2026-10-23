@@ -361,6 +361,8 @@ model Product {
   /// Su indice `products_company_id_last_batch_at_idx` es parcial y con `NULLS LAST`: vive en la
   /// migracion, no aqui.
   lastBatchAt    DateTime?   @map("last_batch_at") @db.Timestamptz(6)
+  /// Solo en empaques.
+  packagingSubtype PackagingSubtype? @map("packaging_subtype")
 
   batches ProductBatch[]
 
@@ -550,6 +552,21 @@ enum ProductType {
   FINISHED_PRODUCT
 }
 
+/// Lo comparten `products` y `supplier_catalog_lines`. Anadir un valor es una migracion.
+enum PackagingSubtype {
+  CONTAINER
+  CAP
+  MEASURER
+  OTHER
+}
+
+/// Que vende el proveedor. No es `ProductType`: la linea de catalogo no conoce el inventario.
+enum CatalogLineType {
+  RAW_MATERIAL
+  TOOL
+  PACKAGING_MATERIAL
+}
+
 /// `recipes_company_name_unique` (empresa, nombre) es PARCIAL (vivas y solo originales) y por
 /// eso no se declara `@@unique` aqui: Prisma no modela indices parciales. Ese mismo indice
 /// hace de indice de `companyId`, asi que tampoco hay un `@@index([companyId])` propio. Los
@@ -687,6 +704,8 @@ model SupplierCatalogLine {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+  type             CatalogLineType?  @map("type")
+  packagingSubtype PackagingSubtype? @map("packaging_subtype")
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 

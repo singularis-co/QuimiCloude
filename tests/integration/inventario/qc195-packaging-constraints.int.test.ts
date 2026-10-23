@@ -171,6 +171,7 @@ async function insertProduct(
       name,
       nameNormalized: name.toLowerCase(),
       type,
+      packagingSubtype: type === 'PACKAGING' ? 'CONTAINER' : null,
       companyId,
       presentationId: ids.presentationId ?? null,
       recipeId: ids.recipeId ?? null,

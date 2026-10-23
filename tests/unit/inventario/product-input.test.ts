@@ -1,4 +1,4 @@
-import { PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { PACKAGING_SUBTYPES, PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import { ValidationError } from '@/lib/modules/inventario/domain/errors';
 import {
@@ -505,5 +505,118 @@ describe('updateProductSchema — qtyAlert por tipo', () => {
         JSON.stringify(sobra),
       ).toBe(false);
     }
+  });
+});
+
+describe('QT-296 — subtipo de empaque en el alta y la edicion', () => {
+  const ALTA_TAPA = {
+    name: 'Tapa',
+    type: PRODUCT_TYPES.PACKAGING,
+    ...REQUERIDOS,
+    ...LOTE_MINIMO,
+  } as const;
+
+  function fallaEnPresentacion(entrada: unknown): boolean {
+    const veredicto = createProductSchema.safeParse(entrada);
+    return !veredicto.success && veredicto.error.issues.some((issue) => issue.path[0] === 'presentationId');
+  }
+
+  it('R5 — un empaque sin subtipo es un envase', () => {
+    const veredicto = createProductSchema.safeParse(ALTA_ENVASE);
+    expect(veredicto.success).toBe(true);
+    expect(veredicto.data).toEqual(expect.objectContaining({ packagingSubtype: PACKAGING_SUBTYPES.CONTAINER }));
+  });
+
+  it('R6 — un envase sin presentacion es invalid_input, con o sin subtipo explicito', () => {
+    const sinPresentacion = { ...ALTA_TAPA };
+    expect(fallaEnPresentacion(sinPresentacion)).toBe(true);
+    expect(fallaEnPresentacion({ ...sinPresentacion, packagingSubtype: PACKAGING_SUBTYPES.CONTAINER })).toBe(true);
+  });
+
+  it('R6, R7, R8 — el caso de uso rechaza la entrada invalida con invalid_input sin consultar ni escribir', async () => {
+    const products = {
+      create: vi.fn(),
+      findAliveById: vi.fn(),
+      updateAlive: vi.fn(),
+      softDeleteAlive: vi.fn(),
+      listAlive: vi.fn(),
+      findAliveIdByNameInPresentationUnit: vi.fn(),
+      findAliveIdByNameInUnit: vi.fn(),
+      findAlivePackagingByName: vi.fn(),
+      createWithFirstBatch: vi.fn(),
+      addBatchToAlive: vi.fn(),
+      adjustBatchStock: vi.fn(),
+      findBatchesOfAliveProduct: vi.fn(),
+      findBatchMovements: vi.fn(),
+    };
+    const createProduct = createCreateProduct({
+      products,
+      packageUnit: { findPackageUnitId: async () => 'unidad-u' },
+    });
+    const actor = { id: 'actor-1', companyId: 'company-a', permissions: ['inventario.modificar'] };
+
+    for (const entrada of [
+      { ...ALTA_TAPA, packagingSubtype: PACKAGING_SUBTYPES.CONTAINER },
+      { ...ALTA_ENVASE, packagingSubtype: PACKAGING_SUBTYPES.CAP },
+      { ...ALTA_PRODUCTO, packagingSubtype: PACKAGING_SUBTYPES.CAP },
+    ]) {
+      const error = await createProduct(entrada, actor).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as ValidationError).code).toBe('invalid_input');
+    }
+    expect(products.findAlivePackagingByName).not.toHaveBeenCalled();
+    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+  });
+
+  it('R7 — tapa, medidor y otro entran sin presentacion y con existencia entera', () => {
+    for (const packagingSubtype of [PACKAGING_SUBTYPES.CAP, PACKAGING_SUBTYPES.MEASURER, PACKAGING_SUBTYPES.OTHER]) {
+      const veredicto = createProductSchema.safeParse({ ...ALTA_TAPA, packagingSubtype });
+      expect(veredicto.success, packagingSubtype).toBe(true);
+      expect(veredicto.data).toEqual(expect.objectContaining({ packagingSubtype }));
+      expect(createProductSchema.safeParse({ ...ALTA_TAPA, packagingSubtype, stock: '2.5' }).success, packagingSubtype).toBe(
+        false,
+      );
+    }
+  });
+
+  it('R7 — tapa, medidor u otro con presentacion es invalid_input', () => {
+    for (const packagingSubtype of [PACKAGING_SUBTYPES.CAP, PACKAGING_SUBTYPES.MEASURER, PACKAGING_SUBTYPES.OTHER]) {
+      expect(fallaEnPresentacion({ ...ALTA_ENVASE, packagingSubtype }), packagingSubtype).toBe(true);
+    }
+  });
+
+  it('R7 — un subtipo fuera del catalogo es invalid_input', () => {
+    expect(createProductSchema.safeParse({ ...ALTA_TAPA, packagingSubtype: 'LABEL' }).success).toBe(false);
+    expect(createProductSchema.safeParse({ ...ALTA_TAPA, packagingSubtype: 'cap' }).success).toBe(false);
+  });
+
+  it('R8 — PRODUCT o MACHINE con subtipo es invalid_input', () => {
+    expect(createProductSchema.safeParse(ALTA_PRODUCTO).success).toBe(true);
+    for (const packagingSubtype of [PACKAGING_SUBTYPES.CONTAINER, PACKAGING_SUBTYPES.CAP]) {
+      expect(createProductSchema.safeParse({ ...ALTA_PRODUCTO, packagingSubtype }).success, packagingSubtype).toBe(false);
+      expect(
+        createProductSchema.safeParse({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE, stock: '1', packagingSubtype }).success,
+        packagingSubtype,
+      ).toBe(false);
+    }
+  });
+
+  it('R10 — la edicion con packagingSubtype es invalid_input, en cualquier tipo', () => {
+    expect(
+      updateProductSchema.safeParse({ name: 'Bidon', type: PRODUCT_TYPES.PACKAGING, qtyAlert: '0' }).success,
+    ).toBe(true);
+    for (const type of [PRODUCT_TYPES.PACKAGING, PRODUCT_TYPES.PRODUCT]) {
+      expect(
+        updateProductSchema.safeParse({ name: 'Bidon', type, qtyAlert: '0', packagingSubtype: PACKAGING_SUBTYPES.CAP })
+          .success,
+        type,
+      ).toBe(false);
+    }
+    expect(
+      updateProductSchema.safeParse({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE, packagingSubtype: PACKAGING_SUBTYPES.CAP })
+        .success,
+    ).toBe(false);
   });
 });

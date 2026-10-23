@@ -319,6 +319,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'recipeId',
         'presentationId',
         'lastBatchAt',
+        'packagingSubtype',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { compareQuantities } from './decimal-quantity';
+import { PACKAGING_SUBTYPE_VALUES, PACKAGING_SUBTYPES, requiresPresentation } from './packaging-subtype';
 import { MANUAL_PRODUCT_TYPE_VALUES, PRODUCT_TYPES } from './product-type';
 
 /**
@@ -241,12 +242,16 @@ export function isWholeQuantity(quantity: string): boolean {
   return WHOLE_QUANTITY_PATTERN.test(quantity.trim().replace(/^-/, ''));
 }
 
-/** Esquema para PACKAGING: `presentationId` es la presentacion fija del envase, no del lote. */
+/**
+ * Esquema para PACKAGING: `presentationId` es la presentacion fija del envase, no del lote. Sin
+ * subtipo, el empaque es un envase, para que un formulario que no lo manda siga creando envases.
+ */
 const createPackagingSchema = z
   .strictObject({
     ...productFieldsShape,
     ...batchFieldsCommon,
-    presentationId: presentationIdSchema,
+    packagingSubtype: z.enum(PACKAGING_SUBTYPE_VALUES).optional().default(PACKAGING_SUBTYPES.CONTAINER),
+    presentationId: presentationIdSchema.optional(),
     type: z.literal(PRODUCT_TYPES.PACKAGING),
     image: createImageSchema,
   })
@@ -254,6 +259,12 @@ const createPackagingSchema = z
     exigirCostoDelLote(value, ctx);
     if (DECIMAL_PATTERN.test(value.stock) && !isWholeQuantity(value.stock)) {
       ctx.addIssue({ code: 'custom', message: 'La existencia de un envase es un numero entero.', path: ['stock'] });
+    }
+    if (requiresPresentation(value.packagingSubtype) && value.presentationId === undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Elige una presentacion.', path: ['presentationId'] });
+    }
+    if (!requiresPresentation(value.packagingSubtype) && value.presentationId !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'Solo un envase lleva presentacion.', path: ['presentationId'] });
     }
   });
 

@@ -620,6 +620,9 @@ describe('el cruce por ORM (R22): Prisma.dmmf, no el texto del esquema', () => {
       'createdAt',
       'updatedAt',
       'deletedAt',
+      // Tipo y subtipo de empaque: enums propios, sin relacion.
+      'type',
+      'packagingSubtype',
       'supplier',
     ])
 

@@ -84,7 +84,14 @@ async function insertBatch(
 ): Promise<string> {
   const name = `Producto ${token()}`;
   const product = await tx.product.create({
-    data: { name, nameNormalized: name.toLowerCase(), type, companyId: c.companyId, unitId: c.unitId },
+    data: {
+      name,
+      nameNormalized: name.toLowerCase(),
+      type,
+      packagingSubtype: type === 'PACKAGING' ? 'CONTAINER' : null,
+      companyId: c.companyId,
+      unitId: c.unitId,
+    },
     select: { id: true },
   });
   const batch = await tx.productBatch.create({

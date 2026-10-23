@@ -138,6 +138,7 @@ async function product(f: Fixture, type: ProductKind, presentationId: string | n
       name,
       nameNormalized: name.toLowerCase(),
       type,
+      packagingSubtype: type === 'PACKAGING' ? 'CONTAINER' : null,
       companyId: f.companyId,
       unitId: type === 'MACHINE' ? null : f.unitId,
       recipeId: type === 'FINISHED_PRODUCT' ? f.recipeId : null,

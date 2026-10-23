@@ -3,6 +3,7 @@ import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { NewProductBatch } from '../domain/product-batch';
 import type { ProductBatchView } from '../domain/product-batch-view';
+import type { PackagingSubtype } from '../domain/packaging-subtype';
 import type { NewProduct, PackagingIdentity, ProductType, ProductView } from '../domain/product-view';
 import type { BatchMovementRecord } from '../domain/reservation';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../domain/stock-adjustment';
@@ -130,8 +131,8 @@ export interface ProductRepository {
    * transaccion: `stock` no lo escribe quien llama, es el adaptador el que suma tras crear el
    * lote.
    *
-   * Con `packaging` (envase), el producto nace con esa presentacion y esa unidad, y el lote va sin
-   * presentacion; una presentacion de otra empresa es `ValidationError`.
+   * Con `packaging` (empaque), el producto nace con ese subtipo, esa presentacion -si la trae- y esa
+   * unidad, y el lote va sin presentacion; una presentacion de otra empresa es `ValidationError`.
    *
    * El `lot` devuelto es el TEXTO que quedo escrito en la fila -el que tecleo la persona o el
    * que genero el correlativo-, no el `batchId`. El adaptador ya lo calcula para escribir la
@@ -145,12 +146,11 @@ export interface ProductRepository {
     packaging?: PackagingIdentity,
   ): Promise<{ id: string; batchId: string; lot: string }>;
 
-  /** El envase vivo con presentacion fija y ese nombre (el mas antiguo si hay varios). Los
-   *  envases sin presentacion fija no cuentan. */
+  /** El empaque vivo con ese nombre, con o sin presentacion (el mas antiguo si hay varios). */
   findAlivePackagingByName(
     name: string,
     scope: InventoryScope,
-  ): Promise<{ id: string; presentationId: string } | null>;
+  ): Promise<{ id: string; presentationId: string | null; packagingSubtype: PackagingSubtype } | null>;
 
   /**
    * Agrega el lote a un producto que YA EXISTE.

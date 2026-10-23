@@ -47,6 +47,7 @@ import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import type { ListAliveOptions } from '../../../ports/product-repository';
+import { PACKAGING_SUBTYPES, type PackagingSubtype } from '../../../domain/packaging-subtype';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
 
@@ -540,7 +541,7 @@ async function findAliveIdByNameAndUnitId(
 export async function findAlivePackagingByName(
   name: string,
   scope: InventoryScope,
-): Promise<{ id: string; presentationId: string } | null> {
+): Promise<{ id: string; presentationId: string | null; packagingSubtype: PackagingSubtype } | null> {
   const row = await prisma.product.findFirst({
     where: {
       AND: [
@@ -548,15 +549,15 @@ export async function findAlivePackagingByName(
         {
           nameNormalized: normalizeProductName(name),
           type: PRODUCT_TYPES.PACKAGING,
-          presentationId: { not: null },
           deletedAt: null,
         },
       ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true, presentationId: true },
+    select: { id: true, presentationId: true, packagingSubtype: true },
   });
-  return row?.presentationId == null ? null : { id: row.id, presentationId: row.presentationId };
+  if (row?.packagingSubtype == null) return null;
+  return { id: row.id, presentationId: row.presentationId, packagingSubtype: row.packagingSubtype };
 }
 
 /**
@@ -876,7 +877,8 @@ async function writeBatchWithLotRetry<T>(
  * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. La
  * unidad del producto sale, por este orden, del envase, de `product.unitId` o de la presentacion
  * del lote -sin fila viva de la empresa, se aborta con `ValidationError` antes de escribir nada-;
- * sin ninguna de las tres, nace sin unidad. Su existencia queda recalculada al final.
+ * sin ninguna de las tres, nace sin unidad. Su existencia queda recalculada al final. Un empaque
+ * nace con el subtipo de `packaging` o, sin el, como envase; los demas tipos, sin subtipo.
  */
 export async function createWithFirstBatch(
   product: NewProduct,
@@ -888,11 +890,13 @@ export async function createWithFirstBatch(
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     let unitId: string | null = null;
     if (packaging !== undefined) {
-      const presentation = await tx.presentation.findFirst({
-        where: { AND: [presentationCompanyScope(scope), { id: packaging.presentationId }] },
-        select: { id: true },
-      });
-      if (presentation === null) throw new ValidationError();
+      if (packaging.presentationId !== null) {
+        const presentation = await tx.presentation.findFirst({
+          where: { AND: [presentationCompanyScope(scope), { id: packaging.presentationId }] },
+          select: { id: true },
+        });
+        if (presentation === null) throw new ValidationError();
+      }
       unitId = packaging.unitId;
     } else if (product.unitId !== undefined) {
       unitId = product.unitId;
@@ -913,6 +917,10 @@ export async function createWithFirstBatch(
         qtyAlert: product.qtyAlert ?? null,
         type: product.type ?? PRODUCT_TYPES.PRODUCT,
         presentationId: packaging?.presentationId ?? null,
+        packagingSubtype:
+          product.type === PRODUCT_TYPES.PACKAGING
+            ? (packaging?.packagingSubtype ?? PACKAGING_SUBTYPES.CONTAINER)
+            : null,
         imagePath: product.imagePath ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,
