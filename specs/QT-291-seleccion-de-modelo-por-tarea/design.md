@@ -3,9 +3,13 @@
 > Zona: `fullstack` · Complejidad: `high` · depends_on: QC-275 (hecha) · Rama:
 > `feature/QT-291-seleccion-de-modelo-por-tarea`
 >
-> El **qué** está en `requirements.md` (R1–R31; decisiones D1–D11 por el orden de su tabla). Aquí va
-> el **cómo**. Pese al nombre de la ficha, el alcance cerrado es **un solo modelo** para fórmula y
-> catálogo (D4), solo del proveedor conectado (D1).
+> El **qué** está en `requirements.md` (R1–R34; decisiones D1–D11 y E1–E8 por el orden de su tabla).
+> Aquí va el **cómo**. Pese al nombre de la ficha, el alcance cerrado es **un solo modelo** para
+> fórmula y catálogo (D4), solo del proveedor conectado (D1).
+>
+> **Enmienda F1.4 (2026-10-22).** Cambian §3 (veinte modelos, recomendado), §4.3 (`selectAiModel`
+> consulta el modelo antes de guardar), §4.4 y §11 (textos), §8, §9, §12, §13, §14 y §16 (la
+> alternativa 6 pasa a ser la elegida). La migración de T1 (commit `418a746f`) solo rehace su seed.
 >
 > **Diseño aprobado** (pase `/design`, D9, «aprobado» 2026-10-22):
 > `docs/diseno/canvas/ProveedorIAModelos.dc.html` (escritorio, tres estados: predeterminado, elegido,
@@ -53,7 +57,7 @@ Buscado `modelo`/`model`, `elegir modelo`, `ai_models`/`AiModel`, `recipeModel`/
 | `SharedSelect`, `SharedSelectControl` | Disparador y lista del selector en ventanas > 640 px: modo controlado (`value`, `onValueChange`), contenido propio del disparador (`children`), `invalid`, `labelledBy`, `describedBy`, `triggerTestId`, `optionTestId` | 1, reutiliza |
 | `SelectField` | La ficha del tablero lo nombra, pero **no cubre modo controlado** (su fila) y aquí se guarda al elegir | No se usa; `SharedSelectControl` es la pieza que envuelve |
 | `CountrySelect` | Patrón de hoja inferior a ≤ 640 px (`Sheet`, `useIsMobile`) que pide el tablero de teléfono | Se copia el **patrón** (no la pieza: es de países, con buscador) |
-| `StatusBadge` | «Predeterminado» (`neutral`), «No disponible» (`danger`); «Error» de la tarjeta ya existe | 1, reutiliza |
+| `StatusBadge` | «Recomendado» (`neutral`), «No disponible» (`danger`); «Error» de la tarjeta ya existe | 1, reutiliza |
 | `ConfirmDialog` | «¿Cambiar de proveedor?» | 1, reutiliza |
 | `Notice` | Aviso «Error con tu proveedor» de la tarjeta, ya existe | 1, sin cambios |
 | `Toaster` (`toast` de `sonner`) | «Modelo guardado» | 1, reutiliza |
@@ -79,9 +83,9 @@ db/migrations/20261022120000_ai_models/{migration,down}.sql
 lib/modules/integraciones/
   index.ts                                              ← + AiModelOption, selectAiModel; − AiReadUse
   domain/ai-provider.ts                                 ← entrada sin recipe/catalog; modelInUse; vista con el modelo
-  domain/ai-provider-failure.ts                         ← + marksConnection, texto de modelo no disponible
+  domain/ai-provider-failure.ts                         ← + marksConnection, textos de la prueba
   domain/ai-model-input.ts                              ← nuevo: zod de la elección
-  domain/select-ai-model.ts                             ← nuevo
+  domain/select-ai-model.ts                             ← nuevo: consulta el modelo y guarda
   domain/get-ai-provider-connection.ts                  ← vista con modelos
   domain/test-ai-provider-key.ts                        ← un solo modelo
   domain/test-saved-ai-provider.ts                      ← modelo en uso, marca/limpia el modelo
@@ -203,41 +207,52 @@ Se pierden las elecciones al bajar: es lo que revierte la subida.
 
 ---
 
-## 3. Modelos del seed (pregunta abierta 1) — PROPUESTA para F1.4
+## 3. Modelos del seed (aprobado en F1.4, E1 y E2)
 
 Condición de cada fila (D3): aceptar **PDF** (fórmula, modo `pdf` de `MODE_BY_STRATEGY`) **e
 imágenes** PNG (catálogo, modo `images`, también el recorte de `crop-catalog-images.ts`).
 
-**Este agente no tiene acceso a la red**: no puede consultar la documentación de los proveedores ni
-`openrouter.ai/api/v1/models`. Por eso solo propone ids **ya confirmados** con fuente y fecha: los
-del T0 de QC-275 (`specs/QC-275-proveedor-ia-propio/design.md > 3`, confirmados el 2026-10-13 contra
-la documentación oficial de cada proveedor, y la entrada `file` + `image` comprobada en
-`architecture.input_modalities` del catálogo de OpenRouter). No se inventa ningún id.
+**Fuente:** `https://openrouter.ai/api/v1/models`, consultada el **2026-10-22**: los veinte tienen
+`architecture.input_modalities` con `file` **e** `image`. Cinco por proveedor, los mejores en
+calidad/precio; `sort_order` = orden por calidad (1 = el de más calidad). Fuera por precio:
+`claude-fable-5.1`, `gpt-6-astra`.
 
-| Proveedor | `model_id` | Predeterminado | `sort_order` | Fuente y fecha |
-|---|---|---|---|---|
-| `ANTHROPIC` | `claude-haiku-5-5` | sí | 1 | docs.anthropic.com «Models overview», T0 QC-275, 2026-10-13 |
-| `GOOGLE` | `gemini-3.8-flash` | **sí** | 1 | ai.google.dev/gemini-api/docs/models, T0 QC-275, 2026-10-13 |
-| `GOOGLE` | `gemini-3.5-flash-lite` | no | 2 | ídem |
-| `OPENAI` | `gpt-6-luna` | sí | 1 | platform.openai.com/docs/models, T0 QC-275, 2026-10-13 |
-| `OPENROUTER` | `anthropic/claude-haiku-5.5` | sí | 1 | openrouter.ai/api/v1/models (`input_modalities`), 2026-10-13 |
+**Ids nativos.** Para Claude, Gemini y OpenAI la fuente es el catálogo de OpenRouter; el id con que
+los llama el SDK del proveedor se confirma en **T0** contra la API de cada uno (con key). Sin key,
+quedan **pendientes** en `progress/impl_QT-291.md` (pregunta abierta 3 de `requirements.md`); si uno
+no existe con ese nombre, se para y se pregunta. Los marcados † ya los confirmó el T0 de QC-275
+(2026-10-13).
 
-**Predeterminado de Gemini.** Hoy lee fórmulas con `gemini-3.8-flash` y catálogos con
-`gemini-3.5-flash-lite`. Se propone `gemini-3.8-flash`: es el que QC-275 eligió para la lectura de
-PDF nativo (fórmula) y también recibe imágenes, así que las dos tareas siguen funcionando con él.
-**Efecto visible:** las empresas con Gemini pasan a leer catálogos con `gemini-3.8-flash` (más caro
-que el lite) hasta que elijan el lite. La alternativa es el lite como predeterminado: más barato,
-pero cambia el modelo de las fórmulas. Lo decide el humano.
+| Proveedor | `sort_order` | `model_id` | `is_default` (UI: «Recomendado») |
+|---|---|---|---|
+| `ANTHROPIC` | 1 | `claude-opus-5-5` | no |
+| `ANTHROPIC` | 2 | `claude-sonnet-5-5` | no |
+| `ANTHROPIC` | 3 | `claude-opus-5` | no |
+| `ANTHROPIC` | 4 | `claude-sonnet-5` | no |
+| `ANTHROPIC` | 5 | `claude-haiku-5-5` † | **sí** |
+| `GOOGLE` | 1 | `gemini-4-argon` | no |
+| `GOOGLE` | 2 | `gemini-3.8-flash` † | **sí** |
+| `GOOGLE` | 3 | `gemini-3.7-flash` | no |
+| `GOOGLE` | 4 | `gemini-3.5-flash-lite` † | no |
+| `GOOGLE` | 5 | `gemini-3.1-flash-lite` | no |
+| `OPENAI` | 1 | `gpt-6.1-sol` | no |
+| `OPENAI` | 2 | `gpt-6-sol` | no |
+| `OPENAI` | 3 | `gpt-6-luna-pro` | no |
+| `OPENAI` | 4 | `gpt-6-luna` † | **sí** |
+| `OPENAI` | 5 | `gpt-5.6-luna` | no |
+| `OPENROUTER` | 1 | `anthropic/claude-sonnet-5.5` | no |
+| `OPENROUTER` | 2 | `openai/gpt-6.1-sol` | no |
+| `OPENROUTER` | 3 | `google/gemini-3.8-flash` | no |
+| `OPENROUTER` | 4 | `anthropic/claude-haiku-5.5` † | **sí** |
+| `OPENROUTER` | 5 | `openai/gpt-6-luna` | no |
 
-**Qué pasa con `recipe_model`/`catalog_model`.** Se **borran** (paso 6 de §2.2): con un solo modelo
-por empresa, conservarlas dejaría dos fuentes del «modelo de un proveedor» que pueden discrepar
-(alternativa descartada en §16).
+**Recomendado** (E2): el mejor calidad/precio, que es el de hoy, para no cambiar el costo de nadie.
+En Gemini, las empresas pasan a leer catálogos con `gemini-3.8-flash` en vez de
+`gemini-3.5-flash-lite` (D4: un solo modelo); el lite queda como opción. El recomendado no es el
+primero de la lista: la lista va por calidad y la insignia lo señala.
 
-**Lista corta.** Con esta propuesta, Claude, OpenAI y OpenRouter tienen **una sola opción**: el
-selector funciona, pero no da a elegir hasta que QT-292 (o una migración) añada modelos. Si el humano
-quiere más modelos desde el primer día, da los ids en F1.4 y **T0 los confirma** contra la
-documentación de cada proveedor (PDF e imágenes, con fecha), como en QC-275; si alguno no existe con
-ese nombre o no lee las dos cosas, se para y se pregunta.
+**Qué pasa con `recipe_model`/`catalog_model`.** Se **borran** (paso 6 de §2.2, E3); `down.sql` los
+restaura con los valores de QC-275.
 
 ---
 
@@ -291,14 +306,33 @@ export function modelInUse(record: Pick<AiProviderConnectionRecord, 'model'>, en
 
 Sin clases nuevas. Elegir un modelo fuera del catálogo del proveedor conectado = `ValidationError`
 (`invalid_input`, R10). Sin conexión = resultado `{ status: 'not_connected' }`, como
-`testSavedAiProvider` (R11): es una carrera con «Desconectar», no un error.
+`testSavedAiProvider` (R11): es una carrera con «Desconectar», no un error. Consulta fallida al
+elegir = resultado `{ status: 'rejected', message }` (R33), como la prueba fallida de
+`saveAiProviderConnection` en QC-275: es un fallo esperado del proveedor, no del sistema. Key
+ilegible = `SecretUnreadableError` de QC-275 (R34).
+
+**Qué hace cada tipo de fallo al elegir** (tipos de `specs/QC-275-proveedor-ia-propio/design.md >
+7.3`):
+
+| Fallo de la consulta (R32) | Se guarda | Conexión | Mensaje |
+|---|---|---|---|
+| `rejected_key` (401, 403, 400 de key de Gemini) | no | sin cambios | el de QC-275 para key rechazada |
+| `quota` (402, 429) | no | sin cambios | el de QC-275 para cuota |
+| `model_unavailable` (404, o id ausente del listado de OpenRouter) | no | sin cambios (el modelo marcado es el **en uso**; el que se intentó elegir no lo es) | R20 |
+| `unreachable` (red, plazo de 10 s) | no | sin cambios | el de QC-275 para sin respuesta |
+| `unexpected` | no | sin cambios | el de QC-275 para error inesperado |
+| Key ilegible | no, y no llama | sin cambios | `integration_secret_unreadable` |
+
+«Sin cambios» en key rechazada, cuota y key ilegible es la propuesta de la pregunta abierta 1:
+si el humano decide que también marcan, esas tres filas pasan a escribir `ERROR` como
+`testSavedAiProvider`.
 
 ### 4.3 Casos de uso
 
 | Caso de uso | Cambio |
 |---|---|
-| `selectAiModel` (nuevo, `domain/select-ai-model.ts`) | `(input{modelId}, actor) => { status:'saved'; connection: View } \| { status:'not_connected' }`. (1) `requirePermission` (R8) → (2) zod `aiModelInputSchema` (`modelId` string recortada, 1–200) → (3) `find(scope)`; `null` ⇒ `not_connected` (R11) → (4) `catalog.get(provider)`; `modelId` ∉ `entry.models` o `=== record.unavailableModel` ⇒ `ValidationError` (R10) → (5) patch `{ model: modelId === entry.defaultModel ? null : modelId, updatedById }` (R9); si `record.unavailableModel !== null`: `unavailableModel: null` y, si `status === 'ERROR'` y `lastError` es el aviso de modelo (§4.4, comparado por `isModelUnavailableNotice`), `status:'ACTIVE', lastError:null, lastErrorAt:null` (R12) → (6) `update` → vista. **Sin prueba** (R9) |
-| `getAiProviderConnection` | `providers` lleva `models` y `defaultModel` (la pantalla los pinta en el formulario, R30); la vista lleva el modelo (§4.1) |
+| `selectAiModel` (nuevo, `domain/select-ai-model.ts`) | `(input{modelId}, actor) => { status:'saved'; connection: View } \| { status:'not_connected' } \| { status:'rejected'; message }`. Deps: `connections`, `catalog`, `cipher`, `probe` (sin reloj: no escribe fechas). (1) `requirePermission` (R8) → (2) zod `aiModelInputSchema` (`modelId` string recortada, 1–200) → (3) `find(scope)`; `null` ⇒ `not_connected` (R11) → (4) `catalog.get(provider)`; `modelId` ∉ `entry.models` o `=== record.unavailableModel` ⇒ `ValidationError` (R10) → (5) `cipher.decrypt(apiKeyEnc, ctx)`; si lanza `SecretUnreadableError`, **relanza sin escribir** (R34; la acción ya lo traduce a `integration_secret_unreadable`) → (6) `probe.probe({ provider, apiKey, models: [modelId] })`, también si es el predeterminado (R32); fallida ⇒ `{ status:'rejected', message: probeFailureMessage(failure, entry.name) }` **sin escribir** (R33) → (7) patch `{ model: modelId === entry.defaultModel ? null : modelId, updatedById }` (R9); si `record.unavailableModel !== null`: `unavailableModel: null` y, si `status === 'ERROR'` y `lastError` es el aviso de modelo (§4.4, por `isModelUnavailableNotice`), `status:'ACTIVE', lastError:null, lastErrorAt:null` (R12) → (8) `update` → vista. La prueba buena **no** escribe `lastCheckedAt` (no es «Probar conexión») |
+| `getAiProviderConnection` | La vista lleva el modelo (§4.1). `providers` lleva `models` y `defaultModel` en el dominio (los usa R19), pero la pantalla del formulario ya no los pinta (R30) |
 | `testAiProviderKey` / `runProbe` | `models: [m]` con un solo modelo (R19): `m = (data.provider === existing?.provider && existing.model !== null) ? existing.model : entry.defaultModel`. Para conocer `existing`, `TestAiProviderKeyDeps` gana `connections` (solo `find`) |
 | `testSavedAiProvider` | prueba `[modelInUse(record, entry)]` (R18). Buena: además vacía `unavailableModel` (R22). Fallida con `model_unavailable` del modelo en uso: `ERROR`, `unavailableModel = failure.model`, `lastError = modelUnavailableNotice(...)` (R21). Otra fallida: como hoy |
 | `saveAiProviderConnection` | prueba el modelo de R19 antes de guardar. Al guardar: si `existing?.provider !== data.provider` ⇒ `model: null, unavailableModel: null` (R14); mismo proveedor ⇒ no toca `model`; `unavailableModel: null` porque la prueba con ese modelo acaba de salir bien. Crear: `model: null` |
@@ -319,7 +353,8 @@ amplía con `model_unavailable` y sustituye a `isAccountFailure` en los lectores
 
 | Dónde | Texto |
 |---|---|
-| Prueba con `model_unavailable` (R20; sustituye «tu cuenta no tiene acceso al modelo …») | «Error con tu proveedor: el modelo {model} ya no está disponible.» |
+| Prueba con `model_unavailable`: «Probar conexión», key escrita y consulta al elegir (R20, R33; sustituye «tu cuenta no tiene acceso al modelo …») | «Error con tu proveedor: el modelo {model} ya no está disponible.» |
+| Prueba buena en «Probar conexión», guardada o con key escrita (R20, E5; sustituye «Conexión correcta · respondió en X s») | «Conexión correcta · el modelo en uso responde». Lo pinta la pantalla (`ai-provider-form.tsx`, hoy `okMessage(elapsedMs)`); `elapsedMs` sigue en el resultado del caso de uso, pero ya no se muestra |
 | `lastError` por prueba de la guardada (R21) | «El modelo {model} que elegiste ya no está disponible en {Proveedor}. Elige otro modelo para volver a leer fórmulas y catálogos en PDF.»; con el predeterminado, sin «que elegiste» |
 | `lastError` por lectura (R23) | «La última lectura falló: » + el mismo aviso |
 
@@ -399,7 +434,9 @@ generar; si responde otro, se ajusta `classifyOpenAiError` con test.
   El doble de lectura (`DOCUMENTS_E2E_DOUBLES`) no cambia.
 - `reportConnectionFailure` → `integraciones.reportAiProviderOutcome(companyId, { kind:
   'connection_failure', failure })`.
-- `integraciones` gana `selectAiModel`, construido con `connections` y `catalog`.
+- `integraciones` gana `selectAiModel`, construido con `connections`, `catalog`, `cipher` y
+  el mismo `aiProviderProbe` de «Probar conexión» (con el doble `ai-provider-probe-canned` cuando
+  están activos los dobles de E2E).
 - `testAiProviderKey` recibe `connections`.
 - Importar la composición sigue sin leer variables ni tocar la base (QC-275 R42).
 
@@ -415,8 +452,10 @@ export async function selectAiModelAction(prev: SelectAiModelFormState, formData
 ```
 
 `modelId` de `formData`; `currentActor()`; `integraciones.selectAiModel`; `saved` ⇒
-`revalidatePath(AI_PROVIDER_INTEGRATION_ROUTE)`. No devuelve la vista (R13: la pantalla se repinta
-con el servidor). `toProviderState` y `toConnectionState` se rehacen campo a campo con los campos de
+`revalidatePath(AI_PROVIDER_INTEGRATION_ROUTE)`; `rejected` ⇒ `ErrorState` con el `message` de la
+consulta (R33), **sin** `revalidatePath` (no cambió nada); `SecretUnreadableError` ⇒ `ErrorState`
+`integration_secret_unreadable` con su texto del catálogo de errores (R34). No devuelve la vista
+(R13: la pantalla se repinta con el servidor). `toProviderState` y `toConnectionState` se rehacen campo a campo con los campos de
 §4.1.
 
 ---
@@ -429,23 +468,27 @@ Ninguna nueva. Permiso, menú y 404 sin `integraciones.modificar`: sin cambios (
 
 ## 11. Textos nuevos
 
-Todos del tablero aprobado salvo el marcado *propuesto*.
+Del tablero aprobado, con las enmiendas de F1.4: el predeterminado se rotula **«Recomendado»** en
+toda la pantalla (E2), y los textos de la prueba y de la ayuda del formulario son los de E5 y E6.
 
 | Clave | Texto |
 |---|---|
 | Título de sección | «Modelo» |
 | Subtítulo | «Se usa para leer fórmulas y catálogos en PDF. Solo aparecen modelos de {Proveedor} que leen PDF e imágenes.» |
 | Etiqueta | «Modelo de {Proveedor}» |
-| Insignias | «Predeterminado», «No disponible» |
-| Marca en la opción | «predeterminado» |
-| Ayudas | «Se usa el modelo predeterminado de {Proveedor}.» · «Elegido por tu empresa.» · «Este modelo ya no está disponible. Elige otro para volver a leer PDF.» |
+| Insignias | «Recomendado», «No disponible» |
+| Marca en la opción | «recomendado» |
+| Ayudas | «Se usa el modelo recomendado de {Proveedor}.» · «Elegido por tu empresa.» · «Este modelo ya no está disponible. Elige otro para volver a leer PDF.» |
 | Toast | «Modelo guardado» |
-| Confirmación | título «¿Cambiar de proveedor?»; texto «El modelo que elegiste es de {Proveedor}. Si conectas otro proveedor, se usa el modelo predeterminado del nuevo proveedor. Si solo cambias la key de {Proveedor}, se conserva.»; «Cancelar» / «Continuar» |
-| Ayuda del formulario (*propuesto*) | «Se usa con el modelo {modelo}.» (sustituye «Se usa con los modelos X y Y.») |
+| Error al elegir | el mensaje de la consulta (§4.2, tabla de fallos) o el del catálogo de errores, bajo el selector |
+| Confirmación | título «¿Cambiar de proveedor?»; texto «El modelo que elegiste es de {Proveedor}. Si conectas otro proveedor, se usa el modelo recomendado del nuevo proveedor. Si solo cambias la key de {Proveedor}, se conserva.»; «Cancelar» / «Continuar» |
+| Prueba buena (E5) | «Conexión correcta · el modelo en uso responde» (sustituye «Conexión correcta · respondió en X s») |
+| Prueba con modelo no disponible (E5) | «Error con tu proveedor: el modelo {modelo} ya no está disponible.» |
+| Ayuda del formulario sin conexión (E6) | «Después de conectar podrás elegir el modelo.» (sustituye «Se usa con los modelos X y Y.») |
 
-Sin cambios (ficha del tablero: «sin cambios en cabecera, aviso de error, prueba y acciones»): «Conexión
-correcta · respondió en X s» y la línea «Última prueba». El tablero muestra variantes de los dos; se
-pregunta en F1.4.
+Sin cambios: la línea «Última prueba» y el resto de mensajes de error de la prueba (QC-275 R11).
+Mientras se consulta el modelo al elegir, el selector se muestra ocupado (`Spinner` en el
+disparador, `aria-busy`), sin texto nuevo.
 
 ---
 
@@ -457,14 +500,17 @@ Props: `providerName`, `options: AiModelOption[]`, `value: string` (modelo en us
 `unavailable`, `pending`, `onChange(modelId)`.
 
 - **> 640 px**: `SharedSelectControl` controlado (`value`, `onValueChange`), `children` = id en mono
-  (tachado si `unavailable`) + `StatusBadge` («Predeterminado» `neutral` o «No disponible» `danger`),
+  (tachado si `unavailable`) + `StatusBadge` («Recomendado» `neutral` o «No disponible» `danger`),
   `invalid={unavailable}`, `labelledBy`/`describedBy` a la etiqueta y la ayuda. Flecha que gira 180°
   y entrada `.pop` del tablero: las del control si ya las trae; si no, clases del tablero en el
   disparador `[POR VERIFICAR en T9]`.
 - **≤ 640 px**: disparador a todo el ancho de 48 px y lista en `Sheet` inferior con título, como
   `CountrySelect` (R31). Sin buscador (pocas opciones).
-- Opciones = `options` (ya sin el marcado, R28), id en mono, «predeterminado» junto al predeterminado,
-  check en el valor.
+- Opciones = `options` (ya sin el marcado, R28) en `sort_order` (por calidad), id en mono,
+  «recomendado» junto al predeterminado, check en el valor. Con cinco opciones, sin buscador.
+- Con `pending` (consulta de R32 en curso): disparador deshabilitado, `aria-busy="true"` y `Spinner`
+  en el disparador; no abre la lista ni la hoja (R29). Que `SharedSelectControl` admita deshabilitar
+  el disparador `[POR VERIFICAR en T9]`; si no, se pide en su fila del catálogo, no se reimplementa.
 - Con `unavailable`, el valor mostrado no está entre las opciones: el disparador pinta `children` con
   el id tachado; `SharedSelectControl` admite contenido propio del disparador (su fila).
 
@@ -473,30 +519,39 @@ Props: `providerName`, `options: AiModelOption[]`, `value: string` (modelo en us
 - Quita las filas «Receta (fórmula desde PDF)» y «Catálogo desde PDF» y sus testids
   (`AI_PROVIDER_CARD_RECIPE_MODEL_TESTID`, `…CATALOG_MODEL_TESTID`) (R26).
 - Añade la sección «Modelo» (§11) entre el aviso de error y «Última prueba», en el orden del tablero.
-- Elegir: `useActionState` con `selectAiModelAction`; valor optimista con `useOptimistic`; `saved` ⇒
-  `toast.success('Modelo guardado')`; `error` ⇒ texto bajo el selector y vuelve al valor del
-  servidor; `not_connected` ⇒ `router.refresh()` (R29, R11).
+- Elegir: `useActionState` con `selectAiModelAction`; valor optimista con `useOptimistic` mientras
+  dura la consulta (el selector ocupado, `pending` del `useActionState`); `saved` ⇒
+  `toast.success('Modelo guardado')`; `error` (consulta fallida R33, key ilegible R34 o error del
+  catálogo) ⇒ texto bajo el selector y vuelve al valor del servidor; `not_connected` ⇒
+  `router.refresh()` (R29, R11). Un fallo de la consulta no cambia el aviso de error de la tarjeta:
+  la conexión no se tocó (R33).
 - «Cambiar key o proveedor»: si `!connection.modelIsDefault`, abre `ConfirmDialog` (§11) y
   «Continuar» hace `setEditing(true)`; si no, como hoy (R15).
 
 ### 12.3 `AiProviderForm`
 
-La ayuda pasa a «Se usa con el modelo {selected.defaultModel}.» (R30). Si el proveedor elegido es el
-conectado y hay elección, el texto **no** cambia: la prueba usa la elección (R19) y es un detalle que
-el tablero no pide mostrar.
+- Sin conexión, la ayuda pasa a «Después de conectar podrás elegir el modelo.» (R30, E6), sin nombrar
+  modelos: el formulario deja de leer `recipeModel`/`catalogModel` y no necesita `defaultModel`.
+- La prueba buena pasa a «Conexión correcta · el modelo en uso responde» (R20, E5): `okMessage`
+  deja de formatear `elapsedMs`. Aplica a la prueba de la key escrita y a la de la conexión guardada.
 
 ---
 
-## 13. E2E (pregunta abierta 2) — PROPUESTA: sí, mínimo
+## 13. E2E (decidido en F1.4, E7: sí, mínimo)
 
 No es flujo crítico (`docs/checkpoints-proyecto.md > Flujos criticos`), pero
 `e2e/integraciones-proveedor-ia.spec.ts` **ya** lee `recipeModel`/`catalogModel` de la base y los
 testids de las dos filas que desaparecen (l. 283-296): sin tocarlo, el E2E de PR a producción se
-pone rojo. Se ajusta ese caso y se añade **uno**:
+pone rojo. Se ajusta ese caso (y el texto `testOk` a «Conexión correcta · el modelo en uso
+responde», R20; la ayuda sin conexión, R30) y se añade **uno**:
 
-- Con la conexión creada por el doble: el selector muestra el predeterminado con «Predeterminado»;
-  elegir otra opción muestra «Modelo guardado» y, tras recargar, «Elegido por tu empresa.». Con
-  Gemini (dos opciones en §3).
+- Con Gemini y la conexión creada por el doble: el selector muestra `gemini-3.8-flash` con
+  «Recomendado»; elegir otra opción (la consulta la responde bien el doble
+  `ai-provider-probe-canned`, cuya key no empieza por `E2E_INVALID`) muestra «Modelo guardado» y,
+  tras recargar, «Elegido por tu empresa.».
+
+El fallo de la consulta al elegir (R33) se cubre en unit: el doble canned solo falla por la key, y
+la key guardada del E2E es válida.
 
 El estado «No disponible» se cubre en unit (`ai-provider-card.test.tsx`) con la vista, no en E2E:
 fabricarlo exige escribir la fila a mano y no añade nada que el unit no vea.
@@ -507,23 +562,23 @@ fabricarlo exige escribir la fila a mano y no añade nada que el unit no vea.
 
 | Archivo | Cubre |
 |---|---|
-| `tests/integration/integraciones/ai-models-migration.int.test.ts` (nuevo) | R1–R4, R7: tabla, PK, CHECK, FK, índice parcial (un segundo predeterminado da `23505`), siembra exacta de §3, un predeterminado por proveedor, FK compuesta rechaza modelo de otro proveedor (`23503`), columnas borradas, `down.sql` deja el esquema y los valores de QC-275 |
+| `tests/integration/integraciones/ai-models-migration.int.test.ts` (creado en T1; R2/R3 se rehacen) | R1–R4, R7: tabla, PK, CHECK, FK, índice parcial (un segundo predeterminado da `23505`), siembra exacta de §3 (veinte filas: proveedor, `model_id`, `sort_order` 1–5 por proveedor), el predeterminado de cada proveedor es el de §3, FK compuesta rechaza modelo de otro proveedor (`23503`), columnas borradas, `down.sql` deja el esquema y los valores de QC-275 |
 | `tests/integration/integraciones/ai-provider-migration.int.test.ts` | Se ajusta: aplica su migración y la nueva en orden, o deja de mirar las columnas que borra la nueva |
 | `tests/integration/integraciones/ai-provider-connection-prisma.int.test.ts` | `model`/`unavailableModel` en create/update/find; P2003 |
-| `tests/unit/integraciones/ai-provider/select-ai-model.test.ts` (nuevo) | R8–R12 |
+| `tests/unit/integraciones/ai-provider/select-ai-model.test.ts` (nuevo) | R8–R12, R32 (la sonda recibe solo el modelo elegido, también el predeterminado, y nada se escribe antes), R33 (un caso por tipo de fallo: sin escrituras y el mensaje), R34 (key ilegible: sin sonda ni escritura) |
 | `…/save-ai-provider-connection.test.ts` | R14, R19 |
 | `…/test-ai-provider-key.test.ts`, `…/test-saved-ai-provider.test.ts` | R18–R22 |
 | `…/resolve-and-report.test.ts` | R16, R17, R23, R24 |
 | `…/ai-provider-failure.test.ts` | R20, textos de §4.4 |
 | `…/connection-view.test.ts` | vista: modelo en uso, marcado, opciones sin el marcado (R28) |
-| `…/ai-provider-actions.test.ts` | `selectAiModelAction`, R13 |
+| `…/ai-provider-actions.test.ts` | `selectAiModelAction`, R13; `rejected` y key ilegible ⇒ `ErrorState` sin `revalidatePath` (R33, R34) |
 | `tests/unit/documentos/run-document-job-ai-provider.test.ts` | R23 (archivo `ai_provider_error`, informe), R25 |
 | `tests/unit/documentos/ai-reader-*.test.ts` (los de hoy) | 404 al leer ⇒ `AiProviderError` con `model_unavailable` (R23) |
 | `tests/unit/composition/ai-provider-wiring.test.ts` | gateway sin uso; `selectAiModel` cableado |
 | `tests/unit/documentos/ai-model-literals.test.ts` | R6, sin cambios (sigue barriendo `lib/`) |
-| `tests/unit/integraciones-ui/ai-model-select.test.tsx` (nuevo) | R26–R28, R31 (opciones, insignias, tachado, `invalid`, hoja a ≤ 640 px, alturas) |
-| `tests/unit/integraciones-ui/ai-provider-card.test.tsx` | R15, R26, R29 |
-| `tests/unit/integraciones-ui/ai-provider-form.test.tsx`, `ai-provider-page.test.tsx` | R30; datos de prueba sin `recipeModel` |
+| `tests/unit/integraciones-ui/ai-model-select.test.tsx` (nuevo) | R26–R28, R31 (opciones en orden, «Recomendado»/«recomendado», ninguna «predeterminado», tachado, `invalid`, ocupado con `pending`, hoja a ≤ 640 px, alturas) |
+| `tests/unit/integraciones-ui/ai-provider-card.test.tsx` | R15 (texto con «recomendado»), R20 (prueba buena), R26, R29 (ocupado, toast, error y vuelta al valor anterior) |
+| `tests/unit/integraciones-ui/ai-provider-form.test.tsx`, `ai-provider-page.test.tsx` | R20 (prueba buena con key escrita), R30; datos de prueba sin `recipeModel` |
 | `tests/unit/integraciones/module-shape.test.ts` | contrato sin `AiReadUse`, con `selectAiModel` |
 | `e2e/integraciones-proveedor-ia.spec.ts` | §13 (R26, R27, R29) |
 | R5 | Sin test de red: `ai-provider-catalog-prisma` es la única fuente de opciones y ningún adaptador de SDK expone un «listar modelos» que la composición cablee; lo afirma `ai-provider-wiring.test.ts` (el catálogo de la vista viene del puerto `AiProviderCatalog`) |
@@ -556,7 +611,14 @@ la revisión del seed; QT-292 deberá pedirla al dar de alta.
 5. **Columna `last_error_kind` para reconocer el error de modelo.** Más robusta que comparar el texto,
    pero añade un enum para un solo caso; `unavailable_model` ya dice qué modelo y el texto lo compone
    el propio módulo. Si aparece un segundo caso, se revisa.
-6. **Probar el modelo al elegirlo.** Daría aviso inmediato, pero el tablero guarda al instante sin
-   prueba y D8 deja la verificación a «Probar conexión». Descartada.
+6. **Guardar al elegir sin probar** (lo que dibuja el tablero y proponía la primera versión de este
+   spec). Más rápido, pero un modelo que la cuenta no tiene quedaría guardado y la siguiente lectura
+   fallaría y marcaría la conexión (R23). Descartada en F1.4 (E8): se consulta antes de guardar (R32).
+6b. **Consultar al elegir con una generación real** (un prompt corto) en vez de la consulta sin
+   texto de QC-275 R10. Probaría también el permiso de generar, pero cuesta tokens en cada cambio y
+   duplica la prueba con otra semántica. Descartada: se reutiliza la sonda de «Probar conexión».
+6c. **Al fallar la consulta, guardar igual y marcar la conexión en `ERROR`.** Deja rastro en la
+   tarjeta, pero contradice E8 («no se guarda y se avisa») y deja a la empresa con un modelo que no
+   responde. Descartada.
 7. **Conservar `AiReadUse` por si vuelve un modelo por tarea.** Sería un parámetro ignorado; «un modelo
    distinto por tarea» está en «Lo que NO entra». Descartada.

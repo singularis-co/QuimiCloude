@@ -7,39 +7,53 @@
 
 ## Bloque A — confirmación y datos
 
-- [ ] **T0. Confirmar la lista de modelos** (sin código). Tomar la lista **aprobada en F1.4**
-  (`design.md > 3`). Para cada id que no venga del T0 de QC-275, confirmar en la documentación
-  oficial del proveedor (y en `architecture.input_modalities` de `openrouter.ai/api/v1/models` para
-  OpenRouter) que existe con ese nombre y acepta PDF **e** imágenes; anotar fuente y fecha en
-  `progress/impl_QT-291.md`. Verificar también qué código devuelve OpenRouter al generar con un id
-  inexistente (`design.md > 7`).
-  *Hecho:* tabla con id, fuente y fecha por fila. Si un id no existe o no lee las dos cosas, **se
-  para y se pregunta**.
+- [ ] **T0. Confirmar la lista de modelos** (sin código; **rehacer**: la tabla de
+  `progress/impl_QT-291.md > T0` es de la lista antigua). Lista aprobada en F1.4: veinte modelos de
+  `design.md > 3`. (a) Los cinco de OpenRouter: re-comprobar en
+  `https://openrouter.ai/api/v1/models` que existen y que `architecture.input_modalities` trae `file`
+  **e** `image` (sin key). (b) Los quince nativos de Claude, Gemini y OpenAI: confirmar el id **contra
+  la API de cada proveedor** (`models.retrieve` / `models.get`, la misma consulta de la prueba de
+  QC-275); los marcados † en `design.md > 3` ya los confirmó QC-275. **Sin key, quedan
+  «pendiente (sin key)»** en la tabla y la implementación sigue (pregunta abierta 3). (c) Qué código
+  devuelve OpenRouter al generar con un id inexistente (`design.md > 7`), si hay key.
+  *Hecho:* tabla de veinte filas con proveedor, id, `sort_order`, recomendado, fuente y fecha, o
+  «pendiente (sin key)». Si un id **responde que no existe** o no lee las dos cosas, **se para y se
+  pregunta**.
 
-- [ ] **T1. Esquema y migración** (dep. T0). `db/schema.prisma` (`AiModel` con `/// @module
-  integraciones`; `AiProvider` sin `recipeModel`/`catalogModel`; `AiProviderConnection` + `model`,
-  `unavailableModel`). `db/migrations/20261022120000_ai_models/migration.sql` y `down.sql` según
-  `design.md > 2.2`. Guardias: `EXENTAS` + caso R7 de `guard-empresa-en-esquema.test.ts`, bullet de
-  `docs/architecture.md`, carpeta en `guard-identificador-de-request.test.ts`.
+- [ ] **T1. Esquema y migración** (dep. T0). **Hecho en `418a746f` salvo el seed**: esquema, tabla
+  `ai_models`, borrado de `recipe_model`/`catalog_model`, columnas `model_id`/`unavailable_model` de
+  la conexión, guardias y `ai-provider-migration.int.test.ts` no cambian. **Queda:** (a) rehacer el
+  `INSERT INTO "ai_models"` de `db/migrations/20261022120000_ai_models/migration.sql` con las veinte
+  filas de `design.md > 3` (`sort_order` 1–5 por proveedor, `is_default` en los cuatro recomendados);
+  `down.sql` no cambia (borra la tabla). (b) Rehacer en
+  `tests/integration/integraciones/ai-models-migration.int.test.ts` los casos «R2: la migracion
+  siembra exactamente la lista aprobada» (veinte filas exactas con su orden) y «R3: cada proveedor
+  tiene exactamente un predeterminado» (y que es el de `design.md > 3`). Si la migración ya está
+  aplicada en la base de test, se reconstruye la plantilla.
   *Hecho:* `pnpm exec prisma validate`; migración aplicada en la base de test; `vitest run guard` en
-  verde; test `ai-models-migration.int.test.ts` (R1–R4, R7) en verde; `ai-provider-migration.int.test.ts`
-  ajustado y en verde.
+  verde; `ai-models-migration.int.test.ts` (R1–R4, R7) y `ai-provider-migration.int.test.ts` en verde.
 
 ## Bloque B — dominio y adaptadores de `integraciones`
 
 - [ ] **T2. Tipos y textos** (dep. T1). `domain/ai-provider.ts` (`AiModelOption`, entrada, registro,
   vista, `modelInUse`; fuera `AiReadUse`), `domain/ai-provider-failure.ts` (`marksConnection`,
-  `modelUnavailableNotice`, `isModelUnavailableNotice`, texto de R20).
-  *Hecho:* `connection-view.test.ts` y `ai-provider-failure.test.ts` en verde (R20, R28 a nivel de vista).
+  `modelUnavailableNotice`, `isModelUnavailableNotice`, texto de modelo no disponible de R20).
+  *Hecho:* `connection-view.test.ts` y `ai-provider-failure.test.ts` en verde (R20 en su parte de
+  fallo, R28 a nivel de vista).
 
 - [ ] **T3. [P] Adaptadores driven** (dep. T2). `catalog/ai-provider-catalog-prisma.ts` (modelos por
   proveedor, descarta proveedor sin predeterminado), `persistence/ai-provider-connection-prisma.ts`
   (dos campos, P2003), puerto del repositorio.
   *Hecho:* `ai-provider-connection-prisma.int.test.ts` en verde con los campos nuevos.
 
-- [ ] **T4. [P] Elegir modelo** (dep. T2). `domain/ai-model-input.ts`, `domain/select-ai-model.ts`,
-  `index.ts`.
-  *Hecho:* `select-ai-model.test.ts` con un caso por R8, R9, R10, R11, R12 en verde.
+- [ ] **T4. [P] Elegir modelo, con consulta antes de guardar** (dep. T2). `domain/ai-model-input.ts`,
+  `domain/select-ai-model.ts` (deps `connections`, `catalog`, `cipher`, `probe`; orden de
+  `design.md > 4.3`: permiso → zod → conexión → catálogo → descifrar → consulta de un modelo →
+  escribir), `index.ts`; doble de sonda en `ai-provider-doubles.ts` si hace falta.
+  *Hecho:* `select-ai-model.test.ts` en verde con un caso por R8, R9, R10, R11, R12, R32 (la sonda
+  recibe solo el modelo elegido, también el predeterminado; nada se escribe antes), R33 (un caso por
+  tipo: `rejected_key`, `quota`, `model_unavailable`, `unreachable`, `unexpected`, sin escrituras y con
+  su mensaje) y R34 (key ilegible: sin sonda ni escritura).
 
 - [ ] **T5. Prueba, guardado, resolución e informe** (dep. T2). `test-ai-provider-key.ts`,
   `test-saved-ai-provider.ts`, `save-ai-provider-connection.ts`, `resolve-ai-provider-for-reading.ts`
@@ -56,27 +70,34 @@
   `ai-reader-openai-adapter.test.ts` con el caso 404 al leer; `run-document-job-ai-provider.test.ts`
   con R23 y R25; todo en verde.
 
-- [ ] **T7. Composición** (dep. T4, T6). `lib/composition/index.ts`.
-  *Hecho:* `ai-provider-wiring.test.ts` (gateway sin uso, `selectAiModel`, R5) y
+- [ ] **T7. Composición** (dep. T4, T6). `lib/composition/index.ts` (`selectAiModel` con `cipher` y
+  el mismo `aiProviderProbe`, doble canned incluido).
+  *Hecho:* `ai-provider-wiring.test.ts` (gateway sin uso, `selectAiModel` con sonda, R5) y
   `module-shape.test.ts` en verde; `ai-model-literals.test.ts` sigue en verde (R6).
 
 - [ ] **T8. Server Action** (dep. T7). `selectAiModelAction` y vistas campo a campo en
-  `ai-provider-actions.ts`.
-  *Hecho:* `ai-provider-actions.test.ts` con `selectAiModelAction` y R13 en verde.
+  `ai-provider-actions.ts` (`rejected` y key ilegible ⇒ `ErrorState` sin `revalidatePath`,
+  `design.md > 9`).
+  *Hecho:* `ai-provider-actions.test.ts` con `selectAiModelAction`, R13, R33 y R34 en verde.
 
 ## Bloque D — pantalla (frontend_dev)
 
 - [ ] **T9. `AiModelSelect`** (dep. T8). `components/ai-model-select.tsx` según `design.md > 12.1` y
-  los tres tableros. Verificar si `SharedSelectControl` ya trae flecha que gira y entrada `.pop`.
-  *Hecho:* `ai-model-select.test.tsx` (R26–R28, R31) en verde.
+  los tres tableros, con los textos de `design.md > 11` («Recomendado»/«recomendado», nunca
+  «predeterminado» en pantalla) y el estado ocupado (`pending`). Verificar si `SharedSelectControl`
+  ya trae flecha que gira, entrada `.pop` y disparador deshabilitado.
+  *Hecho:* `ai-model-select.test.tsx` (R26–R28, R31, ocupado) en verde.
 
-- [ ] **T10. Tarjeta** (dep. T9). `ai-provider-card.tsx`: sección «Modelo», guardar al elegir con
-  toast, confirmación de cambio de proveedor, fuera las dos filas de modelos.
-  *Hecho:* `ai-provider-card.test.tsx` (R15, R26, R29) en verde.
+- [ ] **T10. Tarjeta** (dep. T9). `ai-provider-card.tsx`: sección «Modelo», al elegir selector ocupado
+  mientras se consulta, toast si se guarda, error bajo el selector y vuelta al valor anterior si
+  falla; confirmación de cambio de proveedor con «recomendado»; prueba buena con «Conexión correcta ·
+  el modelo en uso responde»; fuera las dos filas de modelos.
+  *Hecho:* `ai-provider-card.test.tsx` (R15, R20, R26, R29) en verde.
 
-- [ ] **T11. [P] Formulario y página** (dep. T8). `ai-provider-form.tsx` (ayuda con un modelo);
-  datos de `ai-provider-page.test.tsx` sin `recipeModel`.
-  *Hecho:* `ai-provider-form.test.tsx` (R30) y `ai-provider-page.test.tsx` en verde.
+- [ ] **T11. [P] Formulario y página** (dep. T8). `ai-provider-form.tsx`: ayuda sin conexión «Después
+  de conectar podrás elegir el modelo.» (R30) y prueba buena «Conexión correcta · el modelo en uso
+  responde» (R20); datos de `ai-provider-page.test.tsx` sin `recipeModel`.
+  *Hecho:* `ai-provider-form.test.tsx` (R20, R30) y `ai-provider-page.test.tsx` en verde.
 
 - [ ] **T12. Revisión visual** (dep. T10, T11). Escritorio, tablet (≤ 1024 px) y teléfono (390 px)
   contra los tableros; claro y oscuro.
@@ -85,12 +106,14 @@
 ## Bloque E — E2E y cierre
 
 - [ ] **T13. E2E** (dep. T10). `e2e/integraciones-proveedor-ia.spec.ts`: ajustar el caso que lee
-  `recipeModel`/`catalogModel` y añadir el de elegir modelo (`design.md > 13`).
+  `recipeModel`/`catalogModel`, el texto de la prueba buena (`testOk`) y la ayuda sin conexión, y
+  añadir el de elegir modelo con Gemini (`design.md > 13`).
   *Hecho:* `pnpm exec playwright test e2e/integraciones-proveedor-ia.spec.ts` en verde.
 
-- [ ] **T14. Trazabilidad y gate** (dep. todo). Mapa `R<n> -> test` (R1–R31) en
-  `progress/impl_QT-291.md`; `./init.sh` en verde.
-  *Hecho:* ningún `R<n>` sin test.
+- [ ] **T14. Trazabilidad y gate** (dep. todo). Mapa `R<n> -> test` (R1–R34) en
+  `progress/impl_QT-291.md`; ids de T0 que sigan «pendiente (sin key)» listados para el humano;
+  `./init.sh` en verde.
+  *Hecho:* ningún `R<n>` sin test; ningún id pendiente sin aceptación escrita del humano.
 
 ## Archivos esperados
 
@@ -127,6 +150,7 @@
 - `app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx`
 - `tests/guards/guard-empresa-en-esquema.test.ts`
 - `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/integration/aislamiento.json`
 - `tests/integration/integraciones/ai-models-migration.int.test.ts`
 - `tests/integration/integraciones/ai-provider-migration.int.test.ts`
 - `tests/integration/integraciones/ai-provider-connection-prisma.int.test.ts`

@@ -29,13 +29,20 @@
 > «Probar conexión» prueba el modelo en uso · **D9** diseño · **D10** `integraciones.modificar` ·
 > **D11** identificadores de DB en inglés. **[A]** = sale del bloque de Alcance.
 >
+> **Enmienda F1.4 (2026-10-22).** Las filas «(F1.4)» de la tabla se citan como **E1** modelos
+> sembrados · **E2** recomendado · **E3** se borran `recipe_model`/`catalog_model` · **E4** modelo no
+> disponible al leer · **E5** textos de «Probar conexión» · **E6** ayuda sin conexión · **E7** E2E ·
+> **E8** probar al elegir. Cambian R2, R3, R4, R9, R15, R20, R23, R26, R27, R29, R30; se añaden
+> R32–R34. E7 no es un comportamiento: lo cumple el E2E de R26, R27 y R29 (`design.md > 13`).
+>
 > Vocabulario (además del de `specs/QC-275-proveedor-ia-propio/requirements.md`, que sigue vigente
 > salvo donde un requisito de aquí lo sustituye, citado como «sustituye QC-275 R<n>»):
 >
 > - «el catálogo de modelos» = las filas de la tabla global de modelos: proveedor, identificador del
 >   modelo, si es el predeterminado de su proveedor y su orden.
 > - «el predeterminado» = el modelo del catálogo marcado como predeterminado del proveedor de la
->   conexión, leído en el momento en que se usa.
+>   conexión, leído en el momento en que se usa. En la pantalla se rotula «Recomendado» (E2); en la
+  base y en el código sigue siendo el predeterminado (`is_default`).
 > - «la elección» = el modelo que la empresa eligió, guardado en su conexión; vacía si no eligió o
 >   si eligió el predeterminado.
 > - «el modelo en uso» = la elección si no está vacía; si lo está, el predeterminado.
@@ -51,14 +58,18 @@ fila pertenece a un proveedor de `ai_providers`, lleva un identificador de model
 dentro de su proveedor y un orden; con RLS activada y forzada, columnas con nombre en inglés y una
 migración con su `down.sql` que la revierte. [D2, D5, D11]
 
-**R2.** La migración DEBE sembrar en el catálogo de modelos exactamente la lista aprobada en
-`design.md > 3`, y solo modelos que aceptan PDF e imágenes como entrada según la fuente citada allí. [D3, D5]
+**R2.** La migración DEBE sembrar en el catálogo de modelos exactamente los veinte modelos de
+`design.md > 3`, cinco por cada proveedor de `ai_providers`, con el orden de cada proveedor del 1 al 5
+según la calidad que fija esa tabla, y solo modelos que aceptan PDF e imágenes como entrada según la
+fuente citada allí. [D3, D5, E1]
 
-**R3.** El sistema DEBE tener exactamente un predeterminado por cada proveedor de `ai_providers`, y
-la base DEBE rechazar un segundo predeterminado del mismo proveedor. [D4]
+**R3.** El sistema DEBE tener exactamente un predeterminado por cada proveedor de `ai_providers`
+—`claude-haiku-5-5` (Claude), `gemini-3.8-flash` (Gemini), `gpt-6-luna` (OpenAI) y
+`anthropic/claude-haiku-5.5` (OpenRouter)—, y la base DEBE rechazar un segundo predeterminado del
+mismo proveedor. [D4, E2]
 
 **R4.** `ai_providers` NO DEBE guardar modelos por uso (receta, catálogo): tras la migración, el
-modelo de un proveedor DEBE salir solo del catálogo de modelos. [D4]
+modelo de un proveedor DEBE salir solo del catálogo de modelos. [D4, E3]
 
 **R5.** El sistema NO DEBE llamar a ningún proveedor para listar sus modelos: las opciones salen solo
 del catálogo de modelos. [D2]
@@ -76,8 +87,8 @@ el sistema DEBE rechazarlo con `unauthorized` antes de validar la entrada, sin l
 conexión. [D10]
 
 **R9.** CUANDO un actor con `integraciones.modificar` elige un modelo del catálogo del proveedor
-conectado de su empresa, el sistema DEBE guardarlo como la elección sin llamar al proveedor; SI el
-modelo elegido es el predeterminado, ENTONCES DEBE dejar la elección vacía. [D4, D10]
+conectado de su empresa y la consulta de R32 sale bien, el sistema DEBE guardarlo como la elección;
+SI el modelo elegido es el predeterminado, ENTONCES DEBE dejar la elección vacía. [D4, D10, E8]
 
 **R10.** SI el modelo pedido no es del catálogo del proveedor conectado (de otro proveedor,
 inexistente, vacío o el modelo marcado), ENTONCES el sistema DEBE rechazar con `invalid_input` sin
@@ -93,6 +104,21 @@ ENTONCES elegir un modelo NO DEBE cambiar su estado ni su error. [D7]
 
 **R13.** Ninguna respuesta de la elección DEBE incluir la key ni su valor cifrado (QC-275 R8). [D10]
 
+**R32.** CUANDO un actor con `integraciones.modificar` elige un modelo que pasa R10 y R11, el sistema
+DEBE, antes de escribir nada, consultar al proveedor conectado con la key guardada la existencia de
+**solo** ese modelo sin generar texto, con la misma prueba de QC-275 R10 (sin reintentos, plazo de
+10 s); también si el modelo elegido es el predeterminado. [D8, E8]
+
+**R33.** SI la consulta de R32 falla —key rechazada, sin cuota o saldo, modelo no disponible, sin
+respuesta o error inesperado (los tipos de `specs/QC-275-proveedor-ia-propio/design.md > 7.3`)—,
+ENTONCES el sistema NO DEBE escribir nada en la conexión (ni la elección, ni el estado, ni
+`lastError`, `lastErrorAt`, `lastCheckedAt` ni el modelo marcado) y DEBE devolver el mensaje de la
+prueba de ese tipo (QC-275 R11; con modelo no disponible, el de R20). [D7, E8]
+
+**R34.** SI la key guardada no se puede descifrar al elegir un modelo, ENTONCES el sistema NO DEBE
+llamar al proveedor, NO DEBE guardar la elección y DEBE responder `integration_secret_unreadable`.
+[E8]
+
 ### Cambiar de proveedor
 
 **R14.** CUANDO se guarda la conexión con un proveedor distinto del que tenía, el sistema DEBE vaciar
@@ -101,8 +127,9 @@ conservar la elección. [D6]
 
 **R15.** CUANDO el Administrador pulsa «Cambiar key o proveedor» y la elección no está vacía, la
 pantalla DEBE pedir confirmación con el título «¿Cambiar de proveedor?» y el texto de
-`design.md > 11`; «Continuar» abre el formulario y «Cancelar» no cambia nada. SI la elección está
-vacía, ENTONCES DEBE abrir el formulario sin confirmación. [D6, D9]
+`design.md > 11` (que nombra el modelo recomendado del nuevo proveedor); «Continuar» abre el
+formulario y «Cancelar» no cambia nada. SI la elección está vacía, ENTONCES DEBE abrir el formulario
+sin confirmación. [D6, D9, E2]
 
 ### El modelo en uso
 
@@ -124,9 +151,12 @@ QC-275 R10 y R14. [D8]
 modelo que quedará en uso al guardar: la elección actual si el proveedor escrito es el conectado y
 la elección no está vacía; si no, el predeterminado del proveedor escrito. [D6, D8]
 
-**R20.** SI una prueba falla porque el modelo consultado no está disponible, ENTONCES el mensaje de
-la prueba DEBE ser «Error con tu proveedor: el modelo <modelo> ya no está disponible.» (sustituye ese
-texto de QC-275 R11). [D8, D9]
+**R20.** SI una prueba (de la conexión guardada, de una key escrita o la de R32) falla porque el
+modelo consultado no está disponible, ENTONCES el mensaje de la prueba DEBE ser «Error con tu
+proveedor: el modelo <modelo> ya no está disponible.» (sustituye ese texto de QC-275 R11); CUANDO
+«Probar conexión» (de la conexión guardada o de una key escrita) sale bien, la pantalla DEBE mostrar
+«Conexión correcta · el modelo en uso responde», sin el tiempo de respuesta (sustituye el texto de
+QC-275 R12). [D8, D9, E5]
 
 **R21.** SI la prueba de la conexión guardada falla porque el modelo en uso no está disponible,
 ENTONCES el sistema DEBE dejar la conexión en `ERROR`, con ese modelo como modelo marcado,
@@ -143,7 +173,7 @@ disponible, ENTONCES el sistema DEBE terminar el archivo en error con `ai_provid
 reintento de la cola; DEBE dejar la conexión en `ERROR` con ese modelo como modelo marcado,
 `lastError` = el aviso de modelo no disponible de `design.md > 4.4` y `lastErrorAt` = el instante
 del fallo; y NO DEBE repetir la lectura con el predeterminado ni con ningún otro modelo. Sustituye
-QC-275 R26 para este fallo. [D7]
+QC-275 R26 para este fallo; aplica también si el modelo en uso es el predeterminado. [D7, E4]
 
 **R24.** CUANDO la lectura de un archivo termina bien y la conexión estaba en `ERROR`, el sistema
 DEBE, además de lo de QC-275 R27, vaciar el modelo marcado. [D7]
@@ -156,25 +186,27 @@ PDF y DEBE intentar su lectura con el modelo en uso, sin cambiarlo (QC-275 R28).
 **R26.** MIENTRAS la empresa tiene conexión, la tarjeta DEBE mostrar la sección «Modelo» con el texto
 «Se usa para leer fórmulas y catálogos en PDF. Solo aparecen modelos de <proveedor> que leen PDF e
 imágenes.» y **un solo** selector «Modelo de <proveedor>» cuyas opciones son los modelos del catálogo
-del proveedor conectado, en su orden, con «predeterminado» junto al predeterminado y una marca en el
+del proveedor conectado, en su orden, con «recomendado» junto al predeterminado y una marca en el
 modelo en uso; NO DEBE mostrar modelos de otro proveedor ni las filas «Receta (fórmula desde PDF)» y
-«Catálogo desde PDF». [D1, D3, D4, D9]
+«Catálogo desde PDF», y NO DEBE rotular ningún modelo como «predeterminado». [D1, D3, D4, D9, E2]
 
 **R27.** MIENTRAS la elección está vacía, el selector DEBE mostrar el predeterminado con la insignia
-«Predeterminado» y la ayuda «Se usa el modelo predeterminado de <proveedor>.»; MIENTRAS la elección
-no está vacía y no es el modelo marcado, DEBE mostrarla con la ayuda «Elegido por tu empresa.». [D4, D9]
+«Recomendado» y la ayuda «Se usa el modelo recomendado de <proveedor>.»; MIENTRAS la elección
+no está vacía y no es el modelo marcado, DEBE mostrarla con la ayuda «Elegido por tu empresa.». [D4, D9, E2]
 
 **R28.** MIENTRAS el modelo en uso es el modelo marcado, el selector DEBE mostrarlo tachado con la
 insignia «No disponible», marcado como inválido y con la ayuda «Este modelo ya no está disponible.
 Elige otro para volver a leer PDF.», y ese modelo NO DEBE aparecer entre las opciones. [D7, D9]
 
-**R29.** CUANDO el Administrador elige una opción, la pantalla DEBE guardarla sin otro botón y, si se
-guarda, mostrar el aviso emergente «Modelo guardado»; SI falla, ENTONCES DEBE mostrar el texto del
-error del catálogo y volver a mostrar el valor anterior. [D9]
+**R29.** CUANDO el Administrador elige una opción, la pantalla DEBE enviarla sin otro botón y,
+MIENTRAS se consulta el modelo (R32), DEBE mostrar el selector ocupado y no admitir otra elección; si
+se guarda, DEBE mostrar el aviso emergente «Modelo guardado»; SI falla (R33, R34 o un error del
+catálogo), ENTONCES DEBE mostrar bajo el selector el texto del error y volver a mostrar el valor
+anterior. [D9, E8]
 
-**R30.** MIENTRAS la empresa no tiene conexión, la ayuda del formulario DEBE nombrar el predeterminado
-del proveedor seleccionado con el texto «Se usa con el modelo <modelo>.» (sustituye la mención de los
-dos modelos de QC-275 R30). [D4, D9]
+**R30.** MIENTRAS la empresa no tiene conexión, la ayuda del formulario DEBE ser «Después de conectar
+podrás elegir el modelo.», sin nombrar ningún modelo (sustituye la mención de los dos modelos de
+QC-275 R30). [D4, D9, E6]
 
 **R31.** El selector DEBE cumplir la regla multiplataforma (letra ≥ 16 px, objetivos táctiles
 ≥ 44 × 44 px, nada que dependa solo de `:hover`) y la disposición de los tableros aprobados: a 640 px
@@ -183,23 +215,20 @@ o menos, disparador a todo el ancho con 48 px de alto y la lista en una hoja inf
 
 ## Preguntas abiertas
 
-- Lista inicial de modelos que siembra el catálogo, por proveedor, y cuál es el predeterminado: la
-  propone `spec_author` en el `design.md` (con su fuente y fecha, como QC-275) y la aprueba el
-  humano en F1.4. Hoy `ai_providers` tiene dos modelos por proveedor (`recipe_model`,
-  `catalog_model`) que no siempre coinciden (Gemini); el spec propone cómo queda un solo
-  predeterminado.
-  **Propuesta (spec_author, 2026-10-22):** `design.md > 3`. Se siembran solo los cinco ids ya
-  confirmados en el T0 de QC-275 (2026-10-13); predeterminado de Gemini `gemini-3.8-flash`; las
-  columnas `recipe_model`/`catalog_model` se borran. Con esa lista Claude, OpenAI y OpenRouter
-  tienen **una sola opción**: si el humano quiere más, da los ids en F1.4 y se confirman en T0.
-- ¿Hace falta E2E? No es flujo crítico de `docs/checkpoints-proyecto.md`; lo decide el spec con motivo.
-  **Propuesta:** sí, mínimo; `design.md > 13`.
-- **(spec_author)** Un 404 de modelo al leer pasa a marcar la conexión (R23), cuando QC-275 lo dejaba
-  en `ai_unavailable` reintentable. Aplica también si el modelo en uso es el predeterminado
-  (`design.md > 7`). ¿De acuerdo?
-- **(spec_author)** El tablero escribe «Conexión correcta · el modelo en uso responde» y «Falló el … ·
-  modelo no disponible (404)», pero su ficha dice que la prueba de la tarjeta no cambia. El spec
-  conserva los textos de QC-275 salvo el del modelo no disponible (R20). ¿De acuerdo?
+> Las ocho de F1.4 están cerradas (filas «(F1.4)» de la tabla). Quedan las que trajo la enmienda;
+> mientras no se respondan, el spec aplica la propuesta escrita.
+
+- **(spec_author, enmienda)** Al elegir un modelo, si la consulta falla por key rechazada o sin
+  cuota, o la key guardada no se puede descifrar, ¿la conexión pasa también a `ERROR` (como «Probar
+  conexión», QC-275 R9 y R14) o solo se avisa? **Propuesta:** solo se avisa y no se escribe nada
+  (R33, R34): la fila E8 dice «no se guarda y se avisa», y «Probar conexión» sigue siendo quien marca.
+- **(spec_author, enmienda)** Si la conexión está en `ERROR` por key o cuota y la consulta al elegir
+  sale bien, ¿vuelve a `ACTIVE`? **Propuesta:** no; R12 no cambia (solo se limpia el error del modelo
+  marcado). La consulta prueba un modelo, no hace las veces de «Probar conexión».
+- **(spec_author, enmienda)** T0 confirma los ids nativos de Claude, Gemini y OpenAI contra la API;
+  sin key quedan pendientes. ¿Un id pendiente bloquea el merge o basta con la fuente de OpenRouter?
+  **Propuesta:** no bloquea la implementación (el seed se escribe con la lista aprobada), pero T14 no
+  cierra con ids pendientes sin que el humano lo acepte por escrito.
 
 ## Decisiones cerradas (no reabrir)
 
