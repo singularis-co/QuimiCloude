@@ -12,7 +12,7 @@
 
 ## Tanda 1 — base (sin dependencias entre sí)
 
-- [ ] **T1 [P] Permiso `whatsapp.consultar`** (R1–R3, D1).
+- [x] **T1 [P] Permiso `whatsapp.consultar`** (R1–R3, D1).
   - Migración de datos `20261024120000_whatsapp_read_permission` (`migration.sql` + `down.sql`),
     copia de la de QC-240 (design §2.2).
   - `permissions.ts`: entrada y `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]`.
