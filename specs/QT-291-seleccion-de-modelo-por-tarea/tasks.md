@@ -87,19 +87,19 @@
 
 ## Bloque D — pantalla (frontend_dev)
 
-- [ ] **T9. `AiModelSelect`** (dep. T8). `components/ai-model-select.tsx` según `design.md > 12.1` y
+- [x] **T9. `AiModelSelect`** (dep. T8). `components/ai-model-select.tsx` según `design.md > 12.1` y
   los tres tableros, con los textos de `design.md > 11` («Recomendado»/«recomendado», nunca
   «predeterminado» en pantalla) y el estado ocupado (`pending`). Verificar si `SharedSelectControl`
   ya trae flecha que gira, entrada `.pop` y disparador deshabilitado.
   *Hecho:* `ai-model-select.test.tsx` (R26–R28, R31, ocupado) en verde.
 
-- [ ] **T10. Tarjeta** (dep. T9). `ai-provider-card.tsx`: sección «Modelo», al elegir selector ocupado
+- [x] **T10. Tarjeta** (dep. T9). `ai-provider-card.tsx`: sección «Modelo», al elegir selector ocupado
   mientras se consulta, toast si se guarda, error bajo el selector y vuelta al valor anterior si
   falla; confirmación de cambio de proveedor con «recomendado»; prueba buena con «Conexión correcta ·
   el modelo en uso responde»; fuera las dos filas de modelos.
   *Hecho:* `ai-provider-card.test.tsx` (R15, R20, R26, R29) en verde.
 
-- [ ] **T11. [P] Formulario y página** (dep. T8). `ai-provider-form.tsx`: ayuda sin conexión «Después
+- [x] **T11. [P] Formulario y página** (dep. T8). `ai-provider-form.tsx`: ayuda sin conexión «Después
   de conectar podrás elegir el modelo.» (R30) y prueba buena «Conexión correcta · el modelo en uso
   responde» (R20); datos de `ai-provider-page.test.tsx` sin `recipeModel`.
   *Hecho:* `ai-provider-form.test.tsx` (R20, R30) y `ai-provider-page.test.tsx` en verde.

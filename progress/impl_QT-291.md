@@ -413,3 +413,122 @@ spec no lo nombra para `rejected`. Se usa `ai_provider_error` («Error con tu pr
   - Ajeno: `app/layout.tsx` (1, `LayoutProps`).
 
 **Veredicto:** T6, T7 y T8 hechas y en verde; el rojo que queda es de T10/T11, T13 y `app/layout.tsx`.
+
+## T9. `AiModelSelect` (2026-10-22, frontend_dev)
+
+**Regla de decisión.** `SharedSelectControl` (paso 1-2) no traía disparador deshabilitado, `aria-busy`, la
+lista debajo del disparador con entrada de opacidad y escala, ni contenido propio de las opciones. Se
+**extiende** con cinco props opcionales (`disabled`, `busy`, `alignItemWithTrigger`, `renderOption`,
+`optionClassName`); sin ellas no cambia nada para sus dos consumidores (`SelectField`,
+`packing-finish-dialog`). Su fila en `CATALOGO.md` las anota. La flecha que gira 180° no se añade al
+primitivo (cambiaría todos los selects): va en las clases del disparador con `data-popup-open`, que Base UI
+ya pone. La entrada `.pop` del tablero es la animación que `SelectContent` ya trae (`fade-in-0 zoom-in-95`),
+apagada por `alignItemWithTrigger`; con `false` se ve.
+
+`AiModelSelect` (paso 3) compone `SharedSelectControl`, `StatusBadge`, `Spinner`, `ErrorAlert`, `Sheet` y
+`useIsMobile(641)` con el patrón de hoja de `CountrySelect`. Disparador de teléfono con `role="combobox"`,
+`aria-haspopup="dialog"`, `aria-controls` a la lista; ocupado: deshabilitado, `aria-busy` y spinner, y la
+hoja no se abre. Error bajo el selector con `ErrorAlert` (catálogo o mensaje de la consulta), enlazado por
+`aria-describedby`.
+
+**Archivos**
+- Nuevo: `app/(private)/integraciones/proveedor-ia/components/ai-model-select.tsx`
+- Modificados: `app/(private)/integraciones/proveedor-ia/components/index.ts` (barrel),
+  `components/shared/shared-select.tsx`, `components/shared/CATALOGO.md` (fila de `SharedSelect`).
+- Nuevo test: `tests/unit/integraciones-ui/ai-model-select.test.tsx` (11 casos).
+
+**R → test** (`ai-model-select.test.tsx`)
+- R26: «QT-291 R26: un solo selector «Modelo de <proveedor>» con las opciones del catálogo en su orden…».
+- R27: «QT-291 R27: sin elección muestra el recomendado con «Recomendado»…» y «…con elección… «Elegido por
+  tu empresa.»». Ambos afirman que no aparece «predeterminado».
+- R28: «QT-291 R28: el modelo no disponible se muestra tachado, con «No disponible», inválido…».
+- R29 (lado del selector): «elegir otra opción notifica su id, sin otro botón», «ocupado, el disparador
+  está deshabilitado, con aria-busy y spinner, y no abre la lista», los dos de error bajo el selector.
+- R31: «en escritorio, disparador de 44 px con letra de 16 px, opciones de 44 px y lista debajo con flecha
+  que gira», «a 390 px el disparador ocupa el ancho con 48 px y la lista se abre en una hoja inferior…»,
+  «a 390 px, ocupado no abre la hoja».
+
+## T10. Tarjeta (2026-10-22, frontend_dev)
+
+- Fuera las filas «Receta (fórmula desde PDF)» y «Catálogo desde PDF» y sus dos testids.
+- Sección «Modelo» (título, subtítulo de `design.md > 11`, `AiModelSelect`) entre el aviso de error y
+  «Última prueba», en el orden del tablero: el aviso sube por encima de la sección.
+- Elegir: `useActionState(selectAiModelAction)` + `useOptimistic(modelInUse)` en la misma transición. Mientras
+  dura, el selector está ocupado con el elegido; `saved` ⇒ `toast.success('Modelo guardado')`; `error` ⇒
+  texto bajo el selector y, al acabar la transición, el valor del servidor; `not_connected` ⇒
+  `router.refresh()`. El aviso y el estado de la tarjeta no cambian por un fallo de la consulta.
+- «Cambiar key o proveedor»: con `modelIsDefault` abre el formulario como antes; sin él, `ConfirmDialog`
+  «¿Cambiar de proveedor?» con el texto de `design.md > 11` («recomendado»), «Cancelar» / «Continuar».
+- Prueba buena: «Conexión correcta · el modelo en uso responde» (sin `elapsedMs`).
+
+**Archivos**: `app/(private)/integraciones/proveedor-ia/components/ai-provider-card.tsx`,
+`tests/unit/integraciones-ui/ai-provider-card.test.tsx` (datos con `models`/`defaultModel` y la vista
+nueva; viewport fijado con `tests/helpers/viewport` porque el selector usa `useIsMobile`).
+
+**R → test** (`ai-provider-card.test.tsx`)
+- R15: «QT-291 R15: con elección, «Cambiar key o proveedor» pide confirmación con «recomendado»; «Cancelar»
+  no cambia nada», «QT-291 R15: con elección, «Continuar» abre el formulario…», «QT-291 R15, R32: sin
+  elección, … muestra el formulario sin confirmación…».
+- R20: «QT-291 R20: «Probar conexión» prueba la guardada y muestra «Conexión correcta · el modelo en uso
+  responde», sin tiempo».
+- R26: «QT-291 R26: la sección «Modelo» va entre el aviso de error y «Última prueba»… sin las filas de receta
+  y catálogo», «QT-291 R26: las opciones son solo las del proveedor conectado, en su orden».
+- R27/R28 (integrados en la tarjeta): «QT-291 R27: sin elección, «Recomendado»…», «QT-291 R28: con el modelo
+  en uso marcado…».
+- R29: «…elegir envía el modelo sin otro botón; mientras se consulta, el selector está ocupado…; si se
+  guarda, «Modelo guardado»», «…si la consulta falla, el mensaje va bajo el selector, vuelve el valor
+  anterior y la tarjeta no cambia», «…un error del catálogo (key ilegible)…», «…si ya no hay conexion al
+  elegir, refresca la pantalla sin aviso».
+
+## T11. Formulario y página (2026-10-22, frontend_dev)
+
+- `ai-provider-form.tsx`: la ayuda deja de leer `recipeModel`/`catalogModel` y termina en «Después de
+  conectar podrás elegir el modelo.»; `aiProviderTestOkMessage` desaparece y la prueba buena es
+  `AI_PROVIDER_FORM_TEXTS.testOk` («Conexión correcta · el modelo en uso responde»), también la de la
+  tarjeta (comparten `AiProviderFeedbackMessage`).
+- Decisión anotada: el formulario no sabe si hay conexión; la misma ayuda sale también al abrirlo desde
+  «Cambiar key o proveedor». R30 no dice nada de ese caso y la frase sigue siendo cierta.
+- `ai-provider-page.test.tsx`: datos sin `recipeModel`; el caso R31 mira la sección «Modelo»; el caso R8
+  excluye del «input vacío» el input oculto del select de Base UI (lleva el modelo en uso, no la key) y
+  afirma que su valor es un modelo del catálogo.
+
+**Archivos**: `app/(private)/integraciones/proveedor-ia/components/ai-provider-form.tsx`,
+`tests/unit/integraciones-ui/ai-provider-form.test.tsx`, `tests/unit/integraciones-ui/ai-provider-page.test.tsx`.
+
+**R → test**
+- R20 (key escrita): `ai-provider-form.test.tsx` «R34, QT-291 R20: la prueba buena de la key escrita muestra
+  «Conexión correcta · el modelo en uso responde», sin tiempo…».
+- R30: `ai-provider-form.test.tsx` «R30, QT-291 R30: la ayuda enlaza la consola del elegido y dice «Después de
+  conectar podrás elegir el modelo.» sin nombrar modelos…».
+- R26 en la página: `ai-provider-page.test.tsx` «R31, QT-291 R26: con conexion pinta la tarjeta… y la
+  sección «Modelo»…».
+
+## T12. Revisión visual (2026-10-22, frontend_dev) — PENDIENTE
+
+**No hecha.** Se preparó una base aislada (`qct_qt291selecci_2c6b3448_mvkc8lr1_vfs`, copia de la plantilla
+de la rama `qct_tpl_a9127c0147c3`, con los añadidos de la empresa del seed prendidos) y un `next dev
+--port 3119` con los dobles de integraciones, pero el servidor cayó con `ENOSPC: no space left on device`
+al escribir su caché: **el disco C: está al 100 % (0-16 MB libres)**. Sin capturas: no se inventan. La base
+se borró y el servidor se detuvo; `progress/capturas/QT-291/` no se creó.
+
+Para retomarla (con espacio en disco): base desde la plantilla, `next dev` con `DATABASE_URL` de esa base,
+`INTEGRATIONS_E2E_DOUBLES=1` y `INTEGRATIONS_ENCRYPTION_KEYS`/`_ACTIVE`; conectar Gemini por la pantalla,
+elegir `gemini-4-argon` por la pantalla (toast) y fijar los tres estados por SQL (`model_id` nulo; elegido;
+`model_id` = `unavailable_model` = `gemini-3.7-flash` con `status = 'ERROR'` y su `last_error`); capturar
+1440×1000, 820×1180 y 390×844 en claro y oscuro, más el selector abierto en cada ancho.
+
+## Verificación de la tanda T9 + T10 + T11 (2026-10-22, frontend_dev)
+
+- `pnpm run typecheck`: 3 errores, todos en `e2e/integraciones-proveedor-ia.spec.ts` (T13). El de
+  `app/layout.tsx` (`LayoutProps`) no salió en esta corrida (los tipos de rutas de `.next` se regeneraron
+  al arrancar `next dev`).
+- `pnpm exec eslint` de los 9 archivos tocados: «No issues found».
+- `pnpm exec vitest related --run --maxWorkers=4 <9 archivos>`: 189 archivos, 3487 pass, 1 skip, 0 casos en
+  rojo; 2 archivos (`paridad/error-alert-paridad.test.tsx`, `pedidos-ui/packaging-select.test.tsx`) cayeron al
+  cargar por `ENOSPC` (disco lleno). Re-ejecutados con `tests/unit/integraciones-ui/`: 12 archivos, 166 pass.
+  (La primera corrida con los workers por defecto murió sin salida; con 4 terminó.)
+- `pnpm exec vitest run guard`: 87 archivos; un rojo mío en `guard-catalogo-de-componentes` (la celda
+  `Diseño` admite solo un valor) → la cita del tablero pasó a `Puntos de extensión`; re-ejecutada: 59 pass.
+  El resto, 1275 pass, 22 skipped.
+
+**Veredicto:** T9, T10 y T11 hechas y en verde; T12 pendiente por disco lleno; queda T13 (E2E).

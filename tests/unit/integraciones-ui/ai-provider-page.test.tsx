@@ -11,8 +11,8 @@ import { isValidElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  AI_PROVIDER_CARD_CATALOG_MODEL_TESTID,
-  AI_PROVIDER_CARD_RECIPE_MODEL_TESTID,
+  AI_MODEL_SELECT_TRIGGER_TESTID,
+  AI_PROVIDER_CARD_MODEL_SECTION_TESTID,
   AI_PROVIDER_CARD_STATUS_TESTID,
   AI_PROVIDER_CARD_TESTID,
   AI_PROVIDER_FORM_SAVE_TESTID,
@@ -24,10 +24,12 @@ import {
 import AiProviderIntegrationPage from '@/app/(private)/integraciones/proveedor-ia/page';
 import { errorMessage } from '@/lib/modules/errores';
 import type { SessionUser } from '@/lib/modules/identity';
-import type { AiProviderConnectionView, AiProviderEntry } from '@/lib/modules/integraciones';
+import type { AiProviderCode, AiProviderConnectionView, AiProviderEntry } from '@/lib/modules/integraciones';
 import type { AiProviderConnectionQueryResult } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 import { AI_PROVIDER_INTEGRATION_LABEL } from '@/lib/shared/navigation/private-nav';
 import { AI_PROVIDER_INTEGRATION_ROUTE, LOGIN_ROUTE_SESSION_ENDED } from '@/lib/shared/routes';
+
+import { resetViewport, setViewportWidth } from '../../helpers/viewport';
 
 const { getSessionUserMock, getConnectionMock, notFoundMock, redirectMock } = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
@@ -58,6 +60,7 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
     testSavedAiProviderAction: vi.fn(noDebeInvocarse('testSavedAiProviderAction')),
     saveAiProviderConnectionAction: vi.fn(noDebeInvocarse('saveAiProviderConnectionAction')),
     disconnectAiProviderAction: vi.fn(noDebeInvocarse('disconnectAiProviderAction')),
+    selectAiModelAction: vi.fn(noDebeInvocarse('selectAiModelAction')),
     getAiProviderReadinessAction: vi.fn(noDebeInvocarse('getAiProviderReadinessAction')),
   };
 });
@@ -65,16 +68,23 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 const PERMISO = 'integraciones.modificar';
 const RAIZ = join(__dirname, '..', '..', '..');
 
+function proveedor(code: AiProviderCode, name: string, recomendado: string, otro: string): AiProviderEntry {
+  return {
+    code,
+    name,
+    models: [
+      { modelId: otro, isDefault: false },
+      { modelId: recomendado, isDefault: true },
+    ],
+    defaultModel: recomendado,
+  };
+}
+
 const PROVEEDORES: AiProviderEntry[] = [
-  { code: 'ANTHROPIC', name: 'Claude', recipeModel: 'claude-haiku-5-5', catalogModel: 'claude-haiku-5-5' },
-  { code: 'GOOGLE', name: 'Gemini', recipeModel: 'gemini-3.8-flash', catalogModel: 'gemini-3.5-flash-lite' },
-  { code: 'OPENAI', name: 'OpenAI', recipeModel: 'gpt-6-luna', catalogModel: 'gpt-6-luna' },
-  {
-    code: 'OPENROUTER',
-    name: 'OpenRouter',
-    recipeModel: 'anthropic/claude-haiku-5.5',
-    catalogModel: 'anthropic/claude-haiku-5.5',
-  },
+  proveedor('ANTHROPIC', 'Claude', 'claude-haiku-5-5', 'claude-sonnet-5-5'),
+  proveedor('GOOGLE', 'Gemini', 'gemini-3.8-flash', 'gemini-4-argon'),
+  proveedor('OPENAI', 'OpenAI', 'gpt-6-luna', 'gpt-6-sol'),
+  proveedor('OPENROUTER', 'OpenRouter', 'anthropic/claude-haiku-5.5', 'openai/gpt-6-luna'),
 ];
 
 const INTRO =
@@ -94,8 +104,10 @@ function vista(overrides: Partial<AiProviderConnectionView> = {}): AiProviderCon
   return {
     provider: 'GOOGLE',
     providerName: 'Gemini',
-    recipeModel: 'gemini-3.8-flash',
-    catalogModel: 'gemini-3.5-flash-lite',
+    modelInUse: 'gemini-3.8-flash',
+    modelIsDefault: true,
+    modelUnavailable: false,
+    modelOptions: PROVEEDORES[1]?.models ?? [],
     status: 'ACTIVE',
     lastError: null,
     lastErrorAt: null,
@@ -160,10 +172,12 @@ beforeEach(() => {
   });
   getSessionUserMock.mockResolvedValue(sesionCon([PERMISO]));
   getConnectionMock.mockResolvedValue({ status: 'success', providers: PROVEEDORES, connection: null });
+  setViewportWidth(1280);
 });
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('AiProviderIntegrationPage', () => {
@@ -223,7 +237,7 @@ describe('AiProviderIntegrationPage', () => {
     expect(screen.queryByTestId(AI_PROVIDER_CARD_TESTID)).toBeNull();
   });
 
-  it('R31: con conexion pinta la tarjeta con el proveedor, su estado y sus modelos, sin formulario', async () => {
+  it('R31, QT-291 R26: con conexion pinta la tarjeta con el proveedor, su estado y la sección «Modelo» con el modelo en uso, sin formulario', async () => {
     getConnectionMock.mockResolvedValue({
       status: 'success',
       providers: PROVEEDORES,
@@ -235,10 +249,8 @@ describe('AiProviderIntegrationPage', () => {
     const tarjeta = screen.getByTestId(AI_PROVIDER_CARD_TESTID);
     expect(within(tarjeta).getByRole('heading', { level: 2 }).textContent).toBe('Gemini');
     expect(within(tarjeta).getByTestId(AI_PROVIDER_CARD_STATUS_TESTID).textContent).toBe('Conectado');
-    expect(within(tarjeta).getByTestId(AI_PROVIDER_CARD_RECIPE_MODEL_TESTID).textContent).toBe('gemini-3.8-flash');
-    expect(within(tarjeta).getByTestId(AI_PROVIDER_CARD_CATALOG_MODEL_TESTID).textContent).toBe(
-      'gemini-3.5-flash-lite',
-    );
+    const seccion = within(tarjeta).getByTestId(AI_PROVIDER_CARD_MODEL_SECTION_TESTID);
+    expect(within(seccion).getByTestId(AI_MODEL_SELECT_TRIGGER_TESTID).textContent).toContain('gemini-3.8-flash');
     expect(screen.queryByTestId(AI_PROVIDER_FORM_TESTID)).toBeNull();
     expect(screen.queryByTestId(AI_PROVIDER_KEY_FIELD_TESTID)).toBeNull();
   });
@@ -273,8 +285,15 @@ describe('AiProviderIntegrationPage', () => {
 
     const { container } = render(arbol);
     expect(container.innerHTML).not.toMatch(/apiKeyEnc|api_key_enc/);
+    // El input oculto del selector de modelo lleva el modelo en uso, no la key.
+    const seccionModelo = `[data-testid="${AI_PROVIDER_CARD_MODEL_SECTION_TESTID}"]`;
     for (const campo of container.querySelectorAll('input')) {
+      if (campo.closest(seccionModelo) !== null) continue;
       if (campo.type !== 'hidden' && campo.type !== 'radio') expect(campo.value).toBe('');
+    }
+    const modelos = PROVEEDORES.flatMap((p) => p.models.map((m) => m.modelId));
+    for (const campo of container.querySelectorAll(`${seccionModelo} input`)) {
+      expect(modelos).toContain((campo as HTMLInputElement).value);
     }
     expect(fuenteDeLaPagina()).not.toMatch(/apiKey/);
   });
