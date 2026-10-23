@@ -101,7 +101,7 @@ hasta que el backend la guarde (R58).
   `e2e/integraciones-whatsapp.spec.ts` a la pestaña habilitada.
   **Hecho:** `pnpm exec playwright test e2e/integraciones-whatsapp-plantillas.spec.ts
   e2e/integraciones-whatsapp.spec.ts` en verde.
-- [ ] **T14 Cierre** (T13). Prueba de R37 sobre los textos exportados de diálogos y paneles (ninguno
+- [x] **T14 Cierre** (T13). Prueba de R37 sobre los textos exportados de diálogos y paneles (ninguno
   contiene «Meta» ni «QuimiCloude»); revisión de R60 (44 px, 16 px, nada solo con puntero) en los
   componentes nuevos; R62: el diff no toca `lib/modules/`, `db/`, `lib/composition/` ni
   `package.json`; mapa `R<n> → test` completo en `progress/impl_QC-243.md`; `./init.sh` en verde.

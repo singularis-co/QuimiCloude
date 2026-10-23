@@ -1,90 +1,155 @@
-# QC-243 — bitácora de implementación
+# QC-243 — bitácora de implementación (plantillas-whatsapp-frontend)
 
-## Tanda 1 · T1 y T2 (frontend_dev)
+Implementer, 2026-10-22. Worktree `.worktrees/QC-243-plantillas-whatsapp-frontend`, rama
+`feature/QC-243-plantillas-whatsapp-frontend`. Todo delegado en `frontend_dev`: la feature es solo
+frontend y consume las Server Actions de QC-242 sin cambios. Decisiones del humano: P1 traducción
+en el front, P2 sin descripción (R58), P3 relacionar solo local, y P4–P7 con su default.
 
-### Archivos creados
-- `app/(private)/integraciones/whatsapp/components/whatsapp-system-constants.ts` — las tres constantes y la traducción de claves (P1): `toBackendText`, `toDisplayText`, `toBackendKey`, `displayKeyOf`, `constantLabelsForBackend`.
-- `app/(private)/integraciones/whatsapp/components/whatsapp-template-rules.ts` — `dictionaryOf`, `labelOfKey`, `isMappable`, `isUnmapped`, `notCompatibleReasonOf` (P5), `slotMarkOf`, `numberedContentOf`, `metaLengthOf`, `statusBadgeOf`, `usageBadgeOf`, `categoryLabelOf`, `formatSyncDateTime`, `LANGUAGE_OPTIONS`, `draftFromView`, `TEMPLATE_RULES_TEXTS`.
-- `app/(private)/integraciones/whatsapp/components/whatsapp-variable-rules.ts` — `keyFromLabel`, `keyProblemOf`, `valueFormatWarning`, `VARIABLE_RULES_TEXTS`.
-- `tests/unit/integraciones-ui/whatsapp-template-rules.test.ts`
-- `tests/unit/integraciones-ui/whatsapp-variable-rules.test.ts`
+## Commits (sin push: lo hace el leader)
 
-No se tocó `index.ts` (solo exporta lo que usa `page.tsx`), ni `lib/`, `db/`, `package.json`.
+| Commit | Tasks |
+|---|---|
+| `1518e3be` | T1, T2, T3: reglas puras, constantes (P1) y `WaBubble` |
+| `663a59c8` | T4: pestañas y carga en paralelo |
+| `fc5dcf83` | T5, T6, T7, T11: sincronización, listado, interruptor, eliminar y pestaña Variables |
+| `557c7b21` | T8, T9 y el sheet de T10: alta, duplicar, relacionar (autónomo); `whatsapp-page.test.tsx` pasa a `setupUser` |
+| `55a79ca7` | T12 y el enganche de T10; `FormSheet.showCloseButton`; WhatsApp como 13.ª consumidora de `DataTable` |
+| `a3d9cfe5` | T13: E2E |
+| `0e39b330` | T14: Popover del motivo (respaldo de design.md §8), prueba de R37 y corrección de R60 |
 
-### Mapa R → test
+## Archivos
+
+Creados, en `app/(private)/integraciones/whatsapp/components/`:
+- `whatsapp-system-constants.ts`
+- `whatsapp-template-rules.ts`
+- `whatsapp-variable-rules.ts`
+- `wa-bubble.tsx`
+- `whatsapp-templates-panel.tsx`
+- `whatsapp-template-sync-bar.tsx`
+- `whatsapp-template-table.tsx`
+- `whatsapp-template-status.tsx`
+- `whatsapp-template-usage.tsx`
+- `whatsapp-template-delete-dialog.tsx`
+- `whatsapp-template-form-sheet.tsx`
+- `whatsapp-template-variable-menu.tsx`
+- `whatsapp-template-relate-sheet.tsx`
+- `whatsapp-variables-panel.tsx`
+- `whatsapp-variable-form-sheet.tsx`
+
+Modificados en la app:
+- `app/(private)/integraciones/whatsapp/page.tsx`
+- `components/whatsapp-integration-tabs.tsx`
+- `components/shared/form-sheet.tsx`: prop opcional `showCloseButton`, paso 2 de la regla de decisión. Los usos actuales no cambian. Da una X «Cerrar» de 44 px en lugar de la X «Close» `icon-sm`.
+- `components/shared/CATALOGO.md`: fila de `FormSheet`.
+
+Tests nuevos, en `tests/unit/integraciones-ui/`:
+- `whatsapp-template-rules.test.ts`
+- `whatsapp-variable-rules.test.ts`
+- `wa-bubble.test.tsx`
+- `whatsapp-templates-panel.test.tsx`
+- `whatsapp-template-form-sheet.test.tsx`
+- `whatsapp-template-relate-sheet.test.tsx`
+- `whatsapp-variables-panel.test.tsx`
+- `whatsapp-variable-form-sheet.test.tsx`
+- `whatsapp-textos.test.ts`
+
+Tests modificados:
+- `tests/unit/integraciones-ui/whatsapp-page.test.tsx`
+- `tests/unit/shared/data-table-alcance.test.ts`: la pantalla de WhatsApp entra como 13.ª consumidora autorizada, con nota que cita la fila «Listado de plantillas» de design.md.
+- `tests/guards/guard-identificador-de-request.test.ts`: alta del spec nuevo en `E2E_ESPERADOS`.
+
+E2E:
+- `e2e/integraciones-whatsapp-plantillas.spec.ts`: nuevo.
+- `e2e/integraciones-whatsapp.spec.ts`: solo cambia la aserción de la pestaña.
+
+Sin cambios en `lib/`, `db/`, `package.json` ni el lockfile. Ninguna dependencia nueva.
+
+## Mapa R → test
+
+Rutas: `U/` es `tests/unit/integraciones-ui/`, `E2E-P` es `e2e/integraciones-whatsapp-plantillas.spec.ts` y `E2E-W` es `e2e/integraciones-whatsapp.spec.ts`.
+
 | R | Test |
 |---|---|
-| R7 | `whatsapp-template-rules.test.ts` › fecha de sincronización (marca de vacío; zona fija) |
-| R10 | › estado y categoría › «R10: cada categoría con su nombre» |
-| R11 | › estado y categoría › «R11: cada estado con su texto y su tono» |
-| R15 | › relacionable (contenido vacío, variable con nombre, `{{n}}`, clave relacionada, URL) |
-| R24 | › idiomas (códigos y nombres) |
-| R26 | › contador (`{{nombre_del_cliente}}` cuenta 5; repetida; puntos de código) |
-| R32 (diccionario) | › diccionario de pantalla |
-| R40 | › duplicar (`_v2`, huecos `{{n}}`, sin header ni botones, `AUTHENTICATION` → `UTILITY`, no compatible) |
-| R42 (marcas y texto numerado) | › huecos |
-| R48 | › constantes del sistema › «R48: …» |
-| P1 | › constantes del sistema (ida y vuelta; clave con punto desconocida intacta; `constantLabels`) |
-| R51 | `whatsapp-variable-rules.test.ts` › keyFromLabel |
-| R52 | › keyProblemOf (vacía, repetida con propia, igual a constante) |
-| R57 | › valueFormatWarning |
+| R1–R6 | `U/whatsapp-page.test.tsx`: casos «QC-243 R1» … «QC-243 R6». Para R4 siguen verdes los casos de QC-237. R2 también en E2E-W |
+| R7 | `U/whatsapp-template-rules.test.ts` (fecha con zona fija, `null` → marca) y `U/whatsapp-templates-panel.test.tsx` «R7: …» |
+| R8, R9 | `U/whatsapp-templates-panel.test.tsx` «R8: …» y «R9: …» |
+| R10, R11 | `U/whatsapp-templates-panel.test.tsx` y `U/whatsapp-template-rules.test.ts` (tonos y textos) |
+| R12 | `U/whatsapp-templates-panel.test.tsx` «R12: con 760 px o menos, tarjeta…» |
+| R13 | `U/whatsapp-templates-panel.test.tsx`, tres casos: nombre accesible y globo al enfocar; motivo como texto en la tarjeta; Popover al pulsar y con Enter. En E2E-P, caso de teléfono: step «R13» (texto en la tarjeta) y step «R13, R60» (tablet horizontal táctil, `tap()` sobre el «!» abre el Popover) |
+| R14 | `U/whatsapp-templates-panel.test.tsx` «R14: …» (interruptor, «Sin relacionar», «No compatible»; «Relacionar» abre el panel de relación) |
+| R15 | `U/whatsapp-template-rules.test.ts` «R15: …» (contenido vacío, variable con nombre, `{{n}}`, clave relacionada) |
+| R16 | `U/whatsapp-templates-panel.test.tsx` «R16: …»: llamada, aviso, y vuelta atrás si hay error |
+| R17–R20 | `U/whatsapp-templates-panel.test.tsx` «R17: …» … «R20: …» |
+| R21–R27, R29–R31, R33–R36 | `U/whatsapp-template-form-sheet.test.tsx` «R<n>: …». R34: forma exacta del borrador, con `header: null`, `buttons: []`, claves con punto (P1) y `constantLabels`. R27 y R34 también en E2E-P, step «R27, R34» |
+| R28 | `U/whatsapp-template-form-sheet.test.tsx` «R28: …»: el borrador se conserva y la variable nueva está en el menú |
+| R32 | `U/wa-bubble.test.tsx` «R32: …» y `U/whatsapp-template-rules.test.ts` (`dictionaryOf`) |
+| R37 | `U/whatsapp-textos.test.ts`: recorre todos los `*_TEXTS` de diálogos y paneles de alta, relación y variable. También en los casos R37 de form-sheet, relate-sheet, variable-form-sheet y variables-panel |
+| R38 | `U/whatsapp-template-form-sheet.test.tsx` y `U/whatsapp-template-relate-sheet.test.tsx` (< 768 px con pestañas), y E2E-P step «R38» (390 × 844, WebKit y Chromium) |
+| R39 | `U/wa-bubble.test.tsx` «R39: …»: clase de animación y `motion-reduce` |
+| R40 | `U/whatsapp-template-rules.test.ts` (`draftFromView`) y `U/whatsapp-template-form-sheet.test.tsx` «R40: …» |
+| R41 | `U/whatsapp-templates-panel.test.tsx` «R41: …» |
+| R42–R45 | `U/whatsapp-template-relate-sheet.test.tsx` «R42: …» … «R45: …». R44 también en `U/wa-bubble.test.tsx` |
+| R46 | `U/whatsapp-template-relate-sheet.test.tsx` «R46: …» (pares con clave con punto, éxito y error) y `U/whatsapp-templates-panel.test.tsx` «R46: …» (enganche, fila con interruptor y fundido) |
+| R47–R49, R59 | `U/whatsapp-variables-panel.test.tsx` «R47: …», «R48: …», «R49: …» (sin columna Descripción, por P2) y «R59: …» |
+| R50–R58 | `U/whatsapp-variable-form-sheet.test.tsx` «R50: …» … «R58: …». R51, R52 y R57 también en `U/whatsapp-variable-rules.test.ts`. R50, R51 y R54 también en E2E-P, step «R50, R54» |
+| R60 | `U/whatsapp-template-form-sheet.test.tsx`, `U/whatsapp-variable-form-sheet.test.tsx` y `U/whatsapp-variables-panel.test.tsx` «R60: …» (44 px y 16 px), y E2E-P (44 × 44 del «!»). La revisión control por control está abajo |
+| R61 | E2E-P, step «R61»: crear → «Pendiente» → POST firmado al webhook con APPROVED → «Aprobada» |
+| R62 | Comprobación del diff: `git diff --name-only $(git merge-base HEAD origin/dev)...HEAD`, filtrado por `^(lib/modules/\|db/\|lib/composition/\|package.json\|pnpm-lock)`, no devuelve nada (grep rc=1) |
 
-### Verificación
-El worktree no tiene `node_modules` propio (`pnpm exec vitest` → «Command "vitest" not found»); se corrió con los binarios de la raíz (mismo `package.json`/`pnpm-lock.yaml` que la rama de la raíz).
-- `vitest related --run <5 archivos>` → `Test Files 2 passed (2) · Tests 40 passed (40)`.
-- `tsc --noEmit` → 0 errores en los archivos de esta tanda; 1545 errores ajenos del entorno (cliente de Prisma sin generar: `TS2305 '@prisma/client' has no exported member 'Prisma'`, tipos de Next sin generar: `LayoutProps`).
-- `eslint <5 archivos>` → sin hallazgos (exit 0).
+### Revisión de R60
 
-Veredicto: T1 y T2 hechas, 40/40 en verde; typecheck y lint limpios en lo tocado.
+Cada control interactivo nuevo usa `touch`, `touchTarget` o `min-h-11`, y los campos de texto miden `text-base` (16 px).
 
-## T3 — WaBubble (frontend_dev)
+- **Corregido en T14:** «Nueva variable» medía 36 px desde 768 px.
+- **Interruptor de uso:** lleva `md:min-h-11`, porque el `Switch` del catálogo baja a 36 px en escritorio.
+- **Puntero:** no hay `group-hover`, `opacity-0` ni `onMouseEnter`. El motivo del rechazo ya no depende del puntero: se puede leer en el nombre accesible, como texto en la tarjeta o en el Popover.
 
-Archivos creados:
-- `app/(private)/integraciones/whatsapp/components/wa-bubble.tsx`
-- `tests/unit/integraciones-ui/wa-bubble.test.tsx`
+## Salida real de la verificación (cierre, sobre HEAD `0e39b330`)
 
-No se añade al barrel `index.ts`: `page.tsx` no la usa (design §7); la importan los sheets de la ruta.
+```
+pnpm run typecheck                        -> tsc --noEmit, rc=0
+pnpm run lint                             -> 10 problems (0 errors, 10 warnings), ninguno en archivos de QC-243
+pnpm exec vitest related --run <diff .ts/.tsx sin e2e>
+                                          -> Test Files 226 passed (226) · Tests 3952 passed | 3 skipped
+pnpm exec vitest run guard                -> Test Files 87 passed (87) · Tests 1276 passed | 22 skipped
+pnpm exec playwright test e2e/integraciones-whatsapp-plantillas.spec.ts e2e/integraciones-whatsapp.spec.ts --workers=1
+                                          -> 8 passed (1.3m): chromium 4/4, webkit 4/4
+```
 
-| R | Test (`wa-bubble.test.tsx`) |
-|---|---|
-| R32 | propia → valor; constante → etiqueta; desconocida → `[clave]`; `{{n}}` sin resolver → `[n]`; vacío → «Escribe el mensaje para verlo aquí.»; encabezado, pie, hora y botones; nombre accesible |
-| R44 | hueco sin elegir → «[n sin relacionar]»; encabezado con su propia relación |
-| R39 | clases `animate-in fade-in slide-in-from-bottom-1 duration-240 motion-reduce:animate-none` en variables y botones; las variables ya pintadas no se vuelven a montar |
+`vitest related` arrastra 226 archivos porque el diff toca `components/shared/form-sheet.tsx`.
 
-Salida:
-- `pnpm exec vitest related --run wa-bubble.tsx wa-bubble.test.tsx` → Test Files 1 passed, Tests 11 passed
-- `pnpm run typecheck` → `tsc --noEmit` sin errores (tras `pnpm install --frozen-lockfile`, `prisma generate` y `next typegen`: el worktree no tenía `node_modules`)
-- `pnpm run lint` → 0 errors, 10 warnings (ninguno en estos archivos)
-- `pnpm exec vitest run guard-movimiento guard-anillo` → 2 passed, 19 tests
+## `./init.sh` no queda verde, y no es por esta feature
 
-Veredicto: T3 hecha; WaBubble recibe el diccionario por props, sin acoplarse a T1.
+`./init.sh` (modo rápido) **no llega a los tests**: se para en el validador de `feature_list.json`.
+Lee `../../feature_list.json`, la copia local sin versionar del checkout principal, y ahí encuentra:
+- fichas de otro board: QT-290, QT-291, QT-292;
+- ids duplicados: 290, 291, 292;
+- features en vuelo sin assignee: QC-162, QC-166, QC-262, QC-263, QC-264, QT-291.
 
-## T4 — pestañas y página
+Es estado del board o de la última importación (F0), que corresponde al leader. Por eso corrí a mano
+las mismas fases que cubre el gate rápido; su salida está en el bloque de arriba.
 
-Archivos:
-- `app/(private)/integraciones/whatsapp/components/whatsapp-integration-tabs.tsx` (modificado): lista de pestañas `TabSpec[]` (valor, texto, testid, `disabled`, `describedBy`, `refreshOnEnter`, panel); QC-248 añade la suya como una entrada más.
-- `app/(private)/integraciones/whatsapp/page.tsx` (modificado): conexión → plantillas (solo con conexión) en paralelo con el diccionario.
-- `app/(private)/integraciones/whatsapp/components/whatsapp-templates-panel.tsx` (nuevo, esqueleto para T5).
-- `app/(private)/integraciones/whatsapp/components/whatsapp-variables-panel.tsx` (nuevo, esqueleto para T11).
-- `tests/unit/integraciones-ui/whatsapp-page.test.tsx` (modificado).
-- `e2e/integraciones-whatsapp.spec.ts` (modificado, solo la aserción de la pestaña: `WHATSAPP_TABS_TEXTS.comingSoon` desaparece y el typecheck lo exige). No ejecutado.
+## Supuestos y cosas para el reviewer
 
-Los paneles no van al barrel: `page.tsx` no los usa.
+1. **T11:** la pestaña Variables usa `Table` del catálogo y no `DataTable`, aunque la fila «Pestaña Variables» de design.md dice `DataTable`. `DataTable` siempre pinta paginación y barra de filtros, y el tablero no trae ninguna de las dos. La lista de propias pasa a tarjetas por debajo de `md`.
+2. **`FormSheet.showCloseButton`:** extensión de una pieza compartida (paso 2), con su fila del catálogo. Quitarla devuelve la X «Close» de `SheetContent`, que mide menos de 44 px.
+3. **R13, el Popover complementa al Tooltip:** el Tooltip sigue abriéndose con puntero y foco, y el Popover se abre al tocar, con clic o con teclado. Lo prevé design.md §8 para el caso confirmado en el E2E: el globo no se abre al tocar (WebKit y Chromium táctiles).
+4. **Textos que no fija ni el spec ni el tablero.** Siguen el patrón del repo:
+   - títulos del `ErrorState` de las pestañas: «No se pudo cargar la lista de plantillas.» y «… de variables.»;
+   - vacío de propias: «Todavía no hay variables propias.»;
+   - hora fija «09:41» en la burbuja, la del tablero;
+   - avisos «Falta relacionar el hueco Encabezado {{1}}.» para los huecos que no son del cuerpo.
+5. **R37, alcance literal:** diálogos de confirmación y paneles de alta, relación y variable. La barra de sincronización, la tabla («Estado en Meta») y la intro de la pestaña Variables nombran a Meta porque lo pide el tablero, y quedan fuera del test.
+6. **Alta:**
+   - un pie vacío se envía como `footer: null`;
+   - `constantLabels` solo lleva las constantes usadas (R34), así que queda `{}` si no se usa ninguna;
+   - si el envío falla, el diálogo se cierra y el error sale arriba del panel, con el borrador intacto (R36).
+7. **Variable:** el valor se envía sin recortar, y «cambia» compara el texto exacto (R56 y R57).
+8. **Fila recién relacionada:** el fundido se aplica a las celdas de nombre, estado y uso, porque `DataTable` no admite clases por fila.
+9. **Si falla la consulta de la conexión,** Plantillas queda deshabilitada con la pista de R2. El spec no cubre ese caso.
 
-| R | Test (`whatsapp-page.test.tsx`) |
-|---|---|
-| R1 | `QC-243 R1`: una sola tablist, orden Conexión/Plantillas/Variables, Conexión activa |
-| R2 | `QC-243 R2`: Plantillas deshabilitada con `aria-describedby` → «Conecta tu número primero para ver Plantillas.», Variables habilitada, sin llamada a plantillas |
-| R3 | `QC-243 R3`: con conexión habilitada, sin pista, panel con el listado cargado |
-| R4 | `QC-243 R4, R36` y `QC-243 R4, R37` + los casos de QC-237 sin cambios (R35 44 px ahora con tres pestañas) |
-| R5 | `QC-243 R5`: refresh al entrar en Plantillas y Variables; no en Conexión |
-| R6 | `QC-243 R6` ×3: error de plantillas, error del diccionario, error de la conexión |
+## Entorno
 
-Salida:
-- `pnpm exec vitest related --run <page, tabs, 2 paneles, test>` → Test Files 5 passed, Tests 67 passed
-- `pnpm run typecheck` → `tsc --noEmit` sin errores
-- `pnpm run lint` → 0 errors, 10 warnings (ninguno en archivos tocados)
-
-Supuestos a validar: títulos de `ErrorState` «No se pudo cargar la lista de plantillas.» / «… de variables.» (no están en el spec ni en el tablero; siguen el patrón del repo). Si falla la consulta de la conexión, Plantillas queda deshabilitada con la pista de R2.
-
-Veredicto: T4 hecha; tres pestañas con refresco y error por pestaña, paneles listos para T5 y T11.
+- **Dependencias del worktree:** no traía `node_modules`. Se instalaron con `pnpm install --frozen-lockfile`, más `prisma generate` y `next typegen`; ni `package.json` ni el lockfile cambiaron.
+- **`.env` del E2E:** el worktree no tiene `.env`. Los E2E se corrieron cargando `../../.env` solo en la shell, sin copiar archivos.
+- **Disco:** C: está casi lleno (0–190 MB libres). Con varios workers de Playwright los navegadores se caían, así que los E2E se corrieron con `--workers=1`.
