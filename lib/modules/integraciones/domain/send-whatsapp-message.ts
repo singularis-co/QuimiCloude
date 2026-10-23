@@ -28,6 +28,7 @@ import type { SecretCipher } from '../ports/secret-cipher';
 import type { WhatsappConnectionRepository } from '../ports/whatsapp-connection-repository';
 import type { GraphOutboundMessage, WhatsappGraphClient } from '../ports/whatsapp-graph-client';
 import type { WhatsappOutboxRepository } from '../ports/whatsapp-outbox-repository';
+import type { WhatsappSendLog } from '../ports/whatsapp-send-log';
 import type { WhatsappTemplateRepository } from '../ports/whatsapp-template-repository';
 import type { WhatsappVariableKeyRepository } from '../ports/whatsapp-variable-key-repository';
 
@@ -38,13 +39,13 @@ export type SendWhatsappMessageDeps = WhatsappSendRecipientDeps & {
   readonly templates: Pick<WhatsappTemplateRepository, 'findLiveById' | 'findLiveByNameAndLanguage'>;
   readonly variableKeys: Pick<WhatsappVariableKeyRepository, 'listAll'>;
   readonly graph: Pick<WhatsappGraphClient, 'sendMessage'>;
+  readonly sendLog: WhatsappSendLog;
   readonly now?: () => Date;
 };
 
-/** `diagnostic` es para el log del borde: nunca lleva el texto de Meta, el mensaje ni el número. */
+/** El diagnóstico de un fallo de Meta no viaja aquí: va al puerto de log (`design.md > 7`). */
 export type WhatsappSendOutcome = {
   readonly message: WhatsappOutboundMessageView;
-  readonly diagnostic: string | null;
 };
 
 export type SendContent =
@@ -124,7 +125,6 @@ type DeliveryResult = {
   readonly status: 'SENT' | 'FAILED';
   readonly errorCode: string | null;
   readonly errorReason: string | null;
-  readonly diagnostic: string | null;
 };
 
 /**
@@ -152,14 +152,15 @@ export async function deliver(
   let result: DeliveryResult;
   if (sent.ok) {
     await deps.outbox.markSent(inserted.id, sent.wamid, ctx.scope);
-    result = { status: 'SENT', errorCode: null, errorReason: null, diagnostic: null };
+    result = { status: 'SENT', errorCode: null, errorReason: null };
   } else {
     const failure = sendFailureOf(sent);
     await deps.outbox.markFailed(inserted.id, failure.errorCode, failure.errorReason, ctx.scope);
     if (failure.effect === 'token_invalid') {
       await deps.connections.update(connection.id, { status: 'ERROR', lastError: TOKEN_INVALID_MESSAGE }, ctx.scope);
     }
-    result = { status: 'FAILED', ...failure, diagnostic: diagnosticOf(sent) };
+    result = { status: 'FAILED', errorCode: failure.errorCode, errorReason: failure.errorReason };
+    deps.sendLog.sendFailed({ messageId: inserted.id, diagnostic: diagnosticOf(sent) });
   }
 
   await deps.outbox.touchContact(contact.id, ctx.at, ctx.scope);
@@ -175,7 +176,6 @@ export async function deliver(
       errorReason: result.errorReason,
       createdAt: inserted.createdAt.toISOString(),
     },
-    diagnostic: result.diagnostic,
   };
 }
 

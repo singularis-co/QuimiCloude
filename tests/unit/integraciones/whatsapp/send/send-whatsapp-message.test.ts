@@ -39,6 +39,7 @@ import {
   makeGraph,
   makeOutbox,
   makeRepository,
+  makeSendLog,
   makeTemplateRepository,
   makeVariableKeyRepository,
   outboxContact,
@@ -91,6 +92,7 @@ function setup(options: SetupOptions = {}) {
   const keyDouble = makeVariableKeyRepository(options.variableKeys ?? [ACCOUNT_KEY])
   const phones = makeCustomerPhoneLinks({ mainPhone: options.mainPhone, alive: options.alive })
   const graphDouble = makeGraph()
+  const logDouble = makeSendLog()
   if (options.sent !== undefined) {
     const sent = options.sent
     graphDouble.sendMessage.mockImplementation(async () => sent)
@@ -103,6 +105,7 @@ function setup(options: SetupOptions = {}) {
     templates: templateDouble.templates,
     variableKeys: keyDouble.variableKeys,
     graph: graphDouble.graph,
+    sendLog: logDouble.sendLog,
     now: () => NOW,
   }
   const portSpies = [
@@ -135,6 +138,7 @@ function setup(options: SetupOptions = {}) {
     keys: keyDouble,
     phones,
     graph: graphDouble,
+    log: logDouble,
     portSpies,
   }
 }
@@ -573,14 +577,20 @@ describe('sendWhatsappMessage — el mensaje y la llamada a Meta', () => {
     expect(result.message).toMatchObject({ errorCode: '131026', errorReason: rejectedWithCodeReason(131026) })
     expect(JSON.stringify(result)).not.toContain('Recipient')
     expect(JSON.stringify(s.outbox.message(result.message.id))).not.toContain('Recipient')
-    expect(result.diagnostic).toBe('Graph enviar mensaje: rejected; code=131026; subcode=7')
+    expect(s.log.sendFailed).toHaveBeenCalledWith({
+      messageId: result.message.id,
+      diagnostic: 'Graph enviar mensaje: rejected; code=131026; subcode=7',
+    })
   })
 
   it('R36: la falta de respuesta deja errorCode nulo y el texto de «No se pudo contactar con Meta»', async () => {
     const s = setup({ sent: { ok: false, kind: 'unreachable', message: null } })
     const result = await s.send(textTo(), sender())
     expect(result.message).toMatchObject({ status: 'FAILED', errorCode: null, errorReason: UNREACHABLE_REASON })
-    expect(result.diagnostic).toBe('Graph enviar mensaje: unreachable; code=-; subcode=-')
+    expect(s.log.sendFailed).toHaveBeenCalledWith({
+      messageId: result.message.id,
+      diagnostic: 'Graph enviar mensaje: unreachable; code=-; subcode=-',
+    })
   })
 
   it('R37: devuelve el mensaje resultante como resultado correcto, SENT o FAILED', async () => {
@@ -598,13 +608,40 @@ describe('sendWhatsappMessage — el mensaje y la llamada a Meta', () => {
         errorReason: null,
         createdAt: NOW.toISOString(),
       },
-      diagnostic: null,
     })
 
     const failed = setup({ sent: { ok: false, kind: 'rejected', message: null, code: 131047 } })
     await expect(failed.send(textTo(), sender())).resolves.toMatchObject({
       message: { type: 'TEXT', status: 'FAILED', errorCode: '131047', errorReason: WINDOW_CLOSED_REASON },
     })
+  })
+
+  it('R46: un fallo de Meta entrega al puerto de log el id del mensaje y el diagnostico, sin texto de Meta, texto, valores, numero ni token', async () => {
+    const text = 'Hola, su pedido salio hoy'
+    const metaText = 'Recipient 573001234567 said: Hola, su pedido salio hoy'
+    const s = setup({ sent: { ok: false, kind: 'rejected', message: metaText, code: 131026, subcode: 7 } })
+    const result = await s.send(textTo({ contactId: CONTACT_ID }, text), sender())
+
+    expect(s.log.sendFailed).toHaveBeenCalledTimes(1)
+    expect(s.log.sendFailed).toHaveBeenCalledWith({
+      messageId: result.message.id,
+      diagnostic: 'Graph enviar mensaje: rejected; code=131026; subcode=7',
+    })
+    const logged = JSON.stringify(s.log.sendFailed.mock.calls)
+    for (const leak of ['Recipient', text, outboxContact().waId, ACCESS_TOKEN]) expect(logged).not.toContain(leak)
+    expect(result).not.toHaveProperty('diagnostic')
+
+    const template = setup({ sent: { ok: false, kind: 'rejected', message: metaText, code: 131026, subcode: 7 } })
+    await template.send(templateTo(), sender())
+    const loggedTemplate = JSON.stringify(template.log.sendFailed.mock.calls)
+    for (const leak of ['Ana', '123-456', outboxContact().waId, ACCESS_TOKEN]) expect(loggedTemplate).not.toContain(leak)
+  })
+
+  it('R46: un envio correcto no llama al puerto de log', async () => {
+    const s = setup()
+    await s.send(textTo(), sender())
+    await s.send(templateTo(), sender())
+    expect(s.log.sendFailed).not.toHaveBeenCalled()
   })
 
   it('R37: un rechazo previo se devuelve como error del catalogo y no como resultado', async () => {

@@ -2867,6 +2867,7 @@ import {
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-variable-key-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
 import { createWhatsappOutboxRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-outbox-prisma';
+import { createWhatsappSendLogConsole } from '@/lib/modules/integraciones/adapters/driven/observability/whatsapp-send-log-console';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
 import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch';
@@ -2879,6 +2880,7 @@ import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/por
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
 import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository';
+import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log';
 import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
@@ -2987,6 +2989,7 @@ const whatsappOutboxRepository: WhatsappOutboxRepository = createWhatsappOutboxR
 const whatsappSendCustomerPhones: CustomerPhoneLinks = createCustomerPhoneLinks({
   phones: createCustomerPhoneRepository(),
 });
+const whatsappSendLog: WhatsappSendLog = createWhatsappSendLogConsole();
 
 const whatsappSendDeps = {
   connections: whatsappConnectionRepository,
@@ -2996,6 +2999,7 @@ const whatsappSendDeps = {
   templates: whatsappTemplateRepository,
   variableKeys: whatsappVariableKeyRepository,
   graph: whatsappGraphClient,
+  sendLog: whatsappSendLog,
 };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };

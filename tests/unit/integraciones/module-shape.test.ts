@@ -140,6 +140,8 @@ const MODULE_CODE_FILES = [
   'adapters/driven/config/whatsapp-config-env.ts',
   'adapters/driven/graph/whatsapp-graph-client-canned.ts',
   'adapters/driven/graph/whatsapp-graph-client-fetch.ts',
+  // QC-240 T9: el aviso de un fallo de Meta (R46, `design.md > 7`).
+  'adapters/driven/observability/whatsapp-send-log-console.ts',
   'adapters/driven/persistence/ai-provider-connection-prisma.ts',
   'adapters/driven/persistence/company-scope.ts',
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
@@ -249,6 +251,7 @@ const MODULE_CODE_FILES = [
   'ports/whatsapp-graph-client.ts',
   'ports/whatsapp-inbox-repository.ts',
   'ports/whatsapp-outbox-repository.ts',
+  'ports/whatsapp-send-log.ts',
   'ports/whatsapp-template-repository.ts',
   'ports/whatsapp-variable-key-repository.ts',
   'ports/whatsapp-webhook-directory.ts',
@@ -779,6 +782,7 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.integrationsSwitch).toBe('IntegrationsSwitch')
     expect(cableado?.typeOf.whatsappOutboxRepository).toBe('WhatsappOutboxRepository')
     expect(cableado?.typeOf.whatsappSendCustomerPhones).toBe('CustomerPhoneLinks')
+    expect(cableado?.typeOf.whatsappSendLog).toBe('WhatsappSendLog')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {

@@ -83,8 +83,6 @@ const FAILED_VIEW: WhatsappOutboundMessageView = {
   errorReason: 'Meta no acepto el mensaje (codigo 131000). Intenta de nuevo o revisa la conexion.',
 }
 
-const DIAGNOSTIC = 'Graph enviar mensaje: rejected; code=131000; subcode=-'
-
 const SEND_INPUT = { kind: 'text', recipient: { contactId: CONTACT_ID }, text: SECRET_TEXT }
 const TEMPLATE_INPUT = {
   kind: 'template',
@@ -123,8 +121,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(SESSION_USER)
   getSessionContextMock.mockResolvedValue({ companyId: COMPANY_ID })
-  sendMock.mockResolvedValue({ message: VIEW, diagnostic: null })
-  retryMock.mockResolvedValue({ message: VIEW, diagnostic: null })
+  sendMock.mockResolvedValue({ message: VIEW })
+  retryMock.mockResolvedValue({ message: VIEW })
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
   infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -246,7 +244,7 @@ describe('R37: el mensaje escrito es un resultado correcto, tambien si Meta lo r
 
   it('R37: un mensaje FAILED por Meta sale como success con su errorCode y errorReason, no como error', async () => {
     for (const [name, action] of Object.entries(ACTIONS)) {
-      USE_CASE_OF[name as keyof typeof ACTIONS].mockResolvedValueOnce({ message: FAILED_VIEW, diagnostic: DIAGNOSTIC })
+      USE_CASE_OF[name as keyof typeof ACTIONS].mockResolvedValueOnce({ message: FAILED_VIEW })
       const result = await action()
       expect(result, name).toEqual({ status: 'success', data: FAILED_VIEW })
     }
@@ -255,7 +253,7 @@ describe('R37: el mensaje escrito es un resultado correcto, tambien si Meta lo r
   it('R37: si el caso de uso devolviera claves de mas, no salen de la accion', async () => {
     const leaky = { ...VIEW, waId: SECRET_WA_ID, accessToken: ACCESS_TOKEN, payload: { x: SECRET_VALUE } }
     for (const [name, action] of Object.entries(ACTIONS)) {
-      USE_CASE_OF[name as keyof typeof ACTIONS].mockResolvedValueOnce({ message: leaky, diagnostic: null })
+      USE_CASE_OF[name as keyof typeof ACTIONS].mockResolvedValueOnce({ message: leaky })
       const result = await action()
       expect(result, name).toEqual({ status: 'success', data: VIEW })
       expect(JSON.stringify(result)).not.toContain(SECRET_WA_ID)
@@ -307,11 +305,25 @@ describe('R24: la constante faltante sale por la rama missing_values', () => {
 })
 
 describe('R46: los logs no llevan el texto, los valores, el numero ni el token', () => {
-  it('R46: un fallo de Meta se avisa con el id del mensaje y el diagnostico, y nada mas', async () => {
-    sendMock.mockResolvedValueOnce({ message: FAILED_VIEW, diagnostic: DIAGNOSTIC })
-    await ACTIONS.send()
-    expect(warnSpy).toHaveBeenCalledTimes(1)
-    expect(warnSpy).toHaveBeenCalledWith('whatsapp_send_failed', { messageId: MESSAGE_ID, diagnostic: DIAGNOSTIC })
+  it('R46: un fallo de Meta no escribe nada desde la accion: lo avisa el caso de uso por su puerto de log', async () => {
+    for (const [name, action] of Object.entries(ACTIONS)) {
+      USE_CASE_OF[name as keyof typeof ACTIONS].mockResolvedValueOnce({ message: FAILED_VIEW })
+      await action()
+    }
+    expect(everythingLogged()).toBe('[]')
+  })
+
+  it('R46: la accion no lee el diagnostico ni escribe en la consola', () => {
+    const source = readFileSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        '..', '..', '..', '..', '..',
+        'lib', 'modules', 'integraciones', 'adapters', 'driving', 'whatsapp-message-actions.ts',
+      ),
+      'utf8',
+    )
+    expect(source).not.toMatch(/diagnostic/)
+    expect(source).not.toMatch(/console\./)
   })
 
   it('R46: un envio correcto no escribe nada en el log', async () => {
@@ -321,8 +333,8 @@ describe('R46: los logs no llevan el texto, los valores, el numero ni el token',
 
   it('R46: en exito, fallo de Meta, rechazo previo, faltantes o error ajeno, ningun log lleva texto, valores, numero ni token', async () => {
     const outcomes = [
-      () => sendMock.mockResolvedValueOnce({ message: VIEW, diagnostic: null }),
-      () => sendMock.mockResolvedValueOnce({ message: FAILED_VIEW, diagnostic: DIAGNOSTIC }),
+      () => sendMock.mockResolvedValueOnce({ message: VIEW }),
+      () => sendMock.mockResolvedValueOnce({ message: FAILED_VIEW }),
       () => sendMock.mockRejectedValueOnce(new WhatsappWindowClosedError()),
       () =>
         sendMock.mockRejectedValueOnce(

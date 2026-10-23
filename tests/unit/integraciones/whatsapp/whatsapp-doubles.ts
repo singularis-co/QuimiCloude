@@ -54,6 +54,7 @@ import type {
   WhatsappTemplateRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
 import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository'
+import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log'
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory'
 
@@ -381,6 +382,13 @@ export function makeCustomerPhoneLinks(
   const isCustomerAlive = vi.fn<CustomerPhoneLinks['isCustomerAlive']>(async () => results.alive ?? true)
   const customerPhones: CustomerPhoneLinks = { addWaId, removeWaId, mainPhoneOf, isCustomerAlive }
   return { customerPhones, addWaId, removeWaId, mainPhoneOf, isCustomerAlive }
+}
+
+/** Registro del fallo de un envío: anota cada aviso sin escribir en la consola. */
+export function makeSendLog() {
+  const sendFailed = vi.fn<WhatsappSendLog['sendFailed']>()
+  const sendLog: WhatsappSendLog = { sendFailed }
+  return { sendLog, sendFailed }
 }
 
 /** Unidad de trabajo sin base: corre el trabajo con los puertos dados y cuenta las aperturas. */

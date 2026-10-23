@@ -26,7 +26,7 @@ export type WhatsappSendResult =
   | { status: 'missing_values'; message: string; missing: readonly MissingValue[] }
   | ErrorState;
 
-type SendOutcome = { readonly message: WhatsappOutboundMessageView; readonly diagnostic: string | null };
+type SendOutcome = { readonly message: WhatsappOutboundMessageView };
 
 const toErrorState = createErrorStateTranslator(IntegracionesError, observabilidad.readRequestIdHeader);
 
@@ -49,13 +49,12 @@ function missingValuesMessage(missing: readonly MissingValue[]): string {
   return labels.length === 0 ? `Falta el valor de ${last ?? ''}` : `Falta el valor de ${labels.join(', ')} y ${last}`;
 }
 
-/** El aviso de un fallo de Meta lleva solo el id y el diagnóstico: nunca el texto, los valores ni el número. */
+/** El aviso de un fallo de Meta lo escribe el caso de uso por su puerto de log, no esta acción. */
 async function run(operation: (actor: Actor | null) => Promise<SendOutcome>): Promise<WhatsappSendResult> {
   const actor = await currentActor();
 
   try {
-    const { message, diagnostic } = await operation(actor);
-    if (diagnostic !== null) console.warn('whatsapp_send_failed', { messageId: message.id, diagnostic });
+    const { message } = await operation(actor);
     return {
       status: 'success',
       data: {

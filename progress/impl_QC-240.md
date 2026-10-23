@@ -121,11 +121,24 @@ Tanda 1 verde salvo el contraste de T5 con la documentación de Meta, que queda 
 - `vitest related` sobre `actor.ts`: `Test Files 502 passed (502)` / `Tests 8866 passed | 3 skipped (8869)`.
 - guard: `Test Files 87 passed (87)` / `Tests 1303 passed | 22 skipped (1325)`.
 
-## Tanda 4 (T9) — EN CURSO, BLOQUEADA
+## Tanda 4 (T9) — CERRADA
 
 Código y tests en b04e673e + c23e8705: `adapters/driving/whatsapp-message-actions.ts`, `lib/composition/index.ts` (aditivo: `createWhatsappOutboxRepository()`, `whatsappSendCustomerPhones`, `whatsappSendDeps`, los dos miembros), `lib/modules/integraciones/index.ts`, `lib/modules/clientes/adapters/driven/persistence/customer-phone-prisma.ts` (`createCustomerPhoneRepository(db = prisma)`: la guardia de arquitectura R17 prohíbe a la composición importar el cliente Prisma; desvío de §5.3), tests tensados `module-shape`, `session-once-per-request-actions`, `integraciones-graph-doubles`, `encryption-keys-env`.
 
 Verificación: typecheck 0 errores; eslint limpio; actions `Tests 15 passed (15)`; `tests/unit/integraciones` `Test Files 91 passed (91)` / `Tests 1924 passed | 1 skipped (1925)`; `tests/unit/composition` `Tests 87 passed (87)`; session-once `Tests 110 passed (110)`; **guard `Test Files 1 failed | 86 passed (87)`**: el caso 9 de `guard-catalogo-de-errores` prohíbe a `adapters/driving/**` leer `.diagnostic`, y design §7 pide que la acción haga `console.warn('whatsapp_send_failed', { messageId, diagnostic })`. Contradicción spec ↔ guardia: decide el leader/humano.
+
+**Cierre con el puerto de log (decisión del humano, design §7 enmendado en bb3006df):**
+
+- Nuevos: `lib/modules/integraciones/ports/whatsapp-send-log.ts` (`WhatsappSendLog.sendFailed({ messageId, diagnostic })`), `adapters/driven/observability/whatsapp-send-log-console.ts` (`createWhatsappSendLogConsole(escribir = console.warn)`, escribe `'whatsapp_send_failed', { messageId, diagnostic }`), `tests/unit/integraciones/whatsapp/send/whatsapp-send-log-console.test.ts`.
+- `domain/send-whatsapp-message.ts`: `SendWhatsappMessageDeps.sendLog`; `deliver` llama al puerto en un fallo de Meta; `WhatsappSendOutcome` ya no lleva `diagnostic` (el reintento hereda las dos cosas por `deliver`).
+- `whatsapp-message-actions.ts`: sin `console.warn` ni lectura del diagnóstico; solo traduce.
+- `lib/composition/index.ts` (aditivo): `const whatsappSendLog: WhatsappSendLog = createWhatsappSendLogConsole()` y `sendLog` en `whatsappSendDeps`.
+- Tests: `whatsapp-doubles.ts` `makeSendLog()`; S y Rt con 2 casos R46 cada uno; A: R46 reescritos; `module-shape` con los dos archivos y `typeOf.whatsappSendLog`.
+- markSent/markFailed nulos: sin cambio (decisión del humano).
+
+Verificación real: `pnpm run typecheck` sin errores; eslint de los 11 archivos tocados exit 0; `vitest run tests/unit/integraciones` `Test Files 92 passed (92)` / `Tests 1932 passed | 1 skipped (1933)`; `vitest run tests/unit/composition` `Test Files 8 passed (8)` / `Tests 87 passed (87)`; `vitest run guard` `Test Files 87 passed (87)` / `Tests 1303 passed | 22 skipped (1325)`.
+
+Veredicto: T9 verde; el borde no lee el diagnóstico y el aviso sale por el puerto.
 
 ## Mapa R → test (estado a la tanda 3)
 
@@ -172,5 +185,5 @@ Verificación: typecheck 0 errores; eslint limpio; actions `Tests 15 passed (15)
 | R43 | Ob (4 casos R43) y `guard-ambito-empresa-integraciones.test.ts` «R43 (QC-240) …» |
 | R44, R47 | `whatsapp-outbound-messages-migration.int.test.ts` (8 casos) |
 | R45 | A «R45: enviar pasa la entrada tal cual…», «R45: cada error del catalogo sale como ErrorState…» |
-| R46 | A «R46: …» (3 casos); depende de la decisión sobre §7 |
+| R46 | S y Rt «R46: un fallo de Meta entrega al puerto de log el id del mensaje y el diagnostico, sin texto de Meta, texto, valores, numero ni token», «R46: un envio correcto no llama al puerto de log»; `whatsapp-send-log-console.test.ts` (3 casos R46); A «R46: un fallo de Meta no escribe nada desde la accion…», «R46: la accion no lee el diagnostico ni escribe en la consola», «R46: un envio correcto no escribe nada en el log», «R46: en exito, fallo de Meta, … ningun log lleva texto, valores, numero ni token» |
 | R48 | pendiente: `whatsapp-send-flow.int.test.ts` (T10) |
