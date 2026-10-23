@@ -67,7 +67,9 @@ export const WHATSAPP_VARIABLES_TEXTS = {
   deleteTitle: 'Eliminar la variable',
   deleteDescription: (label: string) => `Se va a eliminar «${label}». Esta acción no se puede deshacer.`,
   deleteBlocked: (label: string, usedBy: number) =>
-    `No se puede eliminar «${label}»: la usan ${usedBy} plantillas. Quítala de esas plantillas primero.`,
+    usedBy === 1
+      ? `No se puede eliminar «${label}»: la usa 1 plantilla. Quítala de esa plantilla primero.`
+      : `No se puede eliminar «${label}»: la usan ${usedBy} plantillas. Quítala de esas plantillas primero.`,
   deleteDismiss: 'Volver',
   deleted: 'Variable eliminada.',
 } as const;

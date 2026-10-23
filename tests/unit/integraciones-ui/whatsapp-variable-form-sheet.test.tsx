@@ -277,6 +277,16 @@ describe('editar variable', () => {
     );
   });
 
+  it('R55: con una sola plantilla, la ayuda del valor va en singular', async () => {
+    const user = setupUser();
+    const unaSola = { ...CUENTA, usedBy: 1 };
+    montar([unaSola]);
+    await abrirEditar(user, unaSola);
+    expect(valor()).toHaveAccessibleDescription(
+      'Lo usa 1 plantilla. El valor nuevo se envía desde el próximo mensaje. Hasta 50 caracteres.',
+    );
+  });
+
   it('R55: sin uso, la ayuda del valor es la de siempre', async () => {
     const user = setupUser();
     montar();
@@ -350,6 +360,21 @@ describe('editar variable', () => {
     await waitFor(() => expect(screen.queryByTestId(WHATSAPP_VARIABLE_CONFIRM_DIALOG_TESTID)).toBeNull());
     expect(updateMock).not.toHaveBeenCalled();
     expect(valor()).toHaveValue('2200345679');
+  });
+
+  it('R56: con una sola plantilla, «Revisa el cambio» lo dice en singular', async () => {
+    const user = setupUser();
+    const unaSola = { ...CUENTA, usedBy: 1 };
+    montar([unaSola]);
+    await abrirEditar(user, unaSola);
+
+    await escribir(user, valor(), '2200345679');
+    await user.click(guardar());
+
+    await screen.findByTestId(WHATSAPP_VARIABLE_CONFIRM_DIALOG_TESTID);
+    expect(screen.getByTestId(WHATSAPP_VARIABLE_CONFIRM_MESSAGE_TESTID)).toHaveTextContent(
+      '«Número de cuenta» se envía en 1 plantilla. Desde el próximo mensaje, los clientes recibirán el valor nuevo.',
+    );
   });
 
   it('R56: «Guardar cambio» guarda con la clave guardada y avisa que el valor nuevo va desde el próximo mensaje', async () => {

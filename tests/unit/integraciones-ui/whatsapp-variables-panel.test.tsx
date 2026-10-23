@@ -230,6 +230,19 @@ describe('WhatsappVariablesPanel', () => {
     expect(deleteMock).not.toHaveBeenCalled();
   });
 
+  it('R59: en uso por una sola plantilla, el aviso va en singular', async () => {
+    const user = setupUser();
+    const unaSola = { ...CUENTA, usedBy: 1 };
+    montar([unaSola]);
+
+    await user.click(screen.getByTestId(ownVariableDeleteTestId(unaSola.id)));
+    await screen.findByTestId(WHATSAPP_DELETE_VARIABLE_DIALOG_TESTID);
+    expect(screen.getByTestId(WHATSAPP_DELETE_VARIABLE_MESSAGE_TESTID).textContent).toBe(
+      'No se puede eliminar «Número de cuenta»: la usa 1 plantilla. Quítala de esa plantilla primero.',
+    );
+    expect(screen.getByTestId(WHATSAPP_DELETE_VARIABLE_CONFIRM_TESTID)).toBeDisabled();
+  });
+
   it('R60: «Nueva variable» (con lista y vacía), editar y eliminar miden 44 × 44 px en todos los anchos', () => {
     const { unmount } = montar([CUENTA]);
     const conLista = [

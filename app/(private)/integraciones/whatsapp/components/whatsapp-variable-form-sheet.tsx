@@ -57,10 +57,10 @@ export const WHATSAPP_VARIABLE_FORM_TEXTS = {
   value: 'Valor',
   valueHint: 'Lo que se envía al cliente. Hasta 50 caracteres.',
   valueHintInUse: (usedBy: number) =>
-    `Lo usan ${usedBy} plantillas. El valor nuevo se envía desde el próximo mensaje. Hasta 50 caracteres.`,
+    `${usedBy === 1 ? 'Lo usa 1 plantilla' : `Lo usan ${usedBy} plantillas`}. El valor nuevo se envía desde el próximo mensaje. Hasta 50 caracteres.`,
   confirmTitle: 'Revisa el cambio',
   confirmDescription: (label: string, usedBy: number) =>
-    `«${label}» se envía en ${usedBy} plantillas. Desde el próximo mensaje, los clientes recibirán el valor nuevo.`,
+    `«${label}» se envía en ${usedBy} ${usedBy === 1 ? 'plantilla' : 'plantillas'}. Desde el próximo mensaje, los clientes recibirán el valor nuevo.`,
   confirmBefore: 'Antes',
   confirmAfter: 'Ahora',
   confirmDismiss: 'Volver a revisar',
