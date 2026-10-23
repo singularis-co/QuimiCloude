@@ -67,6 +67,14 @@ function clasesDe(element: Element): string[] {
   return (element.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
 }
 
+/** Cierres del panel que no son «Cancelar»: «Cancelar» también es un `SheetClose`. */
+function cierresDelPanel(): Element[] {
+  const cancelar = screen.getByTestId(TEST_IDS.cancel);
+  return Array.from(screen.getByTestId(TEST_IDS.sheet).querySelectorAll('[data-slot="sheet-close"]')).filter(
+    (el) => el !== cancelar && !el.contains(cancelar),
+  );
+}
+
 describe('FormSheet', () => {
   it('R6 — compone cabecera, cuerpo con scroll y pie fijo con cancelar y guardar dentro del form', () => {
     montar();
@@ -233,5 +241,16 @@ describe('FormSheet', () => {
     expect(screen.getByTestId(TEST_IDS.title)).toHaveTextContent('Título de prueba');
     expect(screen.getByTestId(TEST_IDS.cancel)).toBeInTheDocument();
     expect(screen.getByTestId(TEST_IDS.submit)).toBeInTheDocument();
+  });
+
+  it('sin `showCloseButton` el panel conserva la X de cierre de `SheetContent`', () => {
+    montar();
+    expect(cierresDelPanel()).toHaveLength(1);
+  });
+
+  it('con `showCloseButton = false` el panel no muestra la X de cierre', () => {
+    montar({ showCloseButton: false });
+    expect(cierresDelPanel()).toHaveLength(0);
+    expect(screen.getByTestId(TEST_IDS.cancel)).toBeInTheDocument();
   });
 });

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Modales de plantillas de WhatsApp</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.slotrow{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center}
+</style>
+</helmet>
+<div class="qc" style="width: 1440px; box-sizing: border-box; padding: 40px; display: flex; flex-direction: column; gap: 32px; background: var(--bg); color: var(--fg)">
+  <div style="display: flex; flex-direction: column; gap: 6px"><h1 class="h1">Modales · Plantillas de WhatsApp</h1><p class="sub">Todos los paneles y diálogos de la pestaña, abiertos.</p></div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+    <div class="stage for-sheet" style="min-height: 920px; grid-column: 1 / -1"><span class="stage-cap">Nueva plantilla · con error al enviar</span><div style="position: relative; width: 1040px; height: 920px; flex: none"><div class="frame-in"><dc-import name="PlantillaAlta" modo="nueva" error-meta="{{ true }}" hint-size="100%,100%"></dc-import></div></div></div>
+
+    <div class="stage for-sheet" style="min-height: 920px; grid-column: 1 / -1"><span class="stage-cap">Enviar a revisión · confirmación antes de enviar</span><div style="position: relative; width: 1040px; height: 920px; flex: none"><div class="frame-in"><dc-import name="PlantillaAlta" modo="nueva" confirmar="{{ true }}" hint-size="100%,100%"></dc-import></div></div></div>
+
+    <div class="stage" style="min-height: 400px"><span class="stage-cap">Relacionar · revisa antes de guardar</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-rc" style="position: relative; left: auto; top: auto; translate: none; opacity: 1; scale: 1; pointer-events: auto">
+        <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg></div>
+        <h2 id="m-rc" class="h2">Revisa la relación</h2>
+        <p class="sub"><span class="mono">bienvenida_cliente</span> enviará estos datos en cada mensaje:</p>
+        <div class="lbox" style="gap: 6px; padding: 10px 12px; font-size: 13px">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span class="mono strong">{{ s1 }}</span><span>→ Nombre del cliente</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">nombre_del_cliente</span></div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span class="mono strong">{{ s2 }}</span><span>→ Nombre de la empresa</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">nombre_de_la_empresa</span></div>
+        </div>
+        
+        <div class="actions"><button class="b b-out" type="button">Volver a revisar</button><button class="b b-pri" type="button">Guardar relación</button></div>
+      </div>
+    </div>
+
+    <div class="stage" style="min-height: 400px"><span class="stage-cap">Editar variable en uso · revisa el cambio</span>
+      <div class="dlg static" role="alertdialog" aria-labelledby="m-vc" style="position: relative; left: auto; top: auto; translate: none; opacity: 1; scale: 1; pointer-events: auto">
+        <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></div>
+        <h2 id="m-vc" class="h2">Revisa el cambio</h2>
+        <p class="sub">«Número de cuenta» se envía en 2 plantillas. Desde el próximo mensaje, los clientes recibirán el valor nuevo.</p>
+        <div class="lbox" style="gap: 8px; padding: 10px 12px; font-size: 14px">
+          <div style="display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px"><span class="cap">Antes</span><span style="text-decoration: line-through; color: var(--muted-fg)">2200345678</span></div>
+          <div style="display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px"><span class="cap">Ahora</span><span class="strong">22003456 78</span></div>
+        </div>
+        <p class="err" style="margin: 0">El valor nuevo tiene espacios de más o no tiene el mismo formato que el anterior (antes solo números). Revísalo.</p>
+        <div class="actions"><button class="b b-out" type="button">Volver a revisar</button><button class="b b-pri" type="button">Guardar cambio</button></div>
+      </div>
+    </div>
+
+    <div class="stage for-sheet" style="min-height: 920px; grid-column: 1 / -1"><span class="stage-cap">Duplicar · abre el alta llena con sufijo _v2</span><div style="position: relative; width: 1040px; height: 920px; flex: none"><div class="frame-in"><dc-import name="PlantillaAlta" modo="duplicar" hint-size="100%,100%"></dc-import></div></div></div>
+
+    <div class="stage for-sheet" style="min-height: 640px; grid-column: 1 / -1"><span class="stage-cap">Relacionar variables · plantilla importada</span>
+      <aside class="sheet wide static" style="width: 860px; flex: none" aria-labelledby="m-rel">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-rel" class="h2">Relacionar variables</h2><p class="sub"><span class="mono">bienvenida_cliente</span> · Elige qué dato va en cada hueco. Con todos relacionados puedes habilitarla.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start">
+            <div style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+              <div class="lbox" style="padding: 10px 12px; gap: 4px"><span class="cap">Texto de la plantilla</span><p style="margin: 0; font-size: 14px; line-height: 1.5">{{ relText }}</p></div>
+              <div class="slotrow"><span class="mono strong">{{ s1 }}</span><button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Dato para el hueco 1"><span style="flex: 1">Nombre del cliente</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">nombre_del_cliente</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+              <div class="slotrow"><span class="mono strong">{{ s2 }}</span><button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="false" aria-label="Dato para el hueco 2" aria-invalid="true"><span class="dim">Elige un dato…</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+              <span class="err">Falta relacionar el hueco 2.</span>
+            </div>
+            <div style="min-height: 360px; display: flex"><dc-import name="WaBurbuja" tpl="{{ relTpl }}" hint-size="100%,360px"></dc-import></div>
+          </div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button" disabled="true">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div class="stage for-sheet" style="min-height: 560px"><span class="stage-cap">Variable propia · nueva</span>
+      <aside class="sheet static" aria-labelledby="m-var">
+        <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="m-var" class="h2">Nueva variable</h2><p class="sub">Un dato fijo de tu empresa para usar en las plantillas.</p></div><button class="xbtn" type="button" aria-label="Cerrar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+        <div class="sheet-bd">
+          <div class="f"><label for="m-v-l">Etiqueta <span class="req">*</span></label><input id="m-v-l" class="in" type="text" value="Número de cuenta"><span class="help">Cómo se ve en la app. Hasta 60 caracteres.</span></div>
+          <div class="f"><label for="m-v-k">Clave</label><input id="m-v-k" class="in mono" type="text" value="numero_de_cuenta" readonly="true" style="background: var(--muted)"><span class="help">Se arma sola desde la etiqueta: sin tildes ni mayúsculas, espacios como _. No se puede cambiar después.</span></div>
+          <div class="f"><label for="m-v-d">Descripción</label><textarea id="m-v-d" class="in" rows="2" style="height: auto; padding-top: 8px; padding-bottom: 8px">Cuenta de ahorros para recibir pagos por transferencia.</textarea><span class="help">Para qué sirve el dato, para quien arma las plantillas.</span></div>
+          <div class="f"><label for="m-v-v">Valor <span class="req">*</span></label><input id="m-v-v" class="in" type="text" value="[NÚMERO DE CUENTA]"><span class="help">Lo que se envía al cliente. Hasta 50 caracteres.</span></div>
+        </div>
+        <div class="sheet-ft"><button class="b b-out" type="button">Cancelar</button><button class="b b-pri" type="button">Guardar</button></div>
+      </aside>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 24px">
+      <div class="stage" style="min-height: 268px"><span class="stage-cap">Eliminar plantilla</span>
+        <div class="dlg static" role="alertdialog" aria-labelledby="m-de" style="position: relative; left: auto; top: auto; translate: none; opacity: 1; scale: 1; pointer-events: auto">
+          <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+          <h2 id="m-de" class="h2">Eliminar la plantilla</h2>
+          <p class="sub">Se va a eliminar <span class="mono">promo_octubre</span>. Esta acción no se puede deshacer.</p>
+          <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button">Eliminar</button></div>
+        </div>
+      </div>
+      <div class="stage" style="min-height: 268px"><span class="stage-cap">Eliminar variable · en uso</span>
+        <div class="dlg static" role="alertdialog" aria-labelledby="m-dv" style="position: relative; left: auto; top: auto; translate: none; opacity: 1; scale: 1; pointer-events: auto">
+          <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+          <h2 id="m-dv" class="h2">Eliminar la variable</h2>
+          <p class="sub">No se puede eliminar «Número de cuenta»: la usan 2 plantillas. Quítala de esas plantillas primero.</p>
+          <div class="actions"><button class="b b-out" type="button">Volver</button><button class="b b-des" type="button" disabled="true">Eliminar</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":4700}}'>
+class Component extends DCLogic {
+renderVals() {
+return {
+  s1: '{{1}}', s2: '{{2}}',
+  relText: 'Hola {{1}}, bienvenido a {{2}}. Te escribiremos por aquí cuando tu pedido avance.',
+  relTpl: { header: '', body: 'Hola {{nombre_del_cliente}}, bienvenido a {{2 sin relacionar}}. Te escribiremos por aquí cuando tu pedido avance.', footer: '', buttons: [], labels: { 'nombre_del_cliente': 'Nombre del cliente', '2 sin relacionar': '[2 sin relacionar]' } }
+};
+}
+}
+</script>
+</body>
+</html>
