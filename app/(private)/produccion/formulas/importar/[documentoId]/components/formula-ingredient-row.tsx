@@ -30,10 +30,10 @@ const ROW_PROBLEM_LABELS: Record<RowProblem, string> = {
   repeated: 'ingrediente repetido',
 };
 
-/** Error del campo «Unidad» tras pulsar «Confirmar» sin elegirla (QC-203 R23). */
+/** Error del campo «Unidad» tras pulsar «Confirmar» sin elegirla. */
 export const NEW_UNIT_ERROR = 'Elige la unidad de la materia prima.';
 
-/** La ayuda bajo «Unidad» segun de donde salio (QC-203 R21, R22; textos en `design.md > 6`). */
+/** La ayuda bajo «Unidad» segun de donde salio. */
 function newUnitHint(row: IngredientRowState): string {
   const read = row.unitRead ?? '';
   switch (row.newUnitSource) {
@@ -61,7 +61,7 @@ type FormulaIngredientRowProps = {
   readonly row: IngredientRowState;
   readonly problems: readonly RowProblem[];
   /** Se pulso «Confirmar» con alguna materia prima sin unidad: la de esta fila, si falta, se
-   *  marca con su error (QC-203 R23). */
+   *  marca con su error. */
   readonly showUnitError: boolean;
   readonly units: readonly UnitRef[];
   readonly initialProductPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };

@@ -35,9 +35,9 @@ export function pickSupplyTarget(
   if (entry === undefined) return null;
 
   const familyId = unitFamilyId(entry);
-  // La derivación es de un solo nivel (QC-38 R15, R16: una base no deriva de otra), así que la
-  // base es `{ id: familyId }` sin factor y no hace falta que venga en `units`; `convertQuantity`
-  // (QC-76) solo mira `baseUnitId ?? id` y el factor de cada lado.
+  // La derivación es de un solo nivel (una base no deriva de otra), así que la base es
+  // `{ id: familyId }` sin factor y no hace falta que venga en `units`: `convertQuantity` solo
+  // mira `baseUnitId ?? id` y el factor de cada lado.
   const base: UnitConversion = { id: familyId, baseUnitId: null, factor: null };
 
   const members: { readonly homonym: SupplyHomonym; readonly stockInBase: string }[] = [];

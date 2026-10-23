@@ -49,7 +49,7 @@ const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
  *  `preselected` sigue siendo `existing` para el borrador, pero se pinta sin selector. */
 export type IngredientRowMode = 'preselected' | 'choose' | 'create';
 
-/** De donde sale la unidad de la materia prima nueva (QC-203 R21, R22): sugerida desde el PDF,
+/** De donde sale la unidad de la materia prima nueva: sugerida desde el PDF,
  *  sin coincidencia, con mas de una, sin unidad en el PDF o elegida a mano por el revisor. */
 export type NewUnitSource = 'suggested' | 'none' | 'ambiguous' | 'missing' | 'picked';
 
@@ -70,7 +70,7 @@ export type IngredientRowState = {
   readonly productLabel: string;
   /** Nombre editable de la materia prima a crear, precargado con el leido. */
   readonly newProductName: string;
-  /** Unidad de la materia prima a crear. Cadena vacia = ninguna (no se puede confirmar, R23). */
+  /** Unidad de la materia prima a crear. Cadena vacia = ninguna (no se puede confirmar). */
   readonly newUnitId: string;
   readonly newUnitSource: NewUnitSource;
   /** Cuantos productos vivos coinciden con el nombre leido cuando `match.kind === 'several'`. */
@@ -83,7 +83,7 @@ function percentageToDraft(percentage: string): string | null {
 }
 
 /**
- * La unidad inicial de la materia prima nueva a partir de la leida (QC-203 R21, R22). La
+ * La unidad inicial de la materia prima nueva a partir de la leida. La
  * sugerencia es la misma `suggestUnitId` de la revision de catalogo, sin tocarla; para distinguir
  * «mas de una» de «ninguna» se cuentan aqui las coincidencias con la misma normalizacion.
  */
@@ -234,7 +234,7 @@ function buildConfirmReasons(
 }
 
 /** Las mismas incidencias sin `new_unit_missing`: la unidad vacia no deshabilita «Confirmar»,
- *  se marca en su fila al pulsarlo (QC-203 R23). */
+ *  se marca en su fila al pulsarlo. */
 function withoutMissingUnit(issues: FormulaReviewIssues): FormulaReviewIssues {
   const rows = issues.rows
     .map((row) => ({ ...row, problems: row.problems.filter((problem) => problem !== 'new_unit_missing') }))
@@ -281,7 +281,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   const [confirmError, setConfirmError] = useState<ErrorState | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   // Se enciende al pulsar «Confirmar» con alguna materia prima nueva sin unidad: desde ahi cada
-  // fila sin unidad muestra su error (QC-203 R23).
+  // fila sin unidad muestra su error.
   const [showUnitErrors, setShowUnitErrors] = useState(false);
 
   const issues = useMemo(

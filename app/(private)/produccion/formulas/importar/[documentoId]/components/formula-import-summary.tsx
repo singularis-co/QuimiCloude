@@ -32,7 +32,7 @@ function unitText(unitId: string, units: readonly UnitRef[]): string {
 /**
  * Resultado de una confirmacion que termino bien: si la receta se creo o se reemplazo,
  * cuantas materias primas se crearon -cada una con su unidad- y cuantas se reutilizaron -por su
- * nombre- (QC-203 R27), y la vuelta a la ficha de esa receta, que sale de `recipeEditRoute`,
+ * nombre-, y la vuelta a la ficha de esa receta, que sale de `recipeEditRoute`,
  * nunca de un literal.
  */
 export function FormulaImportSummary({ summary, units }: FormulaImportSummaryProps) {
