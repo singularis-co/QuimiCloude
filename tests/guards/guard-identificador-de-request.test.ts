@@ -553,6 +553,15 @@ export const E2E_ESPERADOS = [
   // responsable del paso. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'pasos-de-acondicionamiento.spec.ts',
+  // Alta el 2026-10-22 (QC-243 T13) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita: en
+  // chromium y webkit, el Administrador crea la conexion de WhatsApp con el doble de Graph, una
+  // variable propia en «Variables» y una plantilla que la usa desde «Insertar variable», que queda
+  // «Pendiente»; un aviso firmado al webhook de la conexion la aprueba y, al volver a entrar en
+  // «Plantillas», se ve «Aprobada»; a 390 px el alta ocupa la pantalla con «Formulario | Vista
+  // previa» y el motivo de una rechazada se lee como texto en la tarjeta. No lee ni afirma nada sobre
+  // el identificador de peticion ni sobre `reference`.
+  'integraciones-whatsapp-plantillas.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */

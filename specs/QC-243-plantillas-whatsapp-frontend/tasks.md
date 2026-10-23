@@ -93,7 +93,7 @@ hasta que el backend la guarde (R58).
 
 ## Tanda 4 — E2E y cierre
 
-- [ ] **T13 E2E** (T4–T12). `e2e/integraciones-whatsapp-plantillas.spec.ts` con el doble `canned`:
+- [x] **T13 E2E** (T4–T12). `e2e/integraciones-whatsapp-plantillas.spec.ts` con el doble `canned`:
   crear desde la pantalla → «Pendiente»; `POST` firmado al webhook con `APPROVED` → volver a entrar en
   Plantillas → «Aprobada» (R61); crear una variable propia y usarla en el alta; en el proyecto móvil
   (WebKit, 390 px), abrir el alta a pantalla completa con sus pestañas (R38) y comprobar que el motivo
