@@ -4,7 +4,7 @@
 > `feature/QC-245-contactos-whatsapp-backend`
 >
 > El **qué** está en `requirements.md` (R1–R43; la Enmienda 1 del 2026-10-23 añade R44–R59, cuyo
-> cómo está en §15). Aquí va el **cómo**. Precedentes que se copian:
+> cómo está en §15, y D12–D14 del mismo día añaden R60–R63, §15.8). Aquí va el **cómo**. Precedentes que se copian:
 >
 > - **QC-240** (`db/migrations/20261023120000_whatsapp_send_permission`): migración de datos del
 >   permiso, permiso dentro del añadido `integraciones`, `requireSendPermission`, las dos Server
@@ -64,7 +64,7 @@ del sistema», `cliente.nombre`, «pedidos del cliente», «nombre de la empresa
 | `decryptStoredSecret` + `ACCESS_TOKEN_FIELD` (QC-240, `send-whatsapp-message.ts`) | Leer el token de la conexión | **Se reutiliza** para la descarga |
 | `app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts` (reexport de un driving) y `guard-rutas-fuera-de-sesion.test.ts` | Forma de una ruta de `app/api` | **Se copia** la forma; la ruta nueva entra en la guardia como del añadido `integraciones` |
 | Ningún archivo servido a un usuario con sesión desde una ruta (`createSignedUrl` solo en Storage de documentos y evidencias) | — | Nace aquí (§15.1) |
-| QC-243 `design.md > 5`: catálogo de constantes del front, `cliente.nombre`, `pedido.numero`, `empresa.nombre` | El único catálogo de constantes escrito | **Manda** (R55, P18). QC-242 F4 fija el formato con punto; QC-247 (`pending`) menciona `pedido.fecha_entrega`, sin código |
+| QC-243 `design.md > 5`: catálogo de constantes del front, `cliente.nombre`, `pedido.numero`, `empresa.nombre` | El único catálogo de constantes escrito | Sus tres claves se mantienen; D13 añade cuatro `pedido.*` que el front tendrá que aprender (R55, §11). QC-242 F4 fija el formato con punto; QC-247 (`pending`) menciona `pedido.fecha_entrega`, sin código |
 | `OrderCatalog.listDeliveryProgressByIdsIncludingDeleted`, `orderedPackages`, `remainingPackages`, `formatOrderNumber` (contrato de `pedidos`) | Envases por línea, entregados y faltantes; número visible | **Se reutilizan** (R51, R52) |
 | `OrderCatalog` no lista por cliente; `orders_company_id_customer_id_idx` existe | — | Servicio nuevo `CustomerOrderDirectory` en `pedidos` (§15.4) |
 | `PresentationCatalog.findRefs` (`inventario`), `RecipeCatalog.findRefsIncludingDeleted` (`recetas`) | Nombre de la presentación y del producto | **Se reutilizan** |
@@ -72,6 +72,9 @@ del sistema», `cliente.nombre`, «pedidos del cliente», «nombre de la empresa
 | `WhatsappVariableKeyRepository.listAll` (QC-242) | Variables propias con valor | **Se reutiliza** (R56) |
 | Fecha de entrega o prometida en `orders` | No existe | Fuera del contrato (D10) |
 | QC-307 (`in_progress`, sin mergear): precio de venta del pedido | Total del pedido | No se espera: `total: null` (D11) |
+| D12–D14: `ORDER_STATUSES_NOT_IN_PROGRESS` (`pedidos/domain/order-classification.ts`, `['ENTREGADO', 'CANCELADO']`) | Los estados que no son «en curso» | Es exactamente «no abierto» (D12): se exporta del barril de `pedidos` y se pasa como `excludedStatuses` (§15.8) |
+| `ORDER_STATUS_LABELS` (`lib/shared/ui/order-status.ts`) | Etiquetas internas de Pedidos («En fabricación», «Por empacar»…) | **No sirven** para el cliente (alternativa 19). No hay ninguna agrupación en lenguaje del cliente: nace aquí desde el `enum OrderStatus` (R60) |
+| `formatCivilDate` (`lib/shared/ui/date-civil.ts`) | Día civil UTC con que Pedidos pinta fechas | Misma regla para `pedido.fecha_solicitud` (R61, P21), reescrita en el dominio (que no importa `lib/shared`) |
 
 ---
 
@@ -388,7 +391,8 @@ vista campo a campo. Sin `revalidatePath` (no hay pantalla todavía). Se importa
 
 > Autocontenido, para copiar tal cual en la ficha de QC-246. **Versión 2, 2026-10-23 (Enmienda 1):**
 > archivo de imágenes y stickers, reacciones por id interno, `getWhatsappChatContextAction` con pedidos
-> y valores por defecto. **[ABIERTO Pn]** = depende de una pregunta abierta del spec; vale su default.
+> y valores por defecto; revisada el mismo día con D12–D14 (pedidos abiertos, siete constantes).
+> **[ABIERTO Pn]** = depende de una pregunta abierta del spec; vale su default.
 
 ### A. Acciones y ruta
 
@@ -438,7 +442,7 @@ listSendableWhatsappTemplatesAction(): Promise<ActionResult<{ templates: readonl
 
 getWhatsappChatContextAction(input: {
   target: ChatTarget;
-  orderId?: string; // el del selector; sin él, el más reciente
+  orderId?: string; // el del selector; sin él, el abierto más reciente
 }): Promise<ActionResult<WhatsappChatContext>>;
 
 // ---- QC-240, sin cambios ----
@@ -560,15 +564,15 @@ type WhatsappSendableTemplate = {
 // ---- Contexto del chat (v2) ----
 type WhatsappChatContext = {
   customer: { id: string; name: string };
-  orders: readonly WhatsappCustomerOrder[]; // vivos no cancelados, 20 más recientes primero [ABIERTO P15]
-  selectedOrderId: string | null; // orderId pedido, o orders[0]; null sin pedidos
-  values: Readonly<Record<string, string | null>>; // clave → valor; null = falta
+  orders: readonly WhatsappCustomerOrder[]; // abiertos (ni entregados ni cancelados), ≤ 20, el más reciente primero
+  selectedOrderId: string | null; // orderId pedido, o orders[0]; null sin pedidos abiertos
+  values: Readonly<Record<string, string | null>>; // clave → texto; null = falta
 };
 type WhatsappCustomerOrder = {
   id: string;
   number: string; // '2026-0000128'
   status: 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'BLOQUEADO'
-    | 'POR_ACONDICIONAR' | 'EN_ACONDICIONAMIENTO' | 'TERMINADO' | 'ENTREGADO';
+    | 'POR_ACONDICIONAR' | 'EN_ACONDICIONAMIENTO' | 'TERMINADO';
   requestedAt: string; // ISO 8601
   total: string | null; // decimal en texto; hoy siempre null (QC-307)
   productName: string | null; // producto (receta)
@@ -623,28 +627,40 @@ posteriores a la marca (las reacciones cuentan [ABIERTO P13]). `markWhatsappChat
 marca hasta `upToMessageId` (el último mostrado) o, sin él, hasta el último; nunca retrocede.
 Llamarla al abrir el chat y tras cada consulta que traiga entrantes. No avisa a Meta.
 
-**Imágenes y stickers (v2).** `attachment.mediaUrl` (relativa, `/api/integraciones/whatsapp/media/<id>`)
-va como `src` de la miniatura y del visor. Se descarga de Meta en cada vista, sin copia: pasados unos
-30 días Meta la borra y la ruta da 502; la pantalla muestra un hueco «Imagen no disponible» (evento
-`error` de la imagen). Audio, video y documento llegan con `mediaUrl: null`.
+**Imágenes y stickers (v2).** `attachment.mediaUrl` (relativa) va como `src` de la miniatura y del
+visor. Se descarga de Meta en cada vista, sin copia: a los ~30 días Meta la borra y la ruta da 502;
+la pantalla muestra «Imagen no disponible» (evento `error`). Audio, video y documento: `mediaUrl: null`.
 
-**Reacciones (v2).** `attachment.messageId` es el `id` del mensaje reaccionado tal como sale en
-`messages`. La reacción sigue llegando como mensaje propio (cuenta como no leído): la pantalla no la
-pinta como burbuja, la pega al mensaje con ese `id`; si ese mensaje aún no está cargado, la pega
-cuando cargue al subir. Varias reacciones del mismo lado al mismo mensaje: vale la más reciente;
-`emoji: null` la quita. `messageId: null` = el mensaje no está guardado; no se pinta.
+**Reacciones (v2).** `attachment.messageId` es el `id` del mensaje reaccionado en `messages`. La
+reacción llega como mensaje propio (cuenta como no leído): no se pinta como burbuja, se pega a ese
+mensaje (si aún no está cargado, al cargarlo). Del mismo lado al mismo mensaje vale la más reciente;
+`emoji: null` la quita; `messageId: null` (no guardado) no se pinta.
 
 **Contexto del chat (v2).** Pedirlo al abrir el chat y al cambiar el selector «Pedido»
 (`orderId`), no en la consulta periódica.
-- `orders`: para el selector (se muestra si hay más de uno) y el detalle, ya con sus líneas: no hay
-  otra llamada. `pending` y `delivered` coinciden con Pedidos. `total` hoy es siempre `null`
-  (QC-307): ocultarlo si es `null`. No hay fecha de entrega.
-- `values` trae **siempre** las claves `cliente.nombre`, `empresa.nombre` y `pedido.numero` (del
-  pedido elegido) [ABIERTO P18] y cada variable propia de la empresa por su clave (sin punto: nunca
-  choca con una constante). Para resolver una plantilla: `values[variable.key]`; si es `null` o la
-  clave no está, el texto muestra `[falta <clave>]`. Al enviar, `constants` = las constantes de la
-  plantilla con valor no nulo, y `constantLabels` de su catálogo de etiquetas.
-- `orderId` que no está en `orders` ⇒ `order_not_found`.
+- `orders`: solo los abiertos, para el selector (se muestra si hay más de uno) y el detalle, ya con
+  sus líneas: no hay otra llamada. `pending` y `delivered` coinciden con Pedidos. `total` hoy es
+  siempre `null` (QC-307): ocultarlo. No hay fecha de entrega. Sin pedidos abiertos: `orders: []`.
+- `values` trae **siempre** estas siete constantes, más cada variable propia por su clave (sin
+  punto: nunca choca). Las `pedido.*` salen del pedido elegido y son todas `null` sin él:
+
+  | Clave | Ejemplo |
+  |---|---|
+  | `cliente.nombre` | «Laura Gómez» |
+  | `empresa.nombre` | «Agua Pura» |
+  | `pedido.numero` | «2026-0000128» |
+  | `pedido.estado` | `recibido`, `en preparación`, `entregado` o `cancelado` [ABIERTO P20] |
+  | `pedido.fecha_solicitud` | «23/10/2026» [ABIERTO P21] |
+  | `pedido.total` | siempre `null` (QC-307) |
+  | `pedido.detalle` | «10 × Bidón 20 L (entregado 6, faltan 4); 5 × Garrafa 5 L (entregado 5, faltan 0)»: una línea de texto, sin saltos |
+
+  Para resolver una plantilla: `values[variable.key]`; si es `null` o no está, el texto muestra
+  `[falta <clave>]`. Al enviar, `constants` = las constantes de la plantilla con valor no nulo, y
+  `constantLabels` de su catálogo de etiquetas.
+- **Seguimiento de front:** el catálogo de constantes de QC-243 (y su traducción
+  `nombre_del_cliente` ↔ `cliente.nombre`) aún no tiene las cuatro `pedido.*` nuevas; hasta
+  añadirlas, ninguna plantilla las usa.
+- `orderId` que no está en `orders` (también entregado o cancelado) ⇒ `order_not_found`.
 
 ---
 
@@ -732,6 +748,14 @@ Mapa `R<n> → test` completo en `tasks.md`.
 - **QC-240**: no se modifica salvo exportar `sendFailureReasonOf`.
 - **QC-241** (envíos del sistema): sus mensajes `origin = SYSTEM` aparecen en el chat con `sentBy:
   null`.
+- **Front de plantillas (seguimiento de D13, no se especifica aquí).** El catálogo de constantes
+  del front de QC-243 (`design.md > 5`) y su traducción de clave visible a clave con punto
+  (`nombre_del_cliente` ↔ `cliente.nombre`) solo conocen `cliente.nombre`, `empresa.nombre` y
+  `pedido.numero`. Para que una plantilla pueda usar `pedido.estado`, `pedido.fecha_solicitud`,
+  `pedido.total` y `pedido.detalle`, el front tiene que aprender esas cuatro (clave visible,
+  etiqueta, descripción y ejemplo). Hasta entonces el back las devuelve y ninguna plantilla las usa.
+  **Nota para el leader:** anotarlo en la ficha de QC-246 si esa pantalla toca el catálogo de
+  constantes; si no, abrir una ficha nueva de front. Lo decide el humano.
 
 | Archivo | Con quién | Cómo se resuelve |
 |---|---|---|
@@ -740,7 +764,7 @@ Mapa `R<n> → test` completo en `tasks.md`.
 | `lib/modules/clientes/domain/customer-catalog.ts` y su adaptador | Fichas de `clientes` (QC-302, QC-303) | Un método más al final |
 | `lib/composition/index.ts` | Todas las fichas con cableado | Solo el bloque de WhatsApp y `buildCustomerCatalog` |
 | `lib/modules/integraciones/**`, `module-shape.test.ts`, guardia de ámbito | QC-241 (mismo módulo) | La que llegue después amplía las listas exactas |
-| `lib/modules/pedidos/index.ts` (Enmienda 1) | QC-307 (`in_progress`, precio de venta) | Solo dos líneas de barril; el adaptador va en archivo nuevo. Cuando QC-307 entre, una ficha de seguimiento rellena `total` (D11) |
+| `lib/modules/pedidos/index.ts` (Enmienda 1) | QC-307 (`in_progress`, precio de venta) | Solo tres líneas de barril (con `ORDER_STATUSES_NOT_IN_PROGRESS`); el adaptador va en archivo nuevo. Cuando QC-307 entre, una ficha de seguimiento rellena `total` y `pedido.total` (D11) |
 | `lib/modules/identity/index.ts` (Enmienda 1) | Fichas de `identity` | Una línea de barril |
 | `tests/guards/guard-rutas-fuera-de-sesion.test.ts`, `session-once-per-request-actions.test.ts` (Enmienda 1) | Cualquier ficha con rutas o acciones nuevas | Una entrada más |
 
@@ -801,6 +825,17 @@ Descartadas en la Enmienda 1:
     plataforma con su permiso y devuelve la ficha entera; aquí basta un campo de la propia empresa,
     como `getCompanyCountry`.
 
+Descartadas al aplicar D12–D14:
+
+18. **Las líneas como dato estructurado dentro de `values`** (`pedido.lineas: [{ presentacion,
+    pedido, entregado, faltante }]`). `values` deja de ser `Record<string, string | null>` y no se
+    puede pasar a `constants` del envío (QC-240 solo acepta texto), ni insertar en un hueco `{{n}}`
+    de Meta. Ese dato estructurado ya va en `orders[].lines` del mismo contexto (D8), que es lo que
+    pinta el panel. Se elige un valor de texto listo, `pedido.detalle` (R62).
+19. **Reutilizar `ORDER_STATUS_LABELS` para `pedido.estado`.** Son diez etiquetas del taller
+    («En fabricación», «Por empacar», «Bloqueado»); el humano pidió cuatro en lenguaje del cliente, y
+    `lib/shared/ui` no se importa desde el dominio.
+
 ---
 
 ## 13. Dependencias de terceros
@@ -833,11 +868,11 @@ lib/modules/identity/
 lib/modules/pedidos/
   domain/customer-order-directory.ts                             ← interfaz + CustomerOrderSummary
   adapters/driven/persistence/customer-order-directory-prisma.ts ← listAliveOfCustomer
-  index.ts                                                       ← + tipos
+  index.ts                                                       ← + tipos, ORDER_STATUSES_NOT_IN_PROGRESS (D12)
 lib/modules/integraciones/
   domain/whatsapp-media.ts                                       ← constantes y reglas puras del archivo
   domain/get-whatsapp-media.ts                                   ← caso de uso del archivo
-  domain/whatsapp-chat-context.ts                                ← tipos y armado puro del contexto
+  domain/whatsapp-chat-context.ts                                ← tipos y armado puro del contexto (+ §15.8)
   domain/get-whatsapp-chat-context.ts                            ← caso de uso del contexto
   domain/whatsapp-conversation.ts                                ← attachmentOf: mediaUrl, reacción por id interno
   domain/whatsapp-conversation-input.ts                          ← + getWhatsappChatContextSchema, getWhatsappMediaSchema
@@ -950,7 +985,7 @@ El `wamid` no sale del adaptador (alternativa 9).
 **Entrada** (`whatsapp-conversation-input.ts`):
 
 ```ts
-export const CUSTOMER_ORDERS_LIMIT = 20;   // P15
+export const CUSTOMER_ORDERS_LIMIT = 20;   // D12
 export const getWhatsappChatContextSchema = z.object({
   target: z.union([z.object({ contactId: z.uuid() }).strict(), z.object({ customerId: z.uuid() }).strict()]),
   orderId: z.uuid().optional(),
@@ -964,7 +999,8 @@ export const getWhatsappChatContextSchema = z.object({
    `WhatsappContactNotFoundError`); por cliente, `customers.findAliveRefById` nulo ⇒
    `LinkedCustomerNotFoundError`, sin mirar la conexión. Se extrae a una función compartida con
    `getWhatsappChat` (`resolveChatCustomer`) para que las dos reglas no diverjan.
-3. `orders = customerOrders.listAliveOfCustomer(companyId, customerId, ['CANCELADO'], CUSTOMER_ORDERS_LIMIT)`.
+3. `orders = customerOrders.listAliveOfCustomer(companyId, customerId,
+   ORDER_STATUSES_NOT_IN_PROGRESS, CUSTOMER_ORDERS_LIMIT)`: solo abiertos (D12, §15.8).
 4. Pedido elegido: con `orderId`, el de `orders` con ese id, o `WhatsappOrderNotFoundError`
    (`order_not_found`); sin él, `orders[0] ?? null` (R54).
 5. Con pedidos: `deliveryProgress.listDeliveryProgressByIdsIncludingDeleted(companyId, ids)`,
@@ -975,8 +1011,7 @@ export const getWhatsappChatContextSchema = z.object({
 
 **Dominio puro** (`domain/whatsapp-chat-context.ts`): tipos del §B del contrato y
 
-- `WHATSAPP_SYSTEM_CONSTANT_KEYS = ['cliente.nombre', 'empresa.nombre', 'pedido.numero'] as const`
-  (P18; el catálogo de QC-243 `design.md > 5`).
+- `WHATSAPP_SYSTEM_CONSTANT_KEYS` (las siete claves de D13, §15.8).
 - `customerOrderOf(summary, progress, presentations, recipes)`: `number = formatOrderNumber`,
   `requestedAt = createdAt` ISO, `total: null` (D11, sin campo de fecha de entrega: D10),
   `productName` = `RecipeRef.name` o `null`; por línea de `progress`, en su orden: `ordered =
@@ -984,8 +1019,9 @@ export const getWhatsappChatContextSchema = z.object({
   orderedPackages: ordered, deliveredPackages: delivered })` (R52, mismas funciones que Pedidos),
   `presentationName` = `PresentationRef.name` o `null`. Un pedido sin progreso sale con `lines: []`.
 - `contextValuesOf({ customer, companyName, selected, variables })`: `cliente.nombre` =
-  `customerNameOf(customer)`; `empresa.nombre` = `companyName`; `pedido.numero` = número del elegido
-  o `null`; cada propia `key → value`. Una cadena vacía se normaliza a `null` (R56).
+  `customerNameOf(customer)`; `empresa.nombre` = `companyName`; las claves `pedido.*` del elegido
+  (§15.8) o todas `null` sin elegido; cada propia `key → value`. Una cadena vacía se normaliza a
+  `null` (R56).
 
 **Pedidos del cliente (`pedidos`, §15.4)** e **identidad de la empresa (§15.5)** llegan por contrato;
 `integraciones` no lee `orders` ni `companies` (alternativa 2 de §12, mismo criterio).
@@ -1072,7 +1108,63 @@ Guardias y tests de borde que se tensan:
 | `tests/unit/integraciones/whatsapp/whatsapp-graph-client-media.test.ts` | R45–R47 con `fetch` doble: dos pasos, token solo en cabecera, host ajeno, tamaño por `file_size`, cabecera y stream, 5xx vs 4xx |
 | `tests/unit/integraciones/whatsapp/whatsapp-graph-client-canned.test.ts` (se amplía) | `downloadMedia` del doble |
 | `tests/integration/integraciones/whatsapp-conversation-prisma.int.test.ts` (se amplía) | R49 (reacción casada, de otro contacto ⇒ null), `findMediaMessage` con ámbito |
-| `tests/integration/pedidos/customer-order-directory.int.test.ts` | vivos, sin cancelados, orden, límite, otra empresa |
+| `tests/integration/pedidos/customer-order-directory.int.test.ts` | vivos, sin entregados ni cancelados (D12), orden, límite, otra empresa |
 | `tests/integration/identity/company-name-read.int.test.ts` | nombre; dada de baja ⇒ null |
 | `tests/unit/identity/get-company-name.test.ts` | la fábrica |
-| `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` | Composición real + Graph doble: R44 (ruta 404 a otra empresa y a cliente dado de baja), R45, R49, R51–R57 de punta a punta |
+| `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` | Composición real + Graph doble: R44 (ruta 404 a otra empresa y a cliente dado de baja), R45, R49, R51–R57, R60–R63 de punta a punta |
+
+### 15.8 Decisiones D12–D14 (R54–R56, R60–R63)
+
+**Pedidos abiertos (D12).** `pedidos` exporta `ORDER_STATUSES_NOT_IN_PROGRESS` en su barril y el
+contexto lo pasa como `excludedStatuses`. `CustomerOrderDirectory` no cambia de firma. Un pedido
+entregado o cancelado no está en `orders` y pedirlo por `orderId` da `order_not_found` (R54). El
+tipo `WhatsappCustomerOrder.status` del contrato pierde `ENTREGADO`.
+
+**Claves (D13).** En `domain/whatsapp-chat-context.ts`:
+
+```ts
+export const WHATSAPP_SYSTEM_CONSTANT_KEYS = [
+  'cliente.nombre', 'empresa.nombre', 'pedido.numero', 'pedido.estado',
+  'pedido.fecha_solicitud', 'pedido.total', 'pedido.detalle',
+] as const;
+export type CustomerOrderStage = 'recibido' | 'en preparación' | 'entregado' | 'cancelado';
+export const CUSTOMER_ORDER_STAGE: Readonly<Record<OrderStatus, CustomerOrderStage>> = {
+  PENDIENTE: 'recibido',
+  EN_CURSO: 'en preparación', POR_EMPACAR: 'en preparación', EN_EMPAQUE: 'en preparación',
+  POR_ACONDICIONAR: 'en preparación', EN_ACONDICIONAMIENTO: 'en preparación',
+  TERMINADO: 'en preparación', BLOQUEADO: 'en preparación',   // P20
+  ENTREGADO: 'entregado', CANCELADO: 'cancelado',
+};
+```
+
+`Record<OrderStatus, …>` hace que un estado nuevo en el `enum` no compile hasta tener etiqueta
+(R60). Con D12 el elegido nunca está entregado ni cancelado; las cuatro etiquetas se definen igual
+para que el mapa sea total.
+
+| Clave | Valor (pedido elegido; sin elegido, todas `null`) |
+|---|---|
+| `pedido.numero` | `formatOrderNumber` (sin cambios) |
+| `pedido.estado` | `CUSTOMER_ORDER_STAGE[status]` (R60) |
+| `pedido.fecha_solicitud` | `customerDateOf(createdAt)`: `DD/MM/AAAA` del día UTC, igual que `formatCivilDate` de Pedidos (R61, P21) |
+| `pedido.total` | siempre `null` (D11) |
+| `pedido.detalle` | `orderDetailTextOf(lines)` (R62) |
+
+**Líneas (D13): texto listo, no estructura.** Los valores de una plantilla son solo texto, y Meta
+rechaza un parámetro con salto de línea, tabulador o más de cuatro espacios seguidos. Por eso:
+
+- **elegido:** `pedido.detalle`, una cadena con una parte por línea del reparto, en el orden de
+  `orders[].lines`, unidas por `; `. Ejemplo: «10 × Bidón 20 L (entregado 6, faltan 4); 5 × Garrafa
+  5 L (entregado 5, faltan 0)». «falta» con 1. Sin nombre de presentación: «presentación sin
+  nombre». Sin líneas: `null`. No se recorta: si una plantilla queda por encima del tope de Meta, el
+  envío sale `FAILED` con su motivo, como cualquier rechazo;
+- **descartado:** `pedido.lineas` estructurado dentro de `values` (alternativa 18). El dato
+  estructurado ya llega en `orders[].lines`.
+
+**Permiso (D14).** `getWhatsappChatContext` solo llama a `requireReadPermission`; ningún
+`assertPermission('pedidos.…')`. Las lecturas de `pedidos` van por contrato sin actor. Test: actor
+con `whatsapp.consultar` y sin ningún permiso de Pedidos recibe pedidos y valores (R63).
+
+**Tests.** `whatsapp-chat-context.test.ts` gana R60 (los diez estados, mapa total), R61 (fecha
+cerca de medianoche UTC), R62 (singular, sin nombre, sin líneas, sin `\n` ni `\t`) y R55/R56 (siete
+claves, todas `pedido.*` nulas sin elegido). `get-whatsapp-chat-context.test.ts` gana R54
+(entregado ⇒ `order_not_found`) y R63.

@@ -213,7 +213,8 @@ Vocabulario:
 ### Enmienda 1 (2026-10-23): lo que añade la pantalla ampliada de QC-246
 
 El humano pidió «actualiza el spec y el contrato» el 2026-10-23, después de ampliar la ficha de
-QC-246 con sus decisiones D5–D7 (aquí D6–D8); el mismo día cerró D9–D11. Esa ampliación cambia una
+QC-246 con sus decisiones D5–D7 (aquí D6–D8); el mismo día cerró D9–D11 y, al responder P15, P18 y
+P19, D12–D14 (que añaden R60–R63 y reescriben R54–R56). Esa ampliación cambia una
 línea de «Lo que NO entra»:
 **las imágenes y los stickers entrantes se sirven** (D7). Audio, video y documentos siguen sin
 descargarse.
@@ -222,8 +223,9 @@ Vocabulario añadido:
 
 - **Medio visible:** mensaje entrante de tipo imagen o sticker que guarda el identificador de su
   archivo en Meta.
-- **Pedidos del cliente:** sus pedidos vivos (sin baja) de la empresa del actor, salvo los
-  cancelados; los 20 de fecha de solicitud más reciente, de más reciente a más antiguo (P15).
+- **Pedidos del cliente:** sus pedidos **abiertos**: vivos (sin baja), de la empresa del actor y ni
+  entregados ni cancelados; los 20 de fecha de solicitud más reciente, de más reciente a más antiguo
+  (D12).
 - **Pedido elegido:** el que indica la pantalla o, si no indica ninguno, el primero de los pedidos
   del cliente.
 - **Contexto del chat:** los pedidos del cliente, el pedido elegido y los valores por defecto de
@@ -272,15 +274,18 @@ Vocabulario añadido:
   pedido no exista en el sistema (D11).
 - **R54.** DONDE la consulta indica un pedido, el sistema DEBE tomarlo como pedido elegido; SI no
   está entre los pedidos del cliente (inexistente, de otro cliente, de otra empresa, dado de baja,
-  cancelado o fuera de los 20), ENTONCES DEBE responder `order_not_found` sin devolver datos. Sin
-  pedidos del cliente, el pedido elegido DEBE ser nulo.
+  entregado, cancelado o fuera de los 20), ENTONCES DEBE responder `order_not_found` sin devolver
+  datos. Sin pedidos del cliente, el pedido elegido DEBE ser nulo.
 - **R55.** El sistema DEBE devolver con el contexto un objeto de valores con una entrada por cada
-  constante del catálogo del sistema —`cliente.nombre`, `empresa.nombre` y `pedido.numero` (P18)— y
-  una por cada variable propia de la empresa, con su clave.
+  constante del catálogo del sistema —`cliente.nombre`, `empresa.nombre`, `pedido.numero`,
+  `pedido.estado`, `pedido.fecha_solicitud`, `pedido.total` y `pedido.detalle` (D13)— y una por cada
+  variable propia de la empresa, con su clave. Todos los valores DEBEN ser texto o nulos.
 - **R56.** El valor de `cliente.nombre` DEBE ser los nombres y apellidos del cliente; el de
   `empresa.nombre`, el nombre de la empresa del actor; el de `pedido.numero`, el número visible del
-  pedido elegido; el de cada variable propia, su valor vigente. SI un valor no se puede resolver,
-  ENTONCES su entrada DEBE ser nula: nunca omitida ni una cadena vacía.
+  pedido elegido; el de `pedido.estado`, `pedido.fecha_solicitud` y `pedido.detalle`, los de R60–R62
+  para el pedido elegido; el de `pedido.total`, nulo (D11); el de cada variable propia, su valor
+  vigente. SI no hay pedido elegido, ENTONCES todas las entradas `pedido.*` DEBEN ser nulas. SI un valor no se puede
+  resolver, ENTONCES su entrada DEBE ser nula: nunca omitida ni una cadena vacía.
 - **R57.** Pedir el contexto NO DEBE escribir nada ni mover la marca de lectura, y DEBE limitarse a
   la empresa del actor: un contacto, cliente o pedido de otra empresa DEBE tratarse como
   inexistente.
@@ -294,6 +299,24 @@ Vocabulario añadido:
 - **R59.** El sistema DEBE verificar la enmienda con tests unitarios (dominio, casos de uso, cliente
   de Graph y ruta, con Graph doble) y de integración contra la base de test (pedidos del cliente,
   nombre de la empresa, mensajes de medio y reacciones, y el flujo completo).
+
+#### Valores del pedido elegido (D12–D14, 2026-10-23)
+
+- **R60.** El valor de `pedido.estado` DEBE ser el estado del pedido elegido en lenguaje del
+  cliente: `recibido` para `PENDIENTE`; `en preparación` para `EN_CURSO`, `POR_EMPACAR`,
+  `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO`, `TERMINADO` y `BLOQUEADO` (P20);
+  `entregado` para `ENTREGADO`; `cancelado` para `CANCELADO`. Todo estado del sistema DEBE tener
+  exactamente una de esas cuatro etiquetas.
+- **R61.** El valor de `pedido.fecha_solicitud` DEBE ser la fecha de solicitud del pedido elegido
+  como `DD/MM/AAAA`, con el día civil que muestra Pedidos (P21).
+- **R62.** El valor de `pedido.detalle` DEBE ser una línea de texto por cada línea del reparto del
+  pedido elegido, en el orden de R51, con la forma `<pedidos> × <presentación> (entregado
+  <entregados>, falta|faltan <por entregar>)` —«falta» cuando es 1— y con los números de R52,
+  unidas por `; `. SI la presentación no tiene nombre, ENTONCES DEBE escribirse «presentación sin
+  nombre». SI el pedido no tiene líneas, ENTONCES el valor DEBE ser nulo. El valor NO DEBE contener
+  saltos de línea ni tabuladores.
+- **R63.** El sistema DEBE devolver los pedidos del cliente y los valores `pedido.*` a quien tenga
+  `whatsapp.consultar`, y NO DEBE exigir además ningún permiso de Pedidos (D14).
 
 ### Cobertura de las decisiones cerradas
 
@@ -309,7 +332,10 @@ Vocabulario añadido:
 | D8 Detalle del pedido por presentación × envases, entregado y faltante | R51, R52 |
 | D9 Medios por proxy en cada vista, nada guardado | R45, R46 |
 | D10 Sin fecha de entrega | R51 |
-| D11 `total: null` hasta QC-307 | R53 |
+| D11 `total: null` hasta QC-307 | R53, R56 |
+| D12 Selector: solo pedidos abiertos, el más reciente primero | Vocabulario «Pedidos del cliente», R51, R54 |
+| D13 Objeto de valores: cliente, empresa y pedido elegido | R55, R56, R60–R62 |
+| D14 Basta `whatsapp.consultar` para ver los pedidos en el chat | R50, R63 |
 
 ## Preguntas abiertas
 
@@ -357,22 +383,21 @@ requisito citado antes de aprobar.
 Abiertas por la Enmienda 1 (2026-10-23):
 
 - **P14 — Medios: proxy o copia propia.** Cerrada por el humano el 2026-10-23: D9.
-- **P15 — Qué pedidos van al selector.** **Default:** los vivos del cliente salvo los cancelados, los
-  20 de fecha de solicitud más reciente, el más reciente primero (vocabulario de la Enmienda 1,
-  R51, R54). Alternativas: incluir los cancelados, o solo los que no están entregados.
+- **P15 — Qué pedidos van al selector.** Cerrada por el humano el 2026-10-23: D12.
 - **P16 — Fecha de entrega.** Cerrada por el humano el 2026-10-23: D10.
 - **P17 — Total del pedido.** Cerrada por el humano el 2026-10-23: D11.
-- **P18 — Catálogo de constantes del sistema.** El único catálogo escrito es el del front de QC-243
-  (`design.md > 5`): `cliente.nombre`, `empresa.nombre`, `pedido.numero`. **Default:** el back
-  resuelve esas tres (R55). Los datos permitirían además `cliente.nombres`, `cliente.apellidos`,
-  `cliente.ciudad`, `cliente.correo`, `cliente.direccion`, `empresa.telefono`, `empresa.correo`,
-  `pedido.estado`, `pedido.fecha_solicitud` y `pedido.total` (siempre nulo, D11); no
-  `pedido.fecha_entrega` (D10). Ampliar el catálogo exige cambiarlo también en el front de
-  plantillas.
-- **P19 — Pedidos con solo `whatsapp.consultar`.** El contexto enseña número, estado, producto y
-  envases de los pedidos del cliente a quien tenga `whatsapp.consultar`, aunque no tenga
-  `pedidos.consultar`. **Default:** basta `whatsapp.consultar` (hoy solo el Administrador, que tiene
-  los dos, D1). Si otro rol recibe el permiso, se revisa.
+- **P18 — Catálogo de constantes del sistema.** Cerrada por el humano el 2026-10-23: D13. Las claves
+  nuevas (`pedido.estado`, `pedido.fecha_solicitud`, `pedido.total`, `pedido.detalle`) tiene que
+  aprenderlas también el front de plantillas: seguimiento anotado en `design.md > 11`.
+- **P19 — Pedidos con solo `whatsapp.consultar`.** Cerrada por el humano el 2026-10-23: D14.
+
+Abiertas al aplicar D12–D14 (2026-10-23):
+
+- **P20 — `TERMINADO` y `BLOQUEADO` para el cliente.** El humano dio cuatro etiquetas y el sistema
+  tiene diez estados. **Default:** los dos son `en preparación`: todavía no se entregaron, igual que
+  los cuenta Pedidos «en curso» (R60).
+- **P21 — Formato y día de `pedido.fecha_solicitud`.** **Default:** `DD/MM/AAAA` del día civil UTC,
+  el mismo día que pinta Pedidos (`formatCivilDate`); la empresa no tiene huso guardado (R61).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -391,3 +416,6 @@ Copiadas de la ficha (`feature_list.json > QC-245`).
 | D9 | (2026-10-23, decisión del humano) El archivo de una imagen o un sticker se descarga de Meta en cada vista y no se guarda nada. Que la imagen deje de verse cuando Meta la caduca (unos 30 días) se acepta. Guardarla en Storage es la alternativa descartada | Sin almacenamiento ni datos nuevos que custodiar; basta para responder conversaciones recientes. |
 | D10 | (2026-10-23, decisión del humano) Sin fecha de entrega: el contrato no tiene ese campo y el detalle del pedido no la muestra | El pedido no tiene esa fecha en la base. |
 | D11 | (2026-10-23, decisión del humano) `total: null` hasta que entre QC-307; QC-245 no la espera. El campo sigue en el contrato y la pantalla lo oculta si es nulo | No bloquear la ficha por otra en curso; el contrato no cambia cuando llegue el precio. |
+| D12 | (2026-10-23, decisión del humano, cierra P15) El selector de pedidos muestra solo los pedidos **abiertos** del cliente (ni entregados ni cancelados), el más reciente primero, con el tope de 20. Sin pedidos abiertos, `pedido.*` llega nulo. Reemplaza el default «vivos salvo cancelados, 20» | Decisión del humano (sin motivo escrito). |
+| D13 | (2026-10-23, decisión del humano, cierra P18) El back devuelve un objeto de valores con el nombre del cliente, el nombre de la empresa y los datos del pedido elegido (por defecto, el abierto más reciente): `cliente.nombre`, `empresa.nombre` (se mantiene para no romper plantillas), `pedido.numero`, `pedido.estado` en lenguaje del cliente (recibido, en preparación, entregado, cancelado), `pedido.fecha_solicitud`, `pedido.total` (nulo hasta QC-307) y las líneas del pedido (presentaciones, entregado y faltante) | `empresa.nombre` se conserva para que no se rompan las plantillas que ya la usan; el resto, decisión del humano. |
+| D14 | (2026-10-23, decisión del humano, cierra P19) Basta `whatsapp.consultar` para ver los pedidos del cliente en el contexto del chat | Decisión del humano (sin motivo escrito). Hoy solo el Administrador tiene el permiso (D1). |

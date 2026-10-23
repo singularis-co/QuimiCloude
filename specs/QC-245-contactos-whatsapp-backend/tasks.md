@@ -1,7 +1,8 @@
 # QC-245 — contactos-whatsapp-backend · tasks.md
 
-> Requisitos R1–R59 (`requirements.md`; R44–R59 y T10–T17 son la Enmienda 1 del 2026-10-23,
-> `design.md > 15`), diseño en `design.md`. `[P]` = puede ir en paralelo con las
+> Requisitos R1–R63 (`requirements.md`; R44–R59 y T10–T17 son la Enmienda 1 del 2026-10-23,
+> `design.md > 15`; R60–R63, de D12–D14 del mismo día, `design.md > 15.8`, se reparten en T11, T13,
+> T15 y T17), diseño en `design.md`. `[P]` = puede ir en paralelo con las
 > otras `[P]` de su tanda. Cada tarea cierra con `pnpm run typecheck`, `pnpm run lint` y
 > `pnpm exec vitest related --run <archivos tocados>`; las que tocan módulos, además
 > `pnpm exec vitest run guard`. Nadie corre `pnpm test`.
@@ -121,13 +122,15 @@
   - **Hecho:** devuelve el nombre de la empresa viva; dada de baja o inexistente ⇒ `null`; patrón
     idéntico a `getCompanyCountry`.
 
-- [ ] **T11 [P] `pedidos`: `CustomerOrderDirectory`** (R51, R54, P15; design §15.4).
+- [ ] **T11 [P] `pedidos`: `CustomerOrderDirectory`** (R51, R54, D12; design §15.4, §15.8).
   - `domain/customer-order-directory.ts`, `adapters/driven/persistence/customer-order-directory-prisma.ts`
-    (archivo nuevo, no `order-catalog-prisma.ts`), barril, composición.
+    (archivo nuevo, no `order-catalog-prisma.ts`), barril (+ `ORDER_STATUSES_NOT_IN_PROGRESS`),
+    composición.
   - Tests `tests/integration/pedidos/customer-order-directory.int.test.ts` (+ `aislamiento.json`);
     tensar `tests/unit/pedidos/module-contract.test.ts`.
-  - **Hecho:** solo vivos de ese cliente y empresa; excluye los estados pedidos; orden `created_at`
-    DESC, `id` DESC; respeta `limit`; un cliente de otra empresa da `[]`. `OrderCatalog` sin cambios.
+  - **Hecho:** solo vivos de ese cliente y empresa; con `ORDER_STATUSES_NOT_IN_PROGRESS` no vuelve
+    ningún entregado ni cancelado; orden `created_at` DESC, `id` DESC; respeta `limit`; un cliente de
+    otra empresa da `[]`. `OrderCatalog` sin cambios.
 
 - [ ] **T12 [P] Graph: `downloadMedia`** (R45–R47; design §15.1).
   - `ports/whatsapp-graph-client.ts` (+ `GraphMediaDownload`), `whatsapp-graph-client-fetch.ts`
@@ -141,19 +144,22 @@
 
 ### Tanda 7 — dominio y adaptador (dependen de T4 y T5)
 
-- [ ] **T13 Dominio puro de la enmienda** (R25, R48, R49, R52, R53, R55, R56). Depende de T4.
+- [ ] **T13 Dominio puro de la enmienda** (R25, R48, R49, R52, R53, R55, R56, R60–R62). Depende de T4.
   - `domain/whatsapp-media.ts` (constantes, `mediaUrlOf`, `mediaIdOf`, `isViewableMedia`).
   - `domain/whatsapp-conversation.ts`: `attachmentOf` con `mediaUrl` y reacción por
     `reactedMessageId`; tipos del §B v2.
-  - `domain/whatsapp-chat-context.ts` (`WHATSAPP_SYSTEM_CONSTANT_KEYS`, `customerOrderOf`,
-    `contextValuesOf`, tipos), `whatsapp-conversation-input.ts` (+ `CUSTOMER_ORDERS_LIMIT`,
+  - `domain/whatsapp-chat-context.ts` (`WHATSAPP_SYSTEM_CONSTANT_KEYS` con las siete claves,
+    `CUSTOMER_ORDER_STAGE`, `customerDateOf`, `orderDetailTextOf`, `customerOrderOf`,
+    `contextValuesOf`, tipos; design §15.8), `whatsapp-conversation-input.ts` (+ `CUSTOMER_ORDERS_LIMIT`,
     `getWhatsappChatContextSchema`, `getWhatsappMediaSchema`), `errors.ts`
     (+ `WhatsappOrderNotFoundError`).
   - Tests `whatsapp-media.test.ts`, `whatsapp-chat-context.test.ts`; ampliar
     `whatsapp-conversation.test.ts` y `whatsapp-conversation-input.test.ts`.
   - **Hecho:** sin imports prohibidos en `domain/`; `media_id` y `wamid` no salen en ningún tipo;
     envases iguales a `orderedPackages`/`remainingPackages`; valores nulos, nunca `''` ni ausentes;
-    tipos idénticos al §B v2 del contrato.
+    sin pedido elegido, las cinco `pedido.*` nulas; los diez estados con una de las cuatro
+    etiquetas; fecha `DD/MM/AAAA` del día UTC; `pedido.detalle` con «falta» en singular, «presentación
+    sin nombre», `null` sin líneas y sin `\n` ni `\t`; tipos idénticos al §B v2 del contrato.
 
 - [ ] **T14 Adaptador de conversaciones** (R44, R49, R57). Depende de T5 y T13.
   - `ports/whatsapp-conversation-repository.ts`: `ChatMessageRow.reactedMessageId`,
@@ -166,15 +172,17 @@
 
 ### Tanda 8 — casos de uso (dependen de T6 y T10–T14)
 
-- [ ] **T15 Casos de uso `getWhatsappMedia` y `getWhatsappChatContext`** (R44–R46, R50–R57).
+- [ ] **T15 Casos de uso `getWhatsappMedia` y `getWhatsappChatContext`** (R44–R46, R50–R57, R63).
   - `domain/get-whatsapp-media.ts`, `domain/get-whatsapp-chat-context.ts`; `resolveChatCustomer`
     compartido con `get-whatsapp-chat.ts` (sin cambiar su comportamiento: los tests de T6 siguen
     verdes sin tocarlos).
   - Tests `get-whatsapp-media.test.ts`, `get-whatsapp-chat-context.test.ts`.
   - **Hecho:** sin permiso ningún puerto se toca; cada rama de «no encontrado» del archivo no llama a
-    Graph; token ilegible o Graph fallido ⇒ `unavailable`; `orderId` ajeno ⇒ `order_not_found`;
-    sin pedidos ⇒ `selectedOrderId: null` y `pedido.numero: null`; el contexto no llama a ningún
-    método que escriba (espías); tres lecturas por lote para los pedidos.
+    Graph; token ilegible o Graph fallido ⇒ `unavailable`; `orderId` ajeno, entregado o cancelado ⇒
+    `order_not_found`; el directorio se llama con `ORDER_STATUSES_NOT_IN_PROGRESS`; sin pedidos
+    abiertos ⇒ `selectedOrderId: null` y todas las `pedido.*` nulas; actor con `whatsapp.consultar`
+    y sin permisos de Pedidos recibe pedidos y valores; el contexto no llama a ningún método que
+    escriba (espías); tres lecturas por lote para los pedidos.
 
 ### Tanda 9 — borde y cableado (depende de T7 y T15)
 
@@ -191,16 +199,18 @@
   - **Hecho:** guardias verdes; firmas y tipos idénticos al §A/§B v2 del contrato; la respuesta 200
     lleva `Cache-Control: private, max-age=3600` y `X-Content-Type-Options: nosniff`.
 
-- [ ] **T17 Integración del flujo y cierre de la enmienda** (R44, R45, R49, R51–R57, R59). Depende de
-  T8 y T16.
+- [ ] **T17 Integración del flujo y cierre de la enmienda** (R44, R45, R49, R51–R57, R59–R63).
+  Depende de T8 y T16.
   - `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` sobre la composición
     real con Graph doble (+ `aislamiento.json`): imagen entrante servida; otra empresa, cliente dado
     de baja y audio ⇒ 404; reacción casada con su mensaje; contexto con pedidos, envases, número y
-    valores; `orderId` ajeno rechazado; marca de lectura intacta tras pedir el contexto.
+    las siete constantes; un pedido entregado y uno cancelado fuera de `orders`; cliente con solo
+    pedidos cerrados ⇒ `orders: []` y `pedido.*` nulas; `orderId` ajeno rechazado; marca de lectura
+    intacta tras pedir el contexto.
   - Repetir T9 sobre todo el diff y actualizar el mapa `R<n> → test` de `progress/impl_QC-245.md`
-    con R44–R59.
-  - **Hecho:** todo verde; ningún R44–R59 sin test. El leader republica el §«Contrato para la
-    pantalla» en QC-246.
+    con R44–R63.
+  - **Hecho:** todo verde; ningún R44–R63 sin test. El leader republica el §«Contrato para la
+    pantalla» en QC-246 y anota el seguimiento del catálogo de constantes del front (design §11).
 
 ## Mapa R → test (previsto)
 
@@ -246,13 +256,15 @@
 | R48 | `whatsapp-media.test.ts`, `whatsapp-conversation.test.ts` |
 | R49 | `whatsapp-conversation.test.ts`, `whatsapp-conversation-prisma.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
 | R50 | `get-whatsapp-chat-context.test.ts` |
-| R51 | `get-whatsapp-chat-context.test.ts`, `customer-order-directory.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R51 | `get-whatsapp-chat-context.test.ts`, `customer-order-directory.int.test.ts` (sin entregados ni cancelados), `whatsapp-chat-context-flow.int.test.ts` |
 | R52, R53 | `whatsapp-chat-context.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
 | R54 | `get-whatsapp-chat-context.test.ts`, `customer-order-directory.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
 | R55, R56 | `whatsapp-chat-context.test.ts`, `get-company-name.test.ts`, `company-name-read.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
 | R57 | `get-whatsapp-chat-context.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
 | R58 | `whatsapp-conversation-actions.test.ts`, `whatsapp-media-route.test.ts`, `module-shape.test.ts` |
 | R59 | `whatsapp-chat-context-flow.int.test.ts` (y los unitarios de T12–T15) |
+| R60–R62 | `whatsapp-chat-context.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R63 | `get-whatsapp-chat-context.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
 
 ## Archivos esperados
 
