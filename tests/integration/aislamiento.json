@@ -48,6 +48,7 @@
     "identity/notifications-addon-migration.int.test.ts",
     "identity/packer-role-migration.int.test.ts",
     "identity/packing-permission-migration.int.test.ts",
+    "identity/whatsapp-read-permission-migration.int.test.ts",
     "identity/whatsapp-send-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",

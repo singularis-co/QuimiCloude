@@ -84,6 +84,10 @@ import {
  * WhatsApp a los clientes de la empresa. Como `usuarios`, su modulo no es una carpeta de
  * `lib/modules/`. Lo recibe unicamente el Administrador.
  *
+ * `whatsapp.consultar` es leer esas conversaciones, separado de enviar: quien solo atiende la
+ * bandeja no necesita escribir, y quien envia desde otra pantalla no necesita leer. Lo recibe
+ * unicamente el Administrador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -263,6 +267,12 @@ export const PERMISSIONS = [
     action: 'enviar',
     description: 'Enviar mensajes de WhatsApp a los clientes de la empresa.',
   },
+  {
+    code: 'whatsapp.consultar',
+    module: 'whatsapp',
+    action: 'consultar',
+    description: 'Ver las conversaciones de WhatsApp con los clientes de la empresa.',
+  },
 ] as const;
 
 /**
@@ -314,6 +324,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'entregas.modificar',
     'entregas.anular',
     'whatsapp.enviar',
+    'whatsapp.consultar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
