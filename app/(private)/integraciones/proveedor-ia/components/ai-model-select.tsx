@@ -74,12 +74,14 @@ export type AiModelSelectProps = {
 
 function OptionContent({ option }: { readonly option: AiModelOption }) {
   return (
-    <>
+    // El texto de la opción del primitivo es flex sin alinear: sin este envoltorio la marca
+    // queda pegada arriba en vez de centrada con el id.
+    <span className="flex items-center gap-2">
       <span className="font-mono break-all">{option.modelId}</span>
       {option.isDefault ? (
         <span className="text-xs text-muted-foreground">{AI_MODEL_SELECT_TEXTS.recommendedMark}</span>
       ) : null}
-    </>
+    </span>
   );
 }
 

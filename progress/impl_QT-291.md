@@ -503,19 +503,41 @@ nueva; viewport fijado con `tests/helpers/viewport` porque el selector usa `useI
 - R26 en la página: `ai-provider-page.test.tsx` «R31, QT-291 R26: con conexion pinta la tarjeta… y la
   sección «Modelo»…».
 
-## T12. Revisión visual (2026-10-22, frontend_dev) — PENDIENTE
+## T12. Revisión visual (2026-10-22, frontend_dev)
 
-**No hecha.** Se preparó una base aislada (`qct_qt291selecci_2c6b3448_mvkc8lr1_vfs`, copia de la plantilla
-de la rama `qct_tpl_a9127c0147c3`, con los añadidos de la empresa del seed prendidos) y un `next dev
---port 3119` con los dobles de integraciones, pero el servidor cayó con `ENOSPC: no space left on device`
-al escribir su caché: **el disco C: está al 100 % (0-16 MB libres)**. Sin capturas: no se inventan. La base
-se borró y el servidor se detuvo; `progress/capturas/QT-291/` no se creó.
+**Cómo.** Base aislada desde la plantilla `qct_tpl_a9127c0147c3` (`qct_qt291selecci_2c6b3448_mvke1giw_18pk`,
+añadidos de la empresa del seed prendidos), `next dev --port 3119` con `INTEGRATIONS_E2E_DOUBLES=1` y clave de
+cifrado efímera. Gemini se conectó por la pantalla y `gemini-4-argon` se eligió por la pantalla (toast
+«Modelo guardado»; la base quedó con `model_id = gemini-4-argon`). Los tres estados se fijaron por SQL; el
+tema, con la cookie `theme_preference`. Al terminar: servidor parado, base borrada, caché de `.next/dev`
+borrada (solo quedan los tipos generados).
 
-Para retomarla (con espacio en disco): base desde la plantilla, `next dev` con `DATABASE_URL` de esa base,
-`INTEGRATIONS_E2E_DOUBLES=1` y `INTEGRATIONS_ENCRYPTION_KEYS`/`_ACTIVE`; conectar Gemini por la pantalla,
-elegir `gemini-4-argon` por la pantalla (toast) y fijar los tres estados por SQL (`model_id` nulo; elegido;
-`model_id` = `unavailable_model` = `gemini-3.7-flash` con `status = 'ERROR'` y su `last_error`); capturar
-1440×1000, 820×1180 y 390×844 en claro y oscuro, más el selector abierto en cada ancho.
+**Capturas** (`progress/capturas/QT-291/`, 22 PNG, 3,9 MB):
+- Tres estados × tres anchos × dos temas: `{recomendado,elegido,retirado}-{escritorio,tablet,telefono}-{claro,oscuro}.png`
+  (1440×1000, 820×1180, 390×844 a 2×).
+- Selector abierto en cada ancho (claro): `recomendado-abierto-{escritorio,tablet,telefono}-claro.png`
+  (escritorio y tablet: lista debajo del disparador; teléfono: hoja inferior con título «Modelo de Gemini»).
+- `elegido-toast-escritorio-claro.png`: el toast tras elegir por la pantalla.
+
+**Contra `docs/diseno/canvas/ProveedorIAModelos*.dc.html`**
+- Orden de la tarjeta igual al tablero: cabecera, aviso de error, sección «Modelo» (título, subtítulo,
+  etiqueta «Modelo de Gemini», selector, ayuda) y «Última prueba».
+- Disparador: id en mono + insignia; «Recomendado» (neutral) donde el tablero dice «predeterminado» —manda
+  el spec—. En la lista, la marca minúscula «recomendado» junto al predeterminado y el check en el valor.
+- Retirado: id tachado, insignia «No disponible» (danger), borde y anillo de inválido, ayuda en rojo y el
+  aviso «Error con tu proveedor» arriba. Legible en claro y oscuro.
+- Teléfono: disparador a todo el ancho, botones apilados a ancho completo; tablet a 820 px usa ya la lista
+  de escritorio (la hoja es solo ≤ 640 px, como `CountrySelect`). Los botones de la tarjeta apilados en tablet
+  son los de QC-275, fuera de esta feature.
+- Sin diferencias más allá de la insignia.
+
+**Defecto corregido.** En la lista de escritorio/tablet la marca «recomendado» quedaba pegada arriba (como un
+superíndice): el `ItemText` del primitivo es `flex` sin alinear y el contenido de la opción eran dos
+hermanos sueltos. El tablero los centra (`align-items: center`). `OptionContent` de
+`ai-model-select.tsx` va ahora en un `<span class="flex items-center gap-2">`; las capturas abiertas son las
+de después del arreglo. En la hoja de teléfono no cambia nada visible.
+
+**Archivos:** `app/(private)/integraciones/proveedor-ia/components/ai-model-select.tsx`, `progress/capturas/QT-291/*.png` (22).
 
 ## Verificación de la tanda T9 + T10 + T11 (2026-10-22, frontend_dev)
 
@@ -565,3 +587,48 @@ o proveedor»»): la frase «Después de conectar podrás elegir el modelo.» so
 ## F2: R34 log
 
 - `selectAiModelAction` registra `console.error('ai_provider_select_secret_unreadable', { companyId })` cuando el estado traducido es `integration_secret_unreadable` (decide por el estado, no por `instanceof`: guardia R23); la conexión no pasa a Error y el aviso no cambia. Sin key, valor cifrado ni diagnóstico propio. Archivos: `lib/modules/integraciones/adapters/driving/ai-provider-actions.ts`, `tests/unit/integraciones/ai-provider/ai-provider-actions.test.ts` (2 tests «QT-291 R34 —»). Salida: typecheck solo 3 errores en `e2e/integraciones-proveedor-ia.spec.ts` (esperado); eslint sin problemas; `vitest run tests/unit/integraciones/ai-provider/` 12 archivos, 214 pass; `vitest run guard` 1276 pass, 22 skipped, 0 fail (el rojo R23 anotado arriba queda resuelto). **Veredicto:** R34 log en verde.
+
+## T13. E2E (2026-10-22, frontend_dev)
+
+**Archivo:** `e2e/integraciones-proveedor-ia.spec.ts`.
+- Fuera los testids de las filas «Receta»/«Catálogo» y la lectura de `recipeModel`/`catalogModel` (los 3
+  errores de typecheck). El paso del alta lee el recomendado de Gemini de `ai_models` y afirma que el selector
+  lo muestra con «Recomendado» y que la fila queda con `model` nulo.
+- `testOk` pasa a «Conexión correcta · el modelo en uso responde»; con Gemini elegido, la ayuda del formulario
+  dice «Después de conectar podrás elegir el modelo.» y no nombra ningún `gemini-`.
+- Caso nuevo: Gemini conectado por el doble → recomendado con «Recomendado» y «Se usa el modelo recomendado de
+  Gemini.» → elegir el primer no predeterminado del catálogo → «Modelo guardado», fila con ese `model` y
+  `ACTIVE` → recargar → «Elegido por tu empresa.» sin «Recomendado».
+
+**R → test**
+- R20 → paso «R13, R34, QT-291 R20: «Probar conexión» … «Conexión correcta · el modelo en uso responde»…».
+- R30 → paso «R16, R34, QT-291 R30: con Gemini la ayuda dice que el modelo se elige despues…».
+- R26, R27 → paso «R17, R31, R34, QT-291 R26, R27: «Guardar y conectar» … recomendado de Gemini en la sección «Modelo»».
+- R9, R26, R27, R29, R32 → caso «QT-291 R26, R27, R29, R32, R9: con Gemini conectado, elegir otro modelo…».
+
+**Salida** (`pnpm exec playwright test e2e/integraciones-proveedor-ia.spec.ts`)
+- Contra la base de `.env` (`QuimiCloude`): 4 failed, 2 passed. Esa base **no tiene la migración
+  `20261022120000_ai_models`** (`aiModel.findMany`: «The table … does not exist»). No es del spec: es el
+  estado de la base de desarrollo local. No se migró (base compartida).
+- Contra una base aislada desde la plantilla de la rama (`DATABASE_URL` de `qct_qt291selecci_…_uv8`):
+  1.ª corrida 5 passed, 1 failed: WebKit, paso «R37: sin conexion, Fórmulas pinta «Subir PDFs»
+  deshabilitado…» (globo por `hover()` no apareció en 5 s; paso de QC-275 sin tocar). 2.ª corrida:
+  ```
+  ✓ [chromium] R37, R3: quien sube PDF sin integraciones.modificar … 404
+  ✓ [chromium] QT-291 R26, R27, R29, R32, R9: con Gemini conectado, elegir otro modelo …
+  ✓ [webkit]   R37, R3: …
+  ✓ [webkit]   QT-291 R26, R27, R29, R32, R9: …
+  ✓ [chromium] R37, R30, R13, R16, R34, R17, R31, R8, R33, R20: …
+  ✓ [webkit]   R37, R30, R13, R16, R34, R17, R31, R8, R33, R20: …
+  6 passed (40.4s)
+  ```
+- Servidor del E2E (3117) parado al terminar; base aislada borrada; `test-results/` borrado.
+
+**Verificación T12 + T13**
+- `pnpm run typecheck`: 0 errores.
+- `pnpm exec eslint` de los 2 archivos: No issues found.
+- `pnpm exec vitest run tests/unit/integraciones-ui/`: 10 archivos, 154 pass.
+- `pnpm exec vitest run guard`: 87 archivos, 1276 pass, 22 skipped, 0 fail.
+
+**Veredicto:** T12 y T13 hechas; un defecto de alineación corregido; E2E en verde contra una base migrada, con un
+rojo intermitente de WebKit en un paso de QC-275 y la base local de `.env` sin migrar.

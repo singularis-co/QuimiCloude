@@ -104,13 +104,13 @@
   responde» (R20); datos de `ai-provider-page.test.tsx` sin `recipeModel`.
   *Hecho:* `ai-provider-form.test.tsx` (R20, R30) y `ai-provider-page.test.tsx` en verde.
 
-- [ ] **T12. Revisión visual** (dep. T10, T11). Escritorio, tablet (≤ 1024 px) y teléfono (390 px)
+- [x] **T12. Revisión visual** (dep. T10, T11). Escritorio, tablet (≤ 1024 px) y teléfono (390 px)
   contra los tableros; claro y oscuro.
   *Hecho:* capturas en `progress/impl_QT-291.md` con los tres estados del selector.
 
 ## Bloque E — E2E y cierre
 
-- [ ] **T13. E2E** (dep. T10). `e2e/integraciones-proveedor-ia.spec.ts`: ajustar el caso que lee
+- [x] **T13. E2E** (dep. T10). `e2e/integraciones-proveedor-ia.spec.ts`: ajustar el caso que lee
   `recipeModel`/`catalogModel`, el texto de la prueba buena (`testOk`) y la ayuda sin conexión, y
   añadir el de elegir modelo con Gemini (`design.md > 13`).
   *Hecho:* `pnpm exec playwright test e2e/integraciones-proveedor-ia.spec.ts` en verde.
