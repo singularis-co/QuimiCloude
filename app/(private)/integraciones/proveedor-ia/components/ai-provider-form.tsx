@@ -39,19 +39,13 @@ export const AI_PROVIDER_FORM_TEXTS = {
   showKey: 'Mostrar la key',
   hideKey: 'Ocultar la key',
   helpBeforeLink: (name: string) => `Créala en la consola de ${name}: `,
-  helpModels: 'Se usa con los modelos ',
-  helpModelsJoin: ' y ',
+  helpModel: 'Después de conectar podrás elegir el modelo.',
   test: 'Probar conexión',
   save: 'Guardar y conectar',
   note: '«Guardar y conectar» hace la misma prueba pequeña antes de guardar: con la key rechazada no se guarda nada.',
   saved: 'Proveedor IA conectado',
+  testOk: 'Conexión correcta · el modelo en uso responde',
 } as const;
-
-const SECONDS = new Intl.NumberFormat('es', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-export function aiProviderTestOkMessage(elapsedMs: number): string {
-  return `Conexión correcta · respondió en ${SECONDS.format(elapsedMs / 1000)} s`;
-}
 
 /** Sin el protocolo, como se lee en la ayuda. */
 function linkText(url: string): string {
@@ -60,7 +54,7 @@ function linkText(url: string): string {
 
 export type AiProviderFeedback =
   | { readonly kind: 'none' }
-  | { readonly kind: 'ok'; readonly elapsedMs: number }
+  | { readonly kind: 'ok' }
   | { readonly kind: 'failed'; readonly message: string }
   | { readonly kind: 'error'; readonly error: ErrorState };
 
@@ -72,7 +66,7 @@ export function AiProviderFeedbackMessage({ feedback }: { readonly feedback: AiP
     return (
       <StatusBadge
         tone="success"
-        label={aiProviderTestOkMessage(feedback.elapsedMs)}
+        label={AI_PROVIDER_FORM_TEXTS.testOk}
         className="animate-in fade-in duration-150"
       />
     );
@@ -100,6 +94,8 @@ export type AiProviderFormProps = {
   readonly providers: readonly AiProviderEntry[];
   /** Al cambiar de proveedor desde la tarjeta, el que ya estaba. */
   readonly initialProvider?: AiProviderCode;
+  /** Con la empresa ya conectada (al cambiar desde la tarjeta) la ayuda no anuncia la elección de modelo. */
+  readonly connected?: boolean;
   /** Tras guardar con éxito, para que la tarjeta vuelva a su vista. */
   readonly onSaved?: () => void;
 };
@@ -109,7 +105,12 @@ export type AiProviderFormProps = {
  * guardar: ni lo escrito vuelve del servidor ni depende del reinicio automático del `<form>`. Tras
  * probar, la key escrita se queda en el campo para poder guardarla sin pegarla otra vez.
  */
-export function AiProviderForm({ providers, initialProvider, onSaved }: AiProviderFormProps) {
+export function AiProviderForm({
+  providers,
+  initialProvider,
+  connected = false,
+  onSaved,
+}: AiProviderFormProps) {
   const baseId = useId();
   const keyId = `${baseId}-key`;
   const helpId = `${baseId}-help`;
@@ -133,9 +134,7 @@ export function AiProviderForm({ providers, initialProvider, onSaved }: AiProvid
       const result = await testAiProviderKeyAction({ status: 'idle' }, formData);
       if (result.status === 'error') return { kind: 'error', error: result };
       if (result.status === 'tested') {
-        return result.ok
-          ? { kind: 'ok', elapsedMs: result.elapsedMs }
-          : { kind: 'failed', message: result.message };
+        return result.ok ? { kind: 'ok' } : { kind: 'failed', message: result.message };
       }
       return NO_AI_PROVIDER_FEEDBACK;
     },
@@ -226,11 +225,8 @@ export function AiProviderForm({ providers, initialProvider, onSaved }: AiProvid
             >
               {linkText(brand.consoleUrl)}
             </a>
-            {'. '}
-            {AI_PROVIDER_FORM_TEXTS.helpModels}
-            <span className="font-mono">{selected.recipeModel}</span>
-            {AI_PROVIDER_FORM_TEXTS.helpModelsJoin}
-            <span className="font-mono">{selected.catalogModel}</span>.
+            {'.'}
+            {connected ? null : ` ${AI_PROVIDER_FORM_TEXTS.helpModel}`}
           </p>
         </div>
 

@@ -48,6 +48,7 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
     testSavedAiProviderAction: vi.fn(prohibida('testSavedAiProviderAction')),
     saveAiProviderConnectionAction: saveMock,
     disconnectAiProviderAction: vi.fn(prohibida('disconnectAiProviderAction')),
+    selectAiModelAction: vi.fn(prohibida('selectAiModelAction')),
     getAiProviderReadinessAction: vi.fn(prohibida('getAiProviderReadinessAction')),
   };
 });
@@ -57,16 +58,23 @@ vi.mock('sonner', async (importOriginal) => ({
   toast: { success: toastSuccessMock, dismiss: vi.fn() },
 }));
 
+function proveedor(code: AiProviderCode, name: string, recomendado: string, otro: string): AiProviderEntry {
+  return {
+    code,
+    name,
+    models: [
+      { modelId: otro, isDefault: false },
+      { modelId: recomendado, isDefault: true },
+    ],
+    defaultModel: recomendado,
+  };
+}
+
 const PROVEEDORES: AiProviderEntry[] = [
-  { code: 'ANTHROPIC', name: 'Claude', recipeModel: 'claude-haiku-5-5', catalogModel: 'claude-haiku-5-5' },
-  { code: 'GOOGLE', name: 'Gemini', recipeModel: 'gemini-3.8-flash', catalogModel: 'gemini-3.5-flash-lite' },
-  { code: 'OPENAI', name: 'OpenAI', recipeModel: 'gpt-6-luna', catalogModel: 'gpt-6-luna-mini' },
-  {
-    code: 'OPENROUTER',
-    name: 'OpenRouter',
-    recipeModel: 'anthropic/claude-haiku-5.5',
-    catalogModel: 'anthropic/claude-haiku-5.5',
-  },
+  proveedor('ANTHROPIC', 'Claude', 'claude-haiku-5-5', 'claude-sonnet-5-5'),
+  proveedor('GOOGLE', 'Gemini', 'gemini-3.8-flash', 'gemini-4-argon'),
+  proveedor('OPENAI', 'OpenAI', 'gpt-6-luna', 'gpt-6-sol'),
+  proveedor('OPENROUTER', 'OpenRouter', 'anthropic/claude-haiku-5.5', 'openai/gpt-6-luna'),
 ];
 
 const KEY = 'sk-ant-centinela-que-nunca-vuelve-a-la-pantalla-0001';
@@ -150,15 +158,19 @@ describe('AiProviderForm', () => {
     expect(screen.getByRole('button', { name: 'Ocultar la key' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('R30: la ayuda enlaza la consola del elegido y nombra sus dos modelos, y cambia al elegir otro', async () => {
+  it('R30, QT-291 R30: la ayuda enlaza la consola del elegido y dice «Después de conectar podrás elegir el modelo.» sin nombrar modelos, y cambia al elegir otro', async () => {
     const user = setupUser();
     render(<AiProviderForm providers={PROVEEDORES} />);
 
     const ayuda = screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID);
     expect(campo()).toHaveAccessibleDescription(ayuda.textContent ?? '');
     expect(ayuda.textContent).toBe(
-      'Créala en la consola de Claude: console.anthropic.com/settings/keys. Se usa con los modelos claude-haiku-5-5 y claude-haiku-5-5.',
+      'Créala en la consola de Claude: console.anthropic.com/settings/keys. Después de conectar podrás elegir el modelo.',
     );
+    for (const entry of PROVEEDORES) {
+      for (const model of entry.models) expect(ayuda.textContent).not.toContain(model.modelId);
+    }
+    expect(ayuda.querySelector('.font-mono')).toBeNull();
     const enlace = within(ayuda).getByRole('link');
     expect(enlace).toHaveAttribute('href', 'https://console.anthropic.com/settings/keys');
     expect(enlace).toHaveAttribute('target', '_blank');
@@ -170,7 +182,23 @@ describe('AiProviderForm', () => {
     expect(opcion('ANTHROPIC')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByLabelText('API key de OpenAI')).toBe(campo());
     expect(screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID).textContent).toBe(
-      'Créala en la consola de OpenAI: platform.openai.com/api-keys. Se usa con los modelos gpt-6-luna y gpt-6-luna-mini.',
+      'Créala en la consola de OpenAI: platform.openai.com/api-keys. Después de conectar podrás elegir el modelo.',
+    );
+  });
+
+  it('QT-291 R30: con la empresa ya conectada, la ayuda solo enlaza la consola, sin «Después de conectar podrás elegir el modelo.»', async () => {
+    const user = setupUser();
+    render(<AiProviderForm providers={PROVEEDORES} initialProvider="GOOGLE" connected />);
+
+    const ayuda = screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID);
+    expect(campo()).toHaveAccessibleDescription(ayuda.textContent ?? '');
+    expect(ayuda.textContent).not.toContain('Después de conectar podrás elegir el modelo.');
+    expect(within(ayuda).getByRole('link')).toBeTruthy();
+
+    await user.click(opcion('OPENAI'));
+
+    expect(screen.getByTestId(AI_PROVIDER_FORM_HELP_TESTID).textContent).toBe(
+      'Créala en la consola de OpenAI: platform.openai.com/api-keys.',
     );
   });
 
@@ -208,7 +236,7 @@ describe('AiProviderForm', () => {
     expect(screen.getByText(/«Guardar y conectar» hace la misma prueba pequeña antes de guardar: con la key rechazada no se guarda nada\./)).toBeTruthy();
   });
 
-  it('R34: la prueba buena muestra «Conexión correcta · respondió en X s» con un decimal en la region viva, y envia proveedor y key', async () => {
+  it('R34, QT-291 R20: la prueba buena de la key escrita muestra «Conexión correcta · el modelo en uso responde», sin tiempo, en la region viva, y envia proveedor y key', async () => {
     testKeyMock.mockResolvedValue({ status: 'tested', ok: true, elapsedMs: 812 });
     const user = setupUser();
     render(<AiProviderForm providers={PROVEEDORES} />);
@@ -217,7 +245,7 @@ describe('AiProviderForm', () => {
     await user.type(campo(), KEY);
     await user.click(botonProbar());
 
-    await waitFor(() => expect(resultado().textContent).toBe('Conexión correcta · respondió en 0,8 s'));
+    await waitFor(() => expect(resultado().textContent).toBe('Conexión correcta · el modelo en uso responde'));
     expect(resultado()).toHaveAttribute('aria-live', 'polite');
     expect(testKeyMock).toHaveBeenCalledTimes(1);
     expect(saveMock).not.toHaveBeenCalled();

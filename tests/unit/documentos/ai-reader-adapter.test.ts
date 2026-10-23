@@ -219,7 +219,21 @@ describe('documentos — el adaptador de Gemini (@google/genai)', () => {
       expect((error as AiProviderError).failure).toEqual({ kind: 'rejected_key', httpStatus: 400, model: null });
     });
 
-    it.each([400, 404, 500])('R26 — %i (sin motivo de key) al leer se propaga tal cual', async (status) => {
+    it('QT-291 R23 — un 404 al leer lanza AiProviderError con el modelo en uso, sin la key ni el cuerpo', async () => {
+      generateContent.mockRejectedValue(await errorHttp(404));
+      const { createGenaiReader } = await adaptador();
+
+      const error = await createGenaiReader(CONFIG).read(LEER).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AiProviderError);
+      const fallo = error as AiProviderError;
+      expect(fallo.failure).toEqual({ kind: 'model_unavailable', httpStatus: 404, model: 'modelo-de-catalogo' });
+      expect(fallo.diagnostic).toBe('gemini generateContent respondió 404');
+      expect(JSON.stringify({ m: fallo.message, d: fallo.diagnostic })).not.toContain(KEY);
+      expect(generateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([400, 500])('R26 — %i (sin motivo de key) al leer se propaga tal cual', async (status) => {
       const original = await errorHttp(status);
       generateContent.mockRejectedValue(original);
       const { createGenaiReader } = await adaptador();

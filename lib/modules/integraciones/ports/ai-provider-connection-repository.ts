@@ -15,6 +15,8 @@ export type NewAiProviderConnectionRow = {
   readonly lastErrorAt: Date | null;
   readonly lastCheckedAt: Date | null;
   readonly keyUpdatedAt: Date;
+  readonly model?: string | null;
+  readonly unavailableModel?: string | null;
   readonly createdById: string;
   readonly updatedById: string;
 };
@@ -28,6 +30,8 @@ export type AiProviderConnectionPatch = {
   readonly lastErrorAt?: Date | null;
   readonly lastCheckedAt?: Date | null;
   readonly keyUpdatedAt?: Date;
+  readonly model?: string | null;
+  readonly unavailableModel?: string | null;
   readonly updatedById?: string;
 };
 
@@ -43,6 +47,8 @@ export class AiProviderConnectionRaceError extends Error {
  * Solo la fila de la empresa de `scope`. `null` es igual para «no existe» y «de otra empresa».
  * `scope` va al final de cada firma: una llamada que lo omita no compila. Si `create` choca con la
  * conexión que otro guardado acaba de crear en la misma empresa, lanza `AiProviderConnectionRaceError`.
+ * Un `model` que no es del catálogo del proveedor de la fila lo rechaza la base y lanza `Error`: el
+ * caso de uso lo valida antes, así que llegar aquí es un dato imposible.
  */
 export interface AiProviderConnectionRepository {
   find(scope: IntegracionesScope): Promise<AiProviderConnectionRecord | null>;

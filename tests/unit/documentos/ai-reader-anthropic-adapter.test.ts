@@ -270,7 +270,22 @@ describe('documentos — el adaptador de Claude (@anthropic-ai/sdk)', () => {
       expect(create).toHaveBeenCalledTimes(1);
     });
 
-    it.each([404, 500, 400])('R26 — %i al leer se propaga tal cual, sin AiProviderError', async (status) => {
+    it('QT-291 R23 — un 404 al leer lanza AiProviderError con el modelo en uso, sin la key ni el cuerpo', async () => {
+      create.mockRejectedValue(await errorHttp(404));
+      const { createAnthropicReader } = await adaptador();
+
+      const error = await createAnthropicReader(CONFIG).read(LEER).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AiProviderError);
+      const fallo = error as AiProviderError;
+      expect(fallo.code).toBe('ai_provider_error');
+      expect(fallo.failure).toEqual({ kind: 'model_unavailable', httpStatus: 404, model: 'modelo-de-receta' });
+      expect(fallo.diagnostic).toBe('claude messages.create respondió 404');
+      expect(JSON.stringify({ m: fallo.message, d: fallo.diagnostic })).not.toContain(KEY);
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([500, 400])('R26 — %i al leer se propaga tal cual, sin AiProviderError', async (status) => {
       const original = await errorHttp(status);
       create.mockRejectedValue(original);
       const { createAnthropicReader } = await adaptador();

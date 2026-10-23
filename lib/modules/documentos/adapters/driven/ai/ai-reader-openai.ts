@@ -2,7 +2,7 @@ import OpenAI, { APIError } from 'openai';
 
 import { AiProviderError } from '../../../domain/errors';
 
-import { isAccountFailure } from '@/lib/modules/integraciones';
+import { marksConnection } from '@/lib/modules/integraciones';
 
 import type { AiDocumentPart, AiReader, AiReadRequest } from '../../../ports/ai-reader';
 import type { AiProviderFailure, AiProviderProbeResult } from '@/lib/modules/integraciones';
@@ -80,11 +80,25 @@ function isAbort(error: unknown): boolean {
 }
 
 /**
- * El tipo del fallo, solo por el código HTTP: el texto del proveedor no se mira ni se guarda.
- * 402 es la falta de saldo de OpenRouter. `model` es el que se consultaba en la prueba; al leer
- * va `null` y un 404 no es de cuenta.
+ * OpenRouter responde 400, no 404, al generar con un id que no existe; el mensaje es lo único que
+ * lo distingue de otro 400 de la petición, y solo se compara entero contra el id consultado.
  */
-export function classifyOpenAiError(error: unknown, model: string | null): AiProviderFailure {
+function isOpenRouterInvalidModel(error: InstanceType<typeof APIError>, model: string): boolean {
+  const body: unknown = error.error;
+  if (typeof body !== 'object' || body === null || !('message' in body)) return false;
+  return body.message === `${model} is not a valid model ID`;
+}
+
+/**
+ * El tipo del fallo por el código HTTP; del cuerpo solo se mira el id inválido de OpenRouter, y
+ * nada de él se guarda. 402 es la falta de saldo de OpenRouter. `model` es el que se consultaba o
+ * con el que se leía; sin él, un 404 no es de modelo.
+ */
+export function classifyOpenAiError(
+  error: unknown,
+  model: string | null,
+  origin: 'openai' | 'openrouter' = 'openai',
+): AiProviderFailure {
   if (error instanceof APIError) {
     // Las clases de conexión y de aborto del SDK son `APIError` sin código: no hubo respuesta.
     if (typeof error.status !== 'number') return { kind: 'unreachable', httpStatus: null, model: null };
@@ -92,13 +106,16 @@ export function classifyOpenAiError(error: unknown, model: string | null): AiPro
     if (status === 401 || status === 403) return { kind: 'rejected_key', httpStatus: status, model: null };
     if (status === 402 || status === 429) return { kind: 'quota', httpStatus: status, model: null };
     if (status === 404 && model !== null) return { kind: 'model_unavailable', httpStatus: status, model };
+    if (status === 400 && model !== null && origin === 'openrouter' && isOpenRouterInvalidModel(error, model)) {
+      return { kind: 'model_unavailable', httpStatus: status, model };
+    }
     return { kind: 'unexpected', httpStatus: status, model: null };
   }
   if (isAbort(error)) return { kind: 'unreachable', httpStatus: null, model: null };
   return { kind: 'unexpected', httpStatus: null, model: null };
 }
 
-function providerLabel(baseURL: string | undefined): string {
+function providerLabel(baseURL: string | undefined): 'openai' | 'openrouter' {
   return baseURL === OPENROUTER_BASE_URL ? 'openrouter' : 'openai';
 }
 
@@ -124,8 +141,8 @@ async function readWithOpenAi(config: OpenAiReaderConfig, request: AiReadRequest
     );
     return textFromOpenAiCompletion(completion);
   } catch (error) {
-    const failure = classifyOpenAiError(error, null);
-    if (isAccountFailure(failure)) {
+    const failure = classifyOpenAiError(error, config.model, providerLabel(config.baseURL));
+    if (marksConnection(failure)) {
       throw new AiProviderError(
         failure,
         `${providerLabel(config.baseURL)} chat.completions.create respondió ${failure.httpStatus}`,

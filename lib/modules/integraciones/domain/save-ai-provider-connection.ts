@@ -7,7 +7,7 @@ import {
   type AiProviderConnectionView,
 } from './ai-provider';
 import { scopeOf, type IntegracionesScope } from './integraciones-scope';
-import { parseKeyInput, runProbe } from './test-ai-provider-key';
+import { modelAfterSaving, parseKeyInput, toTestResult } from './test-ai-provider-key';
 
 import type { AiProviderCatalog } from '../ports/ai-provider-catalog';
 import {
@@ -61,8 +61,16 @@ async function persistOnce(
     updatedById: key.actorId,
   } as const;
 
-  if (existing !== null) return deps.connections.update(id, fresh, scope);
-  return deps.connections.create({ ...fresh, id, createdById: key.actorId }, scope);
+  if (existing !== null) {
+    // La prueba acaba de pasar con el modelo que queda en uso: ya no hay modelo marcado.
+    const sameProvider = existing.provider === key.provider;
+    const models = sameProvider ? { unavailableModel: null } : { model: null, unavailableModel: null };
+    return deps.connections.update(id, { ...fresh, ...models }, scope);
+  }
+  return deps.connections.create(
+    { ...fresh, model: null, unavailableModel: null, id, createdById: key.actorId },
+    scope,
+  );
 }
 
 /** Si otro guardado de la misma empresa gana la carrera, la segunda vuelta reemplaza su fila. */
@@ -92,7 +100,14 @@ export function createSaveAiProviderConnection(
     const scope = scopeOf(actor);
     const { data, entry } = await parseKeyInput(input, deps.catalog);
 
-    const tested = await runProbe(deps.probe, entry, data.apiKey);
+    const existing = await deps.connections.find(scope);
+    const tested = toTestResult(
+      await deps.probe.probe({
+        provider: entry.code,
+        apiKey: data.apiKey,
+        models: [modelAfterSaving(existing, entry)],
+      }),
+    );
     const checkedAt = now();
     if (!tested.ok) return { status: 'test_failed', message: tested.message };
 

@@ -14,7 +14,7 @@ export type GetAiProviderConnectionDeps = {
   readonly catalog: AiProviderCatalog;
 };
 
-/** El catálogo viaja con la conexión porque la pantalla pinta los modelos de cada opción. */
+/** El catálogo viaja con la conexión porque el formulario ofrece los proveedores. */
 export type AiProviderConnectionOverview = {
   readonly providers: readonly AiProviderEntry[];
   readonly connection: AiProviderConnectionView | null;

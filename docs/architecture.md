@@ -31,8 +31,9 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de once tablas: los catalogos compartidos por todas las empresas
-     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`, `addons`), la propia empresa
+     y cerrada de doce tablas: los catalogos compartidos por todas las empresas
+     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`, `ai_models`,
+     `addons`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
      (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
      receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La

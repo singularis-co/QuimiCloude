@@ -46,6 +46,7 @@ const MENSAJE = { documentFileId: ARCHIVO, messageId: 'mensaje-1' };
 
 const KEY_RECHAZADA: AiProviderFailure = { kind: 'rejected_key', httpStatus: 401, model: null };
 const SIN_CUOTA: AiProviderFailure = { kind: 'quota', httpStatus: 429, model: null };
+const MODELO_NO_DISPONIBLE: AiProviderFailure = { kind: 'model_unavailable', httpStatus: 404, model: 'modelo-en-uso' };
 
 function dobleDeRepositorio(strategy: Strategy) {
   const finish = vi.fn<DocumentBatchRepository['finish']>(async () => {});
@@ -167,24 +168,24 @@ function terminoCon(finish: ReturnType<typeof dobleDeRepositorio>['finish']): Jo
 }
 
 describe('documentos — runDocumentJob con el proveedor IA de la empresa', () => {
-  describe('el lector de la empresa y del uso (R21)', () => {
-    it('R21 — la estrategia `formula` pide el lector de uso `recipe` para la empresa del archivo', async () => {
+  describe('el lector de la empresa (R21)', () => {
+    it('R21 — la estrategia `formula` pide el lector de la empresa del archivo, sin uso', async () => {
       const lector = lectorQue('receta');
       const t = montar('formula', { status: 'ready', reader: lector.reader, connectionStatus: 'ACTIVE' });
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'done' });
       expect(t.proveedor.readerFor).toHaveBeenCalledTimes(1);
-      expect(t.proveedor.readerFor).toHaveBeenCalledWith(EMPRESA, 'recipe');
+      expect(t.proveedor.readerFor).toHaveBeenCalledWith(EMPRESA);
       expect(lector.read).toHaveBeenCalledTimes(1);
       expect(terminoCon(t.repo.finish)).toEqual({ kind: 'done', text: 'receta' });
     });
 
-    it('R21 — la estrategia `catalogo` pide `catalog`, y el recorte lee con ese MISMO lector', async () => {
+    it('R21 — la estrategia `catalogo` pide el mismo lector de la empresa, y el recorte lee con ese MISMO lector', async () => {
       const lector = lectorQue('catalogo', '{"regiones":[]}');
       const t = montar('catalogo', { status: 'ready', reader: lector.reader, connectionStatus: 'ACTIVE' });
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'done' });
-      expect(t.proveedor.readerFor).toHaveBeenCalledWith(EMPRESA, 'catalog');
+      expect(t.proveedor.readerFor).toHaveBeenCalledWith(EMPRESA);
       expect(t.cadena.pipelineFor).toHaveBeenCalledTimes(1);
       expect(lector.read).toHaveBeenCalledTimes(2);
     });
@@ -199,7 +200,7 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
       expect(t.almacen.download).not.toHaveBeenCalled();
       expect(t.cadena.pipelineFor).not.toHaveBeenCalled();
       expect(t.almacen.remove).not.toHaveBeenCalled();
-      expect(t.proveedor.reportAccountFailure).not.toHaveBeenCalled();
+      expect(t.proveedor.reportConnectionFailure).not.toHaveBeenCalled();
       expect(t.proveedor.reportRecovered).not.toHaveBeenCalled();
     });
 
@@ -211,7 +212,7 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
       expect(t.almacen.download).not.toHaveBeenCalled();
       expect(t.cadena.pipelineFor).not.toHaveBeenCalled();
       // `integraciones` ya marco la conexion al resolverla: aqui no se informa otra vez.
-      expect(t.proveedor.reportAccountFailure).not.toHaveBeenCalled();
+      expect(t.proveedor.reportConnectionFailure).not.toHaveBeenCalled();
     });
   });
 
@@ -222,8 +223,8 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
       expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'error', code: 'ai_provider_error' });
-      expect(t.proveedor.reportAccountFailure).toHaveBeenCalledTimes(1);
-      expect(t.proveedor.reportAccountFailure).toHaveBeenCalledWith(EMPRESA, KEY_RECHAZADA);
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledTimes(1);
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledWith(EMPRESA, KEY_RECHAZADA);
       expect(t.proveedor.reportRecovered).not.toHaveBeenCalled();
       expect(t.almacen.remove).not.toHaveBeenCalled();
     });
@@ -234,8 +235,8 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
       expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'error', code: 'ai_provider_error' });
-      expect(t.proveedor.reportAccountFailure).toHaveBeenCalledTimes(1);
-      expect(t.proveedor.reportAccountFailure).toHaveBeenCalledWith(EMPRESA, SIN_CUOTA);
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledTimes(1);
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledWith(EMPRESA, SIN_CUOTA);
     });
 
     it('R25 — el observador relanza el MISMO error: la cadena ve el fallo intacto', async () => {
@@ -258,7 +259,7 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'requeue' });
       expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'requeue', code: 'ai_unavailable' });
-      expect(t.proveedor.reportAccountFailure).not.toHaveBeenCalled();
+      expect(t.proveedor.reportConnectionFailure).not.toHaveBeenCalled();
       expect(t.proveedor.reportRecovered).not.toHaveBeenCalled();
     });
 
@@ -268,18 +269,64 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
       expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'error', code: 'invalid_input' });
-      expect(t.proveedor.reportAccountFailure).not.toHaveBeenCalled();
+      expect(t.proveedor.reportConnectionFailure).not.toHaveBeenCalled();
       expect(t.proveedor.reportRecovered).not.toHaveBeenCalled();
     });
 
-    it('R26 — un `AiProviderError` que no es de cuenta (modelo no disponible) no marca la conexion', async () => {
-      const lector = lectorQue(
-        new AiProviderError({ kind: 'model_unavailable', httpStatus: 404, model: 'm' }),
-      );
+  });
+
+  describe('modelo no disponible al leer (QT-291)', () => {
+    it('QT-291 R23 — el modelo en uso no disponible termina el archivo en `ai_provider_error` definitivo y marca la conexion una vez', async () => {
+      const lector = lectorQue(new AiProviderError(MODELO_NO_DISPONIBLE, 'claude messages.create respondió 404'));
+      const t = montar('formula', { status: 'ready', reader: lector.reader, connectionStatus: 'ACTIVE' });
+
+      expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
+      expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'error', code: 'ai_provider_error' });
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledTimes(1);
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledWith(EMPRESA, MODELO_NO_DISPONIBLE);
+      expect(t.proveedor.reportRecovered).not.toHaveBeenCalled();
+      expect(t.almacen.remove).not.toHaveBeenCalled();
+    });
+
+    it('QT-291 R23 — no repite la lectura con el predeterminado ni con otro modelo: un solo lector y una sola lectura', async () => {
+      const lector = lectorQue(new AiProviderError(MODELO_NO_DISPONIBLE), 'no deberia leerse');
       const t = montar('formula', { status: 'ready', reader: lector.reader, connectionStatus: 'ACTIVE' });
 
       await t.runDocumentJob(MENSAJE);
-      expect(t.proveedor.reportAccountFailure).not.toHaveBeenCalled();
+      expect(t.proveedor.readerFor).toHaveBeenCalledTimes(1);
+      expect(t.cadena.pipelineFor).toHaveBeenCalledTimes(1);
+      expect(lector.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('QT-291 R23 — tambien en la peticion de coordenadas del recorte marca la conexion', async () => {
+      const lector = lectorQue('catalogo', new AiProviderError(MODELO_NO_DISPONIBLE, 'gemini generateContent respondió 404'));
+      const t = montar('catalogo', { status: 'ready', reader: lector.reader, connectionStatus: 'ACTIVE' });
+
+      expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
+      expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'error', code: 'ai_provider_error' });
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledWith(EMPRESA, MODELO_NO_DISPONIBLE);
+    });
+
+    it('QT-291 R25 — con la conexion en `ERROR` por un modelo marcado, el archivo se lee con el lector de la empresa sin pedir otro', async () => {
+      const lector = lectorQue('receta');
+      const t = montar('formula', { status: 'ready', reader: lector.reader, connectionStatus: 'ERROR' });
+
+      expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'done' });
+      expect(t.proveedor.readerFor).toHaveBeenCalledTimes(1);
+      expect(t.proveedor.readerFor).toHaveBeenCalledWith(EMPRESA);
+      expect(t.almacen.download).toHaveBeenCalledTimes(1);
+      expect(lector.read).toHaveBeenCalledTimes(1);
+      expect(terminoCon(t.repo.finish)).toEqual({ kind: 'done', text: 'receta' });
+    });
+
+    it('QT-291 R25 — con un modelo marcado que vuelve a fallar, el archivo termina en error y se informa de nuevo', async () => {
+      const lector = lectorQue(new AiProviderError(MODELO_NO_DISPONIBLE));
+      const t = montar('catalogo', { status: 'ready', reader: lector.reader, connectionStatus: 'ERROR' });
+
+      expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
+      expect(t.almacen.download).toHaveBeenCalledTimes(1);
+      expect(t.proveedor.reportConnectionFailure).toHaveBeenCalledWith(EMPRESA, MODELO_NO_DISPONIBLE);
+      expect(t.proveedor.reportRecovered).not.toHaveBeenCalled();
     });
   });
 
@@ -292,7 +339,7 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
       expect(lector.read).toHaveBeenCalledTimes(1);
       expect(t.proveedor.reportRecovered).toHaveBeenCalledTimes(1);
       expect(t.proveedor.reportRecovered).toHaveBeenCalledWith(EMPRESA);
-      expect(t.proveedor.reportAccountFailure).not.toHaveBeenCalled();
+      expect(t.proveedor.reportConnectionFailure).not.toHaveBeenCalled();
     });
 
     it('R27 — con la conexion `ACTIVE` una lectura buena no informa nada', async () => {
@@ -316,7 +363,7 @@ describe('documentos — runDocumentJob con el proveedor IA de la empresa', () =
     it('R25 — si informar el fallo de cuenta revienta, el archivo sigue en error y queda un aviso', async () => {
       const lector = lectorQue(new AiProviderError(KEY_RECHAZADA));
       const t = montar('formula', { status: 'ready', reader: lector.reader, connectionStatus: 'ACTIVE' });
-      t.proveedor.reportAccountFailure.mockRejectedValueOnce(new Error('base caida'));
+      t.proveedor.reportConnectionFailure.mockRejectedValueOnce(new Error('base caida'));
 
       expect(await t.runDocumentJob(MENSAJE)).toEqual({ kind: 'error' });
       expect(terminoCon(t.repo.finish)).toMatchObject({ kind: 'error', code: 'ai_provider_error' });

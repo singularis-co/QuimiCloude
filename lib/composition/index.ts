@@ -2431,14 +2431,14 @@ const READER_BY_PROVIDER: Record<AiProviderCode, ReaderFactory> = {
  */
 const aiProviderGateway: AiProviderGateway = {
   isConfigured: async (companyId) => (await integraciones.getAiProviderStatus(companyId)) !== null,
-  readerFor: async (companyId, use) => {
+  readerFor: async (companyId) => {
     if (documentsE2EDoublesEnabled()) {
       const status = await integraciones.getAiProviderStatus(companyId);
       return status === null
         ? { status: 'missing' }
         : { status: 'ready', reader: { read: readCannedText }, connectionStatus: status.connectionStatus };
     }
-    const resolution = await integraciones.resolveAiProviderForReading(companyId, use);
+    const resolution = await integraciones.resolveAiProviderForReading(companyId);
     if (resolution.status !== 'ready') return { status: resolution.status };
     return {
       status: 'ready',
@@ -2449,8 +2449,8 @@ const aiProviderGateway: AiProviderGateway = {
       connectionStatus: resolution.connectionStatus,
     };
   },
-  reportAccountFailure: (companyId, failure) =>
-    integraciones.reportAiProviderOutcome(companyId, { kind: 'account_failure', failure }),
+  reportConnectionFailure: (companyId, failure) =>
+    integraciones.reportAiProviderOutcome(companyId, { kind: 'connection_failure', failure }),
   reportRecovered: (companyId) => integraciones.reportAiProviderOutcome(companyId, { kind: 'recovered' }),
 };
 
@@ -2994,6 +2994,7 @@ import {
   createReportAiProviderOutcome,
   createResolveAiProviderForReading,
   createSaveAiProviderConnection,
+  createSelectAiModel,
   createTestAiProviderKey,
   createTestSavedAiProvider,
   type AiProviderProbeResult,
@@ -3072,6 +3073,7 @@ export const integraciones = {
   testAiProviderKey: createTestAiProviderKey(aiProviderDeps),
   testSavedAiProvider: createTestSavedAiProvider(aiProviderDeps),
   saveAiProviderConnection: createSaveAiProviderConnection(aiProviderDeps),
+  selectAiModel: createSelectAiModel(aiProviderDeps),
   disconnectAiProvider: createDisconnectAiProvider(aiProviderDeps),
   getAiProviderReadiness: createGetAiProviderReadiness(aiProviderDeps),
   getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),

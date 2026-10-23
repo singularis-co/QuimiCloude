@@ -1,12 +1,17 @@
 import {
   isAccountFailure,
+  modelUnavailableNotice,
+  READING_FAILURE_PREFIX,
   readingFailureMessage,
   type AiProviderFailure,
 } from './ai-provider-failure';
 import type { IntegracionesScope } from './integraciones-scope';
 
 import type { AiProviderCatalog } from '../ports/ai-provider-catalog';
-import type { AiProviderConnectionRepository } from '../ports/ai-provider-connection-repository';
+import type {
+  AiProviderConnectionPatch,
+  AiProviderConnectionRepository,
+} from '../ports/ai-provider-connection-repository';
 
 export type ReportAiProviderOutcomeDeps = {
   readonly connections: AiProviderConnectionRepository;
@@ -15,14 +20,12 @@ export type ReportAiProviderOutcomeDeps = {
 };
 
 export type AiProviderReadingOutcome =
-  | { readonly kind: 'account_failure'; readonly failure: AiProviderFailure }
+  | { readonly kind: 'connection_failure'; readonly failure: AiProviderFailure }
   | { readonly kind: 'recovered' };
 
-export const READING_FAILURE_PREFIX = 'La última lectura falló: ';
-
 /**
- * Solo un fallo de la cuenta marca la conexión; la red, el plazo o un modelo caído no dicen nada
- * de la key. Si la empresa desconectó a mitad de la lectura, no queda fila que marcar.
+ * La red, el plazo o un error inesperado no dicen nada de la key ni del modelo: no marcan la
+ * conexión. Si la empresa desconectó a mitad de la lectura, no queda fila que marcar.
  */
 export function createReportAiProviderOutcome(
   deps: ReportAiProviderOutcomeDeps,
@@ -38,25 +41,33 @@ export function createReportAiProviderOutcome(
       if (record.status !== 'ERROR') return;
       await deps.connections.update(
         record.id,
-        { status: 'ACTIVE', lastError: null, lastErrorAt: null },
+        { status: 'ACTIVE', lastError: null, lastErrorAt: null, unavailableModel: null },
         scope,
       );
       return;
     }
 
-    if (!isAccountFailure(outcome.failure)) return;
+    const { failure } = outcome;
+    if (failure.kind !== 'model_unavailable' && !isAccountFailure(failure)) return;
     const entry = await deps.catalog.get(record.provider);
     if (entry === null) {
       throw new Error(`integraciones: el catálogo no trae el proveedor ${record.provider} de la conexión`);
     }
-    await deps.connections.update(
-      record.id,
-      {
-        status: 'ERROR',
-        lastError: READING_FAILURE_PREFIX + readingFailureMessage(outcome.failure, entry.name),
-        lastErrorAt: now(),
-      },
-      scope,
-    );
+
+    const patch: AiProviderConnectionPatch =
+      failure.kind === 'model_unavailable'
+        ? {
+            status: 'ERROR',
+            unavailableModel: failure.model,
+            lastError:
+              READING_FAILURE_PREFIX + modelUnavailableNotice(failure.model, entry.name, failure.model === record.model),
+            lastErrorAt: now(),
+          }
+        : {
+            status: 'ERROR',
+            lastError: READING_FAILURE_PREFIX + readingFailureMessage(failure, entry.name),
+            lastErrorAt: now(),
+          };
+    await deps.connections.update(record.id, patch, scope);
   };
 }

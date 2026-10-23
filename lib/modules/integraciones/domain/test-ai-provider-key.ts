@@ -1,13 +1,16 @@
 import { requirePermission, type Actor } from './actor';
-import type { AiProviderEntry } from './ai-provider';
-import { probeFailureMessage } from './ai-provider-failure';
+import type { AiProviderConnectionRecord, AiProviderEntry } from './ai-provider';
+import { probeFailureMessage, type AiProviderProbeResult } from './ai-provider-failure';
 import { aiProviderKeyInputSchema, type AiProviderKeyInput } from './ai-provider-input';
 import { ValidationError } from './errors';
+import { scopeOf } from './integraciones-scope';
 
 import type { AiProviderCatalog } from '../ports/ai-provider-catalog';
+import type { AiProviderConnectionRepository } from '../ports/ai-provider-connection-repository';
 import type { AiProviderProbe } from '../ports/ai-provider-probe';
 
 export type TestAiProviderKeyDeps = {
+  readonly connections: Pick<AiProviderConnectionRepository, 'find'>;
   readonly catalog: AiProviderCatalog;
   readonly probe: AiProviderProbe;
 };
@@ -29,16 +32,20 @@ export async function parseKeyInput(
   return { data: parsed.data, entry };
 }
 
-export async function runProbe(
-  probe: AiProviderProbe,
+/**
+ * El modelo que quedará en uso al guardar: guardar con el mismo proveedor conserva la elección y
+ * cambiarlo la borra.
+ */
+export function modelAfterSaving(
+  existing: Pick<AiProviderConnectionRecord, 'provider' | 'model'> | null,
   entry: AiProviderEntry,
-  apiKey: string,
-): Promise<AiProviderTestResult> {
-  const result = await probe.probe({
-    provider: entry.code,
-    apiKey,
-    models: [entry.recipeModel, entry.catalogModel],
-  });
+): string {
+  return existing !== null && existing.provider === entry.code && existing.model !== null
+    ? existing.model
+    : entry.defaultModel;
+}
+
+export function toTestResult(result: AiProviderProbeResult): AiProviderTestResult {
   return result.ok
     ? { status: 'tested', ok: true, elapsedMs: result.elapsedMs }
     : { status: 'tested', ok: false, message: probeFailureMessage(result.failure) };
@@ -50,6 +57,12 @@ export function createTestAiProviderKey(
   return async function testAiProviderKey(input, actor) {
     requirePermission(actor);
     const { data, entry } = await parseKeyInput(input, deps.catalog);
-    return runProbe(deps.probe, entry, data.apiKey);
+    const existing = await deps.connections.find(scopeOf(actor));
+    const result = await deps.probe.probe({
+      provider: entry.code,
+      apiKey: data.apiKey,
+      models: [modelAfterSaving(existing, entry)],
+    });
+    return toTestResult(result);
   };
 }
