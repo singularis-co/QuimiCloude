@@ -8,7 +8,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { cleanup, render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { isValidElement, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -52,6 +51,8 @@ import type { WhatsappTemplateListResult } from '@/lib/modules/integraciones/ada
 import type { WhatsappDictionaryListResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions';
 import { WHATSAPP_INTEGRATION_LABEL } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE_SESSION_ENDED, WHATSAPP_INTEGRATION_ROUTE } from '@/lib/shared/routes';
+
+import { setupUser } from '../../helpers/user-event';
 
 const {
   getSessionUserMock,
@@ -262,6 +263,7 @@ describe('WhatsappIntegrationPage', () => {
   });
 
   it('QC-243 R2: sin conexion, «Plantillas» esta deshabilitada y descrita por su texto, y «Variables» habilitada', async () => {
+    const user = setupUser();
     render(await WhatsappIntegrationPage());
 
     const plantillas = screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID);
@@ -279,7 +281,7 @@ describe('WhatsappIntegrationPage', () => {
     expect(listTemplatesMock).not.toHaveBeenCalled();
     expect(listDictionaryMock).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(variables);
+    await user.click(variables);
     expect(variables).toHaveAttribute('aria-selected', 'true');
     expect(
       within(screen.getByTestId(WHATSAPP_VARIABLES_TAB_PANEL_TESTID)).getByTestId(
@@ -289,6 +291,7 @@ describe('WhatsappIntegrationPage', () => {
   });
 
   it('QC-243 R3: con conexion, «Plantillas» esta habilitada, sin texto de ayuda, y muestra el listado de listWhatsappTemplatesAction', async () => {
+    const user = setupUser();
     conConexion();
     render(await WhatsappIntegrationPage());
 
@@ -298,7 +301,7 @@ describe('WhatsappIntegrationPage', () => {
     expect(screen.queryByTestId(WHATSAPP_NO_CONNECTION_HINT_TESTID)).toBeNull();
     expect(listTemplatesMock).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(plantillas);
+    await user.click(plantillas);
     expect(plantillas).toHaveAttribute('aria-selected', 'true');
     expect(
       within(screen.getByTestId(WHATSAPP_TEMPLATES_TAB_PANEL_TESTID)).getByTestId(
@@ -308,22 +311,24 @@ describe('WhatsappIntegrationPage', () => {
   });
 
   it('QC-243 R5: al entrar en «Plantillas» o «Variables» pide otra vez los datos; al volver a «Conexión», no', async () => {
+    const user = setupUser();
     conConexion();
     render(await WhatsappIntegrationPage());
     expect(refreshMock).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
     expect(refreshMock).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
     expect(refreshMock).toHaveBeenCalledTimes(2);
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID));
     expect(screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID)).toHaveAttribute('aria-selected', 'true');
     expect(refreshMock).toHaveBeenCalledTimes(2);
   });
 
   it('QC-243 R6: si falla el listado de plantillas, esa pestaña muestra el error con reintento y Conexión y Variables siguen', async () => {
+    const user = setupUser();
     conConexion();
     listTemplatesMock.mockResolvedValue({
       status: 'error',
@@ -338,21 +343,22 @@ describe('WhatsappIntegrationPage', () => {
       ),
     ).toBeTruthy();
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
     const error = screen.getByTestId(WHATSAPP_TEMPLATES_ERROR_TESTID);
     expect(error.textContent).toContain(WHATSAPP_TABS_TEXTS.templatesError);
     expect(error.textContent).toContain(errorMessage('unauthorized'));
     expect(screen.queryByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toBeNull();
     refreshMock.mockClear();
-    await userEvent.click(screen.getByTestId(WHATSAPP_TEMPLATES_RETRY_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TEMPLATES_RETRY_TESTID));
     expect(refreshMock).toHaveBeenCalledTimes(1);
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
     expect(screen.getByTestId(WHATSAPP_VARIABLES_PANEL_TESTID)).toBeTruthy();
     expect(screen.queryByTestId(WHATSAPP_DICTIONARY_ERROR_TESTID)).toBeNull();
   });
 
   it('QC-243 R6: si falla el diccionario, «Variables» muestra el error con reintento y Conexión y Plantillas siguen', async () => {
+    const user = setupUser();
     conConexion();
     listDictionaryMock.mockResolvedValue({
       status: 'error',
@@ -367,19 +373,20 @@ describe('WhatsappIntegrationPage', () => {
       ),
     ).toBeTruthy();
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
     const error = screen.getByTestId(WHATSAPP_DICTIONARY_ERROR_TESTID);
     expect(error.textContent).toContain(WHATSAPP_TABS_TEXTS.dictionaryError);
     expect(error.textContent).toContain(errorMessage('unauthorized'));
     expect(screen.getByTestId(WHATSAPP_DICTIONARY_RETRY_TESTID)).toBeTruthy();
     expect(screen.queryByTestId(WHATSAPP_VARIABLES_PANEL_TESTID)).toBeNull();
 
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
     expect(screen.getByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toHaveAttribute('data-count', '1');
     expect(screen.queryByTestId(WHATSAPP_TEMPLATES_ERROR_TESTID)).toBeNull();
   });
 
   it('QC-243 R6: si falla la consulta de la conexion, «Variables» sigue funcionando', async () => {
+    const user = setupUser();
     getConnectionMock.mockResolvedValue({
       status: 'error',
       code: 'unauthorized',
@@ -388,7 +395,7 @@ describe('WhatsappIntegrationPage', () => {
     render(await WhatsappIntegrationPage());
 
     expect(listTemplatesMock).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
     expect(screen.getByTestId(WHATSAPP_VARIABLES_PANEL_TESTID)).toBeTruthy();
   });
 

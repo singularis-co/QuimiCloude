@@ -12,6 +12,10 @@ import {
   WHATSAPP_DELETE_TEMPLATE_MESSAGE_TESTID,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-delete-dialog';
 import {
+  WHATSAPP_TEMPLATE_FORM_NAME_TESTID,
+  WHATSAPP_TEMPLATE_FORM_TITLE_TESTID,
+} from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-form-sheet';
+import {
   WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID,
   WHATSAPP_TEMPLATE_REASON_TEXT_TESTID,
   WHATSAPP_TEMPLATE_STATUS_TESTID,
@@ -59,6 +63,7 @@ import type {
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 
 const { syncMock, setEnabledMock, deleteMock, otherActionMock, toastSuccessMock, toastErrorMock, refreshMock } =
   vi.hoisted(() => ({
@@ -190,10 +195,12 @@ function deferred<T>() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('barra de sincronización', () => {
@@ -450,7 +457,7 @@ describe('listado', () => {
     expect(create).toHaveTextContent('Nueva plantilla');
 
     await user.click(create);
-    expect(screen.getByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toHaveAttribute('data-open-sheet', 'new');
+    expect(await screen.findByTestId(WHATSAPP_TEMPLATE_FORM_TITLE_TESTID)).toHaveTextContent('Nueva plantilla');
   });
 
   it('R19: sin coincidencias, el aviso y «Quitar filtros» vacía la búsqueda y vuelve a «Todas»', async () => {
@@ -471,7 +478,7 @@ describe('listado', () => {
     const user = setupUser();
     renderPanel();
     await user.click(screen.getByTestId(WHATSAPP_TEMPLATE_NEW_TESTID));
-    expect(screen.getByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toHaveAttribute('data-open-sheet', 'new');
+    expect(await screen.findByTestId(WHATSAPP_TEMPLATE_FORM_TITLE_TESTID)).toHaveTextContent('Nueva plantilla');
   });
 
   it('R20: el menú de una relacionable ofrece «Relacionar variables», «Duplicar» y «Eliminar»', async () => {
@@ -483,7 +490,8 @@ describe('listado', () => {
     expect(screen.getByTestId(WHATSAPP_TEMPLATE_ACTION_TESTIDS.delete)).toHaveTextContent('Eliminar');
 
     await user.click(await esperarInteractiva(screen.getByTestId(WHATSAPP_TEMPLATE_ACTION_TESTIDS.duplicate)));
-    expect(screen.getByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toHaveAttribute('data-open-sheet', 'duplicate:t2');
+    expect(await screen.findByTestId(WHATSAPP_TEMPLATE_FORM_TITLE_TESTID)).toHaveTextContent('Duplicar plantilla');
+    expect(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_NAME_TESTID)).toHaveValue('recordatorio_pago_v2');
   });
 
   it('R20: en una no relacionable no hay «Relacionar variables»', async () => {

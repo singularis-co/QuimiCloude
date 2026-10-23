@@ -62,7 +62,7 @@ hasta que el backend la guarde (R58).
   `whatsapp-template-delete-dialog.tsx`.
   **Hecho:** R16 (llamada, aviso, y vuelta atrás con error), R41 (textos, llamada, aviso, fila fuera;
   con error, mensaje en el diálogo y fila presente).
-- [ ] **T8 Alta** (T1, T3, T6). `whatsapp-template-form-sheet.tsx` y
+- [x] **T8 Alta** (T1, T3, T6). `whatsapp-template-form-sheet.tsx` y
   `whatsapp-template-variable-menu.tsx`: campos, idioma, categoría con descripción, contadores, insertar
   en el cursor, «Variables en el mensaje», clave desconocida, validación del dominio, vista previa,
   diálogo «Enviar para autorización», envío, éxito y error, pestañas en teléfono.
@@ -71,7 +71,7 @@ hasta que el backend la guarde (R58).
   (un problema del dominio sale en su campo; botón deshabilitado), R33, R34 (forma exacta del borrador:
   `header: null`, `buttons: []`, claves con punto de P1 y `constantLabels`), R35, R36 (borrador intacto
   y «No se pudo enviar la plantilla»), R38.
-- [ ] **T9 Duplicar** (T8). Acción «Duplicar» que abre el alta con `draftFromView` y el `Notice` de P6.
+- [x] **T9 Duplicar** (T8). Acción «Duplicar» que abre el alta con `draftFromView` y el `Notice` de P6.
   **Hecho:** casos en `whatsapp-template-form-sheet.test.tsx`: R40 (título «Duplicar plantilla»,
   nombre con `_v2`, mensaje con claves de pantalla, aviso al perder encabezado o botones).
 - [ ] **T10 Relacionar variables** (T1, T3, T6). `whatsapp-template-relate-sheet.tsx`.

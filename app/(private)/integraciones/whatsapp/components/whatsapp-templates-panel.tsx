@@ -20,6 +20,7 @@ import {
 } from '@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions';
 
 import { WhatsappTemplateDeleteDialog } from './whatsapp-template-delete-dialog';
+import { WhatsappTemplateFormSheet } from './whatsapp-template-form-sheet';
 import { isUnmapped } from './whatsapp-template-rules';
 import { WHATSAPP_SYNC_BAR_TEXTS, WhatsappTemplateSyncBar } from './whatsapp-template-sync-bar';
 import { WhatsappTemplateTable } from './whatsapp-template-table';
@@ -51,8 +52,8 @@ export type TemplatesPanelSheet =
   | { readonly kind: 'relate'; readonly template: WhatsappTemplateView };
 
 function sheetMarkerOf(sheet: TemplatesPanelSheet | null): string | undefined {
-  if (sheet === null) return undefined;
-  return sheet.kind === 'new' ? sheet.kind : `${sheet.kind}:${sheet.template.id}`;
+  if (sheet === null || sheet.kind !== 'relate') return undefined;
+  return `${sheet.kind}:${sheet.template.id}`;
 }
 
 export type WhatsappTemplatesPanelProps = {
@@ -83,7 +84,7 @@ function templatesOf(changes: LocalChanges): readonly WhatsappTemplateView[] {
   return [...added, ...fromServer].filter((template) => !changes.removed.has(template.id));
 }
 
-export function WhatsappTemplatesPanel({ list }: WhatsappTemplatesPanelProps) {
+export function WhatsappTemplatesPanel({ list, dictionary }: WhatsappTemplatesPanelProps) {
   const router = useRouter();
   const [stored, setStored] = useState<LocalChanges>(() => noChanges(list));
   const changes = stored.source === list ? stored : noChanges(list);
@@ -164,6 +165,12 @@ export function WhatsappTemplatesPanel({ list }: WhatsappTemplatesPanelProps) {
     router.refresh();
   }
 
+  function handleCreated(template: WhatsappTemplateView) {
+    setSheet(null);
+    upsertTemplate(template);
+    router.refresh();
+  }
+
   const isEmpty = templates.length === 0 && !syncing;
 
   return (
@@ -218,6 +225,16 @@ export function WhatsappTemplatesPanel({ list }: WhatsappTemplatesPanelProps) {
           onDelete={openDelete}
         />
       )}
+
+      {sheet !== null && sheet.kind !== 'relate' ? (
+        <WhatsappTemplateFormSheet
+          key={sheet.kind === 'new' ? sheet.kind : `${sheet.kind}:${sheet.template.id}`}
+          source={sheet.kind === 'new' ? null : sheet.template}
+          dictionary={dictionary ?? []}
+          onClose={() => setSheet(null)}
+          onCreated={handleCreated}
+        />
+      ) : null}
 
       <WhatsappTemplateDeleteDialog template={deleting} onClose={() => setDeleting(null)} onDeleted={handleDeleted} />
     </section>
