@@ -47,18 +47,18 @@ hasta que el backend la guarde (R58).
 
 ## Tanda 3 — pantalla (dependencias en cada task)
 
-- [ ] **T5 Barra de sincronización** (T4). `whatsapp-templates-panel.tsx` (esqueleto del panel) y
+- [x] **T5 Barra de sincronización** (T4). `whatsapp-templates-panel.tsx` (esqueleto del panel) y
   `whatsapp-template-sync-bar.tsx`.
   **Hecho:** `whatsapp-templates-panel.test.tsx`: R7, R8 (botón deshabilitado y «Sincronizando…»,
   esqueleto, aviso, hora nueva y las tres etiquetas), R9 (error: listado y hora sin cambios).
-- [ ] **T6 Listado** (T1, T5). `whatsapp-template-table.tsx`, `whatsapp-template-status.tsx`,
+- [x] **T6 Listado** (T1, T5). `whatsapp-template-table.tsx`, `whatsapp-template-status.tsx`,
   `whatsapp-template-usage.tsx`: `DataTable` con `card`, búsqueda, chips en `toolbarActions`, aviso de
   sin relacionar, vacío y sin coincidencias, menú de acciones.
   **Hecho:** casos en `whatsapp-templates-panel.test.tsx`: R10, R11, R12 (tarjeta con «Acciones»), R13
   (nombre accesible del «!» y motivo como texto en la tarjeta), R14, R17 (singular y plural), R18 (cada
   chip, búsqueda sin mayúsculas, ninguna llamada al servidor), R19, R20 («Relacionar variables» ausente
   en una no relacionable).
-- [ ] **T7 Interruptor y eliminar plantilla** (T6). Interruptor con `setWhatsappTemplateEnabledAction`;
+- [x] **T7 Interruptor y eliminar plantilla** (T6). Interruptor con `setWhatsappTemplateEnabledAction`;
   `whatsapp-template-delete-dialog.tsx`.
   **Hecho:** R16 (llamada, aviso, y vuelta atrás con error), R41 (textos, llamada, aviso, fila fuera;
   con error, mensaje en el diálogo y fila presente).
@@ -78,7 +78,7 @@ hasta que el backend la guarde (R58).
   **Hecho:** `whatsapp-template-relate-sheet.test.tsx`: R42 (grupos, claves, relación actual
   preseleccionada, marcas de encabezado y botón), R43, R44, R45 (resumen y «Volver a revisar»), R46
   (pares hueco → clave con la clave con punto de P1 para las constantes; éxito y error).
-- [ ] **T11 Pestaña Variables** (T1, T4). `whatsapp-variables-panel.tsx`: texto de entrada,
+- [x] **T11 Pestaña Variables** (T1, T4). `whatsapp-variables-panel.tsx`: texto de entrada,
   constantes en tabla, propias con editar y eliminar, vacío, diálogo de eliminar.
   **Hecho:** `whatsapp-variables-panel.test.tsx`: R47, R48 (las tres constantes, sin acciones), R49
   (columnas sin Descripción mientras P2 siga abierta; vacío), R59 (sin uso: textos, llamada y aviso; en
