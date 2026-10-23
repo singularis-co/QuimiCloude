@@ -41,7 +41,7 @@
   - **Hecho:** vivo con principal ⇒ `{ e164 }`; sin principal o con teléfono antiguo ⇒ `no_phone`;
     baja, inexistente u otra empresa ⇒ `customer_not_found`.
 
-- [ ] **T5 [P] Graph `sendMessage`** (R29, P9).
+- [x] **T5 [P] Graph `sendMessage`** (R29, P9).
   - Antes de escribir: contrastar con la documentación vigente de la Cloud API el cuerpo de texto y
     de plantilla, la respuesta (`messages[0].id`), los códigos `190`, `131047`, `130429`, `131056` y
     el largo máximo del texto; anotar lo encontrado en `progress/impl_QC-240.md`. Si algo difiere del
