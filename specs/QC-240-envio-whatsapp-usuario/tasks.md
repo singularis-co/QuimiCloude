@@ -101,7 +101,7 @@
 
 ## Tanda 5 — cierre
 
-- [ ] **T11 Verificación y trazabilidad.**
+- [x] **T11 Verificación y trazabilidad.**
   - `pnpm run typecheck`, `pnpm run lint`, `pnpm exec vitest run guard`, `vitest related` sobre todo
     el diff; `./init.sh`.
   - `progress/impl_QC-240.md` con el mapa `R<n> → test` (abajo) actualizado a los nombres reales de

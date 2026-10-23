@@ -108,8 +108,8 @@ Tanda 1 verde salvo el contraste de T5 con la documentación de Meta, que queda 
 `lib/modules/integraciones/domain/actor.ts` (`requireSendPermission`), `whatsapp-send-recipient.ts`, `send-whatsapp-message.ts`, `retry-whatsapp-message.ts`; `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`; `tests/unit/integraciones/whatsapp/send/send-whatsapp-message.test.ts` (62 casos), `retry-whatsapp-message.test.ts` (32 casos).
 
 ### Decisiones de implementación (el design no las fija)
-- El caso de uso devuelve `{ message: WhatsappOutboundMessageView; diagnostic: string | null }` (§7).
-- `markSent`/`markFailed` con `null` (el mensaje ya salió de SENDING): se devuelve el resultado de esta llamada y la fila queda como está. **Pendiente de confirmar** (pregunta abierta).
+- El caso de uso devolvía `{ message, diagnostic }`; desde T9 (puerto de log, decisión del humano) devuelve solo la vista y el diagnóstico va a `WhatsappSendLog`.
+- `markSent`/`markFailed` con `null` (el mensaje ya salió de SENDING): se devuelve el resultado de esta llamada y la fila queda como está. **Cerrada por el humano** (2026-10-23; design §9).
 - Fallido OUT+USER sin contenido que reenviar ⇒ `whatsapp_message_not_retryable`.
 - Valores de propias por `variableKeys.listAll(scope)` indexado por id (el design dice «findByKeys/por id»).
 - Por cliente, el contacto se crea/vincula antes de comprobar ventana y plantilla (§4.4): un texto a un contacto nuevo acaba en `whatsapp_window_closed` con el contacto ya creado.
@@ -140,7 +140,7 @@ Verificación real: `pnpm run typecheck` sin errores; eslint de los 11 archivos 
 
 Veredicto: T9 verde; el borde no lee el diagnóstico y el aviso sale por el puerto.
 
-## Mapa R → test (estado a la tanda 3)
+## Mapa R → test (final)
 
 `S` = `tests/unit/integraciones/whatsapp/send/send-whatsapp-message.test.ts`, `Rt` = `.../retry-whatsapp-message.test.ts`, `A` = `.../whatsapp-message-actions.test.ts`, `Ob` = `tests/integration/integraciones/whatsapp-outbox-prisma.int.test.ts`. Nombres exactos de R1–R3, R6–R7, R29, R44 y R47 en la Tanda 1.
 
@@ -186,4 +186,27 @@ Veredicto: T9 verde; el borde no lee el diagnóstico y el aviso sale por el puer
 | R44, R47 | `whatsapp-outbound-messages-migration.int.test.ts` (8 casos) |
 | R45 | A «R45: enviar pasa la entrada tal cual…», «R45: cada error del catalogo sale como ErrorState…» |
 | R46 | S y Rt «R46: un fallo de Meta entrega al puerto de log el id del mensaje y el diagnostico, sin texto de Meta, texto, valores, numero ni token», «R46: un envio correcto no llama al puerto de log»; `whatsapp-send-log-console.test.ts` (3 casos R46); A «R46: un fallo de Meta no escribe nada desde la accion…», «R46: la accion no lee el diagnostico ni escribe en la consola», «R46: un envio correcto no escribe nada en el log», «R46: en exito, fallo de Meta, … ningun log lleva texto, valores, numero ni token» |
-| R48 | pendiente: `whatsapp-send-flow.int.test.ts` (T10) |
+| R48 | `tests/integration/integraciones/whatsapp-send-flow.int.test.ts` (19 casos, uno por criterio de aceptación: «R48, R15, R26, R27, R29, R30, R32, R37: dentro de la ventana, un texto se envia y queda SENT con su wamid», «R16, R48: fuera de la ventana, un texto se rechaza antes de llamar a Meta», y los de R4, R5, R7, R8, R11, R13, R18, R20–R25, R28, R31, R33, R36, R39, R41–R43) |
+
+## Tanda 4 (T10) — 2026-10-23
+
+- 20b177ad: `tests/integration/integraciones/whatsapp-send-flow.int.test.ts` (nuevo) sobre la composición real (Prisma, AES-GCM con clave por corrida, clientes por `clientes.createCustomer`), con `INTEGRATIONS_E2E_DOUBLES=1` y un `vi.spyOn` sobre el doble de Graph; cuatro empresas efímeras (A principal, B ajena para R43, C para R13, D para R33). Entrada `commit` en `aislamiento.json`. Sin arreglos de producción.
+- Salida: `Test Files 1 passed (1)` / `Tests 19 passed (19)`; guard `Test Files 87 passed (87)`.
+
+## Tanda 5 (T11) — verificación y trazabilidad — 2026-10-23
+
+Por regla del humano no se corre `./init.sh`: el gate es `gate-completo` en CI. `vitest related` sobre todo el diff no se corre porque `permissions.ts`/`actor.ts` arrastran casi toda la suite; en su lugar, los 26 archivos de test que toca la feature, por ruta.
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`; los mismos 10 avisos que la base antes de la feature.
+- `pnpm exec vitest run <26 archivos de test del diff 3ffe6ca1..HEAD>`: `Test Files  26 passed (26)` / `Tests  948 passed | 4 skipped (952)`.
+- `pnpm exec vitest run guard`: `Test Files  87 passed (87)` / `Tests  1303 passed | 22 skipped (1325)`.
+- Trazabilidad: R1–R48 tienen al menos un test en el mapa de arriba.
+
+### Abierto para el reviewer/humano
+- T5: cuerpos de Graph, códigos 190/131047/130429/131056 y el máximo de 4096 no contrastados con la documentación vigente de Meta (sin acceso desde aquí).
+- Desvíos de §5.3 ya explicados: fábrica `createWhatsappOutboxRepository()` y `createCustomerPhoneRepository(db = prisma)`.
+- Historia: c23e8705 (título T8) arrastra tests de T9 por un commit concurrente; contenido íntegro, sin reescritura.
+
+### Veredicto
+Las 11 tareas hechas y verificadas en local; pendiente del reviewer y de `gate-completo`.
