@@ -1,15 +1,17 @@
 # QC-246 — contactos-con-chat · requirements.md
 
-> Zona `frontend`. Depende de QC-245 (Server Actions de conversaciones, `in_progress`, su spec se
-> reabre por la ampliación del 2026-10-23) y de QC-244 (lugar de «Contactos» en el menú, hecho).
-> Se especifica contra el **contrato publicado** en la tarjeta (bloque «Contrato del backend
-> (QC-245)») y `specs/QC-245-contactos-whatsapp-backend/design.md > Contrato para la pantalla`.
-> Lo que depende de la ampliación de QC-245 lleva **[ABIERTO: depende de la ampliación de QC-245]**
-> con el default que se implementa mientras no llegue (lista en `## Dependencias abiertas`).
+> Zona `frontend`. Depende de QC-245 (Server Actions de conversaciones, `in_progress`) y de QC-244
+> (lugar de «Contactos» en el menú, hecho). Se especifica contra el **contrato de QC-245, versión 2**
+> (2026-10-23, Enmienda 1), publicado en la tarjeta (bloque «Contrato del backend (QC-245) —
+> versión 2») y en `specs/QC-245-contactos-whatsapp-backend/design.md > Contrato para la pantalla
+> (QC-246)`. La versión 2 cierra las dependencias A1–A5 de la versión 1 (`## Dependencias del
+> contrato`, D13).
 
 ## Alcance
 
-Copiado de la tarjeta (2026-10-23); no se reabre.
+Copiado de la tarjeta (2026-10-23); no se reabre. Puesto al día con el texto vivo de la tarjeta el
+2026-10-23 (contrato v2): el detalle del pedido ya no lleva fecha de entrega, el total aparece solo
+si existe (QC-307), y se suma el alcance de las cuatro constantes nuevas (D14).
 
 `/clientes/contactos` deja de ser un placeholder (QC-244) y pasa a mostrar las conversaciones de
 WhatsApp con los clientes. Consume los Server Actions de QC-245.
@@ -35,8 +37,12 @@ WhatsApp con los clientes. Consume los Server Actions de QC-245.
   pulsarla otra vez lo quita; en el móvil bajan de línea. Valores por defecto: `cliente.*`,
   `empresa.*`, `pedido.*` (pedido más reciente) y variables propias; lo que falta sale
   `[falta <clave>]`. Selector «Pedido» en la cabecera (solo con más de uno) que recalcula el
-  mensaje, y flecha que despliega el detalle del pedido (número, estado, fecha de entrega, total y,
-  por producto, presentación × cantidad, entregado y faltante).
+  mensaje, y flecha que despliega el detalle del pedido (número, estado, total si ya existe —llega
+  con QC-307— y, por producto, presentación × cantidad, entregado y faltante).
+- **Constantes nuevas en plantillas (humano, 2026-10-23):** el catálogo de constantes del front de
+  plantillas de QC-243, con su traducción `nombre_del_cliente` ↔ `cliente.nombre`, aprende
+  `pedido.estado`, `pedido.fecha_solicitud`, `pedido.total` y `pedido.detalle`. Sin eso, ninguna
+  plantilla puede usarlas.
 - **Actualización:** consulta cada 5–10 s con la pestaña visible; se pausa si no lo está. Sin
   tiempo real.
 - **Desde Clientes:** acción «Abrir chat» (solo con `whatsapp.consultar` y teléfono válido) que
@@ -62,7 +68,11 @@ contacto en el chat: van a **QT-299** (chat-vincular-bloquear-contacto, depende 
 | D9 | Se acepta el choque con QC-166 en `lib/shared/navigation/private-nav.ts`: se rebasa sobre `dev` antes de tocarlo y solo se toca la entrada de Contactos (humano, 2026-10-23) | `archivos-en-vuelo.mjs` lo marca; el cambio aquí es una línea de permiso. | R2 |
 | D10 | Los siete tableros del pase `/design` ya están en `docs/diseno/canvas/` (`Contactos`, `ContactosVentanaCerrada`, `ContactosVacios`, `ContactosNuevoChat`, `ContactosMovil`, `ContactosChatMovil`, `ContactosNuevoChatMovil`) (humano, 2026-10-23) | Son la referencia visual aprobada; se citan en `design.md > Referencia de diseño`. | R5, R6, R7 |
 | D11 | El texto de la plantilla rellenada es de solo lectura (cierra P1; humano, 2026-10-23) | Una plantilla editada deja de ser la aprobada y la acción de envío no recibe texto. | R34 |
-| D12 | Los botones de vincular, desvincular y bloquear no entran: van a QT-299 (chat-vincular-bloquear-contacto, depende de QC-246) (cierra P3; humano, 2026-10-23) | QC-245 (D2) lista solo contactos vinculados; la tarjeta de QC-246 no los incluye. | — (exclusión de alcance, sin requisito: ver «Lo que NO entra») |
+| D12 | Los botones de vincular, desvincular y bloquear no entran: van a QT-299 (chat-vincular-bloquear-contacto, depende de QC-246) (cierra P3; humano, 2026-10-23) | QC-245 (D2) lista solo contactos vinculados; la tarjeta de QC-246 no los incluye. | R49 |
+| D13 | Se especifica contra el contrato de QC-245 **versión 2** (Enmienda 1), que reemplaza a la v1 y cierra A1–A5; los defaults provisionales de D8 dejan de aplicar (contrato publicado en la tarjeta, 2026-10-23) | El contrato v2 ya trae el archivo de los medios, las reacciones por id interno y el contexto del chat. | R21, R22, R24, R35, R38, R39, R54 |
+| D14 | El catálogo de constantes del front de plantillas de QC-243 aprende `pedido.estado`, `pedido.fecha_solicitud`, `pedido.total` y `pedido.detalle` (humano, 2026-10-23; D17 de QC-245) | Sin eso ninguna plantilla puede usar las claves nuevas. | R50, R51, R52, R53 |
+| D15 | El detalle del pedido no muestra fecha de entrega (humano, 2026-10-23; D10 de QC-245) | El pedido no tiene esa fecha en la base y el contrato no la trae. | R39 |
+| D16 | `total` llega `null` hasta QC-307: el detalle del pedido **oculta** la fila del total mientras sea `null`; en una plantilla, `{{pedido.total}}` sale `[falta pedido.total]` y bloquea su envío como cualquier valor que falta (humano, 2026-10-23; D11 de QC-245 y regla del contrato v2 «un `null` se pinta `[falta <clave>]`») | El contrato fija las dos cosas; un «—» en el texto de una plantilla se enviaría al cliente como si fuera el total. | R35, R36, R39 |
 
 ## Requisitos (EARS)
 
@@ -82,7 +92,7 @@ entre comillas son literales de pantalla.
   «Conecta la cuenta de WhatsApp de la empresa para ver y responder las conversaciones con tus
   clientes.» y, DONDE la sesión trae `integraciones.modificar`, el enlace «Ir a Integraciones» a la
   pantalla de WhatsApp de Integraciones.
-- **R4** — SI una carga inicial (lista, chat o plantillas) devuelve un error, ENTONCES el sistema
+- **R4** — SI una carga inicial (lista, chat, plantillas o contexto del chat) devuelve un error, ENTONCES el sistema
   DEBE mostrar el `message` del error, su referencia si es `unexpected`, y un botón «Reintentar»
   que repite esa carga.
 
@@ -147,23 +157,26 @@ entre comillas son literales de pantalla.
   cuerpo como texto; `AUDIO`, `VIDEO` y `DOCUMENT` como «[Audio]», «[Video]» o «[Documento]» con su
   caption y sin el archivo; y `UNSUPPORTED`, `CONTACTS` y cualquier mensaje sin contenido que
   pintar como «Mensaje no soportado» [ABIERTO P8: `CONTACTS` e `INTERACTIVE`].
-- **R21** — DONDE un mensaje `IMAGE` trae su archivo servido [ABIERTO A1: depende de la ampliación
-  de QC-245], el sistema DEBE mostrar su miniatura con el caption y, CUANDO se pulsa, abrir un visor
-  a pantalla completa con la imagen, el caption, el nombre del cliente y la hora, que se cierra con
-  «Cerrar imagen» en escritorio, con la flecha de volver en teléfono y con Escape. SI no trae
-  archivo, ENTONCES DEBE mostrar el recuadro «[Imagen]» con el caption, sin abrir visor.
+- **R21** — DONDE un mensaje `IMAGE` trae `attachment.mediaUrl`, el sistema DEBE mostrar su
+  miniatura (con `mediaUrl` como fuente) y el caption y, CUANDO se pulsa, abrir un visor a pantalla
+  completa con la imagen, el caption, el nombre del cliente y la hora, que se cierra con «Cerrar
+  imagen» en escritorio, con la flecha de volver en teléfono y con Escape. SI `mediaUrl` es `null`,
+  ENTONCES DEBE mostrar el recuadro «[Imagen]» con el caption, sin abrir visor. SI la imagen no se
+  puede cargar (la ruta responde 502 u otro fallo), ENTONCES DEBE mostrar, en la miniatura y en el
+  visor, el recuadro «Imagen no disponible» con el caption.
 - **R22** — El sistema DEBE pintar un mensaje `STICKER` sin burbuja, como imagen de 128 px con la
-  hora debajo; SI no trae archivo servido [ABIERTO A1], ENTONCES como recuadro «[Sticker]» del
-  mismo tamaño.
+  hora debajo, con `attachment.mediaUrl` como fuente; SI `mediaUrl` es `null`, ENTONCES como recuadro
+  «[Sticker]» del mismo tamaño; SI la imagen no se puede cargar, ENTONCES como recuadro «Imagen no
+  disponible» del mismo tamaño.
 - **R23** — El sistema DEBE pintar un mensaje `LOCATION` como tarjeta con el nombre del lugar y la
   dirección cuando vienen, y el enlace «Abrir en el mapa» que abre en una pestaña nueva un mapa en
   sus coordenadas [ABIERTO P5: proveedor del mapa].
 - **R24** — El sistema NO DEBE pintar una reacción como mensaje aparte: DEBE pintar su emoji pegado
-  a la esquina inferior del mensaje reaccionado, con nombre accesible «Reacción del cliente:
-  <emoji>»; con varias reacciones sobre el mismo mensaje, DEBE mostrar la más reciente, y SI la más
-  reciente trae emoji nulo, ENTONCES no DEBE mostrar ninguna. SI el mensaje reaccionado no está
-  entre los cargados o no se puede identificar, ENTONCES la reacción no se muestra hasta que lo esté
-  [ABIERTO A2: depende de la ampliación de QC-245].
+  a la esquina inferior del mensaje cuyo `id` es su `attachment.messageId`, con nombre accesible
+  «Reacción del cliente: <emoji>»; con varias reacciones sobre el mismo mensaje, DEBE mostrar la más
+  reciente, y SI la más reciente trae emoji nulo, ENTONCES no DEBE mostrar ninguna. SI
+  `attachment.messageId` es `null`, ENTONCES la reacción NO DEBE mostrarse; SI el mensaje reaccionado
+  aún no está entre los cargados, ENTONCES DEBE mostrarse al cargarlo.
 - **R25** — CUANDO el usuario llega al inicio del historial y quedan mensajes anteriores, el sistema
   DEBE pedirlos, añadirlos arriba sin mover lo que el usuario está viendo y mostrar «Cargando
   mensajes anteriores…» mientras llegan.
@@ -187,7 +200,7 @@ entre comillas son literales de pantalla.
   enviar una plantilla aprobada.» y el botón «Enviar plantilla».
 - **R31** — CUANDO se pulsa «Enviar plantilla», el sistema DEBE abrir el diálogo «Enviar plantilla»
   con el selector de plantilla (solo enviables), el selector «Pedido» solo si el cliente tiene más
-  de un pedido (con el pedido elegido en el chat), y la vista previa con el texto ya resuelto; NO
+  de un pedido abierto (con el pedido elegido en el chat), y la vista previa con el texto ya resuelto; NO
   DEBE pedir el valor de ninguna variable.
 - **R32** — CUANDO se envía un texto, el sistema DEBE mostrarlo al instante como saliente
   «Enviando», vaciar la caja y, al responder la acción, reemplazarlo por el mensaje devuelto («Enviado»
@@ -200,10 +213,11 @@ entre comillas son literales de pantalla.
   vaciarse y la burbuja desmarcarse; en ancho de teléfono las burbujas DEBEN bajar de línea.
 - **R34** — MIENTRAS haya una plantilla elegida (burbuja o diálogo), el sistema DEBE mostrar el
   texto resuelto sin dejar editarlo (D11).
-- **R35** — El sistema DEBE resolver cada `{{clave}}` de la plantilla con el objeto de valores por
-  defecto —constantes `cliente.*`, `empresa.*`, `pedido.*` del pedido elegido y variables propias de
-  la empresa— y, SI falta el valor de una clave, ENTONCES DEBE escribir `[falta <clave>]` en su
-  lugar [ABIERTO A3/A4: depende de la ampliación de QC-245; default en `design.md > 4`].
+- **R35** — El sistema DEBE resolver cada `{{clave}}` de la plantilla con el objeto de valores del
+  contexto del chat (`values`: `cliente.nombre`, `empresa.nombre`, `pedido.numero`, `pedido.estado`,
+  `pedido.fecha_solicitud`, `pedido.total`, `pedido.detalle` del pedido elegido y las variables
+  propias de la empresa) y, SI la clave no está en `values` o su valor es `null`, ENTONCES DEBE
+  escribir `[falta <clave>]` en su lugar (D16).
 - **R36** — SI el texto resuelto tiene alguna clave sin valor, ENTONCES el sistema DEBE deshabilitar
   el envío de esa plantilla y mostrar «Falta el valor de <etiquetas>»; SI la acción de envío
   devuelve `missing_values`, ENTONCES DEBE mostrar su `message` y no añadir ningún saliente.
@@ -211,14 +225,16 @@ entre comillas son literales de pantalla.
   elegida), el sistema DEBE mostrarla como saliente «Enviando» y luego con el resultado, cerrar el
   diálogo o vaciar la caja y, SI el chat no tenía conversación, ENTONCES DEBE recargarlo para pasar
   a la conversación creada.
-- **R38** — DONDE el cliente tiene más de un pedido [ABIERTO A3], el sistema DEBE mostrar el
-  selector «Pedido» en la cabecera del chat, con el más reciente elegido al abrir; CUANDO se cambia,
-  DEBE recalcular el texto resuelto de la caja y de la vista previa.
-- **R39** — DONDE el cliente tiene al menos un pedido [ABIERTO A3; P10], el sistema DEBE mostrar un
-  botón de flecha «Ver detalles del pedido» (`aria-expanded`, `aria-controls`) que despliega y
-  pliega el detalle del pedido elegido: número, estado, fecha de entrega, total y, por producto, el
-  nombre, la presentación pedida como «N × <presentación>», lo entregado y lo que falta por entregar
-  [ABIERTO P2: campos exactos].
+- **R38** — DONDE el contexto del chat trae más de un pedido abierto, el sistema DEBE mostrar el
+  selector «Pedido» en la cabecera del chat con esos pedidos por su número, en el orden recibido (el
+  más reciente primero) y con `selectedOrderId` elegido al abrir; CUANDO se cambia, DEBE recalcular
+  el texto resuelto de la caja y de la vista previa con los `values` del pedido nuevo (R54).
+- **R39** — DONDE el contexto del chat trae al menos un pedido abierto [ABIERTO P10], el sistema DEBE
+  mostrar un botón de flecha «Ver detalles del pedido» (`aria-expanded`, `aria-controls`) que
+  despliega y pliega el detalle del pedido elegido: número, estado, el nombre del producto cuando
+  viene, el total solo si no es `null` (D16) y, por cada línea, la presentación pedida como
+  «N × <presentación>», lo entregado y lo que falta por entregar; NO DEBE mostrar fecha de entrega
+  (D15).
 - **R40** — SI una acción de envío o de reintento devuelve un error, ENTONCES el sistema DEBE quitar
   el saliente provisional, devolver el texto a la caja (en un texto) y mostrar el `message` del
   error junto a la caja.
@@ -257,29 +273,59 @@ entre comillas son literales de pantalla.
   texto, las burbujas de plantillas, «Enviar plantilla» ni «Reintentar»; el chat queda de solo
   lectura.
 - **R48** — El sistema DEBE leer y escribir los datos de la pantalla solo a través de las Server
-  Actions del contrato de QC-245 / QC-240 (y las de su ampliación cuando existan): ningún archivo de
-  la ruta importa `@/lib/composition` ni un módulo por una ruta profunda que no sea
-  `adapters/driving`.
+  Actions del contrato v2 de QC-245 / QC-240 y de la ruta de medios cuya URL llega en
+  `attachment.mediaUrl`: ningún archivo de la ruta importa `@/lib/composition` ni un módulo por una
+  ruta profunda que no sea `adapters/driving`, ni construye por su cuenta la URL de un medio.
 
-## Dependencias abiertas (ampliación de QC-245)
+### Lo que el chat no ofrece
 
-Nada de esto existe en el contrato publicado. Los nombres que use QC-245 al ampliarlo **no** se
-dan por sabidos; la pantalla los consume a través de los tipos locales de `design.md > 4`.
+- **R49** — El chat (cabecera, historial, caja y diálogos) NO DEBE mostrar acciones para vincular,
+  desvincular ni bloquear el contacto (D12: van a QT-299).
 
-| # | Qué falta en el contrato | Requisitos | Default mientras no llegue |
+### Constantes del sistema en las plantillas (D14)
+
+- **R50** — El catálogo de constantes del sistema del front DEBE contener, en este orden, las tres
+  actuales (`cliente.nombre`, `pedido.numero`, `empresa.nombre`) sin cambios en su clave visible,
+  clave del backend, etiqueta, descripción ni ejemplo, seguidas de `pedido.estado`,
+  `pedido.fecha_solicitud`, `pedido.total` y `pedido.detalle`, cada una con clave visible, etiqueta,
+  descripción y ejemplo [ABIERTO P12: textos; default en `design.md > 6.1`].
+- **R51** — El sistema DEBE traducir en los dos sentidos la clave visible de cada una de las cuatro
+  constantes nuevas a su clave del backend, en una clave suelta y dentro de un texto con marcas
+  `{{…}}`, y DEBE incluir las cuatro en las etiquetas que se mandan al backend al crear una plantilla
+  y al enviar una (`constantLabels`).
+- **R52** — CUANDO se crea, edita o relaciona una plantilla en Integraciones, el sistema DEBE ofrecer
+  las cuatro constantes nuevas en el panel de variables y en el diccionario de variables junto a las
+  tres actuales, y al guardar DEBE mandar su clave del backend.
+- **R53** — SI se intenta crear una variable propia con la clave visible de una de las cuatro
+  constantes nuevas, ENTONCES el sistema DEBE rechazarla con el mismo aviso de clave ocupada que hoy
+  da a las tres actuales.
+
+### Contexto del chat
+
+- **R54** — CUANDO se abre un chat, el sistema DEBE pedir su contexto (pedidos abiertos, pedido
+  elegido y valores) una sola vez, y CUANDO se cambia el pedido elegido, DEBE pedirlo otra vez con
+  ese pedido; la consulta periódica NO DEBE pedirlo. SI la petición al cambiar de pedido devuelve un
+  error (p. ej. `order_not_found`), ENTONCES el sistema DEBE mostrar su `message` junto al selector y
+  conservar el pedido, el detalle y el texto resuelto que había.
+
+## Dependencias del contrato (cerradas por la versión 2)
+
+La v1 no traía estos datos; la v2 sí. Los defaults provisionales de la v1 ya no aplican (D13).
+
+| # | Qué faltaba en la v1 | Cómo lo cierra la v2 | Requisitos |
 |---|---|---|---|
-| A1 | Archivo servido de `IMAGE` y `STICKER` (hoy `attachment` trae `mimeType`, `filename` y `caption`, sin dirección) | R21, R22 | Recuadro «[Imagen]» / «[Sticker]»; el visor no se abre. |
-| A2 | Reacción ligada al **id del mensaje del chat** (hoy `attachment.messageId` es el wamid y los mensajes del chat no exponen su wamid) | R24 | La reacción no se muestra (nunca como mensaje aparte). |
-| A3 | Pedidos del cliente para el chat (lista, más reciente primero, con número, estado, fecha de entrega, total y líneas con presentación × cantidad, entregado y faltante) | R35, R38, R39 | Sin selector ni flecha (como un cliente sin pedidos); `pedido.*` sale `[falta pedido.numero]`. |
-| A4 | Objeto de valores por defecto para cliente + pedido (constantes del sistema y propias) | R35, R36 | `cliente.nombre` = nombre del cliente del chat; propias = `variables[].value` de la plantilla (QC-245 P9); `empresa.nombre` y `pedido.*` sin valor. |
-| A5 | Envío de plantilla con el pedido elegido y parámetros resueltos en el servidor | R37 | Se envía como hoy: `templateId` + `constants` (las del sistema, resueltas por el front) + `constantLabels`. |
+| A1 | Archivo servido de `IMAGE` y `STICKER` | `attachment.mediaUrl` (ruta `GET /api/integraciones/whatsapp/media/<messageId>`) va como `src`; 502 si Meta lo borró → «Imagen no disponible»; audio/video/documento con `mediaUrl: null`. **Cerrada.** | R21, R22 |
+| A2 | Reacción ligada al id del mensaje del chat | `attachment.messageId` = `id` interno del mensaje reaccionado, o `null` (no se muestra). **Cerrada.** | R24 |
+| A3 | Pedidos del cliente para el chat | `getWhatsappChatContextAction`: `orders` abiertos, más reciente primero (≤ 20), `selectedOrderId`, líneas con presentación × envases, entregado y faltante; sin fecha de entrega (D15); `total` en `null` hasta QC-307 (D16). **Cerrada.** | R38, R39, R54 |
+| A4 | Objeto de valores por defecto | `context.values`: las siete constantes + las variables propias, texto o `null`. **Cerrada.** | R35, R36 |
+| A5 | Envío de plantilla con el pedido elegido | El envío de QC-240 no cambia: `constants` = las constantes de la plantilla con valor no nulo en `context.values`, `constantLabels` del catálogo; las propias no se mandan. **Cerrada.** | R37, R41 |
 
 ## Preguntas abiertas
 
 - **P1** — **Cerrada (D11):** el texto de la plantilla rellenada es de solo lectura (R34).
-- **P2** — Campos exactos del detalle del pedido y de dónde salen «entregado» y «faltante» (los
-  cierra QC-245 al ampliar). El total depende además de que el pedido tenga precio de venta
-  (QC-307 en vuelo). Default: los de R39; un campo que no llegue se pinta con la marca de vacío.
+- **P2** — **Cerrada por el contrato v2 (D13, D15, D16):** el detalle trae número, estado, producto,
+  total (`null` hasta QC-307, se oculta) y, por línea, presentación, pedidos, entregados y por
+  entregar (`pending`), que coinciden con Pedidos. Sin fecha de entrega (R39).
 - **P3** — **Cerrada (D12):** los botones de vincular, desvincular y bloquear no entran; van a
   QT-299 (chat-vincular-bloquear-contacto, depende de QC-246).
 - **P4** — El contrato trae de cada plantilla su `name` de Meta (p. ej. `pedido_listo`), no un
@@ -295,8 +341,17 @@ dan por sabidos; la pantalla los consume a través de los tipos locales de `desi
   «Mensaje no soportado» (R20).
 - **P9** — En teléfono no hay Shift. ¿Enter envía también allí (como dice la tarjeta) o inserta
   salto y solo envía el botón? Default: igual que en escritorio (R29).
-- **P10** — Con un solo pedido no hay selector; ¿se muestra la flecha del detalle? Default: sí
-  (R39).
+- **P10** — Con un solo pedido abierto no hay selector; ¿se muestra la flecha del detalle? Default:
+  sí (R39).
 - **P11** — El pase `/design` no trae tableros de tablet ni la ficha por plataforma de los `…Movil`
   (`docs/diseno/README.md > El canvas`). ¿Se aceptan así? (Los tableros ya están copiados en
   `docs/diseno/canvas/`: D10.)
+- **P12** — Clave visible, etiqueta, descripción y ejemplo de las cuatro constantes nuevas (R50). La
+  tarjeta solo pide «estilo `numero_de_pedido`». Default (`design.md > 6.1`): `estado_del_pedido`,
+  `fecha_de_solicitud`, `total_del_pedido`, `detalle_del_pedido`, con las etiquetas «Estado del
+  pedido», «Fecha de solicitud», «Total del pedido», «Detalle del pedido» y los ejemplos del contrato
+  v2.
+- **P13** — Si una empresa ya tiene una variable propia guardada con una de esas cuatro claves
+  visibles, al entrar la constante su clave queda duplicada en el diccionario (la constante gana en
+  `toBackendKey`). El front no puede saber si existe alguna. ¿Se acepta, o se elige otra clave
+  visible? Default: se acepta; R53 impide crear nuevas.
