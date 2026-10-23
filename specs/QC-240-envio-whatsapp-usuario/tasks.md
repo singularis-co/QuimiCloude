@@ -63,7 +63,7 @@
   - **Hecho:** sin imports de `ports`, `next/*`, Prisma ni `lib/shared`; tabla de §4.6 y casos de §4.5
     en verde.
 
-- [ ] **T7 [P] `WhatsappOutboxRepository` y adaptador Prisma** (R8, R11, R26–R28, R30–R32, R43).
+- [x] **T7 [P] `WhatsappOutboxRepository` y adaptador Prisma** (R8, R11, R26–R28, R30–R32, R43).
   Depende de T2.
   - `ports/whatsapp-outbox-repository.ts`, `adapters/driven/persistence/whatsapp-outbox-prisma.ts`
     (funciones con nombre, ámbito por las envolturas existentes).

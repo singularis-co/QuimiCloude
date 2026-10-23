@@ -48,6 +48,7 @@ const ADAPTADOR_INBOX = 'whatsapp-inbox-prisma.ts'
 const ADAPTADOR_CONTACTOS = 'whatsapp-contact-prisma.ts'
 const ADAPTADOR_PLANTILLAS = 'whatsapp-template-prisma.ts'
 const ADAPTADOR_VARIABLES = 'whatsapp-variable-key-prisma.ts'
+const ADAPTADOR_SALIDA = 'whatsapp-outbox-prisma.ts'
 
 const FORMA_DE_AMBITO = {
   identificador: 'scope',
@@ -121,7 +122,26 @@ const PUERTO_VARIABLES: PuertoVigilado = {
   ayudantes: ['liveUsage', 'lockedKey'],
 }
 
-const PUERTOS: readonly PuertoVigilado[] = [PUERTO, PUERTO_INBOX, PUERTO_CONTACTOS, PUERTO_PLANTILLAS, PUERTO_VARIABLES]
+// 2026-10-23, QC-240: el repositorio de salida de un envio (contactos y mensajes salientes). Se
+// cablea en su propia fabrica `create…(db)`, como el de contactos, y entra en el barrido sin exencion.
+const PUERTO_SALIDA: PuertoVigilado = {
+  nombre: 'WhatsappOutboxRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-outbox-repository.ts'),
+  constante: 'whatsappOutboxRepository',
+  metodosEsperados: 9,
+  adaptador: ADAPTADOR_SALIDA,
+  ayudantes: [],
+  fabrica: 'createWhatsappOutboxRepository',
+}
+
+const PUERTOS: readonly PuertoVigilado[] = [
+  PUERTO,
+  PUERTO_INBOX,
+  PUERTO_CONTACTOS,
+  PUERTO_PLANTILLAS,
+  PUERTO_VARIABLES,
+  PUERTO_SALIDA,
+]
 
 /**
  * Archivos exentos por NOMBRE del barrido de ambito, como en la guardia de `pedidos`. Cada entrada la
@@ -1302,5 +1322,157 @@ describe('R32 — sensibilidad: la exencion de la transaccion de los contactos n
     )
     const resolutor = readFileSync(join(PERSISTENCE_ROOT, 'whatsapp-webhook-directory-prisma.ts'), 'utf8')
     expect(hallazgosComoExento(resolutor)).toMatch(/no es `prisma\.\$transaction`/)
+  })
+})
+
+// --- Repositorio de salida (QC-240, 2026-10-23) -------------------------------------------------
+
+/** Los argumentos de cada `db.<modelo>.<operacion>(` del texto (con sus cadenas intactas). */
+function argumentosDeLlamadasDb(texto: string, modelo: string, operacion: string): readonly string[] {
+  const patron = new RegExp(`\\bdb\\s*\\.\\s*${modelo}\\s*\\.\\s*${operacion}\\s*\\(`, 'g')
+  return [...texto.matchAll(patron)].map((llamada) => {
+    const abre = texto.indexOf('(', llamada.index)
+    return texto.slice(abre + 1, cierreEquilibrado(texto, abre, '(', ')'))
+  })
+}
+
+/** De los `updateMany` de mensajes, los que no llevan la envoltura de mensajes Y `status: 'SENDING'` en el `where`. */
+function marcasSinCondicion(texto: string): { readonly llamadas: number; readonly sinCondicion: number } {
+  const llamadas = argumentosDeLlamadasDb(texto, 'whatsappMessage', 'updateMany')
+  const sinCondicion = llamadas.filter((argumentos) => {
+    const where = objetoDeLaClave(argumentos, 'where') ?? ''
+    return !/\bwhatsappMessageCompanyScope\s*\(\s*scope\s*\)/.test(where) || !/\bstatus\s*:\s*'SENDING'/.test(where)
+  })
+  return { llamadas: llamadas.length, sinCondicion: sinCondicion.length }
+}
+
+/** Los `INSERT` crudos cuya empresa no sale de `${columns.companyId}::uuid`, con `columns = companyScopeColumns(scope)`. */
+function altasCrudasSinEmpresa(texto: string): { readonly bloques: number; readonly sinEmpresa: number } {
+  const columnasDelAmbito = /\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/.test(texto)
+  const bloques = [...texto.matchAll(/\$(?:queryRaw|executeRaw)\s*`([^`]*)`/g)].filter((b) =>
+    /\bINSERT\s+INTO\b/i.test(b[1] ?? ''),
+  )
+  const sinEmpresa = bloques.filter(
+    (bloque) => !columnasDelAmbito || !/VALUES\s*\(\s*\$\{\s*columns\.companyId\s*\}::uuid/.test(bloque[1] ?? ''),
+  )
+  return { bloques: bloques.length, sinEmpresa: sinEmpresa.length }
+}
+
+describe('R43 (QC-240) — el repositorio de salida lleva el ambito en cada lectura y escritura', () => {
+  const cableado = cableadoDelPuerto(PUERTO_SALIDA)
+  const adaptador = analizar(ADAPTADOR_SALIDA)
+  const fuente = sinComentarios(readFileSync(join(PERSISTENCE_ROOT, ADAPTADOR_SALIDA), 'utf8'))
+  /** El texto de la funcion que cablea `metodo`, con sus cadenas: el troceo las vacia sin mover posiciones. */
+  const textoDe = (metodo: string): string => {
+    const funcion = adaptador.funciones.find((f) => f.nombre === cableado.get(metodo))
+    expect(funcion, `${ADAPTADOR_SALIDA} no declara la funcion de ${metodo}`).toBeTruthy()
+    return fuente.slice(funcion?.inicio ?? 0, (funcion?.fin ?? 0) + 1)
+  }
+
+  it.each(['markSent', 'markFailed'] as const)(
+    '%s: su unico `updateMany` lleva `whatsappMessageCompanyScope(scope)` y `status: SENDING` en el `where`',
+    (metodo) => {
+      expect(marcasSinCondicion(textoDe(metodo))).toEqual({ llamadas: 1, sinCondicion: 0 })
+    },
+  )
+
+  it('linkContact: su unico `updateMany` lleva `whatsappContactCompanyScope(scope)` en el `where`', () => {
+    const llamadas = argumentosDeLlamadasDb(textoDe('linkContact'), 'whatsappContact', 'updateMany')
+    expect(llamadas).toHaveLength(1)
+    expect(objetoDeLaClave(llamadas[0] ?? '', 'where') ?? '').toMatch(/\bwhatsappContactCompanyScope\s*\(\s*scope\s*\)/)
+  })
+
+  it.each([
+    ['findContact', 'findFirst'],
+    ['findContactsByWaIds', 'findMany'],
+  ] as const)('%s: su `%s` filtra por la conexion y por `whatsappContactCompanyScope(scope)`', (metodo, operacion) => {
+    const llamadas = argumentosDeLlamadasDb(textoDe(metodo), 'whatsappContact', operacion)
+    expect(llamadas).toHaveLength(1)
+    const where = objetoDeLaClave(llamadas[0] ?? '', 'where') ?? ''
+    expect(where).toMatch(/\bconnectionId\b/)
+    expect(where).toMatch(/\bwhatsappContactCompanyScope\s*\(\s*scope\s*\)/)
+  })
+
+  it('findOutbound: su `findFirst` lleva `whatsappMessageCompanyScope(scope)` en el `where`', () => {
+    const llamadas = argumentosDeLlamadasDb(textoDe('findOutbound'), 'whatsappMessage', 'findFirst')
+    expect(llamadas).toHaveLength(1)
+    expect(objetoDeLaClave(llamadas[0] ?? '', 'where') ?? '').toMatch(/\bwhatsappMessageCompanyScope\s*\(\s*scope\s*\)/)
+  })
+
+  it('insertSending: la empresa del alta sale de `companyScopeColumns(scope)`', () => {
+    expect(textoDe('insertSending')).toMatch(/data\s*:\s*\{\s*\.\.\.companyScopeColumns\s*\(\s*scope\s*\)/)
+  })
+
+  it('ensureContact: el `INSERT` crudo toma la empresa de `companyScopeColumns(scope)` y la relectura lleva la envoltura', () => {
+    const texto = textoDe('ensureContact')
+    expect(altasCrudasSinEmpresa(texto)).toEqual({ bloques: 1, sinEmpresa: 0 })
+    expect(texto).toMatch(/ON CONFLICT\s*\(\s*"connection_id"\s*,\s*"wa_id"\s*\)\s*DO NOTHING/)
+    const relectura = argumentosDeLlamadasDb(texto, 'whatsappContact', 'findFirst')
+    expect(relectura).toHaveLength(1)
+    expect(objetoDeLaClave(relectura[0] ?? '', 'where') ?? '').toMatch(/\bwhatsappContactCompanyScope\s*\(\s*scope\s*\)/)
+  })
+
+  it('touchContact: su unico bloque de SQL crudo filtra por la empresa de `companyScopeColumns(scope)`', () => {
+    const texto = textoDe('touchContact')
+    expect(texto).toMatch(/\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/)
+    expect(sqlCrudoSinEmpresa(texto)).toEqual({ bloques: 1, sinEmpresa: 0 })
+  })
+
+  it('el adaptador no escribe un mensaje ni un contacto por `update`, `upsert` ni `delete`, ni da de alta un contacto por Prisma', () => {
+    expect(adaptador.codigo).not.toMatch(/\bdb\s*\.\s*whatsappMessage\s*\.\s*(?:update|upsert|delete|deleteMany|createMany)\s*\(/)
+    expect(adaptador.codigo).not.toMatch(
+      /\bdb\s*\.\s*whatsappContact\s*\.\s*(?:update|upsert|create|createMany|delete|deleteMany)\s*\(/,
+    )
+  })
+})
+
+describe('R43 (QC-240) — sensibilidad: las comprobaciones del repositorio de salida muerden', () => {
+  it('un `updateMany` de mensajes sin `status: SENDING`, con otro estado o con la envoltura de otra tabla, se cuenta', () => {
+    const texto =
+      "await db.whatsappMessage.updateMany({ where: { id, status: 'SENDING', ...whatsappMessageCompanyScope(scope) }, data })\n" +
+      'await db.whatsappMessage.updateMany({ where: { id, ...whatsappMessageCompanyScope(scope) }, data })\n' +
+      "await db.whatsappMessage.updateMany({ where: { id, status: 'SENDING', ...whatsappContactCompanyScope(scope) }, data })\n" +
+      "await db.whatsappMessage.updateMany({ where: { id, status: 'SENT', ...whatsappMessageCompanyScope(scope) }, data })\n"
+    expect(marcasSinCondicion(texto)).toEqual({ llamadas: 4, sinCondicion: 3 })
+  })
+
+  it('la condicion fuera del `where` (en el `data`) no cuenta', () => {
+    const texto =
+      "await db.whatsappMessage.updateMany({ where: { id }, data: { status: 'SENDING', ...whatsappMessageCompanyScope(scope) } })\n"
+    expect(marcasSinCondicion(texto)).toEqual({ llamadas: 1, sinCondicion: 1 })
+  })
+
+  it('un `INSERT` crudo con la empresa de la entrada, o sin `columns` del ambito, se cuenta', () => {
+    const bueno =
+      'const columns = companyScopeColumns(scope)\n' +
+      'await db.$executeRaw`INSERT INTO "whatsapp_contacts" ("company_id") VALUES (${columns.companyId}::uuid)`\n'
+    expect(altasCrudasSinEmpresa(bueno)).toEqual({ bloques: 1, sinEmpresa: 0 })
+    const deLaEntrada = bueno.replace('${columns.companyId}', '${companyId}')
+    expect(altasCrudasSinEmpresa(deLaEntrada)).toEqual({ bloques: 1, sinEmpresa: 1 })
+    const sinColumnas = bueno.replace('companyScopeColumns(scope)', 'otraCosa(scope)')
+    expect(altasCrudasSinEmpresa(sinColumnas)).toEqual({ bloques: 1, sinEmpresa: 1 })
+  })
+
+  it('un miembro de la fabrica de salida que no reenvia `db` o pierde el ambito no queda cableado con nombre', () => {
+    const fuente =
+      'export function createWhatsappOutboxRepository(db: PrismaLike = prisma): WhatsappOutboxRepository {\n' +
+      '  return {\n' +
+      '    findOutbound: (id, scope) => findWhatsappOutboundMessage(db, id, scope),\n' +
+      '    markSent: (id, wamid, scope) => markWhatsappMessageSent(prisma, id, wamid, scope),\n' +
+      '    touchContact: (id, at, scope) => touchWhatsappContactOnSend(db, id, at),\n' +
+      '  };\n' +
+      '}\n'
+    const cableado = cableadoEnFabrica(fuente, PUERTO_SALIDA.fabrica ?? '', PUERTO_SALIDA.nombre)
+    expect(cableado?.get('findOutbound')).toBe('findWhatsappOutboundMessage')
+    expect([...(cableado?.values() ?? [])].filter((nombre) => !/^\w+$/.test(nombre))).toHaveLength(2)
+  })
+
+  it('una funcion de salida que consulta por `db` sin llevar el ambito a la envoltura da hallazgo', () => {
+    const fuente =
+      "import { whatsappMessageCompanyScope } from './company-scope'\n" +
+      'export async function findWhatsappOutboundMessage(db: PrismaLike, id: string, scope: IntegracionesScope) {\n' +
+      '  return db.whatsappMessage.findFirst({ where: { id } })\n' +
+      '}\n'
+    expect(hallazgosDe(ADAPTADOR_SALIDA, analizarFuente(fuente), false).join('\n')).toMatch(/no lo lleva/)
   })
 })
