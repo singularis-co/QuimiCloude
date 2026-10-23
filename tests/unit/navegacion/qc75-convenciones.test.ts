@@ -81,6 +81,8 @@ export const CODIGOS_QC74 = [
   'entregas.modificar',
   // 2026-10-09
   'entregas.anular',
+  // 2026-10-23
+  'whatsapp.enviar',
 ] as const;
 
 /** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
@@ -168,6 +170,8 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         'integraciones',
         // QC-223 2026-10-08: `entregas` tampoco es carpeta de `lib/modules/` y solo escribe.
         'entregas',
+        // 2026-10-23: `whatsapp` tampoco es carpeta de `lib/modules/`; solo lleva `enviar`.
+        'whatsapp',
       ]),
     ].sort();
     expect(modulos).toEqual(esperados);
@@ -175,9 +179,13 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
   });
 
   it('las acciones del catalogo son solo consultar y modificar, mas ejecutar unicamente en asignaciones (QC-201 R2)', () => {
-    // 2026-10-09: entra `anular`, unicamente en `entregas`.
+    // 2026-10-09: entra `anular`, unicamente en `entregas`. 2026-10-23: y `enviar`, unicamente
+    // en `whatsapp`.
     const acciones = [...new Set(catalogo.map((permiso) => permiso.action))].sort();
-    expect(acciones).toEqual(['anular', 'consultar', 'ejecutar', 'modificar']);
+    expect(acciones).toEqual(['anular', 'consultar', 'ejecutar', 'enviar', 'modificar']);
+    expect(
+      catalogo.filter((permiso) => permiso.action === 'enviar').map((permiso) => permiso.code),
+    ).toEqual(['whatsapp.enviar']);
     expect(
       catalogo.filter((permiso) => permiso.action === 'anular').map((permiso) => permiso.code),
     ).toEqual(['entregas.anular']);

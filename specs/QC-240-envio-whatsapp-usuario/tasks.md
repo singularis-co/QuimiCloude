@@ -10,7 +10,7 @@
 
 ## Tanda 1 — base (sin dependencias entre sí)
 
-- [ ] **T1 [P] Permiso `whatsapp.enviar`** (R1–R3, D5).
+- [x] **T1 [P] Permiso `whatsapp.enviar`** (R1–R3, D5).
   - Migración de datos `20261023120000_whatsapp_send_permission` (`migration.sql` + `down.sql`),
     copia de la de QC-221 (design §2.2).
   - `permissions.ts`: entrada, párrafo de enmienda, `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]`.
