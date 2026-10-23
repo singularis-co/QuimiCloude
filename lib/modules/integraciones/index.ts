@@ -21,6 +21,7 @@ export {
   WhatsappVariableKeyInUseError,
   WhatsappTemplateNotMappedError,
   WhatsappTemplateNotMappableError,
+  WhatsappTemplateValuesMissingError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -119,3 +120,6 @@ export { createCreateWhatsappTemplate } from './domain/create-whatsapp-template'
 export { createDeleteWhatsappTemplate } from './domain/delete-whatsapp-template';
 export { createResyncWhatsappTemplates, createSyncWhatsappTemplates } from './domain/sync-whatsapp-templates';
 export { createSyncAllWhatsappTemplates } from './domain/sync-all-whatsapp-templates';
+export type { WhatsappOutboundMessageView } from './domain/whatsapp-outbound-message';
+export { createSendWhatsappMessage } from './domain/send-whatsapp-message';
+export { createRetryWhatsappMessage } from './domain/retry-whatsapp-message';

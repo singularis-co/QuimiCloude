@@ -1,5 +1,7 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 
+import { prisma } from '@/lib/shared/db/prisma';
+
 import { phoneMatchesWaId, waIdCandidates } from '../../../domain/phone-matches-wa-id';
 
 import {
@@ -173,7 +175,7 @@ async function findAliveCustomerOwners(
   return customers.map((customer) => customer.id);
 }
 
-export function createCustomerPhoneRepository(db: PrismaLike): CustomerPhoneRepository {
+export function createCustomerPhoneRepository(db: PrismaLike = prisma): CustomerPhoneRepository {
   return {
     isAlive: (customerId, scope) => isAliveCustomer(db, customerId, scope),
     listAliveLinks: (customerId, scope) => listAliveCustomerPhoneLinks(db, customerId, scope),
