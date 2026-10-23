@@ -21,7 +21,7 @@
   - **Hecho:** los tests nombrados en verde; solo el Administrador tiene el permiso en el seed y en la
     migración; aplicar dos veces no duplica; `down.sql` deja las tablas como antes.
 
-- [ ] **T2 [P] Migración de esquema** (R44, R47).
+- [x] **T2 [P] Migración de esquema** (R44, R47).
   - `schema.prisma`: `templateLanguage String? @map("template_language")` en `WhatsappMessage`.
   - `20261023130000_whatsapp_outbound_messages` (`migration.sql` + `down.sql`, design §2.3).
   - Test `whatsapp-outbound-messages-migration.int.test.ts` (patrón de

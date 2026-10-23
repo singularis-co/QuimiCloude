@@ -110,7 +110,10 @@ function token(): string {
 
 type Fixture = { readonly companyId: string; readonly userId: string; readonly connectionId: string; readonly contactId: string }
 
-/** Empresa, usuario, conexion y contacto propios, dentro de la transaccion del caso. */
+/**
+ * Empresa, usuario que envia, conexion y contacto propios, dentro de la transaccion del caso. La
+ * conexion la crea otro usuario: asi borrar al que envia solo choca con la FK de `sent_by`.
+ */
 async function seed(tx: Prisma.TransactionClient): Promise<Fixture> {
   const marker = token()
   const documentType = await tx.documentType.create({
@@ -142,6 +145,22 @@ async function seed(tx: Prisma.TransactionClient): Promise<Fixture> {
     },
     select: { id: true },
   })
+  const creator = await tx.user.create({
+    data: {
+      firstNames: 'Luis',
+      lastNames: 'Rojas Diaz',
+      birthDate: new Date('1985-02-03T00:00:00.000Z'),
+      email: `luis.${marker}@quimicloude.test`,
+      phone: '+57 300 444 5566',
+      documentTypeCode: documentType.code,
+      documentNumber: marker.slice(12, 24),
+      username: `luis.${marker}`,
+      passwordHash: 'hash-de-prueba-no-es-un-algoritmo-real',
+      roleId: role.id,
+      companyId: company.id,
+    },
+    select: { id: true },
+  })
   const connection = await tx.whatsappConnection.create({
     data: {
       id: randomUUID(),
@@ -152,7 +171,7 @@ async function seed(tx: Prisma.TransactionClient): Promise<Fixture> {
       accessTokenEnc: 'v1:valor-cifrado-de-prueba',
       appSecretEnc: 'v1:otro-valor-cifrado',
       verifyTokenHash: 'a'.repeat(64),
-      createdById: user.id,
+      createdById: creator.id,
     },
     select: { id: true },
   })
