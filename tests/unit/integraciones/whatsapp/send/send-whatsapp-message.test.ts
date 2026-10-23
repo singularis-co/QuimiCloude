@@ -523,6 +523,20 @@ describe('sendWhatsappMessage — el mensaje y la llamada a Meta', () => {
     expect(s.outbox.message(result.message.id)?.status).toBe('SENDING')
   })
 
+  it('R31: si el mensaje ya no esta en SENDING, markFailed no cambia nada y el envio igual responde con el fallo de Meta', async () => {
+    const s = setup({ sent: { ok: false, kind: 'rejected', message: 'x', code: 131026, subcode: null } })
+    s.outbox.markFailed.mockImplementationOnce(async () => null)
+    const result = await s.send(textTo(), sender())
+    expect(result.message).toMatchObject({
+      status: 'FAILED',
+      errorCode: '131026',
+      errorReason: rejectedWithCodeReason(131026),
+    })
+    expect(s.outbox.markFailed).toHaveBeenCalledTimes(1)
+    expect(s.outbox.markSent).not.toHaveBeenCalled()
+    expect(s.outbox.message(result.message.id)).toMatchObject({ status: 'SENDING', errorCode: null, errorReason: null })
+  })
+
   it.each([
     ['un rechazo con codigo', { ok: false, kind: 'rejected', message: 'x', code: 131026, subcode: null } as const, '131026', rejectedWithCodeReason(131026)],
     ['la falta de respuesta', { ok: false, kind: 'unreachable', message: null } as const, null, UNREACHABLE_REASON],

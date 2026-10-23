@@ -171,7 +171,7 @@ Veredicto: T9 verde; el borde no lee el diagnóstico y el aviso sale por el puer
 | R28 | S «R28: una plantilla guarda TEMPLATE…»; Ob «insertSending de una plantilla…» |
 | R29 | `whatsapp-graph-client-send.test.ts`; S «R29: llama a Graph con el phone_number_id…» |
 | R30 | S «R30: si Meta acepta…»; Ob «markSent guarda el wamid…» |
-| R31 | S «R31: con … el mensaje queda FAILED…»; Ob «markFailed pasa a FAILED…» |
+| R31 | S «R31: con … el mensaje queda FAILED…», «R31: si el mensaje ya no esta en SENDING, markFailed no cambia nada y el envio igual responde con el fallo de Meta»; Ob «markFailed pasa a FAILED…» |
 | R32 | S «R32: al terminar actualiza lastMessageAt…»; Ob «touchContact mueve lastMessageAt solo hacia delante…» |
 | R33 | `whatsapp-send-failure.test.ts` «el código 190…»; S «R33: el codigo 190 deja el mensaje FAILED y la conexion en ERROR…» |
 | R34, R35 | `whatsapp-send-failure.test.ts`; S «R34/R35: el codigo … deja el mensaje FAILED…» |
