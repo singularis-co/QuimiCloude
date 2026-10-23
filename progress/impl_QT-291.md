@@ -2,21 +2,41 @@
 
 ## T0. Lista de modelos (2026-10-22)
 
-Lista aprobada en F1.4 (`design.md > 3`), sin modelos añadidos. Los cinco ids vienen del T0 de
-QC-275 (confirmados el 2026-10-13); no hay ninguno nuevo que confirmar.
+Rehecha con la lista enmendada de F1.4 (`design.md > 3`, veinte modelos). Fuente común de PDF e
+imágenes: `https://openrouter.ai/api/v1/models` (los veinte con `file` + `image`, según el spec,
+consultado el 2026-10-22). Ids nativos: consulta de solo lectura `GET /models/<id>` con las keys de
+`.env` (sin generar texto). Keys disponibles: Gemini válida; Anthropic responde 401 (key no válida);
+OpenAI no hay key.
 
-| Proveedor | model_id | Predet. | Fuente | Fecha |
-|---|---|---|---|---|
-| ANTHROPIC | `claude-haiku-5-5` | sí | docs.anthropic.com «Models overview» (T0 QC-275) | 2026-10-13 |
-| GOOGLE | `gemini-3.8-flash` | sí | ai.google.dev/gemini-api/docs/models (T0 QC-275) | 2026-10-13 |
-| GOOGLE | `gemini-3.5-flash-lite` | no | ídem | 2026-10-13 |
-| OPENAI | `gpt-6-luna` | sí | platform.openai.com/docs/models (T0 QC-275) | 2026-10-13 |
-| OPENROUTER | `anthropic/claude-haiku-5.5` | sí | `openrouter.ai/api/v1/models`: `input_modalities = ["text","image","file"]` | **re-comprobado 2026-10-22** |
+| Proveedor | sort | model_id | Recom. | Fuente | Fecha / estado |
+|---|---|---|---|---|---|
+| ANTHROPIC | 1 | `claude-opus-5-5` | no | `GET api.anthropic.com/v1/models/<id>` | **pendiente (sin key válida: 401)** |
+| ANTHROPIC | 2 | `claude-sonnet-5-5` | no | ídem | **pendiente (sin key válida: 401)** |
+| ANTHROPIC | 3 | `claude-opus-5` | no | ídem | **pendiente (sin key válida: 401)** |
+| ANTHROPIC | 4 | `claude-sonnet-5` | no | ídem | **pendiente (sin key válida: 401)** |
+| ANTHROPIC | 5 | `claude-haiku-5-5` † | sí | T0 QC-275 (docs.anthropic.com) | 2026-10-13 |
+| GOOGLE | 1 | `gemini-4-argon` | no | `GET generativelanguage.googleapis.com/v1beta/models/<id>` → 200 | 2026-10-22 |
+| GOOGLE | 2 | `gemini-3.8-flash` † | sí | ídem → 200 | 2026-10-22 |
+| GOOGLE | 3 | `gemini-3.7-flash` | no | ídem → 200 | 2026-10-22 |
+| GOOGLE | 4 | `gemini-3.5-flash-lite` † | no | ídem → 200 | 2026-10-22 |
+| GOOGLE | 5 | `gemini-3.1-flash-lite` | no | ídem → 200 | 2026-10-22 |
+| OPENAI | 1 | `gpt-6.1-sol` | no | `models.retrieve` | **pendiente (sin key)** |
+| OPENAI | 2 | `gpt-6-sol` | no | ídem | **pendiente (sin key)** |
+| OPENAI | 3 | `gpt-6-luna-pro` | no | ídem | **pendiente (sin key)** |
+| OPENAI | 4 | `gpt-6-luna` † | sí | T0 QC-275 (platform.openai.com) | 2026-10-13 |
+| OPENAI | 5 | `gpt-5.6-luna` | no | `models.retrieve` | **pendiente (sin key)** |
+| OPENROUTER | 1 | `anthropic/claude-sonnet-5.5` | no | `/api/v1/models`: `["text","image","file"]` | 2026-10-22 |
+| OPENROUTER | 2 | `openai/gpt-6.1-sol` | no | `["file","image","text"]` | 2026-10-22 |
+| OPENROUTER | 3 | `google/gemini-3.8-flash` | no | `["text","image","video","file","audio"]` | 2026-10-22 |
+| OPENROUTER | 4 | `anthropic/claude-haiku-5.5` † | sí | `["text","image","file"]` | 2026-10-22 |
+| OPENROUTER | 5 | `openai/gpt-6-luna` | no | `["file","image","text"]` | 2026-10-22 |
 
-**Pendiente de confirmar (sin key):** qué código devuelve OpenRouter al generar con un id
-inexistente (`design.md > 7`). Sin credenciales, `POST /api/v1/chat/completions` responde `401`
-antes de mirar el modelo, así que no se pudo observar. Se implementa con el supuesto del spec (404)
-y queda abierto para verificar con una key real.
+Ningún id respondió «no existe». Pendientes: 4 de Anthropic (excepto el †) y 4 de OpenAI (excepto el †).
+
+**OpenRouter con id inexistente al generar (`design.md > 7`), verificado 2026-10-22 con key:**
+`POST /api/v1/chat/completions` con `model: "no-existe/modelo-xyz"` responde **HTTP 400**
+`{"error":{"message":"no-existe/modelo-xyz is not a valid model ID","code":400}}`, **no 404**. T6
+ajusta `classifyOpenAiError` (solo para OpenRouter) con test, como prevé el spec.
 
 ## T1. Esquema y migración (2026-10-22, backend_dev)
 
