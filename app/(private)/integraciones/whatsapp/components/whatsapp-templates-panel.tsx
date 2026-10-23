@@ -21,9 +21,11 @@ import {
 
 import { WhatsappTemplateDeleteDialog } from './whatsapp-template-delete-dialog';
 import { WhatsappTemplateFormSheet } from './whatsapp-template-form-sheet';
+import { WhatsappTemplateRelateSheet } from './whatsapp-template-relate-sheet';
 import { isUnmapped } from './whatsapp-template-rules';
 import { WHATSAPP_SYNC_BAR_TEXTS, WhatsappTemplateSyncBar } from './whatsapp-template-sync-bar';
 import { WhatsappTemplateTable } from './whatsapp-template-table';
+import { WhatsappVariableFormSheet } from './whatsapp-variable-form-sheet';
 
 export const WHATSAPP_TEMPLATES_PANEL_TESTID = 'whatsapp-templates-panel';
 export const WHATSAPP_TEMPLATES_UNMAPPED_NOTICE_TESTID = 'whatsapp-templates-unmapped-notice';
@@ -50,11 +52,6 @@ export type TemplatesPanelSheet =
   | { readonly kind: 'new' }
   | { readonly kind: 'duplicate'; readonly template: WhatsappTemplateView }
   | { readonly kind: 'relate'; readonly template: WhatsappTemplateView };
-
-function sheetMarkerOf(sheet: TemplatesPanelSheet | null): string | undefined {
-  if (sheet === null || sheet.kind !== 'relate') return undefined;
-  return `${sheet.kind}:${sheet.template.id}`;
-}
 
 export type WhatsappTemplatesPanelProps = {
   readonly list: WhatsappTemplateList;
@@ -84,6 +81,18 @@ function templatesOf(changes: LocalChanges): readonly WhatsappTemplateView[] {
   return [...added, ...fromServer].filter((template) => !changes.removed.has(template.id));
 }
 
+type Dictionary = readonly WhatsappDictionaryEntryView[] | null;
+
+/** Variables creadas desde el alta antes de que llegue el diccionario nuevo del servidor. */
+type AddedEntries = { readonly source: Dictionary; readonly entries: readonly WhatsappDictionaryEntryView[] };
+
+function dictionaryWith(dictionary: Dictionary, added: readonly WhatsappDictionaryEntryView[]) {
+  const server = dictionary ?? [];
+  const serverIds = new Set(server.map((entry) => entry.id));
+  const missing = added.filter((entry) => !serverIds.has(entry.id));
+  return missing.length === 0 ? server : [...server, ...missing];
+}
+
 export function WhatsappTemplatesPanel({ list, dictionary }: WhatsappTemplatesPanelProps) {
   const router = useRouter();
   const [stored, setStored] = useState<LocalChanges>(() => noChanges(list));
@@ -93,6 +102,10 @@ export function WhatsappTemplatesPanel({ list, dictionary }: WhatsappTemplatesPa
   const [toggling, setToggling] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [deleting, setDeleting] = useState<WhatsappTemplateView | null>(null);
   const [sheet, setSheet] = useState<TemplatesPanelSheet | null>(null);
+  const [creatingVariable, setCreatingVariable] = useState(false);
+  const [added, setAdded] = useState<AddedEntries>({ source: dictionary, entries: [] });
+  const entries = dictionaryWith(dictionary, added.source === dictionary ? added.entries : []);
+  const [freshId, setFreshId] = useState<string | null>(null);
 
   const update = useCallback(
     (change: (current: LocalChanges) => LocalChanges) =>
@@ -171,13 +184,28 @@ export function WhatsappTemplatesPanel({ list, dictionary }: WhatsappTemplatesPa
     router.refresh();
   }
 
+  function handleRelated(template: WhatsappTemplateView) {
+    setSheet(null);
+    upsertTemplate(template);
+    setFreshId(template.id);
+    router.refresh();
+  }
+
+  function handleVariableSaved(entry: WhatsappDictionaryEntryView) {
+    setCreatingVariable(false);
+    setAdded((current) => ({
+      source: dictionary,
+      entries: [...(current.source === dictionary ? current.entries : []), entry],
+    }));
+    router.refresh();
+  }
+
   const isEmpty = templates.length === 0 && !syncing;
 
   return (
     <section
       data-testid={WHATSAPP_TEMPLATES_PANEL_TESTID}
       data-count={list.templates.length}
-      data-open-sheet={sheetMarkerOf(sheet)}
       className="flex min-w-0 flex-col gap-4"
     >
       <WhatsappTemplateSyncBar syncedAt={changes.syncedAt} syncing={syncing} summary={summary} onSync={sync} />
@@ -223,6 +251,7 @@ export function WhatsappTemplatesPanel({ list, dictionary }: WhatsappTemplatesPa
           onRelate={openRelate}
           onDuplicate={openDuplicate}
           onDelete={openDelete}
+          freshId={freshId}
         />
       )}
 
@@ -230,11 +259,26 @@ export function WhatsappTemplatesPanel({ list, dictionary }: WhatsappTemplatesPa
         <WhatsappTemplateFormSheet
           key={sheet.kind === 'new' ? sheet.kind : `${sheet.kind}:${sheet.template.id}`}
           source={sheet.kind === 'new' ? null : sheet.template}
-          dictionary={dictionary ?? []}
+          dictionary={entries}
           onClose={() => setSheet(null)}
           onCreated={handleCreated}
+          onCreateVariable={() => setCreatingVariable(true)}
         />
       ) : null}
+
+      <WhatsappTemplateRelateSheet
+        template={sheet?.kind === 'relate' ? sheet.template : null}
+        dictionary={entries}
+        onClose={() => setSheet(null)}
+        onRelated={handleRelated}
+      />
+
+      <WhatsappVariableFormSheet
+        target={creatingVariable ? 'new' : null}
+        entries={entries}
+        onClose={() => setCreatingVariable(false)}
+        onSaved={handleVariableSaved}
+      />
 
       <WhatsappTemplateDeleteDialog template={deleting} onClose={() => setDeleting(null)} onDeleted={handleDeleted} />
     </section>

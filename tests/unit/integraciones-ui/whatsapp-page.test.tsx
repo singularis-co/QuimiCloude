@@ -53,6 +53,7 @@ import { WHATSAPP_INTEGRATION_LABEL } from '@/lib/shared/navigation/private-nav'
 import { LOGIN_ROUTE_SESSION_ENDED, WHATSAPP_INTEGRATION_ROUTE } from '@/lib/shared/routes';
 
 import { setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 
 const {
   getSessionUserMock,
@@ -194,6 +195,7 @@ function recorrerProps(nodo: ReactNode, claves: Set<string>, textos: string[]): 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setViewportWidth(WIDE_VIEWPORT);
   notFoundMock.mockImplementation(() => {
     throw new Error('NEXT_NOT_FOUND');
   });
@@ -215,6 +217,7 @@ function conConexion(): void {
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('WhatsappIntegrationPage', () => {

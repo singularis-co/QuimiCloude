@@ -15,6 +15,7 @@ import type { WhatsappDictionaryEntryView } from '@/lib/modules/integraciones';
 import { deleteWhatsappVariableKeyAction } from '@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions';
 
 import { SYSTEM_CONSTANTS } from './whatsapp-system-constants';
+import { WhatsappVariableFormSheet, type WhatsappVariableSheetTarget } from './whatsapp-variable-form-sheet';
 
 export const WHATSAPP_VARIABLES_PANEL_TESTID = 'whatsapp-variables-panel';
 export const WHATSAPP_VARIABLES_INTRO_TESTID = 'whatsapp-variables-intro';
@@ -71,8 +72,7 @@ export const WHATSAPP_VARIABLES_TEXTS = {
   deleted: 'Variable eliminada.',
 } as const;
 
-/** Qué abre el panel de variable: una nueva o la propia que se edita. */
-export type WhatsappVariableSheetTarget = 'new' | WhatsappDictionaryEntryView;
+export type { WhatsappVariableSheetTarget } from './whatsapp-variable-form-sheet';
 
 export type WhatsappVariablesPanelProps = {
   readonly entries: readonly WhatsappDictionaryEntryView[];
@@ -318,6 +318,7 @@ function DeleteVariableDialog({ entry, onClose }: DeleteVariableDialogProps) {
 }
 
 export function WhatsappVariablesPanel({ entries }: WhatsappVariablesPanelProps) {
+  const router = useRouter();
   const [sheetTarget, setSheetTarget] = useState<WhatsappVariableSheetTarget | null>(null);
   const [deleting, setDeleting] = useState<WhatsappDictionaryEntryView | null>(null);
 
@@ -332,7 +333,6 @@ export function WhatsappVariablesPanel({ entries }: WhatsappVariablesPanelProps)
     <section
       data-testid={WHATSAPP_VARIABLES_PANEL_TESTID}
       data-count={entries.length}
-      data-variable-sheet={sheetTarget === null ? undefined : sheetTarget === 'new' ? 'new' : sheetTarget.id}
       className="flex flex-col gap-4"
     >
       <p className="max-w-[720px] text-sm text-muted-foreground" data-testid={WHATSAPP_VARIABLES_INTRO_TESTID}>
@@ -365,6 +365,15 @@ export function WhatsappVariablesPanel({ entries }: WhatsappVariablesPanelProps)
         </CardContent>
       </Card>
 
+      <WhatsappVariableFormSheet
+        target={sheetTarget}
+        entries={entries}
+        onClose={() => setSheetTarget(null)}
+        onSaved={() => {
+          setSheetTarget(null);
+          router.refresh();
+        }}
+      />
       <DeleteVariableDialog entry={deleting} onClose={() => setDeleting(null)} />
     </section>
   );

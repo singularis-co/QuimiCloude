@@ -74,7 +74,7 @@ hasta que el backend la guarde (R58).
 - [x] **T9 Duplicar** (T8). Acción «Duplicar» que abre el alta con `draftFromView` y el `Notice` de P6.
   **Hecho:** casos en `whatsapp-template-form-sheet.test.tsx`: R40 (título «Duplicar plantilla»,
   nombre con `_v2`, mensaje con claves de pantalla, aviso al perder encabezado o botones).
-- [ ] **T10 Relacionar variables** (T1, T3, T6). `whatsapp-template-relate-sheet.tsx`.
+- [x] **T10 Relacionar variables** (T1, T3, T6). `whatsapp-template-relate-sheet.tsx`.
   **Hecho:** `whatsapp-template-relate-sheet.test.tsx`: R42 (grupos, claves, relación actual
   preseleccionada, marcas de encabezado y botón), R43, R44, R45 (resumen y «Volver a revisar»), R46
   (pares hueco → clave con la clave con punto de P1 para las constantes; éxito y error).
@@ -83,7 +83,7 @@ hasta que el backend la guarde (R58).
   **Hecho:** `whatsapp-variables-panel.test.tsx`: R47, R48 (las tres constantes, sin acciones), R49
   (columnas sin Descripción mientras P2 siga abierta; vacío), R59 (sin uso: textos, llamada y aviso; en
   uso: texto y «Eliminar» deshabilitado).
-- [ ] **T12 Panel de variable** (T2, T11; y T8 para R28). `whatsapp-variable-form-sheet.tsx` con el
+- [x] **T12 Panel de variable** (T2, T11; y T8 para R28). `whatsapp-variable-form-sheet.tsx` con el
   diálogo «Revisa el cambio»; enganche desde «Nueva variable propia» del alta.
   **Hecho:** `whatsapp-variable-form-sheet.test.tsx`: R50, R51 (la clave sigue a la etiqueta y es de
   solo lectura), R52, R53, R54, R55 (siempre se envía la clave guardada), R56 (con uso y valor nuevo:

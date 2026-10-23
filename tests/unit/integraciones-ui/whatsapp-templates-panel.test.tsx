@@ -16,6 +16,13 @@ import {
   WHATSAPP_TEMPLATE_FORM_TITLE_TESTID,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-form-sheet';
 import {
+  WHATSAPP_RELATE_CONFIRM_SUBMIT_TESTID,
+  WHATSAPP_RELATE_SAVE_TESTID,
+  WHATSAPP_RELATE_SELECT_TESTID,
+  WHATSAPP_RELATE_SHEET_TESTID,
+  WHATSAPP_RELATE_TEXT_TESTID,
+} from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-relate-sheet';
+import {
   WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID,
   WHATSAPP_TEMPLATE_REASON_TEXT_TESTID,
   WHATSAPP_TEMPLATE_STATUS_TESTID,
@@ -48,7 +55,6 @@ import {
   WHATSAPP_TEMPLATES_EMPTY_NEW_TESTID,
   WHATSAPP_TEMPLATES_EMPTY_SYNC_TESTID,
   WHATSAPP_TEMPLATES_EMPTY_TESTID,
-  WHATSAPP_TEMPLATES_PANEL_TESTID,
   WHATSAPP_TEMPLATES_UNMAPPED_NOTICE_TESTID,
   WhatsappTemplatesPanel,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-templates-panel';
@@ -65,10 +71,11 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 
-const { syncMock, setEnabledMock, deleteMock, otherActionMock, toastSuccessMock, toastErrorMock, refreshMock } =
+const { syncMock, setEnabledMock, relateMock, deleteMock, otherActionMock, toastSuccessMock, toastErrorMock, refreshMock } =
   vi.hoisted(() => ({
     syncMock: vi.fn<() => Promise<WhatsappTemplateSyncResult>>(),
     setEnabledMock: vi.fn<(input: unknown) => Promise<WhatsappTemplateCreateResult>>(),
+    relateMock: vi.fn<(input: unknown) => Promise<WhatsappTemplateCreateResult>>(),
     deleteMock: vi.fn<(id: string) => Promise<WhatsappTemplateDeleteResult>>(),
     otherActionMock: vi.fn(),
     toastSuccessMock: vi.fn(),
@@ -79,10 +86,16 @@ const { syncMock, setEnabledMock, deleteMock, otherActionMock, toastSuccessMock,
 vi.mock('@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions', () => ({
   listWhatsappTemplatesAction: otherActionMock,
   createWhatsappTemplateAction: otherActionMock,
-  relateWhatsappTemplateVariablesAction: otherActionMock,
+  relateWhatsappTemplateVariablesAction: relateMock,
   syncWhatsappTemplatesAction: syncMock,
   setWhatsappTemplateEnabledAction: setEnabledMock,
   deleteWhatsappTemplateAction: deleteMock,
+}));
+
+vi.mock('@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions', () => ({
+  createWhatsappVariableKeyAction: otherActionMock,
+  updateWhatsappVariableKeyAction: otherActionMock,
+  deleteWhatsappVariableKeyAction: otherActionMock,
 }));
 
 vi.mock('sonner', async (importOriginal) => ({
@@ -394,7 +407,47 @@ describe('listado', () => {
     const user = setupUser();
     renderPanel();
     await user.click(within(fila('t2')).getByTestId(WHATSAPP_TEMPLATE_RELATE_LINK_TESTID));
-    expect(screen.getByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toHaveAttribute('data-open-sheet', 'relate:t2');
+    const sheet = await screen.findByTestId(WHATSAPP_RELATE_SHEET_TESTID);
+    expect(within(sheet).getByRole('heading', { name: 'Relacionar variables' })).toBeTruthy();
+    expect(sheet).toHaveTextContent('recordatorio_pago');
+    expect(screen.getByTestId(WHATSAPP_RELATE_TEXT_TESTID)).toHaveTextContent('Hola {{1}}, recuerda pagar.');
+  });
+
+  it('R46: al guardar la relación cierra el panel, avisa una sola vez y la fila entra con su interruptor y el fundido', async () => {
+    const relacionada: WhatsappTemplateView = {
+      ...SIN_RELACIONAR,
+      mappingStatus: 'MAPPED',
+      content: {
+        header: null,
+        body: { text: 'Hola {{cliente.nombre}}, recuerda pagar.', examples: [] },
+        footer: null,
+        buttons: [],
+      },
+      variables: [{ slot: 'body.1', position: 1, kind: 'system', key: 'cliente.nombre', label: 'Nombre del cliente' }],
+    };
+    relateMock.mockResolvedValue({ status: 'success', data: relacionada });
+    const user = setupUser();
+    renderPanel();
+    expect(within(fila('t2')).queryByTestId(WHATSAPP_TEMPLATE_SWITCH_TESTID)).toBeNull();
+    expect(fila('t2').querySelector('[data-fresh]')).toBeNull();
+
+    await user.click(within(fila('t2')).getByTestId(WHATSAPP_TEMPLATE_RELATE_LINK_TESTID));
+    await user.click(await screen.findByTestId(WHATSAPP_RELATE_SELECT_TESTID('body.1')));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: /Nombre del cliente/ })));
+    await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull());
+    await user.click(screen.getByTestId(WHATSAPP_RELATE_SAVE_TESTID));
+    await user.click(await screen.findByTestId(WHATSAPP_RELATE_CONFIRM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(WHATSAPP_RELATE_SHEET_TESTID)).toBeNull());
+    expect(relateMock).toHaveBeenCalledWith({ templateId: 't2', bindings: [{ slot: 'body.1', key: 'cliente.nombre' }] });
+    expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+    expect(toastSuccessMock).toHaveBeenCalledWith('Variables relacionadas. Ya puedes habilitarla.');
+    expect(within(fila('t2')).getByTestId(WHATSAPP_TEMPLATE_SWITCH_TESTID)).toBeInTheDocument();
+    const fundido = fila('t2').querySelectorAll('[data-fresh="true"]');
+    expect(fundido.length).toBeGreaterThan(0);
+    for (const celda of fundido) expect(celda).toHaveClass('animate-in', 'fade-in', 'motion-reduce:animate-none');
+    expect(fila('t1').querySelector('[data-fresh]')).toBeNull();
+    expect(refreshMock).toHaveBeenCalled();
   });
 
   it('R17: aviso en plural con varias sin relacionar', () => {
@@ -492,6 +545,15 @@ describe('listado', () => {
     await user.click(await esperarInteractiva(screen.getByTestId(WHATSAPP_TEMPLATE_ACTION_TESTIDS.duplicate)));
     expect(await screen.findByTestId(WHATSAPP_TEMPLATE_FORM_TITLE_TESTID)).toHaveTextContent('Duplicar plantilla');
     expect(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_NAME_TESTID)).toHaveValue('recordatorio_pago_v2');
+  });
+
+  it('R20: «Relacionar variables» del menú abre el panel de relación de esa plantilla', async () => {
+    renderPanel();
+    const user = await abrirMenu('t2');
+    await user.click(await esperarInteractiva(await screen.findByTestId(WHATSAPP_TEMPLATE_ACTION_TESTIDS.relate)));
+    const sheet = await screen.findByTestId(WHATSAPP_RELATE_SHEET_TESTID);
+    expect(within(sheet).getByRole('heading', { name: 'Relacionar variables' })).toBeTruthy();
+    expect(sheet).toHaveTextContent('recordatorio_pago');
   });
 
   it('R20: en una no relacionable no hay «Relacionar variables»', async () => {

@@ -17,13 +17,18 @@ import {
   WHATSAPP_OWN_VARIABLES_EMPTY_TESTID,
   WHATSAPP_OWN_VARIABLES_TABLE_TESTID,
   WHATSAPP_VARIABLES_INTRO_TESTID,
-  WHATSAPP_VARIABLES_PANEL_TESTID,
   WHATSAPP_VARIABLES_TEXTS,
   WhatsappVariablesPanel,
   ownVariableCardDeleteTestId,
   ownVariableDeleteTestId,
   ownVariableEditTestId,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-variables-panel';
+import {
+  WHATSAPP_VARIABLE_CANCEL_TESTID,
+  WHATSAPP_VARIABLE_KEY_TESTID,
+  WHATSAPP_VARIABLE_SHEET_TESTID,
+  WHATSAPP_VARIABLE_TITLE_TESTID,
+} from '@/app/(private)/integraciones/whatsapp/components/whatsapp-variable-form-sheet';
 import type { WhatsappDictionaryEntryView } from '@/lib/modules/integraciones';
 import type { WhatsappVariableKeyDeleteResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
@@ -143,16 +148,20 @@ describe('WhatsappVariablesPanel', () => {
     expect(within(tarjetas).getAllByRole('button', { name: /^Eliminar / })).toHaveLength(2);
   });
 
-  it('R49: «Nueva variable» y «Editar» dejan elegida la variable para el panel', async () => {
+  it('R49: «Nueva variable» abre el panel de variable nueva y «Editar» el de esa variable', async () => {
     const user = setupUser();
     montar([CUENTA]);
-    const panel = screen.getByTestId(WHATSAPP_VARIABLES_PANEL_TESTID);
 
-    expect(panel.getAttribute('data-variable-sheet')).toBeNull();
+    expect(screen.queryByTestId(WHATSAPP_VARIABLE_SHEET_TESTID)).toBeNull();
     await user.click(screen.getByTestId(WHATSAPP_NEW_VARIABLE_TESTID));
-    expect(panel.getAttribute('data-variable-sheet')).toBe('new');
+    expect(await screen.findByTestId(WHATSAPP_VARIABLE_TITLE_TESTID)).toHaveTextContent('Nueva variable');
+    expect(screen.getByTestId(WHATSAPP_VARIABLE_KEY_TESTID)).toHaveValue('');
+
+    await user.click(screen.getByTestId(WHATSAPP_VARIABLE_CANCEL_TESTID));
+    await waitFor(() => expect(screen.queryByTestId(WHATSAPP_VARIABLE_SHEET_TESTID)).toBeNull());
     await user.click(screen.getByTestId(ownVariableEditTestId(CUENTA.id)));
-    expect(panel.getAttribute('data-variable-sheet')).toBe(CUENTA.id);
+    expect(await screen.findByTestId(WHATSAPP_VARIABLE_TITLE_TESTID)).toHaveTextContent('Editar variable');
+    expect(screen.getByTestId(WHATSAPP_VARIABLE_KEY_TESTID)).toHaveValue(CUENTA.key);
   });
 
   it('R49: sin variables propias muestra el estado vacío con «Nueva variable»', async () => {
@@ -167,7 +176,7 @@ describe('WhatsappVariablesPanel', () => {
     const boton = within(vacio).getByTestId(WHATSAPP_NEW_VARIABLE_EMPTY_TESTID);
     expect(boton.textContent).toBe('Nueva variable');
     await user.click(boton);
-    expect(screen.getByTestId(WHATSAPP_VARIABLES_PANEL_TESTID).getAttribute('data-variable-sheet')).toBe('new');
+    expect(await screen.findByTestId(WHATSAPP_VARIABLE_TITLE_TESTID)).toHaveTextContent('Nueva variable');
   });
 
   it('R59: sin uso pide confirmación, llama a la acción con su id y avisa «Variable eliminada.»', async () => {

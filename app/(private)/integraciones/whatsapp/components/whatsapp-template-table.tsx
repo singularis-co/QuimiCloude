@@ -1,7 +1,7 @@
 'use client';
 
 import { CopyIcon, Link2Icon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 
 import {
   actionsColumn,
@@ -37,6 +37,9 @@ export const WHATSAPP_TEMPLATE_ACTION_TESTIDS = {
   duplicate: 'whatsapp-template-action-duplicate',
   delete: 'whatsapp-template-action-delete',
 } as const;
+
+// La fila recién relacionada entra con el fundido de los avisos del sistema.
+const FRESH_ROW_CLASS = 'block animate-in fade-in duration-(--dur-slow) ease-(--ease-enter) motion-reduce:animate-none';
 
 export type TemplateFilter = 'ALL' | Exclude<TemplateStatus, 'OTHER'> | 'UNMAPPED';
 
@@ -133,6 +136,8 @@ export type WhatsappTemplateRowHandlers = {
   readonly onDelete: (template: WhatsappTemplateView) => void;
 };
 
+type ColumnHandlers = WhatsappTemplateRowHandlers & { readonly freshId: string | null };
+
 function menuItemsOf(template: WhatsappTemplateView, handlers: WhatsappTemplateRowHandlers): RowActionMenuItem[] {
   const items: RowActionMenuItem[] = [];
   if (isMappable(template)) {
@@ -184,27 +189,42 @@ function NameCell({ template }: { readonly template: WhatsappTemplateView }) {
   );
 }
 
-function buildColumns(handlers: WhatsappTemplateRowHandlers): readonly DataTableColumn<WhatsappTemplateView>[] {
+function buildColumns(handlers: ColumnHandlers): readonly DataTableColumn<WhatsappTemplateView>[] {
   const labels = WHATSAPP_TEMPLATE_TABLE_TEXTS.columns;
+  const enter = (row: WhatsappTemplateView, node: ReactNode) =>
+    row.id === handlers.freshId ? (
+      <span className={FRESH_ROW_CLASS} data-fresh="true">
+        {node}
+      </span>
+    ) : (
+      node
+    );
   return [
-    { id: 'name', label: labels.name, align: 'start', cell: (row) => <NameCell template={row} /> },
+    { id: 'name', label: labels.name, align: 'start', cell: (row) => enter(row, <NameCell template={row} />) },
     { id: 'language', label: labels.language, align: 'start', tabular: true, cell: (row) => row.language },
     { id: 'category', label: labels.category, align: 'start', cell: (row) => categoryLabelOf(row.category) },
-    { id: 'status', label: labels.status, align: 'start', cell: (row) => <WhatsappTemplateStatus template={row} /> },
+    {
+      id: 'status',
+      label: labels.status,
+      align: 'start',
+      cell: (row) => enter(row, <WhatsappTemplateStatus template={row} />),
+    },
     {
       id: 'usage',
       label: labels.usage,
       align: 'start',
       hideText: false,
-      cell: (row) => (
-        <WhatsappTemplateUsage
-          template={row}
-          enabled={handlers.enabledOf(row)}
-          pending={handlers.isToggling(row)}
-          onToggle={handlers.onToggle}
-          onRelate={handlers.onRelate}
-        />
-      ),
+      cell: (row) =>
+        enter(
+          row,
+          <WhatsappTemplateUsage
+            template={row}
+            enabled={handlers.enabledOf(row)}
+            pending={handlers.isToggling(row)}
+            onToggle={handlers.onToggle}
+            onRelate={handlers.onRelate}
+          />,
+        ),
     },
     {
       id: 'syncedAt',
@@ -230,12 +250,15 @@ export type WhatsappTemplateTableProps = WhatsappTemplateRowHandlers & {
   readonly templates: readonly WhatsappTemplateView[];
   readonly loading: boolean;
   readonly onNewTemplate: () => void;
+  /** La fila que acaba de cambiar y entra con un fundido. */
+  readonly freshId?: string | null;
 };
 
 export function WhatsappTemplateTable({
   templates,
   loading,
   onNewTemplate,
+  freshId = null,
   ...handlers
 }: WhatsappTemplateTableProps) {
   const [params, setParams] = useState<DataTableParams>(createDefaultParams);
@@ -245,8 +268,8 @@ export function WhatsappTemplateTable({
 
   const { enabledOf, isToggling, onToggle, onRelate, onDuplicate, onDelete } = handlers;
   const columns = useMemo(
-    () => buildColumns({ enabledOf, isToggling, onToggle, onRelate, onDuplicate, onDelete }),
-    [enabledOf, isToggling, onToggle, onRelate, onDuplicate, onDelete],
+    () => buildColumns({ enabledOf, isToggling, onToggle, onRelate, onDuplicate, onDelete, freshId }),
+    [enabledOf, isToggling, onToggle, onRelate, onDuplicate, onDelete, freshId],
   );
 
   const shown = filterTemplates(templates, filter, params.search);

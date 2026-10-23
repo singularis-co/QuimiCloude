@@ -56,6 +56,14 @@ import {
   WHATSAPP_VARIABLE_MENU_TRIGGER_TESTID,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-variable-menu';
 import { WhatsappTemplatesPanel } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-templates-panel';
+import {
+  WHATSAPP_VARIABLE_KEY_TESTID,
+  WHATSAPP_VARIABLE_LABEL_TESTID,
+  WHATSAPP_VARIABLE_SAVE_TESTID,
+  WHATSAPP_VARIABLE_SHEET_TESTID,
+  WHATSAPP_VARIABLE_TITLE_TESTID,
+  WHATSAPP_VARIABLE_VALUE_TESTID,
+} from '@/app/(private)/integraciones/whatsapp/components/whatsapp-variable-form-sheet';
 import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import {
   TEMPLATE_LIMITS,
@@ -65,14 +73,16 @@ import {
   type WhatsappTemplateView,
 } from '@/lib/modules/integraciones';
 import type { WhatsappTemplateCreateResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions';
+import type { WhatsappVariableKeyResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { NARROW_VIEWPORT, resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 
 type User = ReturnType<typeof setupUser>;
 
-const { createMock, otherActionMock, toastSuccessMock, toastErrorMock, refreshMock } = vi.hoisted(() => ({
+const { createMock, createVariableMock, otherActionMock, toastSuccessMock, toastErrorMock, refreshMock } = vi.hoisted(() => ({
   createMock: vi.fn<(draft: unknown) => Promise<WhatsappTemplateCreateResult>>(),
+  createVariableMock: vi.fn<(input: unknown) => Promise<WhatsappVariableKeyResult>>(),
   otherActionMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -86,6 +96,12 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions'
   syncWhatsappTemplatesAction: otherActionMock,
   setWhatsappTemplateEnabledAction: otherActionMock,
   deleteWhatsappTemplateAction: otherActionMock,
+}));
+
+vi.mock('@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions', () => ({
+  createWhatsappVariableKeyAction: createVariableMock,
+  updateWhatsappVariableKeyAction: otherActionMock,
+  deleteWhatsappVariableKeyAction: otherActionMock,
 }));
 
 vi.mock('sonner', async (importOriginal) => ({
@@ -689,6 +705,42 @@ describe('alta desde la pestaña Plantillas', () => {
     const fila = screen.getByTestId('data-table-row-nueva');
     expect(within(fila).getByTestId(WHATSAPP_TEMPLATE_STATUS_TESTID)).toHaveTextContent('Pendiente');
     expect(refreshMock).toHaveBeenCalled();
+  });
+
+  it('R28: «Nueva variable propia» abre el panel de variable encima del alta; al guardarla el borrador sigue y la variable está en el menú', async () => {
+    createVariableMock.mockResolvedValue({
+      status: 'success',
+      data: { id: 'v2', key: 'horario_de_atencion', label: 'Horario de atención', value: 'Lunes a viernes', usedBy: 0 },
+    });
+    const user = setupUser();
+    renderPanel();
+    await user.click(screen.getByTestId(WHATSAPP_TEMPLATE_NEW_TESTID));
+    await rellenar(user, BORRADOR_VALIDO.name, BORRADOR_VALIDO.body);
+
+    await user.click(screen.getByTestId(WHATSAPP_VARIABLE_MENU_TRIGGER_TESTID));
+    await user.click(await esperarInteractiva(await screen.findByTestId(WHATSAPP_VARIABLE_MENU_NEW_TESTID)));
+
+    expect(await screen.findByTestId(WHATSAPP_VARIABLE_TITLE_TESTID)).toHaveTextContent('Nueva variable');
+    expect(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_SHEET_TESTID)).toBeInTheDocument();
+    await user.type(screen.getByTestId(WHATSAPP_VARIABLE_LABEL_TESTID), 'Horario de atención');
+    expect(screen.getByTestId(WHATSAPP_VARIABLE_KEY_TESTID)).toHaveValue('horario_de_atencion');
+    await user.type(screen.getByTestId(WHATSAPP_VARIABLE_VALUE_TESTID), 'Lunes a viernes');
+    await user.click(screen.getByTestId(WHATSAPP_VARIABLE_SAVE_TESTID));
+
+    await waitFor(() => expect(screen.queryByTestId(WHATSAPP_VARIABLE_SHEET_TESTID)).toBeNull());
+    expect(createVariableMock).toHaveBeenCalledWith({
+      key: 'horario_de_atencion',
+      label: 'Horario de atención',
+      value: 'Lunes a viernes',
+    });
+    expect(toastSuccessMock).toHaveBeenCalledWith('Variable creada.');
+    expect(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_SHEET_TESTID)).toBeInTheDocument();
+    expect(nombre()).toHaveValue(BORRADOR_VALIDO.name);
+    expect(mensaje()).toHaveValue(BORRADOR_VALIDO.body);
+
+    await insertar(user, 'horario_de_atencion');
+    expect(mensaje()).toHaveValue(`${BORRADOR_VALIDO.body}{{horario_de_atencion}}`);
+    expect(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_USED_TESTID)).toHaveTextContent('Horario de atención');
   });
 
   it('R40: «Duplicar» abre «Duplicar plantilla» con _v2, su idioma, categoría, mensaje con claves de pantalla, pie y el aviso de lo que pierde', async () => {
