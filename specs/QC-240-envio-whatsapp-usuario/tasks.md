@@ -75,7 +75,7 @@
 
 ## Tanda 3 — casos de uso (dependen de T1, T3–T7)
 
-- [ ] **T8 Casos de uso `sendWhatsappMessage` y `retryWhatsappMessage`** (R4–R20, R26–R42).
+- [x] **T8 Casos de uso `sendWhatsappMessage` y `retryWhatsappMessage`** (R4–R20, R26–R42).
   - `actor.ts` (`requireSendPermission`), `whatsapp-send-recipient.ts`, `send-whatsapp-message.ts`,
     `retry-whatsapp-message.ts`.
   - Dobles en `whatsapp-doubles.ts`; tests `send-whatsapp-message.test.ts` y
