@@ -672,6 +672,20 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).listWhatsappDictionaryAction(),
   },
   {
+    // QC-240: el envio de WhatsApp. Sin permisos el caso de uso rechaza antes de tocar un puerto, y
+    // la accion devuelve el estado de error.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-message-actions.ts',
+    nombre: 'sendWhatsappMessageAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-message-actions')
+      ).sendWhatsappMessageAction({
+        kind: 'text',
+        recipient: { contactId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31' },
+        text: 'Hola',
+      }),
+  },
+  {
     // QC-137: el resumen de la campana, que el navegador consulta cada 30 s. Sin permisos responde
     // `forbidden` antes de tocar la bandeja.
     archivo: 'lib/modules/notificaciones/adapters/driving/notification-actions.ts',

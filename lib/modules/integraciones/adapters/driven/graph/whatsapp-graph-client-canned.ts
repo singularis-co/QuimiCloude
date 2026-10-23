@@ -1,4 +1,6 @@
 import type {
+  GraphMessageSent,
+  GraphOutboundMessage,
   GraphProbeResult,
   GraphTemplateCreated,
   GraphTemplateDeleted,
@@ -19,6 +21,11 @@ export const CANNED_TAKEN_NAME_CODE = 100;
 export const CANNED_TAKEN_NAME_SUBCODE = 2388024;
 const CANNED_TEMPLATE_ID_BASE = 1000;
 
+/** Un destino con este prefijo hace que Meta conteste token inválido al enviar. */
+export const CANNED_SEND_FAIL_PREFIX = 'E2E_SEND_FAIL';
+export const CANNED_SEND_FAIL_CODE = 190;
+export const CANNED_WAMID_PREFIX = 'wamid.E2E.';
+
 type CannedTemplate = {
   readonly id: string;
   readonly name: string;
@@ -34,10 +41,15 @@ type CannedTemplate = {
  */
 const templatesByWaba = new Map<string, CannedTemplate[]>();
 let lastTemplateId = CANNED_TEMPLATE_ID_BASE;
+let lastSentMessage = 0;
 
 export function resetCannedTemplates(): void {
   templatesByWaba.clear();
   lastTemplateId = CANNED_TEMPLATE_ID_BASE;
+}
+
+export function resetCannedSentMessages(): void {
+  lastSentMessage = 0;
 }
 
 async function fetchPhoneNumber(input: {
@@ -105,9 +117,29 @@ async function deleteTemplate(input: {
   return { ok: true };
 }
 
+async function sendMessage(input: {
+  readonly phoneNumberId: string;
+  readonly accessToken: string;
+  readonly to: string;
+  readonly message: GraphOutboundMessage;
+}): Promise<GraphMessageSent> {
+  if (input.to.startsWith(CANNED_SEND_FAIL_PREFIX)) {
+    return {
+      ok: false,
+      kind: 'rejected',
+      message: CANNED_GRAPH_ERROR_MESSAGE,
+      code: CANNED_SEND_FAIL_CODE,
+      subcode: null,
+    };
+  }
+  lastSentMessage += 1;
+  return { ok: true, wamid: `${CANNED_WAMID_PREFIX}${String(lastSentMessage)}` };
+}
+
 export const whatsappGraphClientCanned = {
   fetchPhoneNumber,
   createTemplate,
   listTemplatesPage,
   deleteTemplate,
+  sendMessage,
 } satisfies WhatsappGraphClient;

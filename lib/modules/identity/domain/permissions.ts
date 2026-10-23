@@ -80,6 +80,10 @@ import {
  * `entregas.anular` es la segunda accion que no es `consultar` ni `modificar`: separa entregar de
  * deshacer una entrega, que devuelve producto al inventario. Lo recibe el Administrador.
  *
+ * `whatsapp.enviar` es la tercera accion que no es `consultar` ni `modificar`: enviar mensajes de
+ * WhatsApp a los clientes de la empresa. Como `usuarios`, su modulo no es una carpeta de
+ * `lib/modules/`. Lo recibe unicamente el Administrador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -253,6 +257,12 @@ export const PERMISSIONS = [
     action: 'anular',
     description: 'Anular entregas de producto terminado de los pedidos de la empresa.',
   },
+  {
+    code: 'whatsapp.enviar',
+    module: 'whatsapp',
+    action: 'enviar',
+    description: 'Enviar mensajes de WhatsApp a los clientes de la empresa.',
+  },
 ] as const;
 
 /**
@@ -303,6 +313,7 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'integraciones.modificar',
     'entregas.modificar',
     'entregas.anular',
+    'whatsapp.enviar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],

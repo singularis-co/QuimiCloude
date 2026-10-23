@@ -2826,6 +2826,8 @@ import {
   createLinkWhatsappContact,
   createUnlinkWhatsappContact,
   createSetWhatsappContactBlocked,
+  createSendWhatsappMessage,
+  createRetryWhatsappMessage,
 } from '@/lib/modules/integraciones';
 import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
 import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
@@ -2864,6 +2866,8 @@ import {
   updateWhatsappVariableKey,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-variable-key-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
+import { createWhatsappOutboxRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-outbox-prisma';
+import { createWhatsappSendLogConsole } from '@/lib/modules/integraciones/adapters/driven/observability/whatsapp-send-log-console';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
 import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch';
@@ -2875,6 +2879,9 @@ import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/
 import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
+import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository';
+import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log';
+import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links';
 import { whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
@@ -2895,6 +2902,10 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.deleteTemplate(input)
       : whatsappGraphClientFetch.deleteTemplate(input),
+  sendMessage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.sendMessage(input)
+      : whatsappGraphClientFetch.sendMessage(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {
@@ -2972,6 +2983,24 @@ const whatsappContactUnitOfWork: WhatsappContactUnitOfWork = {
 };
 
 const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
+
+const whatsappOutboxRepository: WhatsappOutboxRepository = createWhatsappOutboxRepository();
+/** Fuera de transacción: el envío solo lee el teléfono principal y si el cliente sigue vivo. */
+const whatsappSendCustomerPhones: CustomerPhoneLinks = createCustomerPhoneLinks({
+  phones: createCustomerPhoneRepository(),
+});
+const whatsappSendLog: WhatsappSendLog = createWhatsappSendLogConsole();
+
+const whatsappSendDeps = {
+  connections: whatsappConnectionRepository,
+  cipher: secretCipher,
+  outbox: whatsappOutboxRepository,
+  customerPhones: whatsappSendCustomerPhones,
+  templates: whatsappTemplateRepository,
+  variableKeys: whatsappVariableKeyRepository,
+  graph: whatsappGraphClient,
+  sendLog: whatsappSendLog,
+};
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -3098,6 +3127,8 @@ export const integraciones = {
   relateWhatsappTemplateVariables: createRelateWhatsappTemplateVariables(whatsappDeps),
   setWhatsappTemplateEnabled: createSetWhatsappTemplateEnabled(whatsappDeps),
   verifyCronSecret,
+  sendWhatsappMessage: createSendWhatsappMessage(whatsappSendDeps),
+  retryWhatsappMessage: createRetryWhatsappMessage(whatsappSendDeps),
 } as const;
 
 import {

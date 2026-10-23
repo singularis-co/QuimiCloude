@@ -1327,6 +1327,7 @@ model WhatsappMessage {
   origin         WhatsappMessageOrigin?
   sentById       String?                  @map("sent_by") @db.Uuid
   templateName   String?                  @map("template_name")
+  templateLanguage String?                @map("template_language")
   attempts       Int                      @default(0)
   queueMessageId String?                  @map("queue_message_id")
   createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
