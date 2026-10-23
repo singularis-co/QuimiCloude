@@ -94,7 +94,7 @@
     lectura de sesión por petición si lo pide.
   - **Hecho:** guardias verdes; la acción no decide nada fuera de traducir.
 
-- [ ] **T10 Test de integración del flujo** (R48, A6). Depende de T9.
+- [x] **T10 Test de integración del flujo** (R48, A6). Depende de T9.
   - `tests/integration/integraciones/whatsapp-send-flow.int.test.ts` sobre la composición real con el
     doble de Graph inyectado; entrada en `aislamiento.json` (`commit`, `motivo`, `desde`).
   - **Hecho:** los criterios de aceptación de la ficha, uno por caso, en verde contra la base de test.
