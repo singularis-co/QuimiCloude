@@ -32,7 +32,7 @@
 > **Enmienda F1.4 (2026-10-22).** Las filas «(F1.4)» de la tabla se citan como **E1** modelos
 > sembrados · **E2** recomendado · **E3** se borran `recipe_model`/`catalog_model` · **E4** modelo no
 > disponible al leer · **E5** textos de «Probar conexión» · **E6** ayuda sin conexión · **E7** E2E ·
-> **E8** probar al elegir. Cambian R2, R3, R4, R9, R15, R20, R23, R26, R27, R29, R30; se añaden
+> **E8** probar al elegir. Cambian R2, R3, R4, R9, R12, R15, R20, R23, R26, R27, R29, R30; se añaden
 > R32–R34. E7 no es un comportamiento: lo cumple el E2E de R26, R27 y R29 (`design.md > 13`).
 >
 > Vocabulario (además del de `specs/QC-275-proveedor-ia-propio/requirements.md`, que sigue vigente
@@ -99,8 +99,12 @@ escribir nada y DEBE responder «sin conexión» para que la pantalla se recargu
 
 **R12.** CUANDO se guarda una elección y la conexión tiene un modelo marcado, el sistema DEBE vaciar
 el modelo marcado y, SI la conexión estaba en `ERROR` por ese modelo, ENTONCES DEBE dejarla en
-`ACTIVE` con `lastError` y `lastErrorAt` vacíos. SI la conexión está en `ERROR` por otra causa,
-ENTONCES elegir un modelo NO DEBE cambiar su estado ni su error. [D7]
+`ACTIVE` con `lastError` y `lastErrorAt` vacíos. CUANDO se guarda una elección y la conexión está en
+`ERROR` por key rechazada o sin cuota (el error lo dejó «Probar conexión» o una lectura), el sistema
+DEBE, además de guardar la elección, dejarla en `ACTIVE` con `lastError` y `lastErrorAt` vacíos. SI
+la conexión está en `ERROR` por otra causa (sin respuesta, error inesperado, key ilegible), ENTONCES
+elegir un modelo NO DEBE cambiar su estado ni su error. [D7, E8, decisión «(F1.4) Conexión en Error
+por key o cuota»]
 
 **R13.** Ninguna respuesta de la elección DEBE incluir la key ni su valor cifrado (QC-275 R8). [D10]
 
@@ -215,20 +219,8 @@ o menos, disparador a todo el ancho con 48 px de alto y la lista en una hoja inf
 
 ## Preguntas abiertas
 
-> Las ocho de F1.4 están cerradas (filas «(F1.4)» de la tabla). Quedan las que trajo la enmienda;
-> mientras no se respondan, el spec aplica la propuesta escrita.
-
-- **(spec_author, enmienda)** Al elegir un modelo, si la consulta falla por key rechazada o sin
-  cuota, o la key guardada no se puede descifrar, ¿la conexión pasa también a `ERROR` (como «Probar
-  conexión», QC-275 R9 y R14) o solo se avisa? **Propuesta:** solo se avisa y no se escribe nada
-  (R33, R34): la fila E8 dice «no se guarda y se avisa», y «Probar conexión» sigue siendo quien marca.
-- **(spec_author, enmienda)** Si la conexión está en `ERROR` por key o cuota y la consulta al elegir
-  sale bien, ¿vuelve a `ACTIVE`? **Propuesta:** no; R12 no cambia (solo se limpia el error del modelo
-  marcado). La consulta prueba un modelo, no hace las veces de «Probar conexión».
-- **(spec_author, enmienda)** T0 confirma los ids nativos de Claude, Gemini y OpenAI contra la API;
-  sin key quedan pendientes. ¿Un id pendiente bloquea el merge o basta con la fuente de OpenRouter?
-  **Propuesta:** no bloquea la implementación (el seed se escribe con la lista aprobada), pero T14 no
-  cierra con ids pendientes sin que el humano lo acepte por escrito.
+Ninguna. Las ocho de F1.4 y las tres de la enmienda están cerradas: son las filas «(F1.4)» de la
+tabla.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -252,4 +244,7 @@ o menos, disparador a todo el ancho con 48 px de alto y la lista en una hoja inf
 | 2026-10-22 | (F1.4) Ayuda del formulario sin conexión | Sin nombrar modelo: «Después de conectar podrás elegir el modelo.». |
 | 2026-10-22 | (F1.4) ¿E2E? | Sí, mínimo: se ajusta el E2E actual de Proveedor IA y se añade elegir modelo con Gemini. |
 | 2026-10-22 | (F1.4) ¿Se prueba el modelo al elegirlo? | Sí: antes de guardar se consulta el modelo con la key guardada, sin generar texto. Si no responde, no se guarda y se avisa. (Revisa «se guarda al instante» del tablero.) |
+| 2026-10-22 | (F1.4) Al elegir, si la prueba falla por key rechazada, cuota o key ilegible, ¿la conexión pasa a Error? | No: se avisa bajo el selector y no se escribe nada. |
+| 2026-10-22 | (F1.4) Conexión en Error por key o cuota: si la prueba al elegir sale bien, ¿vuelve a Conectado? | Sí: queda `ACTIVE` con `lastError` y `lastErrorAt` vacíos, además de guardar la elección. (Cambia la propuesta de R12.) |
+| 2026-10-22 | (F1.4) ¿Un id nativo sin confirmar por falta de key bloquea el merge? | No. Se implementa con los ids de la fuente; al cerrar, el leader lista los pendientes y el humano los acepta por escrito antes del PR. |
 | — | Identificadores de DB | En inglés (heredado de QC-4). |

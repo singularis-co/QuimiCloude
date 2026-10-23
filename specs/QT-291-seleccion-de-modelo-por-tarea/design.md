@@ -323,15 +323,25 @@ ilegible = `SecretUnreadableError` de QC-275 (R34).
 | `unexpected` | no | sin cambios | el de QC-275 para error inesperado |
 | Key ilegible | no, y no llama | sin cambios | `integration_secret_unreadable` |
 
-«Sin cambios» en key rechazada, cuota y key ilegible es la propuesta de la pregunta abierta 1:
-si el humano decide que también marcan, esas tres filas pasan a escribir `ERROR` como
-`testSavedAiProvider`.
+«Sin cambios» en key rechazada, cuota y key ilegible lo decidió el humano (fila «(F1.4) Al elegir,
+si la prueba falla…»): se avisa bajo el selector y no se escribe nada.
+
+**Qué hace una consulta buena al elegir con la conexión en `ERROR`** (R12; fila «(F1.4) Conexión en
+Error por key o cuota»):
+
+| `lastError` de la conexión | Al guardar la elección |
+|---|---|
+| Aviso de modelo no disponible (`isModelUnavailableNotice`) | `ACTIVE`, `lastError`/`lastErrorAt` vacíos, modelo marcado vacío |
+| Key rechazada o sin cuota, de «Probar conexión» o de una lectura (`isAccountFailureNotice`) | `ACTIVE`, `lastError`/`lastErrorAt` vacíos: la consulta acaba de pasar con esa key |
+| Otro (sin respuesta, inesperado, «No se pudo leer la key guardada…») | estado y error sin cambios |
+
+Una key ilegible nunca llega aquí: R34 corta antes de la consulta.
 
 ### 4.3 Casos de uso
 
 | Caso de uso | Cambio |
 |---|---|
-| `selectAiModel` (nuevo, `domain/select-ai-model.ts`) | `(input{modelId}, actor) => { status:'saved'; connection: View } \| { status:'not_connected' } \| { status:'rejected'; message }`. Deps: `connections`, `catalog`, `cipher`, `probe` (sin reloj: no escribe fechas). (1) `requirePermission` (R8) → (2) zod `aiModelInputSchema` (`modelId` string recortada, 1–200) → (3) `find(scope)`; `null` ⇒ `not_connected` (R11) → (4) `catalog.get(provider)`; `modelId` ∉ `entry.models` o `=== record.unavailableModel` ⇒ `ValidationError` (R10) → (5) `cipher.decrypt(apiKeyEnc, ctx)`; si lanza `SecretUnreadableError`, **relanza sin escribir** (R34; la acción ya lo traduce a `integration_secret_unreadable`) → (6) `probe.probe({ provider, apiKey, models: [modelId] })`, también si es el predeterminado (R32); fallida ⇒ `{ status:'rejected', message: probeFailureMessage(failure, entry.name) }` **sin escribir** (R33) → (7) patch `{ model: modelId === entry.defaultModel ? null : modelId, updatedById }` (R9); si `record.unavailableModel !== null`: `unavailableModel: null` y, si `status === 'ERROR'` y `lastError` es el aviso de modelo (§4.4, por `isModelUnavailableNotice`), `status:'ACTIVE', lastError:null, lastErrorAt:null` (R12) → (8) `update` → vista. La prueba buena **no** escribe `lastCheckedAt` (no es «Probar conexión») |
+| `selectAiModel` (nuevo, `domain/select-ai-model.ts`) | `(input{modelId}, actor) => { status:'saved'; connection: View } \| { status:'not_connected' } \| { status:'rejected'; message }`. Deps: `connections`, `catalog`, `cipher`, `probe` (sin reloj: no escribe fechas). (1) `requirePermission` (R8) → (2) zod `aiModelInputSchema` (`modelId` string recortada, 1–200) → (3) `find(scope)`; `null` ⇒ `not_connected` (R11) → (4) `catalog.get(provider)`; `modelId` ∉ `entry.models` o `=== record.unavailableModel` ⇒ `ValidationError` (R10) → (5) `cipher.decrypt(apiKeyEnc, ctx)`; si lanza `SecretUnreadableError`, **relanza sin escribir** (R34; la acción ya lo traduce a `integration_secret_unreadable`) → (6) `probe.probe({ provider, apiKey, models: [modelId] })`, también si es el predeterminado (R32); fallida ⇒ `{ status:'rejected', message: probeFailureMessage(failure, entry.name) }` **sin escribir** (R33) → (7) patch `{ model: modelId === entry.defaultModel ? null : modelId, updatedById }` (R9); si `record.unavailableModel !== null`: `unavailableModel: null`; si `status === 'ERROR'` y `lastError` es el aviso de modelo (`isModelUnavailableNotice`) **o** el de key rechazada o sin cuota (`isAccountFailureNotice`, §4.4), `status:'ACTIVE', lastError:null, lastErrorAt:null` (R12, tabla de §4.2); con otro error, estado y error sin tocar → (8) `update` → vista. La prueba buena **no** escribe `lastCheckedAt` (no es «Probar conexión») |
 | `getAiProviderConnection` | La vista lleva el modelo (§4.1). `providers` lleva `models` y `defaultModel` en el dominio (los usa R19), pero la pantalla del formulario ya no los pinta (R30) |
 | `testAiProviderKey` / `runProbe` | `models: [m]` con un solo modelo (R19): `m = (data.provider === existing?.provider && existing.model !== null) ? existing.model : entry.defaultModel`. Para conocer `existing`, `TestAiProviderKeyDeps` gana `connections` (solo `find`) |
 | `testSavedAiProvider` | prueba `[modelInUse(record, entry)]` (R18). Buena: además vacía `unavailableModel` (R22). Fallida con `model_unavailable` del modelo en uso: `ERROR`, `unavailableModel = failure.model`, `lastError = modelUnavailableNotice(...)` (R21). Otra fallida: como hoy |
@@ -345,7 +355,13 @@ si el humano decide que también marcan, esas tres filas pasan a escribir `ERROR
 export function marksConnection(f: AiProviderFailure): boolean; // rejected_key | quota | model_unavailable
 export function modelUnavailableNotice(model: string, providerName: string, chosen: boolean): string;
 export function isModelUnavailableNotice(lastError: string | null): boolean;
+export function isAccountFailureNotice(lastError: string | null, providerName: string): boolean;
 ```
+
+`isAccountFailureNotice` reconoce los textos de `rejected_key` y `quota` con ese proveedor tal como
+los escriben en `lastError` «Probar conexión» (`probeFailureMessage`) y la lectura
+(`readingFailureMessage`, con su prefijo): comparación exacta contra esos textos, no por subcadena. Mismo motivo que
+`isModelUnavailableNotice` para no añadir `last_error_kind` (§16, alternativa 5).
 
 `isAccountFailure` se conserva (decide el texto de `readingFailureMessage`); `marksConnection` lo
 amplía con `model_unavailable` y sustituye a `isAccountFailure` en los lectores y en
@@ -565,7 +581,8 @@ fabricarlo exige escribir la fila a mano y no añade nada que el unit no vea.
 | `tests/integration/integraciones/ai-models-migration.int.test.ts` (creado en T1; R2/R3 se rehacen) | R1–R4, R7: tabla, PK, CHECK, FK, índice parcial (un segundo predeterminado da `23505`), siembra exacta de §3 (veinte filas: proveedor, `model_id`, `sort_order` 1–5 por proveedor), el predeterminado de cada proveedor es el de §3, FK compuesta rechaza modelo de otro proveedor (`23503`), columnas borradas, `down.sql` deja el esquema y los valores de QC-275 |
 | `tests/integration/integraciones/ai-provider-migration.int.test.ts` | Se ajusta: aplica su migración y la nueva en orden, o deja de mirar las columnas que borra la nueva |
 | `tests/integration/integraciones/ai-provider-connection-prisma.int.test.ts` | `model`/`unavailableModel` en create/update/find; P2003 |
-| `tests/unit/integraciones/ai-provider/select-ai-model.test.ts` (nuevo) | R8–R12, R32 (la sonda recibe solo el modelo elegido, también el predeterminado, y nada se escribe antes), R33 (un caso por tipo de fallo: sin escrituras y el mensaje), R34 (key ilegible: sin sonda ni escritura) |
+| `tests/unit/integraciones/ai-provider/select-ai-model.test.ts` (nuevo) | R8–R12, R32 (la sonda recibe solo el modelo elegido, también el predeterminado, y nada se escribe antes), R33 (un caso por tipo de fallo: sin escrituras y el mensaje), R34 (key ilegible: sin sonda ni escritura); R12 con un caso por fila de la tabla de §4.2 (modelo no disponible, key rechazada y cuota ⇒ `ACTIVE` y error vacío; sin respuesta ⇒ sin cambios) |
+| `…/ai-provider-failure.test.ts` (además) | `isAccountFailureNotice`: reconoce los textos de key rechazada y cuota de la prueba y de la lectura; no reconoce sin respuesta, inesperado ni key ilegible |
 | `…/save-ai-provider-connection.test.ts` | R14, R19 |
 | `…/test-ai-provider-key.test.ts`, `…/test-saved-ai-provider.test.ts` | R18–R22 |
 | `…/resolve-and-report.test.ts` | R16, R17, R23, R24 |

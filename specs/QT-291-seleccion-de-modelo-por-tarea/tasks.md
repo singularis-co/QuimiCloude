@@ -37,9 +37,11 @@
 
 - [ ] **T2. Tipos y textos** (dep. T1). `domain/ai-provider.ts` (`AiModelOption`, entrada, registro,
   vista, `modelInUse`; fuera `AiReadUse`), `domain/ai-provider-failure.ts` (`marksConnection`,
-  `modelUnavailableNotice`, `isModelUnavailableNotice`, texto de modelo no disponible de R20).
+  `modelUnavailableNotice`, `isModelUnavailableNotice`, `isAccountFailureNotice`, texto de modelo no
+  disponible de R20).
   *Hecho:* `connection-view.test.ts` y `ai-provider-failure.test.ts` en verde (R20 en su parte de
-  fallo, R28 a nivel de vista).
+  fallo, R28 a nivel de vista, `isAccountFailureNotice` con los textos de key rechazada y cuota de la
+  prueba y de la lectura, y que no reconoce los demás).
 
 - [ ] **T3. [P] Adaptadores driven** (dep. T2). `catalog/ai-provider-catalog-prisma.ts` (modelos por
   proveedor, descarta proveedor sin predeterminado), `persistence/ai-provider-connection-prisma.ts`
@@ -50,7 +52,10 @@
   `domain/select-ai-model.ts` (deps `connections`, `catalog`, `cipher`, `probe`; orden de
   `design.md > 4.3`: permiso → zod → conexión → catálogo → descifrar → consulta de un modelo →
   escribir), `index.ts`; doble de sonda en `ai-provider-doubles.ts` si hace falta.
-  *Hecho:* `select-ai-model.test.ts` en verde con un caso por R8, R9, R10, R11, R12, R32 (la sonda
+  *Hecho:* `select-ai-model.test.ts` en verde con un caso por R8, R9, R10, R11; R12 con un caso por
+  fila de `design.md > 4.2` (en `ERROR` por modelo no disponible, por key rechazada y por cuota ⇒
+  `ACTIVE` con `lastError`/`lastErrorAt` vacíos y la elección guardada; en `ERROR` por sin respuesta
+  ⇒ estado y error sin cambios); R32 (la sonda
   recibe solo el modelo elegido, también el predeterminado; nada se escribe antes), R33 (un caso por
   tipo: `rejected_key`, `quota`, `model_unavailable`, `unreachable`, `unexpected`, sin escrituras y con
   su mensaje) y R34 (key ilegible: sin sonda ni escritura).
@@ -113,7 +118,8 @@
 - [ ] **T14. Trazabilidad y gate** (dep. todo). Mapa `R<n> -> test` (R1–R34) en
   `progress/impl_QT-291.md`; ids de T0 que sigan «pendiente (sin key)» listados para el humano;
   `./init.sh` en verde.
-  *Hecho:* ningún `R<n>` sin test; ningún id pendiente sin aceptación escrita del humano.
+  *Hecho:* ningún `R<n>` sin test; el leader lista los ids pendientes y el humano los acepta por
+  escrito **antes del PR** (no bloquea la implementación).
 
 ## Archivos esperados
 
