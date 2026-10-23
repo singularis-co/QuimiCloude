@@ -21,6 +21,7 @@ import {
   recipeStepSchema,
   type RecipeStepDocument,
 } from '@/lib/modules/recetas';
+import { unitFamilyId, type UnitRef } from '@/lib/modules/unidades';
 
 import { requirePermission, FORMULA_IMPORT_PERMISSION, type Actor } from './actor';
 import { confirmFormulaImportInputSchema, type ConfirmFormulaImportInput } from './formula-import-input';
@@ -34,6 +35,8 @@ export type FormulaImportSummary = {
   readonly outcome: 'created' | 'replaced';
   readonly rawMaterialsCreated: number;
   readonly rawMaterialsReused: number;
+  readonly created: readonly { readonly name: string; readonly unitId: string }[];
+  readonly reused: readonly { readonly name: string }[];
 };
 
 type ConfirmLineInput = ConfirmFormulaImportInput['lines'][number];
@@ -41,7 +44,7 @@ type ConfirmLineInput = ConfirmFormulaImportInput['lines'][number];
 function toDraftLine(line: ConfirmLineInput): DraftLine {
   return line.kind === 'existing'
     ? { kind: 'existing', productId: line.productId, percentage: line.percentage }
-    : { kind: 'new', newProductName: line.newProductName, percentage: line.percentage };
+    : { kind: 'new', newProductName: line.newProductName, unitId: line.unitId, percentage: line.percentage };
 }
 
 /** El motivo por fila, para el diagnostico del `ValidationError` -nunca para el navegador
@@ -60,13 +63,23 @@ function diagnosticoDeRevision(issues: FormulaReviewIssues): string {
 
 /** Una materia prima nueva pedida por una fila, con su nombre normalizado para dedupe y para
  *  buscarla entre las vivas. */
-type NewMaterialNeed = { readonly rowIndex: number; readonly rawName: string; readonly normalizedName: string };
+type NewMaterialNeed = {
+  readonly rowIndex: number;
+  readonly rawName: string;
+  readonly normalizedName: string;
+  readonly unitId: string;
+};
 
 function collectNewMaterialNeeds(lines: readonly ConfirmLineInput[]): readonly NewMaterialNeed[] {
   const needs: NewMaterialNeed[] = [];
   lines.forEach((line, index) => {
     if (line.kind !== 'new') return;
-    needs.push({ rowIndex: index, rawName: line.newProductName, normalizedName: normalizeProductName(line.newProductName) });
+    needs.push({
+      rowIndex: index,
+      rawName: line.newProductName,
+      normalizedName: normalizeProductName(line.newProductName),
+      unitId: line.unitId,
+    });
   });
   return needs;
 }
@@ -124,8 +137,9 @@ export function createConfirmFormulaImport(
       if (refs.some((ref) => !isIngredientType(ref.type))) throw new ActionNotAllowedError();
     }
 
-    // Las materias primas NUEVAS, resueltas por nombre normalizado -0 crea, 1 reutiliza, mas de
-    // 1 rechaza-; la reutilizada tampoco puede coincidir con el producto que otra fila ya eligio.
+    // Las materias primas NUEVAS, resueltas por nombre normalizado y familia de la unidad elegida
+    // -0 crea, 1 reutiliza, mas de 1 rechaza-; la reutilizada tampoco puede coincidir con el
+    // producto que otra fila ya eligio.
     const existingProductIdSet = new Set(existingProductIds);
     const newMaterialNeeds = collectNewMaterialNeeds(lines);
     const distinctNormalizedNames = [...new Set(newMaterialNeeds.map((need) => need.normalizedName))];
@@ -140,11 +154,28 @@ export function createConfirmFormulaImport(
       matchesByNormalizedName.set(match.nameNormalized, list);
     }
 
+    const unitsById = new Map<string, UnitRef>();
+    if (newMaterialNeeds.length > 0) {
+      const unitIds = new Set<string>(newMaterialNeeds.map((need) => need.unitId));
+      for (const match of foundByName) if (match.unitId !== null) unitIds.add(match.unitId);
+      const refs = await deps.units.findRefs([...unitIds], actor.companyId);
+      for (const ref of refs) unitsById.set(ref.id, ref);
+      if (newMaterialNeeds.some((need) => !unitsById.has(need.unitId))) {
+        throw new ValidationError('formula-import: unidad de materia prima nueva inexistente o de otra empresa');
+      }
+    }
+
     const toCreate: NewMaterialNeed[] = [];
-    let rawMaterialsReused = 0;
+    const reusedNames: { name: string }[] = [];
     for (const need of newMaterialNeeds) {
+      const familyId = unitFamilyId(unitsById.get(need.unitId) as UnitRef);
       const candidates = matchesByNormalizedName.get(need.normalizedName) ?? [];
-      const eligible = candidates.filter((candidate) => isIngredientType(candidate.type));
+      // Un homonimo sin unidad, con una unidad no visible o de otra familia no cuenta.
+      const eligible = candidates.filter((candidate) => {
+        if (!isIngredientType(candidate.type) || candidate.unitId === null) return false;
+        const unit = unitsById.get(candidate.unitId);
+        return unit !== undefined && unitFamilyId(unit) === familyId;
+      });
       if (eligible.length > 1) {
         throw new ValidationError('formula-import: mas de un producto vivo con el nombre de una materia prima nueva');
       }
@@ -154,7 +185,7 @@ export function createConfirmFormulaImport(
           throw new ValidationError('formula-import: la materia prima reutilizada coincide con otra fila');
         }
         resolvedProductIdByRow.set(need.rowIndex, reused.id);
-        rawMaterialsReused += 1;
+        reusedNames.push({ name: reused.name });
       } else {
         toCreate.push(need);
       }
@@ -176,12 +207,18 @@ export function createConfirmFormulaImport(
       assertPermission(actor, 'inventario.modificar', () => new UnauthorizedError());
     }
 
-    let rawMaterialsCreated = 0;
+    const created: { name: string; unitId: string }[] = [];
     for (const need of toCreate) {
-      const created = await deps.createRawMaterial({ name: need.rawName }, actor);
-      resolvedProductIdByRow.set(need.rowIndex, created.id);
-      rawMaterialsCreated += 1;
+      const result = await deps.createRawMaterial({ name: need.rawName, unitId: need.unitId }, actor);
+      resolvedProductIdByRow.set(need.rowIndex, result.id);
+      created.push({ name: need.rawName.trim(), unitId: need.unitId });
     }
+    const materials = {
+      rawMaterialsCreated: created.length,
+      rawMaterialsReused: reusedNames.length,
+      created,
+      reused: reusedNames,
+    };
 
     const finalLines = lines.map((line, index) => ({
       productId: resolvedProductIdByRow.get(index) as string,
@@ -197,13 +234,13 @@ export function createConfirmFormulaImport(
         { name: clash.name, description, steps: finalSteps, packingSteps: finalPackingSteps, lines: finalLines },
         actor,
       );
-      return { recipeId: result.id, outcome: 'replaced', rawMaterialsCreated, rawMaterialsReused };
+      return { recipeId: result.id, outcome: 'replaced', ...materials };
     }
 
     const result = await deps.createRecipe(
       { name, description, steps: finalSteps, packingSteps: finalPackingSteps, lines: finalLines },
       actor,
     );
-    return { recipeId: result.id, outcome: 'created', rawMaterialsCreated, rawMaterialsReused };
+    return { recipeId: result.id, outcome: 'created', ...materials };
   };
 }

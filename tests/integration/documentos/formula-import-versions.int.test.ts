@@ -20,6 +20,7 @@ import { documentBatchRepositoryPrisma } from '@/lib/modules/documentos/adapters
 import { createCreateRawMaterial, PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { ProductCatalog, ProductNameLookup } from '@/lib/modules/inventario';
 import { createProduct, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import {
   findCostingBatches,
   findProductRefs,
@@ -94,7 +95,8 @@ const deps: FormulaImportDeps = {
   recipes: recipeCatalog,
   products: productCatalog,
   productNames: productNameLookup,
-  createRawMaterial: createCreateRawMaterial({ products: { create: createProduct } }),
+  units: { findRefs: findUnitRefs },
+  createRawMaterial: createCreateRawMaterial({ products: { create: createProduct }, units: { findRefs: findUnitRefs } }),
   createRecipe: createCreateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage }),
   updateRecipe: createUpdateRecipe({ recipes: recipeRepository, products: productCatalog, images: recipeImageStorage, stepLocks: noEvidenceLocks }),
 };

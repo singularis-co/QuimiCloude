@@ -60,10 +60,17 @@ productos vivos de la empresa del actor, uno con el mismo nombre normalizado **y
 que esa presentación; SI existe, ENTONCES DEBE agregarle el lote sin crear ningún producto y sin
 modificar su nombre, su cantidad de alerta ni su unidad. [D1]
 
+> Enmendado por QC-203 (2026-10-14): en el insumo, «misma unidad» pasa a «misma familia»; un
+> homónimo en otra unidad de la familia recibe el lote convertido (QC-203 R4).
+
 **R6.** SI no hay ningún producto vivo de la empresa con ese nombre en esa unidad —aunque lo haya
 con ese nombre en otra unidad, o sin unidad—, ENTONCES el sistema DEBE crear un producto nuevo con
 ese nombre, la unidad de la presentación y ese lote, sin rechazar el alta y sin mostrar ningún aviso
 ni pedir confirmación. [D1] [D8]
+
+> Enmendado por QC-203 (2026-10-14): en el insumo, un homónimo en otra unidad **de la misma
+> familia** ya no da otro producto ni pasa sin aviso: recibe el lote convertido y el formulario
+> avisa antes (QC-203 R4, R13). Entre familias distintas, R6 sigue igual.
 
 **R7.** SI hay varios productos vivos de la empresa con el mismo nombre y la misma unidad, ENTONCES
 el sistema DEBE agregar el lote siempre al mismo: el más antiguo, desempatando por identificador

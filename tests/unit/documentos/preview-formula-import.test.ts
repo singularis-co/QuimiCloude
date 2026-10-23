@@ -95,6 +95,7 @@ function crearDeps(bitacora: Bitacora, overrides: Partial<FormulaImportDeps> = {
     recipes: dobleDeRecetas(bitacora) as unknown as FormulaImportDeps['recipes'],
     products: dobleDeProductos() as unknown as FormulaImportDeps['products'],
     productNames: dobleDeNombresDeProducto(bitacora) as unknown as FormulaImportDeps['productNames'],
+    units: { findRefs: dobleQueFallaSiSeLlama('units.findRefs') },
     createRawMaterial: dobleQueFallaSiSeLlama('createRawMaterial') as FormulaImportDeps['createRawMaterial'],
     createRecipe: dobleQueFallaSiSeLlama('createRecipe') as FormulaImportDeps['createRecipe'],
     updateRecipe: dobleQueFallaSiSeLlama('updateRecipe') as FormulaImportDeps['updateRecipe'],

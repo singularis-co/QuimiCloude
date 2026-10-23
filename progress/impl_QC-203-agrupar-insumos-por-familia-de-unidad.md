@@ -200,3 +200,72 @@ Veredicto: tanda 3 verde; T7 y T8 hechas.
 Nota: el borde de R7 de la tanda 2 (el esquema rechaza el costo total sobre la existencia sin convertir) se ve igual en la vista previa, porque la planificación valida con el mismo `createProductSchema`. Vista previa y confirmación siguen coincidiendo.
 
 Veredicto: tanda 4 verde; T9 hecha.
+
+## Tanda 5 — T10 servidor (materia prima de fórmula con unidad)
+
+### Archivos
+Producción (modificados):
+- `lib/modules/documentos/domain/formula-import-input.ts`: la línea `new` exige `unitId: uuid`.
+- `lib/modules/documentos/domain/review-formula-import.ts`: `DraftLine.new.unitId: string | null`, `RowProblem` `new_unit_missing`.
+- `lib/modules/documentos/domain/preview-formula-import.ts`: `FormulaImportDeps.units: Pick<UnitCatalog, 'findRefs'>`.
+- `lib/modules/documentos/domain/confirm-formula-import.ts`: `units.findRefs` de las unidades elegidas y de los homónimos antes de crear; elegible = no terminado, con unidad y de la familia (`unitFamilyId`); `createRawMaterial({ name, unitId })`; resumen con `created` y `reused`.
+- `lib/modules/inventario/domain/create-raw-material.ts`: esquema `{ name, unitId }`, `deps.units.findRefs`, `products.create` con `unitId`.
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: `createProduct` escribe `unitId`.
+- `lib/composition/index.ts`: `units` en `createRawMaterial` y en `formulaImportDeps`.
+
+Tests: nuevo `tests/unit/documentos/confirm-formula-import-unidad.test.ts`; casos nuevos en `review-formula-import.test.ts`, `create-raw-material.test.ts`, `create-raw-material.int.test.ts`; dobles adaptados en `confirm-formula-import.test.ts`, `preview-formula-import.test.ts`, `formula-import-authorization.test.ts`, `formula-import-actions.test.ts`, `formula-import.int.test.ts`, `formula-import-versions.int.test.ts`.
+
+Nota: el homónimo se resuelve con `productNames.findAliveByNormalizedNames` (ya trae `unitId`), como pide `design.md > 8.2`; `findAliveSupplyHomonyms` es un método de `ProductRepository` que `documentos` no ve por contrato.
+
+### Mapa R → test (T10)
+| R | Test |
+|---|---|
+| R23 | `review-formula-import.test.ts`: `R23 una fila nueva sin unidad da new_unit_missing y no se puede confirmar` |
+| R24 | `confirm-formula-import-unidad.test.ts`: `R24 sin unidad rechaza invalid_input sin crear`, `R24 unidad no visible rechaza sin crear`; `create-raw-material.test.ts`: `R24 unidad de otra empresa da ValidationError`, `R24 sin unidad da ValidationError sin tocar el puerto` |
+| R25 | `confirm-formula-import-unidad.test.ts`: `R25 crea la materia prima con la unidad elegida`; `create-raw-material.test.ts`: `R25 guarda la unidad`; `create-raw-material.int.test.ts`: `R25 products.unit_id queda escrito` |
+| R26 | `confirm-formula-import-unidad.test.ts`: `R26 reutiliza el único homónimo de la familia`, `R26 más de uno de la familia rechaza`, `R26 un homónimo sin unidad o de otra familia no cuenta y crea` |
+| R27 | `confirm-formula-import-unidad.test.ts`: `R27 el resumen trae creadas con unidad y reutilizadas` |
+| R28 | `confirm-formula-import-unidad.test.ts`: `R28 sin inventario.modificar no crea` |
+
+### Verificación (tanda 5)
+- `pnpm typecheck` → rojo SOLO en archivos de T11: `formula-import-review.tsx` (3), `formula-ingredient-row.tsx` (1) y `tests/unit/recetas-ui/formula-import-review.test.tsx` (1; el `FormulaImportSummary` gana `created`/`reused`). Ningún error fuera de T11.
+- `pnpm lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 ajenos.
+- `pnpm exec vitest run` sobre review-formula-import, confirm-formula-import-unidad, confirm-formula-import, preview-formula-import, formula-import-authorization, formula-import-actions, create-raw-material, create-raw-material-alcance y documentos/module-contract → 9 archivos, 163 verdes.
+- `pnpm exec vitest run --project integration`: create-raw-material (2 verdes), formula-import (13 verdes), formula-import-versions (2 verdes).
+- `pnpm exec vitest run guard` → 76 archivos, 1064 verdes, 20 saltados.
+- Finales de línea: LF.
+
+Veredicto: T10 verde en servidor; el typecheck queda rojo hasta T11 (UI de la revisión).
+
+## Tanda 5 — T11 UI de la revisión de fórmula
+
+### Archivos
+Producción (modificados), en `app/(private)/produccion/formulas/importar/[documentoId]/components/`:
+- `formula-import-review.tsx`: la fila gana `newUnitId` y `newUnitSource` (`suggested | none | ambiguous | missing | picked`). El valor inicial sale de `suggestUnitId(unitRead, units)`. Para separar «ninguna» de «más de una» se cuentan las coincidencias con `normalizeUnitName`. `toDraftLine` y `toConfirmLine` mandan `unitId`. `ROW_PROBLEM_LABELS` gana `new_unit_missing: 'sin unidad'`. La unidad vacía NO deshabilita «Confirmar»: al pulsarlo, enciende `showUnitErrors`, no llama a la action, y desde ahí la fila y los motivos la marcan (R23, tablero: `confirm → tried`). El resumen recibe `units`.
+- `formula-ingredient-row.tsx`: en modo `create`, `PresentationUnitSelect` controlado (`name={null}`, `value`, `onValueChange` → `picked`, `hint`, `error`) junto a «Nombre» (`sm:grid-cols-[minmax(0,1fr)_12.5rem]`; en teléfono va debajo, a todo el ancho). Entra con `animate-in fade-in`. Los textos de la ayuda y el error son los de `design.md > 6`.
+- `formula-import-summary.tsx`: prop `units`; bajo cada contador va la lista `Nombre · u` de las creadas y los nombres de las reutilizadas, o `EMPTY_MARK` si no hay ninguna.
+- `page.tsx`: sin cambios (ya pasaba `units` de `listUnitsAction()`).
+
+Tests:
+- Nuevo: `tests/unit/recetas-ui/formula-import-unidad.test.tsx`.
+- Adaptados:
+  - `formula-import-review.test.tsx`: el resumen lleva `created`/`reused`; la fila «crear» pide unidad; el selector tiene `min-h-11`.
+  - `formula-import-page.test.tsx`: caso nuevo `R21 … sugiere la unidad leida entre las de listUnitsAction`. Además, el saneador de `useId` acepta letras (`_r_h_`): con un render más antes, el contador de React ya las emitía.
+
+### Mapa R → test (T11)
+| R | Test (`formula-import-unidad.test.tsx` salvo indicación) |
+|---|---|
+| R21 | `R21 con «kg» leído preselecciona kg y dice que se sugirió del PDF`; `formula-import-page.test.tsx`: `R21 una fila «Crear materia prima» sugiere la unidad leida entre las de listUnitsAction` |
+| R22 | `R22 con «gotas» queda vacía con su ayuda`, `R22 sin unidad en el PDF queda vacía con su ayuda`, `R22 con dos coincidencias queda vacía con su ayuda`, `R22 al elegir a mano dice Elegida por ti` |
+| R23 | `R23 Confirmar con una vacía marca el error en esa fila y no llama a la action` |
+| R27 | `R27 el resumen lista las creadas con su unidad`, `R27 sin creadas ni reutilizadas el resumen pinta una raya` |
+
+### Verificación (T11)
+- `pnpm run typecheck` → exit 0, verde en todo el repo.
+- `pnpm run lint` → `✖ 7 problems (0 errors, 7 warnings)`, los mismos 7 ajenos.
+- `pnpm exec vitest run tests/unit/recetas-ui` → 28 archivos, 533 verdes.
+- `pnpm exec vitest related --run` sobre los 3 componentes y los 3 tests → 3 archivos, 48 verdes.
+- `pnpm exec vitest run guard` → 76 archivos, 1064 verdes, 20 saltados. Una primera pasada dio rojo en `guard-piezas-base` R25 por una constante local `'—'`; ahora se usa `EMPTY_MARK`.
+- Finales de línea: `git ls-files --eol` da `w/lf` en todos; `file` no marca CRLF.
+
+Veredicto: T11 verde; typecheck del repo en verde.

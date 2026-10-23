@@ -18,6 +18,7 @@ const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const PERSONA = '11111111-1111-4111-8111-111111111111';
 const ARCHIVO = '44444444-4444-4444-8444-444444444444';
 const PRODUCTO_AGUA = '55555555-5555-4555-8555-555555555555';
+const UNIDAD = '99999999-9999-4999-8999-999999999999';
 
 const ARCHIVO_LISTO: FileForReview = {
   status: 'done',
@@ -114,6 +115,12 @@ function crearDeps(bitacora: Bitacora, overrides: Partial<FormulaImportDeps> = {
       { id: PRODUCTO_AGUA, name: 'Agua', unitId: null, stockByUnit: [], type: PRODUCT_TYPES.PRODUCT },
     ]) as unknown as FormulaImportDeps['products'],
     productNames: dobleDeNombresDeProducto(bitacora) as unknown as FormulaImportDeps['productNames'],
+    units: {
+      findRefs: vi.fn(async (ids: readonly string[]) => {
+        bitacora.push('units.findRefs');
+        return ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null }] : [];
+      }),
+    },
     createRawMaterial: dobleDeCreateRawMaterial(bitacora) as FormulaImportDeps['createRawMaterial'],
     createRecipe: dobleDeCreateRecipe(bitacora) as FormulaImportDeps['createRecipe'],
     updateRecipe: dobleDeUpdateRecipe(bitacora) as FormulaImportDeps['updateRecipe'],
@@ -212,7 +219,7 @@ describe('formula-import — autorizacion de la materia prima nueva (R31)', () =
         entradaConfirmar({
           lines: [
             { kind: 'existing', productId: PRODUCTO_AGUA, percentage: '50.00' },
-            { kind: 'new', newProductName: 'Sosa', percentage: '50.00' },
+            { kind: 'new', newProductName: 'Sosa', unitId: UNIDAD, percentage: '50.00' },
           ],
         }),
       ),

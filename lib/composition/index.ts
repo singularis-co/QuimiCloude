@@ -1057,7 +1057,7 @@ const inventoryImportReadDeps = {
 
 export const inventario = {
   createProduct: createProductUseCase,
-  createRawMaterial: createCreateRawMaterial({ products: productRepository }),
+  createRawMaterial: createCreateRawMaterial({ products: productRepository, units: { findRefs: findUnitRefs } }),
   updateProduct: createUpdateProduct({ products: productRepository }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository }),
@@ -2334,6 +2334,7 @@ const formulaImportDeps: FormulaImportDeps = {
   recipes: recipeCatalog,
   products: productCatalog,
   productNames: productNameLookup,
+  units: unitCatalog,
   createRawMaterial: inventario.createRawMaterial,
   createRecipe: recetas.createRecipe,
   updateRecipe: recetas.updateRecipe,

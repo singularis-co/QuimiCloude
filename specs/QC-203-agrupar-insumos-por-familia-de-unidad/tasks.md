@@ -137,7 +137,7 @@
 
 ## Tanda 5 — materia prima de fórmula (depende de T1; tras la tanda 2 por `product-prisma.ts` y `lib/composition/index.ts`)
 
-- [ ] **T10 — Servidor** (`design.md > 8.1` a `8.3`).
+- [x] **T10 — Servidor** (`design.md > 8.1` a `8.3`).
   - Cambios en `formula-import-input.ts`, `review-formula-import.ts` (`new_unit_missing`),
     `confirm-formula-import.ts`, `FormulaImportDeps.units` y `create-raw-material.ts` (unidad y
     `units`).
@@ -163,7 +163,7 @@
     `formula-import.int.test.ts` a la línea con `unitId` y a `deps.units`.
 
   *Hecho:* verde.
-- [ ] **T11 — UI de la revisión** (`design.md > 8.4`; tableros `ImportarFormulaUnidad*.dc.html`).
+- [x] **T11 — UI de la revisión** (`design.md > 8.4`; tableros `ImportarFormulaUnidad*.dc.html`).
   Depende de T7 y T10.
   - Cambios en `formula-import-review.tsx`, `formula-ingredient-row.tsx` y
     `formula-import-summary.tsx`.
@@ -198,7 +198,7 @@
 
   Depende de T8 y T9.
   *Hecho:* esos specs verdes sin casos saltados.
-- [ ] **T14 — Anotar las enmiendas** (`design.md > 9`). Una línea «Enmendado por QC-203 (fecha):
+- [x] **T14 — Anotar las enmiendas** (`design.md > 9`). Una línea «Enmendado por QC-203 (fecha):
   …» bajo QC-159 R25 y R26, QC-199 R10, QC-121 R5 y R6, y QC-209 R14 y R15, en sus
   `requirements.md`. No se reescribe el requisito original. [P]
   *Hecho:* las seis anotaciones presentes.

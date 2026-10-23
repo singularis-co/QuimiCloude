@@ -95,6 +95,7 @@ export async function createProduct(
       nameNormalized: normalizeProductName(data.name),
       qtyAlert: data.qtyAlert ?? null,
       type: data.type ?? PRODUCT_TYPES.PRODUCT,
+      unitId: data.unitId ?? null,
       ...companyScopeColumns(scope),
       createdAt: now,
       updatedAt: now,
