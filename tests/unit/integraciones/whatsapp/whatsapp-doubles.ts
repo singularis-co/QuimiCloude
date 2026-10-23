@@ -22,6 +22,10 @@ import type {
   WhatsappTemplateRecord,
 } from '@/lib/modules/integraciones/domain/whatsapp-template'
 import { sameComponents } from '@/lib/modules/integraciones/domain/whatsapp-template-components'
+import type {
+  OutboundContact,
+  OutboundMessageRecord,
+} from '@/lib/modules/integraciones/domain/whatsapp-outbound-message'
 import type { WhatsappVariableKeyRecord } from '@/lib/modules/integraciones/domain/whatsapp-variable-key'
 import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links'
 import type { CustomerPhoneOwners } from '@/lib/modules/integraciones/ports/customer-phone-owners'
@@ -49,6 +53,7 @@ import type {
   TemplateSyncRow,
   WhatsappTemplateRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
+import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository'
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory'
 
@@ -736,5 +741,221 @@ export function makeVariableKeyRepository(
       return row === undefined ? undefined : { ...row }
     },
     all: () => [...rows.values()].map((row) => ({ ...row })),
+  }
+}
+
+export type OutboxContactRow = OutboundContact & {
+  readonly companyId: string
+  readonly connectionId: string
+  readonly lastMessageAt: Date | null
+}
+
+export type OutboxMessageRow = OutboundMessageRecord & {
+  readonly companyId: string
+  readonly wamid: string | null
+  readonly attempts: number
+}
+
+/** Un contacto de la conexion por defecto, vinculado a `CUSTOMER_ID` y con la ventana abierta. */
+export function outboxContact(overrides: Partial<OutboxContactRow> = {}): OutboxContactRow {
+  return {
+    id: CONTACT_ID,
+    companyId: COMPANY_ID,
+    connectionId: CONNECTION_ID,
+    waId: '573001234567',
+    customerId: CUSTOMER_ID,
+    customerLinkedBy: null,
+    blockedAt: null,
+    lastInboundAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    lastMessageAt: null,
+    ...overrides,
+  }
+}
+
+export const FAILED_MESSAGE_ID = '00000000-0000-4000-8000-000000000301'
+
+/** Un saliente fallido de texto, del actor, al contacto por defecto. */
+export function outboxMessage(overrides: Partial<OutboxMessageRow> = {}): OutboxMessageRow {
+  return {
+    id: FAILED_MESSAGE_ID,
+    companyId: COMPANY_ID,
+    connectionId: CONNECTION_ID,
+    contactId: CONTACT_ID,
+    sentById: ACTOR_ID,
+    type: 'TEXT',
+    body: 'Hola, su pedido salio hoy',
+    templateName: null,
+    templateLanguage: null,
+    payload: {},
+    status: 'FAILED',
+    direction: 'OUT',
+    origin: 'USER',
+    errorCode: '131026',
+    errorReason: 'Meta no acepto el mensaje (codigo 131026). Intenta de nuevo o revisa la conexion.',
+    createdAt: new Date('2026-10-08T12:00:00.000Z'),
+    wamid: null,
+    attempts: 1,
+    ...overrides,
+  }
+}
+
+/**
+ * Contactos y mensajes salientes en memoria con las reglas del adaptador: ambito de empresa, la
+ * conexion en las lecturas de contacto, `markSent`/`markFailed` solo desde `SENDING` y
+ * `touchContact` que no retrocede.
+ */
+export function makeOutbox(
+  initial: { contacts?: readonly OutboxContactRow[]; messages?: readonly OutboxMessageRow[] } = {},
+  now: () => Date = () => NOW,
+) {
+  const contacts = new Map((initial.contacts ?? []).map((row) => [row.id, { ...row }]))
+  const messages = new Map((initial.messages ?? []).map((row) => [row.id, { ...row }]))
+  let counter = 0
+  const newId = (prefix: number) => {
+    counter += 1
+    return `00000000-0000-4000-8000-${String(prefix + counter)}`
+  }
+  const toContact = (row: OutboxContactRow): OutboundContact => ({
+    id: row.id,
+    waId: row.waId,
+    customerId: row.customerId,
+    customerLinkedBy: row.customerLinkedBy,
+    blockedAt: row.blockedAt,
+    lastInboundAt: row.lastInboundAt,
+  })
+  const toRecord = (row: OutboxMessageRow): OutboundMessageRecord => ({
+    id: row.id,
+    connectionId: row.connectionId,
+    contactId: row.contactId,
+    sentById: row.sentById,
+    type: row.type,
+    body: row.body,
+    templateName: row.templateName,
+    templateLanguage: row.templateLanguage,
+    payload: { ...row.payload },
+    status: row.status,
+    direction: row.direction,
+    origin: row.origin,
+    errorCode: row.errorCode,
+    errorReason: row.errorReason,
+    createdAt: row.createdAt,
+  })
+  const contactOf = (id: string, scope: IntegracionesScope) => {
+    const row = contacts.get(id)
+    return row !== undefined && row.companyId === scope.companyId ? row : undefined
+  }
+  const messageOf = (id: string, scope: IntegracionesScope) => {
+    const row = messages.get(id)
+    return row !== undefined && row.companyId === scope.companyId ? row : undefined
+  }
+
+  const findContact = vi.fn<WhatsappOutboxRepository['findContact']>(async (id, connectionId, scope) => {
+    const row = contactOf(id, scope)
+    return row === undefined || row.connectionId !== connectionId ? null : toContact(row)
+  })
+  const findContactsByWaIds = vi.fn<WhatsappOutboxRepository['findContactsByWaIds']>(async (connectionId, waIds, scope) =>
+    [...contacts.values()]
+      .filter((row) => row.companyId === scope.companyId && row.connectionId === connectionId && waIds.includes(row.waId))
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map(toContact),
+  )
+  const ensureContact = vi.fn<WhatsappOutboxRepository['ensureContact']>(async (connectionId, waId, scope) => {
+    const existing = [...contacts.values()].find((row) => row.connectionId === connectionId && row.waId === waId)
+    if (existing !== undefined) {
+      if (existing.companyId !== scope.companyId) throw new Error('doble: el contacto es de otra empresa')
+      return toContact(existing)
+    }
+    const row: OutboxContactRow = {
+      id: newId(700000000000),
+      companyId: scope.companyId,
+      connectionId,
+      waId,
+      customerId: null,
+      customerLinkedBy: null,
+      blockedAt: null,
+      lastInboundAt: null,
+      lastMessageAt: null,
+    }
+    contacts.set(row.id, row)
+    return toContact(row)
+  })
+  const linkContact = vi.fn<WhatsappOutboxRepository['linkContact']>(async (id, link, scope) => {
+    const row = contactOf(id, scope)
+    if (row !== undefined) contacts.set(id, { ...row, customerId: link.customerId, customerLinkedBy: link.linkedBy })
+  })
+  const insertSending = vi.fn<WhatsappOutboxRepository['insertSending']>(async (input, scope) => {
+    const row: OutboxMessageRow = {
+      ...input,
+      payload: { ...input.payload },
+      id: newId(600000000000),
+      companyId: scope.companyId,
+      status: 'SENDING',
+      direction: 'OUT',
+      origin: 'USER',
+      errorCode: null,
+      errorReason: null,
+      createdAt: now(),
+      wamid: null,
+      attempts: 1,
+    }
+    messages.set(row.id, row)
+    return toRecord(row)
+  })
+  const markSent = vi.fn<WhatsappOutboxRepository['markSent']>(async (id, wamid, scope) => {
+    const row = messageOf(id, scope)
+    if (row === undefined || row.status !== 'SENDING') return null
+    const next: OutboxMessageRow = { ...row, status: 'SENT', wamid }
+    messages.set(id, next)
+    return toRecord(next)
+  })
+  const markFailed = vi.fn<WhatsappOutboxRepository['markFailed']>(async (id, errorCode, errorReason, scope) => {
+    const row = messageOf(id, scope)
+    if (row === undefined || row.status !== 'SENDING') return null
+    const next: OutboxMessageRow = { ...row, status: 'FAILED', errorCode, errorReason }
+    messages.set(id, next)
+    return toRecord(next)
+  })
+  const findOutbound = vi.fn<WhatsappOutboxRepository['findOutbound']>(async (id, scope) => {
+    const row = messageOf(id, scope)
+    return row === undefined ? null : toRecord(row)
+  })
+  const touchContact = vi.fn<WhatsappOutboxRepository['touchContact']>(async (id, at, scope) => {
+    const row = contactOf(id, scope)
+    if (row === undefined) return
+    if (row.lastMessageAt === null || row.lastMessageAt < at) contacts.set(id, { ...row, lastMessageAt: at })
+  })
+
+  const outbox: WhatsappOutboxRepository = {
+    findContact,
+    findContactsByWaIds,
+    ensureContact,
+    linkContact,
+    insertSending,
+    markSent,
+    markFailed,
+    findOutbound,
+    touchContact,
+  }
+  return {
+    outbox,
+    findContact,
+    findContactsByWaIds,
+    ensureContact,
+    linkContact,
+    insertSending,
+    markSent,
+    markFailed,
+    findOutbound,
+    touchContact,
+    contact: (id: string) => {
+      const row = contacts.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+    message: (id: string) => {
+      const row = messages.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+    allContacts: () => [...contacts.values()].map((row) => ({ ...row })),
+    allMessages: () => [...messages.values()].map((row) => ({ ...row })),
   }
 }

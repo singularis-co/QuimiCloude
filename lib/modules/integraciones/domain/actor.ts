@@ -11,6 +11,7 @@ export type Actor = {
 };
 
 const CONFIGURE_PERMISSION = 'integraciones.modificar';
+export const WHATSAPP_SEND_PERMISSION = 'whatsapp.enviar';
 
 /**
  * Primera línea de cada caso de uso, antes de validar la entrada y de tocar un puerto. Un actor
@@ -30,6 +31,14 @@ export function requirePermission(actor: Actor | null | undefined): asserts acto
 export function requireCustomerLinkPermission(actor: Actor | null | undefined): asserts actor is Actor {
   assertPermission(actor, CUSTOMER_MODIFY_PERMISSION, () => new UnauthorizedError());
   assertAddon(actor, 'integraciones', () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
+/** El permiso ya llega quitado si el añadido está apagado: no hace falta comprobar el añadido. */
+export function requireSendPermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, WHATSAPP_SEND_PERMISSION, () => new UnauthorizedError());
   if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
     throw new UnauthorizedError();
   }
