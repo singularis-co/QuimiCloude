@@ -59,7 +59,7 @@ describe('guardar y conectar', () => {
     })
     repo.create.mockImplementationOnce(async (row: NewAiProviderConnectionRow) => {
       order.push('create')
-      return { ...row, companyId: COMPANY_ID }
+      return { ...row, companyId: COMPANY_ID, model: row.model ?? null, unavailableModel: row.unavailableModel ?? null }
     })
 
     await save({ provider: 'OPENAI', apiKey: API_KEY }, admin())
@@ -67,7 +67,7 @@ describe('guardar y conectar', () => {
     expect(probe.call).toHaveBeenCalledWith({
       provider: 'OPENAI',
       apiKey: API_KEY,
-      models: ['modelo-receta-o', 'modelo-catalogo-o'],
+      models: ['modelo-recomendado-o'],
     })
   })
 
@@ -119,8 +119,14 @@ describe('guardar y conectar', () => {
       connection: {
         provider: 'ANTHROPIC',
         providerName: 'Claude',
-        recipeModel: 'modelo-receta-a',
-        catalogModel: 'modelo-catalogo-a',
+        modelInUse: 'modelo-recomendado-a',
+        modelIsDefault: true,
+        modelUnavailable: false,
+        modelOptions: [
+          { modelId: 'modelo-alto-a', isDefault: false },
+          { modelId: 'modelo-recomendado-a', isDefault: true },
+          { modelId: 'modelo-bajo-a', isDefault: false },
+        ],
         status: 'ACTIVE',
         lastError: null,
         lastErrorAt: null,
@@ -243,5 +249,85 @@ describe('guardar y conectar', () => {
     await save({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
     expect(cipher.plaintextOf(repo.row(CONNECTION_ID)?.apiKeyEnc ?? '')).toBe(API_KEY)
     expect(cipher.plaintextOf(repo.row(CONNECTION_ID)?.apiKeyEnc ?? '')).not.toBe(OLD_API_KEY)
+  })
+})
+
+describe('guardar y conectar: el modelo', () => {
+  it('QT-291 R19: con el mismo proveedor y una eleccion, prueba la eleccion', async () => {
+    const { probe, save } = setup({ existing: { provider: 'GOOGLE', model: 'modelo-alto-g' } })
+    await save({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({ provider: 'GOOGLE', apiKey: API_KEY, models: ['modelo-alto-g'] })
+  })
+
+  it('QT-291 R19: con el mismo proveedor sin eleccion, prueba el predeterminado', async () => {
+    const { probe, save } = setup({ existing: { provider: 'GOOGLE', model: null } })
+    await save({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({ provider: 'GOOGLE', apiKey: API_KEY, models: ['modelo-recomendado-g'] })
+  })
+
+  it('QT-291 R19: con otro proveedor, prueba el predeterminado del proveedor escrito aunque haya eleccion', async () => {
+    const { probe, save } = setup({ existing: { provider: 'GOOGLE', model: 'modelo-alto-g' } })
+    await save({ provider: 'ANTHROPIC', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({
+      provider: 'ANTHROPIC',
+      apiKey: API_KEY,
+      models: ['modelo-recomendado-a'],
+    })
+  })
+
+  it('QT-291 R19: sin conexion, prueba el predeterminado del proveedor escrito', async () => {
+    const { probe, save } = setup({ existing: null })
+    await save({ provider: 'OPENROUTER', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({
+      provider: 'OPENROUTER',
+      apiKey: API_KEY,
+      models: ['modelo-recomendado-r'],
+    })
+  })
+
+  it('QT-291 R14: cambiar de proveedor vacia la eleccion y el modelo marcado', async () => {
+    const { repo, save } = setup({
+      existing: { provider: 'GOOGLE', model: 'modelo-alto-g', unavailableModel: 'modelo-alto-g', status: 'ERROR' },
+    })
+    const result = await save({ provider: 'OPENAI', apiKey: API_KEY }, admin())
+
+    expect(repo.row(CONNECTION_ID)).toMatchObject({ provider: 'OPENAI', model: null, unavailableModel: null })
+    expect(result).toMatchObject({
+      status: 'saved',
+      connection: { modelInUse: 'modelo-recomendado-o', modelIsDefault: true, modelUnavailable: false },
+    })
+  })
+
+  it('QT-291 R14: con el mismo proveedor (solo cambia la key) conserva la eleccion', async () => {
+    const { repo, save } = setup({ existing: { provider: 'GOOGLE', model: 'modelo-bajo-g' } })
+    const result = await save({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+
+    expect(repo.row(CONNECTION_ID)?.model).toBe('modelo-bajo-g')
+    expect(repo.update.mock.calls[0]?.[1]).not.toHaveProperty('model')
+    expect(result).toMatchObject({ status: 'saved', connection: { modelInUse: 'modelo-bajo-g', modelIsDefault: false } })
+  })
+
+  it('QT-291 R14: con el mismo proveedor, la prueba buena del modelo en uso vacia el modelo marcado', async () => {
+    const { repo, save } = setup({
+      existing: { provider: 'GOOGLE', model: null, unavailableModel: 'modelo-recomendado-g', status: 'ERROR' },
+    })
+    await save({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(repo.row(CONNECTION_ID)).toMatchObject({ model: null, unavailableModel: null, status: 'ACTIVE' })
+  })
+
+  it('QT-291 R14: crear la conexion la deja sin eleccion ni modelo marcado', async () => {
+    const { repo, save } = setup({ existing: null })
+    await save({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(repo.create.mock.calls[0]?.[0]).toMatchObject({ model: null, unavailableModel: null })
+  })
+
+  it('QT-291 R14: una prueba fallida no toca la eleccion', async () => {
+    const { repo, save } = setup({
+      probe: REJECTED_PROBE,
+      existing: { provider: 'GOOGLE', model: 'modelo-alto-g' },
+    })
+    await save({ provider: 'OPENAI', apiKey: API_KEY }, admin())
+    expect(repo.row(CONNECTION_ID)?.model).toBe('modelo-alto-g')
+    expect(repo.update).not.toHaveBeenCalled()
   })
 })

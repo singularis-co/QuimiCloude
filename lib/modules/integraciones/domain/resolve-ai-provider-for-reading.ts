@@ -1,9 +1,4 @@
-import type {
-  AiProviderCode,
-  AiProviderConnectionStatus,
-  AiProviderEntry,
-  AiReadUse,
-} from './ai-provider';
+import { modelInUse, type AiProviderCode, type AiProviderConnectionStatus } from './ai-provider';
 import { SecretUnreadableError } from './errors';
 import type { IntegracionesScope } from './integraciones-scope';
 import { decryptStoredKey } from './test-saved-ai-provider';
@@ -39,20 +34,16 @@ export type AiProviderStatus = {
   readonly connectionStatus: AiProviderConnectionStatus;
 };
 
-function modelFor(entry: AiProviderEntry, use: AiReadUse): string {
-  return use === 'recipe' ? entry.recipeModel : entry.catalogModel;
-}
-
 /**
- * Sin actor: la empresa sale de la fila del archivo que la cola reclamó. El modelo se lee del
- * catálogo en cada llamada para que un cambio del catálogo llegue a la siguiente lectura.
+ * Sin actor: la empresa sale de la fila del archivo que la cola reclamó. El catálogo se lee en cada
+ * llamada para que un cambio del predeterminado llegue a la siguiente lectura.
  */
 export function createResolveAiProviderForReading(
   deps: ResolveAiProviderForReadingDeps,
-): (companyId: string, use: AiReadUse) => Promise<AiProviderReadingResolution> {
+): (companyId: string) => Promise<AiProviderReadingResolution> {
   const now = deps.now ?? (() => new Date());
 
-  return async function resolveAiProviderForReading(companyId, use) {
+  return async function resolveAiProviderForReading(companyId) {
     const scope: IntegracionesScope = { companyId };
     const record = await deps.connections.find(scope);
     if (record === null) return { status: 'missing' };
@@ -73,7 +64,7 @@ export function createResolveAiProviderForReading(
     return {
       status: 'ready',
       provider: record.provider,
-      model: modelFor(entry, use),
+      model: modelInUse(record, entry),
       apiKey,
       connectionStatus: record.status,
     };

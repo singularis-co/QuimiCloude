@@ -48,7 +48,7 @@
   (dos campos, P2003), puerto del repositorio.
   *Hecho:* `ai-provider-connection-prisma.int.test.ts` en verde con los campos nuevos.
 
-- [ ] **T4. [P] Elegir modelo, con consulta antes de guardar** (dep. T2). `domain/ai-model-input.ts`,
+- [x] **T4. [P] Elegir modelo, con consulta antes de guardar** (dep. T2). `domain/ai-model-input.ts`,
   `domain/select-ai-model.ts` (deps `connections`, `catalog`, `cipher`, `probe`; orden de
   `design.md > 4.3`: permiso → zod → conexión → catálogo → descifrar → consulta de un modelo →
   escribir), `index.ts`; doble de sonda en `ai-provider-doubles.ts` si hace falta.
@@ -60,7 +60,7 @@
   tipo: `rejected_key`, `quota`, `model_unavailable`, `unreachable`, `unexpected`, sin escrituras y con
   su mensaje) y R34 (key ilegible: sin sonda ni escritura).
 
-- [ ] **T5. Prueba, guardado, resolución e informe** (dep. T2). `test-ai-provider-key.ts`,
+- [x] **T5. Prueba, guardado, resolución e informe** (dep. T2). `test-ai-provider-key.ts`,
   `test-saved-ai-provider.ts`, `save-ai-provider-connection.ts`, `resolve-ai-provider-for-reading.ts`
   (sin `use`), `report-ai-provider-outcome.ts`, `get-ai-provider-connection.ts`.
   *Hecho:* tests de R14, R16–R19, R21–R24 en verde (`save-…`, `test-ai-provider-key…`,

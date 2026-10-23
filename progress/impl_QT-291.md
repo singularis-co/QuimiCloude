@@ -201,3 +201,113 @@ Los dos casos que tocan `ai_models` (R17, R3) restauran la fila en `finally`; el
   - Ajeno: `app/layout.tsx` (1, `LayoutProps`, tipo generado por Next ausente en el worktree).
 
 **Veredicto:** T1 cerrada (seed de veinte), T2 y T3 hechas y en verde en sus tests; el resto del rojo es de T4–T13.
+
+## T4. Elegir modelo, con consulta antes de guardar (2026-10-22, backend_dev)
+
+**Archivos**
+- `lib/modules/integraciones/domain/ai-model-input.ts` (nuevo): `aiModelInputSchema` (`modelId` recortado, 1–200).
+- `lib/modules/integraciones/domain/select-ai-model.ts` (nuevo): `createSelectAiModel`, deps `connections`,
+  `catalog`, `cipher`, `probe`. Orden: permiso → zod → `find` (`null` ⇒ `not_connected`) → `catalog.get`
+  (fuera de `entry.models` o el marcado ⇒ `ValidationError`) → `cipher.decrypt` directo (una
+  `SecretUnreadableError` se relanza **sin escribir**; no usa `decryptStoredKey`, que marca la conexión)
+  → `probe` con `[modelId]` (fallida ⇒ `rejected` con `probeFailureMessage(failure)`, sin escribir) →
+  `update` (`model` null si es el predeterminado; `unavailableModel: null` si había marcado;
+  `ACTIVE`/errores vacíos si `ERROR` y `isModelUnavailableNotice` o `isAccountFailureNotice`). No
+  escribe `lastCheckedAt`.
+  Decisión menor: si `update` devuelve `null` (la fila desapareció entre la consulta y la escritura,
+  carrera con «Desconectar») responde `not_connected`, igual que R11.
+- `lib/modules/integraciones/index.ts`: + `createSelectAiModel`, + tipo `SelectAiModelResult`.
+- `tests/unit/integraciones/module-shape.test.ts`: los dos archivos nuevos de `domain/` y los dos
+  nombres nuevos del contrato.
+- `tests/unit/integraciones/ai-provider/ai-provider-doubles.ts`: catálogo con `models`/`defaultModel`
+  (tres modelos por proveedor, el predeterminado en medio), `model`/`unavailableModel` en
+  `storedConnection` y en `create`, `failedProbe(kind, model)`.
+- `tests/unit/integraciones/ai-provider/select-ai-model.test.ts` (nuevo, 42 casos).
+
+**R → test** (`select-ai-model.test.ts`)
+- R8: «R8: rechaza <actor> con unauthorized sin leer ni escribir la conexion» (×5), «R8: el rechazo llega antes de validar la entrada».
+- R9: «R9: un modelo del catalogo del proveedor conectado queda como la eleccion…», «R9: elegir el
+  predeterminado deja la eleccion vacia», «R9: la entrada se recorta…», «R9: elegir no escribe
+  lastCheckedAt…», «R9: solo escribe en la conexion de la empresa del actor».
+- R10: «R10: <otro proveedor | inexistente | vacio | …> da invalid_input sin consultar ni escribir» (×8),
+  «R10: el modelo marcado da invalid_input…».
+- R11: «R11: sin conexion responde not_connected…», «R11: la conexion de otra empresa no cuenta»,
+  «R11: si la conexion desaparece entre la consulta y la escritura…».
+- R12 (una fila de §4.2 por caso): «…ERROR por modelo no disponible (aviso de la prueba)…», «…(aviso de
+  la lectura)…», «…ERROR por key rechazada (de «Probar conexion»)…», «…ERROR por falta de cuota (de una
+  lectura)…» ⇒ `ACTIVE`; «…ERROR por sin respuesta | error inesperado | key ilegible guarda la eleccion
+  sin cambiar el estado ni el error»; «…modelo marcado que no es el elegido…vacia el marcado»; «…aviso
+  de key rechazada de otro proveedor no se reconoce…»; «…en ACTIVE solo escribe la eleccion».
+- R32: «R32: consulta solo el modelo elegido con la key guardada, y nada se escribe antes», «R32:
+  tambien consulta cuando el elegido es el predeterminado», «R32: descifra con el contexto…».
+- R33: «R33: con rejected_key | quota | model_unavailable | unreachable | unexpected no escribe nada y
+  devuelve el mensaje de la prueba» (×5, con la fila en `ERROR` y un modelo marcado: queda idéntica).
+- R34: «R34: no consulta al proveedor, no escribe y lanza integration_secret_unreadable».
+
+## T5. Prueba, guardado, resolución e informe (2026-10-22, backend_dev)
+
+**Archivos**
+- `domain/test-ai-provider-key.ts`: `TestAiProviderKeyDeps` + `connections` (solo `find`);
+  `modelAfterSaving(existing, entry)` (R19); `runProbe` sustituido por `toTestResult(probeResult)`; la
+  prueba consulta un solo modelo.
+- `domain/save-ai-provider-connection.ts`: `find` antes de la prueba para el modelo de R19; al
+  reemplazar, otro proveedor ⇒ `model: null, unavailableModel: null`; mismo proveedor ⇒ no toca
+  `model`, `unavailableModel: null`; al crear, ambos `null`.
+- `domain/test-saved-ai-provider.ts`: consulta `[modelInUse(record, entry)]`; buena ⇒ además
+  `unavailableModel: null`; `model_unavailable` ⇒ `ERROR`, `unavailableModel = failure.model`,
+  `lastError = modelUnavailableNotice(model, entry.name, model === record.model)`; otra fallida, como antes.
+- `domain/resolve-ai-provider-for-reading.ts`: firma `(companyId)`, `model = modelInUse(record, entry)`.
+- `domain/report-ai-provider-outcome.ts`: `account_failure` → `connection_failure`; `model_unavailable`
+  ⇒ `ERROR` + modelo marcado + `READING_FAILURE_PREFIX + modelUnavailableNotice(...)`; `recovered` ⇒
+  además `unavailableModel: null`.
+- `domain/get-ai-provider-connection.ts`: solo el comentario del tipo (el formulario ya no pinta modelos).
+- Tests: `save-ai-provider-connection.test.ts`, `test-ai-provider-key.test.ts`,
+  `test-saved-ai-provider.test.ts`, `resolve-and-report.test.ts`.
+
+**R → test**
+- R14: `save-…` «QT-291 R14: cambiar de proveedor vacia la eleccion y el modelo marcado», «…con el mismo
+  proveedor (solo cambia la key) conserva la eleccion», «…la prueba buena del modelo en uso vacia el
+  modelo marcado», «…crear la conexion la deja sin eleccion ni modelo marcado», «…una prueba fallida no
+  toca la eleccion».
+- R16: `resolve-and-report` «QT-291 R16: sin eleccion resuelve el predeterminado…», «QT-291 R16: con
+  eleccion resuelve la eleccion…».
+- R17: `resolve-and-report` «QT-291 R17: sin eleccion, el predeterminado se lee del catalogo en cada
+  llamada»; `test-saved-…` «QT-291 R17, R18: sin eleccion, consulta el predeterminado leido del catalogo
+  en ese momento».
+- R18: `test-saved-…` «QT-291 R18: con eleccion, consulta solo la eleccion».
+- R19: `save-…` cuatro casos «QT-291 R19: …»; `test-ai-provider-key…` «R10, QT-291 R19: prueba una sola vez…»
+  y cuatro casos «QT-291 R19: …» (conectado con/sin eleccion, otro proveedor, sin conexion).
+- R20 (caso de uso): `test-ai-provider-key…` y `test-saved-…` «QT-291 R20: …ya no está disponible.»».
+- R21: `test-saved-…` «QT-291 R21: la eleccion no disponible deja ERROR…«que elegiste»», «…el
+  predeterminado no disponible…sin «que elegiste»», «…otro fallo no marca ningun modelo».
+- R22: `test-saved-…` «QT-291 R22: la prueba buena vacia el modelo marcado».
+- R23: `resolve-and-report` «QT-291 R23: la eleccion no disponible deja ERROR…», «…tambien con el
+  predeterminado…», «…un fallo de cuenta no marca ningun modelo».
+- R24: `resolve-and-report` «QT-291 R24: una lectura buena con la conexion en ERROR vacia ademas el modelo marcado».
+- R25 (resolución): `resolve-and-report` «QT-291 R25: con un modelo marcado resuelve igual el modelo en uso…».
+
+**Sonda de OpenRouter (dato de T0).** `probeOpenRouter` (`documentos/adapters/driven/ai/ai-reader-openai.ts`)
+no genera texto: busca el id en `GET /models` y un id ausente ya sale como `model_unavailable`; el 400
+«not a valid model ID» solo aparece al generar. No afecta a T4/T5; queda para T6 (`classifyOpenAiError`).
+
+## Verificación de la tanda T4 + T5 (2026-10-22, backend_dev)
+
+- `eslint` de los 16 archivos tocados: 0 problemas.
+- `vitest run` de los cinco tests del caso de uso: `select-ai-model` 42, `save-…` + `test-ai-provider-key…`
+  + `authorization` 74, `test-saved-…` 14, `resolve-and-report` 21; todo en verde. Los 9 rojos de la
+  tanda anterior (doble de catálogo y texto de R20) quedan en verde.
+- `vitest related --run` (los 16): 476 archivos, 8284 pass, 4 skip, **2 fail**, ambos en
+  `tests/unit/composition/ai-provider-wiring.test.ts` (T7): su fixture de catálogo sigue con
+  `recipeModel`/`catalogModel` y la composición todavía llama `resolveAiProviderForReading(companyId, use)`.
+- `pnpm exec vitest run guard`: 87 archivos, 1276 pass, 22 skipped, 0 fail.
+- `pnpm run typecheck`: 34 errores, ninguno en `integraciones/domain` ni en sus tests:
+  - T6: `documentos/domain/ai-read-use.ts` (1), `documentos/ports/ai-provider-gateway.ts` (1).
+  - T6/T7: `lib/composition/index.ts` (2: `resolveAiProviderForReading` con dos argumentos y
+    `'account_failure'` → `'connection_failure'`).
+  - T8: `adapters/driving/ai-provider-actions.ts` (6), `ai-provider-actions.test.ts` (2).
+  - T10/T11: `ai-provider-card.tsx` (2), `ai-provider-form.tsx` (2), `ai-provider-card.test.tsx` (5),
+    `ai-provider-form.test.tsx` (4), `ai-provider-page.test.tsx` (5).
+  - T13: `e2e/integraciones-proveedor-ia.spec.ts` (3).
+  - Ajeno: `app/layout.tsx` (1, `LayoutProps`).
+
+**Veredicto:** T4 y T5 hechas y en verde en sus tests; el rojo que queda es de T6–T13 y de `app/layout.tsx`.
