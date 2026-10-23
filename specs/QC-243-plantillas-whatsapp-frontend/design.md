@@ -37,7 +37,11 @@ Consultadas en `components/shared/CATALOGO.md`: `Tabs`, `DataTable`, `RowActions
 | Alta (`PlantillaAlta`) | 4 · crea en la ruta | `Sheet`, `TextField`, `Textarea`, `Select`, `DropdownMenu`, `Tabs`, `ErrorAlert`, `ConfirmDialog` |
 | Burbuja de vista previa (tablero `WaBurbuja`; componente `WaBubble`) | 4 · crea en la ruta | ninguna: pieza visual nueva |
 | Relacionar variables | 3 · compone | `Sheet`, `Select`, `ConfirmDialog`, `WaBubble` |
-| Pestaña Variables y panel de variable | 3 · compone | `DataTable`, `FormSheet`, `TextField`, `Textarea`, `ConfirmDialog`, `DeleteConfirmDialog` |
+| Pestaña Variables y panel de variable | 3 · compone | `Table`, `FormSheet`, `TextField`, `Textarea`, `ConfirmDialog`, `DeleteConfirmDialog` |
+
+> **Nota (implementación):** la pestaña Variables usa `Table` en vez de `DataTable` porque
+> `DataTable` siempre pinta paginación y barra de filtros, y el tablero
+> `PlantillasWhatsappVariables` no trae ninguna de las dos.
 
 Ninguna pieza sube a `components/shared`: todas las usa una sola ruta.
 
