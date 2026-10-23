@@ -230,6 +230,24 @@ describe('WhatsappVariablesPanel', () => {
     expect(deleteMock).not.toHaveBeenCalled();
   });
 
+  it('R60: «Nueva variable» (con lista y vacía), editar y eliminar miden 44 × 44 px en todos los anchos', () => {
+    const { unmount } = montar([CUENTA]);
+    const conLista = [
+      screen.getByTestId(WHATSAPP_NEW_VARIABLE_TESTID),
+      screen.getByTestId(ownVariableEditTestId(CUENTA.id)),
+      screen.getByTestId(ownVariableDeleteTestId(CUENTA.id)),
+    ];
+    for (const boton of conLista) {
+      expect(boton.className.split(/\s+/)).toEqual(expect.arrayContaining(['min-h-11', 'min-w-11']));
+    }
+    unmount();
+
+    montar([]);
+    const vacio = screen.getByTestId(WHATSAPP_NEW_VARIABLE_EMPTY_TESTID);
+    expect(vacio.className.split(/\s+/)).toEqual(expect.arrayContaining(['min-h-11', 'min-w-11']));
+    expect(vacio.className).not.toContain('max-md:min-h-11');
+  });
+
   it('R37: los textos del diálogo de eliminar no nombran a Meta ni a la empresa', () => {
     const textos = [
       WHATSAPP_VARIABLES_TEXTS.deleteTitle,

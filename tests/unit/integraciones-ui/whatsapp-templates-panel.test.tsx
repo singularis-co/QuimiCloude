@@ -24,6 +24,7 @@ import {
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-relate-sheet';
 import {
   WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID,
+  WHATSAPP_TEMPLATE_REASON_POPOVER_TESTID,
   WHATSAPP_TEMPLATE_REASON_TEXT_TESTID,
   WHATSAPP_TEMPLATE_STATUS_TESTID,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-status';
@@ -368,6 +369,27 @@ describe('listado', () => {
     button.focus();
     expect(await screen.findByText('El contenido no cumple la política.', { selector: '[data-slot="tooltip-content"]' })).toBeInTheDocument();
     expect(within(fila('t1')).queryByTestId(WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID)).toBeNull();
+  });
+
+  it('R13: el «!» abre el motivo en un Popover al pulsarlo (toque o clic) y con Enter, sin depender del puntero', async () => {
+    const user = setupUser();
+    renderPanel();
+    const button = within(fila('t3')).getByTestId(WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID);
+
+    await user.click(button);
+    expect(await screen.findByTestId(WHATSAPP_TEMPLATE_REASON_POPOVER_TESTID)).toHaveTextContent(
+      'El contenido no cumple la política.',
+    );
+    expect(screen.queryByText('El contenido no cumple la política.', { selector: '[data-slot="tooltip-content"]' })).toBeNull();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId(WHATSAPP_TEMPLATE_REASON_POPOVER_TESTID)).toBeNull());
+
+    button.focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByTestId(WHATSAPP_TEMPLATE_REASON_POPOVER_TESTID)).toHaveTextContent(
+      'El contenido no cumple la política.',
+    );
   });
 
   it('R13: en la tarjeta el motivo se ve como texto, sin depender del globo', () => {

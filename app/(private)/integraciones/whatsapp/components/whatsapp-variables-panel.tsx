@@ -323,7 +323,7 @@ export function WhatsappVariablesPanel({ entries }: WhatsappVariablesPanelProps)
   const [deleting, setDeleting] = useState<WhatsappDictionaryEntryView | null>(null);
 
   const newVariableButton = (testId: string) => (
-    <Button type="button" touch="mobile" data-testid={testId} onClick={() => setSheetTarget('new')}>
+    <Button type="button" touch data-testid={testId} onClick={() => setSheetTarget('new')}>
       <PlusIcon aria-hidden="true" />
       {WHATSAPP_VARIABLES_TEXTS.newVariable}
     </Button>

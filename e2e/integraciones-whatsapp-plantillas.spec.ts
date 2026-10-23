@@ -11,7 +11,8 @@
  * - **Una variable propia creada en la pestaña Variables y usada en el alta** por el menu «Insertar
  *   variable»: la relacion queda guardada contra esa variable.
  * - **El telefono** (390 px, tactil): el alta a pantalla completa con sus pestañas (R38) y el motivo
- *   de una rechazada como texto en la tarjeta (R13, `design.md > 8`).
+ *   de una rechazada como texto en la tarjeta (R13, `design.md > 8`); y, girado a tablet en
+ *   horizontal (1366 px, tactil, con la tabla), el «!» abre el motivo en un Popover al tocarlo.
  * - Corre en Chromium y en WebKit (proyectos de `playwright.config.ts`).
  *
  * DATOS: el USUARIO Administrador (rol real del seed) y la EMPRESA de cada worker son efimeros, con
@@ -49,6 +50,7 @@ import {
 import { statusBadgeOf } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-rules';
 import {
   WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID,
+  WHATSAPP_TEMPLATE_REASON_POPOVER_TESTID,
   WHATSAPP_TEMPLATE_REASON_TEXT_TESTID,
   WHATSAPP_TEMPLATE_STATUS_TESTID,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-status';
@@ -120,6 +122,12 @@ const REJECTED_REASON = 'INVALID_FORMAT';
 
 /** Teléfono de `docs/architecture.md > Componentes`: 390 px y tactil. */
 const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
+
+/** Tablet en horizontal: con la tabla visible y sin puntero (la ventana de `design.md > 8`). */
+const TABLET_LANDSCAPE_VIEWPORT = { width: 1366, height: 1024 } as const;
+
+/** Objetivo tactil minimo (R60). */
+const TOUCH_TARGET_PX = 44;
 
 let companyId: string | null = null;
 let administradorRoleId: string | null = null;
@@ -431,7 +439,7 @@ test.describe('las plantillas de WhatsApp de la empresa', () => {
   test.describe('en el telefono', () => {
     test.use({ viewport: PHONE_VIEWPORT, hasTouch: true });
 
-    test('R38, R13: el alta se abre a pantalla completa con «Formulario | Vista previa» y el motivo de una rechazada se lee como texto en la tarjeta', async ({
+    test('R38, R13, R60: el alta se abre a pantalla completa con «Formulario | Vista previa», el motivo de una rechazada se lee como texto en la tarjeta y, en tablet horizontal, se abre tocando el «!»', async ({
       page,
     }) => {
       const credentials = await createAdministrador('movil');
@@ -489,6 +497,21 @@ test.describe('las plantillas de WhatsApp de la empresa', () => {
         await expect(reason).toContainText(REJECTED_REASON);
         // El «!» con globo es de la tabla; en la tarjeta no se ve.
         await expect(page.getByTestId(WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID).filter({ visible: true })).toHaveCount(0);
+      });
+
+      await test.step('R13, R60: en la tablet horizontal tactil, con la tabla, tocar el «!» abre el motivo', async () => {
+        await page.setViewportSize(TABLET_LANDSCAPE_VIEWPORT);
+        const button = page.getByTestId(WHATSAPP_TEMPLATE_REASON_BUTTON_TESTID).filter({ visible: true });
+        await expect(button).toHaveCount(1);
+        await expect(button).toHaveAccessibleName(`Motivo del rechazo: ${REJECTED_REASON}`);
+        const box = await button.boundingBox();
+        expect(box?.width, 'el «!» mide 44 px de ancho').toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
+        expect(box?.height, 'el «!» mide 44 px de alto').toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
+
+        await button.tap();
+        const popover = page.getByTestId(WHATSAPP_TEMPLATE_REASON_POPOVER_TESTID);
+        await expect(popover).toBeVisible();
+        await expect(popover).toHaveText(REJECTED_REASON);
       });
     });
   });
