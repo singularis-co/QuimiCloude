@@ -162,14 +162,37 @@ async function newCompanyId(tx: Prisma.TransactionClient, name: string): Promise
   return (rows[0] as { id: string }).id
 }
 
-// La lista aprobada, ordenada como la devuelve `modelRows` (proveedor y orden).
+// La lista aprobada (veinte modelos), ordenada como la devuelve `modelRows` (proveedor y orden).
 const SEEDED: readonly ModelRow[] = [
-  { provider: 'ANTHROPIC', model_id: 'claude-haiku-5-5', is_default: true, sort_order: 1 },
-  { provider: 'GOOGLE', model_id: 'gemini-3.8-flash', is_default: true, sort_order: 1 },
-  { provider: 'GOOGLE', model_id: 'gemini-3.5-flash-lite', is_default: false, sort_order: 2 },
-  { provider: 'OPENAI', model_id: 'gpt-6-luna', is_default: true, sort_order: 1 },
-  { provider: 'OPENROUTER', model_id: 'anthropic/claude-haiku-5.5', is_default: true, sort_order: 1 },
+  { provider: 'ANTHROPIC', model_id: 'claude-opus-5-5', is_default: false, sort_order: 1 },
+  { provider: 'ANTHROPIC', model_id: 'claude-sonnet-5-5', is_default: false, sort_order: 2 },
+  { provider: 'ANTHROPIC', model_id: 'claude-opus-5', is_default: false, sort_order: 3 },
+  { provider: 'ANTHROPIC', model_id: 'claude-sonnet-5', is_default: false, sort_order: 4 },
+  { provider: 'ANTHROPIC', model_id: 'claude-haiku-5-5', is_default: true, sort_order: 5 },
+  { provider: 'GOOGLE', model_id: 'gemini-4-argon', is_default: false, sort_order: 1 },
+  { provider: 'GOOGLE', model_id: 'gemini-3.8-flash', is_default: true, sort_order: 2 },
+  { provider: 'GOOGLE', model_id: 'gemini-3.7-flash', is_default: false, sort_order: 3 },
+  { provider: 'GOOGLE', model_id: 'gemini-3.5-flash-lite', is_default: false, sort_order: 4 },
+  { provider: 'GOOGLE', model_id: 'gemini-3.1-flash-lite', is_default: false, sort_order: 5 },
+  { provider: 'OPENAI', model_id: 'gpt-6.1-sol', is_default: false, sort_order: 1 },
+  { provider: 'OPENAI', model_id: 'gpt-6-sol', is_default: false, sort_order: 2 },
+  { provider: 'OPENAI', model_id: 'gpt-6-luna-pro', is_default: false, sort_order: 3 },
+  { provider: 'OPENAI', model_id: 'gpt-6-luna', is_default: true, sort_order: 4 },
+  { provider: 'OPENAI', model_id: 'gpt-5.6-luna', is_default: false, sort_order: 5 },
+  { provider: 'OPENROUTER', model_id: 'anthropic/claude-sonnet-5.5', is_default: false, sort_order: 1 },
+  { provider: 'OPENROUTER', model_id: 'openai/gpt-6.1-sol', is_default: false, sort_order: 2 },
+  { provider: 'OPENROUTER', model_id: 'google/gemini-3.8-flash', is_default: false, sort_order: 3 },
+  { provider: 'OPENROUTER', model_id: 'anthropic/claude-haiku-5.5', is_default: true, sort_order: 4 },
+  { provider: 'OPENROUTER', model_id: 'openai/gpt-6-luna', is_default: false, sort_order: 5 },
 ]
+
+// El predeterminado aprobado de cada proveedor.
+const DEFAULTS: Readonly<Record<string, string>> = {
+  ANTHROPIC: 'claude-haiku-5-5',
+  GOOGLE: 'gemini-3.8-flash',
+  OPENAI: 'gpt-6-luna',
+  OPENROUTER: 'anthropic/claude-haiku-5.5',
+}
 
 // Los valores que sembro la migracion de `ai_providers` y que el DOWN debe devolver.
 const PROVIDER_MODELS_BEFORE = [
@@ -238,20 +261,28 @@ describe('migracion ai_models contra Postgres real', () => {
     })
   })
 
-  it('R2: la migracion siembra exactamente la lista aprobada', async () => {
+  it('R2: la migracion siembra exactamente la lista aprobada, cinco por proveedor con orden 1 a 5', async () => {
     await inRolledBackTransaction(async (tx) => {
-      expect(await modelRows(tx)).toEqual(SEEDED)
+      const rows = await modelRows(tx)
+      expect(rows).toHaveLength(20)
+      expect(rows).toEqual(SEEDED)
+      for (const code of ['ANTHROPIC', 'GOOGLE', 'OPENAI', 'OPENROUTER']) {
+        expect(
+          rows.filter((row) => row.provider === code).map((row) => row.sort_order),
+          code,
+        ).toEqual([1, 2, 3, 4, 5])
+      }
     })
   })
 
-  it('R3: cada proveedor tiene exactamente un predeterminado', async () => {
+  it('R3: cada proveedor tiene exactamente un predeterminado y es el aprobado', async () => {
     await inRolledBackTransaction(async (tx) => {
       const providers = await providerRows(tx)
       expect(providers.map((row) => row.code)).toEqual(['ANTHROPIC', 'GOOGLE', 'OPENAI', 'OPENROUTER'])
       const rows = await modelRows(tx)
       for (const { code } of providers) {
         const defaults = rows.filter((row) => row.provider === code && row.is_default)
-        expect(defaults, code).toHaveLength(1)
+        expect(defaults.map((row) => row.model_id), code).toEqual([DEFAULTS[code]])
       }
     })
   })

@@ -47,7 +47,7 @@ export type {
   AiProviderConnectionStatus,
   AiProviderConnectionView,
   AiProviderEntry,
-  AiReadUse,
+  AiModelOption,
 } from './domain/ai-provider';
 export type {
   AiProviderFailure,

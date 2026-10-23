@@ -396,6 +396,7 @@ describe('la forma del modulo integraciones', () => {
     expect(reexports.map((r) => r.name).sort()).toEqual([
       'ActionNotAllowedError',
       'Actor',
+      'AiModelOption',
       'AiProviderCode',
       'AiProviderConnectionOverview',
       'AiProviderConnectionStatus',
@@ -409,7 +410,6 @@ describe('la forma del modulo integraciones', () => {
       'AiProviderReadingResolution',
       'AiProviderStatus',
       'AiProviderTestResult',
-      'AiReadUse',
       'CREATABLE_TEMPLATE_CATEGORIES',
       'ContactLink',
       'IntegracionesError',
@@ -498,6 +498,7 @@ describe('la forma del modulo integraciones', () => {
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
+      'AiModelOption',
       'AiProviderCode',
       'AiProviderConnectionOverview',
       'AiProviderConnectionStatus',
@@ -511,7 +512,6 @@ describe('la forma del modulo integraciones', () => {
       'AiProviderReadingResolution',
       'AiProviderStatus',
       'AiProviderTestResult',
-      'AiReadUse',
       'ContactLink',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
@@ -802,7 +802,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente ocho modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider y AiProviderConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente nueve modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291) y AiProviderConnection', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -818,9 +818,10 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappVariableKey',
       'WhatsappTemplateVariable',
       'AiProvider',
+      'AiModel',
       'AiProviderConnection',
     ])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(8)
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(9)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

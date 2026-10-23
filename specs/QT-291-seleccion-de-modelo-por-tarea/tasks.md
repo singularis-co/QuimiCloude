@@ -7,7 +7,7 @@
 
 ## Bloque A — confirmación y datos
 
-- [ ] **T0. Confirmar la lista de modelos** (sin código; **rehacer**: la tabla de
+- [x] **T0. Confirmar la lista de modelos** (sin código; **rehacer**: la tabla de
   `progress/impl_QT-291.md > T0` es de la lista antigua). Lista aprobada en F1.4: veinte modelos de
   `design.md > 3`. (a) Los cinco de OpenRouter: re-comprobar en
   `https://openrouter.ai/api/v1/models` que existen y que `architecture.input_modalities` trae `file`
@@ -20,7 +20,7 @@
   «pendiente (sin key)». Si un id **responde que no existe** o no lee las dos cosas, **se para y se
   pregunta**.
 
-- [ ] **T1. Esquema y migración** (dep. T0). **Hecho en `418a746f` salvo el seed**: esquema, tabla
+- [x] **T1. Esquema y migración** (dep. T0). **Hecho en `418a746f` salvo el seed**: esquema, tabla
   `ai_models`, borrado de `recipe_model`/`catalog_model`, columnas `model_id`/`unavailable_model` de
   la conexión, guardias y `ai-provider-migration.int.test.ts` no cambian. **Queda:** (a) rehacer el
   `INSERT INTO "ai_models"` de `db/migrations/20261022120000_ai_models/migration.sql` con las veinte
@@ -35,7 +35,7 @@
 
 ## Bloque B — dominio y adaptadores de `integraciones`
 
-- [ ] **T2. Tipos y textos** (dep. T1). `domain/ai-provider.ts` (`AiModelOption`, entrada, registro,
+- [x] **T2. Tipos y textos** (dep. T1). `domain/ai-provider.ts` (`AiModelOption`, entrada, registro,
   vista, `modelInUse`; fuera `AiReadUse`), `domain/ai-provider-failure.ts` (`marksConnection`,
   `modelUnavailableNotice`, `isModelUnavailableNotice`, `isAccountFailureNotice`, texto de modelo no
   disponible de R20).
@@ -43,7 +43,7 @@
   fallo, R28 a nivel de vista, `isAccountFailureNotice` con los textos de key rechazada y cuota de la
   prueba y de la lectura, y que no reconoce los demás).
 
-- [ ] **T3. [P] Adaptadores driven** (dep. T2). `catalog/ai-provider-catalog-prisma.ts` (modelos por
+- [x] **T3. [P] Adaptadores driven** (dep. T2). `catalog/ai-provider-catalog-prisma.ts` (modelos por
   proveedor, descarta proveedor sin predeterminado), `persistence/ai-provider-connection-prisma.ts`
   (dos campos, P2003), puerto del repositorio.
   *Hecho:* `ai-provider-connection-prisma.int.test.ts` en verde con los campos nuevos.

@@ -1,5 +1,6 @@
 import {
   isAccountFailure,
+  READING_FAILURE_PREFIX,
   readingFailureMessage,
   type AiProviderFailure,
 } from './ai-provider-failure';
@@ -17,8 +18,6 @@ export type ReportAiProviderOutcomeDeps = {
 export type AiProviderReadingOutcome =
   | { readonly kind: 'account_failure'; readonly failure: AiProviderFailure }
   | { readonly kind: 'recovered' };
-
-export const READING_FAILURE_PREFIX = 'La última lectura falló: ';
 
 /**
  * Solo un fallo de la cuenta marca la conexión; la red, el plazo o un modelo caído no dicen nada
