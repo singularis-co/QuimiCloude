@@ -756,6 +756,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // 2026-10-14: entran `createGetInventoryImportTemplate` (plantilla .xlsx con la hoja de valores
     // disponibles) y `createGetInventoryImportValues` (los mismos valores en la pantalla), y el
     // barrel pasa de veinticuatro a veintiseis.
+    // 2026-10-23 (QC-203): entra `createFindSupplyHomonyms` (los homonimos del alta de insumo por
+    // familia de unidad, que alimentan el aviso de conversion, R11-R13), y el barrel pasa de
+    // veintiseis a veintisiete. No es una ruta HTTP: la consume una server action.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
@@ -767,6 +770,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createCreateRawMaterial',
       'createDeletePresentation',
       'createDeleteProduct',
+      'createFindSupplyHomonyms',
       'createGetFinishedProduct',
       'createGetInventoryImportTemplate',
       'createGetInventoryImportValues',
