@@ -1,6 +1,7 @@
 # QC-245 — contactos-whatsapp-backend · tasks.md
 
-> Requisitos R1–R43 (`requirements.md`), diseño en `design.md`. `[P]` = puede ir en paralelo con las
+> Requisitos R1–R59 (`requirements.md`; R44–R59 y T10–T17 son la Enmienda 1 del 2026-10-23,
+> `design.md > 15`), diseño en `design.md`. `[P]` = puede ir en paralelo con las
 > otras `[P]` de su tanda. Cada tarea cierra con `pnpm run typecheck`, `pnpm run lint` y
 > `pnpm exec vitest related --run <archivos tocados>`; las que tocan módulos, además
 > `pnpm exec vitest run guard`. Nadie corre `pnpm test`.
@@ -102,6 +103,105 @@
     los casos.
   - **Hecho:** todo verde; ningún `R<n>` sin test.
 
+## Enmienda 1 (2026-10-23) — archivo de medios, reacciones y contexto del chat
+
+> Al enmendar, ninguna tarea estaba marcada como hecha (T1 a medias, sin commit): **ninguna tarea
+> hecha cambia de comportamiento**. T10–T17 van después de las existentes. T13, T14 y T16 modifican
+> lo que producen T4, T5 y T7: si al llegar a ellas esas tareas aún no están cerradas, se pueden
+> hacer en el mismo commit, pero cada tarea se marca por separado. T9 se repite al final como T17.
+
+### Tanda 6 — servicios de otros módulos y Graph (sin dependencias entre sí)
+
+- [ ] **T10 [P] `identity`: `getCompanyName`** (R56; design §15.5).
+  - `domain/get-company-name.ts`, `ports/company-name-reader.ts`,
+    `adapters/driven/persistence/company-name-prisma.ts`, barril, composición
+    (`identity.getCompanyName`).
+  - Tests `tests/unit/identity/get-company-name.test.ts` y
+    `tests/integration/identity/company-name-read.int.test.ts` (+ `aislamiento.json`).
+  - **Hecho:** devuelve el nombre de la empresa viva; dada de baja o inexistente ⇒ `null`; patrón
+    idéntico a `getCompanyCountry`.
+
+- [ ] **T11 [P] `pedidos`: `CustomerOrderDirectory`** (R51, R54, P15; design §15.4).
+  - `domain/customer-order-directory.ts`, `adapters/driven/persistence/customer-order-directory-prisma.ts`
+    (archivo nuevo, no `order-catalog-prisma.ts`), barril, composición.
+  - Tests `tests/integration/pedidos/customer-order-directory.int.test.ts` (+ `aislamiento.json`);
+    tensar `tests/unit/pedidos/module-contract.test.ts`.
+  - **Hecho:** solo vivos de ese cliente y empresa; excluye los estados pedidos; orden `created_at`
+    DESC, `id` DESC; respeta `limit`; un cliente de otra empresa da `[]`. `OrderCatalog` sin cambios.
+
+- [ ] **T12 [P] Graph: `downloadMedia`** (R45–R47; design §15.1).
+  - `ports/whatsapp-graph-client.ts` (+ `GraphMediaDownload`), `whatsapp-graph-client-fetch.ts`
+    (dos pasos, host `.fbsbx.com`, tope por `file_size`, `Content-Length` y stream),
+    `whatsapp-graph-client-canned.ts` (PNG fijo).
+  - Tests `tests/unit/integraciones/whatsapp/whatsapp-graph-client-media.test.ts`; ampliar
+    `whatsapp-graph-client-canned.test.ts`.
+  - **Hecho:** el token va solo en `Authorization` y nunca a un host que no sea de Meta; 5xx/red ⇒
+    `unreachable`, 4xx ⇒ `rejected`; más de `maxBytes` ⇒ `rejected` sin descargar o con el stream
+    cortado; nada de la URL ni del token en logs.
+
+### Tanda 7 — dominio y adaptador (dependen de T4 y T5)
+
+- [ ] **T13 Dominio puro de la enmienda** (R25, R48, R49, R52, R53, R55, R56). Depende de T4.
+  - `domain/whatsapp-media.ts` (constantes, `mediaUrlOf`, `mediaIdOf`, `isViewableMedia`).
+  - `domain/whatsapp-conversation.ts`: `attachmentOf` con `mediaUrl` y reacción por
+    `reactedMessageId`; tipos del §B v2.
+  - `domain/whatsapp-chat-context.ts` (`WHATSAPP_SYSTEM_CONSTANT_KEYS`, `customerOrderOf`,
+    `contextValuesOf`, tipos), `whatsapp-conversation-input.ts` (+ `CUSTOMER_ORDERS_LIMIT`,
+    `getWhatsappChatContextSchema`, `getWhatsappMediaSchema`), `errors.ts`
+    (+ `WhatsappOrderNotFoundError`).
+  - Tests `whatsapp-media.test.ts`, `whatsapp-chat-context.test.ts`; ampliar
+    `whatsapp-conversation.test.ts` y `whatsapp-conversation-input.test.ts`.
+  - **Hecho:** sin imports prohibidos en `domain/`; `media_id` y `wamid` no salen en ningún tipo;
+    envases iguales a `orderedPackages`/`remainingPackages`; valores nulos, nunca `''` ni ausentes;
+    tipos idénticos al §B v2 del contrato.
+
+- [ ] **T14 Adaptador de conversaciones** (R44, R49, R57). Depende de T5 y T13.
+  - `ports/whatsapp-conversation-repository.ts`: `ChatMessageRow.reactedMessageId`,
+    `findMediaMessage` (8 métodos). `whatsapp-conversation-prisma.ts`: `LEFT JOIN` de la reacción
+    (§15.2) y `findMediaMessage` con ámbito.
+  - Ampliar `whatsapp-conversation-prisma.int.test.ts`; tensar
+    `guard-ambito-empresa-integraciones.test.ts` (8 métodos); doble en `whatsapp-doubles.ts`.
+  - **Hecho:** reacción a un mensaje del contacto ⇒ su id; a uno de otro contacto o inexistente ⇒
+    `null`; `findMediaMessage` de otra empresa u otra conexión ⇒ `null`; guardia verde.
+
+### Tanda 8 — casos de uso (dependen de T6 y T10–T14)
+
+- [ ] **T15 Casos de uso `getWhatsappMedia` y `getWhatsappChatContext`** (R44–R46, R50–R57).
+  - `domain/get-whatsapp-media.ts`, `domain/get-whatsapp-chat-context.ts`; `resolveChatCustomer`
+    compartido con `get-whatsapp-chat.ts` (sin cambiar su comportamiento: los tests de T6 siguen
+    verdes sin tocarlos).
+  - Tests `get-whatsapp-media.test.ts`, `get-whatsapp-chat-context.test.ts`.
+  - **Hecho:** sin permiso ningún puerto se toca; cada rama de «no encontrado» del archivo no llama a
+    Graph; token ilegible o Graph fallido ⇒ `unavailable`; `orderId` ajeno ⇒ `order_not_found`;
+    sin pedidos ⇒ `selectedOrderId: null` y `pedido.numero: null`; el contexto no llama a ningún
+    método que escriba (espías); tres lecturas por lote para los pedidos.
+
+### Tanda 9 — borde y cableado (depende de T7 y T15)
+
+- [ ] **T16 Composición, acción y ruta** (R47, R58).
+  - `lib/composition/index.ts` (§15.6), `integraciones/index.ts`,
+    `whatsapp-conversation-actions.ts` (+ `getWhatsappChatContextAction`: cinco acciones),
+    `adapters/driving/whatsapp-media-route.ts`,
+    `app/api/integraciones/whatsapp/media/[mensajeId]/route.ts`.
+  - Test `whatsapp-media-route.test.ts` (estados, cabeceras, sin cuerpo en 404/502, logs); ampliar
+    `whatsapp-conversation-actions.test.ts`.
+  - Tensar `module-shape.test.ts`, `guard-rutas-fuera-de-sesion.test.ts` (la ruta, `anadido:
+    'integraciones'`), `session-once-per-request-actions.test.ts` (la acción y el `GET`; si T7 no
+    registró `whatsapp-conversation-actions.ts`, se registra aquí).
+  - **Hecho:** guardias verdes; firmas y tipos idénticos al §A/§B v2 del contrato; la respuesta 200
+    lleva `Cache-Control: private, max-age=3600` y `X-Content-Type-Options: nosniff`.
+
+- [ ] **T17 Integración del flujo y cierre de la enmienda** (R44, R45, R49, R51–R57, R59). Depende de
+  T8 y T16.
+  - `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` sobre la composición
+    real con Graph doble (+ `aislamiento.json`): imagen entrante servida; otra empresa, cliente dado
+    de baja y audio ⇒ 404; reacción casada con su mensaje; contexto con pedidos, envases, número y
+    valores; `orderId` ajeno rechazado; marca de lectura intacta tras pedir el contexto.
+  - Repetir T9 sobre todo el diff y actualizar el mapa `R<n> → test` de `progress/impl_QC-245.md`
+    con R44–R59.
+  - **Hecho:** todo verde; ningún R44–R59 sin test. El leader republica el §«Contrato para la
+    pantalla» en QC-246.
+
 ## Mapa R → test (previsto)
 
 | R | Test |
@@ -139,6 +239,20 @@
 | R40, R41 | `whatsapp-conversation-actions.test.ts` |
 | R42 | `whatsapp-contacts-last-read-migration.int.test.ts` |
 | R43 | `whatsapp-conversations-flow.int.test.ts` (y los unitarios de T6) |
+| R44 | `get-whatsapp-media.test.ts`, `whatsapp-media-route.test.ts`, `whatsapp-conversation-prisma.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R45 | `get-whatsapp-media.test.ts`, `whatsapp-graph-client-media.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R46 | `get-whatsapp-media.test.ts`, `whatsapp-graph-client-media.test.ts`, `whatsapp-media-route.test.ts` |
+| R47 | `whatsapp-media-route.test.ts`, `whatsapp-graph-client-media.test.ts` |
+| R48 | `whatsapp-media.test.ts`, `whatsapp-conversation.test.ts` |
+| R49 | `whatsapp-conversation.test.ts`, `whatsapp-conversation-prisma.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R50 | `get-whatsapp-chat-context.test.ts` |
+| R51 | `get-whatsapp-chat-context.test.ts`, `customer-order-directory.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R52, R53 | `whatsapp-chat-context.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R54 | `get-whatsapp-chat-context.test.ts`, `customer-order-directory.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R55, R56 | `whatsapp-chat-context.test.ts`, `get-company-name.test.ts`, `company-name-read.int.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R57 | `get-whatsapp-chat-context.test.ts`, `whatsapp-chat-context-flow.int.test.ts` |
+| R58 | `whatsapp-conversation-actions.test.ts`, `whatsapp-media-route.test.ts`, `module-shape.test.ts` |
+| R59 | `whatsapp-chat-context-flow.int.test.ts` (y los unitarios de T12–T15) |
 
 ## Archivos esperados
 
@@ -187,3 +301,35 @@
 - `tests/integration/integraciones/whatsapp-conversations-flow.int.test.ts`
 - `tests/integration/aislamiento.json`
 - `progress/impl_QC-245.md`
+- `app/api/integraciones/whatsapp/media/[mensajeId]/route.ts`
+- `lib/modules/identity/index.ts`
+- `lib/modules/identity/domain/get-company-name.ts`
+- `lib/modules/identity/ports/company-name-reader.ts`
+- `lib/modules/identity/adapters/driven/persistence/company-name-prisma.ts`
+- `lib/modules/pedidos/index.ts`
+- `lib/modules/pedidos/domain/customer-order-directory.ts`
+- `lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma.ts`
+- `lib/modules/integraciones/domain/errors.ts`
+- `lib/modules/integraciones/domain/whatsapp-media.ts`
+- `lib/modules/integraciones/domain/get-whatsapp-media.ts`
+- `lib/modules/integraciones/domain/whatsapp-chat-context.ts`
+- `lib/modules/integraciones/domain/get-whatsapp-chat-context.ts`
+- `lib/modules/integraciones/ports/whatsapp-graph-client.ts`
+- `lib/modules/integraciones/ports/company-name-lookup.ts`
+- `lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-fetch.ts`
+- `lib/modules/integraciones/adapters/driven/graph/whatsapp-graph-client-canned.ts`
+- `lib/modules/integraciones/adapters/driving/whatsapp-media-route.ts`
+- `tests/unit/identity/get-company-name.test.ts`
+- `tests/integration/identity/company-name-read.int.test.ts`
+- `tests/unit/identity/session-once-per-request-actions.test.ts`
+- `tests/unit/pedidos/module-contract.test.ts`
+- `tests/integration/pedidos/customer-order-directory.int.test.ts`
+- `tests/unit/integraciones/whatsapp/whatsapp-graph-client-media.test.ts`
+- `tests/unit/integraciones/whatsapp/whatsapp-graph-client-canned.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/whatsapp-media.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/whatsapp-chat-context.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/get-whatsapp-media.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/get-whatsapp-chat-context.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/whatsapp-media-route.test.ts`
+- `tests/guards/guard-rutas-fuera-de-sesion.test.ts`
+- `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts`

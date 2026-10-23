@@ -150,7 +150,8 @@ Vocabulario:
 - **R25.** La metadata del adjunto DEBE incluir solo lo que describe el mensaje sin descargarlo:
   tipo MIME, nombre de archivo y pie en imagen, audio, video, documento y sticker; latitud, longitud,
   nombre y dirección en ubicación; emoji y mensaje al que reacciona en reacción. NO DEBE incluir el
-  identificador del archivo en Meta.
+  identificador del archivo en Meta. *(Enmienda 1: el mensaje al que reacciona se identifica por su
+  id interno, R49; los medios visibles llevan además la dirección de su archivo, R48.)*
 - **R26.** CUANDO un mensaje fallido tiene código de error, el sistema DEBE devolver como motivo el
   texto en español de la tabla de QC-240 para ese código, y NO DEBE devolver el texto original de
   Meta. SI no tiene código, ENTONCES DEBE devolver el motivo guardado o, si no lo hay, «No se pudo
@@ -209,15 +210,106 @@ Vocabulario:
 - **R43.** El sistema DEBE verificar las consultas con tests unitarios de los casos de uso y tests de
   integración contra la base de test; esta ficha no tiene E2E de navegador (lo trae QC-246).
 
+### Enmienda 1 (2026-10-23): lo que añade la pantalla ampliada de QC-246
+
+El humano pidió «actualiza el spec y el contrato» el 2026-10-23, después de ampliar la ficha de
+QC-246 con sus decisiones D5–D7 (aquí D6–D8); el mismo día cerró D9–D11. Esa ampliación cambia una
+línea de «Lo que NO entra»:
+**las imágenes y los stickers entrantes se sirven** (D7). Audio, video y documentos siguen sin
+descargarse.
+
+Vocabulario añadido:
+
+- **Medio visible:** mensaje entrante de tipo imagen o sticker que guarda el identificador de su
+  archivo en Meta.
+- **Pedidos del cliente:** sus pedidos vivos (sin baja) de la empresa del actor, salvo los
+  cancelados; los 20 de fecha de solicitud más reciente, de más reciente a más antiguo (P15).
+- **Pedido elegido:** el que indica la pantalla o, si no indica ninguno, el primero de los pedidos
+  del cliente.
+- **Contexto del chat:** los pedidos del cliente, el pedido elegido y los valores por defecto de
+  las variables de plantilla, para un contacto o un cliente.
+
+#### Archivo de un medio
+
+- **R44.** CUANDO se pide el archivo de un mensaje, el sistema DEBE exigir sesión con
+  `whatsapp.consultar` y que el mensaje sea un medio visible de un contacto de la conexión de la
+  empresa vinculado a un cliente activo. SI falta cualquiera de esas condiciones, ENTONCES DEBE
+  responder «no encontrado» (HTTP 404) sin cuerpo, igual en todos los casos, y sin llamar a Meta.
+- **R45.** CUANDO se pide el archivo de un medio visible de la empresa, el sistema DEBE descargarlo
+  de Meta con el token de la conexión y devolverlo con su tipo de contenido, sin guardarlo en
+  ningún almacenamiento propio (D9).
+- **R46.** SI el token no se puede leer, Meta no responde o rechaza la descarga, el archivo supera
+  5 MB o su tipo no es `image/jpeg`, `image/png` ni `image/webp`, ENTONCES el sistema DEBE responder
+  «no disponible» (HTTP 502) sin cuerpo y sin guardar ninguna parte del archivo.
+- **R47.** El sistema NO DEBE devolver en ninguna respuesta el identificador del archivo en Meta, la
+  URL de descarga de Meta ni el token. La respuesta con el archivo DEBE marcarse como privada para
+  la caché y NO DEBE poder interpretarse como otro tipo de contenido.
+- **R48.** El sistema DEBE devolver en el adjunto de cada medio visible la dirección de la
+  aplicación desde la que se pide su archivo; en los demás adjuntos de medio (audio, video,
+  documento, o imagen o sticker sin archivo) esa dirección DEBE ser nula.
+
+#### Reacciones
+
+- **R49.** El sistema DEBE identificar el mensaje al que reacciona una reacción por el
+  identificador interno con que ese mensaje aparece en el chat, cuando está guardado en el mismo
+  contacto; SI no lo está, ENTONCES DEBE devolverlo nulo. NO DEBE devolver el identificador de Meta
+  (`wamid`) en ningún mensaje del chat.
+
+#### Contexto del chat
+
+- **R50.** CUANDO un actor pide el contexto del chat, el sistema DEBE exigir `whatsapp.consultar`
+  antes de validar la entrada o tocar ningún puerto (`unauthorized`, R4) y aplicar las reglas de
+  existencia de leer el chat: por contacto, las de R21 (`whatsapp_contact_not_found`, también sin
+  conexión); por cliente, las de R30 (`customer_not_found`), sin depender de la conexión.
+- **R51.** El sistema DEBE devolver con el contexto los pedidos del cliente, cada uno con:
+  identificador, número visible, estado, fecha de solicitud, total, nombre del producto y, por cada
+  línea de su reparto en orden de alta, la presentación (identificador y nombre), los envases
+  pedidos, los entregados y los que faltan por entregar. NO DEBE devolver fecha de entrega (D10).
+- **R52.** Los envases de cada línea DEBEN coincidir con los que muestra Pedidos: pedidos = los que
+  el pedido espera de esa línea (el conteo del empaque si lo hay, menos el excedente), entregados =
+  los entregados sin contar lo anulado, y por entregar = el mayor entre 0 y pedidos − entregados.
+- **R53.** El sistema DEBE devolver el total nulo en todos los pedidos mientras el precio de venta del
+  pedido no exista en el sistema (D11).
+- **R54.** DONDE la consulta indica un pedido, el sistema DEBE tomarlo como pedido elegido; SI no
+  está entre los pedidos del cliente (inexistente, de otro cliente, de otra empresa, dado de baja,
+  cancelado o fuera de los 20), ENTONCES DEBE responder `order_not_found` sin devolver datos. Sin
+  pedidos del cliente, el pedido elegido DEBE ser nulo.
+- **R55.** El sistema DEBE devolver con el contexto un objeto de valores con una entrada por cada
+  constante del catálogo del sistema —`cliente.nombre`, `empresa.nombre` y `pedido.numero` (P18)— y
+  una por cada variable propia de la empresa, con su clave.
+- **R56.** El valor de `cliente.nombre` DEBE ser los nombres y apellidos del cliente; el de
+  `empresa.nombre`, el nombre de la empresa del actor; el de `pedido.numero`, el número visible del
+  pedido elegido; el de cada variable propia, su valor vigente. SI un valor no se puede resolver,
+  ENTONCES su entrada DEBE ser nula: nunca omitida ni una cadena vacía.
+- **R57.** Pedir el contexto NO DEBE escribir nada ni mover la marca de lectura, y DEBE limitarse a
+  la empresa del actor: un contacto, cliente o pedido de otra empresa DEBE tratarse como
+  inexistente.
+
+#### Entrega y verificación
+
+- **R58.** El sistema DEBE ofrecer el contexto como Server Action con la forma de R40 y el archivo
+  como ruta HTTP `GET` de la aplicación, utilizable directamente como fuente de una imagen con la
+  sesión del navegador. Ninguna de las dos DEBE escribir en el log el cuerpo de los mensajes, el
+  número, el nombre del cliente ni el identificador del archivo.
+- **R59.** El sistema DEBE verificar la enmienda con tests unitarios (dominio, casos de uso, cliente
+  de Graph y ruta, con Graph doble) y de integración contra la base de test (pedidos del cliente,
+  nombre de la empresa, mensajes de medio y reacciones, y el flujo completo).
+
 ### Cobertura de las decisiones cerradas
 
 | Decisión | Requisitos |
 |---|---|
-| D1 `whatsapp.consultar` solo para el Administrador | R1–R5 |
-| D2 Solo contactos vinculados a un cliente activo | R6, R21, R30, R38 |
-| D3 No leídos compartidos por empresa (`lastReadAt` en el contacto) | R14–R20 |
+| D1 `whatsapp.consultar` solo para el Administrador | R1–R5, R44, R50 |
+| D2 Solo contactos vinculados a un cliente activo | R6, R21, R30, R38, R44, R50 |
+| D3 No leídos compartidos por empresa (`lastReadAt` en el contacto) | R14–R20, R57 |
 | D4 La plantilla se valida contra el catálogo aquí | R32, R35 (validación de QC-240, P2) |
-| D5 Cliente borrado: chat oculto, mensajes conservados | R36–R38 |
+| D5 Cliente borrado: chat oculto, mensajes conservados | R36–R38, R44 |
+| D6 Plantillas sin pedir variables: el back da los valores por defecto y el pedido elegido | R50, R54–R56 |
+| D7 Imágenes y stickers se ven; el resto de adjuntos, no | R44–R48 |
+| D8 Detalle del pedido por presentación × envases, entregado y faltante | R51, R52 |
+| D9 Medios por proxy en cada vista, nada guardado | R45, R46 |
+| D10 Sin fecha de entrega | R51 |
+| D11 `total: null` hasta QC-307 | R53 |
 
 ## Preguntas abiertas
 
@@ -262,6 +354,26 @@ requisito citado antes de aprobar.
 - **P13 — Reacciones entrantes.** **Default:** cuentan como mensaje entrante: suben a último mensaje
   y suman no leídos (R8, R15).
 
+Abiertas por la Enmienda 1 (2026-10-23):
+
+- **P14 — Medios: proxy o copia propia.** Cerrada por el humano el 2026-10-23: D9.
+- **P15 — Qué pedidos van al selector.** **Default:** los vivos del cliente salvo los cancelados, los
+  20 de fecha de solicitud más reciente, el más reciente primero (vocabulario de la Enmienda 1,
+  R51, R54). Alternativas: incluir los cancelados, o solo los que no están entregados.
+- **P16 — Fecha de entrega.** Cerrada por el humano el 2026-10-23: D10.
+- **P17 — Total del pedido.** Cerrada por el humano el 2026-10-23: D11.
+- **P18 — Catálogo de constantes del sistema.** El único catálogo escrito es el del front de QC-243
+  (`design.md > 5`): `cliente.nombre`, `empresa.nombre`, `pedido.numero`. **Default:** el back
+  resuelve esas tres (R55). Los datos permitirían además `cliente.nombres`, `cliente.apellidos`,
+  `cliente.ciudad`, `cliente.correo`, `cliente.direccion`, `empresa.telefono`, `empresa.correo`,
+  `pedido.estado`, `pedido.fecha_solicitud` y `pedido.total` (siempre nulo, D11); no
+  `pedido.fecha_entrega` (D10). Ampliar el catálogo exige cambiarlo también en el front de
+  plantillas.
+- **P19 — Pedidos con solo `whatsapp.consultar`.** El contexto enseña número, estado, producto y
+  envases de los pedidos del cliente a quien tenga `whatsapp.consultar`, aunque no tenga
+  `pedidos.consultar`. **Default:** basta `whatsapp.consultar` (hoy solo el Administrador, que tiene
+  los dos, D1). Si otro rol recibe el permiso, se revisa.
+
 ## Decisiones cerradas (no reabrir)
 
 Copiadas de la ficha (`feature_list.json > QC-245`).
@@ -273,3 +385,9 @@ Copiadas de la ficha (`feature_list.json > QC-245`).
 | D3 | No leídos compartidos por empresa (`lastReadAt` en el contacto) | Con un solo rol que atiende, no hace falta llevarlo por usuario. |
 | D4 | La plantilla se valida contra el catálogo aquí | El error se da antes de llamar a Meta, con un mensaje claro. |
 | D5 | Cliente borrado: chat oculto, mensajes conservados | No se pierde historial por un borrado lógico. |
+| D6 | (2026-10-23, de D5 de QC-246, decisión del humano) Las plantillas no piden variables: el back entrega los valores por defecto (constantes del sistema y variables propias) y los pedidos del cliente, y el valor de `pedido.*` sale del pedido elegido | Menos pasos para el usuario; los datos ya están en el sistema. |
+| D7 | (2026-10-23, de D6 de QC-246, decisión del humano) Imágenes y stickers entrantes se sirven a la pantalla; audio, video y documentos siguen sin descargarse | Son los adjuntos que el usuario necesita mirar para responder. |
+| D8 | (2026-10-23, de D7 de QC-246, decisión del humano) El detalle del pedido da, por línea, la presentación × envases pedidos, los entregados y los que faltan, no litros | Es como se piensa y se despacha un pedido. |
+| D9 | (2026-10-23, decisión del humano) El archivo de una imagen o un sticker se descarga de Meta en cada vista y no se guarda nada. Que la imagen deje de verse cuando Meta la caduca (unos 30 días) se acepta. Guardarla en Storage es la alternativa descartada | Sin almacenamiento ni datos nuevos que custodiar; basta para responder conversaciones recientes. |
+| D10 | (2026-10-23, decisión del humano) Sin fecha de entrega: el contrato no tiene ese campo y el detalle del pedido no la muestra | El pedido no tiene esa fecha en la base. |
+| D11 | (2026-10-23, decisión del humano) `total: null` hasta que entre QC-307; QC-245 no la espera. El campo sigue en el contrato y la pantalla lo oculta si es nulo | No bloquear la ficha por otra en curso; el contrato no cambia cuando llegue el precio. |

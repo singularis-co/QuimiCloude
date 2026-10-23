@@ -3,7 +3,8 @@
 > Zona: `backend` · Complejidad: `medium` · depends_on: QC-240, QC-242 · Rama:
 > `feature/QC-245-contactos-whatsapp-backend`
 >
-> El **qué** está en `requirements.md` (R1–R43). Aquí va el **cómo**. Precedentes que se copian:
+> El **qué** está en `requirements.md` (R1–R43; la Enmienda 1 del 2026-10-23 añade R44–R59, cuyo
+> cómo está en §15). Aquí va el **cómo**. Precedentes que se copian:
 >
 > - **QC-240** (`db/migrations/20261023120000_whatsapp_send_permission`): migración de datos del
 >   permiso, permiso dentro del añadido `integraciones`, `requireSendPermission`, las dos Server
@@ -52,6 +53,26 @@ leídos», «chat», `listWhatsappConversations`, `sendWhatsappMessage`, «plant
 Conclusión: el envío existe y se reutiliza; las consultas no existen. Se sigue. La feature no toca
 UI: no se consulta `components/shared/CATALOGO.md` y no hay pase `/design`.
 
+**Enmienda 1 (2026-10-23).** Buscado además «media», `media_id`, `wamid`, «reacción», «constantes
+del sistema», `cliente.nombre`, «pedidos del cliente», «nombre de la empresa», «fecha de entrega» y
+«total» en `specs/`, `lib/`, `app/` y `db/` con Grep/Read (el grafo, de nuevo, no se consultó):
+
+| Apareció | Qué es | Qué se hace |
+|---|---|---|
+| `whatsapp-inbound-message.ts`: `payload.media_id` en imagen, sticker, audio, video y documento; `payload.message_id` (= `wamid`) en reacción | Lo que hay para pedir un archivo y para casar una reacción | `media_id` solo lo lee el caso de uso del archivo (R47); la reacción se casa en SQL por `wamid` (único) dentro del contacto (R49) |
+| `whatsapp-graph-client-fetch.ts` (`callGraph`, token solo en cabecera, `GRAPH_TIMEOUT_MS`) y su doble `whatsapp-graph-client-canned.ts` | Cliente de Graph | Gana `downloadMedia` (§15.2); el doble, un PNG fijo |
+| `decryptStoredSecret` + `ACCESS_TOKEN_FIELD` (QC-240, `send-whatsapp-message.ts`) | Leer el token de la conexión | **Se reutiliza** para la descarga |
+| `app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts` (reexport de un driving) y `guard-rutas-fuera-de-sesion.test.ts` | Forma de una ruta de `app/api` | **Se copia** la forma; la ruta nueva entra en la guardia como del añadido `integraciones` |
+| Ningún archivo servido a un usuario con sesión desde una ruta (`createSignedUrl` solo en Storage de documentos y evidencias) | — | Nace aquí (§15.1) |
+| QC-243 `design.md > 5`: catálogo de constantes del front, `cliente.nombre`, `pedido.numero`, `empresa.nombre` | El único catálogo de constantes escrito | **Manda** (R55, P18). QC-242 F4 fija el formato con punto; QC-247 (`pending`) menciona `pedido.fecha_entrega`, sin código |
+| `OrderCatalog.listDeliveryProgressByIdsIncludingDeleted`, `orderedPackages`, `remainingPackages`, `formatOrderNumber` (contrato de `pedidos`) | Envases por línea, entregados y faltantes; número visible | **Se reutilizan** (R51, R52) |
+| `OrderCatalog` no lista por cliente; `orders_company_id_customer_id_idx` existe | — | Servicio nuevo `CustomerOrderDirectory` en `pedidos` (§15.4) |
+| `PresentationCatalog.findRefs` (`inventario`), `RecipeCatalog.findRefsIncludingDeleted` (`recetas`) | Nombre de la presentación y del producto | **Se reutilizan** |
+| `identity.getCompanyCountry` (dato de presentación de la propia empresa, sin permiso) | Precedente de lectura de un campo de la empresa | **Se copia** para `getCompanyName` (§15.5) |
+| `WhatsappVariableKeyRepository.listAll` (QC-242) | Variables propias con valor | **Se reutiliza** (R56) |
+| Fecha de entrega o prometida en `orders` | No existe | Fuera del contrato (D10) |
+| QC-307 (`in_progress`, sin mergear): precio de venta del pedido | Total del pedido | No se espera: `total: null` (D11) |
+
 ---
 
 ## 1. Qué cambia (resumen)
@@ -84,6 +105,9 @@ lib/modules/integraciones/
 lib/composition/index.ts                                  ← cableado
 tests/**                                                  ← §10
 ```
+
+Lo que añade la Enmienda 1 (archivo de un medio, reacciones por id interno, contexto del chat) está
+en §15.0.
 
 ---
 
@@ -362,270 +386,265 @@ vista campo a campo. Sin `revalidatePath` (no hay pantalla todavía). Se importa
 
 ## Contrato para la pantalla (QC-246)
 
-> Sección autocontenida para copiar en la ficha de QC-246. Lo marcado **[ABIERTO]** depende de una
-> pregunta de `requirements.md > Preguntas abiertas`; se indica su default, que es lo que se
-> implementa si el humano no dice otra cosa.
+> Autocontenido, para copiar tal cual en la ficha de QC-246. **Versión 2, 2026-10-23 (Enmienda 1):**
+> archivo de imágenes y stickers, reacciones por id interno, `getWhatsappChatContextAction` con pedidos
+> y valores por defecto. **[ABIERTO Pn]** = depende de una pregunta abierta del spec; vale su default.
 
-### A. Server Actions
+### A. Acciones y ruta
 
-Todas se llaman desde un componente de cliente o de servidor importándolas por su **ruta exacta**
-(no desde `@/lib/modules/integraciones`). Los tipos DTO se importan desde `@/lib/modules/integraciones`.
+Las acciones se importan por su **ruta exacta**; los tipos, desde `@/lib/modules/integraciones`.
+`CONV` = `@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions`;
+`MSG` = `@/lib/modules/integraciones/adapters/driving/whatsapp-message-actions`.
 
-| Acción | Ruta de import | Permiso | Origen |
+| Qué | Dónde | Permiso | Origen |
 |---|---|---|---|
-| `listWhatsappConversationsAction` | `@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions` | `whatsapp.consultar` | nueva |
-| `getWhatsappChatAction` | `@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions` | `whatsapp.consultar` | nueva |
-| `markWhatsappChatReadAction` | `@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions` | `whatsapp.consultar` | nueva |
-| `listSendableWhatsappTemplatesAction` | `@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions` | `whatsapp.consultar` | nueva |
-| `sendWhatsappMessageAction` | `@/lib/modules/integraciones/adapters/driving/whatsapp-message-actions` | `whatsapp.enviar` | QC-240 (ya existe) |
-| `retryWhatsappMessageAction` | `@/lib/modules/integraciones/adapters/driving/whatsapp-message-actions` | `whatsapp.enviar` | QC-240 (ya existe) |
+| `listWhatsappConversationsAction` | `CONV` | `whatsapp.consultar` | nueva |
+| `getWhatsappChatAction` | `CONV` | `whatsapp.consultar` | nueva |
+| `markWhatsappChatReadAction` | `CONV` | `whatsapp.consultar` | nueva |
+| `listSendableWhatsappTemplatesAction` | `CONV` | `whatsapp.consultar` | nueva |
+| `getWhatsappChatContextAction` | `CONV` | `whatsapp.consultar` | nueva (v2) |
+| `GET /api/integraciones/whatsapp/media/<messageId>` | la URL llega hecha en `attachment.mediaUrl` | `whatsapp.consultar` | nueva (v2) |
+| `sendWhatsappMessageAction` | `MSG` | `whatsapp.enviar` | QC-240, ya en `dev` |
+| `retryWhatsappMessageAction` | `MSG` | `whatsapp.enviar` | QC-240, ya en `dev` |
 
-Ambos permisos son hoy solo del Administrador y desaparecen si la empresa tiene apagado el añadido
-«Integraciones».
+Los dos permisos son hoy solo del Administrador y desaparecen con el añadido «Integraciones» apagado.
 
 ```ts
-// ---- Forma de error común (de `@/lib/modules/errores`) ----
-type ErrorState =
-  | { status: 'error'; code: ErrorCode; message: string }                         // message en español
-  | { status: 'error'; code: 'unexpected'; message: string; reference: string };  // reference = id de la petición
-
+type ErrorState = // de @/lib/modules/errores; message en español
+  | { status: 'error'; code: ErrorCode; message: string }
+  | { status: 'error'; code: 'unexpected'; message: string; reference: string };
 type ActionResult<T> = { status: 'success'; data: T } | ErrorState;
+type ChatTarget = { contactId: string } | { customerId: string }; // uuid
 
-// ---- Nuevas ----
-export async function listWhatsappConversationsAction(input: {
-  search?: string;                                   // ≤ 100 caracteres; '' o solo espacios = sin búsqueda
-  blocked?: 'all' | 'blocked' | 'not_blocked';       // [ABIERTO P7] default 'all'
-  page?: number;                                     // entero ≥ 1, default 1
-  pageSize?: number;                                 // entero ≥ 1; default 10, se acota a 25 [ABIERTO P12]
+listWhatsappConversationsAction(input: {
+  search?: string; // ≤ 100; '' o espacios = sin búsqueda
+  blocked?: 'all' | 'blocked' | 'not_blocked'; // default 'all' [ABIERTO P7]
+  page?: number; // ≥ 1, default 1
+  pageSize?: number; // default 10, tope 25 [ABIERTO P12]
 }): Promise<ActionResult<WhatsappConversationList>>;
 
-export async function getWhatsappChatAction(input: {
-  target: { contactId: string } | { customerId: string };   // uuid
-  before?: string;                                   // cursor: id del mensaje más antiguo ya mostrado
-  pageSize?: number;                                 // entero ≥ 1; default 30, se acota a 50 [ABIERTO P12]
+getWhatsappChatAction(input: {
+  target: ChatTarget;
+  before?: string; // = nextCursor
+  pageSize?: number; // default 30, tope 50 [ABIERTO P12]
 }): Promise<ActionResult<WhatsappChat>>;
 
-export async function markWhatsappChatReadAction(input: {
-  contactId: string;                                 // uuid
-  upToMessageId?: string;                            // [ABIERTO P4] último mensaje que mostró la pantalla
+markWhatsappChatReadAction(input: {
+  contactId: string;
+  upToMessageId?: string; // último mostrado [ABIERTO P4]
 }): Promise<ActionResult<{ unreadCount: number }>>;
 
-export async function listSendableWhatsappTemplatesAction(): Promise<ActionResult<{
-  templates: readonly WhatsappSendableTemplate[];
-}>>;
+listSendableWhatsappTemplatesAction(): Promise<ActionResult<{ templates: readonly WhatsappSendableTemplate[] }>>;
 
-// ---- Reutilizadas de QC-240 (sin cambios) ----
-type WhatsappSendRecipient = { contactId: string } | { customerId: string };
+getWhatsappChatContextAction(input: {
+  target: ChatTarget;
+  orderId?: string; // el del selector; sin él, el más reciente
+}): Promise<ActionResult<WhatsappChatContext>>;
 
-export async function sendWhatsappMessageAction(
-  input:
-    | { kind: 'text'; recipient: WhatsappSendRecipient; text: string }    // 1..4096 caracteres, no solo espacios
-    | {
-        kind: 'template';
-        recipient: WhatsappSendRecipient;
-        templateId: string;
-        constants?: Record<string, string>;        // clave con punto (p. ej. 'cliente.nombre') → valor resuelto por el front
-        constantLabels?: Record<string, string>;   // clave con punto → etiqueta, para el mensaje de faltantes
-      },
+// ---- QC-240, sin cambios ----
+sendWhatsappMessageAction(input:
+  | { kind: 'text'; recipient: ChatTarget; text: string } // 1..4096, no solo espacios
+  | { kind: 'template'; recipient: ChatTarget; templateId: string;
+      constants?: Record<string, string>; // clave con punto → valor (de context.values)
+      constantLabels?: Record<string, string> } // clave con punto → etiqueta
 ): Promise<WhatsappSendResult>;
 
-export async function retryWhatsappMessageAction(input: {
-  messageId: string;                               // un saliente FAILED de origen usuario
-  constants?: Record<string, string>;              // en plantillas: el front vuelve a mandar las constantes
-  constantLabels?: Record<string, string>;
+retryWhatsappMessageAction(input: {
+  messageId: string; // saliente FAILED de origen usuario
+  constants?: Record<string, string>; constantLabels?: Record<string, string>; // plantillas
 }): Promise<WhatsappSendResult>;
 
 type WhatsappSendResult =
-  | { status: 'success'; data: WhatsappOutboundMessageView }   // también si Meta lo rechazó: data.status = 'FAILED'
+  | { status: 'success'; data: WhatsappOutboundMessageView } // también si Meta rechazó: data.status = 'FAILED'
   | { status: 'missing_values'; message: string; missing: readonly { key: string; label: string }[] }
   | ErrorState;
-
 type WhatsappOutboundMessageView = {
-  id: string;
-  type: 'TEXT' | 'TEMPLATE';
-  status: 'SENT' | 'FAILED';
-  body: string;                       // en plantillas, el texto final ya armado
-  templateName: string | null;
-  templateLanguage: string | null;
-  errorCode: string | null;
-  errorReason: string | null;         // en español
-  createdAt: string;                  // ISO 8601
+  id: string; type: 'TEXT' | 'TEMPLATE'; status: 'SENT' | 'FAILED';
+  body: string; // plantillas: texto final
+  templateName: string | null; templateLanguage: string | null;
+  errorCode: string | null; errorReason: string | null; // en español
+  createdAt: string; // ISO 8601
 };
 ```
 
-Las variables **propias** de una plantilla no se mandan: el back usa su valor guardado. Para
-reintentar un texto basta `{ messageId }`. Si el destinatario es un cliente sin conversación
-(`{ customerId }`), el envío crea el contacto; el chat siguiente se pide ya por `contactId`.
+Las variables **propias** no se mandan: el back pone su valor guardado. Una constante con valor
+`null` en `context.values` no se manda y el envío responde `missing_values`. Reintentar un texto:
+`{ messageId }`. Enviar a `{ customerId }` sin conversación crea el contacto; el chat siguiente se
+pide ya por `contactId`.
+
+**Ruta del archivo** (`GET`, misma sesión del navegador; se usa como `src` de `<img>`):
+
+| Respuesta | Cuándo |
+|---|---|
+| `200`, cuerpo = la imagen, `Content-Type` `image/jpeg`, `image/png` o `image/webp`, `Cache-Control: private, max-age=3600` | Imagen o sticker entrante de un chat que el actor puede leer |
+| `404` sin cuerpo | Sin sesión o sin `whatsapp.consultar`; id que no es un mensaje así de la empresa, cliente dado de baja, audio/video/documento |
+| `502` sin cuerpo | Meta no lo sirve: caído, token, más de 5 MB, tipo no admitido, o medio caducado (Meta los borra a los ~30 días; no se guarda copia) |
 
 ### B. Tipos compartidos
 
 ```ts
 type WhatsappConnectionStatus = 'ACTIVE' | 'PENDING' | 'ERROR' | 'DISABLED';
 type WhatsappMessageDirection = 'IN' | 'OUT';
-type WhatsappMessageType =
-  | 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO' | 'DOCUMENT' | 'STICKER' | 'LOCATION' | 'CONTACTS'
-  | 'REACTION' | 'BUTTON' | 'INTERACTIVE' | 'TEMPLATE' | 'UNSUPPORTED';
+type WhatsappMessageType = 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO' | 'DOCUMENT' | 'STICKER' | 'LOCATION'
+  | 'CONTACTS' | 'REACTION' | 'BUTTON' | 'INTERACTIVE' | 'TEMPLATE' | 'UNSUPPORTED';
 type WhatsappMessageStatus = 'RECEIVED' | 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
-
-// ---- Paginación ----
-type Page<T> = {                     // listado de conversaciones: por número de página
-  items: readonly T[];
-  total: number;                     // conversaciones que pasan los filtros
-  page: number;                      // 1..totalPages
-  pageSize: number;                  // el efectivo, ya acotado
-  totalPages: number;
-};
-type ChatCursor = string;            // id (uuid) del mensaje más antiguo que ya tiene la pantalla
 
 // ---- Listado ----
 type WhatsappConversationList = {
-  connectionStatus: WhatsappConnectionStatus | null;   // null = la empresa no tiene WhatsApp conectado
-  page: Page<WhatsappConversationItem>;
+  connectionStatus: WhatsappConnectionStatus | null; // null = sin WhatsApp conectado
+  page: { items: readonly WhatsappConversationItem[]; total: number; page: number; pageSize: number; totalPages: number };
 };
-
 type WhatsappConversationItem = {
-  contactId: string;
-  customerId: string;
-  customerName: string;              // «Nombres Apellidos»
-  phone: string;                     // número del contacto en formato internacional, p. ej. «+52 1 55 1234 5678»
-  isBlocked: boolean;
-  unreadCount: number;
+  contactId: string; customerId: string;
+  customerName: string; // «Nombres Apellidos»
+  phone: string; // «+52 1 55 1234 5678»
+  isBlocked: boolean; unreadCount: number;
   lastMessage: {
-    direction: WhatsappMessageDirection;
-    type: WhatsappMessageType;
-    preview: string | null;          // cuerpo recortado a 120 caracteres; null si el tipo no tiene cuerpo
-    status: WhatsappMessageStatus;
-    at: string;                      // ISO 8601
+    direction: WhatsappMessageDirection; type: WhatsappMessageType;
+    preview: string | null; // cuerpo recortado a 120; null sin cuerpo
+    status: WhatsappMessageStatus; at: string; // ISO 8601
   };
 };
 
 // ---- Chat ----
-type WhatsappWindowState =
-  | { open: true; closesAt: string } // ISO 8601: última entrada del cliente + 24 h
-  | { open: false; closesAt: null };
-
 type WhatsappChat = {
   connectionStatus: WhatsappConnectionStatus | null;
-  contact: {                         // null = el cliente aún no tiene conversación (chat vacío)
-    id: string;
-    phone: string;
-    isBlocked: boolean;
-    unreadCount: number;
-  } | null;
+  contact: { id: string; phone: string; isBlocked: boolean; unreadCount: number } | null; // null = chat vacío
   customer: { id: string; name: string };
-  window: WhatsappWindowState;       // chat vacío: siempre cerrada → el primer mensaje es una plantilla
-  messages: readonly WhatsappChatMessage[];   // de más antiguo a más reciente
-  hasMore: boolean;                  // quedan mensajes anteriores
-  nextCursor: ChatCursor | null;     // = messages[0].id si hasMore; si no, null
+  window: { open: true; closesAt: string } | { open: false; closesAt: null }; // última entrada + 24 h
+  messages: readonly WhatsappChatMessage[]; // de más antiguo a más reciente
+  hasMore: boolean;
+  nextCursor: string | null; // = messages[0].id si hasMore
 };
-
 type WhatsappChatMessage = {
   id: string;
-  direction: WhatsappMessageDirection;
-  type: WhatsappMessageType;
-  body: string | null;               // texto, pie de un adjunto, emoji de reacción, título de botón…
+  direction: WhatsappMessageDirection; type: WhatsappMessageType;
+  body: string | null; // texto, pie, emoji de reacción, título de botón…
   attachment: WhatsappChatAttachment | null;
-  status: WhatsappMessageStatus;     // entrantes: 'RECEIVED'
-  errorReason: string | null;        // solo FAILED, en español
-  origin: 'USER' | 'SYSTEM' | null;  // null en los entrantes
-  sentBy: { id: string; displayName: string | null } | null;   // null si no lo envió una persona
+  status: WhatsappMessageStatus; // entrantes: 'RECEIVED'
+  errorReason: string | null; // solo FAILED, en español
+  origin: 'USER' | 'SYSTEM' | null; // null en entrantes
+  sentBy: { id: string; displayName: string | null } | null;
   templateName: string | null;
-  at: string;                        // ISO 8601: hora de Meta en los entrantes, hora de guardado en los salientes
+  at: string; // ISO 8601
 };
-
 type WhatsappChatAttachment =
-  | { kind: 'media'; mimeType: string; filename: string | null; caption: string | null }  // IMAGE, AUDIO, VIDEO, DOCUMENT, STICKER
+  | { kind: 'media'; mimeType: string; filename: string | null; caption: string | null;
+      mediaUrl: string | null } // v2: solo imagen/sticker entrante
   | { kind: 'location'; latitude: number; longitude: number; name: string | null; address: string | null }
-  | { kind: 'reaction'; emoji: string | null; messageId: string };   // emoji null = reacción quitada; messageId = wamid del mensaje reaccionado
+  | { kind: 'reaction'; emoji: string | null; // null = reacción quitada
+      messageId: string | null }; // v2: `id` del mensaje reaccionado; null si no está guardado
 
 // ---- Plantillas enviables ----
 type WhatsappSendableTemplate = {
-  id: string;                        // es el templateId de sendWhatsappMessageAction
-  name: string;
-  language: string;                  // p. ej. 'es_MX'
+  id: string; // = templateId del envío
+  name: string; language: string; // 'es_MX'
   category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
-  content: {                         // los huecos se muestran como {{clave}}
+  content: { // huecos como {{clave}}
     header: { text: string; example: string | null } | null;
     body: { text: string; examples: readonly string[] };
     footer: string | null;
-    buttons: readonly (
-      | { type: 'QUICK_REPLY'; text: string }
+    buttons: readonly ({ type: 'QUICK_REPLY'; text: string }
       | { type: 'URL'; text: string; url: string; example: string | null }
-      | { type: 'PHONE_NUMBER'; text: string; phoneNumber: string }
-    )[];
+      | { type: 'PHONE_NUMBER'; text: string; phoneNumber: string })[];
   };
   variables: readonly {
-    slot: string;                    // 'header', 'body.1', 'button.0'…
-    position: number;
-    kind: 'system' | 'company';      // system = constante: la resuelve el front; company = propia: la pone el back
-    key: string;                     // constante con punto ('cliente.nombre') o clave propia
-    label: string | null;            // solo propias; la etiqueta de una constante la conoce el front
-    value: string | null;            // solo propias: valor vigente, para la vista previa [ABIERTO P9]
+    slot: string; position: number; // 'header', 'body.1', 'button.0'…
+    kind: 'system' | 'company'; // constante | propia
+    key: string; // 'cliente.nombre' o clave propia
+    label: string | null; // solo propias
+    value: string | null; // solo propias, valor vigente [ABIERTO P9]
+  }[];
+};
+
+// ---- Contexto del chat (v2) ----
+type WhatsappChatContext = {
+  customer: { id: string; name: string };
+  orders: readonly WhatsappCustomerOrder[]; // vivos no cancelados, 20 más recientes primero [ABIERTO P15]
+  selectedOrderId: string | null; // orderId pedido, o orders[0]; null sin pedidos
+  values: Readonly<Record<string, string | null>>; // clave → valor; null = falta
+};
+type WhatsappCustomerOrder = {
+  id: string;
+  number: string; // '2026-0000128'
+  status: 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'BLOQUEADO'
+    | 'POR_ACONDICIONAR' | 'EN_ACONDICIONAMIENTO' | 'TERMINADO' | 'ENTREGADO';
+  requestedAt: string; // ISO 8601
+  total: string | null; // decimal en texto; hoy siempre null (QC-307)
+  productName: string | null; // producto (receta)
+  lines: readonly {
+    presentationId: string;
+    presentationName: string | null; // «Bidón 20 L»
+    ordered: number; // envases → «10 × Bidón 20 L»
+    delivered: number;
+    pending: number; // max(0, ordered − delivered)
   }[];
 };
 ```
 
 ### C. Errores por acción
 
-Textos del catálogo (`message` de `ErrorState`). Toda acción puede devolver además `unexpected`
-(«Ocurrio un error inesperado. Intentalo de nuevo.», con `reference`).
+El texto en español llega en `message`: mostrarlo tal cual. Toda acción puede dar además
+`unexpected` (con `reference`). `ctx` = `getWhatsappChatContextAction`.
 
-| Código | Texto | list | getChat | markRead | templates | send | retry |
-|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `unauthorized` | «El actor no tiene permiso para realizar esta operacion.» | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `invalid_input` | «La entrada recibida no es valida.» | ✓ | ✓ | ✓ | | ✓ | ✓ |
-| `whatsapp_contact_not_found` | «La conversación no existe.» | | ✓ | ✓ | | ✓ | ✓ |
-| `customer_not_found` | «El cliente solicitado no existe.» | | ✓ | | | ✓ | |
-| `whatsapp_message_not_found` | «No se encontró el mensaje.» | | ✓ (cursor) | ✓ | | | ✓ |
-| `whatsapp_connection_not_found` | «No se encontró la conexión de WhatsApp.» | | | | | ✓ | ✓ |
-| `whatsapp_connection_not_active` | «La conexión de WhatsApp no está activa. Revísala en Integraciones.» | | | | | ✓ | ✓ |
-| `integration_secret_unreadable` | «No se pudo leer una credencial guardada de la integración. Vuelve a escribirla.» | | | | | ✓ | ✓ |
-| `whatsapp_recipient_not_customer` | «Solo se pueden enviar mensajes a clientes de la empresa.» | | | | | ✓ | ✓ |
-| `whatsapp_customer_without_phone` | «El cliente no tiene un teléfono válido para WhatsApp.» | | | | | ✓ | |
-| `whatsapp_contact_linked_elsewhere` | «Ese número está vinculado a otro cliente. Cámbialo desde Contactos.» | | | | | ✓ | |
-| `whatsapp_contact_blocked` | «El contacto está bloqueado.» | | | | | ✓ | ✓ |
-| `whatsapp_window_closed` | «Pasaron más de 24 horas desde el último mensaje del cliente: usa una plantilla.» | | | | | ✓ | ✓ |
-| `whatsapp_template_not_found` | «No se encontró la plantilla.» | | | | | ✓ | ✓ |
-| `whatsapp_template_not_sendable` | «La plantilla no está habilitada o no está aprobada por Meta.» | | | | | ✓ | ✓ |
-| `whatsapp_message_not_retryable` | «Solo se puede reintentar un mensaje que falló.» | | | | | | ✓ |
-| `missing_values` (rama propia, no `ErrorState`) | «Falta el valor de A» / «Falta el valor de A, B y C» | | | | | ✓ | ✓ |
+| Código | list | chat | read | tpl | ctx | send | retry |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `unauthorized` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `invalid_input` | ✓ | ✓ | ✓ | | ✓ | ✓ | ✓ |
+| `whatsapp_contact_not_found` | | ✓ | ✓ | | ✓ | ✓ | ✓ |
+| `customer_not_found` | | ✓ | | | ✓ | ✓ | |
+| `order_not_found` (v2) | | | | | ✓ | | |
+| `whatsapp_message_not_found` | | ✓ (cursor) | ✓ | | | | ✓ |
+| `whatsapp_connection_not_found`, `whatsapp_connection_not_active`, `integration_secret_unreadable`, `whatsapp_recipient_not_customer`, `whatsapp_contact_blocked`, `whatsapp_window_closed`, `whatsapp_template_not_found`, `whatsapp_template_not_sendable` | | | | | | ✓ | ✓ |
+| `whatsapp_customer_without_phone`, `whatsapp_contact_linked_elsewhere` | | | | | | ✓ | |
+| `whatsapp_message_not_retryable` | | | | | | | ✓ |
+| `missing_values` (rama propia: «Falta el valor de A, B y C») | | | | | | ✓ | ✓ |
 
-Sin conexión de WhatsApp, `list`, `getChat` por cliente y `templates` **no** dan error:
-devuelven `connectionStatus: null` y vacío. `getChat` por contacto da `whatsapp_contact_not_found`.
-
-Un envío que llega a Meta y Meta rechaza **no** es un error: vuelve `success` con `data.status =
-'FAILED'` y `data.errorReason` en español (p. ej. «Revisa el token en Integraciones», «Demasiados
-mensajes, intenta en un momento»).
+Sin WhatsApp conectado, `list`, `chat` por cliente, `tpl` y `ctx` por cliente **no** dan error
+(`connectionStatus: null` y vacío donde aplica); `chat` y `ctx` por contacto dan
+`whatsapp_contact_not_found`. Si Meta rechaza un envío **no** es error: `success` con
+`data.status = 'FAILED'` y `data.errorReason` en español.
 
 ### D. Semántica
 
-**Listado.**
-- Solo conversaciones: contacto de la conexión actual, vinculado a un cliente vivo y con al menos
-  un mensaje [ABIERTO P6]. Números sin cliente y clientes dados de baja no aparecen [ABIERTO P11].
-- Orden: hora del último mensaje, más reciente primero; empate por `contactId`.
-- Búsqueda: casa por nombre del cliente (palabras sin acentos ni mayúsculas, como en Clientes) **o**
-  porque el número contiene los dígitos escritos.
-- Paginación por número de página (`page`, `pageSize`, `total`, `totalPages`). El orden cambia
-  cuando llegan mensajes: al consultar periódicamente, recargar la página 1.
+**Listado.** Solo conversaciones: contacto de la conexión actual, vinculado a un cliente vivo y con
+al menos un mensaje [ABIERTO P6]; números sin cliente y clientes dados de baja no salen [ABIERTO P11].
+Orden por hora del último mensaje, el más reciente primero. La búsqueda casa por nombre del cliente
+(sin acentos ni mayúsculas) **o** por los dígitos del número. Paginado por número de página: en la
+consulta periódica, recargar la página 1.
 
-**Chat.**
-- Primera llamada sin `before`: los `pageSize` mensajes más recientes, devueltos de más antiguo a
-  más reciente. Para cargar los anteriores, `before = nextCursor`; seguir mientras `hasMore`.
-- Para traer lo nuevo en la consulta periódica, volver a pedir sin `before` y unir por `id`.
-- Abrir por `customerId`: si el cliente tiene conversaciones, la de último mensaje más reciente
-  [ABIERTO P5]; si no, chat vacío con `contact: null` y ventana cerrada.
-- Leer el chat **no** marca leído [ABIERTO P3].
+**Chat.** Sin `before`: los `pageSize` más recientes, de más antiguo a más reciente; los anteriores
+con `before = nextCursor` mientras `hasMore`. Lo nuevo: volver a pedir sin `before` y unir por `id`.
+Por `customerId`: la conversación de último mensaje más reciente [ABIERTO P5] o chat vacío con
+ventana cerrada. Leer **no** marca leído [ABIERTO P3].
 
-**No leídos y marcar leído.**
-- La marca de lectura es **una por conversación y compartida por toda la empresa**: si un usuario
-  marca leído, el contador baja para todos.
-- `unreadCount` = mensajes **entrantes** posteriores a la marca (las reacciones entrantes cuentan
-  [ABIERTO P13]); sin marca, todos los entrantes.
-- `markWhatsappChatReadAction({ contactId, upToMessageId })` mueve la marca hasta ese mensaje
-  (pasar el id del último mensaje que se mostró); sin `upToMessageId`, hasta el último del chat.
-  La marca nunca retrocede. Devuelve los no leídos que quedan (0 si no llegó nada después).
-- Uso esperado: al abrir el chat y después de cada consulta periódica que traiga entrantes nuevos.
-- No avisa a Meta: el cliente no ve los checks azules.
+**No leídos.** Una marca por conversación, compartida por la empresa. `unreadCount` = entrantes
+posteriores a la marca (las reacciones cuentan [ABIERTO P13]). `markWhatsappChatReadAction` mueve la
+marca hasta `upToMessageId` (el último mostrado) o, sin él, hasta el último; nunca retrocede.
+Llamarla al abrir el chat y tras cada consulta que traiga entrantes. No avisa a Meta.
+
+**Imágenes y stickers (v2).** `attachment.mediaUrl` (relativa, `/api/integraciones/whatsapp/media/<id>`)
+va como `src` de la miniatura y del visor. Se descarga de Meta en cada vista, sin copia: pasados unos
+30 días Meta la borra y la ruta da 502; la pantalla muestra un hueco «Imagen no disponible» (evento
+`error` de la imagen). Audio, video y documento llegan con `mediaUrl: null`.
+
+**Reacciones (v2).** `attachment.messageId` es el `id` del mensaje reaccionado tal como sale en
+`messages`. La reacción sigue llegando como mensaje propio (cuenta como no leído): la pantalla no la
+pinta como burbuja, la pega al mensaje con ese `id`; si ese mensaje aún no está cargado, la pega
+cuando cargue al subir. Varias reacciones del mismo lado al mismo mensaje: vale la más reciente;
+`emoji: null` la quita. `messageId: null` = el mensaje no está guardado; no se pinta.
+
+**Contexto del chat (v2).** Pedirlo al abrir el chat y al cambiar el selector «Pedido»
+(`orderId`), no en la consulta periódica.
+- `orders`: para el selector (se muestra si hay más de uno) y el detalle, ya con sus líneas: no hay
+  otra llamada. `pending` y `delivered` coinciden con Pedidos. `total` hoy es siempre `null`
+  (QC-307): ocultarlo si es `null`. No hay fecha de entrega.
+- `values` trae **siempre** las claves `cliente.nombre`, `empresa.nombre` y `pedido.numero` (del
+  pedido elegido) [ABIERTO P18] y cada variable propia de la empresa por su clave (sin punto: nunca
+  choca con una constante). Para resolver una plantilla: `values[variable.key]`; si es `null` o la
+  clave no está, el texto muestra `[falta <clave>]`. Al enviar, `constants` = las constantes de la
+  plantilla con valor no nulo, y `constantLabels` de su catálogo de etiquetas.
+- `orderId` que no está en `orders` ⇒ `order_not_found`.
 
 ---
 
@@ -633,6 +652,8 @@ mensajes, intenta en un momento»).
 
 Se suman `createListWhatsappConversations`, `createGetWhatsappChat`, `createMarkWhatsappChatRead`,
 `createListSendableWhatsappTemplates` y los tipos del §B. `module-shape.test.ts` se tensa (§10.2).
+La Enmienda 1 suma `createGetWhatsappChatContext`, `createGetWhatsappMedia`,
+`WhatsappOrderNotFoundError` y los tipos del contexto (§15).
 
 ---
 
@@ -648,7 +669,8 @@ nombre en su `diagnostic`.
 
 **Ningún código nuevo.** Se reutilizan `unauthorized`, `invalid_input`, `whatsapp_contact_not_found`,
 `customer_not_found` (vía `LinkedCustomerNotFoundError`) y `whatsapp_message_not_found`. El catálogo
-y su guardia no cambian.
+y su guardia no cambian. La Enmienda 1 añade una **clase** con un código que ya existe
+(`WhatsappOrderNotFoundError`, `order_not_found`, §15.3), como `LinkedCustomerNotFoundError`.
 
 ---
 
@@ -718,6 +740,9 @@ Mapa `R<n> → test` completo en `tasks.md`.
 | `lib/modules/clientes/domain/customer-catalog.ts` y su adaptador | Fichas de `clientes` (QC-302, QC-303) | Un método más al final |
 | `lib/composition/index.ts` | Todas las fichas con cableado | Solo el bloque de WhatsApp y `buildCustomerCatalog` |
 | `lib/modules/integraciones/**`, `module-shape.test.ts`, guardia de ámbito | QC-241 (mismo módulo) | La que llegue después amplía las listas exactas |
+| `lib/modules/pedidos/index.ts` (Enmienda 1) | QC-307 (`in_progress`, precio de venta) | Solo dos líneas de barril; el adaptador va en archivo nuevo. Cuando QC-307 entre, una ficha de seguimiento rellena `total` (D11) |
+| `lib/modules/identity/index.ts` (Enmienda 1) | Fichas de `identity` | Una línea de barril |
+| `tests/guards/guard-rutas-fuera-de-sesion.test.ts`, `session-once-per-request-actions.test.ts` (Enmienda 1) | Cualquier ficha con rutas o acciones nuevas | Una entrada más |
 
 ---
 
@@ -744,6 +769,38 @@ Mapa `R<n> → test` completo en `tasks.md`.
    `integraciones.modificar` y devuelve plantillas deshabilitadas o sin relacionar que el envío
    rechazaría.
 
+Descartadas en la Enmienda 1:
+
+9. **Exponer `wamid` en cada mensaje del chat** para que la pantalla case la reacción. Mete un
+   identificador de Meta en el contrato de la pantalla, la obliga a llevar dos ids por mensaje y a
+   casar ella; el back ya tiene el índice único por `wamid` y lo casa en la misma consulta (R49).
+10. **Copiar el medio a Storage** al recibirlo o en la primera vista. Sobrevive a la caducidad de Meta,
+    pero exige un bucket nuevo, su RLS, una columna con la ruta, purga y custodia de imágenes de
+    clientes. El humano lo descartó (D9).
+11. **Server Action que devuelve el archivo en base64.** Un `<img>` necesita una URL; un data URL de
+    hasta 5 MB viaja en el payload de React, no se cachea y engorda cada mensaje. La ruta `GET`
+    sirve bytes con la cookie de sesión y la caché privada del navegador.
+12. **La ruta del archivo bajo `app/(private)/clientes/contactos/`.** El middleware le daría sesión,
+    pero sin sesión responde un 307 a `/login` en HTML a una petición de imagen, y mete un archivo
+    de backend en el árbol de la pantalla de QC-246. En `app/api/` el caso de uso decide y la ruta
+    responde 404 limpio.
+13. **Pedir la URL del medio con el `media_id`** (`/media/<mediaId>`). Expone el id de Meta y obliga a
+    buscar el mensaje por un campo JSON; con el id interno la propiedad del mensaje se comprueba
+    por la clave primaria.
+14. **Valores y pedidos dentro de `getWhatsappChat`.** El chat se consulta cada 5–10 s; recalcular
+    pedidos, envases y nombre de la empresa en cada consulta multiplica lecturas a tres módulos sin
+    que cambien. Va en una acción aparte que la pantalla pide al abrir y al cambiar de pedido.
+15. **Detalle del pedido en una segunda llamada** (lista ligera + `getOrderDetail`). Con como mucho
+    20 pedidos y unas pocas líneas por pedido (un producto por pedido, una línea por presentación),
+    la respuesta es pequeña; una sola llamada deja el panel abrirse sin espera y sin un segundo
+    camino de autorización.
+16. **Añadir `listAliveOfCustomer` a `OrderCatalog`.** Ese puerto lo implementan a mano unas 35
+    dobles de test (`: OrderCatalog`); un método obligatorio más las rompe todas. Un servicio
+    estrecho propio (`CustomerOrderDirectory`) no toca a nadie.
+17. **Leer el nombre de la empresa con `createGetCompany`** (ficha del maestro). Es una pantalla de
+    plataforma con su permiso y devuelve la ficha entera; aquí basta un campo de la propia empresa,
+    como `getCompanyCountry`.
+
 ---
 
 ## 13. Dependencias de terceros
@@ -753,4 +810,269 @@ Mapa `R<n> → test` completo en `tasks.md`.
 
 ## 14. Variables de entorno
 
-Ninguna nueva.
+Ninguna nueva (la descarga usa `WHATSAPP_GRAPH_API_VERSION`, que ya existe).
+
+---
+
+## 15. Enmienda 1 (2026-10-23): archivo de medios, reacciones y contexto del chat
+
+R44–R59, D6–D11. Pedida por el humano («actualiza el spec y el contrato») tras ampliar QC-246.
+Ninguna tarea hecha cambia de comportamiento: al enmendar, T1 estaba a medias sin commit y T2–T9
+sin empezar. Las tareas T10–T17 de `tasks.md` añaden lo de aquí; las que tocan lo que producen
+T4, T5 y T7 dependen de ellas.
+
+### 15.0 Qué cambia
+
+```
+app/api/integraciones/whatsapp/media/[mensajeId]/route.ts         ← reexport de GET + runtime nodejs
+lib/modules/identity/
+  domain/get-company-name.ts                                     ← createGetCompanyName
+  ports/company-name-reader.ts                                   ← findNameOf(companyId)
+  adapters/driven/persistence/company-name-prisma.ts             ← su lectura
+  index.ts                                                       ← + createGetCompanyName
+lib/modules/pedidos/
+  domain/customer-order-directory.ts                             ← interfaz + CustomerOrderSummary
+  adapters/driven/persistence/customer-order-directory-prisma.ts ← listAliveOfCustomer
+  index.ts                                                       ← + tipos
+lib/modules/integraciones/
+  domain/whatsapp-media.ts                                       ← constantes y reglas puras del archivo
+  domain/get-whatsapp-media.ts                                   ← caso de uso del archivo
+  domain/whatsapp-chat-context.ts                                ← tipos y armado puro del contexto
+  domain/get-whatsapp-chat-context.ts                            ← caso de uso del contexto
+  domain/whatsapp-conversation.ts                                ← attachmentOf: mediaUrl, reacción por id interno
+  domain/whatsapp-conversation-input.ts                          ← + getWhatsappChatContextSchema, getWhatsappMediaSchema
+  domain/errors.ts                                               ← + WhatsappOrderNotFoundError
+  ports/whatsapp-conversation-repository.ts                      ← + findMediaMessage; ChatMessageRow.reactedMessageId
+  ports/whatsapp-graph-client.ts                                 ← + downloadMedia
+  ports/company-name-lookup.ts                                   ← (companyId) => Promise<string | null>
+  adapters/driven/persistence/whatsapp-conversation-prisma.ts    ← reacción en SQL, findMediaMessage
+  adapters/driven/graph/whatsapp-graph-client-fetch.ts           ← downloadMedia
+  adapters/driven/graph/whatsapp-graph-client-canned.ts          ← downloadMedia (PNG fijo)
+  adapters/driving/whatsapp-conversation-actions.ts              ← + getWhatsappChatContextAction
+  adapters/driving/whatsapp-media-route.ts                       ← GET
+  index.ts                                                       ← + fábricas, tipos, error
+lib/composition/index.ts                                         ← cableado
+```
+
+Sin migraciones ni RLS nuevas: no hay tabla ni columna nueva (D9: nada se guarda).
+
+### 15.1 Archivo de un medio (R44–R48, R58)
+
+**Ruta.** `app/api/integraciones/whatsapp/media/[mensajeId]/route.ts`:
+`export { GET } from '@/lib/modules/integraciones/adapters/driving/whatsapp-media-route'` y
+`export const runtime = 'nodejs'`, como el webhook. Una ruta y no una Server Action: la consume un
+`<img src>` (alternativa 11). `/api/**` no pasa por el middleware, así que la ruta lee la sesión ella
+misma, con el mismo `currentActor()` de las acciones (`runInRequestScope` + `getSessionUser` +
+`getSessionContext`). Como el permiso viene de la sesión, el añadido apagado ya lo quita (R3).
+
+**`whatsapp-media-route.ts` (driving)** solo traduce:
+
+| Resultado del caso de uso | Respuesta |
+|---|---|
+| `{ kind: 'file', contentType, body, contentLength }` | `200`; `Content-Type`; `Content-Length` si se conoce; `Cache-Control: private, max-age=3600`; `X-Content-Type-Options: nosniff`; `Content-Disposition: inline`; cuerpo = el stream |
+| `UnauthorizedError`, `ValidationError`, `WhatsappMessageNotFoundError` | `404` sin cuerpo (404 y no 403: `docs/architecture.md`, «no existe» y «no puedes» indistinguibles) |
+| `{ kind: 'unavailable' }` | `502` sin cuerpo |
+| cualquier otra excepción | `500` sin cuerpo; se registra solo el `diagnostic` sin id de archivo (R58) |
+
+**Caso de uso `getWhatsappMedia(input, actor)`** (`domain/get-whatsapp-media.ts`):
+
+1. `requireReadPermission(actor)` (R44).
+2. `getWhatsappMediaSchema = z.object({ messageId: z.uuid() }).strict()`; fallo ⇒ `ValidationError`.
+3. `connections.findLive(scope)`; `null` ⇒ `WhatsappMessageNotFoundError`.
+4. `conversations.findMediaMessage(messageId, connection.id, scope)` ⇒
+   `{ direction, type, payload, customerId } | null`. `null`, `direction !== 'IN'`, tipo fuera de
+   `VIEWABLE_MEDIA_TYPES = ['IMAGE', 'STICKER']`, `customerId === null`,
+   `customers.findAliveRefById` nulo o `mediaIdOf(payload)` nulo ⇒ `WhatsappMessageNotFoundError`.
+   Nada de esto llama a Meta.
+5. `accessToken = decryptStoredSecret(deps, connection, ACCESS_TOKEN_FIELD, scope)`;
+   `SecretUnreadableError` ⇒ `{ kind: 'unavailable' }` (como al enviar, la conexión queda en
+   `ERROR`; esa es la única escritura posible).
+6. `graph.downloadMedia({ mediaId, accessToken, maxBytes: WHATSAPP_MEDIA_MAX_BYTES })`; fallo ⇒
+   `unavailable`. Tipo fuera de `WHATSAPP_MEDIA_CONTENT_TYPES` ⇒ `unavailable` (R46).
+
+`domain/whatsapp-media.ts` (puro): `WHATSAPP_MEDIA_PATH = '/api/integraciones/whatsapp/media'`,
+`mediaUrlOf(messageId)`, `VIEWABLE_MEDIA_TYPES`, `WHATSAPP_MEDIA_MAX_BYTES = 5 * 1024 * 1024`,
+`WHATSAPP_MEDIA_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp']`, `mediaIdOf(payload)`
+(zod `{ media_id: z.string().min(1) }`), `isViewableMedia(direction, type, payload)`.
+
+**Puerto `WhatsappGraphClient.downloadMedia`:**
+
+```ts
+export type GraphMediaDownload =
+  | { readonly ok: true; readonly contentType: string; readonly contentLength: number | null;
+      readonly body: ReadableStream<Uint8Array> }
+  | ({ readonly ok: false } & GraphFailure);
+downloadMedia(input: { readonly mediaId: string; readonly accessToken: string; readonly maxBytes: number }):
+  Promise<GraphMediaDownload>;
+```
+
+**`whatsapp-graph-client-fetch.ts`:** dos pasos, el token siempre en cabecera y nunca en un log:
+
+1. `GET {GRAPH_BASE_URL}/{version}/{mediaId}` ⇒ zod `{ url: z.string().url(), mime_type: z.string(),
+   file_size: z.number().int().optional() }`. 5xx o red ⇒ `unreachable`; otro no-2xx ⇒ `rejected`
+   (incluye el medio caducado). `file_size > maxBytes` ⇒ `rejected` sin descargar.
+2. La URL tiene que ser `https:` y su host terminar en `.fbsbx.com` (donde Meta sirve los
+   medios); si no, `rejected` y **no** se manda el token a ese host. `GET url` con el token, el mismo
+   `AbortSignal.timeout(GRAPH_TIMEOUT_MS)`. No-2xx ⇒ `rejected`; `Content-Length > maxBytes` ⇒
+   `rejected`. El cuerpo se devuelve como stream detrás de un `TransformStream` que corta con error
+   si pasa de `maxBytes` (defensa si la cabecera miente). `contentType` = la cabecera de la
+   respuesta sin parámetros, o `mime_type` si falta.
+
+**`whatsapp-graph-client-canned.ts`** (dobles de E2E): devuelve siempre el mismo PNG de 1×1, para
+que QC-246 pinte miniaturas sin Meta.
+
+**Adjunto (R48).** `attachmentOf(message)` pasa a recibir el mensaje entero (dirección, tipo,
+`payload`, `id`, `reactedMessageId`) y pone `mediaUrl = isViewableMedia(...) ? mediaUrlOf(id) : null`.
+Sigue sin devolver `media_id` (R25, R47).
+
+**Puerto de conversaciones.** `findMediaMessage(messageId, connectionId, scope)`: el mensaje por
+clave primaria con `company_id` y `connection_id` del ámbito, y el `customer_id` de su contacto.
+Es el octavo método: entra en el barrido de la guardia de ámbito sin exención.
+
+### 15.2 Reacciones (R49)
+
+`listMessages` añade `reactedMessageId` a cada `ChatMessageRow`:
+
+```sql
+LEFT JOIN whatsapp_messages r
+  ON m.type = 'REACTION'
+ AND r.wamid = m.payload->>'message_id'
+ AND r.contact_id = m.contact_id
+ AND r.company_id = m.company_id
+```
+
+Usa el único `whatsapp_messages_wamid_key`. Una reacción a un mensaje de otro contacto o no
+guardado da `null`. `attachmentOf` devuelve `{ kind: 'reaction', emoji, messageId: reactedMessageId }`.
+El `wamid` no sale del adaptador (alternativa 9).
+
+### 15.3 Contexto del chat (R50–R57)
+
+**Entrada** (`whatsapp-conversation-input.ts`):
+
+```ts
+export const CUSTOMER_ORDERS_LIMIT = 20;   // P15
+export const getWhatsappChatContextSchema = z.object({
+  target: z.union([z.object({ contactId: z.uuid() }).strict(), z.object({ customerId: z.uuid() }).strict()]),
+  orderId: z.uuid().optional(),
+}).strict();
+```
+
+**Caso de uso `getWhatsappChatContext(input, actor)`** (`domain/get-whatsapp-chat-context.ts`):
+
+1. `requireReadPermission`; parseo (`ValidationError`).
+2. Cliente: por contacto, las comprobaciones de §4.4 paso 2 (sin conexión ⇒
+   `WhatsappContactNotFoundError`); por cliente, `customers.findAliveRefById` nulo ⇒
+   `LinkedCustomerNotFoundError`, sin mirar la conexión. Se extrae a una función compartida con
+   `getWhatsappChat` (`resolveChatCustomer`) para que las dos reglas no diverjan.
+3. `orders = customerOrders.listAliveOfCustomer(companyId, customerId, ['CANCELADO'], CUSTOMER_ORDERS_LIMIT)`.
+4. Pedido elegido: con `orderId`, el de `orders` con ese id, o `WhatsappOrderNotFoundError`
+   (`order_not_found`); sin él, `orders[0] ?? null` (R54).
+5. Con pedidos: `deliveryProgress.listDeliveryProgressByIdsIncludingDeleted(companyId, ids)`,
+   `presentations.findRefs(idsÚnicos, companyId)` y `recipes.findRefsIncludingDeleted(idsÚnicos,
+   companyId)`: tres lecturas por lote, ninguna por pedido.
+6. `companyName(companyId)` y `variableKeys.listAll(scope)`.
+7. Arma con las funciones puras y **no escribe nada** (R57).
+
+**Dominio puro** (`domain/whatsapp-chat-context.ts`): tipos del §B del contrato y
+
+- `WHATSAPP_SYSTEM_CONSTANT_KEYS = ['cliente.nombre', 'empresa.nombre', 'pedido.numero'] as const`
+  (P18; el catálogo de QC-243 `design.md > 5`).
+- `customerOrderOf(summary, progress, presentations, recipes)`: `number = formatOrderNumber`,
+  `requestedAt = createdAt` ISO, `total: null` (D11, sin campo de fecha de entrega: D10),
+  `productName` = `RecipeRef.name` o `null`; por línea de `progress`, en su orden: `ordered =
+  orderedPackages(line)`, `delivered = line.deliveredPackages`, `pending = remainingPackages({
+  orderedPackages: ordered, deliveredPackages: delivered })` (R52, mismas funciones que Pedidos),
+  `presentationName` = `PresentationRef.name` o `null`. Un pedido sin progreso sale con `lines: []`.
+- `contextValuesOf({ customer, companyName, selected, variables })`: `cliente.nombre` =
+  `customerNameOf(customer)`; `empresa.nombre` = `companyName`; `pedido.numero` = número del elegido
+  o `null`; cada propia `key → value`. Una cadena vacía se normaliza a `null` (R56).
+
+**Pedidos del cliente (`pedidos`, §15.4)** e **identidad de la empresa (§15.5)** llegan por contrato;
+`integraciones` no lee `orders` ni `companies` (alternativa 2 de §12, mismo criterio).
+
+**Error.** `WhatsappOrderNotFoundError extends IntegracionesError`, `code = 'order_not_found'`
+(código ya en el catálogo: «El pedido solicitado no existe.»).
+
+**Grafo de módulos.** `integraciones` gana aristas a `pedidos`, `inventario` y `recetas` (solo
+tipos de sus contratos). Ninguno de los tres importa `integraciones` ni `documentos`
+(que sí importa `integraciones`): no se cierra ningún ciclo (`guard-arquitectura-modulos`, bloque 15).
+
+### 15.4 `pedidos`: `CustomerOrderDirectory`
+
+```ts
+// domain/customer-order-directory.ts
+export type CustomerOrderSummary = {
+  readonly id: string; readonly number: OrderNumber; readonly status: OrderStatus;
+  readonly recipeId: string; readonly createdAt: Date;
+};
+export interface CustomerOrderDirectory {
+  /** Pedidos vivos de ese cliente en esa empresa, sin los de `excludedStatuses`, los `limit` de
+   *  `created_at` más reciente (desempate `id` DESC). Cliente inexistente o de otra empresa ⇒ []. */
+  listAliveOfCustomer(companyId: string, customerId: string,
+    excludedStatuses: readonly OrderStatus[], limit: number): Promise<readonly CustomerOrderSummary[]>;
+}
+```
+
+Adaptador en un archivo nuevo (`customer-order-directory-prisma.ts`, `where: { companyId,
+customerId, deletedAt: null, status: { notIn } }`, índice `orders_company_id_customer_id_idx`) para
+no chocar con QC-307 en `order-catalog-prisma.ts`. Servicio aparte y no método de `OrderCatalog`:
+alternativa 16. El barril exporta la interfaz y el tipo; la composición la instancia.
+
+### 15.5 `identity`: `getCompanyName`
+
+Copia de `getCompanyCountry`: `createGetCompanyName({ companies: Pick<CompanyNameReader,
+'findNameOf'> })` ⇒ `(companyId) => Promise<string | null>`; `null` si la empresa no existe o está
+dada de baja. Sin actor: el `companyId` sale de la sesión firmada y el caso de uso que lo llama ya
+autorizó. En `integraciones`, `ports/company-name-lookup.ts` es el tipo de función (como
+`CompanyCountryLookup` en `clientes`).
+
+### 15.6 Composición y borde
+
+```ts
+const whatsappChatContextDeps = {
+  connections: whatsappConnectionRepository, conversations: whatsappConversationRepository,
+  customers: customerCatalog, customerOrders: customerOrderDirectory,
+  deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
+  presentations: presentationCatalog, recipes: recipeCatalog,
+  companyName: identity.getCompanyName, variableKeys: whatsappVariableKeyRepository,
+};
+const whatsappMediaDeps = {
+  connections: whatsappConnectionRepository, conversations: whatsappConversationRepository,
+  customers: customerCatalog, graph: whatsappGraphClient, cipher: secretCipher,
+};
+// en `integraciones`:
+getWhatsappChatContext: createGetWhatsappChatContext(whatsappChatContextDeps),
+getWhatsappMedia: createGetWhatsappMedia(whatsappMediaDeps),
+```
+
+(Los nombres de las variables del cableado son los que ya haya en `lib/composition/index.ts`.)
+`getWhatsappChatContextAction` va en `whatsapp-conversation-actions.ts`, mismo patrón (`run`,
+`toErrorState`, copia campo a campo). Ese archivo exporta ahora **cinco** acciones.
+
+Guardias y tests de borde que se tensan:
+
+| Archivo | Cambio |
+|---|---|
+| `tests/guards/guard-rutas-fuera-de-sesion.test.ts` | + `app/api/integraciones/whatsapp/media/[mensajeId]/route.ts` como `anadido: 'integraciones'`, prueba `whatsapp-media-route.test.ts` (sin el permiso, 404) |
+| `tests/unit/identity/session-once-per-request-actions.test.ts` | + `getWhatsappChatContextAction` y el `GET` de la ruta: una lectura de sesión por llamada |
+| `tests/unit/integraciones/module-shape.test.ts` | archivos nuevos, contrato, cableado, cinco acciones |
+| `tests/guards/guard-ambito-empresa-integraciones.test.ts` | ocho métodos en `WhatsappConversationRepository` |
+| `tests/unit/pedidos/module-contract.test.ts` | contrato con `CustomerOrderDirectory` |
+
+### 15.7 Tests (R59)
+
+| Archivo | Cubre |
+|---|---|
+| `tests/unit/integraciones/whatsapp/conversations/whatsapp-media.test.ts` | R48 (`mediaUrl` solo en imagen/sticker entrante con `media_id`), `mediaIdOf`, tipos admitidos |
+| `tests/unit/integraciones/whatsapp/conversations/whatsapp-conversation.test.ts` (se amplía) | R25, R48, R49 en `attachmentOf`: sin `media_id`, reacción con id interno o `null` |
+| `tests/unit/integraciones/whatsapp/conversations/whatsapp-chat-context.test.ts` | R52 (pedidos/entregados/faltan con conteo, excedente y anulado), R53, R55, R56 (nulos, sin cadena vacía, propias) |
+| `tests/unit/integraciones/whatsapp/conversations/get-whatsapp-media.test.ts` | R44 (cada rama ⇒ no encontrado y Graph sin llamar), R45, R46 (token ilegible, Graph falla, tipo) |
+| `tests/unit/integraciones/whatsapp/conversations/get-whatsapp-chat-context.test.ts` | R50, R51, R54 (elegido por defecto, `orderId` ajeno), R57 (sin escrituras; espías) |
+| `tests/unit/integraciones/whatsapp/conversations/whatsapp-media-route.test.ts` | R44, R46, R47 (cabeceras, sin `media_id` ni URL de Meta), R58 |
+| `tests/unit/integraciones/whatsapp/whatsapp-graph-client-media.test.ts` | R45–R47 con `fetch` doble: dos pasos, token solo en cabecera, host ajeno, tamaño por `file_size`, cabecera y stream, 5xx vs 4xx |
+| `tests/unit/integraciones/whatsapp/whatsapp-graph-client-canned.test.ts` (se amplía) | `downloadMedia` del doble |
+| `tests/integration/integraciones/whatsapp-conversation-prisma.int.test.ts` (se amplía) | R49 (reacción casada, de otro contacto ⇒ null), `findMediaMessage` con ámbito |
+| `tests/integration/pedidos/customer-order-directory.int.test.ts` | vivos, sin cancelados, orden, límite, otra empresa |
+| `tests/integration/identity/company-name-read.int.test.ts` | nombre; dada de baja ⇒ null |
+| `tests/unit/identity/get-company-name.test.ts` | la fábrica |
+| `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` | Composición real + Graph doble: R44 (ruta 404 a otra empresa y a cliente dado de baja), R45, R49, R51–R57 de punta a punta |
