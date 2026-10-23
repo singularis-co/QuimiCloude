@@ -68,19 +68,19 @@
 
 ## Bloque C — `documentos`, composición y acción
 
-- [ ] **T6. Lectores y trabajo** (dep. T5). Los tres `ai-reader-*.ts` (clasificar con `config.model`,
+- [x] **T6. Lectores y trabajo** (dep. T5). Los tres `ai-reader-*.ts` (clasificar con `config.model`,
   lanzar con `marksConnection`); `ports/ai-provider-gateway.ts` (sin `use`,
   `reportConnectionFailure`); `run-document-job.ts`; borrar `domain/ai-read-use.ts`.
   *Hecho:* `ai-reader-anthropic-adapter.test.ts`, `ai-reader-adapter.test.ts`,
   `ai-reader-openai-adapter.test.ts` con el caso 404 al leer; `run-document-job-ai-provider.test.ts`
   con R23 y R25; todo en verde.
 
-- [ ] **T7. Composición** (dep. T4, T6). `lib/composition/index.ts` (`selectAiModel` con `cipher` y
+- [x] **T7. Composición** (dep. T4, T6). `lib/composition/index.ts` (`selectAiModel` con `cipher` y
   el mismo `aiProviderProbe`, doble canned incluido).
   *Hecho:* `ai-provider-wiring.test.ts` (gateway sin uso, `selectAiModel` con sonda, R5) y
   `module-shape.test.ts` en verde; `ai-model-literals.test.ts` sigue en verde (R6).
 
-- [ ] **T8. Server Action** (dep. T7). `selectAiModelAction` y vistas campo a campo en
+- [x] **T8. Server Action** (dep. T7). `selectAiModelAction` y vistas campo a campo en
   `ai-provider-actions.ts` (`rejected` y key ilegible ⇒ `ErrorState` sin `revalidatePath`,
   `design.md > 9`).
   *Hecho:* `ai-provider-actions.test.ts` con `selectAiModelAction`, R13, R33 y R34 en verde.

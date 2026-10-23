@@ -136,6 +136,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
+      'selectAiModel',
       'setWhatsappConnectionEnabled',
       'setWhatsappContactBlocked',
       'setWhatsappTemplateEnabled',

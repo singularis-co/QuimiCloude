@@ -54,7 +54,7 @@ export type {
   AiProviderFailureKind,
   AiProviderProbeResult,
 } from './domain/ai-provider-failure';
-export { isAccountFailure } from './domain/ai-provider-failure';
+export { isAccountFailure, marksConnection } from './domain/ai-provider-failure';
 export type { AiProviderConnectionOverview } from './domain/get-ai-provider-connection';
 export type { AiProviderTestResult } from './domain/test-ai-provider-key';
 export type { TestSavedAiProviderResult } from './domain/test-saved-ai-provider';

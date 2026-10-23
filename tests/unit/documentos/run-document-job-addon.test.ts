@@ -59,7 +59,7 @@ function montar(pdfReading: PdfReadingSwitch) {
   const aiProvider: AiProviderGateway = {
     isConfigured: prohibido('isConfigured'),
     readerFor,
-    reportAccountFailure: prohibido('reportAccountFailure'),
+    reportConnectionFailure: prohibido('reportConnectionFailure'),
     reportRecovered: prohibido('reportRecovered'),
   };
   const pipelineFor = vi.fn(() => {

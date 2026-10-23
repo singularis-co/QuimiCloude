@@ -3,7 +3,7 @@
  * fue la lectura. La key no cruza este puerto: llega ya dentro del `AiReader`.
  */
 import type { AiReader } from './ai-reader';
-import type { AiProviderFailure, AiReadUse } from '@/lib/modules/integraciones';
+import type { AiProviderFailure } from '@/lib/modules/integraciones';
 
 export type AiReaderLookup =
   | { readonly status: 'missing' }
@@ -16,7 +16,7 @@ export type AiReaderLookup =
 
 export interface AiProviderGateway {
   isConfigured(companyId: string): Promise<boolean>;
-  readerFor(companyId: string, use: AiReadUse): Promise<AiReaderLookup>;
-  reportAccountFailure(companyId: string, failure: AiProviderFailure): Promise<void>;
+  readerFor(companyId: string): Promise<AiReaderLookup>;
+  reportConnectionFailure(companyId: string, failure: AiProviderFailure): Promise<void>;
   reportRecovered(companyId: string): Promise<void>;
 }

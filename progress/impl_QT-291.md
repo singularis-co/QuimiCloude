@@ -311,3 +311,105 @@ no genera texto: busca el id en `GET /models` y un id ausente ya sale como `mode
   - Ajeno: `app/layout.tsx` (1, `LayoutProps`).
 
 **Veredicto:** T4 y T5 hechas y en verde en sus tests; el rojo que queda es de T6–T13 y de `app/layout.tsx`.
+
+## T6. Lectores y trabajo (2026-10-22, backend_dev)
+
+**Archivos**
+- `lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts`, `ai-reader-genai.ts`,
+  `ai-reader-openai.ts`: al leer clasifican con `config.model` y lanzan `AiProviderError` con
+  `marksConnection` (antes `isAccountFailure`). Un 404 al leer pasa a `model_unavailable` del modelo en uso.
+- `ai-reader-openai.ts`, además: `classifyOpenAiError(error, model, origin = 'openai')`. Con
+  `origin === 'openrouter'`, un **400** cuyo `error.message` es **exactamente** `"<model> is not a valid
+  model ID"` (el id consultado) es `model_unavailable` (dato de T0). Cualquier otro 400 —otro mensaje,
+  otro id, sin modelo o desde OpenAI— sigue `unexpected`. `providerLabel` devuelve el `origin`.
+- `lib/modules/documentos/ports/ai-provider-gateway.ts`: `readerFor(companyId)` sin `use`;
+  `reportAccountFailure` → `reportConnectionFailure`.
+- `lib/modules/documentos/domain/run-document-job.ts`: sin `USE_BY_STRATEGY`; informa con
+  `marksConnection` y `reportConnectionFailure`; observador renombrado `observeProviderFailures`.
+- `lib/modules/documentos/domain/ai-read-use.ts`: **borrado** (no se exportaba en `documentos/index.ts`).
+- `lib/modules/integraciones/index.ts`: + `marksConnection` (lo usan los lectores y el trabajo;
+  `isAccountFailure` se conserva, `design.md > 4.4`).
+- Tests: `ai-reader-anthropic-adapter.test.ts`, `ai-reader-adapter.test.ts`,
+  `ai-reader-openai-adapter.test.ts`, `run-document-job-ai-provider.test.ts`, `run-document-job-doubles.ts`,
+  `run-document-job-addon.test.ts` (renombre), `module-shape.test.ts` (contrato + `marksConnection`;
+  R19 sin `ai-read-use.ts`).
+
+**R → test**
+- R23 (lector): «QT-291 R23 — un 404 al leer lanza AiProviderError con el modelo en uso…» en los tres
+  adaptadores (OpenAI y OpenRouter en `it.each`); «QT-291 R23 — OpenRouter: el 400 «<id> is not a valid
+  model ID» del modelo en uso es modelo no disponible»; «QT-291 R23 — un 400 distinto de OpenRouter, o ese
+  mismo 400 con OpenAI, se propaga tal cual»; «QT-291 R23 — el 400 de id invalido solo es modelo no
+  disponible con OpenRouter, con ese mensaje exacto y ese modelo» (clasificación, 9 casos).
+- R23 (trabajo): `run-document-job-ai-provider` «QT-291 R23 — el modelo en uso no disponible termina el
+  archivo en `ai_provider_error` definitivo y marca la conexion una vez», «…no repite la lectura con el
+  predeterminado ni con otro modelo…», «…tambien en la peticion de coordenadas del recorte…».
+- R25: «QT-291 R25 — con la conexion en `ERROR` por un modelo marcado, el archivo se lee con el lector de
+  la empresa sin pedir otro», «QT-291 R25 — con un modelo marcado que vuelve a fallar…».
+- El caso de QC-275 «R26 — un `AiProviderError` que no es de cuenta (modelo no disponible) no marca la
+  conexion» se sustituye por los de R23 (el comportamiento cambia por spec). Los `R26 — %i al leer se
+  propaga` dejan fuera el 404.
+
+## T7. Composición (2026-10-22, backend_dev)
+
+**Archivos**
+- `lib/composition/index.ts`: `readerFor(companyId)` → `resolveAiProviderForReading(companyId)`;
+  `reportConnectionFailure` → `{ kind: 'connection_failure', failure }`; `integraciones.selectAiModel =
+  createSelectAiModel(aiProviderDeps)` (mismas deps: `connections`, `catalog`, `cipher`, `aiProviderProbe`
+  con el doble canned). `testAiProviderKey` ya recibía `connections` por `aiProviderDeps`.
+- `tests/unit/composition/ai-provider-wiring.test.ts`: fixture de catálogo con `models`/`defaultModel`,
+  conexión con `model`/`unavailableModel`, `update`/`list` doblados; bloque nuevo de elegir modelo.
+- `tests/unit/integraciones/module-shape.test.ts`: `selectAiModel` en la fachada de la composición.
+
+**R → test** (`ai-provider-wiring.test.ts`)
+- R5: «QT-291 R5 — las opciones salen del catalogo: ver la conexion no llama a ninguna prueba ni construye
+  ningun lector».
+- R16: «R21, R22, QT-291 R16 — …el modelo en uso, el mismo en las dos estrategias» (con y sin elección).
+- R19: «R40, QT-291 R19 — …solo el predeterminado del catalogo».
+- R32: «QT-291 R32 — sin la variable consulta con la prueba de su codigo solo el modelo elegido…», «…con
+  la variable responde el doble…», «…E2E_INVALID sale rechazada sin escribir».
+- R33: «QT-291 R33 — sin la variable, una consulta fallida no escribe…».
+- R6: `ai-model-literals.test.ts` (guardia) sigue verde: los ids de modelo de los tests están en `tests/`.
+
+## T8. Server Action (2026-10-22, backend_dev)
+
+**Archivos**
+- `lib/modules/integraciones/adapters/driving/ai-provider-actions.ts`: `SelectAiModelFormState` y
+  `selectAiModelAction` (`modelId` del `FormData`; `saved` ⇒ revalida; `not_connected` sin revalidar;
+  `rejected` ⇒ `ErrorState` sin revalidar; errores por `toErrorState`, así que la key ilegible sale
+  `integration_secret_unreadable` con su texto del catálogo y sin revalidar). `toProviderState` y
+  `toConnectionState` campo a campo con los campos nuevos; cada opción de modelo también se copia campo a
+  campo (`toModelOptionState`).
+- `tests/unit/integraciones/ai-provider/ai-provider-actions.test.ts`.
+
+**Decisión menor (a confirmar por el reviewer).** `ErrorState` exige un `code` del catálogo cerrado y el
+spec no lo nombra para `rejected`. Se usa `ai_provider_error` («Error con tu proveedor…») con el
+`message` de la prueba, no el del catálogo, como pide `design.md > 9`.
+
+**R → test** (`ai-provider-actions.test.ts`)
+- R9/R13: «QT-291 R9, R13 — elegir pasa el modelo del formulario…, devuelve solo `saved` y revalida».
+- R10: «QT-291 R10 — sin el campo llega una cadena vacia…». R11: «QT-291 R11 — sin conexion…».
+- R13: «QT-291 R13 — la consulta copia la vista y el catalogo campo a campo, tambien cada opcion de
+  modelo»; además `select` entra en los casos genéricos (fila con key, actor, R1, `unexpected`).
+- R33: «QT-291 R33 — una consulta fallida devuelve un ErrorState con el mensaje de la prueba y no revalida».
+- R34: «QT-291 R34 — con la key ilegible devuelve `integration_secret_unreadable`…».
+
+## Verificación de la tanda T6 + T7 + T8 (2026-10-22, backend_dev)
+
+- `eslint --max-warnings=0` de los 19 `.ts` tocados: 0 problemas.
+- `vitest run` de los tests de T6–T8 (`ai-reader-*` ×3, `run-document-job*`, `ai-provider-wiring`,
+  `ai-provider-actions`, `module-shape`, `ai-model-literals`): todo en verde.
+- `vitest related --run` (los 17 `.ts` + el borrado): 468 archivos, 8086 pass, 4 skip, **3 fail**, todos
+  míos y ya arreglados:
+  - `integraciones-graph-doubles.test.ts` y `encryption-keys-env.test.ts`: la lista exacta de la fachada
+    `integraciones` de la composición no tenía `selectAiModel` → añadido.
+  - `qc159-alcance.test.ts`: lee del disco lo que lista `git ls-files`; con `ai-read-use.ts` borrado y
+    sin preparar en el índice daba `ENOENT` → borrado preparado en el índice (`git rm --cached`).
+  - Re-ejecución de esos tres: 49 pass, 1 skip.
+- `pnpm exec vitest run guard`: 87 archivos, 1276 pass, 22 skipped, 0 fail.
+- `pnpm run typecheck`: 22 errores, ninguno de T6–T8:
+  - T10/T11: `ai-provider-card.tsx` (2), `ai-provider-form.tsx` (2), `ai-provider-card.test.tsx` (5),
+    `ai-provider-form.test.tsx` (4), `ai-provider-page.test.tsx` (5).
+  - T13: `e2e/integraciones-proveedor-ia.spec.ts` (3).
+  - Ajeno: `app/layout.tsx` (1, `LayoutProps`).
+
+**Veredicto:** T6, T7 y T8 hechas y en verde; el rojo que queda es de T10/T11, T13 y `app/layout.tsx`.

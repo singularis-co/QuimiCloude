@@ -29,10 +29,10 @@ export function dobleDeProveedor(
 ) {
   const isConfigured = vi.fn<AiProviderGateway['isConfigured']>(async () => lookup.status !== 'missing');
   const readerFor = vi.fn<AiProviderGateway['readerFor']>(async () => lookup);
-  const reportAccountFailure = vi.fn<AiProviderGateway['reportAccountFailure']>(async () => {});
+  const reportConnectionFailure = vi.fn<AiProviderGateway['reportConnectionFailure']>(async () => {});
   const reportRecovered = vi.fn<AiProviderGateway['reportRecovered']>(async () => {});
-  const aiProvider: AiProviderGateway = { isConfigured, readerFor, reportAccountFailure, reportRecovered };
-  return { aiProvider, isConfigured, readerFor, reportAccountFailure, reportRecovered };
+  const aiProvider: AiProviderGateway = { isConfigured, readerFor, reportConnectionFailure, reportRecovered };
+  return { aiProvider, isConfigured, readerFor, reportConnectionFailure, reportRecovered };
 }
 
 /**

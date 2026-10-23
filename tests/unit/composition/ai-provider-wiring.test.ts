@@ -12,6 +12,8 @@ import type { AiProviderCode, AiProviderConnectionStatus } from '@/lib/modules/i
 
 const m = vi.hoisted(() => ({
   findConnection: vi.fn(),
+  updateConnection: vi.fn(),
+  listProviders: vi.fn(),
   getProvider: vi.fn(),
   decrypt: vi.fn(),
   claim: vi.fn(),
@@ -32,11 +34,11 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/modules/integraciones/adapters/driven/persistence/ai-provider-connection-prisma', () => ({
   findAiProviderConnection: m.findConnection,
   insertAiProviderConnection: vi.fn(),
-  updateAiProviderConnection: vi.fn(),
+  updateAiProviderConnection: m.updateConnection,
   deleteAiProviderConnection: vi.fn(),
 }));
 vi.mock('@/lib/modules/integraciones/adapters/driven/catalog/ai-provider-catalog-prisma', () => ({
-  listAiProviders: vi.fn(),
+  listAiProviders: m.listProviders,
   getAiProvider: m.getProvider,
 }));
 vi.mock('@/lib/modules/integraciones/adapters/driven/security/secret-cipher-aes-gcm', () => ({
@@ -110,12 +112,19 @@ function entryOf(code: AiProviderCode) {
   return {
     code,
     name: `Nombre ${code}`,
-    recipeModel: `modelo-receta-${code}`,
-    catalogModel: `modelo-catalogo-${code}`,
+    models: [
+      { modelId: `modelo-mejor-${code}`, isDefault: false },
+      { modelId: `modelo-predeterminado-${code}`, isDefault: true },
+    ],
+    defaultModel: `modelo-predeterminado-${code}`,
   };
 }
 
-function connectionOf(provider: AiProviderCode, status: AiProviderConnectionStatus = 'ACTIVE') {
+function connectionOf(
+  provider: AiProviderCode,
+  status: AiProviderConnectionStatus = 'ACTIVE',
+  model: string | null = null,
+) {
   return {
     id: '66666666-6666-4666-8666-666666666666',
     companyId: COMPANY_ID,
@@ -126,6 +135,8 @@ function connectionOf(provider: AiProviderCode, status: AiProviderConnectionStat
     lastErrorAt: null,
     lastCheckedAt: null,
     keyUpdatedAt: new Date('2026-10-13T12:00:00.000Z'),
+    model,
+    unavailableModel: null,
   };
 }
 
@@ -164,6 +175,8 @@ beforeEach(() => {
   vi.stubEnv('DOCUMENTS_E2E_DOUBLES', '');
   m.getProvider.mockImplementation(async (code: AiProviderCode) => entryOf(code));
   m.findConnection.mockResolvedValue(null);
+  m.listProviders.mockResolvedValue([]);
+  m.updateConnection.mockResolvedValue(null);
   m.decrypt.mockReturnValue(DECRYPTED_KEY);
   m.finish.mockResolvedValue(undefined);
   m.downloadReal.mockRejectedValue(new Error('descarga real cortada en el test'));
@@ -198,7 +211,7 @@ describe('la prueba de la key: doble o real segun INTEGRATIONS_E2E_DOUBLES', () 
     for (const probe of ALL_PROBES) expect(probe).not.toHaveBeenCalled();
   });
 
-  it('R40 — sin la variable cada codigo usa su propia prueba, con la key y los dos modelos del catalogo', async () => {
+  it('R40, QT-291 R19 — sin la variable cada codigo usa su propia prueba, con la key y solo el predeterminado del catalogo', async () => {
     for (const code of CODES) {
       for (const probe of ALL_PROBES) probe.mockClear();
 
@@ -207,7 +220,7 @@ describe('la prueba de la key: doble o real segun INTEGRATIONS_E2E_DOUBLES', () 
       expect(result, code).toEqual({ status: 'tested', ok: true, elapsedMs: 1234 });
       expect(PROBE_OF[code], code).toHaveBeenCalledWith({
         apiKey: API_KEY,
-        models: [`modelo-receta-${code}`, `modelo-catalogo-${code}`],
+        models: [`modelo-predeterminado-${code}`],
       });
       for (const other of CODES.filter((c) => c !== code)) {
         expect(PROBE_OF[other], `${code} no deberia llamar a la prueba de ${other}`).not.toHaveBeenCalled();
@@ -232,21 +245,92 @@ describe('la prueba de la key: doble o real segun INTEGRATIONS_E2E_DOUBLES', () 
   });
 });
 
+describe('elegir modelo: la misma prueba de la key, doble o real segun INTEGRATIONS_E2E_DOUBLES', () => {
+  it('QT-291 R32 — sin la variable consulta con la prueba de su codigo solo el modelo elegido, con la key descifrada, y guarda', async () => {
+    for (const code of CODES) {
+      for (const probe of ALL_PROBES) probe.mockClear();
+      m.updateConnection.mockClear();
+      m.findConnection.mockResolvedValue(connectionOf(code));
+      m.updateConnection.mockResolvedValue(connectionOf(code, 'ACTIVE', `modelo-mejor-${code}`));
+
+      const result = await integraciones.selectAiModel({ modelId: `modelo-mejor-${code}` }, INTEGRATIONS_ADMIN);
+
+      expect(result, code).toMatchObject({ status: 'saved', connection: { modelInUse: `modelo-mejor-${code}` } });
+      expect(PROBE_OF[code], code).toHaveBeenCalledTimes(1);
+      expect(PROBE_OF[code], code).toHaveBeenCalledWith({ apiKey: DECRYPTED_KEY, models: [`modelo-mejor-${code}`] });
+      for (const other of CODES.filter((c) => c !== code)) {
+        expect(PROBE_OF[other], `${code} no deberia llamar a la prueba de ${other}`).not.toHaveBeenCalled();
+      }
+      expect(m.updateConnection, code).toHaveBeenCalledTimes(1);
+      expect(m.updateConnection.mock.calls[0]?.[1], code).toMatchObject({ model: `modelo-mejor-${code}` });
+    }
+  });
+
+  it('QT-291 R33 — sin la variable, una consulta fallida no escribe y devuelve el mensaje de la prueba', async () => {
+    m.findConnection.mockResolvedValue(connectionOf('GOOGLE'));
+    m.probeGenai.mockResolvedValue({ ok: false, failure: { kind: 'rejected_key', httpStatus: 401, model: null } });
+
+    const result = await integraciones.selectAiModel({ modelId: 'modelo-mejor-GOOGLE' }, INTEGRATIONS_ADMIN);
+
+    expect(result).toMatchObject({ status: 'rejected' });
+    expect(m.updateConnection).not.toHaveBeenCalled();
+  });
+
+  it('QT-291 R32 — con la variable responde el doble de la prueba: ningun SDK se llama y la eleccion se guarda', async () => {
+    vi.stubEnv('INTEGRATIONS_E2E_DOUBLES', '1');
+    m.findConnection.mockResolvedValue(connectionOf('ANTHROPIC'));
+    m.updateConnection.mockResolvedValue(connectionOf('ANTHROPIC', 'ACTIVE', 'modelo-mejor-ANTHROPIC'));
+
+    const result = await integraciones.selectAiModel({ modelId: 'modelo-mejor-ANTHROPIC' }, INTEGRATIONS_ADMIN);
+
+    expect(result).toMatchObject({ status: 'saved' });
+    for (const probe of ALL_PROBES) expect(probe).not.toHaveBeenCalled();
+    expect(m.updateConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('QT-291 R32 — con la variable, una key guardada que empieza por E2E_INVALID sale rechazada sin escribir', async () => {
+    vi.stubEnv('INTEGRATIONS_E2E_DOUBLES', '1');
+    m.findConnection.mockResolvedValue(connectionOf('OPENAI'));
+    m.decrypt.mockReturnValue(`${CANNED_INVALID_KEY_PREFIX}-guardada`);
+
+    const result = await integraciones.selectAiModel({ modelId: 'modelo-mejor-OPENAI' }, INTEGRATIONS_ADMIN);
+
+    expect(result).toMatchObject({ status: 'rejected' });
+    for (const probe of ALL_PROBES) expect(probe).not.toHaveBeenCalled();
+    expect(m.updateConnection).not.toHaveBeenCalled();
+  });
+
+  it('QT-291 R5 — las opciones salen del catalogo: ver la conexion no llama a ninguna prueba ni construye ningun lector', async () => {
+    m.listProviders.mockResolvedValue(CODES.map(entryOf));
+    m.findConnection.mockResolvedValue(connectionOf('OPENROUTER'));
+
+    const overview = await integraciones.getAiProviderConnection(INTEGRATIONS_ADMIN);
+
+    expect(JSON.stringify(overview)).toContain('modelo-mejor-OPENROUTER');
+    for (const probe of ALL_PROBES) expect(probe).not.toHaveBeenCalled();
+    for (const factory of ALL_READER_FACTORIES) expect(factory).not.toHaveBeenCalled();
+  });
+});
+
 describe('la lectura: el lector de la empresa o el doble segun DOCUMENTS_E2E_DOUBLES', () => {
-  it('R21, R22 — sin la variable cada codigo construye su lector con la key descifrada y el modelo del uso', async () => {
-    for (const [strategy, modelOf] of [
-      ['formula', (c: AiProviderCode) => `modelo-receta-${c}`],
-      ['catalogo', (c: AiProviderCode) => `modelo-catalogo-${c}`],
+  it('R21, R22, QT-291 R16 — sin la variable cada codigo construye su lector con la key descifrada y el modelo en uso, el mismo en las dos estrategias', async () => {
+    for (const [strategy, chosen, modelOf] of [
+      ['formula', null, (c: AiProviderCode) => `modelo-predeterminado-${c}`],
+      ['catalogo', null, (c: AiProviderCode) => `modelo-predeterminado-${c}`],
+      ['formula', 'mejor', (c: AiProviderCode) => `modelo-mejor-${c}`],
+      ['catalogo', 'mejor', (c: AiProviderCode) => `modelo-mejor-${c}`],
     ] as const) {
       for (const code of CODES) {
         for (const factory of ALL_READER_FACTORIES) factory.mockClear();
         withBatch(strategy);
-        m.findConnection.mockResolvedValue(connectionOf(code));
+        m.findConnection.mockResolvedValue(
+          connectionOf(code, 'ACTIVE', chosen === null ? null : `modelo-${chosen}-${code}`),
+        );
 
         await runJob();
 
         const expected = { apiKey: DECRYPTED_KEY, model: modelOf(code) };
-        const label = `${strategy} / ${code}`;
+        const label = `${strategy} / ${chosen ?? 'predeterminado'} / ${code}`;
         if (code === 'ANTHROPIC') expect(m.createAnthropicReader, label).toHaveBeenCalledWith(expected);
         if (code === 'GOOGLE') expect(m.createGenaiReader, label).toHaveBeenCalledWith(expected);
         if (code === 'OPENAI') expect(m.createOpenAiReader, label).toHaveBeenCalledWith(expected);

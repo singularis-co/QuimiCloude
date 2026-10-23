@@ -9,7 +9,7 @@ import type { Part } from '@google/genai';
 
 import { AiProviderError } from '../../../domain/errors';
 
-import { isAccountFailure } from '@/lib/modules/integraciones';
+import { marksConnection } from '@/lib/modules/integraciones';
 
 import type { AiDocumentPart, AiReader, AiReadRequest } from '../../../ports/ai-reader';
 import type { AiProviderFailure, AiProviderProbeResult } from '@/lib/modules/integraciones';
@@ -99,8 +99,8 @@ async function readWithGenai(config: GenaiReaderConfig, request: AiReadRequest):
     return text;
   } catch (error) {
     if (error instanceof ApiError) {
-      const failure = classifyGenaiError(error, null);
-      if (isAccountFailure(failure)) {
+      const failure = classifyGenaiError(error, config.model);
+      if (marksConnection(failure)) {
         throw new AiProviderError(failure, `gemini generateContent respondió ${failure.httpStatus}`);
       }
     }

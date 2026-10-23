@@ -17,6 +17,7 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   IntegracionesError,
   type Actor,
+  type AiModelOption,
   type AiProviderConnectionView,
   type AiProviderEntry,
   type AiProviderReadiness,
@@ -52,6 +53,12 @@ export type SaveAiProviderConnectionFormState =
   | { status: 'test_failed'; message: string }
   | ErrorState;
 
+export type SelectAiModelFormState =
+  | { status: 'idle' }
+  | { status: 'saved' }
+  | { status: 'not_connected' }
+  | ErrorState;
+
 export type DisconnectAiProviderFormState =
   | { status: 'idle' }
   | { status: 'disconnected' }
@@ -85,12 +92,16 @@ function buildKeyCandidate(formData: FormData): unknown {
   };
 }
 
+function toModelOptionState(option: AiModelOption): AiModelOption {
+  return { modelId: option.modelId, isDefault: option.isDefault };
+}
+
 function toProviderState(entry: AiProviderEntry): AiProviderEntry {
   return {
     code: entry.code,
     name: entry.name,
-    recipeModel: entry.recipeModel,
-    catalogModel: entry.catalogModel,
+    models: entry.models.map(toModelOptionState),
+    defaultModel: entry.defaultModel,
   };
 }
 
@@ -98,8 +109,10 @@ function toConnectionState(view: AiProviderConnectionView): AiProviderConnection
   return {
     provider: view.provider,
     providerName: view.providerName,
-    recipeModel: view.recipeModel,
-    catalogModel: view.catalogModel,
+    modelInUse: view.modelInUse,
+    modelIsDefault: view.modelIsDefault,
+    modelUnavailable: view.modelUnavailable,
+    modelOptions: view.modelOptions.map(toModelOptionState),
     status: view.status,
     lastError: view.lastError,
     lastErrorAt: view.lastErrorAt,
@@ -184,6 +197,31 @@ export async function saveAiProviderConnectionAction(
     const result = await integraciones.saveAiProviderConnection(buildKeyCandidate(formData), actor);
     if (result.status === 'test_failed') {
       return { status: 'test_failed', message: result.message };
+    }
+    refreshScreen();
+    return { status: 'saved' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/**
+ * Una consulta fallida no escribió nada, así que no hay pantalla que revalidar; su mensaje es el
+ * de la prueba, no el del catálogo de errores.
+ */
+export async function selectAiModelAction(
+  prevState: SelectAiModelFormState,
+  formData: FormData,
+): Promise<SelectAiModelFormState> {
+  void prevState;
+
+  const actor = await currentActor();
+
+  try {
+    const result = await integraciones.selectAiModel({ modelId: readFormString(formData, 'modelId') }, actor);
+    if (result.status === 'not_connected') return { status: 'not_connected' };
+    if (result.status === 'rejected') {
+      return { status: 'error', code: 'ai_provider_error', message: result.message };
     }
     refreshScreen();
     return { status: 'saved' };

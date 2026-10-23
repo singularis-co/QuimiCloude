@@ -284,6 +284,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'saveAiProviderConnection',
         'secretCipher',
         'secretDigest',
+        'selectAiModel',
         'setWhatsappConnectionEnabled',
         'setWhatsappContactBlocked',
         'setWhatsappTemplateEnabled',

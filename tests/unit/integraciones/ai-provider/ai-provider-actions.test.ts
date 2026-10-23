@@ -11,6 +11,7 @@ import {
   getAiProviderConnectionAction,
   getAiProviderReadinessAction,
   saveAiProviderConnectionAction,
+  selectAiModelAction,
   testAiProviderKeyAction,
   testSavedAiProviderAction,
 } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions'
@@ -28,6 +29,7 @@ const {
   testKeyMock,
   testSavedMock,
   saveMock,
+  selectMock,
   disconnectMock,
   readinessMock,
   getSessionUserMock,
@@ -39,6 +41,7 @@ const {
   testKeyMock: vi.fn(),
   testSavedMock: vi.fn(),
   saveMock: vi.fn(),
+  selectMock: vi.fn(),
   disconnectMock: vi.fn(),
   readinessMock: vi.fn(),
   getSessionUserMock: vi.fn(),
@@ -57,6 +60,7 @@ vi.mock('@/lib/composition', () => ({
     testAiProviderKey: testKeyMock,
     testSavedAiProvider: testSavedMock,
     saveAiProviderConnection: saveMock,
+    selectAiModel: selectMock,
     disconnectAiProvider: disconnectMock,
     getAiProviderReadiness: readinessMock,
   },
@@ -82,15 +86,23 @@ const ACTOR = { id: SESSION_USER.id, companyId: COMPANY_ID, permissions: SESSION
 const ENTRY: AiProviderEntry = {
   code: 'GOOGLE',
   name: 'Google Gemini',
-  recipeModel: 'modelo-receta',
-  catalogModel: 'modelo-catalogo',
+  models: [
+    { modelId: 'modelo-mejor', isDefault: false },
+    { modelId: 'modelo-predeterminado', isDefault: true },
+  ],
+  defaultModel: 'modelo-predeterminado',
 }
 
 const VIEW: AiProviderConnectionView = {
   provider: 'GOOGLE',
   providerName: 'Google Gemini',
-  recipeModel: 'modelo-receta',
-  catalogModel: 'modelo-catalogo',
+  modelInUse: 'modelo-mejor',
+  modelIsDefault: false,
+  modelUnavailable: false,
+  modelOptions: [
+    { modelId: 'modelo-mejor', isDefault: false },
+    { modelId: 'modelo-predeterminado', isDefault: true },
+  ],
   status: 'ACTIVE',
   lastError: null,
   lastErrorAt: null,
@@ -119,6 +131,7 @@ function happyPath(): void {
   testKeyMock.mockResolvedValue({ status: 'tested', ok: true, elapsedMs: 812 })
   testSavedMock.mockResolvedValue({ status: 'tested', ok: true, elapsedMs: 640 })
   saveMock.mockResolvedValue({ status: 'saved', connection: VIEW })
+  selectMock.mockResolvedValue({ status: 'saved', connection: VIEW })
   disconnectMock.mockResolvedValue({ status: 'disconnected' })
   readinessMock.mockResolvedValue({ configured: true, canConfigure: true })
 }
@@ -129,6 +142,7 @@ const ACTIONS = {
   testKey: () => testAiProviderKeyAction({ status: 'idle' }, formDataOf(KEY_FIELDS)),
   testSaved: () => testSavedAiProviderAction({ status: 'idle' }, new FormData()),
   save: () => saveAiProviderConnectionAction({ status: 'idle' }, formDataOf(KEY_FIELDS)),
+  select: () => selectAiModelAction({ status: 'idle' }, formDataOf({ modelId: 'modelo-mejor' })),
   disconnect: () => disconnectAiProviderAction({ status: 'idle' }, new FormData()),
 } as const
 
@@ -137,6 +151,7 @@ const USE_CASE_OF = {
   testKey: testKeyMock,
   testSaved: testSavedMock,
   save: saveMock,
+  select: selectMock,
   disconnect: disconnectMock,
 } as const
 
@@ -227,6 +242,7 @@ describe('acciones del proveedor IA — estados de salida', () => {
     testKeyMock.mockResolvedValueOnce({ status: 'tested', ok: true, elapsedMs: 1, apiKey: API_KEY })
     testSavedMock.mockResolvedValueOnce({ status: 'tested', ok: true, elapsedMs: 1, apiKeyEnc: API_KEY_ENC })
     saveMock.mockResolvedValueOnce({ status: 'saved', connection: leakyView })
+    selectMock.mockResolvedValueOnce({ status: 'saved', connection: leakyView })
     disconnectMock.mockResolvedValueOnce({ status: 'disconnected', apiKeyEnc: API_KEY_ENC })
     readinessMock.mockResolvedValueOnce({ configured: true, canConfigure: true, apiKey: API_KEY })
 
@@ -234,6 +250,64 @@ describe('acciones del proveedor IA — estados de salida', () => {
       expectNoKey(await ACTIONS[name]())
     }
     expectNoKey(await getAiProviderReadinessAction())
+  })
+})
+
+describe('accion de elegir modelo (QT-291)', () => {
+  it('QT-291 R9, R13 — elegir pasa el modelo del formulario al caso de uso, devuelve solo `saved` y revalida', async () => {
+    const result = await ACTIONS.select()
+    expect(result).toEqual({ status: 'saved' })
+    expect(selectMock).toHaveBeenCalledWith({ modelId: 'modelo-mejor' }, ACTOR)
+    expect(revalidatePathMock).toHaveBeenCalledTimes(1)
+    expect(revalidatePathMock).toHaveBeenCalledWith(AI_PROVIDER_ROUTE)
+    expectNoKey(result)
+  })
+
+  it('QT-291 R10 — sin el campo llega una cadena vacia al caso de uso: el esquema la rechaza alli', async () => {
+    await selectAiModelAction({ status: 'idle' }, new FormData())
+    expect(selectMock).toHaveBeenCalledWith({ modelId: '' }, ACTOR)
+  })
+
+  it('QT-291 R11 — sin conexion devuelve `not_connected` sin revalidar', async () => {
+    selectMock.mockResolvedValueOnce({ status: 'not_connected' })
+    expect(await ACTIONS.select()).toEqual({ status: 'not_connected' })
+    expect(revalidatePathMock).not.toHaveBeenCalled()
+  })
+
+  it('QT-291 R33 — una consulta fallida devuelve un ErrorState con el mensaje de la prueba y no revalida', async () => {
+    const message = 'Error con tu proveedor: el modelo modelo-mejor ya no está disponible.'
+    selectMock.mockResolvedValueOnce({ status: 'rejected', message })
+    const result = await ACTIONS.select()
+    expect(result).toEqual({ status: 'error', code: 'ai_provider_error', message })
+    expect(revalidatePathMock).not.toHaveBeenCalled()
+    expectNoKey(result)
+  })
+
+  it('QT-291 R34 — con la key ilegible devuelve `integration_secret_unreadable` con el texto del catalogo y no revalida', async () => {
+    selectMock.mockRejectedValueOnce(new SecretUnreadableError('diagnostico interno'))
+    const result = await ACTIONS.select()
+    expect(result).toEqual({
+      status: 'error',
+      code: 'integration_secret_unreadable',
+      message: errorMessage('integration_secret_unreadable'),
+    })
+    expect(JSON.stringify(result)).not.toContain('diagnostico interno')
+    expect(revalidatePathMock).not.toHaveBeenCalled()
+  })
+
+  it('QT-291 R13 — la consulta copia la vista y el catalogo campo a campo, tambien cada opcion de modelo', async () => {
+    const leakyOption = { modelId: 'modelo-mejor', isDefault: false, apiKey: API_KEY }
+    getMock.mockResolvedValueOnce({
+      providers: [{ ...ENTRY, models: [leakyOption] }],
+      connection: { ...VIEW, modelOptions: [leakyOption], apiKeyEnc: API_KEY_ENC },
+    })
+    const result = await getAiProviderConnectionAction()
+    expectNoKey(result)
+    expect(result).toEqual({
+      status: 'success',
+      providers: [{ ...ENTRY, models: [{ modelId: 'modelo-mejor', isDefault: false }] }],
+      connection: { ...VIEW, modelOptions: [{ modelId: 'modelo-mejor', isDefault: false }] },
+    })
   })
 })
 

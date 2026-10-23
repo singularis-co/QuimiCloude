@@ -8,18 +8,17 @@
  * IA, asi que es la unica que puede pedirle donde estan sus imagenes. Corre ANTES de cerrar la
  * fila para que un fallo suyo pueda dejarla en error con su motivo, y si falla el PDF NO se borra.
  *
- * El lector es el del proveedor IA de la empresa dueña del archivo, con el modelo del uso de la
- * estrategia, y se pide antes de descargar: sin conexión o con la key ilegible no se baja nada.
- * Qué cuenta como fallo de la cuenta y cuándo se recupera la conexión se decide aquí, al terminar.
+ * El lector es el del proveedor IA de la empresa dueña del archivo, con el modelo en uso de su
+ * conexión, y se pide antes de descargar: sin conexión o con la key ilegible no se baja nada.
+ * Qué fallo marca la conexión y cuándo se recupera se decide aquí, al terminar.
  */
-import { USE_BY_STRATEGY } from './ai-read-use';
 import { AiProviderError } from './errors';
 import { failureKind, STORAGE_FAILURE_KIND } from './failure-kind';
 import { createNotifyIfBatchFinished, type BatchFinishedDeps } from './notify-if-batch-finished';
 import { createDownloadDocument } from './read-document';
 
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
-import { isAccountFailure } from '@/lib/modules/integraciones';
+import { marksConnection } from '@/lib/modules/integraciones';
 
 import type { Actor } from './actor';
 import type { CropCatalogImagesInput, CropCatalogImagesResult } from './crop-catalog-images';
@@ -82,8 +81,8 @@ function outcomeKindOf(kind: ReturnType<typeof failureKind>): 'requeue' | 'error
   return kind === 'retryable' ? 'requeue' : 'error';
 }
 
-/** Deja pasar la lectura tal cual y recuerda el último fallo de cuenta que la atravesó. */
-function observeAccountFailures(reader: AiReader): {
+/** Deja pasar la lectura tal cual y recuerda el último fallo del proveedor que la atravesó. */
+function observeProviderFailures(reader: AiReader): {
   readonly reader: AiReader;
   readonly lastFailure: () => AiProviderError | null;
 } {
@@ -195,10 +194,7 @@ export function createRunDocumentJob(
       return { kind: outcome.kind };
     }
 
-    const lookup = await deps.aiProvider.readerFor(
-      claimed.companyId,
-      USE_BY_STRATEGY[batch.strategy],
-    );
+    const lookup = await deps.aiProvider.readerFor(claimed.companyId);
     if (lookup.status !== 'ready') {
       // Con la key ilegible, `integraciones` ya dejó la conexión en error al resolverla.
       const code = lookup.status === 'missing' ? 'ai_provider_missing' : 'ai_provider_error';
@@ -213,14 +209,14 @@ export function createRunDocumentJob(
       await terminar(claimed, outcome);
       return { kind: outcome.kind };
     }
-    const observado = observeAccountFailures(lookup.reader);
+    const observado = observeProviderFailures(lookup.reader);
     const pipeline = deps.pipelineFor(observado.reader);
 
     const { id: fileId, companyId } = claimed;
     async function informarFallo(): Promise<void> {
       const fallo = observado.lastFailure();
-      if (fallo === null || !isAccountFailure(fallo.failure)) return;
-      await informar(fileId, () => deps.aiProvider.reportAccountFailure(companyId, fallo.failure));
+      if (fallo === null || !marksConnection(fallo.failure)) return;
+      await informar(fileId, () => deps.aiProvider.reportConnectionFailure(companyId, fallo.failure));
     }
 
     let bytes: Uint8Array;
