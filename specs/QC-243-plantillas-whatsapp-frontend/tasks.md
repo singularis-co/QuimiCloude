@@ -11,7 +11,7 @@ hasta que el backend la guarde (R58).
 
 ## Tanda 1 — reglas puras y burbuja
 
-- [ ] **T1 [P] Constantes y reglas de plantilla.** `whatsapp-system-constants.ts` (§5) y
+- [x] **T1 [P] Constantes y reglas de plantilla.** `whatsapp-system-constants.ts` (§5) y
   `whatsapp-template-rules.ts` (§6.1–6.3, 6.5–6.8): diccionario de pantalla, `toBackendText` /
   `toDisplayText` / `displayKeyOf`, `isMappable`, sin relacionar, marcas de hueco, texto numerado,
   contador, tonos y textos de estado y categoría, `formatSyncDateTime`, `LANGUAGE_OPTIONS`,
@@ -22,12 +22,12 @@ hasta que el backend la guarde (R58).
   como `{{n}}`, sin header ni botones, `AUTHENTICATION` → `UTILITY`), R48 (las tres constantes con sus
   textos), P1 (ida y vuelta de las tres claves; clave con punto desconocida intacta), R7 (`null` → marca
   de vacío; fecha con zona fija).
-- [ ] **T2 [P] Reglas de variable propia.** `whatsapp-variable-rules.ts` (§6.4, 6.9).
+- [x] **T2 [P] Reglas de variable propia.** `whatsapp-variable-rules.ts` (§6.4, 6.9).
   **Hecho:** `whatsapp-variable-rules.test.ts`: R51 (tildes, ñ, mayúsculas, signos, dígitos al
   principio, `_` al final, 40 caracteres, siempre casa con `WHATSAPP_VARIABLE_KEY_PATTERN`), R52 (vacía,
   repetida con una propia, igual a una constante), R57 (espacios al borde, dobles, dígitos → no
   dígitos; sin aviso si nada de eso).
-- [ ] **T3 [P] `WaBubble`.** `wa-bubble.tsx` según `WaBurbuja.dc.html`: encabezado en negrita,
+- [x] **T3 [P] `WaBubble`.** `wa-bubble.tsx` según `WaBurbuja.dc.html`: encabezado en negrita,
   cuerpo con variables resaltadas, pie gris, hora, botones debajo, tema oscuro, nombre accesible con el
   texto, fundido de 240 ms y `motion-reduce`.
   **Hecho:** `wa-bubble.test.tsx`: R32 (propia → valor, constante → etiqueta, desconocida → `[clave]`,
