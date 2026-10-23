@@ -247,4 +247,10 @@ tabla.
 | 2026-10-22 | (F1.4) Al elegir, si la prueba falla por key rechazada, cuota o key ilegible, ¿la conexión pasa a Error? | No: se avisa bajo el selector y no se escribe nada. |
 | 2026-10-22 | (F1.4) Conexión en Error por key o cuota: si la prueba al elegir sale bien, ¿vuelve a Conectado? | Sí: queda `ACTIVE` con `lastError` y `lastErrorAt` vacíos, además de guardar la elección. (Cambia la propuesta de R12.) |
 | 2026-10-22 | (F1.4) ¿Un id nativo sin confirmar por falta de key bloquea el merge? | No. Se implementa con los ids de la fuente; al cerrar, el leader lista los pendientes y el humano los acepta por escrito antes del PR. |
+| 2026-10-22 | (F2) Código de error de `selectAiModelAction` cuando la prueba al elegir falla | `ai_provider_error` con el mensaje de la prueba, igual que «Probar conexión». |
+| 2026-10-22 | (F2) La conexión se borra entre la consulta y la escritura al elegir | Responde «sin conexión», como R11. No se escribe nada. |
+| 2026-10-22 | (F2) Key ilegible al elegir (R34) | La conexión no pasa a Error; se avisa bajo el selector y el error queda registrado en el log del servidor. |
+| 2026-10-22 | (F2) Nombre de los tests nuevos en archivos compartidos con QC-275 | Prefijo «QT-291 R<n>». |
+| 2026-10-22 | (F2) Ayuda «Después de conectar podrás elegir el modelo.» al abrir «Cambiar key o proveedor» | Se oculta cuando ya hay conexión: solo sale en el alta. |
+| 2026-10-22 | (F2) Ids nativos sin confirmar: Anthropic `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-opus-5`, `claude-sonnet-5` (key 401); OpenAI `gpt-6.1-sol`, `gpt-6-sol`, `gpt-6-luna-pro`, `gpt-5.6-luna` (sin key) | Aceptados por escrito por el humano. No bloquean el PR. |
 | — | Identificadores de DB | En inglés (heredado de QC-4). |
