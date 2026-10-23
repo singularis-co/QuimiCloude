@@ -838,6 +838,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261023130000_whatsapp_outbound_messages',
   // 2026-10-24: el permiso whatsapp.consultar; no toca el identificador.
   '20261024120000_whatsapp_read_permission',
+  // 2026-10-24: la marca de lectura de los contactos de WhatsApp; no toca el identificador.
+  '20261024130000_whatsapp_contacts_last_read',
 ] as const
 
 export function hallazgosDeMigraciones(

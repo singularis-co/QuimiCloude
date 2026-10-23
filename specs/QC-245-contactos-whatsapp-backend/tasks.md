@@ -23,7 +23,7 @@
   - **Hecho:** los tests nombrados en verde; solo el Administrador tiene el permiso en el seed y en la
     migración; aplicar dos veces no duplica; `down.sql` deja las tablas como antes.
 
-- [ ] **T2 [P] Migración de esquema `last_read_at`** (R14, R42).
+- [x] **T2 [P] Migración de esquema `last_read_at`** (R14, R42).
   - `schema.prisma`: `lastReadAt DateTime? @map("last_read_at") @db.Timestamptz(6)` en
     `WhatsappContact`.
   - `20261024130000_whatsapp_contacts_last_read` (`migration.sql` + `down.sql`, design §2.3).
