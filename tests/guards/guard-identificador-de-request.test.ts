@@ -832,6 +832,10 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-22: el catalogo de modelos de IA y la eleccion de modelo en la conexion; no toca el
   // identificador.
   '20261022120000_ai_models',
+  // 2026-10-23: el permiso whatsapp.enviar y la columna de idioma con la FK de `sent_by` de los
+  // mensajes de WhatsApp; no tocan el identificador.
+  '20261023120000_whatsapp_send_permission',
+  '20261023130000_whatsapp_outbound_messages',
 ] as const
 
 export function hallazgosDeMigraciones(
