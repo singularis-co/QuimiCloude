@@ -113,16 +113,28 @@ describe('constantes del sistema', () => {
 });
 
 describe('diccionario de pantalla', () => {
-  it('R32: una constante se previsualiza por su etiqueta y una propia por su valor', () => {
+  it('R32: una constante se previsualiza por su ejemplo y una propia por su valor', () => {
     const dictionary = dictionaryOf(OWN);
     expect(dictionary).toHaveLength(4);
     expect(dictionary[0]).toEqual({
       key: 'nombre_del_cliente',
       label: 'Nombre del cliente',
-      preview: 'Nombre del cliente',
+      preview: 'Laura Gómez',
       kind: 'system',
     });
+    expect(dictionary[1]).toMatchObject({ key: 'numero_de_pedido', label: 'Número de pedido', preview: 'PED-00128' });
     expect(dictionary[3]).toEqual({ key: 'numero_de_cuenta', label: 'Número de cuenta', preview: '123456', kind: 'company' });
+  });
+
+  it('R32: una constante sin ejemplo (EMPTY_MARK) se previsualiza por su etiqueta', () => {
+    const empresa = dictionaryOf(OWN).find((entry) => entry.key === 'nombre_de_la_empresa');
+    expect(empresa).toEqual({
+      key: 'nombre_de_la_empresa',
+      label: 'Nombre de la empresa',
+      preview: 'Nombre de la empresa',
+      kind: 'system',
+    });
+    expect(empresa?.preview).not.toBe(EMPTY_MARK);
   });
 
   it('P1: una clave que no está en el diccionario se muestra con la clave como etiqueta', () => {

@@ -471,7 +471,7 @@ describe('alta de plantilla', () => {
     ]);
     expect(
       within(screen.getByTestId(WA_BUBBLE_TESTID)).getAllByTestId(WA_BUBBLE_VARIABLE_TESTID).map((v) => v.textContent),
-    ).toEqual(['2200345678', 'Nombre del cliente', '2200345678']);
+    ).toEqual(['2200345678', 'Laura Gómez', '2200345678']);
   });
 
   it('R30: un {{1}} o una clave inventada muestran el aviso y no dejan enviar', async () => {
@@ -659,7 +659,7 @@ describe('alta de plantilla', () => {
     await escribir(user, mensaje(), 'Hola {{nombre_del_cliente}}');
     await user.click(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_TAB_TESTID('preview')));
     expect(screen.getByTestId(WA_BUBBLE_TESTID)).toBeVisible();
-    expect(screen.getByTestId(WA_BUBBLE_TESTID)).toHaveTextContent('Hola Nombre del cliente');
+    expect(screen.getByTestId(WA_BUBBLE_TESTID)).toHaveTextContent('Hola Laura Gómez');
 
     await user.click(screen.getByTestId(WHATSAPP_TEMPLATE_FORM_TAB_TESTID('form')));
     expect(mensaje()).toHaveValue('Hola {{nombre_del_cliente}}');

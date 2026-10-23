@@ -153,7 +153,8 @@ resuelve aquí (no hay forma de crearla desde la app).
 ### 6.1 Diccionario de pantalla
 
 `dictionaryOf(own)`: constantes (§5) y propias, cada una `{ key (display), label, preview, kind }`, con
-`preview` = etiqueta para una constante y valor para una propia (G7). Lo usan el menú de insertar, el
+`preview` = `example` para una constante (su etiqueta si `example` es `EMPTY_MARK`) y valor para una
+propia (G7). `preview` solo lo leen las vistas previas; `label` y `constantLabels` no cambian. Lo usan el menú de insertar, el
 selector de hueco, «Variables en el mensaje» y las dos vistas previas.
 
 ### 6.2 Relacionable, sin relacionar y huecos
