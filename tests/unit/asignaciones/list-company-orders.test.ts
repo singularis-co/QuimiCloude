@@ -43,6 +43,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: null,
     finishedAt: null,
@@ -53,7 +54,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, imageUrl: null, ...overrides };
 }
 
 function persona(id: string): PersonRef {

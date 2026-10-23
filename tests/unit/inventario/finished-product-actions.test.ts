@@ -5,6 +5,7 @@ import {
   listFinishedProductBatchesAction,
   listFinishedProductCostsAction,
   listFinishedProductDeliveriesAction,
+  listFinishedProductDistributionAction,
   listFinishedProductMovementsAction,
   listProducedProductsAction,
 } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
@@ -21,6 +22,7 @@ const { casos, getSessionUserMock, getSessionContextMock } = vi.hoisted(() => ({
     listFinishedProductBatches: vi.fn(),
     listFinishedProductMovements: vi.fn(),
     listFinishedProductDeliveries: vi.fn(),
+    listFinishedProductDistribution: vi.fn(),
     listFinishedProductCosts: vi.fn(),
     listProducedProducts: vi.fn(),
   },
@@ -67,6 +69,12 @@ const ACCIONES: readonly Accion[] = [
     casoDeUso: 'listFinishedProductDeliveries',
     invocar: () => listFinishedProductDeliveriesAction(FINISHED_PRODUCT_ID, { page: 1 }),
     argumentos: [FINISHED_PRODUCT_ID, { page: 1 }, ACTOR],
+  },
+  {
+    nombre: 'listFinishedProductDistributionAction',
+    casoDeUso: 'listFinishedProductDistribution',
+    invocar: () => listFinishedProductDistributionAction(FINISHED_PRODUCT_ID, { page: 1, pageSize: 25 }),
+    argumentos: [FINISHED_PRODUCT_ID, { page: 1, pageSize: 25 }, ACTOR],
   },
   {
     nombre: 'listFinishedProductCostsAction',

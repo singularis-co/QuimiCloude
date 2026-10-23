@@ -5,6 +5,7 @@ import {
   ActionNotAllowedError,
   ConvertedCostOutOfRangeError,
   ConvertedStockOutOfRangeError,
+  ExpiryDateNotFutureError,
   ProductNotFoundError,
   ValidationError,
 } from './errors';
@@ -12,6 +13,7 @@ import {
   createProductSchema,
   type CreateProductInput,
 } from './product-input';
+import { validateProductImage } from './product-image';
 import { PRODUCT_TYPES, type ProductType } from './product-type';
 import { convertSupplyBatch, pickSupplyTarget } from './supply-family';
 import { deriveUnitCost } from './unit-cost';
@@ -19,6 +21,7 @@ import { deriveUnitCost } from './unit-cost';
 import type { NewProductBatch } from './product-batch';
 import type { NewProduct } from './product-view';
 import type { StockIncreaseListener } from './stock-increase-listener';
+import type { ProductImageStorage, ProductImageUpload } from '../ports/product-image-storage';
 import type { ProductRepository } from '../ports/product-repository';
 
 export type CreateProductDeps = {
@@ -29,8 +32,15 @@ export type CreateProductDeps = {
   readonly packageUnit?: PackageUnitSource;
   /** Comprueba la unidad del alta de insumo. Sin el, el alta de un insumo falla. */
   readonly units?: Pick<UnitCatalog, 'findRefs'>;
+  /** Donde se sube la imagen. Sin el, un alta con imagen falla. */
+  readonly images?: ProductImageStorage;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
+  /**
+   * `true` deja pasar un vencimiento de hoy o anterior. Solo lo pasa el importador: un inventario
+   * que ya existe puede traer lotes vencidos. El alta del formulario lo omite y la regla aplica.
+   */
+  readonly acceptsPastExpiry?: boolean;
 };
 
 /** El lote que se agrego convertido: existencia y unidad del destino. */
@@ -42,6 +52,26 @@ export type SupplyConversion = {
 
 /** `conversion` solo viene cuando el lote se convirtio a la unidad de un homonimo. */
 export type CreateProductResult = { id: string; lot?: string; conversion?: SupplyConversion };
+
+/** La imagen ya validada, pendiente de subir; `null` si el alta no trae ninguna. */
+type ImagenPendiente = ProductImageUpload | null;
+
+/** Valida antes de tocar el puerto: una imagen invalida no deja nada escrito. */
+function validarImagen(deps: CreateProductDeps, image: { bytes: Uint8Array } | undefined): ImagenPendiente {
+  if (image === undefined) return null;
+  const validation = validateProductImage(image.bytes);
+  if (!validation.ok) throw new ValidationError(`image: ${validation.reason}`);
+  if (deps.images === undefined) {
+    throw new Error('alta de producto con imagen sin almacenamiento: falta el cableado');
+  }
+  return { bytes: image.bytes, contentType: validation.contentType, extension: validation.extension };
+}
+
+/** Solo se sube cuando el producto nace: a un homonimo existente se le agrega el lote y nada mas. */
+async function subirImagen(deps: CreateProductDeps, imagen: ImagenPendiente): Promise<string | null> {
+  if (imagen === null || deps.images === undefined) return null;
+  return deps.images.upload(imagen);
+}
 
 type EntradaConLote = Extract<CreateProductInput, { type: (typeof PRODUCT_TYPES)[keyof typeof PRODUCT_TYPES] }>;
 
@@ -84,6 +114,23 @@ function rechazarFechaFutura(purchaseDate: string, instante: Date): void {
   }
 }
 
+/**
+ * Mismo «hoy» UTC y misma comparacion de cadenas que la fecha de compra. Ausente es valido; el
+ * envase nunca lo trae.
+ *
+ * Tolerancia deliberada de un dia: solo se rechaza lo anterior a hoy UTC, no hoy UTC. El servidor
+ * corre en UTC y no hay zona horaria por empresa; en UTC-5, de 19:00 a 24:00 locales el «manana»
+ * local ya es «hoy» UTC y un `<=` lo rechazaria. Nunca rechaza de mas; a cambio, durante el dia
+ * local puede aceptar el «hoy» local. La regla estricta (posterior a hoy local) la impone el picker.
+ */
+function rechazarVencimientoNoFuturo(entrada: EntradaConLote, instante: Date): void {
+  if (entrada.type === PRODUCT_TYPES.PACKAGING || entrada.expiryDate == null) return;
+  const hoy = fechaCivilUtc(instante);
+  if (entrada.expiryDate < hoy) {
+    throw new ExpiryDateNotFutureError(`expiryDate: vencimiento anterior a hoy UTC (${entrada.expiryDate} < ${hoy})`);
+  }
+}
+
 function resolverFechaDeCompra(entrada: EntradaConLote, instante: Date): string {
   if (entrada.purchaseDate == null) return fechaCivilUtc(instante);
   rechazarFechaFutura(entrada.purchaseDate, instante);
@@ -97,8 +144,9 @@ function resolverFechaDeCompra(entrada: EntradaConLote, instante: Date): string 
  * a producto existente). `purchaseDate` vive solo en el lote.
  *
  * El permiso va antes de zod, del reloj y del puerto: un actor sin permiso no dispara nada.
- * La fecha de compra se resuelve antes de tocar el puerto, asi una fecha futura se rechaza sin
- * consultar el nombre ni escribir.
+ * La fecha de compra y el vencimiento se comprueban antes de tocar el puerto, asi una fecha
+ * futura de compra o un vencimiento que no es posterior a hoy se rechazan sin consultar el nombre
+ * ni escribir.
  */
 export function createCreateProduct(
   deps: CreateProductDeps,
@@ -122,13 +170,15 @@ export function createCreateProduct(
     const instante = now();
 
     const purchaseDate = resolverFechaDeCompra(entrada, instante);
+    if (deps.acceptsPastExpiry !== true) rechazarVencimientoNoFuturo(entrada, instante);
+    const imagen = validarImagen(deps, entrada.image);
 
     if (entrada.type === PRODUCT_TYPES.PACKAGING) {
-      return createPackaging(deps, entrada, actor, instante, purchaseDate, scope);
+      return createPackaging(deps, entrada, actor, instante, purchaseDate, scope, imagen);
     }
 
     if (entrada.type === PRODUCT_TYPES.PRODUCT) {
-      return createSupply(deps, entrada, actor, instante, purchaseDate, scope);
+      return createSupply(deps, entrada, actor, instante, purchaseDate, scope, imagen);
     }
 
     const batch: NewProductBatch = {
@@ -150,7 +200,15 @@ export function createCreateProduct(
     );
 
     // El instrumento no declara qtyAlert: el producto se queda en null.
-    return addOrCreate(deps, existente, { name: entrada.name, type: PRODUCT_TYPES.MACHINE }, batch, instante, scope);
+    return addOrCreate(
+      deps,
+      existente,
+      { name: entrada.name, type: PRODUCT_TYPES.MACHINE },
+      batch,
+      instante,
+      scope,
+      imagen,
+    );
   };
 }
 
@@ -164,6 +222,7 @@ async function addOrCreate(
   batch: NewProductBatch,
   instante: Date,
   scope: Scope,
+  imagen: ImagenPendiente,
 ): Promise<{ id: string; lot?: string }> {
   if (existente !== null) {
     // El homonimo vivo es un producto terminado. Se rechaza aqui, antes de tocar el
@@ -183,7 +242,13 @@ async function addOrCreate(
 
   // Una sola operacion del puerto para producto y lote, para que el dominio no pueda dejar
   // escrita solo la mitad.
-  const creado = await deps.products.createWithFirstBatch(producto, batch, instante, scope);
+  const imagePath = await subirImagen(deps, imagen);
+  const creado = await deps.products.createWithFirstBatch(
+    imagePath === null ? producto : { ...producto, imagePath },
+    batch,
+    instante,
+    scope,
+  );
   await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
   return { id: creado.id, lot: creado.lot };
 }
@@ -225,6 +290,7 @@ async function createSupply(
   instante: Date,
   purchaseDate: string,
   scope: Scope,
+  imagen: ImagenPendiente,
 ): Promise<CreateProductResult> {
   if (deps.units === undefined) {
     throw new Error('alta de insumo sin el catalogo de unidades: falta el cableado');
@@ -258,6 +324,7 @@ async function createSupply(
       batch,
       instante,
       scope,
+      imagen,
     );
   }
 
@@ -276,6 +343,7 @@ async function createSupply(
     { ...loteBase, ...convertido },
     instante,
     scope,
+    imagen,
   );
 
   return {
@@ -297,6 +365,7 @@ async function createPackaging(
   instante: Date,
   purchaseDate: string,
   scope: { readonly companyId: string },
+  imagen: ImagenPendiente,
 ): Promise<{ id: string; lot?: string }> {
   const batch: NewProductBatch = {
     presentationId: null,
@@ -327,8 +396,14 @@ async function createPackaging(
     throw new Error('alta de envase sin la unidad de sistema de envases: falta la siembra o el cableado');
   }
 
+  const imagePath = await subirImagen(deps, imagen);
   const creado = await deps.products.createWithFirstBatch(
-    { name: entrada.name, qtyAlert: entrada.qtyAlert, type: PRODUCT_TYPES.PACKAGING },
+    {
+      name: entrada.name,
+      qtyAlert: entrada.qtyAlert,
+      type: PRODUCT_TYPES.PACKAGING,
+      ...(imagePath === null ? {} : { imagePath }),
+    },
     batch,
     instante,
     scope,

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { AiProviderRequiredNotice } from '@/components/shared/ai-provider-required-notice';
+import { AiProviderRequiredTooltip } from '@/components/shared/ai-provider-required-tooltip';
 import { ErrorState } from '@/components/shared/error-state';
 import { identity } from '@/lib/composition';
 import { canUploadDocuments } from '@/lib/modules/documentos';
@@ -128,12 +128,16 @@ export default async function ProveedorDetallePage({
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
       <SupplierDetailHeader supplier={supplierResult.data} />
-      {readiness === null ? null : readiness.configured ? (
+      {readiness === null ? null : (
         <div className="flex justify-end">
-          <CatalogPdfUpload supplierId={supplierResult.data.id} />
+          {readiness.configured ? (
+            <CatalogPdfUpload supplierId={supplierResult.data.id} />
+          ) : (
+            <AiProviderRequiredTooltip>
+              <CatalogPdfUpload supplierId={supplierResult.data.id} disabled />
+            </AiProviderRequiredTooltip>
+          )}
         </div>
-      ) : (
-        <AiProviderRequiredNotice canConfigure={readiness.canConfigure} />
       )}
       {/*
         SIN `key`: este limite no se remonta en cada cambio de consulta -eso destruia la barra de

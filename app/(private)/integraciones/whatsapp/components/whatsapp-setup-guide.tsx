@@ -6,6 +6,7 @@ export const WHATSAPP_SETUP_GUIDE_STEPS = [
   'App Secret: en developers.facebook.com, tu app › Configuración › Básica.',
   'WABA ID y Phone Number ID: tu app › WhatsApp › Configuración de la API.',
   'Access Token: business.facebook.com › Configuración › Usuarios del sistema › Generar token, con los permisos whatsapp_business_management y whatsapp_business_messaging.',
+  'Webhook: en tu app › WhatsApp › Configuración, suscribe los campos messages, message_template_status_update y template_category_update.',
 ] as const;
 
 export function WhatsappSetupGuide() {

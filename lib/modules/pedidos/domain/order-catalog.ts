@@ -18,6 +18,7 @@ import type { OrderPriority, OrderStatus } from './order-classification';
 import type { FinishConditioningAliveById, StartConditioningAliveById } from './order-conditioning';
 import type { OrderNumber } from './order-number';
 import type { Page } from './page';
+import type { PackedLineCount } from './packing-count';
 
 /** Lo que otro modulo puede saber de un pedido: su identidad y su ESTADO, y nada mas. Ni el
  *  numero, ni la receta, ni las cantidades (mismo criterio que `MemberCandidate` de QC-84):
@@ -31,8 +32,10 @@ export type OrderAssignmentTarget = {
 };
 
 /** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,
- *  antiguedad, numero); `finished_recent_first` es el de «Terminados». */
-export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first';
+ *  antiguedad, numero); `finished_recent_first` es el de «Terminados»; `unfinished_then_recent`
+ *  es el de «Terminados» del empacador, que mezcla pedidos aun sin fecha de terminado (en
+ *  acondicionamiento) con los ya terminados: primero los sin fecha. */
+export type OrderSummaryOrdering = 'work_queue' | 'finished_recent_first' | 'unfinished_then_recent';
 
 /** Filtro opcional por persona de un resumen paginado. Va en la consulta, no despues, para que
  *  `total` y la paginacion describan solo lo filtrado. */
@@ -88,7 +91,9 @@ export interface OrderCatalog {
    * usa para «Terminados» y «Todos», que no acotan por quien esta asignado. El `ordering`
    * decide el `ORDER BY`: `work_queue` es el mismo que `listAliveSummariesByIds`, extraido a
    * una constante compartida para que no diverjan; `finished_recent_first` ordena por fecha de
-   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente.
+   * terminado, con los nulos al final y, entre ellos, por numero de pedido descendente;
+   * `unfinished_then_recent` pone los nulos PRIMERO y luego la fecha descendente, con el mismo
+   * desempate (numero descendente, `id`).
    *
    * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
    * `filter.conditionedBy` hace lo mismo con quien acondiciona.
@@ -115,6 +120,16 @@ export interface OrderCatalog {
     pageSize?: number,
     filter?: { readonly numberContains?: string },
   ): Promise<Page<OrderHistorySummary>>;
+
+  /**
+   * La receta y el reparto de cada pedido pedido, con lo ya entregado por linea, INCLUIDOS LOS
+   * DADOS DE BAJA. Un id que no existe o de otra empresa no vuelve. Sin orden garantizado entre
+   * pedidos; las lineas, en el orden de alta. Con `ids` vacio no consulta.
+   */
+  listDeliveryProgressByIdsIncludingDeleted(
+    companyId: string,
+    ids: readonly string[],
+  ): Promise<readonly OrderDeliveryProgress[]>;
 
   /**
    * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
@@ -185,12 +200,20 @@ export interface OrderCatalog {
    *
    * Consume los envases del reparto en la misma transaccion; `'insufficient_material'` es que el
    * disponible no alcanza para consumirlos todos, y tambien deshace todo.
+   *
+   * `counts` son los envases contados de verdad, uno por linea del reparto: mandan sobre el plan
+   * para guardar el conteo en la linea, consumir y liberar envases, dar de alta lotes (una linea
+   * en 0 no da lote) y repartir el coste. `'invalid_packing_count'` son conteos que no casan con
+   * las lineas o con sus motivos; `'packaging_stock_insufficient'`, un envase sin existencia libre
+   * para el exceso sobre lo apartado. Los dos deshacen todo. Lo envasado puede superar la cantidad
+   * del pedido: lo que sobra queda libre en el lote.
    */
   finishPackingAliveById(
     id: string,
     companyId: string,
     packerId: string,
     now: Date,
+    counts: readonly PackedLineCount[],
   ): Promise<
     | { readonly kind: 'ok'; readonly finishedGoods: readonly FinishedGoodsReceipt[] }
     | 'not_packer'
@@ -201,6 +224,8 @@ export interface OrderCatalog {
     | 'incompatible_units'
     | 'order_without_unit'
     | 'insufficient_material'
+    | 'invalid_packing_count'
+    | 'packaging_stock_insufficient'
   >;
 
   /**
@@ -238,11 +263,22 @@ export interface OrderCatalog {
  * copiado ni nada mas que quien reparte no necesite para pintarlo.
  */
 export type AssignedOrderPresentationLine = {
+  readonly id: string;
   readonly presentationId: string;
   readonly packages: number;
+  /** Envases contados al terminar el empaque; `null` = sin terminar, o terminado antes de que se
+   *  contaran (se lee como `packages`). */
+  readonly packedPackages: number | null;
+  /** Contenido copiado al guardar la linea; `null` = sin copia, vale el vigente de la presentacion. */
+  readonly presentationContent: string | null;
+  /** `null` = linea guardada antes de que el reparto nombrara envases. */
+  readonly packagingProductId: string | null;
   /** `null` = linea guardada antes de que el reparto nombrara envases, o envase que ya no vuelve
    *  del catalogo. */
   readonly packagingName: string | null;
+  /** URL publica de la imagen del envase; `null` en los mismos casos que `packagingName` o si el
+   *  envase no tiene imagen. */
+  readonly packagingImageUrl?: string | null;
 };
 
 /**
@@ -257,6 +293,8 @@ export type AssignedOrderSummary = {
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
+  /** La fecha de solicitud del pedido. */
+  readonly createdAt: Date;
   /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo. */
   readonly presentationLines: readonly AssignedOrderPresentationLine[];
   /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la tienen
@@ -273,4 +311,22 @@ export type AssignedOrderSummary = {
   /** Quien acondiciona: obligatorio en `EN_ACONDICIONAMIENTO` y `TERMINADO`, opcional en
    *  `ENTREGADO` y `null` en el resto. Viaja en crudo, como `packedBy`. */
   readonly conditionedBy: string | null;
+};
+
+/** Una linea del reparto con lo entregado de ella: `deliveredPackages` no cuenta lo anulado. */
+export type OrderDeliveryProgressLine = {
+  readonly presentationId: string;
+  readonly packages: number;
+  /** `null` = sin contar al terminar el empaque: vale `packages` (`effectivePackages`). */
+  readonly packedPackages: number | null;
+  /** Envases del conteo que el pedido no espera; restan de lo que le falta (`orderedPackages`). */
+  readonly packedSurplusPackages: number;
+  readonly deliveredPackages: number;
+};
+
+/** Lo que un listado ajeno necesita para pintar que pide un pedido y que le falta por entregar. */
+export type OrderDeliveryProgress = {
+  readonly id: string;
+  readonly recipeId: string;
+  readonly lines: readonly OrderDeliveryProgressLine[];
 };

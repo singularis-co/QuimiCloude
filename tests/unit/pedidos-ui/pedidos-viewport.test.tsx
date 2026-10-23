@@ -68,11 +68,9 @@ import {
   ORDER_FORM_TESTID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_SELECT_TESTID,
-  QUANTITY_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
   RECIPE_PICKER_TESTID,
   buildOrderColumns,
-  type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
 import { PERMISSIONS, type SessionUser } from '@/lib/modules/identity';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -293,7 +291,6 @@ const UNIDAD: UnitView = {
   factor: null,
   isSystem: true,
 };
-const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
 
 /**
  * El pedido del caso: **PENDIENTE**, para que las tres acciones de fila esten habilitadas (R24),
@@ -315,6 +312,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -327,12 +326,16 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
         packages: 1,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
 
     ],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -482,6 +485,7 @@ beforeEach(() => {
       updatedBy: null,
       steps: [],
       packingSteps: [],
+      conditioningSteps: [],
       lines: [],
       tools: [],
       original: null,
@@ -664,7 +668,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // El selector de presentacion del reparto solo aparece con unidad elegida; aqui se mide el de
     // la unidad, que esta siempre.
     const campos = [
-      screen.getByTestId(`order-field-${QUANTITY_COLUMN_ID}`),
+      screen.getByTestId('order-field-quantity'),
       screen.getByTestId(RECIPE_PICKER_TESTID),
       screen.getByTestId('presentation-unit-select'),
       screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
@@ -717,8 +721,8 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
     // Primera mitad: la CONFIGURACION. Solo `recipeName` declara el `width` del contrato
     // (decision humana: es el texto largo de la fila); ninguna declara las claves de
     // dimensionado de la libreria, asi que por esa via no impone nada.
-    const columnas = buildOrderColumns({ recipes: RECETAS, units: [], bridge: null });
-    expect(columnas).toHaveLength(12);
+    const columnas = buildOrderColumns({ units: [], bridge: null });
+    expect(columnas).toHaveLength(14);
 
     for (const columna of columnas) {
       for (const clave of ['size', 'minSize', 'maxSize', 'minWidth', 'maxWidth']) {

@@ -263,7 +263,7 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 function actorDe(empresa: Empresa, permissions: readonly string[] = ['recetas.modificar']): Actor {
-  return { id: empresa.userId, companyId: empresa.companyId, permissions };
+  return { id: empresa.userId, companyId: empresa.companyId, permissions, addons: ['lectura_pdf'] };
 }
 
 async function crearArchivoListoFormula(companyId: string): Promise<string> {

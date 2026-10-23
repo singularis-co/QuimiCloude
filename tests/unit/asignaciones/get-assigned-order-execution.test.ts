@@ -52,6 +52,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '200',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: null,
     finishedAt: null,
@@ -398,7 +399,7 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
 describe('getAssignedOrderExecution — la presentacion del pedido asignado', () => {
   it('R25: la vista lleva el nombre de la presentacion cuando el pedido tiene una', async () => {
     const { deps, findRefsPresentations } = montar({
-      summary: resumen({ presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] }),
+      summary: resumen({ presentationLines: [{ id: 'linea-1', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
       presentations: [presentacion()],
     });
     const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
@@ -427,8 +428,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const { deps, findRefsPresentations } = montar({
       summary: resumen({
         presentationLines: [
-          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: null },
-          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+          { id: 'linea-2', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
+          { id: 'linea-3', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
       }),
       presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
@@ -440,8 +441,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(view.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+      { lineId: 'linea-2', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: 'L' },
+      { lineId: 'linea-3', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: 'L' },
     ]);
   });
 
@@ -449,8 +450,8 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const { deps } = montar({
       summary: resumen({
         presentationLines: [
-          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: 'Envase PET 200 ml' },
-          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+          { id: 'linea-4', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: 'Envase PET 200 ml' },
+          { id: 'linea-5', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
       }),
       presentations: [presentacion(), presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 200 ml' })],
@@ -460,8 +461,33 @@ describe('QC-170 — getAssignedOrderExecution: el reparto entero y la unidad de
     const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
 
     expect(view.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: 'Envase PET 200 ml' },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+      { lineId: 'linea-4', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: 'Envase PET 200 ml', presentationContent: null, presentationUnitLabel: 'L' },
+      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: 'L' },
+    ]);
+  });
+
+  it('cada linea lleva el contenido (copiado o vigente) y la etiqueta de la unidad de su presentacion', async () => {
+    const { deps, findRefs } = montar({
+      summary: resumen({
+        presentationLines: [
+          { id: 'linea-6', presentationId: SEGUNDA_PRESENTACION, packages: 9, packedPackages: null, presentationContent: '300.0000', packagingProductId: null, packagingName: 'Embase pequeño 2' },
+          { id: 'linea-7', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
+        ],
+      }),
+      presentations: [
+        presentacion({ content: '20.0000' }),
+        presentacion({ id: SEGUNDA_PRESENTACION, name: 'Botella 300', content: '250.0000', unitId: MILILITRO }),
+      ],
+      ownUnits: [unidad(), unidad({ id: MILILITRO, name: 'Mililitro', symbol: 'ml' })],
+    });
+    const getAssignedOrderExecution = createGetAssignedOrderExecution(deps);
+
+    const view = await getAssignedOrderExecution(ACTOR, { orderId: PEDIDO });
+
+    expect(findRefs).toHaveBeenCalledWith(expect.arrayContaining([LITRO, MILILITRO]), EMPRESA);
+    expect(view.presentationLines.map(({ presentationContent, presentationUnitLabel }) => ({ presentationContent, presentationUnitLabel }))).toEqual([
+      { presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+      { presentationContent: '20.0000', presentationUnitLabel: 'L' },
     ]);
   });
 
@@ -933,5 +959,49 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
     );
     expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
     expect(d.createSignedReadUrl).not.toHaveBeenCalled();
+  });
+});
+
+// La pantalla de ejecucion no lleva NINGUN importe, ni el real ni el estimado.
+// Se recorre la vista ENTERA (pasos, lineas, reparto, evidencia) buscando claves de importe, y el
+// resumen del doble trae a proposito esos campos colados -como si el catalogo de `pedidos` los
+// filtrara por error-: la vista no puede copiarlos.
+const CLAVE_DE_IMPORTE = /cost|coste|importe|price|precio|amount/i;
+
+function clavesDeImporte(valor: unknown, ruta = ''): string[] {
+  if (Array.isArray(valor)) return valor.flatMap((item, i) => clavesDeImporte(item, `${ruta}[${String(i)}]`));
+  if (valor === null || typeof valor !== 'object' || valor instanceof Date) return [];
+  return Object.entries(valor).flatMap(([clave, hijo]) => [
+    ...(CLAVE_DE_IMPORTE.test(clave) ? [`${ruta}.${clave}`] : []),
+    ...clavesDeImporte(hijo, `${ruta}.${clave}`),
+  ]);
+}
+
+describe('QC-305 — la pantalla de ejecucion no lleva el coste real (R24)', () => {
+  it('R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en toda la vista, aunque el resumen las traiga', async () => {
+    const conImportes = {
+      ...resumen({ status: 'EN_CURSO', presentationLines: [{ id: uuid('5'), presentationId: PRESENTACION, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
+      actualCost: '27.1250',
+      ingredientsCost: '30.0000',
+      packagingCost: '4.5000',
+    } as unknown as AssignedOrderSummary;
+    const { deps } = montar({
+      order: { id: PEDIDO, status: 'EN_CURSO' },
+      summary: conImportes,
+      presentations: [presentacion()],
+    });
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO });
+
+    expect(view.orderId).toBe(PEDIDO);
+    expect(view.lines.length).toBeGreaterThan(0);
+    expect(clavesDeImporte(view)).toEqual([]);
+  });
+
+  it('R24: el contrato de la vista no declara actualCost (comprobacion de tipo)', () => {
+    const sinReal: 'actualCost' extends keyof AssignedOrderExecutionView ? false : true = true;
+    const sinEstimado: 'ingredientsCost' extends keyof AssignedOrderExecutionView ? false : true = true;
+    const resumenSinReal: 'actualCost' extends keyof AssignedOrderSummary ? false : true = true;
+    expect([sinReal, sinEstimado, resumenSinReal]).toEqual([true, true, true]);
   });
 });

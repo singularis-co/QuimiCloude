@@ -163,7 +163,7 @@ afterAll(async () => {
 });
 
 function actorDe(empresa: Empresa): Actor {
-  return { id: empresa.userId, companyId: empresa.companyId, permissions: ['recetas.modificar'] };
+  return { id: empresa.userId, companyId: empresa.companyId, permissions: ['recetas.modificar'], addons: ['lectura_pdf'] };
 }
 
 async function crearArchivoFormula(companyId: string, nombreLeido: string): Promise<string> {

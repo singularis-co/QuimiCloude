@@ -42,6 +42,8 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 
 const CATALOGO_DE_ROLES = 'lib/modules/identity/domain/roles.ts';
 const CATALOGO_DE_PERMISOS = 'lib/modules/identity/domain/permissions.ts';
+// Clasifica cada permiso como nucleo o anadido, y por eso lo nombra.
+const CATALOGO_DE_ANADIDOS = 'lib/modules/identity/domain/company-addons.ts';
 
 const CODIGO_DEL_PERMISO = 'acondicionamiento.modificar';
 
@@ -54,9 +56,12 @@ const CASOS_DE_USO_QUE_LO_EXIGEN = [
   'lib/modules/asignaciones/domain/list-conditioned-orders.ts',
   'lib/modules/asignaciones/domain/get-conditioning-order.ts',
   'lib/modules/asignaciones/domain/list-conditioning-team-candidates.ts',
-  // 2026-10-09 (QC-219 R26): guardar los datos de lote y listar «Entregados».
+  // 2026-10-09 (QC-219 R26): guardar los datos de lote. 2026-10-19 (QC-301 R6): sale el caso de
+  // uso de listar «Entregados», que se borro.
   'lib/modules/asignaciones/domain/save-conditioning-batch-data.ts',
-  'lib/modules/asignaciones/domain/list-delivered-conditioned-orders.ts',
+  // 2026-10-21 (QC-299 R21, R31): las fotos de la fase de acondicionamiento y completar sus pasos.
+  'lib/modules/asignaciones/domain/evidence-target.ts',
+  'lib/modules/asignaciones/domain/record-conditioning-step.ts',
 ] as const;
 
 // Consumidores que no son caso de uso, cada uno con la forma exacta en que debe nombrar el permiso.
@@ -228,12 +233,15 @@ describe('R3 — el rol es global: una sola fila y Role sin campo de empresa', (
 describe('R17, R21 — solo el catalogo, los casos de uso del acondicionamiento y sus dos consumidores nombran acondicionamiento.modificar', () => {
   const permitidos: readonly string[] = [
     CATALOGO_DE_PERMISOS,
+    CATALOGO_DE_ANADIDOS,
     ...CASOS_DE_USO_QUE_LO_EXIGEN,
     ...CONSUMIDORES_QUE_NO_SON_CASO_DE_USO,
   ];
 
-  it('R21, R31, QC-219 R26: son once rutas exactas: el catalogo, ocho casos de uso (con los candidatos del equipo, guardar los datos de lote y «Entregados») y dos consumidores', () => {
-    expect(new Set(permitidos).size).toBe(11);
+  // Merge de dev en QC-299 (2026-10-21): 13 = 11 que deja QC-301 + las fotos y los pasos de
+  // acondicionamiento de QC-299.
+  it('R21, R31, QC-219 R26, QC-301 R6, QC-299 R31: son trece rutas exactas: los dos catalogos (permisos y anadidos), nueve casos de uso (con los candidatos del equipo, guardar los datos de lote, las fotos y los pasos de acondicionamiento) y dos consumidores', () => {
+    expect(new Set(permitidos).size).toBe(13);
   });
 
   it('R17, R21: el codigo solo aparece en el catalogo de permisos y en las rutas exactas abiertas', () => {

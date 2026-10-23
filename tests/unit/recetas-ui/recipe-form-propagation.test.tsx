@@ -82,6 +82,7 @@ function recipeDetail(): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [lineView()],
     tools: [],
     original: null,
@@ -167,7 +168,7 @@ describe('R24 — con versiones vivas se avisa antes de guardar', () => {
 
     const dialog = await screen.findByTestId('propagate-versions-dialog');
     expect(within(dialog).getByTestId('propagate-versions-title')).toHaveTextContent(
-      '1 versión parte de esta receta',
+      '1 versión parte de esta fórmula',
     );
     const boxes = checkboxes();
     expect(boxes).toHaveLength(1);
@@ -184,7 +185,7 @@ describe('R24 — con versiones vivas se avisa antes de guardar', () => {
 
     const dialog = await screen.findByTestId('propagate-versions-dialog');
     expect(within(dialog).getByTestId('propagate-versions-title')).toHaveTextContent(
-      '3 versiones parten de esta receta',
+      '3 versiones parten de esta fórmula',
     );
     const boxes = checkboxes();
     expect(boxes.map((box) => box.getAttribute('data-version-id'))).toEqual([V1, V2, V3]);

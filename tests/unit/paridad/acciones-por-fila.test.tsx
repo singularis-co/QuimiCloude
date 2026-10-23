@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 import ClientesPage from '@/app/(private)/clientes/page';
@@ -98,7 +98,12 @@ vi.mock('@/lib/modules/integraciones/adapters/driving/ai-provider-actions', () =
 
 vi.mock('@/lib/composition', () => ({
   observabilidad: { readRequestIdHeader: vi.fn(async () => null) },
-  identity: { getSessionUser: entorno.getSessionUserMock, endSession: vi.fn() },
+  identity: {
+    getSessionUser: entorno.getSessionUserMock,
+    getSessionContext: vi.fn(async () => null),
+    getCompanyCountry: vi.fn(async () => null),
+    endSession: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/modules/clientes/adapters/driving/customer-actions', () => ({
@@ -384,6 +389,9 @@ const CLIENTE: CustomerView = {
   lastNames: 'Lopez',
   city: 'Bogota',
   phone: '3001234567',
+  phoneCountry: null,
+  phoneE164: null,
+  phoneIssue: null,
   email: null,
   address: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -635,7 +643,9 @@ const TABLAS: readonly Tabla[] = [
           searchParams: Promise.resolve({ type: PRODUCT_TYPES.FINISHED_PRODUCT }),
         }),
       );
-      for (const desplegar of screen.getAllByTestId('finished-stock-toggle')) {
+      // Solo los de la tabla: el de la tarjeta es el mismo conmutador y lo volveria a plegar.
+      const enLasFilas = filas().flatMap((fila) => within(fila).queryAllByTestId('finished-stock-toggle'));
+      for (const desplegar of enLasFilas) {
         fireEvent.click(desplegar);
       }
       await asentar();

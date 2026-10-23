@@ -57,6 +57,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades'
 
 import {
   fakeFinishedGoodsIntake,
+  fakeOrderConsumptionLedger,
   fakeOrderUnitOfWork,
   fakeScopeProducts,
   fakeScopeUnits,
@@ -64,6 +65,7 @@ import {
 } from '@/tests/helpers/order-unit-of-work-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
+import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double';
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333'
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
@@ -108,6 +110,8 @@ function fila(id: string): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'u-0',
@@ -194,7 +198,8 @@ function almacen() {
   const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
   const releaseForOrder = vi.fn(async () => undefined)
   const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
-  const reservations = { syncForOrder, releaseForOrder, consumeForOrder }
+  const settlePackagingForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
+  const reservations = { syncForOrder, releaseForOrder, consumeForOrder, settlePackagingForOrder }
 
   const recipes = {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>
@@ -218,6 +223,7 @@ function almacen() {
     finishedGoods: fakeFinishedGoodsIntake(),
     products: fakeScopeProducts(),
     units: fakeScopeUnits(),
+    consumption: fakeOrderConsumptionLedger(),
   })
   const products = { findRefs: vi.fn(async () => []), findCostingBatches: vi.fn(async () => []) }
   const units = {
@@ -267,7 +273,7 @@ function casosDeUso(a: Almacen) {
   return {
     createOrder: createCreateOrder({ customerCatalog: fakeCustomerCatalog(), recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
     getOrder: createGetOrder({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units }),
-    listOrders: createListOrders({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units, log: a.log }),
+    listOrders: createListOrders({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units, log: a.log, deliveryProgress: fakeDeliveryProgress() }),
     updateOrder: createUpdateOrder({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
     cancelOrder: createCancelOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
@@ -551,6 +557,9 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
       findCostingBatches: explota('packaging.findCostingBatches'),
     }
     const log = { ignoredFields: explota('ignoredFields') }
+    const deliveryProgress = {
+      listDeliveryProgressByIdsIncludingDeleted: explota('deliveryProgress.listDeliveryProgressByIdsIncludingDeleted'),
+    }
     const deps = {
       orders: orders as unknown as OrderRepository,
       unitOfWork: unitOfWork as unknown as OrderUnitOfWork,
@@ -565,6 +574,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
         searchRefs: explota('customerCatalog.searchRefs'),
       } as unknown as CustomerCatalog,
       log,
+      deliveryProgress,
     }
     return {
       deps,
@@ -577,6 +587,7 @@ describe('QC-60 R16, R28 — el PERMISO se exige ANTES que el ambito', () => {
         ...Object.values(presentations),
         ...Object.values(packaging),
         log.ignoredFields,
+        deliveryProgress.listDeliveryProgressByIdsIncludingDeleted,
       ],
     }
   }

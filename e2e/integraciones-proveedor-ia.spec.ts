@@ -1,16 +1,17 @@
 /**
- * E2E del proveedor IA de una empresa en `/integraciones/proveedor-ia` y del aviso de bloqueo que
- * sustituye a «Subir PDFs» en «Fórmulas» mientras la empresa no tiene conexion.
+ * E2E del proveedor IA de una empresa en `/integraciones/proveedor-ia` y del bloqueo de «Subir PDFs»
+ * en «Fórmulas» mientras la empresa no tiene conexion: boton deshabilitado con un globo que enlaza
+ * a la pantalla.
  *
  * Que aporta sobre unit e integracion:
  * - **El corte del flujo de subida con la base real**: sin fila en `ai_provider_connections` la
- *   pagina de «Fórmulas» pinta el aviso y no el boton; con fila, el boton vuelve.
+ *   pagina de «Fórmulas» pinta el boton deshabilitado con el globo; con fila, el boton se habilita.
  * - **El doble de la prueba cableado por la variable de `playwright.config.ts`**: una key con el
  *   prefijo marcado la rechaza; cualquier otra la acepta, sin red.
  * - **Que la key no vuelve**: tras guardar y recargar no esta ni en la pagina ni en el HTML servido,
  *   y la columna cifrada no la contiene.
  * - **Los permisos reales**: el Administrador del seed configura; un rol que sube PDF pero no tiene
- *   `integraciones.modificar` ve el aviso sin enlace y recibe 404 en la pantalla.
+ *   `integraciones.modificar` ve el mismo enlace y recibe 404 en la pantalla.
  * - Corre en Chromium y en WebKit (proyectos de `playwright.config.ts`).
  *
  * DATOS: la EMPRESA de cada worker, sus USUARIOS y el ROL sin permiso de integraciones son efimeros,
@@ -31,6 +32,7 @@ import { probeFailureMessage } from '@/lib/modules/integraciones/domain/ai-provi
 import { prisma } from '@/lib/shared/db/prisma';
 import { AI_PROVIDER_INTEGRATION_ROUTE, FORMULAS_ROUTE } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -60,27 +62,35 @@ const TESTIDS = {
   formSave: 'ai-provider-form-save',
   card: 'ai-provider-card',
   cardStatus: 'ai-provider-card-status',
-  cardRecipeModel: 'ai-provider-card-recipe-model',
-  cardCatalogModel: 'ai-provider-card-catalog-model',
+  formHelp: 'ai-provider-form-help',
+  modelSection: 'ai-provider-card-model',
+  modelTrigger: 'ai-model-select-trigger',
+  modelOption: 'ai-model-select-option',
+  modelHelp: 'ai-model-select-help',
   cardDisconnect: 'ai-provider-card-disconnect',
   disconnectDialog: 'ai-provider-disconnect-dialog',
   disconnectConfirm: 'ai-provider-disconnect-confirm',
   recipesTitle: 'recipes-title',
   uploadOpen: 'document-upload-open',
-  notice: 'ai-provider-required-notice',
-  noticeLink: 'ai-provider-required-notice-link',
-  noticeAsk: 'ai-provider-required-notice-ask',
+  lockedTrigger: 'ai-provider-required-tooltip-trigger',
+  lockedTooltip: 'ai-provider-required-tooltip',
+  lockedLink: 'ai-provider-required-tooltip-link',
 } as const;
 
-/** Textos del tablero que el recorrido afirma (`design.md > 12.3` y `> 12.6`). */
+/** Textos del tablero que el recorrido afirma. */
 const TEXTS = {
   notConfigured: 'Sin configurar',
   connected: 'Conectado',
-  testOk: 'Conexión correcta',
+  testOk: 'Conexión correcta · el modelo en uso responde',
+  helpModel: 'Después de conectar podrás elegir el modelo.',
+  recommended: 'Recomendado',
+  helpRecommended: 'Se usa el modelo recomendado de Gemini.',
+  helpChosen: 'Elegido por tu empresa.',
+  modelSaved: 'Modelo guardado',
   saved: 'Proveedor IA conectado',
   disconnected: 'Proveedor IA desconectado',
-  goToProvider: 'Ir a Proveedor IA',
-  askAdmin: 'Pídele a un administrador que lo configure',
+  lockedMessage: 'Para leer PDF, conecta el proveedor IA de tu empresa',
+  enrollProvider: 'Inscribir proveedor',
 } as const;
 
 const REJECTED_KEY_MESSAGE = probeFailureMessage({
@@ -125,6 +135,24 @@ async function createUser(
   return { id: user.id, username, password };
 }
 
+/** El recomendado de Gemini y otro modelo suyo, leidos del catalogo sembrado. */
+async function recommendedGeminiModel(): Promise<string> {
+  const model = await prisma.aiModel.findFirstOrThrow({
+    where: { provider: 'GOOGLE', isDefault: true },
+    select: { modelId: true },
+  });
+  return model.modelId;
+}
+
+async function otherGeminiModel(): Promise<string> {
+  const model = await prisma.aiModel.findFirstOrThrow({
+    where: { provider: 'GOOGLE', isDefault: false },
+    orderBy: { sortOrder: 'asc' },
+    select: { modelId: true },
+  });
+  return model.modelId;
+}
+
 test.beforeAll(async () => {
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
@@ -166,6 +194,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 
   const uploaderRole = await prisma.role.create({
     data: {
@@ -205,7 +234,7 @@ test.afterAll(async () => {
 test.setTimeout(180_000);
 
 test.describe('el proveedor IA de la empresa', () => {
-  test('R37, R30, R13, R16, R34, R17, R31, R8, R33, R20: aviso en Fórmulas, key rechazada sin guardar, prueba y alta con el doble, la key fuera del HTML y desconectar', async ({
+  test('R37, R30, R13, R16, R34, R17, R31, R8, R33, R20: «Subir PDFs» bloqueado en Fórmulas, key rechazada sin guardar, prueba y alta con el doble, la key fuera del HTML y desconectar', async ({
     page,
   }) => {
     if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -219,18 +248,18 @@ test.describe('el proveedor IA de la empresa', () => {
     const keyField = page.getByTestId(TESTIDS.keyField);
     const formResult = page.getByTestId(TESTIDS.formResult);
 
-    await test.step('R37: sin conexion, Fórmulas pinta el aviso con «Ir a Proveedor IA» y no «Subir PDFs»', async () => {
+    await test.step('R37: sin conexion, Fórmulas pinta «Subir PDFs» deshabilitado con el globo «Inscribir proveedor»', async () => {
       await page.goto(FORMULAS_ROUTE);
       await expect(page.getByTestId(TESTIDS.recipesTitle)).toBeVisible({ timeout: 60_000 });
 
-      await expect(page.getByTestId(TESTIDS.notice)).toBeVisible();
-      await expect(page.getByTestId(TESTIDS.noticeLink)).toHaveText(TEXTS.goToProvider);
-      await expect(page.getByTestId(TESTIDS.noticeAsk)).toHaveCount(0);
-      await expect(page.getByTestId(TESTIDS.uploadOpen)).toHaveCount(0);
+      await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeDisabled();
+      await page.getByTestId(TESTIDS.lockedTrigger).hover();
+      await expect(page.getByTestId(TESTIDS.lockedTooltip)).toContainText(TEXTS.lockedMessage);
+      await expect(page.getByTestId(TESTIDS.lockedLink)).toHaveText(TEXTS.enrollProvider);
     });
 
     await test.step('R30: el enlace lleva a la pantalla, «Sin configurar» y los cuatro proveedores', async () => {
-      await page.getByTestId(TESTIDS.noticeLink).click();
+      await page.getByTestId(TESTIDS.lockedLink).click();
       await page.waitForURL((url) => url.pathname === AI_PROVIDER_INTEGRATION_ROUTE, { timeout: 60_000 });
 
       await expect(form).toBeVisible({ timeout: 60_000 });
@@ -241,9 +270,11 @@ test.describe('el proveedor IA de la empresa', () => {
       await expect(page.getByTestId(TESTIDS.formTest)).toBeDisabled();
     });
 
-    await test.step('R16, R34: con Gemini y una key rechazada, «Guardar y conectar» muestra el rechazo y no guarda nada', async () => {
+    await test.step('R16, R34, QT-291 R30: con Gemini la ayuda dice que el modelo se elige despues; una key rechazada, «Guardar y conectar» muestra el rechazo y no guarda nada', async () => {
       await page.getByTestId(TESTIDS.option('GOOGLE')).click();
       await expect(page.getByTestId(TESTIDS.option('GOOGLE'))).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId(TESTIDS.formHelp)).toContainText(TEXTS.helpModel);
+      await expect(page.getByTestId(TESTIDS.formHelp)).not.toContainText(/gemini-/i);
 
       await keyField.fill(INVALID_KEY);
       await page.getByTestId(TESTIDS.formSave).click();
@@ -261,24 +292,21 @@ test.describe('el proveedor IA de la empresa', () => {
       await expect(page.getByTestId(TESTIDS.card)).toHaveCount(0);
     });
 
-    await test.step('R13, R34: «Probar conexión» con una key valida responde «Conexión correcta» sin escribir nada', async () => {
+    await test.step('R13, R34, QT-291 R20: «Probar conexión» con una key valida responde «Conexión correcta · el modelo en uso responde» sin escribir nada', async () => {
       await page.getByTestId(TESTIDS.option('GOOGLE')).click();
       await keyField.fill(VALID_KEY);
       await page.getByTestId(TESTIDS.formTest).click();
 
       await expect(formResult).toContainText(TEXTS.testOk, { timeout: 60_000 });
-      await expect(keyField).toHaveValue('');
+      await expect(keyField).toHaveValue(VALID_KEY);
       expect(
         await prisma.aiProviderConnection.count({ where: { companyId: fixtureCompanyId } }),
         'probar una key no guarda nada',
       ).toBe(0);
     });
 
-    await test.step('R17, R31, R34: «Guardar y conectar» deja la conexion «Conectado» con los modelos de Gemini del catalogo', async () => {
-      const gemini = await prisma.aiProvider.findUniqueOrThrow({
-        where: { code: 'GOOGLE' },
-        select: { recipeModel: true, catalogModel: true },
-      });
+    await test.step('R17, R31, R34, QT-291 R26, R27: «Guardar y conectar» deja la conexion «Conectado» con el recomendado de Gemini en la sección «Modelo»', async () => {
+      const recommended = await recommendedGeminiModel();
 
       await page.getByTestId(TESTIDS.option('GOOGLE')).click();
       await keyField.fill(VALID_KEY);
@@ -289,17 +317,26 @@ test.describe('el proveedor IA de la empresa', () => {
       await expect(page.getByText(TEXTS.saved).first()).toBeVisible();
       await expect(card).toHaveAttribute('data-status', 'ACTIVE');
       await expect(page.getByTestId(TESTIDS.cardStatus)).toHaveText(TEXTS.connected);
-      await expect(page.getByTestId(TESTIDS.cardRecipeModel)).toHaveText(gemini.recipeModel);
-      await expect(page.getByTestId(TESTIDS.cardCatalogModel)).toHaveText(gemini.catalogModel);
+      await expect(page.getByTestId(TESTIDS.modelSection)).toBeVisible();
+      await expect(page.getByTestId(TESTIDS.modelTrigger)).toContainText(recommended);
+      await expect(page.getByTestId(TESTIDS.modelTrigger)).toContainText(TEXTS.recommended);
       await expect(form).toHaveCount(0);
 
       const row = await prisma.aiProviderConnection.findUnique({
         where: { companyId: fixtureCompanyId },
-        select: { provider: true, status: true, apiKeyEnc: true, lastCheckedAt: true, createdById: true },
+        select: {
+          provider: true,
+          status: true,
+          apiKeyEnc: true,
+          lastCheckedAt: true,
+          createdById: true,
+          model: true,
+        },
       });
       expect(row, 'el alta valida tiene que dejar la fila de la empresa').not.toBeNull();
       if (!row) return;
       expect(row.provider).toBe('GOOGLE');
+      expect(row.model, 'sin eleccion de la empresa se usa el recomendado').toBeNull();
       expect(row.status).toBe('ACTIVE');
       expect(row.lastCheckedAt).not.toBeNull();
       expect(row.createdById).toBe(credentials.id);
@@ -317,11 +354,11 @@ test.describe('el proveedor IA de la empresa', () => {
       expect((await page.content()).includes(VALID_KEY)).toBe(false);
     });
 
-    await test.step('R37: con conexion, Fórmulas vuelve a pintar «Subir PDFs» y no el aviso', async () => {
+    await test.step('R37: con conexion, Fórmulas pinta «Subir PDFs» habilitado y sin globo', async () => {
       await page.goto(FORMULAS_ROUTE);
       await expect(page.getByTestId(TESTIDS.recipesTitle)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByTestId(TESTIDS.notice)).toHaveCount(0);
+      await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeEnabled({ timeout: 60_000 });
+      await expect(page.getByTestId(TESTIDS.lockedTrigger)).toHaveCount(0);
     });
 
     await test.step('R33, R20, R34: «Desconectar», tras confirmar, vuelve a «Sin configurar» y borra la fila', async () => {
@@ -343,7 +380,57 @@ test.describe('el proveedor IA de la empresa', () => {
     });
   });
 
-  test('R37, R3: quien sube PDF sin `integraciones.modificar` ve el aviso sin enlace y la pantalla le responde 404', async ({
+  test('QT-291 R26, R27, R29, R32, R9: con Gemini conectado, elegir otro modelo en el selector lo guarda sin otro boton y tras recargar dice «Elegido por tu empresa.»', async ({
+    page,
+  }) => {
+    if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
+    const fixtureCompanyId = companyId;
+    await prisma.aiProviderConnection.deleteMany({ where: { companyId: fixtureCompanyId } });
+
+    const recommended = await recommendedGeminiModel();
+    const chosen = await otherGeminiModel();
+    const credentials = await createUser(administradorRoleId, 'modelo');
+    await loginAndLand(page, credentials);
+
+    await page.goto(AI_PROVIDER_INTEGRATION_ROUTE);
+    await expect(page.getByTestId(TESTIDS.form)).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId(TESTIDS.option('GOOGLE')).click();
+    await page.getByTestId(TESTIDS.keyField).fill(VALID_KEY);
+    await page.getByTestId(TESTIDS.formSave).click();
+
+    const trigger = page.getByTestId(TESTIDS.modelTrigger);
+    await expect(page.getByTestId(TESTIDS.card)).toBeVisible({ timeout: 60_000 });
+
+    await test.step('QT-291 R27: sin eleccion, el selector muestra el recomendado con «Recomendado»', async () => {
+      await expect(trigger).toContainText(recommended);
+      await expect(trigger).toContainText(TEXTS.recommended);
+      await expect(page.getByTestId(TESTIDS.modelHelp)).toHaveText(TEXTS.helpRecommended);
+    });
+
+    await test.step('QT-291 R29, R32, R9: elegir otra opcion consulta, guarda y muestra «Modelo guardado»', async () => {
+      await trigger.click();
+      await page.locator(`[data-testid="${TESTIDS.modelOption}"][data-value="${chosen}"]`).click();
+
+      await expect(page.getByText(TEXTS.modelSaved).first()).toBeVisible({ timeout: 60_000 });
+      await expect(trigger).toContainText(chosen);
+      const row = await prisma.aiProviderConnection.findUnique({
+        where: { companyId: fixtureCompanyId },
+        select: { model: true, status: true },
+      });
+      expect(row?.model).toBe(chosen);
+      expect(row?.status).toBe('ACTIVE');
+    });
+
+    await test.step('QT-291 R27: tras recargar, el elegido sale con «Elegido por tu empresa.» y sin «Recomendado»', async () => {
+      await page.reload();
+      await expect(trigger).toBeVisible({ timeout: 60_000 });
+      await expect(trigger).toContainText(chosen);
+      await expect(trigger).not.toContainText(TEXTS.recommended);
+      await expect(page.getByTestId(TESTIDS.modelHelp)).toHaveText(TEXTS.helpChosen);
+    });
+  });
+
+  test('R37, R3: quien sube PDF sin `integraciones.modificar` ve el enlace «Inscribir proveedor» igual y la pantalla le responde 404', async ({
     page,
   }) => {
     if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
@@ -354,10 +441,10 @@ test.describe('el proveedor IA de la empresa', () => {
 
     await page.goto(FORMULAS_ROUTE);
     await expect(page.getByTestId(TESTIDS.recipesTitle)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId(TESTIDS.notice)).toBeVisible();
-    await expect(page.getByTestId(TESTIDS.noticeAsk)).toHaveText(TEXTS.askAdmin);
-    await expect(page.getByTestId(TESTIDS.noticeLink)).toHaveCount(0);
-    await expect(page.getByTestId(TESTIDS.uploadOpen)).toHaveCount(0);
+    await expect(page.getByTestId(TESTIDS.uploadOpen)).toBeDisabled();
+    await page.getByTestId(TESTIDS.lockedTrigger).focus();
+    await expect(page.getByTestId(TESTIDS.lockedTooltip)).toContainText(TEXTS.lockedMessage);
+    await expect(page.getByTestId(TESTIDS.lockedLink)).toHaveAttribute('href', AI_PROVIDER_INTEGRATION_ROUTE);
 
     const response = await page.goto(AI_PROVIDER_INTEGRATION_ROUTE);
     expect(response?.status(), 'sin el permiso la pantalla responde 404').toBe(404);

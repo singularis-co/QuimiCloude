@@ -277,29 +277,34 @@ describe('edicion de un envase', () => {
 
 describe('lotes de un envase', () => {
   it('R6: un lote de envase se pinta en u, con la presentacion del producto', () => {
+    const batch = lote();
     render(
-      <ProductBatchesPanel batches={[lote()]} units={UNIDADES} product={envase()} />,
+      <ProductBatchesPanel batches={[batch]} units={UNIDADES} product={envase()} />,
     );
 
-    const panel = screen.getByTestId('product-batches-panel');
-    expect(within(panel).getByTestId('product-batch-quantity')).toHaveTextContent('100 u');
-    expect(within(panel).getByTestId('product-batch-reserved')).toHaveTextContent('40 u');
-    expect(within(panel).getByTestId('product-batch-available')).toHaveTextContent('60 u');
+    // La tabla y la tarjeta pintan lo mismo: se lee la fila de la tabla.
+    const fila = within(screen.getByTestId('product-batches-panel')).getByTestId(`data-table-row-${batch.id}`);
+    expect(within(fila).getByTestId('product-batch-quantity')).toHaveTextContent('100 u');
+    expect(within(fila).getByTestId('product-batch-reserved')).toHaveTextContent('40 u');
+    expect(within(fila).getByTestId('product-batch-available')).toHaveTextContent('60 u');
     expect(screen.getByTestId('product-batches-packaging-presentation')).toHaveTextContent(
       '500 ml',
     );
   });
 
   it('R6: el lote de un envase legado conserva la unidad de su presentacion y la marca', () => {
+    const batch = lote({ stock: '2000.0000', unitId: MILILITRO.id, reserved: undefined, available: undefined });
     render(
       <ProductBatchesPanel
-        batches={[lote({ stock: '2000.0000', unitId: MILILITRO.id, reserved: undefined, available: undefined })]}
+        batches={[batch]}
         units={UNIDADES}
         product={envase({ presentationId: null, presentationName: null, unitId: MILILITRO.id })}
       />,
     );
 
-    expect(screen.getByTestId('product-batch-quantity')).toHaveTextContent('2000 ml');
+    expect(
+      within(screen.getByTestId(`data-table-row-${batch.id}`)).getByTestId('product-batch-quantity'),
+    ).toHaveTextContent('2000 ml');
     expect(screen.getByTestId('product-batches-packaging-legacy')).toHaveTextContent(
       'Envase sin presentación fija',
     );

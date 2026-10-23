@@ -34,8 +34,9 @@ const CON_INVENTARIO: Actor = {
   id: PERSONA,
   companyId: EMPRESA,
   permissions: [FORMULA_IMPORT_PERMISSION, 'inventario.modificar'],
+  addons: ['lectura_pdf'],
 };
-const SIN_INVENTARIO: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION] };
+const SIN_INVENTARIO: Actor = { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 
 function homonimo(id: string, name: string, unitId: string | null): ProductNameMatch {
   return { id, name, nameNormalized: name.toLowerCase(), type: PRODUCT_TYPES.PRODUCT, unitId };

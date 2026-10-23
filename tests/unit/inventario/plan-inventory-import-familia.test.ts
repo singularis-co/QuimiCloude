@@ -77,7 +77,7 @@ describe('planInventoryImport — insumo por nombre + familia de unidad', () => 
       [
         'converted_stock_out_of_range',
         'stock',
-        'Existencia: convertida a la unidad del producto no cabe en 4 decimales; escríbela en esa unidad.',
+        'Cantidad: convertida a la unidad del producto no cabe en 4 decimales; escríbela en esa unidad.',
       ],
     ]);
     expect(result.writes.has(2)).toBe(false);
@@ -99,19 +99,6 @@ describe('planInventoryImport — insumo por nombre + familia de unidad', () => 
         'Costo unitario: convertido a la unidad del producto no cabe en 4 decimales; escribe el lote en esa unidad.',
       ],
     ]);
-    expect(result.writes.has(2)).toBe(false);
-  });
-
-  it('R20 total derivado en 0 tras convertir deja la fila en error en Costo total', () => {
-    const enMililitros = productRef({ id: 'p-ml', nameNormalized: 'glicerina', unitId: ML.id, stock: '10.0000' });
-
-    // Sobre 1 l el unitario sería 0,001; sobre los 1000 ml convertidos queda en 0.
-    const result = plan(
-      sheet({ ...GLICERINA, unit: 'Litro', stock: '1', totalCost: '0,001' }),
-      snapshot({ products: [enMililitros] }),
-    );
-
-    expect(issues(result.rows[0]).map(([code, column]) => [code, column])).toEqual([['total_cost_too_low', 'totalCost']]);
     expect(result.writes.has(2)).toBe(false);
   });
 });

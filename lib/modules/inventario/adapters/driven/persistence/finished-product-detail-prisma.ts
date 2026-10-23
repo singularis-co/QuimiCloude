@@ -23,7 +23,6 @@ import type { Page } from '../../../domain/page';
 import type {
   FinishedProductBatchRecord,
   FinishedProductCostRecord,
-  FinishedProductDeliveryMovementRecord,
   FinishedProductMovementRecord,
   FinishedProductRecord,
   PageRequest,
@@ -69,11 +68,12 @@ export async function findAliveFinishedProduct(
       imagePath: true,
       qtyAlert: true,
       unitId: true,
+      recipeId: true,
       presentationId: true,
       batches: {
         where: batchCompanyScope(scope),
         orderBy: NEWEST_FIRST,
-        select: { id: true, stock: true, packageContent: true },
+        select: { id: true, lot: true, stock: true, packageContent: true },
       },
     },
   });
@@ -93,6 +93,7 @@ export async function findAliveFinishedProduct(
     imagePath: product.imagePath,
     qtyAlert: decimalOrNull(product.qtyAlert),
     unitId: product.unitId,
+    recipeId: product.recipeId,
     presentation:
       presentation === null
         ? null
@@ -104,6 +105,7 @@ export async function findAliveFinishedProduct(
           },
     batches: product.batches.map((batch) => ({
       id: batch.id,
+      lot: batch.lot,
       stock: batch.stock.toFixed(4),
       packageContent: decimalOrNull(batch.packageContent),
     })),
@@ -202,51 +204,6 @@ export async function listFinishedProductMovements(
     reason: row.reason as MovementReason | null,
     createdAt: row.createdAt.toISOString(),
   }));
-  return buildPage(items, total, page.page, limit);
-}
-
-export async function listFinishedProductDeliveryMovements(
-  productId: string,
-  page: PageRequest,
-  scope: InventoryScope,
-): Promise<Page<FinishedProductDeliveryMovementRecord>> {
-  const { offset, limit } = toOffsetLimit(page.page, page.pageSize);
-  const where = productMovementsWhere(productId, { orderDeliveryId: { not: null } }, scope);
-
-  const [rows, total] = await Promise.all([
-    prisma.inventoryMovement.findMany({
-      where,
-      orderBy: NEWEST_FIRST,
-      skip: offset,
-      take: limit,
-      select: {
-        id: true,
-        orderDeliveryId: true,
-        orderId: true,
-        batchId: true,
-        quantity: true,
-        createdAt: true,
-        batch: { select: { lot: true } },
-      },
-    }),
-    prisma.inventoryMovement.count({ where }),
-  ]);
-
-  const items = rows.flatMap((row) =>
-    row.orderDeliveryId === null
-      ? []
-      : [
-          {
-            id: row.id,
-            orderDeliveryId: row.orderDeliveryId,
-            orderId: row.orderId,
-            batchId: row.batchId,
-            lot: row.batch.lot,
-            quantity: row.quantity.toFixed(4),
-            createdAt: row.createdAt.toISOString(),
-          },
-        ],
-  );
   return buildPage(items, total, page.page, limit);
 }
 

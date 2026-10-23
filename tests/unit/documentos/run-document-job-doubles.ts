@@ -12,6 +12,10 @@ import type {
   RunDocumentJobDeps,
 } from '@/lib/modules/documentos/domain/run-document-job';
 import type { AiReader } from '@/lib/modules/documentos/ports/ai-reader';
+import type { PdfReadingSwitch } from '@/lib/modules/documentos/ports/pdf-reading-switch';
+
+/** La lectura de PDF activa en la empresa: el caso de todos los tests que no miran el interruptor. */
+export const LECTURA_PDF_PRENDIDA: PdfReadingSwitch = { isOn: async () => true };
 
 /** Un lector que no deberia llamarse nunca: en estos tests la cadena es un doble entero. */
 export const LECTOR_INERTE: AiReader = {
@@ -25,10 +29,10 @@ export function dobleDeProveedor(
 ) {
   const isConfigured = vi.fn<AiProviderGateway['isConfigured']>(async () => lookup.status !== 'missing');
   const readerFor = vi.fn<AiProviderGateway['readerFor']>(async () => lookup);
-  const reportAccountFailure = vi.fn<AiProviderGateway['reportAccountFailure']>(async () => {});
+  const reportConnectionFailure = vi.fn<AiProviderGateway['reportConnectionFailure']>(async () => {});
   const reportRecovered = vi.fn<AiProviderGateway['reportRecovered']>(async () => {});
-  const aiProvider: AiProviderGateway = { isConfigured, readerFor, reportAccountFailure, reportRecovered };
-  return { aiProvider, isConfigured, readerFor, reportAccountFailure, reportRecovered };
+  const aiProvider: AiProviderGateway = { isConfigured, readerFor, reportConnectionFailure, reportRecovered };
+  return { aiProvider, isConfigured, readerFor, reportConnectionFailure, reportRecovered };
 }
 
 /**
@@ -36,7 +40,8 @@ export function dobleDeProveedor(
  * cadena se construye sobre el lector que entrego el proveedor y no sobre otro.
  */
 export function trabajoConProveedor(
-  deps: Omit<RunDocumentJobDeps, 'aiProvider' | 'pipelineFor'> & DocumentPipeline,
+  deps: Omit<RunDocumentJobDeps, 'aiProvider' | 'pipelineFor' | 'pdfReading'> &
+    DocumentPipeline & { readonly pdfReading?: PdfReadingSwitch },
 ) {
   const { processPdfByStrategy, cropCatalogImages, ...resto } = deps;
   const proveedor = dobleDeProveedor();
@@ -44,5 +49,10 @@ export function trabajoConProveedor(
     if (reader === LECTOR_INERTE) throw new Error('la cadena debe recibir el lector observado');
     return { processPdfByStrategy, cropCatalogImages };
   });
-  return createRunDocumentJob({ ...resto, aiProvider: proveedor.aiProvider, pipelineFor });
+  return createRunDocumentJob({
+    pdfReading: LECTURA_PDF_PRENDIDA,
+    ...resto,
+    aiProvider: proveedor.aiProvider,
+    pipelineFor,
+  });
 }

@@ -31,8 +31,9 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de diez tablas: los catalogos compartidos por todas las empresas
-     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`), la propia empresa
+     y cerrada de doce tablas: los catalogos compartidos por todas las empresas
+     (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`, `ai_models`,
+     `addons`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
      (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
      receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
@@ -40,8 +41,10 @@ consecuencias de arquitectura que no son opinables:
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Nada de infraestructura «por si acaso».** Es sobre-ingenieria —y el reviewer la
      rechaza— todo lo que no esta pedido: jerarquias de empresas, empresas anidadas, un
-     usuario en varias empresas, permisos por empresa mas alla de su rol, o un selector de
-     empresa antes de que exista su ficha.
+     usuario en varias empresas, permisos por empresa **que amplíen** su rol, o un selector de
+     empresa antes de que exista su ficha. Lo único por empresa son sus **añadidos activos**
+     (`company_addon_overrides`), que solo **recortan**: el permiso efectivo es rol ∩ añadidos activos
+     (QC-277).
    - **Coste que esto impone y se acepta**: cada feature de datos pasa a llevar columna de
      empresa, filtro en cada consulta, rechazo probado del acceso cruzado y su test. No es
      gratis y no es opcional.
@@ -343,7 +346,7 @@ lib/modules/<modulo>/
 
 - **Dominio** (`domain/`): casos de uso y tipos. Solo puede importar de su propio
   `domain/`/`ports/`, el contrato (`index.ts`) de otro modulo, y paquetes puros (hoy:
-  `zod`, `papaparse`, `libphonenumber-js`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
+  `zod`, `papaparse`, `libphonenumber-js` y su subpath `libphonenumber-js/max`). Nunca `next/*`, `react*`, `@prisma/client`, `lib/shared/`, `lib/composition`,
   `app/`, `components/` ni las tripas de otro modulo.
 - **Puertos** (`ports/`): la superficie hacia adentro. Los implementa el adaptador
   driven correspondiente y los cablea el punto de composicion. Nadie mas los importa.
@@ -390,7 +393,7 @@ un adaptador driven: recibe datos por props y llama a la Server Action por su ru
 
 | Origen | PUEDE importar | NO PUEDE importar |
 | --- | --- | --- |
-| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`, `papaparse`, `libphonenumber-js`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
+| `lib/modules/M/domain/**`, `ports/**` | su propio `domain/ports`, `@/lib/modules/N` (barrel), paquetes puros (`zod`, `papaparse`, `libphonenumber-js`, `libphonenumber-js/max`) | `next/*`, `react*`, `@prisma/client`, `lib/shared/**`, `lib/composition`, `adapters/**`, `app/**`, `components/**`, `hooks/**`, `lib/modules/N/**` (profundo) |
 | `lib/modules/M/adapters/driven/**` | `../../domain`, `../../ports`, `lib/shared/**`, `@prisma/client`, SDKs externos, `@/lib/modules/N` (barrel), **otro driven del MISMO modulo** (ver nota) | `lib/composition`, `../driving/**`, `app/**`, `components/**`, `lib/modules/N/**` (profundo), **un driven de OTRO modulo** |
 | `lib/modules/M/adapters/driving/**` | `lib/composition`, `@/lib/modules/M` (barrel), su propia carpeta, `next/*`, `react*`, `lib/shared/**` | `@prisma/client`, el cliente Prisma compartido, `../driven/**`, `../../domain`/`../../ports` por ruta profunda |
 | `lib/composition/**` | `@/lib/modules/*` (barrel), `*/ports/**`, `*/adapters/driven/**`, `lib/shared/**` | `*/adapters/driving/**`, `app/**`, `components/**` |
@@ -555,9 +558,13 @@ error mas comun al montar Prisma sobre Supabase.
   pinta `nav-user`). **Un permiso implementado solo como corte de ruta no cuenta como implementado**,
   igual que no cuenta uno implementado solo como policy de RLS: el 404 de la pagina decide si se
   **enseña** una pantalla, y el service decide si se puede **hacer**.
-- **Los permisos de la sesion son una foto del instante del login** y envejecen hasta 8 h: una
-  pantalla puede pintarse para alguien a quien el service ya deniega. La invalidacion inmediata es
-  QC-23.
+- **Los permisos se resuelven en cada petición, en la misma lectura de sesión**: los del rol actual
+  menos los de los añadidos no activos de la empresa. Un cambio de rol o de añadidos vale desde la
+  siguiente petición; lo ya pintado en pantalla no se repinta solo.
+- **Añadidos por empresa.** El catálogo de añadidos vive en `identity/domain/company-addons.ts`. Las
+  operaciones de un añadido que no tienen permiso propio se cortan con `requireAddon` en el caso de
+  uso y con `requirePageAddon` en la pantalla. Lo que corre sin sesión comprueba el añadido en la
+  empresa del trabajo, y lo vigila `tests/guards/guard-rutas-fuera-de-sesion.test.ts`.
 
 ### Por qué
 
@@ -575,8 +582,10 @@ y que el test se ponga rojo si aparece una accion con las dos caras de la sesion
 lista o sin ambito, es lo que detecta la que llegue en el proximo merge, aunque venga en un
 **modulo nuevo** o en una **subcarpeta**.
 
-**Permisos que envejecen:** un cambio de permisos no llega a la pantalla hasta que la sesion
-caduca.
+**Permisos en cada petición:** la sesión ya relee el rol y la empresa en cada petición con una sola
+consulta, y los añadidos salen en esa misma lectura: el recorte no añade consultas ni obliga a volver
+a iniciar sesión. Lo que no hace es repintar una pantalla ya abierta; el cambio se ve en la siguiente
+petición.
 
 ## Server Actions vs Route Handlers
 | Caso | Usar |
@@ -595,6 +604,8 @@ caduca.
 - El proceso no actua en nombre de ninguna empresa, pero **tampoco lee varias a la vez**: recorre
   las empresas y busca los candidatos de cada una por separado, de modo que la regla de ambito de
   empresa de las consultas se cumple sin excepciones.
+- Los crons son **núcleo** y no miran añadidos; el webhook de un añadido sí, en la empresa del
+  trabajo, antes de actuar.
 
 ### Por qué
 
@@ -659,6 +670,12 @@ migracion se aplica sobre un estado que Prisma cree que es otro.
   - *Nota 2026-10-09 (QC-249):* desde QC-249 `VERCEL_ENV=preview` tambien migra y siembra, contra
     la base de preview y tras una comprobacion previa; ver `## Previews (QC-249)`. Con
     development, vacio o ausente sigue sin tocar la base.
+  - *Nota 2026-10-13 (QC-162):* el seed lee su alcance de `VERCEL_ENV`
+    (`lib/modules/identity/adapters/driven/config/seed-scope-env.ts`). Con `production` (recortado)
+    solo siembra roles, permisos y el Maestro: no lee `SEED_ADMIN_*`, no lee ni crea la empresa
+    inicial y no crea el Administrador inicial; las empresas las da de alta el Maestro. Nunca borra
+    ni modifica: la QuimiCloud que ya exista en produccion se queda. Con cualquier otro valor
+    (preview, development, vacio o ausente) siembra todo, como antes. `scripts/build.mjs` no cambia.
 
 `tests/guards/guard-despliegue-produccion.test.ts` lo fija.
 
@@ -778,7 +795,8 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `DATABASE_URL`, `DIRECT_URL` | base de produccion | base del proyecto de preview (contienen `PREVIEW_SUPABASE_REF`) | base local |
 | `PREVIEW_SUPABASE_REF` | ausente | Reference ID del proyecto de Supabase de preview | ausente |
 | `SESSION_SECRET` | propio | **propio de preview**, distinto del de produccion | propio |
-| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
+| `SEED_ADMIN_USERNAME`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL` | no se leen: en produccion el seed solo crea al Maestro (QC-162) | propias de preview | propias |
+| `SEED_MAESTRO_USERNAME`, `SEED_MAESTRO_PASSWORD`, `SEED_MAESTRO_EMAIL` | de produccion | propias de preview | propias |
 | `SEED_DEMO_OPERADOR_PASSWORD`, `SEED_DEMO_EMPACADOR_PASSWORD`, `SEED_DEMO_ACONDICIONAMIENTO_PASSWORD` | ausentes | **obligatorias** (el seed de demostracion falla sin ellas) | en el entorno del comando |
 | `SUPABASE_STORAGE_URL`, `SUPABASE_STORAGE_KEY` | de produccion | del proyecto de preview (la URL contiene `PREVIEW_SUPABASE_REF`) | segun dev |
 | `SUPABASE_STORAGE_BUCKET`, `SUPABASE_DOCUMENTS_BUCKET`, `SUPABASE_CROPS_BUCKET` | de produccion | buckets del proyecto de preview | segun dev |

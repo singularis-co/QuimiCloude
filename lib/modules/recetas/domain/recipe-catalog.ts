@@ -19,6 +19,9 @@ export type RecipeRef = {
   readonly isUnderReview: boolean;
   /** `null` si la receta es una original. */
   readonly original: { readonly id: RecipeId; readonly name: string } | null;
+  /** URL publica de la imagen, ya compuesta. Una version no guarda imagen: lleva la de su
+   *  original (mismo criterio que la ficha de receta). `null` = sin imagen. */
+  readonly imageUrl: string | null;
 };
 
 /** Servicio que `recetas` ofrece a los demas modulos (`docs/architecture.md > Dominio` n.o 2:

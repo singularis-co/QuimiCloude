@@ -38,6 +38,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { formulaImportRoute, FORMULAS_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -124,6 +125,7 @@ test.beforeAll(async () => {
     select: { id: true },
   });
   companyId = company.id;
+  await enableAllAddons(companyId);
 
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },
@@ -363,7 +365,7 @@ test.describe('formula-desde-pdf', () => {
     await expect(page.getByTestId('recipe-step-row')).toHaveCount(3);
     await page.getByTestId('recipe-step-remove-2').click();
     await expect(page.getByTestId('recipe-step-row')).toHaveCount(2);
-    await page.getByTestId('recipe-step-add').click();
+    await page.getByTestId('recipe-step-add-1').click();
     await page.getByTestId('recipe-step-text-2').fill(addedStepText);
 
     // --- 7. El choque de nombre: la receta sembrada tiene el mismo nombre leido (R17).

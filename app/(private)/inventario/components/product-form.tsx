@@ -4,18 +4,21 @@ import { useActionState, useEffect, useId, useState } from 'react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
+import { ImageField, type ImageFieldState } from '@/components/shared/image-field';
 import { Label } from '@/components/ui/label';
 import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
 import {
   createProductSchema,
   updateProductSchema,
   MANUAL_PRODUCT_TYPE_VALUES,
+  MAX_PRODUCT_IMAGE_BYTES,
   PRODUCT_TYPES,
   isStoredDecimal,
   type ProductFormUnits,
   type ProductView,
   type ProductType,
   type SupplyConversion,
+  validateProductImage,
 } from '@/lib/modules/inventario';
 import type { UnitRef } from '@/lib/modules/unidades';
 import { formatDateLocalISO } from '@/lib/shared/ui/date-civil';
@@ -134,8 +137,8 @@ const PACKAGING_LEGACY_LABEL = 'Envase sin presentación fija';
 const PACKAGING_LEGACY_NOTE =
   'Se dio de alta antes de los envases con presentación: no se ofrece en el reparto de pedidos.';
 
-/** Falta el par de costos entero. Se pinta en LOS DOS campos: cualquiera de ellos resuelve. */
-const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario o el costo total; basta con uno.';
+/** Falta el costo unitario: es la unica entrada del par, el total se calcula a partir de el. */
+const COST_REQUIRED_MESSAGE = 'Escribe el costo unitario.';
 
 /** Los unicos tipos que el select ofrece: un producto terminado no nace a mano. */
 const TYPE_OPTION_LABELS: Record<(typeof MANUAL_PRODUCT_TYPE_VALUES)[number], string> = {
@@ -154,7 +157,7 @@ const FINISHED_PRODUCT_LABEL = 'Producto terminado';
 const FIELD_LABELS: Record<ProductFieldName, string> = {
   name: 'Nombre',
   type: 'Tipo',
-  stock: 'Existencia',
+  stock: 'Cantidad',
   qtyAlert: 'Alerta de cantidad',
   presentationId: 'Presentación',
   unitId: 'Unidad',
@@ -284,16 +287,16 @@ function readOptionalText(raw: string): string | undefined {
  * campo (R8: el de «solo total sin existencia» cuelga de `stock`), asi que se muestran tal cual.
  *
  * La unica excepcion es R11 -no viene ningun costo-: el esquema cuelga ese issue de los DOS
- * campos de costo y aqui tiene copy propio, porque decir «basta con uno» es lo que resuelve el
- * problema. Se reconoce por que los dos costos venian vacios, no por el texto del issue.
+ * campos de costo, pero el total es de solo lectura, asi que se pinta solo en el unitario y con
+ * copy propio. Se reconoce por que el unitario venia vacio, no por el texto del issue.
  */
 function fieldMessage(
   field: ProductFieldName,
   issue: { readonly code: string; readonly message: string },
-  faltanLosDosCostos: boolean,
+  faltaElCostoUnitario: boolean,
 ): string {
   if (issue.code !== 'custom') return FIELD_MESSAGES[field];
-  if (faltanLosDosCostos && (field === 'unitCost' || field === 'totalCost')) {
+  if (faltaElCostoUnitario && field === 'unitCost') {
     return COST_REQUIRED_MESSAGE;
   }
   return issue.message;
@@ -360,6 +363,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
   const fieldId = useId();
   const formErrorId = `${fieldId}-form-error`;
 
+  // Fuera del `FormData`: los bytes viajan como argumento aparte de la action. Es estado de React,
+  // asi que un rechazo no lo pierde.
+  const [image, setImage] = useState<ImageFieldState>({ kind: 'untouched' });
+  /** En el alta, la imagen del producto existente elegido: se ve pero no se reenvia. */
+  const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(null);
+  // Remonta el campo al elegir producto: guarda su propia vista previa local del archivo subido.
+  const [imageFieldKey, setImageFieldKey] = useState(0);
+
   /** Tipo de producto seleccionado. Parte del tipo del producto que se edita (o PRODUCT en alta). */
   const [productType, setProductType] = useState<ProductType>(product?.type ?? PRODUCT_TYPES.PRODUCT);
 
@@ -393,6 +404,9 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     });
     setQtyAlertValue(trimDecimal(option.qtyAlert ?? ''));
     setUnitValue(option.unitId ?? '');
+    setPreloadedImageUrl(option.imageUrl ?? null);
+    setImage({ kind: 'untouched' });
+    setImageFieldKey((key) => key + 1);
   }
 
   async function save(_previous: ProductFormState, formData: FormData): Promise<ProductFormState> {
@@ -470,12 +484,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
         );
 
     if (!parsed.success) {
-      const faltanLosDosCostos = isCreate && unitCost === undefined && totalCost === undefined;
+      const faltaElCostoUnitario = isCreate && unitCost === undefined;
 
       for (const issue of parsed.error.issues) {
-        const field = String(issue.path[0] ?? '') as ProductFieldName;
+        const path = String(issue.path[0] ?? '') as ProductFieldName;
+        // El total es de solo lectura: un rechazo suyo se arregla en el unitario, que es de donde sale.
+        const field: ProductFieldName = path === 'totalCost' ? 'unitCost' : path;
         if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
-          fieldErrors[field] = fieldMessage(field, issue, faltanLosDosCostos);
+          fieldErrors[field] = fieldMessage(field, issue, faltaElCostoUnitario);
         }
       }
     }
@@ -509,9 +525,24 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     // `isCreate` no estrecha el TIPO de un `result` ya unificado. Separar la rama es lo que deja
     // leer `result.lot` sin un `as`.
     if (isCreate) {
-      const result = await createProductAction({ status: 'idle' }, formData);
+      // Sin imagen no se pasa el argumento: el alta no admite `null`.
+      const result =
+        image.kind === 'replaced'
+          ? await createProductAction({ status: 'idle' }, formData, { bytes: image.bytes })
+          : await createProductAction({ status: 'idle' }, formData);
 
       if (result.status === 'error') {
+        // El vencimiento no posterior a hoy SI identifica campo: el servidor es quien conoce
+        // "hoy" (fecha civil UTC), asi que su mensaje se pinta bajo la fecha de expiracion.
+        if (result.code === 'batch_expiry_not_future') {
+          return {
+            status: 'error',
+            serverError: result,
+            fieldErrors: { expiryDate: result.message },
+            values,
+          };
+        }
+
         // `invalid_input`, `product_not_found` y `unauthorized` NO identifican campo: van a la
         // region de error del formulario.
         //
@@ -533,7 +564,16 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
         : { status: 'success' };
     }
 
-    const result = await updateProductAction(product.id, { status: 'idle' }, formData);
+    // `untouched` no pasa el argumento (la imagen guardada se queda); `cleared` pasa `null`.
+    const result =
+      image.kind === 'untouched'
+        ? await updateProductAction(product.id, { status: 'idle' }, formData)
+        : await updateProductAction(
+            product.id,
+            { status: 'idle' },
+            formData,
+            image.kind === 'replaced' ? { bytes: image.bytes } : null,
+          );
 
     if (result.status === 'error') {
       return { status: 'error', serverError: result, fieldErrors: {}, values };
@@ -608,6 +648,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
     // Con solo texto libre escrito no hay nada autocompletado que deshacer: se conserva.
     if (template === null) return;
     setTemplate(null);
+    setPreloadedImageUrl(null);
     setStockValue('');
     setQtyAlertValue('');
     supplyHomonyms.onNameChange('');
@@ -653,30 +694,16 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
         />
       )}
 
-      {/*
-        En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
-        autocompletan unidad y alerta. En la EDICION el
-        nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
-      */}
-      {isEdit ? (
-        <ProductField
-          name="name"
-          label={FIELD_LABELS.name}
-          type="text"
-          required
-          defaultValue={initialValue('name', product?.name ?? '')}
-          error={fieldErrors.name}
-        />
-      ) : (
-        <ProductNamePicker
-          key={`name-${resetCount}`}
-          defaultValue={initialValue('name', '')}
-          error={fieldErrors.name}
-          onSelect={applyTemplate}
-          onNameChange={supplyHomonyms.onNameChange}
-          productType={productType}
-        />
-      )}
+      <ImageField
+        key={imageFieldKey}
+        mode={isEdit ? 'edit' : 'create'}
+        initialImageUrl={product?.imageUrl ?? preloadedImageUrl}
+        value={image}
+        onChange={setImage}
+        maxBytes={MAX_PRODUCT_IMAGE_BYTES}
+        validate={validateProductImage}
+        testIdPrefix="product-form-image"
+      />
 
       {/*
         Tipo de producto. Un producto terminado no se elige a mano: el select solo ofrece
@@ -713,6 +740,32 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           error={fieldErrors.type}
           options={TYPE_OPTIONS}
           onChange={(value) => handleTypeChange(value as ProductType)}
+        />
+      )}
+
+      {/*
+        En el ALTA el nombre es un autocomplete que busca productos existentes; al elegir uno se
+        autocompletan unidad y alerta. En la EDICION el
+        nombre sigue siendo un campo de texto plano: no hay otro producto del que copiar nada.
+      */}
+      {isEdit ? (
+        <ProductField
+          name="name"
+          label={FIELD_LABELS.name}
+          type="text"
+          required
+          defaultValue={initialValue('name', product?.name ?? '')}
+          error={fieldErrors.name}
+        />
+      ) : (
+        <ProductNamePicker
+          key={`name-${resetCount}`}
+          defaultValue={initialValue('name', '')}
+          error={fieldErrors.name}
+          onSelect={applyTemplate}
+          onDeselect={() => setPreloadedImageUrl(null)}
+          onNameChange={supplyHomonyms.onNameChange}
+          productType={productType}
         />
       )}
 
@@ -780,7 +833,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           helper={
             isPackaging
               ? PACKAGING_STOCK_HELPER
-              : 'La existencia con la que entra este lote al inventario.'
+              : 'Cantidad que se va a ingresar al inventario.'
           }
           value={stockValue}
           onChange={(event) => setStockValue(sanitizeQuantityInput(event.currentTarget.value))}
@@ -795,7 +848,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           type="text"
           inputMode="decimal"
           required
-          helper="Cantidad a partir de la cual quieres que se avise de que queda poco. Hoy solo se guarda: todavía no dispara ningún aviso."
+          helper="Cantidad a partir de la cual quieres que se avise de que queda poco."
           value={qtyAlertValue}
           onChange={(event) => setQtyAlertValue(sanitizeQuantityInput(event.currentTarget.value))}
           error={fieldErrors.qtyAlert}
@@ -803,13 +856,13 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
       )}
 
       {/*
-        Resto del primer lote (2026-09-10). Solo en el ALTA, y todos opcionales salvo la regla del
-        par de costos: tiene que venir el unitario O el total, y basta con uno.
+        Resto del primer lote (2026-09-10). Solo en el ALTA, y todos opcionales salvo el costo
+        unitario, que es obligatorio.
 
         Los dos costos son `type="text"` con teclado decimal, NO `type="number"`: un importe no
         pasa por el binario de coma flotante -es la misma razon por la que el dominio lo mueve
-        como cadena decimal-. Van juntos en `ProductCostFields` porque se rellenan el uno al otro
-        con la existencia y filtran lo tecleado: son un par, no dos campos sueltos.
+        como cadena decimal-. Van juntos en `ProductCostFields` porque el total, de solo lectura,
+        se calcula del unitario y la existencia: son un par, no dos campos sueltos.
       */}
       {isEdit ? null : (
         <>
@@ -819,9 +872,8 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
               unitCostLabel={FIELD_LABELS.unitCost}
               totalCostLabel={FIELD_LABELS.totalCost}
               initialUnitCost={initialValue('unitCost', '')}
-              initialTotalCost={initialValue('totalCost', '')}
+              quantity={stockValue}
               unitCostError={fieldErrors.unitCost}
-              totalCostError={fieldErrors.totalCost}
               onUnitCostChange={setUnitCostValue}
             />
           )}
@@ -839,13 +891,14 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           )}
 
           {shouldShowField('expiryDate', productType) && (
-            <ProductField
+            // El mismo selector de calendario que la fecha de compra. Opcional: arranca vacio, y
+            // el calendario solo deja elegir de manana en adelante.
+            <ProductBatchDateField
               key={`expiryDate-${resetCount}`}
               name="expiryDate"
               label={FIELD_LABELS.expiryDate}
-              type="date"
-              helper="La fecha en la que este lote caduca. Opcional: hoy solo se guarda, todavía no dispara ningún aviso."
-              defaultValue={initialValue('expiryDate', '')}
+              helper="La fecha en la que este lote caduca."
+              initialValue={initialValue('expiryDate', '')}
               error={fieldErrors.expiryDate}
             />
           )}
@@ -858,6 +911,7 @@ export function ProductForm({ product, units, formUnits = [], onSaved }: Product
           {shouldShowField('purchaseDate', productType) && (
             <ProductBatchDateField
               key={`purchaseDate-${resetCount}`}
+              label={FIELD_LABELS.purchaseDate}
               initialValue={initialValue('purchaseDate', formatDateLocalISO(new Date()))}
               error={fieldErrors.purchaseDate}
             />

@@ -34,6 +34,7 @@ const REGISTRO: FinishedProductRecord = {
   imagePath: null,
   qtyAlert: null,
   unitId: null,
+  recipeId: null,
   presentation: null,
   batches: [],
 };
@@ -70,7 +71,7 @@ function montar(
     findAliveFinished: vi.fn<FinishedProductDetailRepository['findAliveFinished']>(async () => record),
     listBatches: vi.fn<FinishedProductDetailRepository['listBatches']>(async () => finishedProductPage(items)),
     listMovements: vi.fn<FinishedProductDetailRepository['listMovements']>(),
-    listDeliveryMovements: vi.fn<FinishedProductDetailRepository['listDeliveryMovements']>(),
+    // 2026-10-15 (QC-282): el puerto pierde `listDeliveryMovements`; el tab Entregas lee las lineas de `pedidos`.
     listProductionCosts: vi.fn<FinishedProductDetailRepository['listProductionCosts']>(),
     findProducedProducts: vi.fn<FinishedProductDetailRepository['findProducedProducts']>(),
   };
@@ -162,6 +163,18 @@ describe('listFinishedProductBatches', () => {
 
     expect(pagina.items).toHaveLength(1);
     expect(pagina.items[0]).toMatchObject({ id: LITER_BATCH_ID, orderNumberText: null });
+  });
+
+  it('R16: cada fila devuelve el orderId de su pedido, o null en un lote sin pedido', async () => {
+    const m = montar();
+
+    const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+    expect(pagina.items.map((item) => [item.id, item.orderId])).toEqual([
+      [LITER_BATCH_ID, FINISHED_ORDER_ID],
+      [UNPACKAGED_BATCH_ID, null],
+      [EMPTY_BATCH_ID, FINISHED_ORDER_ID],
+    ]);
   });
 
   it('R23: una pagina o un tamano que no son enteros >= 1, o un campo de mas, responden invalid_input', async () => {

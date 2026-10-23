@@ -109,6 +109,8 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -116,7 +118,9 @@ function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> =
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -735,5 +739,28 @@ describe('R13: la tabla monta un solo panel o dialogo, el del pedido elegido', (
     rerender(tabla(PEDIDOS.filter((order) => order.id !== 'o2')));
 
     expect(screen.getByTestId(CANCEL_ORDER_ID_TESTID)).toHaveValue('o2');
+  });
+});
+
+describe('la lista de pedidos lleva la columna «Por entregar», traida del dashboard', () => {
+  it('su cabecera aparece justo antes de «Presentación» (2026-10-22)', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+    const presentacion = cabeceras.findIndex((texto) => texto.includes('Presentación'));
+
+    expect(presentacion).toBeGreaterThanOrEqual(1);
+    expect(cabeceras[presentacion - 1]).toContain('Por entregar');
+  });
+});
+
+describe('la lista de pedidos ya no lleva la columna «Cantidad» (decision humana del 2026-10-16)', () => {
+  it('ninguna cabecera dice «Cantidad» y «Presentación» y «Por entregar» siguen', () => {
+    montar();
+    const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
+
+    expect(cabeceras.some((texto) => texto.includes('Cantidad'))).toBe(false);
+    expect(screen.queryByTestId('data-table-head-quantity')).toBeNull();
+    expect(cabeceras.some((texto) => texto.includes('Presentación'))).toBe(true);
+    expect(cabeceras.some((texto) => texto.includes('Por entregar'))).toBe(true);
   });
 });

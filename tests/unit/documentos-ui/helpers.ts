@@ -9,6 +9,8 @@ export function entry(overrides: Partial<DocumentFileStatusEntry> = {}): Documen
   return {
     id: 'file-1',
     path: 'empresa-1/uno.pdf',
+    attempts: 0,
+    name: 'uno.pdf',
     status: 'queued',
     extractedText: null,
     errorCode: null,
@@ -18,7 +20,8 @@ export function entry(overrides: Partial<DocumentFileStatusEntry> = {}): Documen
 }
 
 export function batch(files: readonly DocumentFileStatusEntry[]): BatchStatus {
-  return { id: 'batch-1', companyId: 'empresa-1', strategy: 'catalogo', files };
+  // 4 = la primera entrega mas los 3 reintentos por defecto de la cola.
+  return { id: 'batch-1', companyId: 'empresa-1', strategy: 'catalogo', files, maxAttempts: 4 };
 }
 
 export function signedUploads(count: number) {

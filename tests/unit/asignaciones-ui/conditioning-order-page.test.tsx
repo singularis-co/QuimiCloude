@@ -84,6 +84,7 @@ const ROW = {
   conditionedById: null,
   team: [],
   batchData: null,
+  conditioningSteps: null,
 };
 
 const CANDIDATES = {
@@ -269,7 +270,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
   it('R4: con líneas sin datos, «Terminar» se pinta deshabilitado con el aviso', async () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
-      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2 },
+      batchData: { lines: [LINE, { ...LINE, batchId: 'otro' }], missingCount: 2, form: { kind: 'empty' } },
     });
 
     render(await invocar());
@@ -287,6 +288,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
       batchData: {
         lines: [{ ...LINE, provisionalLot: null, lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' }],
         missingCount: 0,
+        form: { kind: 'shared', lot: 'L-1', expiryDate: '2027-01-01', productionDate: '2026-10-01' },
       },
     });
 
@@ -300,7 +302,7 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'TERMINADO',
-      batchData: { lines: [LINE], missingCount: 1 },
+      batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } },
     });
 
     render(await invocar());
@@ -310,11 +312,11 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     expect(listConditioningTeamCandidatesMock).not.toHaveBeenCalled();
   });
 
-  it('R21: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Entregados»', async () => {
+  it('R21, QC-301 R4: en ENTREGADO propio pinta la sección, sin «Acondicionar» ni «Terminar», y vuelve a «Acondicionados»', async () => {
     getConditioningOrderMock.mockResolvedValue({
       ...MINE,
       status: 'ENTREGADO',
-      batchData: { lines: [LINE], missingCount: 1 },
+      batchData: { lines: [LINE], missingCount: 1, form: { kind: 'empty' } },
     });
 
     render(await invocar());
@@ -325,8 +327,8 @@ describe('«Datos de lote» y Terminar bloqueado', () => {
     expect(screen.getByRole('button', { name: CONDITIONING_ACTIONS_TEXTS.finish })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Guardar datos de lote' })).toBeEnabled();
     const back = screen.getByTestId(CONDITIONING_ORDER_BACK_LINK_TESTID);
-    expect(back).toHaveTextContent('Volver a «Entregados»');
-    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados_entregados');
+    expect(back).toHaveTextContent('Volver a «Acondicionados»');
+    expect(back).toHaveAttribute('href', '/asignacion?vista=acondicionados');
   });
 
   it('R21: un ENTREGADO que no deja ver el caso de uso sigue dando 404', async () => {

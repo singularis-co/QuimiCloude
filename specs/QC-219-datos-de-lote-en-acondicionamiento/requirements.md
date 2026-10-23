@@ -219,6 +219,9 @@ DEBE listar los pedidos vivos de su empresa en `ENTREGADO` que acondicionó él:
 
 *(Enmienda QC-217 R1, R2 y R5: tres pestañas en vez de dos.)* [D8, D13]
 
+*(Derogado por QC-301, 2026-10-19: el acondicionador ya no tiene «Entregados»; los `ENTREGADO`
+salen de sus vistas.)*
+
 **R21.** CUANDO el acondicionador abre el detalle de un pedido `ENTREGADO` que
 acondicionó él, la pantalla DEBE:
 
@@ -228,6 +231,8 @@ acondicionó él, la pantalla DEBE:
 
 Un `ENTREGADO` que acondicionó otra persona, o nadie, DEBE seguir dando 404. *(Enmienda QC-217
 R17.)* [D8, D13]
+
+*(Enmienda QC-301, 2026-10-19: la vuelta es «Volver a «Acondicionados»».)*
 
 ### Inventario
 

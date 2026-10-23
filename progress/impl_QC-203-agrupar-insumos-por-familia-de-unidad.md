@@ -312,7 +312,7 @@ Veredicto: T11 verde; typecheck del repo en verde.
 | R17 | `product-form-conversion.test.tsx`: `R17 el toast nombra la cantidad convertida y el destino` |
 | R18 | `plan-inventory-import-familia.test.ts`: `R18 fila en ml con homónimo en l queda en sumar lote sobre ese producto`, `R18 segunda fila del archivo en otra unidad de la familia suma sobre la primera`, `R18 otra familia queda en crear` |
 | R19 | `confirm-inventory-import-familia.test.ts`: `R19 la confirmación escribe el lote convertido sobre el destino`; `inventory-import-repository.int.test.ts`: `R19 findAliveProductsByNormalizedNames devuelve la existencia` |
-| R20 | `plan-inventory-import-familia.test.ts`: `R20 existencia convertida que no cabe…`, `R20 costo convertido que no cabe…`, `R20 total derivado en 0 tras convertir…`; `confirm-inventory-import-familia.test.ts`: `R20 la confirmación no escribe la fila que no cabe` |
+| R20 | `plan-inventory-import-familia.test.ts`: `R20 existencia convertida que no cabe…`, `R20 costo convertido que no cabe…`; `confirm-inventory-import-familia.test.ts`: `R20 la confirmación no escribe la fila que no cabe` |
 | R21 | `formula-import-unidad.test.tsx`: `R21 con «kg» leído preselecciona kg y dice que se sugirió del PDF`; `formula-import-page.test.tsx`: `R21 una fila «Crear materia prima» sugiere la unidad leida entre las de listUnitsAction` |
 | R22 | `formula-import-unidad.test.tsx`: `R22 con «gotas» queda vacía con su ayuda`, `R22 sin unidad en el PDF…`, `R22 con dos coincidencias…`, `R22 al elegir a mano dice Elegida por ti` |
 | R23 | `review-formula-import.test.ts`: `R23 una fila nueva sin unidad da new_unit_missing y no se puede confirmar`; `formula-import-unidad.test.tsx`: `R23 Confirmar con una vacía marca el error en esa fila y no llama a la action` |
@@ -337,3 +337,39 @@ Todos los R1..R30 tienen al menos un test nombrado. Ningún R queda sin test.
 - Finales de línea: LF.
 
 Veredicto: Tanda 6 verde. T12, T13 y T15 quedan marcadas.
+
+## Merge con dev · 2026-10-23
+
+`git merge origin/dev` (891 commits, merge, sin rebase). 20 archivos en conflicto, todos resueltos conservando ambos comportamientos:
+
+- Errores: `error-codes.ts`, `error-catalog.ts`, `inventario/domain/errors.ts`, `inventario/index.ts` unen las dos listas; `catalogo.test.ts` espera 123 (121 de dev + 2 de QC-203).
+- `create-product.ts`: imagen de dev (`validarImagen`/`subirImagen`) + `CreateProductResult` con `conversion`; `imagen` también en la rama de misma unidad de `createSupply`.
+- `lib/composition/index.ts`: `createRawMaterial` con `units` (QC-203) y `updateProduct` con `images` (dev).
+- `product-prisma.ts` escribe `unitId` e `imagePath`; `product-actions.ts` devuelve `conversion` y pasa `withImage`.
+- `confirm-inventory-import.ts`: `requireAddon` y `lotClash` simple de dev + traducción de los dos errores de conversión.
+- `inventory-import-contract.ts` y `plan-inventory-import.ts`: códigos de dev + `converted_stock_out_of_range`; `FileProduct.unitId` de QC-203; `checkLot` por clave nueva de dev (QC-284). Sin `cost_required` ni `lot_used_by_other_product` (los retiró dev).
+- UI: `product-cost-fields` (total de solo lectura de dev + `onUnitCostChange`), `product-name-picker` (`onNameChange` + `onDeselect`), `product-form` (imagen de dev + aviso de conversión), `formula-import-review` (maquetación de dev + `shownIssues`/`showUnitError`), `formula-import-summary` (estilos y «Volver al listado» de dev + listas con unidad).
+- `canvas.json`: el de dev, que ya contiene los 6 tableros y las 2 notas de QC-203. `aislamiento.json`: unión de entradas.
+
+Decisión humana (choque de regla, ver `progress/features/QC-203.md > Decisiones`):
+- R20 enmendado: la importación ya no trae «Costo total» (dev 325aa378). Se retira la rama `total_cost_too_low` de `checkConversion` y el test `R20 total derivado en 0 tras convertir…`. R20 sigue con 3 tests (los dos de `plan-inventory-import-familia.test.ts` y el de `confirm-inventory-import-familia.test.ts`).
+- R7: desde el formulario ya no ocurre (total de solo lectura, dev 17978345); el dominio lo sigue cubriendo con sus dos tests de `create-product-familia.test.ts`.
+
+Ajustes a tests y barrel tras el merge:
+- `product-image.test.ts` (de dev): `findAliveIdByNameInUnit` → `findAliveSupplyHomonyms`.
+- `formula-import-layout.test.tsx` (de dev): el resumen trae `created: []`, `reused: []`.
+- `inventario-toasts.test.tsx` (de dev): el doble de `ProductForm` llama `onSaved({ lot })`, el contrato de QC-203.
+- `qc159-alcance.test.ts`: `unitId` entra en la lista cerrada de claves (QC-203 R24).
+- `confirm-formula-import-unidad.test.ts` y `confirm-inventory-import-familia.test.ts`: los actores llevan el add-on que dev exige (`lectura_pdf`, `importacion_excel`).
+- `plan-inventory-import-familia.test.ts`: la cabecera es «Cantidad» (dev da435d96).
+- Barrel `app/(private)/inventario/components/index.ts`: reexporta `supply-conversion-notice` y `use-supply-homonyms` (contrato de ruta).
+
+Verificación (sin nada en paralelo):
+- `pnpm run db:migrate`: «No pending migrations to apply.»
+- `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores, 10 warnings preexistentes.
+- `pnpm exec vitest run guard`: 87 archivos, 1276 verdes, 22 saltados.
+- `vitest related --run` sobre los archivos en conflicto + los tests tocados: 1126 archivos, 18825 verdes, 34 saltados.
+- `vitest run --project integration tests/integration/inventario tests/integration/documentos`: 61 archivos, 515 verdes, 1 saltado.
+- `playwright test e2e/inventario-familia-de-unidad.spec.ts`: 2 passed (43.8s).
+
+Veredicto: merge verde.

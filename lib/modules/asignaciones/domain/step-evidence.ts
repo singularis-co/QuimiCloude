@@ -7,9 +7,9 @@
  * Las fotos se atan al NUMERO de paso (1, 2, ...): los pasos no tienen identificador propio.
  */
 
-export const EVIDENCE_PHASES = ['manufacturing', 'packing'] as const;
+export const EVIDENCE_PHASES = ['manufacturing', 'packing', 'conditioning'] as const;
 
-/** `manufacturing` recorre `steps`; `packing`, `packing_steps`. */
+/** `manufacturing` recorre `steps`; `packing`, `packing_steps`; `conditioning`, `conditioning_steps`. */
 export type EvidencePhase = (typeof EVIDENCE_PHASES)[number];
 
 export const MAX_EVIDENCE_PER_STEP = 3;

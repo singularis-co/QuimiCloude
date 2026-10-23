@@ -1,0 +1,63 @@
+# .github/workflows/mirror-postgres.yml — copia de Postgres 17 en GHCR para el gate (QC-279).
+#
+# El gate (`gate.yml`) levanta Postgres como servicio en cada shard y en el E2E. Bajarlo de un
+# registro publico sin autenticar acaba cortado: Docker Hub dio `toomanyrequests` el 2026-10-09
+# (PR #193) y ECR Public `toomanyrequests: Data limit exceeded` el 2026-10-14 (PR #232). GHCR,
+# con el `GITHUB_TOKEN` del propio repo, no tiene ese limite para los runners de GitHub.
+#
+# Este workflow baja la imagen UNA vez y la publica como `ghcr.io/singularis-co/postgres:17`.
+# Se construye con un Dockerfile de una linea (no `docker tag`) solo para ponerle la etiqueta
+# `org.opencontainers.image.source`: es lo que liga el paquete a este repo y deja que el
+# `GITHUB_TOKEN` de `gate.yml` lo lea aunque el paquete sea privado.
+#
+# Cuando corre:
+# - al tocar este archivo (tambien en la rama de un PR, para que la imagen exista antes del gate);
+# - a mano (`workflow_dispatch`);
+# - cada lunes, para traer los parches de la 17 (la etiqueta `17` se mueve con cada parche).
+name: mirror-postgres
+
+on:
+  push:
+    paths:
+      - '.github/workflows/mirror-postgres.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: mirror-postgres
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Login a GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Construir y publicar ghcr.io/${{ github.repository_owner }}/postgres:17
+        env:
+          # La misma imagen oficial en tres registros. ECR Public corto por cuota otra vez el
+          # 2026-10-22 (PR #223, 5 reintentos): si uno corta, se prueba el siguiente.
+          SOURCES: public.ecr.aws/docker/library/postgres:17 mirror.gcr.io/library/postgres:17 docker.io/library/postgres:17
+          TARGET: ghcr.io/${{ github.repository_owner }}/postgres:17
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Reintentos con espera creciente; en cada ronda, un registro tras otro.
+          SOURCE=""
+          for intento in 1 2 3; do
+            for origen in $SOURCES; do
+              if docker pull "$origen"; then SOURCE="$origen"; break 2; fi
+            done
+            [ "$intento" = 3 ] && { echo "no se pudo bajar postgres:17 de ningun registro"; exit 1; }
+            sleep $((intento * 30))
+          done
+          printf 'FROM %s\nLABEL org.opencontainers.image.source=%s\n' "$SOURCE" "$REPO_URL" \
+            | docker build -t "$TARGET" -
+          docker push "$TARGET"

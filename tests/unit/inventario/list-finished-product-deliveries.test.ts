@@ -9,6 +9,7 @@ import {
   FINISHED_DELIVERY_ID,
   FINISHED_ORDER_ID,
   FINISHED_ORDER_NUMBER,
+  FINISHED_PRESENTATION_ID,
   FINISHED_PRODUCT_ID,
   FINISHED_VOID_REASON,
   GALLON_BATCH_ID,
@@ -22,10 +23,13 @@ import {
 
 import type { CustomerCatalog, CustomerRef } from '@/lib/modules/clientes';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
-import type { DeliveredTotal, FinishedDeliveryDirectory } from '@/lib/modules/inventario/domain/finished-product-detail';
+import type {
+  DeliveredTotal,
+  FinishedDeliveryDirectory,
+  FinishedDeliveryLineRecord,
+} from '@/lib/modules/inventario/domain/finished-product-detail';
 import type { OrderNumberDirectory } from '@/lib/modules/inventario/domain/reservation';
 import type {
-  FinishedProductDeliveryMovementRecord,
   FinishedProductDetailRepository,
   FinishedProductRecord,
 } from '@/lib/modules/inventario/ports/finished-product-detail-repository';
@@ -33,82 +37,70 @@ import type { Page } from '@/lib/modules/inventario/domain/page';
 
 const EMPRESA = 'company-a';
 const LECTOR: Actor = { id: 'u-lector', companyId: EMPRESA, permissions: ['inventario.consultar'] };
-const OTRA_ENTREGA = '10000000-0000-4000-8000-000000000226';
 const OTRO_CLIENTE = 'b0000000-0000-4000-8000-000000000226';
 const TODOS_LOS_LOTES = [LITER_BATCH_ID, GALLON_BATCH_ID, UNPACKAGED_BATCH_ID, EMPTY_BATCH_ID];
 
+// 2026-10-15 (QC-282): los lotes traen su codigo, del que sale el lote de cada fila, y el producto su
+// presentacion, de la que sale la columna Presentacion.
 const REGISTRO: FinishedProductRecord = {
   id: FINISHED_PRODUCT_ID,
   name: 'Limpiador multiusos',
   imagePath: null,
   qtyAlert: null,
   unitId: null,
-  presentation: null,
+  recipeId: null,
+  presentation: { id: FINISHED_PRESENTATION_ID, name: 'Botella 1 L', content: '1.0000', unitId: null },
   batches: [
-    { id: LITER_BATCH_ID, stock: '10.5000', packageContent: '1.0000' },
-    { id: GALLON_BATCH_ID, stock: '9.0000', packageContent: '4.0000' },
-    { id: UNPACKAGED_BATCH_ID, stock: '2.2500', packageContent: null },
-    { id: EMPTY_BATCH_ID, stock: '0.0000', packageContent: '1.0000' },
+    { id: LITER_BATCH_ID, lot: 'L-2026-0225', stock: '10.5000', packageContent: '1.0000' },
+    { id: GALLON_BATCH_ID, lot: 'L-2026-0226', stock: '9.0000', packageContent: '4.0000' },
+    { id: UNPACKAGED_BATCH_ID, lot: 'L-2026-0227', stock: '2.2500', packageContent: null },
+    { id: EMPTY_BATCH_ID, lot: 'L-2026-0228', stock: '0.0000', packageContent: '1.0000' },
   ],
 };
 
 const ANA: CustomerRef = { id: FINISHED_CUSTOMER_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false };
+const BRUNO: CustomerRef = { id: OTRO_CLIENTE, firstNames: 'Bruno', lastNames: 'Diaz', isDeleted: false };
 const ENTREGADO: DeliveredTotal = { quantity: '4.0000', packages: 4 };
 
-function asiento(overrides: Partial<FinishedProductDeliveryMovementRecord> = {}): FinishedProductDeliveryMovementRecord {
+// 2026-10-15 (QC-282): la pagina del tab ya no son asientos completados con `findDeliveryDetails`,
+// son las lineas de entrega de `listDeliveryLines`, con su cliente y su anulacion.
+function linea(overrides: Partial<FinishedDeliveryLineRecord> = {}): FinishedDeliveryLineRecord {
   return {
-    id: '20000000-0000-4000-8000-000000000230',
+    id: '30000000-0000-4000-8000-000000000230',
     orderDeliveryId: FINISHED_DELIVERY_ID,
     orderId: FINISHED_ORDER_ID,
-    batchId: LITER_BATCH_ID,
-    lot: 'L-2026-0225',
-    quantity: '-4.0000',
+    // 2026-10-16 (QC-288): solo una entrega sin pedido lleva nota.
+    note: null,
     createdAt: '2026-10-11T10:00:00.000Z',
+    customerId: FINISHED_CUSTOMER_ID,
+    batchId: LITER_BATCH_ID,
+    packages: 4,
+    quantity: '4.0000',
+    void: null,
     ...overrides,
   };
 }
 
-const ASIENTO_ANULADO = asiento({ id: VOIDED_DELIVERY_ROW.movementId, batchId: GALLON_BATCH_ID, lot: 'L-2026-0226' });
-
-type Detalles = Awaited<ReturnType<FinishedDeliveryDirectory['findDeliveryDetails']>>;
-
-function detallesDe(customerId = FINISHED_CUSTOMER_ID): Detalles {
-  return new Map([
-    [
-      FINISHED_DELIVERY_ID,
-      {
-        customerId,
-        linesByBatch: new Map([
-          [LITER_BATCH_ID, { packages: 4, void: null }],
-          [GALLON_BATCH_ID, { packages: 1, void: { reason: FINISHED_VOID_REASON } }],
-        ]),
-      },
-    ],
-  ]);
-}
+const LINEA_ANULADA = linea({
+  id: VOIDED_DELIVERY_ROW.deliveryLineId,
+  batchId: GALLON_BATCH_ID,
+  packages: 1,
+  quantity: '4.0000',
+  void: { reason: FINISHED_VOID_REASON },
+});
 
 type Montaje = {
-  readonly items?: readonly FinishedProductDeliveryMovementRecord[];
-  readonly pagina?: Partial<Page<FinishedProductDeliveryMovementRecord>>;
+  readonly items?: readonly FinishedDeliveryLineRecord[];
+  readonly pagina?: Partial<Page<FinishedDeliveryLineRecord>>;
   readonly record?: FinishedProductRecord | null;
-  readonly detalles?: Detalles;
   readonly clientes?: readonly CustomerRef[];
 };
 
-function montar({
-  items = [asiento(), ASIENTO_ANULADO],
-  pagina = {},
-  record = REGISTRO,
-  detalles = detallesDe(),
-  clientes = [ANA],
-}: Montaje = {}) {
+function montar({ items = [linea(), LINEA_ANULADA], pagina = {}, record = REGISTRO, clientes = [ANA] }: Montaje = {}) {
   const products: FinishedProductDetailRepository = {
     findAliveFinished: vi.fn<FinishedProductDetailRepository['findAliveFinished']>(async () => record),
     listBatches: vi.fn<FinishedProductDetailRepository['listBatches']>(),
     listMovements: vi.fn<FinishedProductDetailRepository['listMovements']>(),
-    listDeliveryMovements: vi.fn<FinishedProductDetailRepository['listDeliveryMovements']>(async () =>
-      finishedProductPage(items, pagina),
-    ),
     listProductionCosts: vi.fn<FinishedProductDetailRepository['listProductionCosts']>(),
     findProducedProducts: vi.fn<FinishedProductDetailRepository['findProducedProducts']>(),
   };
@@ -116,7 +108,7 @@ function montar({
     findNumberTexts: vi.fn<OrderNumberDirectory['findNumberTexts']>(async () => new Map([[FINISHED_ORDER_ID, FINISHED_ORDER_NUMBER]])),
   };
   const deliveries: FinishedDeliveryDirectory = {
-    findDeliveryDetails: vi.fn<FinishedDeliveryDirectory['findDeliveryDetails']>(async () => detalles),
+    listDeliveryLines: vi.fn<FinishedDeliveryDirectory['listDeliveryLines']>(async () => finishedProductPage(items, pagina)),
     summarizeDelivered: vi.fn<FinishedDeliveryDirectory['summarizeDelivered']>(async () => ENTREGADO),
   };
   const customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'> = {
@@ -134,7 +126,7 @@ function montar({
 function directorios(m: ReturnType<typeof montar>) {
   return [
     m.orders.findNumberTexts,
-    m.deliveries.findDeliveryDetails,
+    m.deliveries.listDeliveryLines,
     m.deliveries.summarizeDelivered,
     m.customers.findRefsIncludingDeleted,
   ];
@@ -195,19 +187,19 @@ describe('listFinishedProductDeliveries', () => {
 
     const ausente = montar({ record: null });
     await expect(ausente.listar(FINISHED_PRODUCT_ID, {}, LECTOR)).rejects.toBeInstanceOf(ProductNotFoundError);
-    expect(ausente.products.listDeliveryMovements).not.toHaveBeenCalled();
     for (const fn of directorios(ausente)) expect(fn).not.toHaveBeenCalled();
   });
 
-  it('R19: cada lote de cada entrega sale con fecha, cliente, pedido, lote, envases y cantidad en valor absoluto', async () => {
+  // 2026-10-15 (QC-282): la pagina la pide `listDeliveryLines` con los lotes del producto, y la fila
+  // gana la presentacion (R43); el resto de la fila y de las llamadas no cambia.
+  it('R19, R43: cada linea de entrega sale con fecha, cliente, pedido, presentacion, lote, envases y cantidad', async () => {
     const m = montar();
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, { page: 1, pageSize: 10 }, LECTOR);
 
-    expect(m.products.listDeliveryMovements).toHaveBeenCalledWith(FINISHED_PRODUCT_ID, { page: 1, pageSize: 10 }, { companyId: EMPRESA });
+    expect(m.deliveries.listDeliveryLines).toHaveBeenCalledTimes(1);
+    expect(m.deliveries.listDeliveryLines).toHaveBeenCalledWith(EMPRESA, TODOS_LOS_LOTES, { page: 1, pageSize: 10 });
     expect(pagina).toEqual(finishedProductDeliveriesPage());
-    expect(m.deliveries.findDeliveryDetails).toHaveBeenCalledTimes(1);
-    expect(m.deliveries.findDeliveryDetails).toHaveBeenCalledWith(EMPRESA, [FINISHED_DELIVERY_ID]);
     expect(m.orders.findNumberTexts).toHaveBeenCalledTimes(1);
     expect(m.orders.findNumberTexts).toHaveBeenCalledWith(EMPRESA, [FINISHED_ORDER_ID]);
     expect(m.customers.findRefsIncludingDeleted).toHaveBeenCalledTimes(1);
@@ -225,7 +217,8 @@ describe('listFinishedProductDeliveries', () => {
   });
 
   it('R20: un cliente que no vuelve sale como null y la fila sigue', async () => {
-    const m = montar({ detalles: detallesDe(OTRO_CLIENTE), clientes: [] });
+    // 2026-10-15 (QC-282): el cliente viene en la linea, no en el detalle de la entrega.
+    const m = montar({ items: [linea({ customerId: OTRO_CLIENTE }), LINEA_ANULADA], clientes: [] });
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
 
@@ -233,26 +226,55 @@ describe('listFinishedProductDeliveries', () => {
     expect(pagina.items[0]).toMatchObject({ customer: null, packages: 4, orderNumberText: FINISHED_ORDER_NUMBER });
   });
 
-  it('R20: una entrega que no vuelve del directorio deja cliente y envases en null, y la fila sigue', async () => {
-    const m = montar({ items: [asiento({ orderDeliveryId: OTRA_ENTREGA })] });
+  // 2026-10-15 (QC-282): la fila es la linea, que siempre trae su cliente y sus envases; lo que puede
+  // no volver de un directorio es el numero del pedido.
+  it('R20: un pedido que no vuelve deja el numero en null y la fila sigue', async () => {
+    const m = montar({ items: [linea()] });
+    vi.mocked(m.orders.findNumberTexts).mockResolvedValue(new Map());
+
+    const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+    expect(pagina.items).toEqual([finishedProductDeliveryRow({ orderNumberText: null })]);
+  });
+
+  it('R43: con la presentacion del producto ausente, la columna sale en null y la fila sigue', async () => {
+    const m = montar({ items: [linea()], record: { ...REGISTRO, presentation: null } });
+
+    const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+    expect(pagina.items).toEqual([finishedProductDeliveryRow({ presentationName: null })]);
+  });
+
+  it('R43: dos clientes del mismo lote en una entrega son dos filas, cada una con su cliente y sus envases', async () => {
+    const deBruno = linea({ id: '30000000-0000-4000-8000-000000000231', customerId: OTRO_CLIENTE, packages: 2, quantity: '2.0000' });
+    const m = montar({ items: [linea(), deBruno], clientes: [ANA, BRUNO] });
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
 
     expect(pagina.items).toEqual([
-      finishedProductDeliveryRow({ orderDeliveryId: OTRA_ENTREGA, customer: null, packages: null, void: null }),
+      finishedProductDeliveryRow(),
+      finishedProductDeliveryRow({
+        deliveryLineId: deBruno.id,
+        customer: BRUNO,
+        packages: 2,
+        quantity: '2.0000',
+      }),
     ]);
+    expect(m.customers.findRefsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(m.customers.findRefsIncludingDeleted).toHaveBeenCalledWith([FINISHED_CUSTOMER_ID, OTRO_CLIENTE], EMPRESA);
+    expect(m.orders.findNumberTexts).toHaveBeenCalledWith(EMPRESA, [FINISHED_ORDER_ID]);
   });
 
   it('R23: una pagina o un tamano invalidos, o un campo de mas, responden invalid_input', async () => {
     for (const entrada of [{ page: 0 }, { pageSize: 0 }, { page: 2.5 }, { page: 1, direction: 'out' }, 'pagina']) {
       const m = montar();
       await expect(m.listar(FINISHED_PRODUCT_ID, entrada, LECTOR)).rejects.toBeInstanceOf(ValidationError);
-      expect(m.products.listDeliveryMovements).not.toHaveBeenCalled();
+      expect(m.deliveries.listDeliveryLines).not.toHaveBeenCalled();
     }
   });
 
-  it('R33: el void de linesByBatch llega a su fila y la fila anulada no se filtra ni cambia de sitio', async () => {
-    const m = montar({ items: [ASIENTO_ANULADO, asiento()] });
+  it('R33, R44: el void de la linea llega a su fila y la fila anulada no se filtra ni cambia de sitio', async () => {
+    const m = montar({ items: [LINEA_ANULADA, linea()] });
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
 
@@ -261,17 +283,38 @@ describe('listFinishedProductDeliveries', () => {
     expect(pagina.items[1]?.void).toBeNull();
   });
 
-  it('R33: una linea que no vuelve en linesByBatch deja void y envases en null', async () => {
-    const m = montar({ items: [asiento({ batchId: UNPACKAGED_BATCH_ID, lot: 'L-2026-0227' })] });
+  // 2026-10-15 (QC-282): sin detalles por lote, una linea no puede quedarse sin envases ni anulacion;
+  // el caso pasa a la anulacion por par cliente-presentacion.
+  it('R44: solo sale Anulada la fila de un par anulado, no la del otro cliente en el mismo lote', async () => {
+    const deBrunoAnulada = linea({
+      id: '30000000-0000-4000-8000-000000000231',
+      customerId: OTRO_CLIENTE,
+      packages: 2,
+      quantity: '2.0000',
+      void: { reason: FINISHED_VOID_REASON },
+    });
+    const m = montar({ items: [linea(), deBrunoAnulada], clientes: [ANA, BRUNO] });
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
 
-    expect(pagina.items).toHaveLength(1);
-    expect(pagina.items[0]).toMatchObject({ batchId: UNPACKAGED_BATCH_ID, customer: ANA, packages: null, void: null });
+    expect(pagina.items.map((item) => [item.customer?.id, item.lot, item.void])).toEqual([
+      [FINISHED_CUSTOMER_ID, 'L-2026-0225', null],
+      [OTRO_CLIENTE, 'L-2026-0225', { reason: FINISHED_VOID_REASON }],
+    ]);
   });
 
-  it('R34: summarizeDelivered se llama una vez con todos los lotes del producto, tambien en la pagina 2', async () => {
-    const m = montar({ items: [asiento()], pagina: { page: 2, total: 11, totalPages: 2 } });
+  it('R44: la paginacion y el orden son los del directorio: la pagina y sus filas pasan tal cual', async () => {
+    const m = montar({ items: [LINEA_ANULADA, linea()], pagina: { page: 3, pageSize: 2, total: 6, totalPages: 3 } });
+
+    const pagina = await m.listar(FINISHED_PRODUCT_ID, { page: 3, pageSize: 2 }, LECTOR);
+
+    expect(m.deliveries.listDeliveryLines).toHaveBeenCalledWith(EMPRESA, TODOS_LOS_LOTES, { page: 3, pageSize: 2 });
+    expect(pagina).toMatchObject({ page: 3, pageSize: 2, total: 6, totalPages: 3 });
+    expect(pagina.items.map((item) => item.deliveryLineId)).toEqual([LINEA_ANULADA.id, linea().id]);
+  });
+
+  it('R34, R44: summarizeDelivered se llama una vez con todos los lotes del producto, tambien en la pagina 2', async () => {
+    const m = montar({ items: [linea()], pagina: { page: 2, total: 11, totalPages: 2 } });
 
     const pagina = await m.listar(FINISHED_PRODUCT_ID, { page: 2 }, LECTOR);
 
@@ -288,7 +331,11 @@ describe('listFinishedProductDeliveries', () => {
 
     expect(pagina.items).toEqual([]);
     expect(pagina.delivered).toEqual({ quantity: '0.0000', packages: 0 });
-    for (const fn of directorios(m)) expect(fn).not.toHaveBeenCalled();
+    // 2026-10-15 (QC-282): la pagina vacia la da el propio directorio de lineas.
+    expect(m.deliveries.listDeliveryLines).toHaveBeenCalledTimes(1);
+    for (const fn of directorios(m).filter((fn) => fn !== m.deliveries.listDeliveryLines)) {
+      expect(fn).not.toHaveBeenCalled();
+    }
   });
 
   it('R36: un actor con solo inventario.consultar recibe la anulacion y el total entregado', async () => {
@@ -299,5 +346,70 @@ describe('listFinishedProductDeliveries', () => {
     expect(LECTOR.permissions).toEqual(['inventario.consultar']);
     expect(pagina.items.map((item) => item.void)).toEqual([null, { reason: FINISHED_VOID_REASON }]);
     expect(pagina.delivered).toEqual(ENTREGADO);
+  });
+
+  // 2026-10-16 (QC-288): las entregas sin pedido entran en el mismo tab.
+  describe('entregas sin pedido', () => {
+    const SIN_PEDIDO = linea({
+      id: '30000000-0000-4000-8000-000000000288',
+      orderDeliveryId: '20000000-0000-4000-8000-000000000288',
+      orderId: null,
+      note: 'Muestra para feria',
+      customerId: OTRO_CLIENTE,
+      batchId: GALLON_BATCH_ID,
+      packages: 2,
+      quantity: '8.0000',
+    });
+
+    it('R52: la fila sin pedido sale con withoutOrder, su nota y sin numero, mezclada en su sitio con las de pedido', async () => {
+      const m = montar({ items: [linea(), SIN_PEDIDO, LINEA_ANULADA], clientes: [ANA, BRUNO] });
+
+      const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(pagina.items.map((item) => item.deliveryLineId)).toEqual([
+        linea().id,
+        SIN_PEDIDO.id,
+        LINEA_ANULADA.id,
+      ]);
+      expect(pagina.items[1]).toMatchObject({
+        withoutOrder: true,
+        note: 'Muestra para feria',
+        orderNumberText: null,
+        customer: BRUNO,
+        lot: 'L-2026-0226',
+        packages: 2,
+        quantity: '8.0000',
+      });
+      expect(pagina.items[0]).toMatchObject({ withoutOrder: false, note: null, orderNumberText: FINISHED_ORDER_NUMBER });
+    });
+
+    it('R52: solo se piden numeros para los orderId no nulos', async () => {
+      const m = montar({ items: [linea(), SIN_PEDIDO], clientes: [ANA, BRUNO] });
+
+      await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(m.orders.findNumberTexts).toHaveBeenCalledTimes(1);
+      expect(m.orders.findNumberTexts).toHaveBeenCalledWith(EMPRESA, [FINISHED_ORDER_ID]);
+    });
+
+    it('R52: una pagina solo de entregas sin pedido no llama al directorio de pedidos', async () => {
+      const m = montar({ items: [SIN_PEDIDO], clientes: [BRUNO] });
+
+      const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(m.orders.findNumberTexts).not.toHaveBeenCalled();
+      expect(pagina.items).toHaveLength(1);
+      expect(pagina.items[0]).toMatchObject({ withoutOrder: true, orderNumberText: null });
+    });
+
+    it('R53: el total entregado es el del directorio sobre todos los lotes, con solo inventario.consultar', async () => {
+      const m = montar({ items: [SIN_PEDIDO], clientes: [BRUNO] });
+
+      const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+      expect(LECTOR.permissions).toEqual(['inventario.consultar']);
+      expect(m.deliveries.summarizeDelivered).toHaveBeenCalledWith(EMPRESA, TODOS_LOS_LOTES);
+      expect(pagina.delivered).toBe(ENTREGADO);
+    });
   });
 });

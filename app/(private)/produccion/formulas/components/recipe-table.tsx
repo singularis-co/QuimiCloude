@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useTransition, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, useTransition, type MouseEvent } from 'react';
 
 import {
   DataTable,
+  type DataTableCardLayout,
   type DataTableParams,
   type DataTableStates,
   type DataTableTexts,
@@ -16,24 +17,25 @@ import type { RecipeSummary } from '@/lib/modules/recetas';
 import { NEW_RECIPE_ROUTE } from '@/lib/shared/routes';
 import { cn } from '@/lib/utils';
 
-import { buildRecipeColumns } from './recipe-columns';
+import { DeleteRecipeDialog } from './delete-recipe-dialog';
+import { buildRecipeColumns, IMAGE_COLUMN_ID } from './recipe-columns';
 import { RECIPE_SKELETON_COLUMN_COUNT } from './recipe-columns-skeleton';
 import { recipeListHref } from './recipe-list-params';
-import { RecipeRowActions } from './recipe-row-actions';
+import { recipeRowActionsSpec, type RecipeRowAction } from './recipe-row-actions';
 
 export const RECIPE_TABLE_ID = 'recetas';
 
 export const RECIPE_TABLE_TEXTS: DataTableTexts = {
-  empty: 'No hay recetas que mostrar.',
-  loading: 'Cargando recetas…',
-  error: 'No se pudo cargar el catálogo de recetas.',
-  search: 'Buscar receta',
+  empty: 'No hay fórmulas que mostrar.',
+  loading: 'Cargando fórmulas…',
+  error: 'No se pudo cargar el catálogo de fórmulas.',
+  search: 'Buscar fórmula',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',
   previousPage: 'Página anterior',
   nextPage: 'Página siguiente',
   pageIndicator: (page, totalPages) => `Página ${page} de ${totalPages}`,
-  pageSize: 'Recetas por página',
+  pageSize: 'Fórmulas por página',
   sortAscending: 'Orden ascendente',
   sortDescending: 'Orden descendente',
   pinColumn: 'Fijar columna',
@@ -43,9 +45,19 @@ export const RECIPE_TABLE_TEXTS: DataTableTexts = {
   lastWeek: 'Última semana',
   lastMonth: 'Último mes',
   lastYear: 'Último año',
+  cardActions: 'Acciones',
+  closeMenu: 'Cerrar',
 };
 
-export const RECIPE_NO_RESULTS_TEXT = 'Ninguna receta coincide con la búsqueda o los filtros.';
+const RECIPE_TABLE_CARD: DataTableCardLayout = {
+  primary: IMAGE_COLUMN_ID,
+  title: 'name',
+  meta: ['stepCount', 'createdAt', 'updatedAt'],
+};
+
+type ActiveRecipe = { readonly recipe: RecipeSummary; readonly open: boolean };
+
+export const RECIPE_NO_RESULTS_TEXT = 'Ninguna fórmula coincide con la búsqueda o los filtros.';
 
 const CLEAR_SEARCH_LABEL = 'Limpiar búsqueda y filtros';
 const FIRST_PAGE_LABEL = 'Volver a la primera página';
@@ -106,8 +118,8 @@ function buildRecipeTableStates(
             testId: 'recipe-list-empty',
             message:
               empty.firstPageHref === undefined
-                ? 'Todavía no hay recetas en el catálogo.'
-                : 'Esta página ya no tiene recetas.',
+                ? 'Todavía no hay fórmulas en el catálogo.'
+                : 'Esta página ya no tiene fórmulas.',
             firstPage:
               empty.firstPageHref === undefined
                 ? undefined
@@ -150,14 +162,17 @@ export function RecipeTable({
 }: RecipeTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // Al cerrar se conserva la receta: el diálogo necesita sus datos mientras anima la salida.
+  const [active, setActive] = useState<ActiveRecipe | null>(null);
+
+  const handleAction = useCallback((_action: RecipeRowAction, recipe: RecipeSummary) => {
+    setActive({ recipe, open: true });
+  }, []);
 
   // Identidad estable: si cambiara en cada render, la tabla reconstruiría todas sus columnas.
   const columns = useMemo(
-    () =>
-      buildRecipeColumns({
-        rowActions: (recipe) => <RecipeRowActions recipe={recipe} />,
-      }),
-    [],
+    () => buildRecipeColumns({ menu: (recipe) => recipeRowActionsSpec({ recipe, onAction: handleAction }) }),
+    [handleAction],
   );
 
   // Una transición y no `status="loading"`: ese estado desmonta la barra y el campo de búsqueda
@@ -220,6 +235,7 @@ export function RecipeTable({
       }
       emptyAction={emptyAction}
       states={buildRecipeTableStates(params, error, empty)}
+      card={RECIPE_TABLE_CARD}
     />
   );
 
@@ -239,6 +255,13 @@ export function RecipeTable({
         <p className="text-xs text-muted-foreground">{RECIPE_TABLE_TEXTS.loading}</p>
       ) : null}
       {table}
+      {active === null ? null : (
+        <DeleteRecipeDialog
+          recipe={active.recipe}
+          open={active.open}
+          onOpenChange={(open) => setActive((current) => (current === null ? null : { ...current, open }))}
+        />
+      )}
     </div>
   );
 }

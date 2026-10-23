@@ -5,12 +5,14 @@ import { requirePlatformPermission, type PlatformActor } from './platform-actor'
 import type { CompanyCountryRepository } from '../ports/company-country-repository';
 
 export type SetCompanyCountryDeps = {
-  readonly companies: CompanyCountryRepository;
+  readonly companies: Pick<CompanyCountryRepository, 'setCountryOfAlive'>;
+  readonly now?: () => Date;
 };
 
 export function createSetCompanyCountry(
   deps: SetCompanyCountryDeps,
 ): (actor: PlatformActor | null | undefined, input: unknown) => Promise<void> {
+  const now = deps.now ?? (() => new Date());
   return async function setCompanyCountry(
     actor: PlatformActor | null | undefined,
     input: unknown,
@@ -22,7 +24,7 @@ export function createSetCompanyCountry(
     if (!parsed.success) throw new ValidationError();
 
     const { companyId, country } = parsed.data;
-    const outcome = await deps.companies.setCountryOfAlive(companyId, country);
+    const outcome = await deps.companies.setCountryOfAlive(companyId, country, actor.id, now());
     if (outcome === 'not_found') throw new CompanyNotFoundError();
   };
 }

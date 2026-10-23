@@ -76,3 +76,120 @@ export class ActionNotAllowedError extends IntegracionesError {
     super('action_not_allowed', diagnostic);
   }
 }
+
+/** El contacto no existe o es de otra empresa: el texto no distingue los dos casos. */
+export class WhatsappContactNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_contact_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_contact_not_found', diagnostic);
+  }
+}
+
+/** Ninguna variante del número del contacto es un teléfono válido: no hay qué añadir al cliente. */
+export class WhatsappContactNumberInvalidError extends IntegracionesError {
+  readonly code = 'whatsapp_contact_number_invalid';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_contact_number_invalid', diagnostic);
+  }
+}
+
+/** Con el código de `clientes`, pero subclase de este módulo para que su traductor la reconozca. */
+export class LinkedCustomerNotFoundError extends IntegracionesError {
+  readonly code = 'customer_not_found';
+
+  constructor(diagnostic?: string) {
+    super('customer_not_found', diagnostic);
+  }
+}
+
+/** La plantilla no existe, está eliminada o es de otra empresa: el texto no distingue los tres casos. */
+export class WhatsappTemplateNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_template_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_not_found', diagnostic);
+  }
+}
+
+export class WhatsappTemplateNameTakenError extends IntegracionesError {
+  readonly code = 'whatsapp_template_name_taken';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_name_taken', diagnostic);
+  }
+}
+
+export class WhatsappTemplateRateLimitedError extends IntegracionesError {
+  readonly code = 'whatsapp_template_rate_limited';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_rate_limited', diagnostic);
+  }
+}
+
+export class WhatsappTemplateRejectedError extends IntegracionesError {
+  readonly code = 'whatsapp_template_rejected';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_rejected', diagnostic);
+  }
+}
+
+export class WhatsappMetaRejectedError extends IntegracionesError {
+  readonly code = 'whatsapp_meta_rejected';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_meta_rejected', diagnostic);
+  }
+}
+
+export class WhatsappMetaUnreachableError extends IntegracionesError {
+  readonly code = 'whatsapp_meta_unreachable';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_meta_unreachable', diagnostic);
+  }
+}
+
+/** La variable propia no existe o es de otra empresa: el texto no distingue los dos casos. */
+export class WhatsappVariableKeyNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_variable_key_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_variable_key_not_found', diagnostic);
+  }
+}
+
+export class WhatsappVariableKeyTakenError extends IntegracionesError {
+  readonly code = 'whatsapp_variable_key_taken';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_variable_key_taken', diagnostic);
+  }
+}
+
+export class WhatsappVariableKeyInUseError extends IntegracionesError {
+  readonly code = 'whatsapp_variable_key_in_use';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_variable_key_in_use', diagnostic);
+  }
+}
+
+export class WhatsappTemplateNotMappedError extends IntegracionesError {
+  readonly code = 'whatsapp_template_not_mapped';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_not_mapped', diagnostic);
+  }
+}
+
+export class WhatsappTemplateNotMappableError extends IntegracionesError {
+  readonly code = 'whatsapp_template_not_mappable';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_not_mappable', diagnostic);
+  }
+}

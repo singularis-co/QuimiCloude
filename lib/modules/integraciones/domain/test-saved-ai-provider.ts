@@ -1,9 +1,9 @@
 import { requirePermission, type Actor } from './actor';
-import { aiProviderKeyContext, type AiProviderConnectionRecord } from './ai-provider';
-import { UNREADABLE_KEY_MESSAGE } from './ai-provider-failure';
+import { aiProviderKeyContext, modelInUse, type AiProviderConnectionRecord } from './ai-provider';
+import { modelUnavailableNotice, probeFailureMessage, UNREADABLE_KEY_MESSAGE } from './ai-provider-failure';
 import { SecretUnreadableError } from './errors';
 import { scopeOf, type IntegracionesScope } from './integraciones-scope';
-import { runProbe, type AiProviderTestResult } from './test-ai-provider-key';
+import { toTestResult, type AiProviderTestResult } from './test-ai-provider-key';
 
 import type { AiProviderCatalog } from '../ports/ai-provider-catalog';
 import type { AiProviderConnectionRepository } from '../ports/ai-provider-connection-repository';
@@ -66,13 +66,30 @@ export function createTestSavedAiProvider(
       throw new Error(`integraciones: el catálogo no trae el proveedor ${record.provider} de la conexión`);
     }
 
-    const result = await runProbe(deps.probe, entry, apiKey);
+    const model = modelInUse(record, entry);
+    const probed = await deps.probe.probe({ provider: record.provider, apiKey, models: [model] });
+    const result = toTestResult(probed);
     const checkedAt = now();
 
-    if (result.ok) {
+    if (probed.ok) {
       await deps.connections.update(
         record.id,
-        { status: 'ACTIVE', lastCheckedAt: checkedAt, lastError: null, lastErrorAt: null },
+        { status: 'ACTIVE', lastCheckedAt: checkedAt, lastError: null, lastErrorAt: null, unavailableModel: null },
+        scope,
+      );
+      return result;
+    }
+
+    if (probed.failure.kind === 'model_unavailable') {
+      const missing = probed.failure.model;
+      await deps.connections.update(
+        record.id,
+        {
+          status: 'ERROR',
+          unavailableModel: missing,
+          lastError: modelUnavailableNotice(missing, entry.name, missing === record.model),
+          lastErrorAt: checkedAt,
+        },
         scope,
       );
       return result;
@@ -80,7 +97,7 @@ export function createTestSavedAiProvider(
 
     await deps.connections.update(
       record.id,
-      { status: 'ERROR', lastError: result.message, lastErrorAt: checkedAt },
+      { status: 'ERROR', lastError: probeFailureMessage(probed.failure), lastErrorAt: checkedAt },
       scope,
     );
     return result;

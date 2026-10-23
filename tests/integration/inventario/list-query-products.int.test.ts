@@ -77,6 +77,8 @@ type Semilla = {
   readonly unitId?: string | null;
   /** Columna directa, sin pasar por lotes: aqui solo importa que la consulta la ordene y la filtre. */
   readonly stock?: number;
+  /** Columna directa, por lo mismo que `stock`. */
+  readonly lastBatchAt?: Date | null;
 };
 
 async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]> {
@@ -90,6 +92,7 @@ async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]>
         deletedAt: semilla.deletedAt ?? null,
         unitId: semilla.unitId ?? null,
         stock: semilla.stock ?? 0,
+        lastBatchAt: semilla.lastBatchAt ?? null,
         companyId: empresaDelArchivo,
         ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
       },
@@ -179,20 +182,21 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
     );
   });
 
-  it('la fila que en el orden de hoy esta en la pagina 3 aparece en la 1 al ordenar al reves', async () => {
-    const nombreDeLaUltima = NOMBRES[NOMBRES.length - 1];
+  it('la fila que en el orden por defecto esta en la pagina 3 aparece en la 1 al ordenar por nombre', async () => {
+    // Sin lotes, el orden por defecto es el alta mas reciente primero: la mas antigua cae al final.
+    const nombreDeLaPrimera = NOMBRES[0];
 
     const porDefectoPagina3 = await listAliveProducts(consulta({ page: 3, pageSize: 5 }), ambito());
-    expect(porDefectoPagina3.items.map((p) => p.name)).toContain(nombreDeLaUltima);
+    expect(porDefectoPagina3.items.map((p) => p.name)).toContain(nombreDeLaPrimera);
     const porDefectoPagina1 = await listAliveProducts(consulta({ page: 1, pageSize: 5 }), ambito());
-    expect(porDefectoPagina1.items.map((p) => p.name)).not.toContain(nombreDeLaUltima);
+    expect(porDefectoPagina1.items.map((p) => p.name)).not.toContain(nombreDeLaPrimera);
 
     // Si el orden se aplicara sobre la pagina ya traida, la fila seguiria en la pagina 3.
-    const desc = await listAliveProducts(
-      consulta({ page: 1, pageSize: 5, sort: { columnId: 'name', direction: 'desc' } }),
+    const asc = await listAliveProducts(
+      consulta({ page: 1, pageSize: 5, sort: { columnId: 'name', direction: 'asc' } }),
       ambito(),
     );
-    expect(desc.items[0]?.name).toBe(nombreDeLaUltima);
+    expect(asc.items[0]?.name).toBe(nombreDeLaPrimera);
   });
 
   it('un filtro que deja fuera casi todo trae la fila en la pagina 1 y el total describe lo filtrado (R14)', async () => {
@@ -233,6 +237,41 @@ describe('el orden y el filtro se aplican sobre el CONJUNTO COMPLETO y antes de 
 
     expect(pagina.pageSize).toBe(MAX_PAGE_SIZE);
     expect(pagina.items.length).toBeLessThanOrEqual(MAX_PAGE_SIZE);
+  });
+});
+
+describe('el orden por defecto pone primero el ultimo lote cargado', () => {
+  it('ordena por ultimo lote descendente, los productos sin lote al final por alta mas reciente', async () => {
+    const marca = `Ultimo lote ${token()}`;
+    await sembrar([
+      // Alta muy reciente pero sin lote: no adelanta a ningun producto con lote.
+      { name: `${marca} sin lote nuevo`, createdAt: new Date('2032-01-02T00:00:00.000Z') },
+      { name: `${marca} lote viejo`, createdAt: new Date('2032-01-03T00:00:00.000Z'), lastBatchAt: new Date('2031-01-01T00:00:00.000Z') },
+      { name: `${marca} sin lote viejo`, createdAt: new Date('2032-01-01T00:00:00.000Z') },
+      // Alta mas antigua, pero con el lote mas reciente: va primero.
+      { name: `${marca} lote nuevo`, createdAt: new Date('2030-01-01T00:00:00.000Z'), lastBatchAt: new Date('2031-06-01T00:00:00.000Z') },
+    ]);
+
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
+
+    expect(pagina.items.map((p) => p.name)).toEqual([
+      `${marca} lote nuevo`,
+      `${marca} lote viejo`,
+      `${marca} sin lote nuevo`,
+      `${marca} sin lote viejo`,
+    ]);
+  });
+
+  it('con el mismo ultimo lote y la misma alta decide el identificador', async () => {
+    const marca = `Empate lote ${token()}`;
+    const instante = new Date('2031-02-01T00:00:00.000Z');
+    const ids = await sembrar(
+      [1, 2, 3].map(() => ({ name: marca, createdAt: instante, lastBatchAt: instante })),
+    );
+
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
+
+    expect(pagina.items.map((p) => p.id)).toEqual([...ids].sort());
   });
 });
 

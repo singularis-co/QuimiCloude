@@ -8,6 +8,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_RESPONSIBLES_SHEET_TESTID,
   ORDER_SHEET_COVERAGE_TESTID,
   ORDER_SHEET_TESTID,
   OrderTable,
@@ -127,6 +128,8 @@ function pedido(): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -134,7 +137,9 @@ function pedido(): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
   };
 }
 
@@ -193,7 +198,7 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
     expect(within(panel).queryByTestId(ORDER_SHEET_COVERAGE_TESTID)).toBeNull();
   });
 
-  it('el mismo panel abierto por «Responsables» tambien pinta la cobertura (R23, R35)', async () => {
+  it('«Responsables» abre su propia hoja, no la de edicion: la cobertura queda en «Editar» (R23, R35)', async () => {
     const user = setupUser();
     montarLista({ [PEDIDO_ID]: 'full' });
 
@@ -202,7 +207,8 @@ describe('la hoja pinta la cobertura que la fila ya trajo (R35)', () => {
       await esperarInteractiva(await screen.findByTestId('order-action-responsibles')),
     );
 
-    const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
-    expect(within(panel).getByTestId('order-coverage')).toHaveAttribute('data-coverage', 'full');
+    await screen.findByTestId(ORDER_RESPONSIBLES_SHEET_TESTID);
+    expect(screen.queryByTestId(ORDER_SHEET_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_SHEET_COVERAGE_TESTID)).toBeNull();
   });
 });

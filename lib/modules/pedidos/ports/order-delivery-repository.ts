@@ -3,18 +3,19 @@ import type { OrderScope } from '../domain/order-scope';
 export type NewOrderDelivery = {
   readonly deliveryKey: string;
   readonly orderId: string;
-  readonly customerId: string;
   readonly actorId: string;
   readonly now: Date;
 };
 
-/** Lo minimo de una entrega ya registrada para responder a un reintento con su clave. */
+/** Lo minimo de una entrega ya registrada para responder a un reintento con su clave. `orderId` es
+ *  `null` si la clave es de una entrega sin pedido. */
 export type RegisteredOrderDelivery = {
   readonly id: string;
-  readonly orderId: string;
+  readonly orderId: string | null;
 };
 
 export type NewOrderDeliveryLine = {
+  readonly customerId: string;
   readonly presentationLineId: string;
   readonly batchId: string;
   readonly packages: number;

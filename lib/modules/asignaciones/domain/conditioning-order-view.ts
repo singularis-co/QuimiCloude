@@ -3,13 +3,27 @@
  * La fila comun de «Por acondicionar» y del detalle del acondicionador: una sola composicion para
  * las dos, para que la lista y el detalle nunca muestren datos distintos de un mismo pedido.
  */
-import { batchesByPresentation, hasBatchData, missingBatchDataLines } from './conditioning-batch-data';
+import {
+  batchDataForm,
+  batchesByPresentation,
+  hasBatchData,
+  missingBatchDataLines,
+  type ConditioningBatchForm,
+} from './conditioning-batch-data';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
+import type { ConditioningProgress } from './conditioning-steps';
 import type { OrderDistributionLineView } from './order-distribution-view';
+import type { StepEvidenceView } from './step-evidence';
 import type { ConditioningTeamMemberRow } from '../ports/conditioning-team-repository';
 
 import type { FinishedBatchOfOrderLine } from '@/lib/modules/inventario';
-import { formatOrderNumber, type AssignedOrderSummary, type OrderStatus } from '@/lib/modules/pedidos';
+import {
+  effectivePackages,
+  formatOrderNumber,
+  type AssignedOrderSummary,
+  type OrderStatus,
+} from '@/lib/modules/pedidos';
+import type { ConditioningStepView } from '@/lib/modules/recetas';
 
 export type ConditioningOrderRow = {
   readonly id: string;
@@ -21,7 +35,8 @@ export type ConditioningOrderRow = {
   /** La unidad de `quantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
   readonly unitId: string | null;
   readonly unitLabel: string | null;
-  /** El reparto completo en orden de alta; vacio = sin reparto. */
+  /** El reparto completo en orden de alta; vacio = sin reparto. `packages` son los envases
+   *  reales: los contados al terminar el empaque o, sin conteo, los del plan. */
   readonly presentationLines: readonly OrderDistributionLineView[];
   readonly status: OrderStatus;
   /** Los dos `null` en `POR_ACONDICIONAR`: todavia nadie lo acondiciona. */
@@ -55,14 +70,62 @@ export type ConditioningBatchLineView = {
 export type ConditioningBatchData = {
   readonly lines: readonly ConditioningBatchLineView[];
   readonly missingCount: number;
+  readonly form: ConditioningBatchForm;
+};
+
+export type ConditioningStepCandidateView = {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly isSelf: boolean;
+};
+
+export type ConditioningStepsView = {
+  readonly steps: readonly ConditioningStepView[];
+  readonly completedCount: number;
+  readonly responsibles: readonly { readonly stepPosition: number; readonly userIds: readonly string[] }[];
+  /** El equipo en su orden y, primero, el propio acondicionador con `isSelf`. */
+  readonly candidates: readonly ConditioningStepCandidateView[];
+  readonly evidence: readonly StepEvidenceView[];
 };
 
 /** La fila del detalle con su equipo; vacio en `POR_ACONDICIONAR`, que todavia no lo tiene.
- *  `batchData` es `null` para quien no puede escribir los datos de lote. */
+ *  `batchData` es `null` para quien no puede escribir los datos de lote. `conditioningSteps` solo
+ *  viaja a quien acondiciona un `EN_ACONDICIONAMIENTO` cuya receta tiene pasos. */
 export type ConditioningOrderDetail = ConditioningOrderRow & {
   readonly team: readonly ConditioningTeamMemberView[];
   readonly batchData: ConditioningBatchData | null;
+  readonly conditioningSteps: ConditioningStepsView | null;
 };
+
+/** Los nombres salen del detalle ya compuesto: quien acondiciona y su equipo se leyeron juntos. */
+export function composeConditioningStepsView(
+  detail: Pick<ConditioningOrderDetail, 'conditionedByName' | 'team'>,
+  actorId: string,
+  steps: readonly ConditioningStepView[],
+  progress: ConditioningProgress,
+  evidence: readonly StepEvidenceView[],
+): ConditioningStepsView {
+  const self: ConditioningStepCandidateView = {
+    userId: actorId,
+    displayName: detail.conditionedByName ?? actorId,
+    isSelf: true,
+  };
+  const others = detail.team
+    .filter((member) => member.userId !== actorId)
+    .map((member) => ({ userId: member.userId, displayName: member.displayName, isSelf: false }));
+  return {
+    steps,
+    completedCount: progress.completedCount,
+    // Como el avance, se recorta a la lista actual: la formula pudo perder pasos. El registro
+    // los conserva y el recorrido los sigue mostrando como historia.
+    responsibles: [...progress.responsibles.entries()]
+      .filter(([stepPosition]) => stepPosition >= 1 && stepPosition <= steps.length)
+      .sort(([a], [b]) => a - b)
+      .map(([stepPosition, userIds]) => ({ stepPosition, userIds })),
+    candidates: [self, ...others],
+    evidence,
+  };
+}
 
 export async function composeConditioningOrderRows(
   deps: ComposeOrderRowsDeps,
@@ -80,7 +143,7 @@ export async function composeConditioningOrderDetail(
   order: AssignedOrderSummary,
   team: readonly ConditioningTeamMemberRow[],
   batches: readonly FinishedBatchOfOrderLine[] | null,
-): Promise<ConditioningOrderDetail | undefined> {
+): Promise<Omit<ConditioningOrderDetail, 'conditioningSteps'> | undefined> {
   const { rows, names } = await composeConditioningOrderRowsWithNames(
     deps,
     companyId,
@@ -125,6 +188,7 @@ function composeBatchData(
       };
     }),
     missingCount: missingBatchDataLines(lines, batches),
+    form: batchDataForm(lines, batches),
   };
 }
 
@@ -158,7 +222,10 @@ async function composeConditioningOrderRowsWithNames(
       quantity: order.quantity,
       unitId: order.unitId,
       unitLabel: rowComposed?.unitLabel ?? null,
-      presentationLines: rowComposed?.presentationLines ?? [],
+      presentationLines: (rowComposed?.presentationLines ?? []).map((line) => ({
+        ...line,
+        packages: effectivePackages(line),
+      })),
       status: order.status,
       conditionedByName: order.conditionedBy === null ? null : (names.get(order.conditionedBy) ?? order.conditionedBy),
       conditionedById: order.conditionedBy,

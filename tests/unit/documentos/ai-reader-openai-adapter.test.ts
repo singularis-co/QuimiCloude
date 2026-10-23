@@ -47,6 +47,16 @@ async function errorHttp(status: number) {
   return APIError.generate(status, { error: { message: `cuerpo con ${KEY}` } }, `fallo ${KEY}`, new Headers());
 }
 
+/** El cuerpo con el que OpenRouter responde al generar con un id que no existe (T0, 2026-10-22). */
+async function errorDeIdInvalido(model: string) {
+  return errorConMensaje(400, `${model} is not a valid model ID`);
+}
+
+async function errorConMensaje(status: number, message: string) {
+  const { APIError } = await sdk();
+  return APIError.generate(status, { error: { message, code: status } }, undefined, new Headers());
+}
+
 function respuesta(overrides: { content?: string | null; refusal?: string | null; finish_reason?: string }) {
   return {
     id: 'c',
@@ -214,12 +224,62 @@ describe('documentos — el adaptador de OpenAI y OpenRouter (openai)', () => {
       expect(error.diagnostic).toBe('openai chat.completions.create respondió 401');
     });
 
-    it.each([400, 404, 500])('R26 — %i al leer se propaga tal cual', async (status) => {
+    it.each([400, 500])('R26 — %i al leer se propaga tal cual', async (status) => {
       const original = await errorHttp(status);
       create.mockRejectedValue(original);
       const { createOpenAiReader } = await adaptador();
 
       await expect(createOpenAiReader(CONFIG).read(LEER)).rejects.toBe(original);
+    });
+
+    it.each([
+      ['OpenAI', undefined, 'openai'],
+      ['OpenRouter', 'https://openrouter.ai/api/v1', 'openrouter'],
+    ] as const)('QT-291 R23 — %s: un 404 al leer lanza AiProviderError con el modelo en uso, sin la key ni el cuerpo', async (_nombre, baseURL, etiqueta) => {
+      create.mockRejectedValue(await errorHttp(404));
+      const { createOpenAiReader } = await adaptador();
+
+      const error = await createOpenAiReader({ ...CONFIG, ...(baseURL === undefined ? {} : { baseURL }) })
+        .read(LEER)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AiProviderError);
+      const fallo = error as AiProviderError;
+      expect(fallo.failure).toEqual({ kind: 'model_unavailable', httpStatus: 404, model: 'modelo-de-receta' });
+      expect(fallo.diagnostic).toBe(`${etiqueta} chat.completions.create respondió 404`);
+      expect(JSON.stringify({ m: fallo.message, d: fallo.diagnostic })).not.toContain(KEY);
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it('QT-291 R23 — OpenRouter: el 400 «<id> is not a valid model ID» del modelo en uso es modelo no disponible', async () => {
+      create.mockRejectedValue(await errorDeIdInvalido('modelo-de-receta'));
+      const { createOpenAiReader, OPENROUTER_BASE_URL } = await adaptador();
+
+      const error = await createOpenAiReader({ ...CONFIG, baseURL: OPENROUTER_BASE_URL })
+        .read(LEER)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(AiProviderError);
+      const fallo = error as AiProviderError;
+      expect(fallo.failure).toEqual({ kind: 'model_unavailable', httpStatus: 400, model: 'modelo-de-receta' });
+      expect(fallo.diagnostic).toBe('openrouter chat.completions.create respondió 400');
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it('QT-291 R23 — un 400 distinto de OpenRouter, o ese mismo 400 con OpenAI, se propaga tal cual', async () => {
+      const { createOpenAiReader, OPENROUTER_BASE_URL } = await adaptador();
+
+      const otro400 = await errorHttp(400);
+      create.mockRejectedValueOnce(otro400);
+      await expect(createOpenAiReader({ ...CONFIG, baseURL: OPENROUTER_BASE_URL }).read(LEER)).rejects.toBe(otro400);
+
+      const deOtroModelo = await errorDeIdInvalido('otro-modelo');
+      create.mockRejectedValueOnce(deOtroModelo);
+      await expect(createOpenAiReader({ ...CONFIG, baseURL: OPENROUTER_BASE_URL }).read(LEER)).rejects.toBe(deOtroModelo);
+
+      const conOpenAi = await errorDeIdInvalido('modelo-de-receta');
+      create.mockRejectedValueOnce(conOpenAi);
+      await expect(createOpenAiReader(CONFIG).read(LEER)).rejects.toBe(conOpenAi);
     });
 
     it('R26 — un fallo de conexion se propaga sin reintentar', async () => {
@@ -244,6 +304,26 @@ describe('documentos — el adaptador de OpenAI y OpenRouter (openai)', () => {
       expect(classifyOpenAiError(await errorHttp(404), 'm')).toEqual({ kind: 'model_unavailable', httpStatus: 404, model: 'm' });
       expect(classifyOpenAiError(await errorHttp(404), null)).toEqual({ kind: 'unexpected', httpStatus: 404, model: null });
       expect(classifyOpenAiError(await errorHttp(500), 'm')).toEqual({ kind: 'unexpected', httpStatus: 500, model: null });
+    });
+
+    it('QT-291 R23 — el 400 de id invalido solo es modelo no disponible con OpenRouter, con ese mensaje exacto y ese modelo', async () => {
+      const { classifyOpenAiError } = await adaptador();
+      const noDisponible = { kind: 'model_unavailable', httpStatus: 400, model: 'm' };
+      const inesperado = { kind: 'unexpected', httpStatus: 400, model: null };
+
+      expect(classifyOpenAiError(await errorDeIdInvalido('m'), 'm', 'openrouter')).toEqual(noDisponible);
+      expect(classifyOpenAiError(await errorDeIdInvalido('m'), 'm', 'openai')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorDeIdInvalido('m'), 'm')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorDeIdInvalido('m'), null, 'openrouter')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorDeIdInvalido('otro'), 'm', 'openrouter')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorHttp(400), 'm', 'openrouter')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorConMensaje(400, 'Prefijo m is not a valid model ID'), 'm', 'openrouter')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorConMensaje(400, 'm is not a valid model ID.'), 'm', 'openrouter')).toEqual(inesperado);
+      expect(classifyOpenAiError(await errorConMensaje(422, 'm is not a valid model ID'), 'm', 'openrouter')).toEqual({
+        kind: 'unexpected',
+        httpStatus: 422,
+        model: null,
+      });
     });
 
     it('R11 — sin respuesta es `unreachable`; lo desconocido, `unexpected`', async () => {

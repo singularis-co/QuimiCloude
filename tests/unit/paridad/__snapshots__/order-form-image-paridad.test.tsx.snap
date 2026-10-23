@@ -17,6 +17,6 @@ div role=generic class="aspect-square bg-muted border flex items-center justify-
 exports[`paridad de la imagen del formulario de pedido > R1 — sin receta elegida, con el marcador 1`] = `
 "
 div role=generic class="aspect-square bg-muted border flex items-center justify-center overflow-hidden rounded-xl w-full"
-  img role=img name="Sin receta elegida" alt="Sin receta elegida" data-missing="true" data-testid="order-recipe-image" decoding="async" loading="lazy" src="/inv_not_found.png" class="h-full object-contain w-full"
+  img role=img name="Sin fórmula elegida" alt="Sin fórmula elegida" data-missing="true" data-testid="order-recipe-image" decoding="async" loading="lazy" src="/inv_not_found.png" class="h-full object-contain w-full"
 "
 `;

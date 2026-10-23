@@ -36,6 +36,22 @@
  * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
  * `evidence_not_found`, `recipe_steps_locked`.
  * **2026-10-14**: `converted_stock_out_of_range`, `converted_cost_out_of_range`.
+ * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
+ * `company_not_deleted`.
+ * **2026-10-14**: `packaging_stock_insufficient`.
+ * **2026-10-16**: `delivery_exceeds_surplus`.
+ * **2026-10-16**: `company_last_administrator`.
+ * **2026-10-19**: `customer_phone_country_required`, `customer_phone_invalid`,
+ * `customer_duplicate_phone`.
+ * **2026-10-20**: `whatsapp_contact_not_found`, `whatsapp_contact_number_invalid`.
+ * **2026-10-20**: se retira `customer_duplicate_phone`: un mismo numero puede ser de varios clientes
+ * de la empresa y ya no hay duplicado que rechazar.
+ * **2026-10-20**: `whatsapp_template_not_found`, `whatsapp_template_name_taken`,
+ * `whatsapp_template_rate_limited`, `whatsapp_template_rejected`, `whatsapp_meta_rejected`,
+ * `whatsapp_meta_unreachable`, `whatsapp_variable_key_not_found`, `whatsapp_variable_key_taken`,
+ * `whatsapp_variable_key_in_use`, `whatsapp_template_not_mapped`, `whatsapp_template_not_mappable`.
+ * **2026-10-21**: `conditioning_step_out_of_order`, `conditioning_responsibles_required`,
+ * `conditioning_responsible_not_allowed`, `conditioning_steps_pending`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -215,6 +231,50 @@ export const ERROR_CODES = [
   // el resultado de convertirla a la unidad del producto.
   'converted_stock_out_of_range',
   'converted_cost_out_of_range',
+  'company_duplicate_name',
+  'company_duplicate_tax_id',
+  'company_name_mismatch',
+  // Distinto de `company_not_found`: la empresa existe, pero no esta de baja.
+  'company_not_deleted',
+  // Distinto de `insufficient_material`: lo que falta es stock libre del envase para el exceso.
+  'packaging_stock_insufficient',
+  // Distinto de `delivery_exceeds_remaining`: no hay pedido; lo que se pasa es lo que queda tras
+  // apartar lo que esperan los pedidos terminados.
+  'delivery_exceeds_surplus',
+  // Distinto de `last_administrator`: cuenta los Administradores vivos de la empresa, sea cual sea su
+  // estado de cuenta, no los que estan en `active`.
+  'company_last_administrator',
+  // Distinto de `invalid_input`: hay numero de telefono, falta el pais con el que leerlo.
+  'customer_phone_country_required',
+  // Distinto de `invalid_input`: el numero tiene forma de texto valida, pero no existe en el pais
+  // elegido.
+  'customer_phone_invalid',
+  // Distinto de `whatsapp_connection_not_found`: la conexion existe, lo que falta es la conversacion.
+  'whatsapp_contact_not_found',
+  // Distinto de `customer_phone_invalid`: no lo escribio nadie, es el numero que trae WhatsApp.
+  'whatsapp_contact_number_invalid',
+  'whatsapp_template_not_found',
+  'whatsapp_template_name_taken',
+  'whatsapp_template_rate_limited',
+  'whatsapp_template_rejected',
+  'whatsapp_meta_rejected',
+  'whatsapp_meta_unreachable',
+  'whatsapp_variable_key_not_found',
+  'whatsapp_variable_key_taken',
+  'whatsapp_variable_key_in_use',
+  'whatsapp_template_not_mapped',
+  'whatsapp_template_not_mappable',
+  // Distinto de `invalid_input`: la peticion es valida, pero la pantalla quedo atras del avance
+  // guardado o de la formula.
+  'conditioning_step_out_of_order',
+  // Distinto de `conditioning_team_empty`: el equipo existe, lo que falta es elegir a alguien en
+  // ese paso.
+  'conditioning_responsibles_required',
+  // Distinto de `conditioning_team_member_not_allowed`: no se compone el equipo, se elige dentro
+  // de el.
+  'conditioning_responsible_not_allowed',
+  // Distinto de `conditioning_batch_data_missing`: los datos de lote pueden estar, faltan pasos.
+  'conditioning_steps_pending',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

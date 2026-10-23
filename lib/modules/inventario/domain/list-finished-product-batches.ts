@@ -51,9 +51,9 @@ export function createListFinishedProductBatches(
 
     return {
       ...page,
-      items: page.items.map(({ orderId, ...batch }) => ({
+      items: page.items.map((batch) => ({
         ...batch,
-        orderNumberText: orderId === null ? null : (numbers.get(orderId) ?? null),
+        orderNumberText: batch.orderId === null ? null : (numbers.get(batch.orderId) ?? null),
         packagedStock: packagedQuantityOf(batch.stock, batch.packageContent),
       })),
     };

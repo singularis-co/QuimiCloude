@@ -21,7 +21,7 @@ const PRODUCTO_AGUA = '55555555-5555-4555-8555-555555555555';
 const PRODUCTO_AGUA_2 = '66666666-6666-4666-8666-666666666666';
 
 function actorConPermiso(): Actor {
-  return { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION] };
+  return { id: PERSONA, companyId: EMPRESA, permissions: [FORMULA_IMPORT_PERMISSION], addons: ['lectura_pdf'] };
 }
 
 const JSON_UN_INGREDIENTE = JSON.stringify({

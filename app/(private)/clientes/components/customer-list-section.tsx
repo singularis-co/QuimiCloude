@@ -1,3 +1,5 @@
+import type { CountryCode } from 'libphonenumber-js';
+
 import type { DataTableParams } from '@/components/shared/data-table';
 import { listCustomersAction } from '@/lib/modules/clientes/adapters/driving/customer-actions';
 
@@ -34,9 +36,15 @@ export type CustomerListSectionProps = {
   readonly params: DataTableParams;
   /** Si la sesion trae `clientes.modificar`. Llega por props desde la pagina. */
   readonly canModify: boolean;
+  /** País de la empresa. Llega por props desde la pagina. */
+  readonly companyCountry?: CountryCode | null;
 };
 
-export async function CustomerListSection({ params, canModify }: CustomerListSectionProps) {
+export async function CustomerListSection({
+  params,
+  canModify,
+  companyCountry = null,
+}: CustomerListSectionProps) {
   const result = await listCustomersAction(params);
 
   if (result.status === 'error') {
@@ -48,6 +56,7 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
         params={params}
         totalPages={0}
         canModify={canModify}
+        companyCountry={companyCountry}
       />
     );
   }
@@ -65,6 +74,7 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        companyCountry={companyCountry}
         empty={{
           firstPageHref: outOfRange ? customerListHref({ ...params, page: FIRST_PAGE }) : undefined,
         }}
@@ -82,6 +92,7 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        companyCountry={companyCountry}
         outOfRange={{ firstPageHref: customerListHref({ ...params, page: FIRST_PAGE }) }}
       />
     );
@@ -96,10 +107,19 @@ export async function CustomerListSection({ params, canModify }: CustomerListSec
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        companyCountry={companyCountry}
         noMatches={{ clearHref: customerListHref(clearSearchAndFilters(params)) }}
       />
     );
   }
 
-  return <CustomerTable customers={items} params={params} totalPages={totalPages} canModify={canModify} />;
+  return (
+    <CustomerTable
+      customers={items}
+      params={params}
+      totalPages={totalPages}
+      canModify={canModify}
+      companyCountry={companyCountry}
+    />
+  );
 }

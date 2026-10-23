@@ -1,6 +1,6 @@
 import type { ListQuery } from '../domain/list-query';
 import type { RecipeScope } from '../domain/recipe-scope';
-import type { RecipeStepView } from '../domain/recipe-view';
+import type { ConditioningStepView, RecipeStepView } from '../domain/recipe-view';
 
 /**
  * Puerto de persistencia de receta (`design.md > 7.3`). El sufijo `Alive` en el nombre de
@@ -59,6 +59,8 @@ export type NewRecipe = {
   readonly description: string | null;
   readonly steps: readonly RecipeStepView[];
   readonly packingSteps: readonly RecipeStepView[];
+  /** Ausente = conservar los guardados. */
+  readonly conditioningSteps?: readonly ConditioningStepView[];
   readonly lines: readonly RecipeLineData[];
   readonly imagePath: string | null;
   /** `null` = no tocar las que ya tiene. Releerlas y reenviarlas desde fuera de la
@@ -78,6 +80,7 @@ export type RecipeRow = {
   readonly description: string | null;
   readonly steps: readonly RecipeStepView[];
   readonly packingSteps: readonly RecipeStepView[];
+  readonly conditioningSteps: readonly ConditioningStepView[];
   readonly imagePath: string | null;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
@@ -98,6 +101,7 @@ export type RecipeOriginalRow = {
   readonly imagePath: string | null;
   readonly steps: readonly RecipeStepView[];
   readonly packingSteps: readonly RecipeStepView[];
+  readonly conditioningSteps: readonly ConditioningStepView[];
 };
 
 /** Datos de una version nueva: nombre y lineas; lo demas sale de la original. */

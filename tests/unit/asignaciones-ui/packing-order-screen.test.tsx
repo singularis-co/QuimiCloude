@@ -1,15 +1,19 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   PACKING_ORDER_FINISH_BUTTON_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
-  PACKING_ORDER_FINISH_CONFIRM_TEXTS,
   PACKING_ORDER_FINISH_DIALOG_TESTID,
   PACKING_ORDER_FINISH_ERROR_TESTID,
   PACKING_ORDER_FINISH_FORM_TESTID,
   PACKING_ORDER_ID_FIELD,
+  PACKING_ORDER_LINES_FIELD,
+  PACKING_FINISH_DIALOG_TEXTS,
+  PACKING_FINISH_LINE_TESTID,
+  PACKING_FINISH_REASON_TESTID,
   PACKING_ORDER_MISSING_DISTRIBUTION_TESTID,
+  PACKING_ORDER_MISSING_UNIT_TESTID,
   PACKING_ORDER_PRESENTATION_LINE_TESTID,
   PACKING_ORDER_PRESENTATION_TESTID,
   PACKING_ORDER_QUANTITY_TESTID,
@@ -22,15 +26,20 @@ import {
   PACKING_ORDER_STEPS_TESTID,
   PACKING_ORDER_BACK_LINK_TESTID,
   PACKING_ORDER_PACKER_TESTID,
-  PACKING_ORDER_PACKAGES_TESTID,
   PACKING_ORDER_RECIPE_TESTID,
   PACKING_ORDER_START_FORM_TESTID,
   PACKING_ORDER_TEXTS,
   PackingOrderScreen,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
 import { STEP_READER_SIDE_COLUMN_RESERVE } from '@/app/(private)/asignacion/components/operator-screen-frame';
+import {
+  ENTITY_IMAGE_ZOOM_TRIGGER_TESTID,
+  MISSING_IMAGE_SRC,
+} from '@/components/shared/entity-image';
 import type { PackingOrderDetail } from '@/lib/modules/asignaciones';
 import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
+
+import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 
 const { startPackingActionMock, finishPackingActionMock } = vi.hoisted(() => ({
   startPackingActionMock: vi.fn(),
@@ -43,6 +52,29 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () 
 }));
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
+const LITRO = { id: 'unit-1', baseUnitId: null, factor: null } as const;
+
+const FINISH: NonNullable<PackingOrderDetail['finish']> = {
+  orderQuantity: '12.5',
+  orderUnit: LITRO,
+  orderUnitLabel: 'kg',
+  lines: [
+    { lineId: 'linea-1', label: 'Botella 200 ml', plan: 5, content: '0.2', unit: LITRO, packaging: null },
+    { lineId: 'linea-2', label: 'Garrafa 5 l', plan: 2, content: '5', unit: LITRO, packaging: null },
+  ],
+};
+
+const FINISH_CONFIRM_TEXTS = {
+  title: PACKING_FINISH_DIALOG_TEXTS.title,
+  description: PACKING_FINISH_DIALOG_TEXTS.descriptionEnd,
+  cancel: PACKING_FINISH_DIALOG_TEXTS.cancel,
+  confirm: PACKING_FINISH_DIALOG_TEXTS.confirm,
+} as const;
+
+const PLAN_SIN_CAMBIOS = [
+  { lineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
+  { lineId: 'linea-2', packedPackages: 2, reason: null, reasonOther: null },
+];
 const MISSING_DISTRIBUTION_TEXT = 'Falta el reparto: lo define quien edita pedidos';
 
 function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
@@ -52,18 +84,20 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-      { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
-      { presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
+      { lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-3', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '8',
     status: 'POR_EMPACAR',
+    priority: 'MEDIA',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -91,6 +125,47 @@ describe('pantalla del Empacador — el reparto completo en solo lectura', () =>
     ]);
   });
 
+  it('cada linea del reparto lleva la miniatura de su envase, con el nombre del envase como alt', () => {
+    pintar(
+      fila({
+        presentationLines: [
+          {
+            lineId: 'linea-1',
+            packedPackages: null,
+            presentationId: 'p-1',
+            presentationName: 'Botella 200 ml',
+            packagingName: 'Galón 4 L',
+            packagingImageUrl: 'https://cdn.example/galon.png',
+            packages: 3,
+            presentationContent: null,
+            presentationUnitLabel: null,
+          },
+          { lineId: 'linea-2', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Botella 1 L', packagingImageUrl: null, packages: 12, presentationContent: null, presentationUnitLabel: null },
+        ],
+      }),
+    );
+
+    const lineas = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.querySelectorAll('img').length)).toEqual([1, 1]);
+    const [conImagen, sinImagen] = lineas.map((linea) => within(linea).getByRole('img'));
+    expect(conImagen).toHaveAttribute('alt', 'Galón 4 L');
+    expect(conImagen).toHaveAttribute('src', 'https://cdn.example/galon.png');
+    expect(conImagen).not.toHaveAttribute('data-missing');
+    expect(sinImagen).toHaveAttribute('alt', 'Botella 1 L');
+    expect(sinImagen).toHaveAttribute('data-missing', 'true');
+    expect(sinImagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
+    expect(lineas.map((linea) => linea.textContent)).toEqual(['3 × Galón 4 L', '12 × Botella 1 L']);
+  });
+
+  it('una linea antigua sin envase muestra el marcador con el nombre de la presentacion', () => {
+    pintar(fila());
+
+    const [primera] = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    const imagen = within(primera).getByRole('img');
+    expect(imagen).toHaveAttribute('alt', 'Botella 200 ml');
+    expect(imagen).toHaveAttribute('data-missing', 'true');
+  });
+
   it('R26: la cantidad del pedido va con su unidad', () => {
     pintar(fila({ quantity: '12.5', unitLabel: 'kg' }));
 
@@ -116,7 +191,11 @@ describe('pantalla del Empacador — el reparto completo en solo lectura', () =>
       expect(within(pantalla).queryAllByRole('textbox')).toHaveLength(0);
       expect(pantalla.querySelectorAll('input:not([type="hidden"]), textarea')).toHaveLength(0);
       expect(within(pantalla).queryByRole('button', { name: /añadir|agregar|quitar|eliminar/i })).toBeNull();
-      expect(within(screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID)).queryAllByRole('button')).toHaveLength(0);
+      // Los unicos botones del reparto son las miniaturas que amplian la imagen del envase.
+      const botones = within(screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID)).queryAllByRole('button');
+      expect(botones.map((boton) => boton.dataset.testid)).toEqual(
+        botones.map(() => ENTITY_IMAGE_ZOOM_TRIGGER_TESTID),
+      );
 
       cleanup();
     }
@@ -169,7 +248,7 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
     pintar(
       fila({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
+          { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: 'Botella PET ámbar 200 ml', packages: 5, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -178,12 +257,25 @@ describe('pantalla del Empacador — el nombre del envase de cada linea', () => 
     expect(lineas.map((linea) => linea.textContent)).toEqual(['5 × Botella PET ámbar 200 ml']);
   });
 
+  it('una linea con envase y volumen conocido pinta el envase y el volumen', () => {
+    pintar(
+      fila({
+        presentationLines: [
+          { lineId: 'linea-7', packedPackages: null, presentationId: 'p-1', presentationName: '300 ml', packagingName: 'Embase pequeño 2', packages: 9, presentationContent: '300.0000', presentationUnitLabel: 'ml' },
+        ],
+      }),
+    );
+
+    const lineas = screen.getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID);
+    expect(lineas.map((linea) => linea.textContent)).toEqual(['9 × Embase pequeño 2 · 300 ml']);
+  });
+
   it('R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion', () => {
     pintar(
       fila({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5 },
-          { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2 },
+          { lineId: 'linea-5', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella PET', packagingName: 'Botella PET ámbar 200 ml', packages: 5, presentationContent: null, presentationUnitLabel: null },
+          { lineId: 'linea-6', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: null, packages: 2, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -210,11 +302,11 @@ describe('pantalla del Empacador — Comenzar y Terminar piden confirmacion', ()
     },
     {
       nombre: 'Terminar',
-      order: () => fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }),
+      order: () => fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }),
       button: PACKING_ORDER_FINISH_BUTTON_TESTID,
       dialog: PACKING_ORDER_FINISH_DIALOG_TESTID,
       confirm: PACKING_ORDER_FINISH_CONFIRM_TESTID,
-      texts: PACKING_ORDER_FINISH_CONFIRM_TEXTS,
+      texts: FINISH_CONFIRM_TEXTS,
       action: finishPackingActionMock,
       other: startPackingActionMock,
     },
@@ -281,7 +373,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
   ];
 
   const enEmpaquePropio = (packingSteps: PackingOrderDetail['packingSteps'] = PASOS_DE_ENVASADO) =>
-    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', packingSteps });
+    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', packingSteps, finish: FINISH });
 
   function marcarTodo(): void {
     for (const casilla of screen.queryAllByRole('checkbox')) {
@@ -369,7 +461,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(screen.getByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toHaveClass('hidden');
   });
 
-  it('R21: el ultimo boton dice «Terminar» y pasa por la misma confirmacion que el boton de hoy', async () => {
+  it('R1, R21: el ultimo boton dice «Terminar» y abre el diálogo del conteo, que envía las líneas', async () => {
     finishPackingActionMock.mockResolvedValue({ status: 'success' });
     await recorrerHastaElUltimo();
 
@@ -378,9 +470,9 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(terminar).toHaveTextContent('Terminar');
 
     fireEvent.click(terminar);
-    expect(screen.getByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toHaveTextContent(
-      PACKING_ORDER_FINISH_CONFIRM_TEXTS.title,
-    );
+    const dialogo = screen.getByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID);
+    expect(dialogo).toHaveTextContent(PACKING_FINISH_DIALOG_TEXTS.title);
+    expect(within(dialogo).getAllByTestId(PACKING_FINISH_LINE_TESTID)).toHaveLength(2);
     expect(finishPackingActionMock).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -391,6 +483,7 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(startPackingActionMock).not.toHaveBeenCalled();
     const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
     expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual(PLAN_SIN_CAMBIOS);
   });
 
   it('R21: mientras termina, el ultimo boton dice «Terminando…» como el boton de hoy', async () => {
@@ -578,11 +671,11 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(within(cabecera()).getByRole('button', { name: 'Cambiar tema' })).toBeInTheDocument();
   });
 
-  it('R39: con la receta dada de baja el h1 dice «Esta receta está dada de baja.»', () => {
+  it('R39: con la receta dada de baja el h1 dice «Esta fórmula está dada de baja.»', () => {
     pintar(fila({ recipeName: null }));
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
-      'Esta receta está dada de baja.',
+      'Esta fórmula está dada de baja.',
     );
   });
 
@@ -595,6 +688,38 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(volver).toHaveTextContent('Volver a «Por empacar»');
     expect(volver.textContent).toBe(PACKING_ORDER_TEXTS.back);
     expect(volver.querySelector('svg')).not.toBeNull();
+  });
+
+  it('POR_EMPACAR: la vuelta es un enlace habilitado', () => {
+    pintar(fila({ status: 'POR_EMPACAR' }));
+
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).toBe('A');
+    expect(volver).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('EN_EMPAQUE a nombre propio: la vuelta se ve deshabilitada, sin href', () => {
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }));
+
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).not.toBe('A');
+    expect(volver).not.toHaveAttribute('href');
+    expect(volver).toHaveAttribute('aria-disabled', 'true');
+    expect(volver.textContent).toBe(PACKING_ORDER_TEXTS.back);
+  });
+
+  it('EN_EMPAQUE a nombre de otro: la vuelta sigue habilitada, quien mira no lo comenzo', () => {
+    pintar(
+      fila({
+        status: 'EN_EMPAQUE',
+        packedById: '22222222-2222-4222-8222-222222222222',
+        packedByName: 'Otra persona',
+      }),
+    );
+
+    const volver = screen.getByTestId(PACKING_ORDER_BACK_LINK_TESTID);
+    expect(volver.tagName).toBe('A');
+    expect(volver).toHaveAttribute('href', '/asignacion?vista=por_empacar');
   });
 
   it('R27: el estado va en la cabecera con `StatusBadge`, su testid y `data-status`', () => {
@@ -614,7 +739,7 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     const reparto = screen.getByTestId(PACKING_ORDER_PRESENTATION_TESTID);
     expect(within(reparto).getByRole('heading', { level: 2, name: 'Reparto' })).toBeInTheDocument();
     expect(within(reparto).getAllByTestId(PACKING_ORDER_PRESENTATION_LINE_TESTID)).toHaveLength(3);
-    expect(screen.getByTestId(PACKING_ORDER_PACKAGES_TESTID)).toHaveTextContent('Envases: 8');
+    expect(screen.queryByText(/Envases:/)).toBeNull();
   });
 
   it('R28: sin líneas dice «Sin presentación» y la falta de reparto es un `Notice` `warning`', () => {
@@ -643,7 +768,7 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
   });
 
   it('R29: `EN_EMPAQUE` propio sin pasos habilita solo «Terminar», dentro de su formulario', () => {
-    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo' }));
+    pintar(fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }));
 
     const comenzar = within(pie()).getByRole('button', { name: 'Comenzar' });
     const terminar = within(pie()).getByRole('button', { name: 'Terminar' });
@@ -704,5 +829,151 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
   it('R39: los textos de quien empaca llevan tilde', () => {
     expect(PACKING_ORDER_TEXTS.packerUnknown).toBe('Lo está empacando otra persona.');
     expect(PACKING_ORDER_TEXTS.packer('Ana')).toBe('Lo está empacando Ana.');
+  });
+});
+
+describe('el diálogo del conteo real desde el pie', () => {
+  const enEmpaque = (overrides: Partial<PackingOrderDetail> = {}) =>
+    fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH, ...overrides });
+
+  it('R1: «Terminar» del pie abre «¿Terminar el empaque?» con una fila por línea prellenada con el plan', () => {
+    pintar(enEmpaque());
+
+    fireEvent.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+
+    const dialogo = screen.getByRole('dialog', { name: PACKING_FINISH_DIALOG_TEXTS.title });
+    expect(within(dialogo).getByRole('textbox', { name: 'Envases reales de Botella 200 ml' })).toHaveValue('5');
+    expect(within(dialogo).getByRole('textbox', { name: 'Envases reales de Garrafa 5 l' })).toHaveValue('2');
+    expect(dialogo).toHaveTextContent('2026-0000030 · Jarabe simple · Cantidad 12.5 kg');
+  });
+
+  it('R1, R16: con una línea distinta y su motivo, el formulario lleva el conteo real en `lines`', async () => {
+    finishPackingActionMock.mockResolvedValue({ status: 'success' });
+    pintar(enEmpaque());
+    const user = setupUser();
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByRole('button', { name: 'Quitar un envase de Garrafa 5 l' }));
+    await user.click(screen.getByTestId(PACKING_FINISH_REASON_TESTID));
+    await user.click(await esperarInteractiva(await screen.findByRole('option', { name: 'Rotura' })));
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+
+    await waitFor(() => expect(finishPackingActionMock).toHaveBeenCalledTimes(1));
+    const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
+    expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual([
+      { lineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
+      { lineId: 'linea-2', packedPackages: 1, reason: 'rotura', reasonOther: null },
+    ]);
+  });
+
+  it('R6: con una línea distinta sin motivo, Terminar no envía nada', async () => {
+    pintar(enEmpaque());
+    const user = setupUser();
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByRole('button', { name: 'Quitar un envase de Garrafa 5 l' }));
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_CONFIRM_TESTID));
+
+    expect(screen.getByText('Elige un motivo.')).toBeInTheDocument();
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R11: cerrar el diálogo tras cambiar el conteo no envía, y al reabrir vuelve al plan', async () => {
+    pintar(enEmpaque());
+    const user = setupUser();
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    await user.click(screen.getByRole('button', { name: 'Quitar un envase de Garrafa 5 l' }));
+    await user.click(screen.getByRole('button', { name: PACKING_FINISH_DIALOG_TEXTS.cancel }));
+    await waitFor(() => expect(screen.queryByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toBeNull());
+
+    await user.click(screen.getByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID));
+    expect(screen.getByRole('textbox', { name: 'Envases reales de Garrafa 5 l' })).toHaveValue('2');
+    expect(finishPackingActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R12: la pantalla no pinta «Envases:» en ningún estado', () => {
+    for (const order of [fila(), enEmpaque(), fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra' })]) {
+      pintar(order);
+      expect(screen.queryByText(/Envases:/)).toBeNull();
+      cleanup();
+    }
+  });
+});
+
+describe('pedido sin unidad: Terminar deshabilitado con su nota', () => {
+  const sinUnidad = (packingSteps: PackingOrderDetail['packingSteps'] = []) =>
+    fila({
+      status: 'EN_EMPAQUE',
+      packedById: ACTOR_ID,
+      packedByName: 'Yo',
+      unitId: null,
+      unitLabel: null,
+      packingSteps,
+      finish: null,
+    });
+
+  it('R1, R8: sin pasos, «Terminar» del pie queda deshabilitado, sin formulario, y la nota lo explica', () => {
+    pintar(sinUnidad());
+
+    const nota = screen.getByTestId(PACKING_ORDER_MISSING_UNIT_TESTID);
+    expect(nota).toHaveAttribute('data-tone', 'warning');
+    expect(nota).toHaveAttribute('role', 'status');
+    expect(nota).toHaveTextContent(PACKING_ORDER_TEXTS.missingUnit);
+
+    const terminar = screen.getByRole('button', { name: 'Terminar' });
+    expect(terminar).toBeDisabled();
+    expect(terminar).toHaveAttribute('aria-describedby', nota.id);
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_BUTTON_TESTID)).toBeNull();
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_FORM_TESTID)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Comenzar' })).toBeDisabled();
+  });
+
+  it('R1, R8: con pasos, el último paso no deja terminar y su motivo visible es la nota', async () => {
+    vi.useFakeTimers();
+    try {
+      pintar(
+        sinUnidad([
+          { blocks: [{ kind: 'paragraph', spans: [{ text: 'Llenar' }] }] },
+          { blocks: [{ kind: 'paragraph', spans: [{ text: 'Etiquetar' }] }] },
+        ]),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.getByTestId('step-reader-next')).toBeEnabled();
+      fireEvent.click(screen.getByTestId('step-reader-next'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const terminar = screen.getByTestId('step-reader-finish');
+    expect(terminar).toBeDisabled();
+    expect(screen.getByTestId('step-reader-blocked-reason')).toHaveTextContent(PACKING_ORDER_TEXTS.missingUnit);
+    expect(screen.getByTestId(PACKING_ORDER_MISSING_UNIT_TESTID)).toBeInTheDocument();
+    fireEvent.click(terminar);
+    expect(screen.queryByTestId(PACKING_ORDER_FINISH_DIALOG_TESTID)).toBeNull();
+  });
+
+  it('R1: la nota no sale en `POR_EMPACAR`, ni si empaca otro, ni con unidad', () => {
+    for (const order of [
+      fila({ unitId: null, unitLabel: null }),
+      fila({ status: 'EN_EMPAQUE', packedById: 'otro', packedByName: 'Otra', unitId: null, unitLabel: null }),
+      fila({ status: 'EN_EMPAQUE', packedById: ACTOR_ID, packedByName: 'Yo', finish: FINISH }),
+    ]) {
+      pintar(order);
+      expect(screen.queryByTestId(PACKING_ORDER_MISSING_UNIT_TESTID)).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('R1: la nota es corta y lleva tilde', () => {
+    expect(PACKING_ORDER_TEXTS.missingUnit).toBe(
+      'Falta la unidad del pedido: sin ella no se puede comprobar el conteo real.',
+    );
   });
 });

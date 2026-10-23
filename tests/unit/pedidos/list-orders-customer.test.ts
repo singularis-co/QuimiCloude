@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createListOrders, type ListOrdersDeps } from '@/lib/modules/pedidos/domain/list-orders'
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double'
+import { fakeDeliveryProgress } from '@/tests/helpers/delivery-progress-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PresentationCatalog } from '@/lib/modules/inventario'
@@ -45,6 +46,7 @@ const REF_RECETA: RecipeRef = {
   isDeleted: false,
   isUnderReview: false,
   original: null,
+  imageUrl: null,
 }
 
 let secuencia = 0
@@ -59,6 +61,8 @@ function fila(customerId: string | null): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
@@ -94,6 +98,7 @@ function dobles(filas: readonly OrderRow[] = [], idsQueCasan: readonly string[] 
     units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
     customerCatalog: { findRefsIncludingDeleted: findCustomerRefs },
     log: { ignoredFields },
+    deliveryProgress: fakeDeliveryProgress(),
   }
   return { deps, listAlive, findCustomerRefs, findIdsMatchingName, ignoredFields, listOrders: createListOrders(deps) }
 }

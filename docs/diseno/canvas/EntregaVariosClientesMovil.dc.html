@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Entregar a varios clientes en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 1100px; height: 1300px; padding: 30px; box-sizing: border-box; display: flex; gap: 40px; align-items: flex-start; font-family: 'IBM Plex Sans', sans-serif">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="EntregaVariosClientes" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Entregar a varios clientes · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd>El sheet «Entregar» de QC-223 (<span class="mono">order-deliveries-sheet</span>), con sus tablas de lotes por presentación, ahora dentro de un bloque por cliente · <span class="mono">async-autocomplete</span> de clientes · <span class="mono">delivery-void-dialog</span> (<span class="mono">confirm-dialog</span>) · <span class="mono">order-delivery-list</span> · <span class="mono">status-badge</span> · <span class="mono">field-error</span></dd>
+      <dt>Nuevo</dt><dd>Bloque por cliente: una tarjeta con «Cliente N», el buscador de cliente y las tablas de lotes, más «Quitar», que solo aparece si hay más de un bloque · botón discontinuo «Añadir cliente» · resumen «Por entregar» con la suma de todos los bloques por presentación · casilla de grupo por cliente en «Anular la entrega» (marca o desmarca todo lo de ese cliente; queda a medias si solo hay algunas presentaciones marcadas) · subbloque por cliente en la tarjeta de la entrega</dd>
+      <dt>Librerías</dt><dd><span class="mono">@base-ui/react</span> (Dialog, AlertDialog, Checkbox) · <span class="mono">lucide-react</span>. Ninguna nueva.</dd>
+      <dt>Escritorio</dt><dd>Sheet ancho de 600 px · bloques apilados · tabla de lotes por presentación con Lote, Disponibles y Entrada (sin «Vence», que hoy sí aparece) · tab Entregas de QC-225 con columna nueva «Presentación» · el resumen arriba, siempre visible · los errores de cliente vacío y de cliente repetido salen al pulsar «Entregar», bajo el campo del bloque</dd>
+      <dt>Tablet</dt><dd>Lo mismo que escritorio; el sheet ocupa hasta 600 px y los tableros se reparten en dos columnas</dd>
+      <dt>Teléfono</dt><dd>El sheet ocupa todo el ancho · cada tabla de lotes pasa a tarjetas con «Entrada» táctil · «Quitar» y «Añadir cliente» de 44 px · el diálogo de anular queda centrado, con filas de 44 px</dd>
+      <dt>Animación</dt><dd>Un bloque nuevo entra con el fundido <span class="mono">fade</span> del sistema · el error entra con <span class="mono">qc-err</span> · el cambio de etiqueta del resumen (Faltan, Completa, Sobran) usa la transición de color de <span class="mono">sb</span> · sin animaciones nuevas</dd>
+      <dt>Validación</dt><dd>«Anular la entrega» abre sin nada marcado · cada cliente lleva al menos un envase en alguna presentación; si no, error bajo su bloque al pulsar «Entregar» · «Disponibles» muestra lo que queda del lote después de lo que llevan todos los clientes; la Entrada no deja pasar de ahí · si la suma de los clientes supera el stock de un lote (por ejemplo, porque el stock bajó), el lote marca «Solo hay N» y «Entregar» queda deshabilitado · el aviso de borrador es el de hoy (QC-223 D8): solo sale cuando un lote del borrador ya no está disponible</dd>
+      <dt>Por confirmar</dt><dd>«Entregó» y «Anuló» llevan el nombre real</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1100,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

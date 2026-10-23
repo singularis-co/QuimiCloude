@@ -19,14 +19,15 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
 import { cn } from '@/lib/utils';
 
 import {
+  ACTUAL_COST_COLUMN_ID,
   buildOrderColumns,
   ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
-  QUANTITY_COLUMN_ID,
+  PRODUCTION_COST_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
 } from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
-import type { OrderCustomerChoice } from './order-customer-label';
+import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
 import type { ProducedProductsByOrder } from './order-produced-presentations';
 import type { OrderResponsiblesCatalog } from './order-responsibles';
 import type { OrderRowAction } from './order-row-actions';
@@ -86,7 +87,7 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   empty: 'No hay pedidos que mostrar.',
   loading: 'Cargando pedidos…',
   error: 'No se pudo cargar la lista de pedidos.',
-  search: 'Buscar por receta',
+  search: 'Buscar por fórmula',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',
   previousPage: 'Página anterior',
@@ -106,11 +107,16 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
   closeMenu: 'Cerrar',
 };
 
+/**
+ * La tarjeta de telefono: los dos costes van en los datos secundarios, en el orden de
+ * la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion propia: la
+ * pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
+ */
 const ORDER_TABLE_CARD: DataTableCardLayout = {
   primary: ORDER_NUMBER_COLUMN_ID,
   status: STATUS_COLUMN_ID,
   title: RECIPE_NAME_COLUMN_ID,
-  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, QUANTITY_COLUMN_ID, CREATED_AT_COLUMN_ID],
+  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, CREATED_AT_COLUMN_ID, PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID],
   footer: PRIORITY_COLUMN_ID,
 };
 
@@ -244,7 +250,6 @@ export function OrderTable({
   const columns = useMemo(
     () =>
       buildOrderColumns({
-        recipes,
         units,
         bridge,
         responsiblesByOrder,
@@ -257,7 +262,6 @@ export function OrderTable({
         onAction: handleAction,
       }),
     [
-      recipes,
       units,
       bridge,
       responsiblesByOrder,

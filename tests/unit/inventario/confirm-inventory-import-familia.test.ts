@@ -22,7 +22,7 @@ import type { Actor, ImportCells, ImportResultRow, SupplyHomonym } from '@/lib/m
 import type { ProductRepository } from '@/lib/modules/inventario/ports/product-repository';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
-const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'] };
+const ADMIN: Actor = { id: 'user-1', companyId: 'company-1', permissions: ['inventario.modificar'], addons: ['importacion_excel'] };
 const FILE = { ...CSV_FILE, importKey: '9b2f6a52-5d0e-4c7e-9a36-0f1d7c1b2a10' };
 
 type DobleDelPuerto = { [K in keyof ProductRepository]: Mock<ProductRepository[K]> };

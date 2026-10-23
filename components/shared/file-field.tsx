@@ -30,11 +30,13 @@
 // **La validacion de dominio no vive aqui**: `validateBytes` deja que el consumidor imponga lo
 // suyo -la deteccion por FIRMA de `validateRecipeImage`, por ejemplo- sobre los bytes finales.
 
-import { FileIcon, UploadCloudIcon } from 'lucide-react';
+import { FileIcon, UploadCloudIcon, XIcon } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 import { compressImage } from './compress-image';
 import {
@@ -93,7 +95,16 @@ export type FileFieldProps = {
   readonly emptyImageSrc?: string;
   /** Validacion de dominio sobre los bytes finales (firma, cabeceras...). */
   readonly validateBytes?: (bytes: Uint8Array, type: UploadableFileType) => FileFieldValidation;
-  /** Prefijo de los `data-testid`: `<prefijo>-field`, `-input`, `-error`, `-preview`, `-clear`. */
+  /**
+   * `image`: la vista previa ocupa la zona entera sin recortar la imagen y, con un archivo
+   * elegido, solo queda el texto para cambiarlo, sin nombre ni tamaño. `file` (por defecto):
+   * miniatura y nombre y tamaño del archivo.
+   */
+  readonly variant?: 'file' | 'image';
+  /**
+   * Prefijo de los `data-testid`: `<prefijo>-field`, `-input`, `-error`, `-preview`, `-clear`.
+   * Con `image` y vista previa, quitar es una X sobre la esquina de la imagen.
+   */
   readonly testIdPrefix: string;
 };
 
@@ -104,6 +115,13 @@ const DROPZONE_IDLE =
   'border-input bg-transparent hover:border-ring hover:bg-accent/40 focus-within:border-ring';
 const DROPZONE_DRAGGING = 'border-primary bg-primary/5';
 const DROPZONE_INVALID = 'border-destructive bg-destructive/5';
+const DROPZONE_IMAGE_PADDING = 'p-2';
+/** Alto fijo: sin él, `h-full` en la imagen no tendría contra qué medirse. */
+const IMAGE_PREVIEW_FRAME = 'flex h-48 w-full items-center justify-center';
+const IMAGE_PREVIEW_FILL = 'h-full w-full rounded-lg object-contain';
+const CHANGE_HINT = 'Haz clic o arrastra otro para cambiarla';
+const IMAGE_CLEAR_BUTTON =
+  'absolute top-1 right-1 z-10 rounded-full bg-black/60 text-white hover:bg-black/75 hover:text-white focus-visible:outline-offset-1';
 
 export function FileField({
   label,
@@ -119,8 +137,10 @@ export function FileField({
   placeholder = 'Arrastra un archivo aquí o haz clic para elegirlo',
   emptyImageSrc,
   validateBytes,
+  variant = 'file',
   testIdPrefix,
 }: FileFieldProps) {
+  const isImageVariant = variant === 'image';
   const inputId = useId();
   const errorId = `${inputId}-error`;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -221,6 +241,7 @@ export function FileField({
 
   const displayUrl = localPreviewUrl ?? previewUrl;
   const canOfferClear = clearable && onClear !== undefined && (displayUrl !== null || chosen !== null);
+  const clearOverImage = canOfferClear && isImageVariant && displayUrl !== null;
 
   const dropzoneState = isDragging
     ? DROPZONE_DRAGGING
@@ -235,7 +256,11 @@ export function FileField({
       </Label>
 
       <div
-        className={`${DROPZONE_BASE} ${dropzoneState}`}
+        className={cn(
+          DROPZONE_BASE,
+          dropzoneState,
+          isImageVariant && displayUrl !== null && DROPZONE_IMAGE_PADDING,
+        )}
         data-testid={`${testIdPrefix}-dropzone`}
         data-dragging={isDragging ? '' : undefined}
         // La zona es una comodidad de ratón: reenvía el clic al input, que es el control real.
@@ -244,7 +269,43 @@ export function FileField({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {displayUrl !== null ? (
+        {clearOverImage ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  touch
+                  aria-label={clearLabel}
+                  className={IMAGE_CLEAR_BUTTON}
+                  data-testid={`${testIdPrefix}-clear`}
+                  // Sin esto el clic llega a la zona, que abriría el diálogo de elegir archivo.
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleClear();
+                  }}
+                />
+              }
+            >
+              <XIcon aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>{clearLabel}</TooltipContent>
+          </Tooltip>
+        ) : null}
+
+        {displayUrl !== null && isImageVariant ? (
+          <div className={IMAGE_PREVIEW_FRAME}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia */}
+            <img
+              src={displayUrl}
+              alt=""
+              className={IMAGE_PREVIEW_FILL}
+              data-testid={`${testIdPrefix}-preview`}
+            />
+          </div>
+        ) : displayUrl !== null ? (
           // eslint-disable-next-line @next/next/no-img-element -- vista previa local o URL ya compuesta por el backend, sin optimizacion propia
           <img
             src={displayUrl}
@@ -292,6 +353,10 @@ export function FileField({
             </p>
             <p className="text-xs text-muted-foreground">{hint}</p>
           </div>
+        ) : isImageVariant ? (
+          <p className="text-xs text-muted-foreground" data-testid={`${testIdPrefix}-change-hint`}>
+            {CHANGE_HINT}
+          </p>
         ) : (
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium" data-testid={`${testIdPrefix}-file-name`}>
@@ -301,7 +366,7 @@ export function FileField({
               {formatFileSize(chosen.size)}
               {chosen.compressed ? ' · comprimida para caber en el límite' : ''}
             </p>
-            <p className="text-xs text-muted-foreground">Haz clic o arrastra otro para cambiarla</p>
+            <p className="text-xs text-muted-foreground">{CHANGE_HINT}</p>
           </div>
         )}
 
@@ -337,7 +402,7 @@ export function FileField({
         </p>
       )}
 
-      {canOfferClear ? (
+      {canOfferClear && !clearOverImage ? (
         <Button
           type="button"
           variant="outline"

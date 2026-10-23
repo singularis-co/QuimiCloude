@@ -6,9 +6,15 @@
  *   1. entrega parte del producto terminado de un pedido `TERMINADO` desde el menu de su fila;
  *   2. abre la ficha desde el enlace de la presentacion en la fila de /pedidos;
  *   3. en Lotes ve el lote con su pedido; en Entradas, la produccion; en Salidas, la entrega; en
- *      Entregas, el cliente, el pedido, el lote y los envases;
+ *      Entregas, el cliente, el pedido, la presentacion, el lote y los envases;
  *   4. vuelve a /inventario y abre la misma ficha desde la pestana de producto terminado.
  * Un segundo `test()` entra con un usuario sin `inventario.consultar` y la ficha le responde 404.
+ *
+ * ENMIENDA 2026-10-15 (QC-282): el sheet «Entregar» va por bloques de cliente; con un solo bloque el
+ * selector de cliente y el campo del lote siguen siendo unicos en el panel, asi que la entrega del
+ * paso 1 no cambia. El cliente de la entrega vive ahora en sus lineas, y el tab Entregas -que lo lee
+ * de ellas- gana la columna «Presentación» (QC-282 R43), que el paso 3d afirma. Este spec no siembra
+ * entregas por Prisma: no hay SQL que mover. Las aserciones previas se conservan.
  *
  * QUE APORTA SOBRE UNIT E INTEGRACION: los dos puntos de llegada, los tabs por URL y la lectura de
  * los asientos que deja una entrega de verdad, contra un navegador real y Postgres. Chromium y
@@ -131,6 +137,7 @@ const MOVEMENT_ORDER_TESTID = 'finished-product-movement-order';
 const DELIVERY_ROW_TESTID = 'finished-product-delivery-row';
 const DELIVERY_CUSTOMER_TESTID = 'finished-product-delivery-customer';
 const DELIVERY_ORDER_TESTID = 'finished-product-delivery-order';
+const DELIVERY_PRESENTATION_TESTID = 'finished-product-delivery-presentation';
 const DELIVERY_LOT_TESTID = 'finished-product-delivery-lot';
 const DELIVERY_PACKAGES_TESTID = 'finished-product-delivery-packages';
 const PRIVATE_NOT_FOUND_TESTID = 'private-not-found';
@@ -517,11 +524,12 @@ test.describe('ficha de producto terminado', () => {
     await expect(exitRows.getByTestId(MOVEMENT_LOT_TESTID)).toHaveText(exactText(LOT));
     await expect(exitRows.getByTestId(MOVEMENT_ORDER_TESTID)).toHaveText(exactText(ORDER_NUMBER_TEXT));
 
-    // 3d. Entregas: cliente, pedido, lote y envases.
+    // 3d. Entregas: cliente, pedido, presentacion (2026-10-15, QC-282 R43), lote y envases.
     const deliveryRows = await openTab(page, 'entregas');
     await expect(deliveryRows.getByTestId(DELIVERY_ROW_TESTID)).toHaveAttribute('data-voided', 'false');
     await expect(deliveryRows.getByTestId(DELIVERY_CUSTOMER_TESTID)).toHaveText(exactText(CUSTOMER_LABEL));
     await expect(deliveryRows.getByTestId(DELIVERY_ORDER_TESTID)).toHaveText(exactText(ORDER_NUMBER_TEXT));
+    await expect(deliveryRows.getByTestId(DELIVERY_PRESENTATION_TESTID)).toHaveText(exactText(PRESENTATION_NAME));
     await expect(deliveryRows.getByTestId(DELIVERY_LOT_TESTID)).toHaveText(exactText(LOT));
     await expect(deliveryRows.getByTestId(DELIVERY_PACKAGES_TESTID)).toHaveText(exactText(DELIVERED_PACKAGES));
 
@@ -536,16 +544,19 @@ test.describe('ficha de producto terminado', () => {
     );
 
     // La pestana lista pedidos: el producto aparece al desplegar el de la receta.
+    // Se busca en las FILAS de la tabla: la lista pinta cada fila tambien como tarjeta (oculta en
+    // una pantalla ancha, QC-263) y la tarjeta repite la celda «Nombre» con los mismos testids.
+    const tableRows = page.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`);
     const groupName = page.getByTestId(FINISHED_STOCK_NAME_TESTID).filter({ hasText: exactText(RECIPE_NAME) });
-    await expect(groupName).toHaveCount(1, { timeout: 60_000 });
-    const toggle = page
-      .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-      .filter({ has: groupName })
-      .getByTestId(FINISHED_STOCK_TOGGLE_TESTID);
+    const groupRow = tableRows.filter({ has: groupName });
+    await expect(groupRow).toHaveCount(1, { timeout: 60_000 });
+    const toggle = groupRow.getByTestId(FINISHED_STOCK_TOGGLE_TESTID);
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-    const lineLink = page.getByTestId(FINISHED_STOCK_LINE_LINK_TESTID).filter({ hasText: exactText(FINISHED_NAME) });
+    const lineLink = tableRows
+      .getByTestId(FINISHED_STOCK_LINE_LINK_TESTID)
+      .filter({ hasText: exactText(FINISHED_NAME) });
     await expect(lineLink).toHaveCount(1, { timeout: 60_000 });
     await expect(lineLink).toHaveAttribute('href', finishedProductDetailRoute(product));
     await lineLink.click();

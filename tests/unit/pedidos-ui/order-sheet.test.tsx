@@ -263,6 +263,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -275,12 +277,16 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
         packages: 1,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
 
     ],
     unitId: UNIDAD.id,
     unitLabel: UNIDAD.symbol,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -378,6 +384,7 @@ beforeEach(() => {
       updatedBy: null,
       steps: [],
       packingSteps: [],
+      conditioningSteps: [],
       lines: [],
       tools: [],
       original: null,

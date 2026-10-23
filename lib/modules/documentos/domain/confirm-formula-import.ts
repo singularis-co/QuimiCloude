@@ -23,7 +23,7 @@ import {
 } from '@/lib/modules/recetas';
 import { unitFamilyId, type UnitRef } from '@/lib/modules/unidades';
 
-import { requirePermission, FORMULA_IMPORT_PERMISSION, type Actor } from './actor';
+import { requireAddon, requirePermission, FORMULA_IMPORT_PERMISSION, type Actor } from './actor';
 import { confirmFormulaImportInputSchema, type ConfirmFormulaImportInput } from './formula-import-input';
 import { UnauthorizedError, ValidationError } from './errors';
 import { reviewFormulaImport, type DraftLine, type FormulaReviewIssues } from './review-formula-import';
@@ -92,6 +92,7 @@ export function createConfirmFormulaImport(
     input: unknown,
   ): Promise<FormulaImportSummary> {
     requirePermission(actor, FORMULA_IMPORT_PERMISSION);
+    requireAddon(actor, 'lectura_pdf');
 
     const parsed = confirmFormulaImportInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();

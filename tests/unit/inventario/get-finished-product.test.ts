@@ -34,12 +34,14 @@ function registro(overrides: Partial<FinishedProductRecord> = {}): FinishedProdu
     imagePath: null,
     qtyAlert: '5.0000',
     unitId: FINISHED_UNIT_ID,
+    recipeId: null,
     presentation: { id: FINISHED_PRESENTATION_ID, name: 'Botella 1 L', content: '1.0000', unitId: FINISHED_UNIT_ID },
+    // 2026-10-15 (QC-282): los lotes del registro traen su codigo.
     batches: [
-      { id: LITER_BATCH_ID, stock: '10.5000', packageContent: '1.0000' },
-      { id: GALLON_BATCH_ID, stock: '9.0000', packageContent: '4.0000' },
-      { id: UNPACKAGED_BATCH_ID, stock: '2.2500', packageContent: null },
-      { id: EMPTY_BATCH_ID, stock: '0.0000', packageContent: '1.0000' },
+      { id: LITER_BATCH_ID, lot: 'L-LITRO', stock: '10.5000', packageContent: '1.0000' },
+      { id: GALLON_BATCH_ID, lot: 'L-GALON', stock: '9.0000', packageContent: '4.0000' },
+      { id: UNPACKAGED_BATCH_ID, lot: 'L-SUELTO', stock: '2.2500', packageContent: null },
+      { id: EMPTY_BATCH_ID, lot: 'L-VACIO', stock: '0.0000', packageContent: '1.0000' },
     ],
     ...overrides,
   };
@@ -50,7 +52,7 @@ function montar(record: FinishedProductRecord | null = registro(), refs: readonl
     findAliveFinished: vi.fn<FinishedProductDetailRepository['findAliveFinished']>(async () => record),
     listBatches: vi.fn<FinishedProductDetailRepository['listBatches']>(),
     listMovements: vi.fn<FinishedProductDetailRepository['listMovements']>(),
-    listDeliveryMovements: vi.fn<FinishedProductDetailRepository['listDeliveryMovements']>(),
+    // 2026-10-15 (QC-282): el puerto pierde `listDeliveryMovements`; el tab Entregas lee las lineas de `pedidos`.
     listProductionCosts: vi.fn<FinishedProductDetailRepository['listProductionCosts']>(),
     findProducedProducts: vi.fn<FinishedProductDetailRepository['findProducedProducts']>(),
   };

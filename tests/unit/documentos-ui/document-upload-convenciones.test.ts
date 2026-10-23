@@ -103,9 +103,9 @@ describe('lo que la pieza de subida NO trae', () => {
       CODIGO_DEL_COMPONENTE.flatMap(({ codigo }) => importesDe(codigo)).filter(esPaquete),
     );
 
-    // `react` para el sondeo (`useEffect` + `setTimeout`) y `next/link` para el enlace de
-    // revision opcional: nada mas.
-    expect([...paquetes].sort()).toEqual(['next/link', 'react']);
+    // `react` para el sondeo (`useEffect` + `setTimeout`) y `lucide-react` para los iconos, ya
+    // en el stack; el enlace de revision llega por `ArrowLink`: nada mas.
+    expect([...paquetes].sort()).toEqual(['lucide-react', 'react']);
 
     const manifiesto = JSON.parse(leer('package.json')) as {
       dependencies: Record<string, string>;
@@ -295,5 +295,94 @@ describe('la ventana de subida usa la primitiva de dialogo existente (R20)', () 
     expect(
       importaElDialogoDeBaseUiDirecto("import { Dialog } from '@/components/ui/dialog';"),
     ).toBe(false);
+  });
+});
+
+/** Ancho máximo de línea de los archivos de producción de QC-306 (P8 de su spec). */
+const ANCHO_MAXIMO = 100;
+
+/**
+ * Los archivos de producción que toca QC-306: toda la carpeta de la pieza (recorrida, para que un
+ * archivo nuevo entre solo) y el envoltorio, el barrel y la página de fórmulas.
+ */
+const ARCHIVOS_CON_FORMATO = [
+  ...FUENTES_DEL_COMPONENTE,
+  ENVOLTORIO_DE_FORMULAS,
+  `${CARPETA_DE_FORMULAS}/components/index.ts`,
+  PAGINA_DE_FORMULAS,
+];
+
+/**
+ * Excepción explícita al ancho máximo: un import de un solo nombre, en una línea. Otras guardias
+ * leen esos imports como línea exacta (`tests/unit/integraciones/module-shape.test.ts`, R19 de
+ * integraciones: la acción de readiness «por su ruta exacta»), y partirlos las rompe.
+ */
+const IMPORT_DE_UN_NOMBRE = /^import \{ \w+ \} from '[^']+';$/;
+
+/** Las líneas de una fuente que superan el ancho máximo, como `archivo:línea (columnas)`. */
+function lineasLargas(ruta: string, fuente: string): string[] {
+  return fuente
+    .split(/\r?\n/)
+    .map((linea, indice) => ({ linea, numero: indice + 1, columnas: [...linea].length }))
+    .filter(({ linea, columnas }) => columnas > ANCHO_MAXIMO && !IMPORT_DE_UN_NOMBRE.test(linea))
+    .map(({ numero, columnas }) => `${ruta}:${numero} (${columnas})`);
+}
+
+describe('formato de los archivos de producción de la pieza (QC-306)', () => {
+  it('R36, R37 — cada archivo termina con salto de línea final y ninguna línea pasa de 100 columnas', () => {
+    expect(FUENTES_DEL_COMPONENTE.length).toBeGreaterThan(0);
+
+    const sinSaltoFinal = ARCHIVOS_CON_FORMATO.filter((ruta) => !leer(ruta).endsWith('\n'));
+    expect(sinSaltoFinal).toEqual([]);
+
+    const largas = ARCHIVOS_CON_FORMATO.flatMap((ruta) => lineasLargas(ruta, leer(ruta)));
+    expect(largas).toEqual([]);
+  });
+
+  it('el detector de líneas largas muerde con 101 columnas y no con 100', () => {
+    expect(lineasLargas('x.ts', `${'a'.repeat(100)}\n`)).toEqual([]);
+    expect(lineasLargas('x.ts', `ok\n${'a'.repeat(101)}\n`)).toEqual(['x.ts:2 (101)']);
+  });
+
+  it('la única excepción es un import de un solo nombre en una línea', () => {
+    const ruta = `@/lib/${'m'.repeat(100)}`;
+    expect(lineasLargas('x.ts', `import { accion } from '${ruta}';\n`)).toEqual([]);
+    expect(lineasLargas('x.ts', `import { a, b } from '${ruta}';\n`)).toHaveLength(1);
+    expect(lineasLargas('x.ts', `const x = '${ruta}';\n`)).toHaveLength(1);
+  });
+});
+
+/** Las celdas de una fila de tabla Markdown, sin los bordes. */
+function celdasDe(fila: string): string[] {
+  return fila
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((celda) => celda.trim());
+}
+
+describe('la fila de la pieza en el catálogo de componentes (QC-306)', () => {
+  it('R38 — la fila de DocumentBatchPanel cita en Diseño el tablero del panel y no declara la sincronía entre pestañas como no cubierta', () => {
+    const catalogo = leer('components/shared/CATALOGO.md');
+    const fila = catalogo
+      .split(/\r?\n/)
+      .find((linea) => linea.startsWith('| `DocumentBatchPanel`'));
+    expect(fila, 'falta la fila de DocumentBatchPanel').toBeDefined();
+
+    const celdas = celdasDe(fila ?? '');
+    expect(celdas).toHaveLength(7);
+    const alcance = celdas[3] ?? '';
+    const diseno = celdas[6] ?? '';
+
+    const tableros = [...diseno.matchAll(/docs\/diseno\/canvas\/([\w-]+)\.dc\.html/g)];
+    expect(tableros.length, `Diseño = «${diseno}»`).toBeGreaterThan(0);
+    for (const [ruta, nombre] of tableros) {
+      expect(existsSync(join(RAIZ, ruta)), ruta).toBe(true);
+      expect(['Formulas', 'ModalesProduccion'], ruta).not.toContain(nombre);
+    }
+
+    const noCubre = alcance.split('No cubre:')[1] ?? '';
+    expect(noCubre).not.toMatch(/entre pestañas/);
   });
 });

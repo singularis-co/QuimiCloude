@@ -9,6 +9,7 @@
 
 import type { SessionClaims } from '@/lib/modules/identity/domain/session-claims';
 import type { SessionUserRecord } from '@/lib/modules/identity/ports/session-user-reader';
+import { ADDONS } from '@/lib/modules/identity';
 
 const { readClaimsMock, findActiveByIdMock } = vi.hoisted(() => ({
   readClaimsMock: vi.fn<() => Promise<SessionClaims | null>>(),
@@ -53,6 +54,7 @@ const RECORD: SessionUserRecord = {
   roleName: 'operador',
   companyId: COMPANY_ID,
   companyDeletedAt: null,
+  companyAddons: [...ADDONS],
   // QC-74 T8 (R7, R11): el record trae ya los permisos del rol. Los cortes de esta cadena no
   // los miran —quien los mira es `assertPermission` en cada caso de uso—, asi que aqui basta
   // con una lista no vacia que se pueda seguir hasta la proyeccion.

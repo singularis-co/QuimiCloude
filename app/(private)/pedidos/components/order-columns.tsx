@@ -1,17 +1,19 @@
 'use client';
 
+import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
   formatOrderNumber,
-  type OrderPresentationLineView,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
-import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { exactDecimalTitle, formatMoneyDisplay } from '@/lib/shared/ui/decimal-display';
+import { ORDER_STATUS_LABELS } from '@/lib/shared/ui/order-status';
+import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
-import { orderCustomerLabel } from './order-customer-label';
+import { orderCustomerLabel } from '@/components/shared/order-customer-label';
 import {
   OrderProducedPresentations,
   type ProducedProductsByOrder,
@@ -25,9 +27,9 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
+import { distributionLabelLine } from './order-responsibles-sheet';
 import { orderRowActionsSpec, type OrderRowAction } from './order-row-actions';
 import { OrderRowResponsibles } from './order-sheet';
-import type { RecipePickerPage } from './recipe-picker';
 import {
   ORDER_PRIORITY_FILTER_OPTIONS,
   ORDER_STATUS_FILTER_OPTIONS,
@@ -39,8 +41,8 @@ import {
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
- * Las DIEZ columnas de la lista de pedidos, declaradas **como datos** (R8-R12, R14, R19, R23,
- * `design.md > 7`).
+ * Las CATORCE columnas de la lista de pedidos (trece de datos y la de acciones), declaradas
+ * **como datos** (R8-R12, R14, R19, R23, `design.md > 7`).
  *
  * **Modulo de CLIENTE, y no por gusto** (`design.md > 6.1`): la columna de acciones devuelve
  * elementos y las demas devuelven funciones de celda, y una configuracion con funciones no cruza
@@ -63,17 +65,10 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * el servidor en QC-68, y `createdBy`/`updatedBy` son identificadores, no nombres. El test de R8
  * lo comprueba recorriendo esta misma declaracion.
  *
- * **La cantidad se pinta REDONDEADA A DOS DECIMALES** (enmienda del 2026-09-17 a R39,
- * decision humana). Es una cadena decimal del contrato y llega con la escala de la columna
- * -«12.5000»-, pero cuatro decimales de relleno no informan de nada y compiten por la atencion
- * con los que si: la celda la pasa por `formatDecimalDisplay` y muestra «12.5».
- *
- * Lo que R39 protege de fondo sigue vigilado y sin una sola excepcion: NI `Intl.NumberFormat`,
- * NI `toFixed`, NI coma flotante, NI aritmetica de `number` —tampoco para un total, que aqui no
- * existe—. `formatDecimalDisplay` redondea con enteros `BigInt` sobre el texto, que es exacto.
- * Y es PRESENTACION: esta celda no alimenta ningun envio, el pedido guardado conserva sus
- * cuatro decimales y reabrirlo para editar no los pierde (el formulario precarga con
- * `trimDecimal`, que no redondea).
+ * **No hay columna de cantidad** (decision humana del 2026-10-16): ni en la tabla ni en
+ * la tarjeta movil, que se compone con estos mismos ids. Una URL vieja con `sort=quantity` sigue
+ * siendo valida -`ORDER_QUERYABLE.sortable` la admite y el servidor ordena por ella-; solo deja de
+ * haber cabecera que la muestre.
  *
  * **QC-35bis (2026-09-07): no hay columna de unidad ni de precio unitario.** Salieron del pedido
  * entero -formulario, contrato del modulo y tabla `orders`-, asi que no queda dato que pintar.
@@ -83,6 +78,9 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * `asignaciones` (R14)-: los trae un lote aparte que el Server Component de la seccion pide UNA
  * vez por pagina y reparte por fila (`design.md > 1`). La columna **no ordena y no filtra**, y el
  * esqueleto sube a nueve con ella (R22).
+ *
+ * **Costo estimado y costo real**, las dos ultimas columnas de datos, justo antes de las acciones.
+ * No ordenan ni filtran. Son costes guardados, no precios de venta.
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -91,16 +89,25 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 /** Ids de las columnas que no filtran ni ordenan, pero que los tests localizan por su celda. */
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
 export const ORDER_CUSTOMER_NAME_COLUMN_ID = 'customer';
-export const QUANTITY_COLUMN_ID = 'quantity';
 export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
+export const PENDING_DELIVERY_COLUMN_ID = 'pendingDelivery';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const COVERAGE_COLUMN_ID = 'coverage';
 /** QC-102 R16 — la columna propia de responsables. */
 export const RESPONSIBLES_COLUMN_ID = 'responsibles';
+/** Costo estimado del pedido. El id conserva el nombre antiguo para no perder preferencias guardadas. */
+export const PRODUCTION_COST_COLUMN_ID = 'productionCost';
+export const PRODUCTION_COST_TESTID = 'order-production-cost';
+export const ACTUAL_COST_COLUMN_ID = 'actualCost';
+export const ACTUAL_COST_TESTID = 'order-actual-cost';
 export const ACTIONS_COLUMN_ID = 'actions';
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
 export const MISSING_VALUE_MARK = '—';
+
+/** Todo lo empacado ya se entrego: se lee como el estado `ENTREGADO`. */
+export const NOTHING_PENDING_MARK = ORDER_STATUS_LABELS.ENTREGADO;
+export const PENDING_DELIVERY_TESTID = 'order-pending-delivery';
 
 /**
  * Marcador identificable de «este dato no viene informado» (R9, R11).
@@ -118,6 +125,38 @@ function MissingValue({ field }: { readonly field: string }) {
 }
 
 /**
+ * Celda «Por entregar». `delivered` se lee «Entregado»; `not_packed` -y un `pending` sin
+ * presentaciones con nombre- lleva el marcador de ausencia, porque no hay nada que entregar
+ * que se pueda nombrar. Con varias presentaciones el texto salta de linea.
+ */
+function PendingDelivery({ order }: { readonly order: OrderSummary }) {
+  const state = order.pendingDelivery;
+  const text = state.kind === 'pending' ? formatPresentationQuantities(state.items) : '';
+  if (text === '') {
+    return (
+      <span
+        data-testid={PENDING_DELIVERY_TESTID}
+        data-state={state.kind}
+        data-empty="true"
+        className="text-muted-foreground"
+      >
+        {state.kind === 'delivered' ? NOTHING_PENDING_MARK : MISSING_VALUE_MARK}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid={PENDING_DELIVERY_TESTID}
+      data-state={state.kind}
+      title={text}
+      className="inline-block max-w-xs align-middle break-words whitespace-normal"
+    >
+      {text}
+    </span>
+  );
+}
+
+/**
  * Fecha en `YYYY-MM-DD` y en UTC, **no con `toLocaleDateString`**: el Server Component y el
  * navegador tienen husos y locales distintos, y una fecha formateada con el local del entorno
  * produce una discrepancia de hidratacion que nadie relaciona con la tabla. Mismo criterio que
@@ -127,12 +166,8 @@ function formatRequestDate(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-/**
- * Los dos catalogos que el panel lateral de edicion necesita, bajados por props desde el Server
- * Component de la seccion (R43): la primera pagina de recetas y las unidades existentes.
- */
+/** Lo que las columnas necesitan, bajado por props desde el Server Component de la seccion. */
 export type OrderColumnsDeps = {
-  readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
   readonly bridge: MassVolumeBridge | null;
   /**
@@ -167,11 +202,6 @@ export type OrderColumnsDeps = {
   readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
 };
 
-/** Una linea con envase se nombra por el envase; una antigua, o sin nombre de envase, por su presentacion. */
-function distributionLabelLine(line: OrderPresentationLineView) {
-  return { presentationName: line.packagingName ?? line.presentationName, packages: line.packages };
-}
-
 const PRODUCED_ORDER_STATUSES: ReadonlySet<OrderSummary['status']> = new Set([
   'TERMINADO',
   'ENTREGADO',
@@ -188,12 +218,44 @@ function producedProductsOf(
   return products;
 }
 
+/**
+ * Celda de importe. El estimado es `ingredientsCost` y NADA MAS: ya incluye los envases, y sumar
+ * `packagingCost` los contaria dos veces. Sin importe, el marcador de ausencia; nunca `0`.
+ *
+ * La misma celda va a la tarjeta de telefono con su rotulo delante
+ * (`withCardFieldLabel`), que dentro de la tabla se oculta: la cabecera ya lo dice.
+ */
+export const PRODUCTION_COST_LABEL = 'Costo estimado';
+export const ACTUAL_COST_LABEL = 'Costo real';
+
+const COST_TESTIDS = {
+  [PRODUCTION_COST_COLUMN_ID]: PRODUCTION_COST_TESTID,
+  [ACTUAL_COST_COLUMN_ID]: ACTUAL_COST_TESTID,
+} as const;
+
+function CostCell({
+  value,
+  field,
+}: {
+  readonly value: string | null;
+  readonly field: keyof typeof COST_TESTIDS;
+}) {
+  const label = field === PRODUCTION_COST_COLUMN_ID ? PRODUCTION_COST_LABEL : ACTUAL_COST_LABEL;
+  return withCardFieldLabel(
+    label,
+    value === null ? (
+      <MissingValue field={field} />
+    ) : (
+      <span data-testid={COST_TESTIDS[field]} title={exactDecimalTitle(value)}>
+        {formatMoneyDisplay(value)}
+      </span>
+    ),
+  );
+}
+
 function ignoreAction(): void {}
 
 export function buildOrderColumns({
-  recipes,
-  units,
-  bridge,
   responsiblesByOrder = {},
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverageByOrder = {},
@@ -234,7 +296,7 @@ export function buildOrderColumns({
     },
     {
       id: RECIPE_NAME_COLUMN_ID,
-      label: 'Receta',
+      label: 'Fórmula',
       align: 'start',
       width: 500,
       hideText: false,
@@ -253,19 +315,11 @@ export function buildOrderColumns({
           orderCustomerLabel(order.customer)
         ),
     },
-    {
-      id: QUANTITY_COLUMN_ID,
-      label: 'Cantidad',
-      tabular: true,
-      align: 'center',
-      // Se pinta redondeada a dos decimales y el `title` lleva el valor exacto, para el caso
-      // en que el redondeo esconda una diferencia real.
-      cell: (order) => (
-        <span title={exactDecimalTitle(order.quantity)}>
-          {formatDecimalDisplay(order.quantity)}
-          {order.unitLabel === null ? null : ` ${order.unitLabel}`}
-        </span>
-      ),
+        {
+      id: PENDING_DELIVERY_COLUMN_ID,
+      label: 'Por entregar',
+      align: 'start',
+      cell: (order) => <PendingDelivery order={order} />,
     },
     {
       id: PRESENTATION_NAME_COLUMN_ID,
@@ -330,16 +384,25 @@ export function buildOrderColumns({
       cell: (order) => (
         <OrderRowResponsibles
           order={order}
-          recipes={recipes}
-          units={units}
-          bridge={bridge}
           // R20: si el lote fallo, esta clave no existe y la celda pinta el marcador de ausencia.
           responsibles={responsiblesByOrder[order.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
-          // El panel es el mismo, se abra por donde se abra.
-          coverage={coverageByOrder[order.id]}
         />
       ),
+    },
+    {
+      id: PRODUCTION_COST_COLUMN_ID,
+      label: PRODUCTION_COST_LABEL,
+      align: 'end',
+      tabular: true,
+      cell: (order) => <CostCell value={order.ingredientsCost} field={PRODUCTION_COST_COLUMN_ID} />,
+    },
+    {
+      id: ACTUAL_COST_COLUMN_ID,
+      label: ACTUAL_COST_LABEL,
+      align: 'end',
+      tabular: true,
+      cell: (order) => <CostCell value={order.actualCost} field={ACTUAL_COST_COLUMN_ID} />,
     },
     actionsColumn({
       id: ACTIONS_COLUMN_ID,

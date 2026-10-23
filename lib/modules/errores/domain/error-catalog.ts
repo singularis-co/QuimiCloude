@@ -102,6 +102,32 @@ export const ERROR_MESSAGE_KEY = {
   ai_provider_error: 'errors.ai_provider_error',
   converted_stock_out_of_range: 'errors.converted_stock_out_of_range',
   converted_cost_out_of_range: 'errors.converted_cost_out_of_range',
+  company_duplicate_name: 'errors.company_duplicate_name',
+  company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
+  company_name_mismatch: 'errors.company_name_mismatch',
+  company_not_deleted: 'errors.company_not_deleted',
+  packaging_stock_insufficient: 'errors.packaging_stock_insufficient',
+  delivery_exceeds_surplus: 'errors.delivery_exceeds_surplus',
+  company_last_administrator: 'errors.company_last_administrator',
+  customer_phone_country_required: 'errors.customer_phone_country_required',
+  customer_phone_invalid: 'errors.customer_phone_invalid',
+  whatsapp_contact_not_found: 'errors.whatsapp_contact_not_found',
+  whatsapp_contact_number_invalid: 'errors.whatsapp_contact_number_invalid',
+  whatsapp_template_not_found: 'errors.whatsapp_template_not_found',
+  whatsapp_template_name_taken: 'errors.whatsapp_template_name_taken',
+  whatsapp_template_rate_limited: 'errors.whatsapp_template_rate_limited',
+  whatsapp_template_rejected: 'errors.whatsapp_template_rejected',
+  whatsapp_meta_rejected: 'errors.whatsapp_meta_rejected',
+  whatsapp_meta_unreachable: 'errors.whatsapp_meta_unreachable',
+  whatsapp_variable_key_not_found: 'errors.whatsapp_variable_key_not_found',
+  whatsapp_variable_key_taken: 'errors.whatsapp_variable_key_taken',
+  whatsapp_variable_key_in_use: 'errors.whatsapp_variable_key_in_use',
+  whatsapp_template_not_mapped: 'errors.whatsapp_template_not_mapped',
+  whatsapp_template_not_mappable: 'errors.whatsapp_template_not_mappable',
+  conditioning_step_out_of_order: 'errors.conditioning_step_out_of_order',
+  conditioning_responsibles_required: 'errors.conditioning_responsibles_required',
+  conditioning_responsible_not_allowed: 'errors.conditioning_responsible_not_allowed',
+  conditioning_steps_pending: 'errors.conditioning_steps_pending',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -122,7 +148,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.presentation_duplicate_name': 'Ya existe una presentacion con un nombre equivalente.',
   'errors.presentation_in_use': 'La presentacion tiene productos asignados y no se puede borrar.',
   'errors.order_not_found': 'El pedido solicitado no existe.',
-  'errors.recipe_not_found': 'La receta indicada no existe o esta dada de baja.',
+  'errors.recipe_not_found': 'La fórmula indicada no existe o esta dada de baja.',
   'errors.invalid_transition': 'El pedido no admite ese cambio de estado.',
   'errors.not_cancellable': 'El pedido no se puede cancelar en su estado actual.',
   'errors.not_deletable': 'El pedido no se puede borrar en su estado actual.',
@@ -131,7 +157,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.catalog_line_not_found': 'La linea de catalogo solicitada no existe.',
   'errors.supplier_duplicate_name': 'Ya existe un proveedor con un nombre equivalente.',
   'errors.duplicate_catalog_line': 'Ese proveedor ya tiene una linea con ese nombre y esa presentacion.',
-  'errors.recipe_duplicate_name': 'Ya existe una receta con un nombre equivalente.',
+  'errors.recipe_duplicate_name': 'Ya existe una fórmula con un nombre equivalente.',
   'errors.unit_not_found': 'La unidad no existe.',
   'errors.unit_duplicate_name': 'Ya existe una unidad con ese nombre.',
   'errors.duplicate_symbol': 'Ya existe una unidad con ese simbolo.',
@@ -177,8 +203,8 @@ export const ERROR_MESSAGES_ES = {
   'errors.order_assignment_not_found': 'Esa persona no es responsable de este pedido.',
   // No dice cual estado inactivo es: el catalogo no interpola y todos llevan a la misma accion.
   'errors.user_not_assignable': 'No se puede asignar a una persona cuya cuenta no esta activa.',
-  // «En esta empresa» porque el lote es unico por empresa, no en toda la base.
-  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor en esta empresa.',
+  // El lote es unico por producto y presentacion: el mismo valor puede existir en otro producto.
+  'errors.batch_duplicate_lot': 'Ya existe un lote con ese valor para ese producto y presentacion.',
   // No distingue «no existe» de «es de otra empresa»: la respuesta es la misma para las dos.
   'errors.batch_not_found': 'El lote solicitado no existe.',
   'errors.batch_stock_negative': 'El ajuste dejaria la existencia del lote por debajo de cero.',
@@ -191,7 +217,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.insufficient_material':
     'No hay material suficiente en inventario para entregar el pedido.',
   'errors.recipe_without_lines':
-    'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
+    'La fórmula del pedido no tiene ingredientes: completala antes de entregarlo.',
   'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
   'errors.customer_not_found': 'El cliente solicitado no existe.',
   'errors.presentation_without_content':
@@ -219,7 +245,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_version_under_review':
     'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
   'errors.order_unit_not_convertible':
-    'La unidad del pedido no se puede convertir a la de algún insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
+    'La unidad del pedido no se puede convertir a la de algún insumo de la fórmula: revisa los insumos marcados en la tabla o elige otra unidad.',
   'errors.batch_stock_changed':
     'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
   'errors.adjustment_reason_not_allowed':
@@ -248,7 +274,7 @@ export const ERROR_MESSAGES_ES = {
     'Falta evidencia: algun paso que la exige no tiene ninguna foto.',
   'errors.evidence_limit': 'Ese paso ya tiene 3 fotos: cambia o quita una antes de subir otra.',
   'errors.evidence_invalid_file':
-    'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 5 MB.',
+    'No se pudo registrar la foto: debe ser JPG, PNG o WebP y pesar como maximo 4.4 MB.',
   'errors.evidence_not_found': 'La foto de evidencia no existe.',
   'errors.recipe_steps_locked':
     'Hay pedidos en curso con fotos de evidencia: mientras sigan en curso no puedes mover ni quitar pasos.',
@@ -259,4 +285,40 @@ export const ERROR_MESSAGES_ES = {
     'La existencia convertida a la unidad del producto no cabe en 4 decimales. Ingrésala en la unidad del producto.',
   'errors.converted_cost_out_of_range':
     'El costo unitario convertido a la unidad del producto no cabe en 4 decimales. Ingresa el lote en la unidad del producto.',
+  'errors.company_duplicate_name': 'Ya existe una empresa activa con ese nombre.',
+  'errors.company_duplicate_tax_id':
+    'Ya existe una empresa activa con esa identificación fiscal.',
+  'errors.company_name_mismatch': 'El nombre escrito no coincide con el de la empresa.',
+  'errors.company_not_deleted': 'La empresa ya está activa.',
+  'errors.packaging_stock_insufficient': 'No alcanza el stock del envase.',
+  'errors.delivery_exceeds_surplus':
+    'La entrega supera el excedente: hay pedidos terminados esperando esos envases.',
+  'errors.company_last_administrator':
+    'Es el único Administrador de la empresa: crea otro antes de darlo de baja.',
+  'errors.customer_phone_country_required': 'Elige el país del teléfono.',
+  'errors.customer_phone_invalid': 'Este número no es válido para el país elegido.',
+  'errors.whatsapp_contact_not_found': 'La conversación no existe.',
+  'errors.whatsapp_contact_number_invalid': 'El número de esta conversación no es un teléfono válido.',
+  'errors.whatsapp_template_not_found': 'No se encontró la plantilla.',
+  'errors.whatsapp_template_name_taken': 'Ya existe una plantilla con ese nombre en ese idioma.',
+  'errors.whatsapp_template_rate_limited':
+    'Meta no permite crear más plantillas por ahora. Intenta de nuevo más tarde.',
+  'errors.whatsapp_template_rejected':
+    'Meta rechazó la plantilla. Revisa el contenido e intenta de nuevo.',
+  'errors.whatsapp_meta_rejected':
+    'Meta rechazó la solicitud. Intenta de nuevo o revisa la conexión.',
+  'errors.whatsapp_meta_unreachable':
+    'No se pudo contactar con Meta. Intenta de nuevo en unos minutos.',
+  'errors.whatsapp_variable_key_not_found': 'No se encontró la variable.',
+  'errors.whatsapp_variable_key_taken': 'Ya existe una variable con esa clave.',
+  'errors.whatsapp_variable_key_in_use':
+    'La variable se usa en una o más plantillas. Quítala de ellas antes de eliminarla o cambiar su clave.',
+  'errors.whatsapp_template_not_mapped':
+    'Relaciona todas las variables de la plantilla antes de habilitarla.',
+  'errors.whatsapp_template_not_mappable':
+    'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
+  'errors.conditioning_step_out_of_order': 'La pantalla quedó desactualizada. Recárgala para seguir.',
+  'errors.conditioning_responsibles_required': 'Elige al menos un responsable para avanzar.',
+  'errors.conditioning_responsible_not_allowed': 'Solo puedes elegir a personas del equipo o a ti.',
+  'errors.conditioning_steps_pending': 'Completa los pasos de acondicionamiento antes de terminar.',
 } as const satisfies Record<ErrorMessageKey, string>;

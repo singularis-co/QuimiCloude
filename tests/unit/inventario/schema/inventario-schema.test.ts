@@ -304,7 +304,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       .sort()
     // `nameNormalized` (forma canonica de `name`), `unitId` (referencia a otro modulo) y
     // `companyId` (dueno de la fila) no son datos de negocio: van aparte para que el censo siga
-    // siendo una igualdad exacta.
+    // siendo una igualdad exacta. `lastBatchAt` tampoco: es una marca que deja la carga de lotes.
     expect(scalarNames).toEqual(
       [
         'id',
@@ -318,6 +318,7 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
         'deletedAt',
         'recipeId',
         'presentationId',
+        'lastBatchAt',
       ].sort(),
     )
     expect(product.body).toContain('@@map("products")')
@@ -577,6 +578,15 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     expect(deletedAt.attributes).not.toMatch(/@default\(/)
   })
 
+  it('Product declara lastBatchAt opcional, sin default: NULL significa producto sin lotes', () => {
+    const lastBatchAt = field(product, 'lastBatchAt')
+    expect(lastBatchAt.type).toBe('DateTime')
+    expect(lastBatchAt.isOptional).toBe(true)
+    expect(lastBatchAt.attributes).toContain('@map("last_batch_at")')
+    expect(lastBatchAt.attributes).toContain('@db.Timestamptz(6)')
+    expect(lastBatchAt.attributes).not.toMatch(/@default\(/)
+  })
+
   it('Product y Presentation declaran createdAt y updatedAt', () => {
     for (const [modelName, model] of [
       ['Product', product],
@@ -743,6 +753,9 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
     // `createListFinishedProductMovements`, `createListFinishedProductDeliveries`,
     // `createListFinishedProductCosts` y `createListProducedProducts`-, y el barrel pasa de
     // dieciocho a veinticuatro. Sus tipos y funciones puras van en una sentencia sin `...Deps`.
+    // 2026-10-14: entran `createGetInventoryImportTemplate` (plantilla .xlsx con la hoja de valores
+    // disponibles) y `createGetInventoryImportValues` (los mismos valores en la pantalla), y el
+    // barrel pasa de veinticuatro a veintiseis.
     expect(
       [...FACTORIAS_DE_CASO_DE_USO].sort(),
       'no se pudieron derivar las factorias de caso de uso del barrel: sin ellas esta guardia no mira nada',
@@ -755,11 +768,14 @@ describe('db/schema.prisma — modelo de producto y presentacion', () => {
       'createDeletePresentation',
       'createDeleteProduct',
       'createGetFinishedProduct',
+      'createGetInventoryImportTemplate',
+      'createGetInventoryImportValues',
       'createGetProduct',
       'createListBatchMovements',
       'createListFinishedProductBatches',
       'createListFinishedProductCosts',
       'createListFinishedProductDeliveries',
+      'createListFinishedProductDistribution',
       'createListFinishedProductMovements',
       'createListFinishedStock',
       'createListOrderBatches',
@@ -926,9 +942,9 @@ describe('QC-80 R25/R28 — la presentacion sigue viviendo solo en product_batch
     expect(productBatch.body).toMatch(
       /@@index\(\[companyId\],\s*map:\s*"product_batches_company_id_idx"\)/,
     )
-    // Por empresa y no global: dos empresas pueden repetir lote, una misma empresa no.
-    expect(productBatch.body, 'la unicidad (empresa, lote) la declara QC-81 (R11)').toMatch(
-      /@@unique\(\[companyId,\s*lot\],\s*map:\s*"product_batches_company_lot_unique"\)/,
+    // QC-284: la unicidad del lote son dos indices parciales de la migracion, que Prisma no modela.
+    expect(productBatch.body, 'ningun @@unique de lote en el esquema (QC-284)').not.toMatch(
+      /@@unique\(\[[^\]]*\blot\b[^\]]*\]/,
     )
     expect(productBatch.body, 'ninguna unicidad GLOBAL de lote (R12)').not.toMatch(
       /@@unique\(\[lot\]/,
@@ -1080,5 +1096,34 @@ describe('QC-219 R23/R24 — el dia de produccion vive en el lote del inventario
     expect(productionDate.attributes).toContain('@map("production_date")')
     expect(productionDate.attributes).toContain('@db.Date')
     expect(productionDate.attributes).not.toMatch(/@default\(/)
+  })
+})
+
+describe('QC-284 R1/R2 — la unicidad del lote vive en dos indices parciales, no en el esquema', () => {
+  it('R1, R2: ProductBatch no declara ningun @@unique que incluya lot, y el modelo dice donde vive la unicidad', () => {
+    expect(productBatch.body).not.toMatch(/@@unique\(\[[^\]]*\blot\b[^\]]*\]/)
+    expect(productBatch.body).not.toContain('product_batches_company_lot_unique')
+    expect(productBatch.body).not.toMatch(/\blot\b[^\n]*@unique/)
+    expect(rawSchema, 'el comentario del modelo nombra los indices parciales').toMatch(
+      /La unicidad del lote son dos indices unicos parciales/,
+    )
+  })
+})
+
+// QC-288 2026-10-16: el tipo del asiento gana los de la entrega sin pedido y su anulacion, al
+// final y sin reordenar. Los casos anteriores no cambian.
+describe('QC-288 — InventoryMovementKind con los asientos de la entrega sin pedido', () => {
+  it('R41: InventoryMovementKind termina en direct_delivery y direct_delivery_void, en ingles y sin reordenar', () => {
+    const kind = schemaEnums.find((declared) => declared.name === 'InventoryMovementKind')
+    expect(kind?.values).toEqual([
+      'opening',
+      'adjustment',
+      'consumption',
+      'production',
+      'delivery',
+      'delivery_void',
+      'direct_delivery',
+      'direct_delivery_void',
+    ])
   })
 })

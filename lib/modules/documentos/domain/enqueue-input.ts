@@ -10,12 +10,17 @@
  */
 import { z } from 'zod';
 
+import { fileNameSchema } from './file-name';
 import { MAX_FILES_PER_BATCH } from './limits';
 import { pdfStrategySchema } from './pdf-strategy';
 
-export const enqueueBatchSchema = z.strictObject({
-  strategy: pdfStrategySchema,
-  paths: z.array(z.string().min(1)).min(1).max(MAX_FILES_PER_BATCH),
-});
+// `names` es opcional para que un cliente viejo en caché siga encolando, con los nombres vacíos.
+export const enqueueBatchSchema = z
+  .strictObject({
+    strategy: pdfStrategySchema,
+    paths: z.array(z.string().min(1)).min(1).max(MAX_FILES_PER_BATCH),
+    names: z.array(fileNameSchema).optional(),
+  })
+  .refine((input) => input.names === undefined || input.names.length === input.paths.length);
 
 export type EnqueueBatchInput = z.infer<typeof enqueueBatchSchema>;

@@ -25,7 +25,7 @@ function montar(options?: {
   readonly pasos?: readonly RecipeStepView[];
   readonly filas?: Parameters<typeof repositorioEnMemoria>[0];
 }) {
-  const append = vi.fn<ExecutionLogRepository['append']>(async () => undefined);
+  const append = vi.fn<ExecutionLogRepository['append']>(async () => 'ok' as const);
   const findExecutionContentById = vi.fn(async () => ({ steps: options?.pasos ?? PASOS_FABRICACION }));
   const { repo } = repositorioEnMemoria(options?.filas);
   const listAliveSummariesByIds = vi.fn(async () => ({

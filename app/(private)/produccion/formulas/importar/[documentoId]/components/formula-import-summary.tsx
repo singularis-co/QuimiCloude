@@ -1,13 +1,13 @@
 'use client';
 
-import Link from 'next/link';
+import { CircleCheckIcon } from 'lucide-react';
 
-import { buttonVariants } from '@/components/ui/button';
+import { ArrowLink } from '@/components/shared/arrow-link';
+import { Card } from '@/components/ui/card';
 import type { FormulaImportSummary as FormulaImportSummaryData } from '@/lib/modules/documentos';
 import type { UnitRef } from '@/lib/modules/unidades';
-import { recipeEditRoute } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
-import { cn } from '@/lib/utils';
 
 const OUTCOME_LABELS: Record<FormulaImportSummaryData['outcome'], string> = {
   created: 'Se creó una fórmula nueva.',
@@ -45,40 +45,69 @@ export function FormulaImportSummary({ summary, units }: FormulaImportSummaryPro
   const reusedList = summary.reused.map((item) => item.name).join(', ');
 
   return (
-    <div
+    <Card
       role="status"
-      className="flex flex-col items-start gap-4 rounded-lg border p-4"
+      aria-labelledby="formula-import-summary-outcome"
+      className="gap-4 rounded-[14px] px-5 py-5"
       data-testid="formula-import-summary"
     >
-      <p className="text-sm font-medium" data-testid="formula-import-summary-outcome">
-        {OUTCOME_LABELS[summary.outcome]}
-      </p>
+      <div className="flex items-center gap-3.5">
+        <span
+          aria-hidden="true"
+          data-testid="formula-import-summary-icon"
+          className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-success-subtle text-success-text"
+        >
+          <CircleCheckIcon className="size-5" />
+        </span>
+        <h2
+          id="formula-import-summary-outcome"
+          className="text-lg font-semibold"
+          data-testid="formula-import-summary-outcome"
+        >
+          {OUTCOME_LABELS[summary.outcome]}
+        </h2>
+      </div>
 
-      <dl className="grid grid-cols-2 gap-3 text-sm">
+      <dl className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
-          <dt className="text-muted-foreground">Materias primas creadas</dt>
-          <dd data-testid="formula-import-summary-raw-materials-created">{summary.rawMaterialsCreated}</dd>
+          <dt className="text-xs font-semibold text-muted-foreground">Materias primas creadas</dt>
+          <dd
+            className="font-mono text-2xl font-semibold"
+            data-testid="formula-import-summary-raw-materials-created"
+          >
+            {summary.rawMaterialsCreated}
+          </dd>
           <dd className="text-muted-foreground" data-testid="formula-import-summary-created-list">
             {createdList === '' ? EMPTY_MARK : createdList}
           </dd>
         </div>
         <div className="flex flex-col gap-1">
-          <dt className="text-muted-foreground">Materias primas reutilizadas</dt>
-          <dd data-testid="formula-import-summary-raw-materials-reused">{summary.rawMaterialsReused}</dd>
+          <dt className="text-xs font-semibold text-muted-foreground">Materias primas reutilizadas</dt>
+          <dd
+            className="font-mono text-2xl font-semibold"
+            data-testid="formula-import-summary-raw-materials-reused"
+          >
+            {summary.rawMaterialsReused}
+          </dd>
           <dd className="text-muted-foreground" data-testid="formula-import-summary-reused-list">
             {reusedList === '' ? EMPTY_MARK : reusedList}
           </dd>
         </div>
       </dl>
 
-      <Link
-        href={recipeEditRoute(summary.recipeId)}
-        data-slot="button"
-        className={cn(buttonVariants({ variant: 'outline', touch: true }))}
-        data-testid="formula-import-summary-link"
-      >
-        Ver la fórmula
-      </Link>
-    </div>
+      <div className="flex flex-wrap justify-end gap-3">
+        <ArrowLink direction="back" href={FORMULAS_ROUTE} touch testId="formula-import-summary-back-link">
+          Volver al listado
+        </ArrowLink>
+        <ArrowLink
+          direction="forward"
+          href={recipeEditRoute(summary.recipeId)}
+          touch
+          testId="formula-import-summary-link"
+        >
+          Ver la fórmula
+        </ArrowLink>
+      </div>
+    </Card>
   );
 }

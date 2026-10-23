@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { OrderNotFoundError } from '@/lib/modules/pedidos/domain/errors'
+import { OrderNotFoundError, UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
@@ -29,6 +29,7 @@ const REF_ORIGINAL: RecipeRef = {
   isDeleted: false,
   isUnderReview: false,
   original: null,
+  imageUrl: null,
 }
 const REF_VERSION: RecipeRef = {
   id: VERSION,
@@ -37,6 +38,7 @@ const REF_VERSION: RecipeRef = {
   isDeleted: false,
   isUnderReview: false,
   original: { id: ORIGINAL, name: 'Crema base' },
+  imageUrl: null,
 }
 
 function fila(recipeId: string): OrderRow {
@@ -49,6 +51,8 @@ function fila(recipeId: string): OrderRow {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-02T03:04:05.000Z'),
     updatedAt: new Date('2026-01-02T03:04:05.000Z'),
     createdBy: 'admin-0',
@@ -199,9 +203,9 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
     return {
       ...fila(ORIGINAL),
       presentationLines: [
-        { presentationId: PRESENTACION_ANTIGUA, packages: 3, packagingProductId: null },
-        { presentationId: PRESENTACION_ENVASE, packages: 40, packagingProductId: ENVASE },
-        { presentationId: '88888888-8888-4888-8888-888888888888', packages: 1, packagingProductId: ENVASE_DE_BAJA },
+        { presentationId: PRESENTACION_ANTIGUA, packages: 3, packagingProductId: null, presentationContent: null },
+        { presentationId: PRESENTACION_ENVASE, packages: 40, packagingProductId: ENVASE, presentationContent: null },
+        { presentationId: '88888888-8888-4888-8888-888888888888', packages: 1, packagingProductId: ENVASE_DE_BAJA, presentationContent: null },
       ],
     }
   }
@@ -228,7 +232,7 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
     const d = {
       ...dobles({
         ...fila(ORIGINAL),
-        presentationLines: [{ presentationId: PRESENTACION_ANTIGUA, packages: 3, packagingProductId: null }],
+        presentationLines: [{ presentationId: PRESENTACION_ANTIGUA, packages: 3, packagingProductId: null, presentationContent: null }],
       }),
       packaging,
     }
@@ -244,4 +248,123 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
 
     expect(vista.presentationLines[1]).toMatchObject({ packagingProductId: ENVASE, packagingName: null })
   })
+})
+
+describe('la ficha lleva el contenido y la unidad de la presentacion de cada linea', () => {
+  const LITRO = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
+  const MILILITRO = 'a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2'
+  const BOTELLA = '66666666-6666-4666-8666-666666666666'
+  const GARRAFA = '77777777-7777-4777-8777-777777777777'
+  const PERDIDA = '88888888-8888-4888-8888-888888888888'
+
+  it('la copia de la linea manda; sin copia vale la vigente; la etiqueta es la de la unidad de la presentacion', async () => {
+    const row: OrderRow = {
+      ...fila(ORIGINAL),
+      unitId: LITRO,
+      presentationLines: [
+        { presentationId: BOTELLA, packages: 9, packagingProductId: null, presentationContent: '300.0000' },
+        { presentationId: GARRAFA, packages: 2, packagingProductId: null, presentationContent: null },
+        { presentationId: PERDIDA, packages: 1, packagingProductId: null, presentationContent: '5.0000' },
+      ],
+    }
+    const unitsFindRefs = vi.fn(async () => [
+      { id: LITRO, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null },
+      { id: MILILITRO, name: 'Mililitro', symbol: 'ml', baseUnitId: LITRO, factor: '0.001' },
+    ])
+    const d = {
+      ...dobles(row),
+      presentations: {
+        findRefs: vi.fn(async () => [
+          { id: BOTELLA, name: 'Botella 300', content: '250.0000', unitId: MILILITRO },
+          { id: GARRAFA, name: 'Garrafa 5 L', content: '5.0000', unitId: LITRO },
+        ]),
+      } as unknown as PresentationCatalog,
+      units: { findRefs: unitsFindRefs } as unknown as UnitCatalog,
+    }
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.presentationLines.map((line) => [line.presentationContent, line.presentationUnitLabel])).toEqual([
+      ['300.0000', 'ml'],
+      ['5.0000', 'L'],
+      // La presentacion no vuelve: conserva la copia de la linea, pero sin unidad no hay etiqueta.
+      ['5.0000', null],
+    ])
+    expect(vista.unitLabel).toBe('L')
+    // La unidad del pedido y las de las presentaciones, en una sola llamada y sin repetir.
+    expect(unitsFindRefs).toHaveBeenCalledTimes(1)
+    expect(unitsFindRefs).toHaveBeenCalledWith([LITRO, MILILITRO], COMPANY)
+  })
+
+  it('toOrderView sin presentaciones resueltas deja contenido de la copia y unidad en null', () => {
+    const vista = toOrderView(
+      { ...fila(ORIGINAL), presentationLines: [{ presentationId: BOTELLA, packages: 1, packagingProductId: null, presentationContent: null }] },
+      new Map([[ORIGINAL, REF_ORIGINAL]]),
+    )
+
+    expect(vista.presentationLines[0]).toMatchObject({ presentationContent: null, presentationUnitLabel: null })
+  })
+})
+
+describe('la ficha lleva la imagen de la receta', () => {
+  it('la de la receta del pedido; sin receta en el catalogo, null', async () => {
+    const conImagen = dobles(fila(VERSION), [{ ...REF_VERSION, imageUrl: 'https://cdn.test/recetas/crema.png' }])
+
+    expect((await createGetOrder(conImagen)(ORDER_ID, ADMIN)).recipeImageUrl).toBe('https://cdn.test/recetas/crema.png')
+    expect((await createGetOrder(dobles(fila(VERSION), []))(ORDER_ID, ADMIN)).recipeImageUrl).toBeNull()
+  })
+})
+
+describe('getOrder — el importe y su parte de envases', () => {
+  it('la ficha devuelve ingredientsCost y packagingCost tal como vienen de la fila', async () => {
+    const conImporte = { ...fila(ORIGINAL), ingredientsCost: '30.0000', packagingCost: '4.5000' }
+
+    const vista = await createGetOrder(dobles(conImporte))(ORDER_ID, ADMIN)
+
+    expect(vista.ingredientsCost).toBe('30.0000')
+    expect(vista.packagingCost).toBe('4.5000')
+  })
+
+  it('sin importe, los dos salen null y no "0.0000"', async () => {
+    const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
+
+    expect(vista.ingredientsCost).toBeNull()
+    expect(vista.packagingCost).toBeNull()
+  })
+})
+
+// El coste real sale por la ficha, que exige `pedidos.consultar`, y por ninguna otra
+// puerta: sin el permiso, el rechazo llega antes que el repositorio y los catalogos.
+describe('QC-305 — getOrder: el coste real y quien lo ve (R24)', () => {
+  it('R24: con pedidos.consultar la ficha trae actualCost como cadena de 4 decimales, tal como viene de la fila', async () => {
+    const d = dobles({ ...fila(ORIGINAL), status: 'TERMINADO', ingredientsCost: '30.0000', actualCost: '27.1250' })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.actualCost).toBe('27.1250')
+    expect(vista.actualCost).toMatch(/^\d+\.\d{4}$/)
+    // El real no pisa el estimado: los dos viajan juntos y distintos.
+    expect(vista.ingredientsCost).toBe('30.0000')
+  })
+
+  it('R24: un pedido sin coste real sale con actualCost null, no "0.0000" ni ausente', async () => {
+    const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
+
+    expect(vista).toHaveProperty('actualCost')
+    expect(vista.actualCost).toBeNull()
+  })
+
+  for (const [etiqueta, actor] of [
+    ['un actor sin pedidos.consultar', { id: 'operador-1', companyId: COMPANY, permissions: ['asignaciones.consultar'] }],
+    ['un actor ausente', null],
+  ] as const) {
+    it(`R24: ${etiqueta} se rechaza como hoy, sin llegar al repositorio ni a los catalogos`, async () => {
+      const d = dobles({ ...fila(ORIGINAL), actualCost: '27.1250' })
+
+      await expect(createGetOrder(d)(ORDER_ID, actor)).rejects.toBeInstanceOf(UnauthorizedError)
+      expect(d.orders.findAliveById).not.toHaveBeenCalled()
+      expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
+      expect(d.findCustomerRefs).not.toHaveBeenCalled()
+    })
+  }
 })

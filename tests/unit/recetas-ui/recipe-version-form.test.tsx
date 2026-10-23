@@ -109,6 +109,7 @@ function versionDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [CHECKLIST_STEP],
     packingSteps: [],
+    conditioningSteps: [],
     lines: VERSION_LINES,
     tools: [],
     original: { id: ORIGINAL_ID, name: 'Jabón' },
@@ -211,9 +212,13 @@ describe('RecipeVersionForm — guardar habilitado solo con 100,00 % y todo con 
     renderCreate();
     await user.type(screen.getByTestId('recipe-version-field-name'), 'Nueva');
 
-    await user.click(screen.getByTestId('recipe-line-add-1'));
+    // Al 100 % el «+» está apagado: se libera el 40 %, se añade la línea y se le da ese 40 %
+    // sin elegir producto.
+    await user.click(screen.getByTestId('recipe-line-remove-1'));
+    await user.click(screen.getByTestId('recipe-line-add-0'));
+    await user.type(screen.getByTestId('recipe-line-percentage-1'), '40');
 
-    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(3);
+    expect(screen.getAllByTestId('recipe-line-row')).toHaveLength(2);
     expect(screen.getByTestId('recipe-lines-sum')).toHaveAttribute('data-complete', 'true');
     expect(screen.getByTestId('recipe-version-form-submit')).toBeDisabled();
     screen.getByTestId('recipe-version-field-name').focus();
@@ -277,6 +282,39 @@ describe('RecipeVersionForm — guardado con éxito', () => {
   });
 });
 
+describe('RecipeVersionForm — pie fijo (R36)', () => {
+  it('R36 — el pie va dentro del <form>, pegado abajo con el margen seguro, con «Cancelar» y «Guardar» de 44 px', () => {
+    renderEdit();
+
+    const form = screen.getByTestId('recipe-version-form');
+    const footer = screen.getByTestId('recipe-version-form-footer');
+    expect(footer.tagName).toBe('FOOTER');
+    expect(footer).toHaveAttribute('data-slot', 'form-footer-bar');
+    expect(form.contains(footer)).toBe(true);
+    expect(footer).toHaveClass(
+      'sticky',
+      'bottom-0',
+      'border-t',
+      'pb-[calc(14px+env(safe-area-inset-bottom))]',
+      '-mx-4',
+      '-mb-6',
+      'md:-mx-7',
+      'md:-mb-8',
+    );
+
+    const cancelar = within(footer).getByTestId('recipe-version-form-cancel');
+    const guardar = within(footer).getByTestId('recipe-version-form-submit');
+    expect(cancelar).toHaveTextContent('Cancelar');
+    expect(guardar).toHaveTextContent('Guardar');
+    expect(guardar).toHaveAttribute('type', 'submit');
+    expect((guardar as HTMLButtonElement).form).toBe(form);
+    expect(cancelar.compareDocumentPosition(guardar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const boton of [cancelar, guardar]) {
+      expect(boton).toHaveClass('min-h-11', 'min-w-11');
+    }
+  });
+});
+
 describe('RecipeVersionForm — cancelar', () => {
   it('R14 — «Cancelar» es un enlace a la ficha de la original y no invoca nada', async () => {
     const user = setupUser();
@@ -336,7 +374,13 @@ describe('RecipeVersionForm — errores del guardado', () => {
       const region = await screen.findByTestId('recipe-version-form-error');
       expect(region).toHaveAttribute('role', 'alert');
       expect(within(region).getByTestId('recipe-version-form-error-message')).toHaveTextContent(message);
-      expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      if (code === 'invalid_input') {
+        // `invalid_input` no se pinta: el mensaje ya dice qué hacer.
+        expect(within(region).queryByTestId('recipe-version-form-error-code')).toBeNull();
+        expect(region).not.toHaveTextContent('invalid_input');
+      } else {
+        expect(within(region).getByTestId('recipe-version-form-error-code')).toHaveTextContent(code);
+      }
       expect(screen.queryByTestId('recipe-version-error-name')).toBeNull();
       expect(screen.getByTestId('recipe-version-field-name')).toHaveValue('Escrito a mano');
       expect(percentageValues()).toEqual(['70,00', '30,00']);
@@ -390,7 +434,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit();
 
     const inherited = screen.getByTestId('recipe-version-inherited');
-    expect(inherited).toHaveTextContent('De la receta original');
+    expect(inherited).toHaveTextContent('De la fórmula original');
     const image = within(inherited).getByTestId('recipe-version-inherited-image');
     expect(image.tagName).toBe('IMG');
     expect(image).toHaveAttribute('src', 'https://cdn.example.test/jabon.png');
@@ -441,7 +485,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit(versionDetail({ steps: [], stepCount: 0 }));
 
     expect(screen.getByTestId('recipe-version-steps-empty')).toHaveTextContent(
-      'La receta original no tiene pasos.',
+      'La fórmula original no tiene pasos.',
     );
     expect(screen.queryByTestId('recipe-version-inherited-steps')).toBeNull();
   });
@@ -477,7 +521,7 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     renderEdit(versionDetail({ packingSteps: [] }));
 
     expect(screen.getByTestId('recipe-version-packing-steps-empty')).toHaveTextContent(
-      'La receta original no tiene pasos de envasado.',
+      'La fórmula original no tiene pasos de envasado.',
     );
     expect(screen.queryByTestId('recipe-version-inherited-packing-steps')).toBeNull();
     expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
@@ -489,6 +533,58 @@ describe('RecipeVersionForm — lo heredado de la original', () => {
     expect(screen.queryByTestId('recipe-version-inherited-packing-steps')).toBeNull();
     expect(screen.queryByTestId('recipe-version-packing-steps-empty')).toBeNull();
     expect(screen.queryByTestId('recipe-packing-steps-field')).toBeNull();
+  });
+
+  it('R16 — los pasos de acondicionamiento heredados se leen dentro de un contenedor inert, sin controles ni switches', async () => {
+    const user = setupUser();
+    renderEdit(
+      versionDetail({
+        conditioningSteps: [
+          { ...PACKING_STEP, requiresEvidence: true, requiresAssignment: true },
+          { ...PACKING_PLAIN_STEP, requiresAssignment: true },
+        ],
+      }),
+    );
+
+    const conditioning = screen.getByTestId('recipe-version-inherited-conditioning-steps');
+    expect(conditioning).toHaveAttribute('inert');
+    expect(conditioning).toHaveAttribute('aria-readonly', 'true');
+    expect(within(conditioning).getByText('Etiquetar el envase')).toBeInTheDocument();
+    expect(within(conditioning).getByText('Etiquetar el envase').closest('strong')).not.toBeNull();
+    expect(within(conditioning).getByText('Sellar la tapa')).toBeInTheDocument();
+    expect(within(conditioning).getByText('Lote impreso')).toBeInTheDocument();
+    expect(
+      within(conditioning).getByTestId('recipe-version-conditioning-step-0-evidence'),
+    ).toHaveTextContent('Requiere evidencia');
+    expect(
+      within(conditioning).getByTestId('recipe-version-conditioning-step-0-assignment'),
+    ).toHaveTextContent('Asignación requerida');
+    expect(within(conditioning).queryByTestId('recipe-version-conditioning-step-1-evidence')).toBeNull();
+
+    expect(
+      conditioning.querySelector('[contenteditable], input:not([type="checkbox"]), textarea, select'),
+    ).toBeNull();
+    expect(within(conditioning).queryByRole('switch')).toBeNull();
+    expect(within(conditioning).queryByRole('button')).toBeNull();
+    expect(within(conditioning).queryByRole('toolbar')).toBeNull();
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByTestId('recipe-conditioning-steps-field')).toBeNull();
+    expect(screen.queryByTestId('recipe-version-conditioning-steps-empty')).toBeNull();
+
+    const checkbox = within(conditioning).getByRole('checkbox');
+    await user.click(checkbox);
+    expect(checkbox).toHaveAttribute('aria-checked', 'false');
+    expect(updateVersionMock).not.toHaveBeenCalled();
+  });
+
+  it('R16 — sin pasos de acondicionamiento en la original se muestra el aviso y ningún bloque', () => {
+    renderEdit(versionDetail({ conditioningSteps: [] }));
+
+    expect(screen.getByTestId('recipe-version-conditioning-steps-empty')).toHaveTextContent(
+      'La fórmula original no tiene pasos de acondicionamiento.',
+    );
+    expect(screen.queryByTestId('recipe-version-inherited-conditioning-steps')).toBeNull();
+    expect(screen.queryByTestId('recipe-conditioning-steps-field')).toBeNull();
   });
 
   it('R23 — la versión por revisar lleva la marca «Por revisar»', () => {

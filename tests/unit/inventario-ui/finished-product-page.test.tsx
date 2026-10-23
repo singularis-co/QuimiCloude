@@ -3,12 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FinishedProductDetailPage from '@/app/(private)/inventario/producto-terminado/[id]/page';
 import {
+  DIRECT_DELIVERY_OPEN_TESTID,
   TYPE_PARAM,
   parseProductListParams,
   productListHref,
 } from '@/app/(private)/inventario/components';
+import {
+  ROLE_ADMINISTRADOR,
+  ROLE_OPERADOR,
+  SEED_ROLE_PERMISSIONS,
+  type SessionUser,
+} from '@/lib/modules/identity';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { FinishedProductResult } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
+import type { DirectDeliverySurplusResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { INVENTORY_ROUTE } from '@/lib/shared/routes';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
@@ -17,11 +25,20 @@ import {
   finishedProductDetail,
 } from '../../fixtures/finished-product-detail';
 
-const { requirePagePermissionMock, getFinishedProductActionMock, listMock, routerMock } = vi.hoisted(
+const {
+  requirePagePermissionMock,
+  getFinishedProductActionMock,
+  listMock,
+  routerMock,
+  getSessionUserMock,
+  listSurplusMock,
+} = vi.hoisted(
   () => ({
     requirePagePermissionMock: vi.fn<(permission: string) => Promise<void>>(),
     getFinishedProductActionMock: vi.fn<(id: string) => Promise<FinishedProductResult>>(),
     listMock: vi.fn(),
+    getSessionUserMock: vi.fn(),
+    listSurplusMock: vi.fn<(productIds: readonly string[]) => Promise<DirectDeliverySurplusResult>>(),
     routerMock: {
       push: vi.fn(),
       replace: vi.fn(),
@@ -37,19 +54,38 @@ vi.mock('@/lib/modules/identity/adapters/driving/require-page-permission', () =>
   requirePagePermission: requirePagePermissionMock,
 }));
 
+// La sesion decide si existe el tab de costos (solo el Administrador). Por defecto, Administrador.
+vi.mock('@/lib/composition', () => ({
+  identity: { getSessionUser: getSessionUserMock },
+  observabilidad: { readRequestIdHeader: vi.fn(async () => 'req-1') },
+}));
+
+const ADMINISTRADOR = { permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] };
+const OPERADOR = { permissions: SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] };
+
 vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
   getFinishedProductAction: getFinishedProductActionMock,
   listFinishedProductBatchesAction: listMock,
   listFinishedProductMovementsAction: listMock,
   listFinishedProductDeliveriesAction: listMock,
   listFinishedProductCostsAction: listMock,
+  listFinishedProductDistributionAction: listMock,
   listProducedProductsAction: listMock,
+}));
+
+// 2026-10-16 (QC-288): la cabecera lee el permiso (de la sesion de arriba) y el excedente para pintar «Entregar».
+vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
+  listDirectDeliverySurplusAction: listSurplusMock,
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => routerMock,
 }));
+
+function usuario(permissions: readonly string[]): SessionUser {
+  return { id: 'u-1', username: 'ana', displayName: 'Ana', roleName: 'Ventas', permissions };
+}
 
 type Query = Record<string, string | undefined>;
 
@@ -68,7 +104,9 @@ const FINISHED_LIST_HREF = productListHref(
 beforeEach(() => {
   vi.clearAllMocks();
   requirePagePermissionMock.mockResolvedValue(undefined);
+  getSessionUserMock.mockResolvedValue(ADMINISTRADOR);
   getFinishedProductActionMock.mockResolvedValue({ status: 'success', data: finishedProductDetail() });
+  listSurplusMock.mockResolvedValue({ status: 'success', data: {} });
 });
 
 afterEach(cleanup);
@@ -119,11 +157,46 @@ describe('pagina de la ficha de producto terminado', () => {
     expect(listMock).not.toHaveBeenCalled();
   });
 
-  it('R8 — el exito pinta el nombre del producto y las siete pestañas', async () => {
+  it('R8, R26 — el exito pinta el nombre del producto y las ocho pestañas', async () => {
     await renderPage();
 
     expect(screen.getByTestId('finished-product-name')).toHaveTextContent(finishedProductDetail().name);
-    expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(7);
+    expect(within(screen.getByRole('tablist')).getAllByRole('tab')).toHaveLength(8);
+  });
+
+  it('el tab «Costo de produccion» lo ve el Administrador y lo abre con `?tab=costo`', async () => {
+    listMock.mockResolvedValue({
+      status: 'success',
+      data: { items: [], page: 1, pageSize: 10, total: 0, totalPages: 0 },
+    });
+    await renderPage({ tab: 'costo' });
+
+    expect(screen.getByTestId('finished-product-tab-costo')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('finished-product-general')).toBeNull();
+  });
+
+  it('sin permiso de costos falta el tab, y `?tab=costo` cae al tab por defecto sin pedir costos', async () => {
+    getSessionUserMock.mockResolvedValue(OPERADOR);
+
+    await renderPage({ tab: 'costo' });
+
+    const pestanas = within(screen.getByRole('tablist')).getAllByRole('tab');
+    expect(pestanas).toHaveLength(7);
+    expect(screen.queryByTestId('finished-product-tab-costo')).toBeNull();
+    expect(screen.getByTestId('finished-product-tab-general')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('finished-product-general')).toBeInTheDocument();
+    expect(screen.queryByTestId('finished-product-list-skeleton')).toBeNull();
+    expect(listMock).not.toHaveBeenCalled();
+  });
+
+  it('sin sesion, igual: falla cerrado', async () => {
+    getSessionUserMock.mockResolvedValue(null);
+
+    await renderPage({ tab: 'costo' });
+
+    expect(screen.queryByTestId('finished-product-tab-costo')).toBeNull();
+    expect(screen.getByTestId('finished-product-general')).toBeInTheDocument();
+    expect(listMock).not.toHaveBeenCalled();
   });
 
   it('R10 — General muestra nombre, imagen, presentacion con su contenido, unidad base y alerta', async () => {
@@ -197,5 +270,83 @@ describe('pagina de la ficha de producto terminado', () => {
     expect(screen.queryByTestId('finished-product-stock-packages')).toBeNull();
     expect(screen.getByTestId('finished-product-stock-packages-empty')).toHaveTextContent(EMPTY_MARK);
     expect(screen.queryByTestId('finished-product-stock-unpackaged')).toBeNull();
+  });
+});
+
+describe('«Entregar» en la cabecera de la ficha', () => {
+  function cabecera(): HTMLElement {
+    const encabezado = screen.getByTestId('finished-product-name').closest('[data-slot="page-header"]');
+    expect(encabezado).not.toBeNull();
+    return encabezado as HTMLElement;
+  }
+
+  it.each(['general', 'stock'])(
+    'R5 — con entregas.modificar y excedente > 0, la cabecera muestra «Entregar» (tab %s)',
+    async (tab) => {
+      getSessionUserMock.mockResolvedValue(usuario(['inventario.consultar', 'entregas.modificar']));
+      listSurplusMock.mockResolvedValue({ status: 'success', data: { [FINISHED_PRODUCT_ID]: 3 } });
+
+      await renderPage({ tab });
+
+      const boton = within(cabecera()).getByTestId(DIRECT_DELIVERY_OPEN_TESTID);
+      expect(boton).toHaveTextContent('Entregar');
+      expect(within(screen.getByRole('tablist')).queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+      expect(listSurplusMock).toHaveBeenCalledExactlyOnceWith([FINISHED_PRODUCT_ID]);
+    },
+  );
+
+  it('R5 — con excedente cero el botón no existe en el DOM', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(['entregas.modificar']));
+    listSurplusMock.mockResolvedValue({ status: 'success', data: { [FINISHED_PRODUCT_ID]: 0 } });
+
+    await renderPage();
+
+    expect(screen.getByTestId('finished-product-name')).toBeInTheDocument();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+  });
+
+  it('R5 — sin el producto en la respuesta el botón no existe', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(['entregas.modificar']));
+
+    await renderPage();
+
+    expect(screen.queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+  });
+
+  it('R5 — si el excedente no se pudo leer (error o rechazo) el botón no existe y la ficha se pinta', async () => {
+    getSessionUserMock.mockResolvedValue(usuario(['entregas.modificar']));
+    listSurplusMock.mockResolvedValueOnce(FINISHED_PRODUCT_ERROR_STATES.unauthorized);
+
+    await renderPage();
+    expect(screen.getByTestId('finished-product-name')).toBeInTheDocument();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+    cleanup();
+
+    listSurplusMock.mockRejectedValueOnce(new Error('caida'));
+    await renderPage();
+    expect(screen.getByTestId('finished-product-name')).toBeInTheDocument();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+  });
+
+  it('R5 — sin entregas.modificar o sin sesión, ni se lee el excedente ni existe el botón', async () => {
+    getSessionUserMock.mockResolvedValueOnce(usuario(['inventario.consultar', 'entregas.anular']));
+    await renderPage();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+    cleanup();
+
+    getSessionUserMock.mockResolvedValueOnce(null);
+    await renderPage();
+    expect(screen.queryByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeNull();
+
+    expect(listSurplusMock).not.toHaveBeenCalled();
+  });
+
+  it('R5 — el permiso decide, no el rol: un rol sin nombre de ventas con el permiso ve el botón', async () => {
+    getSessionUserMock.mockResolvedValue({ ...usuario(['entregas.modificar']), roleName: 'Bodega' });
+    listSurplusMock.mockResolvedValue({ status: 'success', data: { [FINISHED_PRODUCT_ID]: 1 } });
+
+    await renderPage();
+
+    expect(screen.getByTestId(DIRECT_DELIVERY_OPEN_TESTID)).toBeInTheDocument();
   });
 });

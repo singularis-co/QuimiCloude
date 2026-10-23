@@ -234,13 +234,15 @@ type ColumnasDeArchivo = {
 };
 
 const sinAcciones = () => null;
+const sinMenu = () => ({ items: [], triggerLabel: '' });
 
 const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   {
     archivo: 'order-columns.tsx',
     construir: async () =>
-      buildOrderColumns({ recipes: { items: [], totalPages: 1 }, units: [], bridge: null }),
-    esperadas: ['Cantidad', 'Fecha de solicitud'],
+      buildOrderColumns({ units: [], bridge: null }),
+    // Los dos costes son cifras, como el «Costo unitario» de inventario.
+    esperadas: ['Fecha de solicitud', 'Costo estimado', 'Costo real'],
   },
   {
     archivo: 'customer-columns.tsx',
@@ -249,8 +251,9 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   },
   {
     archivo: 'recipe-columns.tsx',
-    construir: async () => buildRecipeColumns({ rowActions: sinAcciones }),
-    esperadas: ['Creado', 'Actualizado'],
+    construir: async () => buildRecipeColumns({ menu: sinMenu }),
+    // El tablero Fórmulas pinta también «Pasos» en Mono, alineado al final.
+    esperadas: ['Pasos', 'Creado', 'Actualizado'],
   },
   {
     archivo: 'catalog-columns.tsx',
@@ -263,12 +266,12 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
   },
   {
     archivo: 'product-columns.tsx',
-    construir: async () => buildProductColumns({ rowActions: sinAcciones }),
-    esperadas: ['Existencia', 'Alerta de cantidad', 'Reservado', 'Disponible'],
+    construir: async () => buildProductColumns({ menu: sinMenu, showCost: true }),
+    esperadas: ['Existencia', 'Disponible', 'Reservado', 'Alerta de cantidad', 'Costo unitario'],
   },
   {
     archivo: 'finished-stock-columns.tsx',
-    construir: async () => buildFinishedStockColumns({ onToggle: vi.fn(), lineActions: sinAcciones }),
+    construir: async () => buildFinishedStockColumns({ onToggle: vi.fn(), menu: sinMenu }),
     esperadas: ['Existencia', 'Alerta de cantidad'],
   },
   {
@@ -300,7 +303,7 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
           typeof import('@/app/(private)/asignacion/components/packing-orders-columns')
         >('@/app/(private)/asignacion/components/packing-orders-columns')
       ).buildPackingOrdersColumns(),
-    esperadas: ['Envases'],
+    esperadas: [],
   },
   {
     archivo: 'execution-trace-columns.tsx',
@@ -361,8 +364,32 @@ describe('lista cerrada de columnas en Plex Mono', () => {
   });
 });
 
+describe('alineación de las cifras de inventario', () => {
+  function alineaciones(columnas: readonly { id: string; align: string }[]) {
+    return Object.fromEntries(columnas.map((columna) => [columna.id, columna.align]));
+  }
+
+  it('R6: en product-columns.tsx las cifras, «Costo» incluido, van a la derecha y «Tipo» y «Presentación» a la izquierda', () => {
+    const align = alineaciones(buildProductColumns({ menu: sinMenu, showType: true, showCost: true }));
+    for (const id of ['stock', 'averageUnitCost', 'qtyAlert', 'reserved', 'available']) {
+      expect(align[id], id).toBe('end');
+    }
+    expect(align.type).toBe('start');
+    expect(align.presentationName).toBe('start');
+  });
+
+  it('R6: en finished-stock-columns.tsx la existencia y la alerta van a la derecha y «Presentación» a la izquierda', () => {
+    const align = alineaciones(
+      buildFinishedStockColumns({ onToggle: vi.fn(), menu: sinMenu }),
+    );
+    expect(align.stock).toBe('end');
+    expect(align.qtyAlert).toBe('end');
+    expect(align.presentationName).toBe('start');
+  });
+});
+
 describe('panel de lotes con la nueva marca', () => {
-  it('R12: lote, cantidades y fechas del panel van en Mono con cifras tabulares, y sus etiquetas no', () => {
+  it('R12: lote, cantidades y fechas del panel van en celdas Mono con cifras tabulares, y sus cabeceras no', () => {
     const lote: ProductBatchView = {
       id: 'b1',
       lot: 'L-001',
@@ -384,14 +411,16 @@ describe('panel de lotes con la nueva marca', () => {
       'product-batch-reserved',
       'product-batch-available',
     ]) {
-      const dd = screen.getByTestId(testId);
-      expect(dd.tagName, testId).toBe('DD');
-      expect(dd, testId).toHaveClass('font-mono', 'tabular-nums');
+      const valor = within(screen.getByTestId('data-table-row-b1')).getByTestId(testId);
+      expect(valor.tagName, testId).not.toBe('DD');
+      expect(valor.closest('td'), testId).toHaveClass('font-mono', 'tabular-nums');
     }
-    const etiquetas = screen.getByTestId('product-batches-panel').querySelectorAll('dt');
-    expect(etiquetas).toHaveLength(6);
-    for (const dt of etiquetas) {
-      expect(dt).not.toHaveClass('font-mono');
+    const panel = screen.getByTestId('product-batches-panel');
+    expect(panel.querySelector('dl, dt, dd')).toBeNull();
+    const cabeceras = within(panel).getAllByRole('columnheader');
+    expect(cabeceras).toHaveLength(6);
+    for (const th of cabeceras) {
+      expect(th).not.toHaveClass('font-mono');
     }
   });
 });

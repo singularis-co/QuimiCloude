@@ -7,6 +7,8 @@ import { DataTable, type DataTableColumn } from '@/components/shared/data-table'
 import type { FinishedProductBatchRow, Page } from '@/lib/modules/inventario';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { BatchEvidenceButton } from './batch-evidence-button';
+import { BATCH_EVIDENCE_TEXTS } from './batch-evidence-dialog';
 import {
   FINISHED_PRODUCT_TABLE_TEXTS,
   finishedProductPageHref,
@@ -17,8 +19,39 @@ import { packagedText, quantityText } from './finished-product-stock';
 export const FINISHED_PRODUCT_BATCHES_TABLE_ID = 'inventario-producto-terminado-lotes';
 export const WITHOUT_ORDER_LABEL = 'Sin pedido';
 
-function batchColumns(unitLabel: string | null): readonly DataTableColumn<FinishedProductBatchRow>[] {
-  return [
+/** Fotos por pedido de origen; sin el mapa, la columna no existe. */
+export type EvidenceCounts = ReadonlyMap<string, number>;
+
+function evidenceColumn(evidenceCounts: EvidenceCounts): DataTableColumn<FinishedProductBatchRow> {
+  return {
+    id: 'evidence',
+    label: BATCH_EVIDENCE_TEXTS.column,
+    align: 'start',
+    cell: (row) => {
+      const photoCount = row.orderId === null ? 0 : (evidenceCounts.get(row.orderId) ?? 0);
+      return (
+        <span data-testid="finished-product-batch-evidence">
+          {row.orderId !== null && photoCount > 0 ? (
+            <BatchEvidenceButton
+              lot={row.lot}
+              orderId={row.orderId}
+              orderNumberText={row.orderNumberText ?? EMPTY_MARK}
+              photoCount={photoCount}
+            />
+          ) : (
+            EMPTY_MARK
+          )}
+        </span>
+      );
+    },
+  };
+}
+
+function batchColumns(
+  unitLabel: string | null,
+  evidenceCounts: EvidenceCounts | undefined,
+): readonly DataTableColumn<FinishedProductBatchRow>[] {
+  const columns: DataTableColumn<FinishedProductBatchRow>[] = [
     {
       id: 'lot',
       label: 'Lote',
@@ -99,22 +132,28 @@ function batchColumns(unitLabel: string | null): readonly DataTableColumn<Finish
       ),
     },
   ];
+  return evidenceCounts === undefined ? columns : [...columns, evidenceColumn(evidenceCounts)];
 }
 
 export type FinishedProductBatchesTableProps = {
   readonly productId: string;
   readonly page: Page<FinishedProductBatchRow>;
   readonly unitLabel: string | null;
+  readonly evidenceCounts?: EvidenceCounts;
 };
 
 export function FinishedProductBatchesTable({
   productId,
   page,
   unitLabel,
+  evidenceCounts,
 }: FinishedProductBatchesTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const columns = useMemo(() => batchColumns(unitLabel), [unitLabel]);
+  const columns = useMemo(
+    () => batchColumns(unitLabel, evidenceCounts),
+    [unitLabel, evidenceCounts],
+  );
 
   return (
     <div data-testid="finished-product-lotes" aria-busy={isPending}>

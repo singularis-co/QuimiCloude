@@ -19,8 +19,21 @@ import {
   findLiveWhatsappConnection,
   findLiveWhatsappConnectionById,
   insertWhatsappConnection,
+  recordWhatsappWebhookHandshake,
   updateLiveWhatsappConnection,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-connection-prisma'
+import {
+  applyWhatsappTemplateSync,
+  applyWhatsappTemplateWebhookUpdates,
+  findLiveWhatsappTemplateById,
+  findLiveWhatsappTemplateByNameAndLanguage,
+  insertCreatedWhatsappTemplate,
+  listLiveWhatsappTemplates,
+  listWhatsappTemplatesForSync,
+  markWhatsappTemplateDeleted,
+  replaceWhatsappTemplateVariables,
+  setWhatsappTemplateEnabled,
+} from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-template-prisma'
 import { createCreateWhatsappConnection } from '@/lib/modules/integraciones/domain/create-whatsapp-connection'
 import {
   WhatsappConnectionExistsError,
@@ -185,6 +198,7 @@ describe('R2: la empresa sale del ambito, nunca de la fila', () => {
       companyId: a.companyId,
       createdById: undefined,
       lastWebhookAt: null,
+      templatesSyncedAt: null,
     })
   })
 })
@@ -344,10 +358,23 @@ describe('R9: a la base solo llegan valores cifrados y el resumen del verify tok
       findLiveById: findLiveWhatsappConnectionById,
       create: insertWhatsappConnection,
       update: updateLiveWhatsappConnection,
+      recordWebhookHandshake: recordWhatsappWebhookHandshake,
     }
     const create = createCreateWhatsappConnection({
       connections,
       graph: whatsappGraphClientCanned,
+      templates: {
+        listLive: listLiveWhatsappTemplates,
+        findLiveById: findLiveWhatsappTemplateById,
+        findLiveByNameAndLanguage: findLiveWhatsappTemplateByNameAndLanguage,
+        insertCreated: insertCreatedWhatsappTemplate,
+        replaceVariables: replaceWhatsappTemplateVariables,
+        setEnabled: setWhatsappTemplateEnabled,
+        markDeleted: markWhatsappTemplateDeleted,
+        listForSync: listWhatsappTemplatesForSync,
+        applySync: applyWhatsappTemplateSync,
+        applyWebhookUpdates: applyWhatsappTemplateWebhookUpdates,
+      },
       cipher: secretCipherAesGcm,
       digest: secretDigestSha256,
       random: randomSourceNode,

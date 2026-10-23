@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recorrido con pasos de acondicionamiento en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="RecorridoPasosAcondicionamiento" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Recorrido · responsables por paso (QC-299)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd>Recorrido de QC-283 (<span class="mono">tl · ev · ev-dot · rm-meta · person</span>) · anotaciones de Avanzar con «Paso N de M»</dd>
+      <dt>Nuevo</dt><dd>Línea «Responsables» bajo el Avanzar de un paso con asignación · anotación «Cambio de responsables» con antes → después (registro nuevo, el anterior no se edita) · conteo de fotos de evidencia del paso</dd>
+      <dt>Librerías</dt><dd><span class="mono">lucide-react</span> · sin librería nueva</dd>
+      <dt>Escritorio</dt><dd>Línea de tiempo del tramo de acondicionamiento; el resto del recorrido no cambia</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio</dd>
+      <dt>Teléfono</dt><dd>Los responsables saltan de línea · antes → después en dos líneas si no caben</dd>
+      <dt>Animación</dt><dd>Entrada escalonada de las anotaciones, como QC-283</dd>
+      <dt>Por confirmar</dt><dd>Nada</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -168,7 +168,9 @@ async function sembrarLote(
   empresa: Empresa,
   productId: string,
   presentationId: string,
+  extras: { readonly expiryDate?: string | null } = {},
 ): Promise<string> {
+  const expiryDate = extras.expiryDate ?? null;
   const { id } = await prisma.productBatch.create({
     data: {
       productId,
@@ -177,6 +179,7 @@ async function sembrarLote(
       unitCost: '3.0000',
       lot: `L-${randomUUID()}`,
       purchaseDate: new Date('2026-09-01T00:00:00Z'),
+      expiryDate: expiryDate === null ? null : new Date(`${expiryDate}T00:00:00Z`),
       createdBy: empresa.userId,
       updatedBy: empresa.userId,
       // El disparador exige que coincida con la empresa de su producto y su presentacion.
@@ -904,6 +907,72 @@ describe('R25 — marcar la empresa como borrada no toca su inventario', () => {
       expect(desdeA.items.map((p) => p.id)).not.toContain(B.productos[0]);
     } finally {
       await prisma.company.update({ where: { id: B.companyId }, data: { deletedAt: null } });
+    }
+  });
+});
+
+describe('nextExpiryDate — el vencimiento de A no lo mueven los lotes de B', () => {
+  // Marcador propio: `consulta()` busca `MARCA`, asi que estos productos no alteran los recuentos
+  // de los casos de arriba.
+  const VENCE = `v${token().slice(0, 12)}`;
+
+  it('un lote de B con fecha anterior y existencia, en un producto de B, no entra en el de A', async () => {
+    const propio = await sembrarProducto(A, `${VENCE} Producto A con vencimiento`);
+    await sembrarLote(A, propio, A.presentaciones[0] ?? '', { expiryDate: '2027-05-20' });
+    const ajeno = await sembrarProducto(B, `${VENCE} Producto B con vencimiento`);
+    await sembrarLote(B, ajeno, B.presentaciones[0] ?? '', { expiryDate: '2026-10-20' });
+
+    const desdeA = await listAliveProducts(consulta({ search: VENCE }), ambitoDe(A));
+    expect(desdeA.items.map((p) => [p.id, p.nextExpiryDate])).toEqual([[propio, '2027-05-20']]);
+
+    // Control positivo: la fecha de B existe y su empresa la ve.
+    const desdeB = await listAliveProducts(consulta({ search: VENCE }), ambitoDe(B));
+    expect(desdeB.items.map((p) => [p.id, p.nextExpiryDate])).toEqual([[ajeno, '2026-10-20']]);
+  });
+
+  it('un lote de B colgado del producto de A (lo que R22 impide en la base) tampoco lo mueve', async () => {
+    // `product_batches_check_company_trigger` (QC-49 R22) rechaza un lote cuya empresa difiere de
+    // la de su producto, asi que por la via normal el escenario no existe y el `batchCompanyScope`
+    // de `findNextExpiryDateByProduct` es defensa en profundidad. Para ejercitarlo se siembra la
+    // fila con los disparadores apagados SOLO en esta transaccion (`SET LOCAL`), como haria una
+    // fila heredada o una restauracion a mano.
+    const propio = await sembrarProducto(A, `${VENCE} Producto A con lote colado`);
+    await sembrarLote(A, propio, A.presentaciones[0] ?? '', { expiryDate: '2027-08-01' });
+
+    const colado = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL session_replication_role = 'replica'`;
+      return tx.productBatch.create({
+        data: {
+          productId: propio,
+          presentationId: A.presentaciones[0] ?? '',
+          stock: 5,
+          unitCost: '1.0000',
+          lot: `L-${randomUUID()}`,
+          purchaseDate: new Date('2026-09-01T00:00:00Z'),
+          expiryDate: new Date('2026-10-01T00:00:00Z'),
+          createdBy: B.userId,
+          updatedBy: B.userId,
+          companyId: B.companyId,
+        },
+        select: { id: true },
+      });
+    });
+
+    try {
+      // Sin esto, un alta rechazada en silencio dejaria verde lo de abajo: la fila existe, es de B,
+      // cuelga del producto de A, tiene existencia y una fecha anterior a la de A.
+      const fila = await prisma.productBatch.findUniqueOrThrow({ where: { id: colado.id } });
+      expect(fila.companyId).toBe(B.companyId);
+      expect(fila.productId).toBe(propio);
+      expect(fila.stock.toString()).toBe('5');
+      expect(fila.expiryDate?.toISOString().slice(0, 10)).toBe('2026-10-01');
+
+      const desdeA = await listAliveProducts(consulta({ search: VENCE }), ambitoDe(A));
+      expect(desdeA.items.find((p) => p.id === propio)?.nextExpiryDate).toBe('2027-08-01');
+    } finally {
+      // Antes del `afterAll`: borra los productos de A antes que los lotes de B, y esta fila lo
+      // impediria por FK.
+      await prisma.productBatch.delete({ where: { id: colado.id } });
     }
   });
 });

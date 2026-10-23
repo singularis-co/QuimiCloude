@@ -21,7 +21,7 @@ export type TableSkeletonProps = {
   readonly cellClassName?: string;
 };
 
-export const TABLE_SKELETON_IMAGE_CLASS_NAME = 'size-[60px] shrink-0';
+export const TABLE_SKELETON_IMAGE_CLASS_NAME = 'size-[80px] shrink-0';
 
 export function TableSkeleton({
   columns,

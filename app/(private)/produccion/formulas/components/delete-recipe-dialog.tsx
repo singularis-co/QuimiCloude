@@ -13,7 +13,9 @@ import {
   listRecipeVersionsAction,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 
-const DELETE_SUCCESS = 'Receta borrada.';
+export const DELETE_RECIPE_ICON_TESTID = 'delete-recipe-icon';
+
+const DELETE_SUCCESS = 'Fórmula borrada.';
 const DELETE_VERSION_SUCCESS = 'Versión borrada.';
 
 type DeleteKind = 'recipe' | 'version';
@@ -32,6 +34,8 @@ function versionsNotice(count: number): string | null {
 export type DeleteRecipeDialogProps = {
   readonly recipe: { readonly id: string; readonly name: string };
   readonly kind?: DeleteKind;
+  /** Nombre accesible del disparador propio; por defecto «Borrar <nombre>». */
+  readonly triggerLabel?: string;
   /** Con `open` no se monta el disparador propio: la apertura la decide quien lo pasa. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
@@ -40,6 +44,7 @@ export type DeleteRecipeDialogProps = {
 export function DeleteRecipeDialog({
   recipe,
   kind = 'recipe',
+  triggerLabel,
   open: controlledOpen,
   onOpenChange,
 }: DeleteRecipeDialogProps) {
@@ -136,7 +141,7 @@ export function DeleteRecipeDialog({
                 <Button
                   variant="ghost"
                   touch
-                  aria-label={`Borrar ${recipe.name}`}
+                  aria-label={triggerLabel ?? `Borrar ${recipe.name}`}
                   data-testid="recipe-delete-open"
                 />
               ),
@@ -144,7 +149,7 @@ export function DeleteRecipeDialog({
             }
       }
       texts={{
-        title: isVersion ? 'Borrar versión' : 'Borrar receta',
+        title: isVersion ? 'Borrar versión' : 'Borrar fórmula',
         description: (
           <>
             {isVersion
@@ -168,6 +173,7 @@ export function DeleteRecipeDialog({
         confirm: 'delete-recipe-confirm',
         error: 'delete-recipe-error',
       }}
+      icon={{ glyph: Trash2Icon, tone: 'danger', testId: DELETE_RECIPE_ICON_TESTID }}
       submit={{ kind: 'transition', onConfirm: handleConfirm }}
       isPending={isPending}
       announceBusy={false}

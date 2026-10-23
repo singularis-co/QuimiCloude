@@ -9,7 +9,13 @@ import { z } from 'zod';
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
-import { composePackingOrderRows, type PackingOrderDetail, type PackingOrderViewDeps } from './packing-order-view';
+import {
+  composePackingFinishView,
+  composePackingOrderRows,
+  type PackingFinishViewDeps,
+  type PackingOrderDetail,
+  type PackingOrderViewDeps,
+} from './packing-order-view';
 
 import type { EvidenceStorage } from '../ports/evidence-storage';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
@@ -22,7 +28,7 @@ const getPackingOrderSchema = z.strictObject({
   orderId: z.string().uuid(),
 });
 
-export type GetPackingOrderDeps = PackingOrderViewDeps & {
+export type GetPackingOrderDeps = PackingOrderViewDeps & PackingFinishViewDeps & {
   readonly orders: OrderCatalog;
   readonly packingSteps: RecipePackingStepsReader;
   readonly evidence: StepEvidenceRepository;
@@ -56,9 +62,9 @@ export function createGetPackingOrder(
     const [row] = await composePackingOrderRows(deps, actor.companyId, [summary]);
     if (row === undefined) throw new OrderNotFoundError();
 
-    // Antes de Comenzar, o si empaca otro, ni los pasos ni las fotos salen en la respuesta.
+    // Antes de Comenzar, o si empaca otro, ni los pasos, ni las fotos, ni el conteo salen en la respuesta.
     if (summary.status !== 'EN_EMPAQUE' || summary.packedBy !== actor.id) {
-      return { ...row, packingSteps: [], packingEvidence: [] };
+      return { ...row, packingSteps: [], packingEvidence: [], finish: null };
     }
     const packingSteps = (await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId)) ?? [];
     const packingEvidence = await readStepEvidence(
@@ -70,6 +76,8 @@ export function createGetPackingOrder(
       packingSteps,
     );
 
-    return { ...row, packingSteps, packingEvidence };
+    const finish = await composePackingFinishView(deps, actor.companyId, summary);
+
+    return { ...row, packingSteps, packingEvidence, finish };
   };
 }

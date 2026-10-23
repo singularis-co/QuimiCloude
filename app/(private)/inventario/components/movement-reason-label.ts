@@ -1,11 +1,14 @@
 import type { MovementReason } from '@/lib/modules/inventario';
 
-/**
- * Deriva la etiqueta legible de un motivo a partir del propio valor, sin enumerarlo a mano:
- * guion bajo a espacio y primera letra en mayuscula. Sin `'use client'` para que un Server
- * Component pueda llamarla.
- */
+// Exhaustivo a propósito: un motivo nuevo en el dominio no compila hasta tener su texto.
+const MOVEMENT_REASON_LABELS: Readonly<Record<MovementReason, string>> = {
+  merma: 'Merma',
+  rotura: 'Rotura',
+  conteo_fisico: 'Conteo físico',
+  error_de_carga: 'Error de carga',
+};
+
+/** Etiqueta legible de un motivo de ajuste. Sin `'use client'` para que un Server Component pueda llamarla. */
 export function movementReasonLabel(reason: MovementReason): string {
-  const conEspacios = reason.split('_').join(' ');
-  return conEspacios.charAt(0).toUpperCase() + conEspacios.slice(1);
+  return MOVEMENT_REASON_LABELS[reason];
 }

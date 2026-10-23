@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
 import { ErrorState } from '@/components/shared/error-state';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { errorMessage } from '@/lib/modules/errores';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
@@ -10,7 +13,7 @@ import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-a
 import { listUnitsAction } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { BRAND_LABEL, RECIPES_LABEL } from '@/lib/shared/navigation/private-nav';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
-import { FORMULAS_ROUTE } from '@/lib/shared/routes';
+import { FORMULAS_ROUTE, recipeEditRoute } from '@/lib/shared/routes';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { RecipeVersionForm } from '../../../components';
@@ -20,6 +23,7 @@ export const metadata: Metadata = {
 };
 
 const FIRST_PAGE = 1;
+const BACK_LABEL = 'Volver a la fórmula';
 
 // Los mismos testids que el error de la lista: los vigila el E2E de errores.
 const LOAD_ERROR = {
@@ -122,10 +126,22 @@ export default async function NuevaVersionPage({
   const original = recipeResult.data;
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 data-testid="recipe-version-page-title" className="text-2xl font-semibold">
-        Nueva versión de {original.name}
-      </h1>
+    <PageShell>
+      <div className="flex flex-col gap-3">
+        <ArrowLink
+          direction="back"
+          href={recipeEditRoute(original.id)}
+          touch
+          testId="recipe-version-back-link"
+          className="self-start"
+        >
+          {BACK_LABEL}
+        </ArrowLink>
+        <PageHeader
+          title={<span className="break-words">Nueva versión de {original.name}</span>}
+          titleTestId="recipe-version-page-title"
+        />
+      </div>
       <RecipeVersionForm
         mode="create"
         original={{
@@ -152,6 +168,6 @@ export default async function NuevaVersionPage({
           totalPages: machinesResult.data.totalPages,
         }}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -16,13 +16,17 @@ import {
   type ExecutionTraceDetail,
   type ExecutionTraceList,
   type ExecutionTraceListInput,
+  type OrderEvidence,
 } from '@/lib/modules/asignaciones';
+import { forModule } from '@/lib/shared/observability/logger';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
   observabilidad.readRequestIdHeader,
 );
+
+const log = forModule('asignaciones');
 
 /** El actor, de las dos caras de la sesion, compartiendo una sola lectura por peticion. */
 async function currentActor(): Promise<Actor | null> {
@@ -63,6 +67,22 @@ export async function getExecutionTraceAction(orderId: string): Promise<Executio
   try {
     const data = await asignaciones.getExecutionTrace(actor, { orderId }, new Date());
     return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type ExecutionEvidenceResult = { status: 'success'; data: OrderEvidence } | ErrorState;
+
+/** Las fotos del pedido del recorrido. Un pedido inexistente o de otra empresa vuelve como `order_not_found`. */
+export async function getExecutionEvidenceAction(orderId: string): Promise<ExecutionEvidenceResult> {
+  const actor = await currentActor();
+
+  try {
+    const { evidence, signingFailure } = await asignaciones.getExecutionEvidence(actor, { orderId });
+    // La firma caida no es un error de la lectura: los grupos salen sin fotos y la causa, al log.
+    if (signingFailure !== null) log.warn('evidence_read_signing_failed', { orderId, message: signingFailure });
+    return { status: 'success', data: evidence };
   } catch (error) {
     return toErrorState(error);
   }

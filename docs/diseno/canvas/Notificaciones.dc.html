@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Notificaciones</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}
+.nf-bell{overflow:visible}
+.nf-bdg{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--primary);color:var(--primary-fg);font:600 11px 'IBM Plex Mono',monospace;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}
+.nf-bdg.bump{animation:nf-bump 360ms var(--e-in) both}
+.nf-bell.ring .ic{animation:nf-ring 700ms var(--e-std) both;transform-origin:50% 10%}
+@keyframes nf-bump{0%{scale:1}40%{scale:1.3}100%{scale:1}}
+@keyframes nf-ring{0%,100%{rotate:0}20%{rotate:14deg}40%{rotate:-12deg}60%{rotate:8deg}80%{rotate:-4deg}}
+.nf-pop{top:48px;width:400px;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.nf-pop-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+.nf-pop-bd{height:520px;overflow:auto;overscroll-behavior:contain;display:flex;flex-direction:column}
+.nf-list{display:flex;flex-direction:column}
+.nf-row{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start;padding:14px 16px;min-height:44px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--border);transition:background-color var(--d-i) var(--e-std)}
+.nf-row:hover{background:color-mix(in oklch,var(--fg) 4%,transparent)}
+.nf-row:focus-visible{outline:2px solid var(--ring);outline-offset:-2px}
+.nf-row.unread{background:color-mix(in oklch,var(--primary) 7%,var(--card))}
+.nf-row.unread .nf-t{font-weight:600}
+.nf-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.nf-ic .ic{width:18px;height:18px}
+.nf-ic.ok{background:var(--s-bg);color:var(--s-fg)}
+.nf-ic.warn{background:var(--w-bg);color:var(--w-fg)}
+.nf-ic.bad{background:var(--d-bg);color:var(--d-fg)}
+.nf-t{font-size:14px;line-height:1.35;font-weight:500}
+.nf-x{font-size:13px;line-height:1.45;color:var(--muted-fg);margin-top:2px}
+.nf-go{font-size:13px;font-weight:500;color:var(--primary);margin-top:6px;display:inline-flex;align-items:center;gap:4px}
+.nf-when{display:flex;flex-direction:column;align-items:flex-end;gap:8px;font:400 12px 'IBM Plex Mono',monospace;color:var(--muted-fg);white-space:nowrap}
+.nf-dot{width:9px;height:9px;border-radius:50%;background:var(--primary)}
+.nf-row.fresh{animation:nf-in var(--d-s) var(--e-in) both}
+.nf-row.more{animation:nf-fade var(--d-s) var(--e-in) both}
+@keyframes nf-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes nf-fade{from{opacity:0}to{opacity:1}}
+.nf-sk{display:grid;grid-template-columns:36px 1fr;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.nf-tail{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px;font-size:13px;color:var(--muted-fg);text-align:center}
+.nf-tail .b{height:36px}
+@container (max-width: 760px){
+.tb-right.anchor{position:static}
+.nf-pop{position:absolute;top:64px;left:8px;right:8px;width:auto;max-height:calc(100% - 80px);bottom:auto;transform-origin:top center}
+.nf-pop-bd{height:auto;flex:1;min-height:0;max-height:none}
+.nf-row{grid-template-columns:32px 1fr;padding:14px 12px}
+.nf-when{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between}
+}
+@media (prefers-reduced-motion: reduce){.nf-bdg.bump,.nf-bell.ring .ic,.nf-row.fresh,.nf-row.more{animation:none}}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="dashboard" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right anchor">
+          <button class="{{ bellCls }}" type="button" aria-label="{{ bellLabel }}" aria-haspopup="dialog" aria-expanded="{{ panelStr }}" onClick="{{ togglePanel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg><sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><span class="{{ bdgCls }}" aria-hidden="true">{{ cnt }}</span></sc-if><span class="tip">Notificaciones</span></button>
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+
+          <div class="{{ panelCls }}" role="dialog" aria-label="Notificaciones">
+            <div class="nf-pop-hd"><span class="h3">Notificaciones</span><sc-if value="{{ hasUnread }}" hint-placeholder-val="{{ true }}"><button class="b b-lnk b-sm" type="button" onClick="{{ readAll }}">Marcar todas como leídas</button></sc-if></div>
+            <div class="nf-pop-bd" onScroll="{{ onScroll }}">
+              <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+                <div role="status" aria-label="Cargando notificaciones"><sc-for list="{{ skel }}" as="k" hint-placeholder-count="5"><div class="nf-sk"><span class="sk" style="width: 36px; height: 36px; border-radius: 10px"></span><span style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px"><span class="sk" style="width: 70%"></span><span class="sk" style="width: 90%"></span></span></div></sc-for></div>
+              </sc-if>
+              <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+                <div class="box error" role="alert" style="border: 0; border-radius: 0; flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 8v5M12 16h.01"></path></svg></span><p class="sub" style="color: var(--fg)">No se pudieron cargar las notificaciones.</p><button class="b b-out b-sm" type="button" onClick="{{ retry }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"></path></svg>Reintentar</button></div>
+              </sc-if>
+              <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+                <div class="box" style="border: 0; border-radius: 0; flex: 1"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span><p class="sub">No tienes notificaciones.</p></div>
+              </sc-if>
+              <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+                <div class="nf-list">
+                  <sc-for list="{{ rows }}" as="n" hint-placeholder-count="8">
+                    <a class="{{ n.cls }}" href="#" onClick="{{ n.open }}" aria-label="{{ n.aria }}"><span class="{{ n.icCls }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ n.icon }}"></path></svg></span><span><span class="nf-t" style="display: block">{{ n.t }}</span><span class="nf-x" style="display: block">{{ n.x }}</span><span class="nf-go">{{ n.go }}<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></span></span><span class="nf-when">{{ n.when }}<sc-if value="{{ n.unread }}" hint-placeholder-val="{{ true }}"><span class="nf-dot"><span class="sr">Sin leer</span></span></sc-if></span></a>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ moreLoading }}" hint-placeholder-val="{{ false }}">
+                  <div class="nf-tail" role="status"><svg class="ic spin" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.2-8.56"></path></svg>Cargando más avisos…</div>
+                </sc-if>
+                <sc-if value="{{ moreError }}" hint-placeholder-val="{{ false }}">
+                  <div class="nf-tail" role="alert">No se pudieron cargar más avisos.<button class="b b-out b-sm" type="button" onClick="{{ retryMore }}">Reintentar</button></div>
+                </sc-if>
+                <sc-if value="{{ atEnd }}" hint-placeholder-val="{{ false }}">
+                  <div class="nf-tail">No hay más avisos. Se conservan 90 días.</div>
+                </sc-if>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph"><div class="ph-t"><h1 class="h1">Dashboard</h1></div></div>
+        <div class="box" style="min-height: 260px"><p class="sub">[Pantalla actual: la campana vive en la cabecera de todas las pantallas privadas]</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite">
+    <div class="{{ toastCls }}" role="status">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--i-fg); flex: none; margin-top: 2px"><path d="M11 5 6 9H2v6h4l5 4zM22 9l-6 6M16 9l6 6"></path></svg>
+      <span style="flex: 1"><b style="display: block; font-weight: 600">Notificaciones sin sonido</b><span style="color: var(--muted-fg); font-size: 13px">Tu navegador no permite reproducir audio en esta página. Los avisos siguen llegando.</span></span>
+      <button class="xbtn" type="button" aria-label="Cerrar aviso" onClick="{{ closeToast }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="dashboard" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["lista","vacio","cargando","error"],"default":"lista"},"panel":{"editor":"boolean","default":true},"cola":{"editor":"enum","options":["normal","cargandomas","errormas","fin"],"default":"normal"},"sinaudio":{"editor":"boolean","default":false},"nuevo":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const estado = s.estado || this.props.estado || 'lista';
+const panel = s.panel !== undefined ? s.panel : (this.props.panel !== undefined ? !!this.props.panel : true);
+const toast = s.toast !== undefined ? s.toast : !!this.props.sinaudio;
+const fresh = !!this.props.nuevo;
+const cola = s.cola || this.props.cola || 'normal';
+const IC = {
+ok: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M9 15l2 2 4-4',
+warn: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M12 12v3M12 18h.01',
+bad: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M10 13l4 4M14 13l-4 4'
+};
+const base = [
+['n0','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 14:52.','Ver fórmulas','hace 1 min',true],
+['n1','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:20.','Ver fórmulas','hace 3 min',true],
+['n2','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 14:02.','Ver proveedores','hace 12 min',true],
+['n3','warn','Tanda procesada con errores','Se leyeron 2 de 3 archivos. Uno no se pudo leer.','Ver fórmulas','hace 48 min',true],
+['n4','ok','Tanda de PDFs procesada','Se leyeron los 6 archivos de la tanda que subiste a las 16:58.','Ver proveedores','ayer 17:05',false],
+['n5','warn','Tanda procesada con errores','Se leyeron 4 de 5 archivos. Uno no se pudo leer.','Ver fórmulas','14/10/2026 09:12',false],
+['n6','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 16:31.','Ver fórmulas','13/10/2026 16:40',false],
+['n7','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 10:05.','Ver proveedores','12/10/2026 10:11',false],
+['n8','bad','Falló la lectura de la tanda','No se pudo leer ningún archivo de la tanda que subiste a las 08:40.','Ver fórmulas','10/10/2026 08:44',false],
+['n9','ok','Tanda de PDFs procesada','Se leyeron los 5 archivos de la tanda que subiste a las 15:22.','Ver fórmulas','09/10/2026 15:30',false],
+['n10','ok','Tanda de PDFs procesada','Se leyeron los 2 archivos de la tanda que subiste a las 11:47.','Ver proveedores','07/10/2026 11:52',false],
+['n11','warn','Tanda procesada con errores','Se leyeron 1 de 2 archivos. Uno no se pudo leer.','Ver fórmulas','05/10/2026 09:03',false],
+['n12','ok','Tanda de PDFs procesada','Se leyeron los 4 archivos de la tanda que subiste a las 14:10.','Ver fórmulas','02/10/2026 14:18',false],
+['n13','ok','Tanda de PDFs procesada','Se leyeron los 3 archivos de la tanda que subiste a las 09:30.','Ver proveedores','29/09/2026 09:36',false]
+];
+const data = fresh ? base : base.slice(1);
+const read = s.read || {};
+const isUnread = (d) => d[6] && !read[d[0]];
+const unread = estado === 'lista' ? data.filter(isUnread).length : 0;
+const PAGE = 10;
+const shown = Math.min(data.length, s.shown || (cola === 'fin' ? data.length : PAGE));
+const markRead = (id) => (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ read: Object.assign({}, read, { [id]: true }), panel: false }); };
+const rows = data.slice(0, shown).map((d, i) => {
+const u = isUnread(d);
+return {
+t: d[2], x: d[3], go: d[4], when: d[5], unread: u,
+cls: 'nf-row' + (u ? ' unread' : '') + (fresh && i === 0 ? ' fresh' : '') + (i >= PAGE ? ' more' : ''),
+icCls: 'nf-ic ' + d[1], icon: IC[d[1]],
+aria: d[2] + '. ' + d[3] + ' ' + d[5] + (u ? '. Sin leer' : ''),
+open: markRead(d[0])
+};
+});
+const isList = estado === 'lista' && data.length > 0;
+const hasMore = shown < data.length;
+const loadMore = () => { if (hasMore && cola === 'normal') this.setState({ shown: Math.min(data.length, shown + 5) }); };
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true, panel: false }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+ovCls: s.menu ? 'ov open' : 'ov',
+closeAll: () => this.setState({ menu: false }),
+hasUnread: unread > 0, cnt: unread > 99 ? '99+' : String(unread),
+bellCls: 'tb-btn nf-bell' + (fresh ? ' ring' : ''),
+bdgCls: 'nf-bdg' + (fresh ? ' bump' : ''),
+bellLabel: unread > 0 ? 'Notificaciones, ' + unread + ' sin leer' : 'Notificaciones, ninguna sin leer',
+panelStr: panel ? 'true' : 'false',
+panelCls: 'pop right nf-pop' + (panel ? ' open' : ''),
+togglePanel: () => this.setState({ panel: !panel }),
+readAll: () => { const r = Object.assign({}, read); data.forEach((d) => { r[d[0]] = true; }); this.setState({ read: r }); },
+isLoading: estado === 'cargando', isError: estado === 'error',
+isEmpty: estado === 'vacio', isList: isList,
+retry: () => this.setState({ estado: 'lista' }),
+skel: [1, 2, 3, 4, 5],
+rows: rows,
+onScroll: (e) => { const t = e && e.target; if (t && t.scrollTop + t.clientHeight >= t.scrollHeight - 80) loadMore(); },
+moreLoading: cola === 'cargandomas' || (cola === 'normal' && hasMore),
+moreError: cola === 'errormas',
+retryMore: () => this.setState({ cola: 'normal' }),
+atEnd: cola === 'fin' || (cola === 'normal' && !hasMore),
+toastCls: toast ? 'toast show' : 'toast',
+closeToast: () => this.setState({ toast: false })
+};
+}
+}
+</script>
+</body>
+</html>

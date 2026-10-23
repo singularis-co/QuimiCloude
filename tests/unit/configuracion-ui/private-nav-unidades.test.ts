@@ -75,39 +75,30 @@ function paginaDe(href: string): string {
   return join(RAIZ, 'app', '(private)', ...href.split('/').filter(Boolean), 'page.tsx');
 }
 
-describe('la seccion Configuración sigue siendo una y ahora tiene tres items (R9)', () => {
-  it('hay exactamente UNA seccion Configuración y lleva exactamente TRES items', () => {
-    // Ni se crea una segunda seccion ni se renombra la que existe: se anade un item a la de
-    // QC-45, que nacio con uno.
+describe('la seccion Configuración sigue siendo una y lleva cuatro items (R9)', () => {
+  it('hay exactamente UNA seccion Configuración y lleva exactamente CUATRO items', () => {
     const secciones = groupNavItemsBySection(PRIVATE_NAV_ITEMS).filter(
       (seccion) => seccion.label === NAV_SECTION_CONFIGURATION,
     );
 
     expect(secciones).toHaveLength(1);
-    // TENSADA el 2026-09-11 (QC-67 T2, R2/R39) a TRES con «Usuarios», que entraba al FINAL, y
-    // RELAJADA de vuelta a DOS el 2026-09-21: «Usuarios» paso a `NAV_SECTION_OPERATION` por
-    // decision humana (es operacion, no configuracion). Lo que R9 promete sigue intacto y lo
-    // comprueba el caso de abajo: el item de presentaciones no se toca y sigue siendo el primero;
-    // el de unidades tampoco se mueve.
-    // TENSADA el 2026-10-08 a TRES con el grupo «Integraciones», que entra al FINAL: Unidades
-    // sigue en la segunda posicion.
-    expect(secciones[0]?.items).toHaveLength(3);
-    expect((secciones[0]?.items[1] as NavLink | undefined)?.href).toBe(UNITS_ROUTE);
+    // Usuarios, Presentaciones, Unidades e Integraciones: Unidades va en tercera posicion.
+    expect(secciones[0]?.items).toHaveLength(4);
+    expect((secciones[0]?.items[2] as NavLink | undefined)?.href).toBe(UNITS_ROUTE);
   });
 
-  it('el item de presentaciones sigue intacto y sigue siendo el PRIMERO de la seccion', () => {
-    // R9 prohibe alterarlo o reordenarlo: el item nuevo se anade DETRAS, sin tocarlo.
+  it('el item de presentaciones sigue intacto y va justo delante del de unidades', () => {
     const seccion = groupNavItemsBySection(PRIVATE_NAV_ITEMS).find(
       (candidata) => candidata.label === NAV_SECTION_CONFIGURATION,
     );
 
-    const primero = seccion?.items[0];
-    expect(primero?.kind).toBe('link');
-    expect((primero as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
-    expect((primero as NavLink | undefined)?.label).toBe(PRESENTATIONS_LABEL);
-    expect((primero as NavLink | undefined)?.testId).toBe('nav-presentaciones');
-    expect((primero as NavLink | undefined)?.permission).toBe('inventario.modificar');
-    expect((primero as NavLink | undefined)?.icon).toBe('boxes');
+    const presentaciones = seccion?.items[1];
+    expect(presentaciones?.kind).toBe('link');
+    expect((presentaciones as NavLink | undefined)?.href).toBe(PRESENTATIONS_ROUTE);
+    expect((presentaciones as NavLink | undefined)?.label).toBe(PRESENTATIONS_LABEL);
+    expect((presentaciones as NavLink | undefined)?.testId).toBe('nav-presentaciones');
+    expect((presentaciones as NavLink | undefined)?.permission).toBe('inventario.modificar');
+    expect((presentaciones as NavLink | undefined)?.icon).toBe('boxes');
   });
 
   it('el item nuevo apunta a UNITS_ROUTE y declara etiqueta, testId, icono y seccion', () => {

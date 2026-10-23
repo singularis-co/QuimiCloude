@@ -65,6 +65,8 @@ export type FinishedGoodsDispatchInput = {
   readonly orderDeliveryId: string;
   readonly recipeId: string;
   readonly presentationId: string;
+  /** Puede repetir `batchId`: cada lote se descuenta una vez, por la suma de sus envases, con un solo
+   *  asiento. */
   readonly allocations: readonly { readonly batchId: string; readonly packages: number }[];
   readonly actorId: string;
   readonly now: Date;
@@ -73,6 +75,7 @@ export type FinishedGoodsDispatchInput = {
 export type FinishedGoodsDispatchOutcome =
   | {
       readonly kind: 'dispatched';
+      /** Una por asignacion de entrada, en el mismo orden; las de un lote suman su asiento. */
       readonly lines: readonly {
         readonly batchId: string;
         readonly packages: number;
@@ -87,4 +90,57 @@ export type FinishedGoodsDispatchOutcome =
  *  `inventario` sobre la transaccion de quien llama. */
 export interface FinishedGoodsDispatch {
   dispatchForDelivery(input: FinishedGoodsDispatchInput): Promise<FinishedGoodsDispatchOutcome>;
+}
+
+/** Un producto terminado listo para entregar sin pedido, leido fuera de transaccion. */
+export type FinishedProductForDelivery = {
+  readonly productId: string;
+  readonly name: string;
+  readonly recipeId: string | null;
+  readonly presentationId: string | null;
+  readonly presentationName: string | null;
+  /** Suma de los envases enteros de sus lotes con contenido de envase. */
+  readonly stockPackages: number;
+  /** Mismo orden que `FinishedBatchCatalog.findDeliverableBatches`. */
+  readonly batches: readonly DeliverableBatch[];
+};
+
+export type FinishedProductSurplusBase = {
+  readonly productId: string;
+  readonly recipeId: string | null;
+  readonly presentationId: string | null;
+  readonly stockPackages: number;
+};
+
+export interface FinishedProductDeliveryCatalog {
+  /** El producto terminado vivo de la empresa, o `null`. */
+  findForDelivery(productId: string, companyId: string): Promise<FinishedProductForDelivery | null>;
+  /** Una sola consulta; los ids que no son productos terminados vivos de la empresa no vuelven. */
+  findSurplusBases(
+    productIds: readonly string[],
+    companyId: string,
+  ): Promise<readonly FinishedProductSurplusBase[]>;
+}
+
+export type FinishedProductDeliveryLock = {
+  readonly recipeId: string | null;
+  readonly presentationId: string | null;
+  readonly stockPackages: number;
+};
+
+export type FinishedGoodsDirectDispatchInput = {
+  readonly companyId: string;
+  readonly productId: string;
+  readonly orderDeliveryId: string;
+  /** Puede repetir `batchId`: cada lote se descuenta una vez, con un solo asiento. */
+  readonly allocations: readonly { readonly batchId: string; readonly packages: number }[];
+  readonly actorId: string;
+  readonly now: Date;
+};
+
+/** Salida de producto terminado sin pedido, sobre la transaccion de quien llama. */
+export interface FinishedGoodsDirectDispatch {
+  /** Bloquea el producto terminado vivo y lee sus lotes ya bloqueado; `null` si no lo es. */
+  lockForDirectDelivery(productId: string, companyId: string): Promise<FinishedProductDeliveryLock | null>;
+  dispatchDirect(input: FinishedGoodsDirectDispatchInput): Promise<FinishedGoodsDispatchOutcome>;
 }

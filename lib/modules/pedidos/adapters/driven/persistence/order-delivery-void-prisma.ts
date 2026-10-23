@@ -43,10 +43,11 @@ async function findDeliveryForVoid(
   scope: OrderScope,
   tx: PrismaLike,
 ): Promise<DeliveryForVoid | null> {
-  return tx.orderDelivery.findFirst({
+  const row = await tx.orderDelivery.findFirst({
     where: { ...companyScopeColumns(scope), id: deliveryId },
-    select: { id: true, orderId: true },
+    select: { id: true, orderId: true, productId: true, createdAt: true },
   });
+  return row;
 }
 
 async function findDeliveryLinesForVoid(
@@ -59,16 +60,18 @@ async function findDeliveryLinesForVoid(
     where: { ...columns, deliveryId, delivery: columns },
     select: {
       id: true,
+      customerId: true,
       orderPresentationLineId: true,
       batchId: true,
       packages: true,
       quantity: true,
       voidLine: { select: { id: true } },
     },
-    orderBy: [{ orderPresentationLineId: 'asc' }, { batchId: 'asc' }],
+    orderBy: [{ orderPresentationLineId: 'asc' }, { customerId: 'asc' }, { batchId: 'asc' }],
   });
   return rows.map((row) => ({
     id: row.id,
+    customerId: row.customerId,
     presentationLineId: row.orderPresentationLineId,
     batchId: row.batchId,
     packages: row.packages,
@@ -129,33 +132,40 @@ async function listOrderDeliveryHistory(
     where: { ...columns, orderId },
     select: {
       id: true,
-      customerId: true,
       createdBy: true,
       createdAt: true,
       lines: {
         where: columns,
         select: {
+          customerId: true,
           orderPresentationLineId: true,
           batchId: true,
           packages: true,
           voidLine: { select: { void: { select: { reason: true, createdBy: true, createdAt: true } } } },
         },
-        orderBy: [{ orderPresentationLineId: 'asc' }, { batchId: 'asc' }],
+        orderBy: [{ orderPresentationLineId: 'asc' }, { customerId: 'asc' }, { batchId: 'asc' }],
       },
     },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
   });
   return rows.map((row) => ({
     id: row.id,
-    customerId: row.customerId,
     createdBy: row.createdBy,
     createdAt: row.createdAt,
-    lines: row.lines.map((line) => ({
-      presentationLineId: line.orderPresentationLineId,
-      batchId: line.batchId,
-      packages: line.packages,
-      void: line.voidLine === null ? null : line.voidLine.void,
-    })),
+    // Las lineas de una entrega de pedido siempre tienen linea del reparto: el disparador lo exige.
+    lines: row.lines.flatMap((line) =>
+      line.orderPresentationLineId === null
+        ? []
+        : [
+            {
+              customerId: line.customerId,
+              presentationLineId: line.orderPresentationLineId,
+              batchId: line.batchId,
+              packages: line.packages,
+              void: line.voidLine === null ? null : line.voidLine.void,
+            },
+          ],
+    ),
   }));
 }
 

@@ -1,5 +1,6 @@
 // La pantalla /integraciones/whatsapp: corte por permiso, pestañas, alta sin conexion, tarjeta con
-// conexion y ningun verify token en la pagina.
+// conexion, ningun verify token en la pagina y carga de plantillas y diccionario por pestaña.
+// Los casos «QC-243 R<n>» son de esa ficha; el resto, de QC-237.
 //
 // Se mockea el proveedor de sesion, no `requirePagePermission`: el corte se ejecuta de verdad.
 
@@ -20,31 +21,71 @@ import {
   WHATSAPP_SETUP_GUIDE_STEPS,
   WHATSAPP_SETUP_GUIDE_TESTID,
   WHATSAPP_TAB_CONNECTION_TESTID,
+  WHATSAPP_DICTIONARY_ERROR_TESTID,
+  WHATSAPP_DICTIONARY_RETRY_TESTID,
+  WHATSAPP_NO_CONNECTION_HINT_TESTID,
   WHATSAPP_TAB_TEMPLATES_TESTID,
+  WHATSAPP_TAB_VARIABLES_TESTID,
+  WHATSAPP_TABS_TEXTS,
+  WHATSAPP_TEMPLATES_ERROR_TESTID,
+  WHATSAPP_TEMPLATES_RETRY_TESTID,
+  WHATSAPP_TEMPLATES_TAB_PANEL_TESTID,
+  WHATSAPP_VARIABLES_TAB_PANEL_TESTID,
   WHATSAPP_VERIFY_TOKEN_NOTICE_TESTID,
   WHATSAPP_VERIFY_TOKEN_TESTID,
   WHATSAPP_WEBHOOK_PANEL_TESTID,
   WHATSAPP_WEBHOOK_URL_TESTID,
 } from '@/app/(private)/integraciones/whatsapp/components';
+import { WHATSAPP_TEMPLATES_PANEL_TESTID } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-templates-panel';
+import { WHATSAPP_VARIABLES_PANEL_TESTID } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-variables-panel';
 import WhatsappIntegrationPage from '@/app/(private)/integraciones/whatsapp/page';
 import { errorMessage } from '@/lib/modules/errores';
 import type { SessionUser } from '@/lib/modules/identity';
-import type { WhatsappConnectionView } from '@/lib/modules/integraciones';
+import type {
+  WhatsappConnectionView,
+  WhatsappDictionaryEntryView,
+  WhatsappTemplateView,
+} from '@/lib/modules/integraciones';
 import type { WhatsappConnectionQueryResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-connection-actions';
+import type { WhatsappTemplateListResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions';
+import type { WhatsappDictionaryListResult } from '@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions';
 import { WHATSAPP_INTEGRATION_LABEL } from '@/lib/shared/navigation/private-nav';
 import { LOGIN_ROUTE_SESSION_ENDED, WHATSAPP_INTEGRATION_ROUTE } from '@/lib/shared/routes';
 
-const { getSessionUserMock, getConnectionMock, notFoundMock, redirectMock } = vi.hoisted(() => ({
+import { setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
+
+const {
+  getSessionUserMock,
+  getConnectionMock,
+  listTemplatesMock,
+  listDictionaryMock,
+  notFoundMock,
+  redirectMock,
+  refreshMock,
+} = vi.hoisted(() => ({
   getSessionUserMock: vi.fn<() => Promise<unknown>>(),
   getConnectionMock: vi.fn<() => Promise<WhatsappConnectionQueryResult>>(),
+  listTemplatesMock: vi.fn<() => Promise<WhatsappTemplateListResult>>(),
+  listDictionaryMock: vi.fn<() => Promise<WhatsappDictionaryListResult>>(),
   notFoundMock: vi.fn<() => never>(),
   redirectMock: vi.fn<(ruta: string) => never>(),
+  refreshMock: vi.fn<() => void>(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   notFound: notFoundMock,
   redirect: redirectMock,
+  useRouter: () => ({ refresh: refreshMock, push: vi.fn(), replace: vi.fn() }),
+}));
+
+vi.mock('@/lib/modules/integraciones/adapters/driving/whatsapp-template-actions', () => ({
+  listWhatsappTemplatesAction: listTemplatesMock,
+}));
+
+vi.mock('@/lib/modules/integraciones/adapters/driving/whatsapp-variable-key-actions', () => ({
+  listWhatsappDictionaryAction: listDictionaryMock,
 }));
 
 vi.mock('@/lib/composition', () => ({
@@ -76,6 +117,27 @@ const WEBHOOK = {
   url: 'https://app.ejemplo.com/api/integraciones/whatsapp/webhook/conn-1',
   complete: true,
 };
+
+const PLANTILLA: WhatsappTemplateView = {
+  id: '00000000-0000-4000-8000-000000000001',
+  name: 'pedido_listo',
+  language: 'es',
+  category: 'UTILITY',
+  status: 'APPROVED',
+  statusRaw: null,
+  rejectedReason: null,
+  content: { header: null, body: { text: 'Hola {{1}}', examples: [] }, footer: null, buttons: [] },
+  lastSyncedAt: null,
+  createdAt: '2026-10-01T10:00:00.000Z',
+  mappingStatus: 'UNMAPPED',
+  enabled: false,
+  variables: [{ slot: 'body.1', position: 1, kind: null, key: null, label: null }],
+};
+
+const DICCIONARIO: readonly WhatsappDictionaryEntryView[] = [
+  { id: 'k1', key: 'numero_de_cuenta', label: 'Número de cuenta', value: '123456', usedBy: 0 },
+  { id: 'k2', key: 'horario', label: 'Horario', value: '9 a 18', usedBy: 1 },
+];
 
 function sesionCon(permissions: readonly string[]): SessionUser {
   return {
@@ -133,6 +195,7 @@ function recorrerProps(nodo: ReactNode, claves: Set<string>, textos: string[]): 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  setViewportWidth(WIDE_VIEWPORT);
   notFoundMock.mockImplementation(() => {
     throw new Error('NEXT_NOT_FOUND');
   });
@@ -141,10 +204,20 @@ beforeEach(() => {
   });
   getSessionUserMock.mockResolvedValue(sesionCon([PERMISO]));
   getConnectionMock.mockResolvedValue({ status: 'success', data: null, webhook: null });
+  listTemplatesMock.mockResolvedValue({
+    status: 'success',
+    data: { templates: [PLANTILLA], templatesSyncedAt: null },
+  });
+  listDictionaryMock.mockResolvedValue({ status: 'success', data: DICCIONARIO });
 });
+
+function conConexion(): void {
+  getConnectionMock.mockResolvedValue({ status: 'success', data: vista(), webhook: WEBHOOK });
+}
 
 afterEach(() => {
   cleanup();
+  resetViewport();
 });
 
 describe('WhatsappIntegrationPage', () => {
@@ -174,35 +247,174 @@ describe('WhatsappIntegrationPage', () => {
     expect([...fuente.matchAll(/requirePagePermission\(/g)]).toHaveLength(1);
   });
 
-  it('R35: muestra el titulo y las pestañas «Conexión» activa y «Plantillas» deshabilitada con «Disponible próximamente» visible', async () => {
+  it('QC-243 R1: muestra el titulo y una sola fila de pestañas «Conexión», «Plantillas» y «Variables», con «Conexión» activa', async () => {
     render(await WhatsappIntegrationPage());
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(WHATSAPP_INTEGRATION_LABEL);
-    const conexion = screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID);
-    expect(conexion).toHaveAttribute('role', 'tab');
-    expect(conexion.textContent).toBe('Conexión');
-    expect(conexion).toHaveAttribute('aria-selected', 'true');
+    const listas = screen.getAllByRole('tablist');
+    expect(listas).toHaveLength(1);
+    expect(within(listas[0]).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Conexión',
+      'Plantillas',
+      'Variables',
+    ]);
+    expect(screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID)).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID)).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID)).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByTestId(WHATSAPP_CONNECTION_PANEL_TESTID)).toBeVisible();
+    expect(screen.queryByText('Disponible próximamente')).toBeNull();
+  });
+
+  it('QC-243 R2: sin conexion, «Plantillas» esta deshabilitada y descrita por su texto, y «Variables» habilitada', async () => {
+    const user = setupUser();
+    render(await WhatsappIntegrationPage());
 
     const plantillas = screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID);
-    expect(plantillas).toHaveAttribute('role', 'tab');
-    expect(plantillas).toHaveAttribute('aria-selected', 'false');
     expect(
       plantillas.hasAttribute('disabled') || plantillas.getAttribute('aria-disabled') === 'true',
     ).toBe(true);
-    expect(within(plantillas).getByText('Plantillas')).toBeVisible();
-    expect(within(plantillas).getByText('Disponible próximamente')).toBeVisible();
-    expect(plantillas.getAttribute('title')).toBeNull();
+    const pista = screen.getByTestId(WHATSAPP_NO_CONNECTION_HINT_TESTID);
+    expect(pista.textContent).toBe('Conecta tu número primero para ver Plantillas.');
+    expect(pista).toBeVisible();
+    expect(plantillas.getAttribute('aria-describedby')).toBe(pista.id);
+
+    const variables = screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID);
+    expect(variables.hasAttribute('disabled')).toBe(false);
+    expect(variables.getAttribute('aria-disabled')).not.toBe('true');
+    expect(listTemplatesMock).not.toHaveBeenCalled();
+    expect(listDictionaryMock).toHaveBeenCalledTimes(1);
+
+    await user.click(variables);
+    expect(variables).toHaveAttribute('aria-selected', 'true');
+    expect(
+      within(screen.getByTestId(WHATSAPP_VARIABLES_TAB_PANEL_TESTID)).getByTestId(
+        WHATSAPP_VARIABLES_PANEL_TESTID,
+      ),
+    ).toHaveAttribute('data-count', String(DICCIONARIO.length));
+  });
+
+  it('QC-243 R3: con conexion, «Plantillas» esta habilitada, sin texto de ayuda, y muestra el listado de listWhatsappTemplatesAction', async () => {
+    const user = setupUser();
+    conConexion();
+    render(await WhatsappIntegrationPage());
+
+    const plantillas = screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID);
+    expect(plantillas.hasAttribute('disabled')).toBe(false);
+    expect(plantillas.getAttribute('aria-describedby')).toBeNull();
+    expect(screen.queryByTestId(WHATSAPP_NO_CONNECTION_HINT_TESTID)).toBeNull();
+    expect(listTemplatesMock).toHaveBeenCalledTimes(1);
+
+    await user.click(plantillas);
+    expect(plantillas).toHaveAttribute('aria-selected', 'true');
+    expect(
+      within(screen.getByTestId(WHATSAPP_TEMPLATES_TAB_PANEL_TESTID)).getByTestId(
+        WHATSAPP_TEMPLATES_PANEL_TESTID,
+      ),
+    ).toHaveAttribute('data-count', '1');
+  });
+
+  it('QC-243 R5: al entrar en «Plantillas» o «Variables» pide otra vez los datos; al volver a «Conexión», no', async () => {
+    const user = setupUser();
+    conConexion();
+    render(await WhatsappIntegrationPage());
+    expect(refreshMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    expect(refreshMock).toHaveBeenCalledTimes(2);
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID));
+    expect(screen.getByTestId(WHATSAPP_TAB_CONNECTION_TESTID)).toHaveAttribute('aria-selected', 'true');
+    expect(refreshMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('QC-243 R6: si falla el listado de plantillas, esa pestaña muestra el error con reintento y Conexión y Variables siguen', async () => {
+    const user = setupUser();
+    conConexion();
+    listTemplatesMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+    render(await WhatsappIntegrationPage());
+
+    expect(
+      within(screen.getByTestId(WHATSAPP_CONNECTION_PANEL_TESTID)).getByTestId(
+        WHATSAPP_CONNECTION_CARD_TESTID,
+      ),
+    ).toBeTruthy();
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
+    const error = screen.getByTestId(WHATSAPP_TEMPLATES_ERROR_TESTID);
+    expect(error.textContent).toContain(WHATSAPP_TABS_TEXTS.templatesError);
+    expect(error.textContent).toContain(errorMessage('unauthorized'));
+    expect(screen.queryByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toBeNull();
+    refreshMock.mockClear();
+    await user.click(screen.getByTestId(WHATSAPP_TEMPLATES_RETRY_TESTID));
+    expect(refreshMock).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    expect(screen.getByTestId(WHATSAPP_VARIABLES_PANEL_TESTID)).toBeTruthy();
+    expect(screen.queryByTestId(WHATSAPP_DICTIONARY_ERROR_TESTID)).toBeNull();
+  });
+
+  it('QC-243 R6: si falla el diccionario, «Variables» muestra el error con reintento y Conexión y Plantillas siguen', async () => {
+    const user = setupUser();
+    conConexion();
+    listDictionaryMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+    render(await WhatsappIntegrationPage());
+
+    expect(
+      within(screen.getByTestId(WHATSAPP_CONNECTION_PANEL_TESTID)).getByTestId(
+        WHATSAPP_CONNECTION_CARD_TESTID,
+      ),
+    ).toBeTruthy();
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    const error = screen.getByTestId(WHATSAPP_DICTIONARY_ERROR_TESTID);
+    expect(error.textContent).toContain(WHATSAPP_TABS_TEXTS.dictionaryError);
+    expect(error.textContent).toContain(errorMessage('unauthorized'));
+    expect(screen.getByTestId(WHATSAPP_DICTIONARY_RETRY_TESTID)).toBeTruthy();
+    expect(screen.queryByTestId(WHATSAPP_VARIABLES_PANEL_TESTID)).toBeNull();
+
+    await user.click(screen.getByTestId(WHATSAPP_TAB_TEMPLATES_TESTID));
+    expect(screen.getByTestId(WHATSAPP_TEMPLATES_PANEL_TESTID)).toHaveAttribute('data-count', '1');
+    expect(screen.queryByTestId(WHATSAPP_TEMPLATES_ERROR_TESTID)).toBeNull();
+  });
+
+  it('QC-243 R6: si falla la consulta de la conexion, «Variables» sigue funcionando', async () => {
+    const user = setupUser();
+    getConnectionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unauthorized',
+      message: errorMessage('unauthorized'),
+    });
+    render(await WhatsappIntegrationPage());
+
+    expect(listTemplatesMock).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId(WHATSAPP_TAB_VARIABLES_TESTID));
+    expect(screen.getByTestId(WHATSAPP_VARIABLES_PANEL_TESTID)).toBeTruthy();
   });
 
   it('R35: las pestañas miden al menos 44 px', async () => {
     render(await WhatsappIntegrationPage());
 
-    for (const testId of [WHATSAPP_TAB_CONNECTION_TESTID, WHATSAPP_TAB_TEMPLATES_TESTID]) {
+    for (const testId of [
+      WHATSAPP_TAB_CONNECTION_TESTID,
+      WHATSAPP_TAB_TEMPLATES_TESTID,
+      WHATSAPP_TAB_VARIABLES_TESTID,
+    ]) {
       expect(screen.getByTestId(testId).className).toMatch(/(^|\s)min-h-11(\s|$)/);
     }
   });
 
-  it('R36: sin conexion, la pestaña «Conexión» muestra la guia y el formulario de alta', async () => {
+  it('QC-243 R4, R36: sin conexion, la pestaña «Conexión» muestra la guia y el formulario de alta', async () => {
     render(await WhatsappIntegrationPage());
 
     const panel = screen.getByTestId(WHATSAPP_CONNECTION_PANEL_TESTID);
@@ -218,7 +430,21 @@ describe('WhatsappIntegrationPage', () => {
     expect(screen.queryByTestId(WHATSAPP_CONNECTION_CARD_TESTID)).toBeNull();
   });
 
-  it('R37: con conexion, muestra la tarjeta, el panel del webhook y las acciones, sin formulario de alta', async () => {
+  it('R49: la guia incluye un paso que pide suscribir messages, message_template_status_update y template_category_update', async () => {
+    render(await WhatsappIntegrationPage());
+
+    const guia = screen.getByTestId(WHATSAPP_SETUP_GUIDE_TESTID);
+    const pasos = within(guia)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '');
+    const campos = ['messages', 'message_template_status_update', 'template_category_update'];
+    const paso = pasos.find((texto) => campos.every((campo) => texto.includes(campo)));
+
+    expect(paso).toBeDefined();
+    expect(pasos).toHaveLength(WHATSAPP_SETUP_GUIDE_STEPS.length);
+  });
+
+  it('QC-243 R4, R37: con conexion, muestra la tarjeta, el panel del webhook y las acciones, sin formulario de alta', async () => {
     getConnectionMock.mockResolvedValue({
       status: 'success',
       data: vista({ status: 'ERROR', lastError: 'Token caducado' }),

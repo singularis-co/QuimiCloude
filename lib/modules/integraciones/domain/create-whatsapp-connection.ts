@@ -3,23 +3,32 @@ import { ACCESS_TOKEN_FIELD, APP_SECRET_FIELD, connectionSecretContext } from '.
 import { ValidationError, WhatsappConnectionExistsError } from './errors';
 import { metaMessageOf } from './graph-failure';
 import { scopeOf } from './integraciones-scope';
+import { syncConnectionTemplates, syncFailureCodeOf } from './sync-whatsapp-templates';
 import { toWhatsappConnectionView, type WhatsappConnectionView } from './whatsapp-connection';
 import { createWhatsappConnectionSchema } from './whatsapp-connection-input';
+import type { TemplateSyncSummary } from './whatsapp-template';
 
 import type { RandomSource } from '../ports/random-source';
 import type { SecretCipher } from '../ports/secret-cipher';
 import type { SecretDigest } from '../ports/secret-digest';
 import type { WhatsappConnectionRepository } from '../ports/whatsapp-connection-repository';
 import type { WhatsappGraphClient } from '../ports/whatsapp-graph-client';
+import type { WhatsappTemplateRepository } from '../ports/whatsapp-template-repository';
 
 export type CreateWhatsappConnectionDeps = {
   readonly connections: WhatsappConnectionRepository;
   readonly graph: WhatsappGraphClient;
+  readonly templates: WhatsappTemplateRepository;
   readonly cipher: SecretCipher;
   readonly digest: SecretDigest;
   readonly random: RandomSource;
   readonly now?: () => Date;
 };
+
+/** Un fallo de la importación no deshace el alta: solo viaja su código, para el log. */
+export type TemplateImportOutcome =
+  | { readonly ok: true; readonly summary: TemplateSyncSummary }
+  | { readonly ok: false; readonly code: string };
 
 /** El verify token en claro solo viaja aquí: después solo queda su resumen. */
 export type CreateWhatsappConnectionResult =
@@ -27,6 +36,7 @@ export type CreateWhatsappConnectionResult =
       readonly status: 'created';
       readonly connection: WhatsappConnectionView;
       readonly verifyToken: string;
+      readonly templateImport: TemplateImportOutcome;
     }
   | { readonly status: 'test_failed'; readonly message: string };
 
@@ -91,6 +101,14 @@ export function createCreateWhatsappConnection(
       scope,
     );
 
-    return { status: 'created', connection: toWhatsappConnectionView(record), verifyToken };
+    let templateImport: TemplateImportOutcome;
+    try {
+      const summary = await syncConnectionTemplates({ ...deps, now }, record, data.accessToken, scope);
+      templateImport = { ok: true, summary };
+    } catch (error) {
+      templateImport = { ok: false, code: syncFailureCodeOf(error) };
+    }
+
+    return { status: 'created', connection: toWhatsappConnectionView(record), verifyToken, templateImport };
   };
 }

@@ -49,6 +49,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
     quantity: '10.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: null,
     finishedAt: null,
@@ -59,7 +60,7 @@ function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): Assigne
 }
 
 function receta(overrides?: Partial<RecipeRef>): RecipeRef {
-  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, ...overrides };
+  return { id: RECETA, name: 'Jabon liquido', ownName: 'Jabon liquido', isUnderReview: false, original: null, isDeleted: false, imageUrl: null, ...overrides };
 }
 
 function persona(id: string): PersonRef {
@@ -475,7 +476,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
   it('R24: cada fila lleva el nombre de la presentacion, o null, con una sola llamada al catalogo', async () => {
     const ids = [pedidoId(1), pedidoId(2)];
     const items = [
-      resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] }),
+      resumen(pedidoId(1), { presentationLines: [{ id: 'linea-1', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
       resumen(pedidoId(2), { presentationLines: [] }),
     ];
     const { deps, findRefsPresentations } = montar({
@@ -512,7 +513,7 @@ describe('listAssignedOrders: la presentacion del pedido asignado', () => {
 
   it('R26: un actor sin permisos de presentaciones recibe la presentacion de sus pedidos asignados', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 1, packagingName: null }] })];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ id: 'linea-2', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] })];
     const { deps } = montar({
       ids,
       page: { items, total: 1 },
@@ -534,11 +535,11 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     const items = [
       resumen(pedidoId(1), {
         presentationLines: [
-          { presentationId: SEGUNDA_PRESENTACION, packages: 5, packagingName: null },
-          { presentationId: PRESENTACION, packages: 1, packagingName: null },
+          { id: 'linea-3', presentationId: SEGUNDA_PRESENTACION, packages: 5, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
+          { id: 'linea-4', presentationId: PRESENTACION, packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null },
         ],
       }),
-      resumen(pedidoId(2), { presentationLines: [{ presentationId: PRESENTACION, packages: 2, packagingName: null }] }),
+      resumen(pedidoId(2), { presentationLines: [{ id: 'linea-5', presentationId: PRESENTACION, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
     ];
     const { deps, findRefsPresentations } = montar({
       ids,
@@ -553,11 +554,11 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
     expect(findRefsPresentations).toHaveBeenCalledTimes(1);
     expect(findRefsPresentations).toHaveBeenCalledWith([SEGUNDA_PRESENTACION, PRESENTACION], EMPRESA);
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packagingName: null },
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packagingName: null },
+      { lineId: 'linea-3', presentationId: SEGUNDA_PRESENTACION, presentationName: 'Botella 200 ml', packages: 5, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-4', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 1, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
     expect(pagina.items[1]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2, packagingName: null },
+      { lineId: 'linea-5', presentationId: PRESENTACION, presentationName: 'Bidon 20L', packages: 2, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
   });
 
@@ -579,14 +580,14 @@ describe('QC-170 — listAssignedOrders: el reparto y la unidad del pedido asign
 
   it('R26: una presentacion que no vuelve del catalogo deja la linea con `presentationName: null`, no la descarta', async () => {
     const ids = [pedidoId(1)];
-    const items = [resumen(pedidoId(1), { presentationLines: [{ presentationId: PRESENTACION, packages: 3, packagingName: null }] })];
+    const items = [resumen(pedidoId(1), { presentationLines: [{ id: 'linea-6', presentationId: PRESENTACION, packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] })];
     const { deps } = montar({ ids, page: { items, total: 1 }, refs: [receta()] });
     const listAssignedOrders = createListAssignedOrders(deps);
 
     const pagina = await listAssignedOrders(ACTOR, { page: 1 });
 
     expect(pagina.items[0]?.presentationLines).toEqual([
-      { presentationId: PRESENTACION, presentationName: null, packages: 3, packagingName: null },
+      { lineId: 'linea-6', presentationId: PRESENTACION, presentationName: null, packages: 3, packedPackages: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ]);
   });
 
@@ -667,5 +668,58 @@ describe('listAssignedOrders — sin `asignaciones.ejecutar` no hay pedidos prev
     expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, ids, ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'], 1, undefined);
     expect(pagina.total).toBe(1);
     expect(pagina.items.map((item) => item.id)).toEqual(ids);
+  });
+});
+
+// La lista del Operador no lleva NINGUN importe, ni el real ni el estimado. Se
+// recorre cada fila entera (reparto y responsables incluidos) buscando claves de importe, con
+// resumenes que traen esos campos colados a proposito: la fila no puede copiarlos.
+const CLAVE_DE_IMPORTE = /cost|coste|importe|price|precio|amount/i;
+
+function clavesDeImporte(valor: unknown, ruta = ''): string[] {
+  if (Array.isArray(valor)) return valor.flatMap((item, i) => clavesDeImporte(item, `${ruta}[${String(i)}]`));
+  if (valor === null || typeof valor !== 'object' || valor instanceof Date) return [];
+  return Object.entries(valor).flatMap(([clave, hijo]) => [
+    ...(CLAVE_DE_IMPORTE.test(clave) ? [`${ruta}.${clave}`] : []),
+    ...clavesDeImporte(hijo, `${ruta}.${clave}`),
+  ]);
+}
+
+describe('QC-305 — la lista de pedidos asignados no lleva el coste real (R24)', () => {
+  it('R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en ninguna fila, aunque el resumen las traiga', async () => {
+    const ids = [pedidoId(1), pedidoId(2)];
+    const items = [
+      {
+        ...resumen(pedidoId(1), {
+          status: 'EN_CURSO',
+          presentationLines: [{ id: uuid('5'), presentationId: PRESENTACION, packages: 3, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }],
+          unitId: UNIDAD,
+        }),
+        actualCost: '27.1250',
+        ingredientsCost: '30.0000',
+        packagingCost: '4.5000',
+      },
+      { ...resumen(pedidoId(2)), actualCost: null, ingredientsCost: null, packagingCost: null },
+    ] as unknown as AssignedOrderSummary[];
+    const { deps } = montar({
+      ids,
+      page: { items, total: 2 },
+      refs: [receta()],
+      rows: [filaSuelta(pedidoId(1), BEA)],
+      people: [persona(BEA)],
+      presentations: [presentacion()],
+      units: [unidad()],
+    });
+
+    const pagina = await createListAssignedOrders(deps)(ACTOR, { page: 1 });
+
+    expect(pagina.items).toHaveLength(2);
+    expect(clavesDeImporte(pagina)).toEqual([]);
+  });
+
+  it('R24: el contrato del resumen asignado no declara actualCost (comprobacion de tipo)', () => {
+    const sinReal: 'actualCost' extends keyof AssignedOrderSummary ? false : true = true;
+    const sinEnvases: 'packagingCost' extends keyof AssignedOrderSummary ? false : true = true;
+    expect([sinReal, sinEnvases]).toEqual([true, true]);
   });
 });

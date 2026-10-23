@@ -71,6 +71,7 @@
   derivar el costo unitario dividiendo el total entre la existencia **ya convertida**, con la regla
   de derivación vigente. SI el unitario derivado queda en 0, ENTONCES DEBE rechazar el alta igual
   que hoy.
+  Nota (2026-10-23): desde el formulario ya no ocurre; el costo total es de solo lectura (dev 17978345). El dominio lo sigue cubriendo.
 - **R8** `[D6]` `[D13]` SI la existencia convertida no cabe en el formato de cantidad del ERP
   (más de 4 decimales o más de 10 cifras enteras), ENTONCES el sistema DEBE rechazar el alta sin
   escribir nada, con un error propio que señale la existencia y pida ingresarla en la unidad del
@@ -121,6 +122,7 @@
   o el costo unitario derivado sobre la existencia convertida queda en 0 (R7), ENTONCES la vista
   previa y la confirmación DEBEN dejar la fila en `error`, con el motivo en la columna
   «Existencia», «Costo unitario» o «Costo total», y la confirmación NO DEBE escribirla.
+  Enmendado (2026-10-23): la importación ya no trae «Costo total» (dev 325aa378); se retira el caso de costo total derivado en 0.
 
 ### Materia prima nueva desde la revisión de fórmula
 

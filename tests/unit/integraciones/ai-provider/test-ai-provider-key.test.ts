@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { AiProviderConnectionRecord } from '@/lib/modules/integraciones/domain/ai-provider'
 import type { AiProviderProbeResult } from '@/lib/modules/integraciones/domain/ai-provider-failure'
 import { ValidationError } from '@/lib/modules/integraciones/domain/errors'
 import { createTestAiProviderKey } from '@/lib/modules/integraciones/domain/test-ai-provider-key'
@@ -16,17 +17,21 @@ import {
   storedConnection,
 } from './ai-provider-doubles'
 
-function setup(result?: AiProviderProbeResult, entries = [...CATALOG]) {
+function setup(
+  result?: AiProviderProbeResult,
+  entries = [...CATALOG],
+  record: Partial<AiProviderConnectionRecord> | null = {},
+) {
   const cipher = makeCipher()
-  const repo = makeRepository([storedConnection(cipher.seed)])
+  const repo = makeRepository(record === null ? [] : [storedConnection(cipher.seed, record)])
   const catalog = makeCatalog(entries)
   const probe = makeProbe(result)
-  const test = createTestAiProviderKey({ catalog: catalog.catalog, probe: probe.probe })
+  const test = createTestAiProviderKey({ connections: repo.connections, catalog: catalog.catalog, probe: probe.probe })
   return { repo, cipher, catalog, probe, test }
 }
 
 describe('probar una key escrita', () => {
-  it('R10: prueba con la key dada y los dos modelos del proveedor en el catalogo', async () => {
+  it('R10, QT-291 R19: prueba una sola vez con la key dada y el predeterminado del proveedor escrito', async () => {
     const { probe, test } = setup()
     await test({ provider: 'OPENROUTER', apiKey: API_KEY }, admin())
 
@@ -34,8 +39,33 @@ describe('probar una key escrita', () => {
     expect(probe.call).toHaveBeenCalledWith({
       provider: 'OPENROUTER',
       apiKey: API_KEY,
-      models: ['modelo-receta-r', 'modelo-catalogo-r'],
+      models: ['modelo-recomendado-r'],
     })
+  })
+
+  it('QT-291 R19: con el proveedor conectado y una eleccion, prueba la eleccion', async () => {
+    const { probe, test } = setup(undefined, [...CATALOG], { provider: 'GOOGLE', model: 'modelo-bajo-g' })
+    await test({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({ provider: 'GOOGLE', apiKey: API_KEY, models: ['modelo-bajo-g'] })
+  })
+
+  it('QT-291 R19: con el proveedor conectado sin eleccion, prueba el predeterminado', async () => {
+    const { probe, test } = setup(undefined, [...CATALOG], { provider: 'GOOGLE', model: null })
+    await test({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({ provider: 'GOOGLE', apiKey: API_KEY, models: ['modelo-recomendado-g'] })
+  })
+
+  it('QT-291 R19: con otro proveedor que el conectado, prueba su predeterminado aunque haya eleccion', async () => {
+    const { probe, test } = setup(undefined, [...CATALOG], { provider: 'GOOGLE', model: 'modelo-bajo-g' })
+    await test({ provider: 'ANTHROPIC', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({ provider: 'ANTHROPIC', apiKey: API_KEY, models: ['modelo-recomendado-a'] })
+  })
+
+  it('QT-291 R19: sin conexion, prueba el predeterminado del proveedor escrito', async () => {
+    const { probe, test, repo } = setup(undefined, [...CATALOG], null)
+    await test({ provider: 'GOOGLE', apiKey: API_KEY }, admin())
+    expect(probe.call).toHaveBeenCalledWith({ provider: 'GOOGLE', apiKey: API_KEY, models: ['modelo-recomendado-g'] })
+    expect(repo.find).toHaveBeenCalledWith({ companyId: admin().companyId })
   })
 
   it('R10: la key se recorta antes de probar', async () => {
@@ -65,15 +95,16 @@ describe('probar una key escrita', () => {
     expect(JSON.stringify(result)).not.toContain(API_KEY)
   })
 
-  it('R11: un modelo no disponible nombra el modelo en el mensaje', async () => {
+  it('QT-291 R20: un modelo no disponible da «el modelo <modelo> ya no está disponible.»', async () => {
     const { test } = setup({
       ok: false,
-      failure: { kind: 'model_unavailable', httpStatus: 404, model: 'modelo-receta-o' },
+      failure: { kind: 'model_unavailable', httpStatus: 404, model: 'modelo-recomendado-o' },
     })
     const result = await test({ provider: 'OPENAI', apiKey: API_KEY }, admin())
-    expect(result).toMatchObject({
+    expect(result).toEqual({
+      status: 'tested',
       ok: false,
-      message: 'Error con tu proveedor: tu cuenta no tiene acceso al modelo modelo-receta-o.',
+      message: 'Error con tu proveedor: el modelo modelo-recomendado-o ya no está disponible.',
     })
   })
 
@@ -85,6 +116,7 @@ describe('probar una key escrita', () => {
       expect(repo.update).not.toHaveBeenCalled()
       expect(repo.remove).not.toHaveBeenCalled()
       expect(cipher.encrypt).not.toHaveBeenCalled()
+      expect(cipher.decrypt).not.toHaveBeenCalled()
     }
   })
 

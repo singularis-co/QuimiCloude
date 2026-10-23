@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { ComponentProps } from 'react';
+
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { setupUser } from '../../helpers/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -554,7 +556,7 @@ describe('StepReader — mode="ejecucion" (rediseno de planta, 2026-09-21, fuera
     expect(screen.getByTestId('step-reader').className).toContain('env(safe-area-inset-bottom');
   });
 
-  it('QC-265 R25: en "ejecucion" los botones van en talla xl, Anterior a 1/3 y la accion a 2/3', () => {
+  it('QC-265 R25 (enmendado): en "ejecucion" los botones van en talla xl y Anterior y la accion tienen el mismo ancho', () => {
     render(
       <StepReader steps={TRES_PASOS} onFinish={vi.fn()} title="Receta de prueba" mode="ejecucion" />,
     );
@@ -567,7 +569,8 @@ describe('StepReader — mode="ejecucion" (rediseno de planta, 2026-09-21, fuera
     }
     const fila = anterior.parentElement as HTMLElement;
     expect(fila).toBe(siguiente.parentElement);
-    expect(fila.className).toContain('grid-cols-[minmax(0,1fr)_minmax(0,2fr)]');
+    expect(fila).toHaveClass('grid', 'grid-cols-2');
+    expect(fila.className).not.toContain('2fr');
     expect(fila.firstElementChild).toBe(anterior);
   });
 
@@ -997,9 +1000,83 @@ describe('StepReader — espera minima por paso', () => {
     }
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 4');
 
-    const motivo = screen.getByTestId('step-reader-wait-reason');
+    const siguiente = screen.getByTestId('step-reader-next');
     expect(screen.getAllByTestId('step-reader-wait-ring')).toHaveLength(1);
-    expect(within(motivo).getAllByTestId('countdown-timer')).toHaveLength(1);
+    expect(screen.getAllByTestId('countdown-timer')).toHaveLength(1);
+    expect(within(siguiente).getByTestId('countdown-timer')).toBeInTheDocument();
+  });
+
+  function renderEjecucionConEspera(steps: readonly RecipeStepDocument[] = TRES_PASOS_SIN_ITEMS) {
+    return render(
+      <StepReader
+        steps={steps}
+        onFinish={vi.fn()}
+        title="Receta de prueba"
+        mode="ejecucion"
+        minStepSeconds={5}
+      />,
+    );
+  }
+
+  it('en "ejecucion", la cuenta va dentro de Siguiente y no en el cuerpo del paso', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera();
+
+    const siguiente = screen.getByTestId('step-reader-next');
+    const cuenta = within(siguiente).getByTestId('step-reader-button-countdown');
+    expect(within(cuenta).getByTestId('countdown-timer')).toHaveTextContent('00:05');
+    expect(within(cuenta).getByTestId('step-reader-wait-ring')).toBeInTheDocument();
+    expect(cuenta).toHaveAttribute('aria-hidden', 'true');
+    expect(within(cuenta).getByTestId('countdown-timer')).toHaveClass('tabular-nums');
+
+    const acciones = screen.getByTestId('step-reader-actions');
+    expect(acciones).toContainElement(screen.getByTestId('countdown-timer'));
+    expect(within(acciones).getByTestId('step-reader-wait-reason')).not.toContainElement(
+      screen.getByTestId('countdown-timer'),
+    );
+
+    avanzarReloj(2000);
+    expect(within(siguiente).getByTestId('countdown-timer')).toHaveTextContent('00:03');
+  });
+
+  it('en "ejecucion", el nombre accesible de Siguiente no cambia con la cuenta y el motivo va por aria-describedby', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera();
+
+    const siguiente = screen.getByRole('button', { name: 'Siguiente' });
+    expect(siguiente).toBeDisabled();
+    const motivo = screen.getByTestId('step-reader-wait-reason');
+    expect(motivo).toHaveClass('sr-only');
+    expect(motivo).toHaveTextContent('para continuar.');
+    expect(motivo).not.toHaveTextContent(/\d/);
+    expect(siguiente.getAttribute('aria-describedby')?.split(' ')).toContain(motivo.id);
+  });
+
+  it('en "ejecucion", al cumplirse la espera la cuenta sale del boton y se habilita', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera();
+
+    avanzarReloj(5000);
+
+    const siguiente = screen.getByTestId('step-reader-next');
+    expect(siguiente).toBeEnabled();
+    expect(siguiente).toHaveTextContent(/^Siguiente$/);
+    expect(screen.queryByTestId('step-reader-button-countdown')).toBeNull();
+    expect(screen.queryByTestId('step-reader-wait-reason')).toBeNull();
+    expect(siguiente).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('en "ejecucion", en el ultimo paso la cuenta va dentro de Finalizar', () => {
+    vi.useFakeTimers();
+    renderEjecucionConEspera([PASO_SIN_ITEMS_A]);
+
+    const finalizar = screen.getByTestId('step-reader-finish');
+    expect(finalizar).toBeDisabled();
+    expect(within(finalizar).getByTestId('countdown-timer')).toHaveTextContent('00:05');
+
+    avanzarReloj(5000);
+    expect(finalizar).toBeEnabled();
+    expect(within(finalizar).queryByTestId('countdown-timer')).toBeNull();
   });
 });
 
@@ -1292,3 +1369,260 @@ describe.each(['lectura', 'ejecucion'] as const)(
     });
   },
 );
+
+/** HTML con los `useId` neutralizados (su contador es global entre renders) y una etiqueta por linea. */
+function arbolDe(container: HTMLElement): string {
+  return container.innerHTML.replace(/_[rR]_[0-9a-z]+_/g, 'ID').replace(/></g, '>\n<');
+}
+
+describe('StepReader — layout (QC-264): inline y ejecucion no cambian de arbol', () => {
+  const props = {
+    steps: TRES_PASOS,
+    onFinish: () => {},
+    title: 'Receta de prueba',
+    minStepSeconds: 5,
+    renderStepAddon: (position: number) => <div data-testid="addon">{`Extra ${position}`}</div>,
+  };
+
+  it('R26: en lectura, sin layout pinta el arbol de hoy y con layout="inline" el mismo', () => {
+    const { container, unmount } = render(<StepReader {...props} />);
+    const hoy = arbolDe(container);
+    unmount();
+    expect(hoy).toMatchInlineSnapshot(`
+      "<section data-testid="step-reader" class="flex flex-col gap-4">
+      <h2 id="ID-title" data-testid="step-reader-title" class="text-base font-semibold">Receta de prueba</h2>
+      <p aria-live="polite" data-testid="step-reader-position" class="text-base text-muted-foreground">Paso 1 de 3</p>
+      <div data-testid="step-reader-document" class="flex flex-col gap-3 text-base">
+      <p data-testid="step-reader-paragraph-0" class="min-h-6 text-base whitespace-pre-wrap">Pesar el pigmento en la balanza</p>
+      <ul data-testid="step-reader-checklist-1" class="flex flex-col gap-1">
+      <li>
+      <label data-testid="step-reader-item-label-1-0" class="flex min-h-11 min-w-11 cursor-pointer items-center gap-3 text-base">
+      <span data-unchecked="" role="checkbox" tabindex="0" id="base-ui-ID" aria-checked="false" aria-labelledby="ID-0-item-1-0" data-slot="checkbox" data-testid="step-reader-item-1-0" class="peer relative flex size-4 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary min-h-11 min-w-11 shrink-0">
+      </span>
+      <input style="clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: 1px; margin: -1px; position: fixed; top: 0px; left: 0px;" tabindex="-1" aria-hidden="true" type="checkbox">
+      <span id="ID-0-item-1-0">Balanza calibrada</span>
+      </label>
+      </li>
+      <li>
+      <label data-testid="step-reader-item-label-1-1" class="flex min-h-11 min-w-11 cursor-pointer items-center gap-3 text-base">
+      <span data-unchecked="" role="checkbox" tabindex="0" id="base-ui-ID" aria-checked="false" aria-labelledby="ID-0-item-1-1" data-slot="checkbox" data-testid="step-reader-item-1-1" class="peer relative flex size-4 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary min-h-11 min-w-11 shrink-0">
+      </span>
+      <input style="clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: 1px; margin: -1px; position: fixed; top: 0px; left: 0px;" tabindex="-1" aria-hidden="true" type="checkbox">
+      <span id="ID-0-item-1-1">Guantes puestos</span>
+      </label>
+      </li>
+      </ul>
+      </div>
+      <div data-testid="addon">Extra 1</div>
+      <p id="ID-reason" data-testid="step-reader-blocked-reason" class="text-base">Marca los 2 elementos pendientes para continuar.</p>
+      <p id="ID-wait-reason" data-testid="step-reader-wait-reason" class="text-base">Espera <span role="timer" aria-label="Tiempo restante: 00:05" class="tabular-nums font-medium text-destructive" data-testid="countdown-timer">00:05</span> para continuar.</p>
+      <div class="flex flex-wrap items-center gap-2">
+      <button type="button" data-disabled="" tabindex="0" disabled="" data-slot="button" data-testid="step-reader-previous" class="group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 btn-veil border-border bg-background active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 h-9 gap-1.5 px-3.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 min-h-11 min-w-11">Anterior</button>
+      <button type="button" data-disabled="" tabindex="0" disabled="" data-slot="button" data-testid="step-reader-next" aria-describedby="ID-reason ID-wait-reason" class="group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 btn-shine bg-primary text-primary-foreground active:not-aria-[haspopup]:scale-[0.98] h-9 gap-1.5 px-3.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 min-h-11 min-w-11">Siguiente</button>
+      </div>
+      </section>"
+    `);
+
+    const { container: inline } = render(<StepReader {...props} layout="inline" />);
+    expect(arbolDe(inline)).toBe(hoy);
+  });
+
+  it('R26: en ejecucion pinta el arbol de hoy aunque reciba layout="panel"', () => {
+    const { container, unmount } = render(<StepReader {...props} mode="ejecucion" />);
+    const hoy = arbolDe(container);
+    unmount();
+    expect(hoy).toMatchInlineSnapshot(`
+      "<section data-testid="step-reader" class="flex flex-col gap-4 pb-[calc(140px+env(safe-area-inset-bottom,0px))]">
+      <div tabindex="-1" data-testid="step-reader-heading" class="flex flex-col gap-1 outline-none">
+      <div data-testid="step-reader-progress" role="list" class="flex gap-1">
+      <span role="listitem" data-testid="step-reader-progress-segment-0" data-state="current" class="h-1.5 flex-1 rounded-full bg-primary/50">
+      </span>
+      <span role="listitem" data-testid="step-reader-progress-segment-1" data-state="pending" class="h-1.5 flex-1 rounded-full bg-muted">
+      </span>
+      <span role="listitem" data-testid="step-reader-progress-segment-2" data-state="pending" class="h-1.5 flex-1 rounded-full bg-muted">
+      </span>
+      </div>
+      <h2 id="ID-title" data-testid="step-reader-title" class="text-xl font-bold sm:text-2xl">Receta de prueba</h2>
+      <p aria-live="polite" data-testid="step-reader-position" class="text-sm font-medium text-muted-foreground">Paso 1 de 3</p>
+      </div>
+      <div data-testid="step-reader-document" class="flex flex-col gap-3 text-base">
+      <p data-testid="step-reader-paragraph-0" class="min-h-6 text-base whitespace-pre-wrap">Pesar el pigmento en la balanza</p>
+      <ul data-testid="step-reader-checklist-1" class="flex flex-col gap-1">
+      <li>
+      <label data-testid="step-reader-item-label-1-0" class="flex min-h-11 min-w-11 cursor-pointer items-center gap-3 text-base">
+      <span data-unchecked="" role="checkbox" tabindex="0" id="base-ui-ID" aria-checked="false" aria-labelledby="ID-0-item-1-0" data-slot="checkbox" data-testid="step-reader-item-1-0" class="peer relative flex size-4 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary min-h-11 min-w-11 shrink-0">
+      </span>
+      <input style="clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: 1px; margin: -1px; position: fixed; top: 0px; left: 0px;" tabindex="-1" aria-hidden="true" type="checkbox">
+      <span id="ID-0-item-1-0">Balanza calibrada</span>
+      </label>
+      </li>
+      <li>
+      <label data-testid="step-reader-item-label-1-1" class="flex min-h-11 min-w-11 cursor-pointer items-center gap-3 text-base">
+      <span data-unchecked="" role="checkbox" tabindex="0" id="base-ui-ID" aria-checked="false" aria-labelledby="ID-0-item-1-1" data-slot="checkbox" data-testid="step-reader-item-1-1" class="peer relative flex size-4 items-center justify-center rounded-[4px] border border-input transition-colors outline-none group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary min-h-11 min-w-11 shrink-0">
+      </span>
+      <input style="clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: 1px; margin: -1px; position: fixed; top: 0px; left: 0px;" tabindex="-1" aria-hidden="true" type="checkbox">
+      <span id="ID-0-item-1-1">Guantes puestos</span>
+      </label>
+      </li>
+      </ul>
+      </div>
+      <div data-testid="addon">Extra 1</div>
+      <div data-testid="step-reader-actions" class="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom,0px))]">
+      <div class="mx-auto flex w-full max-w-[720px] flex-col gap-2">
+      <div data-testid="step-reader-reason-slot" class="min-h-6">
+      <p id="ID-reason" data-testid="step-reader-blocked-reason" class="text-center text-base">Marca los 2 elementos pendientes para continuar.</p>
+      <p id="ID-wait-reason" data-testid="step-reader-wait-reason" class="sr-only">Espera a que termine la cuenta regresiva para continuar.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+      <button type="button" data-disabled="" tabindex="0" disabled="" data-slot="button" data-testid="step-reader-previous" class="group/button inline-flex shrink-0 cursor-pointer items-center justify-center border bg-clip-padding whitespace-nowrap transition-all outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 btn-veil border-border bg-background active:not-aria-[haspopup]:scale-[0.98] aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 h-13 gap-2 rounded-[10px] px-5 text-base font-semibold min-h-11 w-full min-w-11">Anterior</button>
+      <button type="button" data-disabled="" tabindex="0" disabled="" data-slot="button" data-testid="step-reader-next" aria-describedby="ID-reason ID-wait-reason" class="group/button inline-flex shrink-0 cursor-pointer items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap transition-all outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 btn-shine bg-primary text-primary-foreground active:not-aria-[haspopup]:scale-[0.98] h-13 gap-2 rounded-[10px] px-5 text-base font-semibold min-h-11 w-full min-w-11">Siguiente<span aria-hidden="true" data-testid="step-reader-button-countdown" class="inline-flex items-center gap-1.5">
+      <svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true" data-testid="step-reader-wait-ring" class="shrink-0 size-5 [&amp;_[data-slot=countdown-ring-progress]]:stroke-primary-foreground [&amp;_[data-slot=countdown-ring-track]]:stroke-primary-foreground/30">
+      <circle cx="24" cy="24" r="20" fill="none" stroke-width="4" class="stroke-muted" data-slot="countdown-ring-track">
+      </circle>
+      <circle cx="24" cy="24" r="20" fill="none" stroke-width="4" stroke-linecap="round" transform="rotate(-90 24 24)" class="stroke-primary" data-slot="countdown-ring-progress" stroke-dasharray="125.66370614359172" stroke-dashoffset="0" style="transition: stroke-dashoffset 5s linear;">
+      </circle>
+      </svg>
+      <span role="timer" aria-label="Tiempo restante: 00:05" class="tabular-nums font-medium text-current" data-testid="countdown-timer">00:05</span>
+      </span>
+      </button>
+      </div>
+      </div>
+      </div>
+      </section>"
+    `);
+
+    const { container: panel } = render(<StepReader {...props} mode="ejecucion" layout="panel" />);
+    expect(arbolDe(panel)).toBe(hoy);
+  });
+});
+
+describe('StepReader — layout="panel" (QC-264): el lector de la vista previa', () => {
+  function renderPanel(extra: Partial<ComponentProps<typeof StepReader>> = {}) {
+    return render(<StepReader steps={TRES_PASOS} onFinish={vi.fn()} layout="panel" {...extra} />);
+  }
+
+  it('R22: cabecera con «Paso N de M» y un tramo por paso marcado hasta el actual', async () => {
+    const user = setupUser();
+    renderPanel();
+
+    const cabecera = screen.getByTestId('step-reader-heading');
+    expect(screen.getByTestId('step-reader')).toHaveAttribute('data-layout', 'panel');
+    expect(within(cabecera).getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 3');
+    expect(within(cabecera).getAllByRole('listitem')).toHaveLength(3);
+    const estados = () =>
+      [0, 1, 2].map((i) =>
+        screen.getByTestId(`step-reader-progress-segment-${i}`).getAttribute('data-state'),
+      );
+    expect(estados()).toEqual(['current', 'pending', 'pending']);
+
+    await marcarTodo(user);
+    await user.click(screen.getByTestId('step-reader-next'));
+
+    expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 3');
+    expect(estados()).toEqual(['done', 'current', 'pending']);
+  });
+
+  it('R22: el motivo es un Notice info y la espera un Notice warning, en el cuerpo y referenciados por el boton', () => {
+    renderPanel({ minStepSeconds: 5 });
+
+    const cuerpo = screen.getByTestId('step-reader-body');
+    const motivo = within(cuerpo).getByTestId('step-reader-blocked-reason');
+    const espera = within(cuerpo).getByTestId('step-reader-wait-reason');
+    expect(motivo).toHaveAttribute('data-tone', 'info');
+    expect(motivo).toHaveTextContent('Marca los 2 elementos pendientes para continuar.');
+    expect(espera).toHaveAttribute('data-tone', 'warning');
+    expect(espera).toHaveTextContent('Espera 00:05 para continuar.');
+
+    const siguiente = screen.getByTestId('step-reader-next');
+    expect(siguiente).toBeDisabled();
+    expect(siguiente.getAttribute('aria-describedby')?.split(' ')).toEqual([motivo.id, espera.id]);
+  });
+
+  it('R22: el motivo de stepBlockReason sale en el mismo Notice info y renderStepAddon en el cuerpo, tras el paso', async () => {
+    const user = setupUser();
+    renderPanel({
+      stepBlockReason: () => 'Sube al menos 1 foto de evidencia para continuar.',
+      renderStepAddon: (position) => <div data-testid="addon">{`Extra ${position}`}</div>,
+    });
+
+    const cuerpo = screen.getByTestId('step-reader-body');
+    const addon = within(cuerpo).getByTestId('addon');
+    expect(addon).toHaveTextContent('Extra 1');
+    expect(
+      screen.getByTestId('step-reader-step').compareDocumentPosition(addon) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await marcarTodo(user);
+
+    const motivos = within(cuerpo).getAllByTestId('step-reader-blocked-reason');
+    expect(motivos).toHaveLength(1);
+    expect(motivos[0]).toHaveAttribute('data-tone', 'info');
+    expect(motivos[0]).toHaveTextContent('Sube al menos 1 foto de evidencia para continuar.');
+    expect(screen.getByTestId('step-reader-next')).toHaveAttribute('aria-describedby', motivos[0].id);
+  });
+
+  it('R22: pie con «Anterior» y «Siguiente»/«Finalizar» de 44 px, alineados al final y con sus testids', () => {
+    renderPanel({ initialStepPosition: 2 });
+
+    const pie = screen.getByTestId('step-reader-actions');
+    expect(pie.className).toContain('justify-end');
+    expect(pie.className).toContain('env(safe-area-inset-bottom)');
+    const anterior = within(pie).getByTestId('step-reader-previous');
+    const siguiente = within(pie).getByTestId('step-reader-next');
+    expect(anterior).toHaveTextContent('Anterior');
+    expect(siguiente).toHaveTextContent('Siguiente');
+    for (const boton of [anterior, siguiente]) {
+      expect(boton.className).toContain('min-h-11');
+      expect(boton.className).toContain('min-w-11');
+    }
+    expect(anterior.className).toContain('basis-40');
+    expect(siguiente.className).toContain('basis-56');
+
+    fireEvent.click(siguiente);
+    const finalizar = within(pie).getByTestId('step-reader-finish');
+    expect(finalizar).toHaveTextContent('Finalizar');
+    expect(finalizar.className).toContain('min-h-11');
+    expect(finalizar.className).toContain('basis-56');
+    expect(within(pie).queryByTestId('step-reader-next')).toBeNull();
+  });
+
+  it('R24: data-direction sigue al ultimo cambio, igual que onStepChange, tambien tras un stepRequest', () => {
+    const onStepChange = vi.fn();
+    const props = {
+      steps: [PASO_SIN_ITEMS, PASO_SIN_ITEMS, PASO_SIN_ITEMS],
+      onFinish: vi.fn(),
+      layout: 'panel' as const,
+      onStepChange,
+    };
+    const { rerender } = render(<StepReader {...props} />);
+    const paso = () => screen.getByTestId('step-reader-step');
+    expect(paso()).toHaveAttribute('data-direction', 'advance');
+
+    fireEvent.click(screen.getByTestId('step-reader-next'));
+    expect(paso()).toHaveAttribute('data-direction', 'advance');
+    expect(paso().className).toContain('slide-in-from-right-7');
+
+    fireEvent.click(screen.getByTestId('step-reader-previous'));
+    expect(paso()).toHaveAttribute('data-direction', 'go_back');
+    expect(paso().className).toContain('slide-in-from-left-7');
+    expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'go_back', position: 1 });
+
+    rerender(<StepReader {...props} stepRequest={{ position: 3, id: 1 }} />);
+    expect(paso()).toHaveAttribute('data-direction', 'advance');
+    expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'advance', position: 3 });
+
+    rerender(<StepReader {...props} stepRequest={{ position: 2, id: 2 }} />);
+    expect(paso()).toHaveAttribute('data-direction', 'go_back');
+    expect(onStepChange).toHaveBeenLastCalledWith({ direction: 'go_back', position: 2 });
+  });
+
+  it('R24: entra con animacion de 200 ms y no se desplaza con prefers-reduced-motion', () => {
+    renderPanel();
+
+    const clases = screen.getByTestId('step-reader-step').className.split(' ');
+    expect(clases).toEqual(
+      expect.arrayContaining(['animate-in', 'fade-in', 'duration-200', 'motion-reduce:animate-none']),
+    );
+  });
+});

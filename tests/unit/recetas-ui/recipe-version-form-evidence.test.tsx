@@ -64,6 +64,7 @@ function versionDetail(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
     updatedBy: null,
     steps: [paragraph('Pesar'), paragraph('Mezclar', true)],
     packingSteps: [paragraph('Etiquetar', true), paragraph('Sellar')],
+    conditioningSteps: [],
     lines: LINES,
     tools: [],
     original: { id: ORIGINAL_ID, name: 'Jabón' },

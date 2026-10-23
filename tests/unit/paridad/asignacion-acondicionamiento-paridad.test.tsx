@@ -12,12 +12,12 @@ import {
   ConditionedOrdersListSection,
   ConditioningOrdersListSection,
   ConditioningOrdersSkeleton,
-  DeliveredConditionedOrdersListSection,
   OrderOutcomeNotice,
 } from '@/app/(private)/asignacion/components';
 import { PackingOrderScreen } from '@/app/(private)/asignacion/empaque/[id]/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type {
+  ConditioningBatchForm,
   ConditioningBatchLineView,
   ConditioningOrderDetail,
   ConditioningOrderRow,
@@ -46,7 +46,6 @@ const {
   getSessionContextMock,
   listConditioningOrdersMock,
   listConditionedOrdersMock,
-  listDeliveredConditionedOrdersMock,
   finishConditioningActionMock,
 } = vi.hoisted(() => ({
   routerMock: {
@@ -61,7 +60,6 @@ const {
   getSessionContextMock: vi.fn<() => Promise<unknown>>(),
   listConditioningOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
   listConditionedOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
-  listDeliveredConditionedOrdersMock: vi.fn<(actor: unknown, query: unknown) => Promise<unknown>>(),
   finishConditioningActionMock:
     vi.fn<(prev: FinishConditioningResult, data: FormData) => Promise<FinishConditioningResult>>(),
 }));
@@ -72,7 +70,6 @@ vi.mock('@/lib/composition', () => ({
     listPackingOrders: vi.fn(),
     listConditioningOrders: listConditioningOrdersMock,
     listConditionedOrders: listConditionedOrdersMock,
-    listDeliveredConditionedOrders: listDeliveredConditionedOrdersMock,
   },
   observabilidad: {
     readRequestIdHeader: vi.fn(async () => '7b1c9f2e-4d3a-4f5b-9c0d-1e2f3a4b5c6d'),
@@ -120,8 +117,8 @@ const POR_ACONDICIONAR: ConditioningOrderRow = {
   unitId: 'unit-kg',
   unitLabel: 'kg',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12 },
-    { presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: null, packages: 4 },
+    { lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 12, presentationContent: null, presentationUnitLabel: null },
+    { lineId: 'linea-2', packedPackages: null, presentationId: 'pres-2', presentationName: 'Bolsa', packagingName: null, packages: 4, presentationContent: null, presentationUnitLabel: null },
   ],
   status: 'POR_ACONDICIONAR',
   conditionedByName: null,
@@ -147,7 +144,7 @@ const ACONDICIONADO: FinishedOrderView = {
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
-    { presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 5 },
+    { lineId: 'linea-3', packedPackages: null, presentationId: 'pres-1', presentationName: 'Frasco', packagingName: '500 g', packages: 5, presentationContent: null, presentationUnitLabel: null },
   ],
   unitId: null,
   unitLabel: null,
@@ -214,8 +211,15 @@ const LINEA_DE_LOTE_COMPLETA: ConditioningBatchLineView = {
   productionDate: '2026-09-30',
 };
 
+const FORMULARIO_COMPARTIDO: ConditioningBatchForm = {
+  kind: 'shared',
+  lot: 'L-2026-07',
+  expiryDate: '2027-09-30',
+  productionDate: '2026-09-30',
+};
+
 function detalle(overrides: Partial<ConditioningOrderDetail> = {}): ConditioningOrderDetail {
-  return { ...POR_ACONDICIONAR, team: [], batchData: null, ...overrides };
+  return { ...POR_ACONDICIONAR, team: [], batchData: null, conditioningSteps: null, ...overrides };
 }
 
 const MIO = {
@@ -240,18 +244,20 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
-      { presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5 },
-      { presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Garrafa azul', packages: 2 },
-      { presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1 },
+      { lineId: 'linea-4', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-5', packedPackages: null, presentationId: 'p-2', presentationName: 'Garrafa 5 l', packagingName: 'Garrafa azul', packages: 2, presentationContent: null, presentationUnitLabel: null },
+      { lineId: 'linea-6', packedPackages: null, presentationId: 'p-3', presentationName: null, packagingName: null, packages: 1, presentationContent: null, presentationUnitLabel: null },
     ],
     unitId: 'unit-1',
     unitLabel: 'kg',
-    packages: '8',
     status: 'POR_EMPACAR',
+    priority: 'MEDIA',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     packedByName: null,
     packedById: null,
     packingSteps: [],
     packingEvidence: [],
+    finish: null,
     ...overrides,
   };
 }
@@ -295,13 +301,6 @@ const LISTAS: readonly Lista[] = [
     fila: ACONDICIONADO,
     montar: (params) => ConditionedOrdersListSection({ params }),
   },
-  {
-    nombre: 'entregados',
-    responder: (items, page) =>
-      listDeliveredConditionedOrdersMock.mockResolvedValue(pagina(items, page)),
-    fila: ACONDICIONADO,
-    montar: (params) => DeliveredConditionedOrdersListSection({ params }),
-  },
 ];
 
 describe('paridad del acondicionador — sus tres listas', () => {
@@ -326,7 +325,7 @@ describe('paridad del acondicionador — sus tres listas', () => {
     expect(arbolAccesible()).toMatchSnapshot();
   });
 
-  it.each(['por_acondicionar', 'acondicionados', 'acondicionados_entregados'] as const)(
+  it.each(['por_acondicionar', 'acondicionados'] as const)(
     'R6 R24 — esqueleto de %s',
     (list) => {
       render(<ConditioningOrdersSkeleton rows={3} list={list} />);
@@ -368,12 +367,22 @@ describe('paridad del acondicionador — el detalle', () => {
     expect(arbolAccesible()).toMatchSnapshot();
   });
 
-  it('R11 R13 R24 — mio, con datos de lote incompletos y «Terminar» bloqueado', () => {
+  it('R11 R13 R15 R24 — mio, con datos de lote incompletos y «Terminar» bloqueado', () => {
     render(
       <ConditioningOrderScreen
         order={detalle({
           ...MIO,
-          batchData: { lines: [LINEA_DE_LOTE, LINEA_DE_LOTE_COMPLETA], missingCount: 1 },
+          batchData: {
+            lines: [LINEA_DE_LOTE, LINEA_DE_LOTE_COMPLETA],
+            missingCount: 1,
+            form: {
+              kind: 'divergent',
+              lines: [
+                { presentationId: 'pres-1', lot: '0000042' },
+                { presentationId: 'pres-2', lot: 'L-2026-07' },
+              ],
+            },
+          },
         })}
         canFinish
         finishBlocked
@@ -385,8 +394,29 @@ describe('paridad del acondicionador — el detalle', () => {
   it('R11 R24 — mio, con los datos de lote completos y «Terminar» disponible', () => {
     render(
       <ConditioningOrderScreen
-        order={detalle({ ...MIO, batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0 } })}
+        order={detalle({
+          ...MIO,
+          batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0, form: FORMULARIO_COMPARTIDO },
+        })}
         canFinish
+      />,
+    );
+    expect(arbolAccesible()).toMatchSnapshot();
+  });
+
+  it('R17 R24 — mio, sin ninguna línea con lote: el formulario va deshabilitado', () => {
+    render(
+      <ConditioningOrderScreen
+        order={detalle({
+          ...MIO,
+          batchData: {
+            lines: [{ ...LINEA_DE_LOTE, batchId: null, provisionalLot: null }],
+            missingCount: 1,
+            form: { kind: 'no_batches' },
+          },
+        })}
+        canFinish
+        finishBlocked
       />,
     );
     expect(arbolAccesible()).toMatchSnapshot();
@@ -395,7 +425,11 @@ describe('paridad del acondicionador — el detalle', () => {
   it.each(['TERMINADO', 'ENTREGADO'] as const)('R11 R24 — %s, con su vuelta a la lista', (status) => {
     render(
       <ConditioningOrderScreen
-        order={detalle({ ...MIO, status, batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0 } })}
+        order={detalle({
+          ...MIO,
+          status,
+          batchData: { lines: [LINEA_DE_LOTE_COMPLETA], missingCount: 0, form: FORMULARIO_COMPARTIDO },
+        })}
       />,
     );
     expect(arbolAccesible()).toMatchSnapshot();
@@ -521,6 +555,12 @@ describe('paridad del empaque — la pantalla del pedido', () => {
         status: 'EN_EMPAQUE',
         packedById: ACTOR_ID,
         packedByName: 'Empacador De Prueba',
+        finish: {
+          orderQuantity: '12.5',
+          orderUnit: { id: 'unit-1', baseUnitId: null, factor: null },
+          orderUnitLabel: 'kg',
+          lines: [],
+        },
       }),
     );
     expect(arbolAccesible()).toMatchSnapshot();
@@ -535,7 +575,6 @@ describe('paridad del empaque — la pantalla del pedido', () => {
         recipeName: null,
         unitId: null,
         unitLabel: null,
-        packages: null,
       }),
     );
     expect(arbolAccesible()).toMatchSnapshot();

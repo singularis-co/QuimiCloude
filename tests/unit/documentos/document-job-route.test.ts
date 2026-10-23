@@ -15,7 +15,7 @@ import { trabajoConProveedor } from './run-document-job-doubles';
 
 import { POST } from '@/lib/modules/documentos/adapters/driving/document-job-route';
 
-import type { BatchStatus } from '@/lib/modules/documentos/domain/batch-status';
+import type { ReadBatch } from '@/lib/modules/documentos/domain/batch-status';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
 import type {
   ClaimedFile,
@@ -60,7 +60,7 @@ function cablearRunDocumentJobReal() {
     return { id: ARCHIVO, companyId: EMPRESA, batchId: 'batch-1', path: `${EMPRESA}/doc.pdf` };
   });
   const finish = vi.fn(async () => {});
-  const batch: BatchStatus = { id: 'batch-1', companyId: EMPRESA, strategy: 'catalogo', files: [] };
+  const batch: ReadBatch = { id: 'batch-1', companyId: EMPRESA, strategy: 'catalogo', files: [] };
   const repository: DocumentBatchRepository = {
     createBatch: vi.fn(async () => {
       throw new Error('run-document-job no crea tandas');

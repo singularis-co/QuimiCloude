@@ -19,6 +19,7 @@ import type { RecipeDetail } from '@/lib/modules/recetas';
 import type { UnitRef, UnitView } from '@/lib/modules/unidades';
 
 import { setupUser } from '../../helpers/user-event';
+import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 import { arbolAccesible } from './arbol-accesible';
 
 /**
@@ -233,6 +234,9 @@ const CLIENTE: CustomerView = {
   lastNames: 'Pérez Gómez',
   city: 'Bogotá',
   phone: '3001234567',
+  phoneCountry: null,
+  phoneE164: null,
+  phoneIssue: null,
   email: 'ana@example.com',
   address: 'Calle 1 # 2-3',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -342,6 +346,7 @@ const DETALLE_RECETA: RecipeDetail = {
   updatedBy: null,
   steps: [],
   packingSteps: [],
+  conditioningSteps: [],
   lines: [
     {
       id: 'linea-1',
@@ -370,6 +375,8 @@ const PEDIDO: OrderSummary = {
   status: 'EN_CURSO',
   cancellationReason: null,
   ingredientsCost: null,
+  packagingCost: null,
+  actualCost: null,
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   createdBy: null,
@@ -377,7 +384,9 @@ const PEDIDO: OrderSummary = {
   presentationLines: [],
   unitId: UNIDAD_KG.id,
   unitLabel: UNIDAD_KG.symbol,
+  pendingDelivery: { kind: 'not_packed' },
   customer: null,
+  recipeImageUrl: null,
 };
 
 function porDefecto() {
@@ -405,12 +414,15 @@ function porDefecto() {
 beforeEach(() => {
   vi.clearAllMocks();
   porDefecto();
+  // El selector de pais del telefono del cliente decide popup u hoja con `matchMedia`.
+  setViewportWidth(WIDE_VIEWPORT);
 });
 
 afterEach(async () => {
   cleanup();
   for (const soltar of enVuelo.splice(0)) soltar();
   await act(async () => {});
+  resetViewport();
 });
 
 type Formulario = {

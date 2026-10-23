@@ -12,6 +12,8 @@ export type PackagingRef = {
   readonly unitId: string;
   /** Disponible en envases. */
   readonly available: string;
+  /** URL publica de la imagen del envase; `null` si no tiene o si no hay almacenamiento cableado. */
+  readonly imageUrl?: string | null;
 };
 
 export type PackagingCostingBatch = {

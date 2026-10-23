@@ -291,6 +291,26 @@ describe('QC-195 — restricciones de envases en la base', () => {
   it('R32 — una linea guardada antes de la migracion queda intacta, sin envase y sin apartados', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seed(tx);
+      // 2026-10-19 (QC-288): la clave candidata `products_company_id_id_key` que el `down.sql` de
+      // QC-195 suelta ya no la usa solo QC-195: la FK compuesta `order_deliveries_product_id_fkey`
+      // de una migracion POSTERIOR (`20261016130100_direct_deliveries`) depende de ella, y Postgres
+      // rechaza el DROP (2BP01). En un rollback real esa FK cae antes, con el `down.sql` de su
+      // propia migracion, que se revierte primero. Aqui solo se revierte QC-195, asi que el test
+      // hace lo mismo a mano: suelta las FK posteriores que dependen de la clave, corre el down y
+      // el up de QC-195, y las vuelve a crear con su definicion leida del catalogo. La lista es
+      // CERRADA: una FK nueva sobre la clave vuelve a poner esto en rojo hasta que se anote aqui.
+      const dependents = await tx.$queryRaw<ReadonlyArray<{ table: string; name: string; definition: string }>>`
+        SELECT c.conrelid::regclass::text AS "table", c.conname AS "name",
+               pg_get_constraintdef(c.oid) AS "definition"
+          FROM pg_constraint c
+         WHERE c.contype = 'f'
+           AND c.conindid = 'products_company_id_id_key'::regclass
+           AND c.conname <> 'order_presentation_lines_company_id_packaging_product_id_fkey'
+         ORDER BY c.conname`;
+      expect(dependents.map((fk) => fk.name)).toEqual(['order_deliveries_product_id_fkey']);
+      for (const fk of dependents) {
+        await tx.$executeRawUnsafe(`ALTER TABLE ${fk.table} DROP CONSTRAINT "${fk.name}"`);
+      }
       await runScript(tx, downSource);
       const orderId = await insertOrder(tx, f);
       await tx.$executeRaw`
@@ -303,6 +323,9 @@ describe('QC-195 — restricciones de envases en la base', () => {
           FROM "order_presentation_lines" WHERE "order_id" = CAST(${orderId} AS uuid)`;
 
       await runScript(tx, upSource);
+      for (const fk of dependents) {
+        await tx.$executeRawUnsafe(`ALTER TABLE ${fk.table} ADD CONSTRAINT "${fk.name}" ${fk.definition}`);
+      }
 
       const after = await tx.$queryRaw<ReadonlyArray<Record<string, unknown>>>`
         SELECT "id", "presentation_id", "packages", "presentation_content"::text AS content, "updated_at"

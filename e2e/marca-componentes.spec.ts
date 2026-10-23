@@ -28,6 +28,7 @@ import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 import { readSidebarOpenState, SIDEBAR_STATE_COOKIE } from '@/lib/shared/ui/sidebar-state';
 import { THEME_COOKIE } from '@/lib/shared/ui/theme-state';
 
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 
@@ -580,6 +581,7 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  await enableAllAddons(companyId);
 
   const role = await prisma.role.findUnique({
     where: { name: ROLE_ADMINISTRADOR },

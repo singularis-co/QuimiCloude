@@ -21,7 +21,6 @@ function lectores(overrides: Partial<ViewCountReaders> = {}): ViewCountReaders {
     por_empacar: lectorCon(4),
     por_acondicionar: lectorCon(5),
     acondicionados: lectorCon(6),
-    acondicionados_entregados: lectorCon(7),
     ...overrides,
   };
 }
@@ -47,16 +46,15 @@ describe('readViewCounts', () => {
 
     expect(readers.asignados).not.toHaveBeenCalled();
     expect(readers.todos).not.toHaveBeenCalled();
-    expect(readers.acondicionados_entregados).not.toHaveBeenCalled();
   });
 
   it('R10: el contador es el `total` de la lista', async () => {
     const counts = await readViewCounts(
-      ['por_acondicionar', 'acondicionados', 'acondicionados_entregados'],
-      lectores({ acondicionados_entregados: lectorCon(0) }),
+      ['por_acondicionar', 'acondicionados'],
+      lectores({ acondicionados: lectorCon(0) }),
     );
 
-    expect(counts).toEqual({ por_acondicionar: 5, acondicionados: 6, acondicionados_entregados: 0 });
+    expect(counts).toEqual({ por_acondicionar: 5, acondicionados: 0 });
   });
 
   it('R11: una vista cuya lista falla queda sin contador y el resto se lee igual, sin lanzar', async () => {

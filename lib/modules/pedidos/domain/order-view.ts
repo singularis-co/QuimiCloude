@@ -2,6 +2,7 @@ import type { OrderPriority, OrderStatus } from './order-classification';
 import type { EditableOrderStatus } from './order-input';
 import type { OrderCustomer } from './order-customer';
 import type { OrderNumber } from './order-number';
+import type { OrderDeliveryState } from './order-pending-delivery';
 
 /**
  * Contratos de entrada y salida del pedido (`design.md > 7.3`). Viven en `domain/` -no en
@@ -33,11 +34,13 @@ export type OrderPresentationLineWrite = {
   readonly packagingProductId: string | null;
 };
 
-/** Una linea del reparto tal como la lee el puerto: sin el contenido copiado, que solo
- *  necesita Terminar y lo lee por su propio camino. */
+/** Una linea del reparto tal como la lee el puerto, con el contenido copiado al guardarla: la
+ *  ficha y el listado lo pintan junto al envase («Envase 2 · 300 ml»). */
 export type OrderPresentationLineRow = {
   readonly presentationId: string;
   readonly packages: number;
+  /** Cadena decimal copiada al guardar la linea; `null` = sin copia, vale la de la presentacion. */
+  readonly presentationContent: string | null;
   /** `null` en una linea anterior a que el reparto nombrara su envase. */
   readonly packagingProductId: string | null;
 };
@@ -52,6 +55,12 @@ export type OrderPresentationLineView = {
   readonly packagingProductId: string | null;
   /** `null` en esa linea antigua, o si el envase no vuelve del catalogo. */
   readonly packagingName: string | null;
+  /** Cadena decimal: el contenido copiado en la linea o, sin copia, el vigente de la
+   *  presentacion. `null` = ninguno de los dos: la etiqueta no pinta el volumen. */
+  readonly presentationContent: string | null;
+  /** Simbolo (o nombre) de la unidad de la PRESENTACION, en la que se expresa el contenido;
+   *  `null` si la presentacion o su unidad no vuelven del catalogo. */
+  readonly presentationUnitLabel: string | null;
 };
 
 /**
@@ -108,6 +117,12 @@ export type OrderRow = {
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
   readonly ingredientsCost: string | null;
+  /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
+   *  solo si `ingredientsCost` lo es. */
+  readonly packagingCost: string | null;
+  /** Coste real de lo consumido, fijado al Terminar el empaque; `null` sin terminar o sin
+   *  calculo posible, nunca `0`. Va aparte del estimado y no lo sustituye. */
+  readonly actualCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
@@ -152,11 +167,21 @@ export type OrderView = {
     readonly originalName: string;
     readonly versionName: string;
   } | null;
+  /** URL publica de la imagen de la receta; la de la original si `recipeId` es una version.
+   *  Llega con la misma lectura del catalogo que `recipeName`, sin consulta por fila. `null` =
+   *  sin imagen, o receta que no vuelve del catalogo. */
+  readonly recipeImageUrl: string | null;
   readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
   readonly ingredientsCost: string | null;
+  /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
+   *  solo si `ingredientsCost` lo es. */
+  readonly packagingCost: string | null;
+  /** Coste real de lo consumido, fijado al Terminar el empaque; `null` sin terminar o sin
+   *  calculo posible, nunca `0`. Va aparte del estimado y no lo sustituye. */
+  readonly actualCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
@@ -176,9 +201,11 @@ export type OrderView = {
 };
 
 /**
- * Cada fila del listado lleva LO MISMO que la ficha (`design.md > 7.3`): un pedido es una sola
- * linea y no hay nada pesado que dejar fuera, a diferencia de las `lines` de una receta. Se
- * declara como alias y no como una copia recortada para que las dos salidas no puedan diverger.
+ * Cada fila del listado lleva lo mismo que la ficha mas lo que falta por entregar. Se declara
+ * sobre `OrderView` y no como una copia para que las dos salidas no puedan diverger.
  */
-export type OrderSummary = OrderView;
+export type OrderSummary = OrderView & {
+  /** Si hay algo empacado, si queda por entregar y que (`deliveryStateOf`). */
+  readonly pendingDelivery: OrderDeliveryState;
+};
 

@@ -34,7 +34,6 @@ import {
   updateAliveProduct,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
-import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
@@ -48,6 +47,10 @@ const MIGRACION = join(RAIZ, 'db', 'migrations', '20260913120000_product_batch_l
 // Leido del disco para probar la migracion real y no una copia.
 const UP_SQL = readFileSync(join(MIGRACION, 'migration.sql'), 'utf8');
 const DOWN_SQL = readFileSync(join(MIGRACION, 'down.sql'), 'utf8');
+const LOT_PER_PRESENTATION_DOWN_SQL = readFileSync(
+  join(RAIZ, 'db', 'migrations', '20261014200000_product_batches_lot_per_presentation', 'down.sql'),
+  'utf8',
+);
 
 const UNIQUE_VIOLATION = '23505';
 const NOT_NULL_VIOLATION = '23502';
@@ -345,30 +348,14 @@ describe('R9: solo los lotes puramente numericos cuentan para la serie', () => {
   });
 });
 
-describe('R13, R25: un lote a mano repetido en la empresa se rechaza sin escribir nada', () => {
-  it('R13, R25: rechaza con BatchDuplicateLotError (batch_duplicate_lot), sin reintentar ni sustituir y con cero filas escritas', async () => {
+describe('R13, R25 (QC-284 R7): un lote a mano repetido con la misma clave se rechaza sin escribir nada', () => {
+  it('QC-284 R7, R25: con la clave existente rechaza con BatchDuplicateLotError (batch_duplicate_lot), sin reintentar ni sustituir y con cero filas escritas; con otro producto se acepta', async () => {
     const fixture = await createFixture();
     const spy = vi.spyOn(prisma, '$transaction');
     try {
       const existente = await altaConLote(fixture, 'L-REPETIDO');
-      const nombreNuevo = `Producto ${token()}`;
 
       // Si el adaptador no reconociera el `P2002` real, aqui llegaria el error crudo.
-      spy.mockClear();
-      const rechazoAlta = await createWithFirstBatch(
-        newProduct({ name: nombreNuevo }),
-        newBatch(fixture, { lot: 'L-REPETIDO' }),
-        new Date(),
-        ambito(fixture),
-      ).then(
-        () => null,
-        (error: unknown) => error,
-      );
-      expect(rechazoAlta).toBeInstanceOf(BatchDuplicateLotError);
-      expect((rechazoAlta as BatchDuplicateLotError).code).toBe('batch_duplicate_lot');
-      // Una sola transaccion: no reintento.
-      expect(spy).toHaveBeenCalledTimes(1);
-
       spy.mockClear();
       const rechazoAgregar = await addBatchToAlive(
         existente.productId,
@@ -381,12 +368,15 @@ describe('R13, R25: un lote a mano repetido en la empresa se rechaza sin escribi
       );
       expect(rechazoAgregar).toBeInstanceOf(BatchDuplicateLotError);
       expect((rechazoAgregar as BatchDuplicateLotError).code).toBe('batch_duplicate_lot');
+      // Una sola transaccion: no reintento.
       expect(spy).toHaveBeenCalledTimes(1);
-
-      // Tampoco queda el producto nuevo (la transaccion deshizo su INSERT) ni un lote sustituto '1'.
-      expect(await prisma.product.count({ where: { nameNormalized: normalizeProductName(nombreNuevo) } })).toBe(0);
-      expect(await prisma.product.count({ where: { companyId: fixture.companyId } })).toBe(1);
       expect(await lotsOfCompany(fixture)).toEqual(['L-REPETIDO']);
+
+      // El mismo codigo en otro producto de la empresa es otra clave: se escribe tal cual.
+      const otro = await altaConLote(fixture, 'L-REPETIDO');
+      expect(otro.lot).toBe('L-REPETIDO');
+      expect(await prisma.product.count({ where: { companyId: fixture.companyId } })).toBe(2);
+      expect(await lotsOfCompany(fixture)).toEqual(['L-REPETIDO', 'L-REPETIDO']);
     } finally {
       spy.mockRestore();
       await dropFixture(fixture);
@@ -416,8 +406,8 @@ describe('R12, R27: la unicidad y el correlativo son de la empresa del ambito', 
   });
 });
 
-describe('R11: la unicidad (empresa, lote) esta en la base, no en el codigo', () => {
-  it('R11: un duplicado dentro de la empresa por SQL crudo lo rechaza product_batches_company_lot_unique con 23505', async () => {
+describe('QC-284 R1: la unicidad (empresa, producto, presentacion, lote) esta en la base, no en el codigo', () => {
+  it('QC-284 R1: un duplicado de la misma clave por SQL crudo lo rechaza product_batches_product_presentation_lot_unique con 23505', async () => {
     const fixture = await createFixture();
     try {
       const existente = await altaConLote(fixture, 'RAW-1');
@@ -433,12 +423,12 @@ describe('R11: la unicidad (empresa, lote) esta en la base, no en el codigo', ()
                ) VALUES ($1::uuid, $2::uuid, 1, 1.0000, $3, DATE '2026-09-01', $4::uuid, $5::uuid, $5::uuid, now())`,
               [existente.productId, fixture.presentationId, 'RAW-1', fixture.companyId, fixture.actorId],
             ),
-          'un segundo lote RAW-1 en la misma empresa',
+          'un segundo lote RAW-1 del mismo producto y presentacion',
         ),
       );
 
       expect(rechazo.code).toBe(UNIQUE_VIOLATION);
-      expect(rechazo.constraint).toBe('product_batches_company_lot_unique');
+      expect(rechazo.constraint).toBe('product_batches_product_presentation_lot_unique');
       expect(await lotsOfCompany(fixture)).toEqual(['RAW-1']);
     } finally {
       await dropFixture(fixture);
@@ -898,24 +888,34 @@ async function withMigrationSandbox(body: (client: Client, schema: string) => Pr
            (LIKE public.product_batches INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`,
       );
 
-      const unico = await client.query<{ indexname: string }>(
-        `SELECT indexname FROM pg_indexes
+      // La tabla real ya lleva la migracion posterior de QC-284 (los dos indices parciales del
+      // lote): se revierte antes, como en una reversion real, y eso deja el indice (company_id, lot)
+      // con su nombre. Sus copias se renombran para que su DOWN las encuentre.
+      const parciales = await client.query<{ indexname: string; indexdef: string }>(
+        `SELECT indexname, indexdef FROM pg_indexes
           WHERE schemaname = $1 AND tablename = 'product_batches'
-            AND indexdef LIKE 'CREATE UNIQUE INDEX % (company_id, lot)'`,
+            AND indexdef LIKE 'CREATE UNIQUE INDEX %lot) WHERE%'`,
         [schema],
       );
-      const copiado = unico.rows[0];
-      if (unico.rows.length !== 1 || copiado === undefined) {
-        throw new Error(`la copia no trae el indice unico (company_id, lot): ${JSON.stringify(unico.rows)}`);
+      const conPresentacion = parciales.rows.find((r) => r.indexdef.includes('presentation_id IS NOT NULL'));
+      const sinPresentacion = parciales.rows.find((r) => r.indexdef.includes('presentation_id IS NULL'));
+      if (parciales.rows.length !== 2 || conPresentacion === undefined || sinPresentacion === undefined) {
+        throw new Error(`la copia no trae los dos indices parciales del lote: ${JSON.stringify(parciales.rows)}`);
       }
       await client.query(
-        `ALTER INDEX "${schema}"."${copiado.indexname}" RENAME TO "product_batches_company_lot_unique"`,
+        `ALTER INDEX "${schema}"."${conPresentacion.indexname}" RENAME TO "product_batches_product_presentation_lot_unique"`,
+      );
+      await client.query(
+        `ALTER INDEX "${schema}"."${sinPresentacion.indexname}" RENAME TO "product_batches_product_lot_unique"`,
       );
 
-      // Si la copia no fuera fiel, el DOWN podria funcionar sobre una tabla distinta de la real.
-      expect(await schemaState(client, schema)).toEqual(ESTADO_MIGRADO);
-
       await client.query(`SET search_path TO "${schema}"`);
+      await runInTransaction(client, LOT_PER_PRESENTATION_DOWN_SQL);
+
+      // Si la copia no fuera fiel, el DOWN podria funcionar sobre una tabla distinta de la real.
+      // El DOWN de QC-284 deja la RLS forzada.
+      expect(await schemaState(client, schema)).toEqual({ ...ESTADO_MIGRADO, rlsForced: true });
+
       await runInTransaction(client, DOWN_SQL);
       expect(await schemaState(client, schema)).toEqual(ESTADO_PREVIO);
 

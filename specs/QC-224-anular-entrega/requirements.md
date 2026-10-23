@@ -104,6 +104,9 @@ operación que mueve existencias idempotente y auditable).
   campo ausente.
 - **R18** [A] SI la entrega no existe o es de otra empresa, ENTONCES el servidor DEBE responder
   `delivery_not_found` en los dos casos, sin escribir nada.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** Además, si se pide esta anulación sobre una
+  > entrega sin pedido, el servidor responde `delivery_not_found` sin escribir nada (QC-288 R48).
 - **R19** [D7, A] CUANDO el servidor recibe una anulación, DEBE bloquear el pedido de la entrega y
   comprobar sobre la fila bloqueada que sigue vivo y que está `TERMINADO` o `ENTREGADO`. SI no
   existe o está borrado, ENTONCES DEBE responder `order_not_found`. SI está en cualquier otro
@@ -164,6 +167,9 @@ operación que mueve existencias idempotente y auditable).
     entrega, la del lote o la del usuario que la registra;
   - dos anulaciones con la misma clave en la misma empresa;
   - una anulación con el motivo vacío o solo con espacios.
+
+  > **Enmienda 2026-10-19 (enmienda QC-288, aprobada por el humano en F1.4; `specs/QC-288-entrega-sin-pedido/design.md` §11).** La lista se mantiene tal cual para los
+  > asientos de tipo `delivery_void`; además, la base rechaza los casos de QC-288 R40.
 - **R33** [D8, D9] El sistema NO DEBE ofrecer ningún camino de aplicación que modifique o borre una
   anulación, una línea de anulación o su asiento: ningún caso de uso, Server Action ni control de
   UI. QC-223 R32 sigue vigente: el único caso de uso y la única Server Action que anulan una entrega

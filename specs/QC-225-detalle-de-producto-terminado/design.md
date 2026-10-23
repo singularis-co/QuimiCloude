@@ -500,6 +500,11 @@ presentación anulada y otra no muestra filas de los dos tipos (R33).
   `pageSize` solo se leen en los tabs de listado, y su saneo es el de `product-list-params.ts`: un
   valor que no es entero cae al defecto en la pantalla. Al cambiar de tab, el enlace se construye
   sin `page`.
+- **Enmienda 2026-10-16 (R37; `b0eaa866`, `6a665e3f`).** La página calcula `canViewUnitCosts` con la
+  sesión y lo baja como `canViewCosts` a `FinishedProductTabs`; sin él, el tab `costo` no se pinta y
+  `resolveFinishedProductTab` lo cambia por `general` antes de pedir datos. `listFinishedProductCosts`
+  exige `canViewUnitCosts` además de `inventario.consultar` y responde `unauthorized` sin tocar
+  puertos. Es presentación más autorización en el caso de uso: el permiso decide, no el rol.
 
 ## 6. UI
 
@@ -742,7 +747,9 @@ Rutas abreviadas:
 |---|---|
 | R1 | u `producto-terminado/finished-product-route-contract.test.ts`; e2e (usuario sin permiso → 404) |
 | R2, R3 | u de cada caso de uso (`get-finished-product.test.ts`, `list-finished-product-*.test.ts`, `list-produced-products.test.ts`): sin permiso, ningún puerto se llama; actor con el permiso y otro rol, aceptado; Administrador sin él, rechazado |
-| R4 | u `list-finished-product-deliveries.test.ts` y `list-finished-product-costs.test.ts` (actor solo con `inventario.consultar`) |
+| R4 | u `list-finished-product-deliveries.test.ts` (actor solo con `inventario.consultar`); u `list-finished-product-costs.test.ts` › «R4: con inventario.consultar y canViewUnitCosts, sin recetas ni pedidos, ve el costo y el pedido» (enmendado el 2026-10-16) |
+| R37 (2026-10-16) | u `list-finished-product-costs.test.ts` › «solo el Administrador ve costos: con inventario.consultar sin canViewUnitCosts responde unauthorized y no llama a ningun puerto»; u `unit-cost-visibility.test.ts` › «canViewUnitCosts: quien ve los costos unitarios»; ui `finished-product-tabs.test.tsx` › «sin `canViewCosts` (cualquier rol que no sea el Administrador) falta «Costo de produccion»» |
+| R8/R9, enmienda 2026-10-16 | ui `finished-product-tabs.test.tsx` › ««costo» sin permiso abre el tab por defecto; con permiso, el propio» y «el resto de tabs no dependen del permiso de costos»; ui `finished-product-page.test.tsx` › «el tab «Costo de produccion» lo ve el Administrador y lo abre con `?tab=costo`» y «sin permiso de costos falta el tab, y `?tab=costo` cae al tab por defecto sin pedir costos» |
 | R5 | u de cada caso de uso (id sin uuid, `null` del puerto); int `finished-product-detail.int.test.ts` (borrado, empresa B, insumo) |
 | R6 | ui `finished-product-page.test.tsx` |
 | R7 | u `producto-terminado/finished-product-route-contract.test.ts` |

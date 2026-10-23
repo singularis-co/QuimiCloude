@@ -130,9 +130,14 @@ function expectNoSecrets(state: unknown): void {
   }
 }
 
+const IMPORT_OK = {
+  ok: true,
+  summary: { imported: 2, updated: 0, deleted: 0, skipped: 0, syncedAt: '2026-10-09T12:00:00.000Z' },
+} as const
+
 function happyPath(): void {
   getMock.mockResolvedValue(VIEW)
-  createMock.mockResolvedValue({ status: 'created', connection: VIEW, verifyToken: VERIFY_TOKEN })
+  createMock.mockResolvedValue({ status: 'created', connection: VIEW, verifyToken: VERIFY_TOKEN, templateImport: IMPORT_OK })
   updateMock.mockResolvedValue({ status: 'saved', connection: VIEW })
   testMock.mockResolvedValue({ status: 'tested', ok: true, connection: VIEW })
   setEnabledMock.mockResolvedValue({ status: 'saved', connection: VIEW })
@@ -184,6 +189,38 @@ describe('acciones de la conexion de WhatsApp — estados de salida', () => {
     expect(result).toEqual({ status: 'created', verifyToken: VERIFY_TOKEN, webhook: WEBHOOK })
     expect(createMock.mock.calls[0]?.[0]).toEqual(FIELDS)
     expectNoSecrets(result)
+  })
+
+  it('R30 — el alta con la importacion de plantillas fallida devuelve `created` y deja una linea de log sin secretos', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    createMock.mockResolvedValueOnce({
+      status: 'created',
+      connection: VIEW,
+      verifyToken: VERIFY_TOKEN,
+      templateImport: { ok: false, code: 'whatsapp_meta_unreachable' },
+    })
+
+    const result = await ACTIONS.create()
+
+    expect(result).toEqual({ status: 'created', verifyToken: VERIFY_TOKEN, webhook: WEBHOOK })
+    expect(revalidatePathMock).toHaveBeenCalledWith(WHATSAPP_ROUTE)
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledWith('whatsapp_templates_initial_sync_failed', {
+      connectionId: CONNECTION_ID,
+      code: 'whatsapp_meta_unreachable',
+    })
+    const logged = JSON.stringify(errorSpy.mock.calls)
+    for (const forbidden of [ACCESS_TOKEN, APP_SECRET, VERIFY_TOKEN, VERIFY_TOKEN_HASH]) {
+      expect(logged).not.toContain(forbidden)
+    }
+    errorSpy.mockRestore()
+  })
+
+  it('R30 — con la importacion bien no se escribe ningun log', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await ACTIONS.create()
+    expect(errorSpy).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
   })
 
   it('R10 — el alta con prueba fallida devuelve el mensaje de Meta y no revalida', async () => {
@@ -262,7 +299,7 @@ describe('acciones de la conexion de WhatsApp — estados de salida', () => {
 
   it('R10 — un caso de uso que devolviera la fila entera no la filtra: el borde copia solo lo suyo', async () => {
     const leaky = { ...VIEW, accessTokenEnc: 'v1:enc', appSecretEnc: 'v1:enc', verifyTokenHash: VERIFY_TOKEN_HASH }
-    createMock.mockResolvedValueOnce({ status: 'created', connection: leaky, verifyToken: VERIFY_TOKEN })
+    createMock.mockResolvedValueOnce({ status: 'created', connection: leaky, verifyToken: VERIFY_TOKEN, templateImport: IMPORT_OK })
     updateMock.mockResolvedValueOnce({ status: 'saved', connection: leaky })
     testMock.mockResolvedValueOnce({ status: 'tested', ok: true, connection: leaky })
     setEnabledMock.mockResolvedValueOnce({ status: 'saved', connection: leaky })

@@ -1,5 +1,6 @@
 import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import type {
+  FinishedDistributionLine,
   FinishedProductBatchRow,
   FinishedProductCostRow,
   FinishedProductDeliveriesPage,
@@ -59,6 +60,7 @@ export function finishedProductBatchRow(overrides: Partial<FinishedProductBatchR
   return {
     id: LITER_BATCH_ID,
     lot: 'L-2026-0225',
+    orderId: FINISHED_ORDER_ID,
     orderNumberText: FINISHED_ORDER_NUMBER,
     purchaseDate: '2026-10-10',
     productionDate: '2026-10-10',
@@ -75,6 +77,7 @@ export function finishedProductBatchRow(overrides: Partial<FinishedProductBatchR
 export const UNPACKAGED_BATCH_ROW = finishedProductBatchRow({
   id: UNPACKAGED_BATCH_ID,
   lot: 'L-2026-0227',
+  orderId: null,
   orderNumberText: null,
   productionDate: null,
   expiryDate: null,
@@ -154,27 +157,32 @@ export const FINISHED_OUT_MOVEMENTS: readonly FinishedProductMovementRow[] = [
   }),
 ];
 
+// 2026-10-15: la fila es una linea de entrega (`deliveryLineId`) y lleva su presentacion.
 export function finishedProductDeliveryRow(
   overrides: Partial<FinishedProductDeliveryRow> = {},
 ): FinishedProductDeliveryRow {
   return {
-    movementId: '20000000-0000-4000-8000-000000000230',
+    deliveryLineId: '30000000-0000-4000-8000-000000000230',
     orderDeliveryId: FINISHED_DELIVERY_ID,
     createdAt: '2026-10-11T10:00:00.000Z',
     customer: { id: FINISHED_CUSTOMER_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false },
     orderNumberText: FINISHED_ORDER_NUMBER,
+    presentationName: 'Botella 1 L',
     batchId: LITER_BATCH_ID,
     lot: 'L-2026-0225',
     packages: 4,
     quantity: '4.0000',
     void: null,
+    // 2026-10-16 (QC-288): la fila puede ser de una entrega sin pedido, con su nota.
+    withoutOrder: false,
+    note: null,
     ...overrides,
   };
 }
 
 /** Misma entrega que la fila sin anular, otro lote y su linea anulada. */
 export const VOIDED_DELIVERY_ROW = finishedProductDeliveryRow({
-  movementId: '20000000-0000-4000-8000-000000000232',
+  deliveryLineId: '30000000-0000-4000-8000-000000000232',
   batchId: GALLON_BATCH_ID,
   lot: 'L-2026-0226',
   packages: 1,
@@ -197,6 +205,21 @@ export function finishedProductCostRow(overrides: Partial<FinishedProductCostRow
     unitCost: '2.5000',
     totalCost: '30.0000',
     createdAt: '2026-10-10T12:00:00.000Z',
+    ...overrides,
+  };
+}
+
+/** Linea del reparto empacada igual al plan. */
+export function finishedDistributionLine(
+  overrides: Partial<FinishedDistributionLine> = {},
+): FinishedDistributionLine {
+  return {
+    lineId: 'd0000000-0000-4000-8000-000000000281',
+    orderNumberText: FINISHED_ORDER_NUMBER,
+    plan: 12,
+    packedPackages: 12,
+    reason: null,
+    reasonOther: null,
     ...overrides,
   };
 }

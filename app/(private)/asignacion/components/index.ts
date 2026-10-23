@@ -8,12 +8,6 @@ export {
   assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
 export {
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
-  ASSIGNED_ORDER_START_DIALOG_TESTID,
-  AssignedOrderStartTrigger,
-  assignedOrderStartConfirmTexts,
-} from './assigned-order-start-trigger';
-export {
   ASSIGNED_ORDER_ENTER_COLUMN_ID,
   ASSIGNED_ORDER_NUMBER_COLUMN_ID,
   ASSIGNED_ORDER_PRESENTATION_COLUMN_ID,
@@ -121,11 +115,6 @@ export {
   type ConditioningOrdersEmptyProps,
 } from './conditioning-orders-empty';
 export {
-  DELIVERED_CONDITIONED_ORDERS_EMPTY_TEXT,
-  DELIVERED_CONDITIONED_ORDERS_SECTION_TESTID,
-  DeliveredConditionedOrdersListSection,
-} from './delivered-conditioned-orders-list-section';
-export {
   CONDITIONING_ORDERS_SECTION_TESTID,
   ConditioningOrdersListSection,
 } from './conditioning-orders-list-section';
@@ -194,9 +183,10 @@ export {
 } from './finished-orders-table';
 export {
   PACKING_ORDER_NUMBER_COLUMN_ID,
-  PACKING_ORDER_PACKAGES_COLUMN_ID,
   PACKING_ORDER_PACKER_COLUMN_ID,
   PACKING_ORDER_PRESENTATION_COLUMN_ID,
+  PACKING_ORDER_PRIORITY_COLUMN_ID,
+  PACKING_ORDER_QUANTITY_COLUMN_ID,
   PACKING_ORDER_RECIPE_NAME_COLUMN_ID,
   PACKING_ORDER_STATUS_COLUMN_ID,
   PACKING_ORDERS_CARD,
@@ -231,6 +221,7 @@ export {
   type OrderOutcomeNoticeProps,
 } from './order-outcome-notice';
 export {
+  ORDER_DISTRIBUTION_FULL_LINE_TESTID,
   ORDER_DISTRIBUTION_FULL_SEPARATOR,
   ORDER_DISTRIBUTION_FULL_TESTID,
   OrderDistributionFull,

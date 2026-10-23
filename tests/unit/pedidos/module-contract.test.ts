@@ -358,6 +358,8 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      // 2026-10-14: el contador de pedidos en curso de una empresa, para el impacto de su baja.
+      'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
       // `OrderNumberDirectory` de `inventario` -el numero visible de un pedido para el
       // historial de un lote-, tercer y ultimo dueno.
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
@@ -485,20 +487,29 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `@prisma/client` -el `P2002` de la clave y de la linea ya anulada- y el cliente compartido
     // como defecto de sus dos fabricas. Las dos listas siguen CERRADAS.
     const ANULACIONES = 'lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma.ts'
-    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, ENTREGAS, ANULACIONES, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
+    // 2026-10-16 (QC-288): `direct-delivery-prisma.ts` (entregas sin pedido y lineas que esperan
+    // producto) importa `@prisma/client` -`Prisma.Decimal` y el `P2002` de la clave- y el cliente
+    // compartido como defecto de sus dos fabricas. Las dos listas siguen CERRADAS.
+    const SIN_PEDIDO = 'lib/modules/pedidos/adapters/driven/persistence/direct-delivery-prisma.ts'
+    const DUENOS_DE_PRISMA = [AMBITO_DE_EMPRESA, SIN_PEDIDO, ENTREGAS, ANULACIONES, DUENO_DE_PRISMA, UNIDAD_DE_TRABAJO]
     // `order-number-directory-prisma.ts` (`OrderNumberDirectory` de `inventario`) tambien abre
     // el cliente compartido, sin importar `@prisma/client`.
     // 2026-10-13: `order-delivery-directory-prisma.ts` (`FinishedDeliveryDirectory` de
     // `inventario`, solo lectura) abre el cliente compartido, sin importar `@prisma/client`.
+    // 2026-10-14: `packed-lines-directory-prisma.ts` (`FinishedDistributionDirectory` de
+    // `inventario`, solo lectura) igual, sin importar `@prisma/client`.
     // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
+      SIN_PEDIDO,
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
+      'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma.ts',
       ENTREGAS,
       ANULACIONES,
       'lib/modules/pedidos/adapters/driven/persistence/order-number-directory-prisma.ts',
       DUENO_DE_PRISMA,
       UNIDAD_DE_TRABAJO,
+      'lib/modules/pedidos/adapters/driven/persistence/packed-lines-directory-prisma.ts',
     ]
     expect(
       pedidosSources.filter((file) => /@prisma\/client/.test(read(file))).map(etiqueta),
@@ -807,6 +818,27 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // pieza de pedidos ahi que deba colarse igual-.
     const rutaCronCaducidad = join(repoRoot, 'app', 'api', 'cron', 'caducar-pedidos', 'route.ts')
 
+    // AMPLIADA el 2026-10-19 (QC-288, entrega-sin-pedido, TC). La entrega sin pedido se registra
+    // y se anula desde `/inventario` (design.md §2.7, §7.2, §7.4), y tres piezas de la pantalla de
+    // pedidos subieron a `components/shared` (design.md §7.1). Exclusion NOMBRADA, por ARCHIVO
+    // -la misma lista que `tests/unit/pedidos/scope.test.ts`-: cualquier otro archivo de
+    // `inventario` o de `components/` que importe `pedidos` sigue cayendo. Por dentro siguen
+    // obligados a consumir solo el contrato publico o el driving por ruta exacta (abajo).
+    const consumidoresDeLaEntregaSinPedido = new Set(
+      [
+        ['app', '(private)', 'inventario', 'components', 'direct-delivery-draft.ts'],
+        ['app', '(private)', 'inventario', 'components', 'direct-delivery-sheet.tsx'],
+        ['app', '(private)', 'inventario', 'components', 'direct-delivery-surplus-card.tsx'],
+        ['app', '(private)', 'inventario', 'components', 'finished-stock-list-section.tsx'],
+        ['app', '(private)', 'inventario', 'components', 'use-direct-delivery-draft.ts'],
+        ['app', '(private)', 'inventario', 'producto-terminado', '[id]', 'components', 'direct-delivery-void-dialog.tsx'],
+        ['app', '(private)', 'inventario', 'producto-terminado', '[id]', 'page.tsx'],
+        ['components', 'shared', 'order-customer-label.ts'],
+        ['components', 'shared', 'order-customer-picker.tsx'],
+      ].map((segmentos) => join(repoRoot, ...segmentos)),
+    )
+    let consumidoresDeLaEntregaSinPedidoVistos = 0
+
     let consumidoresDeLaPantalla = 0
     for (const file of [
       ...sourcesIn(join(repoRoot, 'app')),
@@ -821,6 +853,20 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       const dentroDeOtraPantallaAutorizada =
         !relative(carpetaAsignacion, file).startsWith(`..${sep}`) || file === rutaCronCaducidad
       if (dentroDeOtraPantallaAutorizada) continue
+
+      // QC-288 2026-10-19: la entrega sin pedido, por archivo; su consumo sigue pasando por la
+      // comprobacion de especificadores.
+      if (consumidoresDeLaEntregaSinPedido.has(file)) {
+        consumidoresDeLaEntregaSinPedidoVistos += 1
+        for (const spec of especificadores) {
+          expect(
+            spec === '@/lib/modules/pedidos' ||
+              spec.startsWith('@/lib/modules/pedidos/adapters/driving/'),
+            `${etiqueta(file)} consume pedidos por dentro (${spec}): solo el contrato publico o el driving por ruta exacta`,
+          ).toBe(true)
+        }
+        continue
+      }
 
       const dentroDeLaPantalla = !relative(carpetaDeLaPantalla, file).startsWith(`..${sep}`)
       expect(
@@ -839,6 +885,12 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     }
     // Sin esto, el bucle de arriba pasaria en verde por no haber iterado sobre nada.
     expect(consumidoresDeLaPantalla, 'la pantalla de pedidos deberia consumir su modulo').toBeGreaterThan(0)
+    // QC-288 2026-10-19: cada archivo nombrado consume de verdad el modulo; si uno deja de
+    // hacerlo, la lista se recorta.
+    expect(
+      consumidoresDeLaEntregaSinPedidoVistos,
+      'cada consumidor nombrado de la entrega sin pedido deberia importar pedidos',
+    ).toBe(consumidoresDeLaEntregaSinPedido.size)
 
     // `lib/composition` cablea `pedidos`, y es el UNICO sitio del repo que puede hacerlo (R52).
     //

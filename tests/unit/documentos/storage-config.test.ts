@@ -26,9 +26,10 @@ const REQUIRED_VARS = ['SUPABASE_STORAGE_URL', 'SUPABASE_DOCUMENTS_BUCKET', 'SUP
 const ARBOL_DE_PRODUCCION = ['lib', 'app', 'components', 'hooks', 'scripts'];
 
 /**
- * Los CINCO archivos que pueden importar la libreria de Storage, y ninguno mas: cuatro buckets,
- * cinco adaptadores (evidencias de asignaciones, recetas, documentos, el bucket propio de los
- * recortes al subirlos y, para revisarlos, su lectura aparte).
+ * Los SEIS archivos que pueden importar la libreria de Storage, y ninguno mas: cuatro buckets,
+ * seis adaptadores (evidencias de asignaciones, recetas, imagenes de producto de inventario sobre
+ * el mismo bucket de recetas, documentos, el bucket propio de los recortes al subirlos y, para
+ * revisarlos, su lectura aparte).
  */
 const IMPORTADORES_PERMITIDOS = [
   // QC-214 2026-10-13: adaptador del bucket privado de evidencias, fijado en
@@ -37,6 +38,7 @@ const IMPORTADORES_PERMITIDOS = [
   'lib/modules/documentos/adapters/driven/storage/crop-catalog-supabase.ts',
   'lib/modules/documentos/adapters/driven/storage/crop-storage-supabase.ts',
   'lib/modules/documentos/adapters/driven/storage/document-storage-supabase.ts',
+  'lib/modules/inventario/adapters/driven/storage/product-image-supabase.ts',
   'lib/modules/recetas/adapters/driven/storage/recipe-image-supabase.ts',
 ];
 
@@ -196,7 +198,7 @@ describe('documentos — configuracion del almacenamiento y aislamiento de su li
       expect(fuentesDeProduccion.length).toBeGreaterThan(100);
     });
 
-    it('R26 — exactamente CINCO archivos de produccion importan la libreria, y este modulo aporta tres de ellos', () => {
+    it('R26 — exactamente SEIS archivos de produccion importan la libreria, y este modulo aporta tres de ellos', () => {
       const importadores = fuentesDeProduccion
         .filter((abs) => importaElPaquete(readFileSync(abs, 'utf8'), '@supabase/storage-js'))
         .map((abs) => toPosix(relative(repoRoot, abs)))

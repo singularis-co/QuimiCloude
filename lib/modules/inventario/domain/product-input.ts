@@ -194,6 +194,20 @@ function exigirCostoDelLote(
   }
 }
 
+/** Bytes sin validar todavia: formato y tamano los comprueba `validateProductImage` en el caso de uso. */
+const productImageUploadSchema = z.object({
+  bytes: z.instanceof(Uint8Array),
+});
+
+/** En el alta no hay imagen anterior que quitar: ausente o una nueva, sin `null`. */
+const createImageSchema = productImageUploadSchema.optional();
+
+/**
+ * En la edicion, ausente es «no tocar», `null` es «quitarla» y `{ bytes }` es «reemplazarla».
+ * Sin `.default()`, que confundiria ausente con `null`.
+ */
+const updateImageSchema = productImageUploadSchema.nullable().optional();
+
 /** Esquema para PRODUCT: lote con expiryDate opcional. El literal va DESPUES del spread. */
 const createProductWithBatchSchema = z
   .strictObject({
@@ -202,6 +216,7 @@ const createProductWithBatchSchema = z
     unitId: unitIdSchema,
     ...batchFieldsCommon,
     expiryDate: expiryDateSchema.nullish(),
+    image: createImageSchema,
   })
   .superRefine(exigirCostoDelLote);
 
@@ -221,6 +236,7 @@ const createMachineSchema = z.strictObject({
   lot: lotSchema.nullish(),
   purchaseDate: purchaseDateSchema.nullish(),
   expiryDate: expiryDateSchema.nullish(),
+  image: createImageSchema,
 });
 
 const WHOLE_QUANTITY_PATTERN = /^\d{1,10}(\.0{1,4})?$/;
@@ -237,6 +253,7 @@ const createPackagingSchema = z
     ...batchFieldsCommon,
     presentationId: presentationIdSchema,
     type: z.literal(PRODUCT_TYPES.PACKAGING),
+    image: createImageSchema,
   })
   .superRefine((value, ctx) => {
     exigirCostoDelLote(value, ctx);
@@ -261,15 +278,18 @@ const updateUnion = z.discriminatedUnion('type', [
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.PRODUCT),
     qtyAlert: qtyAlertSchema,
+    image: updateImageSchema,
   }),
   z.strictObject({
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.MACHINE),
+    image: updateImageSchema,
   }),
   z.strictObject({
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.PACKAGING),
     qtyAlert: qtyAlertSchema,
+    image: updateImageSchema,
   }),
   // Un producto terminado no nace de este esquema: esta rama solo deja pasar la
   // forma, para que rechazar un cambio de tipo sea cosa del caso de uso, no de zod.
@@ -277,6 +297,7 @@ const updateUnion = z.discriminatedUnion('type', [
     name: productNameSchema,
     type: z.literal(PRODUCT_TYPES.FINISHED_PRODUCT),
     qtyAlert: qtyAlertSchema,
+    image: updateImageSchema,
   }),
 ]);
 

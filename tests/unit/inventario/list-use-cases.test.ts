@@ -93,7 +93,7 @@ function montarPresentaciones() {
  * la consulta, el primer argumento, que es lo que afirma todo el archivo. El ambito se lee
  * con `ambitoRecibido`, abajo, y tiene sus propios casos.
  */
-function consultaRecibida(recibidas: readonly (readonly [ListQuery, InventoryScope])[]): ListQuery {
+function consultaRecibida(recibidas: readonly (readonly [ListQuery, InventoryScope, ...unknown[]])[]): ListQuery {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('el puerto no fue llamado');
   return ultima[0];
@@ -101,7 +101,7 @@ function consultaRecibida(recibidas: readonly (readonly [ListQuery, InventorySco
 
 /** El ambito que llego al puerto en la ultima llamada (QC-49 R13). */
 function ambitoRecibido(
-  recibidas: readonly (readonly [ListQuery, InventoryScope])[],
+  recibidas: readonly (readonly [ListQuery, InventoryScope, ...unknown[]])[],
 ): InventoryScope {
   const ultima = recibidas.at(-1);
   if (ultima === undefined) throw new Error('el puerto no fue llamado');

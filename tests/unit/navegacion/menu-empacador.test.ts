@@ -46,7 +46,7 @@ describe('R15 — el menu del Empacador deja visible solo Asignacion', () => {
 
   // Caso simetrico: con los permisos del Operador aparece ADEMAS nav-inventario, que demuestra que
   // el test de arriba distingue por permisos y no pasa en verde con cualquier menu.
-  it('con los permisos del Operador aparece ademas nav-inventario, y el aterrizaje sigue siendo Asignacion', () => {
+  it('con los permisos del Operador aparece ademas nav-inventario, y el aterrizaje es Inventario', () => {
     const permisosDelOperador = SEED_ROLE_PERMISSIONS[ROLE_OPERADOR];
     expect(permisosDelOperador).toBeDefined();
 
@@ -54,8 +54,8 @@ describe('R15 — el menu del Empacador deja visible solo Asignacion', () => {
 
     expect(testIds(visible)).toContain('nav-inventario');
     expect(testIds(visible)).toContain('nav-asignacion');
-    // El Operador NO tiene `terminados.consultar`; el Empacador es el unico que aterriza igual.
-    expect(firstVisibleNavHref(visible)).toBe(ASSIGNED_ORDERS_ROUTE);
+    // Inventario va antes que Asignación en el menu, asi que el Operador aterriza alli.
+    expect(firstVisibleNavHref(visible)).toBe(INVENTORY_ROUTE);
   });
 
   it('ancla anti-vacuidad: el menu real trae ambos enlaces y las dos rutas no son la misma', () => {

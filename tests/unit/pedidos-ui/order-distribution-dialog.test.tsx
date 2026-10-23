@@ -118,6 +118,8 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
     status,
     cancellationReason: status === 'CANCELADO' ? 'Cliente anuló el encargo' : null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -129,11 +131,15 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
         packages: 2,
         packagingProductId: ENVASE_ID,
         packagingName: 'Bidón PET 20 L',
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
     ],
     unitId: UNIDAD_ID,
     unitLabel: 'L',
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -317,7 +323,7 @@ describe('dialogo «Reparto y unidad»', () => {
     montarDialogo(
       pedido('POR_EMPACAR', {
         presentationLines: [
-          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null },
+          { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
@@ -432,6 +438,8 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
               packages: 7,
               packagingProductId: ENVASE_ID,
               packagingName: 'Bidón PET 20 L',
+              presentationContent: null,
+              presentationUnitLabel: null,
             },
           ],
         }),

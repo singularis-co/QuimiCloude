@@ -564,6 +564,44 @@ const MIGRACION_QC275 = [
   'db/migrations/20261013150000_ai_providers/down.sql',
 ];
 
+// QC-277 2026-10-15: las tablas de añadidos (catalogo y excepciones por empresa) y
+// `db/schema.prisma` con esas tablas. No toca ninguna tabla de recetas; la rama entra aqui
+// porque la pantalla de importar formulas llama a `requirePageAddon`. Lista nombrada como las
+// demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC277 = [
+  'db/schema.prisma',
+  'db/migrations/20261015190000_company_addons/migration.sql',
+  'db/migrations/20261015190000_company_addons/down.sql',
+];
+
+// QC-299 (2026-10-21): pasos de acondicionamiento. Exactamente los archivos que el diff de esta
+// rama toca bajo `lib/modules/recetas/`, ninguno mas: la formula guarda sus pasos de
+// acondicionamiento y los expone al recorrido por `recipe-conditioning-steps-reader.ts`.
+const PASOS_DE_ACONDICIONAMIENTO_QC299 = [
+  'lib/modules/recetas/index.ts',
+  'lib/modules/recetas/domain/create-recipe.ts',
+  'lib/modules/recetas/domain/get-recipe.ts',
+  'lib/modules/recetas/domain/recipe-conditioning-steps-reader.ts',
+  'lib/modules/recetas/domain/recipe-input.ts',
+  'lib/modules/recetas/domain/recipe-step-lock.ts',
+  'lib/modules/recetas/domain/recipe-view.ts',
+  'lib/modules/recetas/domain/update-recipe-version.ts',
+  'lib/modules/recetas/domain/update-recipe.ts',
+  'lib/modules/recetas/ports/recipe-repository.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma.ts',
+  'lib/modules/recetas/adapters/driven/persistence/recipe-prisma.ts',
+];
+
+// Las tablas de acciones y de pasos de acondicionamiento y `db/schema.prisma` con los modelos
+// nuevos. Lista nombrada como las demas: cualquier otro archivo de `db/` en el diff sigue en rojo.
+const MIGRACION_QC299 = [
+  'db/schema.prisma',
+  'db/migrations/20261021120000_conditioning_step_actions/migration.sql',
+  'db/migrations/20261021120000_conditioning_step_actions/down.sql',
+  'db/migrations/20261021120001_conditioning_steps/migration.sql',
+  'db/migrations/20261021120001_conditioning_steps/down.sql',
+];
+
 export const RECETAS_PERMITIDAS: readonly string[] = [
   ...AMPLIACION_RECETAS_QC34,
   ...AUTORIZACION_POR_PERMISO_QC74,
@@ -573,6 +611,7 @@ export const RECETAS_PERMITIDAS: readonly string[] = [
   ...HERRAMIENTAS_DE_LA_RECETA_QC194,
   ...PASOS_DE_ENVASADO_QC211,
   ...EVIDENCIA_POR_PASO_QC214,
+  ...PASOS_DE_ACONDICIONAMIENTO_QC299,
 ];
 
 export const DB_PERMITIDAS: readonly string[] = [
@@ -595,6 +634,8 @@ export const DB_PERMITIDAS: readonly string[] = [
   ...MIGRACION_QC211,
   ...MIGRACION_QC214,
   ...MIGRACION_QC275,
+  ...MIGRACION_QC277,
+  ...MIGRACION_QC299,
 ];
 
 /** Espera rutas con separadores POSIX, como las devuelve `git diff --name-only`. */
@@ -1319,6 +1360,14 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     'app/(private)/asignacion/empaque/[id]/components/packing-order-screen.tsx';
 
   /**
+   * CUARTO montador (QC-299 design.md 5.2, T17): el panel de pasos de acondicionamiento reutiliza
+   * el asistente en modo ejecucion («Reutiliza StepReader mode=ejecucion»). Lo monta por props desde
+   * una pantalla, no le da ruta propia, asi que R12 sigue intacta. Archivo EXACTO, nunca la carpeta.
+   */
+  const MONTADOR_DE_ACONDICIONAMIENTO =
+    'app/(private)/asignacion/acondicionamiento/[id]/components/conditioning-steps-panel.tsx';
+
+  /**
    * La edicion de una version pinta el documento con la vista sin estado del asistente, no con el
    * asistente: se acepta solo ese archivo y solo ese import exacto.
    */
@@ -1391,6 +1440,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // Alta: la pantalla de clientes. No es una ruta ni una funcion de ruta del asistente de
         // lectura -no la marca el patron de arriba ni apunta a ninguna URL del asistente-.
         'CUSTOMERS_ROUTE',
+        // Alta: la pantalla de contactos, derivada de `CUSTOMERS_ROUTE`. No es una ruta del
+        // asistente de lectura. La lista sigue CERRADA.
+        'CUSTOMER_CONTACTS_ROUTE',
         'DASHBOARD_ROUTE',
         // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
         // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
@@ -1411,6 +1463,9 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
+        // No es una pantalla: redirige al primer enlace del menu efectivo (logo y /login con
+        // sesion). No es del asistente de lectura. La lista sigue CERRADA.
+        'HOME_ROUTE',
         // La pantalla de importar inventario: cuelga de /inventario, no del asistente de lectura.
         'INVENTORY_IMPORT_ROUTE',
         'INVENTORY_ROUTE',
@@ -1471,11 +1526,15 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'WHATSAPP_WEBHOOK_ROUTE_BASE',
         'whatsappWebhookPath',
+        // Las pantallas del Maestro, bajo /maestro: ninguna es del asistente de lectura.
+        'MAESTRO_ADMINISTRATORS_ROUTE',
+        'MAESTRO_COMPANIES_ROUTE',
+        'maestroCompanyRoute',
       ].sort(),
     );
   });
 
-  it('el asistente solo se importa desde sus tres montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
+  it('el asistente solo se importa desde sus cuatro montadores y la vista sin estado, ademas, desde recipe-version-form.tsx', () => {
     const importadores: string[] = [];
 
     const vista = fuenteSinComentarios(MONTADOR_DE_LA_VISTA);
@@ -1498,7 +1557,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
     }
 
     expect(importadores.sort()).toEqual(
-      [MONTADOR_DE_EJECUCION, MONTADOR_DE_EMPAQUE, UNICO_MONTADOR].sort(),
+      [
+        MONTADOR_DE_EJECUCION,
+        MONTADOR_DE_EMPAQUE,
+        MONTADOR_DE_ACONDICIONAMIENTO,
+        UNICO_MONTADOR,
+      ].sort(),
     );
   });
 

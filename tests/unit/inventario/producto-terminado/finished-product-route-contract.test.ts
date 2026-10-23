@@ -172,7 +172,34 @@ const LECTURAS_PERMITIDAS = new Set([
   'listFinishedProductMovementsAction',
   'listFinishedProductDeliveriesAction',
   'listFinishedProductCostsAction',
+  'listFinishedProductDistributionAction',
 ]);
+
+// 2026-10-14 (QC-271): la pestaña Lotes lee, solo lee, las fotos del pedido de origen de cada lote.
+// Es el segundo archivo de acciones que la ruta puede importar, y solo con estas dos lecturas.
+const ACCIONES_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
+const LECTURAS_DE_EVIDENCIA = new Set(['getOrderEvidenceAction', 'countOrderEvidenceAction']);
+
+// 2026-10-16 (QC-288, enmienda de QC-225 R7): la ficha entrega sin pedido y, en Entregas, anula las
+// entregas sin pedido. De las actions de `pedidos` admite solo esas dos escrituras y la lectura que
+// pinta el diálogo de anular; las demás de `pedidos` y todas las de producto y lote siguen prohibidas.
+const ACCIONES_DE_PEDIDOS = ACCIONES_DE_ESCRITURA[3];
+const ESCRITURAS_SIN_PEDIDO = new Set(['deliverDirectAction', 'voidDirectDeliveryAction']);
+// 2026-10-16 (enmienda QC-288, decisión del humano tras el bloqueo de F3): la página lee además el
+// excedente del producto para decidir si pinta «Entregar» en la cabecera. Es una lectura; las
+// aserciones previas no cambian.
+const LECTURAS_SIN_PEDIDO = new Set(['getDirectDeliveryForVoidAction', 'listDirectDeliverySurplusAction']);
+
+function nombreDePedidosPermitido(nombre: string): boolean {
+  return (
+    ESCRITURAS_SIN_PEDIDO.has(nombre) ||
+    LECTURAS_SIN_PEDIDO.has(nombre) ||
+    /(Result|Input)$/.test(nombre)
+  );
+}
+
+const ACCIONES_DE_ESCRITURA_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/step-evidence-actions';
+const PIEZA_DE_EVIDENCIA = '@/components/shared/step-evidence';
 
 describe('contrato de la ficha de producto terminado', () => {
   it('la pantalla existe donde la ubica finishedProductDetailRoute, con su barrel', () => {
@@ -202,11 +229,16 @@ describe('contrato de la ficha de producto terminado', () => {
     for (const ruta of FUENTES_DE_LA_RUTA) {
       const codigo = leer(ruta);
       for (const especificador of especificadores(codigo)) {
+        if (especificador === ACCIONES_DE_PEDIDOS) continue;
         if ((ACCIONES_DE_ESCRITURA as readonly string[]).includes(especificador)) {
           hallazgos.push(`${ruta} -> ${especificador}`);
           continue;
         }
-        if (/\/adapters\/driving\//.test(especificador) && especificador !== ACCIONES_DE_LECTURA) {
+        if (
+          /\/adapters\/driving\//.test(especificador) &&
+          especificador !== ACCIONES_DE_LECTURA &&
+          especificador !== ACCIONES_DE_EVIDENCIA
+        ) {
           if (!especificador.endsWith('/require-page-permission')) {
             hallazgos.push(`${ruta} -> ${especificador}`);
           }
@@ -217,6 +249,21 @@ describe('contrato de la ficha de producto terminado', () => {
           hallazgos.push(`${ruta} -> ${nombre}`);
         }
       }
+      for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_EVIDENCIA)) {
+        if (!LECTURAS_DE_EVIDENCIA.has(nombre) && !/Result$/.test(nombre)) {
+          hallazgos.push(`${ruta} -> ${nombre}`);
+        }
+      }
+      for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_PEDIDOS)) {
+        if (!nombreDePedidosPermitido(nombre)) hallazgos.push(`${ruta} -> ${nombre}`);
+      }
+      // Un `import *` o un `import()` esquivaría la lista de nombres.
+      const conLlaves = /import\s+(?:type\s+)?\{[^}]*\}\s+from\s+(['"])([^'"]+)\1/g;
+      const usosConLlaves = [...sinComentarios(codigo).matchAll(conLlaves)].filter(
+        (encaje) => encaje[2] === ACCIONES_DE_PEDIDOS,
+      ).length;
+      const usos = especificadores(codigo).filter((especificador) => especificador === ACCIONES_DE_PEDIDOS).length;
+      if (usos !== usosConLlaves) hallazgos.push(`${ruta} -> ${ACCIONES_DE_PEDIDOS} sin nombres`);
       if (/voidDelivery/i.test(sinComentarios(codigo))) hallazgos.push(`${ruta} -> voidDelivery`);
     }
 
@@ -231,6 +278,85 @@ describe('contrato de la ficha de producto terminado', () => {
     expect(especificadores(fabricada)).toContain(ACCIONES_DE_ESCRITURA[3]);
     expect(nombresImportadosDe(fabricada, ACCIONES_DE_LECTURA)).toEqual(['listProducedProductsAction']);
     expect(LECTURAS_PERMITIDAS.has('listProducedProductsAction')).toBe(false);
+  });
+
+  it('QC-225 R7 (enmienda QC-288), R43 — de las actions de pedidos la ruta solo usa la entrega y la anulación sin pedido', () => {
+    const usados = new Set<string>();
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      for (const nombre of nombresImportadosDe(leer(ruta), ACCIONES_DE_PEDIDOS)) {
+        if (!/(Result|Input)$/.test(nombre)) usados.add(nombre);
+      }
+    }
+
+    expect(usados.has('voidDirectDeliveryAction')).toBe(true);
+    expect(usados.has('listDirectDeliverySurplusAction')).toBe(true);
+    expect(nombresImportadosDe(leer(PAGE_PATH), ACCIONES_DE_PEDIDOS)).toEqual(['listDirectDeliverySurplusAction']);
+    for (const nombre of usados) {
+      expect(ESCRITURAS_SIN_PEDIDO.has(nombre) || LECTURAS_SIN_PEDIDO.has(nombre), nombre).toBe(true);
+    }
+  });
+
+  it('QC-225 R7 (enmienda QC-288) — la guardia sigue mordiendo con voidDeliveryAction y las demás de pedidos', () => {
+    const fabricada = [
+      `import { deliverOrderAction, voidDirectDeliveryAction, type VoidDirectDeliveryInput } from '${ACCIONES_DE_PEDIDOS}';`,
+      `import { voidDeliveryAction } from '${ACCIONES_DE_PEDIDOS}';`,
+    ].join('\n');
+    const prohibidos = nombresImportadosDe(fabricada, ACCIONES_DE_PEDIDOS).filter(
+      (nombre) => !nombreDePedidosPermitido(nombre),
+    );
+    expect(prohibidos).toEqual(['deliverOrderAction', 'voidDeliveryAction']);
+    expect(/voidDelivery/i.test('voidDirectDeliveryAction')).toBe(false);
+    expect(ACCIONES_DE_ESCRITURA.slice(0, 3)).toEqual([
+      '@/lib/modules/inventario/adapters/driving/product-actions',
+      '@/lib/modules/inventario/adapters/driving/batch-actions',
+      '@/lib/modules/inventario/adapters/driving/inventory-import-actions',
+    ]);
+  });
+
+  it('R26 — ningun archivo de la ruta sube, cambia ni quita fotos de evidencia', () => {
+    const hallazgos: string[] = [];
+    let lecturas = 0;
+
+    for (const ruta of FUENTES_DE_LA_RUTA) {
+      const codigo = leer(ruta);
+      for (const especificador of especificadores(codigo)) {
+        if (/step-evidence-actions|upload-evidence/.test(especificador)) {
+          hallazgos.push(`${ruta} -> ${especificador}`);
+        }
+      }
+      for (const nombre of nombresImportadosDe(codigo, PIEZA_DE_EVIDENCIA)) {
+        if (/upload|EvidenceMissing/i.test(nombre)) hallazgos.push(`${ruta} -> ${nombre}`);
+      }
+      for (const nombre of nombresImportadosDe(codigo, ACCIONES_DE_EVIDENCIA)) {
+        if (LECTURAS_DE_EVIDENCIA.has(nombre)) lecturas += 1;
+        else if (!/Result$/.test(nombre)) hallazgos.push(`${ruta} -> ${nombre}`);
+      }
+      const limpio = sinComentarios(codigo);
+      for (const prohibido of [
+        'uploadEvidence',
+        'requestEvidenceUploadAction',
+        'registerEvidenceAction',
+        'removeEvidenceAction',
+      ]) {
+        if (limpio.includes(prohibido)) hallazgos.push(`${ruta} -> ${prohibido}`);
+      }
+    }
+
+    expect(lecturas, 'la ruta lee el conteo y las fotos').toBeGreaterThanOrEqual(2);
+    expect(hallazgos).toEqual([]);
+  });
+
+  it('R26 — la guardia de escritura de evidencia muerde con una fuente fabricada', () => {
+    const fabricada = [
+      `import { registerEvidenceAction } from '${ACCIONES_DE_ESCRITURA_DE_EVIDENCIA}';`,
+      `import { StepEvidence, uploadEvidence } from '${PIEZA_DE_EVIDENCIA}';`,
+      `import { getOrderEvidenceAction, removeEvidenceAction } from '${ACCIONES_DE_EVIDENCIA}';`,
+    ].join('\n');
+    expect(especificadores(fabricada)).toContain(ACCIONES_DE_ESCRITURA_DE_EVIDENCIA);
+    expect(nombresImportadosDe(fabricada, PIEZA_DE_EVIDENCIA)).toContain('uploadEvidence');
+    expect(
+      nombresImportadosDe(fabricada, ACCIONES_DE_EVIDENCIA).filter((nombre) => !LECTURAS_DE_EVIDENCIA.has(nombre)),
+    ).toEqual(['removeEvidenceAction']);
   });
 
   it('R30 — ningun archivo de la ruta incrusta la direccion de la ficha', () => {
@@ -273,6 +399,27 @@ describe('contrato de la ficha de producto terminado', () => {
     const origenDeLaEtiqueta = origenEnElBarrel(barrel, 'movementReasonLabel');
     expect(origenDeLaEtiqueta).not.toBeNull();
     expect(esModuloDeCliente(leer(origenDeLaEtiqueta as string))).toBe(false);
+  });
+
+  /**
+   * El barrel de /inventario reexporta secciones de servidor (`next/headers` via la composicion):
+   * un modulo de cliente que importe un VALOR de el arrastra ese codigo al bundle y rompe el build.
+   * Las etiquetas le llegan por props desde el servidor.
+   */
+  it('R16 — ningun modulo de cliente de la ruta importa valores del barrel de /inventario', () => {
+    const clientes = FUENTES_DE_LA_RUTA.filter((ruta) => esModuloDeCliente(leer(ruta)));
+    const hallazgos = clientes.flatMap((ruta) =>
+      valoresImportadosDe(leer(ruta), ESPECIFICADOR_INVENTARIO).map((nombre) => `${ruta} -> ${nombre}`),
+    );
+
+    expect(clientes.length).toBeGreaterThan(0);
+    expect(hallazgos).toEqual([]);
+  });
+
+  it('R16 — la guardia de cliente contra el barrel muerde con una fuente fabricada', () => {
+    const fabricada = `'use client';\n\nimport { movementReasonLabel } from '${ESPECIFICADOR_INVENTARIO}';\n`;
+    expect(esModuloDeCliente(fabricada)).toBe(true);
+    expect(valoresImportadosDe(fabricada, ESPECIFICADOR_INVENTARIO)).toEqual(['movementReasonLabel']);
   });
 
   it('R16 — la guardia de modulo de cliente muerde con fuentes fabricadas', () => {

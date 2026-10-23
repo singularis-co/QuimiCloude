@@ -1,10 +1,11 @@
 'use client';
 
 import { useId } from 'react';
+import { XIcon } from 'lucide-react';
 
 import { PresentationUnitSelect } from '@/components/shared/presentation-unit-select';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { RowProblem } from '@/lib/modules/documentos';
@@ -106,63 +107,73 @@ export function FormulaIngredientRow({
   }
 
   return (
-    <Card data-testid={`formula-import-row-${index}`}>
-      <CardHeader className="flex-row items-start justify-between gap-2">
-        <div className="flex flex-col gap-1">
-          <CardTitle>Fila {index + 1}</CardTitle>
-          <span className="text-sm text-muted-foreground" data-testid={`formula-import-row-name-${index}`}>
-            {row.readName ?? 'Sin nombre leído'}
+    <Card className="gap-2.5 overflow-visible rounded-xl px-3.5 py-3.5" data-testid={`formula-import-row-${index}`}>
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden="true"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted font-mono text-[13px] font-semibold"
+          data-testid={`formula-import-row-number-${index}`}
+        >
+          {index + 1}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[10.5px] font-semibold tracking-widest text-muted-foreground uppercase">
+            Referencia del PDF
+          </span>
+          <span className="flex min-w-0 items-baseline gap-1.5 text-sm">
+            <span className="truncate" data-testid={`formula-import-row-name-${index}`}>
+              {row.readName ?? 'Sin nombre leído'}
+            </span>
+            {reference === null ? null : (
+              <span
+                className="shrink-0 font-mono text-[13px] text-muted-foreground"
+                data-testid={`formula-import-row-reference-${index}`}
+              >
+                {reference}
+              </span>
+            )}
           </span>
         </div>
         <Button
           type="button"
           variant="ghost"
+          size="sm"
           touch
           onClick={onRemove}
+          aria-label={`Quitar el ingrediente ${index + 1}`}
           data-testid={`formula-import-row-remove-${index}`}
         >
-          Quitar
+          <XIcon aria-hidden="true" />
+          <span className="hidden sm:inline" data-testid={`formula-import-row-remove-text-${index}`}>
+            Quitar
+          </span>
         </Button>
-      </CardHeader>
+      </div>
 
-      <CardContent className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
         {problems.length === 0 ? null : (
           <p role="alert" className="text-sm text-destructive" data-testid={`formula-import-row-problems-${index}`}>
             {problems.map((problem) => ROW_PROBLEM_LABELS[problem]).join(', ')}.
           </p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`${fieldId}-percentage`}>Porcentaje</Label>
-            <Input
-              id={`${fieldId}-percentage`}
-              value={row.percentage}
-              onChange={(event) => handlePercentageChange(event.target.value)}
-              inputMode="decimal"
-              className={`${touchTarget} ${FIELD_TEXT}`}
-              data-testid={`formula-import-row-percentage-${index}`}
-            />
-            {row.percentageRead === null ? null : (
-              <p
-                className="text-sm text-muted-foreground"
-                data-testid={`formula-import-row-percentage-read-${index}`}
-              >
-                Leído: {row.percentageRead}
-              </p>
-            )}
-          </div>
-
-          {reference === null ? null : (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium">Referencia del PDF</span>
-              <p
-                className={`${touchTarget} ${FIELD_TEXT} flex items-center`}
-                data-testid={`formula-import-row-reference-${index}`}
-              >
-                {reference}
-              </p>
-            </div>
+        <div className="flex flex-col gap-2 sm:w-40">
+          <Label htmlFor={`${fieldId}-percentage`}>Porcentaje</Label>
+          <Input
+            id={`${fieldId}-percentage`}
+            value={row.percentage}
+            onChange={(event) => handlePercentageChange(event.target.value)}
+            inputMode="decimal"
+            className={`${touchTarget} ${FIELD_TEXT} font-mono`}
+            data-testid={`formula-import-row-percentage-${index}`}
+          />
+          {row.percentageRead === null ? null : (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid={`formula-import-row-percentage-read-${index}`}
+            >
+              Leído: {row.percentageRead}
+            </p>
           )}
         </div>
 
@@ -254,7 +265,7 @@ export function FormulaIngredientRow({
             ) : null}
           </div>
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

@@ -8,8 +8,8 @@ import { trabajoConProveedor } from './run-document-job-doubles';
 
 
 import type {
-  BatchStatus,
   DocumentFileStatusEntry,
+  ReadBatch,
 } from '@/lib/modules/documentos/domain/batch-status';
 import type { CropCatalogImagesResult } from '@/lib/modules/documentos/domain/crop-catalog-images';
 import type { StrategyRunResult } from '@/lib/modules/documentos/domain/process-pdf-by-strategy';
@@ -41,13 +41,13 @@ function dobleDeRepositorio(strategy: 'catalogo' | 'formula' = 'catalogo') {
     reclamada = true;
     return fila();
   });
-  const batch: BatchStatus = {
+  const batch: ReadBatch = {
     id: TANDA,
     companyId: EMPRESA,
     strategy,
     files: [] as readonly DocumentFileStatusEntry[],
   };
-  const readBatch = vi.fn(async (): Promise<BatchStatus | null> => batch);
+  const readBatch = vi.fn(async (): Promise<ReadBatch | null> => batch);
 
   const repository: DocumentBatchRepository = {
     createBatch: vi.fn(async () => {

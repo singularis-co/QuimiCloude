@@ -5,7 +5,7 @@ import {
   OrderWouldBlockError,
   ValidationError,
 } from './errors';
-import type { OrderStatus } from './order-classification';
+import { isStartedOrderStatus, type OrderStatus } from './order-classification';
 import { requireAliveCustomer } from './order-customer';
 import { isCustomerOnlyEdit } from './order-edit-change';
 import { updateOrderSchema } from './order-input';
@@ -26,7 +26,7 @@ import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 import type { OrderRepository } from '../ports/order-repository';
 import type { OrderWriteRepository } from '../ports/order-write-repository';
 
-/** Recupera `products` y `units` porque cada escritura recalcula el coste de los ingredientes:
+/** Recupera `products` y `units` porque la escritura antes de Comenzar recalcula el coste:
  *  hace falta leer los lotes disponibles y convertir entre la unidad de la receta y la del
  *  lote. `orders` sigue siendo `OrderRepository`: solo lee la fila previa. La escritura y el
  *  apartado viven en `unitOfWork`. */
@@ -137,20 +137,22 @@ export function createUpdateOrder(
       await requireAliveCustomer(deps.customerCatalog, data.customerId, actor.companyId);
     }
 
-    // El coste se recalcula con la receta del DATO ENTRANTE, no con la de la fila vieja: una
-    // edicion que solo cambia la cantidad o la prioridad tambien reescribe el importe con los
-    // lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado como
-    // disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
-    // promedio el lote que el mismo aparto entero.
-    const cost = await resolveStoredOrderCost(
-      deps,
-      effectiveId,
-      data.quantity,
-      data.unitId,
-      packagingLinesOfInput(data.presentationLines),
-      actor.companyId,
-      { orderId: id },
-    );
+    // Antes de Comenzar el coste se recalcula con la receta del DATO ENTRANTE, no con la de la
+    // fila vieja: una edicion que solo cambia la cantidad o la prioridad tambien reescribe el
+    // importe con los lotes de HOY. `orderId: id` cuenta lo que este mismo pedido tiene apartado
+    // como disponible para si mismo: editarlo sin cambiar nada no le hace perder de su propio
+    // promedio el lote que el mismo aparto entero. Desde Comenzar el importe guardado se conserva.
+    const computedCost = isStartedOrderStatus(row.status)
+      ? 'keep'
+      : await resolveStoredOrderCost(
+          deps,
+          effectiveId,
+          data.quantity,
+          data.unitId,
+          packagingLinesOfInput(data.presentationLines),
+          actor.companyId,
+          { orderId: id },
+        );
 
     const instant = now();
 
@@ -161,6 +163,9 @@ export function createUpdateOrder(
       // Repetida sobre la fila BLOQUEADA: otra operacion pudo moverla entre la lectura de
       // arriba y este bloqueo.
       assertTransition(locked.status, locked.status);
+
+      // Un Comenzar entre las dos lecturas tambien congela el importe.
+      const cost = isStartedOrderStatus(locked.status) ? 'keep' : computedCost;
 
       // La unidad y el reparto se resuelven y se validan contra
       // el total con la fila del pedido YA BLOQUEADA, para que dos ediciones simultaneas no
@@ -227,7 +232,7 @@ export function createUpdateOrder(
         if (locked.status !== 'BLOQUEADO') {
           await moveStatus(transaction.orders, id, locked.status, 'BLOQUEADO', actor.id, instant, scope);
         }
-        if (cost !== null) {
+        if (cost !== null && cost !== 'keep') {
           await transaction.orders.setIngredientsCost(id, null, actor.id, instant, scope);
         }
       } else if (locked.status === 'BLOQUEADO') {

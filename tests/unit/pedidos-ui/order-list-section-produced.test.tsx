@@ -161,6 +161,8 @@ function pedido(id: string, sequence: number, status: OrderSummary['status']): O
     status,
     cancellationReason: status === 'CANCELADO' ? 'Sin stock' : null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -172,11 +174,15 @@ function pedido(id: string, sequence: number, status: OrderSummary['status']): O
         packages: 2,
         packagingProductId: null,
         packagingName: null,
+        presentationContent: null,
+        presentationUnitLabel: null,
       },
     ],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
   };
 }
 

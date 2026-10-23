@@ -233,7 +233,7 @@ export function DataTableHeaderCell<TRow>({
             <SortIcon aria-hidden="true" className="size-4" />
           </button>
         ) : (
-          <span>{column.label}</span>
+          <span className={column.srOnlyLabel === true ? 'sr-only' : undefined}>{column.label}</span>
         )}
         {children}
       </div>

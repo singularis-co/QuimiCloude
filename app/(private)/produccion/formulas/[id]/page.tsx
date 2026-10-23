@@ -2,7 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { ArrowLink } from '@/components/shared/arrow-link';
 import { ErrorState } from '@/components/shared/error-state';
+import { PageHeader } from '@/components/shared/page-header';
+import { PageShell } from '@/components/shared/page-shell';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { PRODUCT_TYPES } from '@/lib/modules/inventario';
 import { listProductsAction } from '@/lib/modules/inventario/adapters/driving/product-actions';
@@ -17,13 +20,14 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { FORMULAS_ROUTE, recipeVersionRoute } from '@/lib/shared/routes';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
-import { RecipeForm, RecipeVersionList } from '../components';
+import { NewRecipeVersionButton, RecipeForm, RecipeVersionList } from '../components';
 
 export const metadata: Metadata = {
   title: `Editar fórmula · ${RECIPES_LABEL} · ${BRAND_LABEL}`,
 };
 
 const FIRST_PAGE = 1;
+const BACK_LABEL = 'Volver a la lista';
 
 // Los mismos testids que el error de la lista: los vigila el E2E de errores.
 const LOAD_ERROR = {
@@ -165,14 +169,28 @@ export default async function EditarRecetaPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <h1 data-testid="recipe-form-title" className="text-2xl font-semibold break-words">
-        Editar fórmula · {recipeResult.data.name}
-      </h1>
+    <PageShell>
+      <div className="flex flex-col gap-3">
+        <ArrowLink
+          direction="back"
+          href={FORMULAS_ROUTE}
+          touch
+          testId="recipe-form-back-link"
+          className="self-start"
+        >
+          {BACK_LABEL}
+        </ArrowLink>
+        <PageHeader
+          title={<span className="break-words">Editar fórmula · {recipeResult.data.name}</span>}
+          titleTestId="recipe-form-title"
+        />
+      </div>
       <RecipeForm
         mode="edit"
         recipe={recipeResult.data}
         versions={versionsResult.data}
+        versionList={<RecipeVersionList originalId={id} versions={versionsResult.data} />}
+        newVersionAction={<NewRecipeVersionButton originalId={id} />}
         lockingOrders={lockResult.data.lockingOrders}
         units={unitsResult.data}
         initialProductPage={{
@@ -192,7 +210,6 @@ export default async function EditarRecetaPage({
           totalPages: machinesResult.data.totalPages,
         }}
       />
-      <RecipeVersionList originalId={id} versions={versionsResult.data} />
-    </div>
+    </PageShell>
   );
 }

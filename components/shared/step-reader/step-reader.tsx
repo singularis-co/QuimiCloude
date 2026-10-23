@@ -1,9 +1,11 @@
 'use client';
 
 import { type ReactNode, useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 
 import { CountdownRing } from '@/components/shared/countdown-ring';
 import { CountdownTimer } from '@/components/shared/countdown-timer';
+import { Notice } from '@/components/shared/notice';
 import { Button } from '@/components/ui/button';
 import type { RecipeStepDocument } from '@/lib/modules/recetas';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
@@ -25,7 +27,9 @@ import { StepDocumentView } from './step-document-view';
  *
  * **El bloqueo (R17)** no es solo `disabled`: el motivo va en un parrafo de **texto visible**
  * junto al boton y asociado por `aria-describedby`. Un `title` no vale, porque en tactil no hay
- * `:hover` (R26) y una pantalla que no responde sin decir por que es una pantalla rota.
+ * `:hover` (R26) y una pantalla que no responde sin decir por que es una pantalla rota. En
+ * `mode="ejecucion"` la espera minima es la excepcion: su cuenta va visible dentro del boton
+ * primario y su motivo, solo para lectores de pantalla (decision humana, fuera de SDD).
  *
  * Los textos viven en UNA constante para que la i18n futura sea sustituirla.
  *
@@ -38,11 +42,11 @@ import { StepDocumentView } from './step-document-view';
  * ampare. Quien busque trazabilidad completa, que la pida — hoy no existe.
  */
 
-/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie. */
+/** En `'ejecucion'` los botones van en talla `xl` y llenan su columna del pie, a partes iguales. */
 const PRIMARY_TOUCH_TARGET_EJECUCION = 'w-full min-w-11';
 
 const TEXTS = {
-  empty: 'Esta receta no tiene ningún paso que leer.',
+  empty: 'Esta fórmula no tiene ningún paso que leer.',
   previous: 'Anterior',
   next: 'Siguiente',
   finish: 'Finalizar',
@@ -50,6 +54,7 @@ const TEXTS = {
   blocked: (pending: number) => `Marca los ${pending} elementos pendientes para continuar.`,
   waitPrefix: 'Espera',
   waitSuffix: 'para continuar.',
+  waitReasonEjecucion: 'Espera a que termine la cuenta regresiva para continuar.',
 } as const;
 
 export type StepReaderProps = {
@@ -80,7 +85,12 @@ export type StepReaderProps = {
   /** Cada `id` nuevo lleva al paso `position` (desde 1), aunque el actual esté bloqueado, y avisa
    *  a `onStepChange` si el paso cambia. El `id` con el que se monta no navega. */
   readonly stepRequest?: { readonly position: number; readonly id: number };
+  /** `'inline'` (por defecto) se apila con el resto de la página. `'panel'` llena el alto de su
+   *  contenedor, con cabecera, cuerpo desplazable y pie propios. Solo se lee en `mode="lectura"`. */
+  readonly layout?: 'inline' | 'panel';
 };
+
+type StepDirection = 'advance' | 'go_back';
 
 /**
  * Posicion de entrada, desde 1, recortada a los pasos que hay; `null` si no hay pasos. Exportada
@@ -161,13 +171,16 @@ export function StepReader({
   renderStepAddon,
   stepBlockReason,
   stepRequest,
+  layout = 'inline',
 }: StepReaderProps) {
   const isEjecucion = mode === 'ejecucion';
+  const isPanel = !isEjecucion && layout === 'panel';
   const baseId = useId();
   const [index, setIndex] = useState(() => initialIndexFor(initialStepPosition, steps.length));
   const [checkedItems, setCheckedItems] = useState<ReadonlySet<string>>(() => new Set<string>());
   const [arrival, setArrival] = useState(0);
   const [waitedArrival, setWaitedArrival] = useState<number | null>(null);
+  const [direction, setDirection] = useState<StepDirection>('advance');
   const headingRef = useRef<HTMLDivElement>(null);
   const skipNextFocus = useRef(true);
 
@@ -200,9 +213,11 @@ export function StepReader({
     const from = Math.min(index, steps.length - 1);
     const target = (clampStepPosition(stepRequest.position, steps.length) ?? 1) - 1;
     if (target === from) return;
+    const change: StepDirection = target > from ? 'advance' : 'go_back';
     setArrival((previous) => previous + 1);
     setIndex(target);
-    onStepChange?.({ direction: target > from ? 'advance' : 'go_back', position: target + 1 });
+    setDirection(change);
+    onStepChange?.({ direction: change, position: target + 1 });
   });
 
   useEffect(() => {
@@ -267,6 +282,7 @@ export function StepReader({
     }
     setIndex(next);
     if (next !== currentIndex) {
+      setDirection('go_back');
       onStepChange?.({ direction: 'go_back', position: next + 1 });
     }
   }
@@ -279,6 +295,7 @@ export function StepReader({
     }
     setIndex(next);
     if (next !== currentIndex) {
+      setDirection('advance');
       onStepChange?.({ direction: 'advance', position: next + 1 });
     }
   }
@@ -302,20 +319,45 @@ export function StepReader({
 
   const stepAddon = renderStepAddon?.(currentIndex + 1);
 
-  const waitReason = waiting && (
-    <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
-      {isEjecucion && (
-        <CountdownRing
-          key={`ring-${arrival}`}
-          seconds={minStepSeconds ?? 0}
-          testId="step-reader-wait-ring"
-        />
-      )}
-      {TEXTS.waitPrefix}{' '}
-      <CountdownTimer key={`timer-${arrival}`} seconds={minStepSeconds} onEnd={() => setWaitedArrival(arrival)} />
-      {' '}
-      {TEXTS.waitSuffix}
-    </p>
+  const waitTimer = (
+    <CountdownTimer
+      key={`timer-${arrival}`}
+      seconds={minStepSeconds}
+      onEnd={() => setWaitedArrival(arrival)}
+      className={isEjecucion ? 'text-current' : isPanel ? 'font-mono font-semibold text-current' : undefined}
+    />
+  );
+
+  // En 'lectura' el motivo de espera, con su cuenta, es texto visible en el cuerpo del paso.
+  // En 'ejecucion' la cuenta va dentro del boton primario y el motivo queda solo para lectores
+  // de pantalla, sin la cuenta: anunciar cada segundo seria ruido.
+  const waitReason =
+    waiting &&
+    (isEjecucion ? (
+      <p id={waitReasonId} data-testid="step-reader-wait-reason" className="sr-only">
+        {TEXTS.waitReasonEjecucion}
+      </p>
+    ) : (
+      <p id={waitReasonId} data-testid="step-reader-wait-reason" className="text-base">
+        {TEXTS.waitPrefix} {waitTimer} {TEXTS.waitSuffix}
+      </p>
+    ));
+
+  // `aria-hidden`: el nombre accesible del boton se queda en su texto, no cambia con cada tick.
+  const buttonCountdown = isEjecucion && waiting && (
+    <span
+      aria-hidden="true"
+      data-testid="step-reader-button-countdown"
+      className="inline-flex items-center gap-1.5"
+    >
+      <CountdownRing
+        key={`ring-${arrival}`}
+        seconds={minStepSeconds ?? 0}
+        testId="step-reader-wait-ring"
+        className="size-5 [&_[data-slot=countdown-ring-progress]]:stroke-primary-foreground [&_[data-slot=countdown-ring-track]]:stroke-primary-foreground/30"
+      />
+      {waitTimer}
+    </span>
   );
 
   const buttonSize = isEjecucion ? 'xl' : 'default';
@@ -326,11 +368,12 @@ export function StepReader({
       variant="outline"
       size={buttonSize}
       touch
-      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : undefined}
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : isPanel ? 'basis-40' : undefined}
       data-testid="step-reader-previous"
       disabled={isFirst}
       onClick={goPrevious}
     >
+      {isPanel && <ArrowLeft aria-hidden="true" data-icon="inline-start" />}
       {TEXTS.previous}
     </Button>
   );
@@ -339,30 +382,91 @@ export function StepReader({
     <Button
       type="button"
       size={buttonSize}
-      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
-      touch={isEjecucion}
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : isPanel ? 'basis-56' : touchTarget}
+      touch={isEjecucion || isPanel}
       data-testid="step-reader-finish"
       disabled={blocked || finishBusy}
       aria-busy={finishBusy || undefined}
       aria-describedby={describedBy}
       onClick={finish}
     >
+      {isPanel && <Check aria-hidden="true" data-icon="inline-start" />}
       {finishLabel}
+      {buttonCountdown}
     </Button>
   ) : (
     <Button
       type="button"
       size={buttonSize}
-      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : touchTarget}
-      touch={isEjecucion}
+      className={isEjecucion ? PRIMARY_TOUCH_TARGET_EJECUCION : isPanel ? 'basis-56' : touchTarget}
+      touch={isEjecucion || isPanel}
       data-testid="step-reader-next"
       disabled={blocked}
       aria-describedby={describedBy}
       onClick={goNext}
     >
       {TEXTS.next}
+      {isPanel && <ArrowRight aria-hidden="true" data-icon="inline-end" />}
+      {buttonCountdown}
     </Button>
   );
+
+  if (isPanel) {
+    return (
+      <section data-testid="step-reader" data-layout="panel" className="flex h-full min-h-0 flex-col">
+        <div data-testid="step-reader-heading" className="flex flex-col gap-2 px-6 pt-4">
+          {title !== undefined && (
+            <h2 id={headingId} data-testid="step-reader-title" className="text-base font-semibold">
+              {title}
+            </h2>
+          )}
+          <p aria-live="polite" data-testid="step-reader-position" className="text-sm font-semibold">
+            {TEXTS.position(currentIndex + 1, steps.length)}
+          </p>
+          <StepProgress total={steps.length} current={currentIndex} />
+        </div>
+
+        <div data-testid="step-reader-body" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex max-w-[640px] flex-col gap-3.5">
+            {/* La clave reinicia la animación de entrada en cada cambio de paso. */}
+            <div
+              key={currentIndex}
+              data-testid="step-reader-step"
+              data-direction={direction}
+              className={cn(
+                'animate-in fade-in duration-200 motion-reduce:animate-none',
+                direction === 'advance' ? 'slide-in-from-right-7' : 'slide-in-from-left-7',
+              )}
+            >
+              {documentView}
+            </div>
+
+            {stepAddon}
+
+            {reasonText !== null && (
+              <Notice tone="info" id={reasonId} testId="step-reader-blocked-reason">
+                {reasonText}
+              </Notice>
+            )}
+
+            {waiting && (
+              <Notice tone="warning" id={waitReasonId} testId="step-reader-wait-reason">
+                {TEXTS.waitPrefix} {waitTimer} {TEXTS.waitSuffix}
+              </Notice>
+            )}
+          </div>
+        </div>
+
+        <div
+          data-testid="step-reader-actions"
+          className="flex justify-end gap-3 border-t border-border px-6 pt-3.5 pb-[calc(14px+env(safe-area-inset-bottom))]"
+        >
+          {previousButton}
+          {primaryButton}
+        </div>
+      </section>
+    );
+  }
 
   if (isEjecucion) {
     return (
@@ -399,8 +503,6 @@ export function StepReader({
 
         {stepAddon}
 
-        {waitReason}
-
         <div
           data-testid="step-reader-actions"
           className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
@@ -415,8 +517,9 @@ export function StepReader({
               >
                 {reasonText ?? TEXTS.blocked(pending)}
               </p>
+              {waitReason}
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {previousButton}
               {primaryButton}
             </div>

@@ -191,6 +191,8 @@ const PEDIDO: OrderSummary = {
   status: 'PENDIENTE',
   cancellationReason: null,
   ingredientsCost: null,
+  packagingCost: null,
+  actualCost: null,
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   createdBy: null,
@@ -198,7 +200,9 @@ const PEDIDO: OrderSummary = {
   presentationLines: [],
   unitId: null,
   unitLabel: null,
+  pendingDelivery: { kind: 'not_packed' },
   customer: null,
+  recipeImageUrl: null,
 };
 
 beforeEach(() => {

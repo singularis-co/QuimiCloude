@@ -17,6 +17,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ACTIONS_COLUMN_ID,
+  ACTUAL_COST_COLUMN_ID,
+  ACTUAL_COST_TESTID,
   CANCELLATION_REASON_COLUMN_ID,
   COVERAGE_COLUMN_ID,
   CREATED_AT_COLUMN_ID,
@@ -29,9 +31,13 @@ import {
   ORDER_PRODUCED_PRODUCT_LINK_TESTID,
   ORDER_SKELETON_COLUMN_COUNT,
   ORDER_STATUS_LABELS,
+  NOTHING_PENDING_MARK,
+  PENDING_DELIVERY_COLUMN_ID,
+  PENDING_DELIVERY_TESTID,
   PRESENTATION_NAME_COLUMN_ID,
   PRIORITY_COLUMN_ID,
-  QUANTITY_COLUMN_ID,
+  PRODUCTION_COST_COLUMN_ID,
+  PRODUCTION_COST_TESTID,
   RESPONSIBLES_COLUMN_ID,
   STATUS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
@@ -69,7 +75,6 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
  * las declaraba como array del modulo: **ningun assert de este archivo se relaja**.
  */
 const ORDER_COLUMNS = buildOrderColumns({
-  recipes: { items: [], totalPages: 1 },
   units: [],
   bridge: null,
 });
@@ -91,6 +96,8 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     status: 'PENDIENTE',
     cancellationReason: null,
     ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
@@ -98,7 +105,9 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     presentationLines: [],
     unitId: null,
     unitLabel: null,
+    pendingDelivery: { kind: 'not_packed' },
     customer: null,
+    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -116,25 +125,30 @@ afterEach(() => {
 
 // QC-35bis (2026-09-07): eran DIEZ. La unidad y el precio unitario salieron del pedido -de la
 // tabla `orders` hacia arriba-, asi que sus dos columnas ya no tienen dato que pintar y la lista
-// acordada baja a ocho. Luego sube a diez con RESPONSABLES, a ONCE con COBERTURA y a DOCE con
-// CLIENTE. Sigue siendo cerrada y en un orden acordado.
-describe('las columnas declaradas son exactamente las doce acordadas (R8, R20, R35)', () => {
-  it('en positivo: los doce ids, en el orden acordado', () => {
+// acordada baja a ocho. Luego sube a diez con RESPONSABLES, a ONCE con COBERTURA, a DOCE con
+// CLIENTE y a TRECE con POR ENTREGAR, que llega desde el dashboard. El 2026-10-16 baja a DOCE: sale
+// CANTIDAD (decision humana). El 2026-10-20 sube a TRECE con el costo y despues a CATORCE con el
+// costo real. El 2026-10-22 POR ENTREGAR pasa delante de PRESENTACION. Sigue siendo cerrada y en un
+// orden acordado.
+describe('las columnas declaradas son exactamente las catorce acordadas (R8, R20, R35)', () => {
+  it('en positivo: los catorce ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
-      QUANTITY_COLUMN_ID,
+      PENDING_DELIVERY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
+      PRODUCTION_COST_COLUMN_ID,
+      ACTUAL_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(12);
+    expect(ORDER_COLUMNS).toHaveLength(14);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -147,6 +161,11 @@ describe('las columnas declaradas son exactamente las doce acordadas (R8, R20, R
     // ponga el test rojo.
     expect(ids).not.toContain('unitName');
     expect(ids).not.toContain('unitPrice');
+  });
+
+  it('en negativo: la columna «Cantidad» ya no esta (decision humana del 2026-10-16)', () => {
+    expect(ORDER_COLUMNS.map((column) => column.id)).not.toContain('quantity');
+    expect(ORDER_COLUMNS.map((column) => column.label)).not.toContain('Cantidad');
   });
 
   it('el esqueleto de carga pinta tantas celdas como columnas hay (R21)', () => {
@@ -170,21 +189,24 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
     }
   });
 
-  it('en negativo: ninguna otra columna es ordenable, ni siquiera la cantidad', () => {
+  it('en negativo: ninguna otra columna es ordenable', () => {
     const noOrdenables = ORDER_COLUMNS.filter((column) => column.sortable !== true).map((c) => c.id);
 
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
-      QUANTITY_COLUMN_ID,
+      PENDING_DELIVERY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
+      PRODUCTION_COST_COLUMN_ID,
+      ACTUAL_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    // Esta en `ORDER_QUERYABLE.sortable` pero la decision cerrada NO pide su cabecera.
-    expect(ORDER_QUERYABLE.sortable).toContain(QUANTITY_COLUMN_ID);
+    // `quantity` sigue en `ORDER_QUERYABLE.sortable` -una URL vieja con ese orden no rompe-, pero
+    // desde el 2026-10-16 ni siquiera hay columna.
+    expect(ORDER_QUERYABLE.sortable).toContain('quantity');
     // Y `unitPrice` ya no esta ni en la lista blanca: se fue con la columna (2026-09-07).
     expect(ORDER_QUERYABLE.sortable).not.toContain('unitPrice');
   });
@@ -261,7 +283,6 @@ describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`
   it('R10: el menu lleva los permisos del servidor y emite `onAction` con el pedido de la fila', () => {
     const onAction = vi.fn();
     const columnas = buildOrderColumns({
-      recipes: { items: [], totalPages: 1 },
       units: [],
       bridge: null,
       canEditCustomer: true,
@@ -338,87 +359,30 @@ describe('el motivo de cancelacion (R11)', () => {
   });
 });
 
-describe('la cantidad se pinta REDONDEADA A DOS DECIMALES (enmienda del 2026-09-17 a R39)', () => {
-  // Decision humana del 2026-09-17: la cadena decimal del contrato llega con la escala de la
-  // columna -«12.5000»- y cuatro decimales de relleno no informan de nada. La celda la pasa por
-  // `formatDecimalDisplay`. El precio unitario acompanaba a la cantidad en este caso hasta el
-  // 2026-09-07; hoy la cantidad es el unico decimal que le queda al pedido.
-
-  it('los ceros de relleno no se pintan: «12.5000» se lee «12.5» y «15.0000» se lee «15»', () => {
-    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' })).container.textContent)
-      .toBe('12.5');
-    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '15.0000' })).container.textContent)
-      .toBe('15');
-  });
-
-  it('mas de dos decimales se redondean al mas cercano', () => {
-    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '0.1255' })).container.textContent)
-      .toBe('0.13');
-  });
-
-  it('el redondeo es EXACTO: no pasa por coma flotante', () => {
-    // Lo que R39 protege de fondo sigue en pie. Con `number`, 1.005 no se representa exacto y
-    // `toFixed(2)` da «1.00»; la celda tiene que dar «1.01».
-    expect(pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '1.0050' })).container.textContent)
-      .toBe('1.01');
-  });
-
-  it('QC-132 R1: expone el valor exacto en el title cuando difiere del pintado', () => {
-    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '0.1255' }));
-
-    expect(container.textContent).toBe('0.13');
-    expect(container.firstElementChild).toHaveAttribute('title', '0.1255');
-  });
-
-  it('QC-132 R2: sin title cuando el valor pintado coincide con el exacto', () => {
-    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' }));
-
-    expect(container.textContent).toBe('12.5');
-    expect(container.querySelector('[title]')).toBeNull();
-  });
-});
-
-describe('QC-170 R42: la cantidad lleva la unidad del pedido, o va sola si no la tiene', () => {
-  it('con unidad pinta la cifra y su etiqueta', () => {
-    const { container } = pintarCelda(
-      QUANTITY_COLUMN_ID,
-      pedido({ quantity: '12.5000', unitId: 'unit-l', unitLabel: 'L' }),
-    );
-
-    expect(container.textContent).toBe('12.5 L');
-  });
-
-  it('sin unidad pinta la cifra sola', () => {
-    const { container } = pintarCelda(QUANTITY_COLUMN_ID, pedido({ quantity: '12.5000' }));
-
-    expect(container.textContent).toBe('12.5');
-  });
-});
-
 describe('R20: la columna Presentación pinta el reparto o Sin presentación', () => {
   it('QC-170 R26: con una linea pinta «envases × nombre» sin «+0»', () => {
     const { container } = pintarCelda(
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
-        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null }],
+        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       }),
     );
 
     expect(container.textContent).toBe('2 × Bidón 20L');
   });
 
-  it('QC-170 R26: con varias lineas pinta la primera y «+N»', () => {
+  it('QC-170 R26: con varias lineas pinta todas separadas por coma', () => {
     const { container } = pintarCelda(
       PRESENTATION_NAME_COLUMN_ID,
       pedido({
         presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5, packagingProductId: null, packagingName: null },
-          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1, packagingProductId: null, packagingName: null },
+          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
+          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
       }),
     );
 
-    expect(container.textContent).toBe('5 × Botella 200 ml +1');
+    expect(container.textContent).toBe('5 × Botella 200 ml, 1 × Bidón 20L');
   });
 
   it('QC-170 R27: sin reparto se pinta «Sin presentación»', () => {
@@ -443,6 +407,8 @@ describe('el reparto del listado con lineas de envase y antiguas', () => {
             packages: 2,
             packagingProductId: 'e-1',
             packagingName: 'Bidón PET 20 L',
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
         ],
       }),
@@ -462,6 +428,8 @@ describe('el reparto del listado con lineas de envase y antiguas', () => {
             packages: 2,
             packagingProductId: null,
             packagingName: null,
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
         ],
       }),
@@ -481,12 +449,35 @@ describe('el reparto del listado con lineas de envase y antiguas', () => {
             packages: 3,
             packagingProductId: 'e-1',
             packagingName: null,
+            presentationContent: null,
+            presentationUnitLabel: null,
           },
         ],
       }),
     );
 
     expect(container.textContent).toBe('3 × 20 L');
+  });
+
+  it('una linea con envase y volumen conocido pinta «envases × envase · volumen»', () => {
+    const { container } = pintarCelda(
+      PRESENTATION_NAME_COLUMN_ID,
+      pedido({
+        presentationLines: [
+          {
+            presentationId: 'p-1',
+            presentationName: '300 ml',
+            packages: 9,
+            packagingProductId: 'e-1',
+            packagingName: 'Embase pequeño 2',
+            presentationContent: '300.0000',
+            presentationUnitLabel: 'ml',
+          },
+        ],
+      }),
+    );
+
+    expect(container.textContent).toBe('9 × Embase pequeño 2 · 300 ml');
   });
 });
 
@@ -589,23 +580,25 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
 // QC-123 T9 (R18) — el importe NO se pinta en esta ficha (lo pinta QC-122). En positivo, la
 // lista blanca de ids sigue sin ninguna columna de importe; en negativo, las celdas que SI se
 // pueden pintar sin montar el resto de la pantalla (router, dialogos) no dejan escapar el valor.
+// Los costes SI se pintan, pero solo en sus columnas propias (cubiertas abajo); las demas celdas
+// siguen sin dejarlos escapar.
 describe('la tabla de pedidos no pinta el importe (R18)', () => {
   it('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(12);
+    expect(ids).toHaveLength(14);
 
     const VALOR_DELATOR = '999999.9999';
-    const order = pedido({ ingredientsCost: VALOR_DELATOR });
+    const order = pedido({ ingredientsCost: VALOR_DELATOR, actualCost: VALOR_DELATOR });
     const idsRenderizablesSinContexto = [
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
-      QUANTITY_COLUMN_ID,
       PRESENTATION_NAME_COLUMN_ID,
+      PENDING_DELIVERY_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
     ];
@@ -613,6 +606,110 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
       const { container } = pintarCelda(id, order);
       expect(container.textContent).not.toContain(VALOR_DELATOR);
     }
+  });
+});
+
+describe('las columnas «Costo estimado» y «Costo real»', () => {
+  it('R19: son contiguas, en ese orden, justo antes de las acciones', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids.at(-1)).toBe(ACTIONS_COLUMN_ID);
+    expect(ids.at(-2)).toBe(ACTUAL_COST_COLUMN_ID);
+    expect(ids.at(-3)).toBe(PRODUCTION_COST_COLUMN_ID);
+  });
+
+  it('R19: se rotulan «Costo estimado» y «Costo real», y el rotulo viejo ya no esta', () => {
+    const porId = new Map(ORDER_COLUMNS.map((column) => [column.id, column]));
+
+    expect(porId.get(PRODUCTION_COST_COLUMN_ID)?.label).toBe('Costo estimado');
+    expect(porId.get(ACTUAL_COST_COLUMN_ID)?.label).toBe('Costo real');
+    expect(ORDER_COLUMNS.map((column) => column.label)).not.toContain('Costo de producción');
+  });
+
+  it('R19: el estimado conserva su id para no perder preferencias guardadas', () => {
+    expect(PRODUCTION_COST_COLUMN_ID).toBe('productionCost');
+    expect(ACTUAL_COST_COLUMN_ID).toBe('actualCost');
+  });
+
+  it('R19: ninguna de las dos ordena ni filtra', () => {
+    for (const id of [PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID]) {
+      const costo = ORDER_COLUMNS.find((column) => column.id === id);
+      expect(costo?.sortable, id).not.toBe(true);
+      expect(costo?.filter, id).toBeUndefined();
+    }
+  });
+
+  it('R19: las dos alinean al final y en cifras tabulares', () => {
+    for (const id of [PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID]) {
+      const costo = ORDER_COLUMNS.find((column) => column.id === id);
+      expect(costo?.align, id).toBe('end');
+      expect(costo?.tabular, id).toBe(true);
+    }
+  });
+
+  it('R20: sin coste real pinta el guion con el rotulo «Sin dato», nunca 0 ni vacio', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '50.0000', actualCost: null }));
+
+    expect(screen.queryByTestId(ACTUAL_COST_TESTID)).toBeNull();
+    const guion = screen.getByTestId(`order-missing-${ACTUAL_COST_COLUMN_ID}`);
+    expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(guion).toHaveAccessibleName('Sin dato');
+    expect(guion).not.toHaveTextContent('0');
+  });
+
+  it('R20: sin estimado pinta el guion con el rotulo «Sin dato», como hoy', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: null, packagingCost: null }));
+
+    expect(screen.queryByTestId(PRODUCTION_COST_TESTID)).toBeNull();
+    const guion = screen.getByTestId(`order-missing-${PRODUCTION_COST_COLUMN_ID}`);
+    expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(guion).toHaveAccessibleName('Sin dato');
+  });
+
+  it('R20: el real no cae al estimado cuando falta', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '50.0000', actualCost: null }));
+
+    expect(document.body).not.toHaveTextContent('50.00');
+  });
+
+  it('R21: un importe exacto a dos decimales no lleva `title`', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '120.0000' }));
+
+    const celda = screen.getByTestId(ACTUAL_COST_TESTID);
+    expect(celda.textContent).toBe('$120.00');
+    expect(celda).not.toHaveAttribute('title');
+  });
+
+  it('R21: un importe que se redondea expone el exacto en el `title`', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '12752.5512' }));
+
+    const celda = screen.getByTestId(ACTUAL_COST_TESTID);
+    expect(celda.textContent).toBe('$12,752.55');
+    expect(celda).toHaveAttribute('title', '12752.5512');
+  });
+
+  it('R21: el real se pinta de `actualCost` y no del estimado', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '99.0000', actualCost: '120.0000' }));
+
+    expect(screen.getByTestId(ACTUAL_COST_TESTID).textContent).toBe('$120.00');
+    expect(screen.getByTestId(ACTUAL_COST_TESTID)).not.toHaveTextContent('99.00');
+  });
+
+  it('el estimado pinta el importe como dinero, con el valor exacto en el `title` si se redondea', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '1234.5670', packagingCost: '0.0000' }));
+
+    const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
+    expect(celda).toHaveTextContent('$1,234.57');
+    expect(celda).toHaveAttribute('title', '1234.567');
+  });
+
+  it('el estimado NO suma `packagingCost`: los envases ya van dentro de `ingredientsCost`', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '12.5000', packagingCost: '2.0000' }));
+
+    const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
+    expect(celda).toHaveTextContent('$12.50');
+    expect(celda).not.toHaveTextContent('$14.50');
+    expect(celda).not.toHaveAttribute('title');
   });
 });
 
@@ -642,7 +739,6 @@ describe('QC-102 — la columna propia de responsables (R16)', () => {
     };
     const order = pedido();
     const columnas = buildOrderColumns({
-      recipes: { items: [], totalPages: 1 },
       units: [],
       bridge: null,
       responsiblesByOrder: { [order.id]: [RESPONSABLE] },
@@ -684,7 +780,6 @@ describe('QC-141 T14 — la columna propia de cobertura del material (R35)', () 
     (coverage) => {
       const order = pedido();
       const columnas = buildOrderColumns({
-        recipes: { items: [], totalPages: 1 },
         units: [],
         bridge: null,
         coverageByOrder: { [order.id]: coverage },
@@ -771,12 +866,11 @@ describe('la columna «Presentación» enlaza al producto terminado del pedido p
   const PRESENTACION_ID = 'p-1';
   const PRODUCTO_ID = '33333333-3333-4333-8333-333333333333';
   const LINEAS = [
-    { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null },
+    { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
   ];
 
   function pintarPresentacionConMapa(order: OrderSummary) {
     const columnas = buildOrderColumns({
-      recipes: { items: [], totalPages: 1 },
       units: [],
       bridge: null,
       producedProductsByOrder: { [PEDIDO_ID]: { [PRESENTACION_ID]: PRODUCTO_ID } },
@@ -835,5 +929,76 @@ describe('la columna «Presentación» enlaza al producto terminado del pedido p
 
     expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
     expect(container.textContent).toBe('2 × Bidón 20L');
+  });
+});
+
+describe('la columna «Por entregar», traida del dashboard', () => {
+  // 2026-10-22: pasa delante de «Presentación», justo despues de «Cliente» (decision humana).
+  it('va despues de Cliente, antes de Presentación, y no ordena ni filtra', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+    expect(ids.indexOf(PENDING_DELIVERY_COLUMN_ID)).toBe(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID) + 1);
+    expect(ids.indexOf(PRESENTATION_NAME_COLUMN_ID)).toBe(ids.indexOf(PENDING_DELIVERY_COLUMN_ID) + 1);
+
+    const columna = ORDER_COLUMNS.find((column) => column.id === PENDING_DELIVERY_COLUMN_ID);
+    expect(columna?.sortable).not.toBe(true);
+    expect(columna?.filter).toBeUndefined();
+  });
+
+  it('pendiente: pinta cantidad y nombre de cada presentacion, separadas por coma', () => {
+    pintarCelda(
+      PENDING_DELIVERY_COLUMN_ID,
+      pedido({
+        status: 'POR_ACONDICIONAR',
+        pendingDelivery: {
+          kind: 'pending',
+          items: [
+            { label: 'galones', quantity: 4 },
+            { label: 'vasos', quantity: 2 },
+          ],
+        },
+      }),
+    );
+
+    const celda = screen.getByTestId(PENDING_DELIVERY_TESTID);
+    expect(celda).toHaveTextContent('4 galones, 2 vasos');
+    expect(celda).toHaveAttribute('title', '4 galones, 2 vasos');
+    expect(celda).not.toHaveAttribute('data-empty');
+  });
+
+  it('entregado: pinta «Entregado» atenuado, como lo hacia el dashboard', () => {
+    pintarCelda(
+      PENDING_DELIVERY_COLUMN_ID,
+      pedido({ status: 'ENTREGADO', pendingDelivery: { kind: 'delivered' } }),
+    );
+
+    const celda = screen.getByTestId(PENDING_DELIVERY_TESTID);
+    expect(NOTHING_PENDING_MARK).toBe(ORDER_STATUS_LABELS.ENTREGADO);
+    expect(celda).toHaveTextContent(NOTHING_PENDING_MARK);
+    expect(celda).toHaveAttribute('data-empty', 'true');
+    expect(celda).toHaveClass('text-muted-foreground');
+  });
+
+  it.each(['EN_EMPAQUE', 'CANCELADO'] as const)(
+    'sin empacar (%s): pinta el marcador de ausencia atenuado, no «Entregado»',
+    (status) => {
+      pintarCelda(PENDING_DELIVERY_COLUMN_ID, pedido({ status, pendingDelivery: { kind: 'not_packed' } }));
+
+      const celda = screen.getByTestId(PENDING_DELIVERY_TESTID);
+      expect(celda).toHaveTextContent(MISSING_VALUE_MARK);
+      expect(celda).not.toHaveTextContent(NOTHING_PENDING_MARK);
+      expect(celda).toHaveAttribute('data-empty', 'true');
+      expect(celda).toHaveClass('text-muted-foreground');
+    },
+  );
+
+  it('pendiente sin presentaciones con nombre: pinta el marcador de ausencia, no una celda vacia', () => {
+    pintarCelda(
+      PENDING_DELIVERY_COLUMN_ID,
+      pedido({ status: 'TERMINADO', pendingDelivery: { kind: 'pending', items: [] } }),
+    );
+
+    const celda = screen.getByTestId(PENDING_DELIVERY_TESTID);
+    expect(celda).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(celda).toHaveAttribute('data-empty', 'true');
   });
 });

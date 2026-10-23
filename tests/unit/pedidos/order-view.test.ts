@@ -156,6 +156,13 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
     expect([enLaFila, enLaVista]).toEqual([true, true])
   })
 
+  it('OrderRow y OrderView llevan packagingCost, la parte de envases del importe', () => {
+    const enLaFila: Declara<OrderRow, 'packagingCost'> = true
+    const enLaVista: Declara<OrderView, 'packagingCost'> = true
+    const sinCoste: OrderView['packagingCost'] = null
+    expect([enLaFila, enLaVista, sinCoste]).toEqual([true, true, null])
+  })
+
   it('ingredientsCost en null no se vuelve "0.0000"', () => {
     const sinCoste: OrderView['ingredientsCost'] = null
     expect(sinCoste).toBeNull()

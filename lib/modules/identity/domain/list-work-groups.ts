@@ -40,11 +40,11 @@ const listQuerySchema = createListQuerySchema();
  *   4. el log de lo podado (QC-57 R6).
  *   5. el puerto, con la consulta **YA SANEADA**.
  *
- * El defecto de 10 y el tope de 25 (R24), el orden `name ASC, id ASC` con desempate estable (R25) y
- * la columna que toca la busqueda son del **adaptador driven**, el unico que puede importar
- * `lib/shared/pagination` y conocer la base. **Este listado SI pagina en SQL**, a diferencia del de
- * miembros (`design.md > 5.3`): su filtro —empresa y vivos— es expresable en el `WHERE` sin copiar
- * ninguna regla de dominio.
+ * El defecto de 10 y el tope de 25 (R24), el orden por defecto `created_at DESC, id ASC` con
+ * desempate estable y la columna que toca la busqueda son del **adaptador driven**, el unico que
+ * puede importar `lib/shared/pagination` y conocer la base. **Este listado SI pagina en SQL**, a
+ * diferencia del de miembros (`design.md > 5.3`): su filtro —empresa y vivos— es expresable en el
+ * `WHERE` sin copiar ninguna regla de dominio.
  *
  * Dos exclusiones que no estan aqui porque son del puerto, y por eso nadie puede olvidarlas: los
  * grupos dados de baja (R9) y los de otra empresa (R8).

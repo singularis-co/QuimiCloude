@@ -61,6 +61,8 @@ const ORDER_ROW = {
   unitLabel: null,
   packages: '4',
   status: 'POR_EMPACAR',
+  priority: 'ALTA',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
   packedByName: null,
 };
 

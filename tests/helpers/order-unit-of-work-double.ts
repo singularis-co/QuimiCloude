@@ -13,10 +13,12 @@ import type {
 } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type {
+  ConsumedLot,
   ConsumptionOutcome,
   FinishedGoodsIntake,
   FinishedGoodsOutcome,
   MaterialReservations,
+  OrderConsumptionLedger,
   ProductRef,
   ReservationOutcome,
 } from '@/lib/modules/inventario';
@@ -41,8 +43,10 @@ export function fakeOrderWriteRepository(
     setStatus: vi.fn(explota('setStatus')),
     setReservedAt: vi.fn(explota('setReservedAt')),
     setIngredientsCost: vi.fn(explota('setIngredientsCost')),
+    setActualCost: vi.fn(explota('setActualCost')),
     finishPackingAlive: vi.fn(explota('finishPackingAlive')),
     findPresentationLinesForFinish: vi.fn(explota('findPresentationLinesForFinish')),
+    recordPackedCounts: vi.fn(explota('recordPackedCounts')),
     ...overrides,
   } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
 }
@@ -59,10 +63,14 @@ export function fakeMaterialReservations(
   const consumeForOrder = vi.fn(
     async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
   );
+  const settlePackagingForOrder = vi.fn(
+    async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
+  );
   return {
     syncForOrder,
     releaseForOrder,
     consumeForOrder,
+    settlePackagingForOrder,
     ...overrides,
   } as unknown as MaterialReservations & Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
 }
@@ -130,6 +138,15 @@ export function fakeScopeUnits(
     Record<'findRefs' | 'findMassVolumeBridge', ReturnType<typeof vi.fn>>;
 }
 
+/** Lectura de consumos del `scope`: por defecto el pedido no consumio nada, asi que el coste real
+ *  queda sin importe. Quien necesite lotes concretos los pasa. */
+export function fakeOrderConsumptionLedger(
+  lots: readonly ConsumedLot[] = [],
+): OrderConsumptionLedger & Record<'findConsumedLots', ReturnType<typeof vi.fn>> {
+  const findConsumedLots = vi.fn(async () => lots);
+  return { findConsumedLots } as OrderConsumptionLedger & Record<'findConsumedLots', ReturnType<typeof vi.fn>>;
+}
+
 /** Combina los puertos del `scope` y la unidad de trabajo que los expone, lista para
  *  inyectar en `CreateOrderDeps.unitOfWork`, etc. */
 export function fakeUnitOfWork(overrides: {
@@ -139,6 +156,7 @@ export function fakeUnitOfWork(overrides: {
   readonly finishedGoods?: Partial<FinishedGoodsIntake>;
   readonly products?: OrderTransactionScope['products'];
   readonly units?: OrderTransactionScope['units'];
+  readonly consumption?: OrderConsumptionLedger;
 } = {}): {
   readonly unitOfWork: OrderUnitOfWork;
   readonly orders: OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
@@ -148,6 +166,7 @@ export function fakeUnitOfWork(overrides: {
   readonly finishedGoods: FinishedGoodsIntake & Record<keyof FinishedGoodsIntake, ReturnType<typeof vi.fn>>;
   readonly products: OrderTransactionScope['products'];
   readonly units: OrderTransactionScope['units'];
+  readonly consumption: OrderConsumptionLedger;
 } {
   const orders = fakeOrderWriteRepository(overrides.orders);
   const reservations = fakeMaterialReservations(overrides.reservations);
@@ -155,14 +174,16 @@ export function fakeUnitOfWork(overrides: {
   const finishedGoods = fakeFinishedGoodsIntake(overrides.finishedGoods);
   const products = overrides.products ?? fakeScopeProducts();
   const units = overrides.units ?? fakeScopeUnits();
+  const consumption = overrides.consumption ?? fakeOrderConsumptionLedger();
   return {
-    unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes, finishedGoods, products, units }),
+    unitOfWork: fakeOrderUnitOfWork({ orders, reservations, recipes, finishedGoods, products, units, consumption }),
     orders,
     reservations,
     recipes,
     finishedGoods,
     products,
     units,
+    consumption,
   };
 }
 
@@ -189,6 +210,7 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     customerId: null,
     reservedAt: new Date('2026-01-02T03:04:05.000Z'),
     packagingCost: null,
+    actualCost: null,
     ...overrides,
   };
 }

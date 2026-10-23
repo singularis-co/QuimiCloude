@@ -1,14 +1,9 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { compareQuantities, subtractQuantities } from './decimal-quantity';
 import { ProductNotFoundError, ValidationError } from './errors';
 
-import type {
-  DeliveredTotal,
-  FinishedDeliveryDirectory,
-  FinishedProductDeliveriesPage,
-} from './finished-product-detail';
+import type { DeliveredTotal, FinishedDeliveryDirectory, FinishedProductDeliveriesPage } from './finished-product-detail';
 import type { OrderNumberDirectory } from './reservation';
 import type { FinishedProductDetailRepository } from '../ports/finished-product-detail-repository';
 
@@ -21,10 +16,7 @@ export type ListFinishedProductDeliveriesDeps = {
   readonly customers: Pick<CustomerCatalog, 'findRefsIncludingDeleted'>;
 };
 
-type DeliveryDetails = Awaited<ReturnType<FinishedDeliveryDirectory['findDeliveryDetails']>>;
-
-const ZERO_QUANTITY = '0.0000';
-const NOTHING_DELIVERED: DeliveredTotal = { quantity: ZERO_QUANTITY, packages: 0 };
+const NOTHING_DELIVERED: DeliveredTotal = { quantity: '0.0000', packages: 0 };
 
 const productIdSchema = z.string().uuid();
 
@@ -34,12 +26,15 @@ const pageSchema = z.strictObject({
   pageSize: z.number().int().min(1).optional(),
 });
 
-function absoluteQuantity(quantity: string): string {
-  return compareQuantities(quantity, ZERO_QUANTITY) < 0 ? subtractQuantities(ZERO_QUANTITY, quantity) : quantity;
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
-function uniqueNonNull(values: readonly (string | null | undefined)[]): string[] {
-  return [...new Set(values.filter((value): value is string => value !== null && value !== undefined))];
+// El directorio solo devuelve lineas de los lotes que se le pasan, que salen de este mapa.
+function lotOf(lotsById: ReadonlyMap<string, string>, batchId: string): string {
+  const lot = lotsById.get(batchId);
+  if (lot === undefined) throw new Error(`listFinishedProductDeliveries: el lote ${batchId} no es del producto`);
+  return lot;
 }
 
 export function createListFinishedProductDeliveries(
@@ -61,52 +56,48 @@ export function createListFinishedProductDeliveries(
     const parsed = pageSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
 
-    const page = await deps.products.listDeliveryMovements(id, parsed.data, scope);
+    const batchIds = record.batches.map((batch) => batch.id);
+    const page = await deps.deliveries.listDeliveryLines(actor.companyId, batchIds, parsed.data);
     if (page.total === 0) return { ...page, items: [], delivered: NOTHING_DELIVERED };
 
-    const deliveryIds = uniqueNonNull(page.items.map((item) => item.orderDeliveryId));
-    const orderIds = uniqueNonNull(page.items.map((item) => item.orderId));
+    const orderIds = unique(
+      page.items.map((item) => item.orderId).filter((orderId): orderId is string => orderId !== null),
+    );
+    const customerIds = unique(page.items.map((item) => item.customerId));
 
     // El total cubre todos los lotes del producto, no solo los de la pagina.
-    const [delivered, details, numbers] = await Promise.all([
-      deps.deliveries.summarizeDelivered(
-        actor.companyId,
-        record.batches.map((batch) => batch.id),
-      ),
-      deliveryIds.length === 0
-        ? Promise.resolve<DeliveryDetails>(new Map())
-        : deps.deliveries.findDeliveryDetails(actor.companyId, deliveryIds),
+    const [delivered, numbers, customers] = await Promise.all([
+      deps.deliveries.summarizeDelivered(actor.companyId, batchIds),
       orderIds.length === 0
         ? Promise.resolve(new Map<string, string>())
         : deps.orders.findNumberTexts(actor.companyId, orderIds),
-    ]);
-
-    const customerIds = uniqueNonNull([...details.values()].map((detail) => detail.customerId));
-    const customers =
       customerIds.length === 0
-        ? []
-        : await deps.customers.findRefsIncludingDeleted(customerIds, actor.companyId);
+        ? Promise.resolve<readonly CustomerRef[]>([])
+        : deps.customers.findRefsIncludingDeleted(customerIds, actor.companyId),
+    ]);
     const customersById = new Map<string, CustomerRef>(customers.map((customer) => [customer.id, customer]));
+    const lotsById = new Map(record.batches.map((batch) => [batch.id, batch.lot]));
+    // Todos los lotes de un producto terminado son de su presentacion.
+    const presentationName = record.presentation?.name ?? null;
 
     // Lo que no vuelve de un directorio sale como ausente y la fila se queda en su sitio.
     return {
       ...page,
-      items: page.items.map((movement) => {
-        const detail = details.get(movement.orderDeliveryId);
-        const line = detail?.linesByBatch.get(movement.batchId);
-        return {
-          movementId: movement.id,
-          orderDeliveryId: movement.orderDeliveryId,
-          createdAt: movement.createdAt,
-          customer: detail === undefined ? null : (customersById.get(detail.customerId) ?? null),
-          orderNumberText: movement.orderId === null ? null : (numbers.get(movement.orderId) ?? null),
-          batchId: movement.batchId,
-          lot: movement.lot,
-          packages: line?.packages ?? null,
-          quantity: absoluteQuantity(movement.quantity),
-          void: line?.void ?? null,
-        };
-      }),
+      items: page.items.map((line) => ({
+        deliveryLineId: line.id,
+        orderDeliveryId: line.orderDeliveryId,
+        createdAt: line.createdAt,
+        customer: customersById.get(line.customerId) ?? null,
+        orderNumberText: line.orderId === null ? null : (numbers.get(line.orderId) ?? null),
+        presentationName,
+        batchId: line.batchId,
+        lot: lotOf(lotsById, line.batchId),
+        packages: line.packages,
+        quantity: line.quantity,
+        void: line.void,
+        withoutOrder: line.orderId === null,
+        note: line.note,
+      })),
       delivered,
     };
   };

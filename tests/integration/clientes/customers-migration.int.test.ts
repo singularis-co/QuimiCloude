@@ -64,16 +64,43 @@ function locateCustomersMigrationDir(): string {
 const migrationDir = locateCustomersMigrationDir()
 const migrationsDir = dirname(migrationDir)
 
+/**
+ * Nota 2026-10-15: respeta el cuerpo `$$ ... $$` de un bloque `DO`. La cadena de dependientes
+ * incluye `20261015130000_order_delivery_lines_customer`, cuyo UP y DOWN abren con un `DO $$` que
+ * aborta antes de cambiar nada; un `split(';')` ingenuo lo partia por la mitad (42601). Mismo
+ * recorrido que `inventario/reserve-existing-orders-migration.int.test.ts`. Sin `$$`, el resultado
+ * es identico al de antes.
+ */
 function statementsOf(sql: string): readonly string[] {
-  return sql
+  const withoutComments = sql
     .replace(/\r\n/g, '\n')
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n')
     .map((line) => line.replace(/--.*$/, ''))
     .join('\n')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0)
+
+  const statements: string[] = []
+  let current = ''
+  let inDollarBlock = false
+  let i = 0
+  while (i < withoutComments.length) {
+    if (withoutComments.slice(i, i + 2) === '$$') {
+      inDollarBlock = !inDollarBlock
+      current += '$$'
+      i += 2
+      continue
+    }
+    const char = withoutComments[i] as string
+    if (char === ';' && !inDollarBlock) {
+      statements.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+    i += 1
+  }
+  statements.push(current)
+  return statements.map((statement) => statement.trim()).filter((statement) => statement.length > 0)
 }
 
 const UP_SOURCE = readFileSync(join(migrationDir, 'migration.sql'), 'utf8')
@@ -93,6 +120,10 @@ const DOWN_STATEMENTS = statementsOf(DOWN_SOURCE)
  * entrega choca con 2BP01 igual. Se recorre en orden de timestamp y entra toda migracion que
  * referencie `customers` o una tabla creada por una dependiente ya detectada. Las aserciones de
  * antes se conservan.
+ *
+ * Nota 2026-10-20: entra tambien toda migracion posterior que agrega columnas a `customers`. El
+ * `DROP TABLE` se las lleva y el UP de esta tabla no las recrea; desde que la de telefonos n:m
+ * copia `customers.phone_e164` en su UP, sin el UP de esas columnas delante falla con 42703.
  */
 const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
 const TABLAS_DEPENDIENTES = new Set<string>(['customers'])
@@ -102,6 +133,7 @@ const DEPENDIENTES_POSTERIORES = readdirSync(migrationsDir)
   .sort()
   .filter((nombre) => {
     const sql = readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')
+    if (/ALTER\s+TABLE\s+"customers"\s+ADD\s+COLUMN/.test(sql)) return true
     const referenciadas = [...sql.matchAll(/REFERENCES\s+"(\w+)"/g)].map((m) => m[1] as string)
     if (!referenciadas.some((tabla) => TABLAS_DEPENDIENTES.has(tabla))) return false
     for (const m of sql.matchAll(/CREATE\s+TABLE\s+"(\w+)"/g)) TABLAS_DEPENDIENTES.add(m[1] as string)

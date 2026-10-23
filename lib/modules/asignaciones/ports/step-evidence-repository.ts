@@ -40,4 +40,6 @@ export interface StepEvidenceRepository {
     companyId: string,
     candidates: readonly { readonly orderId: string; readonly phase: EvidencePhase }[],
   ): Promise<readonly string[]>;
+  /** Fotos de las dos fases por pedido. Un pedido sin fotos o de otra empresa no sale. */
+  countByOrders(companyId: string, orderIds: readonly string[]): Promise<ReadonlyMap<string, number>>;
 }

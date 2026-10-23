@@ -83,14 +83,14 @@ export async function findAliveFinishedProducts(
 export async function findBatchesByLots(
   lots: readonly string[],
   scope: InventoryScope,
-): Promise<readonly { lot: string; productId: string }[]> {
+): Promise<readonly { lot: string; productId: string; presentationId: string | null }[]> {
   const distinct = [...new Set(lots)];
   if (distinct.length === 0) return [];
 
   return prisma.productBatch.findMany({
     where: { AND: [batchCompanyScope(scope), { lot: { in: distinct } }] },
     orderBy: [{ lot: 'asc' }],
-    select: { lot: true, productId: true },
+    select: { lot: true, productId: true, presentationId: true },
   });
 }
 
@@ -268,7 +268,7 @@ export async function receiveImportedFinishedGoods(
   }
 
   throw new Error(
-    `receiveImportedFinishedGoods: no se pudo escribir un lote generado sin chocar con el indice unico (company_id, lot), ${GENERATED_LOT_MAX_ATTEMPTS} intentos`,
+    `receiveImportedFinishedGoods: no se pudo escribir un lote generado sin chocar con la unicidad del lote, ${GENERATED_LOT_MAX_ATTEMPTS} intentos`,
     { cause: lastCollision },
   );
 }

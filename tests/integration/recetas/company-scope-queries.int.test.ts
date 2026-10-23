@@ -489,6 +489,7 @@ describe('R25 — findRecipeRefsIncludingDeleted acotado, con la baja logica via
         isDeleted: false,
         isUnderReview: false,
         original: null,
+        imageUrl: null,
       },
     ]);
   });
@@ -615,7 +616,22 @@ describe('versiones en el catalogo publico (R8, R25, R37, R40, R41)', () => {
       isDeleted: false,
       isUnderReview: false,
       original: { id: originalA, name: `Crema ${MARCA_ORIGINAL}` },
+      imageUrl: null,
     });
+  });
+
+  it('la referencia de una version lleva la imagen de su original, compuesta a URL al leer', async () => {
+    const images = { publicUrl: (path: string) => `https://cdn.test/${path}` };
+    const ruta = `recetas/${randomUUID()}.jpg`;
+    await prisma.recipe.update({ where: { id: originalA }, data: { imagePath: ruta } });
+    try {
+      const refs = await findRecipeRefsIncludingDeleted([versionA, originalA], A.companyId, images);
+
+      expect(refs.find((ref) => ref.id === versionA)?.imageUrl).toBe(`https://cdn.test/${ruta}`);
+      expect(refs.find((ref) => ref.id === originalA)?.imageUrl).toBe(`https://cdn.test/${ruta}`);
+    } finally {
+      await prisma.recipe.update({ where: { id: originalA }, data: { imagePath: null } });
+    }
   });
 
   it('R37: findAliveByNormalizedName ignora una version viva con ese nombre, y encuentra la original', async () => {

@@ -7,6 +7,11 @@ import type { EvidenceSignedUpload, EvidenceStorage } from '../../../ports/evide
  * Se niega a leer o borrar una ruta que no firmo: un doble que respondiera a cualquiera dejaria
  * pasar una ruta mal emparejada. Los bytes no llegan aqui (el E2E intercepta la subida), asi que
  * `download` devuelve siempre la misma imagen PNG valida.
+ *
+ * La instancia del E2E firma ademas la LECTURA de cualquier ruta con la forma que compone
+ * `buildEvidencePath` (`<empresa>/<pedido>/<archivo>`, tres uuid): el E2E siembra las fotos en la
+ * base desde su propio proceso, y esas rutas nunca pasaron por `createSignedUpload` en el del
+ * servidor. Una ruta con otra forma sigue fallando; descargar y borrar siguen exigiendo la firma.
  */
 
 /** Dominio reservado: no resuelve, asi que una subida sin interceptar falla en vez de salir. */
@@ -18,43 +23,77 @@ const MINIMAL_PNG_BASE64 =
 
 const MINIMAL_PNG = Uint8Array.from(atob(MINIMAL_PNG_BASE64), (char) => char.charCodeAt(0));
 
-const signedPaths = new Set<string>();
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Rechaza la promesa, no lanza: quien encadena con `.catch` tambien lo ve. */
-function whenSigned<T>(path: string, operation: string, run: () => T): Promise<T> {
-  if (!signedPaths.has(path)) {
-    return Promise.reject(
-      new Error(`el almacenamiento en memoria no firmo la ruta ${path}: ${operation} imposible`),
-    );
-  }
-  return Promise.resolve(run());
+/** Exactamente tres segmentos y los tres uuid: la forma de `buildEvidencePath`. */
+function hasEvidencePathShape(path: string): boolean {
+  const segments = path.split('/');
+  return segments.length === 3 && segments.every((segment) => UUID_PATTERN.test(segment));
 }
 
-export const evidenceStorageMemory: EvidenceStorage = {
-  createSignedUpload(path: string): Promise<EvidenceSignedUpload> {
-    signedPaths.add(path);
-    return Promise.resolve({
-      path,
-      uploadUrl: `${E2E_STORAGE_ORIGIN}/upload/${path}`,
-      token: crypto.randomUUID(),
-    });
-  },
-
-  createSignedReadUrl(path: string, expiresInSeconds: number): Promise<string> {
-    return whenSigned(
-      path,
-      'firmar la lectura',
-      () => `${E2E_STORAGE_ORIGIN}/read/${path}?expiresIn=${String(expiresInSeconds)}`,
-    );
-  },
-
-  download(path: string): Promise<Uint8Array | null> {
-    return whenSigned(path, 'la descarga', () => MINIMAL_PNG.slice());
-  },
-
-  remove(path: string): Promise<void> {
-    return whenSigned(path, 'el borrado', () => {
-      signedPaths.delete(path);
-    });
-  },
+export type EvidenceStorageMemoryOptions = {
+  /** Firmar la lectura de una ruta bien formada aunque no la haya firmado este proceso. */
+  readonly signsReadOfWellFormedPaths: boolean;
 };
+
+export function createEvidenceStorageMemory(options: EvidenceStorageMemoryOptions): EvidenceStorage {
+  const signedPaths = new Set<string>();
+
+  /** Rechaza la promesa, no lanza: quien encadena con `.catch` tambien lo ve. */
+  function whenSigned<T>(path: string, operation: string, run: () => T, accepted = signedPaths.has(path)): Promise<T> {
+    if (!accepted) {
+      return Promise.reject(
+        new Error(`el almacenamiento en memoria no firmo la ruta ${path}: ${operation} imposible`),
+      );
+    }
+    return Promise.resolve(run());
+  }
+
+  const storage: EvidenceStorage = {
+    createSignedUpload(path: string): Promise<EvidenceSignedUpload> {
+      signedPaths.add(path);
+      return Promise.resolve({
+        path,
+        uploadUrl: `${E2E_STORAGE_ORIGIN}/upload/${path}`,
+        token: crypto.randomUUID(),
+      });
+    },
+
+    createSignedReadUrl(path: string, expiresInSeconds: number): Promise<string> {
+      const readable =
+        signedPaths.has(path) || (options.signsReadOfWellFormedPaths && hasEvidencePathShape(path));
+      return whenSigned(
+        path,
+        'firmar la lectura',
+        () => `${E2E_STORAGE_ORIGIN}/read/${path}?expiresIn=${String(expiresInSeconds)}`,
+        readable,
+      );
+    },
+
+    createSignedReadUrls(paths: readonly string[], expiresInSeconds: number): Promise<readonly string[]> {
+      return Promise.all(paths.map((path) => storage.createSignedReadUrl(path, expiresInSeconds)));
+    },
+
+    download(path: string): Promise<Uint8Array | null> {
+      return whenSigned(path, 'la descarga', () => MINIMAL_PNG.slice());
+    },
+
+    remove(path: string): Promise<void> {
+      return whenSigned(path, 'el borrado', () => {
+        signedPaths.delete(path);
+      });
+    },
+  };
+
+  return storage;
+}
+
+/** Solo firma lo que firmo. */
+export const evidenceStorageMemory: EvidenceStorage = createEvidenceStorageMemory({
+  signsReadOfWellFormedPaths: false,
+});
+
+/** La que elige la composicion bajo `EVIDENCE_E2E_DOUBLES`. */
+export const evidenceStorageMemoryForE2E: EvidenceStorage = createEvidenceStorageMemory({
+  signsReadOfWellFormedPaths: true,
+});

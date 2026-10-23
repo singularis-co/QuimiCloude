@@ -23,9 +23,13 @@ const IDENTIDAD = '.arnes.local.json';
 const CUPOS_POR_DEFECTO = { frontend: 2, backend: 3, fullstack: 3 };
 const EN_VUELO = ['spec_ready', 'in_progress'];
 // Los cinco estados del arnes. Son los unicos valores validos de `status` en
-// `feature_list.json` y de `jira.estados` en `arnes.config.json` (`docs/jira.md > Los estados
-// del board`).
+// `feature_list.json` y de `tracker.estados` (o `jira.estados`) en `arnes.config.json`
+// (`docs/jira.md > Los estados del board`, `docs/trello.md > Los estados del board`).
 const ESTADOS = ['pending', 'spec_ready', 'in_progress', 'done', 'cancelled'];
+// Los trackers que el arnes sabe importar (`docs/jira.md`, `docs/trello.md`).
+const TIPOS_TRACKER = ['jira', 'trello'];
+// La identidad local que escribe `/tracker-connect`, segun el tipo de tracker.
+const CAMPO_IDENTIDAD = { jira: 'jira_account_id', trello: 'trello_member_id' };
 
 const errores = [];
 const notas = [];
@@ -91,9 +95,39 @@ const config = leerJsonOpcional(CONFIG) ?? (RAIZ ? leerJsonOpcional(path.join(RA
 const CUPOS = { ...CUPOS_POR_DEFECTO, ...(config?.cupos_por_persona ?? {}) };
 const cupoDe = (zone) => CUPOS[zone] ?? 2;
 
-// Quien soy en Jira. Lo escribe `/jira-connect` en la raiz del worktree principal; no se versiona.
+/**
+ * El tracker del repo, resuelto. `arnes.config.json > tracker` manda; sin el, el bloque `jira`
+ * antiguo equivale a `tipo: "jira"` con `prefijo = jira.project` y `estados = jira.estados`, asi
+ * que un perfil anterior se valida exactamente igual que antes. `etiqueta` es la ruta que se
+ * nombra en los mensajes (`tracker` o `jira`), para que el error apunte a lo que esta escrito.
+ */
+function resolverTracker(cfg, respaldoJira) {
+  const t = cfg?.tracker;
+  if (t !== undefined && t !== null) {
+    return {
+      etiqueta: 'tracker',
+      tipo: t.tipo,
+      prefijo: t.prefijo,
+      historicos: Array.isArray(t.prefijos_historicos) ? t.prefijos_historicos : [],
+      estados: t.estados,
+    };
+  }
+  const j = cfg?.jira ?? respaldoJira;
+  return { etiqueta: 'jira', tipo: 'jira', prefijo: j?.project, historicos: [], estados: j?.estados };
+}
+
+const tracker = resolverTracker(config);
+if (tracker.etiqueta === 'tracker' && !TIPOS_TRACKER.includes(tracker.tipo)) {
+  errores.push(
+    `${CONFIG} > tracker.tipo es ${JSON.stringify(tracker.tipo)}, que no es un tracker del arnes ` +
+    `(validos: ${TIPOS_TRACKER.join(', ')}).`,
+  );
+}
+
+// Quien soy en el tracker. Lo escribe `/tracker-connect` en la raiz del worktree principal; no se
+// versiona. El campo depende del tipo: `jira_account_id` o `trello_member_id`.
 const identidad = leerJsonOpcional(RAIZ ? path.join(RAIZ, IDENTIDAD) : IDENTIDAD);
-const MI_CUENTA = identidad?.jira_account_id ?? null;
+const MI_CUENTA = identidad?.[CAMPO_IDENTIDAD[tracker.tipo] ?? 'jira_account_id'] ?? null;
 
 // Fallar, no avisar. Un `warn` aqui reintroduce el agujero que este bloque cierra: el gate
 // seguiria verde habiendo validado a ciegas (`docs/gate.md > El anti-patron: la
@@ -137,23 +171,26 @@ const prefijos = (f) => [f.key, f.id].filter((v) => v != null).map(String);
 // versionado y tiene que fallar tambien en CI, donde no hay copia del board.
 // Muchos-a-uno se acepta (un «Bloqueado» que cuente como `in_progress`); un valor fuera de
 // los cinco, no. Que falte alguno de los cinco solo se avisa: un board puede no usar
-// `cancelled` todavia.
-const estadosJira = config?.jira?.estados;
+// `cancelled` todavia. Con `tracker` la tabla es `tracker.estados` (en Trello, nombre de lista ->
+// estado) y se valida igual; los mensajes nombran la ruta que esta escrita en el perfil.
+const estadosJira = tracker.estados;
+const ESTADOS_DE = `${tracker.etiqueta}.estados`;
+const DOC_ESTADOS = tracker.tipo === 'trello' ? 'docs/trello.md' : 'docs/jira.md';
 if (estadosJira !== undefined) {
   if (estadosJira === null || typeof estadosJira !== 'object' || Array.isArray(estadosJira)) {
-    errores.push(`${CONFIG} > jira.estados no es un objeto { "<nombre en Jira>": "<estado del arnes>" } (docs/jira.md > Los estados del board)`);
+    errores.push(`${CONFIG} > ${ESTADOS_DE} no es un objeto { "<nombre en el board>": "<estado del arnes>" } (${DOC_ESTADOS} > Los estados del board)`);
   } else {
     const malos = Object.entries(estadosJira).filter(([, v]) => !ESTADOS.includes(v));
     for (const [nombre, valor] of malos) {
       errores.push(
-        `${CONFIG} > jira.estados traduce "${nombre}" a ${JSON.stringify(valor)}, que no es un estado del arnes ` +
+        `${CONFIG} > ${ESTADOS_DE} traduce "${nombre}" a ${JSON.stringify(valor)}, que no es un estado del arnes ` +
         `(validos: ${ESTADOS.join(', ')}).`,
       );
     }
     const usados = new Set(Object.values(estadosJira));
     const sinNombre = ESTADOS.filter((e) => !usados.has(e));
     if (sinNombre.length > 0) {
-      avisos.push(`${CONFIG} > jira.estados no traduce ningun estado del board a: ${sinNombre.join(', ')}`);
+      avisos.push(`${CONFIG} > ${ESTADOS_DE} no traduce ningun estado del board a: ${sinNombre.join(', ')}`);
     }
   }
 }
@@ -170,13 +207,13 @@ if (!existsSync(FEATURE_LIST)) {
 }
 
 let features;
-let jira;
+let board;
 try {
   const raw = JSON.parse(readFileSync(FEATURE_LIST, 'utf8'));
   features = raw.features;
   // El board al que pertenece el repo vive en `arnes.config.json` (versionado). El bloque
   // `jira` de `feature_list.json` es el formato anterior a v2 y queda solo de respaldo.
-  jira = config?.jira ?? raw.jira;
+  board = resolverTracker(config, raw.jira);
   if (!Array.isArray(features)) throw new Error('la clave "features" no es un array');
 } catch (err) {
   console.error(`[features] ${FEATURE_LIST} no se pudo leer: ${err.message}`);
@@ -190,23 +227,28 @@ try {
 // el prefijo nuevo, consistentes entre si, y una comprobacion derivada los daria por
 // buenos. Derivar validaria el resultado del error contra el error. Por eso se declara
 // aparte, y por eso F0 tiene prohibido tocar este bloque.
+// Con `tracker`, el prefijo es `tracker.prefijo` y se aceptan tambien `tracker.prefijos_historicos`:
+// las features migradas de otro tracker conservan su key (`docs/trello.md > Migrar desde Jira`).
+const CAMPO_PREFIJO = board.etiqueta === 'tracker' ? 'tracker.prefijo' : 'jira.project';
 const conKey = features.filter((f) => f.key != null);
 if (conKey.length > 0) {
-  if (!jira?.project) {
+  if (!board.prefijo) {
     errores.push(
-      `${CONFIG} no declara "jira.project": no hay contra que validar que las fichas ` +
+      `${CONFIG} no declara "${CAMPO_PREFIJO}": no hay contra que validar que las fichas ` +
       `vengan del board correcto (docs/jira.md > El board al que pertenece el disco).`,
     );
   } else {
-    const ajenas = conKey.filter((f) => f.key.split('-')[0] !== jira.project);
+    const validos = [board.prefijo, ...board.historicos];
+    const ajenas = conKey.filter((f) => !validos.includes(f.key.split('-')[0]));
+    const esperado = validos.map((p) => `"${p}"`).join(' o ');
     if (ajenas.length > 0) {
       errores.push(
-        `fichas de otro board en ${FEATURE_LIST} (se esperaba "${jira.project}"): ` +
+        `fichas de otro board en ${FEATURE_LIST} (se esperaba ${esperado}): ` +
         `${ajenas.map((f) => f.key).join(', ')}. Si el proyecto cambio a proposito, ` +
-        `actualiza "jira.project" en ${CONFIG}; si no, la ultima importacion apunto al board equivocado.`,
+        `actualiza "${CAMPO_PREFIJO}" en ${CONFIG}; si no, la ultima importacion apunto al board equivocado.`,
       );
     } else {
-      notas.push(`las ${conKey.length} fichas vienen del proyecto ${jira.project}`);
+      notas.push(`las ${conKey.length} fichas vienen del proyecto ${validos.join('/')}`);
     }
   }
 }
@@ -247,7 +289,7 @@ for (const f of features) {
   if (!ESTADOS.includes(f.status)) {
     errores.push(
       `${ref(f)} tiene status ${JSON.stringify(f.status)}, que no es un estado del arnes ` +
-      `(validos: ${ESTADOS.join(', ')}). F0 traduce con ${CONFIG} > jira.estados (docs/jira.md > Los estados del board).`,
+      `(validos: ${ESTADOS.join(', ')}). F0 traduce con ${CONFIG} > ${ESTADOS_DE} (${DOC_ESTADOS} > Los estados del board).`,
     );
   }
 
@@ -305,10 +347,20 @@ const copiaV2 = features.some((f) => Object.prototype.hasOwnProperty.call(f, 'as
 if (!copiaV2) {
   avisos.push('la copia del board es anterior al arnes v2 (no trae assignee): corre F0 para importarlo');
 } else {
-  const sinDueno = enVuelo.filter((f) => !f.assignee?.accountId).map(ref);
+  // Trello admite varios members por tarjeta y el candado necesita exactamente uno: el importador
+  // (`scripts/trello.mjs`) escribe entonces `assignee` como array, y aqui eso es un error.
+  const varios = enVuelo.filter((f) => Array.isArray(f.assignee) && f.assignee.length > 1);
+  for (const f of varios) {
+    errores.push(
+      `${ref(f)} esta en vuelo con ${f.assignee.length} members en el tracker ` +
+      `(${f.assignee.map((a) => a?.displayName ?? a?.accountId).join(', ')}): el candado admite uno solo. ` +
+      `Deja solo a quien la tiene (docs/trello.md > El assignee: el candado visible del equipo).`,
+    );
+  }
+  const sinDueno = enVuelo.filter((f) => !varios.includes(f) && !f.assignee?.accountId).map(ref);
   if (sinDueno.length > 0) {
-    errores.push(`features en vuelo sin assignee en Jira: ${sinDueno.join(', ')}. Asignalas (docs/equipo.md > Tomar una feature).`);
-  } else if (enVuelo.length > 0) {
+    errores.push(`features en vuelo sin assignee en el tracker: ${sinDueno.join(', ')}. Asignalas (docs/equipo.md > Tomar una feature).`);
+  } else if (enVuelo.length > 0 && varios.length === 0) {
     notas.push(`las ${enVuelo.length} features en vuelo tienen assignee`);
   }
 }
@@ -320,7 +372,7 @@ if (!copiaV2) {
 // `scripts/archivos-en-vuelo.mjs` contra las ramas de todo el equipo.
 const esMia = (f) => MI_CUENTA == null || f.assignee?.accountId === MI_CUENTA;
 if (MI_CUENTA == null) {
-  avisos.push(`sin ${IDENTIDAD}: el cupo se cuenta sobre TODO el equipo. Corre /jira-connect para fijar tu identidad.`);
+  avisos.push(`sin ${IDENTIDAD} (o sin ${CAMPO_IDENTIDAD[tracker.tipo] ?? 'jira_account_id'}): el cupo se cuenta sobre TODO el equipo. Corre /tracker-connect para fijar tu identidad.`);
 }
 const enProgreso = features.filter((f) => f.status === 'in_progress' && esMia(f));
 const porZona = new Map();

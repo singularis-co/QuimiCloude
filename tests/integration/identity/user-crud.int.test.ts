@@ -822,7 +822,7 @@ describe('R29 — el filtro por estado de cuenta es multivalor y OPCIONAL', () =
 // R30 — orden estable: el caso de los dos homonimos, recorriendo TODAS las paginas
 // ---------------------------------------------------------------------------
 
-describe('R30 — orden por apellidos y nombres con desempate por identificador: ningun usuario sale en dos paginas ni se omite de todas', () => {
+describe('R30 — orden por defecto mas nuevos primero (QC-289) con desempate por identificador: ningun usuario sale en dos paginas ni se omite de todas', () => {
   it('con DOS homonimos en la misma empresa, la union de todas las paginas es EXACTAMENTE el conjunto esperado y sin repetidos', async () => {
     await withCompany(async (companyId) => {
       const actorId = await seedUser(companyId);
@@ -841,6 +841,20 @@ describe('R30 — orden por apellidos y nombres con desempate por identificador:
       const despues = await seedUser(companyId, { firstNames: 'Zoe', lastNames: 'Zapata' });
       const tambienDespues = await seedUser(companyId, { firstNames: 'Zuleima', lastNames: 'Zapata' });
       const esperados = [homonimoUno, homonimoDos, antes, despues, tambienDespues];
+      // QC-289: el orden por defecto es `created_at DESC, id ASC`. Se fija el `created_at` a mano
+      // para que el caso no dependa del reloj: los dos homonimos comparten instante -es ahi donde
+      // solo el `id` puede desempatar- y el resto va en orden INVERSO al alfabetico, para que un
+      // orden por apellidos no pudiera pasar por el correcto.
+      const instantes: ReadonlyArray<readonly [string, string]> = [
+        [tambienDespues, '2020-01-01T00:00:01.000Z'],
+        [despues, '2020-01-01T00:00:02.000Z'],
+        [homonimoUno, '2020-01-01T00:00:03.000Z'],
+        [homonimoDos, '2020-01-01T00:00:03.000Z'],
+        [antes, '2020-01-01T00:00:04.000Z'],
+      ];
+      for (const [id, iso] of instantes) {
+        await prisma.user.update({ where: { id }, data: { createdAt: new Date(iso) } });
+      }
 
       const primera = await listAliveInCompany(companyId, actorId, listQuery({ pageSize: 2 }));
       expect(primera.total).toBe(esperados.length);
@@ -858,7 +872,7 @@ describe('R30 — orden por apellidos y nombres con desempate por identificador:
       expect(new Set(vistos).size).toBe(esperados.length);
       expect([...vistos].sort()).toEqual([...esperados].sort());
 
-      // Y el orden pedido: `Alvarez` < `Mismoapellido` < `Zapata`, con los dos homonimos
+      // Y el orden por defecto: el mas nuevo primero, con los dos homonimos -mismo instante-
       // consecutivos y desempatados por identificador ascendente.
       const [menor, mayor] = [homonimoUno, homonimoDos].sort();
       expect(vistos).toEqual([antes, menor, mayor, despues, tambienDespues]);
@@ -1216,8 +1230,18 @@ describe('R35 — el propio actor NO sale en su listado', () => {
       const actorId = await seedUser(companyId, { lastNames: 'Aaaactor' });
       const otroUno = await seedUser(companyId, { lastNames: 'Bbb' });
       const otroDos = await seedUser(companyId, { lastNames: 'Ccc' });
+      // QC-289: el orden por defecto es `created_at DESC`. El actor es el MAS NUEVO, asi que si
+      // apareciera, apareceria el primero; el `created_at` va fijado para no depender del reloj.
+      const instantes: ReadonlyArray<readonly [string, string]> = [
+        [actorId, '2020-01-01T00:00:03.000Z'],
+        [otroUno, '2020-01-01T00:00:02.000Z'],
+        [otroDos, '2020-01-01T00:00:01.000Z'],
+      ];
+      for (const [id, iso] of instantes) {
+        await prisma.user.update({ where: { id }, data: { createdAt: new Date(iso) } });
+      }
 
-      // El actor seria el PRIMERO por orden de apellidos, asi que si apareciera, apareceria aqui.
+      // El actor seria el PRIMERO por orden por defecto, asi que si apareciera, apareceria aqui.
       const page = await listAliveInCompany(companyId, actorId, listQuery({ pageSize: 25 }));
 
       expect(page.items.map((item) => item.id)).toEqual([otroUno, otroDos]);

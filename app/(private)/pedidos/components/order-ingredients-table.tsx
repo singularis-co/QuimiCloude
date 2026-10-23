@@ -172,7 +172,7 @@ export function OrderIngredientsTable({
           className="text-sm text-muted-foreground"
           data-testid={ORDER_INGREDIENTS_EMPTY_TESTID}
         >
-          Esta receta no tiene ingredientes.
+          Esta fórmula no tiene ingredientes.
         </p>
       ) : (
         <Table data-testid={ORDER_INGREDIENTS_TABLE_TESTID}>

@@ -141,6 +141,16 @@ export class ConvertedCostOutOfRangeError extends InventarioError {
   }
 }
 
+/** El vencimiento del alta no es posterior a hoy. Codigo propio y no `invalid_input` para que el
+ *  formulario lo pinte junto al campo de vencimiento. */
+export class ExpiryDateNotFutureError extends InventarioError {
+  readonly code = 'batch_expiry_not_future';
+
+  constructor(diagnostic?: string) {
+    super('batch_expiry_not_future', diagnostic);
+  }
+}
+
 export class ValidationError extends InventarioError {
   readonly code = 'invalid_input';
 

@@ -1,10 +1,19 @@
 'use client';
 
 import { EditorContent, useEditor, useEditorState, type Content } from '@tiptap/react';
-import { CameraIcon, CheckIcon } from 'lucide-react';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { BoldIcon, CameraIcon, CheckIcon, ItalicIcon, ListChecksIcon, UserPlusIcon } from 'lucide-react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   MAX_STEP_ELEMENTS,
   countRecipeStepElements,
@@ -44,8 +53,12 @@ const TEXTS = {
   italic: 'Cursiva',
   checklist: 'Lista de verificacion',
   toolbar: 'Formato del paso',
-  requiresEvidence: 'Requiere evidencia',
+  evidenceTooltip: 'Requiere evidencia: al ejecutar, el paso pide de 1 a 3 fotos antes de avanzar.',
   evidenceHelp: 'Al ejecutar, este paso pide de 1 a 3 fotos antes de avanzar.',
+  assignmentTooltip:
+    'Asignación requerida: al ejecutar, hay que elegir uno o más responsables del equipo que hicieron el paso.',
+  assignmentHelp:
+    'Al ejecutar, hay que elegir uno o más responsables del equipo antes de avanzar.',
   tooManyElements: (count: number, max: number) =>
     `Este paso tiene ${count} elementos y el maximo es ${max}. Quita elementos antes de guardar.`,
 } as const;
@@ -60,13 +73,17 @@ export type RecipeStepEditorProps = {
   readonly error?: string;
   readonly errorId?: string;
   /** Sin ella no se pinta el interruptor «Requiere evidencia». */
-  readonly evidence?: RecipeStepEvidenceControl;
+  readonly evidence?: RecipeStepSwitchControl;
+  /** Sin ella no se pinta el interruptor «Asignación requerida». */
+  readonly assignment?: RecipeStepSwitchControl;
+  /** Botones de la fila (añadir, quitar), en el mismo grupo que el interruptor. */
+  readonly actions?: ReactNode;
 };
 
-export type RecipeStepEvidenceControl = {
+export type RecipeStepSwitchControl = {
   readonly checked: boolean;
   readonly onCheckedChange: (checked: boolean) => void;
-  /** Nombre accesible del interruptor, por ejemplo «Requiere evidencia en el paso 1». */
+  /** Nombre accesible completo, por ejemplo «Requiere evidencia en el paso 1 de Pasos». */
   readonly label: string;
 };
 
@@ -87,10 +104,15 @@ export function RecipeStepEditor({
   error,
   errorId,
   evidence,
+  assignment,
+  actions,
 }: RecipeStepEditorProps) {
   const warningId = useId();
   const evidenceHelpId = useId();
+  const assignmentHelpId = useId();
   const evidenceOn = evidence?.checked === true;
+  const assignmentOn = assignment?.checked === true;
+  const hasSwitches = evidence !== undefined || assignment !== undefined;
 
   // `onChange` puede cambiar de identidad en cada render del formulario, pero el editor se crea
   // UNA vez: sin esta referencia, `onUpdate` se quedaria con la primera version para siempre.
@@ -114,7 +136,7 @@ export function RecipeStepEditor({
       attributes: {
         // `text-base` = 16 px: por debajo, iOS hace zoom al enfocar el area editable (R26).
         class:
-          'min-h-11 w-full rounded-md border px-3 py-2 text-base outline-none focus-visible:ring-[3px] [&_ul]:list-none [&_li]:flex [&_li]:items-start [&_li]:gap-2 [&_li>div]:flex-1',
+          'min-h-11 w-full rounded-b-lg px-3 py-2.5 text-base leading-normal outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring[&_ul]:list-none [&_li]:flex [&_li]:items-start [&_li]:gap-2 [&_li>div]:flex-1',
         'aria-label': label,
         'aria-multiline': 'true',
         'data-testid': editableTestId,
@@ -155,64 +177,106 @@ export function RecipeStepEditor({
 
   return (
     <div className="flex flex-col gap-1" data-testid={`${editableTestId}-editor`}>
-      {/* R2: la barra ofrece TRES acciones y ninguna mas. No hay control ni menu de encabezado,
-          enlace, imagen, tabla, cita, lista numerada ni bloque de codigo, aqui ni en ningun otro
-          sitio del componente. */}
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="rounded-lg border border-input bg-card">
+        {/* La barra ofrece tres acciones y ninguna más: ni encabezados, enlaces, imágenes, tablas,
+            citas, listas numeradas ni bloques de código. */}
         <div
-          role="toolbar"
-          aria-label={TEXTS.toolbar}
-          aria-orientation="horizontal"
-          className="flex flex-wrap gap-1"
-          data-testid={`${editableTestId}-toolbar`}
+          className="flex flex-wrap items-center gap-1 rounded-t-lg border-b bg-muted p-1"
+          data-testid={`${editableTestId}-bar`}
         >
-          <ToolbarButton
-            label={TEXTS.bold}
-            pressed={estado.bold}
-            testId={`${editableTestId}-bold`}
-            onActivate={() => editor?.chain().focus().toggleBold().run()}
+          <div
+            role="toolbar"
+            aria-label={TEXTS.toolbar}
+            aria-orientation="horizontal"
+            className="flex flex-wrap gap-0.5"
+            data-testid={`${editableTestId}-toolbar`}
           >
-            <strong aria-hidden="true">N</strong>
-          </ToolbarButton>
-          <ToolbarButton
-            label={TEXTS.italic}
-            pressed={estado.italic}
-            testId={`${editableTestId}-italic`}
-            onActivate={() => editor?.chain().focus().toggleItalic().run()}
-          >
-            <em aria-hidden="true">C</em>
-          </ToolbarButton>
-          <ToolbarButton
-            label={TEXTS.checklist}
-            pressed={estado.checklist}
-            testId={`${editableTestId}-checklist`}
-            onActivate={() => editor?.chain().focus().toggleTaskList().run()}
-          >
-            <span aria-hidden="true">&#9745;</span>
-          </ToolbarButton>
-        </div>
-        {evidence === undefined ? null : (
-          // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
-          <div className="flex w-full md:ml-auto md:w-auto">
-            <Switch
-              checked={evidenceOn}
-              onCheckedChange={(checked) => evidence.onCheckedChange(checked)}
-              aria-label={evidence.label}
-              aria-describedby={evidenceOn ? evidenceHelpId : undefined}
-              data-testid={`${editableTestId}-evidence`}
+            <ToolbarButton
+              label={TEXTS.bold}
+              pressed={estado.bold}
+              testId={`${editableTestId}-bold`}
+              onActivate={() => editor?.chain().focus().toggleBold().run()}
             >
-              <CameraIcon aria-hidden="true" className="size-4" />
-              {TEXTS.requiresEvidence}
-            </Switch>
+              <BoldIcon aria-hidden="true" className="size-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              label={TEXTS.italic}
+              pressed={estado.italic}
+              testId={`${editableTestId}-italic`}
+              onActivate={() => editor?.chain().focus().toggleItalic().run()}
+            >
+              <ItalicIcon aria-hidden="true" className="size-4" />
+            </ToolbarButton>
+            <ToolbarButton
+              label={TEXTS.checklist}
+              pressed={estado.checklist}
+              testId={`${editableTestId}-checklist`}
+              onActivate={() => editor?.chain().focus().toggleTaskList().run()}
+            >
+              <ListChecksIcon aria-hidden="true" className="size-4" />
+            </ToolbarButton>
           </div>
-        )}
-      </div>
+          {!hasSwitches && actions === undefined ? null : (
+            // En teléfono el interruptor baja a su propia línea; desde md se alinea a la derecha.
+            // `flex-wrap`: a 390 px la columna del paso no cabe interruptor + botones de 44 px, y
+            // sin él las acciones se salían de la ventana; así bajan a otra línea, a la derecha.
+            <div
+              className="flex w-full flex-wrap items-center gap-1 md:ml-auto md:w-auto"
+              data-testid={`${editableTestId}-row-tools`}
+            >
+              {evidence === undefined ? null : (
+                <IconSwitch
+                  control={evidence}
+                  tooltip={TEXTS.evidenceTooltip}
+                  helpId={evidenceOn ? evidenceHelpId : undefined}
+                  testId={`${editableTestId}-evidence`}
+                >
+                  <CameraIcon aria-hidden="true" className="size-4" />
+                </IconSwitch>
+              )}
+              {assignment === undefined ? null : (
+                <IconSwitch
+                  control={assignment}
+                  tooltip={TEXTS.assignmentTooltip}
+                  helpId={assignmentOn ? assignmentHelpId : undefined}
+                  testId={`${editableTestId}-assignment`}
+                >
+                  <UserPlusIcon aria-hidden="true" className="size-4" />
+                </IconSwitch>
+              )}
+              {actions === undefined ? null : <div className="ml-auto flex shrink-0 gap-1">{actions}</div>}
+            </div>
+          )}
+        </div>
 
-      <EditorContent
-        editor={editor}
-        aria-invalid={error === undefined ? undefined : true}
-        aria-describedby={describedBy}
-      />
+        <EditorContent
+          editor={editor}
+          aria-invalid={error === undefined ? undefined : true}
+          aria-describedby={describedBy}
+        />
+
+        {evidenceOn ? (
+          <p
+            id={evidenceHelpId}
+            className="flex animate-in items-center gap-1.5 px-3 pb-2.5 text-xs text-primary duration-(--dur-slow) ease-(--ease-enter) fade-in slide-in-from-bottom-[10px]"
+            data-testid={`${editableTestId}-evidence-help`}
+          >
+            <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
+            {TEXTS.evidenceHelp}
+          </p>
+        ) : null}
+
+        {assignmentOn ? (
+          <p
+            id={assignmentHelpId}
+            className="flex animate-in items-center gap-1.5 px-3 pb-2.5 text-xs text-primary duration-(--dur-slow) ease-(--ease-enter) fade-in slide-in-from-bottom-[10px]"
+            data-testid={`${editableTestId}-assignment-help`}
+          >
+            <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
+            {TEXTS.assignmentHelp}
+          </p>
+        ) : null}
+      </div>
 
       {excedeElTope && (
         <p
@@ -223,18 +287,111 @@ export function RecipeStepEditor({
           {TEXTS.tooManyElements(elementos, MAX_STEP_ELEMENTS)}
         </p>
       )}
-
-      {evidenceOn ? (
-        <p
-          id={evidenceHelpId}
-          className="flex animate-in items-center gap-1.5 text-xs text-primary duration-(--dur-slow) ease-(--ease-enter) fade-in slide-in-from-bottom-[10px]"
-          data-testid={`${editableTestId}-evidence-help`}
-        >
-          <CheckIcon aria-hidden="true" className="size-4 shrink-0" />
-          {TEXTS.evidenceHelp}
-        </p>
-      ) : null}
     </div>
+  );
+}
+
+type IconSwitchProps = {
+  readonly control: RecipeStepSwitchControl;
+  readonly tooltip: string;
+  readonly helpId: string | undefined;
+  readonly testId: string;
+  readonly children: ReactNode;
+};
+
+/** Lo que hay que mantener el dedo para abrir la ayuda en táctil, y lo que puede moverse sin que cuente como desplazamiento. */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP_PX = 10;
+
+type PendingPress = {
+  readonly pointerId: number;
+  readonly x: number;
+  readonly y: number;
+  readonly timer: ReturnType<typeof setTimeout>;
+};
+
+/**
+ * Interruptor que solo enseña su icono. El texto completo va en el nombre accesible y en un
+ * tooltip; el envoltorio es el disparador para que el globo abra tanto al pasar el puntero como al
+ * enfocar el interruptor con el teclado.
+ *
+ * En táctil no hay hover y en iOS Safari tocar no da el foco, así que el globo abre también al
+ * mantener pulsado. El `click` que el navegador pueda mandar al soltar esa pulsación se descarta
+ * para que leer la ayuda no cambie el interruptor; el globo queda abierto hasta tocar fuera.
+ */
+function IconSwitch({ control, tooltip, helpId, testId, children }: IconSwitchProps) {
+  const [open, setOpen] = useState(false);
+  const pending = useRef<PendingPress | null>(null);
+  const swallowNextClick = useRef(false);
+
+  const cancelPress = () => {
+    if (pending.current === null) return;
+    clearTimeout(pending.current.timer);
+    pending.current = null;
+  };
+
+  useEffect(() => cancelPress, []);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    swallowNextClick.current = false;
+    cancelPress();
+    if (event.pointerType === 'mouse') return;
+    const timer = setTimeout(() => {
+      pending.current = null;
+      swallowNextClick.current = true;
+      setOpen(true);
+    }, LONG_PRESS_MS);
+    pending.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, timer };
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const press = pending.current;
+    if (press === null || press.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > LONG_PRESS_SLOP_PX) cancelPress();
+  };
+
+  const handleClickCapture = (event: ReactMouseEvent<HTMLSpanElement>) => {
+    if (!swallowNextClick.current) return;
+    swallowNextClick.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger
+        render={
+          <span
+            className="inline-flex select-none [-webkit-touch-callout:none]"
+            data-testid={`${testId}-trigger`}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={cancelPress}
+            onPointerCancel={cancelPress}
+            onClickCapture={handleClickCapture}
+            onKeyDownCapture={() => {
+              swallowNextClick.current = false;
+            }}
+            onContextMenu={(event) => {
+              if (pending.current !== null || swallowNextClick.current) event.preventDefault();
+            }}
+          />
+        }
+      >
+        <Switch
+          checked={control.checked}
+          onCheckedChange={(checked) => control.onCheckedChange(checked)}
+          aria-label={control.label}
+          aria-describedby={helpId}
+          data-testid={testId}
+        >
+          {children}
+        </Switch>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="end" className="max-w-65" data-testid={`${testId}-tooltip`}>
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -259,8 +416,8 @@ function ToolbarButton({ label, pressed, testId, onActivate, children }: Toolbar
       aria-pressed={pressed}
       data-testid={testId}
       onClick={onActivate}
-      className={`${touchTarget} flex items-center justify-center rounded-md border bg-background text-base ${
-        pressed ? 'bg-accent' : ''
+      className={`${touchTarget} flex items-center justify-center rounded-md text-foreground transition-colors hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring ${
+        pressed ? 'bg-card' : 'bg-transparent'
       }`}
     >
       {children}

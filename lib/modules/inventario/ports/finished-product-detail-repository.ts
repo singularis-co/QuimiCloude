@@ -14,6 +14,7 @@ export type FinishedProductRecord = {
   readonly imagePath: string | null;
   readonly qtyAlert: string | null;
   readonly unitId: string | null;
+  readonly recipeId: string | null;
   readonly presentation: {
     readonly id: string;
     readonly name: string;
@@ -22,6 +23,7 @@ export type FinishedProductRecord = {
   } | null;
   readonly batches: readonly {
     readonly id: string;
+    readonly lot: string;
     readonly stock: string;
     readonly packageContent: string | null;
   }[];
@@ -44,17 +46,6 @@ export type FinishedProductMovementRecord = {
   readonly packageContent: string | null;
   readonly orderId: string | null;
   readonly reason: MovementReason | null;
-  readonly createdAt: string;
-};
-
-export type FinishedProductDeliveryMovementRecord = {
-  readonly id: string;
-  readonly orderDeliveryId: string;
-  readonly orderId: string | null;
-  readonly batchId: string;
-  readonly lot: string;
-  /** Con signo. */
-  readonly quantity: string;
   readonly createdAt: string;
 };
 
@@ -85,12 +76,6 @@ export interface FinishedProductDetailRepository {
     page: PageRequest,
     scope: InventoryScope,
   ): Promise<Page<FinishedProductMovementRecord>>;
-  /** Asientos con `orderDeliveryId`, anulados o no. */
-  listDeliveryMovements(
-    productId: string,
-    page: PageRequest,
-    scope: InventoryScope,
-  ): Promise<Page<FinishedProductDeliveryMovementRecord>>;
   /** Asientos `production`, con el `unitCost` y el `packageContent` de su lote. */
   listProductionCosts(
     productId: string,

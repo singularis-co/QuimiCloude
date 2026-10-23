@@ -2,11 +2,14 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react';
 import type { FocusEvent } from 'react';
+import { CheckIcon, PlusIcon } from 'lucide-react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
   confirmFormulaImportAction,
@@ -30,6 +33,8 @@ import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import {
   createLocalKey,
+  FormFooterBar,
+  PACKING_STEPS_FIELD_TEXTS,
   RecipeStepsField,
   type ProductPickerOption,
   type RecipeStepFormValue,
@@ -41,9 +46,9 @@ import { FormulaNameClash } from './formula-name-clash';
 
 const FIELD_TEXT = 'text-base';
 
-const PACKING_STEPS_TITLE = 'Pasos de envasado';
-const PACKING_STEPS_ADD_LABEL = 'Añadir paso de envasado';
 const PACKING_STEPS_TESTID_PREFIX = 'recipe-packing-step';
+
+const CARD_CLASS = 'gap-4 overflow-visible rounded-[14px] px-5 py-5';
 
 /** Modo de asignacion de producto de una fila, distinto del `kind` de `DraftLine`: una fila
  *  `preselected` sigue siendo `existing` para el borrador, pero se pinta sin selector. */
@@ -406,8 +411,11 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
   const usedProductIds = rows.flatMap((row) => (row.productId === '' ? [] : [row.productId]));
 
   return (
-    <div className="flex flex-col gap-6" data-testid="formula-import-review">
-      <div className="flex flex-col gap-4 sm:max-w-xl">
+    <div className="flex flex-col gap-5" data-testid="formula-import-review">
+      <Card className={CARD_CLASS}>
+        <h2 className="sr-only">
+          Datos de la fórmula
+        </h2>
         <div className="flex flex-col gap-1">
           <Label htmlFor="formula-import-name-input">Nombre</Label>
           <Input
@@ -449,49 +457,73 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
             </p>
           )}
         </div>
-      </div>
+      </Card>
 
       {nameClash === null ? null : (
         <FormulaNameClash recipeName={nameClash.recipeName} onReplace={handleReplace} onRename={handleRename} />
       )}
 
-      <div className="flex flex-col gap-4">
-        {rows.map((row, index) => (
-          <FormulaIngredientRow
-            key={row.key}
-            index={index}
-            row={row}
-            problems={shownIssues.rows.find((item) => item.index === index)?.problems ?? []}
-            showUnitError={showUnitErrors}
-            units={units}
-            initialProductPage={initialProductPage}
-            excludedIds={usedProductIds.filter((id) => id !== row.productId)}
-            onChange={(patch) => updateRow(index, patch)}
-            onRemove={() => removeRow(index)}
-          />
-        ))}
-      </div>
+      <Card className={CARD_CLASS}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">
+            Ingredientes
+          </h2>
+          <span className="text-xs text-muted-foreground" data-testid="formula-import-ingredients-summary">
+            <span className="font-mono">{rows.length}</span> · <span className="font-mono">{formatPercentage(issues.total)} %</span>
+          </span>
+        </div>
 
-      <div>
-        <Button type="button" touch onClick={addRow} data-testid="formula-import-add-ingredient">
+        <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+          {rows.map((row, index) => (
+            <li key={row.key}>
+              <FormulaIngredientRow
+                index={index}
+                row={row}
+                problems={shownIssues.rows.find((item) => item.index === index)?.problems ?? []}
+                showUnitError={showUnitErrors}
+                units={units}
+                initialProductPage={initialProductPage}
+                excludedIds={usedProductIds.filter((id) => id !== row.productId)}
+                onChange={(patch) => updateRow(index, patch)}
+                onRemove={() => removeRow(index)}
+              />
+            </li>
+          ))}
+        </ol>
+
+        <Button
+          type="button"
+          variant="outline-dashed"
+          touch
+          onClick={addRow}
+          className="w-full text-primary"
+          data-testid="formula-import-add-ingredient"
+        >
+          <PlusIcon aria-hidden="true" />
           Añadir ingrediente
         </Button>
-      </div>
 
-      <p className="text-sm font-medium" data-testid="formula-import-sum">
-        Suma: {formatPercentage(issues.total)} %
-      </p>
+        <p className="text-sm font-medium" data-testid="formula-import-sum">
+          Suma: {formatPercentage(issues.total)} %
+        </p>
+      </Card>
 
-      {/* `RecipeStepsField` se importa TAL CUAL del barrel de formulas: no se toca. */}
-      <RecipeStepsField steps={steps} onChange={setSteps} />
+      <Card className={CARD_CLASS}>
+        <RecipeStepsField steps={steps} onChange={setSteps} />
 
-      <RecipeStepsField
-        steps={packingSteps}
-        onChange={setPackingSteps}
-        title={PACKING_STEPS_TITLE}
-        addLabel={PACKING_STEPS_ADD_LABEL}
-        testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
-      />
+        <Separator data-testid="formula-import-steps-separator" />
+
+        <RecipeStepsField
+          steps={packingSteps}
+          onChange={setPackingSteps}
+          title={PACKING_STEPS_FIELD_TEXTS.title}
+          optionalHelp={{
+            text: PACKING_STEPS_FIELD_TEXTS.optionalHelp,
+            label: PACKING_STEPS_FIELD_TEXTS.optionalHelpLabel,
+          }}
+          testIdPrefix={PACKING_STEPS_TESTID_PREFIX}
+        />
+      </Card>
 
       {confirmError === null ? null : (
         <ErrorAlert
@@ -517,7 +549,7 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
         </ul>
       )}
 
-      <div>
+      <FormFooterBar testId="formula-import-footer">
         <Button
           type="button"
           touch
@@ -526,9 +558,10 @@ export function FormulaImportReview({ documentFileId, units, initialProductPage,
           onClick={handleConfirm}
           data-testid="formula-import-confirm"
         >
+          <CheckIcon aria-hidden="true" />
           {isConfirming ? 'Confirmando…' : 'Confirmar'}
         </Button>
-      </div>
+      </FormFooterBar>
     </div>
   );
 }

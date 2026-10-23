@@ -26,6 +26,7 @@ function record(overrides: Partial<WhatsappConnectionRecord> = {}): WhatsappConn
     lastError: null,
     lastCheckedAt: new Date('2026-10-09T10:00:00.000Z'),
     lastWebhookAt: null,
+    templatesSyncedAt: new Date('2026-10-09T11:00:00.000Z'),
     ...overrides,
   }
 }

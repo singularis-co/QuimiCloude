@@ -1,6 +1,7 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
+import type { CountryCode } from 'libphonenumber-js';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger } from '@/components/ui/sheet';
@@ -45,9 +46,15 @@ export type CustomerSheetProps = {
   /** Apertura controlada desde fuera. Ausente = el panel trae su propio disparador de alta. */
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  readonly companyCountry?: CountryCode | null;
 };
 
-export function CustomerSheet({ customer, open, onOpenChange }: CustomerSheetProps) {
+export function CustomerSheet({
+  customer,
+  open,
+  onOpenChange,
+  companyCountry = null,
+}: CustomerSheetProps) {
   const isEdit = customer !== undefined;
   const { isOpen, isControlled, changeOpen, handleSaved } = useEntitySheet({
     open,
@@ -71,7 +78,7 @@ export function CustomerSheet({ customer, open, onOpenChange }: CustomerSheetPro
           {CREATE_LABEL}
         </SheetTrigger>
       )}
-      <CustomerForm customer={customer} onSaved={handleSaved} />
+      <CustomerForm customer={customer} onSaved={handleSaved} companyCountry={companyCountry} />
     </Sheet>
   );
 }

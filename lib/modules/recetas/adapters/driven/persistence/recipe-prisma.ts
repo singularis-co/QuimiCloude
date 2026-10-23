@@ -2,12 +2,12 @@ import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { recipeStepSchema } from '../../../domain/recipe-input';
+import { conditioningStepSchema, recipeStepSchema } from '../../../domain/recipe-input';
 import { normalizeRecipeName } from '../../../domain/recipe-name';
 import { isVersionUnderReview, propagateLines, propagateTools } from '../../../domain/recipe-version';
 import { ValidationError } from '../../../domain/errors';
 import type { RecipeScope } from '../../../domain/recipe-scope';
-import type { RecipeStepView } from '../../../domain/recipe-view';
+import type { ConditioningStepView, RecipeStepView } from '../../../domain/recipe-view';
 
 import { companyScopeColumns, recipeCompanyScope } from './company-scope';
 import { dateRangeCondition, normalizedSearchCondition } from './list-query-sql';
@@ -43,7 +43,7 @@ import type {
 const RECIPE_INCLUDE = {
   lines: true,
   tools: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
-  parent: { select: { id: true, name: true, description: true, imagePath: true, steps: true, packingSteps: true } },
+  parent: { select: { id: true, name: true, description: true, imagePath: true, steps: true, packingSteps: true, conditioningSteps: true } },
 } satisfies Prisma.RecipeInclude;
 
 type RecipeWithLines = Prisma.RecipeGetPayload<{ include: typeof RECIPE_INCLUDE }>;
@@ -80,6 +80,27 @@ export function toSteps(steps: Prisma.JsonValue): readonly RecipeStepView[] {
   return parsed;
 }
 
+/** Como `toSteps`, con el esquema del paso de acondicionamiento, que admite su marca propia. */
+export function toConditioningSteps(steps: Prisma.JsonValue): readonly ConditioningStepView[] {
+  if (!Array.isArray(steps)) return [];
+
+  const parsed: ConditioningStepView[] = [];
+  for (const step of steps) {
+    const result = conditioningStepSchema.safeParse(step);
+    if (result.success) parsed.push(result.data);
+  }
+  return parsed;
+}
+
+/** Ausente = no tocar la columna: conserva los guardados (en el alta, el `DEFAULT '[]'`). */
+function conditioningStepsData(
+  data: NewRecipe,
+): { conditioningSteps: Prisma.InputJsonValue } | Record<string, never> {
+  return data.conditioningSteps === undefined
+    ? {}
+    : { conditioningSteps: data.conditioningSteps as unknown as Prisma.InputJsonValue };
+}
+
 function toLineRow(line: RecipeWithLines['lines'][number]): RecipeLineRow {
   return {
     id: line.id,
@@ -96,6 +117,7 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
     description: row.description,
     steps: toSteps(row.steps),
     packingSteps: toSteps(row.packingSteps),
+    conditioningSteps: toConditioningSteps(row.conditioningSteps),
     imagePath: row.imagePath,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
@@ -113,6 +135,7 @@ export function toRecipeRow(row: RecipeWithLines): RecipeRow {
             imagePath: row.parent.imagePath,
             steps: toSteps(row.parent.steps),
             packingSteps: toSteps(row.parent.packingSteps),
+            conditioningSteps: toConditioningSteps(row.parent.conditioningSteps),
           },
   };
 }
@@ -225,6 +248,7 @@ export async function createRecipe(
         description: data.description,
         steps: data.steps as unknown as Prisma.InputJsonValue,
         packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
+        ...conditioningStepsData(data),
         imagePath: data.imagePath,
         createdAt: now,
         updatedAt: now,
@@ -273,15 +297,14 @@ export async function findAliveRecipeById(id: string, scope: RecipeScope): Promi
 const TIE_BREAKER = { id: 'asc' } as const satisfies Prisma.RecipeOrderByWithRelationInput;
 
 /**
- * Orden POR DEFECTO: exactamente el de hoy, `name ASC` (R11). Sin `sort`, la lista no se mueve;
- * el desempate por `id` que se le anade detras no la cambia -el nombre es unico entre vivas, asi
- * que no hay empates que romper- y la deja estable el dia que deje de serlo.
+ * Orden POR DEFECTO: mas nuevas primero, `created_at DESC, id ASC`. Dos altas del mismo
+ * instante empatan en `created_at`, y el desempate por `id` las deja en un orden estable.
  *
  * Se construye en CADA llamada, no como constante compartida: Prisma exige un array mutable en
  * `orderBy`, y devolver siempre la misma instancia dejaria que un llamante la mutara para todos.
  */
 function defaultOrderBy(): Prisma.RecipeOrderByWithRelationInput[] {
-  return [{ name: 'asc' }, TIE_BREAKER];
+  return [{ createdAt: 'desc' }, TIE_BREAKER];
 }
 
 /**
@@ -449,6 +472,7 @@ export async function replaceAliveRecipe(
           description: data.description,
           steps: data.steps as unknown as Prisma.InputJsonValue,
           packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
+          ...conditioningStepsData(data),
           imagePath: data.imagePath,
           updatedAt: now,
           updatedBy: actorId,
@@ -577,6 +601,7 @@ export async function createRecipeVersion(
           description: null,
           steps: [],
           packingSteps: [],
+          conditioningSteps: [],
           imagePath: null,
           createdAt: now,
           updatedAt: now,
@@ -660,6 +685,7 @@ export async function replaceAliveRecipeWithPropagation(
           description: data.description,
           steps: data.steps as unknown as Prisma.InputJsonValue,
           packingSteps: data.packingSteps as unknown as Prisma.InputJsonValue,
+          ...conditioningStepsData(data),
           imagePath: data.imagePath,
           updatedAt: now,
           updatedBy: actorId,

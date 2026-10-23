@@ -127,7 +127,7 @@ describe('requestEvidenceUpload — entrada (R28, R30)', () => {
 
   it('entrada mal formada -fase desconocida, posicion 0 o decimal, ids no uuid- es invalid_input', async () => {
     for (const entrada of [
-      { ...FABRICACION, phase: 'conditioning' },
+      { ...FABRICACION, phase: 'storage' },
       { ...FABRICACION, stepPosition: 0 },
       { ...FABRICACION, stepPosition: 1.5 },
       { ...FABRICACION, orderId: 'no-uuid' },

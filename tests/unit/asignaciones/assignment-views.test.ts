@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { resolveAssignmentView, resolveAssignmentViews } from '@/lib/modules/asignaciones/domain/assignment-views';
 import {
+  ROLE_ACONDICIONAMIENTO,
   ROLE_ADMINISTRADOR,
   ROLE_EMPACADOR,
   ROLE_OPERADOR,
@@ -62,7 +63,7 @@ describe('R14 — la decisión depende solo de los permisos, nunca del rol', () 
   });
 });
 
-describe('R39 (QC-168) — `por_empacar` se anade AL FINAL, solo con `empaque.modificar`', () => {
+describe('R39 (QC-168) — `por_empacar` va detras de `todos`/`asignados` y delante de `terminados`, solo con `empaque.modificar`', () => {
   it('sin `empaque.modificar` no se ofrece la pestana, en ninguna de las tres combinaciones de arriba', () => {
     expect(resolveAssignmentViews({ permissions: ['asignaciones.ejecutar'] })).toEqual(['asignados']);
     expect(
@@ -71,19 +72,19 @@ describe('R39 (QC-168) — `por_empacar` se anade AL FINAL, solo con `empaque.mo
     expect(resolveAssignmentViews({ permissions: ['pedidos.consultar'] })).toEqual(['todos']);
   });
 
-  it('con `empaque.modificar` se anade al final sin cambiar la vista por defecto (`asignados`)', () => {
+  it('con `empaque.modificar` se anade detras de `asignados`, que sigue siendo la vista por defecto', () => {
     expect(resolveAssignmentViews({ permissions: ['asignaciones.consultar', 'asignaciones.ejecutar', 'empaque.modificar'] })).toEqual([
       'asignados',
       'por_empacar',
     ]);
   });
 
-  it('con `empaque.modificar` y `terminados.consultar`, `por_empacar` sigue siendo la ULTIMA', () => {
+  it('con `empaque.modificar` y `terminados.consultar`, `por_empacar` va delante de `terminados`', () => {
     expect(
       resolveAssignmentViews({
         permissions: ['asignaciones.consultar', 'asignaciones.ejecutar', 'terminados.consultar', 'empaque.modificar'],
       }),
-    ).toEqual(['asignados', 'terminados', 'por_empacar']);
+    ).toEqual(['asignados', 'por_empacar', 'terminados']);
   });
 
   it('con `pedidos.consultar` y `empaque.modificar`, la vista por defecto sigue siendo `todos`', () => {
@@ -120,10 +121,10 @@ describe('R15 — una vista inexistente o no permitida cae a la primera permitid
 describe('vistas segun `asignaciones.ejecutar`', () => {
   const permisosDe = (rol: string): readonly string[] => SEED_ROLE_PERMISSIONS[rol] ?? [];
 
-  it('R19: con el seed, Administrador -> todos; Operador -> asignados; Empacador -> terminados y por_empacar', () => {
+  it('R19: con el seed, Administrador -> todos; Operador -> asignados; Empacador -> por_empacar y terminados', () => {
     expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_ADMINISTRADOR) })).toEqual(['todos']);
     expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_OPERADOR) })).toEqual(['asignados']);
-    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) })).toEqual(['terminados', 'por_empacar']);
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) })).toEqual(['por_empacar', 'terminados']);
   });
 
   it('R19: `asignaciones.ejecutar` + `terminados.consultar` -> asignados y terminados', () => {
@@ -147,32 +148,30 @@ describe('vistas segun `asignaciones.ejecutar`', () => {
     expect(resolveAssignmentViews({ permissions: ['asignaciones.consultar'] })).toEqual(['asignados']);
   });
 
-  it('R19a: pedir `asignados` con las vistas del Empacador aterriza en `terminados`', () => {
+  it('R19a: pedir `asignados` con las vistas del Empacador aterriza en `por_empacar`', () => {
     const vistasDelEmpacador = resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) });
-    expect(resolveAssignmentView('asignados', vistasDelEmpacador)).toBe('terminados');
+    expect(resolveAssignmentView('asignados', vistasDelEmpacador)).toBe('por_empacar');
   });
 });
 
 describe('R1 — el permiso del acondicionador anade `por_acondicionar` y `acondicionados` al final', () => {
-  it('R1: con `acondicionamiento.modificar` se anaden las dos, en ese orden, detras de las que ya tocaban', () => {
+  it('R1: con `acondicionamiento.modificar` se anaden las dos, en ese orden, detras de las de pedidos y empaque', () => {
     expect(
       resolveAssignmentViews({
         permissions: ['asignaciones.ejecutar', 'terminados.consultar', 'empaque.modificar', 'acondicionamiento.modificar'],
       }),
-    ).toEqual(['asignados', 'terminados', 'por_empacar', 'por_acondicionar', 'acondicionados', 'acondicionados_entregados']);
+    ).toEqual(['asignados', 'por_empacar', 'terminados', 'por_acondicionar', 'acondicionados']);
     expect(resolveAssignmentViews({ permissions: ['pedidos.consultar', 'acondicionamiento.modificar'] })).toEqual([
       'todos',
       'por_acondicionar',
       'acondicionados',
-      'acondicionados_entregados',
     ]);
   });
 
-  it('R1, QC-219 R20: con solo el permiso salen exactamente las tres, sin la vista de reserva', () => {
+  it('R1, QC-301 R1: con solo el permiso salen exactamente las dos, sin la vista de reserva', () => {
     expect(resolveAssignmentViews({ permissions: ['acondicionamiento.modificar'] })).toEqual([
       'por_acondicionar',
       'acondicionados',
-      'acondicionados_entregados',
     ]);
   });
 
@@ -193,10 +192,10 @@ describe('R1 — el permiso del acondicionador anade `por_acondicionar` y `acond
 describe('R3 — sin el permiso no aparece ninguna de las dos, y los roles de semilla siguen igual', () => {
   const permisosDe = (rol: string): readonly string[] => SEED_ROLE_PERMISSIONS[rol] ?? [];
 
-  it('R3: Administrador -> todos; Operador -> asignados; Empacador -> terminados y por_empacar, como antes', () => {
+  it('R3: Administrador -> todos; Operador -> asignados; Empacador -> por_empacar y terminados', () => {
     expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_ADMINISTRADOR) })).toEqual(['todos']);
     expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_OPERADOR) })).toEqual(['asignados']);
-    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) })).toEqual(['terminados', 'por_empacar']);
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) })).toEqual(['por_empacar', 'terminados']);
   });
 
   it('R3: ningun rol sin el permiso recibe `por_acondicionar` ni `acondicionados`', () => {
@@ -212,8 +211,8 @@ describe('R3 — sin el permiso no aparece ninguna de las dos, y los roles de se
     expect(resolveAssignmentViews(null)).toEqual(['asignados']);
     expect(resolveAssignmentViews({ permissions: [] })).toEqual(['asignados']);
     expect(resolveAssignmentViews({ permissions: ['empaque.modificar', 'terminados.consultar'] })).toEqual([
-      'terminados',
       'por_empacar',
+      'terminados',
     ]);
   });
 
@@ -225,14 +224,39 @@ describe('R3 — sin el permiso no aparece ninguna de las dos, y los roles de se
   });
 });
 
-describe('QC-219 R20 — «Entregados» va detras de «Terminados», con el mismo permiso', () => {
-  it('R20: `acondicionados_entregados` sigue inmediatamente a `acondicionados`', () => {
-    const vistas = resolveAssignmentViews({ permissions: ['empaque.modificar', 'acondicionamiento.modificar'] });
-    expect(vistas.indexOf('acondicionados_entregados')).toBe(vistas.indexOf('acondicionados') + 1);
+describe('QC-301 — el acondicionador ya no tiene «Entregados» (deroga QC-219 R20)', () => {
+  const permisosDe = (rol: string): readonly string[] => SEED_ROLE_PERMISSIONS[rol] ?? [];
+
+  it('QC-301 R1: el rol sembrado de acondicionamiento recibe exactamente `por_acondicionar` y `acondicionados`', () => {
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_ACONDICIONAMIENTO) })).toEqual([
+      'por_acondicionar',
+      'acondicionados',
+    ]);
   });
 
-  it('R20: la vista pedida se respeta con el permiso', () => {
-    const vistas = resolveAssignmentViews({ permissions: ['acondicionamiento.modificar'] });
-    expect(resolveAssignmentView('acondicionados_entregados', vistas)).toBe('acondicionados_entregados');
+  it('QC-301 R1: con otros permisos, las dos van al final, en el mismo orden y sin una tercera', () => {
+    const vistas = resolveAssignmentViews({ permissions: ['empaque.modificar', 'acondicionamiento.modificar'] });
+    expect(vistas).toEqual(['por_empacar', 'por_acondicionar', 'acondicionados']);
+    expect(vistas).not.toContain('acondicionados_entregados');
+  });
+
+  it('QC-301 R3: pedir `acondicionados_entregados` con el permiso cae a la primera vista permitida', () => {
+    const soloAcondiciona = resolveAssignmentViews({ permissions: permisosDe(ROLE_ACONDICIONAMIENTO) });
+    expect(resolveAssignmentView('acondicionados_entregados', soloAcondiciona)).toBe('por_acondicionar');
+    const conEmpaque = resolveAssignmentViews({ permissions: ['empaque.modificar', 'acondicionamiento.modificar'] });
+    expect(resolveAssignmentView('acondicionados_entregados', conEmpaque)).toBe(conEmpaque[0]);
+  });
+
+  it('QC-301 R3: pedir `acondicionados_entregados` sin el permiso cae a la vista por defecto de cada rol', () => {
+    for (const rol of [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR]) {
+      const vistas = resolveAssignmentViews({ permissions: permisosDe(rol) });
+      expect(resolveAssignmentView('acondicionados_entregados', vistas), rol).toBe(vistas[0]);
+    }
+  });
+
+  it('QC-301 R7: las vistas de los roles sin el permiso no cambian', () => {
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_ADMINISTRADOR) })).toEqual(['todos']);
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_OPERADOR) })).toEqual(['asignados']);
+    expect(resolveAssignmentViews({ permissions: permisosDe(ROLE_EMPACADOR) })).toEqual(['por_empacar', 'terminados']);
   });
 });

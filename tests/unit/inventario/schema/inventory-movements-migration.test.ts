@@ -444,7 +444,9 @@ describe('QC-92 migration.sql — R15: inventory_movements solo admite altas', (
     // 2026-10-13: se admite `count`, que solo lee (lo usa la paginacion de la ficha de producto
     // terminado). La intencion no cambia: ninguna operacion que modifique un movimiento. El censo
     // sigue cerrado; cualquier operacion nueva lo pone en rojo hasta revisarla aqui.
-    expect([...operations].sort()).toEqual(['count', 'create', 'findMany'])
+    // 2026-10-21: se admite `groupBy`, que solo lee (suma lo consumido por lote en
+    // `order-consumption-prisma.ts`).
+    expect([...operations].sort()).toEqual(['count', 'create', 'findMany', 'groupBy'])
 
     // Sensibilidad: el propio detector, probado sobre fuentes fabricadas -no solo sobre el arbol real-.
     expect(inventoryMovementOperationsIn('await tx.inventoryMovement.update({ where: {}, data: {} });')).toEqual([

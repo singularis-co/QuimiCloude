@@ -6,7 +6,7 @@ import type { OrderScope } from './order-scope';
 import type { OrderRow, OrderView } from './order-view';
 
 import type { CustomerCatalog } from '@/lib/modules/clientes';
-import type { PackagingCatalog, PresentationCatalog } from '@/lib/modules/inventario';
+import type { PackagingCatalog, PresentationCatalog, PresentationRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -34,6 +34,44 @@ export type GetOrderDeps = {
  *  `list-orders.ts` la reutiliza para no divergir en el criterio. */
 export function unitLabelOf(unit: { readonly name: string; readonly symbol: string | null }): string {
   return unit.symbol ?? unit.name;
+}
+
+/** Lo que la vista de una linea toma de su presentacion: el nombre, el contenido vigente y la
+ *  etiqueta de la unidad en que se declara ese contenido (`null` si la unidad no volvio). */
+export type OrderPresentationDisplay = {
+  readonly name: string;
+  readonly content: string | null;
+  readonly unitLabel: string | null;
+};
+
+/**
+ * Las presentaciones del catalogo listas para `toOrderView`: la etiqueta de la unidad sale del
+ * mismo `unitLabels` que la del pedido, asi que quien llama lee las unidades del pedido Y las de
+ * las presentaciones en UNA sola llamada (`presentationUnitIds`).
+ */
+export function toPresentationDisplays(
+  presentations: readonly PresentationRef[],
+  unitLabels: ReadonlyMap<string, string>,
+): ReadonlyMap<string, OrderPresentationDisplay> {
+  return new Map(
+    presentations.map((presentation) => [
+      presentation.id,
+      { name: presentation.name, content: presentation.content, unitLabel: unitLabels.get(presentation.unitId) ?? null },
+    ]),
+  );
+}
+
+/** Los ids unicos de unidad de los pedidos y de sus presentaciones, para una sola llamada. */
+export function orderAndPresentationUnitIds(
+  rows: readonly Pick<OrderRow, 'unitId'>[],
+  presentations: readonly Pick<PresentationRef, 'unitId'>[],
+): string[] {
+  return [
+    ...new Set([
+      ...rows.flatMap((row) => (row.unitId === null ? [] : [row.unitId])),
+      ...presentations.map((presentation) => presentation.unitId),
+    ]),
+  ];
 }
 
 /** Los ids unicos de las presentaciones de todo el reparto de las filas, para resolverlos
@@ -66,23 +104,35 @@ export async function findOrderCustomers(
   return new Map(refs.map((ref) => [ref.id, toOrderCustomer(ref)]));
 }
 
+export type PackagingInfo = { readonly name: string; readonly imageUrl: string | null };
+
+/** Nombre e imagen de los envases; uno dado de baja o sin presentacion fija no vuelve. */
+export async function findPackagingInfo(
+  packaging: PackagingCatalog,
+  ids: readonly string[],
+  companyId: string,
+): Promise<ReadonlyMap<string, PackagingInfo>> {
+  if (ids.length === 0) return new Map();
+  const refs = await packaging.findRefs(ids, companyId);
+  return new Map(refs.map((ref) => [ref.id, { name: ref.name, imageUrl: ref.imageUrl ?? null }]));
+}
+
 /** Los nombres de los envases; uno dado de baja o sin presentacion fija no vuelve. */
 export async function findPackagingNames(
   packaging: PackagingCatalog,
   ids: readonly string[],
   companyId: string,
 ): Promise<ReadonlyMap<string, string>> {
-  if (ids.length === 0) return new Map();
-  const refs = await packaging.findRefs(ids, companyId);
-  return new Map(refs.map((ref) => [ref.id, ref.name]));
+  const info = await findPackagingInfo(packaging, ids, companyId);
+  return new Map([...info].map(([id, { name }]) => [id, name]));
 }
 
 /**
  * Compone la salida de una fila con los nombres ya resueltos (R42, R43, R44, R46).
  *
  * Vive aqui y lo IMPORTA `list-orders.ts` para que la ficha y el listado no puedan diverger:
- * `OrderSummary` es un alias de `OrderView` (`design.md > 7.3`) y una segunda copia de este
- * mapeo seria el sitio exacto por donde empezarian a diferir.
+ * `OrderSummary` es `OrderView` mas lo pendiente de entregar, y una segunda copia de este mapeo
+ * seria el sitio exacto por donde empezarian a diferir.
  *
  * `recipeName` es `null` solo si el id NO vuelve del catalogo -una receta borrada FISICAMENTE
  * por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila SIGUE saliendo
@@ -96,7 +146,7 @@ export async function findPackagingNames(
 export function toOrderView(
   row: OrderRow,
   recipes: ReadonlyMap<string, RecipeRef>,
-  presentationNames: ReadonlyMap<string, string> = new Map(),
+  presentations: ReadonlyMap<string, OrderPresentationDisplay> = new Map(),
   unitLabels: ReadonlyMap<string, string> = new Map(),
   packagingNames: ReadonlyMap<string, string> = new Map(),
   orderCustomers: ReadonlyMap<string, OrderCustomer> = new Map(),
@@ -112,6 +162,8 @@ export function toOrderView(
       recipe?.original == null
         ? null
         : { originalId: recipe.original.id, originalName: recipe.original.name, versionName: recipe.ownName },
+    // El catalogo ya resuelve la de la original para una version.
+    recipeImageUrl: recipe?.imageUrl ?? null,
     quantity: row.quantity,
     priority: row.priority,
     status: row.status,
@@ -119,17 +171,25 @@ export function toOrderView(
     // cancelado. Ningun caso de uso lo vacia ni lo sustituye.
     cancellationReason: row.cancellationReason,
     ingredientsCost: row.ingredientsCost,
+    packagingCost: row.packagingCost,
+    actualCost: row.actualCost,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationLines: row.presentationLines.map((line) => ({
-      presentationId: line.presentationId,
-      presentationName: presentationNames.get(line.presentationId) ?? null,
-      packages: line.packages,
-      packagingProductId: line.packagingProductId,
-      packagingName: line.packagingProductId === null ? null : packagingNames.get(line.packagingProductId) ?? null,
-    })),
+    presentationLines: row.presentationLines.map((line) => {
+      const presentation = presentations.get(line.presentationId);
+      return {
+        presentationId: line.presentationId,
+        presentationName: presentation?.name ?? null,
+        packages: line.packages,
+        packagingProductId: line.packagingProductId,
+        packagingName: line.packagingProductId === null ? null : packagingNames.get(line.packagingProductId) ?? null,
+        // Mismo criterio que Terminar el empaque: la copia de la linea manda sobre la vigente.
+        presentationContent: line.presentationContent ?? presentation?.content ?? null,
+        presentationUnitLabel: presentation?.unitLabel ?? null,
+      };
+    }),
     unitId: row.unitId,
     // `null` si el pedido esta sin unidad; la FK con RESTRICT hace imposible el caso
     // «tiene id pero no vuelve del catalogo».
@@ -167,15 +227,18 @@ export function createGetOrder(
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
 
-    const units = row.unitId === null ? [] : await deps.units.findRefs([row.unitId], actor.companyId);
+    // La unidad del pedido y las de sus presentaciones, en una sola llamada.
+    const unitIds = orderAndPresentationUnitIds([row], presentations);
+    const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
+    const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
     const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds([row]), actor.companyId);
     const orderCustomers = await findOrderCustomers(deps.customerCatalog, [row], actor.companyId);
 
     return toOrderView(
       row,
       new Map(recipes.map((recipe) => [recipe.id, recipe])),
-      new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
-      new Map(units.map((unit) => [unit.id, unitLabelOf(unit)])),
+      toPresentationDisplays(presentations, unitLabels),
+      unitLabels,
       packagingNames,
       orderCustomers,
     );

@@ -60,6 +60,7 @@ function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummar
     quantity: '250.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
     presentationLines: [],
     unitId: null,
     finishedAt: null,
@@ -124,6 +125,7 @@ function montar(options?: {
   const append = vi.fn(async (entry: NewExecutionEntry) => {
     if (options?.appendFalla === true) throw new Error('la base no acepto la anotacion');
     anotaciones.push({ entry, dentroDeRun });
+    return 'ok' as const;
   });
   const findLastStepPosition = vi.fn(async () => options?.ultimaPosicion ?? null);
   const log: ExecutionLogRepository = {

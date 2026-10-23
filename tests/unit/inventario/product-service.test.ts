@@ -309,6 +309,8 @@ describe('listar tambien exige Administrador y delega la paginacion en el puerto
         search: '',
       },
       { companyId: EMPRESA },
+      // ADMIN trae `inventario.modificar`: ve costos (`canViewUnitCosts`).
+      { withUnitCosts: true },
     );
   });
 

@@ -2,7 +2,11 @@
 // casos de uso que lo usan, llegan con sus tests; aqui va la tabla de acceso.
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveEvidenceTarget, type EvidenceTargetDeps } from '@/lib/modules/asignaciones/domain/evidence-target';
+import {
+  requireEvidenceAccess,
+  resolveEvidenceTarget,
+  type EvidenceTargetDeps,
+} from '@/lib/modules/asignaciones/domain/evidence-target';
 import { OrderBlockedError, OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -21,14 +25,18 @@ const RECETA = uuid('9');
 
 const OPERADOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
 const EMPACADOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
+const ACONDICIONADOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['acondicionamiento.modificar'] };
 
 const PASOS_FABRICACION = [{ blocks: [] }, { blocks: [], requiresEvidence: true }];
 const PASOS_ENVASADO = [{ blocks: [], requiresEvidence: true }];
+const PASOS_ACONDICIONAMIENTO = [{ blocks: [] }, { blocks: [], requiresEvidence: true, requiresAssignment: true }];
 
 function montar(options: {
   readonly asignados?: readonly string[];
   readonly status?: OrderStatus | null;
   readonly packedBy?: string | null;
+  readonly conditionedBy?: string | null;
+  readonly pasosAcondicionamiento?: typeof PASOS_ACONDICIONAMIENTO | null;
 }) {
   const status = options.status === undefined ? 'EN_CURSO' : options.status;
   const listOrderIdsByUserInCompany = vi.fn(async () => options.asignados ?? [PEDIDO]);
@@ -39,19 +47,31 @@ function montar(options: {
     async (companyId: string, _ids: readonly string[], statuses: readonly OrderStatus[]) => {
       const visible = status !== null && companyId === EMPRESA && statuses.includes(status);
       const items = visible
-        ? [{ id: PEDIDO, recipeId: RECETA, status, packedBy: options.packedBy ?? null }]
+        ? [
+            {
+              id: PEDIDO,
+              recipeId: RECETA,
+              status,
+              packedBy: options.packedBy ?? null,
+              conditionedBy: options.conditionedBy ?? null,
+            },
+          ]
         : [];
       return { items, total: items.length, page: 1, pageSize: 1, totalPages: 1 };
     },
   );
   const findExecutionContentById = vi.fn(async () => ({ steps: PASOS_FABRICACION }));
   const findPackingStepsById = vi.fn(async () => PASOS_ENVASADO);
+  const findConditioningStepsById = vi.fn(async () =>
+    options.pasosAcondicionamiento === undefined ? PASOS_ACONDICIONAMIENTO : options.pasosAcondicionamiento,
+  );
 
   const deps = {
     assignments: { listOrderIdsByUserInCompany },
     orders: { findAliveById, listAliveSummariesByIds },
     recipes: { findExecutionContentById },
     packingSteps: { findPackingStepsById },
+    conditioningSteps: { findConditioningStepsById },
   } as unknown as EvidenceTargetDeps;
 
   const puertos = [
@@ -60,8 +80,9 @@ function montar(options: {
     listAliveSummariesByIds,
     findExecutionContentById,
     findPackingStepsById,
+    findConditioningStepsById,
   ];
-  return { deps, puertos, findExecutionContentById, findPackingStepsById };
+  return { deps, puertos, findExecutionContentById, findPackingStepsById, findConditioningStepsById };
 }
 
 describe('resolveEvidenceTarget — fabricacion (R26, R38, R39)', () => {
@@ -157,5 +178,75 @@ describe('resolveEvidenceTarget — envasado (R27, R38, R39)', () => {
     const { deps } = montar({ status: 'EN_EMPAQUE', packedBy: ANA });
     const ajeno: Actor = { ...EMPACADOR, companyId: OTRA_EMPRESA };
     await expect(resolveEvidenceTarget(deps, ajeno, PEDIDO, 'packing')).rejects.toBeInstanceOf(OrderNotFoundError);
+  });
+});
+
+describe('resolveEvidenceTarget — acondicionamiento (QC-299: R21, R32)', () => {
+  it('R21: quien acondiciona un pedido EN_ACONDICIONAMIENTO recibe la receta y sus pasos de acondicionamiento', async () => {
+    const { deps, findConditioningStepsById } = montar({ status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA });
+    await expect(resolveEvidenceTarget(deps, ACONDICIONADOR, PEDIDO, 'conditioning')).resolves.toEqual({
+      recipeId: RECETA,
+      steps: PASOS_ACONDICIONAMIENTO,
+    });
+    expect(findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
+  });
+
+  it('R21: sin pasos legibles la lista sale vacia', async () => {
+    const { deps } = montar({ status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA, pasosAcondicionamiento: null });
+    await expect(resolveEvidenceTarget(deps, ACONDICIONADOR, PEDIDO, 'conditioning')).resolves.toEqual({
+      recipeId: RECETA,
+      steps: [],
+    });
+  });
+
+  it('R21: sin acondicionamiento.modificar se rechaza sin tocar ningun puerto', async () => {
+    const { deps, puertos } = montar({ status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA });
+    for (const actor of [OPERADOR, EMPACADOR, null, undefined, { ...ACONDICIONADOR, permissions: [] }]) {
+      await expect(resolveEvidenceTarget(deps, actor, PEDIDO, 'conditioning')).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      );
+    }
+    for (const puerto of puertos) expect(puerto).not.toHaveBeenCalled();
+  });
+
+  it('R21: si acondiciona otra persona, o nadie, se rechaza sin leer los pasos', async () => {
+    for (const conditionedBy of [BETO, null]) {
+      const { deps, findConditioningStepsById } = montar({ status: 'EN_ACONDICIONAMIENTO', conditionedBy });
+      await expect(
+        resolveEvidenceTarget(deps, ACONDICIONADOR, PEDIDO, 'conditioning'),
+        String(conditionedBy),
+      ).rejects.toBeInstanceOf(OrderNotFoundError);
+      expect(findConditioningStepsById).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R21: un pedido que no esta EN_ACONDICIONAMIENTO se rechaza', async () => {
+    for (const status of ['POR_ACONDICIONAR', 'EN_EMPAQUE', 'EN_CURSO', 'TERMINADO', 'CANCELADO', null] as const) {
+      const { deps, findConditioningStepsById } = montar({ status, conditionedBy: ANA });
+      await expect(
+        resolveEvidenceTarget(deps, ACONDICIONADOR, PEDIDO, 'conditioning'),
+        String(status),
+      ).rejects.toBeInstanceOf(OrderNotFoundError);
+      expect(findConditioningStepsById).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R32: el pedido de otra empresa no existe para el actor y no se leen sus pasos', async () => {
+    const { deps, findConditioningStepsById } = montar({ status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA });
+    const ajeno: Actor = { ...ACONDICIONADOR, companyId: OTRA_EMPRESA };
+    await expect(resolveEvidenceTarget(deps, ajeno, PEDIDO, 'conditioning')).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(findConditioningStepsById).not.toHaveBeenCalled();
+  });
+});
+
+describe('requireEvidenceAccess (QC-299: R21)', () => {
+  it('R21: acondicionamiento.modificar basta para el primer corte; sin ningun permiso de fotos, no', () => {
+    expect(() => requireEvidenceAccess(ACONDICIONADOR)).not.toThrow();
+    expect(() => requireEvidenceAccess(OPERADOR)).not.toThrow();
+    expect(() => requireEvidenceAccess(EMPACADOR)).not.toThrow();
+    expect(() => requireEvidenceAccess({ ...ACONDICIONADOR, permissions: [] })).toThrow(UnauthorizedError);
+    expect(() => requireEvidenceAccess(null)).toThrow(UnauthorizedError);
   });
 });

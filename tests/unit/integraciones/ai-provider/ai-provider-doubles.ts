@@ -10,7 +10,10 @@ import type {
   AiProviderConnectionRecord,
   AiProviderEntry,
 } from '@/lib/modules/integraciones/domain/ai-provider'
-import type { AiProviderProbeResult } from '@/lib/modules/integraciones/domain/ai-provider-failure'
+import type {
+  AiProviderFailureKind,
+  AiProviderProbeResult,
+} from '@/lib/modules/integraciones/domain/ai-provider-failure'
 import { SecretUnreadableError } from '@/lib/modules/integraciones/domain/errors'
 import type { IntegracionesScope } from '@/lib/modules/integraciones/domain/integraciones-scope'
 import type { SecretContext } from '@/lib/modules/integraciones/domain/secret-context'
@@ -35,11 +38,25 @@ export const EARLIER = new Date('2026-10-01T00:00:00.000Z')
 export const API_KEY = 'sk-key-en-claro-de-la-empresa'
 export const OLD_API_KEY = 'sk-key-anterior'
 
+/** Tres modelos por proveedor: el predeterminado va en medio para que no coincida con el primero. */
+function entry(code: AiProviderCode, name: string, suffix: string): AiProviderEntry {
+  return {
+    code,
+    name,
+    models: [
+      { modelId: `modelo-alto-${suffix}`, isDefault: false },
+      { modelId: `modelo-recomendado-${suffix}`, isDefault: true },
+      { modelId: `modelo-bajo-${suffix}`, isDefault: false },
+    ],
+    defaultModel: `modelo-recomendado-${suffix}`,
+  }
+}
+
 export const CATALOG: readonly AiProviderEntry[] = [
-  { code: 'ANTHROPIC', name: 'Claude', recipeModel: 'modelo-receta-a', catalogModel: 'modelo-catalogo-a' },
-  { code: 'GOOGLE', name: 'Gemini', recipeModel: 'modelo-receta-g', catalogModel: 'modelo-catalogo-g' },
-  { code: 'OPENAI', name: 'OpenAI', recipeModel: 'modelo-receta-o', catalogModel: 'modelo-catalogo-o' },
-  { code: 'OPENROUTER', name: 'OpenRouter', recipeModel: 'modelo-receta-r', catalogModel: 'modelo-catalogo-r' },
+  entry('ANTHROPIC', 'Claude', 'a'),
+  entry('GOOGLE', 'Gemini', 'g'),
+  entry('OPENAI', 'OpenAI', 'o'),
+  entry('OPENROUTER', 'OpenRouter', 'r'),
 ]
 
 export const GOOD_PROBE: AiProviderProbeResult = { ok: true, elapsedMs: 1234 }
@@ -91,6 +108,14 @@ export function makeCatalog(entries: AiProviderEntry[] = [...CATALOG]) {
   return { catalog, list, get, entries }
 }
 
+/** Un fallo de la sonda por cada tipo; el de modelo no disponible nombra el modelo dado. */
+export function failedProbe(kind: AiProviderFailureKind, model = 'modelo-alto-g'): AiProviderProbeResult {
+  const httpStatus = { rejected_key: 401, quota: 429, model_unavailable: 404, unreachable: null, unexpected: 500 }[kind]
+  return kind === 'model_unavailable'
+    ? { ok: false, failure: { kind, httpStatus, model } }
+    : { ok: false, failure: { kind, httpStatus, model: null } }
+}
+
 export function makeProbe(result: AiProviderProbeResult = GOOD_PROBE) {
   const probe = vi.fn<AiProviderProbe['probe']>(async () => result)
   return { probe: { probe } satisfies AiProviderProbe, call: probe }
@@ -120,6 +145,8 @@ export function makeRepository(initial: AiProviderConnectionRecord[] = []) {
       lastErrorAt: row.lastErrorAt,
       lastCheckedAt: row.lastCheckedAt,
       keyUpdatedAt: row.keyUpdatedAt,
+      model: row.model ?? null,
+      unavailableModel: row.unavailableModel ?? null,
     }
     rows.set(record.id, { ...record })
     return record
@@ -175,6 +202,8 @@ export function storedConnection(
     lastErrorAt: null,
     lastCheckedAt: EARLIER,
     keyUpdatedAt: EARLIER,
+    model: null,
+    unavailableModel: null,
     ...overrides,
   }
 }

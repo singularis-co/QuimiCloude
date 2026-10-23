@@ -254,6 +254,9 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           listSummariesByIdsIncludingDeleted: async () => {
             throw new Error('listAssignedOrders no lee el historial de pedidos');
           },
+          listDeliveryProgressByIdsIncludingDeleted: async () => {
+            throw new Error('listAssignedOrders no lee el progreso de entrega');
+          },
           transitionAliveById: async () => {
             throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
           },

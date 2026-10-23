@@ -31,8 +31,8 @@ describe('constantes de la evidencia', () => {
     expect(EVIDENCE_READ_LINK_TTL_SECONDS).toBe(900);
   });
 
-  it('las dos fases son fabricacion y envasado', () => {
-    expect(EVIDENCE_PHASES).toEqual(['manufacturing', 'packing']);
+  it('las tres fases son fabricacion, envasado y acondicionamiento (QC-299 R21)', () => {
+    expect(EVIDENCE_PHASES).toEqual(['manufacturing', 'packing', 'conditioning']);
   });
 });
 

@@ -172,33 +172,45 @@ function documentoTieneCaracterVisible(blocks: readonly RecipeStepBlock[]): bool
   );
 }
 
-/**
- * Un paso: el documento entero. Se valida por su FORMA, nunca por su contenido (R6, decision
- * cerrada 8). El orden de los bloques se conserva tal cual llego (R1, R5).
- */
-export const recipeStepSchema = z
-  .object({
-    blocks: z.array(recipeStepBlockSchema),
-    // Ausente equivale a apagado: las formulas guardadas antes no lo traen y no se migran.
-    requiresEvidence: z.boolean().optional(),
-  })
-  .strict()
-  .superRefine((document, ctx) => {
-    if (!documentoTieneCaracterVisible(document.blocks)) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Un paso no puede quedar vacio.',
-      });
-    }
-    if (countRecipeStepElements(document) > MAX_STEP_ELEMENTS) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `Un paso admite como maximo ${MAX_STEP_ELEMENTS} elementos.`,
-      });
-    }
-  });
+// Un `z.object(...).strict().superRefine(...)` no se puede `.extend`: la forma y las reglas van
+// aparte para que el paso de acondicionamiento las reutilice sin copiarlas.
+const recipeStepShape = {
+  blocks: z.array(recipeStepBlockSchema),
+  // Ausente equivale a apagado: las formulas guardadas antes no lo traen y no se migran.
+  requiresEvidence: z.boolean().optional(),
+};
+
+function refineStep(
+  document: { readonly blocks: readonly RecipeStepBlock[] },
+  ctx: z.RefinementCtx,
+): void {
+  if (!documentoTieneCaracterVisible(document.blocks)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Un paso no puede quedar vacio.',
+    });
+  }
+  if (countRecipeStepElements(document) > MAX_STEP_ELEMENTS) {
+    ctx.addIssue({
+      code: 'custom',
+      message: `Un paso admite como maximo ${MAX_STEP_ELEMENTS} elementos.`,
+    });
+  }
+}
+
+/** Un paso se valida por su forma, nunca por su contenido; el orden de los bloques se conserva. */
+export const recipeStepSchema = z.object(recipeStepShape).strict().superRefine(refineStep);
 
 export type RecipeStepInput = z.infer<typeof recipeStepSchema>;
+
+// Estricto como el del operador: la marca de asignacion solo existe en acondicionamiento, y un
+// paso del operador o de envasado que la traiga se rechaza.
+export const conditioningStepSchema = z
+  .object({ ...recipeStepShape, requiresAssignment: z.boolean().optional() })
+  .strict()
+  .superRefine(refineStep);
+
+export type ConditioningStepInput = z.infer<typeof conditioningStepSchema>;
 
 /** Alias de lectura: el documento de un paso es el mismo dentro y fuera (`design.md > 2`). */
 export type RecipeStepDocument = RecipeStepInput;
@@ -207,6 +219,8 @@ export const MAX_RECIPE_STEPS = 50;
 
 /** `.default([])`: sin pasos se persiste la lista vacia, no `undefined`. */
 const recipeStepsSchema = z.array(recipeStepSchema).max(MAX_RECIPE_STEPS).default([]);
+
+const conditioningStepsSchema = z.array(conditioningStepSchema).max(MAX_RECIPE_STEPS);
 
 /** Rechaza que la lista de lineas repita el mismo `productId` (R16). */
 function sinProductoRepetido(lines: readonly { readonly productId: string }[]): boolean {
@@ -271,6 +285,7 @@ export const createRecipeSchema = z.object({
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
   packingSteps: recipeStepsSchema,
+  conditioningSteps: conditioningStepsSchema.default([]),
   lines: recipeLinesSchema,
   tools: recipeToolsSchema.default([]),
   image: recipeImageUploadSchema.optional(),
@@ -291,6 +306,8 @@ export const updateRecipeSchema = z.object({
   description: recipeDescriptionSchema,
   steps: recipeStepsSchema,
   packingSteps: recipeStepsSchema,
+  // Omitida = conservar los guardados, como `tools`: el reemplazo por PDF no la manda.
+  conditioningSteps: conditioningStepsSchema.optional(),
   lines: recipeLinesSchema,
   image: recipeImageUploadSchema.nullable().optional(),
   // Omitidas = conservar las que tiene; `[]` = quitarlas todas. Con `.default([])` el reemplazo

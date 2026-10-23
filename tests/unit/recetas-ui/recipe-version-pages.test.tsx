@@ -12,6 +12,7 @@ import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/r
 import type { ProductListResult } from '@/lib/modules/inventario/adapters/driving/product-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
+import { recipeEditRoute } from '@/lib/shared/routes';
 
 const {
   getSessionUserMock,
@@ -90,6 +91,7 @@ function detail(overrides: Partial<RecipeDetail>): RecipeDetail {
     updatedBy: null,
     steps: [],
     packingSteps: [],
+    conditioningSteps: [],
     lines: [lineView('l-a', PRODUCT_A, 'Agua', '60.00'), lineView('l-b', PRODUCT_B, 'Sal', '40.00')],
     tools: [],
     original: null,
@@ -341,6 +343,33 @@ describe('R10 — version que no cuelga de [id] o [id] que no es original', () =
     expect(screen.getByTestId('recipe-list-error')).toBeInTheDocument();
     expect(screen.queryByTestId('recipe-not-found')).toBeNull();
     expect(screen.queryByTestId('recipe-version-form')).toBeNull();
+  });
+});
+
+describe('R32 — «Volver a la fórmula» con flecha y el h1 debajo, dentro de PageShell', () => {
+  it.each([
+    ['alta', abrirAlta, 'Nueva versión de Jabón'],
+    ['version', abrirVersion, 'Jabón · Sin sal'],
+  ] as const)('R32: %s pinta el boton de volver hacia la original y el h1 de hoy', async (_nombre, abrir, titulo) => {
+    await abrir();
+
+    const volver = screen.getByTestId('recipe-version-back-link');
+    expect(volver.tagName).toBe('A');
+    expect(volver).toHaveAttribute('href', recipeEditRoute(ORIGINAL_ID));
+    expect(volver).toHaveAttribute('data-direction', 'back');
+    expect(volver).toHaveTextContent('Volver a la fórmula');
+    expect(volver.querySelector('svg')).not.toBeNull();
+    expect(volver).toHaveClass('min-h-11');
+
+    const titulos = screen.getAllByRole('heading', { level: 1 });
+    expect(titulos).toHaveLength(1);
+    expect(titulos[0]).toHaveAttribute('data-testid', 'recipe-version-page-title');
+    expect(titulos[0]).toHaveTextContent(titulo);
+    expect(volver.compareDocumentPosition(titulos[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const shell = volver.closest('[data-slot="page-shell"]');
+    expect(shell).not.toBeNull();
+    expect(shell).toContainElement(screen.getByTestId('recipe-version-form'));
   });
 });
 

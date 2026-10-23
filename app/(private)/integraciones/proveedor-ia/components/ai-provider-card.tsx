@@ -1,7 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { startTransition, useActionState, useCallback, useId, useState, useSyncExternalStore } from 'react';
+import {
+  startTransition,
+  useActionState,
+  useCallback,
+  useId,
+  useOptimistic,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { toast } from 'sonner';
 
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -18,10 +26,12 @@ import type {
 } from '@/lib/modules/integraciones';
 import {
   disconnectAiProviderAction,
+  selectAiModelAction,
   testSavedAiProviderAction,
 } from '@/lib/modules/integraciones/adapters/driving/ai-provider-actions';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { AiModelSelect } from './ai-model-select';
 import {
   AiProviderFeedbackMessage,
   AiProviderForm,
@@ -33,8 +43,7 @@ import { AiProviderLogo } from './ai-provider-logo';
 export const AI_PROVIDER_CARD_TESTID = 'ai-provider-card';
 export const AI_PROVIDER_CARD_KEY_SAVED_TESTID = 'ai-provider-card-key-saved';
 export const AI_PROVIDER_CARD_STATUS_TESTID = 'ai-provider-card-status';
-export const AI_PROVIDER_CARD_RECIPE_MODEL_TESTID = 'ai-provider-card-recipe-model';
-export const AI_PROVIDER_CARD_CATALOG_MODEL_TESTID = 'ai-provider-card-catalog-model';
+export const AI_PROVIDER_CARD_MODEL_SECTION_TESTID = 'ai-provider-card-model';
 export const AI_PROVIDER_CARD_LAST_TEST_TESTID = 'ai-provider-card-last-test';
 export const AI_PROVIDER_CARD_ERROR_TESTID = 'ai-provider-card-error';
 export const AI_PROVIDER_CARD_RESULT_TESTID = 'ai-provider-card-result';
@@ -44,12 +53,17 @@ export const AI_PROVIDER_CARD_CHANGE_TESTID = 'ai-provider-card-change';
 export const AI_PROVIDER_DISCONNECT_DIALOG_TESTID = 'ai-provider-disconnect-dialog';
 export const AI_PROVIDER_DISCONNECT_CONFIRM_TESTID = 'ai-provider-disconnect-confirm';
 export const AI_PROVIDER_DISCONNECT_DISMISS_TESTID = 'ai-provider-disconnect-dismiss';
+export const AI_PROVIDER_CHANGE_DIALOG_TESTID = 'ai-provider-change-dialog';
+export const AI_PROVIDER_CHANGE_CONFIRM_TESTID = 'ai-provider-change-confirm';
+export const AI_PROVIDER_CHANGE_DISMISS_TESTID = 'ai-provider-change-dismiss';
 
 export const AI_PROVIDER_CARD_TEXTS = {
   keySavedBefore: 'Key guardada el ',
   keySavedAfter: ' · cifrada',
-  recipeModel: 'Receta (fórmula desde PDF)',
-  catalogModel: 'Catálogo desde PDF',
+  modelTitle: 'Modelo',
+  modelDescription: (name: string) =>
+    `Se usa para leer fórmulas y catálogos en PDF. Solo aparecen modelos de ${name} que leen PDF e imágenes.`,
+  modelSaved: 'Modelo guardado',
   lastTest: 'Última prueba',
   lastTestOk: 'Correcta el ',
   lastTestFailed: 'Falló el ',
@@ -71,6 +85,14 @@ export const AI_PROVIDER_DISCONNECT_DIALOG_TEXTS = {
     'La key se borra y no se puede recuperar. Mientras no conectes otro proveedor, nadie de tu empresa podrá leer fórmulas ni catálogos en PDF.',
   dismiss: 'Cancelar',
   confirm: 'Desconectar',
+} as const;
+
+export const AI_PROVIDER_CHANGE_DIALOG_TEXTS = {
+  title: '¿Cambiar de proveedor?',
+  description: (name: string) =>
+    `El modelo que elegiste es de ${name}. Si conectas otro proveedor, se usa el modelo recomendado del nuevo proveedor. Si solo cambias la key de ${name}, se conserva.`,
+  dismiss: 'Cancelar',
+  confirm: 'Continuar',
 } as const;
 
 const noSubscription = () => () => {};
@@ -130,6 +152,10 @@ type DisconnectState = { readonly kind: 'idle' } | { readonly kind: 'error'; rea
 
 const DISCONNECT_IDLE: DisconnectState = { kind: 'idle' };
 
+type SelectModelState = { readonly kind: 'idle' } | { readonly kind: 'error'; readonly error: ErrorState };
+
+const SELECT_MODEL_IDLE: SelectModelState = { kind: 'idle' };
+
 export type AiProviderCardProps = {
   readonly providers: readonly AiProviderEntry[];
   readonly connection: AiProviderConnectionView;
@@ -138,8 +164,12 @@ export type AiProviderCardProps = {
 export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
   const router = useRouter();
   const titleId = useId();
+  const modelTitleId = useId();
   const [editing, setEditing] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [changeOpen, setChangeOpen] = useState(false);
+  // Al terminar la consulta el valor optimista se descarta: si falló, vuelve el del servidor.
+  const [shownModel, showModel] = useOptimistic(connection.modelInUse);
 
   const [testFeedback, runTest, testPending] = useActionState(
     async (_previous: AiProviderFeedback, formData: FormData): Promise<AiProviderFeedback> => {
@@ -150,9 +180,7 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
         return NO_AI_PROVIDER_FEEDBACK;
       }
       if (result.status === 'tested') {
-        return result.ok
-          ? { kind: 'ok', elapsedMs: result.elapsedMs }
-          : { kind: 'failed', message: result.message };
+        return result.ok ? { kind: 'ok' } : { kind: 'failed', message: result.message };
       }
       return NO_AI_PROVIDER_FEEDBACK;
     },
@@ -173,10 +201,37 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
     DISCONNECT_IDLE,
   );
 
+  const [selectState, runSelect, selectPending] = useActionState(
+    async (_previous: SelectModelState, formData: FormData): Promise<SelectModelState> => {
+      const result = await selectAiModelAction({ status: 'idle' }, formData);
+      if (result.status === 'error') return { kind: 'error', error: result };
+      if (result.status === 'not_connected') router.refresh();
+      if (result.status === 'saved') toast.success(AI_PROVIDER_CARD_TEXTS.modelSaved);
+      return SELECT_MODEL_IDLE;
+    },
+    SELECT_MODEL_IDLE,
+  );
+
+  const chooseModel = (modelId: string) => {
+    const formData = new FormData();
+    formData.set('modelId', modelId);
+    startTransition(() => {
+      showModel(modelId);
+      runSelect(formData);
+    });
+  };
+
   const closeEditor = useCallback(() => setEditing(false), []);
 
   if (editing) {
-    return <AiProviderForm providers={providers} initialProvider={connection.provider} onSaved={closeEditor} />;
+    return (
+      <AiProviderForm
+        providers={providers}
+        initialProvider={connection.provider}
+        connected
+        onSaved={closeEditor}
+      />
+    );
   }
 
   const isError = connection.status === 'ERROR';
@@ -186,6 +241,18 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
     (testFeedback.kind === 'failed' && isError && connection.lastError === testFeedback.message)
       ? NO_AI_PROVIDER_FEEDBACK
       : testFeedback;
+
+  const isServerModel = shownModel === connection.modelInUse;
+  const shownIsDefault = isServerModel
+    ? connection.modelIsDefault
+    : connection.modelOptions.some((option) => option.modelId === shownModel && option.isDefault);
+  const shownUnavailable = isServerModel && connection.modelUnavailable;
+  const selectError = !selectPending && selectState.kind === 'error' ? selectState.error : undefined;
+
+  const askChange = () => {
+    if (connection.modelIsDefault) setEditing(true);
+    else setChangeOpen(true);
+  };
 
   return (
     <Card
@@ -216,26 +283,43 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
         />
       </div>
 
-      <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5 rounded-xl bg-muted px-4 py-3.5 text-xs leading-normal @max-[760px]:grid-cols-1">
-        <dt className="text-muted-foreground">{AI_PROVIDER_CARD_TEXTS.recipeModel}</dt>
-        <dd className="m-0 font-mono break-all" data-testid={AI_PROVIDER_CARD_RECIPE_MODEL_TESTID}>
-          {connection.recipeModel}
-        </dd>
-        <dt className="text-muted-foreground">{AI_PROVIDER_CARD_TEXTS.catalogModel}</dt>
-        <dd className="m-0 font-mono break-all" data-testid={AI_PROVIDER_CARD_CATALOG_MODEL_TESTID}>
-          {connection.catalogModel}
-        </dd>
-        <dt className="text-muted-foreground">{AI_PROVIDER_CARD_TEXTS.lastTest}</dt>
-        <dd className="m-0" data-testid={AI_PROVIDER_CARD_LAST_TEST_TESTID}>
-          <LastTest connection={connection} />
-        </dd>
-      </dl>
-
       {isError && connection.lastError !== null ? (
         <Notice tone="danger" title={AI_PROVIDER_CARD_TEXTS.errorTitle} testId={AI_PROVIDER_CARD_ERROR_TESTID}>
           <span className="break-words">{connection.lastError}</span>
         </Notice>
       ) : null}
+
+      <section
+        aria-labelledby={modelTitleId}
+        className="flex flex-col gap-3 pt-1"
+        data-testid={AI_PROVIDER_CARD_MODEL_SECTION_TESTID}
+      >
+        <div className="flex flex-col gap-0.5">
+          <h3 id={modelTitleId} className="text-[15px] font-semibold">
+            {AI_PROVIDER_CARD_TEXTS.modelTitle}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {AI_PROVIDER_CARD_TEXTS.modelDescription(connection.providerName)}
+          </p>
+        </div>
+        <AiModelSelect
+          providerName={connection.providerName}
+          options={connection.modelOptions}
+          value={shownModel}
+          isDefault={shownIsDefault}
+          unavailable={shownUnavailable}
+          pending={selectPending}
+          onChange={chooseModel}
+          error={selectError}
+        />
+      </section>
+
+      <dl className="m-0 grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-1.5 rounded-xl bg-muted px-4 py-3.5 text-xs leading-normal @max-[760px]:grid-cols-1">
+        <dt className="text-muted-foreground">{AI_PROVIDER_CARD_TEXTS.lastTest}</dt>
+        <dd className="m-0" data-testid={AI_PROVIDER_CARD_LAST_TEST_TESTID}>
+          <LastTest connection={connection} />
+        </dd>
+      </dl>
 
       <div aria-live="polite" className="min-h-[22px]" data-testid={AI_PROVIDER_CARD_RESULT_TESTID}>
         <AiProviderFeedbackMessage feedback={feedback} />
@@ -269,7 +353,7 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
             type="button"
             touch
             disabled={testPending || disconnectPending}
-            onClick={() => setEditing(true)}
+            onClick={askChange}
             data-testid={AI_PROVIDER_CARD_CHANGE_TESTID}
           >
             {AI_PROVIDER_CARD_TEXTS.change}
@@ -294,6 +378,23 @@ export function AiProviderCard({ providers, connection }: AiProviderCardProps) {
           dialog: AI_PROVIDER_DISCONNECT_DIALOG_TESTID,
           dismiss: AI_PROVIDER_DISCONNECT_DISMISS_TESTID,
           confirm: AI_PROVIDER_DISCONNECT_CONFIRM_TESTID,
+        }}
+      />
+
+      <ConfirmDialog
+        open={changeOpen}
+        onOpenChange={setChangeOpen}
+        texts={{
+          title: AI_PROVIDER_CHANGE_DIALOG_TEXTS.title,
+          description: AI_PROVIDER_CHANGE_DIALOG_TEXTS.description(connection.providerName),
+          dismiss: AI_PROVIDER_CHANGE_DIALOG_TEXTS.dismiss,
+          confirm: AI_PROVIDER_CHANGE_DIALOG_TEXTS.confirm,
+        }}
+        onConfirm={() => setEditing(true)}
+        testIds={{
+          dialog: AI_PROVIDER_CHANGE_DIALOG_TESTID,
+          dismiss: AI_PROVIDER_CHANGE_DISMISS_TESTID,
+          confirm: AI_PROVIDER_CHANGE_CONFIRM_TESTID,
         }}
       />
     </Card>

@@ -57,10 +57,18 @@ tienen alguna anotación en él, el instante de la primera y de la última anota
 (una sola cifra, R15), el número de vueltas atrás y un enlace a su recorrido. SI el pedido está dado
 de baja, ENTONCES su fila DEBE llevar además la marca **«Dado de baja»**. `[D1] [D2] [D11] [D12]`
 
-**R3.** MIENTRAS el pedido está activo, su fila DEBE marcarlo **«En curso»** y su duración DEBE
-mostrarse **abierta**: contada desde la primera anotación hasta el instante de la consulta y
-señalada como abierta. CUANDO el pedido deja de estar activo —llega a un estado final o se da de
-baja—, la duración **NO DEBE** seguir abierta. `[D6] [D11]`
+**R3.** MIENTRAS el pedido está activo, su duración DEBE mostrarse **abierta**: contada desde la
+primera anotación hasta el instante de la consulta y señalada como abierta con el sufijo « (en
+curso)». La fila NO DEBE llevar otra marca «En curso» aparte de ese sufijo. CUANDO el pedido deja de
+estar activo —llega a un estado final o se da de baja—, la duración **NO DEBE** seguir abierta.
+`[D6] [D11]`
+
+> **Enmendado el 2026-10-16 (enmienda aprobada por el usuario, sin tarjeta; commits `0f135128` y
+> `440ff5b2`).** Texto original: «MIENTRAS el pedido está activo, su fila DEBE marcarlo **«En
+> curso»** y su duración DEBE mostrarse **abierta**…». El chip «En curso» de la fila se quita
+> (`0f135128`); lo que marca al pedido en curso es la duración abierta. Además, el estado
+> `EN_CURSO` se lee «En fabricación» (`440ff5b2`), así que «En curso» ya no es el texto de ningún
+> estado.
 
 **R4.** La lista DEBE ordenarse por número de pedido **descendente** (año y, dentro del año,
 secuencia), con un orden total y estable entre páginas. `[D1] [D13]`
@@ -288,3 +296,5 @@ aterriza ningún rol tras el login.
 | 2026-10-07 | ¿Búsqueda sin dígitos? | El texto debe tener al menos un dígito. Sin dígitos (p. ej. «-» solo) la lista queda vacía, sin error |
 | 2026-10-07 | ¿«2026-42» encuentra «2026-0000042»? | No, y se acepta así: la búsqueda es subcadena del número visible, sin normalizar ceros |
 | 2026-10-07 | ¿Formato de duraciones largas? | A partir de 24 h, en días: «2 d 02 h 05 min». Por debajo, como estaba (horas, minutos, segundos) |
+| 2026-10-16 | ¿Cómo se marca un pedido en curso? | **Enmienda aprobada por el usuario, sin tarjeta** (commit `0f135128`). Sin chip «En curso»: lo marca la duración abierta con « (en curso)». «Dado de baja» sigue. Enmienda R3 y la fila «¿Pedidos en curso?» en lo de «marcados». |
+| 2026-10-16 | ¿Texto del estado `EN_CURSO`? | **Enmienda aprobada por el usuario, sin tarjeta** (commit `440ff5b2`, #256). Se lee «En fabricación»; solo cambia el texto visible. |

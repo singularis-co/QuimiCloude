@@ -18,9 +18,9 @@
  *
  * El rol `Operador` es el REAL del seed, nunca un fixture: sus permisos son el dato bajo prueba
  * del camino feliz y de la reentrada. Para el camino negativo hace falta un actor SIN
- * `asignaciones.consultar`, y ninguno de los dos roles del seed sirve -Administrador y Operador lo
- * tienen los dos-, asi que este spec crea un rol efimero sin ningun permiso, igual que
- * `e2e/inventario.spec.ts`.
+ * `asignaciones.consultar`. El Operador lo tiene y el Administrador no, pero el Administrador tiene
+ * otros permisos que no son el dato bajo prueba, asi que este spec crea un rol efimero sin ningun
+ * permiso, igual que `e2e/inventario.spec.ts`.
  *
  * EVIDENCIA POR PASO (QC-214): una segunda receta con el paso 1 que exige evidencia y un pedido
  * propio ya EN_CURSO en el paso 2, el ultimo. Ese punto de partida es el de una fabricacion que
@@ -47,7 +47,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
-  ASSIGNED_ORDER_START_CONFIRM_TESTID,
+  enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
 
@@ -449,8 +449,8 @@ test.beforeAll(async () => {
     })
   ).id;
 
-  // Rol efimero SIN ningun permiso: ni Administrador ni Operador sirven para el camino negativo,
-  // los dos tienen `asignaciones.consultar`.
+  // Rol efimero SIN ningun permiso: el camino negativo no depende de lo que tenga cualquier rol
+  // del seed.
   const noPermissionsRole = await prisma.role.create({
     data: {
       name: NO_PERMISSIONS_ROLE_NAME,
@@ -687,15 +687,15 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
       'el pedido del fixture debe nacer PENDIENTE para que este caso demuestre la transicion',
     ).toBe('PENDIENTE');
 
-    // Nunca una ruta escrita a mano: `loginAndLand` deriva el destino de los permisos reales del
-    // actor.
+    // El Operador no aterriza en la lista: tras el login se abre por su ruta.
     await loginAndLand(page, operatorUser);
+    await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     const pendingRow = rowByNumber(page, orderPendingNumber);
     await expect(pendingRow).toHaveCount(1, { timeout: 60_000 });
 
-    await clickAndConfirm(page, pendingRow.getByTestId(ENTER_TESTID), ASSIGNED_ORDER_START_CONFIRM_TESTID);
+    await enterAndStartAssignedOrder(page, pendingRow.getByTestId(ENTER_TESTID));
     await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderPendingId!), {
       timeout: 60_000,
     });

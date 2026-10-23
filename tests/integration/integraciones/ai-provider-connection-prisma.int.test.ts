@@ -154,7 +154,7 @@ afterAll(async () => {
 })
 
 describe('R4: el catalogo de proveedores', () => {
-  it('R4 — list devuelve los cuatro proveedores en el orden del tablero, con nombre y modelos no vacios', async () => {
+  it('R4 — list devuelve los cuatro proveedores en el orden del tablero, con nombre, modelos y predeterminado', async () => {
     const entries = await listAiProviders()
     expect(entries.map((entry) => [entry.code, entry.name])).toEqual([
       ['ANTHROPIC', 'Claude'],
@@ -163,10 +163,78 @@ describe('R4: el catalogo de proveedores', () => {
       ['OPENROUTER', 'OpenRouter'],
     ])
     for (const entry of entries) {
-      expect(entry.recipeModel.trim()).not.toBe('')
-      expect(entry.catalogModel.trim()).not.toBe('')
-      expect(Object.keys(entry).sort()).toEqual(['catalogModel', 'code', 'name', 'recipeModel'])
+      expect(Object.keys(entry).sort()).toEqual(['code', 'defaultModel', 'models', 'name'])
+      expect(entry.models).toHaveLength(5)
+      expect(entry.models.filter((model) => model.isDefault).map((model) => model.modelId)).toEqual([
+        entry.defaultModel,
+      ])
+      for (const model of entry.models) expect(Object.keys(model).sort()).toEqual(['isDefault', 'modelId'])
     }
+  })
+
+  it('QT-291 R2, R3, R5 — los modelos de cada proveedor salen del catalogo de modelos en su orden, con el predeterminado sembrado', async () => {
+    const entries = await listAiProviders()
+    const google = entries.find((entry) => entry.code === 'GOOGLE')
+    expect(google?.models).toEqual([
+      { modelId: 'gemini-4-argon', isDefault: false },
+      { modelId: 'gemini-3.8-flash', isDefault: true },
+      { modelId: 'gemini-3.7-flash', isDefault: false },
+      { modelId: 'gemini-3.5-flash-lite', isDefault: false },
+      { modelId: 'gemini-3.1-flash-lite', isDefault: false },
+    ])
+    expect(Object.fromEntries(entries.map((entry) => [entry.code, entry.defaultModel]))).toEqual({
+      ANTHROPIC: 'claude-haiku-5-5',
+      GOOGLE: 'gemini-3.8-flash',
+      OPENAI: 'gpt-6-luna',
+      OPENROUTER: 'anthropic/claude-haiku-5.5',
+    })
+  })
+
+  it('QT-291 R17 — el catalogo se lee en cada llamada: un cambio de predeterminado se ve en la siguiente', async () => {
+    const antes = await getAiProvider('OPENAI')
+    expect(antes?.defaultModel).toBe('gpt-6-luna')
+    try {
+      await prisma.$transaction([
+        prisma.aiModel.update({
+          where: { provider_modelId: { provider: 'OPENAI', modelId: 'gpt-6-luna' } },
+          data: { isDefault: false },
+        }),
+        prisma.aiModel.update({
+          where: { provider_modelId: { provider: 'OPENAI', modelId: 'gpt-5.6-luna' } },
+          data: { isDefault: true },
+        }),
+      ])
+      expect((await getAiProvider('OPENAI'))?.defaultModel).toBe('gpt-5.6-luna')
+    } finally {
+      await prisma.$transaction([
+        prisma.aiModel.update({
+          where: { provider_modelId: { provider: 'OPENAI', modelId: 'gpt-5.6-luna' } },
+          data: { isDefault: false },
+        }),
+        prisma.aiModel.update({
+          where: { provider_modelId: { provider: 'OPENAI', modelId: 'gpt-6-luna' } },
+          data: { isDefault: true },
+        }),
+      ])
+    }
+    expect(await getAiProvider('OPENAI')).toEqual(antes)
+  })
+
+  it('QT-291 R3 — un proveedor sin predeterminado (dato imposible) no sale de list y get devuelve null', async () => {
+    try {
+      await prisma.aiModel.update({
+        where: { provider_modelId: { provider: 'OPENROUTER', modelId: 'anthropic/claude-haiku-5.5' } },
+        data: { isDefault: false },
+      })
+      expect((await listAiProviders()).map((entry) => entry.code)).toEqual(['ANTHROPIC', 'GOOGLE', 'OPENAI'])
+      expect(await getAiProvider('OPENROUTER')).toBeNull()
+    } finally {
+      await prisma.aiModel.update({
+        where: { provider_modelId: { provider: 'OPENROUTER', modelId: 'anthropic/claude-haiku-5.5' } },
+        data: { isDefault: true },
+      })
+    }
+    expect((await getAiProvider('OPENROUTER'))?.defaultModel).toBe('anthropic/claude-haiku-5.5')
   })
 
   it('R4 — get devuelve la fila de un codigo, igual a la de list', async () => {
@@ -235,6 +303,8 @@ describe('R2: la empresa sale del ambito, nunca de la fila', () => {
       lastErrorAt: null,
       lastCheckedAt: NOW,
       keyUpdatedAt: NOW,
+      model: null,
+      unavailableModel: null,
     })
   })
 
@@ -284,6 +354,89 @@ describe('R2: la empresa sale del ambito, nunca de la fila', () => {
     await deleteAiProviderConnection(a.scope)
     await deleteAiProviderConnection(a.scope)
     expect(await prisma.aiProviderConnection.count({ where: { companyId: a.companyId } })).toBe(0)
+  })
+})
+
+const MODEL_OUTSIDE_CATALOG = 'integraciones: el modelo de la conexión no está en el catálogo de su proveedor'
+
+describe('QT-291 R7: la eleccion y el modelo marcado en la conexion', () => {
+  it('QT-291 R7 — create guarda la eleccion y el modelo marcado, y find los devuelve', async () => {
+    const a = await crearEmpresa()
+    const fila = nuevaFila(a, { model: 'gemini-4-argon', unavailableModel: 'gemini-3.8-flash' })
+    const creada = await insertAiProviderConnection(fila, a.scope)
+
+    expect(creada).toMatchObject({ model: 'gemini-4-argon', unavailableModel: 'gemini-3.8-flash' })
+    expect(await findAiProviderConnection(a.scope)).toMatchObject({
+      model: 'gemini-4-argon',
+      unavailableModel: 'gemini-3.8-flash',
+    })
+  })
+
+  it('QT-291 R7 — create sin los campos deja la eleccion y el modelo marcado vacios', async () => {
+    const a = await crearEmpresa()
+    const creada = await insertAiProviderConnection(nuevaFila(a), a.scope)
+    expect(creada).toMatchObject({ model: null, unavailableModel: null })
+  })
+
+  it('QT-291 R7, R12 — update cambia y vacia la eleccion y el modelo marcado; un parche sin ellos los conserva', async () => {
+    const a = await crearEmpresa()
+    const fila = nuevaFila(a)
+    await insertAiProviderConnection(fila, a.scope)
+
+    expect(
+      await updateAiProviderConnection(
+        fila.id,
+        { model: 'gemini-3.7-flash', unavailableModel: 'gemini-3.7-flash' },
+        a.scope,
+      ),
+    ).toMatchObject({ model: 'gemini-3.7-flash', unavailableModel: 'gemini-3.7-flash' })
+
+    expect(await updateAiProviderConnection(fila.id, { status: 'ERROR', lastError: 'x' }, a.scope)).toMatchObject({
+      model: 'gemini-3.7-flash',
+      unavailableModel: 'gemini-3.7-flash',
+    })
+
+    expect(
+      await updateAiProviderConnection(fila.id, { model: null, unavailableModel: null }, a.scope),
+    ).toMatchObject({ model: null, unavailableModel: null, status: 'ERROR', lastError: 'x' })
+  })
+
+  it('QT-291 R14 — cambiar de proveedor vaciando la eleccion en el mismo parche se acepta', async () => {
+    const a = await crearEmpresa()
+    await insertAiProviderConnection(nuevaFila(a, { model: 'gemini-4-argon' }), a.scope)
+    const fila = await findAiProviderConnection(a.scope)
+    if (fila === null) throw new Error('falta la fila')
+
+    expect(
+      await updateAiProviderConnection(fila.id, { provider: 'OPENAI', model: null, unavailableModel: null }, a.scope),
+    ).toMatchObject({ provider: 'OPENAI', model: null, unavailableModel: null })
+  })
+
+  it('QT-291 R7 — una eleccion de otro proveedor la rechaza la base y el adaptador lanza el error de dato imposible, sin escribir', async () => {
+    const a = await crearEmpresa()
+    const fila = nuevaFila(a)
+    await insertAiProviderConnection(fila, a.scope)
+
+    const alActualizar = await errorOf(updateAiProviderConnection(fila.id, { model: 'gpt-6-luna' }, a.scope))
+    expect(alActualizar).toBeInstanceOf(Error)
+    expect(alActualizar).not.toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+    expect((alActualizar as Error).message).toBe(MODEL_OUTSIDE_CATALOG)
+    const causa = (alActualizar as Error).cause
+    expect(causa).toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+    expect((causa as Prisma.PrismaClientKnownRequestError).code).toBe('P2003')
+    expect(await findAiProviderConnection(a.scope)).toMatchObject({ model: null })
+
+    const b = await crearEmpresa()
+    const alCrear = await errorOf(insertAiProviderConnection(nuevaFila(b, { model: 'no-existe' }), b.scope))
+    expect((alCrear as Error).message).toBe(MODEL_OUTSIDE_CATALOG)
+    expect(await findAiProviderConnection(b.scope)).toBeNull()
+  })
+
+  it('QT-291 R7 — otra FK rota (el autor) no se disfraza de modelo fuera del catalogo', async () => {
+    const a = await crearEmpresa()
+    const error = await errorOf(insertAiProviderConnection(nuevaFila(a, { createdById: randomUUID() }), a.scope))
+    expect(error).toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
+    expect((error as Prisma.PrismaClientKnownRequestError).code).toBe('P2003')
   })
 })
 

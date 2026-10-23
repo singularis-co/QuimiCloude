@@ -15,6 +15,12 @@ const ACTIVE_ITEM_SELECTOR = ':scope > ul > li > [data-active]';
  * Suma los desplazamientos por la cadena de `offsetParent` hasta el contenedor. El `<li>` del
  * primitivo es `relative`, asi que el `offsetTop` del boton solo no basta. `null` si el activo
  * no se puede medir (oculto o fuera del contenedor): entonces lo sigue pintando el CSS.
+ *
+ * `offsetLeft` y `offsetTop` cuentan desde el borde de relleno de su `offsetParent`, sin su
+ * borde. Por eso se suma el borde (`clientLeft`, `clientTop`) de cada `offsetParent`
+ * intermedio. El del contenedor no se suma: el indicador tambien se coloca desde su relleno.
+ * Sin esto el indicador del submenu queda 1 px a la izquierda del boton: la lista lleva
+ * `border-l` y, al ir trasladada, es el `offsetParent` del `<li>`.
  */
 function measureWithin(element: HTMLElement, container: HTMLElement): Box | null {
   let x = 0;
@@ -25,7 +31,12 @@ function measureWithin(element: HTMLElement, container: HTMLElement): Box | null
     if (!(node instanceof HTMLElement)) return null;
     x += node.offsetLeft;
     y += node.offsetTop;
-    node = node.offsetParent;
+    const parent: Element | null = node.offsetParent;
+    if (parent !== null && parent !== container) {
+      x += parent.clientLeft;
+      y += parent.clientTop;
+    }
+    node = parent;
   }
 
   if (node !== container) return null;

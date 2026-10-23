@@ -22,7 +22,12 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
-import { addPackagingLine, openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import {
+  addPackagingLine,
+  openOrderRowMenu,
+  orderMenuTrigger,
+  submitOrderWithLeftover,
+} from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qc156_e2e_';
@@ -89,7 +94,6 @@ const UNIT_OPTION = 'presentation-unit-option';
 const DISTRIBUTION_FIELD = 'order-distribution-field';
 const DISTRIBUTION_AVAILABLE = 'order-distribution-available';
 const QUANTITY_FIELD = 'order-field-quantity';
-const FORM_SUBMIT = 'order-form-submit';
 const CUSTOMER_PICKER = 'order-customer-picker';
 const CUSTOMER_PICKER_OPTION = 'order-customer-picker-option';
 const CUSTOMER_PICKER_VALUE = 'order-customer-picker-value';
@@ -434,7 +438,8 @@ test.describe('pedido con cliente', () => {
     await chooseCustomer(page, ORDER_FORM, customerLabel(CUSTOMER_MAIN));
     await expect(form.getByTestId(CUSTOMER_PICKER_VALUE)).toHaveValue(mainId);
 
-    await page.getByTestId(FORM_SUBMIT).click();
+    // 3 en un envase de 1: queda sobrante y Guardar pregunta antes.
+    await submitOrderWithLeftover(page, form);
     await expect(form).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findMany({

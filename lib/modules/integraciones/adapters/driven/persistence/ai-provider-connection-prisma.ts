@@ -24,6 +24,8 @@ const CONNECTION_SELECT = {
   lastErrorAt: true,
   lastCheckedAt: true,
   keyUpdatedAt: true,
+  model: true,
+  unavailableModel: true,
 } satisfies Prisma.AiProviderConnectionSelect;
 
 type ConnectionRow = Prisma.AiProviderConnectionGetPayload<{ select: typeof CONNECTION_SELECT }>;
@@ -39,6 +41,8 @@ function toRecord(row: ConnectionRow): AiProviderConnectionRecord {
     lastErrorAt: row.lastErrorAt,
     lastCheckedAt: row.lastCheckedAt,
     keyUpdatedAt: row.keyUpdatedAt,
+    model: row.model,
+    unavailableModel: row.unavailableModel,
   };
 }
 
@@ -59,6 +63,34 @@ function isCompanyRace(error: unknown): boolean {
   const targets = targetsOf(error);
   if (targets.some((target) => target.includes(COMPANY_INDEX))) return true;
   return targets.length === 1 && COMPANY_COLUMNS.includes(targets[0] ?? '');
+}
+
+const MODEL_FOREIGN_KEY = 'ai_provider_connections_model_fkey';
+
+/** Se lee de `meta`, nunca del mensaje: su idioma depende del servidor. */
+function constraintOf(error: Prisma.PrismaClientKnownRequestError): string {
+  const meta: unknown = error.meta;
+  if (typeof meta !== 'object' || meta === null) return '';
+  for (const key of ['constraint', 'field_name'] as const) {
+    const value: unknown = (meta as Record<string, unknown>)[key];
+    if (typeof value === 'string') return value;
+  }
+  return '';
+}
+
+function isModelForeignKeyViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2003' &&
+    constraintOf(error).includes(MODEL_FOREIGN_KEY)
+  );
+}
+
+class AiModelOutsideCatalogError extends Error {
+  constructor(cause: unknown) {
+    super('integraciones: el modelo de la conexión no está en el catálogo de su proveedor', { cause });
+    this.name = 'AiModelOutsideCatalogError';
+  }
 }
 
 export async function findAiProviderConnection(
@@ -87,6 +119,8 @@ export async function insertAiProviderConnection(
         lastErrorAt: row.lastErrorAt,
         lastCheckedAt: row.lastCheckedAt,
         keyUpdatedAt: row.keyUpdatedAt,
+        model: row.model ?? null,
+        unavailableModel: row.unavailableModel ?? null,
         createdById: row.createdById,
         updatedById: row.updatedById,
       },
@@ -95,6 +129,7 @@ export async function insertAiProviderConnection(
     return toRecord(created);
   } catch (error) {
     if (isCompanyRace(error)) throw new AiProviderConnectionRaceError();
+    if (isModelForeignKeyViolation(error)) throw new AiModelOutsideCatalogError(error);
     throw error;
   }
 }
@@ -105,19 +140,27 @@ export async function updateAiProviderConnection(
   patch: AiProviderConnectionPatch,
   scope: IntegracionesScope,
 ): Promise<AiProviderConnectionRecord | null> {
-  const { count } = await prisma.aiProviderConnection.updateMany({
-    where: { id, ...companyScopeColumns(scope) },
-    data: {
-      provider: patch.provider,
-      apiKeyEnc: patch.apiKeyEnc,
-      status: patch.status,
-      lastError: patch.lastError,
-      lastErrorAt: patch.lastErrorAt,
-      lastCheckedAt: patch.lastCheckedAt,
-      keyUpdatedAt: patch.keyUpdatedAt,
-      updatedById: patch.updatedById,
-    },
-  });
+  let count: number;
+  try {
+    ({ count } = await prisma.aiProviderConnection.updateMany({
+      where: { id, ...companyScopeColumns(scope) },
+      data: {
+        provider: patch.provider,
+        apiKeyEnc: patch.apiKeyEnc,
+        status: patch.status,
+        lastError: patch.lastError,
+        lastErrorAt: patch.lastErrorAt,
+        lastCheckedAt: patch.lastCheckedAt,
+        keyUpdatedAt: patch.keyUpdatedAt,
+        model: patch.model,
+        unavailableModel: patch.unavailableModel,
+        updatedById: patch.updatedById,
+      },
+    }));
+  } catch (error) {
+    if (isModelForeignKeyViolation(error)) throw new AiModelOutsideCatalogError(error);
+    throw error;
+  }
   if (count === 0) return null;
   const row = await prisma.aiProviderConnection.findFirst({
     where: { id, ...companyScopeColumns(scope) },

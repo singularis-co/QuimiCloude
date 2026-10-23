@@ -1,23 +1,53 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
-import type { CountryCode } from 'libphonenumber-js';
+import { isSupportedCountry, type CountryCode } from 'libphonenumber-js';
 
 import { prisma } from '@/lib/shared/db/prisma';
+
+import { atomically, recordCompanyEvent } from './company-prisma';
 
 import type { CompanyCountryRepository } from '../../../ports/company-country-repository';
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
 
-// Escritura aparte de `company-directory-prisma.ts`, que es solo de lectura.
 export function createCompanyCountryRepository(db: PrismaLike = prisma): CompanyCountryRepository {
   return {
-    async setCountryOfAlive(companyId: string, country: CountryCode | null) {
-      // Una sola sentencia sin lectura previa: `deletedAt: null` en el filtro cubre «no existe» y
-      // «dada de baja» sin carrera entre leer y escribir.
-      const { count } = await db.company.updateMany({
-        where: { id: companyId, deletedAt: null },
-        data: { country },
+    async setCountryOfAlive(
+      companyId: string,
+      country: CountryCode | null,
+      actorId: string,
+      now: Date,
+    ) {
+      return atomically(db, async (tx) => {
+        const rows = await tx.$queryRaw<Array<{ country: string | null }>>`
+          SELECT country FROM companies
+          WHERE id = ${companyId}::uuid AND deleted_at IS NULL FOR UPDATE`;
+        const current = rows[0];
+        if (current === undefined) return 'not_found' as const;
+        if (current.country === country) return 'ok' as const;
+
+        await tx.company.update({
+          where: { id: companyId },
+          data: { country, updatedAt: now },
+          select: { id: true },
+        });
+        await recordCompanyEvent(tx, {
+          companyId,
+          kind: 'company.updated',
+          actorId,
+          now,
+          fields: ['country'],
+        });
+        return 'ok' as const;
       });
-      return count === 1 ? 'ok' : 'not_found';
+    },
+
+    async findCountryOf(companyId: string) {
+      const rows = await db.$queryRaw<Array<{ country: string | null }>>`
+        SELECT country FROM companies WHERE id = ${companyId}::uuid AND deleted_at IS NULL`;
+      const country = rows[0]?.country ?? null;
+      // El CHECK de la base solo exige dos mayusculas; un codigo que la libreria no conoce no
+      // sirve para interpretar telefonos, asi que cuenta como sin pais.
+      return country !== null && isSupportedCountry(country) ? country : null;
     },
   };
 }

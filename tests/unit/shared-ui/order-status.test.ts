@@ -69,7 +69,7 @@ describe('mapa de pedido', () => {
   it('R10 — conserva los textos de hoy', () => {
     expect(ORDER_STATUS_LABELS).toEqual({
       PENDIENTE: 'Pendiente',
-      EN_CURSO: 'En curso',
+      EN_CURSO: 'En fabricación',
       POR_EMPACAR: 'Por empacar',
       EN_EMPAQUE: 'En empaque',
       ENTREGADO: 'Entregado',

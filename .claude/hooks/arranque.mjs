@@ -25,8 +25,13 @@ try {
 
   const ident = path.join(raiz, '.arnes.local.json');
   const lista = path.join(raiz, 'feature_list.json');
-  const yo = existsSync(ident) ? JSON.parse(readFileSync(ident, 'utf8')).jira_account_id : null;
-  if (!yo) salida.push('AVISO: sin .arnes.local.json — corre /jira-connect para fijar tu identidad de Jira.');
+  // El campo de identidad depende del tracker (`arnes.config.json > tracker.tipo`; sin `tracker`, Jira).
+  const configPath = existsSync('arnes.config.json') ? 'arnes.config.json' : path.join(raiz, 'arnes.config.json');
+  const tipo = existsSync(configPath) ? (JSON.parse(readFileSync(configPath, 'utf8')).tracker?.tipo ?? 'jira') : 'jira';
+  const campo = tipo === 'trello' ? 'trello_member_id' : 'jira_account_id';
+  const nombreTracker = tipo === 'trello' ? 'Trello' : 'Jira';
+  const yo = existsSync(ident) ? JSON.parse(readFileSync(ident, 'utf8'))[campo] : null;
+  if (!yo) salida.push(`AVISO: sin ${campo} en .arnes.local.json — corre /tracker-connect para fijar tu identidad de ${nombreTracker}.`);
   if (existsSync(lista)) {
     const { features } = JSON.parse(readFileSync(lista, 'utf8'));
     const mias = features.filter((f) => ['spec_ready', 'in_progress'].includes(f.status) && (!yo || f.assignee?.accountId === yo));
