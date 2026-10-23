@@ -122,6 +122,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
     // Enmendado el 2026-10-20 (QC-239): la fachada gana `linkWhatsappContact`,
     // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
     // Merge de dev (2026-10-20): se suman los siete de plantillas de QC-242 y `verifyCronSecret`.
+    // QC-240: se suman `sendWhatsappMessage` y `retryWhatsappMessage`.
     expect(Object.keys(integraciones).sort()).toEqual([
       'createWhatsappConnection',
       'createWhatsappTemplate',
@@ -143,10 +144,12 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'reportAiProviderOutcome',
       'resolveAiProviderForReading',
       'resyncWhatsappTemplates',
+      'retryWhatsappMessage',
       'saveAiProviderConnection',
       'secretCipher',
       'secretDigest',
       'selectAiModel',
+      'sendWhatsappMessage',
       'setWhatsappConnectionEnabled',
       'setWhatsappContactBlocked',
       'setWhatsappTemplateEnabled',
