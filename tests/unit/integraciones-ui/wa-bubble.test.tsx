@@ -18,10 +18,10 @@ import {
   type WaBubbleVariable,
 } from '@/app/(private)/integraciones/whatsapp/components/wa-bubble';
 
-// Forma de las entradas del diccionario de pantalla: una constante con su etiqueta como vista
+// Forma de las entradas del diccionario de pantalla: una constante con su ejemplo como vista
 // previa y una propia con su valor.
 const DICCIONARIO: readonly (WaBubbleVariable & { label: string; kind: 'constant' | 'own' })[] = [
-  { key: 'nombre_del_cliente', label: 'Nombre del cliente', preview: 'Nombre del cliente', kind: 'constant' },
+  { key: 'nombre_del_cliente', label: 'Nombre del cliente', preview: 'Laura Gómez', kind: 'constant' },
   { key: 'numero_de_cuenta', label: 'Número de cuenta', preview: '2200-1234', kind: 'own' },
 ];
 
@@ -41,10 +41,10 @@ describe('WaBubble', () => {
     expect(screen.getByTestId(WA_BUBBLE_BODY_TESTID).textContent).toBe('Paga en la cuenta 2200-1234.');
   });
 
-  it('R32: una constante se pinta con su etiqueta, resaltada', () => {
+  it('R32: una constante se pinta con su ejemplo, resaltada', () => {
     render(<WaBubble body="Hola {{nombre_del_cliente}}" variables={DICCIONARIO} time="09:41" />);
 
-    expect(variables()).toEqual(['Nombre del cliente']);
+    expect(variables()).toEqual(['Laura Gómez']);
   });
 
   it('R32: una clave desconocida se pinta como [clave]', () => {
@@ -82,7 +82,7 @@ describe('WaBubble', () => {
       />,
     );
 
-    expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID).textContent).toBe('Pedido de Nombre del cliente');
+    expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID).textContent).toBe('Pedido de Laura Gómez');
     expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID).className).toContain('font-semibold');
     expect(screen.getByTestId(WA_BUBBLE_FOOTER_TESTID).textContent).toBe('QuimiCloude');
     expect(screen.getByTestId(WA_BUBBLE_TIME_TESTID).textContent).toBe('09:41');
@@ -103,7 +103,7 @@ describe('WaBubble', () => {
       />,
     );
 
-    expect(screen.getByRole('img', { name: 'Vista previa del mensaje: Aviso. Hola Nombre del cliente. QuimiCloude' }))
+    expect(screen.getByRole('img', { name: 'Vista previa del mensaje: Aviso. Hola Laura Gómez. QuimiCloude' }))
       .toBeTruthy();
   });
 
@@ -111,13 +111,13 @@ describe('WaBubble', () => {
     render(
       <WaBubble
         body="Hola {{1}}, tu cuenta es {{2}}"
-        variables={[{ key: '1', preview: 'Nombre del cliente' }]}
+        variables={[{ key: '1', preview: 'Laura Gómez' }]}
         unmappedSlots
         time="09:41"
       />,
     );
 
-    expect(variables()).toEqual(['Nombre del cliente', '[2 sin relacionar]']);
+    expect(variables()).toEqual(['Laura Gómez', '[2 sin relacionar]']);
     expect(WA_BUBBLE_TEXTS.unmappedSlot('2')).toBe('[2 sin relacionar]');
   });
 
@@ -126,7 +126,7 @@ describe('WaBubble', () => {
       <WaBubble
         header="Pedido {{1}}"
         body="Hola {{1}}"
-        variables={[{ key: '1', preview: 'Nombre del cliente' }]}
+        variables={[{ key: '1', preview: 'Laura Gómez' }]}
         headerVariables={[]}
         unmappedSlots
         time="09:41"
@@ -134,7 +134,7 @@ describe('WaBubble', () => {
     );
 
     expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID).textContent).toBe('Pedido [1 sin relacionar]');
-    expect(screen.getByTestId(WA_BUBBLE_BODY_TESTID).textContent).toBe('Hola Nombre del cliente');
+    expect(screen.getByTestId(WA_BUBBLE_BODY_TESTID).textContent).toBe('Hola Laura Gómez');
   });
 
   it('R39: cada variable y cada botón entran con fundido de 240 ms y sin él con movimiento reducido', () => {

@@ -54,7 +54,7 @@ etiqueta (QC-242 E15), así que no hay «Agregar variable `{{n}}`» ni campo de 
 | G4 | Categoría como desplegable, con la descripción en cada opción | 2026-10-22 | R25 |
 | G5 | La clave de una variable propia es de solo lectura, la arma el front desde la etiqueta (sin tildes ni mayúsculas, espacios y signos como `_`) y no se cambia nunca; etiqueta y valor sí, aunque esté en uso | 2026-10-22 | R51, R52, R55 |
 | G6 | Constantes del sistema de ejemplo, definidas en el front; el catálogo real se define después | 2026-10-22 | R48 |
-| G7 | Vista previa: una variable propia muestra su valor; una constante, su etiqueta | 2026-10-22 | R32, R44 |
+| G7 | Vista previa: una variable propia muestra su valor; una constante, su ejemplo (o su etiqueta si no tiene ejemplo). Solo en la vista previa: el resto de la pantalla y la etiqueta que va a Meta como ejemplo no cambian. Enmienda del 2026-10-23 (antes: la etiqueta) | 2026-10-22, 2026-10-23 | R32, R44 |
 | G8 | Idiomas del alta: solo español (con variantes) e inglés | 2026-10-22 | R24 |
 | G9 | Plantilla no relacionable (QC-242 P16) = «No compatible» con su motivo y sin «Relacionar» | 2026-10-22 | R14, R15, R20 |
 | G10 | Rechazada = icono «!» con el motivo en un globo | 2026-10-22 | R13 |
@@ -210,7 +210,8 @@ diccionario de la empresa mientras se escribe, mostrar cada problema en su campo
 revisión» deshabilitado mientras haya alguno o falte el Mensaje. (D3)
 
 **R32.** La vista previa DEBE pintar, mientras se escribe, una burbuja de chat con el mensaje (cada
-variable propia por su valor y cada constante por su etiqueta, resaltadas; una clave desconocida como
+variable propia por su valor y cada constante por su ejemplo, o por su etiqueta si no tiene ejemplo,
+resaltadas; una clave desconocida como
 `[clave]`), el pie en gris y la hora; con el Mensaje vacío DEBE decir «Escribe el mensaje para verlo
 aquí.». (G7)
 
@@ -266,8 +267,9 @@ ya elegida, la ayuda «¿Falta un dato? Créalo en Variables y vuelve aquí.» y
 **R43.** MIENTRAS falta elegir el dato de algún hueco, «Guardar» DEBE estar deshabilitado y el panel
 DEBE decir «Falta relacionar el hueco <n>.» por cada uno.
 
-**R44.** La vista previa del panel DEBE mostrar cada hueco elegido con el valor (propia) o la etiqueta
-(constante) de su dato, y cada hueco sin elegir como «[<n> sin relacionar]». (G7)
+**R44.** La vista previa del panel DEBE mostrar cada hueco elegido con el valor (propia) o el ejemplo
+(constante; su etiqueta si no tiene ejemplo) de su dato, y cada hueco sin elegir como «[<n> sin
+relacionar]». (G7)
 
 **R45.** CUANDO el Administrador pulsa «Guardar», la pantalla DEBE abrir el diálogo «Revisa la
 relación» con «<nombre> enviará estos datos en cada mensaje:» y una línea `{{n}}` → etiqueta y clave por
