@@ -677,6 +677,7 @@ import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/cliente
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
 import type { CustomerCatalog } from '@/lib/modules/clientes';
 import {
+  findAliveCustomerIdsMatchingName,
   findAliveCustomerRefById,
   findCustomerRefsIncludingDeleted,
   searchCustomerRefs,
@@ -2779,6 +2780,8 @@ function buildCustomerCatalog(): CustomerCatalog {
     findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
     findAliveRefById: (id, companyId) => findAliveCustomerRefById(id, { companyId }),
     searchRefs: (query, companyId) => searchCustomerRefs(query, { companyId }),
+    findAliveIdsMatchingName: (search, ids, companyId) =>
+      findAliveCustomerIdsMatchingName(search, ids, { companyId }),
   };
 }
 

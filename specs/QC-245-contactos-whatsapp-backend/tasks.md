@@ -31,7 +31,7 @@
     `whatsapp-outbound-messages-migration.int.test.ts`) + entrada en `aislamiento.json`.
   - **Hecho:** down + up dejan el mismo esquema; `prisma validate` sin cambios inesperados.
 
-- [ ] **T3 [P] `clientes`: `CustomerCatalog.findAliveIdsMatchingName`** (R10).
+- [x] **T3 [P] `clientes`: `CustomerCatalog.findAliveIdsMatchingName`** (R10).
   - `customer-catalog.ts` (interfaz) y `customer-catalog-prisma.ts` (con `searchCondition`,
     `deletedAt: null`, ámbito, `id IN ids`); `buildCustomerCatalog` en la composición.
   - Ampliar `tests/integration/clientes/customer-catalog.int.test.ts` y tensar
