@@ -35,7 +35,7 @@
     `missing: { key, label }[]`.
   - **Hecho:** `guard-catalogo-de-errores` verde; cada clase devuelve su código.
 
-- [ ] **T4 [P] `clientes`: `mainPhoneOf` e `isCustomerAlive`** (R6, R7, R5).
+- [x] **T4 [P] `clientes`: `mainPhoneOf` e `isCustomerAlive`** (R6, R7, R5).
   - `customer-phone-links.ts` (dominio de `clientes`) y el puerto `integraciones/ports/customer-phone-links.ts`.
   - Tests unitarios en `tests/unit/clientes/customer-phone-links-main-phone.test.ts`.
   - **Hecho:** vivo con principal ⇒ `{ e164 }`; sin principal o con teléfono antiguo ⇒ `no_phone`;
