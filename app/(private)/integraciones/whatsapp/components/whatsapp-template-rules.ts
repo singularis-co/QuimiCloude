@@ -53,7 +53,7 @@ export function dictionaryOf(own: readonly WhatsappDictionaryEntryView[]): reado
     (constant): DisplayDictionaryEntry => ({
       key: constant.displayKey,
       label: constant.label,
-      preview: constant.label,
+      preview: constant.example === EMPTY_MARK ? constant.label : constant.example,
       kind: 'system',
     }),
   );

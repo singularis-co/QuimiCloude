@@ -214,20 +214,20 @@ describe('Relacionar variables', () => {
     expect(screen.queryByText(/Falta relacionar el hueco/)).toBeNull();
   });
 
-  it('R44: la vista previa pinta la etiqueta de la constante, el valor de la propia y «[n sin relacionar]»', async () => {
+  it('R44: la vista previa pinta el ejemplo de la constante, el valor de la propia y «[n sin relacionar]»', async () => {
     const user = setupUser();
     renderSheet();
     const cuerpo = screen.getByTestId(WA_BUBBLE_BODY_TESTID);
-    expect(cuerpo).toHaveTextContent('Hola Nombre del cliente, bienvenido a [2 sin relacionar]. Paga en 0012-3456.');
+    expect(cuerpo).toHaveTextContent('Hola Laura Gómez, bienvenido a [2 sin relacionar]. Paga en 0012-3456.');
     expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID)).toHaveTextContent('Pedido [1 sin relacionar]');
 
     await elegir(user, 'body.2', /Horario/);
     await elegir(user, 'header', /Número de pedido/);
 
     expect(screen.getByTestId(WA_BUBBLE_BODY_TESTID)).toHaveTextContent(
-      'Hola Nombre del cliente, bienvenido a De 8 a 17 h. Paga en 0012-3456.',
+      'Hola Laura Gómez, bienvenido a De 8 a 17 h. Paga en 0012-3456.',
     );
-    expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID)).toHaveTextContent('Pedido Número de pedido');
+    expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID)).toHaveTextContent('Pedido PED-00128');
   });
 
   it('R45: «Guardar» abre «Revisa la relación» con el resumen {{n}} → etiqueta y clave por hueco', async () => {
