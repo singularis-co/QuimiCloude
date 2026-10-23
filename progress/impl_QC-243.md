@@ -165,3 +165,10 @@ las mismas fases que cubre el gate rápido; su salida está en el bloque de arri
   - `pnpm run lint`: 0 errores y 10 warnings, todos en archivos ajenos.
   - `vitest related --run` sobre los 2 componentes y `components/shared/form-sheet.tsx`: 220 archivos, 3849 tests pasados y 1 skipped.
   - E2E: no se corre porque no se tocaron sus specs y ningún E2E usa estos textos.
+
+## Rojo de CI en el PR #300: `module-shape` R19 (2026-10-22)
+
+- **Causa:** la lista exacta de importadores del módulo `integraciones` en `tests/unit/integraciones/module-shape.test.ts` (R19) no recogía los 13 componentes nuevos de la ruta de WhatsApp.
+- **Revisión:** los 13 importan solo del barrel `@/lib/modules/integraciones` (tipos, `validateWhatsappVariableKeyInput`, `WHATSAPP_VARIABLE_KEY_LIMITS`) y de las Server Actions públicas de `adapters/driving/whatsapp-template-actions` y `whatsapp-variable-key-actions`. Ninguno usa adaptadores driven, domain interno, ports ni composition.
+- **Arreglo:** se añaden los 13 por ruta exacta a la lista de R19. No hay cambios en los componentes.
+- **Verificación:** `vitest run tests/unit/integraciones/module-shape.test.ts` en verde, con 104 tests pasados y 1 skipped.
