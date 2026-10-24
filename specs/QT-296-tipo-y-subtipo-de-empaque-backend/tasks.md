@@ -7,6 +7,10 @@
 > Un solo carril: `backend_dev`. La UI es de QT-297. **TP** es humana, está **bloqueada hasta que
 > QC-131 esté `done`** y no bloquea a ninguna otra: T0–T10 siguen ya.
 >
+> **Enmienda F2.2 (2026-10-24).** La review de la vuelta 1 rechazó por B1, y el humano decidió que
+> el envase legado no cuenta como homónimo (R43). El arreglo va en la task nueva **T11**, que
+> reabre lo de T2 y T5 solo en ese punto. Después de T11 se repite el cierre de T10.
+>
 > Cada task cierra con typecheck, lint, `vitest related` de lo tocado, `pnpm exec vitest run guard`
 > y un commit (`feat(QT-296): …` / `test(QT-296): …`). Los tests llevan `R<n>` en el nombre del
 > caso. El código de producción no cita fichas ni requisitos (`docs/conventions.md > Comentarios`).
@@ -271,12 +275,51 @@ veredicto es del humano.
 
 ## [x] T10 — Cierre `[depende de T1–T9]`
 
-- `progress/impl_QT-296.md` con el mapa `R1..R42 -> test` sin huecos. R37 queda mapeado a TP y,
+- `progress/impl_QT-296.md` con el mapa `R1..R42 -> test` sin huecos (`R1..R43` tras T11). R37 queda mapeado a TP y,
   si TP no ha cerrado, se declara pendiente porque espera a que QC-131 esté `done`.
 - Limpieza de comentarios en las líneas tocadas.
 - `./init.sh` en verde.
 
 **Hecho cuando:** trazabilidad completa y gate local en verde.
+
+## [ ] T11 — El envase legado no cuenta como homónimo (review B1) `[backend_dev]` `[depende de T2, T5]`
+
+Decisión del humano, 2026-10-24 (`requirements.md > Decisiones cerradas`, R43; `design.md > 4.1`
+y `> 4.5`).
+
+- `lib/modules/inventario/domain/packaging-subtype.ts`: el predicado puro
+  `countsAsPackagingHomonym(ref)`. Es falso solo para `CONTAINER` con `presentationId === null`.
+- `product-prisma.ts` (`findAlivePackagingByName`): `NOT: { packagingSubtype: CONTAINER,
+  presentationId: null }` en el `where`, y el mismo desempate de hoy.
+- `plan-inventory-import.ts` (`resolveIdentity`, rama `PACKAGING`): el `find` usa
+  `countsAsPackagingHomonym`.
+- Tests:
+  - `tests/unit/inventario/packaging-subtype.test.ts`: la tabla de verdad de
+    `countsAsPackagingHomonym` (`CONTAINER` con y sin presentación, y `CAP`, `MEASURER` y `OTHER`
+    sin ella) (R43).
+  - `tests/unit/inventario/create-product.test.ts` (R43, R9):
+    - con solo un legado «Galón» en el doble, que el adaptador ya no devuelve, el alta de «Galón»
+      con presentación crea el producto;
+    - una tapa homónima sin presentación sigue dando `action_not_allowed` si el subtipo difiere.
+  - `tests/integration/inventario/qt296-packaging-subtype-product.int.test.ts` (ampliado) (R43,
+    R9):
+    - con un «Galón» legado sembrado (`CONTAINER`, sin presentación), el alta de «Galón» con
+      presentación 4 L crea un producto nuevo y no toca el legado;
+    - con el legado (el más antiguo) y el «Galón» 4 L coexistiendo, un alta de «Galón» 4 L suma el
+      lote al de 4 L, y el legado queda sin lotes nuevos;
+    - con una tapa «Galón» viva, el alta de un envase «Galón» da `action_not_allowed`: la tapa sí
+      cuenta aunque no tenga presentación.
+  - `tests/unit/inventario/plan-inventory-import.test.ts` (R43, R20):
+    - con solo el legado, una fila «Galón» con presentación 4 L sale `create`;
+    - con el legado y el de 4 L coexistiendo, la fila sale `add_batch` con `target` el de 4 L;
+    - con una tapa «Galón» viva, una fila de envase «Galón» sale `subtype_mismatch`.
+  - `tests/integration/inventario/inventory-import-confirm.int.test.ts` (ampliado) (R43): con el
+    legado y el 4 L sembrados, confirmar una fila «Galón» 4 L suma el lote al de 4 L.
+
+**Hecho cuando:** R9, R20 y R43 en verde; los casos de R9 y R20 de T2 y T5 siguen en verde; y
+`qc195-packaging-list.int` y `qc195-packaging-catalog.int` (que siembran legados) siguen en verde.
+Después, repetir T10 con el mapa `R1..R43 -> test` y anotar en la bitácora que la divergencia 3 de
+T2 queda revertida.
 
 ## Mapa R -> task
 
@@ -294,13 +337,17 @@ veredicto es del humano.
 | R10 | T2 | R20 | T5 | R30 | T7 | R40 | T9 |
 | | | | | | | R41 | T5 |
 | | | | | | | R42 | T5 |
+| | | | | | | R43 | T11 |
+
+R9 y R20 ganan además T11.
 
 ## Archivos esperados
 
 Producción:
 - `db/schema.prisma`
-- `db/migrations/<ts>_packaging_subtype/migration.sql`
-- `db/migrations/<ts>_packaging_subtype/down.sql`
+- `db/migrations/20261023150000_packaging_subtype/migration.sql`
+- `db/migrations/20261023150000_packaging_subtype/down.sql`
+- `app/(private)/inventario/importar/components/import-texts.ts` (excepción de UI aprobada, `design.md > 4.5`)
 - `lib/modules/inventario/index.ts`
 - `lib/modules/inventario/domain/packaging-subtype.ts`
 - `lib/modules/inventario/domain/product-input.ts`
@@ -374,6 +421,7 @@ Tests que se amplían o ajustan:
 - `tests/unit/inventario/importar/import-preview-fixtures.ts`
 - `tests/unit/inventario/importar/import-guide.test.tsx`
 - `tests/unit/shared/listas-blancas-listados.test.ts`
+- `tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS`)
 - `tests/unit/inventario/schema/inventario-schema.test.ts` (si fija las columnas de `Product`)
 - `tests/unit/proveedores/schema/proveedores-schema.test.ts` (si fija las columnas de `SupplierCatalogLine`)
 - `tests/integration/inventario/list-query-products.int.test.ts`

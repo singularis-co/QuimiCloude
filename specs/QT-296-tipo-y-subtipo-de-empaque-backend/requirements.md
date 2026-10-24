@@ -21,7 +21,8 @@
 
 > Escritos por `spec_author` en F1.2 (2026-10-23). «Empaque» es el tipo de producto `PACKAGING`.
 > «Subtipo» es el de empaque: envase, tapa, medidor u otro. Actualizados el mismo día con las
-> respuestas del humano a las preguntas abiertas (ahora en «Decisiones cerradas»).
+> respuestas del humano a las preguntas abiertas (ahora en «Decisiones cerradas»). Enmienda F2.2
+> (2026-10-24, review B1): R9 y R20 remiten a la nueva R43.
 
 ### Subtipo de empaque en el inventario
 
@@ -53,10 +54,21 @@ escribir nada.
 **R8.** SI la entrada del alta de un producto que no es empaque trae subtipo, ENTONCES el sistema
 DEBE rechazarla como `invalid_input` sin escribir nada.
 
-**R9.** CUANDO se da de alta un empaque con el nombre de un empaque vivo de la empresa:
+**R9.** CUANDO se da de alta un empaque con el nombre de un empaque vivo de la empresa que cuenta
+como homónimo (R43):
 - con otro subtipo, el sistema DEBE rechazarlo con `action_not_allowed` sin escribir nada;
 - con el mismo subtipo (y, si es envase, la misma presentación), el sistema DEBE sumarle un lote
   al existente, como hoy.
+
+**R43.** Al buscar un homónimo de empaque, en el alta manual (R9) y en la importación desde Excel
+(R20), un envase legado (subtipo envase y sin presentación) NO DEBE contar como homónimo: se
+ignora, como hacía QC-195. Tapa, medidor y otro SÍ cuentan aunque no tengan presentación. En
+consecuencia:
+- CUANDO existe solo un envase legado con un nombre y se da de alta, a mano o por Excel, un envase
+  con ese nombre y una presentación, el sistema DEBE crear el envase nuevo;
+- CUANDO coexisten el envase legado y un envase con presentación del mismo nombre, un lote nuevo
+  de ese envase con la misma presentación, a mano o por Excel, DEBE sumarse al envase con
+  presentación, sea cual sea el más antiguo.
 
 **R10.** La edición de un producto NO DEBE cambiar su subtipo: una entrada de edición
 que lo traiga DEBE rechazarse como `invalid_input`.
@@ -97,8 +109,8 @@ como hoy.
 **R19.** SI una fila que no es de empaque trae «Subtipo», ENTONCES el sistema DEBE ignorar esa
 columna y seguir con la fila.
 
-**R20.** SI una fila de empaque nombra un empaque vivo de la empresa, o uno que crea una fila
-anterior del mismo archivo, con otro subtipo, ENTONCES la fila DEBE quedar en error con el motivo
+**R20.** SI una fila de empaque nombra un empaque vivo de la empresa que cuenta como homónimo
+(R43), o uno que crea una fila anterior del mismo archivo, con otro subtipo, ENTONCES la fila DEBE quedar en error con el motivo
 `subtype_mismatch`. Con el mismo subtipo, la fila DEBE sumar un lote, como hoy.
 
 **R21.** La plantilla descargable DEBE incluir la columna «Subtipo». Las filas de ejemplo de una
@@ -212,6 +224,7 @@ tratándose como inexistente.
 | ¿Se puede cambiar el subtipo de un producto ya creado? | R10 |
 | ¿Una línea de catálogo de empaque puede quedar sin subtipo? | R24, R31 |
 | Etiqueta del tipo en el Excel | R21, R41, R42 |
+| Envase legado sin presentación al buscar homónimos (B1) | R9, R20, R43 |
 | Alta y edición manual de la línea de catálogo | R26, R27 |
 | E2E | R38 |
 | Conjunto cerrado del subtipo | R1 |
@@ -245,3 +258,4 @@ Ninguna.
 | 2026-10-23 | ¿Se puede cambiar el subtipo de un producto ya creado? | No: queda fijo al crearlo, como la presentación del envase. |
 | 2026-10-23 | ¿Una línea de catálogo de empaque puede quedar sin subtipo? | Sí, y la revisión la marca. |
 | 2026-10-23 | Etiqueta del tipo en el Excel | «Empaque» se acepta ya como sinónimo de «Envase» en «Tipo», comparado como los demás valores. La plantilla escribe «Empaque». Los archivos y filas de ejemplo con «Envase» siguen importándose igual que hoy. |
+| 2026-10-24 | Envase legado sin presentación al buscar homónimos (review B1) | Al buscar un empaque del mismo nombre, en el alta manual y en el Excel, un envase legado sin presentación (el que dejó así QC-195) no cuenta: se ignora. «Galón» con presentación 4 L se crea aunque exista un «Galón» legado sin presentación, y los lotes nuevos van al bueno, como hoy. |

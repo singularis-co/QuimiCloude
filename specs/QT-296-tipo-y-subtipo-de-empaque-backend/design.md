@@ -3,6 +3,11 @@
 > Escrito por `spec_author` en F1.2 (2026-10-23). Las referencias `archivo:línea` son sobre la punta
 > de la rama en esa fecha (`18541c51`). La T0 de `tasks.md` las vuelve a contrastar.
 > El MCP del grafo no se usó: la exploración fue con Grep y Read sobre el worktree.
+>
+> **Enmienda F2.2 (2026-10-24).** Recoge la decisión del humano sobre el review B1 (§4.1, §4.5,
+> R43) y las divergencias de la implementación que cambian el diseño (`progress/impl_QT-296-…md >
+> T10 > Divergencias con el spec`, review m3). Cada cambio va en su sección, marcado
+> «*Enmienda F2.2*», y la tabla de §13 dice adónde fue cada una de las 14 divergencias.
 
 ## Lo que ya existe
 
@@ -108,7 +113,12 @@ model SupplierCatalogLine {
 |---|---|---|---|
 | `products_packaging_subtype_matches_type` | `products` | `("type" = 'PACKAGING') = ("packaging_subtype" IS NOT NULL)` | R2 |
 | `products_presentation_only_in_container` | `products` | `"packaging_subtype" IS NULL OR "packaging_subtype" = 'CONTAINER' OR "presentation_id" IS NULL` | R3 |
-| `supplier_catalog_lines_packaging_subtype_matches_type` | `supplier_catalog_lines` | `"packaging_subtype" IS NULL OR "type" = 'PACKAGING_MATERIAL'` | R24 |
+| `supplier_catalog_lines_packaging_subtype_matches_type` | `supplier_catalog_lines` | `"packaging_subtype" IS NULL OR "type" IS NOT DISTINCT FROM 'PACKAGING_MATERIAL'` | R24 |
+
+*Enmienda F2.2 (divergencia 1).* La primera versión del CHECK de R24 usaba `"type" =
+'PACKAGING_MATERIAL'`. Con `type` nulo, esa comparación vale `NULL`, el CHECK no falla y un
+subtipo sin tipo pasaba. `IS NOT DISTINCT FROM` lo rechaza. Lo detectó el test de R24. Los CHECK de
+R2 y R3 no tienen ese problema: `type` es `NOT NULL`, y en R3 el `IS NULL` explícito cubre el caso.
 
 - **El envase no exige presentación en la base.** `schema.prisma:356-357` documenta envases sin
   presentación de antes de QC-195, y la decisión «Empaque que ya existe» los convierte en envase.
@@ -119,9 +129,13 @@ model SupplierCatalogLine {
 - **RLS:** sin tablas nuevas. `products` y `supplier_catalog_lines` ya tienen RLS y `FORCE`, y
   añadir columnas no lo cambia. `guard-empresa-en-esquema` no cambia.
 
-### 2.3 Migración `db/migrations/<ts>_packaging_subtype/`
+### 2.3 Migración `db/migrations/20261023150000_packaging_subtype/`
 
-`<ts>` es posterior a `20261022120000` (la última de la punta). Se escribe a mano, con el mismo
+*Enmienda F2.2 (divergencia 2).* El `<ts>` quedó en `20261023150000`. Mientras tanto, `origin/dev`
+había ganado `20261023120000_whatsapp_send_permission` y `20261023130000_whatsapp_outbound_messages`,
+que no tocan estas tablas. La migración está registrada en `MIGRACIONES_ESPERADAS`
+(`tests/guards/guard-identificador-de-request.test.ts`), en orden cronológico tras las dos de `dev`.
+Se escribe a mano, con el mismo
 paréntesis de RLS que `20260922150000_product_type_enum`, porque el relleno escribe `products`.
 
 ```sql
@@ -153,7 +167,7 @@ ALTER TABLE "products" FORCE  ROW LEVEL SECURITY;
 
 | Archivo | Exporta | Barrel |
 |---|---|---|
-| `lib/modules/inventario/domain/packaging-subtype.ts` (nuevo) | `PACKAGING_SUBTYPES` (`Object.freeze`, `as const`), `PACKAGING_SUBTYPE_VALUES`, `type PackagingSubtype`, `requiresPresentation(subtype)` (solo `CONTAINER`) | `@/lib/modules/inventario` |
+| `lib/modules/inventario/domain/packaging-subtype.ts` (nuevo) | `PACKAGING_SUBTYPES` (`Object.freeze`, `as const`), `PACKAGING_SUBTYPE_VALUES`, `type PackagingSubtype`, `requiresPresentation(subtype)` (solo `CONTAINER`); *Enmienda F2.2:* `countsAsPackagingHomonym(ref)` (§4.1, R43) | `@/lib/modules/inventario` |
 | `lib/modules/proveedores/domain/catalog-line-type.ts` (nuevo) | `CATALOG_LINE_TYPES`, `CATALOG_LINE_TYPE_VALUES`, `type CatalogLineType`, `CATALOG_LINE_PACKAGING_SUBTYPES` y `CATALOG_LINE_PACKAGING_SUBTYPES_VALUES` (espejo del de arriba), `type CatalogLinePackagingSubtype`; y en `domain/imported-classification.ts` (nuevo) `resolveImportedClassification` (§6.3) | `@/lib/modules/proveedores` |
 
 El subtipo se declara dos veces a propósito, porque `proveedores` no puede importar `inventario`.
@@ -194,16 +208,35 @@ z.strictObject({
   envase cuenta como envase») y para lo que ya existe. Además, el formulario actual, que no cambia
   hasta QT-297, sigue funcionando sin mandar el campo.
 - `createPackaging` (`create-product.ts:292`):
-  - El homónimo se busca por nombre entre todos los empaques vivos, con o sin presentación. Hoy
-    `findAlivePackagingByName` (`product-prisma.ts:540-560`) exige `presentationId != null`; se
-    quita esa condición y la consulta devuelve también `packagingSubtype`.
+  - **Qué cuenta como homónimo** (*Enmienda F2.2, decisión del humano sobre B1, R43*). Cuenta un
+    empaque vivo de la empresa con ese nombre normalizado **salvo un envase legado**: subtipo
+    `CONTAINER` y `presentation_id NULL`, el que QC-195 dejó así. Se ignora como lo ignoraba
+    QC-195. Tapa, medidor y otro sí cuentan, aunque no tengan presentación. El `where` de
+    `findAlivePackagingByName` (`product-prisma.ts:540-560`) queda así:
+
+    ```ts
+    { nameNormalized, type: PACKAGING, deletedAt: null,
+      NOT: { packagingSubtype: CONTAINER, presentationId: null } }
+    ```
+
+    Devuelve también `packagingSubtype` y mantiene el desempate `createdAt asc, id asc`. Con el
+    legado fuera del conjunto, el más antiguo que queda es el envase bueno, y los lotes nuevos van
+    a él (R43).
+    *La primera versión decía «con o sin presentación» y quitaba la condición entera. Con eso, un
+    legado bloqueaba el alta de un envase nuevo con el mismo nombre y, si ya coexistían, se quedaba
+    con todos los lotes nuevos (review B1).*
   - Un homónimo con otro subtipo da `ActionNotAllowedError`. Si es envase con otra presentación,
     también, como hoy. En los demás casos se suma el lote (R9).
-  - Nace con `{ presentationId: string | null, unitId, packagingSubtype }`. `PackagingIdentity`
-    (`product-view.ts:89-92`) gana `packagingSubtype` y su `presentationId` pasa a admitir `null`.
-    Los lotes siguen sin presentación.
-- `createWithFirstBatch` (`product-prisma.ts`) escribe `packaging_subtype` solo en empaques. Los
-  demás tipos lo dejan `NULL`, y el CHECK de R2 lo garantiza aunque el código fallara.
+  - Nace con `{ presentationId: string | null, unitId, packagingSubtype }`. Los lotes siguen sin
+    presentación.
+- *Enmienda F2.2 (divergencia 4).* `PackagingIdentity.packagingSubtype` (`product-view.ts:89-92`)
+  es **opcional**, y su `presentationId` admite `null`. `createWithFirstBatch` (`product-prisma.ts`)
+  decide el subtipo por `product.type`:
+  - `PACKAGING` → el de la identidad o, si falta, `CONTAINER` (la misma regla que R5);
+  - cualquier otro tipo → `NULL`, y el CHECK de R2 lo garantiza aunque el código fallara.
+
+  El dominio siempre lo manda. Que sea opcional evita tocar cinco ayudantes de siembra de test que
+  llaman al adaptador con la identidad de QC-195.
 - `product-actions.ts` (driving) lee `packagingSubtype` del `FormData` igual que lee `type`. Si
   falta, se omite. No hay UI que lo mande hasta QT-297.
 
@@ -216,8 +249,13 @@ dando de baja el producto y creándolo de nuevo.
 
 ### 4.3 Lecturas y listado (R11, R12)
 
-- `ProductView` gana `packagingSubtype: PackagingSubtype | null`. Lo rellenan `PRODUCT_SELECT` y
+- `ProductView` gana `packagingSubtype?: PackagingSubtype | null`. Lo rellenan `PRODUCT_SELECT` y
   sus proyecciones, que cubren el detalle, el listado y `getProduct`.
+  *Enmienda F2.2 (divergencia 4, review m2).* El campo es **opcional** (`?:`). Hacerlo obligatorio
+  obligaba a tocar unos 30 fixtures de UI. Los adaptadores de lectura (`toProductView`,
+  `finished-stock-prisma`) siempre lo rellenan, así que el riesgo es solo de tipos: QT-297 tiene
+  que tratar `undefined` igual que `null`. **Deuda:** volverlo obligatorio cuando QT-297 toque esos
+  fixtures.
 - `PRODUCT_QUERYABLE.filterable` gana `packagingSubtype: 'select'`. `buildProductWhere`
   (`product-prisma.ts:234-247`) lo traduce a `{ packagingSubtype: { in: valoresValidos } }`,
   descartando los que no estén en `PACKAGING_SUBTYPE_VALUES`, igual que hace hoy con `type`. Se
@@ -260,6 +298,10 @@ ImportRowBase += readonly packagingSubtype: PackagingSubtype | null   // null si
 - **Lectura del subtipo.** Se compara igual que «Tipo»: sin mayúsculas, sin tildes y sin espacios
   en los extremos. Vacío en un empaque da `CONTAINER` (R16). Un texto desconocido da
   `subtype_invalid` en `subtype` (R17).
+  *Enmienda F2.2 (divergencia 12).* Con el subtipo ilegible, la fila tiene
+  `packagingSubtype = null`. `presentation` no recibe ninguna regla de subtipo (ni obligatoria ni
+  ignorada), y el resto de columnas se valida como en un envase. La fila queda en error de todos
+  modos y no se escribe.
 - **Presentación según el subtipo.** La tabla de reglas es por tipo, y el subtipo no cabe en ella.
   En una fila `PACKAGING` con subtipo distinto de envase, `presentation` se trata como
   `'forbidden'`: se ignora y se anota en `ignoredColumns` (R18). En envase sigue `'required'`.
@@ -268,10 +310,18 @@ ImportRowBase += readonly packagingSubtype: PackagingSubtype | null   // null si
   directas de `column.rules[type]`.
 - **Subtipo en una fila que no es de empaque.** Se ignora por la regla `forbidden` (R19).
 - **Identidad.** La clave sigue siendo `E|<nombre>`. El existente se busca entre los empaques
-  vivos, con o sin presentación. Hoy la búsqueda exige `presentationId !== null`
-  (`plan-inventory-import.ts:476`), y eso cambia. Si el subtipo difiere del existente o del de
-  una fila anterior del archivo, la fila da `subtype_mismatch` en `subtype` (R20). Si coincide,
-  envase sigue con su regla de presentación (`presentation_mismatch`) y el resto suma lote.
+  vivos que cuentan como homónimo, con la **misma regla que el alta** (§4.1, R43): se ignora el
+  envase legado (`CONTAINER` sin presentación), y tapa, medidor y otro cuentan sin presentación.
+  En `resolveIdentity` (`plan-inventory-import.ts:476`), el `find` exige
+  `!(product.packagingSubtype === CONTAINER && product.presentationId === null)` en lugar del
+  `presentationId !== null` de hoy. Para que las dos búsquedas no diverjan, la regla se escribe una
+  sola vez, como predicado puro del dominio (`countsAsPackagingHomonym(ref)` en
+  `packaging-subtype.ts`). La usan `resolveIdentity` y los tests del adaptador; el `where` de
+  Prisma la refleja tal cual. Si el subtipo difiere del existente o del de una fila anterior del
+  archivo, la fila da `subtype_mismatch` en `subtype` (R20). Si coincide, el envase sigue con su
+  regla de presentación (`presentation_mismatch`) y el resto suma lote.
+  *Enmienda F2.2 (B1).* La primera versión decía «con o sin presentación» y quitaba la condición.
+  Ver §4.1.
   `ImportProductRef` (`ports/inventory-import-repository.ts:5-12`) y su adaptador
   (`inventory-import-prisma.ts`) ganan `packagingSubtype`, y el estado del archivo (`FileProduct`)
   también.
@@ -289,6 +339,13 @@ ImportRowBase += readonly packagingSubtype: PackagingSubtype | null   // null si
 - La guía y la tabla de vista previa (`app/(private)/inventario/importar/components/`) son UI y van
   en QT-297. Si un test de UI existente cuenta columnas del contrato, se ajusta solo su
   expectativa, nunca el componente (`tasks.md > T5`).
+- *Enmienda F2.2 (divergencia 13, excepción de UI aprobada por el humano el 2026-10-23).*
+  `app/(private)/inventario/importar/components/import-texts.ts` (`GUIDE_COLUMN_DESCRIPTION_TEXTS`)
+  gana la entrada `subtype`, y el texto de `type` pasa a decir «Empaque», con el texto exacto del
+  humano. Sin ese cambio no compila, porque el mapa está tipado sobre `ImportColumnKey`, que gana
+  `subtype`. Es el único archivo de `app/` que toca la ficha, y QT-297 pulirá el texto. Quedan
+  para QT-297, por decisión del leader: el mensaje de `type_invalid`, que sigue diciendo «Envase», y
+  la hoja «Valores disponibles», que no lista subtipos.
 
 ### 4.6 «Empaque» como sinónimo de «Envase» en «Tipo» (R21, R41, R42)
 
@@ -341,10 +398,12 @@ updateCatalogLineSchema = z.strictObject({ ...catalogLineFieldsShape,
   nunca queda un subtipo viejo bajo un tipo nuevo. Es la única excepción al «reemplazo completo»
   de la edición (`catalog-line-input.ts:186-195`), y es necesaria porque el formulario de hoy no
   conoce los campos.
-- `classify-catalog-import.ts` valida campo a campo con `createCatalogLineSchema.shape.*`. Como
-  `superRefine` devuelve un `ZodEffects`, `.shape` deja de estar disponible. Para no romperlo, la
-  forma base se exporta aparte (`catalogLineFieldsShape` con los dos campos nuevos) y los
-  validadores de `documentos` usan esa forma.
+- `classify-catalog-import.ts` valida campo a campo con `createCatalogLineSchema.shape.*`, y lo
+  sigue haciendo.
+  *Enmienda F2.2 (divergencia 9).* La primera versión daba por hecho que `.shape` se perdía con
+  `superRefine` y proponía exportar `catalogLineFieldsShape` para `documentos`. Con zod 4,
+  `superRefine` devuelve el mismo esquema y `.shape` sigue disponible, como confirman typecheck y
+  tests. El clasificador no cambia de fuente y la forma base no se exporta.
 - `supplier-catalog-actions.ts` (driving) lee `type` y `packagingSubtype` del `FormData`. Clave
   ausente es ausente; cadena vacía es `null`.
 
@@ -352,9 +411,16 @@ updateCatalogLineSchema = z.strictObject({ ...catalogLineFieldsShape,
 
 - `CatalogLineFields` y `CatalogLineView` (`catalog-line-view.ts:33-69`) ganan
   `type: CatalogLineType | null` y `packagingSubtype: CatalogLinePackagingSubtype | null` (R28).
-- La edición recibe un `classification?: { type, packagingSubtype }` opcional. Si es `undefined`,
-  el adaptador no escribe esas dos columnas.
-- La lectura del detalle y del listado selecciona las dos columnas. El listado no gana filtro por
+- *Enmienda F2.2 (divergencia 7).* La clasificación no viaja como un parámetro
+  `classification?` aparte, sino dentro de `data`, con el tipo `CatalogLineReplacement`:
+  `CatalogLineFields` sin los dos campos y con un `classification?: { type, packagingSubtype }`
+  opcional. Si `classification` es `undefined`, el adaptador no escribe esas dos columnas (R27).
+  El alta y la importación usan `CatalogLineFields`, con `type` y `packagingSubtype` obligatorios
+  y anulables. El contrato es el mismo, y queda tipado en un solo argumento.
+- La lectura del listado y la lectura por identidad seleccionan las dos columnas.
+  *Enmienda F2.2 (divergencia 8).* `proveedores` no tiene lectura de una línea por id (`create` y
+  `replaceAlive` no devuelven vista), así que el «detalle» de R28 se prueba sobre el listado y sobre
+  la lectura por identidad. No se añade una lectura por id para eso. El listado no gana filtro por
   tipo: nadie lo pidió, y QT-297 decidirá si lo necesita.
 
 ### 5.3 Escritura por identidad de la importación (R33–R35)
@@ -429,6 +495,10 @@ Se añaden dos campos por línea. El resto no cambia.
   `packagingSubtype`, que es inválido si no es `null` y el tipo no es `PACKAGING_MATERIAL`. Con
   eso la fila clasifica «incompleta» (R32). El tipo no puede ser inválido por valor: lo filtra el
   borde (§6.4) o la extracción (§6.2).
+  *Enmienda F2.2 (divergencia 11).* Esto vale también para un subtipo **sin tipo** (`type = null`).
+  La regla se aplica tal cual: la fila revisada sale «incompleta» por `packagingSubtype`, y no se
+  descarta el subtipo en silencio como hace la extracción de la IA (R30). La diferencia es a
+  propósito: lo que escribe un revisor se le señala, y lo que adivina la IA se descarta.
 - `AliveCatalogLine` gana `type` y `packagingSubtype`. Una fila con línea viva es «cambia» si el
   costo difiere o si la clasificación resultante, calculada con la regla de §5.3, difiere de la
   guardada (R35). Para que la vista previa y la escritura no puedan divergir, esa regla se escribe
@@ -441,6 +511,13 @@ Se añaden dos campos por línea. El resto no cambia.
 Si faltan, son `null`, y la pantalla actual, que no los manda, sigue funcionando (R32). Un valor
 fuera de la lista rechaza la petición entera (`ValidationError`), igual que hoy un `deliveryTime`
 que no es entero: es una entrada del navegador, no de la IA.
+
+*Enmienda F2.2 (divergencia 10).* No hay `.transform` en el borde: `ReviewedLineInput.type` y
+`.packagingSubtype` quedan **opcionales** en el tipo inferido. Un `.transform(v => v ?? null)` los
+volvería obligatorios en ese tipo, y rompería `catalog-import-review.tsx`, la pantalla actual, que
+construye filas sin ellos y es de QT-297. El paso de ausente a `null` se hace donde se usan los
+campos: en `fromReviewedLine` (vista previa), en `toClassifyRow` y en el mapeo de `fields` de la
+confirmación.
 
 ### 6.5 Vista previa y confirmación
 
@@ -524,6 +601,8 @@ T14) debe mirar el subtipo.
 | **En la reimportación, el tipo de la IA siempre pisa al guardado, aunque sea `null`.** | Una pasada en la que la IA duda borraría la clasificación que alguien hizo a mano. «Un dato conocido reemplaza, uno desconocido no borra» (R34) cumple igual la decisión «se reimporta el PDF». |
 | **Edición de línea como reemplazo completo también para tipo y subtipo.** | El formulario actual, que no cambia hasta QT-297, no manda los campos, y cada edición borraría el tipo que puso el PDF. |
 | **Reconocer las filas de ejemplo comparando «Tipo» por el tipo leído, en vez de añadir las filas de ejemplo antiguas** (R21). | Es menos código, pero ignoraría como ejemplo filas que hoy se importan («ENVASE» o «envase» con el resto igual al ejemplo). La decisión exige que los archivos existentes se importen igual que hoy. |
+| **Que el envase legado cuente como homónimo** (la primera versión de §4.1 y §4.5). | Cerraba el camino de QC-195 para recuperar un legado («se da de alta de nuevo como envase») y, con el legado y el bueno ya coexistiendo, mandaba todos los lotes nuevos contra el legado porque es el más antiguo (review B1). El humano decidió ignorarlo (R43). |
+| **Rellenar la presentación de los envases legados en la migración, para que dejen de ser legado.** | No hay una regla cerrada para elegir esa presentación, y hacerlo a ciegas inventa un dato (regla 6). |
 | **Filtrar por subtipo en el selector, cambiando la consulta del cliente.** | Es UI (QT-297), y no hace falta: R3 garantiza que el filtro por unidad de la presentación ya solo casa envases. La defensa del servidor está en `PackagingCatalog`. |
 
 ## 11. Tests existentes que cambian, y por qué
@@ -540,6 +619,36 @@ T14) debe mirar el subtipo.
 | `tests/unit/documentos/ai-reader-canned.test.ts` | El texto de guion trae los dos campos. |
 | `tests/integration/inventario/qc195-packaging-*.int.test.ts` | Las siembras de envase pasan por el alta con el subtipo por defecto. No se espera ningún cambio de expectativa; si alguno cambia, se anota en la bitácora con su motivo. |
 
+*Enmienda F2.2 (divergencias 3 y 5).*
+- **T1 y T2 se commitearon juntas.** El CHECK de R2 rompe cualquier alta de empaque hasta que T2
+  manda el subtipo: 126 fallos en 18 suites con T1 sola. Por eso cuatro tests que siembran
+  empaques a mano ganaron solo `packagingSubtype`.
+- **`create-product.test.ts`.** Dos expectativas de QC-195 («R1, R6» y «R11») ganan
+  `packagingSubtype: CONTAINER`, porque la identidad nueva de §4.1 lo incluye.
+
 ## 12. Dependencias de terceros
 
 Ninguna. Todo se resuelve con `zod`, Prisma y SQL, que ya están en el repo.
+
+## 13. Enmienda F2.2: adónde fue cada divergencia de la implementación
+
+Origen: `progress/impl_QT-296-tipo-y-subtipo-de-empaque-backend.md > T10 > Divergencias con el
+spec`, y review vuelta 1 (B1, m2, m3).
+
+| # | Divergencia | Cambia el diseño | Dónde queda |
+|---|---|---|---|
+| 1 | CHECK de R24 con `IS NOT DISTINCT FROM` | Sí | §2.2 |
+| 2 | Migración `20261023150000` | Sí | §2.3 |
+| 3 | T1 y T2 en un mismo commit | No (orden de trabajo) | §11 |
+| 4 | `PackagingIdentity.packagingSubtype` y `ProductView.packagingSubtype` opcionales | Sí | §4.1, §4.3 (deuda de m2) |
+| 5 | Dos expectativas de `create-product.test.ts` | No (consecuencia de §4.1) | §11 |
+| 6 | R13 y R14 no distinguen el filtro `CONTAINER` de la guarda anterior | No | §4.4 ya lo da como defensa en profundidad |
+| 7 | Clasificación de la edición dentro de `data` (`CatalogLineReplacement`) | Sí | §5.2 |
+| 8 | R28 probado sobre el listado y la lectura por identidad | Sí | §5.2 |
+| 9 | El clasificador conserva `createCatalogLineSchema.shape` | Sí | §5.1 |
+| 10 | Campos de la fila revisada opcionales, sin `.transform` | Sí | §6.4 |
+| 11 | Subtipo sin tipo en una fila revisada da «incompleta» | Sí (lo precisa) | §6.3 |
+| 12 | Subtipo ilegible en el Excel | Sí | §4.5 |
+| 13 | Excepción de UI en `import-texts.ts` | Sí | §4.5 |
+| 14 | Exports nuevos en `inventario/index.ts` | No (cabe en §7) | §7 |
+| B1 | El envase legado no cuenta como homónimo (decisión del humano, 2026-10-24) | Sí | §4.1, §4.5, §10, R43, `tasks.md > T11` |
