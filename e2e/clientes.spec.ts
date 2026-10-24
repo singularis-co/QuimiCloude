@@ -62,8 +62,8 @@
  * LOS `data-testid` VAN COMO CONSTANTES LOCALES y no importados del barrel de la ruta: sus
  * modulos son de CLIENTE (`'use client'`, JSX, `useActionState`) e importarlos desde el proceso de
  * Node del runner arrastraria React sin aportar nada. Es el mismo criterio que
- * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Los de contactos si se importan: su modulo de
- * textos no es de cliente. Ningun assert mira copy escrito a mano: todo se localiza por
+ * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Los de contactos si se importan, de `contact-texts`
+ * y no del barrel: ese modulo de textos no es de cliente. Ningun assert mira copy escrito a mano: todo se localiza por
  * `data-testid`, por rol ARIA, por valores del fixture o por la constante de la etiqueta.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
@@ -88,9 +88,10 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import {
-  CUSTOMER_CONTACTS_EMPTY_TESTID,
+  CONTACTS_NOT_CONNECTED_TESTID,
+  CONTACTS_SCREEN_TESTID,
   CUSTOMER_CONTACTS_TITLE_TESTID,
-} from '@/app/(private)/clientes/contactos/components';
+} from '@/app/(private)/clientes/contactos/components/contact-texts';
 import { prisma } from '@/lib/shared/db/prisma';
 import { CUSTOMER_CONTACTS_LABEL } from '@/lib/shared/navigation/private-nav';
 import { CUSTOMER_CONTACTS_ROUTE, CUSTOMERS_ROUTE } from '@/lib/shared/routes';
@@ -455,7 +456,9 @@ test.describe('pantalla de clientes', () => {
     await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveText(CUSTOMER_CONTACTS_LABEL, {
       timeout: 60_000,
     });
-    await expect(page.getByTestId(CUSTOMER_CONTACTS_EMPTY_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.getByTestId(CONTACTS_SCREEN_TESTID).or(page.getByTestId(CONTACTS_NOT_CONNECTED_TESTID)),
+    ).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId(NAV_CUSTOMERS_LIST_TESTID).click();
     await page.waitForURL((url) => url.pathname === CUSTOMERS_ROUTE, { timeout: 60_000 });
@@ -529,6 +532,7 @@ test.describe('pantalla de clientes', () => {
       ).toBe(false);
     }
     await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveCount(0);
-    await expect(page.getByTestId(CUSTOMER_CONTACTS_EMPTY_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(CONTACTS_SCREEN_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(CONTACTS_NOT_CONNECTED_TESTID)).toHaveCount(0);
   });
 });

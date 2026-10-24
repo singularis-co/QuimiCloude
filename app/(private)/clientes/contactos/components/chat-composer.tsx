@@ -15,6 +15,7 @@ import type {
 import { constantLabelsForBackend } from '@/lib/shared/ui/whatsapp-system-constants';
 import { cn } from '@/lib/utils';
 
+import { settleAction } from './action-rejection';
 import { ChatTemplateChips } from './chat-template-chips';
 import type { ChatContextView, ChatMessageView, ChatTarget } from './chat-view';
 import {
@@ -151,7 +152,7 @@ export function ChatComposer({
     setSending(true);
     onOptimistic(pendingMessage(pendingId, text));
     setDraft('');
-    const result = await sendWhatsappMessageAction({ kind: 'text', recipient, text });
+    const result = await settleAction(() => sendWhatsappMessageAction({ kind: 'text', recipient, text }));
     setSending(false);
     if (result.status === 'success') {
       onSent(pendingId, sentMessage(result.data));
@@ -171,13 +172,15 @@ export function ChatComposer({
     report(null);
     setSending(true);
     onOptimistic(pendingMessage(pendingId, resolved.text));
-    const result = await sendWhatsappMessageAction({
-      kind: 'template',
-      recipient,
-      templateId: template.id,
-      constants: systemConstantsFor(template, values),
-      constantLabels: { ...constantLabelsForBackend() },
-    });
+    const result = await settleAction(() =>
+      sendWhatsappMessageAction({
+        kind: 'template',
+        recipient,
+        templateId: template.id,
+        constants: systemConstantsFor(template, values),
+        constantLabels: { ...constantLabelsForBackend() },
+      }),
+    );
     setSending(false);
     if (result.status === 'success') {
       onSent(pendingId, sentMessage(result.data));

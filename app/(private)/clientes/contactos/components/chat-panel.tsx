@@ -16,6 +16,7 @@ import type { WhatsappChat, WhatsappChatMessage, WhatsappSendableTemplate } from
 import { SYSTEM_CONSTANTS, constantLabelsForBackend } from '@/lib/shared/ui/whatsapp-system-constants';
 import { cn } from '@/lib/utils';
 
+import { settleAction } from './action-rejection';
 import { ChatComposer, sentMessage } from './chat-composer';
 import { ChatHeader } from './chat-header';
 import { ChatMessageList } from './chat-message-list';
@@ -58,6 +59,8 @@ export type ChatPanelProps = {
   readonly onChatRead: (contactId: string) => void;
   /** Tras enviar al cliente sin conversación: el chat se vuelve a pedir por `{ customerId }`. */
   readonly onReloadChat: () => void;
+  /** Teléfono del cliente para la cabecera cuando el chat aún no tiene contacto. */
+  readonly customerPhone?: string | null;
   readonly className?: string;
 };
 
@@ -154,6 +157,7 @@ function ChatConversation({
   onBack,
   onChatRead,
   onReloadChat,
+  customerPhone,
   className,
 }: ChatConversationProps) {
   const [now] = useState(() => new Date());
@@ -193,7 +197,7 @@ function ChatConversation({
       setLoadingOlder(true);
       setOlderError(null);
       const target: ChatTarget = contactId === null ? { customerId } : { contactId };
-      const result = await getWhatsappChatAction({ target, before: cursor, pageSize: CHAT_PAGE_SIZE });
+      const result = await settleAction(() => getWhatsappChatAction({ target, before: cursor, pageSize: CHAT_PAGE_SIZE }));
       setLoadingOlder(false);
       if (result.status !== 'success') {
         setOlderError(result);
@@ -209,11 +213,13 @@ function ChatConversation({
     if (retryingRef.current.has(messageId)) return;
     retryingRef.current.add(messageId);
     setRetryFailure(null);
-    const result = await retryWhatsappMessageAction({
-      messageId,
-      constants: retryConstantsOf(context),
-      constantLabels: { ...constantLabelsForBackend() },
-    });
+    const result = await settleAction(() =>
+      retryWhatsappMessageAction({
+        messageId,
+        constants: retryConstantsOf(context),
+        constantLabels: { ...constantLabelsForBackend() },
+      }),
+    );
     retryingRef.current.delete(messageId);
     if (result.status === 'success') {
       const message = sentMessage(result.data);
@@ -229,7 +235,7 @@ function ChatConversation({
     <section data-testid={CHAT_PANEL_TESTID} className={cn(PANEL_CLASS, className)}>
       <ChatHeader
         customerName={chat.customer.name}
-        phone={chat.contact?.phone ?? ''}
+        phone={chat.contact?.phone ?? customerPhone ?? ''}
         window={chat.window}
         context={context}
         contextLoading={contextLoading}

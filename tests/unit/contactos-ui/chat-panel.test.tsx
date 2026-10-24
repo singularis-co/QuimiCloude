@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatPanel, type ChatPanelProps } from '@/app/(private)/clientes/contactos/components/chat-panel';
 import type { ChatContextView } from '@/app/(private)/clientes/contactos/components/chat-view';
-import type { ErrorState } from '@/lib/modules/errores';
+import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import type { WhatsappChat, WhatsappChatMessage, WhatsappOutboundMessageView } from '@/lib/modules/integraciones';
 import { constantLabelsForBackend } from '@/lib/shared/ui/whatsapp-system-constants';
 
@@ -385,6 +385,18 @@ describe('R41 · reintentar un fallido', () => {
     const alerta = await screen.findByTestId('chat-retry-error');
     expect(within(alerta).getByText(ERROR_CATALOGADO.message)).toBeTruthy();
     expect(screen.getAllByTestId('chat-message')).toHaveLength(2);
+  });
+
+  it('R41: si la acción no responde (red caída) pinta el error inesperado y deja el fallido', async () => {
+    const user = setupUser();
+    actions.retry.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    pintar({ chat: chatDe({ messages: [mensaje('m1', 0), fallido] }) });
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }));
+    const alerta = await screen.findByTestId('chat-retry-error');
+    expect(within(alerta).getByText(errorMessage(UNEXPECTED_ERROR_CODE))).toBeTruthy();
+    expect(within(alerta).getByTestId('unexpected-error-notice-reference')).toBeTruthy();
+    expect(screen.getAllByTestId('chat-message')).toHaveLength(2);
+    expect(screen.getByText('No se pudo enviar: Número no válido')).toBeTruthy();
   });
 
   it('R41: sin permiso de envío no hay «Reintentar» ni caja', () => {

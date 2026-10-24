@@ -1,7 +1,6 @@
-export const CUSTOMER_CONTACTS_EMPTY_MESSAGE =
-  'Aquí verás las conversaciones de WhatsApp con tus clientes.';
 export const CUSTOMER_CONTACTS_TITLE_TESTID = 'customer-contacts-title';
-export const CUSTOMER_CONTACTS_EMPTY_TESTID = 'customer-contacts-empty';
+export const CONTACTS_LOAD_ERROR_TESTID = 'contacts-load-error';
+export const CONTACTS_LOAD_ERROR_RETRY_TESTID = 'contacts-load-error-retry';
 
 export const CHAT_MEDIA_LABELS = {
   audio: '[Audio]',
@@ -112,6 +111,52 @@ export const SEND_TEMPLATE_DIALOG_TEXT = {
   send: 'Enviar plantilla',
   close: 'Cerrar',
 } as const;
+
+export const CONVERSATION_LIST_TEXT = {
+  regionLabel: 'Conversaciones',
+  searchLabel: 'Buscar conversación',
+  searchPlaceholder: 'Buscar por nombre o teléfono',
+  loadingMore: 'Cargando más conversaciones…',
+  unread: (count: number) => `${count} sin leer`,
+  retry: CHAT_PANEL_TEXT.retry,
+} as const;
+
+export const CONVERSATION_PREVIEW_LABELS = {
+  image: CHAT_IMAGE_TEXT.imagePlaceholder,
+  sticker: CHAT_IMAGE_TEXT.stickerPlaceholder,
+  ...CHAT_MEDIA_LABELS,
+  location: '[Ubicación]',
+  reaction: 'Reacción',
+  unsupported: CHAT_MESSAGE_TEXT.unsupported,
+} as const;
+
+export const CONTACTS_EMPTY_TEXT = {
+  notConnectedTitle: 'WhatsApp no está conectado',
+  notConnectedDescription:
+    'Conecta la cuenta de WhatsApp de la empresa para ver y responder las conversaciones con tus clientes.',
+  openIntegrations: 'Ir a Integraciones',
+  noConversationsTitle: 'Aún no hay conversaciones',
+  noConversationsDescription: 'Cuando un cliente te escriba por WhatsApp, o abras un chat desde Clientes, aparecerá aquí.',
+  noSearchResults: 'No hay conversaciones que coincidan con la búsqueda.',
+  clearSearch: 'Limpiar la búsqueda',
+  noSelection: 'Elige una conversación para verla aquí.',
+} as const;
+
+export const CONVERSATION_LIST_TESTID = 'conversation-list';
+export const CONVERSATION_ITEM_TESTID = 'conversation-item';
+export const CONVERSATION_UNREAD_TESTID = 'conversation-unread';
+export const CONVERSATIONS_SEARCH_TESTID = 'conversations-search';
+export const CONVERSATIONS_SENTINEL_TESTID = 'conversations-sentinel';
+export const CONVERSATIONS_LOADING_MORE_TESTID = 'conversations-loading-more';
+export const CONVERSATIONS_ERROR_TESTID = 'conversations-error';
+export const CONTACTS_NOT_CONNECTED_TESTID = 'contacts-not-connected';
+export const CONTACTS_INTEGRATIONS_LINK_TESTID = 'contacts-integrations-link';
+export const CONVERSATIONS_EMPTY_TESTID = 'conversations-empty';
+export const CONVERSATIONS_SEARCH_EMPTY_TESTID = 'conversations-search-empty';
+export const CONVERSATIONS_CLEAR_SEARCH_TESTID = 'conversations-clear-search';
+export const CHAT_NO_SELECTION_TESTID = 'chat-no-selection';
+export const CONTACTS_SCREEN_TESTID = 'contacts-screen';
+export const CONTACTS_CHAT_PANE_TESTID = 'contacts-chat-pane';
 
 export const CHAT_COMPOSER_TESTID = 'chat-composer';
 export const CHAT_COMPOSER_ERROR_TESTID = 'chat-composer-error';

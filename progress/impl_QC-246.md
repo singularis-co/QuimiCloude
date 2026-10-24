@@ -218,3 +218,225 @@ fallido no trae la plantilla (el backend solo usa las que pide la plantilla).
 - E2E: no procede todavía (T19).
 
 Veredicto: T8–T12 hechas con su «Hecho»; los cuatro comandos en verde.
+
+## Tanda 4 (2026-10-24) — T13 (frontend_dev)
+
+### Archivos
+- Nuevo `app/(private)/clientes/contactos/components/conversation-list.tsx`: `useConversationList(initialPage)`
+  (búsqueda con pausa `SEARCH_DEBOUNCE_MS`, página 1 al buscar, página siguiente, descarte de respuestas de una búsqueda
+  anterior, `mergePolled(search, page)` para el poller, `markRead(contactId)` para R27) y `ConversationList` (buscador
+  `maxLength=100`, filas, centinela con `useEndSentinel`, «Cargando más conversaciones…», vacíos, error + «Reintentar»).
+- Nuevo `.../components/conversation-list-item.tsx`: `ConversationListItem` (botón con `aria-current`, `Avatar` con
+  `getInitials`/`avatarTone`, hora con `formatListTime`, contador `role="img"` «N sin leer») y `conversationPreview`.
+- Nuevo `.../components/contacts-empty-states.tsx`: `ContactsNotConnected`, `ConversationsEmpty`,
+  `ConversationsSearchEmpty`, `ChatNoSelection` (sobre `EmptyState`).
+- `.../components/contact-texts.ts`: `CONVERSATION_LIST_TEXT`, `CONVERSATION_PREVIEW_LABELS`, `CONTACTS_EMPTY_TEXT` y testids.
+- Tests nuevos: `tests/unit/contactos-ui/conversation-list.test.tsx`, `tests/unit/contactos-ui/contacts-empty-states.test.tsx`.
+- No tocados: `contacts-screen.tsx`, `page.tsx`, `index.ts` (T14/T15).
+
+### Mapa R → test
+| R | Casos |
+|---|---|
+| R3 | `contacts-empty-states.test.tsx` › «R3: con integraciones.modificar … enlace «Ir a Integraciones»», «R3: sin integraciones.modificar … sin el enlace» |
+| R4 | `conversation-list.test.tsx` › «R4: si la búsqueda falla muestra el mensaje y «Reintentar» la repite» |
+| R5 | `contacts-empty-states.test.tsx` › «R5: sin chat elegido muestra el estado neutro» (la disposición es T14) |
+| R8 | `conversation-list.test.tsx` › «R8: pinta nombre, teléfono, vista previa, hora y contador «N sin leer» en el orden del servidor» |
+| R9 | `conversation-list.test.tsx` › «R9: sin vista previa, un último mensaje %s muestra «%s»» (9 casos), «R9: con vista previa la muestra…» |
+| R11 | `conversation-list.test.tsx` › «R11: tras la pausa al escribir pide la página 1…», «R11: una búsqueda nueva descarta la respuesta tardía…» |
+| R12 | `conversation-list.test.tsx` › «R12: sin búsqueda y sin conversaciones…», «R12: con búsqueda sin resultados… limpiarla»; `contacts-empty-states.test.tsx` › dos casos R12 |
+| R13 | `conversation-list.test.tsx` › «R13: al verse el centinela pide la página siguiente, muestra «Cargando más conversaciones…»…», «R13: sin más páginas…», «R13: la página siguiente usa la búsqueda vigente» |
+| R14 | `conversation-list.test.tsx` › «R14: al pulsar una conversación avisa con ella y la seleccionada queda marcada» |
+| R27 (parcial, lista) | `conversation-list.test.tsx` › «R27: marcar leída una conversación pone su contador a 0» |
+| R42 (parcial, lista) | `conversation-list.test.tsx` › «R42: la página 1 de la consulta periódica se fusiona solo si es de la búsqueda vigente» |
+
+Textos sin literal en requirements/tableros: botón del vacío de búsqueda «Limpiar la búsqueda» (el de las otras tablas del
+repo; R12 solo dice «la opción de limpiarla»). Defaults P6 usados: «No hay conversaciones que coincidan con la búsqueda.» y
+«Elige una conversación para verla aquí.». Etiqueta oculta del buscador «Buscar conversación» (tablero).
+
+### Salida real
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la tanda.
+- `pnpm exec vitest related --run <4 archivos de components>`: `Test Files 14 passed (14)` · `Tests 210 passed (210)`.
+- Mis dos archivos: `Test Files 2 passed (2)` · `Tests 27 passed (27)`.
+
+Veredicto: T13 hecha con su «Hecho»; typecheck, lint y tests relacionados en verde.
+
+### T14 + D4 (frontend_dev, 2026-10-24)
+
+#### Archivos
+- Nuevo `app/(private)/clientes/contactos/components/contacts-screen.tsx`: `ContactsScreen` (`'use client'`). Lista y
+  chat lado a lado desde `md` (lista de 360 px, como el tablero) y uno u otro por debajo (`data-view`, `max-md:hidden`;
+  sin `useIsMobile`). Selección en la URL: abrir desde la lista hace `pushState` (`?contacto=`), entre chats
+  `replaceState`, «Volver a conversaciones» retrocede si la entrada es de la pantalla y si no la quita con
+  `replaceState`; `popstate` sincroniza la selección. Carga chat (`{ target, pageSize: 30 }`) y contexto (`{ target }`)
+  al abrir; cambio de pedido con `{ target, orderId }`; respuestas descartadas por `targetKey` y secuencia. Poller
+  conectado (`createContactsPoller`, puertos inyectables `pollPorts`): fusiona la página 1 con la búsqueda con la que se
+  pidió, une el chat abierto, vuelve a marcar leído con entrantes nuevos; nunca pide el contexto. `onChatRead` → `markRead`.
+  Teléfono de la cabecera sin contacto (D2): conversación del mismo cliente en la lista o, si no, `requestedCustomer`.
+- Nuevo `.../components/contacts-selection.ts`: `CONTACTS_SELECTION_PARAMS`, `selectionFromSearch`, `searchOfSelection`
+  (sin `'use client'`: lo podrá usar `page.tsx` en T15).
+- Nuevo `.../components/action-rejection.ts`: `unexpectedFromRejection()` (mismo patrón que los diálogos de Pedidos:
+  `errorMessage(UNEXPECTED_ERROR_CODE)` + `newRequestId()`) y `settleAction`.
+- `.../components/chat-composer.tsx` (D4): envío de texto y de plantilla con `settleAction`.
+- `.../components/chat-panel.tsx` (D4 + D2): reintento y anteriores con `settleAction`; prop opcional `customerPhone`
+  (cabecera cuando `chat.contact` es `null`).
+- `.../components/contact-texts.ts`: `CONTACTS_SCREEN_TESTID`, `CONTACTS_CHAT_PANE_TESTID`.
+- Tests: nuevo `tests/unit/contactos-ui/contacts-screen.test.tsx` (22 casos); un caso nuevo en `chat-composer.test.tsx`,
+  `send-template-dialog.test.tsx` y `chat-panel.test.tsx`.
+- No tocados: `page.tsx`, `index.ts` (T15).
+
+#### Mapa R → test (`contacts-screen.test.tsx` salvo indicación)
+| R | Casos |
+|---|---|
+| R5 | «R5: sin chat elegido, la lista y el estado neutro se ven juntos», «R5: con un chat elegido, la lista y el chat se ven juntos» |
+| R6 | «R6: abrir una conversación pasa al chat y «Volver a conversaciones» vuelve a la lista», «R6: «Atrás» del navegador vuelve a la lista», «R6: entre chats se reemplaza la URL…», «R6: abierto desde la URL, «Volver a conversaciones» quita la selección…» |
+| R14 | «R14: pide su chat, lo abre y la marca como la seleccionada», «R14: si la carga del chat falla muestra su `message` y «Reintentar» la repite» |
+| R27 | «R27: al abrir una conversación con no leídos la marca leída y su contador queda en 0», «R27: si marcar leída falla, el contador se queda» |
+| R28 | «R28: con entrantes nuevos en el chat abierto lo vuelve a marcar leído hasta el último» |
+| R42 | «R42: trae la página 1 y el chat abierto, y añade la conversación y el mensaje nuevos sin duplicar», «R42: sin chat abierto solo pide la lista» |
+| R46 (+ D2) | «R46: abre el chat vacío del cliente sin conversación, con la ventana cerrada y su teléfono», «R46: con conversación, el teléfono sale de la conversación del cliente en la lista», «R46: si el cliente no existe muestra «El cliente solicitado no existe.» junto a la lista» |
+| R54 | «R54: al abrir una conversación pide su contexto una vez, solo con `{ target }`», «R54: al cambiar el pedido lo pide con `{ target, orderId }`…», «R54: la consulta periódica no pide el contexto», «R54: la respuesta tardía del contexto de otro chat se descarta», «R54: si el cambio de pedido falla muestra su `message` junto al selector y conserva el pedido», «R54: una red caída al abrir el contexto se pinta como error inesperado con «Reintentar»» |
+| R40 (D4) | `chat-composer.test.tsx` › «R40: si la acción no responde (red caída) quita el provisional, devuelve el texto y pinta el error inesperado»; `send-template-dialog.test.tsx` › «R40: si la acción no responde (red caída) el diálogo sigue abierto…» |
+| R41 (D4) | `chat-panel.test.tsx` › «R41: si la acción no responde (red caída) pinta el error inesperado y deja el fallido» |
+
+#### Desvíos y huecos
+- D2: `WhatsappChat` sin contacto no trae teléfono y la pantalla no tiene el del cliente si no tiene conversación. Se
+  añade `requestedCustomer?: { id, phone }` a `ContactsScreen`; **T15 debe cargarlo** en `page.tsx` cuando hay
+  `?cliente=` (p. ej. `getCustomerAction`). Sin él, la cabecera sigue con teléfono vacío en ese caso.
+- D4: el mensaje genérico es el del catálogo, `errorMessage(UNEXPECTED_ERROR_CODE)` («Ocurrio un error inesperado.
+  Intentalo de nuevo.») con su «Código para soporte». En la caja y en el diálogo no hay botón «Reintentar» (R40 no lo
+  pide: el texto vuelve a la caja / el diálogo queda abierto y se reenvía con el mismo botón); el «Reintentar» está
+  en las cargas (chat, contexto). Si el humano quiere un botón en la caja, falta su texto y su sitio en el tablero.
+- La altura de la pantalla (`calc(100dvh - <cabecera>)`) la pone el contenedor de `page.tsx` (design 5.1, T15); la
+  pantalla ocupa `h-full`.
+- El estado «WhatsApp no está conectado» (R3) lo decide `page.tsx` (design 5.1 paso 5); la pantalla no lo pinta.
+- `markWhatsappChatReadAction` en `chat-panel.tsx` sigue sin `catch` (no estaba en D4).
+- Textos nuevos: ninguno.
+
+#### Salida real
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la ruta.
+- `pnpm exec vitest related --run <6 archivos de components + 4 tests>`: `Test Files 15 passed (15)` · `Tests 235 passed (235)`.
+
+Veredicto: T14 hecha con su «Hecho» y D2/D4 aplicadas; typecheck, lint y tests relacionados en verde.
+
+### T15 — página (frontend_dev, 2026-10-24)
+
+#### Archivos
+- `app/(private)/clientes/contactos/page.tsx` (reescrito): `requirePagePermission('whatsapp.consultar')` en la primera
+  línea; `searchParams` después; `canSend` (`whatsapp.enviar`) y `canOpenIntegrations` (`integraciones.modificar`) con
+  `assertPermission` sobre `currentPlatformActor()`; en un solo `Promise.all`: permisos, lista (página 1, 25),
+  plantillas y, con selección, chat (30) y contexto `{ target }`; con `?cliente=` además `getCustomerAction` → 
+  `requestedCustomer` (D2: `formatPhoneInternational(phoneE164)` si el teléfono es válido). `connectionStatus: null` →
+  `ContactsNotConnected`; error de lista o plantillas → `ContactsLoadError`. `PageShell` mide `calc(100dvh - 3.5rem)`
+  (la cabecera privada es `h-14`) y la pantalla ocupa el resto (`flex-1 min-h-0`).
+- `.../components/contacts-load-error.tsx` (nuevo, `'use client'`): `ErrorAlert` + «Reintentar» (`router.refresh()`).
+- `.../components/contact-texts.ts`: fuera el placeholder (`CUSTOMER_CONTACTS_EMPTY_*`); + `CONTACTS_LOAD_ERROR_TESTID`,
+  `CONTACTS_LOAD_ERROR_RETRY_TESTID`.
+- `.../components/index.ts`: barrel con lo que usa la página.
+- `tests/unit/clientes-ui/contactos-page.test.tsx` (reescrito, 21 casos).
+- `tests/guards/guard-pantallas-exigen-permiso.test.ts`: comentario de `/clientes/contactos` → `whatsapp.consultar`.
+- `e2e/clientes.spec.ts`, `e2e/movimiento.spec.ts`: importan de `components/contact-texts` (el barrel ya arrastra
+  componentes de cliente); el placeholder vacío pasa a «pantalla o sin conexión».
+
+#### Mapa R → test (`contactos-page.test.tsx`)
+| R | Casos |
+|---|---|
+| R1 | «R1: sin sesión redirige al login… y no pide ningún dato», «R1: con sesión sin whatsapp.consultar responde 404 y no pide ningún dato», «R1: exige whatsapp.consultar una sola vez y como primera sentencia…», «R1: con el permiso pinta un único h1…» |
+| R3 | «R3: con connectionStatus null pinta solo el estado sin conexión y el enlace a Integraciones», «R3: sin integraciones.modificar no hay enlace «Ir a Integraciones»» |
+| R4 | «R4: si la lista falla muestra su mensaje y «Reintentar» vuelve a pedir la página», «R4: si las plantillas fallan…» |
+| R46 (+ D2) | «R46: con ?cliente= abre el chat vacío de ese cliente con el teléfono de su ficha», «R46: si el cliente no tiene teléfono válido…», «R46: si el cliente no existe muestra «El cliente solicitado no existe.» junto a la lista», «R46: con ?contacto= no pide la ficha del cliente» |
+| R47 | «R47: sin whatsapp.enviar el chat abierto no tiene caja de texto», «R47: con whatsapp.enviar el chat abierto trae la caja» |
+| R48 | «R48: la página no importa la composición ni construye la URL de un medio» (el barrido de toda la ruta es T17) |
+| R54 | «R54: con selección pide el contexto una sola vez, con el mismo target que el chat», «R54: con ?contacto= el contexto se pide por contacto» |
+| carga en paralelo | «pide todo en paralelo: ninguna carga espera a otra», «sin selección pide la página 1 y las plantillas…» |
+
+#### Desvíos y huecos
+- design 5.1 dice «`assertPermission` como `canModifyCustomers`», pero ese patrón importa `identity` de
+  `@/lib/composition`, que R48 prohíbe en la ruta. Se usa `currentPlatformActor()` (adapters/driving de identity: solo
+  el usuario de la sesión, `{ id, permissions }`) + `assertPermission` del barrel. Sin backend nuevo.
+- `?cliente=` lee la ficha con `getCustomerAction`, que exige `clientes.consultar`: sin ese permiso (o si el cliente no
+  existe) `requestedCustomer` es `null` y la cabecera queda sin teléfono; el «no existe» lo pinta el error del chat.
+- R4 para lista y plantillas: `ContactsScreen` no acepta un error inicial, así que lo pinta la página
+  (`ContactsLoadError`, compone `ErrorAlert` + `Button`; sin título porque no hay texto para él). Sin conexión gana
+  sobre el error de plantillas.
+- E2E tocado fuera de T15 solo para no dejar typecheck en rojo; el flujo nuevo es T19.
+- Textos nuevos: ninguno («Reintentar» reutiliza `CHAT_PANEL_TEXT.retry`).
+
+#### Salida real
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la ruta.
+- `pnpm exec vitest related --run <page.tsx, index.ts, contact-texts.ts, contacts-load-error.tsx, contactos-page.test.tsx>`:
+  `Test Files 15 passed (15)` · `Tests 247 passed (247)`.
+- `pnpm exec vitest run guard-pantallas-exigen-permiso`: `Test Files 1 passed (1)` · `Tests 9 passed (9)`.
+
+Veredicto: T15 hecha con su «Hecho»; typecheck, lint, tests relacionados y guardia en verde.
+
+### T16 + T17 — menú y frontera (frontend_dev, 2026-10-24)
+
+#### Archivos
+- `lib/shared/navigation/private-nav.ts` (M): una sola línea, el `permission` del hijo
+  `nav-clientes-contactos` pasa de `clientes.consultar` a `whatsapp.consultar`. El comentario del
+  grupo («el permiso de cada hijo es el que exige su pantalla») sigue siendo cierto y no se toca.
+- `tests/unit/clientes-ui/private-nav-clientes.test.ts` (M; ya existía, venía de QC-244): los dos
+  casos de QC-244 que fijaban `clientes.consultar` para los dos hijos ahora esperan
+  `whatsapp.consultar` en Contactos; se añade el bloque `QC-246: el hijo «Contactos» exige
+  whatsapp.consultar`.
+- `tests/unit/shell/nav-iconos.test.ts` (M): la tabla congelada del menú (R3 de su feature) lleva
+  el nuevo permiso de Contactos. Es consecuencia directa de T16.
+- `tests/unit/contactos-ui/contactos-frontera.test.ts` (A): detector puro
+  `findBoundaryViolations({ ruta, fuente }[])` que barre `app/(private)/clientes/contactos/**`.
+
+#### Mapa R → test
+| R | Test |
+|---|---|
+| R2 | `private-nav-clientes.test.ts` › `QC-246 R2: el hijo declara whatsapp.consultar, el mismo y unico que exige su page.tsx` · `QC-246 R2: con clientes.consultar y sin whatsapp.consultar se ve la lista y NO Contactos` · `QC-246 R2: con whatsapp.consultar el hijo aparece (Administrador del seed)` · `QC-246 R2: <rol>, sin whatsapp.consultar, no recibe el hijo Contactos` |
+| R48 | `contactos-frontera.test.ts` › `el codigo real no tiene ninguna violacion` · `falla con un import simulado de @/lib/composition (%s)` · `falla con una ruta profunda que no es adapters/driving (%s)` · `falla con el literal de la ruta de medios en la ruta (%s)` · `falla si construye la URL con la constante de la ruta de medios` |
+
+Las fuentes de prueba de R48 se fabrican en memoria y se pasan al detector; no se escribe nada en
+`app/`. Dos anclas evitan que el caso real pase en vacío: el barrido encuentra `page.tsx` y más de
+10 componentes, y la ruta real sí importa `adapters/driving` y usa `mediaUrl`.
+
+#### Desvíos y huecos
+- La task dice «crea» `private-nav-clientes.test.ts`, pero ya existía (QC-244). Se amplió en lugar
+  de crear otro archivo con el mismo nombre.
+- Se tocó `tests/unit/shell/nav-iconos.test.ts` (fuera de lo que pide la task), porque su tabla
+  congelada se ponía roja con T16.
+- Rojo preexistente que no es de esta tanda: `tests/unit/recetas-ui/recipe-route-contract.test.ts`
+  › «lib/shared/routes.ts no gana ninguna constante para el asistente y publica exactamente las de
+  hoy». Falla porque `routes.ts` publica `WHATSAPP_MEDIA_ROUTE_BASE` y `whatsappMediaPath`, que
+  llegaron con el commit de QC-245 `a7a9bad4`. `routes.ts` no tiene cambios en este worktree. Hay
+  que actualizar esa lista en QC-245 o aquí, con decisión del leader.
+
+#### Salida real
+- `pnpm run typecheck` (`tsc --noEmit`): sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, todos en archivos ajenos. Con
+  `pnpm exec eslint` sobre los 4 archivos tocados: `No issues found`.
+- `pnpm exec vitest related --run lib/shared/navigation/private-nav.ts tests/unit/clientes-ui/private-nav-clientes.test.ts tests/unit/contactos-ui/contactos-frontera.test.ts`:
+  `Test Files 2 failed | 145 passed (147)` · `Tests 2 failed | 2372 passed | 22 skipped (2396)`.
+  Los 2 rojos eran `nav-iconos.test.ts`, ya corregido, y `recipe-route-contract.test.ts`, el
+  preexistente de arriba.
+- `pnpm exec vitest run tests/unit/shell/nav-iconos.test.ts tests/unit/contactos-ui/contactos-frontera.test.ts tests/unit/clientes-ui/private-nav-clientes.test.ts guard-nav-permisos-declarados`:
+  `Tests 71 passed (71)`, en verde después de corregir.
+- `git diff --stat -- lib/shared/navigation/private-nav.ts`:
+  ```
+  lib/shared/navigation/private-nav.ts | 2 +-
+   1 file changed, 1 insertion(+), 1 deletion(-)
+  ```
+
+Veredicto: T16 y T17 cumplen su «Hecho». Queda en rojo `recipe-route-contract`, que viene de QC-245 y no de esta tanda.
+
+### Salida real de la tanda 4 (implementer)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la tanda.
+- `pnpm exec vitest related --run <archivos .ts/.tsx cambiados, sin e2e>`: `Test Files 1 failed | 161 passed (162)` ·
+  `Tests 1 failed | 2608 passed | 22 skipped (2631)`. El rojo es
+  `tests/unit/recetas-ui/recipe-route-contract.test.ts` (lista exacta de `lib/shared/routes.ts` sin
+  `WHATSAPP_MEDIA_ROUTE_BASE`/`whatsappMediaPath`), ajeno: ni el test ni `routes.ts` cambian en esta tanda y QC-245 ya
+  lo corrigió en `28d80a81`, posterior al merge de apilado `bc929f03`. Se va al volver a mergear QC-245.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+- `./init.sh`: rojo solo por `feature_list.json` (ids 290–298 duplicados, en vuelo sin assignee QC-162/166/262/263/264,
+  zona backend 4/3), ajeno.
+- E2E: no procede (T19); `e2e/clientes.spec.ts` y `e2e/movimiento.spec.ts` ajustados al quitar el placeholder viejo, sin correr.
+
+Veredicto: T13–T17 hechas con su «Hecho»; D2 y D4 aplicadas.

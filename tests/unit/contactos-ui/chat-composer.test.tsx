@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer, type ChatComposerProps } from '@/app/(private)/clientes/contactos/components/chat-composer';
 import type { ChatContextView, ChatMessageView } from '@/app/(private)/clientes/contactos/components/chat-view';
+import { errorMessage, UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { WhatsappOutboundMessageView, WhatsappSendableTemplate } from '@/lib/modules/integraciones';
 import { constantLabelsForBackend } from '@/lib/shared/ui/whatsapp-system-constants';
 
@@ -206,6 +207,24 @@ describe('R40 · error del envío', () => {
     expect(props.onSent).not.toHaveBeenCalled();
     expect(caja().value).toBe('Hola');
     expect(screen.getByTestId('chat-composer-error').textContent).toContain('No tienes permiso para esta acción.');
+  });
+
+  it('R40: si la acción no responde (red caída) quita el provisional, devuelve el texto y pinta el error inesperado', async () => {
+    const user = setupUser();
+    sendMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const props = pintar();
+    await user.type(caja(), 'Hola');
+    await user.click(enviar());
+
+    await waitFor(() => expect(props.onSendFailed).toHaveBeenCalledTimes(1));
+    const provisional = vi.mocked(props.onOptimistic).mock.calls[0]?.[0] as ChatMessageView;
+    expect(props.onSendFailed).toHaveBeenCalledWith(provisional.id);
+    expect(props.onSent).not.toHaveBeenCalled();
+    expect(caja().value).toBe('Hola');
+    const alerta = screen.getByTestId('chat-composer-error');
+    expect(alerta.textContent).toContain(errorMessage(UNEXPECTED_ERROR_CODE));
+    expect(within(alerta).getByTestId('unexpected-error-notice-reference')).toBeTruthy();
+    expect(enviar().hasAttribute('disabled')).toBe(false);
   });
 });
 

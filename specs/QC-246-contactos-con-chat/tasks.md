@@ -97,30 +97,30 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 
 ## Bloque 3 — Lista y pantalla
 
-- [ ] **T13** `[P]` (dep. T5, T6) — `conversation-list.tsx`, `conversation-list-item.tsx`,
+- [x] **T13** `[P]` (dep. T5, T6) — `conversation-list.tsx`, `conversation-list-item.tsx`,
   `contacts-empty-states.tsx`.
   *Hecho:* tests de R8, R9, R11 (búsqueda desde página 1 tras la pausa), R12 (dos vacíos), R13
   (centinela y «Cargando más conversaciones…»), R14, R3 (enlace solo con `integraciones.modificar`).
-- [ ] **T14** (dep. T7, T12, T13) — `contacts-screen.tsx`: dos columnas / una, selección en la URL
+- [x] **T14** (dep. T7, T12, T13) — `contacts-screen.tsx`: dos columnas / una, selección en la URL
   (`?contacto=`, `?cliente=`), poller conectado, contador a 0 tras marcar leído, contexto del chat
   abierto (`design.md > 5.4.1`).
   *Hecho:* tests de R5, R6 (cambio de vista y «Atrás»), R14, R27 (contador a 0), R42 (integra lo
   nuevo), R46, R54 (contexto con `{ target }` al abrir, con `{ target, orderId }` al cambiar, nunca en
   el poller; respuesta tardía de otro chat descartada; error conserva el pedido anterior).
-- [ ] **T15** (dep. T14) — `page.tsx`, `contact-texts.ts`, `index.ts`: corte con
+- [x] **T15** (dep. T14) — `page.tsx`, `contact-texts.ts`, `index.ts`: corte con
   `whatsapp.consultar`, `canSend`, `canOpenIntegrations`, carga inicial en paralelo (con el contexto
   si hay selección).
   *Hecho:* `tests/unit/clientes-ui/contactos-page.test.tsx` reescrito: R1 (login / 404 antes de
   pedir datos), R3, R46 (por cliente; «El cliente solicitado no existe.»), R54 (contexto en la carga
   inicial con selección). Comentario de `/clientes/contactos` en `guard-pantallas-exigen-permiso`
   actualizado al permiso nuevo; guardia verde.
-- [ ] **T16** `[P]` — Menú: el hijo `nav-clientes-contactos` declara `whatsapp.consultar`.
+- [x] **T16** `[P]` — Menú: el hijo `nav-clientes-contactos` declara `whatsapp.consultar`.
   Choque **aceptado** con QC-166 en `lib/shared/navigation/private-nav.ts` (`requirements.md > D9`):
   rebasar la rama sobre `dev` **antes** de tocar el archivo y cambiar **solo** la entrada de
   Contactos.
   *Hecho:* el diff de `private-nav.ts` se limita a la entrada de Contactos; `tests/unit/clientes-ui/private-nav-clientes.test.ts` cubre R2;
   `guard-nav-permisos-declarados` verde.
-- [ ] **T17** `[P]` — Test de frontera R48 sobre `app/(private)/clientes/contactos/**`.
+- [x] **T17** `[P]` — Test de frontera R48 sobre `app/(private)/clientes/contactos/**`.
   *Hecho:* falla con un import simulado de `@/lib/composition` y con un literal
   `/api/integraciones/whatsapp/media` en la ruta; pasa con el código real.
 

@@ -10,6 +10,7 @@ import {
   SendTemplateDialog,
   type SendTemplateDialogProps,
 } from '@/app/(private)/clientes/contactos/components/send-template-dialog';
+import { errorMessage, UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 import type { WhatsappSendableTemplate } from '@/lib/modules/integraciones';
 import { constantLabelsForBackend } from '@/lib/shared/ui/whatsapp-system-constants';
 
@@ -239,5 +240,21 @@ describe('R37 · envío desde el diálogo', () => {
     expect(within(dialogo()).getByTestId('send-template-error').textContent).toContain('No tienes permiso para esta acción.');
     expect(props.onSent).not.toHaveBeenCalled();
     expect(props.onReloadChat).not.toHaveBeenCalled();
+  });
+
+  it('R40: si la acción no responde (red caída) el diálogo sigue abierto, quita el provisional y pinta el error inesperado', async () => {
+    const user = setupUser();
+    sendMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const props = pintarCaja();
+    await user.click(screen.getByRole('button', { name: 'Enviar plantilla' }));
+    await user.click(await esperarInteractiva(botonEnviar()));
+
+    await waitFor(() => expect(props.onSendFailed).toHaveBeenCalledTimes(1));
+    const alerta = within(dialogo()).getByTestId('send-template-error');
+    expect(alerta.textContent).toContain(errorMessage(UNEXPECTED_ERROR_CODE));
+    expect(within(alerta).getByTestId('unexpected-error-notice-reference')).toBeTruthy();
+    expect(props.onSent).not.toHaveBeenCalled();
+    expect(props.onReloadChat).not.toHaveBeenCalled();
+    expect(botonEnviar().hasAttribute('disabled')).toBe(false);
   });
 });
