@@ -173,6 +173,35 @@ el token no viaje a otro host.
 
 Salida: lint 0 errores · 4 archivos de cliente Graph, 71 passed · guardias 87 archivos, 1320 passed.
 
+## T9 — Verificación y trazabilidad de T1–T8
+
+Sobre el árbol con T1–T8 y T10–T12 (`3b18b873`): `pnpm run typecheck` 0 errores; `pnpm run lint` 0
+errores (11 avisos: los 10 ajenos + `customerOrderDirectory` sin uso hasta que T16 cablee el
+contexto); `pnpm exec vitest run guard` 87 archivos, 1322 passed, 22 skipped. `./init.sh` no se corre
+por decisión del humano: la suite completa es `gate-completo` en CI. Mapa R1–R43 completo abajo.
+
+## T10 — `identity.getCompanyName` (R56)
+
+Archivos: `lib/modules/identity/{domain/get-company-name.ts, ports/company-name-reader.ts,
+adapters/driven/persistence/company-name-prisma.ts}` (nuevos), `lib/modules/identity/index.ts`,
+`lib/composition/index.ts` (import + `identity.getCompanyName`), `tests/unit/identity/get-company-name.test.ts`,
+`tests/integration/identity/company-name-read.int.test.ts` (`transaccion`) + `aislamiento.json`.
+
+Salida: typecheck 0 · lint 0 errores · 2 archivos, 6 passed.
+
+## T11 — `pedidos.CustomerOrderDirectory` (R51, R54)
+
+Archivos: `lib/modules/pedidos/domain/customer-order-directory.ts`,
+`lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma.ts` (nuevos),
+`lib/modules/pedidos/index.ts` (+ `ORDER_STATUSES_NOT_IN_PROGRESS` y tipos), `lib/composition/index.ts`,
+`tests/integration/pedidos/customer-order-directory.int.test.ts` + `aislamiento.json`, tensado
+`tests/unit/pedidos/module-contract.test.ts`. `OrderCatalog` sin cambios.
+
+Salida: typecheck 0 · lint 0 errores · 4 archivos (int + contrato + los dos de T10), 21 passed. Corrida
+final `tests/unit/{identity,pedidos,integraciones}`: 395/397 archivos; los dos rojos
+(`encryption-keys-env.test.ts` por timeout de 61 s y `session-once-per-request-actions.test.ts`) pasan
+solos (2 archivos, 140 passed): saturación. Guardias 87 archivos, 1322 passed.
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -232,5 +261,8 @@ Salida: lint 0 errores · 4 archivos de cliente Graph, 71 passed · guardias 87 
 | R45 | `whatsapp-graph-client-media.test.ts` > «R45: primero pide los datos del medio a Graph y luego descarga el binario…», «R45: el id del medio va codificado…», «R45: el tipo es la cabecera sin parametros…», «R45: sin `Content-Length`…»; `whatsapp-graph-client-canned.test.ts` > «R45: devuelve siempre el mismo PNG de 1x1…» |
 | R46 (Graph) | `whatsapp-graph-client-media.test.ts` > casos R46 (sin red, 5xx, 4xx, datos inválidos, `file_size`, `Content-Length`, stream cortado, tope exacto); canned > «R46: un tope menor que el PNG es un rechazo» |
 | R47 (Graph) | `whatsapp-graph-client-media.test.ts` > «R47: el token va solo en `Authorization: Bearer`…», «R47: una redireccion no se sigue…», «R47: una URL de %s es un rechazo…», «R47: nada de la URL de Meta ni del token acaba en la consola», «R47: el resultado no lleva la URL de Meta ni el token» |
+
+| R51, R54 (directorio) | `customer-order-directory.int.test.ts` > «R51: devuelve solo los pedidos vivos de ese cliente y esa empresa…», «R51, R54: con ORDER_STATUSES_NOT_IN_PROGRESS no vuelve ningun entregado ni cancelado…», «R51: ordena por created_at DESC y desempata por id DESC», «R54: respeta limit…», «R54: un cliente de otra empresa, o uno inexistente, da []»; `module-contract.test.ts` > «R51, R54: el barrel publica CustomerOrderDirectory…» |
+| R56 (identity) | `get-company-name.test.ts` > «R56: devuelve el nombre que lee el puerto…», «R56: una empresa sin nombre legible … da null…»; `company-name-read.int.test.ts` > «R56: una empresa viva da su nombre», «R56: getCompanyName devuelve el nombre … y no el de otra empresa», «R56: una empresa dada de baja da null», «R56: una empresa inexistente da null» |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.
