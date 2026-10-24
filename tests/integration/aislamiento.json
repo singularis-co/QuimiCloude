@@ -76,6 +76,7 @@
     "notificaciones/notification-inbox.int.test.ts",
     "notificaciones/notifications-schema.int.test.ts",
     "pedidos/company-scope.int.test.ts",
+    "pedidos/customer-order-directory.int.test.ts",
     "pedidos/order-company-stats.int.test.ts",
     "pedidos/order-conditioning-constraints.int.test.ts",
     "pedidos/order-conditioning-states-rollback.int.test.ts",

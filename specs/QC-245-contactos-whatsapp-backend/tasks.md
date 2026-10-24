@@ -122,7 +122,7 @@
   - **Hecho:** devuelve el nombre de la empresa viva; dada de baja o inexistente ⇒ `null`; patrón
     idéntico a `getCompanyCountry`.
 
-- [ ] **T11 [P] `pedidos`: `CustomerOrderDirectory`** (R51, R54, D12; design §15.4, §15.8).
+- [x] **T11 [P] `pedidos`: `CustomerOrderDirectory`** (R51, R54, D12; design §15.4, §15.8).
   - `domain/customer-order-directory.ts`, `adapters/driven/persistence/customer-order-directory-prisma.ts`
     (archivo nuevo, no `order-catalog-prisma.ts`), barril (+ `ORDER_STATUSES_NOT_IN_PROGRESS`),
     composición.

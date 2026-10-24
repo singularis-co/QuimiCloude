@@ -575,6 +575,8 @@ import {
 import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
 import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
 import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
+import type { CustomerOrderDirectory } from '@/lib/modules/pedidos';
+import { createCustomerOrderDirectory } from '@/lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -1932,6 +1934,8 @@ const orderSummaryReader: OrderSummaryReader = {
   listNumbersByIdsIncludingDeleted: listOrderNumbersByIdsIncludingDeleted,
   listHistoryByIdsIncludingDeleted: listOrderHistoryByIdsIncludingDeleted,
 };
+
+const customerOrderDirectory: CustomerOrderDirectory = createCustomerOrderDirectory();
 
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
