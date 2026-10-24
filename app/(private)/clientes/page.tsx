@@ -45,6 +45,19 @@ async function canModifyCustomers(): Promise<boolean> {
   }
 }
 
+/** `true` si la sesión trae `whatsapp.consultar`; como `canModifyCustomers`, solo presentación. */
+async function canChatWithCustomers(): Promise<boolean> {
+  const user = await identity.getSessionUser();
+
+  try {
+    assertPermission(user, 'whatsapp.consultar', () => PERMISO_DENEGADO);
+    return true;
+  } catch (error) {
+    if (error !== PERMISO_DENEGADO) throw error;
+    return false;
+  }
+}
+
 /** El país viene de la sesión firmada, nunca de la entrada. */
 async function readCompanyCountry(): Promise<CountryCode | null> {
   const context = await identity.getSessionContext();
@@ -89,6 +102,7 @@ export default async function ClientesPage({
 
   const resolved = await searchParams;
   const canModify = await canModifyCustomers();
+  const canChat = await canChatWithCustomers();
   const companyCountry = await readCompanyCountry();
   const params = parseCustomerListParams(resolved);
 
@@ -107,11 +121,17 @@ export default async function ClientesPage({
             params={params}
             totalPages={0}
             canModify={canModify}
+            canChat={canChat}
             companyCountry={companyCountry}
           />
         }
       >
-        <CustomerListSection params={params} canModify={canModify} companyCountry={companyCountry} />
+        <CustomerListSection
+          params={params}
+          canModify={canModify}
+          canChat={canChat}
+          companyCountry={companyCountry}
+        />
       </Suspense>
     </div>
   );

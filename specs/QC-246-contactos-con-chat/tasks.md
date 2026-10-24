@@ -126,7 +126,7 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 
 ## Bloque 4 — Clientes
 
-- [ ] **T18** `[P]` — `customer-chat-link.tsx` + `canChat` en `page.tsx` →
+- [x] **T18** `[P]` — `customer-chat-link.tsx` + `canChat` en `page.tsx` →
   `customer-list-section.tsx` → `customer-table.tsx` → `customer-columns.tsx`; barrel.
   *Hecho:* `tests/unit/clientes-ui/customer-chat-link.test.tsx` cubre R45 (enlace con
   `?cliente=<id>`, «Sin teléfono válido», nada sin permiso); los tests de la lista de Clientes siguen
@@ -138,8 +138,8 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
   entrante → aparece en la lista y el chat sin recargar (R42) → responder (R32) → «Enviado» →
   status `delivered` por webhook → «Entregado» (R19); 404 sin `whatsapp.consultar` (R1); «Abrir chat»
   desde Clientes (R45, R46); a 390 × 844 lista ↔ chat (R6) y sin scroll horizontal (R7).
-  *Hecho:* el spec pasa en local.
-- [ ] **T20** — Mapa `R<n> → test` en `progress/impl_QC-246.md` (R1–R54), `./init.sh` verde y
+  *Hecho:* el spec pasa en local. **Estado (2026-10-24):** escrito y en verde estático (`--list` 8 tests); sin correr: la base local compartida no tiene las migraciones de QC-245. Se cierra con el job E2E de CI o una base migrada.
+- [x] **T20** — Mapa `R<n> → test` en `progress/impl_QC-246.md` (R1–R54), `./init.sh` verde y
   `node scripts/archivos-en-vuelo.mjs --candidata QC-246` sin choques sin aceptar.
   *Hecho:* cada `R<n>` con su test; gate local verde.
 

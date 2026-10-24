@@ -175,6 +175,12 @@ export const E2E_ESPERADOS = [
   // el numero, la empresa sin pais, los avisos de los migrados en la lista y el campo a 390 px. NO
   // lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'clientes-telefono.spec.ts',
+  // Alta el 2026-10-24 (QC-246 T19) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: en `/clientes/contactos` un entrante firmado al webhook aparece en la lista y en el
+  // chat sin recargar, la respuesta pasa por «Enviando», «Enviado» y «Entregado», el 404 sin
+  // `whatsapp.consultar`, «Abrir chat» desde Clientes y lista ↔ chat a 390 px. NO lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`.
+  'contactos-chat.spec.ts',
   // Alta el 2026-10-09 (QC-219) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
   // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
   // archivo se nombra, uno a uno-. Lo que ejercita: el acondicionador ve Terminar bloqueado, la

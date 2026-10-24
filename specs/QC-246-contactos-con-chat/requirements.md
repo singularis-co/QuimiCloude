@@ -73,6 +73,8 @@ contacto en el chat: van a **QT-299** (chat-vincular-bloquear-contacto, depende 
 | D14 | El catálogo de constantes del front de plantillas de QC-243 aprende `pedido.estado`, `pedido.fecha_solicitud`, `pedido.total` y `pedido.detalle` (humano, 2026-10-23; D17 de QC-245) | Sin eso ninguna plantilla puede usar las claves nuevas. | R50, R51, R52, R53 |
 | D15 | El detalle del pedido no muestra fecha de entrega (humano, 2026-10-23; D10 de QC-245) | El pedido no tiene esa fecha en la base y el contrato no la trae. | R39 |
 | D16 | `total` llega `null` hasta QC-307: el detalle del pedido **oculta** la fila del total mientras sea `null`; en una plantilla, `{{pedido.total}}` sale `[falta pedido.total]` y bloquea su envío como cualquier valor que falta (humano, 2026-10-23; D11 de QC-245 y regla del contrato v2 «un `null` se pinta `[falta <clave>]`») | El contrato fija las dos cosas; un «—» en el texto de una plantilla se enviaría al cliente como si fuera el total. | R35, R36, R39 |
+| D17 | Un envío que falla por red no pone botón «Reintentar» junto a la caja: el texto vuelve a la caja y se reenvía con el botón de enviar (humano, 2026-10-24) | Un solo camino para enviar; el texto no se pierde. | R32 |
+| D18 | El teléfono de la cabecera sale de `getCustomerAction`; sin `clientes.consultar` o sin teléfono válido, la cabecera va sin teléfono (humano, 2026-10-24) | No se abre un permiso nuevo solo para pintar el teléfono. | R15 |
 
 ## Requisitos (EARS)
 

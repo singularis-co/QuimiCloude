@@ -262,8 +262,9 @@ app/(private)/clientes/contactos/
 
 1. `await requirePagePermission('whatsapp.consultar')` en la primera línea (R1).
 2. `canSend` (`whatsapp.enviar`) y `canOpenIntegrations` (`integraciones.modificar`) con
-   `assertPermission`, como `canModifyCustomers` en `app/(private)/clientes/page.tsx`: presentación,
-   no autorización (R3, R47).
+   `currentPlatformActor()` + `assertPermission` (de `@/lib/shared/auth`), no con
+   `canModifyCustomers` de `app/(private)/clientes/page.tsx`, que importa `@/lib/composition` y la
+   frontera R48 lo prohíbe en esta ruta: presentación, no autorización (R3, R47, R48).
 3. Resuelve `searchParams` (`cliente`, `contacto`) **después** del corte.
 4. En paralelo: lista (página 1), plantillas enviables y, si hay selección, el chat y su contexto
    (`getWhatsappChatContextAction({ target })`, R54).

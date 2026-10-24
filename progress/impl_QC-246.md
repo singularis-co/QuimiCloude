@@ -440,3 +440,125 @@ Veredicto: T16 y T17 cumplen su «Hecho». Queda en rojo `recipe-route-contract`
 - E2E: no procede (T19); `e2e/clientes.spec.ts` y `e2e/movimiento.spec.ts` ajustados al quitar el placeholder viejo, sin correr.
 
 Veredicto: T13–T17 hechas con su «Hecho»; D2 y D4 aplicadas.
+
+## T18 — Clientes: «Abrir chat» (frontend_dev)
+
+### Archivos
+- Nuevo: `app/(private)/clientes/components/customer-chat-link.tsx` (compone `buttonVariants` + `MessageSquare`;
+  href con `CUSTOMER_CONTACTS_ROUTE` + `URLSearchParams` y la clave `CONTACTS_SELECTION_PARAMS.customer`).
+- Modificados: `app/(private)/clientes/page.tsx` (`canChatWithCustomers`, mismo patrón que `canModifyCustomers`),
+  `components/customer-list-section.tsx`, `components/customer-table.tsx`, `components/customer-columns.tsx`
+  (`canChat?` opcional, por defecto `false`; el chat va delante de `rowActions` en la celda de acciones),
+  `components/index.ts` (barrel).
+- Tests: nuevo `tests/unit/clientes-ui/customer-chat-link.test.tsx`; `tests/unit/clientes-ui/clientes-page.test.tsx`
+  (bloque R45 de página); snapshot `tests/unit/paridad/__snapshots__/clientes-paridad.test.tsx.snap` actualizado
+  (la sesión de paridad trae `whatsapp.consultar`: aparece «Abrir chat» en la fila; cambio esperado por R45).
+- La lista de Clientes no usa tarjetas de `DataTable` (sin prop `card`): en teléfono pinta la misma celda de acciones,
+  así que tabla y teléfono comparten el enlace.
+
+### R45 → test
+- `tests/unit/clientes-ui/customer-chat-link.test.tsx` (14 casos `R45 — ...`: href `?cliente=<id>`, nombre accesible,
+  codificación, 44 px, orden en la celda, «Sin teléfono válido» ×4, nada sin permiso ×4, sin literal de ruta).
+- `tests/unit/clientes-ui/clientes-page.test.tsx > R45 — canChat sale de assertPermission con whatsapp.consultar` (3 casos).
+
+### Salida real
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de T18.
+- `pnpm exec vitest related --run <6 archivos de app + 3 tests>`: `Test Files 23 passed (23)` · `Tests 472 passed (472)`
+  (antes de actualizar el snapshot: 1 failed, `clientes-paridad > con filas`).
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+
+Veredicto: T18 hecha con su «Hecho»; R45 cubierto.
+
+## T19 — E2E `e2e/contactos-chat.spec.ts`
+
+- Creado: `e2e/contactos-chat.spec.ts`. Modificado: `tests/guards/guard-identificador-de-request.test.ts`
+  (alta de `contactos-chat.spec.ts` en la lista cerrada `E2E_ESPERADOS`, su punto de extensión; sin ella la
+  guardia daba rojo «archivo nuevo en e2e/»).
+- NO se ha corrido contra la base: la local compartida no tiene las migraciones de QC-245 (orden del leader).
+  El «Hecho» de T19 («el spec pasa en local») queda PENDIENTE de una base migrada o del job E2E de CI.
+
+### R → caso (nombre exacto, en `el chat de WhatsApp de Contactos`)
+- R42, R32, R19 → `R42, R32, R19: el entrante firmado aparece en la lista y en el chat sin recargar, la respuesta pasa por «Enviando» y «Enviado» y el status delivered la deja «Entregado»`
+- R1, R45 (sin permiso) → `R1, R45: sin `whatsapp.consultar` (empresa sin el añadido de integraciones) la ruta responde 404 y Clientes no ofrece «Abrir chat»`
+- R45, R46 → `R45, R46: «Abrir chat» desde Clientes lleva a `?cliente=<id>` con el chat del cliente abierto, o vacio y con la ventana cerrada si no tiene conversacion`
+- R6, R7 → `en el telefono > R6, R7: a 390 × 844 se ve la lista o el chat, se vuelve con «Volver a conversaciones» y con «Atrás», sin scroll horizontal`
+
+### Salida real
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0 (incluye `e2e/`: `tsconfig.json` incluye `**/*.ts`).
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de T19; `eslint` de los 2 archivos: sin problemas.
+- `pnpm exec playwright test e2e/contactos-chat.spec.ts --list`: `Total: 8 tests in 1 file` (4 casos × chromium, webkit).
+- `pnpm exec vitest run guard`: antes del alta en `E2E_ESPERADOS` `1 failed | 86 passed (87)`; después
+  `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+
+Veredicto: T19 escrito y verificado estáticamente; falta correrlo contra una base con las migraciones de QC-245.
+
+## Tanda 5 (2026-10-24) — T18, T19, T20 (implementer)
+
+### Spec
+- `design.md > 5.1`: `canSend`/`canOpenIntegrations` con `currentPlatformActor()` + `assertPermission`, no con
+  `canModifyCustomers` (importa `@/lib/composition`, prohibido en la ruta por R48).
+- `requirements.md > Decisiones cerradas`: D17 (error de red al enviar sin «Reintentar» junto a la caja; el texto
+  vuelve y se reenvía con enviar) y D18 (teléfono de cabecera vía `getCustomerAction`; sin `clientes.consultar`
+  o sin teléfono válido, sin teléfono).
+
+### Mapa consolidado R1–R54 → test (archivos en `tests/unit/contactos-ui/` salvo indicación; casos en las secciones de arriba)
+| R | Test |
+|---|---|
+| R1 | `clientes-ui/contactos-page.test.tsx`; E2E `contactos-chat.spec.ts` › «R1, R45: …404…» |
+| R2 | `clientes-ui/private-nav-clientes.test.ts` |
+| R3 | `contacts-empty-states.test.tsx`, `clientes-ui/contactos-page.test.tsx` |
+| R4 | `conversation-list.test.tsx`, `chat-panel.test.tsx`, `clientes-ui/contactos-page.test.tsx` |
+| R5 | `contacts-screen.test.tsx`, `contacts-empty-states.test.tsx` |
+| R6 | `contacts-screen.test.tsx`, `chat-header.test.tsx`; E2E › «R6, R7: a 390 × 844…» |
+| R7 | solo E2E › «R6, R7: a 390 × 844 … sin scroll horizontal» (sin unit: jsdom no maqueta) |
+| R8, R9, R11, R12 | `conversation-list.test.tsx` (R12 también `contacts-empty-states.test.tsx`) |
+| R10 | `chat-time-format.test.ts` |
+| R13 | `conversation-list-state.test.ts`, `conversation-list.test.tsx`, `chat-message-list.test.tsx` |
+| R14 | `conversation-list.test.tsx`, `contacts-screen.test.tsx` |
+| R15, R16 | `chat-header.test.tsx` (R15 también `chat-time-format.test.ts`) |
+| R17 | `chat-time-format.test.ts`, `chat-timeline.test.ts`, `chat-message-list.test.tsx` |
+| R18, R20, R21, R22, R24 | `chat-view.test.ts`, `chat-message.test.tsx` |
+| R19 | `chat-view.test.ts`, `chat-message.test.tsx`; E2E › «R42, R32, R19: …» |
+| R23 | `chat-message.test.tsx` |
+| R25 | `chat-timeline.test.ts`, `chat-message-list.test.tsx`, `chat-panel.test.tsx` |
+| R26 | `chat-message-list.test.tsx` |
+| R27 | `chat-panel.test.tsx`, `conversation-list.test.tsx`, `contacts-screen.test.tsx` |
+| R28 | `contacts-poller.test.ts`, `contacts-screen.test.tsx` |
+| R29, R30 | `chat-composer.test.tsx` |
+| R31, R34 | `chat-composer.test.tsx`, `send-template-dialog.test.tsx` |
+| R32 | `chat-composer.test.tsx`, `chat-panel.test.tsx`; E2E › «R42, R32, R19: …» |
+| R33 | `chat-composer.test.tsx`, `chat-panel.test.tsx` |
+| R35 | `template-values.test.ts` |
+| R36, R37 | `template-values.test.ts`, `chat-composer.test.tsx` |
+| R38, R39 | `chat-view.test.ts`, `chat-header.test.tsx` (R38 también `template-values.test.ts`) |
+| R40 | `chat-composer.test.tsx`, `send-template-dialog.test.tsx` |
+| R41 | `chat-view.test.ts`, `template-values.test.ts`, `chat-message.test.tsx`, `chat-panel.test.tsx` |
+| R42 | `contacts-poller.test.ts`, `chat-timeline.test.ts`, `conversation-list-state.test.ts`, `conversation-list.test.tsx`, `contacts-screen.test.tsx`; E2E › «R42, R32, R19: …» |
+| R43, R44 | `contacts-poller.test.ts` |
+| R45 | `clientes-ui/customer-chat-link.test.tsx`, `clientes-ui/clientes-page.test.tsx`; E2E › «R1, R45», «R45, R46» |
+| R46 | `contacts-screen.test.tsx`, `clientes-ui/contactos-page.test.tsx`; E2E › «R45, R46: …» |
+| R47 | `chat-composer.test.tsx`, `clientes-ui/contactos-page.test.tsx` |
+| R48 | `contactos-frontera.test.ts`, `clientes-ui/contactos-page.test.tsx` |
+| R49 | `chat-panel.test.tsx` |
+| R50, R51 | `shared-ui/whatsapp-system-constants.test.ts`, `integraciones-ui/whatsapp-template-rules.test.ts` |
+| R52 | `integraciones-ui/whatsapp-variables-panel.test.tsx`, `…-template-relate-sheet.test.tsx`, `…-template-form-sheet.test.tsx`, `…-template-rules.test.ts` |
+| R53 | `integraciones-ui/whatsapp-template-rules.test.ts` |
+| R54 | `contacts-poller.test.ts`, `chat-view.test.ts`, `chat-header.test.tsx`, `contacts-screen.test.tsx`, `clientes-ui/contactos-page.test.tsx` |
+
+Huecos: **R7** solo tiene el E2E (sin correr en local), y a 390 px, no a los 360 px que nombra R7; ni el diálogo de
+plantilla ni el visor de imagen se miden. Ningún R sin test.
+
+### Salida real (implementer)
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)` (ninguno de la tanda).
+- `pnpm exec vitest related --run <9 archivos .ts/.tsx cambiados, sin e2e>`: `Test Files 24 passed (24)` · `Tests 495 passed (495)`.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+- `./init.sh`: ROJO en el paso de `feature_list.json` (ids 290–298 duplicados, en vuelo sin assignee, zona backend 4/3): el mismo rojo ajeno de las tandas anteriores.
+- `node scripts/archivos-en-vuelo.mjs --candidata QC-246`: único choque QC-166 en `lib/shared/navigation/private-nav.ts`, aceptado (D9).
+- E2E NO corrido en local (`contactos-chat`, `clientes`, `movimiento`): la única base local es la compartida
+  `localhost:5432/QuimiCloude` y `prisma migrate status` da historia divergente: le faltan las 4 migraciones de
+  QC-245 (`20261023120000_whatsapp_send_permission`, `20261023130000_whatsapp_outbound_messages`,
+  `20261024120000_whatsapp_read_permission`, `20261024130000_whatsapp_contacts_last_read`) y tiene 3 de otra rama que
+  aquí no existen. Migrarla rompería a las otras sesiones; Docker no está levantado para una base propia. Quedan
+  para el job E2E de CI. `playwright test e2e/contactos-chat.spec.ts --list`: `Total: 8 tests in 1 file`.

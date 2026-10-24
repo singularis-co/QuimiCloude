@@ -18,6 +18,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CUSTOMERS_TITLE_TESTID,
+  CUSTOMER_CHAT_LINK_TESTID,
+  CUSTOMER_CHAT_UNAVAILABLE_TESTID,
   CUSTOMER_ACTION_DELETE_TESTID,
   CUSTOMER_ACTION_EDIT_TESTID,
   CUSTOMER_CREATE_OPEN_TESTID,
@@ -318,6 +320,42 @@ describe('el corte por permiso ocurre antes de leer o pintar nada (R3)', () => {
     // Y es la PRIMERA sentencia del cuerpo: nada se resuelve antes que el corte.
     const cuerpo = fuente.slice(fuente.indexOf('export default async function'));
     expect(cuerpo.indexOf('requirePagePermission(')).toBeLessThan(cuerpo.indexOf('canModify'));
+  });
+});
+
+describe('R45 — `canChat` sale de assertPermission con `whatsapp.consultar`', () => {
+  const CON_TELEFONO: CustomerView = {
+    ...CLIENTE,
+    phone: '3001234567',
+    phoneCountry: 'CO',
+    phoneE164: '573001234567',
+  };
+
+  it('R45 — con `whatsapp.consultar` la fila con teléfono válido trae «Abrir chat»', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA, 'whatsapp.consultar']));
+    listCustomersActionMock.mockResolvedValue(paginaCon([CON_TELEFONO]));
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(`${CUSTOMER_CHAT_LINK_TESTID}-${CLIENTE.id}`)).toBeInTheDocument();
+  });
+
+  it('R45 — con `whatsapp.consultar` la fila sin teléfono trae «Sin teléfono válido»', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon([PERMISO_DE_CONSULTA, 'whatsapp.consultar']));
+
+    await renderPantalla();
+
+    expect(screen.getByTestId(`${CUSTOMER_CHAT_UNAVAILABLE_TESTID}-${CLIENTE.id}`)).toBeInTheDocument();
+  });
+
+  it('R45 — sin `whatsapp.consultar` no aparece ninguno de los dos', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(CODIGOS_DE_CLIENTES));
+    listCustomersActionMock.mockResolvedValue(paginaCon([CON_TELEFONO, { ...CLIENTE, id: '33333333-3333-4333-8333-333333333333' }]));
+
+    await renderPantalla();
+
+    expect(screen.queryByTestId(`${CUSTOMER_CHAT_LINK_TESTID}-${CLIENTE.id}`)).toBeNull();
+    expect(screen.queryByTestId(/^customer-chat-/)).toBeNull();
   });
 });
 

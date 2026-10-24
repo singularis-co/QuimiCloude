@@ -8,6 +8,7 @@ import { CUSTOMER_QUERYABLE, describeCustomerPhone, type CustomerView } from '@/
 import { formatCivilDate } from '@/lib/shared/ui/date-civil';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { CustomerChatLink } from './customer-chat-link';
 import { CITY_COLUMN_ID, CREATED_AT_COLUMN_ID } from './customer-list-params';
 
 /**
@@ -37,6 +38,8 @@ export type CustomerColumn = DataTableColumn<CustomerView> & { readonly id: Cust
 export type CustomerColumnsDeps = {
   /** Slot: quien monta la tabla enchufa las acciones de fila, ya acotadas por `canModify`. */
   readonly rowActions: (customer: CustomerView) => ReactNode;
+  /** Si la sesión trae `whatsapp.consultar`. */
+  readonly canChat?: boolean;
 };
 
 function MissingValue({ field }: { readonly field: string }) {
@@ -80,7 +83,20 @@ function isSortable(id: string): boolean {
   return CUSTOMER_QUERYABLE.sortable.includes(id);
 }
 
-export function buildCustomerColumns({ rowActions }: CustomerColumnsDeps): readonly CustomerColumn[] {
+function actionsCell(customer: CustomerView, canChat: boolean, rowActions: CustomerColumnsDeps['rowActions']) {
+  if (!canChat) return rowActions(customer);
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-2">
+      <CustomerChatLink customer={customer} canChat={canChat} />
+      {rowActions(customer)}
+    </span>
+  );
+}
+
+export function buildCustomerColumns({
+  rowActions,
+  canChat = false,
+}: CustomerColumnsDeps): readonly CustomerColumn[] {
   return [
     {
       id: LAST_NAMES_COLUMN_ID,
@@ -146,7 +162,7 @@ export function buildCustomerColumns({ rowActions }: CustomerColumnsDeps): reado
       ...actionsColumn<CustomerView>({
         id: ACTIONS_COLUMN_ID,
         label: 'Acciones',
-        cell: (customer) => rowActions(customer),
+        cell: (customer) => actionsCell(customer, canChat, rowActions),
       }),
       id: ACTIONS_COLUMN_ID,
     },
