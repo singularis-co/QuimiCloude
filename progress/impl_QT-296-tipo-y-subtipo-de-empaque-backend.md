@@ -776,3 +776,17 @@ Lo que no se tocó:
 ```
 
 **Veredicto T8:** la parte de código y unit test de R38 está en verde, sin dependencias nuevas. Falta correr las dos E2E (las corre el leader).
+
+### T8 — E2E (corridas por el implementer, una a la vez, 2026-10-23, sobre `c6b754c8`)
+
+```
+$ pnpm exec playwright test e2e/catalogo-desde-pdf.spec.ts      (exit 0)
+  ✓  2 [chromium] › e2e\catalogo-desde-pdf.spec.ts:305:7 › catalogo-desde-pdf › sube un PDF de catalogo, revisa sus filas y confirma la importacion (R38) (33.3s)
+  ✓  1 [webkit] › e2e\catalogo-desde-pdf.spec.ts:305:7 › catalogo-desde-pdf › sube un PDF de catalogo, revisa sus filas y confirma la importacion (R38) (35.1s)
+  2 passed (58.0s)
+
+$ pnpm exec playwright test e2e/documentos.spec.ts              (exit 0)
+  ✓ [chromium] + [webkit] documentos.spec.ts:361 (R16), :456 (R17), :524 (R18)
+  6 passed (38.7s)
+```
+Ninguna de las dos se tocó. R38 (mitad E2E) en verde.
