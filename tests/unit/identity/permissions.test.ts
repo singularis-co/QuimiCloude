@@ -51,6 +51,8 @@ const CODIGOS_DEL_REQUISITO = [
   'entregas.modificar',
   // 2026-10-09: entra `entregas.anular`, al final.
   'entregas.anular',
+  // 2026-10-23: entra `whatsapp.enviar`, al final.
+  'whatsapp.enviar',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
@@ -66,7 +68,12 @@ const ENTREGAS = 'entregas.modificar'
 // devolviendo el catalogo previo a `entregas`, ahora sin ninguno de los dos; los casos previos
 // comparan sin `entregas.anular` con `sinAnular`.
 const ANULAR = 'entregas.anular'
-const sinAnular = (codigo: string): boolean => codigo !== ANULAR
+// 2026-10-23: `whatsapp.enviar` entra detras de `entregas.anular`. `sinAnular` (y con ella
+// `sinEntregas`) devuelve ahora el catalogo previo sin ninguno de los dos; los casos de
+// `entregas.anular` comparan sin `whatsapp.enviar` con `sinEnviar`.
+const ENVIAR = 'whatsapp.enviar'
+const sinEnviar = (codigo: string): boolean => codigo !== ENVIAR
+const sinAnular = (codigo: string): boolean => codigo !== ANULAR && sinEnviar(codigo)
 const sinEntregas = (codigo: string): boolean => codigo !== ENTREGAS && sinAnular(codigo)
 // 2026-10-14: el Administrador deja de recibir `asignaciones.consultar` (pasa a
 // ADMIN_EXCLUDED_PERMISSIONS). Los casos previos que fijan su conjunto escrito a mano lo restan con
@@ -217,6 +224,8 @@ const MODULOS = [
   'integraciones',
   // QC-223 2026-10-08
   'entregas',
+  // 2026-10-23: como `usuarios`, no es carpeta de `lib/modules/`.
+  'whatsapp',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -244,9 +253,12 @@ const codigos = PERMISSIONS.map((permiso) => permiso.code)
 // 2026-10-09: y `anular`, que solo se admite en `entregas`.
 const esAnularEntregas = (permiso: { module: string; action: string }): boolean =>
   permiso.action === 'anular' && permiso.module === 'entregas'
+// 2026-10-23: y `enviar`, que solo se admite en `whatsapp`.
+const esEnviarWhatsapp = (permiso: { module: string; action: string }): boolean =>
+  permiso.action === 'enviar' && permiso.module === 'whatsapp'
 function accionAdmitida(permiso: { module: string; action: string }): boolean {
   if (permiso.action === 'consultar' || permiso.action === 'modificar') return true
-  if (esAnularEntregas(permiso)) return true
+  if (esAnularEntregas(permiso) || esEnviarWhatsapp(permiso)) return true
   return permiso.action === 'ejecutar' && permiso.module === 'asignaciones'
 }
 
@@ -900,8 +912,11 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
     expect(PERMISSIONS.filter((p) => p.action === 'ejecutar').map((p) => p.module)).toEqual([
       'asignaciones',
     ])
-    // 2026-10-09: `entregas.anular` es la otra excepcion; tiene su propio caso.
-    for (const permiso of PERMISSIONS.filter((p) => p.module !== 'asignaciones' && !esAnularEntregas(p))) {
+    // 2026-10-09: `entregas.anular` es la otra excepcion; tiene su propio caso. 2026-10-23: y
+    // `whatsapp.enviar`.
+    for (const permiso of PERMISSIONS.filter(
+      (p) => p.module !== 'asignaciones' && !esAnularEntregas(p) && !esEnviarWhatsapp(p),
+    )) {
       expect(['consultar', 'modificar'], permiso.code).toContain(permiso.action)
     }
   })
@@ -1393,14 +1408,19 @@ describe('QC-224 — el permiso entregas.anular', () => {
   }
 
   it('R1: el catalogo contiene entregas.anular con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
-    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ANULAR)
+    // 2026-10-23: detras va `whatsapp.enviar`; se compara sin ella.
+    expect(PERMISSIONS.filter((permiso) => sinEnviar(permiso.code)).at(-1)).toEqual(ENTRADA_DE_ANULAR)
     expect(codigos.filter((codigo) => codigo === ANULAR)).toHaveLength(1)
   })
 
   it('R1: el catalogo es el previo, en el mismo orden y con los mismos campos, mas entregas.anular', () => {
-    expect(codigos).toEqual([...codigos.filter(sinAnular), ANULAR])
+    expect(codigos.filter(sinEnviar)).toEqual([...codigos.filter(sinAnular), ANULAR])
     expect(codigos.filter(sinAnular)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinAnular))
-    expect(PERMISSIONS.slice(0, -1).map((permiso) => permiso.code)).toEqual(codigos.filter(sinAnular))
+    expect(
+      PERMISSIONS.filter((permiso) => sinEnviar(permiso.code))
+        .slice(0, -1)
+        .map((permiso) => permiso.code),
+    ).toEqual(codigos.filter(sinAnular))
   })
 
   it('R1: anular solo existe en entregas', () => {
@@ -1411,7 +1431,7 @@ describe('QC-224 — el permiso entregas.anular', () => {
 
   it('R1: el Administrador recibe entregas.anular al final, una vez, y no figura entre sus excluidos', () => {
     const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
-    expect(admin.at(-1)).toBe(ANULAR)
+    expect(admin.filter(sinEnviar).at(-1)).toBe(ANULAR)
     expect(admin.filter((codigo) => codigo === ANULAR)).toHaveLength(1)
     expect(admin.filter(sinAnular)).toEqual(CODIGOS_DEL_ADMINISTRADOR.filter(sinAnular))
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(ANULAR)
@@ -1464,5 +1484,71 @@ describe('QC-137 — las notificaciones no tienen permiso propio', () => {
     ])
     expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual([...CODIGOS_DE_EMPRESAS])
     expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([CONSULTAR_ASIGNACIONES, ACONDICIONAMIENTO])
+  })
+})
+
+describe('el permiso whatsapp.enviar', () => {
+  const citaFichaORequisito = /QC-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADA_DE_ENVIAR = {
+    code: 'whatsapp.enviar',
+    module: 'whatsapp',
+    action: 'enviar',
+    description: 'Enviar mensajes de WhatsApp a los clientes de la empresa.',
+  } as const
+
+  function parrafoDeEnviar(): string | undefined {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .find((bloque) => bloque.includes(ENVIAR))
+  }
+
+  it('R1: el catalogo contiene whatsapp.enviar con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
+    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_ENVIAR)
+    expect(codigos.filter((codigo) => codigo === ENVIAR)).toHaveLength(1)
+    expect(codigos.filter((codigo) => codigo.startsWith('whatsapp.'))).toEqual([ENVIAR])
+  })
+
+  it('R1: el catalogo es el previo, en el mismo orden y con los mismos campos, mas whatsapp.enviar', () => {
+    expect(codigos).toEqual([...codigos.filter(sinEnviar), ENVIAR])
+    expect(codigos.filter(sinEnviar)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinEnviar))
+    for (const previo of PERMISOS_PREVIOS) {
+      expect(PERMISSIONS.find((permiso) => permiso.code === previo.code), previo.code).toEqual(previo)
+    }
+  })
+
+  it('R1: enviar solo existe en whatsapp', () => {
+    expect(PERMISSIONS.filter((p) => p.action === 'enviar').map((p) => p.module)).toEqual(['whatsapp'])
+    expect(accionAdmitida({ module: 'whatsapp', action: 'enviar' })).toBe(true)
+    expect(accionAdmitida({ module: 'integraciones', action: 'enviar' })).toBe(false)
+  })
+
+  it('R1: el Administrador recibe whatsapp.enviar al final, una vez, y no figura entre sus excluidos', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+    expect(admin.at(-1)).toBe(ENVIAR)
+    expect(admin.filter((codigo) => codigo === ENVIAR)).toHaveLength(1)
+    expect(admin.filter(sinEnviar)).toEqual(CODIGOS_DEL_ADMINISTRADOR.filter(sinEnviar))
+    expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(ENVIAR)
+  })
+
+  it('R1: ningun otro rol recibe whatsapp.enviar', () => {
+    for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO]) {
+      expect(SEED_ROLE_PERMISSIONS[rol], rol).not.toContain(ENVIAR)
+    }
+  })
+
+  it('R1: el JSDoc del catalogo tiene el parrafo de whatsapp.enviar, corto y sin citas', () => {
+    const parrafo = parrafoDeEnviar()
+    expect(parrafo).toBeDefined()
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).toContain('lib/modules/')
+    expect(parrafo).not.toMatch(citaFichaORequisito)
   })
 })

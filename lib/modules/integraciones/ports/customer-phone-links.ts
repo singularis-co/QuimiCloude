@@ -16,4 +16,10 @@ export interface CustomerPhoneLinks {
     now: Date,
     companyId: string,
   ): Promise<{ readonly numbers: readonly string[] }>;
+  /** El principal del cliente vivo de la empresa; `no_phone` si no tiene uno válido. */
+  mainPhoneOf(
+    customerId: string,
+    companyId: string,
+  ): Promise<'customer_not_found' | 'no_phone' | { readonly e164: string }>;
+  isCustomerAlive(customerId: string, companyId: string): Promise<boolean>;
 }
