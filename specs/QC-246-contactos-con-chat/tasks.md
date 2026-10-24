@@ -39,7 +39,7 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 
 ## Bloque 1 — Lógica pura (sin UI)
 
-- [ ] **T3** `[P]` — `chat-view.ts`: tipos locales; `toChatMessages` (tipos, estados, autor,
+- [x] **T3** `[P]` — `chat-view.ts`: tipos locales; `toChatMessages` (tipos, estados, autor,
   `retryable`, `src` = `attachment.mediaUrl`, reacciones por `attachment.messageId`) y `toChatContext`
   (pedidos con `ORDER_STATUS_LABELS` y `orderDistributionLineText`, `total` tal cual, `values` sin
   tocar).
@@ -48,20 +48,20 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
   nulo; la más reciente gana), R41 (`retryable`), R38/R39 (`toChatContext` con 0, 1 y 2 pedidos,
   orden recibido, total `null` → `totalLabel: null`, presentación sin nombre → «N × —», sin fecha de
   entrega).
-- [ ] **T4** `[P]` (dep. T21) — `template-values.ts`: `resolveTemplate`, `systemConstantsFor`, texto
+- [x] **T4** `[P]` (dep. T21) — `template-values.ts`: `resolveTemplate`, `systemConstantsFor`, texto
   «Falta el valor de …».
   *Hecho:* tests de R35 (todas las claves con `values`; clave ausente y valor `null` →
   `[falta <clave>]`; `pedido.total` nulo → `[falta pedido.total]`; encabezado/cuerpo/pie), R36
   (`missing` con las etiquetas del catálogo, incluidas las cuatro nuevas, y texto con 1, 2 y 3
   faltantes), R37/R41 (`constants` sin las nulas ni las propias), R38 (otros `values` → otro texto).
-- [ ] **T5** `[P]` — `chat-timeline.ts` y `conversation-list-state.ts`: unir por id, ordenar, separar
+- [x] **T5** `[P]` — `chat-timeline.ts` y `conversation-list-state.ts`: unir por id, ordenar, separar
   por día, anteponer anteriores sin duplicar, fusionar la página 1 del poller.
   *Hecho:* tests de R13 (sin repetidos), R17 (orden y separadores), R25 (anteriores), R42 (fusión sin
   duplicar, estado nuevo reemplaza al viejo).
-- [ ] **T6** `[P]` — `chat-time-format.ts`: hora de la lista, separador de día, cuenta atrás de la
+- [x] **T6** `[P]` — `chat-time-format.ts`: hora de la lista, separador de día, cuenta atrás de la
   ventana.
   *Hecho:* tests con reloj fijo de R10, R15 (con y sin horas) y R17.
-- [ ] **T7** `[P]` — `contacts-poller.ts` con puertos de visibilidad y temporizador.
+- [x] **T7** `[P]` — `contacts-poller.ts` con puertos de visibilidad y temporizador.
   *Hecho:* tests con puertos falsos de R42 (8 s tras el fin de la anterior), R43 (oculta no consulta,
   visible consulta ya), R44 (error sigue, `unauthorized` para), R28 (avisa de entrantes nuevos),
   R54 (el turno no pide el contexto).
