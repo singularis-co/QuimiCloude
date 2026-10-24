@@ -212,7 +212,7 @@ en verde (sin importar `inventario`) y `catalog-service.test.ts` en verde.
 **Hecho cuando:** R29–R33 y R35 (lado `documentos`) en verde, y
 `catalog-import-authorization.test.ts` y `catalog-import-actions.test.ts` siguen en verde.
 
-## [ ] T8 — Doble de IA y E2E existentes `[depende de T7]`
+## [x] T8 — Doble de IA y E2E existentes `[depende de T7]`
 
 - `ai-reader-canned.ts`: tipo y subtipo en `CANNED_CATALOG_TEXT`, y las dos constantes nuevas
   (`design.md > 6.6`).
