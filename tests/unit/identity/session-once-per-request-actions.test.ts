@@ -686,6 +686,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       }),
   },
   {
+    // QC-245: el listado de conversaciones. Sin permisos el caso de uso rechaza antes de tocar un
+    // puerto, y la accion devuelve el estado de error.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions.ts',
+    nombre: 'listWhatsappConversationsAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions')
+      ).listWhatsappConversationsAction({}),
+  },
+  {
     // QC-137: el resumen de la campana, que el navegador consulta cada 30 s. Sin permisos responde
     // `forbidden` antes de tocar la bandeja.
     archivo: 'lib/modules/notificaciones/adapters/driving/notification-actions.ts',

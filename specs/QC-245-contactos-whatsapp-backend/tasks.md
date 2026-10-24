@@ -76,7 +76,7 @@
 
 ## Tanda 4 — borde y cableado (depende de T6)
 
-- [ ] **T7 Composición, contrato y Server Actions** (R34, R40, R41).
+- [x] **T7 Composición, contrato y Server Actions** (R34, R40, R41).
   - `lib/composition/index.ts`, `integraciones/index.ts`,
     `adapters/driving/whatsapp-conversation-actions.ts` (las cuatro acciones del §A del contrato).
   - Test `whatsapp-conversation-actions.test.ts` (éxito, `ErrorState`, copia campo a campo, logs sin

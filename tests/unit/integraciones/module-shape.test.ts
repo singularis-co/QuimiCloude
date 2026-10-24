@@ -147,6 +147,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
   'adapters/driven/persistence/whatsapp-contact-prisma.ts',
   'adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma.ts',
+  'adapters/driven/persistence/whatsapp-conversation-prisma.ts',
   'adapters/driven/persistence/whatsapp-inbox-prisma.ts',
   'adapters/driven/persistence/whatsapp-outbox-prisma.ts',
   'adapters/driven/persistence/whatsapp-template-prisma.ts',
@@ -160,6 +161,7 @@ const MODULE_CODE_FILES = [
   'adapters/driving/whatsapp-connection-actions.ts',
   // QC-239 2026-10-20: las cuatro Server Actions de vincular, desvincular y bloquear un contacto.
   'adapters/driving/whatsapp-contact-actions.ts',
+  'adapters/driving/whatsapp-conversation-actions.ts',
   'adapters/driving/whatsapp-message-actions.ts',
   'adapters/driving/whatsapp-template-actions.ts',
   'adapters/driving/whatsapp-template-cron-route.ts',
@@ -179,12 +181,16 @@ const MODULE_CODE_FILES = [
   'domain/errors.ts',
   'domain/get-ai-provider-connection.ts',
   'domain/get-ai-provider-readiness.ts',
+  'domain/get-whatsapp-chat.ts',
   'domain/get-whatsapp-connection.ts',
   'domain/graph-failure.ts',
   'domain/integraciones-scope.ts',
   'domain/link-whatsapp-contact.ts',
+  'domain/list-sendable-whatsapp-templates.ts',
+  'domain/list-whatsapp-conversations.ts',
   'domain/list-whatsapp-templates.ts',
   'domain/manage-whatsapp-variable-keys.ts',
+  'domain/mark-whatsapp-chat-read.ts',
   'domain/receive-whatsapp-webhook.ts',
   'domain/refresh-whatsapp-contact-links.ts',
   'domain/regenerate-whatsapp-verify-token.ts',
@@ -215,6 +221,8 @@ const MODULE_CODE_FILES = [
   'domain/whatsapp-connection.ts',
   'domain/whatsapp-contact-input.ts',
   'domain/whatsapp-contact-link.ts',
+  'domain/whatsapp-conversation-input.ts',
+  'domain/whatsapp-conversation.ts',
   'domain/whatsapp-inbound-message.ts',
   'domain/whatsapp-message-status.ts',
   'domain/whatsapp-message.ts',
@@ -248,6 +256,7 @@ const MODULE_CODE_FILES = [
   'ports/whatsapp-connection-repository.ts',
   'ports/whatsapp-contact-repository.ts',
   'ports/whatsapp-contact-unit-of-work.ts',
+  'ports/whatsapp-conversation-repository.ts',
   'ports/whatsapp-graph-client.ts',
   'ports/whatsapp-inbox-repository.ts',
   'ports/whatsapp-outbox-repository.ts',
@@ -314,6 +323,32 @@ export function integracionesWiring(source: string): { members: string[]; typeOf
     }
   }
   return members === null ? null : { members, typeOf }
+}
+
+/** Los nombres de valor que exporta un fuente: funciones, constantes y `export { }`; los tipos no cuentan. */
+export function actionExports(source: string): string[] {
+  const file = ts.createSourceFile('actions.ts', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS)
+  const names: string[] = []
+  for (const statement of file.statements) {
+    const exported = ts.canHaveModifiers(statement)
+      ? (ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ?? false)
+      : false
+    if (ts.isFunctionDeclaration(statement) && exported && statement.name) names.push(statement.name.text)
+    if (ts.isVariableStatement(statement) && exported) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) names.push(declaration.name.text)
+      }
+    }
+    if (
+      ts.isExportDeclaration(statement) &&
+      !statement.isTypeOnly &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      for (const element of statement.exportClause.elements) if (!element.isTypeOnly) names.push(element.name.text)
+    }
+  }
+  return names
 }
 
 /** Lo que esta feature no toca: prefijos de carpeta y archivos exactos. */
@@ -405,7 +440,7 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, la regla, el recalculo y las tres acciones sobre contactos, QC-239, y las de plantillas con su diccionario, QC-242, y el envio y el reintento con su error de faltantes y su vista, QC-240), y solo desde ./domain; el validador sin claves ya no sale', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, la regla, el recalculo y las tres acciones sobre contactos, QC-239, y las de plantillas con su diccionario, QC-242, y el envio y el reintento con su error de faltantes y su vista, QC-240, y R40: las cuatro consultas de conversaciones con sus tipos, QC-245), y solo desde ./domain; el validador sin claves ya no sale', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
@@ -445,17 +480,26 @@ describe('la forma del modulo integraciones', () => {
       'WHATSAPP_TEMPLATE_LANGUAGES',
       'WHATSAPP_VARIABLE_KEY_LIMITS',
       'WHATSAPP_VARIABLE_KEY_PATTERN',
+      'WhatsappChat',
+      'WhatsappChatAttachment',
+      'WhatsappChatMessage',
       'WhatsappConnectionExistsError',
       'WhatsappConnectionNotFoundError',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
       'WhatsappContactNotFoundError',
       'WhatsappContactNumberInvalidError',
+      'WhatsappConversationItem',
+      'WhatsappConversationList',
       'WhatsappDictionaryEntryView',
+      'WhatsappMessageDirection',
+      'WhatsappMessageStatus',
+      'WhatsappMessageType',
       'WhatsappMetaRejectedError',
       'WhatsappMetaUnreachableError',
       'WhatsappOutboundMessageView',
       'WhatsappPhoneNumberTakenError',
+      'WhatsappSendableTemplate',
       'WhatsappTemplateButton',
       'WhatsappTemplateCategory',
       'WhatsappTemplateContent',
@@ -485,11 +529,15 @@ describe('la forma del modulo integraciones', () => {
       'createGetAiProviderConnection',
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
+      'createGetWhatsappChat',
       'createGetWhatsappConnection',
       'createGetWhatsappTemplate',
       'createLinkWhatsappContact',
+      'createListSendableWhatsappTemplates',
+      'createListWhatsappConversations',
       'createListWhatsappDictionary',
       'createListWhatsappTemplates',
+      'createMarkWhatsappChatRead',
       'createReceiveWhatsappWebhook',
       'createRefreshWhatsappContactLinks',
       'createRegenerateWhatsappVerifyToken',
@@ -543,10 +591,19 @@ describe('la forma del modulo integraciones', () => {
       'SelectAiModelResult',
       'TemplateSyncSummary',
       'TestSavedAiProviderResult',
+      'WhatsappChat',
+      'WhatsappChatAttachment',
+      'WhatsappChatMessage',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
+      'WhatsappConversationItem',
+      'WhatsappConversationList',
       'WhatsappDictionaryEntryView',
+      'WhatsappMessageDirection',
+      'WhatsappMessageStatus',
+      'WhatsappMessageType',
       'WhatsappOutboundMessageView',
+      'WhatsappSendableTemplate',
       'WhatsappTemplateButton',
       'WhatsappTemplateCategory',
       'WhatsappTemplateContent',
@@ -716,7 +773,7 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), vincular, desvincular y bloquear contactos (QC-239) y las plantillas con su diccionario, relacionar y habilitar, y el secreto del cron (QC-242), y el envio y el reintento (QC-240), con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), vincular, desvincular y bloquear contactos (QC-239) y las plantillas con su diccionario, relacionar y habilitar, y el secreto del cron (QC-242), y el envio y el reintento (QC-240), y R40: las cuatro consultas de conversaciones (QC-245), con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
@@ -730,11 +787,15 @@ describe('la forma del modulo integraciones', () => {
       'getAiProviderConnection',
       'getAiProviderReadiness',
       'getAiProviderStatus',
+      'getWhatsappChat',
       'getWhatsappConnection',
       'getWhatsappTemplate',
       'linkWhatsappContact',
+      'listSendableWhatsappTemplates',
+      'listWhatsappConversations',
       'listWhatsappDictionary',
       'listWhatsappTemplates',
+      'markWhatsappChatRead',
       'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'relateWhatsappTemplateVariables',
@@ -783,6 +844,7 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.whatsappOutboxRepository).toBe('WhatsappOutboxRepository')
     expect(cableado?.typeOf.whatsappSendCustomerPhones).toBe('CustomerPhoneLinks')
     expect(cableado?.typeOf.whatsappSendLog).toBe('WhatsappSendLog')
+    expect(cableado?.typeOf.whatsappConversationRepository).toBe('WhatsappConversationRepository')
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {
@@ -793,6 +855,25 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.members).toEqual(['secretCipher', 'secretDigest', 'extra'])
     expect(cableado?.typeOf.secretCipher).toBe('unknown')
     expect(integracionesWiring('export const otra = {}\n')).toBeNull()
+  })
+
+  it('R34, R40: whatsapp-conversation-actions.ts exporta exactamente las cuatro consultas y ninguna accion de envio', () => {
+    const fuente = readFileSync(join(moduleDir, 'adapters', 'driving', 'whatsapp-conversation-actions.ts'), 'utf8')
+    expect(actionExports(fuente).sort()).toEqual([
+      'getWhatsappChatAction',
+      'listSendableWhatsappTemplatesAction',
+      'listWhatsappConversationsAction',
+      'markWhatsappChatReadAction',
+    ])
+    expect(fuente).not.toMatch(/sendWhatsappMessage|retryWhatsappMessage/)
+  })
+
+  it('R34, R40: el lector de exportaciones ve funciones, constantes y export { }, y no los tipos', () => {
+    expect(
+      actionExports(
+        'export type R = 1\nexport async function a() {}\nexport const b = 1\nfunction c() {}\nexport { d }\n',
+      ).sort(),
+    ).toEqual(['a', 'b', 'd'])
   })
 
   it('R22: el diff de la rama contra dev no toca db/, package.json, pnpm-lock.yaml, docs/dependencias.md, app/, components/, hooks/ ni middleware.ts', (ctx) => {
