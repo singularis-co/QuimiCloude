@@ -1526,6 +1526,12 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // la marca el patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'WHATSAPP_WEBHOOK_ROUTE_BASE',
         'whatsappWebhookPath',
+        // Alta QC-245: la URL del medio de un mensaje de WhatsApp
+        // (`/api/integraciones/whatsapp/media/<id>`), su base y la funcion que la arma. Es un
+        // endpoint de API, no una pantalla ni una ruta del asistente de lectura: no la marca el
+        // patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
+        'WHATSAPP_MEDIA_ROUTE_BASE',
+        'whatsappMediaPath',
         // Las pantallas del Maestro, bajo /maestro: ninguna es del asistente de lectura.
         'MAESTRO_ADMINISTRATORS_ROUTE',
         'MAESTRO_COMPANIES_ROUTE',
