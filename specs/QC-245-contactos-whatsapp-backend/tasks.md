@@ -50,7 +50,7 @@
   - **Hecho:** sin imports de `ports`, `next/*`, Prisma ni `lib/shared`; los casos de §4.2 en verde;
     los tipos coinciden con el §B del contrato.
 
-- [ ] **T5 [P] `WhatsappConversationRepository` y adaptador Prisma** (R6, R9–R12, R15–R18, R22, R23,
+- [x] **T5 [P] `WhatsappConversationRepository` y adaptador Prisma** (R6, R9–R12, R15–R18, R22, R23,
   R39). Depende de T2.
   - `ports/whatsapp-conversation-repository.ts`,
     `adapters/driven/persistence/whatsapp-conversation-prisma.ts` (funciones con nombre, ámbito por

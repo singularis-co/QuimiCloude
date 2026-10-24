@@ -53,6 +53,7 @@
     "identity/work-groups-constraints.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
     "integraciones/whatsapp-contacts-last-read-migration.int.test.ts",
+    "integraciones/whatsapp-conversation-prisma.int.test.ts",
     "integraciones/whatsapp-messages-migration.int.test.ts",
     "integraciones/whatsapp-outbound-messages-migration.int.test.ts",
     "integraciones/whatsapp-template-migration.int.test.ts",

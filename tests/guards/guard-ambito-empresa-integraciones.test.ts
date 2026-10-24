@@ -134,6 +134,19 @@ const PUERTO_SALIDA: PuertoVigilado = {
   fabrica: 'createWhatsappOutboxRepository',
 }
 
+// 2026-10-23, QC-245: las lecturas de conversaciones y la marca de lectura. Se lee en su fabrica
+// `create…(db)` (la composicion la cablea despues) y entra en el barrido sin exencion.
+const ADAPTADOR_CONVERSACIONES = 'whatsapp-conversation-prisma.ts'
+const PUERTO_CONVERSACIONES: PuertoVigilado = {
+  nombre: 'WhatsappConversationRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-conversation-repository.ts'),
+  constante: 'whatsappConversationRepository',
+  metodosEsperados: 7,
+  adaptador: ADAPTADOR_CONVERSACIONES,
+  ayudantes: [],
+  fabrica: 'createWhatsappConversationRepository',
+}
+
 const PUERTOS: readonly PuertoVigilado[] = [
   PUERTO,
   PUERTO_INBOX,
@@ -141,6 +154,7 @@ const PUERTOS: readonly PuertoVigilado[] = [
   PUERTO_PLANTILLAS,
   PUERTO_VARIABLES,
   PUERTO_SALIDA,
+  PUERTO_CONVERSACIONES,
 ]
 
 /**
@@ -848,6 +862,94 @@ describe('R63 — las relaciones y las variables propias llevan el ambito en cad
 
   it('variables propias create: la empresa del alta sale de `companyScopeColumns(scope)`', () => {
     expect(cuerpoDe(variables, cableadoVariables, 'create')).toMatch(/data\s*:\s*\{\s*\.\.\.companyScopeColumns\s*\(\s*scope\s*\)/)
+  })
+})
+
+/** Horas que el SQL recibe desde JS (`${…}::timestamptz`): un `Date` pierde los microsegundos de la base. */
+function horasDesdeJs(texto: string): number {
+  return [...texto.matchAll(/\$\{[^}]*\}\s*::\s*timestamp(?:tz)?\b/g)].length
+}
+
+/** Los bloques de SQL crudo que escriben (`UPDATE`, `INSERT`, `DELETE`). */
+function sqlCrudoQueEscribe(texto: string): readonly string[] {
+  return [...texto.matchAll(/\$(?:queryRaw|executeRaw)\s*(?:<[^`]*>)?\s*`([^`]*)`/g)]
+    .map((bloque) => bloque[1] ?? '')
+    .filter((sql) => /\b(?:UPDATE|INSERT|DELETE)\b/i.test(sql))
+}
+
+const MARCA_QUE_NO_RETROCEDE =
+  /UPDATE\s+"whatsapp_contacts"\s+c\s+SET\s+"last_read_at"\s*=\s*target\."at"\s*,\s*"updated_at"\s*=\s*now\(\)\s+FROM\s+target\s+WHERE\s+c\."company_id"\s*=\s*\$\{\s*columns\.companyId\s*\}::uuid[\s\S]*c\."last_read_at"\s*<\s*target\."at"/
+
+describe('R39 — las lecturas de conversaciones filtran por empresa en cada SQL y la marca solo avanza', () => {
+  const adaptador = analizar(ADAPTADOR_CONVERSACIONES)
+  const fuente = sinComentarios(readFileSync(join(PERSISTENCE_ROOT, ADAPTADOR_CONVERSACIONES), 'utf8'))
+  const cableado = cableadoDelPuerto(PUERTO_CONVERSACIONES)
+  const textoDe = (metodo: string) => {
+    const funcion = adaptador.funciones.find((f) => f.nombre === cableado.get(metodo))
+    return fuente.slice(funcion?.inicio ?? 0, (funcion?.fin ?? 0) + 1)
+  }
+
+  it('cada bloque de SQL crudo del adaptador filtra por la empresa de `companyScopeColumns(scope)`', () => {
+    expect(sqlCrudoSinEmpresa(fuente)).toEqual({ bloques: 7, sinEmpresa: 0 })
+    for (const funcion of adaptador.funciones.filter((f) => /\$queryRaw/.test(f.cuerpo))) {
+      expect(funcion.cuerpo, `${funcion.nombre} usa SQL crudo sin \`const columns = companyScopeColumns(scope)\``).toMatch(
+        /\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/,
+      )
+    }
+  })
+
+  it('ninguna hora entra al SQL desde JS: la del mensaje, la del cursor y la de la marca se calculan en la base', () => {
+    expect(horasDesdeJs(fuente)).toBe(0)
+    for (const funcion of adaptador.funciones) {
+      expect(funcion.parametros, `${funcion.nombre} recibe un \`Date\``).not.toMatch(/:\s*Date\b/)
+    }
+  })
+
+  it('la unica escritura es la marca de lectura de `advanceLastRead`, con `GREATEST` de hecho: solo si la hora nueva es mayor', () => {
+    expect(adaptador.codigo).not.toMatch(
+      /\bdb\s*\.\s*(?:whatsappContact|whatsappMessage)\s*\.\s*(?:update|updateMany|upsert|create|createMany|delete|deleteMany)\s*\(/,
+    )
+    expect(sqlCrudoQueEscribe(fuente)).toHaveLength(1)
+    const escrituras = sqlCrudoQueEscribe(textoDe('advanceLastRead'))
+    expect(escrituras).toHaveLength(1)
+    expect(escrituras[0] ?? '').toMatch(MARCA_QUE_NO_RETROCEDE)
+  })
+})
+
+describe('R39 — sensibilidad: las comprobaciones de conversaciones muerden', () => {
+  it('una hora pasada desde JS al SQL se cuenta', () => {
+    const texto =
+      'await db.$queryRaw`UPDATE "whatsapp_contacts" SET "last_read_at" = ${at}::timestamptz WHERE "id" = ${id}::uuid`\n' +
+      'await db.$queryRaw`SELECT 1 WHERE "created_at" < ${ before.at } :: timestamp`\n'
+    expect(horasDesdeJs(texto)).toBe(2)
+    expect(horasDesdeJs('await db.$queryRaw`SELECT COALESCE(m."meta_timestamp", m."created_at")`')).toBe(0)
+  })
+
+  it('un SQL con alias cuya empresa no sale de `columns` se cuenta como sin empresa', () => {
+    const texto =
+      'await db.$queryRaw`SELECT 1 FROM "whatsapp_contacts" c WHERE c."company_id" = ${companyId}::uuid`\n' +
+      'await db.$queryRaw`SELECT 1 FROM "whatsapp_messages" m WHERE m."contact_id" = ${id}::uuid`\n' +
+      'await db.$queryRaw`SELECT 1 FROM "whatsapp_messages" m WHERE m."company_id" = ${columns.companyId}::uuid`\n'
+    expect(sqlCrudoSinEmpresa(texto)).toEqual({ bloques: 3, sinEmpresa: 2 })
+  })
+
+  it('una marca que se escribe sin la condicion de avance, sin empresa o desde otro valor no casa con la forma', () => {
+    const buena =
+      'UPDATE "whatsapp_contacts" c SET "last_read_at" = target."at", "updated_at" = now() FROM target ' +
+      'WHERE c."company_id" = ${columns.companyId}::uuid AND c."id" = ${contactId}::uuid ' +
+      'AND (c."last_read_at" IS NULL OR c."last_read_at" < target."at")'
+    expect(buena).toMatch(MARCA_QUE_NO_RETROCEDE)
+    expect(buena.replace(' OR c."last_read_at" < target."at"', '')).not.toMatch(MARCA_QUE_NO_RETROCEDE)
+    expect(buena.replace('${columns.companyId}', '${companyId}')).not.toMatch(MARCA_QUE_NO_RETROCEDE)
+    expect(buena.replace('= target."at",', '= ${at}::timestamptz,')).not.toMatch(MARCA_QUE_NO_RETROCEDE)
+  })
+
+  it('un segundo SQL que escribe se ve', () => {
+    const texto =
+      'await db.$queryRaw<{ id: string }[]>`UPDATE "whatsapp_contacts" SET "blocked_at" = NULL`\n' +
+      'await db.$executeRaw`DELETE FROM "whatsapp_messages"`\n' +
+      'await db.$queryRaw`SELECT 1`\n'
+    expect(sqlCrudoQueEscribe(texto)).toHaveLength(2)
   })
 })
 
