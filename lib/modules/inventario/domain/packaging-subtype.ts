@@ -23,3 +23,16 @@ export const PACKAGING_SUBTYPE_VALUES = [
 export function requiresPresentation(subtype: PackagingSubtype): boolean {
   return subtype === PACKAGING_SUBTYPES.CONTAINER;
 }
+
+/**
+ * Si un empaque vivo cuenta como homonimo al dar de alta otro con el mismo nombre. El envase
+ * sin presentacion es legado: se ignora para que un envase nuevo con ese nombre pueda nacer y,
+ * si ya coexisten, los lotes vayan al que tiene presentacion. La consulta de Prisma de
+ * `findAlivePackagingByName` aplica esta misma regla.
+ */
+export function countsAsPackagingHomonym(ref: {
+  readonly packagingSubtype: PackagingSubtype | null;
+  readonly presentationId: string | null;
+}): boolean {
+  return !(ref.packagingSubtype === PACKAGING_SUBTYPES.CONTAINER && ref.presentationId === null);
+}

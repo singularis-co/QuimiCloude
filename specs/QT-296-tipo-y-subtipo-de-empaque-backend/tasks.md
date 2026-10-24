@@ -282,7 +282,7 @@ veredicto es del humano.
 
 **Hecho cuando:** trazabilidad completa y gate local en verde.
 
-## [ ] T11 — El envase legado no cuenta como homónimo (review B1) `[backend_dev]` `[depende de T2, T5]`
+## [x] T11 — El envase legado no cuenta como homónimo (review B1) `[backend_dev]` `[depende de T2, T5]`
 
 Decisión del humano, 2026-10-24 (`requirements.md > Decisiones cerradas`, R43; `design.md > 4.1`
 y `> 4.5`).

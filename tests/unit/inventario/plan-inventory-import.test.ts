@@ -640,6 +640,46 @@ describe('planInventoryImport — QT-296, «Subtipo» de empaque', () => {
   });
 });
 
+describe('planInventoryImport — QT-296, el envase legado no cuenta como homonimo', () => {
+  const GALON_4L = {
+    id: '77777777-7777-4777-8777-777777777777',
+    name: 'Galón 4 L',
+    nameNormalized: 'galon4l',
+    unitId: LITRO.id,
+    content: '4',
+  } as const;
+  const ROW_GALON = { ...ROW_ENVASE, name: 'Galón', presentation: 'Galón 4 L' };
+  const legado = productRef({ id: 'p-galon-legado', nameNormalized: 'galon', type: 'PACKAGING', presentationId: null });
+  const galon4l = productRef({ id: 'p-galon-4l', nameNormalized: 'galon', type: 'PACKAGING', presentationId: GALON_4L.id });
+
+  function catalogo(products: ReturnType<typeof productRef>[]) {
+    return snapshot({ presentations: [...snapshot().presentations, GALON_4L], products });
+  }
+
+  it('R43, R20 con solo el «Galón» legado, una fila «Galón» con presentacion 4 L sale create', () => {
+    expect(legado.packagingSubtype).toBe('CONTAINER');
+    const result = plan(sheet(ROW_GALON), catalogo([legado]));
+    expect(result.rows[0]).toMatchObject({ status: 'create', type: 'PACKAGING', packagingSubtype: 'CONTAINER' });
+    expect(candidateOf(result, 2)).toMatchObject({ packagingSubtype: 'CONTAINER', presentationId: GALON_4L.id });
+  });
+
+  it('R43, R20 con el legado (el primero de la lectura) y el de 4 L coexistiendo, la fila sale add_batch con target el de 4 L', () => {
+    const result = plan(sheet(ROW_GALON), catalogo([legado, galon4l]));
+    expect(result.rows[0]).toMatchObject({
+      status: 'add_batch',
+      packagingSubtype: 'CONTAINER',
+      target: { kind: 'existing', productId: 'p-galon-4l' },
+    });
+  });
+
+  it('R43, R20 con una tapa «Galón» viva, una fila de envase «Galón» sale subtype_mismatch', () => {
+    const tapa = productRef({ id: 'p-tapa-galon', nameNormalized: 'galon', type: 'PACKAGING', packagingSubtype: 'CAP' });
+    const result = plan(sheet(ROW_GALON), catalogo([tapa]));
+    expect(codes(result.rows[0])).toEqual([['subtype_mismatch', 'subtype']]);
+    expect(result.writes.size).toBe(0);
+  });
+});
+
 describe('planInventoryImport — QT-296, «Envase» y «Empaque» en «Tipo»', () => {
   /** Un archivo de antes de la ficha: «Envase» en «Tipo» y sin «Subtipo». */
   const LEGACY_ROWS = [

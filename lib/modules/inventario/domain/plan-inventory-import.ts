@@ -22,7 +22,12 @@ import {
   type ImportRowIssueCode,
   type ImportRowType,
 } from './inventory-import-contract';
-import { PACKAGING_SUBTYPES, requiresPresentation, type PackagingSubtype } from './packaging-subtype';
+import {
+  countsAsPackagingHomonym,
+  PACKAGING_SUBTYPES,
+  requiresPresentation,
+  type PackagingSubtype,
+} from './packaging-subtype';
 import { normalizePresentationName } from './presentation-name';
 import { typedLotSchema } from './product-batch-input';
 import { createProductSchema, isWholeQuantity, PRODUCT_NAME_MAX_LENGTH } from './product-input';
@@ -534,7 +539,10 @@ function resolveIdentity(
     if (requiresPresentation(subtype) && presentation === null) return null;
     const key = `E|${normalized}`;
     const existing = products.find(
-      (product) => product.nameNormalized === normalized && product.type === PRODUCT_TYPES.PACKAGING,
+      (product) =>
+        product.nameNormalized === normalized &&
+        product.type === PRODUCT_TYPES.PACKAGING &&
+        countsAsPackagingHomonym(product),
     );
     const inFile = state.fileProducts.get(key);
     const known = existing ?? inFile;

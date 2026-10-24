@@ -41,6 +41,7 @@ export { isIngredientType, PRODUCT_TYPES, type ProductType } from './domain/prod
 export {
   PACKAGING_SUBTYPES,
   PACKAGING_SUBTYPE_VALUES,
+  countsAsPackagingHomonym,
   requiresPresentation,
   type PackagingSubtype,
 } from './domain/packaging-subtype';

@@ -11,6 +11,8 @@ import { performance } from 'node:perf_hooks';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { inventario } from '@/lib/composition';
+import { normalizeProductName } from '@/lib/modules/inventario/domain/product-name';
+import { findPackageUnitId } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
@@ -315,6 +317,50 @@ describe('importacion de inventario contra la base', () => {
     expect(productos[0]?.packagingSubtype).toBe('CONTAINER');
     expect(productos[0]?.stock.toString()).toBe('8');
     expect(await prisma.productBatch.count({ where: { companyId, productId: productos[0]?.id } })).toBe(2);
+  });
+
+  it('R43 con el «Galón» legado (el mas antiguo) y el de 4 L sembrados, confirmar una fila «Galón» 4 L suma el lote al de 4 L', async () => {
+    const empresa = await nuevaEmpresa();
+    const { companyId } = empresa;
+    const unitId = await sembrarUnidad(empresa);
+    // Sin tilde: `sembrarPresentacion` normaliza el nombre quitando lo que no sea ASCII.
+    const presentacion = `Galon 4 L ${token()}`;
+    const p4l = await sembrarPresentacion(empresa, unitId, { name: presentacion, content: '4' });
+    const unidadEnvases = await findPackageUnitId();
+    if (unidadEnvases === null) throw new Error('falta la unidad de sistema de envases');
+    const envase = (presentationId: string | null, createdAt: Date, unit: string) =>
+      prisma.product.create({
+        data: {
+          name: 'Galón',
+          nameNormalized: normalizeProductName('Galón'),
+          type: 'PACKAGING',
+          packagingSubtype: 'CONTAINER',
+          presentationId,
+          unitId: unit,
+          companyId,
+          createdAt,
+        },
+        select: { id: true },
+      });
+    const legado = (await envase(null, new Date('2020-01-01T00:00:00Z'), unitId)).id;
+    const bueno = (await envase(p4l, new Date('2026-01-01T00:00:00Z'), unidadEnvases)).id;
+    const filas: Partial<ImportCells>[] = [
+      { type: 'Envase', name: 'Galón', presentation: presentacion, stock: '6', unitCost: '1,2', qtyAlert: '1' },
+    ];
+    const { preview, confirm } = wireImport();
+    const actor = actorOf(empresa);
+
+    const vista = await preview(csvFile(filas), actor);
+    const outcome = await confirm({ ...csvFile(filas), importKey: crypto.randomUUID() }, actor);
+
+    expect(vista.kind === 'preview' && vista.rows.map((row) => [row.status, row.packagingSubtype])).toEqual([
+      ['add_batch', 'CONTAINER'],
+    ]);
+    expect((outcome as InventoryImportResult).rows.map((row) => row.status)).toEqual(['batch_added']);
+    expect(await prisma.productBatch.count({ where: { companyId, productId: bueno } })).toBe(1);
+    expect(await prisma.productBatch.count({ where: { companyId, productId: legado } })).toBe(0);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: bueno }, select: { stock: true } })).stock.toString()).toBe('6');
+    expect(await prisma.product.count({ where: { companyId } })).toBe(2);
   });
 
   it.skipIf(process.env.QC209_MEDIR_2000 !== '1')(

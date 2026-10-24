@@ -930,3 +930,36 @@ Notas para QT-297, decididas por el leader (no se tocan aquí):
 - `pnpm exec vitest run guard`: 87/87 archivos, 1276 pasados, 22 omitidos.
 - `vitest related` sobre todo el diff contra `origin/dev`: **no se completó**. Dos ejecuciones paralelas se colgaron durante horas y el leader las mató, y el reintento lo detuvo el sistema por falta de memoria. Con el visto bueno del humano, la suite completa queda para `gate-completo` en CI. Cada tanda ya pasó su `vitest related` (secciones T3/T4, T5, T6, T7 y T8).
 - TP sigue pendiente: espera a que QC-131 esté `done` (R37).
+
+## T11 — El envase legado no cuenta como homónimo (review B1, 2026-10-24)
+
+Decisión del humano (R43, `design.md > 4.1` y `> 4.5`). La **divergencia 3 de T2 queda revertida**:
+un `CONTAINER` con `presentation_id NULL` vuelve a no contar como homónimo, como antes de esta
+ficha. Tapa, medidor y otro sí cuentan aunque no tengan presentación.
+
+`backend_dev` escribió el código y los tests, pero se cayó por un corte de stream antes de
+informar. El implementer revisó el diff y corrió la verificación (abajo).
+
+### Archivos
+- `lib/modules/inventario/domain/packaging-subtype.ts`: predicado puro `countsAsPackagingHomonym(ref)`.
+- `lib/modules/inventario/index.ts`: lo exporta el barrel.
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` (`findAlivePackagingByName`):
+  `NOT: { packagingSubtype: CONTAINER, presentationId: null }`, con el mismo desempate de antes.
+- `lib/modules/inventario/domain/plan-inventory-import.ts` (`resolveIdentity`, rama `PACKAGING`): el `find` usa el predicado.
+- Tests: `tests/unit/inventario/packaging-subtype.test.ts`, `create-product.test.ts` y
+  `plan-inventory-import.test.ts`; `tests/integration/inventario/qt296-packaging-subtype-product.int.test.ts`
+  e `inventory-import-confirm.int.test.ts` (ampliados).
+
+### Mapa R → test
+| R | Tests |
+|---|---|
+| R43 | `packaging-subtype.test.ts` › «R43: el envase sin presentacion (legado) no cuenta como homonimo; con presentacion si», «R43: tapa, medidor y otro cuentan como homonimo aunque no tengan presentacion»; `inventory-import-confirm.int.test.ts` › «R43 con el «Galón» legado (el mas antiguo) y el de 4 L sembrados, confirmar una fila «Galón» 4 L suma el lote al de 4 L» |
+| R43, R9 | `create-product.test.ts` › «R43, R9 — con solo un «Galón» legado, que el adaptador ya no devuelve, …crea el producto», «R43, R9 — una tapa «Galón» homonima sin presentacion sigue contando…»; `qt296-packaging-subtype-product.int.test.ts` › «R43, R9 — con solo un «Galón» legado, … crea un producto nuevo y no toca el legado», «R43, R9 — con el legado (el mas antiguo) y el «Galón» 4 L coexistiendo, … suma el lote al de 4 L», «R43, R9 — con una tapa «Galón» viva, … action_not_allowed…» |
+| R43, R20 | `plan-inventory-import.test.ts` › «R43, R20 con solo el «Galón» legado, … sale create», «R43, R20 con el legado … y el de 4 L coexistiendo, la fila sale add_batch con target el de 4 L», «R43, R20 con una tapa «Galón» viva, … subtype_mismatch» |
+
+### Verificación (implementer; un proceso cada vez, `--maxWorkers=2`, `.env` con `QuimiCloude_QT296`)
+- `pnpm run typecheck`: exit 0. `eslint` sobre los 9 archivos tocados: sin salida (0 errores, 0 avisos).
+- Unit `packaging-subtype`, `create-product` y `plan-inventory-import`: 3 archivos, **159/159**.
+- Int `qt296-packaging-subtype-product` e `inventory-import-confirm`: 2 archivos, **15 pasados y 1 omitido** (el `skipIf(QC209_MEDIR_2000)` de siempre).
+- Int `qc195-packaging-list` y `qc195-packaging-catalog` (siembran legados): **9/9**. `qc195-packaging-product`: **8/8**.
+- `pnpm exec vitest run guard`: 87/87 archivos, 1276 pasados, 22 omitidos.

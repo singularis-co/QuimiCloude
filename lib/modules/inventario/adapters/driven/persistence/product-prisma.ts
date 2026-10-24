@@ -564,6 +564,8 @@ export async function findAlivePackagingByName(
           type: PRODUCT_TYPES.PACKAGING,
           deletedAt: null,
         },
+        // Misma regla que `countsAsPackagingHomonym`: el envase sin presentacion no cuenta.
+        { NOT: { packagingSubtype: PACKAGING_SUBTYPES.CONTAINER, presentationId: null } },
       ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],

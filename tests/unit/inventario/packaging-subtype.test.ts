@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { PACKAGING_SUBTYPES, PACKAGING_SUBTYPE_VALUES, requiresPresentation } from '@/lib/modules/inventario';
+import {
+  countsAsPackagingHomonym,
+  PACKAGING_SUBTYPES,
+  PACKAGING_SUBTYPE_VALUES,
+  requiresPresentation,
+} from '@/lib/modules/inventario';
 import {
   CATALOG_LINE_PACKAGING_SUBTYPES,
   CATALOG_LINE_PACKAGING_SUBTYPES_VALUES,
@@ -64,6 +69,17 @@ describe('espejos del subtipo de empaque y del tipo de la linea de catalogo', ()
     expect(PACKAGING_SUBTYPE_VALUES.filter((subtype) => requiresPresentation(subtype))).toEqual([
       PACKAGING_SUBTYPES.CONTAINER,
     ]);
+  });
+
+  it('R43: el envase sin presentacion (legado) no cuenta como homonimo; con presentacion si', () => {
+    expect(countsAsPackagingHomonym({ packagingSubtype: PACKAGING_SUBTYPES.CONTAINER, presentationId: null })).toBe(false);
+    expect(countsAsPackagingHomonym({ packagingSubtype: PACKAGING_SUBTYPES.CONTAINER, presentationId: 'p-4l' })).toBe(true);
+  });
+
+  it('R43: tapa, medidor y otro cuentan como homonimo aunque no tengan presentacion', () => {
+    for (const subtype of [PACKAGING_SUBTYPES.CAP, PACKAGING_SUBTYPES.MEASURER, PACKAGING_SUBTYPES.OTHER]) {
+      expect(countsAsPackagingHomonym({ packagingSubtype: subtype, presentationId: null }), subtype).toBe(true);
+    }
   });
 
   it('R1, R24: db/schema.prisma declara las columnas con su enum, anulables y en snake_case', () => {

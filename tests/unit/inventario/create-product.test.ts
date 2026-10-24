@@ -1223,6 +1223,55 @@ describe('QT-296 — homonimo de un empaque por subtipo', () => {
   });
 });
 
+describe('QT-296 — el envase legado no cuenta como homonimo', () => {
+  const UNIDAD_ENVASES = 'unidad-u';
+  const packageUnit = { findPackageUnitId: vi.fn(async () => UNIDAD_ENVASES) };
+  const ALTA_GALON = {
+    name: 'Galón',
+    type: PRODUCT_TYPES.PACKAGING,
+    qtyAlert: '0',
+    presentationId: PRESENTACION,
+    stock: '10',
+    unitCost: '1.2000',
+  };
+
+  it('R43, R9 — con solo un «Galón» legado, que el adaptador ya no devuelve, el alta de «Galón» con presentacion crea el producto', async () => {
+    // El doble devuelve `null`: es lo que hace el adaptador cuando el unico homonimo es un legado.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await createProduct(ALTA_GALON, ADMIN);
+
+    expect(products.findAlivePackagingByName).toHaveBeenCalledWith('Galón', { companyId: EMPRESA });
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+    const llamada = products.createWithFirstBatch.mock.calls[0];
+    expect(llamada?.[0]).toEqual({ name: 'Galón', qtyAlert: '0', type: PRODUCT_TYPES.PACKAGING });
+    expect(llamada?.[4]).toEqual({
+      presentationId: PRESENTACION,
+      unitId: UNIDAD_ENVASES,
+      packagingSubtype: PACKAGING_SUBTYPES.CONTAINER,
+    });
+  });
+
+  it('R43, R9 — una tapa «Galón» homonima sin presentacion sigue contando: el alta de un envase «Galón» da action_not_allowed', async () => {
+    const products = montarRepositorio({
+      findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
+        id: 'tapa-galon',
+        presentationId: null,
+        packagingSubtype: PACKAGING_SUBTYPES.CAP,
+      })),
+    });
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    const alta = createProduct(ALTA_GALON, ADMIN);
+
+    await expect(alta).rejects.toBeInstanceOf(ActionNotAllowedError);
+    await expect(alta).rejects.toMatchObject({ code: 'action_not_allowed' });
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+});
+
 describe('QC-199 — alta de insumo por unidad', () => {
   it('R7 una unidad inexistente o de otra empresa es invalid_input y no escribe', async () => {
     const products = montarRepositorio();
