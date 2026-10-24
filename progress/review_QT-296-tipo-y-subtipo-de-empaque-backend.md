@@ -117,3 +117,50 @@ Las divergencias 1, 2, 7, 9, 10 y 12, más la que salga de B1, piden que `spec_a
 **RECHAZADO** (changes required): 1 bloqueante (B1) y 3 menores (m1–m3).
 
 El resto de la ficha está bien. La migración es correcta y reversible, los límites de módulo y el aislamiento por empresa se cumplen, la trazabilidad R1–R42 está completa (R37 pendiente de TP, aceptado) y los tests revisados pasan. La vuelta 2 puede acotarse al diff que resuelva B1, más el rebase de m1.
+
+## Vuelta 2 (acotada a 99ccc04a..ae4f5a9b)
+
+Revisado: `a64755a1` (fix B1/T11), la resolución de conflicto de `cee4fcb0` (solo
+`tests/guards/guard-identificador-de-request.test.ts`; lo entrante de `dev` no se revisa) y
+`ae4f5a9b` (bitácora). La enmienda del spec `3cc88579` (R43, §4.1, §4.5, §7, §13) es la referencia.
+
+### Checklist
+- [x] **B1, regla única.** `countsAsPackagingHomonym` (dominio) excluye solo `CONTAINER` con
+  `presentationId === null`; `resolveIdentity` lo aplica y `findAlivePackagingByName` aplica la
+  misma regla en Prisma (`NOT: { packagingSubtype: CONTAINER, presentationId: null }`). El SQL
+  `NOT (a AND b)` no deja escapar filas por NULL: el CHECK `products_packaging_subtype_matches_type`
+  garantiza `packaging_subtype NOT NULL` en todo `PACKAGING`. Tapa, medidor y otro siguen contando.
+- [x] **B1, escenario «legado solo»**: alta manual (unit `create-product.test.ts` y
+  `qt296-packaging-subtype-product.int.test.ts`: se crea producto nuevo, el legado no se toca) y
+  Excel (unit `plan-inventory-import.test.ts`: fila sale `create` con la presentación).
+- [x] **B1, escenario «coexistiendo»**: alta manual (`.int`: el adaptador devuelve el de 4 L aunque
+  el legado es más antiguo; el lote se suma a él, stock 20, legado intacto) y Excel (unit: `add_batch`
+  con target el de 4 L; `.int` de confirmación: `batch_added`, lote en el bueno, 0 en el legado, 2
+  productos).
+- [x] **Contra-caso** (tapa homónima sigue contando → `action_not_allowed` / `subtype_mismatch`)
+  cubierto en unit, `.int` y Excel. R9, R20 y R43 trazados a tests no vacíos.
+- [x] **T11** marcada `[x]`. Única tarea abierta: TP `[HUMANO]` `[BLOQUEADA]`, ya aceptada en la vuelta 1.
+- [x] **m1.** `MIGRACIONES_ESPERADAS` queda en orden cronológico: `…_ai_models`,
+  `20261023120000_whatsapp_send_permission`, `20261023130000_whatsapp_outbound_messages`,
+  `20261023150000_packaging_subtype`, que coincide con `db/migrations/`. El `--cc` del merge solo
+  muestra esa resolución; no hay cambios «malvados» en el área de la rama.
+- [x] **m2.** Anotado como deuda en `design.md > 7` (Enmienda F2.2, divergencia 4).
+- [x] **m3.** Enmiendas en `design.md` (cabecera, §2.2, §2.3, §4.1, §4.5, §5.2, §6.3, §6.4 y tabla §13).
+- [x] **Ámbito.** `countsAsPackagingHomonym` y `findAlivePackagingByName` solo se consumen dentro de
+  `inventario` (alta y planificador del Excel; la composición solo cablea). El fix no toca piezas
+  compartidas: la vuelta no se amplía.
+
+### Verificación ejecutada
+- `tsc --noEmit`: exit 0.
+- `eslint` sobre los 8 archivos tocados del rango: exit 0.
+- `vitest run` (`--maxWorkers=2`): `packaging-subtype`, `plan-inventory-import`, `create-product`,
+  `guard-identificador-de-request` → 4 archivos, 182 tests en verde.
+- `qt296-packaging-subtype-product.int.test.ts` → 6/6 en verde.
+- `inventory-import-confirm.int.test.ts` → 9 en verde, 1 skip preexistente (`QC209_MEDIR_2000`, medición).
+- `gate-completo`: lo corre el CI sobre el PR.
+
+### Hallazgos
+Ninguno nuevo. B1 cerrado; m1, m2 y m3 cerrados.
+
+### Veredicto
+**OK.** 0 bloqueantes, 0 menores abiertos.
