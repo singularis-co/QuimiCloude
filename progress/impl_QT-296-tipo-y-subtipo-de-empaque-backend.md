@@ -827,3 +827,106 @@ Ninguna de las dos se tocó. R38 (mitad E2E) en verde.
 ```
 
 **Veredicto T9:** R36 y R40 en verde, sin codigo de produccion ni dependencias nuevas; no aparecio ningun bug real.
+
+## T10 — Cierre (2026-10-24)
+
+### Commits de la rama (sobre `5db868e1`)
+| Commit | Tasks |
+|---|---|
+| `98c067c7` feat: subtipo de empaque en la base y en el alta de producto | T0, T1, T2 |
+| `0a1e3e44` feat: subtipo en lecturas y reparto, y tipo en la linea de catalogo | T3, T4, T6 |
+| `3efec93d` feat: tipo y subtipo en la lectura del catalogo desde PDF | T7 |
+| `7688557d` feat: columna Subtipo y Empaque como tipo en el Excel de inventario | T5 |
+| `c6b754c8` test: tipo y subtipo en el doble de IA del catalogo | T8 |
+| `363fe495` docs: salida de las E2E de T8 | T8 |
+| `de1ef3f5` test: aislamiento por empresa y alcance del diff | T9 |
+
+### Mapa R1..R42 -> test (resumen; el detalle por caso está en el «Mapa R → test» de cada task)
+| R | Test(s) | Task |
+|---|---|---|
+| R1 | `unit/inventario/packaging-subtype.test.ts`, `integration/inventario/qt296-packaging-subtype-constraints.int.test.ts` | T1 |
+| R2, R3 | `integration/inventario/qt296-packaging-subtype-constraints.int.test.ts` | T1 |
+| R4 | `integration/inventario/qt296-packaging-subtype-migration.int.test.ts` | T1 |
+| R5–R8, R10 | `unit/inventario/product-input.test.ts` (+ `product-actions.test.ts` R5/R7, `qt296-packaging-subtype-product.int.test.ts` R5/R7) | T2 |
+| R9 | `unit/inventario/create-product.test.ts`, `qt296-packaging-subtype-product.int.test.ts` | T2 |
+| R11, R12 | `integration/inventario/list-query-products.int.test.ts`, `unit/inventario/product-prisma.test.ts`, `unit/shared/listas-blancas-listados.test.ts` (R12) | T3 |
+| R13, R14 | `integration/inventario/qt296-only-containers.int.test.ts`, `integration/pedidos/qt296-distribution-rejects-caps.int.test.ts` (R14) | T4 |
+| R39 | `integration/pedidos/qt296-distribution-rejects-caps.int.test.ts` | T4 |
+| R15–R20 | `unit/inventario/plan-inventory-import.test.ts` | T5 |
+| R21 | `unit/inventario/inventory-import-downloads.test.ts`, `unit/inventario/import-sheet-limits.test.ts` | T5 |
+| R22 | `integration/inventario/inventory-import-confirm.int.test.ts` | T5 |
+| R41 | `unit/inventario/import-cell-parsing.test.ts`, `plan-inventory-import.test.ts`, `inventory-import-confirm.int.test.ts` | T5 |
+| R42 | `unit/inventario/inventory-import-downloads.test.ts` | T5 |
+| R23, R24 | `integration/proveedores/qt296-catalog-line-type.int.test.ts` | T1 |
+| R25 | `integration/proveedores/qt296-catalog-line-type.int.test.ts`, `unit/inventario/schema/qt296-packaging-subtype-migration.test.ts` | T1 |
+| R26, R27 | `unit/proveedores/catalog-line-input.test.ts`, `integration/proveedores/catalog-line.int.test.ts` | T6 |
+| R28 | `integration/proveedores/catalog-line.int.test.ts` (listado), `catalog-import-upsert.int.test.ts` (lectura por identidad) | T6 |
+| R29, R30 | `unit/documentos/catalog-extraction.test.ts` | T7 |
+| R31, R32 | `unit/documentos/preview-catalog-import.test.ts`, `classify-catalog-import.test.ts`, `confirm-catalog-import.test.ts` | T7 |
+| R33 | `integration/proveedores/catalog-import-upsert.int.test.ts`, `unit/documentos/confirm-catalog-import.test.ts` | T6, T7 |
+| R34 | `unit/proveedores/imported-classification.test.ts`, `catalog-import-upsert.int.test.ts` | T6 |
+| R35 | `catalog-import-upsert.int.test.ts`, `unit/documentos/classify-catalog-import.test.ts` | T6, T7 |
+| R36 | `unit/documentos/qt296-alcance.test.ts` | T9 |
+| R37 | **TP (humana): PENDIENTE hasta que QC-131 esté `done`** (decisión cerrada por el humano). Sin test automático: la verifica la sección firmada de `docs/revision-de-prompts.md`. | TP |
+| R38 | `unit/documentos/ai-reader-canned.test.ts`; E2E `catalogo-desde-pdf.spec.ts` (2 passed) y `documentos.spec.ts` (6 passed) | T8 |
+| R40 | `integration/inventario/qt296-company-scope.int.test.ts` + los tres tests de autorización sin cambios | T9 |
+
+Sin huecos salvo R37, que espera a TP.
+
+### TP — pendiente
+TP **no se hizo** y queda sin marcar en `tasks.md`. Es humana, está bloqueada hasta que QC-131 esté
+`done` y no bloquea ninguna otra task.
+
+### Divergencias con el spec (para que `spec_author` enmiende `design.md`)
+1. **§2.2, CHECK de R24.** `"packaging_subtype" IS NULL OR "type" = 'PACKAGING_MATERIAL'` deja pasar
+   un subtipo sin tipo (el CHECK se evalúa a `NULL`). La migración usa
+   `"type" IS NOT DISTINCT FROM 'PACKAGING_MATERIAL'`. Lo detectó el test de R24.
+2. **§2.3, `<ts>` de la migración = `20261023150000`.** `origin/dev` ya tiene `20261023120000_*` y
+   `20261023130000_*`.
+3. **Orden T1 → T2.** T1 sola no cierra en verde: el CHECK de R2 rompe toda alta de empaque hasta T2
+   (126 fallos en 18 suites). Se commitearon juntas, y 4 tests que siembran empaques a mano ganaron
+   solo `packagingSubtype`.
+4. **Campos opcionales en lugar de obligatorios.** `PackagingIdentity.packagingSubtype` (§4.1) y
+   `ProductView.packagingSubtype` (§4.3). Con campos obligatorios habría que tocar 5 helpers de siembra y
+   unos 30 fixtures de UI. Los adaptadores de lectura siempre lo rellenan.
+5. **`create-product.test.ts`.** Dos expectativas de QC-195 («R1, R6», «R11») ganan
+   `packagingSubtype: CONTAINER`, porque la identidad nueva lo exige.
+6. **R13/R14.** Con datos válidos, los tests no distinguen el filtro `CONTAINER` nuevo de la guarda
+   anterior (`presentationId != null` + CHECK de R3). El filtro es la defensa que pide el diseño.
+7. **§5, forma del puerto de edición.** La clasificación va como campo de `data`
+   (`CatalogLineReplacement`) y no como parámetro `classification?` aparte. El alta y la importación usan
+   `CatalogLineFields`, con los dos campos obligatorios y anulables.
+8. **§5, R28 «detalle».** `proveedores` no tiene lectura de una línea por id. R28 se prueba sobre el
+   listado y sobre la lectura por identidad.
+9. **§6.3, el clasificador conserva `createCatalogLineSchema.shape`.** No pasa a
+   `catalogLineFieldsShape`: con zod 4, `.shape` sobrevive a `superRefine`.
+10. **§6.4, campos de la fila revisada opcionales.** `ReviewedLineInput.type` y `.packagingSubtype` son
+    opcionales en el tipo inferido, y el `?? null` se aplica en `fromReviewedLine` y en la confirmación.
+    Un `.transform` en el borde volvería obligatorio el campo y rompería `catalog-import-review.tsx` (QT-297).
+11. **§6.3, subtipo sin tipo.** La fila revisada sale «incompleta» por `packagingSubtype`, aplicando
+    la regla tal cual.
+12. **§4.5, subtipo ilegible en un empaque.** Da `subtype_invalid` con `packagingSubtype = null`.
+    `presentation` queda sin regla y el resto se valida como envase.
+13. **Excepción de UI aprobada por el humano (2026-10-23).** En `import-texts.ts`
+    (`GUIDE_COLUMN_DESCRIPTION_TEXTS`) se añadió la entrada `subtype` y el texto de `type` pasó a decir «Empaque»,
+    con el texto exacto del humano. Sin ese cambio no compila, porque `ImportColumnKey` gana `subtype`. QT-297
+    pulirá el texto.
+14. **Exports nuevos en `inventario/index.ts`**, para QT-297. El leader los dio por buenos.
+
+Notas para QT-297, decididas por el leader (no se tocan aquí):
+- el mensaje de `type_invalid` sigue diciendo «Envase»;
+- la hoja «Valores disponibles» no lista subtipos.
+
+### Verificación final
+- `./init.sh` (rápido): rojo en el validador de features, antes de los tests. Las causas son del
+  board: ids QC/QT duplicados, features en vuelo sin assignee y el cupo de backend. El leader lo
+  conoce y lo acepta. Por eso las comprobaciones se corren a mano, abajo.
+- Limpieza de comentarios: ninguna línea de producción añadida (`lib/`, `app/`, `db/schema.prisma`,
+  la migración) cita fichas, requisitos, TODO ni FIXME.
+
+### Verificación final del leader (2026-10-24)
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 10 avisos (los mismos 10 de antes).
+- `pnpm exec vitest run guard`: 87/87 archivos, 1276 pasados, 22 omitidos.
+- `vitest related` sobre todo el diff contra `origin/dev`: **no se completó**. Dos ejecuciones paralelas se colgaron durante horas y el leader las mató, y el reintento lo detuvo el sistema por falta de memoria. Con el visto bueno del humano, la suite completa queda para `gate-completo` en CI. Cada tanda ya pasó su `vitest related` (secciones T3/T4, T5, T6, T7 y T8).
+- TP sigue pendiente: espera a que QC-131 esté `done` (R37).

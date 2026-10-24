@@ -269,7 +269,7 @@ que QC-131 esté `done`, y se hace sobre el texto que QC-131 dejó firmado en Ve
 ningún **mal** (R37). El arnés solo puede comprobar que las filas y la sección existen; el
 veredicto es del humano.
 
-## [ ] T10 — Cierre `[depende de T1–T9]`
+## [x] T10 — Cierre `[depende de T1–T9]`
 
 - `progress/impl_QT-296.md` con el mapa `R1..R42 -> test` sin huecos. R37 queda mapeado a TP y,
   si TP no ha cerrado, se declara pendiente porque espera a que QC-131 esté `done`.
