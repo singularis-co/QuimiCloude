@@ -2842,6 +2842,8 @@ import {
   createGetWhatsappChat,
   createMarkWhatsappChatRead,
   createListSendableWhatsappTemplates,
+  createGetWhatsappChatContext,
+  createGetWhatsappMedia,
 } from '@/lib/modules/integraciones';
 import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
 import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
@@ -3032,6 +3034,24 @@ const whatsappConversationDeps = {
   variableKeys: whatsappVariableKeyRepository,
   mediaUrlOf: whatsappMediaPath,
 };
+const whatsappChatContextDeps = {
+  connections: whatsappConnectionRepository,
+  conversations: whatsappConversationRepository,
+  customers: customerCatalog,
+  customerOrders: customerOrderDirectory,
+  deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
+  presentations: presentationCatalog,
+  recipes: recipeCatalog,
+  companyName: identity.getCompanyName,
+  variableKeys: whatsappVariableKeyRepository,
+};
+const whatsappMediaDeps = {
+  connections: whatsappConnectionRepository,
+  conversations: whatsappConversationRepository,
+  customers: customerCatalog,
+  graph: whatsappGraphClient,
+  cipher: secretCipher,
+};
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
@@ -3164,6 +3184,8 @@ export const integraciones = {
   getWhatsappChat: createGetWhatsappChat(whatsappConversationDeps),
   markWhatsappChatRead: createMarkWhatsappChatRead(whatsappConversationDeps),
   listSendableWhatsappTemplates: createListSendableWhatsappTemplates(whatsappConversationDeps),
+  getWhatsappChatContext: createGetWhatsappChatContext(whatsappChatContextDeps),
+  getWhatsappMedia: createGetWhatsappMedia(whatsappMediaDeps),
 } as const;
 
 import {

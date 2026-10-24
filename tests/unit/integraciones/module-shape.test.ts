@@ -162,6 +162,7 @@ const MODULE_CODE_FILES = [
   // QC-239 2026-10-20: las cuatro Server Actions de vincular, desvincular y bloquear un contacto.
   'adapters/driving/whatsapp-contact-actions.ts',
   'adapters/driving/whatsapp-conversation-actions.ts',
+  'adapters/driving/whatsapp-media-route.ts',
   'adapters/driving/whatsapp-message-actions.ts',
   'adapters/driving/whatsapp-template-actions.ts',
   'adapters/driving/whatsapp-template-cron-route.ts',
@@ -445,7 +446,7 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, la regla, el recalculo y las tres acciones sobre contactos, QC-239, y las de plantillas con su diccionario, QC-242, y el envio y el reintento con su error de faltantes y su vista, QC-240, y R40: las cuatro consultas de conversaciones con sus tipos, QC-245), y solo desde ./domain; el validador sin claves ya no sale', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, la regla, el recalculo y las tres acciones sobre contactos, QC-239, y las de plantillas con su diccionario, QC-242, y el envio y el reintento con su error de faltantes y su vista, QC-240, y R40: las cuatro consultas de conversaciones con sus tipos, QC-245, y R58: el contexto del chat y el archivo de un medio con sus tipos y el error de pedido), y solo desde ./domain; el validador sin claves ya no sale', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
@@ -487,6 +488,7 @@ describe('la forma del modulo integraciones', () => {
       'WHATSAPP_VARIABLE_KEY_PATTERN',
       'WhatsappChat',
       'WhatsappChatAttachment',
+      'WhatsappChatContext',
       'WhatsappChatMessage',
       'WhatsappConnectionExistsError',
       'WhatsappConnectionNotFoundError',
@@ -496,12 +498,15 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappContactNumberInvalidError',
       'WhatsappConversationItem',
       'WhatsappConversationList',
+      'WhatsappCustomerOrder',
       'WhatsappDictionaryEntryView',
+      'WhatsappMediaResult',
       'WhatsappMessageDirection',
       'WhatsappMessageStatus',
       'WhatsappMessageType',
       'WhatsappMetaRejectedError',
       'WhatsappMetaUnreachableError',
+      'WhatsappOrderNotFoundError',
       'WhatsappOutboundMessageView',
       'WhatsappPhoneNumberTakenError',
       'WhatsappSendableTemplate',
@@ -535,7 +540,9 @@ describe('la forma del modulo integraciones', () => {
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
       'createGetWhatsappChat',
+      'createGetWhatsappChatContext',
       'createGetWhatsappConnection',
+      'createGetWhatsappMedia',
       'createGetWhatsappTemplate',
       'createLinkWhatsappContact',
       'createListSendableWhatsappTemplates',
@@ -598,12 +605,15 @@ describe('la forma del modulo integraciones', () => {
       'TestSavedAiProviderResult',
       'WhatsappChat',
       'WhatsappChatAttachment',
+      'WhatsappChatContext',
       'WhatsappChatMessage',
       'WhatsappConnectionStatus',
       'WhatsappConnectionView',
       'WhatsappConversationItem',
       'WhatsappConversationList',
+      'WhatsappCustomerOrder',
       'WhatsappDictionaryEntryView',
+      'WhatsappMediaResult',
       'WhatsappMessageDirection',
       'WhatsappMessageStatus',
       'WhatsappMessageType',
@@ -698,7 +708,7 @@ describe('la forma del modulo integraciones', () => {
     expect(ajenos).toEqual([])
   })
 
-  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, la ruta del webhook (QC-238) y la del cron de plantillas (QC-242)', () => {
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, la ruta del webhook (QC-238), la del cron de plantillas (QC-242) y, R58, la del archivo de un medio', () => {
     expect(filesImportingTheModule()).toEqual([
       'lib/composition/index.ts',
       'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts',
@@ -736,6 +746,7 @@ describe('la forma del modulo integraciones', () => {
       'app/(private)/produccion/formulas/page.tsx',
       'app/(private)/proveedores/[id]/page.tsx',
       'app/api/cron/sincronizar-plantillas-whatsapp/route.ts',
+      'app/api/integraciones/whatsapp/media/[mensajeId]/route.ts',
       'app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts',
     ])
   })
@@ -778,7 +789,7 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), vincular, desvincular y bloquear contactos (QC-239) y las plantillas con su diccionario, relacionar y habilitar, y el secreto del cron (QC-242), y el envio y el reintento (QC-240), y R40: las cuatro consultas de conversaciones (QC-245), con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), vincular, desvincular y bloquear contactos (QC-239) y las plantillas con su diccionario, relacionar y habilitar, y el secreto del cron (QC-242), y el envio y el reintento (QC-240), y R40: las cuatro consultas de conversaciones (QC-245), y R58: el contexto del chat y el archivo de un medio, con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
@@ -793,7 +804,9 @@ describe('la forma del modulo integraciones', () => {
       'getAiProviderReadiness',
       'getAiProviderStatus',
       'getWhatsappChat',
+      'getWhatsappChatContext',
       'getWhatsappConnection',
+      'getWhatsappMedia',
       'getWhatsappTemplate',
       'linkWhatsappContact',
       'listSendableWhatsappTemplates',
@@ -850,6 +863,42 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.whatsappSendCustomerPhones).toBe('CustomerPhoneLinks')
     expect(cableado?.typeOf.whatsappSendLog).toBe('WhatsappSendLog')
     expect(cableado?.typeOf.whatsappConversationRepository).toBe('WhatsappConversationRepository')
+    expect(cableado?.typeOf.customerOrderDirectory).toBe('CustomerOrderDirectory')
+  })
+
+  it('R58: el contexto del chat se cablea con los pedidos del cliente, el nombre de la empresa y los catalogos por contrato, y el archivo con Graph y el cifrado', () => {
+    const fuente = readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8')
+    expect(fuente).toContain('getWhatsappChatContext: createGetWhatsappChatContext(whatsappChatContextDeps),')
+    expect(fuente).toContain('getWhatsappMedia: createGetWhatsappMedia(whatsappMediaDeps),')
+    const bloque = (nombre: string): string => {
+      const inicio = fuente.indexOf(`const ${nombre} = {`)
+      expect(inicio, nombre).toBeGreaterThanOrEqual(0)
+      return fuente.slice(inicio, fuente.indexOf('};', inicio))
+    }
+    const contexto = bloque('whatsappChatContextDeps')
+    for (const linea of [
+      'connections: whatsappConnectionRepository,',
+      'conversations: whatsappConversationRepository,',
+      'customers: customerCatalog,',
+      'customerOrders: customerOrderDirectory,',
+      'deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },',
+      'presentations: presentationCatalog,',
+      'recipes: recipeCatalog,',
+      'companyName: identity.getCompanyName,',
+      'variableKeys: whatsappVariableKeyRepository,',
+    ]) {
+      expect(contexto, linea).toContain(linea)
+    }
+    const medio = bloque('whatsappMediaDeps')
+    for (const linea of [
+      'connections: whatsappConnectionRepository,',
+      'conversations: whatsappConversationRepository,',
+      'customers: customerCatalog,',
+      'graph: whatsappGraphClient,',
+      'cipher: secretCipher,',
+    ]) {
+      expect(medio, linea).toContain(linea)
+    }
   })
 
   it('R19: el lector del cableado ve un miembro de mas y un tipo que no es el puerto', () => {
@@ -862,10 +911,11 @@ describe('la forma del modulo integraciones', () => {
     expect(integracionesWiring('export const otra = {}\n')).toBeNull()
   })
 
-  it('R34, R40: whatsapp-conversation-actions.ts exporta exactamente las cuatro consultas y ninguna accion de envio', () => {
+  it('R34, R40, R58: whatsapp-conversation-actions.ts exporta exactamente las cinco consultas (con el contexto del chat) y ninguna accion de envio', () => {
     const fuente = readFileSync(join(moduleDir, 'adapters', 'driving', 'whatsapp-conversation-actions.ts'), 'utf8')
     expect(actionExports(fuente).sort()).toEqual([
       'getWhatsappChatAction',
+      'getWhatsappChatContextAction',
       'listSendableWhatsappTemplatesAction',
       'listWhatsappConversationsAction',
       'markWhatsappChatReadAction',

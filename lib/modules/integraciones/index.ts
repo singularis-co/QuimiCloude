@@ -22,6 +22,7 @@ export {
   WhatsappTemplateNotMappedError,
   WhatsappTemplateNotMappableError,
   WhatsappTemplateValuesMissingError,
+  WhatsappOrderNotFoundError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -140,3 +141,6 @@ export { createListWhatsappConversations } from './domain/list-whatsapp-conversa
 export { createGetWhatsappChat } from './domain/get-whatsapp-chat';
 export { createMarkWhatsappChatRead } from './domain/mark-whatsapp-chat-read';
 export { createListSendableWhatsappTemplates } from './domain/list-sendable-whatsapp-templates';
+export type { WhatsappChatContext, WhatsappCustomerOrder } from './domain/whatsapp-chat-context';
+export { createGetWhatsappChatContext } from './domain/get-whatsapp-chat-context';
+export { createGetWhatsappMedia, type WhatsappMediaResult } from './domain/get-whatsapp-media';

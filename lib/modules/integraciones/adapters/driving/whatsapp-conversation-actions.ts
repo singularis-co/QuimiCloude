@@ -16,9 +16,11 @@ import {
   type Actor,
   type WhatsappChat,
   type WhatsappChatAttachment,
+  type WhatsappChatContext,
   type WhatsappChatMessage,
   type WhatsappConversationItem,
   type WhatsappConversationList,
+  type WhatsappCustomerOrder,
   type WhatsappSendableTemplate,
   type WhatsappTemplateButton,
 } from '@/lib/modules/integraciones';
@@ -31,6 +33,7 @@ export type WhatsappConversationListResult = ActionResult<WhatsappConversationLi
 export type WhatsappChatResult = ActionResult<WhatsappChat>;
 export type WhatsappChatReadResult = ActionResult<{ unreadCount: number }>;
 export type WhatsappSendableTemplatesResult = ActionResult<{ templates: readonly WhatsappSendableTemplate[] }>;
+export type WhatsappChatContextResult = ActionResult<WhatsappChatContext>;
 
 const toErrorState = createErrorStateTranslator(IntegracionesError, observabilidad.readRequestIdHeader);
 
@@ -162,6 +165,33 @@ function sendableTemplateOf(template: WhatsappSendableTemplate): WhatsappSendabl
   };
 }
 
+function customerOrderOf(order: WhatsappCustomerOrder): WhatsappCustomerOrder {
+  return {
+    id: order.id,
+    number: order.number,
+    status: order.status,
+    requestedAt: order.requestedAt,
+    total: order.total,
+    productName: order.productName,
+    lines: order.lines.map((line) => ({
+      presentationId: line.presentationId,
+      presentationName: line.presentationName,
+      ordered: line.ordered,
+      delivered: line.delivered,
+      pending: line.pending,
+    })),
+  };
+}
+
+function chatContextOf(context: WhatsappChatContext): WhatsappChatContext {
+  return {
+    customer: { id: context.customer.id, name: context.customer.name },
+    orders: context.orders.map(customerOrderOf),
+    selectedOrderId: context.selectedOrderId,
+    values: { ...context.values },
+  };
+}
+
 export async function listWhatsappConversationsAction(input: {
   search?: string;
   blocked?: 'all' | 'blocked' | 'not_blocked';
@@ -207,4 +237,12 @@ export async function listSendableWhatsappTemplatesAction(): Promise<WhatsappSen
     const { templates } = await integraciones.listSendableWhatsappTemplates(actor);
     return { templates: templates.map(sendableTemplateOf) };
   });
+}
+
+/** Solo lee: no mueve la marca de lectura. */
+export async function getWhatsappChatContextAction(input: {
+  target: ChatTarget;
+  orderId?: string;
+}): Promise<WhatsappChatContextResult> {
+  return run(async (actor) => chatContextOf(await integraciones.getWhatsappChatContext(input, actor)));
 }

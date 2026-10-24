@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import * as conversationActions from '@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions'
 import {
   getWhatsappChatAction,
+  getWhatsappChatContextAction,
   listSendableWhatsappTemplatesAction,
   listWhatsappConversationsAction,
   markWhatsappChatReadAction,
@@ -19,18 +20,21 @@ import {
   UnauthorizedError,
   ValidationError,
   WhatsappContactNotFoundError,
+  WhatsappOrderNotFoundError,
   type WhatsappChat,
+  type WhatsappChatContext,
   type WhatsappConversationList,
   type WhatsappSendableTemplate,
 } from '@/lib/modules/integraciones'
 import { WhatsappMessageNotFoundError } from '@/lib/modules/integraciones/domain/errors'
 
-const { listMock, chatMock, markMock, templatesMock, getSessionUserMock, getSessionContextMock, readRequestIdHeaderMock } =
+const { listMock, chatMock, markMock, templatesMock, contextMock, getSessionUserMock, getSessionContextMock, readRequestIdHeaderMock } =
   vi.hoisted(() => ({
     listMock: vi.fn(),
     chatMock: vi.fn(),
     markMock: vi.fn(),
     templatesMock: vi.fn(),
+    contextMock: vi.fn(),
     getSessionUserMock: vi.fn(),
     getSessionContextMock: vi.fn(),
     readRequestIdHeaderMock: vi.fn(async () => '7c9e6679-7425-40de-944b-e07fc1f90ae7'),
@@ -44,6 +48,7 @@ vi.mock('@/lib/composition', () => ({
     getWhatsappChat: chatMock,
     markWhatsappChatRead: markMock,
     listSendableWhatsappTemplates: templatesMock,
+    getWhatsappChatContext: contextMock,
   },
 }))
 
@@ -191,18 +196,49 @@ const TEMPLATE: WhatsappSendableTemplate = {
   ],
 }
 
+const ORDER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const PRESENTATION_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+
+const CONTEXT: WhatsappChatContext = {
+  customer: { id: CUSTOMER_ID, name: SECRET_NAME },
+  orders: [
+    {
+      id: ORDER_ID,
+      number: '2026-0000128',
+      status: 'EN_CURSO',
+      requestedAt: '2026-10-23T10:00:00.000Z',
+      total: null,
+      productName: 'Cloro 5%',
+      lines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidón 20 L', ordered: 10, delivered: 6, pending: 4 }],
+    },
+  ],
+  selectedOrderId: ORDER_ID,
+  values: {
+    'cliente.nombre': SECRET_NAME,
+    'empresa.nombre': 'Agua Pura',
+    'pedido.numero': '2026-0000128',
+    'pedido.estado': 'en preparación',
+    'pedido.fecha_solicitud': '23/10/2026',
+    'pedido.total': null,
+    'pedido.detalle': '10 × Bidón 20 L (entregado 6, faltan 4)',
+    codigo: '1234',
+  },
+}
+
 const LIST_INPUT = { search: 'ana', blocked: 'all' as const, page: 1, pageSize: 10 }
 const CHAT_INPUT = { target: { contactId: CONTACT_ID }, before: MESSAGE_ID, pageSize: 30 }
 const MARK_INPUT = { contactId: CONTACT_ID, upToMessageId: MESSAGE_ID }
+const CONTEXT_INPUT = { target: { contactId: CONTACT_ID }, orderId: ORDER_ID }
 
 const ACTIONS = {
   list: () => listWhatsappConversationsAction(LIST_INPUT),
   chat: () => getWhatsappChatAction(CHAT_INPUT),
   read: () => markWhatsappChatReadAction(MARK_INPUT),
   tpl: () => listSendableWhatsappTemplatesAction(),
+  ctx: () => getWhatsappChatContextAction(CONTEXT_INPUT),
 } as const
 
-const USE_CASE_OF = { list: listMock, chat: chatMock, read: markMock, tpl: templatesMock } as const
+const USE_CASE_OF = { list: listMock, chat: chatMock, read: markMock, tpl: templatesMock, ctx: contextMock } as const
 
 const SOURCE = readFileSync(
   join(
@@ -226,6 +262,7 @@ beforeEach(() => {
   chatMock.mockResolvedValue(CHAT)
   markMock.mockResolvedValue({ unreadCount: 0 })
   templatesMock.mockResolvedValue({ templates: [TEMPLATE] })
+  contextMock.mockResolvedValue(CONTEXT)
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
   infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
@@ -250,9 +287,10 @@ function withLeaks<T extends object>(value: T): T {
 }
 
 describe('R40: las cuatro consultas como Server Actions', () => {
-  it('R40: el archivo exporta exactamente las cuatro acciones de consulta y ninguna de envio', () => {
+  it('R40, R58: el archivo exporta exactamente las cinco acciones de consulta (con el contexto del chat) y ninguna de envio', () => {
     expect(Object.keys(conversationActions).sort()).toEqual([
       'getWhatsappChatAction',
+      'getWhatsappChatContextAction',
       'listSendableWhatsappTemplatesAction',
       'listWhatsappConversationsAction',
       'markWhatsappChatReadAction',
@@ -317,6 +355,12 @@ describe('R40: las cuatro consultas como Server Actions', () => {
       ],
       read: [new ValidationError('x'), new WhatsappContactNotFoundError(), new WhatsappMessageNotFoundError()],
       tpl: [new UnauthorizedError()],
+      ctx: [
+        new ValidationError('orderId raro'),
+        new WhatsappContactNotFoundError(),
+        new LinkedCustomerNotFoundError(),
+        new WhatsappOrderNotFoundError(),
+      ],
     }
     for (const [name, errors] of Object.entries(byAction)) {
       for (const error of errors) {
@@ -452,6 +496,7 @@ describe('R41: los logs no llevan el cuerpo, el numero ni el nombre', () => {
       chat: () => getWhatsappChatAction(CHAT_INPUT),
       read: () => markWhatsappChatReadAction(MARK_INPUT),
       tpl: () => listSendableWhatsappTemplatesAction(),
+      ctx: () => getWhatsappChatContextAction(CONTEXT_INPUT),
     } as const
     for (const [name, action] of Object.entries(withSecrets)) {
       const useCase = USE_CASE_OF[name as keyof typeof ACTIONS]
@@ -466,5 +511,74 @@ describe('R41: los logs no llevan el cuerpo, el numero ni el nombre', () => {
     expect(logged).not.toContain(SECRET_BODY)
     expect(logged).not.toContain(SECRET_PHONE)
     expect(logged).not.toContain(SECRET_NAME)
+  })
+})
+
+describe('R58: el contexto del chat como Server Action con la forma de R40', () => {
+  it('R58: pasa la entrada tal cual y el actor, y devuelve success con el contexto', async () => {
+    expect(await ACTIONS.ctx()).toEqual({ status: 'success', data: CONTEXT })
+    expect(contextMock).toHaveBeenCalledWith(CONTEXT_INPUT, ACTOR)
+  })
+
+  it('R58: por cliente y sin orderId pasa la entrada tal cual, y sin pedidos sale con orders vacio y elegido nulo', async () => {
+    const empty: WhatsappChatContext = {
+      customer: CONTEXT.customer,
+      orders: [],
+      selectedOrderId: null,
+      values: { ...CONTEXT.values, 'pedido.numero': null, 'pedido.estado': null, 'pedido.fecha_solicitud': null, 'pedido.detalle': null },
+    }
+    contextMock.mockResolvedValueOnce(empty)
+    const input = { target: { customerId: CUSTOMER_ID } }
+    expect(await getWhatsappChatContextAction(input)).toEqual({ status: 'success', data: empty })
+    expect(contextMock).toHaveBeenCalledWith(input, ACTOR)
+  })
+
+  it('R58: un orderId fuera de los pedidos del cliente sale como order_not_found sin datos', async () => {
+    contextMock.mockRejectedValueOnce(new WhatsappOrderNotFoundError())
+    expect(await ACTIONS.ctx()).toEqual({
+      status: 'error',
+      code: 'order_not_found',
+      message: errorMessage('order_not_found'),
+    })
+  })
+
+  it('R58: el contexto no deja salir claves de mas del cliente, de cada pedido ni de cada linea', async () => {
+    const order = CONTEXT.orders[0] as WhatsappChatContext['orders'][number]
+    contextMock.mockResolvedValueOnce(
+      withLeaks({
+        ...CONTEXT,
+        customer: withLeaks(CONTEXT.customer),
+        orders: [
+          withLeaks({
+            ...order,
+            deliveredAt: '2026-10-25T00:00:00.000Z',
+            lines: order.lines.map((line) => withLeaks(line)),
+          }),
+        ],
+      }),
+    )
+    const result = await ACTIONS.ctx()
+    expect(result).toEqual({ status: 'success', data: CONTEXT })
+    const json = JSON.stringify(result)
+    for (const leak of [SECRET_WA_ID, ACCESS_TOKEN, 'deliveredAt']) expect(json).not.toContain(leak)
+  })
+
+  it('R58: valores nulos se copian como null y no se omiten', async () => {
+    const result = await ACTIONS.ctx()
+    expect(result.status).toBe('success')
+    if (result.status !== 'success') return
+    expect(Object.keys(result.data.values).sort()).toEqual(Object.keys(CONTEXT.values).sort())
+    expect(result.data.values['pedido.total']).toBeNull()
+  })
+
+  it('R58: con el nombre del cliente en la vista, ni el exito, ni un error del catalogo ni uno ajeno lo llevan al log', async () => {
+    await ACTIONS.ctx()
+    contextMock.mockRejectedValueOnce(new WhatsappOrderNotFoundError())
+    await ACTIONS.ctx()
+    contextMock.mockRejectedValueOnce(new Error('fallo de base'))
+    await ACTIONS.ctx()
+    const logged = everythingLogged()
+    expect(logged).toContain('fallo de base')
+    for (const leak of [SECRET_NAME, SECRET_BODY, SECRET_PHONE]) expect(logged).not.toContain(leak)
   })
 })
