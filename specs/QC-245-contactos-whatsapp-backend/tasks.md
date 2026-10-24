@@ -41,7 +41,7 @@
 
 ## Tanda 2 — dominio puro y adaptador (dependen de T2/T3)
 
-- [ ] **T4 [P] Dominio puro** (R8, R10, R12, R25, R26, R28, R31).
+- [x] **T4 [P] Dominio puro** (R8, R10, R12, R25, R26, R28, R31).
   - `whatsapp-conversation.ts` (tipos del §B del contrato, `previewOf`, `attachmentOf`,
     `failureReasonOf`, `windowOf`, `customerNameOf`), `whatsapp-conversation-input.ts`.
   - `whatsapp-send-failure.ts`: exportar `sendFailureReasonOf` (antes `reasonOf`), sin cambiar textos.

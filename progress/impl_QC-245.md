@@ -63,6 +63,45 @@ Salida (backend_dev):
 - `vitest related` (interfaz, adaptador, composición, doble): 483 archivos, 8264 passed, 2 skipped
 - `pnpm exec vitest run guard`: 87/87
 
+## T4 — Dominio puro (R8, R10, R12, R25, R26, R28, R31)
+
+Archivos:
+- `lib/modules/integraciones/domain/whatsapp-conversation.ts` (nuevo: tipos del §B, `previewOf`,
+  `attachmentOf`, `failureReasonOf`, `windowOf`, `customerNameOf`)
+- `lib/modules/integraciones/domain/whatsapp-conversation-input.ts` (nuevo: esquemas del §3; defecto
+  10 y tope 25 del listado copiados en el dominio como en `asignaciones`, con un test que los compara
+  con `lib/shared/pagination`)
+- `lib/modules/integraciones/domain/whatsapp-send-failure.ts` (`reasonOf` → `sendFailureReasonOf`)
+- tests: `tests/unit/integraciones/whatsapp/conversations/whatsapp-conversation.test.ts`,
+  `.../whatsapp-conversation-input.test.ts`; tensado `.../send/whatsapp-send-failure.test.ts`
+
+Quedan para T13 (contrato v2): `media.mediaUrl` y `reaction.messageId` en `WhatsappChatAttachment`;
+`attachmentOf` pasará a recibir el mensaje entero (necesita `reactedMessageId` de T14).
+
+Salida:
+- typecheck 0 · lint 0 errores (10 avisos ajenos)
+- tests de la tarea: 3 archivos, 100 passed (corrido también por el implementer: 100/100)
+- `vitest related` (3 fuentes): 483 archivos, 8456 passed, 3 skipped
+- guardias: 87 archivos, 1320 passed, 22 skipped
+
+## T5 — `WhatsappConversationRepository` y adaptador Prisma (R6, R9–R12, R15–R18, R22, R23, R39)
+
+Archivos:
+- `lib/modules/integraciones/ports/whatsapp-conversation-repository.ts` (nuevo, 7 métodos;
+  `ConversationPageQuery.search` es `{ nameMatchIds, digits } | null`, para distinguir «sin búsqueda»
+  de «búsqueda sin coincidencias»)
+- `lib/modules/integraciones/adapters/driven/persistence/whatsapp-conversation-prisma.ts` (nuevo)
+- `tests/integration/integraciones/whatsapp-conversation-prisma.int.test.ts` (nuevo, `transaccion`)
+  + `tests/integration/aislamiento.json`
+- tensado `tests/guards/guard-ambito-empresa-integraciones.test.ts` (puerto nuevo, SQL con empresa,
+  sin hora por JS, única escritura la marca; 4 casos de sensibilidad)
+
+Salida:
+- typecheck 0 · lint 0 errores
+- `whatsapp-conversation-prisma.int.test.ts`: 19/19
+- `vitest related` (puerto y adaptador): 1 archivo, 19 passed
+- guardias: 87 archivos, 1320 passed, 22 skipped (la de ámbito: 155/155)
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -73,5 +112,21 @@ Salida (backend_dev):
 | R10 (catálogo) | `customer-catalog.int.test.ts` > «R10: de los ids pedidos devuelve solo los vivos de la empresa que casan por nombre», «R10: misma normalizacion que la busqueda de Clientes…», «R10: un texto sin palabras utiles no filtra por nombre…»; `customer-catalog.test.ts` > 4 casos R10 (firma del contrato, `where` con la misma `searchCondition`, texto sin palabras, ids vacíos/no uuid) |
 | R14 | `whatsapp-contacts-last-read-migration.int.test.ts` > «R14: el contacto tiene una unica columna last_read_at, timestamptz(6) opcional y sin valor por defecto», «R14: un contacto nuevo nace sin marca y la marca guarda microsegundos» |
 | R42 | `whatsapp-contacts-last-read-migration.int.test.ts` > «R42: existe exactamente una carpeta de la migracion, con su down.sql», «R42: el DOWN quita exactamente la columna…», «R42: ida, vuelta e ida dejan exactamente el mismo esquema», «R42 (sensibilidad): un DOWN sin el DROP COLUMN…» |
+
+| R6, R39 (adaptador) | `whatsapp-conversation-prisma.int.test.ts` > «R6, R39 — listLinkedCustomerIds devuelve solo clientes…», «R6, R39 — listPage no devuelve contactos sin mensajes…», «R23, R39 — un cursor de otro contacto…», «R39 — findContact y findLatestContactOfCustomer…», «R39 — countUnread de un contacto de otra empresa es 0»; guardia de ámbito > bloques R39 |
+| R8 | `whatsapp-conversation.test.ts` > 4 casos R8 (entero, recorte, puntos de código y emoji, nulo) |
+| R9 | `whatsapp-conversation-prisma.int.test.ts` > «R9 — ordena por la hora del ultimo mensaje…», «R9 — el ultimo mensaje es el de hora mayor…» |
+| R10 (dominio/adaptador) | `whatsapp-conversation-input.test.ts` > «R10: admite una búsqueda de 100 caracteres y rechaza una de 101», «R10: la búsqueda llega sin recortar…»; `whatsapp-conversation-prisma.int.test.ts` > «R10 — la busqueda devuelve los clientes por nombre O los numeros…» |
+| R11 | `whatsapp-conversation-prisma.int.test.ts` > «R11 — el filtro de bloqueo…» |
+| R12 | `whatsapp-conversation-input.test.ts` > casos R12 (defecto y tope 10/25, acota sin rechazar); `whatsapp-conversation-prisma.int.test.ts` > «R12 — pagina con offset y limit…» |
+| R15 | `whatsapp-conversation-prisma.int.test.ts` > «R15 — sin marca cuenta todos los entrantes…», «R15 — con la marca en microsegundos…» |
+| R16 | `whatsapp-conversation-prisma.int.test.ts` > «R16 — sin mensaje indicado mueve la marca…» |
+| R17 | `whatsapp-conversation-prisma.int.test.ts` > «R17 — con mensaje indicado mueve la marca a su hora…» |
+| R18 | `whatsapp-conversation-prisma.int.test.ts` > «R18 — la marca nunca retrocede…», «R18 — un contacto sin mensajes queda como estaba» |
+| R22, R23 | `whatsapp-conversation-prisma.int.test.ts` > «R22 — devuelve del mas reciente al mas antiguo…», «R22, R23 — el cursor con varios mensajes a la misma hora…» |
+| R25 | `whatsapp-conversation.test.ts` > casos R25 (medios sin `media_id`, documento, ubicación, reacción sin wamid, payload que no casa) |
+| R26 | `whatsapp-conversation.test.ts` > casos R26 (por código, sin código, no numérico); `whatsapp-send-failure.test.ts` > «el código %i da el mismo texto que el envío guarda» |
+| R28 | `whatsapp-conversation.test.ts` > 3 casos R28 (abierta, 24 h exactas, sin entrante) |
+| R31 | `whatsapp-conversation-input.test.ts` > «R31: 30 mensajes por defecto y tope de 50», «R31: un tamaño mayor que el tope no se rechaza» |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.
