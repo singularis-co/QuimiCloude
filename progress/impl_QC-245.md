@@ -102,6 +102,33 @@ Salida:
 - `vitest related` (puerto y adaptador): 1 archivo, 19 passed
 - guardias: 87 archivos, 1320 passed, 22 skipped (la de ámbito: 155/155)
 
+Nota del implementer: una corrida mía de `vitest related` sobre las fuentes de T4, simultánea a las
+de dos subagentes (36 min), dio 15 rojos sin nombre de archivo en la salida; la corrida aislada del
+subagente sobre el mismo conjunto dio 0. Se trata como saturación (`docs/verification.md > Los
+flakes de saturación`); la suite completa la corre `gate-completo` en CI.
+
+## T6 — Casos de uso de consulta (R4–R7, R10, R11, R13, R17, R19–R24, R27–R33)
+
+Archivos:
+- `lib/modules/integraciones/domain/actor.ts` (`WHATSAPP_READ_PERMISSION`, `requireReadPermission`)
+- nuevos en `lib/modules/integraciones/domain/`: `list-whatsapp-conversations.ts`,
+  `get-whatsapp-chat.ts` (exporta `resolveChatCustomer` y `requireConversationContact`, para T15),
+  `mark-whatsapp-chat-read.ts`, `list-sendable-whatsapp-templates.ts`
+- `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts` (doble en memoria del repositorio, catálogo
+  y directorio de personas)
+- tests nuevos en `tests/unit/integraciones/whatsapp/conversations/`: `list-whatsapp-conversations`,
+  `get-whatsapp-chat`, `mark-whatsapp-chat-read`, `list-sendable-whatsapp-templates`
+
+Decisiones del subagente (sin cambio de contrato): una plantilla cuyo contenido no se puede leer o
+una variable sin tipo/clave queda fuera del selector (el contrato no admite `content` nulo); una fila
+sin último mensaje o sin cliente vivo se descarta (el repositorio ya lo garantiza).
+
+Salida:
+- typecheck 0 · lint 0 errores (10 avisos ajenos)
+- `vitest run tests/unit/integraciones/whatsapp`: 61 archivos, 1321 passed (tras un ajuste de lint al
+  doble, `conversations/`: 6 archivos, 151 passed)
+- guardias: 87 archivos, 1320 passed, 22 skipped
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -128,5 +155,25 @@ Salida:
 | R26 | `whatsapp-conversation.test.ts` > casos R26 (por código, sin código, no numérico); `whatsapp-send-failure.test.ts` > «el código %i da el mismo texto que el envío guarda» |
 | R28 | `whatsapp-conversation.test.ts` > 3 casos R28 (abierta, 24 h exactas, sin entrante) |
 | R31 | `whatsapp-conversation-input.test.ts` > «R31: 30 mensajes por defecto y tope de 50», «R31: un tamaño mayor que el tope no se rechaza» |
+
+| R4 | los cuatro tests de casos de uso > «R4: sin whatsapp.consultar / sin empresa / sin actor responde unauthorized sin validar ni tocar un puerto», «R4: una entrada inválida con permiso da invalid_input sin tocar un puerto» |
+| R6 (caso de uso) | `list-whatsapp-conversations.test.ts` > «R6: contactos sin cliente, con el cliente dado de baja, sin mensajes…», «R6: si todos los clientes vinculados están dados de baja la página sale vacía…» |
+| R7 | `list-whatsapp-conversations.test.ts` > «R7: cada conversación trae contacto, cliente, nombre, número internacional…»; `whatsapp-conversation.test.ts` > 2 casos R7 de `customerNameOf` |
+| R10 (caso de uso) | `list-whatsapp-conversations.test.ts` > «R10: casa por nombre del cliente», «R10: casa por los dígitos del número…», «R10: el texto ""/"   " equivale a no buscar» |
+| R11 (caso de uso) | `list-whatsapp-conversations.test.ts` > «R11: blocked=…» (4 casos) |
+| R12 (caso de uso) | `list-whatsapp-conversations.test.ts` > «R12: pasa offset y límite de la página y calcula el total de páginas…» |
+| R13 | `list-whatsapp-conversations.test.ts` > «R13: sin conexión viva da página vacía y estado nulo…», «R13: con conexión devuelve su estado…» |
+| R17 (caso de uso) | `mark-whatsapp-chat-read.test.ts` > «R17, R20: con un mensaje del contacto marca hasta él…», «R17: un mensaje inexistente/de otro contacto da whatsapp_message_not_found…» |
+| R19 | `mark-whatsapp-chat-read.test.ts` > «R19: un contacto inexistente/…/sin conexión viva da whatsapp_contact_not_found sin escribir» |
+| R20 | `mark-whatsapp-chat-read.test.ts` > «R20: sin mensaje indicado marca hasta el último…»; `get-whatsapp-chat.test.ts` > «R20: leer el chat no mueve la marca de lectura» |
+| R21 | `get-whatsapp-chat.test.ts` > «R21: un contacto … da whatsapp_contact_not_found sin leer mensajes» |
+| R22, R23 (caso de uso) | `get-whatsapp-chat.test.ts` > «R22, R31: sin before trae los 30 más recientes…», «R23: indica que quedan anteriores y el cursor…», «R23: un cursor que no es un mensaje del contacto da whatsapp_message_not_found» |
+| R24, R29 | `get-whatsapp-chat.test.ts` > «R24, R29: devuelve la cabecera del contacto y cada mensaje con todos sus campos» |
+| R27 | `get-whatsapp-chat.test.ts` > «R27: el autor dado de baja sale con su nombre…», «R27: sin autores no consulta el directorio de personas» |
+| R28 (caso de uso) | `get-whatsapp-chat.test.ts` > «R28: la ventana sale abierta…/cerrada pasadas 24 h/cerrada sin entrantes» |
+| R30 | `get-whatsapp-chat.test.ts` > «R30: un cliente dado de baja, inexistente o de otra empresa da customer_not_found», «R30: con conversaciones devuelve la de último mensaje más reciente», «R30: sin conversación / sin conexión viva devuelve un chat vacío…» |
+| R31 (caso de uso) | `get-whatsapp-chat.test.ts` > «R31: el tamaño de página se acota a 50» |
+| R32 | `list-sendable-whatsapp-templates.test.ts` > «R32: sin conexión viva devuelve una lista vacía…», «R32: solo las enviables de la conexión…» |
+| R33 | `list-sendable-whatsapp-templates.test.ts` > «R33: cada plantilla trae id, nombre, idioma, categoría, contenido y variables…» |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.

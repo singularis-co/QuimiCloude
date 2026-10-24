@@ -4,7 +4,8 @@
 
 import { vi } from 'vitest'
 
-import { phoneMatchesWaId } from '@/lib/modules/clientes'
+import { phoneMatchesWaId, type CustomerCatalog, type CustomerRef } from '@/lib/modules/clientes'
+import type { PeopleDirectory } from '@/lib/modules/identity'
 
 import type { Actor } from '@/lib/modules/integraciones/domain/actor'
 import {
@@ -53,6 +54,12 @@ import type {
   TemplateSyncRow,
   WhatsappTemplateRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
+import type {
+  ChatMessageRow,
+  ConversationContactRow,
+  ConversationRow,
+  WhatsappConversationRepository,
+} from '@/lib/modules/integraciones/ports/whatsapp-conversation-repository'
 import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository'
 import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log'
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
@@ -966,4 +973,262 @@ export function makeOutbox(
     allContacts: () => [...contacts.values()].map((row) => ({ ...row })),
     allMessages: () => [...messages.values()].map((row) => ({ ...row })),
   }
+}
+
+export type ConversationDoubleContact = ConversationContactRow & {
+  readonly companyId: string
+  readonly connectionId: string
+  readonly lastReadAt: Date | null
+}
+
+export type ConversationDoubleMessage = ChatMessageRow & {
+  readonly companyId: string
+  readonly contactId: string
+}
+
+export function conversationContact(overrides: Partial<ConversationDoubleContact> = {}): ConversationDoubleContact {
+  return {
+    id: CONTACT_ID,
+    companyId: COMPANY_ID,
+    connectionId: CONNECTION_ID,
+    waId: '5215512345678',
+    customerId: CUSTOMER_ID,
+    blockedAt: null,
+    lastInboundAt: null,
+    lastReadAt: null,
+    ...overrides,
+  }
+}
+
+export function conversationMessage(overrides: Partial<ConversationDoubleMessage> = {}): ConversationDoubleMessage {
+  return {
+    id: '00000000-0000-4000-8000-000000000401',
+    companyId: COMPANY_ID,
+    contactId: CONTACT_ID,
+    direction: 'IN',
+    type: 'TEXT',
+    body: 'Hola',
+    payload: {},
+    status: 'RECEIVED',
+    errorCode: null,
+    errorReason: null,
+    origin: null,
+    sentById: null,
+    templateName: null,
+    at: new Date('2026-10-09T10:00:00.000Z'),
+    ...overrides,
+  }
+}
+
+const newestFirst = (a: ConversationDoubleMessage, b: ConversationDoubleMessage) =>
+  b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
+
+/**
+ * Conversaciones en memoria con las reglas del adaptador: ámbito de empresa, conexión, hora del
+ * mensaje, orden `(hora, id)` y una marca de lectura que nunca retrocede.
+ */
+export function makeConversationRepository(
+  initialContacts: readonly ConversationDoubleContact[] = [],
+  initialMessages: readonly ConversationDoubleMessage[] = [],
+) {
+  const contacts = new Map(initialContacts.map((row) => [row.id, { ...row }]))
+  const messages = initialMessages.map((row) => ({ ...row }))
+
+  const contactOf = (id: string, connectionId: string, scope: IntegracionesScope) => {
+    const row = contacts.get(id)
+    return row !== undefined && row.companyId === scope.companyId && row.connectionId === connectionId ? row : null
+  }
+  const messagesOf = (contactId: string, scope: IntegracionesScope) =>
+    messages.filter((row) => row.contactId === contactId && row.companyId === scope.companyId).sort(newestFirst)
+  const unreadOf = (contact: ConversationDoubleContact, scope: IntegracionesScope) =>
+    messagesOf(contact.id, scope).filter(
+      (row) => row.direction === 'IN' && (contact.lastReadAt === null || row.at > contact.lastReadAt),
+    ).length
+  const contactRow = (row: ConversationDoubleContact): ConversationContactRow => ({
+    id: row.id,
+    waId: row.waId,
+    customerId: row.customerId,
+    blockedAt: row.blockedAt,
+    lastInboundAt: row.lastInboundAt,
+  })
+  const conversationsOf = (connectionId: string, scope: IntegracionesScope) =>
+    [...contacts.values()].filter(
+      (row) =>
+        row.companyId === scope.companyId &&
+        row.connectionId === connectionId &&
+        messagesOf(row.id, scope).length > 0,
+    )
+
+  const listLinkedCustomerIds = vi.fn<WhatsappConversationRepository['listLinkedCustomerIds']>(
+    async (connectionId, scope) => [
+      ...new Set(
+        conversationsOf(connectionId, scope).flatMap((row) => (row.customerId === null ? [] : [row.customerId])),
+      ),
+    ],
+  )
+  const listPage = vi.fn<WhatsappConversationRepository['listPage']>(async (query, scope) => {
+    const matching = conversationsOf(query.connectionId, scope)
+      .filter((row) => row.customerId !== null && query.customerIds.includes(row.customerId))
+      .filter((row) =>
+        query.blocked === 'all' ? true : query.blocked === 'blocked' ? row.blockedAt !== null : row.blockedAt === null,
+      )
+      .filter((row) => {
+        if (query.search === null) return true
+        const byName = row.customerId !== null && query.search.nameMatchIds.includes(row.customerId)
+        const byDigits = query.search.digits !== '' && row.waId.includes(query.search.digits)
+        return byName || byDigits
+      })
+      .map((row): ConversationRow => {
+        const last = messagesOf(row.id, scope)[0]
+        return {
+          ...contactRow(row),
+          unreadCount: unreadOf(row, scope),
+          lastMessage: {
+            direction: last.direction,
+            type: last.type,
+            body: last.body,
+            status: last.status,
+            at: last.at,
+          },
+        }
+      })
+      .sort(
+        (a, b) =>
+          (b.lastMessage?.at.getTime() ?? 0) - (a.lastMessage?.at.getTime() ?? 0) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
+    return { rows: matching.slice(query.offset, query.offset + query.limit), total: matching.length }
+  })
+  const findContact = vi.fn<WhatsappConversationRepository['findContact']>(async (id, connectionId, scope) => {
+    const row = contactOf(id, connectionId, scope)
+    return row === null ? null : contactRow(row)
+  })
+  const findLatestContactOfCustomer = vi.fn<WhatsappConversationRepository['findLatestContactOfCustomer']>(
+    async (customerId, connectionId, scope) => {
+      const latest = conversationsOf(connectionId, scope)
+        .filter((row) => row.customerId === customerId)
+        .sort((a, b) => newestFirst(messagesOf(a.id, scope)[0], messagesOf(b.id, scope)[0]))[0]
+      return latest === undefined ? null : contactRow(latest)
+    },
+  )
+  const listMessages = vi.fn<WhatsappConversationRepository['listMessages']>(
+    async (contactId, connectionId, page, scope) => {
+      if (contactOf(contactId, connectionId, scope) === null) return []
+      const all = messagesOf(contactId, scope)
+      let start = 0
+      if (page.before !== null) {
+        const index = all.findIndex((row) => row.id === page.before)
+        if (index === -1) return 'cursor_not_found'
+        start = index + 1
+      }
+      return all.slice(start, start + page.limit).map(
+        (row): ChatMessageRow => ({
+          id: row.id,
+          direction: row.direction,
+          type: row.type,
+          body: row.body,
+          payload: row.payload,
+          status: row.status,
+          errorCode: row.errorCode,
+          errorReason: row.errorReason,
+          origin: row.origin,
+          sentById: row.sentById,
+          templateName: row.templateName,
+          at: row.at,
+        }),
+      )
+    },
+  )
+  const countUnread = vi.fn<WhatsappConversationRepository['countUnread']>(async (contactId, scope) => {
+    const row = contacts.get(contactId)
+    return row === undefined || row.companyId !== scope.companyId ? 0 : unreadOf(row, scope)
+  })
+  const advanceLastRead = vi.fn<WhatsappConversationRepository['advanceLastRead']>(
+    async (contactId, upToMessageId, scope) => {
+      const row = contacts.get(contactId)
+      if (row === undefined || row.companyId !== scope.companyId) return 'ok'
+      const own = messagesOf(contactId, scope)
+      const target = upToMessageId === null ? own[0] : own.find((message) => message.id === upToMessageId)
+      if (target === undefined) return upToMessageId === null ? 'ok' : 'message_not_found'
+      if (row.lastReadAt === null || target.at > row.lastReadAt) contacts.set(contactId, { ...row, lastReadAt: target.at })
+      return 'ok'
+    },
+  )
+
+  const conversations: WhatsappConversationRepository = {
+    listLinkedCustomerIds,
+    listPage,
+    findContact,
+    findLatestContactOfCustomer,
+    listMessages,
+    countUnread,
+    advanceLastRead,
+  }
+  const spies = {
+    listLinkedCustomerIds,
+    listPage,
+    findContact,
+    findLatestContactOfCustomer,
+    listMessages,
+    countUnread,
+    advanceLastRead,
+  }
+  return {
+    conversations,
+    ...spies,
+    allSpies: () => Object.values(spies),
+    contact: (id: string) => {
+      const row = contacts.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+  }
+}
+
+export function customerRef(overrides: Partial<CustomerRef> = {}): CustomerRef {
+  return { id: CUSTOMER_ID, firstNames: 'Laura', lastNames: 'Gómez', isDeleted: false, ...overrides }
+}
+
+/** Catálogo de clientes por empresa. La búsqueda por nombre es un subcadena sin mayúsculas: basta aquí. */
+export function makeCustomerCatalog(byCompany: Record<string, readonly CustomerRef[]> = { [COMPANY_ID]: [customerRef()] }) {
+  const of = (companyId: string) => byCompany[companyId] ?? []
+  const findRefsIncludingDeleted = vi.fn<CustomerCatalog['findRefsIncludingDeleted']>(async (ids, companyId) =>
+    of(companyId).filter((ref) => ids.includes(ref.id)),
+  )
+  const findAliveRefById = vi.fn<CustomerCatalog['findAliveRefById']>(
+    async (id, companyId) => of(companyId).find((ref) => ref.id === id && !ref.isDeleted) ?? null,
+  )
+  const searchRefs = vi.fn<CustomerCatalog['searchRefs']>(async () => ({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 1,
+  }))
+  const findAliveIdsMatchingName = vi.fn<CustomerCatalog['findAliveIdsMatchingName']>(async (search, ids, companyId) =>
+    of(companyId)
+      .filter(
+        (ref) =>
+          !ref.isDeleted &&
+          ids.includes(ref.id) &&
+          `${ref.firstNames} ${ref.lastNames}`.toLowerCase().includes(search.toLowerCase()),
+      )
+      .map((ref) => ref.id),
+  )
+  const customers: CustomerCatalog = { findRefsIncludingDeleted, findAliveRefById, searchRefs, findAliveIdsMatchingName }
+  return { customers, findRefsIncludingDeleted, findAliveRefById, searchRefs, findAliveIdsMatchingName }
+}
+
+/** Directorio de personas de la empresa: `names` es id → nombre mostrable, incluidas las dadas de baja. */
+export function makePeopleDirectory(names: Record<string, string> = {}) {
+  const findRefsIncludingDeletedInCompany = vi.fn<PeopleDirectory['findRefsIncludingDeletedInCompany']>(
+    async (companyId, ids) =>
+      companyId !== COMPANY_ID
+        ? []
+        : ids.flatMap((id) =>
+            names[id] === undefined
+              ? []
+              : [{ id, displayName: names[id], isActive: false, permissions: [], roleName: 'Administrador' }],
+          ),
+  )
+  return { people: { findRefsIncludingDeletedInCompany }, findRefsIncludingDeletedInCompany }
 }

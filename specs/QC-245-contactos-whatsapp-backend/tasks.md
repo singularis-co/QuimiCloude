@@ -64,7 +64,7 @@
 
 ## Tanda 3 — casos de uso (dependen de T1, T3–T5)
 
-- [ ] **T6 Casos de uso de consulta** (R4–R7, R10, R11, R13, R16–R24, R27–R33).
+- [x] **T6 Casos de uso de consulta** (R4–R7, R10, R11, R13, R16–R24, R27–R33).
   - `actor.ts` (`requireReadPermission`), `list-whatsapp-conversations.ts`, `get-whatsapp-chat.ts`,
     `mark-whatsapp-chat-read.ts`, `list-sendable-whatsapp-templates.ts`.
   - Doble en `whatsapp-doubles.ts`; tests `list-whatsapp-conversations.test.ts`,
