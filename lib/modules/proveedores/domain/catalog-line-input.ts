@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  CATALOG_LINE_PACKAGING_SUBTYPES_VALUES,
+  CATALOG_LINE_TYPE_VALUES,
+  CATALOG_LINE_TYPES,
+} from './catalog-line-type';
 import { blankToNull } from './supplier-input';
 import { normalizeSupplierName } from './supplier-name';
 
@@ -152,12 +157,16 @@ const unitIdSchema = z.string().uuid().nullish();
  */
 const imagePathSchema = z.string().min(1).nullish();
 
+const catalogLineTypeSchema = z.enum(CATALOG_LINE_TYPE_VALUES).nullable();
+const catalogLinePackagingSubtypeSchema = z.enum(CATALOG_LINE_PACKAGING_SUBTYPES_VALUES).nullable();
+
 /**
- * Los NUEVE campos de negocio de la linea, compartidos por el alta y la edicion. Estan
+ * Los campos de negocio de la linea, compartidos por el alta y la edicion. Estan
  * declarados UNA vez: dos listas paralelas divergen en cuanto alguien anade un campo a una
- * sola de ellas. `material` y `measurements` se suman aqui.
+ * sola de ellas. Se exporta porque los esquemas con refinamiento no sirven para validar un
+ * campo suelto.
  */
-const catalogLineFieldsShape = {
+export const catalogLineFieldsShape = {
   name: catalogLineNameSchema,
   presentationId: presentationIdSchema,
   unitId: unitIdSchema,
@@ -167,7 +176,26 @@ const catalogLineFieldsShape = {
   deliveryTime: deliveryTimeSchema,
   material: materialSchema,
   measurements: measurementsSchema,
+  type: catalogLineTypeSchema.optional(),
+  packagingSubtype: catalogLinePackagingSubtypeSchema.optional(),
 } as const;
+
+type ClassificationCandidate = {
+  readonly type?: string | null;
+  readonly packagingSubtype?: string | null;
+};
+
+function subtypeOnlyInPackaging(value: ClassificationCandidate, ctx: z.RefinementCtx): void {
+  if (value.packagingSubtype == null) return;
+  if (value.type === CATALOG_LINE_TYPES.PACKAGING_MATERIAL) return;
+  ctx.addIssue({ code: 'custom', path: ['packagingSubtype'], message: 'subtype_without_packaging' });
+}
+
+/** En la edicion, un campo sin el otro dejaria un subtipo viejo bajo un tipo nuevo. */
+function bothOrNeither(value: ClassificationCandidate, ctx: z.RefinementCtx): void {
+  if ((value.type === undefined) === (value.packagingSubtype === undefined)) return;
+  ctx.addIssue({ code: 'custom', path: ['type'], message: 'classification_incomplete' });
+}
 
 /**
  * Alta de una linea del catalogo (R31). `supplierId` se valida solo en su FORMA -que sea un
@@ -178,10 +206,12 @@ const catalogLineFieldsShape = {
  * Ignorarla seria peor, porque quien la envia creeria haber vinculado algo que no se guardo
  * en ningun sitio -y desde QC-52 no hay ninguna columna donde pudiera guardarse-.
  */
-export const createCatalogLineSchema = z.strictObject({
-  supplierId: z.string().uuid(),
-  ...catalogLineFieldsShape,
-});
+export const createCatalogLineSchema = z
+  .strictObject({
+    supplierId: z.string().uuid(),
+    ...catalogLineFieldsShape,
+  })
+  .superRefine(subtypeOnlyInPackaging);
 
 /**
  * Edicion de la linea: REEMPLAZO COMPLETO de los siete campos de negocio (R24, P6). No hay
@@ -191,8 +221,14 @@ export const createCatalogLineSchema = z.strictObject({
  * porque un `if` la filtre, sino porque el tipo no la tiene. `strictObject` hace que
  * colarla -o colar el identificador de un articulo del inventario- de `invalid_input`, no
  * un campo ignorado.
+ *
+ * Tipo y subtipo son la excepcion: si no viene ninguno se conservan los guardados, para que
+ * un formulario que no los conoce no borre lo que puso la importacion.
  */
-export const updateCatalogLineSchema = z.strictObject({ ...catalogLineFieldsShape });
+export const updateCatalogLineSchema = z
+  .strictObject({ ...catalogLineFieldsShape })
+  .superRefine(bothOrNeither)
+  .superRefine(subtypeOnlyInPackaging);
 
 export type CreateCatalogLineInput = z.infer<typeof createCatalogLineSchema>;
 export type UpdateCatalogLineInput = z.infer<typeof updateCatalogLineSchema>;

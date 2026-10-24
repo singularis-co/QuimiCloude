@@ -131,7 +131,14 @@ describe('createConfirmCatalogImport', () => {
       ]),
       catalog: {
         findAliveByIdentity: vi.fn(async () => [
-          { id: 'linea-viva', nameNormalized: 'acidocitrico', presentationId: PRESENTACION_LITRO, cost: '50.0000' },
+          {
+            id: 'linea-viva',
+            nameNormalized: 'acidocitrico',
+            presentationId: PRESENTACION_LITRO,
+            cost: '50.0000',
+            type: null,
+            packagingSubtype: null,
+          },
         ]),
         importLines,
       },

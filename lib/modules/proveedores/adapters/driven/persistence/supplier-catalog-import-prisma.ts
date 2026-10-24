@@ -4,7 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import { normalizeSupplierName } from '../../../domain/supplier-name';
 
-import type { CatalogLineFields } from '../../../domain/catalog-line-view';
+import type { CatalogLineClassification, CatalogLineFields } from '../../../domain/catalog-line-view';
 import type { SupplierScope } from '../../../domain/supplier-scope';
 
 import { catalogLineCompanyScope, companyScopeColumns, supplierCompanyScope } from './company-scope';
@@ -36,14 +36,14 @@ type AliveByIdentityRow = {
   readonly nameNormalized: string;
   readonly presentationId: string;
   readonly cost: Prisma.Decimal;
-};
+} & CatalogLineClassification;
 
 type AliveByIdentityLine = {
   readonly id: string;
   readonly nameNormalized: string;
   readonly presentationId: string;
   readonly cost: string;
-};
+} & CatalogLineClassification;
 
 /** Union del resultado, EXTRAIDA a un alias: un tipo de retorno multilinea deja al troceo de la
  *  guardia de ambito confundir la llave de un tipo con la del cuerpo de la funcion (mismo riesgo
@@ -74,7 +74,14 @@ export async function findAliveCatalogLinesByIdentities(
         presentationId: key.presentationId,
       })),
     },
-    select: { id: true, nameNormalized: true, presentationId: true, cost: true },
+    select: {
+      id: true,
+      nameNormalized: true,
+      presentationId: true,
+      cost: true,
+      type: true,
+      packagingSubtype: true,
+    },
   });
 
   return {
@@ -83,6 +90,8 @@ export async function findAliveCatalogLinesByIdentities(
       nameNormalized: row.nameNormalized,
       presentationId: row.presentationId,
       cost: row.cost.toFixed(4),
+      type: row.type,
+      packagingSubtype: row.packagingSubtype,
     })),
   };
 }
@@ -100,6 +109,17 @@ type UpsertRow = { readonly inserted: boolean };
 function measurementsParam(value: CatalogLineFields['measurements']): string | null {
   return value === null ? null : JSON.stringify(value);
 }
+
+/**
+ * Subtipo con que queda una linea viva tras el `DO UPDATE`: la misma regla que
+ * `resolveImportedClassification`. Va en el `SET` y en el `WHERE`, que deben coincidir para que
+ * «solo cambio el subtipo» cuente como actualizada.
+ */
+const RESOLVED_PACKAGING_SUBTYPE = Prisma.sql`CASE
+            WHEN COALESCE(EXCLUDED."type", supplier_catalog_lines."type") = 'PACKAGING_MATERIAL'
+              THEN COALESCE(EXCLUDED."packaging_subtype", supplier_catalog_lines."packaging_subtype")
+            ELSE NULL
+          END`;
 
 /**
  * `upsertCostByIdentity`. `FOR SHARE` hace que una baja concurrente del proveedor espere a esta
@@ -135,6 +155,7 @@ export async function upsertCatalogLinesByIdentity(
         INSERT INTO "supplier_catalog_lines" (
           "id", "supplier_id", "name", "name_normalized", "presentation_id", "unit_id",
           "image_path", "cost", "min_purchase", "delivery_time", "material", "measurements",
+          "type", "packaging_subtype",
           "company_id", "created_by", "updated_by", "created_at", "updated_at"
         ) VALUES (
           gen_random_uuid(),
@@ -149,6 +170,8 @@ export async function upsertCatalogLinesByIdentity(
           ${line.deliveryTime}::integer,
           ${line.material},
           ${measurementsParam(line.measurements)}::jsonb,
+          ${line.type}::"CatalogLineType",
+          ${line.packagingSubtype}::"PackagingSubtype",
           ${companyId}::uuid,
           ${actorId}::uuid,
           ${actorId}::uuid,
@@ -158,9 +181,13 @@ export async function upsertCatalogLinesByIdentity(
         ON CONFLICT (supplier_id, name_normalized, presentation_id) WHERE deleted_at IS NULL
         DO UPDATE SET
           "cost" = EXCLUDED."cost",
+          "type" = COALESCE(EXCLUDED."type", supplier_catalog_lines."type"),
+          "packaging_subtype" = ${RESOLVED_PACKAGING_SUBTYPE},
           "updated_by" = EXCLUDED."updated_by",
           "updated_at" = EXCLUDED."updated_at"
         WHERE supplier_catalog_lines."cost" IS DISTINCT FROM EXCLUDED."cost"
+           OR supplier_catalog_lines."type" IS DISTINCT FROM COALESCE(EXCLUDED."type", supplier_catalog_lines."type")
+           OR supplier_catalog_lines."packaging_subtype" IS DISTINCT FROM ${RESOLVED_PACKAGING_SUBTYPE}
         RETURNING (xmax = 0) AS "inserted"
       `);
 

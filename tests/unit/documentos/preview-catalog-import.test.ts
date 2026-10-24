@@ -214,6 +214,8 @@ describe('createPreviewCatalogImport', () => {
             nameNormalized: 'acidocitrico',
             presentationId: PRESENTACION_LITRO,
             cost: '100.0000',
+            type: null,
+            packagingSubtype: null,
           },
         ]),
         importLines: dobleQueFallaSiSeLlama('catalog.importLines') as CatalogImportDeps['catalog']['importLines'],

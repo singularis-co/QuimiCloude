@@ -44,6 +44,8 @@ function lineaDe(id: string, imagePath: string | null): CatalogLineView {
     deliveryTime: null,
     material: null,
     measurements: null,
+    type: null,
+    packagingSubtype: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: null,

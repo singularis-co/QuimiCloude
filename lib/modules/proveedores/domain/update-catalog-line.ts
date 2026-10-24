@@ -74,6 +74,14 @@ export function createUpdateCatalogLine(
         deliveryTime: parsed.data.deliveryTime ?? null,
         material: parsed.data.material ?? null,
         measurements: parsed.data.measurements ?? null,
+        ...(parsed.data.type === undefined
+          ? {}
+          : {
+              classification: {
+                type: parsed.data.type,
+                packagingSubtype: parsed.data.packagingSubtype ?? null,
+              },
+            }),
       },
       actor.id,
       now(),

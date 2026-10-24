@@ -157,7 +157,7 @@ describe('createImportCatalogLines — R31, primera linea; validacion por fila',
     expect(fallo).toBeInstanceOf(SupplierNotFoundError)
     expect(catalog.upsertCostByIdentity).toHaveBeenCalledWith(
       SUPPLIER_ID,
-      [CAMPOS_LINEA_VALIDA],
+      [{ ...CAMPOS_LINEA_VALIDA, type: null, packagingSubtype: null }],
       'u-1',
       now,
       { companyId: COMPANY_ID },

@@ -35,6 +35,7 @@ describe('toProductView', () => {
     unitId: 'u-9',
     qtyAlert: new Prisma.Decimal(5),
     type: PRODUCT_TYPES.PRODUCT,
+    packagingSubtype: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-02T00:00:00Z'),
   };
@@ -143,5 +144,52 @@ describe('QC-195 R8, R9 — el filtro por unidad de la presentacion fija', () =>
 
   it('R9 — sin presentaciones resueltas no deja pasar ningun producto, tampoco los que no tienen presentacion fija', () => {
     expect(filtroDePresentacion(buildProductWhere(consulta, { companyId: 'empresa-1' }))).toEqual({ in: [] });
+  });
+});
+
+describe('QT-296 — subtipo de empaque en la lectura y el filtro del listado', () => {
+  function consulta(values: readonly string[]): ListQuery {
+    return {
+      page: 1,
+      pageSize: 20,
+      sort: null,
+      search: '',
+      filters: { packagingSubtype: { kind: 'select', values } },
+    };
+  }
+
+  function filtroDeSubtipo(where: ReturnType<typeof buildProductWhere>): unknown {
+    const filtros = (where.AND as Array<{ AND?: Array<{ packagingSubtype?: unknown }> }>)[1]?.AND ?? [];
+    return filtros.find((condicion) => condicion.packagingSubtype !== undefined)?.packagingSubtype;
+  }
+
+  it('R11 — PRODUCT_SELECT trae el subtipo y toProductView lo copia tal cual', () => {
+    expect(Object.keys(PRODUCT_SELECT)).toContain('packagingSubtype');
+    const base = {
+      id: 'p-1',
+      name: 'Tapa 28 mm',
+      imagePath: null,
+      stock: new Prisma.Decimal(3),
+      unitId: 'u-u',
+      qtyAlert: null,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-02T00:00:00Z'),
+    };
+    expect(toProductView({ ...base, type: PRODUCT_TYPES.PACKAGING, packagingSubtype: 'CAP' }).packagingSubtype).toBe('CAP');
+    expect(toProductView({ ...base, type: PRODUCT_TYPES.PRODUCT, packagingSubtype: null }).packagingSubtype).toBeNull();
+  });
+
+  it('R12 — se traduce a los subtipos validos pedidos', () => {
+    expect(filtroDeSubtipo(buildProductWhere(consulta(['CAP', 'MEASURER']), { companyId: 'empresa-1' }))).toEqual({
+      in: ['CAP', 'MEASURER'],
+    });
+  });
+
+  it('R12 — un valor desconocido se descarta, y si no queda ninguno no compone condicion', () => {
+    expect(filtroDeSubtipo(buildProductWhere(consulta(['CAP', 'GATILLO']), { companyId: 'empresa-1' }))).toEqual({
+      in: ['CAP'],
+    });
+    const where = buildProductWhere(consulta(['GATILLO']), { companyId: 'empresa-1' });
+    expect((where.AND as Array<{ AND?: unknown[] }>)[1]?.AND).toBeUndefined();
   });
 });

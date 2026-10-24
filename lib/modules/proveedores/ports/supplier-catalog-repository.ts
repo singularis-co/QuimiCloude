@@ -1,4 +1,8 @@
-import type { CatalogLineFields, CatalogLineView, NewCatalogLine } from '../domain/catalog-line-view';
+import type {
+  CatalogLineReplacement,
+  CatalogLineView,
+  NewCatalogLine,
+} from '../domain/catalog-line-view';
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { SupplierScope } from '../domain/supplier-scope';
@@ -58,7 +62,7 @@ export interface SupplierCatalogRepository {
    */
   replaceAlive(
     id: string,
-    data: CatalogLineFields,
+    data: CatalogLineReplacement,
     actorId: string,
     now: Date,
     scope: SupplierScope,

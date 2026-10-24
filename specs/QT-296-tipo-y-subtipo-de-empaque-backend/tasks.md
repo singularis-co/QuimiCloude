@@ -76,7 +76,7 @@ hay.
 **Hecho cuando:** R5–R10 en verde, y los casos de `PACKAGING` de `product-input.test.ts` y de
 `qc195-packaging-product.int.test.ts` siguen en verde sin cambiar sus expectativas.
 
-## [ ] T3 — Subtipo en lecturas y filtro del listado `[depende de T1]` `[P con T2, T4, T5, T6]`
+## [x] T3 — Subtipo en lecturas y filtro del listado `[depende de T1]` `[P con T2, T4, T5, T6]`
 
 - `ProductView.packagingSubtype`, `PRODUCT_SELECT` y sus proyecciones, `PRODUCT_QUERYABLE`, y
   `buildProductWhere` (`design.md > 4.3`).
@@ -89,7 +89,7 @@ hay.
 
 **Hecho cuando:** R11 y R12 en verde; listas blancas en verde.
 
-## [ ] T4 — Solo envases en el reparto `[depende de T1]` `[P con T2, T3, T5, T6]`
+## [x] T4 — Solo envases en el reparto `[depende de T1]` `[P con T2, T3, T5, T6]`
 
 - `packaging-catalog-prisma.ts`: `packagingSubtype: CONTAINER` en `findAlivePackaging` y en la
   consulta de lotes de costeo (`design.md > 4.4`). `pedidos` no se toca.
@@ -156,7 +156,7 @@ hay.
 **Hecho cuando:** R15–R22, R41 y R42 en verde y la suite de importación de inventario sigue en
 verde.
 
-## [ ] T6 — Tipo y subtipo en la línea de catálogo `[depende de T1]` `[P con T2, T3, T4, T5]`
+## [x] T6 — Tipo y subtipo en la línea de catálogo `[depende de T1]` `[P con T2, T3, T4, T5]`
 
 - `catalog-line-input.ts` (forma base exportada, alta, edición «los dos o ninguno»),
   `catalog-line-view.ts`, `create-catalog-line.ts`, `update-catalog-line.ts`,

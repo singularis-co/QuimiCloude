@@ -162,7 +162,14 @@ describe('sanitize contra la lista blanca', () => {
     expect(Object.keys(PRODUCT_QUERYABLE.filterable)).not.toContain('unitId');
     expect(PRODUCT_QUERYABLE.sortable).not.toContain('unitId');
     // QC-195 R8: `presentationUnitId` filtra por la unidad de la presentacion fija, no por la del producto.
-    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual(['stock', 'qtyAlert', 'createdAt', 'type', 'presentationUnitId']);
+    expect(Object.keys(PRODUCT_QUERYABLE.filterable)).toEqual([
+      'stock',
+      'qtyAlert',
+      'createdAt',
+      'type',
+      'presentationUnitId',
+      'packagingSubtype',
+    ]);
 
     const resultado = sanitizeListQuery(
       query({ filters: { unitId: { kind: 'select', values: ['u1'] } } }),

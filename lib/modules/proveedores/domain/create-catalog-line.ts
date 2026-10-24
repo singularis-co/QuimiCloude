@@ -74,6 +74,8 @@ export function createCreateCatalogLine(
         deliveryTime: parsed.data.deliveryTime ?? null,
         material: parsed.data.material ?? null,
         measurements: parsed.data.measurements ?? null,
+        type: parsed.data.type ?? null,
+        packagingSubtype: parsed.data.packagingSubtype ?? null,
       },
       actor.id,
       now(),

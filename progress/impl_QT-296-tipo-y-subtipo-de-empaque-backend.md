@@ -290,3 +290,246 @@ en verde: el adaptador escribe el subtipo en todo `PACKAGING` y las 5 siembras g
 
 **Veredicto T2:** R5–R10 en verde; typecheck, lint, guardias y `vitest related` (729/729 archivos) en
 verde, con tres divergencias anotadas arriba.
+
+## T3 — Subtipo en lecturas y filtro del listado (2026-10-23)
+
+### Archivos
+Producción (modificados):
+- `lib/modules/inventario/domain/product-view.ts`: `ProductView.packagingSubtype?: PackagingSubtype | null`.
+- `lib/modules/inventario/domain/product-queryable.ts`: `PRODUCT_PACKAGING_SUBTYPE_FILTER = 'packagingSubtype'` y
+  `filterable.packagingSubtype: 'select'` (no ordenable).
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`: `PRODUCT_SELECT` gana
+  `packagingSubtype` y `toProductView` lo copia. `productFilterWhere` traduce el filtro a
+  `{ packagingSubtype: { in: validos } }` y descarta lo que no está en `PACKAGING_SUBTYPE_VALUES`
+  (sin válidos, ninguna condición), igual que con `type`.
+- `lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma.ts`: su llamada a
+  `toProductView` (filas de `FINISHED_PRODUCT` por SQL crudo) pasa `packagingSubtype: null`.
+
+Tests:
+- `tests/integration/inventario/list-query-products.int.test.ts` (ampliado): `sembrar` admite `type`,
+  `packagingSubtype` y `companyId`. Tiene un bloque nuevo, «QT-296 — el subtipo de empaque en la lectura y en el
+  filtro del listado», y el `afterAll` borra también la empresa ajena.
+- `tests/unit/inventario/product-prisma.test.ts`: `filaBase` gana `packagingSubtype: null`. Bloque
+  nuevo: «QT-296 — subtipo de empaque en la lectura y el filtro del listado».
+- `tests/unit/shared/listas-blancas-listados.test.ts` (ampliado): bloque QT-296.
+- Censos que fijaban la forma anterior (consecuencia directa del diseño):
+  - `tests/unit/inventario/list-query.test.ts`: las claves de `PRODUCT_QUERYABLE.filterable` ganan
+    `packagingSubtype`.
+  - `tests/unit/inventario/company-scope.test.ts`: las claves de `toProductView` ganan
+    `packagingSubtype`, y la fila del caso gana `packagingSubtype: null`.
+
+### Divergencia con `design.md > 4.3`
+`ProductView.packagingSubtype` es **opcional** (`?: PackagingSubtype | null`), no obligatorio.
+- **Motivo:** con el campo obligatorio, `tsc` cae en 30 archivos de test que construyen un
+  `ProductView` a mano. Son dobles y fixtures, casi todos de UI y fuera del alcance de backend
+  (`paridad/*`, `inventario-ui/*`, `recetas-ui/*`, `shared-ui/*`, `inventario/*.tsx`…).
+- **Lo que se mantiene:** los dos adaptadores que leen de la base (`PRODUCT_SELECT`/`toProductView`
+  y `finished-stock-prisma`) **siempre** lo rellenan, y R11 lo prueba contra Postgres.
+- Es el mismo criterio que la divergencia 1 de T2.
+- **Para volverlo obligatorio:** basta un cambio mecánico en esos 30 archivos (una línea
+  `packagingSubtype: null` por fixture).
+
+### Mapa R → test
+| R | Test |
+|---|---|
+| R11 | `list-query-products.int.test.ts` › «R11 — el detalle y el listado devuelven el subtipo, y null en lo que no es empaque» (`findAliveProductById`, que es lo que llama `getProduct`, y `listAliveProducts`); `product-prisma.test.ts` › «R11 — PRODUCT_SELECT trae el subtipo y toProductView lo copia tal cual» |
+| R12 | `list-query-products.int.test.ts` › «R12 — con packagingSubtype = {CAP} salen solo las tapas vivas de la empresa» (con una tapa de baja y una tapa de otra empresa sembradas), «R12 — varios subtipos a la vez se suman, y un valor desconocido se descarta como con type»; `product-prisma.test.ts` › «R12 — se traduce a los subtipos validos pedidos», «R12 — un valor desconocido se descarta, y si no queda ninguno no compone condicion»; `listas-blancas-listados.test.ts` › «R12 — productos declara packagingSubtype como filtro de seleccion, sin hacerlo ordenable» |
+
+## T4 — Solo envases en el reparto (2026-10-23)
+
+### Archivos
+Producción (modificado):
+- `lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma.ts`: `findAlivePackaging`
+  gana `packagingSubtype: CONTAINER`. Es la única consulta de productos del archivo y la usan tanto
+  `findRefs` como `findPackagingCostingBatches`: los lotes de costeo solo se piden de los productos
+  que devuelve, así que el filtro cubre los dos. `pedidos` no se toca.
+
+Tests (nuevos):
+- `tests/integration/inventario/qt296-only-containers.int.test.ts`.
+- `tests/integration/pedidos/qt296-distribution-rejects-caps.int.test.ts`: cableado real de
+  `createOrder`, `updateOrder`, `updateOrderPresentationLines`, `transition`, `startPacking` y
+  `finishPacking`, como en `finish-with-finished-goods.int.test.ts`.
+- `tests/integration/aislamiento.json`: las dos filas nuevas en `commit`, justo después de la de T2.
+
+### Nota sobre R13/R14
+- **R14:** sus tests pasarían también **sin** el filtro nuevo, por dos motivos:
+  - `findAlivePackaging` ya exigía `presentationId != null`;
+  - el CHECK `products_presentation_only_in_container` (R3) impide que una tapa, un medidor u otro
+    tengan presentación.
+
+  El filtro por subtipo es la defensa en el servidor que pide el diseño. Con datos válidos no hay
+  forma de sembrar un caso que lo distinga.
+- **R13:** pasa lo mismo. El selector ya deja fuera tapa y medidor porque no tienen presentación. El
+  test incluye el control sin el filtro por unidad, donde salen los tres.
+
+### Mapa R → test
+| R | Test |
+|---|---|
+| R13 | `qt296-only-containers.int.test.ts` › «R13 — la consulta del selector (type=PACKAGING, presentationUnitId={l}) devuelve solo el envase» |
+| R14 | `qt296-only-containers.int.test.ts` › «R14 — findRefs con los ids del envase, la tapa y el medidor devuelve solo el envase», «R14 — findCostingBatches no trae lotes de la tapa ni del medidor, aunque tengan existencia y costo»; `qt296-distribution-rejects-caps.int.test.ts` › «R14 — el alta con una linea de reparto que apunta a una tapa da packaging_not_found y no escribe nada», «R14 — la edicion de un pedido con una linea que apunta a un medidor da packaging_not_found y el pedido queda intacto», «R14 — «Reparto y unidad» en POR_EMPACAR con una linea que apunta a una tapa da packaging_not_found sin escribir nada» |
+| R39 | `qt296-distribution-rejects-caps.int.test.ts` › «R39 — Terminar el empaque con un envase en el reparto no toca la existencia de la tapa ni del medidor» (control: la existencia del envase sí cambia) |
+
+Cómo sale `packaging_not_found` en cada camino:
+- en el alta y la edición, como `ProductNotFoundError` de `pedidos`, que es como lo traduce hoy
+  `resolveDistribution`;
+- en «Reparto y unidad», como el literal `'packaging_not_found'`.
+
+### Salida real (T3 + T4)
+Los tests nuevos y ampliados, con `.env` cargado (base efímera de la plantilla). Primera tanda:
+`qt296-distribution-rejects-caps`, `qt296-only-containers`, `qc195-packaging-catalog`,
+`qc195-packaging-list` y `guard-aislamiento-integracion`.
+```
+ Test Files  5 passed (5)
+      Tests  22 passed (22)
+```
+Segunda tanda: `qt296-only-containers`, `list-query-products`, `product-prisma` y
+`listas-blancas-listados`.
+```
+ Test Files  4 passed (4)
+      Tests  45 passed (45)
+```
+
+`pnpm run typecheck`: `tsc --noEmit`, exit 0 (con el trabajo en curso de T6 en `proveedores`).
+`pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 de T1/T2.
+`pnpm exec vitest run guard`:
+```
+ Test Files  87 passed (87)
+      Tests  1276 passed | 22 skipped (1298)
+```
+`pnpm exec vitest related --run <los 10 archivos de T3/T4>`: los 5 de producción, los 3 tests
+ampliados y los 2 nuevos. Primera corrida:
+```
+ Test Files  6 failed | 719 passed (725)
+      Tests  2 failed | 12504 passed | 8 skipped (12514)
+   Duration  3813.30s
+```
+- **2 fallos reales:** los censos de `list-query.test.ts` y `company-scope.test.ts` (arriba). Ya
+  están corregidos.
+- **4 suites caídas por `Hook timed out in 10000ms` en su `afterAll`:** `clientes/customer-phone-shared`,
+  `inventario/deliverable-batches`, `inventario/product-crud` y `recetas/list-query-recipes`. La
+  causa es la carga de la máquina: la corrida duró 63 min, en paralelo con la de T6. Ninguna toca
+  código de T3/T4.
+
+Las seis, solas, tras el arreglo:
+```
+ Test Files  6 passed (6)
+      Tests  61 passed (61)
+```
+
+**Veredicto T3/T4:** R11–R14 y R39 en verde. Typecheck, lint y guardias en verde. `vitest related`
+queda en verde tras corregir dos censos y repetir cuatro suites caídas por tiempo. Hay una
+divergencia: `ProductView.packagingSubtype` es opcional.
+
+## T6 — Tipo y subtipo en la línea de catálogo (2026-10-23)
+
+### Archivos
+Producción (`lib/modules/proveedores/`):
+- `domain/imported-classification.ts` (nuevo): `resolveImportedClassification(stored, incoming)`.
+- `domain/catalog-line-input.ts`:
+  - `catalogLineFieldsShape` se exporta con `type` y `packagingSubtype`
+    (`z.enum(...).nullable().optional()`);
+  - el alta usa `superRefine(subtypeOnlyInPackaging)`;
+  - la edición usa `bothOrNeither` + `subtypeOnlyInPackaging`.
+- `domain/catalog-line-view.ts`:
+  - tipos nuevos: `CatalogLineClassification` y `CatalogLineBusinessFields` (los nueve campos de siempre);
+  - `CatalogLineFields = negocio & clasificación`;
+  - `CatalogLineReplacement = negocio & { classification? }`;
+  - `CatalogLineView` hereda `type` y `packagingSubtype`.
+- `domain/create-catalog-line.ts` e `import-catalog-lines.ts`: pasan `type ?? null` y
+  `packagingSubtype ?? null`.
+- `domain/update-catalog-line.ts`: manda `classification` solo si la entrada trae los campos.
+- `domain/find-catalog-lines-by-identity.ts`: `AliveCatalogLineByIdentity` gana la clasificación.
+- `ports/supplier-catalog-repository.ts`: `replaceAlive(id, data: CatalogLineReplacement, …)`.
+- `ports/supplier-catalog-import-repository.ts`: las líneas de `findAliveByIdentities` ganan la
+  clasificación, y el texto de `upsertCostByIdentity` ya no dice «solo el costo».
+- `adapters/driven/persistence/supplier-catalog-line-prisma.ts`:
+  - el select y la vista llevan las dos columnas;
+  - el alta las escribe;
+  - la edición escribe `classification` solo si viene.
+- `adapters/driven/persistence/supplier-catalog-import-prisma.ts`:
+  - la lectura por identidad trae las dos columnas;
+  - `INSERT … ON CONFLICT` con el SQL de `design.md > 5.3`. El `CASE` del subtipo vive en una
+    constante `Prisma.sql` y la usan el `SET` y el `WHERE`.
+- `adapters/driving/supplier-catalog-actions.ts`: `readClassification` (clave ausente = no viaja;
+  vacía = `null`).
+- `index.ts`: exporta `catalogLineFieldsShape`, `CatalogLineBusinessFields`,
+  `CatalogLineClassification`, `CatalogLineReplacement` y `resolveImportedClassification`.
+
+Tests:
+- `tests/unit/proveedores/imported-classification.test.ts` (nuevo).
+- `tests/unit/proveedores/catalog-line-input.test.ts`:
+  - bloque nuevo «QT-296 — tipo y subtipo en el alta y la edicion manual de la linea»;
+  - los dos censos de `.shape` ganan `type` y `packagingSubtype`.
+- `tests/integration/proveedores/catalog-line.int.test.ts` y `catalog-import-upsert.int.test.ts`:
+  bloque QT-296 en cada uno; sus helpers `fields` y `campos` ganan los dos campos.
+- `tests/unit/proveedores/scope.test.ts`:
+  - el censo de `SupplierCatalogLine` gana `type` y `packagingSubtype`;
+  - la lista de migraciones que tocan las tablas gana `20261023150000_packaging_subtype`.
+
+  **Estaba rojo desde T1.** Lee `db/schema.prisma` y `db/migrations/`, y no salió en el
+  `vitest related` de T1/T2.
+- `catalog-service.test.ts` e `import-catalog-lines.test.ts`: las expectativas `toEqual` del dato
+  que llega al puerto ganan `type: null, packagingSubtype: null` (`design.md > 11`).
+- **Arreglos de compilación.** `CatalogLineView` y `CatalogLineFields` ganan campos obligatorios.
+  En estos archivos solo se añade `type: null, packagingSubtype: null` al fixture, sin tocar
+  ninguna aserción:
+  - `tests/integration/proveedores/company-scope-queries.int.test.ts`;
+  - `tests/unit/proveedores/{catalog-image-url,company-isolation-service,showcase-service}.test.ts`;
+  - `tests/unit/proveedores-ui/{catalog-columns,catalog-line-form,catalog-line-sheet,delete-catalog-line-dialog,supplier-detail-page}.test.tsx`;
+  - `tests/unit/paridad/{acciones-por-fila,campos-paridad,catalogo-paridad,confirmaciones-paridad,formularios-paridad}.test.tsx`;
+  - `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`;
+  - `tests/unit/documentos-ui/supplier-detail-upload.test.tsx`;
+  - en `documentos`, el arreglo mínimo pedido: los dobles de `findAliveByIdentity` de
+    `tests/unit/documentos/confirm-catalog-import.test.ts` y `preview-catalog-import.test.ts`.
+
+Lo que no se tocó:
+- **`lib/modules/documentos/**`.** Con zod 4, `superRefine` sobre un `strictObject` conserva
+  `.shape`. Por eso `classify-catalog-import.ts` (`createCatalogLineSchema.shape.*`) compila y se
+  comporta igual. Pasar a `catalogLineFieldsShape` queda para T7.
+- **`tests/integration/aislamiento.json`.** Los dos `.int` ampliados ya tenían su fila.
+
+### Divergencias con `design.md > 5`
+1. **Forma del puerto de edición.** El diseño pide que la edición reciba un `classification?`
+   opcional. Va como campo de `data` (`CatalogLineReplacement`), no como parámetro aparte, porque
+   las firmas del módulo llevan `scope` al final y no opcional. El alta y la importación usan
+   `CatalogLineFields`, con los dos campos obligatorios y anulables.
+2. **R28, «detalle».** El módulo no tiene lectura de una línea por id. Su única lectura es el
+   listado (`listBySupplierAlive`, que también usa la vitrina). R28 se prueba sobre el listado y
+   sobre la lectura por identidad, y `CatalogLineView` es el tipo de las dos.
+
+### Mapa R → test (lado `proveedores`)
+| R | Test |
+|---|---|
+| R26 | `catalog-line-input.test.ts` › «R26 — en el alta, sin tipo ni subtipo la linea queda sin tipo», «R26 — en el alta, PACKAGING_MATERIAL + CAP vale y llega al puerto; un tipo sin subtipo tambien», «R26 — en el alta, un subtipo con TOOL o sin tipo, o un valor ajeno, es invalid_input sin escribir»; `catalog-line.int.test.ts` › «R26, R27, R28 — el alta los guarda, …» |
+| R27 | `catalog-line-input.test.ts` › «R27 — en la edicion, sin ninguno de los dos el puerto no recibe clasificacion…», «R27 — en la edicion, con los dos se reemplazan y null + null quita», «R27 — en la edicion, uno solo de los dos, o un subtipo sin empaque, es invalid_input sin escribir»; `catalog-line.int.test.ts` › «R26, R27, R28 — …» |
+| R28 | `catalog-line.int.test.ts` › «R26, R27, R28 — … y el listado los devuelve»; `catalog-import-upsert.int.test.ts` › «R34, R35 — la lectura por identidad devuelve el tipo y el subtipo guardados» |
+| R33 | `catalog-import-upsert.int.test.ts` › «R33 — una linea nueva se guarda con el tipo y el subtipo de su fila», «R33 — una linea nueva sin tipo queda sin tipo ni subtipo» |
+| R34 | `imported-classification.test.ts` › tabla «R34 — guardado %j + importado %j = %j» (14 filas), «R34 — un subtipo importado sin tipo empaque resultante se descarta», «R34 — el resultado nunca deja un subtipo bajo un tipo que no es empaque…»; `catalog-import-upsert.int.test.ts` › «R34 — sobre una linea viva CAP, null no la borra, CONTAINER la reemplaza y TOOL deja el subtipo en NULL», «R34 — el SQL da lo mismo que resolveImportedClassification en cada transicion» |
+| R35 | `catalog-import-upsert.int.test.ts` › «R35 — con el mismo costo y solo un tipo nuevo cuenta `updated`; sin cambios, `unchanged`» |
+
+### Salida real
+`pnpm run typecheck`: `tsc --noEmit`, exit 0.
+`pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 de antes. Ninguno es de T6.
+
+`pnpm exec vitest run guard`:
+```
+ Test Files  87 passed (87)
+      Tests  1276 passed | 22 skipped (1298)
+```
+Los dos `.int` de proveedores, con `.env` cargado:
+```
+ Test Files  2 passed (2)
+      Tests  30 passed (30)
+```
+`pnpm exec vitest related --run <los 38 archivos de T6>`, con `.env` cargado. El barrel arrastra
+casi toda la suite, y la primera corrida la cortó mi propio `timeout 3000` antes del resumen. La
+segunda:
+```
+ Test Files  494 passed (494)
+      Tests  8283 passed | 3 skipped (8286)
+   Duration  1181.70s
+```
+
+**Veredicto T6:** R26–R28 y R33–R35 (lado `proveedores`) en verde. `scope.test.ts`,
+`catalog-service.test.ts`, typecheck, lint, guardias y `vitest related` también en verde. Hay dos
+divergencias de forma, anotadas arriba.

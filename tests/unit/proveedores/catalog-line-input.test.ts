@@ -23,6 +23,11 @@ import {
   updateCatalogLineSchema,
 } from '@/lib/modules/proveedores/domain/catalog-line-input'
 import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier-name'
+import { createCreateCatalogLine } from '@/lib/modules/proveedores/domain/create-catalog-line'
+import { createUpdateCatalogLine } from '@/lib/modules/proveedores/domain/update-catalog-line'
+import { ValidationError } from '@/lib/modules/proveedores/domain/errors'
+import type { SupplierCatalogRepository } from '@/lib/modules/proveedores/ports/supplier-catalog-repository'
+import type { UnitCatalog } from '@/lib/modules/unidades'
 
 const SUPPLIER_ID = '11111111-1111-4111-8111-111111111111'
 const PRESENTATION_ID = '22222222-2222-4222-8222-222222222222'
@@ -265,7 +270,9 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
       'measurements',
       'minPurchase',
       'name',
+      'packagingSubtype',
       'presentationId',
+      'type',
       'unitId',
     ])
 
@@ -315,8 +322,10 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
       'measurements',
       'minPurchase',
       'name',
+      'packagingSubtype',
       'presentationId',
       'supplierId',
+      'type',
       'unitId',
     ])
   })
@@ -470,5 +479,120 @@ describe('esquemas de entrada de la linea del catalogo (QC-52 T11)', () => {
 
     expect(crear(ALTA_VALIDA)).toBe(true)
     expect(repositorio).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('QT-296 — tipo y subtipo en el alta y la edicion manual de la linea', () => {
+  const ACTOR = {
+    id: '77777777-7777-4777-8777-777777777777',
+    companyId: '88888888-8888-4888-8888-888888888888',
+    permissions: ['proveedores.modificar'],
+  }
+  const AHORA = new Date('2026-10-23T10:00:00.000Z')
+  const sinUnidades = {} as UnitCatalog
+
+  function catalogoDoble() {
+    const create = vi.fn<SupplierCatalogRepository['create']>(async () => ({ id: 'linea-1' }))
+    const replaceAlive = vi.fn<SupplierCatalogRepository['replaceAlive']>(async () => 'ok' as const)
+    const repo = { create, replaceAlive } as unknown as SupplierCatalogRepository
+    return { repo, create, replaceAlive }
+  }
+
+  it('R26 — en el alta, sin tipo ni subtipo la linea queda sin tipo', async () => {
+    const parsed = createCatalogLineSchema.safeParse(ALTA_VALIDA)
+    expect(parsed.success).toBe(true)
+
+    const { repo, create } = catalogoDoble()
+    await createCreateCatalogLine({ catalog: repo, units: sinUnidades, now: () => AHORA })(ALTA_VALIDA, ACTOR)
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ type: null, packagingSubtype: null })
+  })
+
+  it('R26 — en el alta, PACKAGING_MATERIAL + CAP vale y llega al puerto; un tipo sin subtipo tambien', async () => {
+    const { repo, create } = catalogoDoble()
+    const alta = createCreateCatalogLine({ catalog: repo, units: sinUnidades, now: () => AHORA })
+
+    await alta({ ...ALTA_VALIDA, type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' }, ACTOR)
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' })
+
+    await alta({ ...ALTA_VALIDA, type: 'PACKAGING_MATERIAL' }, ACTOR)
+    expect(create.mock.calls[1]?.[0]).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: null })
+
+    await alta({ ...ALTA_VALIDA, type: 'TOOL', packagingSubtype: null }, ACTOR)
+    expect(create.mock.calls[2]?.[0]).toMatchObject({ type: 'TOOL', packagingSubtype: null })
+  })
+
+  it('R26 — en el alta, un subtipo con TOOL o sin tipo, o un valor ajeno, es invalid_input sin escribir', async () => {
+    for (const malo of [
+      { type: 'TOOL', packagingSubtype: 'CAP' },
+      { type: 'RAW_MATERIAL', packagingSubtype: 'CONTAINER' },
+      { packagingSubtype: 'CAP' },
+      { type: null, packagingSubtype: 'MEASURER' },
+      { type: 'FINISHED_PRODUCT' },
+      { type: 'PACKAGING' },
+      { type: 'PACKAGING_MATERIAL', packagingSubtype: 'tapa' },
+      { type: 'raw_material' },
+    ]) {
+      expect(createCatalogLineSchema.safeParse({ ...ALTA_VALIDA, ...malo }).success, JSON.stringify(malo)).toBe(false)
+
+      const { repo, create } = catalogoDoble()
+      const fallo = await createCreateCatalogLine({ catalog: repo, units: sinUnidades, now: () => AHORA })(
+        { ...ALTA_VALIDA, ...malo },
+        ACTOR,
+      ).catch((error: unknown) => error)
+      expect(fallo).toBeInstanceOf(ValidationError)
+      expect((fallo as ValidationError).code).toBe('invalid_input')
+      expect(create).not.toHaveBeenCalled()
+    }
+  })
+
+  it('R27 — en la edicion, sin ninguno de los dos el puerto no recibe clasificacion y se conserva la guardada', async () => {
+    const { repo, replaceAlive } = catalogoDoble()
+    await createUpdateCatalogLine({ catalog: repo, units: sinUnidades, now: () => AHORA })('linea-1', EDICION_VALIDA, ACTOR)
+    expect(replaceAlive.mock.calls[0]?.[1]).not.toHaveProperty('classification')
+    expect(replaceAlive.mock.calls[0]?.[1]).not.toHaveProperty('type')
+  })
+
+  it('R27 — en la edicion, con los dos se reemplazan y null + null quita', async () => {
+    const { repo, replaceAlive } = catalogoDoble()
+    const editar = createUpdateCatalogLine({ catalog: repo, units: sinUnidades, now: () => AHORA })
+
+    await editar('linea-1', { ...EDICION_VALIDA, type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' }, ACTOR)
+    expect(replaceAlive.mock.calls[0]?.[1]).toMatchObject({
+      classification: { type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' },
+    })
+
+    await editar('linea-1', { ...EDICION_VALIDA, type: 'RAW_MATERIAL', packagingSubtype: null }, ACTOR)
+    expect(replaceAlive.mock.calls[1]?.[1]).toMatchObject({
+      classification: { type: 'RAW_MATERIAL', packagingSubtype: null },
+    })
+
+    await editar('linea-1', { ...EDICION_VALIDA, type: null, packagingSubtype: null }, ACTOR)
+    expect(replaceAlive.mock.calls[2]?.[1]).toMatchObject({
+      classification: { type: null, packagingSubtype: null },
+    })
+  })
+
+  it('R27 — en la edicion, uno solo de los dos, o un subtipo sin empaque, es invalid_input sin escribir', async () => {
+    for (const malo of [
+      { type: 'PACKAGING_MATERIAL' },
+      { type: null },
+      { packagingSubtype: 'CAP' },
+      { packagingSubtype: null },
+      { type: 'TOOL', packagingSubtype: 'CAP' },
+      { type: null, packagingSubtype: 'OTHER' },
+      { type: 'FINISHED_PRODUCT', packagingSubtype: null },
+    ]) {
+      expect(updateCatalogLineSchema.safeParse({ ...EDICION_VALIDA, ...malo }).success, JSON.stringify(malo)).toBe(false)
+
+      const { repo, replaceAlive } = catalogoDoble()
+      const fallo = await createUpdateCatalogLine({ catalog: repo, units: sinUnidades, now: () => AHORA })(
+        'linea-1',
+        { ...EDICION_VALIDA, ...malo },
+        ACTOR,
+      ).catch((error: unknown) => error)
+      expect(fallo).toBeInstanceOf(ValidationError)
+      expect((fallo as ValidationError).code).toBe('invalid_input')
+      expect(replaceAlive).not.toHaveBeenCalled()
+    }
   })
 })

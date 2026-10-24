@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { addQuantities, compareQuantities } from '../../../domain/decimal-quantity';
+import { PACKAGING_SUBTYPES } from '../../../domain/packaging-subtype';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
 
 import { batchCompanyScope, presentationCompanyScope, productCompanyScope } from './company-scope';
@@ -25,7 +26,13 @@ async function findAlivePackaging(ids: readonly ProductId[], scope: InventorySco
     where: {
       AND: [
         productCompanyScope(scope),
-        { id: { in: [...ids] }, type: PRODUCT_TYPES.PACKAGING, presentationId: { not: null }, deletedAt: null },
+        {
+          id: { in: [...ids] },
+          type: PRODUCT_TYPES.PACKAGING,
+          packagingSubtype: PACKAGING_SUBTYPES.CONTAINER,
+          presentationId: { not: null },
+          deletedAt: null,
+        },
       ],
     },
     select: { id: true, name: true, presentationId: true, imagePath: true },

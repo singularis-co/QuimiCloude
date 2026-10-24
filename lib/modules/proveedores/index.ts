@@ -41,6 +41,7 @@ export {
   type UpdateSupplierInput,
 } from './domain/supplier-input';
 export {
+  catalogLineFieldsShape,
   createCatalogLineSchema,
   updateCatalogLineSchema,
   CATALOG_LINE_NAME_MAX_LENGTH,
@@ -66,11 +67,15 @@ export { type NewSupplier, type SupplierView } from './domain/supplier-view';
 // El error de «articulo del inventario no encontrado» tampoco se reexporta ya: QC-52 lo
 // borro del modulo porque su caso no puede ocurrir (R32).
 export {
+  type CatalogLineBusinessFields,
+  type CatalogLineClassification,
   type CatalogLineFields,
   type CatalogLineListItem,
+  type CatalogLineReplacement,
   type CatalogLineView,
   type NewCatalogLine,
 } from './domain/catalog-line-view';
+export { resolveImportedClassification } from './domain/imported-classification';
 
 // Las nueve factories de caso de uso (`design.md > 4`). Los tipos `*Deps` viajan con ellas:
 // quien las cablea es `lib/composition`, y sin el tipo no podria declarar la dependencia.

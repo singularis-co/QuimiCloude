@@ -1,5 +1,6 @@
 import { requirePermission, type Actor } from './actor';
 import { SupplierNotFoundError, ValidationError } from './errors';
+import type { CatalogLineClassification } from './catalog-line-view';
 import type { SupplierScope } from './supplier-scope';
 
 import type { SupplierCatalogImportRepository } from '../ports/supplier-catalog-import-repository';
@@ -26,7 +27,7 @@ export type AliveCatalogLineByIdentity = {
   readonly nameNormalized: string;
   readonly presentationId: string;
   readonly cost: string;
-};
+} & CatalogLineClassification;
 
 /**
  * Lectura para MOSTRAR el costo actual de una fila que va a clasificar como «cambia». NO es

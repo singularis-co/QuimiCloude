@@ -61,6 +61,8 @@ export type ProductView = {
   readonly qtyAlert: string | null;
   /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
   readonly type: ProductType;
+  /** `null` en lo que no es empaque. Las lecturas de la base siempre lo traen. */
+  readonly packagingSubtype?: PackagingSubtype | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   /** Suma de lo apartado en los lotes vivos del producto. Opcional: solo lo rellena

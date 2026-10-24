@@ -47,9 +47,13 @@ import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import type { ListAliveOptions } from '../../../ports/product-repository';
-import { PACKAGING_SUBTYPES, type PackagingSubtype } from '../../../domain/packaging-subtype';
+import { PACKAGING_SUBTYPES, PACKAGING_SUBTYPE_VALUES, type PackagingSubtype } from '../../../domain/packaging-subtype';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
-import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
+import {
+  PRODUCT_PACKAGING_SUBTYPE_FILTER,
+  PRODUCT_PRESENTATION_UNIT_FILTER,
+  PRODUCT_TYPE_VALUES,
+} from '../../../domain/product-queryable';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
 // condicion del `where` pueda relajarlo. Una fila de otra empresa sale igual que una que no existe
@@ -63,6 +67,7 @@ export const PRODUCT_SELECT = {
   unitId: true,
   qtyAlert: true,
   type: true,
+  packagingSubtype: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ProductSelect;
@@ -80,6 +85,7 @@ export function toProductView(row: ProductRow): ProductView {
     unitId: row.unitId,
     qtyAlert: row.qtyAlert === null ? null : row.qtyAlert.toFixed(4),
     type: row.type as ProductType,
+    packagingSubtype: row.packagingSubtype,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -243,6 +249,13 @@ function productFilterWhere(
         const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType)) as ProductType[];
         if (validValues.length === 0) return null;
         return { type: { in: validValues } };
+      }
+      if (field === PRODUCT_PACKAGING_SUBTYPE_FILTER) {
+        const validValues = value.values.filter((v): v is PackagingSubtype =>
+          (PACKAGING_SUBTYPE_VALUES as readonly string[]).includes(v),
+        );
+        if (validValues.length === 0) return null;
+        return { packagingSubtype: { in: validValues } };
       }
       return null;
     }
