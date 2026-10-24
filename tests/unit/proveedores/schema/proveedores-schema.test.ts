@@ -174,6 +174,9 @@ const SUPPLIER_CATALOG_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = 
   ['updatedAt', 'updated_at'],
   // QC-52 (decision cerrada 11, R8, R21): borrado LOGICO.
   ['deletedAt', 'deleted_at'],
+  // Tipo y subtipo de empaque, opcionales.
+  ['type', 'type'],
+  ['packagingSubtype', 'packaging_subtype'],
 ]
 
 /** Los ocho escalares que cruzan de modulo y por eso NO llevan `@relation` (R30). */

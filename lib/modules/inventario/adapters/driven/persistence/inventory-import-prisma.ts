@@ -27,6 +27,7 @@ const IMPORT_PRODUCT_REF_SELECT = {
   type: true,
   unitId: true,
   presentationId: true,
+  packagingSubtype: true,
   recipeId: true,
 } satisfies Prisma.ProductSelect;
 
@@ -39,6 +40,7 @@ function toImportProductRef(row: ImportProductRefRow): ImportProductRef {
     type: row.type as ProductType,
     unitId: row.unitId,
     presentationId: row.presentationId,
+    packagingSubtype: row.packagingSubtype,
     recipeId: row.recipeId,
   };
 }

@@ -39,11 +39,12 @@ const TRICKY = cells({
 });
 
 const ROWS: (ImportPreviewRow | ImportResultRow)[] = [
-  { rowNumber: 2, cells: cells({ type: 'Insumo', name: 'Bien' }), type: 'PRODUCT', productName: 'Bien', status: 'create' },
+  { rowNumber: 2, cells: cells({ type: 'Insumo', name: 'Bien' }), type: 'PRODUCT', packagingSubtype: null, productName: 'Bien', status: 'create' },
   {
     rowNumber: 3,
     cells: TRICKY,
     type: 'PRODUCT',
+    packagingSubtype: null,
     productName: null,
     status: 'error',
     issues: [
@@ -55,6 +56,7 @@ const ROWS: (ImportPreviewRow | ImportResultRow)[] = [
     rowNumber: 4,
     cells: cells({ type: 'Envase', name: 'Bidón', lot: 'L1' }),
     type: 'PACKAGING',
+    packagingSubtype: 'CONTAINER',
     productName: 'Bidón',
     status: 'duplicate',
     lot: 'L1',
@@ -64,6 +66,7 @@ const ROWS: (ImportPreviewRow | ImportResultRow)[] = [
     rowNumber: 7,
     cells: cells({ type: 'Maquina' }),
     type: null,
+    packagingSubtype: null,
     productName: null,
     status: 'error',
     issues: [{ code: 'type_invalid', column: 'type', message: 'Tipo: no es uno de los tipos.' }],
@@ -87,6 +90,7 @@ describe('plantilla', () => {
     const [header, ...rows] = template.rows;
     expect(header).toEqual([
       'Tipo',
+      'Subtipo',
       'Nombre',
       'Unidad',
       'Presentación',
@@ -128,10 +132,33 @@ describe('plantilla', () => {
     expect(values.rows).toEqual([
       ['Tipo', 'Unidad', 'Presentación', 'Fórmula'],
       ['Insumo', 'gramo', 'Bidón 20 L', 'Desengrasante'],
-      ['Envase', 'kilogramo', '', 'Jabón'],
+      ['Empaque', 'kilogramo', '', 'Jabón'],
       ['Instrumento', '', '', 'Cloro'],
       ['Producto terminado', '', '', ''],
     ]);
+  });
+});
+
+describe('plantilla — QT-296, «Subtipo» y «Empaque»', () => {
+  it('R21 la cabecera trae «Subtipo» justo despues de «Tipo», y ningun ejemplo lo rellena', () => {
+    const [template] = buildInventoryImportTemplateSheets(VALUES);
+    const [header, ...rows] = template.rows;
+    expect(header?.slice(0, 3)).toEqual(['Tipo', 'Subtipo', 'Nombre']);
+    expect(rows.map((row) => row[1])).toEqual(['', '', '', '']);
+  });
+
+  it('R42 la fila de ejemplo del empaque dice «Empaque» y no «Envase»', () => {
+    const [template] = buildInventoryImportTemplateSheets(VALUES);
+    const types = template.rows.slice(1).map((row) => row[0]);
+    expect(types).toContain('Empaque');
+    expect(types).not.toContain('Envase');
+  });
+
+  it('R42 la hoja de valores admitidos dice «Empaque» y no «Envase»', () => {
+    const [, values] = buildInventoryImportTemplateSheets(VALUES);
+    const types = values.rows.slice(1).map((row) => row[0]);
+    expect(types).toContain('Empaque');
+    expect(types).not.toContain('Envase');
   });
 });
 
@@ -172,18 +199,19 @@ describe('archivo de errores', () => {
 
   it('R28 sirve con las filas del resultado de la confirmacion', () => {
     const result: ImportResultRow[] = [
-      { rowNumber: 2, cells: cells({ name: 'A' }), type: 'PRODUCT', productName: 'A', status: 'created', productId: 'p', lot: '1' },
+      { rowNumber: 2, cells: cells({ name: 'A' }), type: 'PRODUCT', packagingSubtype: null, productName: 'A', status: 'created', productId: 'p', lot: '1' },
       {
         rowNumber: 3,
         cells: cells({ type: 'Insumo', name: 'B' }),
         type: 'PRODUCT',
+        packagingSubtype: null,
         productName: 'B',
         status: 'error',
         issues: [{ code: 'write_failed', column: null, message: 'No se pudo guardar la fila.' }],
       },
     ];
     const [, ...rows] = parse(buildInventoryImportErrorFile(result, 'a.csv').content);
-    expect(rows.map((row) => [row[0], row[2], row.at(-1)])).toEqual([['3', 'B', 'No se pudo guardar la fila.']]);
+    expect(rows.map((row) => [row[0], row[3], row.at(-1)])).toEqual([['3', 'B', 'No se pudo guardar la fila.']]);
   });
 
   it('R28 el archivo de errores se vuelve a subir sin rechazo de cabecera y con los mismos valores', () => {

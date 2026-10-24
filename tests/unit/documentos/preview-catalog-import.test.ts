@@ -214,6 +214,8 @@ describe('createPreviewCatalogImport', () => {
             nameNormalized: 'acidocitrico',
             presentationId: PRESENTACION_LITRO,
             cost: '100.0000',
+            type: null,
+            packagingSubtype: null,
           },
         ]),
         importLines: dobleQueFallaSiSeLlama('catalog.importLines') as CatalogImportDeps['catalog']['importLines'],
@@ -350,6 +352,137 @@ describe('createPreviewCatalogImport', () => {
       const resultado = await preview(actor, { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
 
       expect(resultado.rows).toHaveLength(1);
+    });
+  });
+
+  describe('QT-296 — tipo, subtipo y marca de revision por fila', () => {
+    const FILA_REVISADA = {
+      name: 'Frasco 500',
+      presentation: 'Caja 100u',
+      cost: '1.2000',
+      minPurchase: null,
+      deliveryTime: null,
+      material: null,
+      measurements: null,
+      imagePath: null,
+    };
+
+    function archivoConLineas(lineas: readonly Record<string, unknown>[]): FileForReview {
+      return { status: 'done', strategy: 'catalogo', extractedText: JSON.stringify({ lines: lineas }) };
+    }
+
+    it.each([
+      ['sin tipo', null, null, true],
+      ['empaque sin subtipo', 'PACKAGING_MATERIAL', null, true],
+      ['materia prima', 'RAW_MATERIAL', null, false],
+      ['empaque con subtipo envase', 'PACKAGING_MATERIAL', 'CONTAINER', false],
+    ] as const)('R31 — %s: needsTypeReview = %s y la fila trae su tipo y subtipo', async (_caso, type, packagingSubtype, marca) => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora);
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), {
+        supplierId: PROVEEDOR,
+        documentFileId: ARCHIVO,
+        lines: [{ ...FILA_REVISADA, type, packagingSubtype }],
+      });
+
+      expect(resultado.rows[0]).toMatchObject({ type, packagingSubtype, needsTypeReview: marca, kind: 'nueva' });
+    });
+
+    it('R31 — la marca sale tambien de las filas leidas de la IA', async () => {
+      const bitacora: Bitacora = [];
+      const archivo = archivoConLineas([
+        { name: 'Frasco 500', presentation: 'Caja 100u', cost: '1.2000', type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' },
+        { name: 'Glicerina', presentation: 'Bidon 20L', cost: '9.0000' },
+      ]);
+      const deps = crearDeps(bitacora, { repository: dobleDeRepositorio(bitacora, archivo) });
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), { supplierId: PROVEEDOR, documentFileId: ARCHIVO });
+
+      expect(resultado.rows.map((fila) => [fila.type, fila.packagingSubtype, fila.needsTypeReview])).toEqual([
+        ['PACKAGING_MATERIAL', 'CONTAINER', false],
+        [null, null, true],
+      ]);
+    });
+
+    it('R31 — la marca no cambia kind: una fila sin tipo con el mismo costo sigue «sin cambios»', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora, {
+        presentations: dobleDePresentaciones(bitacora, [
+          { id: PRESENTACION_LITRO, name: 'Caja 100u', nameNormalized: 'caja100u', unitId: 'u-1' },
+        ]),
+        catalog: {
+          findAliveByIdentity: vi.fn(async () => [
+            {
+              id: 'linea-viva-1',
+              nameNormalized: 'frasco500',
+              presentationId: PRESENTACION_LITRO,
+              cost: '1.2000',
+              type: null,
+              packagingSubtype: null,
+            },
+          ]),
+          importLines: dobleQueFallaSiSeLlama('catalog.importLines') as CatalogImportDeps['catalog']['importLines'],
+        },
+      });
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), {
+        supplierId: PROVEEDOR,
+        documentFileId: ARCHIVO,
+        lines: [FILA_REVISADA],
+      });
+
+      expect(resultado.rows[0]).toMatchObject({ kind: 'sin cambios', needsTypeReview: true, invalidFields: [] });
+    });
+
+    it('R32 — las filas revisadas sin type ni packagingSubtype se aceptan y quedan sin tipo', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora);
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), {
+        supplierId: PROVEEDOR,
+        documentFileId: ARCHIVO,
+        lines: [FILA_REVISADA],
+      });
+
+      expect(resultado.rows[0]).toMatchObject({ kind: 'nueva', type: null, packagingSubtype: null });
+    });
+
+    it.each([
+      ['un tipo ajeno', { type: 'PACKAGING' }],
+      ['un subtipo ajeno', { type: 'PACKAGING_MATERIAL', packagingSubtype: 'tapa' }],
+    ])('R32 — %s en una fila revisada rechaza la peticion con ValidationError', async (_caso, campos) => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora);
+      const preview = createPreviewCatalogImport(deps);
+
+      await expect(
+        preview(actorConPermiso(), {
+          supplierId: PROVEEDOR,
+          documentFileId: ARCHIVO,
+          lines: [{ ...FILA_REVISADA, ...campos }],
+        }),
+      ).rejects.toBeInstanceOf(ValidationError);
+      expect(deps.repository.readFileForReview).not.toHaveBeenCalled();
+    });
+
+    it('R32 — una fila revisada con subtipo y tipo TOOL sale «incompleta» con packagingSubtype invalido', async () => {
+      const bitacora: Bitacora = [];
+      const deps = crearDeps(bitacora);
+      const preview = createPreviewCatalogImport(deps);
+
+      const resultado = await preview(actorConPermiso(), {
+        supplierId: PROVEEDOR,
+        documentFileId: ARCHIVO,
+        lines: [{ ...FILA_REVISADA, type: 'TOOL', packagingSubtype: 'CAP' }],
+      });
+
+      expect(resultado.rows[0]?.kind).toBe('incompleta');
+      expect(resultado.rows[0]?.invalidFields).toEqual(['packagingSubtype']);
     });
   });
 });

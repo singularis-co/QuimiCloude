@@ -4,6 +4,7 @@ import {
   parseImportDate,
   parseImportDecimal,
   parseImportPurchaseDate,
+  parseImportSubtype,
   parseImportType,
 } from './import-cell-parsing';
 import {
@@ -21,6 +22,12 @@ import {
   type ImportRowIssueCode,
   type ImportRowType,
 } from './inventory-import-contract';
+import {
+  countsAsPackagingHomonym,
+  PACKAGING_SUBTYPES,
+  requiresPresentation,
+  type PackagingSubtype,
+} from './packaging-subtype';
 import { normalizePresentationName } from './presentation-name';
 import { typedLotSchema } from './product-batch-input';
 import { createProductSchema, isWholeQuantity, PRODUCT_NAME_MAX_LENGTH } from './product-input';
@@ -82,6 +89,8 @@ const DATE_RULE = 'no es una fecha valida (AAAA-MM-DD o DD/MM/AAAA).';
 
 const ISSUE_TEXT: Readonly<Record<ImportRowIssueCode, string>> = {
   type_invalid: 'debe ser Insumo, Envase, Instrumento o Producto terminado.',
+  subtype_invalid: 'debe ser Envase, Tapa, Medidor u Otro.',
+  subtype_mismatch: 'ya existe un empaque con ese nombre y otro subtipo.',
   value_required: 'este campo es obligatorio para este tipo.',
   name_too_long: `admite hasta ${PRODUCT_NAME_MAX_LENGTH} caracteres.`,
   unit_not_found: 'la unidad no existe en la empresa.',
@@ -172,7 +181,8 @@ function readDecimal(row: ParsedImportRow, key: ImportColumnKey, issues: RowIssu
   return parsed.value;
 }
 
-type ColumnRules = (typeof INVENTORY_IMPORT_COLUMNS)[number]['rules'];
+type ImportColumn = (typeof INVENTORY_IMPORT_COLUMNS)[number];
+type ColumnRules = ImportColumn['rules'];
 
 /**
  * La regla de la columna para el tipo. Sin tipo valido, solo la regla en la que coinciden todos los
@@ -184,10 +194,31 @@ function ruleFor(rules: ColumnRules, type: ImportRowType | null): ColumnRules[Im
   return first !== undefined && rest.every((rule) => rule === first) ? first : null;
 }
 
-function checkRequired(row: ParsedImportRow, type: ImportRowType | null, issues: RowIssues): void {
+/**
+ * La tabla de reglas es por tipo; en un empaque, la presentacion depende ademas del subtipo. Un
+ * empaque con «Subtipo» ilegible (`null`) deja la presentacion sin regla.
+ */
+function columnRule(
+  column: ImportColumn,
+  type: ImportRowType | null,
+  subtype: PackagingSubtype | null,
+): ColumnRules[ImportRowType] | null {
+  if (type === PRODUCT_TYPES.PACKAGING && column.key === 'presentation') {
+    if (subtype === null) return null;
+    return requiresPresentation(subtype) ? 'required' : 'forbidden';
+  }
+  return ruleFor(column.rules, type);
+}
+
+function checkRequired(
+  row: ParsedImportRow,
+  type: ImportRowType | null,
+  subtype: PackagingSubtype | null,
+  issues: RowIssues,
+): void {
   for (const column of INVENTORY_IMPORT_COLUMNS) {
     const filled = row.cells[column.key].trim() !== '';
-    if (ruleFor(column.rules, type) === 'required' && !filled) issues.add('value_required', column.key);
+    if (columnRule(column, type, subtype) === 'required' && !filled) issues.add('value_required', column.key);
   }
 }
 
@@ -199,9 +230,10 @@ function checkRequired(row: ParsedImportRow, type: ImportRowType | null, issues:
 function withoutIgnoredColumns(
   row: ParsedImportRow,
   type: ImportRowType,
+  subtype: PackagingSubtype | null,
 ): { readonly row: ParsedImportRow; readonly ignoredColumns: readonly ImportColumnKey[] } {
   const ignoredColumns = INVENTORY_IMPORT_COLUMNS.filter(
-    (column) => column.rules[type] === 'forbidden' && row.cells[column.key].trim() !== '',
+    (column) => columnRule(column, type, subtype) === 'forbidden' && row.cells[column.key].trim() !== '',
   ).map((column) => column.key);
   if (ignoredColumns.length === 0) return { row, ignoredColumns };
   const cells = { ...row.cells };
@@ -209,11 +241,19 @@ function withoutIgnoredColumns(
   return { row: { ...row, cells }, ignoredColumns };
 }
 
-function readValues(row: ParsedImportRow, type: ImportRowType | null, today: string, issues: RowIssues): RowValues {
+function readValues(
+  row: ParsedImportRow,
+  type: ImportRowType | null,
+  subtype: PackagingSubtype | null,
+  today: string,
+  issues: RowIssues,
+): RowValues {
   const applies = (key: ImportColumnKey): boolean => {
-    const rules = INVENTORY_IMPORT_COLUMNS.find((column) => column.key === key)?.rules;
-    if (rules === undefined) return true;
-    return type === null ? Object.values(rules).some((rule) => rule !== 'forbidden') : rules[type] !== 'forbidden';
+    const column = INVENTORY_IMPORT_COLUMNS.find((candidate) => candidate.key === key);
+    if (column === undefined) return true;
+    return type === null
+      ? Object.values(column.rules).some((rule) => rule !== 'forbidden')
+      : columnRule(column, type, subtype) !== 'forbidden';
   };
 
   let purchaseDate: string | null = null;
@@ -298,6 +338,7 @@ function productCandidate(
   type: ImportRowType,
   values: RowValues,
   refs: { readonly unitId: string; readonly presentationId: string },
+  subtype: PackagingSubtype,
 ): Record<string, unknown> {
   const batch = {
     stock: values.stock,
@@ -310,7 +351,14 @@ function productCandidate(
     return { type, name: values.name, unitId: refs.unitId, qtyAlert: values.qtyAlert, ...batch, expiryDate: values.expiryDate };
   }
   if (type === PRODUCT_TYPES.PACKAGING) {
-    return { type, name: values.name, qtyAlert: values.qtyAlert, presentationId: refs.presentationId, ...batch };
+    return {
+      type,
+      name: values.name,
+      qtyAlert: values.qtyAlert,
+      packagingSubtype: subtype,
+      ...(requiresPresentation(subtype) ? { presentationId: refs.presentationId } : {}),
+      ...batch,
+    };
   }
   return { type, name: values.name, ...batch, expiryDate: values.expiryDate };
 }
@@ -326,7 +374,13 @@ function validateWithoutType(values: RowValues, issues: RowIssues): void {
   if (values.lot !== null && !typedLotSchema.safeParse(values.lot).success) issues.add('lot_invalid', 'lot');
 }
 
-function validateWithSchema(type: ImportRowType, values: RowValues, issues: RowIssues): void {
+/** Un «Subtipo» ilegible ya tiene su motivo: el resto de la fila se valida como la de un envase. */
+function validateWithSchema(
+  type: ImportRowType,
+  subtype: PackagingSubtype | null,
+  values: RowValues,
+  issues: RowIssues,
+): void {
   const result =
     type === PRODUCT_TYPES.FINISHED_PRODUCT
       ? importFinishedGoodsRowSchema.safeParse({
@@ -338,7 +392,12 @@ function validateWithSchema(type: ImportRowType, values: RowValues, issues: RowI
           expiryDate: values.expiryDate,
         })
       : createProductSchema.safeParse(
-          productCandidate(type, values, { unitId: PLACEHOLDER_ID, presentationId: PLACEHOLDER_ID }),
+          productCandidate(
+            type,
+            values,
+            { unitId: PLACEHOLDER_ID, presentationId: PLACEHOLDER_ID },
+            subtype ?? PACKAGING_SUBTYPES.CONTAINER,
+          ),
         );
   if (result.success) return;
   for (const issue of result.error.issues) addSchemaIssue(String(issue.path[0] ?? ''), type, values, issues);
@@ -372,7 +431,12 @@ class MissingCatalog {
   }
 }
 
-type FileProduct = { readonly rowNumber: number; readonly presentationId: string | null; readonly finished: boolean };
+type FileProduct = {
+  readonly rowNumber: number;
+  readonly presentationId: string | null;
+  readonly packagingSubtype: PackagingSubtype | null;
+  readonly finished: boolean;
+};
 
 type PlanState = {
   readonly snapshot: ImportCatalogSnapshot;
@@ -447,6 +511,7 @@ function fileTarget(product: FileProduct): ImportBatchTarget {
 /** La misma regla de identidad que el alta manual de cada tipo, contra la base y contra el archivo. */
 function resolveIdentity(
   type: ImportRowType,
+  subtype: PackagingSubtype | null,
   name: string,
   refs: Resolved,
   state: PlanState,
@@ -469,15 +534,23 @@ function resolveIdentity(
   }
 
   if (type === PRODUCT_TYPES.PACKAGING) {
-    if (refs.presentation === null) return null;
+    if (subtype === null) return null;
+    const presentation = refs.presentation;
+    if (requiresPresentation(subtype) && presentation === null) return null;
     const key = `E|${normalized}`;
     const existing = products.find(
       (product) =>
-        product.nameNormalized === normalized && product.type === PRODUCT_TYPES.PACKAGING && product.presentationId !== null,
+        product.nameNormalized === normalized &&
+        product.type === PRODUCT_TYPES.PACKAGING &&
+        countsAsPackagingHomonym(product),
     );
     const inFile = state.fileProducts.get(key);
-    const presentationId = existing?.presentationId ?? inFile?.presentationId ?? null;
-    if ((existing !== undefined || inFile !== undefined) && presentationId !== refs.presentation.id) {
+    const known = existing ?? inFile;
+    if (known !== undefined && known.packagingSubtype !== subtype) {
+      issues.add('subtype_mismatch', 'subtype');
+      return null;
+    }
+    if (known !== undefined && presentation !== null && known.presentationId !== presentation.id) {
       issues.add('presentation_mismatch', 'presentation');
       return null;
     }
@@ -544,26 +617,34 @@ type PlannedRow = { readonly preview: ImportPreviewRow; readonly write: ImportRo
 function planRow(parsed: ParsedImportRow, state: PlanState, today: string): PlannedRow {
   const type = parseImportType(parsed.cells.type);
   if (type === null) {
-    const base = { rowNumber: parsed.rowNumber, cells: parsed.cells };
+    const base = { rowNumber: parsed.rowNumber, cells: parsed.cells, packagingSubtype: null };
     const issues = new RowIssues();
     issues.add('type_invalid', 'type');
-    checkRequired(parsed, null, issues);
-    validateWithoutType(readValues(parsed, null, today, issues), issues);
+    checkRequired(parsed, null, null, issues);
+    validateWithoutType(readValues(parsed, null, null, today, issues), issues);
     const [first, ...rest] = issues.list();
     const all: [ImportRowIssue, ...ImportRowIssue[]] = [first ?? importRowIssue('type_invalid', 'type'), ...rest];
     return { preview: { ...base, type: null, productName: null, status: 'error', issues: all }, write: null };
   }
 
-  const { row, ignoredColumns } = withoutIgnoredColumns(parsed, type);
+  const issues = new RowIssues();
+  let subtype: PackagingSubtype | null = null;
+  if (type === PRODUCT_TYPES.PACKAGING) {
+    const parsedSubtype = parseImportSubtype(parsed.cells.subtype);
+    if (parsedSubtype.kind === 'value') subtype = parsedSubtype.value;
+    else issues.add('subtype_invalid', 'subtype');
+  }
+
+  const { row, ignoredColumns } = withoutIgnoredColumns(parsed, type, subtype);
   const base = {
     rowNumber: parsed.rowNumber,
     cells: parsed.cells,
+    packagingSubtype: subtype,
     ...(ignoredColumns.length === 0 ? {} : { ignoredColumns }),
   };
-  const issues = new RowIssues();
-  checkRequired(row, type, issues);
-  const values = readValues(row, type, today, issues);
-  validateWithSchema(type, values, issues);
+  checkRequired(row, type, subtype, issues);
+  const values = readValues(row, type, subtype, today, issues);
+  validateWithSchema(type, subtype, values, issues);
   const refs = resolveReferences(row, type, state, issues);
 
   const productName =
@@ -573,7 +654,7 @@ function planRow(parsed: ParsedImportRow, state: PlanState, today: string): Plan
         : null
       : values.name.trim() || null;
 
-  const identity = resolveIdentity(type, values.name, refs, state, issues);
+  const identity = resolveIdentity(type, subtype, values.name, refs, state, issues);
   const lot = values.lot?.trim() ?? null;
   const duplicateOf =
     identity !== null && lot !== null && !issues.has('lot')
@@ -595,6 +676,7 @@ function planRow(parsed: ParsedImportRow, state: PlanState, today: string): Plan
     const created: FileProduct = {
       rowNumber: row.rowNumber,
       presentationId: refs.presentation?.id ?? null,
+      packagingSubtype: subtype,
       finished: type === PRODUCT_TYPES.FINISHED_PRODUCT,
     };
     state.fileProducts.set(identity.key, created);
@@ -615,10 +697,12 @@ function planRow(parsed: ParsedImportRow, state: PlanState, today: string): Plan
         })()
       : {
           kind: 'product',
-          candidate: productCandidate(type, values, {
-            unitId: refs.unitId ?? PLACEHOLDER_ID,
-            presentationId: refs.presentation?.id ?? PLACEHOLDER_ID,
-          }),
+          candidate: productCandidate(
+            type,
+            values,
+            { unitId: refs.unitId ?? PLACEHOLDER_ID, presentationId: refs.presentation?.id ?? PLACEHOLDER_ID },
+            subtype ?? PACKAGING_SUBTYPES.CONTAINER,
+          ),
         };
 
   const preview: ImportPreviewRow =

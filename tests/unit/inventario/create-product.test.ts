@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import type { Mock } from 'vitest';
 
-import { PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { PACKAGING_SUBTYPES, PRODUCT_TYPES } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import {
@@ -1076,7 +1076,7 @@ describe('QC-195 — alta de envase (PACKAGING)', () => {
     const llamada = products.createWithFirstBatch.mock.calls[0];
     expect(llamada?.[0]).toEqual({ name: 'Botella PET 500 ml', qtyAlert: '0', type: PRODUCT_TYPES.PACKAGING });
     expect(llamada?.[1]).toEqual(expect.objectContaining({ presentationId: null, stock: '100', unitCost: '0.5000', expiryDate: null }));
-    expect(llamada?.[4]).toEqual({ presentationId: PRESENTACION, unitId: UNIDAD_ENVASES });
+    expect(llamada?.[4]).toEqual({ presentationId: PRESENTACION, unitId: UNIDAD_ENVASES, packagingSubtype: PACKAGING_SUBTYPES.CONTAINER });
   });
 
   it('R1 — sin presentacion se rechaza con invalid_input sin tocar el puerto', async () => {
@@ -1101,6 +1101,7 @@ describe('QC-195 — alta de envase (PACKAGING)', () => {
       findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
         id: 'envase-1',
         presentationId: PRESENTACION,
+        packagingSubtype: PACKAGING_SUBTYPES.CONTAINER,
       })),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, packageUnit, now: () => AHORA });
@@ -1118,6 +1119,7 @@ describe('QC-195 — alta de envase (PACKAGING)', () => {
       findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
         id: 'envase-1',
         presentationId: OTRA_PRESENTACION,
+        packagingSubtype: PACKAGING_SUBTYPES.CONTAINER,
       })),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, packageUnit, now: () => AHORA });
@@ -1136,6 +1138,136 @@ describe('QC-195 — alta de envase (PACKAGING)', () => {
     });
 
     await expect(createProduct(ALTA_ENVASE, ADMIN)).rejects.toThrow(/unidad de sistema de envases/);
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('QT-296 — homonimo de un empaque por subtipo', () => {
+  const UNIDAD_ENVASES = 'unidad-u';
+  const packageUnit = { findPackageUnitId: vi.fn(async () => UNIDAD_ENVASES) };
+  const ALTA_TAPA = {
+    name: 'Tapa rosca 28 mm',
+    type: PRODUCT_TYPES.PACKAGING,
+    packagingSubtype: PACKAGING_SUBTYPES.CAP,
+    qtyAlert: '0',
+    stock: '200',
+    unitCost: '0.1000',
+  };
+  const ALTA_ENVASE = {
+    name: 'Tapa rosca 28 mm',
+    type: PRODUCT_TYPES.PACKAGING,
+    qtyAlert: '0',
+    presentationId: PRESENTACION,
+    stock: '100',
+    unitCost: '0.5000',
+  };
+
+  function homonimo(presentationId: string | null, packagingSubtype: (typeof PACKAGING_SUBTYPES)[keyof typeof PACKAGING_SUBTYPES]) {
+    return montarRepositorio({
+      findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
+        id: 'empaque-1',
+        presentationId,
+        packagingSubtype,
+      })),
+    });
+  }
+
+  it('R9 — un homonimo con otro subtipo se rechaza con action_not_allowed sin escribir', async () => {
+    for (const [products, entrada] of [
+      [homonimo(PRESENTACION, PACKAGING_SUBTYPES.CONTAINER), ALTA_TAPA],
+      [homonimo(null, PACKAGING_SUBTYPES.MEASURER), ALTA_TAPA],
+      [homonimo(null, PACKAGING_SUBTYPES.CAP), ALTA_ENVASE],
+    ] as const) {
+      const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+      const alta = createProduct(entrada, ADMIN);
+
+      await expect(alta).rejects.toBeInstanceOf(ActionNotAllowedError);
+      await expect(alta).rejects.toMatchObject({ code: 'action_not_allowed' });
+      expect(products.addBatchToAlive).not.toHaveBeenCalled();
+      expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R9 — un homonimo envase con el mismo subtipo y la misma presentacion suma un lote', async () => {
+    const products = homonimo(PRESENTACION, PACKAGING_SUBTYPES.CONTAINER);
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await expect(createProduct(ALTA_ENVASE, ADMIN)).resolves.toEqual({ id: 'empaque-1', lot: '1' });
+    const llamada = products.addBatchToAlive.mock.calls[0];
+    expect(llamada?.[0]).toBe('empaque-1');
+    expect(llamada?.[4]).toEqual({ presentationId: PRESENTACION });
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('R9 — una tapa homonima de una tapa suma un lote sin presentacion', async () => {
+    const products = homonimo(null, PACKAGING_SUBTYPES.CAP);
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await expect(createProduct(ALTA_TAPA, ADMIN)).resolves.toEqual({ id: 'empaque-1', lot: '1' });
+    const llamada = products.addBatchToAlive.mock.calls[0];
+    expect(llamada?.[0]).toBe('empaque-1');
+    expect(llamada?.[1]).toEqual(expect.objectContaining({ presentationId: null, stock: '200' }));
+    expect(llamada?.[4]).toBeUndefined();
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+  });
+
+  it('R7 — una tapa sin homonimo nace sin presentacion, con la unidad de envases y su subtipo', async () => {
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await createProduct(ALTA_TAPA, ADMIN);
+    const llamada = products.createWithFirstBatch.mock.calls[0];
+    expect(llamada?.[1]).toEqual(expect.objectContaining({ presentationId: null }));
+    expect(llamada?.[4]).toEqual({ presentationId: null, unitId: UNIDAD_ENVASES, packagingSubtype: PACKAGING_SUBTYPES.CAP });
+  });
+});
+
+describe('QT-296 — el envase legado no cuenta como homonimo', () => {
+  const UNIDAD_ENVASES = 'unidad-u';
+  const packageUnit = { findPackageUnitId: vi.fn(async () => UNIDAD_ENVASES) };
+  const ALTA_GALON = {
+    name: 'Galón',
+    type: PRODUCT_TYPES.PACKAGING,
+    qtyAlert: '0',
+    presentationId: PRESENTACION,
+    stock: '10',
+    unitCost: '1.2000',
+  };
+
+  it('R43, R9 — con solo un «Galón» legado, que el adaptador ya no devuelve, el alta de «Galón» con presentacion crea el producto', async () => {
+    // El doble devuelve `null`: es lo que hace el adaptador cuando el unico homonimo es un legado.
+    const products = montarRepositorio();
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    await createProduct(ALTA_GALON, ADMIN);
+
+    expect(products.findAlivePackagingByName).toHaveBeenCalledWith('Galón', { companyId: EMPRESA });
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+    const llamada = products.createWithFirstBatch.mock.calls[0];
+    expect(llamada?.[0]).toEqual({ name: 'Galón', qtyAlert: '0', type: PRODUCT_TYPES.PACKAGING });
+    expect(llamada?.[4]).toEqual({
+      presentationId: PRESENTACION,
+      unitId: UNIDAD_ENVASES,
+      packagingSubtype: PACKAGING_SUBTYPES.CONTAINER,
+    });
+  });
+
+  it('R43, R9 — una tapa «Galón» homonima sin presentacion sigue contando: el alta de un envase «Galón» da action_not_allowed', async () => {
+    const products = montarRepositorio({
+      findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => ({
+        id: 'tapa-galon',
+        presentationId: null,
+        packagingSubtype: PACKAGING_SUBTYPES.CAP,
+      })),
+    });
+    const createProduct = createCreateProduct({ products, packageUnit, now: () => AHORA });
+
+    const alta = createProduct(ALTA_GALON, ADMIN);
+
+    await expect(alta).rejects.toBeInstanceOf(ActionNotAllowedError);
+    await expect(alta).rejects.toMatchObject({ code: 'action_not_allowed' });
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   });
 });
@@ -1232,7 +1364,11 @@ describe('QC-199 — alta de insumo por unidad', () => {
       ADMIN,
     );
     expect(products.findAlivePackagingByName).toHaveBeenCalledTimes(1);
-    expect(products.createWithFirstBatch.mock.calls[0]?.[4]).toEqual({ presentationId: PRESENTACION, unitId: 'unidad-u' });
+    expect(products.createWithFirstBatch.mock.calls[0]?.[4]).toEqual({
+      presentationId: PRESENTACION,
+      unitId: 'unidad-u',
+      packagingSubtype: PACKAGING_SUBTYPES.CONTAINER,
+    });
 
     await createProduct({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE, stock: '1' }, ADMIN);
     expect(products.findAliveIdByNameInPresentationUnit).toHaveBeenCalledWith('Balanza', null, { companyId: EMPRESA });

@@ -23,7 +23,11 @@ import { normalizeSupplierName } from '@/lib/modules/proveedores/domain/supplier
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { CatalogLineFields } from '@/lib/modules/proveedores/domain/catalog-line-view';
+import { resolveImportedClassification } from '@/lib/modules/proveedores/domain/imported-classification';
+import type {
+  CatalogLineClassification,
+  CatalogLineFields,
+} from '@/lib/modules/proveedores/domain/catalog-line-view';
 import type { SupplierScope } from '@/lib/modules/proveedores/domain/supplier-scope';
 
 function token(): string {
@@ -153,6 +157,8 @@ function campos(
     deliveryTime: null,
     material: null,
     measurements: null,
+    type: null,
+    packagingSubtype: null,
     ...overrides,
   };
 }
@@ -460,5 +466,138 @@ describe('findAliveCatalogLinesByIdentities — R9 (lectura para clasificar)', (
       { companyId: empresa.companyId },
     );
     expect(resultado).toBe('supplier_not_found');
+  });
+});
+
+describe('QT-296 — tipo y subtipo en la escritura por identidad', () => {
+  async function preparar() {
+    const empresa = await crearEmpresa();
+    const scope: SupplierScope = { companyId: empresa.companyId };
+    const supplierId = await crearProveedor(empresa.companyId);
+    const presentationId = await crearPresentacion(empresa.companyId, `Bidon ${token()}`);
+    const importar = (overrides: Partial<CatalogLineFields>, now: Date) =>
+      upsertCatalogLinesByIdentity(
+        supplierId,
+        [campos('Tapa rosca 28', presentationId, { cost: '10.0000', ...overrides })],
+        empresa.userId,
+        now,
+        scope,
+      );
+    const fila = () => lineaDe(empresa.companyId, supplierId, normalizeSupplierName('Tapa rosca 28'));
+    return { empresa, scope, supplierId, presentationId, importar, fila };
+  }
+
+  it('R33 — una linea nueva se guarda con el tipo y el subtipo de su fila', async () => {
+    const { importar, fila } = await preparar();
+
+    const resultado = await importar(
+      { type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' },
+      new Date('2026-10-23T08:00:00.000Z'),
+    );
+    expect(resultado).toEqual({ created: 1, updated: 0, unchanged: 0 });
+    expect(await fila()).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' });
+  });
+
+  it('R33 — una linea nueva sin tipo queda sin tipo ni subtipo', async () => {
+    const { importar, fila } = await preparar();
+
+    await importar({ type: null, packagingSubtype: null }, new Date('2026-10-23T08:00:00.000Z'));
+    expect(await fila()).toMatchObject({ type: null, packagingSubtype: null });
+  });
+
+  it('R34 — sobre una linea viva CAP, null no la borra, CONTAINER la reemplaza y TOOL deja el subtipo en NULL', async () => {
+    const { importar, fila } = await preparar();
+    await importar({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' }, new Date('2026-10-23T08:00:00.000Z'));
+
+    await importar({ type: null, packagingSubtype: null }, new Date('2026-10-23T09:00:00.000Z'));
+    expect(await fila()).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' });
+
+    await importar({ type: 'PACKAGING_MATERIAL', packagingSubtype: null }, new Date('2026-10-23T09:30:00.000Z'));
+    expect(await fila()).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' });
+
+    await importar(
+      { type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' },
+      new Date('2026-10-23T10:00:00.000Z'),
+    );
+    expect(await fila()).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' });
+
+    await importar({ type: 'TOOL', packagingSubtype: null }, new Date('2026-10-23T11:00:00.000Z'));
+    expect(await fila()).toMatchObject({ type: 'TOOL', packagingSubtype: null });
+
+    await importar({ type: null, packagingSubtype: null }, new Date('2026-10-23T12:00:00.000Z'));
+    expect(await fila()).toMatchObject({ type: 'TOOL', packagingSubtype: null });
+  });
+
+  it('R34 — el SQL da lo mismo que resolveImportedClassification en cada transicion', async () => {
+    const pasos: readonly CatalogLineClassification[] = [
+      { type: 'RAW_MATERIAL', packagingSubtype: null },
+      { type: 'PACKAGING_MATERIAL', packagingSubtype: null },
+      { type: null, packagingSubtype: null },
+      { type: 'PACKAGING_MATERIAL', packagingSubtype: 'MEASURER' },
+      { type: null, packagingSubtype: null },
+      { type: 'PACKAGING_MATERIAL', packagingSubtype: 'OTHER' },
+      { type: 'RAW_MATERIAL', packagingSubtype: null },
+    ];
+    const { importar, fila } = await preparar();
+    let guardado: CatalogLineClassification = { type: null, packagingSubtype: null };
+    await importar(guardado, new Date('2026-10-23T08:00:00.000Z'));
+
+    let minuto = 0;
+    for (const paso of pasos) {
+      minuto += 1;
+      await importar(paso, new Date(Date.UTC(2026, 9, 23, 9, minuto)));
+      const esperado = resolveImportedClassification(guardado, paso);
+      const real = await fila();
+      expect({ type: real?.type, packagingSubtype: real?.packagingSubtype }, JSON.stringify(paso)).toEqual(esperado);
+      guardado = esperado;
+    }
+  });
+
+  it('R35 — con el mismo costo y solo un tipo nuevo cuenta `updated`; sin cambios, `unchanged`', async () => {
+    const { importar, fila } = await preparar();
+    const t1 = new Date('2026-10-23T08:00:00.000Z');
+    await importar({ type: null, packagingSubtype: null }, t1);
+
+    const t2 = new Date('2026-10-23T09:00:00.000Z');
+    expect(await importar({ type: 'PACKAGING_MATERIAL', packagingSubtype: null }, t2)).toEqual({
+      created: 0,
+      updated: 1,
+      unchanged: 0,
+    });
+    expect((await fila())?.updatedAt.toISOString()).toBe(t2.toISOString());
+
+    const t3 = new Date('2026-10-23T10:00:00.000Z');
+    expect(await importar({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' }, t3)).toEqual({
+      created: 0,
+      updated: 1,
+      unchanged: 0,
+    });
+
+    const t4 = new Date('2026-10-23T11:00:00.000Z');
+    expect(await importar({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' }, t4)).toEqual({
+      created: 0,
+      updated: 0,
+      unchanged: 1,
+    });
+    expect(await importar({ type: null, packagingSubtype: null }, t4)).toEqual({
+      created: 0,
+      updated: 0,
+      unchanged: 1,
+    });
+    expect((await fila())?.updatedAt.toISOString()).toBe(t3.toISOString());
+  });
+
+  it('R34, R35 — la lectura por identidad devuelve el tipo y el subtipo guardados', async () => {
+    const { importar, supplierId, presentationId, scope } = await preparar();
+    await importar({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'MEASURER' }, new Date('2026-10-23T08:00:00.000Z'));
+
+    const resultado = await findAliveCatalogLinesByIdentities(
+      supplierId,
+      [{ nameNormalized: normalizeSupplierName('Tapa rosca 28'), presentationId }],
+      scope,
+    );
+    expect(resultado).not.toBe('supplier_not_found');
+    if (resultado === 'supplier_not_found') return;
+    expect(resultado.lines[0]).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'MEASURER' });
   });
 });

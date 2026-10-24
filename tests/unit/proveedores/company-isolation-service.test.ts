@@ -102,6 +102,8 @@ const CAMPOS_LINEA = {
   deliveryTime: null,
   material: null,
   measurements: null,
+  type: null,
+  packagingSubtype: null,
 };
 
 // --- El almacen en memoria, con dato de LAS DOS empresas ---------------------------------------

@@ -543,6 +543,9 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       'createdAt',
       'updatedAt',
       'deletedAt',
+      // Tipo y subtipo de lo que vende el proveedor: enums propios, sin `@relation`.
+      'type',
+      'packagingSubtype',
       'supplier',
       // Prefijo izquierdo de «lineas de esta empresa y de este proveedor», que es como se
       // consultan siempre, y lado hijo de la clave foranea compuesta. Es un INDICE, no un
@@ -610,6 +613,8 @@ describe('alcance de QC-43 (crud-de-proveedores): sin route handler; la pantalla
       // Ampliacion nombrada: material y medidas de la linea, con los mismos
       // dos campos añadidos al censo de `SupplierCatalogLine` de arriba.
       '20260924180000_supplier_catalog_line_material_and_measurements',
+      // Ampliacion nombrada: tipo y subtipo de la linea, con los dos campos del censo de arriba.
+      '20261023150000_packaging_subtype',
     ])
   })
 

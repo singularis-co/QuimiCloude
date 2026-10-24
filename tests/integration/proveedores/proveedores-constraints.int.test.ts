@@ -996,8 +996,12 @@ describe('estructura de la linea de catalogo', () => {
         'min_purchase',
         'name',
         'name_normalized',
+        // QT-296: el tipo de la linea (RAW_MATERIAL/TOOL/PACKAGING_MATERIAL) y su subtipo de
+        // empaque, anulables; los anade `20261023150000_packaging_subtype`.
+        'packaging_subtype',
         'presentation_id',
         'supplier_id',
+        'type',
         'unit_id',
         'updated_at',
         'updated_by',
@@ -1421,6 +1425,8 @@ describe('estructura de la linea de catalogo', () => {
         'supplier_catalog_lines_material_check',
         'supplier_catalog_lines_measurements_check',
         'supplier_catalog_lines_min_purchase_non_negative',
+        // QT-296: el subtipo de empaque solo cuelga de una linea PACKAGING_MATERIAL.
+        'supplier_catalog_lines_packaging_subtype_matches_type',
       ])
 
       const cero = await createLine(tx, supplierId, presentationId, '0.0001', {

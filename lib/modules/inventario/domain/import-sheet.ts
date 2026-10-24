@@ -13,7 +13,7 @@ import {
   type ImportColumnKey,
   type ImportFileRejection,
 } from './inventory-import-contract';
-import { IMPORT_EXAMPLE_ROWS } from './inventory-import-downloads';
+import { IMPORT_EXAMPLE_ROWS, LEGACY_IMPORT_EXAMPLE_ROWS } from './inventory-import-downloads';
 
 export type ParsedImportRow = {
   /** 1 = cabecera, como en la hoja. */
@@ -146,7 +146,7 @@ function canonicalCell(key: ImportColumnKey, text: string, origin: ImportCellOri
   return collapseSpaces(text);
 }
 
-const CANONICAL_EXAMPLES = IMPORT_EXAMPLE_ROWS.map(
+const CANONICAL_EXAMPLES = [...IMPORT_EXAMPLE_ROWS, ...LEGACY_IMPORT_EXAMPLE_ROWS].map(
   (example) =>
     new Map<ImportColumnKey, string>(
       INVENTORY_IMPORT_COLUMNS.map((column) => [column.key, canonicalCell(column.key, example[column.key], 'text')]),

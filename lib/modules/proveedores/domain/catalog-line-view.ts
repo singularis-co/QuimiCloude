@@ -14,6 +14,13 @@
  */
 
 import type { CatalogLineMeasurements } from './catalog-line-input';
+import type { CatalogLinePackagingSubtype, CatalogLineType } from './catalog-line-type';
+
+/** `null` es «sin tipo» o «sin subtipo»; el subtipo solo existe en un empaque. */
+export type CatalogLineClassification = {
+  readonly type: CatalogLineType | null;
+  readonly packagingSubtype: CatalogLinePackagingSubtype | null;
+};
 
 /**
  * Los NUEVE campos de negocio de la linea: lo que el alta escribe y lo que la edicion
@@ -30,7 +37,7 @@ import type { CatalogLineMeasurements } from './catalog-line-input';
  * (`design.md > 2.3`). Derivarlo en el adaptador, en toda escritura, es lo que impide que
  * las dos columnas puedan diverger.
  */
-export type CatalogLineFields = {
+export type CatalogLineBusinessFields = {
   /** Recortado y no vacio al normalizar (R14). Lo garantiza el esquema del borde. */
   readonly name: string;
   /** uuid, OBLIGATORIO (R10, decision cerrada 4): forma parte de la identidad de la linea. */
@@ -43,6 +50,13 @@ export type CatalogLineFields = {
   readonly deliveryTime: number | null;
   readonly material: string | null;
   readonly measurements: CatalogLineMeasurements | null;
+};
+
+export type CatalogLineFields = CatalogLineBusinessFields & CatalogLineClassification;
+
+/** Edicion: sin `classification`, el tipo y el subtipo guardados no se tocan. */
+export type CatalogLineReplacement = CatalogLineBusinessFields & {
+  readonly classification?: CatalogLineClassification;
 };
 
 /** Alta de una linea: sus campos de negocio mas el proveedor al que pertenece. */

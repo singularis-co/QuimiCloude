@@ -5,6 +5,7 @@ import {
   parseImportDate,
   parseImportDecimal,
   parseImportPurchaseDate,
+  parseImportSubtype,
   parseImportType,
 } from '@/lib/modules/inventario/domain/import-cell-parsing';
 
@@ -121,6 +122,39 @@ describe('parseImportType', () => {
 
   it.each(['', 'Producto', 'PRODUCT', 'Maquina'])('%j no es un tipo', (text) => {
     expect(parseImportType(text)).toBeNull();
+  });
+});
+
+describe('parseImportType — QT-296, «Empaque» y «Envase»', () => {
+  it.each(['Empaque', 'empaque', ' EMPAQUE ', 'Envase', 'envase'])('R41 %j es PACKAGING', (text) => {
+    expect(parseImportType(text)).toBe('PACKAGING');
+  });
+
+  it.each(['Empaques', 'Envases', 'Tapa'])('R41 %j sigue dando type_invalid, como cualquier texto desconocido', (text) => {
+    expect(parseImportType(text)).toBeNull();
+  });
+});
+
+describe('parseImportSubtype', () => {
+  it.each([
+    ['', 'CONTAINER'],
+    ['   ', 'CONTAINER'],
+  ])('R16 %j vacio es CONTAINER', (text, value) => {
+    expect(parseImportSubtype(text)).toEqual({ kind: 'value', value });
+  });
+
+  it.each([
+    ['Envase', 'CONTAINER'],
+    ['tapa', 'CAP'],
+    ['MEDIDOR', 'MEASURER'],
+    [' Otro ', 'OTHER'],
+    ['Médidor', 'MEASURER'],
+  ])('R17 %j se lee sin mayusculas, tildes ni espacios de los extremos como %j', (text, value) => {
+    expect(parseImportSubtype(text)).toEqual({ kind: 'value', value });
+  });
+
+  it.each(['gatillo', 'CAP', 'Tapas'])('R17 %j es invalido', (text) => {
+    expect(parseImportSubtype(text)).toEqual({ kind: 'invalid' });
   });
 });
 

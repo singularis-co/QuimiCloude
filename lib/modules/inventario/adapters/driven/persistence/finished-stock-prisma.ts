@@ -208,6 +208,7 @@ function toProduct(row: DetailRow): ProductView {
       unitId: row.unitId,
       qtyAlert: row.qtyAlert,
       type: row.type as ProductType,
+      packagingSubtype: null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }),

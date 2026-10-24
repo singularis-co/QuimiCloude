@@ -47,8 +47,13 @@ import type { ProductBatchView } from '../../../domain/product-batch-view';
 import type { AdjustBatchStockOutcome, BatchStockAdjustment } from '../../../domain/stock-adjustment';
 import type { NewProduct, PackagingIdentity, ProductView, ProductType } from '../../../domain/product-view';
 import type { ListAliveOptions } from '../../../ports/product-repository';
+import { PACKAGING_SUBTYPES, PACKAGING_SUBTYPE_VALUES, type PackagingSubtype } from '../../../domain/packaging-subtype';
 import { PRODUCT_TYPES } from '../../../domain/product-type';
-import { PRODUCT_PRESENTATION_UNIT_FILTER, PRODUCT_TYPE_VALUES } from '../../../domain/product-queryable';
+import {
+  PRODUCT_PACKAGING_SUBTYPE_FILTER,
+  PRODUCT_PRESENTATION_UNIT_FILTER,
+  PRODUCT_TYPE_VALUES,
+} from '../../../domain/product-queryable';
 
 // El ambito de empresa va como conjuncion aparte en un `AND` de primer nivel, para que ninguna otra
 // condicion del `where` pueda relajarlo. Una fila de otra empresa sale igual que una que no existe
@@ -62,6 +67,7 @@ export const PRODUCT_SELECT = {
   unitId: true,
   qtyAlert: true,
   type: true,
+  packagingSubtype: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ProductSelect;
@@ -79,6 +85,7 @@ export function toProductView(row: ProductRow): ProductView {
     unitId: row.unitId,
     qtyAlert: row.qtyAlert === null ? null : row.qtyAlert.toFixed(4),
     type: row.type as ProductType,
+    packagingSubtype: row.packagingSubtype,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -242,6 +249,13 @@ function productFilterWhere(
         const validValues = value.values.filter((v) => PRODUCT_TYPE_VALUES.includes(v as ProductType)) as ProductType[];
         if (validValues.length === 0) return null;
         return { type: { in: validValues } };
+      }
+      if (field === PRODUCT_PACKAGING_SUBTYPE_FILTER) {
+        const validValues = value.values.filter((v): v is PackagingSubtype =>
+          (PACKAGING_SUBTYPE_VALUES as readonly string[]).includes(v),
+        );
+        if (validValues.length === 0) return null;
+        return { packagingSubtype: { in: validValues } };
       }
       return null;
     }
@@ -540,7 +554,7 @@ async function findAliveIdByNameAndUnitId(
 export async function findAlivePackagingByName(
   name: string,
   scope: InventoryScope,
-): Promise<{ id: string; presentationId: string } | null> {
+): Promise<{ id: string; presentationId: string | null; packagingSubtype: PackagingSubtype } | null> {
   const row = await prisma.product.findFirst({
     where: {
       AND: [
@@ -548,15 +562,17 @@ export async function findAlivePackagingByName(
         {
           nameNormalized: normalizeProductName(name),
           type: PRODUCT_TYPES.PACKAGING,
-          presentationId: { not: null },
           deletedAt: null,
         },
+        // Misma regla que `countsAsPackagingHomonym`: el envase sin presentacion no cuenta.
+        { NOT: { packagingSubtype: PACKAGING_SUBTYPES.CONTAINER, presentationId: null } },
       ],
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true, presentationId: true },
+    select: { id: true, presentationId: true, packagingSubtype: true },
   });
-  return row?.presentationId == null ? null : { id: row.id, presentationId: row.presentationId };
+  if (row?.packagingSubtype == null) return null;
+  return { id: row.id, presentationId: row.presentationId, packagingSubtype: row.packagingSubtype };
 }
 
 /**
@@ -876,7 +892,8 @@ async function writeBatchWithLotRetry<T>(
  * Producto y lote en la misma transaccion: si el lote falla, el producto tampoco queda. La
  * unidad del producto sale, por este orden, del envase, de `product.unitId` o de la presentacion
  * del lote -sin fila viva de la empresa, se aborta con `ValidationError` antes de escribir nada-;
- * sin ninguna de las tres, nace sin unidad. Su existencia queda recalculada al final.
+ * sin ninguna de las tres, nace sin unidad. Su existencia queda recalculada al final. Un empaque
+ * nace con el subtipo de `packaging` o, sin el, como envase; los demas tipos, sin subtipo.
  */
 export async function createWithFirstBatch(
   product: NewProduct,
@@ -888,11 +905,13 @@ export async function createWithFirstBatch(
   return writeBatchWithLotRetry(batch, scope, async (tx, resolveBatchLot) => {
     let unitId: string | null = null;
     if (packaging !== undefined) {
-      const presentation = await tx.presentation.findFirst({
-        where: { AND: [presentationCompanyScope(scope), { id: packaging.presentationId }] },
-        select: { id: true },
-      });
-      if (presentation === null) throw new ValidationError();
+      if (packaging.presentationId !== null) {
+        const presentation = await tx.presentation.findFirst({
+          where: { AND: [presentationCompanyScope(scope), { id: packaging.presentationId }] },
+          select: { id: true },
+        });
+        if (presentation === null) throw new ValidationError();
+      }
       unitId = packaging.unitId;
     } else if (product.unitId !== undefined) {
       unitId = product.unitId;
@@ -913,6 +932,10 @@ export async function createWithFirstBatch(
         qtyAlert: product.qtyAlert ?? null,
         type: product.type ?? PRODUCT_TYPES.PRODUCT,
         presentationId: packaging?.presentationId ?? null,
+        packagingSubtype:
+          product.type === PRODUCT_TYPES.PACKAGING
+            ? (packaging?.packagingSubtype ?? PACKAGING_SUBTYPES.CONTAINER)
+            : null,
         imagePath: product.imagePath ?? null,
         ...companyScopeColumns(scope),
         createdAt: now,

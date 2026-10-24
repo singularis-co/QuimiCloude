@@ -239,6 +239,8 @@ beforeEach(() => {
           deliveryTime: 5,
           material: null,
           measurements: null,
+          type: null,
+          packagingSubtype: null,
           createdAt: new Date('2026-03-01T10:00:00.000Z'),
           updatedAt: new Date('2026-03-05T10:00:00.000Z'),
           createdBy: 'autor',

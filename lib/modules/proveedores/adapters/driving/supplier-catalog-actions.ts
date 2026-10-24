@@ -95,6 +95,24 @@ function readOptionalFormString(formData: FormData, name: string): string | unde
   return value;
 }
 
+/** Clave ausente = no viaja; vacia = `null`, que en la edicion quita lo guardado. */
+function readNullableFormString(formData: FormData, name: string): string | null | undefined {
+  const value = formData.get(name);
+  if (typeof value !== 'string') return undefined;
+  return value.trim() === '' ? null : value;
+}
+
+function readClassification(
+  formData: FormData,
+): { type?: string | null; packagingSubtype?: string | null } {
+  const type = readNullableFormString(formData, 'type');
+  const packagingSubtype = readNullableFormString(formData, 'packagingSubtype');
+  return {
+    ...(type === undefined ? {} : { type }),
+    ...(packagingSubtype === undefined ? {} : { packagingSubtype }),
+  };
+}
+
 function readOptionalFormInt(
   formData: FormData,
   name: string,
@@ -160,6 +178,7 @@ export async function createCatalogLineAction(
     deliveryTime,
     material: readOptionalFormString(formData, 'material'),
     measurements: readMeasurements(formData),
+    ...readClassification(formData),
   };
 
   const actor = await currentActor();
@@ -200,6 +219,7 @@ export async function updateCatalogLineAction(
     deliveryTime,
     material: readOptionalFormString(formData, 'material'),
     measurements: readMeasurements(formData),
+    ...readClassification(formData),
   };
 
   const actor = await currentActor();

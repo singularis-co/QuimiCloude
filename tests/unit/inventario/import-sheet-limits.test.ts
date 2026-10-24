@@ -166,3 +166,53 @@ describe('fila de ejemplo de la plantilla', () => {
     expect(parseImportSheet(sheet([HEADER, EXAMPLE]))).toEqual({ ok: false, rejection: { code: 'empty' } });
   });
 });
+
+/** La cabecera y la fila de ejemplo del empaque de una plantilla descargada antes de la columna «Subtipo». */
+const LEGACY_HEADER = HEADER.filter((header) => header !== 'Subtipo');
+const LEGACY_PACKAGING_EXAMPLE = [
+  'Envase',
+  'Ejemplo botella PET',
+  '',
+  'Ejemplo botella 1 litro',
+  '',
+  '100',
+  '0,80',
+  'EJEMPLO-002',
+  '2026-01-15',
+  '',
+  '20',
+];
+
+describe('fila de ejemplo — QT-296, plantilla nueva y plantilla antigua', () => {
+  it('R21 todas las filas de ejemplo de la plantilla nueva se ignoran', () => {
+    const examples = IMPORT_EXAMPLE_ROWS.map((example) => INVENTORY_IMPORT_COLUMNS.map((column) => example[column.key]));
+    const outcome = parseImportSheet(sheet([HEADER, ...examples, item('Sal')]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(true);
+    expect(outcome.ok && outcome.sheet.rows.map((row) => row.cells.name)).toEqual(['Sal']);
+  });
+
+  it('R21 la fila de ejemplo de empaque de una plantilla antigua (sin «Subtipo», con «Envase») se ignora', () => {
+    expect(LEGACY_HEADER).toHaveLength(HEADER.length - 1);
+    const legacyItem = LEGACY_HEADER.map((header) => (header === 'Tipo' ? 'Insumo' : header === 'Nombre' ? 'Sal' : ''));
+    const outcome = parseImportSheet(sheet([LEGACY_HEADER, LEGACY_PACKAGING_EXAMPLE, legacyItem]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(true);
+    expect(outcome.ok && outcome.sheet.rows.map((row) => row.cells.name)).toEqual(['Sal']);
+  });
+
+  it('R21 las demas filas de ejemplo de una plantilla antigua tambien se ignoran', () => {
+    const legacyExamples = IMPORT_EXAMPLE_ROWS.filter((example) => example.type !== 'Empaque').map((example) =>
+      INVENTORY_IMPORT_COLUMNS.filter((column) => column.key !== 'subtype').map((column) => example[column.key]),
+    );
+    const outcome = parseImportSheet(sheet([LEGACY_HEADER, ...legacyExamples, LEGACY_PACKAGING_EXAMPLE]));
+    expect(outcome).toEqual({ ok: false, rejection: { code: 'empty' } });
+  });
+
+  it('R21 una fila igual al ejemplo antiguo pero con «ENVASE» se sigue importando, como hoy', () => {
+    const upper = LEGACY_PACKAGING_EXAMPLE.map((value, index) => (index === 0 ? 'ENVASE' : value));
+    const outcome = parseImportSheet(sheet([LEGACY_HEADER, upper]));
+    expect(outcome.ok && outcome.sheet.exampleRowIgnored).toBe(false);
+    expect(outcome.ok && outcome.sheet.rows.map((row) => [row.cells.type, row.cells.name, row.cells.subtype])).toEqual([
+      ['ENVASE', 'Ejemplo botella PET', ''],
+    ]);
+  });
+});

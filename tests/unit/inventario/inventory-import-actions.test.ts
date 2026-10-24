@@ -73,10 +73,11 @@ const PREVIEW: InventoryImportPreview = {
   exampleRowIgnored: false,
   totals: { rows: 2, create: 1, addBatch: 0, duplicate: 0, error: 1 },
   rows: [
-    { rowNumber: 2, type: 'PRODUCT', productName: 'Sal', cells: cells({ type: 'Insumo', name: 'Sal' }), status: 'create' },
+    { rowNumber: 2, type: 'PRODUCT', packagingSubtype: null, productName: 'Sal', cells: cells({ type: 'Insumo', name: 'Sal' }), status: 'create' },
     {
       rowNumber: 3,
       type: 'PRODUCT',
+      packagingSubtype: null,
       productName: 'Mal',
       cells: cells({ type: 'Insumo', name: 'Mal', stock: 'x' }),
       status: 'error',
@@ -100,6 +101,7 @@ const IMPORTED: InventoryImportResult = {
     {
       rowNumber: 2,
       type: 'PRODUCT',
+      packagingSubtype: null,
       productName: 'Sal',
       cells: cells({ type: 'Insumo', name: 'Sal' }),
       status: 'created',
@@ -264,6 +266,7 @@ describe('confirmInventoryImportAction', () => {
         {
           rowNumber: 2,
           type: 'PRODUCT',
+          packagingSubtype: null,
           productName: 'Sal',
           cells: cells({ type: 'Insumo', name: 'Sal' }),
           status: 'duplicate',

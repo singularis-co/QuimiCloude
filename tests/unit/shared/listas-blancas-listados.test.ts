@@ -88,3 +88,10 @@ describe('listas blancas de los siete listados', () => {
     expect(sinBusqueda).toEqual([]);
   });
 });
+
+describe('QT-296 — el listado de productos filtra por subtipo de empaque', () => {
+  it('R12 — productos declara packagingSubtype como filtro de seleccion, sin hacerlo ordenable', () => {
+    expect(PRODUCT_QUERYABLE.filterable.packagingSubtype).toBe('select');
+    expect(PRODUCT_QUERYABLE.sortable).not.toContain('packagingSubtype');
+  });
+});

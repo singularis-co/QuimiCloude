@@ -197,6 +197,8 @@ function camposDeLinea(
     deliveryTime: null,
     material: null,
     measurements: null,
+    type: null,
+    packagingSubtype: null,
     ...overrides,
   };
 }

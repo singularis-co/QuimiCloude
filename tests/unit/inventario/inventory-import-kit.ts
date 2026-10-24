@@ -108,7 +108,14 @@ export function snapshot(overrides: Partial<ImportCatalogSnapshot> = {}): Import
 }
 
 export function productRef(overrides: Partial<ImportProductRef> & Pick<ImportProductRef, 'id' | 'nameNormalized'>): ImportProductRef {
-  return { type: 'PRODUCT', unitId: null, presentationId: null, recipeId: null, ...overrides };
+  return {
+    type: 'PRODUCT',
+    unitId: null,
+    presentationId: null,
+    recipeId: null,
+    ...overrides,
+    packagingSubtype: overrides.packagingSubtype ?? (overrides.type === 'PACKAGING' ? 'CONTAINER' : null),
+  };
 }
 
 /** Un lector que devuelve siempre esta hoja, con la cabecera de la plantilla delante. */

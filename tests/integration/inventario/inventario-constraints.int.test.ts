@@ -813,6 +813,9 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
     // `20260904160000_list_query_indexes`, es NOT NULL y NO tiene indice unico -el nombre
     // del producto no es unico, QC-14 decision cerrada 6-.
     'name_normalized',
+    // QT-296: el subtipo de empaque (CONTAINER/CAP/MEASURER/OTHER), presente si y solo si
+    // `type = PACKAGING`, lo vigila su CHECK mas abajo. La anade `20261023150000_packaging_subtype`.
+    'packaging_subtype',
     // La receta y la presentacion que identifican el producto terminado: las dos van
     // siempre juntas (o ninguna), lo vigila el CHECK de identidad mas abajo.
     'presentation_id',
@@ -921,6 +924,10 @@ describe('QC-52/QC-91 — censo de products tras las migraciones', () => {
       // presentes, y a la inversa: ningun producto terminado sin identidad ni identidad
       // colgando de un producto que no lo sea.
       'products_finished_identity_matches_type',
+      // QT-296: el subtipo va si y solo si es PACKAGING, y un empaque solo lleva
+      // presentacion si es envase (CONTAINER).
+      'products_packaging_subtype_matches_type',
+      'products_presentation_only_in_container',
       'products_qty_alert_non_negative',
       'products_stock_non_negative',
     ])

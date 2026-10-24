@@ -61,6 +61,9 @@ function fila(overrides: Partial<CatalogImportPreviewRow> = {}): CatalogImportPr
     measurements: null,
     imagePath: null,
     imageUrl: null,
+    type: null,
+    packagingSubtype: null,
+    needsTypeReview: true,
     ...overrides,
   };
 }

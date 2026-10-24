@@ -1,4 +1,4 @@
-import type { CatalogLineFields } from '../domain/catalog-line-view';
+import type { CatalogLineClassification, CatalogLineFields } from '../domain/catalog-line-view';
 import type { SupplierScope } from '../domain/supplier-scope';
 
 /**
@@ -30,20 +30,21 @@ export interface SupplierCatalogImportRepository {
     scope: SupplierScope,
   ): Promise<
     | {
-        lines: readonly {
+        lines: readonly ({
           id: string;
           nameNormalized: string;
           presentationId: string;
           cost: string;
-        }[];
+        } & CatalogLineClassification)[];
       }
     | 'supplier_not_found'
   >;
 
   /**
    * Escritura TODO O NADA de una confirmacion completa, en una sola transaccion. Por cada
-   * linea: si ya hay una VIVA con su identidad, actualiza SOLO su costo -y el autor y la
-   * fecha de la ultima modificacion-; si no la hay, la crea con todos sus campos revisados.
+   * linea: si ya hay una VIVA con su identidad, actualiza su costo, su tipo y su subtipo -y el
+   * autor y la fecha de la ultima modificacion-; si no la hay, la crea con todos sus campos
+   * revisados. Un tipo o un subtipo `null` no borra el guardado.
    * El indice unico parcial es el arbitro: dos confirmaciones simultaneas no duplican nada.
    *
    * `'supplier_not_found'` es el mismo caso que en `findAliveByIdentities`, comprobado DENTRO

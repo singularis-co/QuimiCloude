@@ -5,12 +5,22 @@
  *
  * La validez de cada campo se decide reutilizando, campo a campo, los esquemas de `proveedores` y
  * `inventario`: ningun patron se reescribe aqui. La comparacion de costo es sobre la cadena decimal,
- * nunca `Number(...)`.
+ * nunca `Number(...)`. Una fila con linea viva «cambia» si difiere el costo o si la confirmacion
+ * cambiaria su tipo o su subtipo; esa segunda parte se calcula con la misma regla que aplica la
+ * escritura por identidad de `proveedores`, para que la vista previa no anuncie algo distinto de
+ * lo que se va a guardar.
  *
  * Dominio puro: sin base de datos ni framework.
  */
 
-import { createCatalogLineSchema, normalizeSupplierName } from '@/lib/modules/proveedores';
+import {
+  CATALOG_LINE_TYPES,
+  createCatalogLineSchema,
+  normalizeSupplierName,
+  resolveImportedClassification,
+  type CatalogLinePackagingSubtype,
+  type CatalogLineType,
+} from '@/lib/modules/proveedores';
 import { createPresentationSchema, normalizePresentationName } from '@/lib/modules/inventario';
 
 export type ClassKind = 'nueva' | 'cambia' | 'sin cambios' | 'incompleta' | 'duplicada';
@@ -24,6 +34,8 @@ export type ClassifyRowInput = {
   readonly deliveryTime: number | null;
   readonly material: string | null;
   readonly measurements: unknown;
+  readonly type: CatalogLineType | null;
+  readonly packagingSubtype: CatalogLinePackagingSubtype | null;
 };
 
 /** Una presentacion de la empresa, resuelta por nombre normalizado. */
@@ -37,6 +49,8 @@ export type AliveCatalogLine = {
   readonly nameNormalized: string;
   readonly presentationId: string;
   readonly cost: string;
+  readonly type: CatalogLineType | null;
+  readonly packagingSubtype: CatalogLinePackagingSubtype | null;
 };
 
 export type ClassifiedLine = {
@@ -82,6 +96,10 @@ const FIELD_VALIDATORS: ReadonlyArray<{
     field: 'measurements',
     isValid: (row) => createCatalogLineSchema.shape.measurements.safeParse(row.measurements).success,
   },
+  {
+    field: 'packagingSubtype',
+    isValid: (row) => row.packagingSubtype === null || row.type === CATALOG_LINE_TYPES.PACKAGING_MATERIAL,
+  },
 ];
 
 function invalidFieldsOf(row: ClassifyRowInput): readonly string[] {
@@ -106,6 +124,14 @@ function normalizeDecimal(value: string): string {
 function sameCost(a: string, b: string): boolean {
   if (ZERO_ONLY.test(a) && ZERO_ONLY.test(b)) return true;
   return normalizeDecimal(a) === normalizeDecimal(b);
+}
+
+function classificationChanges(alive: AliveCatalogLine, row: ClassifyRowInput): boolean {
+  const resolved = resolveImportedClassification(
+    { type: alive.type, packagingSubtype: alive.packagingSubtype },
+    { type: row.type, packagingSubtype: row.packagingSubtype },
+  );
+  return resolved.type !== alive.type || resolved.packagingSubtype !== alive.packagingSubtype;
 }
 
 /**
@@ -153,7 +179,8 @@ export function classifyCatalogImportRows(
     }
 
     const rowCost = row.cost as string;
-    const kind: ClassKind = sameCost(alive.cost, rowCost) ? 'sin cambios' : 'cambia';
+    const kind: ClassKind =
+      sameCost(alive.cost, rowCost) && !classificationChanges(alive, row) ? 'sin cambios' : 'cambia';
     return { kind, invalidFields: [], presentationId: match.id, currentCost: alive.cost, newCost: rowCost };
   });
 }

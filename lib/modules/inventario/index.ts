@@ -38,6 +38,13 @@ export {
   PRODUCT_PRESENTATION_UNIT_FILTER,
 } from './domain/product-queryable';
 export { isIngredientType, PRODUCT_TYPES, type ProductType } from './domain/product-type';
+export {
+  PACKAGING_SUBTYPES,
+  PACKAGING_SUBTYPE_VALUES,
+  countsAsPackagingHomonym,
+  requiresPresentation,
+  type PackagingSubtype,
+} from './domain/packaging-subtype';
 export { normalizePresentationName } from './domain/presentation-name';
 export { normalizeProductName } from './domain/product-name';
 export {
@@ -267,6 +274,8 @@ export {
   INVENTORY_IMPORT_MAX_FILE_BYTES,
   INVENTORY_IMPORT_ACCEPT,
   IMPORT_TYPE_LABELS,
+  IMPORT_TYPE_ALIASES,
+  IMPORT_SUBTYPE_LABELS,
   INVENTORY_IMPORT_COLUMNS,
   IMPORT_ROW_ISSUE_CODES,
   type InventoryImportFormat,
@@ -297,6 +306,7 @@ export {
 } from './domain/inventory-import-contract';
 export {
   IMPORT_EXAMPLE_ROWS,
+  LEGACY_IMPORT_EXAMPLE_ROWS,
   IMPORT_TEMPLATE_FILE_NAME,
   IMPORT_TEMPLATE_MIME_TYPE,
   IMPORT_TEMPLATE_SHEET_NAME,

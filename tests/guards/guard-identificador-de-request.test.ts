@@ -836,6 +836,9 @@ export const MIGRACIONES_ESPERADAS = [
   // mensajes de WhatsApp; no tocan el identificador.
   '20261023120000_whatsapp_send_permission',
   '20261023130000_whatsapp_outbound_messages',
+  // 2026-10-23: subtipo de empaque en productos y tipo en la linea de catalogo; no toca el
+  // identificador.
+  '20261023150000_packaging_subtype',
 ] as const
 
 export function hallazgosDeMigraciones(

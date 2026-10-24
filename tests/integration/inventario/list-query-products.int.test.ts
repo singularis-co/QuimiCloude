@@ -10,8 +10,11 @@ import { randomUUID } from 'node:crypto';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { listAliveProducts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
-import { normalizeProductName } from '@/lib/modules/inventario';
+import {
+  findAliveProductById,
+  listAliveProducts,
+} from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
+import { normalizeProductName, PRODUCT_TYPES, type PackagingSubtype, type ProductType } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
@@ -56,6 +59,7 @@ const productosSembrados: string[] = [];
 const lotesSembrados: string[] = [];
 const presentacionesSembradas: string[] = [];
 const unidadesSembradas: string[] = [];
+const otrasEmpresas: string[] = [];
 
 function consulta(partial: Partial<ListQuery> = {}): ListQuery {
   return {
@@ -79,6 +83,10 @@ type Semilla = {
   readonly stock?: number;
   /** Columna directa, por lo mismo que `stock`. */
   readonly lastBatchAt?: Date | null;
+  readonly type?: ProductType;
+  readonly packagingSubtype?: PackagingSubtype | null;
+  /** Sin ella, la siembra va a la empresa del archivo. */
+  readonly companyId?: string;
 };
 
 async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]> {
@@ -93,7 +101,9 @@ async function sembrar(semillas: readonly Semilla[]): Promise<readonly string[]>
         unitId: semilla.unitId ?? null,
         stock: semilla.stock ?? 0,
         lastBatchAt: semilla.lastBatchAt ?? null,
-        companyId: empresaDelArchivo,
+        ...(semilla.type === undefined ? {} : { type: semilla.type }),
+        packagingSubtype: semilla.packagingSubtype ?? null,
+        companyId: semilla.companyId ?? empresaDelArchivo,
         ...(semilla.createdAt === undefined ? {} : { createdAt: semilla.createdAt }),
       },
       select: { id: true },
@@ -163,7 +173,7 @@ afterAll(async () => {
   await prisma.presentation.deleteMany({ where: { id: { in: presentacionesSembradas } } });
   await prisma.unit.deleteMany({ where: { id: { in: unidadesSembradas } } });
   // La empresa va la ultima: la referencian las tres tablas de inventario.
-  await prisma.company.deleteMany({ where: { id: empresaDelArchivo } });
+  await prisma.company.deleteMany({ where: { id: { in: [empresaDelArchivo, ...otrasEmpresas] } } });
   await prisma.$disconnect();
 });
 
@@ -554,5 +564,80 @@ describe('el listado sirve la existencia guardada tal cual, haya lotes vencidos 
 
     expect(pagina.items).toHaveLength(1);
     expect(pagina.items[0]?.stock).toBe('15.0000');
+  });
+});
+
+describe('QT-296 — el subtipo de empaque en la lectura y en el filtro del listado', () => {
+  const marca = `Subtipo ${token()}`;
+  let ids: {
+    readonly envase: string;
+    readonly tapa: string;
+    readonly tapaDeBaja: string;
+    readonly medidor: string;
+    readonly insumo: string;
+    readonly tapaAjena: string;
+  };
+
+  beforeAll(async () => {
+    const nombre = `Empresa ajena subtipo ${token()}`;
+    const ajena = await prisma.company.create({
+      data: { name: nombre, nameNormalized: nombre.toLowerCase().replace(/[^a-z0-9]/gu, '') },
+      select: { id: true },
+    });
+    otrasEmpresas.push(ajena.id);
+    const empaque = { type: PRODUCT_TYPES.PACKAGING };
+    const [envase, tapa, tapaDeBaja, medidor, insumo, tapaAjena] = await sembrar([
+      { name: `${marca} envase`, ...empaque, packagingSubtype: 'CONTAINER' },
+      { name: `${marca} tapa`, ...empaque, packagingSubtype: 'CAP' },
+      { name: `${marca} tapa de baja`, ...empaque, packagingSubtype: 'CAP', deletedAt: new Date() },
+      { name: `${marca} medidor`, ...empaque, packagingSubtype: 'MEASURER' },
+      { name: `${marca} insumo` },
+      { name: `${marca} tapa ajena`, ...empaque, packagingSubtype: 'CAP', companyId: ajena.id },
+    ]);
+    ids = { envase, tapa, tapaDeBaja, medidor, insumo, tapaAjena };
+  });
+
+  it('R11 — el detalle y el listado devuelven el subtipo, y null en lo que no es empaque', async () => {
+    expect((await findAliveProductById(ids.tapa, ambito()))?.packagingSubtype).toBe('CAP');
+    expect((await findAliveProductById(ids.envase, ambito()))?.packagingSubtype).toBe('CONTAINER');
+    expect((await findAliveProductById(ids.insumo, ambito()))?.packagingSubtype).toBeNull();
+
+    const pagina = await listAliveProducts(consulta({ pageSize: 25, search: marca }), ambito());
+    expect(new Map(pagina.items.map((p) => [p.id, p.packagingSubtype]))).toEqual(
+      new Map([
+        [ids.envase, 'CONTAINER'],
+        [ids.tapa, 'CAP'],
+        [ids.medidor, 'MEASURER'],
+        [ids.insumo, null],
+      ]),
+    );
+  });
+
+  it('R12 — con packagingSubtype = {CAP} salen solo las tapas vivas de la empresa', async () => {
+    const pagina = await listAliveProducts(
+      consulta({ pageSize: 25, search: marca, filters: { packagingSubtype: { kind: 'select', values: ['CAP'] } } }),
+      ambito(),
+    );
+
+    expect(pagina.items.map((p) => p.id)).toEqual([ids.tapa]);
+    expect(pagina.total).toBe(1);
+  });
+
+  it('R12 — varios subtipos a la vez se suman, y un valor desconocido se descarta como con type', async () => {
+    const conDesconocido = await listAliveProducts(
+      consulta({
+        pageSize: 25,
+        search: marca,
+        filters: { packagingSubtype: { kind: 'select', values: ['CAP', 'MEASURER', 'GATILLO'] } },
+      }),
+      ambito(),
+    );
+    expect(new Set(conDesconocido.items.map((p) => p.id))).toEqual(new Set([ids.tapa, ids.medidor]));
+
+    const soloDesconocido = await listAliveProducts(
+      consulta({ pageSize: 25, search: marca, filters: { packagingSubtype: { kind: 'select', values: ['GATILLO'] } } }),
+      ambito(),
+    );
+    expect(soloDesconocido.total).toBe(4);
   });
 });

@@ -97,7 +97,43 @@ describe('findAliveProductsByNormalizedNames — R14, R15, R17: identidad por no
     const refs = await findAliveProductsByNormalizedNames(['jabon botella', 'otro'], ambito(empresa));
 
     expect(refs).toEqual([
-      { id, nameNormalized: 'jabonbotella', type: PRODUCT_TYPES.FINISHED_PRODUCT, unitId, presentationId, recipeId },
+      {
+        id,
+        nameNormalized: 'jabonbotella',
+        type: PRODUCT_TYPES.FINISHED_PRODUCT,
+        unitId,
+        presentationId,
+        packagingSubtype: null,
+        recipeId,
+      },
+    ]);
+  });
+
+  it('R20 devuelve el subtipo de cada empaque vivo, tambien el de una tapa sin presentacion', async () => {
+    const empresa = await nuevaEmpresa();
+    const { id } = await prisma.product.create({
+      data: {
+        name: 'Tapa 38',
+        nameNormalized: 'tapa38',
+        type: PRODUCT_TYPES.PACKAGING,
+        packagingSubtype: 'CAP',
+        companyId: empresa.companyId,
+      },
+      select: { id: true },
+    });
+
+    const refs = await findAliveProductsByNormalizedNames(['Tapa 38'], ambito(empresa));
+
+    expect(refs).toEqual([
+      {
+        id,
+        nameNormalized: 'tapa38',
+        type: PRODUCT_TYPES.PACKAGING,
+        unitId: null,
+        presentationId: null,
+        packagingSubtype: 'CAP',
+        recipeId: null,
+      },
     ]);
   });
 

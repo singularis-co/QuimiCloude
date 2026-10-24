@@ -9,7 +9,8 @@ import { ValidationError } from '../../../domain/errors';
 
 import type { CatalogLineMeasurements } from '../../../domain/catalog-line-input';
 import type {
-  CatalogLineFields,
+  CatalogLineBusinessFields,
+  CatalogLineReplacement,
   CatalogLineView,
   NewCatalogLine,
 } from '../../../domain/catalog-line-view';
@@ -53,6 +54,8 @@ const CATALOG_LINE_SELECT = {
   deliveryTime: true,
   material: true,
   measurements: true,
+  type: true,
+  packagingSubtype: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -118,6 +121,8 @@ export function toCatalogLineView(row: CatalogLineRow): CatalogLineView {
     deliveryTime: row.deliveryTime,
     material: row.material,
     measurements: fromMeasurements(row.measurements),
+    type: row.type,
+    packagingSubtype: row.packagingSubtype,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -279,7 +284,7 @@ async function isSupplierAlive(supplierId: string, scope: SupplierScope): Promis
  * `design.md > 7` fija literalmente- no lleva `nameNormalized`: es una columna derivada,
  * no un campo de negocio que nadie escriba a mano.
  */
-function writableFields(data: CatalogLineFields): {
+function writableFields(data: CatalogLineBusinessFields): {
   readonly name: string;
   readonly nameNormalized: string;
   readonly presentationId: string;
@@ -334,6 +339,8 @@ export async function createCatalogLine(
         ...companyScopeColumns(scope),
         supplierId: data.supplierId,
         ...writableFields(data),
+        type: data.type,
+        packagingSubtype: data.packagingSubtype,
         createdAt: now,
         updatedAt: now,
         createdBy: actorId,
@@ -366,7 +373,7 @@ export async function createCatalogLine(
  */
 export async function replaceAliveCatalogLine(
   id: string,
-  data: CatalogLineFields,
+  data: CatalogLineReplacement,
   actorId: string,
   now: Date,
   scope: SupplierScope,
@@ -381,6 +388,7 @@ export async function replaceAliveCatalogLine(
       },
       data: {
         ...writableFields(data),
+        ...(data.classification ?? {}),
         updatedAt: now,
         updatedBy: actorId,
       },

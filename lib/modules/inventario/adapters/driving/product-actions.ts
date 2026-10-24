@@ -166,6 +166,9 @@ function buildCreateProductCandidate(formData: FormData): unknown | typeof INVAL
     candidate.presentationId = readOptionalFormString(formData, 'presentationId');
   }
 
+  const packagingSubtype = readOptionalFormString(formData, 'packagingSubtype');
+  if (packagingSubtype !== undefined) candidate.packagingSubtype = packagingSubtype;
+
   // PACKAGING no tiene expiryDate
   if (type !== PRODUCT_TYPES.PACKAGING) {
     candidate.expiryDate = readOptionalFormString(formData, 'expiryDate');

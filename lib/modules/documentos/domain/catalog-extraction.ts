@@ -12,10 +12,22 @@
  * numero ya paso por coma flotante y no hay forma de recuperar la cadena decimal original, asi que
  * se trata como vacio.
  *
- * Dominio puro: `zod` y `extractJsonObject`.
+ * `type` y `packagingSubtype` se leen como codigos del enum, sin sinonimos: un valor que no sea
+ * exactamente uno de ellos (una etiqueta en espanol, otra caja) queda en `null`. Un subtipo bajo
+ * un tipo que no es empaque se descarta, y el tipo nunca se deduce del subtipo.
+ *
+ * Dominio puro: `zod`, `extractJsonObject` y las listas de tipos de `proveedores`.
  */
 
 import { z } from 'zod';
+
+import {
+  CATALOG_LINE_PACKAGING_SUBTYPES_VALUES,
+  CATALOG_LINE_TYPES,
+  CATALOG_LINE_TYPE_VALUES,
+  type CatalogLinePackagingSubtype,
+  type CatalogLineType,
+} from '@/lib/modules/proveedores';
 
 import { extractJsonObject } from './json-in-text';
 import { ValidationError } from './errors';
@@ -54,6 +66,8 @@ const extractedLineSchema = z.object({
   material: nullableString,
   measurements: measurementsSchema,
   page: nullableInt,
+  type: z.enum(CATALOG_LINE_TYPE_VALUES).nullable().catch(null),
+  packagingSubtype: z.enum(CATALOG_LINE_PACKAGING_SUBTYPES_VALUES).nullable().catch(null),
 });
 
 export type ExtractedMeasurement = { value: string | null; unit: string | null } | null;
@@ -74,6 +88,8 @@ export type ExtractedLine = {
   material: string | null;
   measurements: ExtractedMeasurements;
   page: number | null;
+  type: CatalogLineType | null;
+  packagingSubtype: CatalogLinePackagingSubtype | null;
 };
 
 export type CatalogExtraction = { lines: ExtractedLine[] };
@@ -109,6 +125,7 @@ function trimLine(line: ExtractedLine): ExtractedLine {
     minPurchase: trimOrNull(line.minPurchase),
     material: trimOrNull(line.material),
     measurements,
+    packagingSubtype: line.type === CATALOG_LINE_TYPES.PACKAGING_MATERIAL ? line.packagingSubtype : null,
   };
 }
 

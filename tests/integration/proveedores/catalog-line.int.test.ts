@@ -355,6 +355,8 @@ function fields(
     deliveryTime: number | null;
     material: string | null;
     measurements: CatalogLineFields['measurements'];
+    type: CatalogLineFields['type'];
+    packagingSubtype: CatalogLineFields['packagingSubtype'];
   }> = {},
 ) {
   return {
@@ -367,6 +369,8 @@ function fields(
     deliveryTime: null,
     material: null,
     measurements: null,
+    type: null,
+    packagingSubtype: null,
     ...overrides,
   };
 }
@@ -1202,6 +1206,98 @@ describe('R19: las dos tablas son independientes', () => {
       await prisma.supplierCatalogLine.deleteMany({ where: { supplierId } });
       await prisma.supplier.delete({ where: { id: supplierId } });
       await prisma.product.deleteMany({ where: { id: producto.id } });
+      await prisma.presentation.delete({ where: { id: presentationId } });
+    }
+  });
+});
+
+describe('QT-296 — tipo y subtipo de la linea en el alta, la edicion y el listado', () => {
+  it('R26, R27, R28 — el alta los guarda, una edicion sin ellos los conserva, null + null los quita y el listado los devuelve', async () => {
+    const supplierId = await createTestSupplier(prisma);
+    const presentationId = await createTestPresentation(prisma);
+    try {
+      const conTipo = await createCatalogLine(
+        {
+          supplierId,
+          ...fields('Tapa rosca 28', presentationId, { type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' }),
+        },
+        sharedActorId,
+        new Date('2026-10-23T08:00:00Z'),
+        scope,
+      );
+      const sinTipo = await createCatalogLine(
+        { supplierId, ...fields('Acido citrico', presentationId) },
+        sharedActorId,
+        new Date('2026-10-23T08:01:00Z'),
+        scope,
+      );
+      if (typeof conTipo === 'string' || typeof sinTipo === 'string') throw new Error('el alta de apoyo fallo');
+
+      const clasificacion = (id: string) =>
+        prisma.supplierCatalogLine.findUniqueOrThrow({
+          where: { id },
+          select: { type: true, packagingSubtype: true, cost: true },
+        });
+
+      // R26: el alta guarda lo que trae, y sin nada queda sin tipo.
+      expect(await clasificacion(conTipo.id)).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' });
+      expect(await clasificacion(sinTipo.id)).toMatchObject({ type: null, packagingSubtype: null });
+
+      // R28: el listado devuelve el tipo y el subtipo de cada linea.
+      const pagina = await listCatalogLinesBySupplierAlive(supplierId, consulta({ pageSize: 10 }), scope);
+      if (pagina === 'supplier_not_found') throw new Error('el proveedor de apoyo esta dado de baja');
+      const porId = new Map(pagina.items.map((linea) => [linea.id, linea]));
+      expect(porId.get(conTipo.id)).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' });
+      expect(porId.get(sinTipo.id)).toMatchObject({ type: null, packagingSubtype: null });
+
+      // R27: una edicion sin clasificacion cambia el costo y conserva el tipo guardado.
+      const sinClasificacion = {
+        name: 'Tapa rosca 28',
+        presentationId,
+        unitId: null,
+        imagePath: null,
+        cost: '20.0000',
+        minPurchase: null,
+        deliveryTime: null,
+        material: null,
+        measurements: null,
+      };
+      expect(
+        await replaceAliveCatalogLine(conTipo.id, sinClasificacion, sharedActorId, new Date('2026-10-23T09:00:00Z'), scope),
+      ).toBe('ok');
+      const conservada = await clasificacion(conTipo.id);
+      expect(conservada).toMatchObject({ type: 'PACKAGING_MATERIAL', packagingSubtype: 'CAP' });
+      expect(conservada.cost.toFixed(4)).toBe('20.0000');
+
+      // R27: con los dos, se reemplazan.
+      expect(
+        await replaceAliveCatalogLine(
+          conTipo.id,
+          { ...sinClasificacion, classification: { type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' } },
+          sharedActorId,
+          new Date('2026-10-23T10:00:00Z'),
+          scope,
+        ),
+      ).toBe('ok');
+      expect(await clasificacion(conTipo.id)).toMatchObject({
+        type: 'PACKAGING_MATERIAL',
+        packagingSubtype: 'CONTAINER',
+      });
+
+      // R27: null + null los quita.
+      expect(
+        await replaceAliveCatalogLine(
+          conTipo.id,
+          { ...sinClasificacion, classification: { type: null, packagingSubtype: null } },
+          sharedActorId,
+          new Date('2026-10-23T11:00:00Z'),
+          scope,
+        ),
+      ).toBe('ok');
+      expect(await clasificacion(conTipo.id)).toMatchObject({ type: null, packagingSubtype: null });
+    } finally {
+      await prisma.supplierCatalogLine.deleteMany({ where: { supplierId } });
+      await prisma.supplier.delete({ where: { id: supplierId } });
       await prisma.presentation.delete({ where: { id: presentationId } });
     }
   });

@@ -1,5 +1,6 @@
 import type { UnitId } from '@/lib/modules/unidades';
 
+import type { PackagingSubtype } from './packaging-subtype';
 import type { ProductType } from './product-type';
 
 /**
@@ -60,6 +61,8 @@ export type ProductView = {
   readonly qtyAlert: string | null;
   /** Tipo del producto: PRODUCT, MACHINE o PACKAGING. */
   readonly type: ProductType;
+  /** `null` en lo que no es empaque. Las lecturas de la base siempre lo traen. */
+  readonly packagingSubtype?: PackagingSubtype | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   /** Suma de lo apartado en los lotes vivos del producto. Opcional: solo lo rellena
@@ -85,8 +88,10 @@ export type ProductView = {
   readonly presentationUnitId?: UnitId | null;
 };
 
-/** Lo que fija el alta de un envase: su presentacion y la unidad en que se cuenta su existencia. */
+/** Lo que fija el alta de un empaque: su presentacion (solo el envase la lleva), la unidad en que
+ *  se cuenta su existencia y su subtipo, que sin indicar es envase. */
 export type PackagingIdentity = {
-  readonly presentationId: string;
+  readonly presentationId: string | null;
   readonly unitId: UnitId;
+  readonly packagingSubtype?: PackagingSubtype;
 };

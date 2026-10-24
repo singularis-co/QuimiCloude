@@ -1,4 +1,5 @@
 import type { Actor } from './actor';
+import type { PackagingSubtype } from './packaging-subtype';
 import type { ProductType } from './product-type';
 
 export const INVENTORY_IMPORT_MAX_ROWS = 2000;
@@ -12,16 +13,30 @@ export type ImportRowType = ProductType;
 /** Lo que se escribe en la columna «Tipo». Se compara sin mayúsculas, tildes ni espacios de los extremos. */
 export const IMPORT_TYPE_LABELS = {
   PRODUCT: 'Insumo',
-  PACKAGING: 'Envase',
+  PACKAGING: 'Empaque',
   MACHINE: 'Instrumento',
   FINISHED_PRODUCT: 'Producto terminado',
 } as const satisfies Record<ImportRowType, string>;
+
+/** Otros textos que «Tipo» acepta para el mismo tipo: «Envase» es la etiqueta de las plantillas anteriores. */
+export const IMPORT_TYPE_ALIASES = {
+  PACKAGING: ['Envase'],
+} as const satisfies Partial<Record<ImportRowType, readonly string[]>>;
+
+/** Lo que se escribe en la columna «Subtipo» de un empaque. Se compara como «Tipo». */
+export const IMPORT_SUBTYPE_LABELS = {
+  CONTAINER: 'Envase',
+  CAP: 'Tapa',
+  MEASURER: 'Medidor',
+  OTHER: 'Otro',
+} as const satisfies Record<PackagingSubtype, string>;
 
 /** 'required' = la fila de ese tipo la exige; 'optional' = puede ir vacía; 'forbidden' = DEBE ir vacía. */
 export type ImportColumnRule = 'required' | 'optional' | 'forbidden';
 
 export const INVENTORY_IMPORT_COLUMNS = [
   { key: 'type',         header: 'Tipo',                 headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'required'  } },
+  { key: 'subtype',      header: 'Subtipo',              headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'optional',  MACHINE: 'forbidden', FINISHED_PRODUCT: 'forbidden' } },
   { key: 'name',         header: 'Nombre',               headerRequired: true,  rules: { PRODUCT: 'required',  PACKAGING: 'required',  MACHINE: 'required',  FINISHED_PRODUCT: 'forbidden' } },
   { key: 'unit',         header: 'Unidad',               headerRequired: false, rules: { PRODUCT: 'required',  PACKAGING: 'forbidden', MACHINE: 'forbidden', FINISHED_PRODUCT: 'forbidden' } },
   { key: 'presentation', header: 'Presentación',         headerRequired: false, rules: { PRODUCT: 'forbidden', PACKAGING: 'required',  MACHINE: 'forbidden', FINISHED_PRODUCT: 'required'  } },
@@ -46,6 +61,8 @@ export type ImportCells = Readonly<Record<ImportColumnKey, string>>;
 
 export const IMPORT_ROW_ISSUE_CODES = [
   'type_invalid',
+  'subtype_invalid',
+  'subtype_mismatch',
   'value_required',
   'name_too_long',
   'unit_not_found',
@@ -83,6 +100,8 @@ type ImportRowBase = {
   readonly cells: ImportCells;
   /** `null` cuando «Tipo» no se pudo leer. */
   readonly type: ImportRowType | null;
+  /** `null` si la fila no es de empaque o su «Subtipo» no se pudo leer. */
+  readonly packagingSubtype: PackagingSubtype | null;
   /** Nombre con el que queda el producto (en terminado, el derivado). `null` si no se pudo resolver. */
   readonly productName: string | null;
   /** Columnas con valor que el tipo no usa: no se importan y la fila sigue. Ausente si no hay. */

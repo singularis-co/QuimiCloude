@@ -3,6 +3,7 @@ import { ActionNotAllowedError, BatchDuplicateLotError } from './errors';
 import { createImportFinishedGoods } from './import-finished-goods';
 import { importRowIssue, type ImportRowWrite } from './plan-inventory-import';
 import { civilDateUtc, readInventoryImport, type InventoryImportReadDeps } from './preview-inventory-import';
+import { PACKAGING_SUBTYPES } from './packaging-subtype';
 import { PRODUCT_TYPES } from './product-type';
 
 import type {
@@ -38,11 +39,12 @@ function resultTotals(rows: readonly ImportResultRow[]): ImportResultTotals {
 
 function baseOf(
   row: ImportPreviewRow,
-): Pick<ImportResultRow, 'rowNumber' | 'cells' | 'type' | 'productName' | 'ignoredColumns'> {
+): Pick<ImportResultRow, 'rowNumber' | 'cells' | 'type' | 'packagingSubtype' | 'productName' | 'ignoredColumns'> {
   return {
     rowNumber: row.rowNumber,
     cells: row.cells,
     type: row.type,
+    packagingSubtype: row.packagingSubtype,
     productName: row.productName,
     ...(row.ignoredColumns === undefined ? {} : { ignoredColumns: row.ignoredColumns }),
   };
@@ -118,9 +120,11 @@ async function writeRow(
     if (error instanceof ActionNotAllowedError) {
       return errorRow(
         row,
-        row.type === PRODUCT_TYPES.PACKAGING
-          ? importRowIssue('presentation_mismatch', 'presentation')
-          : importRowIssue('finished_product_homonym', 'name'),
+        row.type !== PRODUCT_TYPES.PACKAGING
+          ? importRowIssue('finished_product_homonym', 'name')
+          : row.packagingSubtype === PACKAGING_SUBTYPES.CONTAINER
+            ? importRowIssue('presentation_mismatch', 'presentation')
+            : importRowIssue('subtype_mismatch', 'subtype'),
       );
     }
     // La fila se da por fallida y las demas siguen: lo ya escrito se conserva.

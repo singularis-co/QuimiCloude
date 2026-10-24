@@ -9,7 +9,9 @@ import {
   CANNED_CATALOG_CHANGES_NEW_COST,
   CANNED_CATALOG_CHANGES_PRESENTATION,
   CANNED_CATALOG_NEW_LINE_NAME,
+  CANNED_CATALOG_NEW_PACKAGING_SUBTYPE,
   CANNED_CATALOG_NEW_PRESENTATION,
+  CANNED_CATALOG_NEW_TYPE,
   CANNED_CATALOG_NEW_UNIT_READ,
   CANNED_CATALOG_TEXT,
   CANNED_CROP_COORDINATES_TEXT,
@@ -28,6 +30,7 @@ import { extractCatalogFromText } from '@/lib/modules/documentos/domain/catalog-
 import { extractCropCoordinates } from '@/lib/modules/documentos/domain/crop-coordinates';
 import { CROP_COORDINATES_PROMPT } from '@/lib/modules/documentos/domain/crop-prompt';
 import { extractFormulaFromText } from '@/lib/modules/documentos/domain/formula-extraction';
+import { CATALOG_LINE_PACKAGING_SUBTYPES, CATALOG_LINE_TYPES } from '@/lib/modules/proveedores';
 
 import type { AiDocumentPart } from '@/lib/modules/documentos/ports/ai-reader';
 
@@ -111,6 +114,34 @@ describe('documentos — el doble de IA de guion (R38, design.md > 9)', () => {
     );
 
     expect(lineasPagina1.length).toBe(regionesPagina1.length);
+  });
+
+  it('R38 — el catalogo de guion trae una linea PACKAGING_MATERIAL + CONTAINER y otra sin tipo ni subtipo', async () => {
+    expect(CANNED_CATALOG_NEW_TYPE).toBe(CATALOG_LINE_TYPES.PACKAGING_MATERIAL);
+    expect(CANNED_CATALOG_NEW_PACKAGING_SUBTYPE).toBe(CATALOG_LINE_PACKAGING_SUBTYPES.CONTAINER);
+
+    const texto = await readCannedText(request('otro prompt', [imagePart]));
+    const extraccion = extractCatalogFromText(texto);
+    expect(extraccion.lines).toHaveLength(JSON.parse(CANNED_CATALOG_TEXT).lines.length);
+
+    const nueva = extraccion.lines.find((line) => line.name === CANNED_CATALOG_NEW_LINE_NAME);
+    expect(nueva?.type).toBe(CANNED_CATALOG_NEW_TYPE);
+    expect(nueva?.packagingSubtype).toBe(CANNED_CATALOG_NEW_PACKAGING_SUBTYPE);
+
+    const cambia = extraccion.lines.find((line) => line.name === CANNED_CATALOG_CHANGES_LINE_NAME);
+    expect(cambia?.type).toBeNull();
+    expect(cambia?.packagingSubtype).toBeNull();
+  });
+
+  it('R38 — el JSON crudo trae los codigos del enum, no etiquetas, y la linea sin tipo los trae explicitos en null', () => {
+    const crudo = JSON.parse(CANNED_CATALOG_TEXT) as { lines: Array<Record<string, unknown>> };
+    const nueva = crudo.lines.find((line) => line.name === CANNED_CATALOG_NEW_LINE_NAME);
+    expect(nueva?.type).toBe('PACKAGING_MATERIAL');
+    expect(nueva?.packagingSubtype).toBe('CONTAINER');
+
+    const cambia = crudo.lines.find((line) => line.name === CANNED_CATALOG_CHANGES_LINE_NAME);
+    expect(cambia).toHaveProperty('type', null);
+    expect(cambia).toHaveProperty('packagingSubtype', null);
   });
 
   it('los tres textos son JSON puro: `JSON.parse` directo, sin recortar nada antes (R36, R37)', () => {

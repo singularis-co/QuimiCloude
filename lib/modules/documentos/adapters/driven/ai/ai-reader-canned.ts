@@ -1,3 +1,10 @@
+import {
+  CATALOG_LINE_PACKAGING_SUBTYPES,
+  CATALOG_LINE_TYPES,
+  type CatalogLinePackagingSubtype,
+  type CatalogLineType,
+} from '@/lib/modules/proveedores';
+
 import { CROP_COORDINATES_PROMPT } from '../../../domain/crop-prompt';
 
 import type { AiReader } from '../../../ports/ai-reader';
@@ -25,6 +32,11 @@ export const CANNED_CATALOG_NEW_LINE_NAME = `${CANNED_CATALOG_PREFIX}-nueva`;
 export const CANNED_CATALOG_NEW_PRESENTATION = `${CANNED_CATALOG_PREFIX}-presentacion-nueva`;
 /** Unidad leida por la fila «nueva»: deliberadamente no casa con ninguna unidad sembrada. */
 export const CANNED_CATALOG_NEW_UNIT_READ = `${CANNED_CATALOG_PREFIX}-unidad-sin-sembrar`;
+/** Tipo leido por la fila «nueva»: trae material y medidas de envase, asi que es empaque. */
+export const CANNED_CATALOG_NEW_TYPE: CatalogLineType = CATALOG_LINE_TYPES.PACKAGING_MATERIAL;
+/** Subtipo leido por la fila «nueva»: un envase. */
+export const CANNED_CATALOG_NEW_PACKAGING_SUBTYPE: CatalogLinePackagingSubtype =
+  CATALOG_LINE_PACKAGING_SUBTYPES.CONTAINER;
 
 /** Nombre de la fila que sale «cambia»: el especificador siembra antes una linea viva con este nombre. */
 export const CANNED_CATALOG_CHANGES_LINE_NAME = `${CANNED_CATALOG_PREFIX}-cambia`;
@@ -46,7 +58,8 @@ export const CANNED_CROP_COORDINATES_TEXT = JSON.stringify({
  * `CANNED_CROP_COORDINATES_TEXT`, para que el emparejamiento por pagina y orden proponga imagen a
  * las dos. La primera trae material y medidas completas y una presentacion inexistente («nueva»);
  * la segunda no trae imagen emparejable con exclusividad, solo costo distinto sobre una identidad
- * viva («cambia»).
+ * viva («cambia»). La primera trae tipo empaque y subtipo envase; la segunda no trae tipo ni
+ * subtipo, para que la vista previa la marque para revisar.
  */
 export const CANNED_CATALOG_TEXT = JSON.stringify({
   lines: [
@@ -64,6 +77,8 @@ export const CANNED_CATALOG_TEXT = JSON.stringify({
         mouth: '28/410',
       },
       page: 1,
+      type: CANNED_CATALOG_NEW_TYPE,
+      packagingSubtype: CANNED_CATALOG_NEW_PACKAGING_SUBTYPE,
     },
     {
       name: CANNED_CATALOG_CHANGES_LINE_NAME,
@@ -75,6 +90,8 @@ export const CANNED_CATALOG_TEXT = JSON.stringify({
       material: null,
       measurements: null,
       page: 1,
+      type: null,
+      packagingSubtype: null,
     },
   ],
 });

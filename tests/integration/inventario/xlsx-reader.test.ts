@@ -24,6 +24,9 @@ const FIXTURE = join(
 
 const bytes = new Uint8Array(readFileSync(FIXTURE));
 
+/** El fixture es anterior a la columna «Subtipo» (QT-296): sus columnas son las de la plantilla sin ella. */
+const FIXTURE_COLUMNS = INVENTORY_IMPORT_COLUMNS.filter((column) => column.key !== 'subtype');
+
 async function rows(): Promise<{ text: string; origin: string }[][]> {
   const result = await readXlsx(bytes);
   if (result.kind !== 'ok') throw new Error('esperaba ok');
@@ -31,7 +34,7 @@ async function rows(): Promise<{ text: string; origin: string }[][]> {
 }
 
 function cell(all: { text: string; origin: string }[][], row: number, header: string) {
-  const column = INVENTORY_IMPORT_COLUMNS.findIndex((c) => c.header === header);
+  const column = FIXTURE_COLUMNS.findIndex((c) => c.header === header);
   return all[row - 1]?.[column];
 }
 
@@ -43,7 +46,7 @@ describe('lector .xlsx con mixto.xlsx', () => {
 
   it('R4 lee la cabecera de la plantilla como texto', async () => {
     const all = await rows();
-    expect(all[0]?.map((c) => c.text)).toEqual(INVENTORY_IMPORT_COLUMNS.map((c) => c.header));
+    expect(all[0]?.map((c) => c.text)).toEqual(FIXTURE_COLUMNS.map((c) => c.header));
     expect(all[0]?.every((c) => c.origin === 'text')).toBe(true);
   });
 

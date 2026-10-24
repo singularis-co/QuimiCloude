@@ -1,5 +1,6 @@
 import type { ImportResultTotals } from '../domain/inventory-import-contract';
 import type { InventoryScope } from '../domain/inventory-scope';
+import type { PackagingSubtype } from '../domain/packaging-subtype';
 import type { ProductType } from '../domain/product-type';
 
 export type ImportProductRef = {
@@ -8,6 +9,8 @@ export type ImportProductRef = {
   readonly type: ProductType;
   readonly unitId: string | null;
   readonly presentationId: string | null;
+  /** `null` si no es un empaque. */
+  readonly packagingSubtype: PackagingSubtype | null;
   readonly recipeId: string | null;
 };
 

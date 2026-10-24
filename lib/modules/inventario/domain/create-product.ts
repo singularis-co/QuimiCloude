@@ -285,9 +285,9 @@ async function createSupply(
 type EntradaEnvase = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PACKAGING }>;
 
 /**
- * El envase lleva su presentacion en el producto y cuenta su existencia en la unidad de envases;
- * sus lotes no llevan presentacion. Un homonimo vivo con otra presentacion se rechaza: la
- * presentacion de un envase no cambia.
+ * El empaque cuenta su existencia en la unidad de envases y sus lotes no llevan presentacion; solo
+ * el envase lleva la suya en el producto. Un homonimo vivo con otro subtipo u otra presentacion se
+ * rechaza: ninguno de los dos cambia.
  */
 async function createPackaging(
   deps: CreateProductDeps,
@@ -308,13 +308,19 @@ async function createPackaging(
     createdBy: actor.id,
   };
 
+  const presentationId = entrada.presentationId ?? null;
   const existente = await deps.products.findAlivePackagingByName(entrada.name, scope);
   if (existente !== null) {
-    if (existente.presentationId !== entrada.presentationId) throw new ActionNotAllowedError();
+    if (existente.packagingSubtype !== entrada.packagingSubtype) throw new ActionNotAllowedError();
+    if (existente.presentationId !== presentationId) throw new ActionNotAllowedError();
 
-    const agregado = await deps.products.addBatchToAlive(existente.id, batch, instante, scope, {
-      presentationId: entrada.presentationId,
-    });
+    const agregado = await deps.products.addBatchToAlive(
+      existente.id,
+      batch,
+      instante,
+      scope,
+      presentationId === null ? undefined : { presentationId },
+    );
     if (agregado === 'finished_product') throw new ActionNotAllowedError();
     if (agregado === null) throw new ProductNotFoundError(existente.id);
 
@@ -338,7 +344,7 @@ async function createPackaging(
     batch,
     instante,
     scope,
-    { presentationId: entrada.presentationId, unitId },
+    { presentationId, unitId, packagingSubtype: entrada.packagingSubtype },
   );
   await deps.stockIncreases?.onStockIncreased({ companyId: scope.companyId, now: instante });
   return { id: creado.id, lot: creado.lot };

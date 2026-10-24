@@ -152,6 +152,8 @@ function linea(id: string, name: string, presentationId: string): CatalogLineVie
     deliveryTime: null,
     material: null,
     measurements: null,
+    type: null,
+    packagingSubtype: null,
     createdAt: AHORA,
     updatedAt: AHORA,
     createdBy: ADMIN.id,
@@ -311,6 +313,9 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       deliveryTime: null,
       material: null,
       measurements: null,
+
+      type: null,
+      packagingSubtype: null,
     })
 
     // R10: lo que no se indica llega como AUSENCIA explicita, nunca como `undefined`.
@@ -329,6 +334,9 @@ describe('casos de uso del catalogo del proveedor (QC-52 T10, T14, T15)', () => 
       deliveryTime: null,
       material: null,
       measurements: null,
+
+      type: null,
+      packagingSubtype: null,
     })
   })
 
