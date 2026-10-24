@@ -202,6 +202,49 @@ final `tests/unit/{identity,pedidos,integraciones}`: 395/397 archivos; los dos r
 (`encryption-keys-env.test.ts` por timeout de 61 s y `session-once-per-request-actions.test.ts`) pasan
 solos (2 archivos, 140 passed): saturación. Guardias 87 archivos, 1322 passed.
 
+## T13 — Dominio puro de la enmienda (R25, R46, R48, R49, R51–R56, R60–R62)
+
+Archivos:
+- nuevos: `lib/modules/integraciones/domain/whatsapp-media.ts`, `domain/whatsapp-chat-context.ts`
+- modificados: `domain/whatsapp-conversation.ts` (adjunto v2: `mediaUrl`, `messageId`; `attachmentOf`
+  recibe el mensaje), `domain/whatsapp-conversation-input.ts`, `domain/errors.ts`
+  (`WhatsappOrderNotFoundError`, código `order_not_found` ya existente en el catálogo)
+- de T6/T7, por el v2: `domain/get-whatsapp-chat.ts`, `adapters/driving/whatsapp-conversation-actions.ts`
+  (la copia campo a campo lleva `mediaUrl` y `messageId`), sus tests, y `module-shape.test.ts` (lista
+  de archivos)
+- tests: `whatsapp-media.test.ts`, `whatsapp-chat-context.test.ts` (nuevos);
+  `whatsapp-conversation.test.ts`, `whatsapp-conversation-input.test.ts` (ampliados)
+- ajuste por choque con `integration-routes.test.ts` (R14 de otra ficha: solo `lib/shared/routes.ts`
+  puede tener literales `/integraciones/whatsapp`): la base de la ruta de medios va a
+  `lib/shared/routes.ts` y la composición inyecta `mediaUrlOf`, como el webhook. `design.md > 15.1`
+  actualizado en el mismo commit; la URL del contrato no cambia.
+
+Decisiones del subagente (abiertas en el spec, sin cambio de contrato): `WhatsappCustomerOrderStatus`
+= `OrderStatus` sin entregado ni cancelado (test de tipos contra la unión del contrato);
+`isOpenCustomerOrder` para estrechar; `contextValuesOf` recibe el pedido ya armado; cadenas solo con
+espacios ⇒ `null`; espacios repetidos de un nombre de presentación se colapsan;
+`isAllowedMediaContentType` (para T15) compara sin mayúsculas.
+
+## T14 — Adaptador de conversaciones (R44, R49, R57)
+
+Archivos: `ports/whatsapp-conversation-repository.ts` (`ChatMessageRow.reactedMessageId`,
+`MediaMessageRow`, `findMediaMessage`; 8 métodos), `adapters/driven/persistence/whatsapp-conversation-prisma.ts`
+(`LEFT JOIN` de la reacción, `findWhatsappMediaMessage` con empresa y conexión),
+`tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`, `whatsapp-conversation-prisma.int.test.ts`
+(ampliado), `guard-ambito-empresa-integraciones.test.ts` (8 métodos, 8 bloques SQL).
+
+T13 y T14 van en un mismo commit: el dominio de T13 lee `reactedMessageId` del puerto de T14 y por
+separado ninguno compila (lo admite la nota de la enmienda en `tasks.md`).
+
+Salida (estado final, tras el ajuste de la ruta de medios):
+- typecheck 0 · lint 0 errores (11 avisos, los de antes)
+- `vitest run tests/unit/integraciones`: 102 archivos, 2218 passed, 1 skipped (incluye `integration-routes.test.ts`)
+- `vitest run tests/unit/shared`: 82 archivos, 930 passed, 2 skipped
+- `whatsapp-conversation-prisma.int.test.ts` + guardia de ámbito: 2 archivos, 179 passed
+- `vitest run tests/unit/errores`: 4 archivos, 103 passed
+- guardias: 87 archivos, 1323 passed, 22 skipped
+- `whatsapp-conversations-flow.int.test.ts`: 9 passed
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -264,5 +307,17 @@ solos (2 archivos, 140 passed): saturación. Guardias 87 archivos, 1322 passed.
 
 | R51, R54 (directorio) | `customer-order-directory.int.test.ts` > «R51: devuelve solo los pedidos vivos de ese cliente y esa empresa…», «R51, R54: con ORDER_STATUSES_NOT_IN_PROGRESS no vuelve ningun entregado ni cancelado…», «R51: ordena por created_at DESC y desempata por id DESC», «R54: respeta limit…», «R54: un cliente de otra empresa, o uno inexistente, da []»; `module-contract.test.ts` > «R51, R54: el barrel publica CustomerOrderDirectory…» |
 | R56 (identity) | `get-company-name.test.ts` > «R56: devuelve el nombre que lee el puerto…», «R56: una empresa sin nombre legible … da null…»; `company-name-read.int.test.ts` > «R56: una empresa viva da su nombre», «R56: getCompanyName devuelve el nombre … y no el de otra empresa», «R56: una empresa dada de baja da null», «R56: una empresa inexistente da null» |
+
+| R25, R48 | `whatsapp-conversation.test.ts` > «R25/R48: %s entrante con archivo lleva la dirección…», «R48: una imagen saliente no lleva dirección de archivo», casos R25; `whatsapp-media.test.ts` > «R48: la dirección es relativa…», «R48: una imagen saliente no es visible», «R48: … sin media_id no es visible» |
+| R44 (entrada/adaptador) | `whatsapp-conversation-input.test.ts` > «R44: acepta el id interno del mensaje», «R44: rechaza la entrada inválida %j»; `whatsapp-conversation-prisma.int.test.ts` > «R44 — findMediaMessage devuelve direccion, tipo, payload y el cliente del contacto», «R44, R39 — findMediaMessage de otra empresa, de otra conexion o inexistente es null» |
+| R46 (dominio) | `whatsapp-media.test.ts` > «R46: el tope es de 5 MB», «R46: solo se admiten image/jpeg…» |
+| R49 | `whatsapp-conversation.test.ts` > «R25/R49: una reacción da su emoji y el id interno…», «R49: una reacción a un mensaje no guardado… messageId nulo»; `whatsapp-conversation-prisma.int.test.ts` > «R49 — una reaccion a un mensaje guardado del mismo contacto da su id interno…», «R49, R39 — una reaccion de otra empresa no se casa…» |
+| R50 (entrada) | `whatsapp-conversation-input.test.ts` > «R50: acepta el contexto por contacto o por cliente…», «R50: rechaza la entrada inválida %j» |
+| R51–R53 (dominio) | `whatsapp-chat-context.test.ts` > «R51/R53: los tipos del contexto son los del contrato v2», «R51/R53: número visible, estado, fecha ISO, total nulo…», «R51: las líneas salen en el orden del reparto…», «R52: pedidos usa el conteo del empaque menos el excedente…» |
+| R54 (dominio) | `whatsapp-chat-context.test.ts` > «R54: lleva el código order_not_found…», «R54: %s es abierto solo si no es entregado ni cancelado»; `whatsapp-conversation-input.test.ts` > «R54: se devuelven como mucho 20 pedidos…» |
+| R55, R56 (dominio) | `whatsapp-chat-context.test.ts` > «R55/R56: una entrada por cada una de las siete constantes…», «R56: sin pedido elegido las cinco pedido.* están presentes y nulas», «R56: un valor que no se resuelve es nulo…», «R53/R56: pedido.total es nulo…» |
+| R60 | `whatsapp-chat-context.test.ts` > «R60: cada estado del sistema tiene exactamente una de las cuatro etiquetas», «R60: PENDIENTE va solo…», «R60: pedido.estado de un pedido %s es la etiqueta del mapa», «R60: ninguna otra pieza del módulo escribe una etiqueta…» |
+| R61 | `whatsapp-chat-context.test.ts` > «R61: da DD/MM/AAAA», «R61: cerca de medianoche usa el día UTC» |
+| R62 | `whatsapp-chat-context.test.ts` > «R62: una parte por línea…», «R62: «falta» en singular…», «R62: sin nombre de presentación…», «R62: sin líneas el detalle es nulo», «R62: no contiene saltos de línea ni tabuladores…» |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.

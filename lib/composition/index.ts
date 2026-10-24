@@ -2898,7 +2898,7 @@ import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports
 import type { WhatsappConversationRepository } from '@/lib/modules/integraciones/ports/whatsapp-conversation-repository';
 import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log';
 import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links';
-import { whatsappWebhookPath } from '@/lib/shared/routes';
+import { whatsappMediaPath, whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
 const whatsappGraphClient: WhatsappGraphClient = {
@@ -3030,6 +3030,7 @@ const whatsappConversationDeps = {
   people: peopleDirectory,
   templates: whatsappTemplateRepository,
   variableKeys: whatsappVariableKeyRepository,
+  mediaUrlOf: whatsappMediaPath,
 };
 
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };

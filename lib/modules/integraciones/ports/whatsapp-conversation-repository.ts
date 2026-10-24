@@ -40,6 +40,16 @@ export type ChatMessageRow = {
   readonly sentById: string | null;
   readonly templateName: string | null;
   readonly at: Date;
+  /** Solo en reacciones: el id interno del mensaje reaccionado si está guardado en el mismo contacto. */
+  readonly reactedMessageId: string | null;
+};
+
+export type MediaMessageRow = {
+  readonly direction: WhatsappMessageDirection;
+  readonly type: WhatsappMessageType;
+  readonly payload: unknown;
+  /** El cliente del contacto del mensaje; `null` si el contacto no está vinculado. */
+  readonly customerId: string | null;
 };
 
 export type ConversationBlockedFilter = 'all' | 'blocked' | 'not_blocked';
@@ -88,6 +98,8 @@ export interface WhatsappConversationRepository {
     scope: IntegracionesScope,
   ): Promise<readonly ChatMessageRow[] | 'cursor_not_found'>;
   countUnread(contactId: string, scope: IntegracionesScope): Promise<number>;
+  /** El mensaje por su id, solo si es de esa conexión. */
+  findMediaMessage(messageId: string, connectionId: string, scope: IntegracionesScope): Promise<MediaMessageRow | null>;
   /** Sin `upToMessageId`, hasta el último mensaje del contacto. La marca nunca retrocede. */
   advanceLastRead(
     contactId: string,

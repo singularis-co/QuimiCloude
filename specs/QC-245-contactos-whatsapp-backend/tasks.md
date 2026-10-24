@@ -144,7 +144,7 @@
 
 ### Tanda 7 — dominio y adaptador (dependen de T4 y T5)
 
-- [ ] **T13 Dominio puro de la enmienda** (R25, R48, R49, R52, R53, R55, R56, R60–R62). Depende de T4.
+- [x] **T13 Dominio puro de la enmienda** (R25, R48, R49, R52, R53, R55, R56, R60–R62). Depende de T4.
   - `domain/whatsapp-media.ts` (constantes, `mediaUrlOf`, `mediaIdOf`, `isViewableMedia`).
   - `domain/whatsapp-conversation.ts`: `attachmentOf` con `mediaUrl` y reacción por
     `reactedMessageId`; tipos del §B v2.
@@ -161,7 +161,7 @@
     etiquetas, leídas solo de `CUSTOMER_ORDER_STAGE` (ningún otro texto de estado en el código, D15); fecha `DD/MM/AAAA` del día UTC; `pedido.detalle` con «falta» en singular, «presentación
     sin nombre», `null` sin líneas y sin `\n` ni `\t`; tipos idénticos al §B v2 del contrato.
 
-- [ ] **T14 Adaptador de conversaciones** (R44, R49, R57). Depende de T5 y T13.
+- [x] **T14 Adaptador de conversaciones** (R44, R49, R57). Depende de T5 y T13.
   - `ports/whatsapp-conversation-repository.ts`: `ChatMessageRow.reactedMessageId`,
     `findMediaMessage` (8 métodos). `whatsapp-conversation-prisma.ts`: `LEFT JOIN` de la reacción
     (§15.2) y `findMediaMessage` con ámbito.

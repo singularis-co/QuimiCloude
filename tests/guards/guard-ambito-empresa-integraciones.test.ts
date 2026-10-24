@@ -141,7 +141,7 @@ const PUERTO_CONVERSACIONES: PuertoVigilado = {
   nombre: 'WhatsappConversationRepository',
   ruta: join(MODULE_ROOT, 'ports', 'whatsapp-conversation-repository.ts'),
   constante: 'whatsappConversationRepository',
-  metodosEsperados: 7,
+  metodosEsperados: 8,
   adaptador: ADAPTADOR_CONVERSACIONES,
   ayudantes: [],
   fabrica: 'createWhatsappConversationRepository',
@@ -890,7 +890,7 @@ describe('R39 — las lecturas de conversaciones filtran por empresa en cada SQL
   }
 
   it('cada bloque de SQL crudo del adaptador filtra por la empresa de `companyScopeColumns(scope)`', () => {
-    expect(sqlCrudoSinEmpresa(fuente)).toEqual({ bloques: 7, sinEmpresa: 0 })
+    expect(sqlCrudoSinEmpresa(fuente)).toEqual({ bloques: 8, sinEmpresa: 0 })
     for (const funcion of adaptador.funciones.filter((f) => /\$queryRaw/.test(f.cuerpo))) {
       expect(funcion.cuerpo, `${funcion.nombre} usa SQL crudo sin \`const columns = companyScopeColumns(scope)\``).toMatch(
         /\bconst\s+columns\s*=\s*companyScopeColumns\s*\(\s*scope\s*\)/,

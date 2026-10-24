@@ -994,9 +994,11 @@ export type ConversationDoubleContact = ConversationContactRow & {
   readonly lastReadAt: Date | null
 }
 
-export type ConversationDoubleMessage = ChatMessageRow & {
+/** Sin `reactedMessageId`: el doble lo resuelve como el adaptador, por `wamid` dentro del mismo contacto. */
+export type ConversationDoubleMessage = Omit<ChatMessageRow, 'reactedMessageId'> & {
   readonly companyId: string
   readonly contactId: string
+  readonly wamid: string | null
 }
 
 export function conversationContact(overrides: Partial<ConversationDoubleContact> = {}): ConversationDoubleContact {
@@ -1029,6 +1031,7 @@ export function conversationMessage(overrides: Partial<ConversationDoubleMessage
     sentById: null,
     templateName: null,
     at: new Date('2026-10-09T10:00:00.000Z'),
+    wamid: null,
     ...overrides,
   }
 }
@@ -1064,6 +1067,16 @@ export function makeConversationRepository(
     blockedAt: row.blockedAt,
     lastInboundAt: row.lastInboundAt,
   })
+  const reactedIdOf = (row: ConversationDoubleMessage): string | null => {
+    if (row.type !== 'REACTION') return null
+    const payload = row.payload as { readonly message_id?: unknown } | null
+    const wamid = payload?.message_id
+    if (typeof wamid !== 'string') return null
+    const reacted = messages.find(
+      (other) => other.wamid === wamid && other.contactId === row.contactId && other.companyId === row.companyId,
+    )
+    return reacted?.id ?? null
+  }
   const conversationsOf = (connectionId: string, scope: IntegracionesScope) =>
     [...contacts.values()].filter(
       (row) =>
@@ -1148,8 +1161,18 @@ export function makeConversationRepository(
           sentById: row.sentById,
           templateName: row.templateName,
           at: row.at,
+          reactedMessageId: reactedIdOf(row),
         }),
       )
+    },
+  )
+  const findMediaMessage = vi.fn<WhatsappConversationRepository['findMediaMessage']>(
+    async (messageId, connectionId, scope) => {
+      const row = messages.find((message) => message.id === messageId && message.companyId === scope.companyId)
+      if (row === undefined) return null
+      const contact = contactOf(row.contactId, connectionId, scope)
+      if (contact === null) return null
+      return { direction: row.direction, type: row.type, payload: row.payload, customerId: contact.customerId }
     },
   )
   const countUnread = vi.fn<WhatsappConversationRepository['countUnread']>(async (contactId, scope) => {
@@ -1175,6 +1198,7 @@ export function makeConversationRepository(
     findLatestContactOfCustomer,
     listMessages,
     countUnread,
+    findMediaMessage,
     advanceLastRead,
   }
   const spies = {
@@ -1184,6 +1208,7 @@ export function makeConversationRepository(
     findLatestContactOfCustomer,
     listMessages,
     countUnread,
+    findMediaMessage,
     advanceLastRead,
   }
   return {

@@ -8,7 +8,10 @@ import {
   CONVERSATIONS_DEFAULT_PAGE_SIZE,
   CONVERSATIONS_MAX_PAGE_SIZE,
   conversationsPageSizeOf,
+  CUSTOMER_ORDERS_LIMIT,
+  getWhatsappChatContextSchema,
   getWhatsappChatSchema,
+  getWhatsappMediaSchema,
   listWhatsappConversationsSchema,
   markWhatsappChatReadSchema,
 } from '@/lib/modules/integraciones/domain/whatsapp-conversation-input'
@@ -125,5 +128,46 @@ describe('markWhatsappChatReadSchema', () => {
     { contactId: UUID, extra: true },
   ])('R17: rechaza la entrada inválida %j', (input) => {
     expect(markWhatsappChatReadSchema.safeParse(input).success).toBe(false)
+  })
+})
+
+describe('getWhatsappChatContextSchema', () => {
+  it('R50: acepta el contexto por contacto o por cliente, con o sin pedido', () => {
+    expect(getWhatsappChatContextSchema.parse({ target: { contactId: UUID } })).toEqual({ target: { contactId: UUID } })
+    expect(getWhatsappChatContextSchema.parse({ target: { customerId: UUID }, orderId: OTHER_UUID })).toEqual({
+      target: { customerId: UUID },
+      orderId: OTHER_UUID,
+    })
+  })
+
+  it.each<Record<string, unknown>>([
+    {},
+    { target: {} },
+    { target: { contactId: 'no-uuid' } },
+    { target: { customerId: UUID, contactId: OTHER_UUID } },
+    { target: { contactId: UUID }, orderId: 'no-uuid' },
+    { target: { contactId: UUID }, orderId: null },
+    { target: { contactId: UUID }, extra: true },
+  ])('R50: rechaza la entrada inválida %j', (input) => {
+    expect(getWhatsappChatContextSchema.safeParse(input).success).toBe(false)
+  })
+
+  it('R54: se devuelven como mucho 20 pedidos del cliente', () => {
+    expect(CUSTOMER_ORDERS_LIMIT).toBe(20)
+  })
+})
+
+describe('getWhatsappMediaSchema', () => {
+  it('R44: acepta el id interno del mensaje', () => {
+    expect(getWhatsappMediaSchema.parse({ messageId: UUID })).toEqual({ messageId: UUID })
+  })
+
+  it.each<Record<string, unknown>>([
+    {},
+    { messageId: 'wamid.HBgM' },
+    { messageId: 'meta-media-id-123' },
+    { messageId: UUID, extra: true },
+  ])('R44: rechaza la entrada inválida %j', (input) => {
+    expect(getWhatsappMediaSchema.safeParse(input).success).toBe(false)
   })
 })

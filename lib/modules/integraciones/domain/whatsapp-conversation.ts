@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { isViewableMedia, type MediaUrlOf } from './whatsapp-media';
 import { sendFailureReasonOf } from './whatsapp-send-failure';
 import { isWindowOpen, WHATSAPP_WINDOW_MS } from './whatsapp-send-window';
 
@@ -50,6 +51,7 @@ export type WhatsappChatAttachment =
       readonly mimeType: string;
       readonly filename: string | null;
       readonly caption: string | null;
+      readonly mediaUrl: string | null;
     }
   | {
       readonly kind: 'location';
@@ -58,7 +60,7 @@ export type WhatsappChatAttachment =
       readonly name: string | null;
       readonly address: string | null;
     }
-  | { readonly kind: 'reaction'; readonly emoji: string | null };
+  | { readonly kind: 'reaction'; readonly emoji: string | null; readonly messageId: string | null };
 
 export type WhatsappChatMessage = {
   readonly id: string;
@@ -139,8 +141,18 @@ const locationPayloadSchema = z.object({
 
 const reactionPayloadSchema = z.object({ emoji: z.string().nullish() });
 
+/** `reactedMessageId` es el id interno del mensaje reaccionado, ya resuelto por el adaptador. */
+export type AttachmentSource = {
+  readonly id: string;
+  readonly direction: WhatsappMessageDirection;
+  readonly type: WhatsappMessageType;
+  readonly payload: unknown;
+  readonly reactedMessageId: string | null;
+};
+
 // Cada esquema enumera sus claves: `media_id` y el `wamid` de la reacción nunca salen al chat.
-export function attachmentOf(type: WhatsappMessageType, payload: unknown): WhatsappChatAttachment | null {
+export function attachmentOf(message: AttachmentSource, mediaUrlOf: MediaUrlOf): WhatsappChatAttachment | null {
+  const { type, payload } = message;
   if (MEDIA_ATTACHMENT_TYPES.includes(type)) {
     const parsed = mediaPayloadSchema.safeParse(payload);
     if (!parsed.success) return null;
@@ -149,6 +161,7 @@ export function attachmentOf(type: WhatsappMessageType, payload: unknown): Whats
       mimeType: parsed.data.mime_type,
       filename: parsed.data.filename ?? null,
       caption: parsed.data.caption ?? null,
+      mediaUrl: isViewableMedia(message.direction, type, payload) ? mediaUrlOf(message.id) : null,
     };
   }
   if (type === 'LOCATION') {
@@ -165,7 +178,7 @@ export function attachmentOf(type: WhatsappMessageType, payload: unknown): Whats
   if (type === 'REACTION') {
     const parsed = reactionPayloadSchema.safeParse(payload);
     if (!parsed.success) return null;
-    return { kind: 'reaction', emoji: parsed.data.emoji || null };
+    return { kind: 'reaction', emoji: parsed.data.emoji || null, messageId: message.reactedMessageId };
   }
   return null;
 }

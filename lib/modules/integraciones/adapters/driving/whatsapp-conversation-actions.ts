@@ -81,6 +81,7 @@ function attachmentOf(attachment: WhatsappChatAttachment | null): WhatsappChatAt
       mimeType: attachment.mimeType,
       filename: attachment.filename,
       caption: attachment.caption,
+      mediaUrl: attachment.mediaUrl,
     };
   }
   if (attachment.kind === 'location') {
@@ -92,7 +93,7 @@ function attachmentOf(attachment: WhatsappChatAttachment | null): WhatsappChatAt
       address: attachment.address,
     };
   }
-  return { kind: 'reaction', emoji: attachment.emoji };
+  return { kind: 'reaction', emoji: attachment.emoji, messageId: attachment.messageId };
 }
 
 function chatMessageOf(message: WhatsappChatMessage): WhatsappChatMessage {

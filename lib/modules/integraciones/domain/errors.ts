@@ -283,3 +283,12 @@ export class WhatsappMessageNotRetryableError extends IntegracionesError {
     super('whatsapp_message_not_retryable', diagnostic);
   }
 }
+
+/** El pedido no existe, es de otra empresa o de otro cliente, o ya no está abierto: el texto no distingue los casos. */
+export class WhatsappOrderNotFoundError extends IntegracionesError {
+  readonly code = 'order_not_found';
+
+  constructor(diagnostic?: string) {
+    super('order_not_found', diagnostic);
+  }
+}

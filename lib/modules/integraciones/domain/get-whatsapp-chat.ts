@@ -19,6 +19,7 @@ import {
   type WhatsappChatMessage,
 } from './whatsapp-conversation';
 import { chatPageSizeOf, getWhatsappChatSchema, type GetWhatsappChatQuery } from './whatsapp-conversation-input';
+import type { MediaUrlOf } from './whatsapp-media';
 
 import type { WhatsappConnectionRepository } from '../ports/whatsapp-connection-repository';
 import type {
@@ -36,6 +37,7 @@ export type GetWhatsappChatDeps = ChatCustomerDeps & {
   readonly connections: Pick<WhatsappConnectionRepository, 'findLive'>;
   readonly conversations: Pick<WhatsappConversationRepository, 'listMessages' | 'countUnread'>;
   readonly people: Pick<PeopleDirectory, 'findRefsIncludingDeletedInCompany'>;
+  readonly mediaUrlOf: MediaUrlOf;
   readonly now?: () => Date;
 };
 
@@ -80,13 +82,13 @@ export async function resolveChatCustomer(
   return { customer, contact };
 }
 
-function messageOf(row: ChatMessageRow, authors: ReadonlyMap<string, string>): WhatsappChatMessage {
+function messageOf(row: ChatMessageRow, authors: ReadonlyMap<string, string>, mediaUrlOf: MediaUrlOf): WhatsappChatMessage {
   return {
     id: row.id,
     direction: row.direction,
     type: row.type,
     body: row.body,
-    attachment: attachmentOf(row.type, row.payload),
+    attachment: attachmentOf(row, mediaUrlOf),
     status: row.status,
     errorReason: failureReasonOf(row),
     origin: row.origin,
@@ -148,7 +150,7 @@ export function createGetWhatsappChat(
     const rows = fetched.slice(0, pageSize).reverse();
 
     const authors = await authorsOf(deps, rows, scope.companyId, now);
-    const messages = rows.map((row) => messageOf(row, authors));
+    const messages = rows.map((row) => messageOf(row, authors, deps.mediaUrlOf));
     const unreadCount = await deps.conversations.countUnread(contact.id, scope);
     return {
       connectionStatus: connection.status,

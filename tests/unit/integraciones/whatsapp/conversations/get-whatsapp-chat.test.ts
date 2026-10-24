@@ -10,6 +10,7 @@ import {
   WhatsappMessageNotFoundError,
 } from '@/lib/modules/integraciones/domain/errors'
 import { createGetWhatsappChat } from '@/lib/modules/integraciones/domain/get-whatsapp-chat'
+import { whatsappMediaPath } from '@/lib/shared/routes'
 
 import {
   ACTOR_ID,
@@ -75,6 +76,7 @@ function setup(
     conversations: conv.conversations,
     customers: catalog.customers,
     people: directory.people,
+    mediaUrlOf: whatsappMediaPath,
     now: () => NOW,
   })
   return { getChat, repo, conv, catalog, directory }
@@ -158,7 +160,13 @@ describe('getWhatsappChat', () => {
         direction: 'IN',
         type: 'IMAGE',
         body: 'mira',
-        attachment: { kind: 'media', mimeType: 'image/jpeg', filename: null, caption: 'mira' },
+        attachment: {
+          kind: 'media',
+          mimeType: 'image/jpeg',
+          filename: null,
+          caption: 'mira',
+          mediaUrl: `/api/integraciones/whatsapp/media/${messageId(1)}`,
+        },
         status: 'RECEIVED',
         errorReason: null,
         origin: null,

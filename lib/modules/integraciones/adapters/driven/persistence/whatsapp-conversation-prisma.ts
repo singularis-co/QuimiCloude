@@ -17,6 +17,7 @@ import type {
   ConversationMessagesPage,
   ConversationPageQuery,
   ConversationRow,
+  MediaMessageRow,
   WhatsappConversationRepository,
 } from '../../../ports/whatsapp-conversation-repository';
 
@@ -60,6 +61,14 @@ type MessageSqlRow = {
   readonly sent_by: string | null;
   readonly template_name: string | null;
   readonly at: Date;
+  readonly reacted_message_id: string | null;
+};
+
+type MediaMessageSqlRow = {
+  readonly direction: WhatsappMessageDirection;
+  readonly type: WhatsappMessageType;
+  readonly payload: unknown;
+  readonly customer_id: string | null;
 };
 
 function toContactRow(row: ContactSqlRow): ConversationContactRow {
@@ -100,6 +109,7 @@ function toMessageRow(row: MessageSqlRow): ChatMessageRow {
     sentById: row.sent_by,
     templateName: row.template_name,
     at: row.at,
+    reactedMessageId: row.reacted_message_id,
   };
 }
 
@@ -249,8 +259,14 @@ export async function listWhatsappChatMessages(
   const rows = await db.$queryRaw<ReadonlyArray<MessageSqlRow>>`
     SELECT m."id", m."direction"::text AS direction, m."type"::text AS type, m."body", m."payload",
            m."status"::text AS status, m."error_code", m."error_reason", m."origin"::text AS origin,
-           m."sent_by", m."template_name", COALESCE(m."meta_timestamp", m."created_at") AS "at"
+           m."sent_by", m."template_name", COALESCE(m."meta_timestamp", m."created_at") AS "at",
+           r."id" AS reacted_message_id
     FROM "whatsapp_messages" m
+    LEFT JOIN "whatsapp_messages" r
+      ON m."type" = 'REACTION'
+     AND r."wamid" = m."payload"->>'message_id'
+     AND r."contact_id" = m."contact_id"
+     AND r."company_id" = m."company_id"
     WHERE m."company_id" = ${columns.companyId}::uuid
       AND m."contact_id" = ${contactId}::uuid
       AND m."connection_id" = ${connectionId}::uuid
@@ -275,6 +291,25 @@ export async function countWhatsappChatUnread(
       AND m."direction" = 'IN'
       AND COALESCE(m."meta_timestamp", m."created_at") > COALESCE(c."last_read_at", '-infinity')`;
   return rows[0]?.unread ?? 0;
+}
+
+export async function findWhatsappMediaMessage(
+  db: PrismaLike,
+  messageId: string,
+  connectionId: string,
+  scope: IntegracionesScope,
+): Promise<MediaMessageRow | null> {
+  const columns = companyScopeColumns(scope);
+  const rows = await db.$queryRaw<ReadonlyArray<MediaMessageSqlRow>>`
+    SELECT m."direction"::text AS direction, m."type"::text AS type, m."payload", c."customer_id"
+    FROM "whatsapp_messages" m
+    JOIN "whatsapp_contacts" c ON c."id" = m."contact_id" AND c."company_id" = m."company_id"
+    WHERE m."company_id" = ${columns.companyId}::uuid
+      AND m."id" = ${messageId}::uuid
+      AND m."connection_id" = ${connectionId}::uuid`;
+  const row = rows[0];
+  if (row === undefined) return null;
+  return { direction: row.direction, type: row.type, payload: row.payload, customerId: row.customer_id };
 }
 
 /**
@@ -322,6 +357,7 @@ export function createWhatsappConversationRepository(db: PrismaLike = prisma): W
     listMessages: (contactId, connectionId, page, scope) =>
       listWhatsappChatMessages(db, contactId, connectionId, page, scope),
     countUnread: (contactId, scope) => countWhatsappChatUnread(db, contactId, scope),
+    findMediaMessage: (messageId, connectionId, scope) => findWhatsappMediaMessage(db, messageId, connectionId, scope),
     advanceLastRead: (contactId, upToMessageId, scope) =>
       advanceWhatsappChatLastRead(db, contactId, upToMessageId, scope),
   };

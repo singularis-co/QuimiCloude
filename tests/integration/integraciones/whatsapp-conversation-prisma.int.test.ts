@@ -194,6 +194,38 @@ async function crearMensaje(
   return id
 }
 
+type MensajeTipado = {
+  readonly type: 'TEXT' | 'IMAGE' | 'STICKER' | 'AUDIO' | 'REACTION'
+  readonly direction?: 'IN' | 'OUT'
+  readonly payload: Record<string, unknown>
+  readonly wamid?: string | null
+  readonly meta: string
+  readonly connectionId?: string
+}
+
+async function crearMensajeTipado(
+  tx: Prisma.TransactionClient,
+  empresa: Empresa,
+  contactId: string,
+  datos: MensajeTipado,
+): Promise<string> {
+  const id = randomUUID()
+  const direction = datos.direction ?? 'IN'
+  await tx.$executeRaw`
+    INSERT INTO "whatsapp_messages" ("id", "company_id", "connection_id", "contact_id", "direction", "wamid", "type",
+                                     "payload", "status", "meta_timestamp", "created_at", "updated_at")
+    VALUES (${id}::uuid, ${empresa.companyId}::uuid, ${datos.connectionId ?? empresa.connectionId}::uuid,
+            ${contactId}::uuid, ${direction}::whatsapp_message_direction, ${datos.wamid ?? null},
+            ${datos.type}::whatsapp_message_type, ${JSON.stringify(datos.payload)}::jsonb,
+            ${direction === 'IN' ? 'RECEIVED' : 'SENT'}::whatsapp_message_status,
+            ${datos.meta}::timestamptz, ${datos.meta}::timestamptz, now())`
+  return id
+}
+
+function wamid(): string {
+  return `wamid.${token()}`
+}
+
 /** La marca de lectura tal como la guarda Postgres, con sus microsegundos. */
 async function marcaDe(tx: Prisma.TransactionClient, contactId: string): Promise<string | null> {
   const rows = await tx.$queryRaw<ReadonlyArray<{ readonly mark: string | null }>>`
@@ -584,6 +616,7 @@ describe('whatsapp-conversation-prisma — mensajes del chat', () => {
         sentById: a.userId,
         templateName: 'aviso_pedido',
         at: new Date('2026-10-20T12:00:00Z'),
+        reactedMessageId: null,
       })
       expect(pagina1[1]).toMatchObject({ direction: 'IN', origin: null, sentById: null, at: new Date('2026-10-20T11:00:00Z') })
 
@@ -639,6 +672,137 @@ describe('whatsapp-conversation-prisma — mensajes del chat', () => {
       expect(await pedir(contactoB, b.connectionId, deB)).toBe('cursor_not_found')
       expect(await pedir(contactoB, b.connectionId, null)).toEqual([])
       expect(await pedir(contacto, a.otherConnectionId, null)).toEqual([])
+    })
+  })
+})
+
+describe('whatsapp-conversation-prisma — reacciones', () => {
+  it('R49 — una reaccion a un mensaje guardado del mismo contacto da su id interno; a uno de otro contacto o no guardado, null', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createWhatsappConversationRepository(tx)
+      const a = await crearEmpresa(tx)
+      const contacto = await crearContacto(tx, a)
+      const otro = await crearContacto(tx, a)
+      const wamidPropio = wamid()
+      const wamidAjeno = wamid()
+      const reaccionado = await crearMensajeTipado(tx, a, contacto, {
+        type: 'TEXT',
+        direction: 'OUT',
+        payload: {},
+        wamid: wamidPropio,
+        meta: '2026-10-20T10:00:00Z',
+      })
+      await crearMensajeTipado(tx, a, otro, { type: 'TEXT', payload: {}, wamid: wamidAjeno, meta: '2026-10-20T10:00:00Z' })
+      const casada = await crearMensajeTipado(tx, a, contacto, {
+        type: 'REACTION',
+        payload: { message_id: wamidPropio, emoji: 'A' },
+        wamid: wamid(),
+        meta: '2026-10-20T10:01:00Z',
+      })
+      const deOtroContacto = await crearMensajeTipado(tx, a, contacto, {
+        type: 'REACTION',
+        payload: { message_id: wamidAjeno, emoji: 'B' },
+        meta: '2026-10-20T10:02:00Z',
+      })
+      const noGuardada = await crearMensajeTipado(tx, a, contacto, {
+        type: 'REACTION',
+        payload: { message_id: wamid(), emoji: 'C' },
+        meta: '2026-10-20T10:03:00Z',
+      })
+      const textoConMessageId = await crearMensajeTipado(tx, a, contacto, {
+        type: 'TEXT',
+        payload: { message_id: wamidPropio },
+        meta: '2026-10-20T10:04:00Z',
+      })
+
+      const filas = await repo.listMessages(contacto, a.connectionId, { before: null, limit: 10 }, a.scope)
+      if (filas === 'cursor_not_found') throw new Error('sin cursor no puede faltar el cursor')
+      const reaccionDe = new Map(filas.map((row) => [row.id, row.reactedMessageId]))
+      expect(filas).toHaveLength(5)
+      expect(reaccionDe.get(casada)).toBe(reaccionado)
+      expect(reaccionDe.get(deOtroContacto)).toBeNull()
+      expect(reaccionDe.get(noGuardada)).toBeNull()
+      expect(reaccionDe.get(textoConMessageId)).toBeNull()
+      expect(reaccionDe.get(reaccionado)).toBeNull()
+      for (const row of filas) expect(Object.keys(row)).not.toContain('wamid')
+    })
+  })
+
+  it('R49, R39 — una reaccion de otra empresa no se casa con un mensaje de esta', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createWhatsappConversationRepository(tx)
+      const a = await crearEmpresa(tx)
+      const b = await crearEmpresa(tx)
+      const contactoA = await crearContacto(tx, a)
+      const contactoB = await crearContacto(tx, b)
+      const wamidA = wamid()
+      await crearMensajeTipado(tx, a, contactoA, { type: 'TEXT', payload: {}, wamid: wamidA, meta: '2026-10-20T10:00:00Z' })
+      const reaccionB = await crearMensajeTipado(tx, b, contactoB, {
+        type: 'REACTION',
+        payload: { message_id: wamidA, emoji: 'A' },
+        meta: '2026-10-20T10:01:00Z',
+      })
+
+      const filas = await repo.listMessages(contactoB, b.connectionId, { before: null, limit: 10 }, b.scope)
+      expect(filas === 'cursor_not_found' ? filas : filas.map((row) => [row.id, row.reactedMessageId])).toEqual([
+        [reaccionB, null],
+      ])
+    })
+  })
+})
+
+describe('whatsapp-conversation-prisma — mensaje de un medio', () => {
+  it('R44 — findMediaMessage devuelve direccion, tipo, payload y el cliente del contacto', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createWhatsappConversationRepository(tx)
+      const a = await crearEmpresa(tx)
+      const cliente = await crearCliente(tx, a)
+      const contacto = await crearContacto(tx, a, { customerId: cliente })
+      const sinCliente = await crearContacto(tx, a)
+      const payload = { media_id: 'meta-media-id-1', mime_type: 'image/jpeg' }
+      const imagen = await crearMensajeTipado(tx, a, contacto, { type: 'IMAGE', payload, meta: '2026-10-20T10:00:00Z' })
+      const sticker = await crearMensajeTipado(tx, a, sinCliente, {
+        type: 'STICKER',
+        payload: { media_id: 'meta-media-id-2', mime_type: 'image/webp' },
+        meta: '2026-10-20T10:00:00Z',
+      })
+
+      expect(await repo.findMediaMessage(imagen, a.connectionId, a.scope)).toEqual({
+        direction: 'IN',
+        type: 'IMAGE',
+        payload,
+        customerId: cliente,
+      })
+      expect(await repo.findMediaMessage(sticker, a.connectionId, a.scope)).toMatchObject({ type: 'STICKER', customerId: null })
+    })
+  })
+
+  it('R44, R39 — findMediaMessage de otra empresa, de otra conexion o inexistente es null', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const repo = createWhatsappConversationRepository(tx)
+      const a = await crearEmpresa(tx)
+      const b = await crearEmpresa(tx)
+      const clienteA = await crearCliente(tx, a)
+      const clienteB = await crearCliente(tx, b)
+      const contactoA = await crearContacto(tx, a, { customerId: clienteA })
+      const contactoViejo = await crearContacto(tx, a, { customerId: clienteA, connectionId: a.otherConnectionId })
+      const contactoB = await crearContacto(tx, b, { customerId: clienteB })
+      const payload = { media_id: 'meta-media-id-3', mime_type: 'image/png' }
+      const propio = await crearMensajeTipado(tx, a, contactoA, { type: 'IMAGE', payload, meta: '2026-10-20T10:00:00Z' })
+      const deOtraConexion = await crearMensajeTipado(tx, a, contactoViejo, {
+        type: 'IMAGE',
+        payload,
+        meta: '2026-10-20T10:00:00Z',
+        connectionId: a.otherConnectionId,
+      })
+      const deB = await crearMensajeTipado(tx, b, contactoB, { type: 'IMAGE', payload, meta: '2026-10-20T10:00:00Z' })
+
+      expect(await repo.findMediaMessage(deB, a.connectionId, a.scope)).toBeNull()
+      expect(await repo.findMediaMessage(deB, b.connectionId, a.scope)).toBeNull()
+      expect(await repo.findMediaMessage(deOtraConexion, a.connectionId, a.scope)).toBeNull()
+      expect(await repo.findMediaMessage(propio, a.otherConnectionId, a.scope)).toBeNull()
+      expect(await repo.findMediaMessage(randomUUID(), a.connectionId, a.scope)).toBeNull()
+      expect(await repo.findMediaMessage(propio, a.connectionId, a.scope)).not.toBeNull()
     })
   })
 })

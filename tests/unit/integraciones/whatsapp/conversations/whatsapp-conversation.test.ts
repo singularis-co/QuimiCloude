@@ -6,9 +6,11 @@ import {
   failureReasonOf,
   previewOf,
   windowOf,
+  type AttachmentSource,
   type FailureSource,
 } from '@/lib/modules/integraciones/domain/whatsapp-conversation'
 import type { WhatsappMessageStatus, WhatsappMessageType } from '@/lib/modules/integraciones/domain/whatsapp-message'
+import { whatsappMediaPath } from '@/lib/shared/routes'
 
 const MEDIA_ID = 'meta-media-id-123'
 const WAMID = 'wamid.HBgMNTIxNTUxMjM0NTY3OBUCABIYFjNFQjA'
@@ -36,39 +38,87 @@ describe('previewOf', () => {
   })
 })
 
+const MESSAGE_ID = '6f1c2b8e-3d4a-4c5b-9e6f-7a8b9c0d1e2f'
+const REACTED_ID = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d'
+
+function source(
+  type: WhatsappMessageType,
+  payload: unknown,
+  overrides: Partial<Omit<AttachmentSource, 'type' | 'payload'>> = {},
+): AttachmentSource {
+  return { id: MESSAGE_ID, direction: 'IN', reactedMessageId: null, ...overrides, type, payload }
+}
+
 describe('attachmentOf', () => {
-  it.each<WhatsappMessageType>(['IMAGE', 'AUDIO', 'VIDEO', 'STICKER'])(
-    'R25: %s da tipo MIME y pie, sin el identificador del archivo en Meta',
+  it.each<WhatsappMessageType>(['AUDIO', 'VIDEO'])(
+    'R25/R48: %s da tipo MIME y pie, sin el identificador del archivo en Meta ni dirección de archivo',
     (type) => {
-      const payload = { from: '5215512345678', media_id: MEDIA_ID, mime_type: 'image/jpeg', caption: 'mira' }
-      const attachment = attachmentOf(type, payload)
-      expect(attachment).toEqual({ kind: 'media', mimeType: 'image/jpeg', filename: null, caption: 'mira' })
+      const payload = { from: '5215512345678', media_id: MEDIA_ID, mime_type: 'audio/ogg', caption: 'mira' }
+      const attachment = attachmentOf(source(type, payload), whatsappMediaPath)
+      expect(attachment).toEqual({ kind: 'media', mimeType: 'audio/ogg', filename: null, caption: 'mira', mediaUrl: null })
       expect(JSON.stringify(attachment)).not.toContain(MEDIA_ID)
     },
   )
 
-  it('R25: un documento da tipo MIME, nombre de archivo y pie', () => {
+  it.each<WhatsappMessageType>(['IMAGE', 'STICKER'])(
+    'R25/R48: %s entrante con archivo lleva la dirección de la aplicación y nunca el media_id',
+    (type) => {
+      const payload = { from: '5215512345678', media_id: MEDIA_ID, mime_type: 'image/webp', caption: 'mira' }
+      const attachment = attachmentOf(source(type, payload), whatsappMediaPath)
+      expect(attachment).toEqual({
+        kind: 'media',
+        mimeType: 'image/webp',
+        filename: null,
+        caption: 'mira',
+        mediaUrl: `/api/integraciones/whatsapp/media/${MESSAGE_ID}`,
+      })
+      expect(JSON.stringify(attachment)).not.toContain(MEDIA_ID)
+    },
+  )
+
+  it('R48: la dirección sale del constructor inyectado con el id interno del mensaje', () => {
+    const payload = { media_id: MEDIA_ID, mime_type: 'image/png' }
+    const attachment = attachmentOf(source('IMAGE', payload), (id) => `/otra/${id}`)
+    expect(attachment).toMatchObject({ kind: 'media', mediaUrl: `/otra/${MESSAGE_ID}` })
+  })
+
+  it('R48: una imagen saliente no lleva dirección de archivo', () => {
+    const payload = { media_id: MEDIA_ID, mime_type: 'image/jpeg' }
+    expect(attachmentOf(source('IMAGE', payload, { direction: 'OUT' }), whatsappMediaPath)).toMatchObject({ kind: 'media', mediaUrl: null })
+  })
+
+  it('R48: una imagen entrante sin media_id no lleva dirección de archivo', () => {
+    expect(attachmentOf(source('IMAGE', { mime_type: 'image/jpeg' }), whatsappMediaPath)).toMatchObject({ kind: 'media', mediaUrl: null })
+    expect(attachmentOf(source('STICKER', { mime_type: 'image/webp', media_id: '' }), whatsappMediaPath)).toMatchObject({
+      kind: 'media',
+      mediaUrl: null,
+    })
+  })
+
+  it('R25/R48: un documento da tipo MIME, nombre de archivo y pie, sin dirección de archivo', () => {
     const payload = { media_id: MEDIA_ID, mime_type: 'application/pdf', filename: 'factura.pdf', caption: 'la factura' }
-    expect(attachmentOf('DOCUMENT', payload)).toEqual({
+    expect(attachmentOf(source('DOCUMENT', payload), whatsappMediaPath)).toEqual({
       kind: 'media',
       mimeType: 'application/pdf',
       filename: 'factura.pdf',
       caption: 'la factura',
+      mediaUrl: null,
     })
   })
 
   it('R25: un medio sin pie ni nombre deja ambos nulos', () => {
-    expect(attachmentOf('AUDIO', { media_id: MEDIA_ID, mime_type: 'audio/ogg' })).toEqual({
+    expect(attachmentOf(source('AUDIO', { media_id: MEDIA_ID, mime_type: 'audio/ogg' }), whatsappMediaPath)).toEqual({
       kind: 'media',
       mimeType: 'audio/ogg',
       filename: null,
       caption: null,
+      mediaUrl: null,
     })
   })
 
   it('R25: una ubicación da latitud, longitud, nombre y dirección', () => {
     const payload = { from: '5215512345678', latitude: 19.43, longitude: -99.13, name: 'Oficina', address: 'Reforma 1' }
-    expect(attachmentOf('LOCATION', payload)).toEqual({
+    expect(attachmentOf(source('LOCATION', payload), whatsappMediaPath)).toEqual({
       kind: 'location',
       latitude: 19.43,
       longitude: -99.13,
@@ -78,7 +128,7 @@ describe('attachmentOf', () => {
   })
 
   it('R25: una ubicación sin nombre ni dirección los deja nulos', () => {
-    expect(attachmentOf('LOCATION', { latitude: 1, longitude: 2 })).toEqual({
+    expect(attachmentOf(source('LOCATION', { latitude: 1, longitude: 2 }), whatsappMediaPath)).toEqual({
       kind: 'location',
       latitude: 1,
       longitude: 2,
@@ -87,14 +137,25 @@ describe('attachmentOf', () => {
     })
   })
 
-  it('R25: una reacción da su emoji y nunca el wamid del mensaje reaccionado', () => {
-    const attachment = attachmentOf('REACTION', { from: '5215512345678', message_id: WAMID, emoji: '👍' })
-    expect(attachment).toEqual({ kind: 'reaction', emoji: '👍' })
+  it('R25/R49: una reacción da su emoji y el id interno del mensaje reaccionado, nunca el wamid', () => {
+    const payload = { from: '5215512345678', message_id: WAMID, emoji: '👍' }
+    const attachment = attachmentOf(source('REACTION', payload, { reactedMessageId: REACTED_ID }), whatsappMediaPath)
+    expect(attachment).toEqual({ kind: 'reaction', emoji: '👍', messageId: REACTED_ID })
+    expect(JSON.stringify(attachment)).not.toContain(WAMID)
+  })
+
+  it('R49: una reacción a un mensaje no guardado en el contacto da messageId nulo', () => {
+    const attachment = attachmentOf(source('REACTION', { message_id: WAMID, emoji: '👍' }), whatsappMediaPath)
+    expect(attachment).toEqual({ kind: 'reaction', emoji: '👍', messageId: null })
     expect(JSON.stringify(attachment)).not.toContain(WAMID)
   })
 
   it.each([null, undefined, ''])('R25: una reacción quitada (emoji %s) da emoji nulo', (emoji) => {
-    expect(attachmentOf('REACTION', { message_id: WAMID, emoji })).toEqual({ kind: 'reaction', emoji: null })
+    expect(attachmentOf(source('REACTION', { message_id: WAMID, emoji }, { reactedMessageId: REACTED_ID }), whatsappMediaPath)).toEqual({
+      kind: 'reaction',
+      emoji: null,
+      messageId: REACTED_ID,
+    })
   })
 
   it.each<[WhatsappMessageType, unknown]>([
@@ -106,13 +167,14 @@ describe('attachmentOf', () => {
     ['IMAGE', null],
     ['LOCATION', 'texto'],
   ])('R25: un payload de %s que no casa da adjunto nulo', (type, payload) => {
-    expect(attachmentOf(type, payload)).toBeNull()
+    expect(attachmentOf(source(type, payload), whatsappMediaPath)).toBeNull()
   })
 
   it.each<WhatsappMessageType>(['TEXT', 'CONTACTS', 'BUTTON', 'INTERACTIVE', 'TEMPLATE', 'UNSUPPORTED'])(
     'R25: %s no tiene adjunto',
     (type) => {
-      expect(attachmentOf(type, { mime_type: 'image/jpeg', latitude: 1, longitude: 2, emoji: '👍' })).toBeNull()
+      const payload = { mime_type: 'image/jpeg', media_id: MEDIA_ID, latitude: 1, longitude: 2, emoji: '👍' }
+      expect(attachmentOf(source(type, payload, { reactedMessageId: REACTED_ID }), whatsappMediaPath)).toBeNull()
     },
   )
 })

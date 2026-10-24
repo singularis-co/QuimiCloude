@@ -923,10 +923,17 @@ misma, con el mismo `currentActor()` de las acciones (`runInRequestScope` + `get
 6. `graph.downloadMedia({ mediaId, accessToken, maxBytes: WHATSAPP_MEDIA_MAX_BYTES })`; fallo ⇒
    `unavailable`. Tipo fuera de `WHATSAPP_MEDIA_CONTENT_TYPES` ⇒ `unavailable` (R46).
 
-`domain/whatsapp-media.ts` (puro): `WHATSAPP_MEDIA_PATH = '/api/integraciones/whatsapp/media'`,
-`mediaUrlOf(messageId)`, `VIEWABLE_MEDIA_TYPES`, `WHATSAPP_MEDIA_MAX_BYTES = 5 * 1024 * 1024`,
+`domain/whatsapp-media.ts` (puro): `VIEWABLE_MEDIA_TYPES`, `WHATSAPP_MEDIA_MAX_BYTES = 5 * 1024 * 1024`,
 `WHATSAPP_MEDIA_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp']`, `mediaIdOf(payload)`
 (zod `{ media_id: z.string().min(1) }`), `isViewableMedia(direction, type, payload)`.
+
+*Ajuste de implementación (2026-10-23, sin cambio de contrato).* La base de la ruta no vive en el
+dominio: `tests/unit/integraciones/integration-routes.test.ts` solo admite literales
+`/integraciones/whatsapp` en `lib/shared/routes.ts`, y el dominio no puede importar `lib/shared`. Igual
+que `WHATSAPP_WEBHOOK_ROUTE_BASE`, va a `lib/shared/routes.ts` (`WHATSAPP_MEDIA_ROUTE_BASE` y
+`whatsappMediaPath(messageId)`) y la composición inyecta el constructor de la URL (`mediaUrlOf`) en
+el caso de uso del chat. La URL que recibe la pantalla es la misma:
+`/api/integraciones/whatsapp/media/<messageId>`.
 
 **Puerto `WhatsappGraphClient.downloadMedia`:**
 
@@ -946,7 +953,9 @@ downloadMedia(input: { readonly mediaId: string; readonly accessToken: string; r
    (incluye el medio caducado). `file_size > maxBytes` ⇒ `rejected` sin descargar.
 2. La URL tiene que ser `https:` y su host terminar en `.fbsbx.com` (donde Meta sirve los
    medios); si no, `rejected` y **no** se manda el token a ese host. `GET url` con el token, el mismo
-   `AbortSignal.timeout(GRAPH_TIMEOUT_MS)`. No-2xx ⇒ `rejected`; `Content-Length > maxBytes` ⇒
+   `AbortSignal.timeout(GRAPH_TIMEOUT_MS)`. 5xx o red ⇒ `unreachable` (como en el paso 1 y en el
+   «Hecho» de T12); otro no-2xx, incluida una redirección (no se sigue, para que el token no viaje a
+   otro host) ⇒ `rejected`; `Content-Length > maxBytes` ⇒
    `rejected`. El cuerpo se devuelve como stream detrás de un `TransformStream` que corta con error
    si pasa de `maxBytes` (defensa si la cabecera miente). `contentType` = la cabecera de la
    respuesta sin parámetros, o `mime_type` si falta.
@@ -955,7 +964,8 @@ downloadMedia(input: { readonly mediaId: string; readonly accessToken: string; r
 que QC-246 pinte miniaturas sin Meta.
 
 **Adjunto (R48).** `attachmentOf(message)` pasa a recibir el mensaje entero (dirección, tipo,
-`payload`, `id`, `reactedMessageId`) y pone `mediaUrl = isViewableMedia(...) ? mediaUrlOf(id) : null`.
+`payload`, `id`, `reactedMessageId`) y pone `mediaUrl = isViewableMedia(...) ? mediaUrlOf(id) : null`,
+con `mediaUrlOf` inyectado (ver el ajuste de arriba).
 Sigue sin devolver `media_id` (R25, R47).
 
 **Puerto de conversaciones.** `findMediaMessage(messageId, connectionId, scope)`: el mensaje por
