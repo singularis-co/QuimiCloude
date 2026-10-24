@@ -264,6 +264,42 @@ dobles de pedidos viven en el test del contexto.
 Salida: typecheck 0 · lint 0 errores (11 avisos de antes) · `vitest run tests/unit/integraciones`:
 104 archivos, 2293 passed, 1 skipped · guardias: 87 archivos, 1323 passed, 22 skipped.
 
+## T16 — Composición, acción y ruta (R47, R58)
+
+Código en el WIP `109efd49` (lo guardó el leader al cortarse la sesión; el subagente se colgó antes
+de informar), verificado y cerrado por el implementer.
+
+Archivos: `lib/composition/index.ts` (`whatsappChatContextDeps`, `whatsappMediaDeps`,
+`integraciones.getWhatsappChatContext` y `getWhatsappMedia`; cablea `customerOrderDirectory`),
+`lib/modules/integraciones/index.ts` (fábricas, tipos, `WhatsappOrderNotFoundError`),
+`adapters/driving/whatsapp-conversation-actions.ts` (+ `getWhatsappChatContextAction`, cinco acciones),
+`adapters/driving/whatsapp-media-route.ts` (nuevo), `app/api/integraciones/whatsapp/media/[mensajeId]/route.ts`
+(nuevo: reexporta `GET`, `runtime = 'nodejs'`); tests: `whatsapp-media-route.test.ts` (nuevo),
+`whatsapp-conversation-actions.test.ts`, `module-shape.test.ts`, `guard-rutas-fuera-de-sesion.test.ts`,
+`session-once-per-request-actions.test.ts`; y `encryption-keys-env.test.ts` (lista cerrada de miembros
+de `integraciones`: + `getWhatsappChatContext`, `getWhatsappMedia`; añadido por el implementer).
+
+La entrada de censo de `whatsapp-chat-context-flow.int.test.ts` que traía el WIP se retira de este
+commit (la guardia R20 del censo cae si nombra un archivo que no existe) y vuelve con T17.
+
+Sesión y permiso de la ruta: `/api/**` no pasa por el middleware; la ruta lee la sesión
+(`getSessionUser` + `getSessionContext` dentro de `runInRequestScope`) y sin usuario o sin empresa
+pasa actor `null`; el caso de uso exige `whatsapp.consultar` (`requireReadPermission`) y `unauthorized`
+se responde 404 sin cuerpo, igual que «no existe». Cubierto por «R44, R58: sin usuario o sin empresa
+en la sesion pasa actor null y responde 404 sin cuerpo» y «R44: sin el permiso whatsapp.consultar, el
+caso de uso real responde 404 sin tocar la base ni Meta».
+
+Firma de `getWhatsappChatContextAction` = §A v2 (`{ target: ChatTarget; orderId?: string }`). Sin
+cambio de contrato.
+
+Salida (implementer, 2026-10-24):
+- typecheck 0 · lint 0 errores (10 avisos ajenos; el de `customerOrderDirectory` desaparece)
+- 4 archivos de la tarea (ruta, acciones, module-shape, session-once): 263 passed, 1 skipped
+- `vitest run tests/unit/integraciones`: 105 archivos; el único rojo, `encryption-keys-env.test.ts`,
+  también solo → lista cerrada sin los dos miembros nuevos; corregido: 28/28
+- guardias: 86/87 con el WIP (la del censo, por la entrada de T17); tras retirarla, la guardia del
+  censo 6/6
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -348,5 +384,10 @@ Salida: typecheck 0 · lint 0 errores (11 avisos de antes) · `vitest run tests/
 | R55, R56 (caso de uso) | `get-whatsapp-chat-context.test.ts` > «R55, R56: trae las siete constantes del pedido elegido…», «R54, R56: sin pedidos abiertos el elegido es nulo y todas las pedido.* son nulas…», «R55, R56: un valor que no se resuelve sale nulo…» |
 | R57 | `get-whatsapp-chat-context.test.ts` > «R57: pedir el contexto no llama a ningún método que escriba ni mueve la marca de lectura»; adaptador: guardia de ámbito (única escritura, la marca) |
 | R63 | `get-whatsapp-chat-context.test.ts` > «R63: con whatsapp.consultar y ningún permiso de Pedidos recibe los pedidos y los valores pedido.*» |
+
+| R44, R45 (ruta) | `whatsapp-media-route.test.ts` > «R44, R58: sin usuario o sin empresa en la sesion pasa actor null y responde 404 sin cuerpo», «R44: sin el permiso whatsapp.consultar, el caso de uso real responde 404…», «R44: unauthorized, invalid_input y whatsapp_message_not_found responden igual: 404 sin cuerpo», «R44: un id que no es un uuid … 404», «R45, R47: 200 con el cuerpo, su tipo, su largo, privado para la cache, nosniff e inline» |
+| R46 (ruta) | `whatsapp-media-route.test.ts` > «R46: el resultado unavailable responde 502 sin cuerpo y sin log», «R46: un error de dominio fuera de los de 404 responde 500…», «R46: un error ajeno responde 500 sin cuerpo y deja una linea en el log» |
+| R47 (ruta) | `whatsapp-media-route.test.ts` > «R47: sin largo conocido no manda Content-Length…», «R47: ninguna respuesta lleva el id del archivo en Meta, su URL ni el token» |
+| R58 | `whatsapp-media-route.test.ts` > «R58: pasa { messageId } y el actor de la sesion», «R58: el archivo de ruta reexporta GET del adaptador y fija runtime nodejs…», «R58: el adaptador no decide…», «R58: el exito, el 404 y el 502 no escriben nada», «R58: el log de un 500 no lleva el id del mensaje…», «R58: el adaptador solo escribe en la consola desde el registro del 500»; `guard-rutas-fuera-de-sesion.test.ts` > «QC-245 R58: la ruta del archivo de un medio es del añadido `integraciones`…»; `whatsapp-conversation-actions.test.ts` y `module-shape.test.ts` (cinco acciones) |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.

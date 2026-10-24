@@ -186,7 +186,7 @@
 
 ### Tanda 9 — borde y cableado (depende de T7 y T15)
 
-- [ ] **T16 Composición, acción y ruta** (R47, R58).
+- [x] **T16 Composición, acción y ruta** (R47, R58).
   - `lib/composition/index.ts` (§15.6), `integraciones/index.ts`,
     `whatsapp-conversation-actions.ts` (+ `getWhatsappChatContextAction`: cinco acciones),
     `adapters/driving/whatsapp-media-route.ts`,

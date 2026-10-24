@@ -261,7 +261,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
       // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
       // Merge de dev (2026-10-20): se suman los siete de plantillas de QC-242 y `verifyCronSecret`.
       // QC-240: se suman `sendWhatsappMessage` y `retryWhatsappMessage`.
-      // QC-245: se suman las cuatro consultas de conversaciones.
+      // QC-245: se suman las cuatro consultas de conversaciones, el contexto del chat y el archivo de un medio.
       expect(Object.keys(composition.integraciones).sort()).toEqual([
         'createWhatsappConnection',
         'createWhatsappTemplate',
@@ -273,7 +273,9 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'getAiProviderReadiness',
         'getAiProviderStatus',
         'getWhatsappChat',
+        'getWhatsappChatContext',
         'getWhatsappConnection',
+        'getWhatsappMedia',
         'getWhatsappTemplate',
         'linkWhatsappContact',
         'listSendableWhatsappTemplates',
