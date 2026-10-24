@@ -33,6 +33,19 @@ export type GraphOutboundMessage =
 
 export type GraphMessageSent = { readonly ok: true; readonly wamid: string } | ({ readonly ok: false } & GraphFailure);
 
+/**
+ * `contentType` va sin parámetros. `contentLength` es la cabecera de Meta si la manda. Si Meta
+ * declara un tamaño y mintió, el cuerpo se corta con error al pasar del tope pedido.
+ */
+export type GraphMediaDownload =
+  | {
+      readonly ok: true;
+      readonly contentType: string;
+      readonly contentLength: number | null;
+      readonly body: ReadableStream<Uint8Array>;
+    }
+  | ({ readonly ok: false } & GraphFailure);
+
 /** Un fallo de Meta o de red es un resultado, no una excepción: el caso de uso decide qué guardar. */
 export interface WhatsappGraphClient {
   fetchPhoneNumber(input: {
@@ -66,4 +79,10 @@ export interface WhatsappGraphClient {
     readonly to: string;
     readonly message: GraphOutboundMessage;
   }): Promise<GraphMessageSent>;
+  /** Un archivo que se sabe de más de `maxBytes` es un rechazo y no se descarga. */
+  downloadMedia(input: {
+    readonly mediaId: string;
+    readonly accessToken: string;
+    readonly maxBytes: number;
+  }): Promise<GraphMediaDownload>;
 }

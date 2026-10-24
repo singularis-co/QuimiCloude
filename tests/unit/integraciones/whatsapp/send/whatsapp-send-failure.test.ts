@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { GraphFailure } from '@/lib/modules/integraciones/domain/graph-failure'
-import { sendFailureOf, TOKEN_INVALID_MESSAGE } from '@/lib/modules/integraciones/domain/whatsapp-send-failure'
+import { sendFailureOf, sendFailureReasonOf, TOKEN_INVALID_MESSAGE } from '@/lib/modules/integraciones/domain/whatsapp-send-failure'
 
 const META_TEXT = 'Recipient +5215512345678 said: hola secreto'
 
@@ -78,5 +78,18 @@ describe('sendFailureOf', () => {
   it('R36: todo errorReason cabe en el recorte de 500 caracteres', () => {
     const reason = sendFailureOf(rejected(Number.MAX_SAFE_INTEGER)).errorReason
     expect([...reason].length).toBeLessThanOrEqual(500)
+  })
+})
+
+describe('sendFailureReasonOf', () => {
+  it.each([
+    [190, 'Revisa el token en Integraciones'],
+    [131047, 'Pasaron más de 24 horas desde el último mensaje del cliente: usa una plantilla.'],
+    [130429, 'Demasiados mensajes, intenta en un momento'],
+    [131056, 'Demasiados mensajes, intenta en un momento'],
+    [131026, 'Meta no aceptó el mensaje (código 131026). Intenta de nuevo o revisa la conexión.'],
+  ])('R26: el código %i da el mismo texto que el envío guarda', (code, reason) => {
+    expect(sendFailureReasonOf(code)).toBe(reason)
+    expect(sendFailureOf(rejected(code)).errorReason).toBe(sendFailureReasonOf(code))
   })
 })

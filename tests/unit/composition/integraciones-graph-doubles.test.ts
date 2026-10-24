@@ -112,8 +112,16 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('R29 — el cliente real y el doble exponen los mismos cinco metodos, sendMessage incluido', () => {
-    const metodos = ['createTemplate', 'deleteTemplate', 'fetchPhoneNumber', 'listTemplatesPage', 'sendMessage']
+  it('R29 — el cliente real y el doble exponen los mismos seis metodos, sendMessage y downloadMedia incluidos', () => {
+    // QC-245 T12: se suma `downloadMedia`.
+    const metodos = [
+      'createTemplate',
+      'deleteTemplate',
+      'downloadMedia',
+      'fetchPhoneNumber',
+      'listTemplatesPage',
+      'sendMessage',
+    ]
     expect(Object.keys(whatsappGraphClientFetch).sort()).toEqual(metodos)
     expect(Object.keys(whatsappGraphClientCanned).sort()).toEqual(metodos)
   })
@@ -123,6 +131,8 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
     // `unlinkWhatsappContact` y `setWhatsappContactBlocked`. La lista sigue cerrada.
     // Merge de dev (2026-10-20): se suman los siete de plantillas de QC-242 y `verifyCronSecret`.
     // QC-240: se suman `sendWhatsappMessage` y `retryWhatsappMessage`.
+    // QC-245: se suman `getWhatsappChat`, `getWhatsappChatContext`, `getWhatsappMedia`,
+    // `listSendableWhatsappTemplates`, `listWhatsappConversations` y `markWhatsappChatRead`.
     expect(Object.keys(integraciones).sort()).toEqual([
       'createWhatsappConnection',
       'createWhatsappTemplate',
@@ -133,11 +143,17 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'getAiProviderConnection',
       'getAiProviderReadiness',
       'getAiProviderStatus',
+      'getWhatsappChat',
+      'getWhatsappChatContext',
       'getWhatsappConnection',
+      'getWhatsappMedia',
       'getWhatsappTemplate',
       'linkWhatsappContact',
+      'listSendableWhatsappTemplates',
+      'listWhatsappConversations',
       'listWhatsappDictionary',
       'listWhatsappTemplates',
+      'markWhatsappChatRead',
       'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'relateWhatsappTemplateVariables',

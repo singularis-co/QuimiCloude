@@ -83,3 +83,27 @@ export async function searchCustomerRefs(
 
   return buildPage(rows.map(toCustomerRef), total, query.page, limit);
 }
+
+/** Misma regla de palabras que el listado, para que un nombre que alli aparece aqui tambien case. */
+export async function findAliveCustomerIdsMatchingName(
+  search: string,
+  ids: readonly string[],
+  scope: CustomerScope,
+): Promise<readonly string[]> {
+  // Un id sin forma de uuid haria fallar la consulta entera en Postgres en vez de no casar.
+  const validIds = ids.filter((id) => isCustomerId(id));
+  if (validIds.length === 0) return [];
+
+  const words = searchCondition(search);
+  const rows = await prisma.customer.findMany({
+    where: {
+      id: { in: validIds },
+      deletedAt: null,
+      ...customerCompanyScope(scope),
+      ...(words === null ? {} : { AND: [...words] }),
+    },
+    select: { id: true },
+    orderBy: { id: 'asc' },
+  });
+  return rows.map((row) => row.id);
+}

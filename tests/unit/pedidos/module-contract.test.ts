@@ -30,6 +30,7 @@ import {
   DEFAULT_ORDER_PRIORITY,
   DEFAULT_ORDER_STATUS,
   ORDER_PRIORITY_VALUES,
+  ORDER_STATUSES_NOT_IN_PROGRESS,
   ORDER_STATUS_VALUES,
   formatOrderNumber,
 } from '@/lib/modules/pedidos'
@@ -357,6 +358,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // sigue afirmando, y con la misma fuerza, es que NINGUN otro modulo, ninguna pantalla y
     // ningun script tocan `orders`.
     const DUENOS_DE_ORDERS = [
+      // 2026-10-23: `CustomerOrderDirectory`, los pedidos vivos de un cliente para el chat de
+      // WhatsApp, solo lectura y en archivo propio.
+      'lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
       // 2026-10-14: el contador de pedidos en curso de una empresa, para el impacto de su baja.
       'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
@@ -498,8 +502,11 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // `inventario`, solo lectura) abre el cliente compartido, sin importar `@prisma/client`.
     // 2026-10-14: `packed-lines-directory-prisma.ts` (`FinishedDistributionDirectory` de
     // `inventario`, solo lectura) igual, sin importar `@prisma/client`.
+    // 2026-10-23: `customer-order-directory-prisma.ts` (`CustomerOrderDirectory`, solo lectura)
+    // abre el cliente compartido, sin importar `@prisma/client`.
     // Las dos listas siguen CERRADAS.
     const DUENOS_DEL_CLIENTE = [
+      'lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma.ts',
       SIN_PEDIDO,
       'lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma.ts',
       'lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma.ts',
@@ -723,6 +730,36 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Lo que el contrato publica sobre el estado sigue siendo la LISTA de valores y su defecto.
     const contrato = read(barrel)
     expect(contrato).toMatch(/ORDER_STATUS_VALUES/)
+  })
+
+  it('R51, R54: el barrel publica CustomerOrderDirectory y ORDER_STATUSES_NOT_IN_PROGRESS; solo la composicion instancia su adaptador, aparte de OrderCatalog', () => {
+    // Los pedidos abiertos del chat se piden excluyendo justo los dos estados que ya no estan en
+    // curso: entregado y cancelado.
+    expect([...ORDER_STATUSES_NOT_IN_PROGRESS]).toEqual(['ENTREGADO', 'CANCELADO'])
+
+    const contrato = read(barrel)
+    expect(contrato).toMatch(
+      /export \{[^}]*\bORDER_STATUSES_NOT_IN_PROGRESS\b[^}]*\} from '\.\/domain\/order-classification'/,
+    )
+    // Solo el tipo y la interfaz: el adaptador arrastraria `@prisma/client` al barrel.
+    expect(contrato).toMatch(
+      /export type \{[^}]*\bCustomerOrderDirectory\b[^}]*\bCustomerOrderSummary\b[^}]*\} from '\.\/domain\/customer-order-directory'/,
+    )
+    expect(contrato).not.toMatch(/customer-order-directory-prisma/)
+
+    const ADAPTADOR = 'lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma.ts'
+    expect(existsSync(join(repoRoot, ...ADAPTADOR.split('/')))).toBe(true)
+    expect(
+      todoElCodigo
+        .filter((file) => /adapters\/driven\/persistence\/customer-order-directory-prisma/.test(read(file)))
+        .map(etiqueta),
+    ).toEqual(['lib/composition/index.ts'])
+
+    // Servicio aparte: `OrderCatalog` ni lo declara ni lo implementa.
+    const catalogo = read(join(pedidosDir, 'domain', 'order-catalog.ts'))
+    const adaptadorDelCatalogo = read(join(pedidosDir, 'adapters', 'driven', 'persistence', 'order-catalog-prisma.ts'))
+    expect(catalogo).not.toMatch(/listAliveOfCustomer|CustomerOrderDirectory/)
+    expect(adaptadorDelCatalogo).not.toMatch(/listAliveOfCustomer|CustomerOrderDirectory/)
   })
 
   it('el barrel de pedidos exporta formatOrderNumber y no hay ninguna otra composicion del numero visible', () => {
