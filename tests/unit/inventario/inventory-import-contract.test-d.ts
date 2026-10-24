@@ -25,10 +25,13 @@ import type {
   InventoryImportPreview,
   InventoryImportPreviewOutcome,
   InventoryImportResult,
+  PackagingSubtype,
   PreviewInventoryImport,
   ProductType,
 } from '@/lib/modules/inventario'
 import {
+  IMPORT_SUBTYPE_LABELS,
+  IMPORT_TYPE_ALIASES,
   IMPORT_TYPE_LABELS,
   INVENTORY_IMPORT_COLUMNS,
   createConfirmInventoryImport,
@@ -93,6 +96,13 @@ expectTypeOf<ImportCells[ImportColumnKey]>().toEqualTypeOf<string>()
 expectTypeOf<ImportRowType>().toEqualTypeOf<ProductType>()
 expectTypeOf<keyof typeof IMPORT_TYPE_LABELS>().toEqualTypeOf<ImportRowType>()
 expectTypeOf<keyof (typeof INVENTORY_IMPORT_COLUMNS)[number]['rules']>().toEqualTypeOf<ImportRowType>()
+
+// --- Subtipo de empaque (QT-296) ------------------------------------------------------------
+expectTypeOf<'subtype'>().toExtend<ImportColumnKey>()
+expectTypeOf<keyof typeof IMPORT_SUBTYPE_LABELS>().toEqualTypeOf<PackagingSubtype>()
+expectTypeOf<keyof typeof IMPORT_TYPE_ALIASES>().toEqualTypeOf<'PACKAGING'>()
+expectTypeOf<ImportPreviewRow['packagingSubtype']>().toEqualTypeOf<PackagingSubtype | null>()
+expectTypeOf<ImportResultRow['packagingSubtype']>().toEqualTypeOf<PackagingSubtype | null>()
 
 // --- Casos de uso ---------------------------------------------------------------------------
 expectTypeOf(createPreviewInventoryImport).returns.toEqualTypeOf<PreviewInventoryImport>()

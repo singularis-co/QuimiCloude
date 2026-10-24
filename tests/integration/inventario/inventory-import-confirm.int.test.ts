@@ -253,6 +253,70 @@ describe('importacion de inventario contra la base', () => {
     expect(await prisma.productBatch.count({ where: { companyId, lot: escenario.loteExistente } })).toBe(3);
   });
 
+  it('R22 confirmar un envase, una tapa y un medidor crea los tres con su subtipo, y la tapa sin presentacion', async () => {
+    const escenario = await escenarioMixto();
+    const { companyId } = escenario.empresa;
+    const actor = actorOf(escenario.empresa);
+    const filas: Partial<ImportCells>[] = [
+      { type: 'Empaque', name: 'Bidon verde', presentation: escenario.presentacion, stock: '4', unitCost: '2', qtyAlert: '1' },
+      { type: 'Empaque', subtype: 'tapa', name: 'Tapa 38', presentation: escenario.presentacion, stock: '50', unitCost: '0,1', qtyAlert: '5' },
+      { type: 'Envase', subtype: 'Medidor', name: 'Vasito 30', stock: '20', unitCost: '0,2', qtyAlert: '2' },
+    ];
+    const { preview, confirm } = wireImport();
+
+    const vista = await preview(csvFile(filas), actor);
+    const outcome = await confirm({ ...csvFile(filas), importKey: crypto.randomUUID() }, actor);
+
+    expect(vista.kind === 'preview' && vista.rows.map((row) => [row.status, row.packagingSubtype])).toEqual([
+      ['create', 'CONTAINER'],
+      ['create', 'CAP'],
+      ['create', 'MEASURER'],
+    ]);
+    const result = outcome as InventoryImportResult;
+    expect(result.rows.map((row) => [row.status, row.packagingSubtype])).toEqual([
+      ['created', 'CONTAINER'],
+      ['created', 'CAP'],
+      ['created', 'MEASURER'],
+    ]);
+    const presentationId = (
+      await prisma.presentation.findFirstOrThrow({ where: { name: escenario.presentacion }, select: { id: true } })
+    ).id;
+    const productos = await prisma.product.findMany({
+      where: { companyId, name: { in: ['Bidon verde', 'Tapa 38', 'Vasito 30'] } },
+      select: { name: true, type: true, packagingSubtype: true, presentationId: true, stock: true },
+      orderBy: { name: 'asc' },
+    });
+    expect(productos.map((p) => [p.name, p.type, p.packagingSubtype, p.presentationId, p.stock.toString()])).toEqual([
+      ['Bidon verde', 'PACKAGING', 'CONTAINER', presentationId, '4'],
+      ['Tapa 38', 'PACKAGING', 'CAP', null, '50'],
+      ['Vasito 30', 'PACKAGING', 'MEASURER', null, '20'],
+    ]);
+  });
+
+  it('R41 una fila con «Envase» y otra con «Empaque» del mismo nombre y presentacion crean un solo envase con dos lotes', async () => {
+    const escenario = await escenarioMixto();
+    const { companyId } = escenario.empresa;
+    const actor = actorOf(escenario.empresa);
+    const filas: Partial<ImportCells>[] = [
+      { type: 'Envase', name: 'Bidon gris', presentation: escenario.presentacion, stock: '3', unitCost: '2', qtyAlert: '1' },
+      { type: ' empaque ', name: 'BIDON GRIS', presentation: escenario.presentacion, stock: '5', unitCost: '2', qtyAlert: '1' },
+    ];
+    const { confirm } = wireImport();
+
+    const outcome = await confirm({ ...csvFile(filas), importKey: crypto.randomUUID() }, actor);
+
+    const result = outcome as InventoryImportResult;
+    expect(result.rows.map((row) => row.status)).toEqual(['created', 'batch_added']);
+    const productos = await prisma.product.findMany({
+      where: { companyId, nameNormalized: 'bidongris' },
+      select: { id: true, packagingSubtype: true, stock: true },
+    });
+    expect(productos).toHaveLength(1);
+    expect(productos[0]?.packagingSubtype).toBe('CONTAINER');
+    expect(productos[0]?.stock.toString()).toBe('8');
+    expect(await prisma.productBatch.count({ where: { companyId, productId: productos[0]?.id } })).toBe(2);
+  });
+
   it.skipIf(process.env.QC209_MEDIR_2000 !== '1')(
     'R7 medida: confirmar 2.000 filas en la misma peticion, con el alta y el aviso de pedidos reales',
     async () => {

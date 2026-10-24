@@ -39,6 +39,17 @@ describe('cabecera de la importacion', () => {
     expect(outcome.ok && outcome.sheet.rows[0]?.cells).toMatchObject({ type: 'Envase', name: 'Sal', stock: '7' });
   });
 
+  it('R15 «Subtipo» es opcional: sin la columna la celda va vacia, y con ella se lee por su cabecera', () => {
+    expect(INVENTORY_IMPORT_COLUMNS.find((column) => column.key === 'subtype')).toMatchObject({
+      header: 'Subtipo',
+      headerRequired: false,
+    });
+    const without = parseImportSheet(sheet([['Tipo', 'Nombre', 'Cantidad'], ['Envase', 'Bidon', '7']]));
+    expect(without.ok && without.sheet.rows[0]?.cells.subtype).toBe('');
+    const withIt = parseImportSheet(sheet([['Tipo', ' SUBTIPO ', 'Nombre', 'Cantidad'], ['Empaque', 'Tapa', 'Tapa 28', '7']]));
+    expect(withIt.ok && withIt.sheet.rows[0]?.cells).toMatchObject({ type: 'Empaque', subtype: 'Tapa', name: 'Tapa 28' });
+  });
+
   it('R5 compara los nombres sin mayusculas, tildes ni espacios de los extremos', () => {
     const header = ['  TIPO ', 'nombre', 'CANTIDAD', 'presentacion', 'FORMULA', ' fecha  de compra '];
     expect(rejection(header)).toBeNull();

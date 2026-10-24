@@ -106,7 +106,7 @@ hay.
 **Hecho cuando:** R13, R14 y R39 en verde, y `qc195-packaging-catalog.int.test.ts` y
 `qc195-packaging-list.int.test.ts` siguen en verde.
 
-## [ ] T5 — Columna «Subtipo» en el Excel `[depende de T1, T2]` `[P con T3, T4, T6]`
+## [x] T5 — Columna «Subtipo» en el Excel `[depende de T1, T2]` `[P con T3, T4, T6]`
 
 - `inventory-import-contract.ts`, `plan-inventory-import.ts` (`columnRule`, lectura del subtipo,
   identidad, mensajes), `inventory-import-downloads.ts` (`subtype: ''` en los ejemplos),

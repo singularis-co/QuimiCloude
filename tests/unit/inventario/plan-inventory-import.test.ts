@@ -507,3 +507,189 @@ describe('planInventoryImport — faltantes', () => {
     expect([...result.writes.values()].map((write) => write.kind)).toEqual(['product']);
   });
 });
+
+function candidateOf(result: ReturnType<typeof plan>, rowNumber: number): Readonly<Record<string, unknown>> | undefined {
+  const write = result.writes.get(rowNumber);
+  return write?.kind === 'product' ? write.candidate : undefined;
+}
+
+function firstIssue(previewRow: ImportPreviewRow | undefined) {
+  return previewRow?.status === 'error' ? previewRow.issues[0] : undefined;
+}
+
+describe('planInventoryImport — QT-296, «Subtipo» de empaque', () => {
+  const ROW_TAPA = { ...ROW_ENVASE, name: 'Tapa 28', subtype: 'Tapa', presentation: '' };
+
+  it('R15 un archivo sin la columna «Subtipo» planifica igual que hoy, con los empaques como CONTAINER', () => {
+    const result = plan(sheet(ROW_INSUMO, ROW_ENVASE, ROW_INSTRUMENTO, ROW_TERMINADO));
+    expect(result.rows.map((r) => [r.status, r.type, r.packagingSubtype])).toEqual([
+      ['create', 'PRODUCT', null],
+      ['create', 'PACKAGING', 'CONTAINER'],
+      ['create', 'MACHINE', null],
+      ['create', 'FINISHED_PRODUCT', null],
+    ]);
+    expect(candidateOf(result, 3)).toMatchObject({ packagingSubtype: 'CONTAINER', presentationId: BIDON.id });
+    expect(result.rows.every((r) => !('ignoredColumns' in r))).toBe(true);
+  });
+
+  it('R16 «Subtipo» vacio o con solo espacios en un empaque es CONTAINER', () => {
+    const result = plan(sheet({ ...ROW_ENVASE, subtype: '' }, { ...ROW_ENVASE, name: 'Otro bidon', subtype: '   ' }));
+    expect(result.rows.map((r) => [r.status, r.packagingSubtype])).toEqual([
+      ['create', 'CONTAINER'],
+      ['create', 'CONTAINER'],
+    ]);
+  });
+
+  it('R17 «tapa», «MEDIDOR» y « Otro » se leen sin mayusculas, tildes ni espacios', () => {
+    const result = plan(
+      sheet(
+        { ...ROW_TAPA, subtype: 'tapa' },
+        { ...ROW_TAPA, name: 'Vasito', subtype: 'MEDIDOR' },
+        { ...ROW_TAPA, name: 'Gatillo', subtype: ' Otro ' },
+        { ...ROW_ENVASE, subtype: 'énvase' },
+      ),
+    );
+    expect(result.rows.map((r) => [r.status, r.packagingSubtype])).toEqual([
+      ['create', 'CAP'],
+      ['create', 'MEASURER'],
+      ['create', 'OTHER'],
+      ['create', 'CONTAINER'],
+    ]);
+  });
+
+  it('R17 «gatillo» deja la fila en error subtype_invalid sobre «Subtipo»', () => {
+    const result = plan(sheet({ ...ROW_ENVASE, subtype: 'gatillo' }));
+    expect(result.rows[0]).toMatchObject({ status: 'error', type: 'PACKAGING', packagingSubtype: null });
+    expect(codes(result.rows[0])).toEqual([['subtype_invalid', 'subtype']]);
+    expect(firstIssue(result.rows[0])?.message).toBe('Subtipo: debe ser Envase, Tapa, Medidor u Otro.');
+    expect(result.writes.size).toBe(0);
+  });
+
+  it('R18 una tapa con «Presentación» la anota en ignoredColumns y sigue, sin presentacion en lo que se escribe', () => {
+    const result = plan(
+      sheet({ ...ROW_TAPA, presentation: 'Bidón 20 L' }, { ...ROW_TAPA, name: 'Vasito', subtype: 'Medidor' }),
+    );
+    expect(result.rows[0]).toMatchObject({ status: 'create', packagingSubtype: 'CAP', ignoredColumns: ['presentation'] });
+    expect(result.rows[0]?.cells.presentation).toBe('Bidón 20 L');
+    expect(candidateOf(result, 2)).toMatchObject({ type: 'PACKAGING', packagingSubtype: 'CAP' });
+    expect(candidateOf(result, 2)).not.toHaveProperty('presentationId');
+    expect(result.rows[1]).toMatchObject({ status: 'create', packagingSubtype: 'MEASURER' });
+    expect(result.rows[1]).not.toHaveProperty('ignoredColumns');
+    expect(candidateOf(result, 3)).not.toHaveProperty('presentationId');
+    expect(result.missingPresentations).toEqual([]);
+  });
+
+  it('R18 un envase sin presentacion da value_required, con o sin «Subtipo»', () => {
+    const result = plan(
+      sheet({ ...ROW_ENVASE, presentation: '' }, { ...ROW_ENVASE, name: 'Otro', subtype: 'Envase', presentation: '' }),
+    );
+    for (const previewRow of result.rows) {
+      expect(codes(previewRow)).toEqual([['value_required', 'presentation']]);
+    }
+  });
+
+  it('R19 un insumo, un instrumento o un terminado con «Subtipo» lo anota en ignoredColumns y sigue', () => {
+    const result = plan(
+      sheet(
+        { ...ROW_INSUMO, subtype: 'Tapa' },
+        { ...ROW_INSTRUMENTO, subtype: 'gatillo' },
+        { ...ROW_TERMINADO, subtype: 'Otro' },
+      ),
+    );
+    expect(result.rows.map((r) => [r.status, r.packagingSubtype, r.ignoredColumns])).toEqual([
+      ['create', null, ['subtype']],
+      ['create', null, ['subtype']],
+      ['create', null, ['subtype']],
+    ]);
+    expect(candidateOf(result, 2)).not.toHaveProperty('packagingSubtype');
+  });
+
+  it('R20 un empaque vivo con otro subtipo da subtype_mismatch; con el mismo, add_batch', () => {
+    const tapa = productRef({ id: 'p-tapa', nameNormalized: 'tapa28', type: 'PACKAGING', packagingSubtype: 'CAP' });
+    const result = plan(
+      sheet({ ...ROW_ENVASE, name: 'Tapa 28' }, { ...ROW_TAPA, subtype: 'Medidor' }, ROW_TAPA),
+      snapshot({ products: [tapa] }),
+    );
+    expect(codes(result.rows[0])).toEqual([['subtype_mismatch', 'subtype']]);
+    expect(codes(result.rows[1])).toEqual([['subtype_mismatch', 'subtype']]);
+    expect(firstIssue(result.rows[0])?.message).toBe('Subtipo: ya existe un empaque con ese nombre y otro subtipo.');
+    expect(result.rows[2]).toMatchObject({
+      status: 'add_batch',
+      packagingSubtype: 'CAP',
+      target: { kind: 'existing', productId: 'p-tapa' },
+    });
+    expect([...result.writes.keys()]).toEqual([4]);
+  });
+
+  it('R20 una fila anterior del archivo con otro subtipo da subtype_mismatch; con el mismo, suma a esa fila', () => {
+    const result = plan(sheet(ROW_TAPA, { ...ROW_TAPA, subtype: 'Otro' }, { ...ROW_TAPA, subtype: 'TAPA' }));
+    expect(result.rows[0]?.status).toBe('create');
+    expect(codes(result.rows[1])).toEqual([['subtype_mismatch', 'subtype']]);
+    expect(result.rows[2]).toMatchObject({ status: 'add_batch', target: { kind: 'file_row', rowNumber: 2 } });
+  });
+
+  it('R20 un envase vivo con el mismo subtipo sigue con su regla de presentacion', () => {
+    const envase = productRef({ id: 'p-bidon', nameNormalized: 'bidon', type: 'PACKAGING', presentationId: BIDON.id });
+    const result = plan(
+      sheet(ROW_ENVASE, { ...ROW_ENVASE, presentation: 'Botella 1 L' }, { ...ROW_ENVASE, subtype: 'Tapa', presentation: '' }),
+      snapshot({ products: [envase] }),
+    );
+    expect(result.rows[0]).toMatchObject({ status: 'add_batch', target: { kind: 'existing', productId: 'p-bidon' } });
+    expect(codes(result.rows[1])).toEqual([['presentation_mismatch', 'presentation']]);
+    expect(codes(result.rows[2])).toEqual([['subtype_mismatch', 'subtype']]);
+  });
+});
+
+describe('planInventoryImport — QT-296, «Envase» y «Empaque» en «Tipo»', () => {
+  /** Un archivo de antes de la ficha: «Envase» en «Tipo» y sin «Subtipo». */
+  const LEGACY_ROWS = [
+    ROW_ENVASE,
+    { ...ROW_ENVASE, lot: 'L-9' },
+    { ...ROW_ENVASE, name: 'Bidon', presentation: 'Botella 1 L' },
+    { ...ROW_ENVASE, name: 'Frasco', presentation: 'Inexistente' },
+    { ...ROW_ENVASE, name: 'Garrafa', presentation: '' },
+    { ...ROW_ENVASE, name: 'Botella', presentation: 'Botella 1 L', stock: '2,5' },
+    { ...ROW_ENVASE, name: 'Botella', presentation: 'Botella 1 L', expiryDate: '2027-01-01' },
+    { ...ROW_ENVASE, name: 'Botella', presentation: 'Botella 1 L' },
+    { ...ROW_ENVASE, type: 'envase', name: 'Caja' },
+  ];
+  const envase = productRef({ id: 'p-bidon', nameNormalized: 'bidon', type: 'PACKAGING', presentationId: BIDON.id });
+  const catalog = snapshot({ products: [envase], batches: [{ lot: 'L-9', productId: 'p-bidon', presentationId: null }] });
+
+  function summary(result: ReturnType<typeof plan>) {
+    return result.rows.map((r) => ({
+      status: r.status,
+      type: r.type,
+      packagingSubtype: r.packagingSubtype,
+      target: 'target' in r ? r.target : undefined,
+      issues: codes(r),
+      ignoredColumns: r.ignoredColumns,
+    }));
+  }
+
+  it('R41 un archivo con «Envase» y sin «Subtipo» da la misma vista previa que antes, fila por fila', () => {
+    const result = plan(sheet(...LEGACY_ROWS), catalog);
+    const existing = { kind: 'existing', productId: 'p-bidon' };
+    const base = { type: 'PACKAGING', packagingSubtype: 'CONTAINER', target: undefined, issues: [], ignoredColumns: undefined };
+    expect(summary(result)).toEqual([
+      { ...base, status: 'add_batch', target: existing },
+      { ...base, status: 'duplicate', target: existing },
+      { ...base, status: 'error', issues: [['presentation_mismatch', 'presentation']] },
+      { ...base, status: 'error', issues: [['presentation_not_found', 'presentation']] },
+      { ...base, status: 'error', issues: [['value_required', 'presentation']] },
+      { ...base, status: 'error', issues: [['stock_not_whole', 'stock']] },
+      { ...base, status: 'create', ignoredColumns: ['expiryDate'] },
+      { ...base, status: 'add_batch', target: { kind: 'file_row', rowNumber: 8 } },
+      { ...base, status: 'create' },
+    ]);
+    expect(result.missingPresentations).toEqual([{ name: 'Inexistente', rowNumbers: [5] }]);
+    expect(candidateOf(result, 2)).toMatchObject({ packagingSubtype: 'CONTAINER', presentationId: BIDON.id });
+  });
+
+  it('R41 «Empaque» en lugar de «Envase» da exactamente la misma vista previa', () => {
+    const legacy = plan(sheet(...LEGACY_ROWS), catalog);
+    const renamed = plan(sheet(...LEGACY_ROWS.map((values) => ({ ...values, type: ' EMPAQUE ' }))), catalog);
+    expect(summary(renamed)).toEqual(summary(legacy));
+    expect([...renamed.writes.values()]).toEqual([...legacy.writes.values()]);
+  });
+});

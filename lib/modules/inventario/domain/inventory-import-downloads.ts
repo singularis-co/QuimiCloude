@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 
 import {
+  IMPORT_TYPE_ALIASES,
   IMPORT_TYPE_LABELS,
   INVENTORY_IMPORT_COLUMNS,
   type ImportCells,
@@ -39,6 +40,7 @@ const EXAMPLE_PRESENTATION = 'Ejemplo botella 1 litro';
 export const IMPORT_EXAMPLE_ROWS: readonly [ImportCells, ...ImportCells[]] = [
   {
     type: IMPORT_TYPE_LABELS.PRODUCT,
+    subtype: '',
     name: 'Ejemplo ácido cítrico',
     unit: 'kilogramo',
     presentation: '',
@@ -52,6 +54,7 @@ export const IMPORT_EXAMPLE_ROWS: readonly [ImportCells, ...ImportCells[]] = [
   },
   {
     type: IMPORT_TYPE_LABELS.PACKAGING,
+    subtype: '',
     name: 'Ejemplo botella PET',
     unit: '',
     presentation: EXAMPLE_PRESENTATION,
@@ -65,6 +68,7 @@ export const IMPORT_EXAMPLE_ROWS: readonly [ImportCells, ...ImportCells[]] = [
   },
   {
     type: IMPORT_TYPE_LABELS.MACHINE,
+    subtype: '',
     name: 'Ejemplo balanza',
     unit: '',
     presentation: '',
@@ -78,6 +82,7 @@ export const IMPORT_EXAMPLE_ROWS: readonly [ImportCells, ...ImportCells[]] = [
   },
   {
     type: IMPORT_TYPE_LABELS.FINISHED_PRODUCT,
+    subtype: '',
     name: '',
     unit: '',
     presentation: EXAMPLE_PRESENTATION,
@@ -90,6 +95,14 @@ export const IMPORT_EXAMPLE_ROWS: readonly [ImportCells, ...ImportCells[]] = [
     qtyAlert: '',
   },
 ];
+
+/**
+ * Las filas de ejemplo de las plantillas que ya se descargaron, con «Envase» en «Tipo» y sin
+ * «Subtipo». Se siguen ignorando al leer para que esas plantillas no importen su ejemplo.
+ */
+export const LEGACY_IMPORT_EXAMPLE_ROWS: readonly ImportCells[] = IMPORT_EXAMPLE_ROWS.map((example) =>
+  example.type === IMPORT_TYPE_LABELS.PACKAGING ? { ...example, type: IMPORT_TYPE_ALIASES.PACKAGING[0] } : example,
+);
 
 /** Los nombres tal como están guardados en la empresa: es lo que la importación reconoce. */
 export type ImportTemplateValues = {

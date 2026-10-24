@@ -364,3 +364,39 @@ describe('confirmInventoryImport — registro de la importacion', () => {
     expect(createProduct).not.toHaveBeenCalled();
   });
 });
+
+describe('confirmInventoryImport — QT-296, subtipo de empaque', () => {
+  it('R22 cada empaque llega al alta con el subtipo de su fila, y solo el envase con presentacion', async () => {
+    const { confirm, createProduct } = build([
+      ROW_ENVASE,
+      { ...ROW_ENVASE, name: 'Tapa 28', subtype: 'Tapa', presentation: '' },
+      { ...ROW_ENVASE, name: 'Vasito', subtype: 'Medidor', presentation: '' },
+    ]);
+
+    const outcome = await confirm(FILE, ADMIN);
+
+    expect(outcome.kind === 'imported' && outcome.rows.map((row) => [row.status, row.packagingSubtype])).toEqual([
+      ['created', 'CONTAINER'],
+      ['created', 'CAP'],
+      ['created', 'MEASURER'],
+    ]);
+    const inputs = createProduct.mock.calls.map(([input]) => input as Record<string, unknown>);
+    expect(inputs.map((input) => input.packagingSubtype)).toEqual(['CONTAINER', 'CAP', 'MEASURER']);
+    expect(inputs[0]).toHaveProperty('presentationId');
+    expect(inputs[1]).not.toHaveProperty('presentationId');
+    expect(inputs[2]).not.toHaveProperty('presentationId');
+  });
+
+  it('R20 un rechazo del alta en carrera es subtype_mismatch en una tapa y presentation_mismatch en un envase', async () => {
+    const { confirm, createProduct } = build([ROW_ENVASE, { ...ROW_ENVASE, name: 'Tapa 28', subtype: 'Tapa', presentation: '' }]);
+    createProduct.mockRejectedValueOnce(new ActionNotAllowedError());
+    createProduct.mockRejectedValueOnce(new ActionNotAllowedError());
+
+    const outcome = await confirm(FILE, ADMIN);
+
+    expect(outcome.kind === 'imported' && outcome.rows.map((row) => row.status === 'error' && row.issues[0])).toEqual([
+      expect.objectContaining({ code: 'presentation_mismatch', column: 'presentation' }),
+      expect.objectContaining({ code: 'subtype_mismatch', column: 'subtype' }),
+    ]);
+  });
+});

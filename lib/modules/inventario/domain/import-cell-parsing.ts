@@ -1,4 +1,10 @@
-import { IMPORT_TYPE_LABELS, type ImportRowType } from './inventory-import-contract';
+import {
+  IMPORT_SUBTYPE_LABELS,
+  IMPORT_TYPE_ALIASES,
+  IMPORT_TYPE_LABELS,
+  type ImportRowType,
+} from './inventory-import-contract';
+import { PACKAGING_SUBTYPES, type PackagingSubtype } from './packaging-subtype';
 
 export type ImportCellOrigin = 'text' | 'number' | 'date';
 
@@ -36,15 +42,43 @@ export function normalizeHeader(header: string): string {
   return foldText(header);
 }
 
-const TYPE_BY_LABEL = new Map<string, ImportRowType>(
-  (Object.entries(IMPORT_TYPE_LABELS) as [ImportRowType, string][]).map(([type, label]) => [
-    foldText(label),
-    type,
-  ]),
+function labelMap<T extends string>(entries: readonly (readonly [T, string])[]): ReadonlyMap<string, T> {
+  const map = new Map<string, T>();
+  for (const [value, label] of entries) {
+    const key = foldText(label);
+    const taken = map.get(key);
+    if (taken !== undefined && taken !== value) {
+      throw new Error(`import-cell-parsing: «${label}» nombra a ${taken} y a ${value}`);
+    }
+    map.set(key, value);
+  }
+  return map;
+}
+
+const TYPE_BY_LABEL = labelMap<ImportRowType>([
+  ...(Object.entries(IMPORT_TYPE_LABELS) as [ImportRowType, string][]),
+  ...(Object.entries(IMPORT_TYPE_ALIASES) as [ImportRowType, readonly string[]][]).flatMap(([type, aliases]) =>
+    aliases.map((alias) => [type, alias] as const),
+  ),
+]);
+
+const SUBTYPE_BY_LABEL = labelMap<PackagingSubtype>(
+  Object.entries(IMPORT_SUBTYPE_LABELS) as [PackagingSubtype, string][],
 );
 
 export function parseImportType(text: string): ImportRowType | null {
   return TYPE_BY_LABEL.get(foldText(text)) ?? null;
+}
+
+export type ParsedImportSubtype =
+  | { readonly kind: 'value'; readonly value: PackagingSubtype }
+  | { readonly kind: 'invalid' };
+
+/** Vacío es un envase: las plantillas anteriores no traen la columna. */
+export function parseImportSubtype(text: string): ParsedImportSubtype {
+  if (text.trim() === '') return { kind: 'value', value: PACKAGING_SUBTYPES.CONTAINER };
+  const value = SUBTYPE_BY_LABEL.get(foldText(text));
+  return value === undefined ? { kind: 'invalid' } : { kind: 'value', value };
 }
 
 /**

@@ -368,7 +368,8 @@ export const GUIDE_DESCRIPTION_HEADER = 'Descripción';
  * (`import-guide-descriptions.tsx`), porque este archivo no lleva JSX.
  */
 export const GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, string>> = {
-  type: 'Qué es el producto: Insumo, Envase, Instrumento o Producto terminado. Decide qué otras columnas se piden.',
+  type: 'Qué es el producto: Insumo, Empaque, Instrumento o Producto terminado. Decide qué otras columnas se piden.',
+  subtype: 'Solo en Empaque: Envase, Tapa, Medidor u Otro. Si va vacío, es Envase. Tapa, Medidor y Otro no llevan presentación.',
   name: 'Nombre del producto. Si ya existe uno igual (mismo nombre y unidad; en envases, misma presentación), se agrega como lote nuevo del producto.',
   unit: 'Unidad en que se mide el insumo, por su nombre o su símbolo. Debe existir en la empresa.',
   presentation:

@@ -20,6 +20,7 @@ export function celdas(valores: Partial<Record<ImportColumnKey, string>>): Impor
 const FILA_CREAR = {
   rowNumber: 3,
   type: PRODUCT_TYPES.PRODUCT,
+  packagingSubtype: null,
   productName: 'Ácido cítrico',
   cells: celdas({ type: 'Insumo', name: 'Ácido cítrico', unit: 'kilogramo', stock: '25', lot: 'AC-001' }),
 } as const;
@@ -27,6 +28,7 @@ const FILA_CREAR = {
 const FILA_SUMA_EXISTENTE = {
   rowNumber: 4,
   type: PRODUCT_TYPES.PACKAGING,
+  packagingSubtype: 'CONTAINER',
   productName: 'Frasco ámbar',
   cells: celdas({ type: 'Envase', name: 'Frasco ámbar', presentation: 'Frasco 500 mL', stock: '100' }),
 } as const;
@@ -34,6 +36,7 @@ const FILA_SUMA_EXISTENTE = {
 const FILA_DUPLICADA = {
   rowNumber: 5,
   type: PRODUCT_TYPES.MACHINE,
+  packagingSubtype: null,
   productName: 'Balanza analítica',
   cells: celdas({ type: 'Instrumento', name: 'Balanza analítica', stock: '1', lot: 'BA-01' }),
 } as const;
@@ -41,6 +44,7 @@ const FILA_DUPLICADA = {
 const FILA_SUMA_ARCHIVO = {
   rowNumber: 6,
   type: PRODUCT_TYPES.PRODUCT,
+  packagingSubtype: null,
   productName: 'Ácido cítrico',
   cells: celdas({ type: 'Insumo', name: 'Ácido cítrico', unit: 'kilogramo', stock: '10', lot: 'AC-002' }),
 } as const;
@@ -48,6 +52,7 @@ const FILA_SUMA_ARCHIVO = {
 const FILA_SIN_UNIDAD = {
   rowNumber: 7,
   type: PRODUCT_TYPES.PRODUCT,
+  packagingSubtype: null,
   productName: 'Glicerina',
   cells: celdas({ type: 'Insumo', name: 'Glicerina', unit: 'Galón', stock: '4,5,1' }),
   issues: [
@@ -59,6 +64,7 @@ const FILA_SIN_UNIDAD = {
 const FILA_SIN_PRESENTACION = {
   rowNumber: 8,
   type: PRODUCT_TYPES.PACKAGING,
+  packagingSubtype: 'CONTAINER',
   productName: 'Bidón',
   cells: celdas({ type: 'Envase', name: 'Bidón', presentation: 'Bidón 20 L', stock: '30' }),
   issues: [

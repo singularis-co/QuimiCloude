@@ -534,19 +534,130 @@ segunda:
 `catalog-service.test.ts`, typecheck, lint, guardias y `vitest related` también en verde. Hay dos
 divergencias de forma, anotadas arriba.
 
-## T5 — Columna «Subtipo» en el Excel: BLOQUEADA (2026-10-23)
+## T5 — Columna «Subtipo» en el Excel (2026-10-23)
 
-Sin cambios en el árbol. Añadir `subtype` a `INVENTORY_IMPORT_COLUMNS` (design §4.5) amplía
-`ImportColumnKey`, y `app/(private)/inventario/importar/components/import-texts.ts:370`
-(`GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, string>>`) exige una entrada
-por clave: el typecheck no pasa sin escribir ahí un texto de UI que el spec no da (es de QT-297).
-`tasks.md > T5` manda parar si hace falta tocar UI. Opciones para el leader / humano:
-1. permitir la línea `subtype: '<texto>'` en `import-texts.ts`, con el texto dado por el humano o QT-297;
-2. que QT-297 añada la entrada antes y T5 espere;
-3. enmendar el spec para no ampliar `ImportColumnKey` (no recomendado).
-Notas para retomarla: los defaults de `productRef` del kit de tests necesitan `packagingSubtype`
-(`CONTAINER` en empaques) o los tests R14/QC-284 dan `subtype_mismatch`; el borrador de fila de
-tapa/medidor no debe llevar `presentationId`.
+### Bloqueo anterior (resuelto)
+La primera pasada se paró sin tocar nada. `subtype` amplía `ImportColumnKey`, y
+`GUIDE_COLUMN_DESCRIPTION_TEXTS` (`import-texts.ts`, UI de QT-297) exige un texto por clave que el
+spec no daba. El humano aprobó la excepción de abajo y T5 se retomó con las dos notas que había
+dejado: los defaults de `productRef` del kit necesitan `packagingSubtype`, y el borrador de una
+tapa o un medidor va sin `presentationId`. Las dos están aplicadas.
+
+### Excepción de UI aprobada por el humano (2026-10-23)
+Es el único cambio bajo `app/**`, en `app/(private)/inventario/importar/components/import-texts.ts`,
+`GUIDE_COLUMN_DESCRIPTION_TEXTS`, con `subtype` justo después de `type` (el orden del contrato):
+- `type: 'Qué es el producto: Insumo, Empaque, Instrumento o Producto terminado. Decide qué otras columnas se piden.'`
+- `subtype: 'Solo en Empaque: Envase, Tapa, Medidor u Otro. Si va vacío, es Envase. Tapa, Medidor y Otro no llevan presentación.'`
+
+`GUIDE_COLUMN_DESCRIPTIONS` (`import-guide-descriptions.tsx`) hace spread de ese mapa y no se tocó.
+Ningún test de UI fijaba el texto viejo ni contaba columnas: `tests/unit/inventario/importar/` pasó
+sin cambiar ninguna expectativa (salvo los fixtures de tipos, abajo).
+
+### Archivos
+Producción (`lib/modules/inventario/`):
+- `domain/inventory-import-contract.ts`:
+  - columna `subtype` («Subtipo», `headerRequired: false`, `optional` solo en `PACKAGING`) después de `type`;
+  - `IMPORT_TYPE_LABELS.PACKAGING = 'Empaque'`, `IMPORT_TYPE_ALIASES = { PACKAGING: ['Envase'] }` y `IMPORT_SUBTYPE_LABELS`;
+  - los códigos `subtype_invalid` y `subtype_mismatch`;
+  - `ImportRowBase.packagingSubtype: PackagingSubtype | null`.
+- `domain/import-cell-parsing.ts`: `TYPE_BY_LABEL` con etiquetas y alias, construido con `labelMap`, que lanza si un alias choca con otra etiqueta. `parseImportSubtype` nuevo: vacío es `CONTAINER`.
+- `domain/plan-inventory-import.ts`:
+  - `columnRule(column, type, subtype)` sustituye a las lecturas directas de `column.rules[type]` en `checkRequired`, `withoutIgnoredColumns` y `readValues`;
+  - en un empaque que no es envase, `presentation` es `forbidden`;
+  - el subtipo se lee antes de quitar las columnas ignoradas;
+  - identidad `E|<nombre>` contra cualquier empaque vivo (ya no exige `presentationId !== null`). Primero `subtype_mismatch` y luego, solo en envase, `presentation_mismatch`. `FileProduct` lleva el subtipo;
+  - el candidato lleva `packagingSubtype`, y `presentationId` solo si es envase. Hay dos mensajes nuevos.
+- `domain/inventory-import-downloads.ts`: `subtype: ''` en los cuatro ejemplos y `LEGACY_IMPORT_EXAMPLE_ROWS`, con «Envase» en el empaque.
+- `domain/import-sheet.ts`: `CANONICAL_EXAMPLES` con las dos listas.
+- `domain/confirm-inventory-import.ts`:
+  - `baseOf` pasa `packagingSubtype`;
+  - una `ActionNotAllowedError` en un empaque da `presentation_mismatch` si es envase y `subtype_mismatch` si no.
+- `ports/inventory-import-repository.ts`: `ImportProductRef.packagingSubtype`.
+- `adapters/driven/persistence/inventory-import-prisma.ts`: lo selecciona y lo mapea.
+- `index.ts`: exporta `IMPORT_TYPE_ALIASES`, `IMPORT_SUBTYPE_LABELS` y `LEGACY_IMPORT_EXAMPLE_ROWS`.
+
+UI (la excepción aprobada): `app/(private)/inventario/importar/components/import-texts.ts`.
+
+Tests:
+- Ampliados con casos nuevos:
+  - `tests/unit/inventario/plan-inventory-import.test.ts`: dos bloques «QT-296»;
+  - `confirm-inventory-import.test.ts`, `import-cell-parsing.test.ts`, `import-header.test.ts`, `import-sheet-limits.test.ts` e `inventory-import-downloads.test.ts`;
+  - `inventory-import-contract.test-d.ts`;
+  - `tests/integration/inventario/inventory-import-confirm.int.test.ts`: R22 y R41;
+  - `inventory-import-repository.int.test.ts`: R20, lado del adaptador.
+- Solo expectativas o fixtures, por la columna nueva y `packagingSubtype`:
+  - `inventory-import-kit.ts`: `productRef` pone `CONTAINER` por defecto en `PACKAGING` y `null` en el resto;
+  - `importar/import-preview-fixtures.ts` e `inventory-import-actions.test.ts`;
+  - en `inventory-import-downloads.test.ts`: la cabecera con «Subtipo», «Empaque» en la hoja de valores y el índice de «Nombre» en R28 (`row[2]` → `row[3]`);
+  - en `inventory-import-repository.int.test.ts` R17: `packagingSubtype: null`;
+  - `tests/integration/inventario/xlsx-reader.test.ts`: `FIXTURE_COLUMNS`, porque el fixture es anterior a la columna (ver Verificación).
+- `tests/integration/aislamiento.json` no cambia: no hay `.int` nuevo, e `inventory-import-confirm` ya estaba registrado.
+- No toqué los archivos de T8 (`ai-reader-canned.ts` y su test).
+
+### Divergencias y decisiones
+1. **Subtipo ilegible en un empaque.** La fila da `subtype_invalid` y su `packagingSubtype` es `null`. `presentation` queda sin regla (ni obligatoria ni ignorada), y el resto se valida como envase. Así sale un único motivo por la columna culpable.
+2. **El texto de `type_invalid` sigue diciendo «Envase».** («debe ser Insumo, Envase, Instrumento o Producto terminado.»). El spec no lo menciona, y R41 pide que un archivo existente dé la misma vista previa que hoy. «Envase» sigue siendo válido. Lo dejo así y lo marco como abierto, por si el humano lo quiere decir «Empaque».
+3. **La hoja «Valores disponibles» no lista subtipos.** R42 solo pide «Empaque» en ella, y una columna nueva cambiaría su forma sin que el spec lo pida.
+4. **Exports nuevos en `index.ts`**, para la UI de QT-297. El diseño no los pedía explícitamente.
+
+### Mapa R → test
+| R | Test |
+|---|---|
+| R15 | `plan-inventory-import.test.ts` › «R15 un archivo sin la columna «Subtipo» planifica igual que hoy, con los empaques como CONTAINER»; `import-header.test.ts` › «R15 «Subtipo» es opcional: sin la columna la celda va vacia, y con ella se lee por su cabecera» |
+| R16 | `plan-inventory-import.test.ts` › «R16 «Subtipo» vacio o con solo espacios en un empaque es CONTAINER»; `import-cell-parsing.test.ts` › «R16 %j vacio es CONTAINER» |
+| R17 | `plan-inventory-import.test.ts` › «R17 «tapa», «MEDIDOR» y « Otro » se leen…», «R17 «gatillo» deja la fila en error subtype_invalid sobre «Subtipo»»; `import-cell-parsing.test.ts` › «R17 %j se lee sin mayusculas…», «R17 %j es invalido» |
+| R18 | `plan-inventory-import.test.ts` › «R18 una tapa con «Presentación» la anota en ignoredColumns y sigue…», «R18 un envase sin presentacion da value_required, con o sin «Subtipo»» |
+| R19 | `plan-inventory-import.test.ts` › «R19 un insumo, un instrumento o un terminado con «Subtipo» lo anota en ignoredColumns y sigue» |
+| R20 | `plan-inventory-import.test.ts` › «R20 un empaque vivo con otro subtipo da subtype_mismatch; con el mismo, add_batch», «R20 una fila anterior del archivo…», «R20 un envase vivo con el mismo subtipo sigue con su regla de presentacion»; `confirm-inventory-import.test.ts` › «R20 un rechazo del alta en carrera es subtype_mismatch en una tapa y presentation_mismatch en un envase»; `inventory-import-repository.int.test.ts` › «R20 devuelve el subtipo de cada empaque vivo…» |
+| R21 | `inventory-import-downloads.test.ts` › «R21 la cabecera trae «Subtipo» justo despues de «Tipo»…»; `import-sheet-limits.test.ts` › «R21 todas las filas de ejemplo de la plantilla nueva se ignoran», «R21 la fila de ejemplo de empaque de una plantilla antigua… se ignora», «R21 las demas filas de ejemplo de una plantilla antigua tambien se ignoran», «R21 una fila igual al ejemplo antiguo pero con «ENVASE» se sigue importando, como hoy» |
+| R22 | `inventory-import-confirm.int.test.ts` › «R22 confirmar un envase, una tapa y un medidor crea los tres con su subtipo, y la tapa sin presentacion»; `confirm-inventory-import.test.ts` › «R22 cada empaque llega al alta con el subtipo de su fila…» |
+| R41 | `import-cell-parsing.test.ts` › «R41 %j es PACKAGING», «R41 %j sigue dando type_invalid…»; `plan-inventory-import.test.ts` › «R41 un archivo con «Envase» y sin «Subtipo» da la misma vista previa que antes, fila por fila», «R41 «Empaque» en lugar de «Envase» da exactamente la misma vista previa»; `inventory-import-confirm.int.test.ts` › «R41 una fila con «Envase» y otra con «Empaque»… crean un solo envase con dos lotes» |
+| R42 | `inventory-import-downloads.test.ts` › «R42 la fila de ejemplo del empaque dice «Empaque» y no «Envase»», «R42 la hoja de valores admitidos dice «Empaque» y no «Envase»» |
+
+### Verificación
+`pnpm run typecheck`: `tsc --noEmit`, exit 0. Incluye `inventory-import-contract.test-d.ts`.
+`pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 de antes, ninguno en archivos de T5.
+`pnpm exec vitest run guard`:
+```
+ Test Files  87 passed (87)
+      Tests  1276 passed | 22 skipped (1298)
+```
+Unit de la importación (los 6 archivos ampliados):
+```
+ Test Files  6 passed (6)
+      Tests  194 passed (194)
+```
+`tests/unit/inventario/importar/` (UI de la importación, sin cambiar expectativas):
+```
+ Test Files  9 passed (9)
+      Tests  178 passed (178)
+```
+Integración (`.env` cargado) de `inventory-import-confirm` e `inventory-import-repository`:
+- primera pasada: 1 rojo, en R17 del repositorio, porque esperaba la forma sin `packagingSubtype`. Se ajustó la expectativa;
+- segunda pasada:
+```
+ Test Files  2 passed (2)
+      Tests  22 passed | 1 skipped (23)
+```
+`pnpm exec vitest related --run <archivos de T5>`, con los 10 de producción, el de UI y los tests y fixtures tocados, sin T8. Primera corrida:
+```
+ Test Files  1 failed | 688 passed (689)
+      Tests  6 failed | 12236 passed | 8 skipped (12250)
+   Duration  1104.13s
+```
+- Los 6 rojos eran de `tests/integration/inventario/xlsx-reader.test.ts`, y ninguno era un `Hook timed out`.
+- Su fixture `mixto.xlsx` es un Excel real de antes de la ficha, sin «Subtipo». El test ubicaba las columnas por posición con `INVENTORY_IMPORT_COLUMNS`.
+- Arreglo solo en el test: `FIXTURE_COLUMNS` = las columnas sin `subtype`. El binario no se toca.
+- Su caso «R4 R6 la hoja entera pasa a filas…» ya pasaba sin cambios: una plantilla antigua sin «Subtipo» se sigue leyendo (R15).
+
+`xlsx-reader.test.ts`, solo, después del arreglo:
+```
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+```
+`tsc --noEmit` exit 0 y `eslint` del archivo exit 0 tras el arreglo.
+
+**Veredicto T5:** R15–R22, R41 y R42 en verde. Typecheck, lint y guardias también en verde, y en `vitest related` el único archivo rojo (`xlsx-reader`) quedó verde tras el arreglo. Sin dependencias nuevas, y bajo `app/**` solo la excepción aprobada.
 
 ## T7 — Lectura del PDF: interpretación, clasificación, vista previa y confirmación (2026-10-23)
 
@@ -623,3 +734,45 @@ Lo que no se tocó:
 ```
 
 **Veredicto T7:** R29–R33 y R35 (lado `documentos`) en verde. Typecheck, lint, guardias y `vitest related` también en verde, sin dependencias nuevas.
+
+## T8 — Doble de IA (2026-10-23)
+
+### Archivos
+- `lib/modules/documentos/adapters/driven/ai/ai-reader-canned.ts`:
+  - dos constantes nuevas, `CANNED_CATALOG_NEW_TYPE` (`PACKAGING_MATERIAL`) y `CANNED_CATALOG_NEW_PACKAGING_SUBTYPE` (`CONTAINER`), tomadas de `CATALOG_LINE_TYPES` / `CATALOG_LINE_PACKAGING_SUBTYPES` del barrel de `proveedores`;
+  - `CANNED_CATALOG_TEXT`: la fila «nueva» lleva esas dos constantes y la fila «cambia» lleva `type: null` y `packagingSubtype: null` explícitos.
+- `tests/unit/documentos/ai-reader-canned.test.ts`: dos casos nuevos con `R38` en el nombre. Los seis casos que ya existían no cambian.
+
+### Mapa R → test
+| R | Test |
+|---|---|
+| R38 | `ai-reader-canned.test.ts` › «R38 — el catalogo de guion trae una linea PACKAGING_MATERIAL + CONTAINER y otra sin tipo ni subtipo» (pasa por `extractCatalogFromText`, todas las líneas sobreviven), «R38 — el JSON crudo trae los codigos del enum, no etiquetas, y la linea sin tipo los trae explicitos en null». La mitad E2E de R38 (las dos specs siguen en verde) queda pendiente: la corre el leader. |
+
+### Lectura de las dos E2E (solo leídas, sin correr y sin tocar)
+- `e2e/catalogo-desde-pdf.spec.ts`: no afirma tipo, subtipo ni `needsTypeReview`. Las afirmaciones que podría tocar el texto nuevo:
+  - fila 0 = «Nueva»: no hay línea viva con ese nombre, así que sigue igual;
+  - fila 1 = «Cambia de costo»: la línea viva sembrada no tiene tipo (la columna queda en NULL), y la fila trae `null` + `null`. `resolveImportedClassification` deja lo guardado, así que la clasificación no cambia, el costo sigue distinto y la fila sigue siendo «cambia»;
+  - resumen 1/1/0/1 y la base (costo, material, medidas, imagen, presentación): nada de eso depende del tipo.
+  - La validación del subtipo (`FIELD_VALIDATORS`) acepta `PACKAGING_MATERIAL` + `CONTAINER`, así que la fila 0 no pasa a «incompleta». La marca de revisión de la fila 1 no bloquea `catalog-import-confirm` (design §6.5). La pantalla actual no manda los dos campos al confirmar (R32: valen `null`), así que la línea creada queda sin tipo. La spec no lo mira.
+  - Riesgo esperado: ninguno.
+- `e2e/documentos.spec.ts`: solo afirma el estado `done` de las filas y el recuento de tandas/archivos en la base. Dice explícitamente que no afirma el texto de la IA. El texto nuevo sigue siendo JSON válido que `extractCatalogFromText` acepta entero, así que el trabajo no falla. Riesgo esperado: ninguno.
+- Otros consumidores del archivo:
+  - `formula-desde-pdf.spec.ts` y `formula-extraction.test.ts` usan el texto de fórmula, que no cambia;
+  - `guard-dobles-e2e`, `qc158-alcance` y `qc159-alcance` siguen en verde: están dentro de la corrida de guardias y de `related`.
+
+### Verificación
+`pnpm run typecheck`: `tsc --noEmit`, exit 0.
+`pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 de antes.
+`pnpm exec vitest related --run lib/modules/documentos/adapters/driven/ai/ai-reader-canned.ts tests/unit/documentos/ai-reader-canned.test.ts`, con `.env` cargado:
+```
+ Test Files  463 passed (463)
+      Tests  7892 passed | 6 skipped (7898)
+   Duration  1129.77s
+```
+`pnpm exec vitest run guard`:
+```
+ Test Files  87 passed (87)
+      Tests  1276 passed | 22 skipped (1298)
+```
+
+**Veredicto T8:** la parte de código y unit test de R38 está en verde, sin dependencias nuevas. Falta correr las dos E2E (las corre el leader).
