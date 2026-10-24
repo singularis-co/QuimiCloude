@@ -172,7 +172,7 @@
 
 ### Tanda 8 — casos de uso (dependen de T6 y T10–T14)
 
-- [ ] **T15 Casos de uso `getWhatsappMedia` y `getWhatsappChatContext`** (R44–R46, R50–R57, R63).
+- [x] **T15 Casos de uso `getWhatsappMedia` y `getWhatsappChatContext`** (R44–R46, R50–R57, R63).
   - `domain/get-whatsapp-media.ts`, `domain/get-whatsapp-chat-context.ts`; `resolveChatCustomer`
     compartido con `get-whatsapp-chat.ts` (sin cambiar su comportamiento: los tests de T6 siguen
     verdes sin tocarlos).

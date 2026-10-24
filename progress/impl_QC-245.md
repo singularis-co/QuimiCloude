@@ -245,6 +245,25 @@ Salida (estado final, tras el ajuste de la ruta de medios):
 - guardias: 87 archivos, 1323 passed, 22 skipped
 - `whatsapp-conversations-flow.int.test.ts`: 9 passed
 
+## T15 — Casos de uso `getWhatsappMedia` y `getWhatsappChatContext` (R44–R46, R50–R57, R63)
+
+Archivos: `lib/modules/integraciones/ports/company-name-lookup.ts`, `domain/get-whatsapp-media.ts`
+(`createGetWhatsappMedia`, `WhatsappMediaResult`), `domain/get-whatsapp-chat-context.ts`
+(`createGetWhatsappChatContext`; reutiliza `resolveChatCustomer` sin cambiarlo) — nuevos;
+`tests/unit/integraciones/whatsapp/conversations/get-whatsapp-media.test.ts` (35 casos) y
+`get-whatsapp-chat-context.test.ts` (40 casos) — nuevos; `module-shape.test.ts` (lista de archivos).
+`get-whatsapp-chat.ts` y sus tests de T6, sin tocar.
+
+Decisiones del subagente donde el spec calla: las comprobaciones baratas del medio (dirección, tipo,
+`media_id`, cliente) van antes de `findAliveRefById` y ninguna descifra el token ni llama a Graph; un
+tipo no admitido suelta el stream con `cancel()`; `contentType` en minúsculas; el contexto por cliente
+no consulta la conexión (design §15.3: «sin mirar la conexión»); un `orderId` inválido falla antes de
+las lecturas por lote; los resultados del directorio se filtran además con `isOpenCustomerOrder`; los
+dobles de pedidos viven en el test del contexto.
+
+Salida: typecheck 0 · lint 0 errores (11 avisos de antes) · `vitest run tests/unit/integraciones`:
+104 archivos, 2293 passed, 1 skipped · guardias: 87 archivos, 1323 passed, 22 skipped.
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -319,5 +338,15 @@ Salida (estado final, tras el ajuste de la ruta de medios):
 | R60 | `whatsapp-chat-context.test.ts` > «R60: cada estado del sistema tiene exactamente una de las cuatro etiquetas», «R60: PENDIENTE va solo…», «R60: pedido.estado de un pedido %s es la etiqueta del mapa», «R60: ninguna otra pieza del módulo escribe una etiqueta…» |
 | R61 | `whatsapp-chat-context.test.ts` > «R61: da DD/MM/AAAA», «R61: cerca de medianoche usa el día UTC» |
 | R62 | `whatsapp-chat-context.test.ts` > «R62: una parte por línea…», «R62: «falta» en singular…», «R62: sin nombre de presentación…», «R62: sin líneas el detalle es nulo», «R62: no contiene saltos de línea ni tabuladores…» |
+
+| R44 (caso de uso) | `get-whatsapp-media.test.ts` > «R44: %s responde unauthorized sin validar ni tocar un puerto», «R44: %s responde invalid_input…», «R44: %s responde whatsapp_message_not_found sin descifrar el token ni llamar a Meta» (14 ramas), «R44: el mensaje se busca con la conexión y el ámbito del actor», «R44: un mensaje de otro contacto … sí se sirve» |
+| R45 (caso de uso) | `get-whatsapp-media.test.ts` > «R45: descarga de Meta con el token de la conexión y el tope de 5 MB…», «R45: %s se sirve» |
+| R46 (caso de uso) | `get-whatsapp-media.test.ts` > «R46: un token ilegible da unavailable sin llamar a Meta…», «R46: Meta con fallo %s da unavailable», «R46: un archivo de tipo %s da unavailable y se suelta su stream…», «R46: si soltar el stream falla, sigue siendo unavailable» |
+| R50 | `get-whatsapp-chat-context.test.ts` > «R50: %s responde unauthorized…», «R50: %s responde invalid_input…», «R50, R57: un contacto %s da whatsapp_contact_not_found sin leer pedidos», «R50, R57: un cliente %s da customer_not_found…», «R50: por cliente no mira la conexión…», «R50: por contacto toma el cliente vinculado al contacto» |
+| R51–R53 (caso de uso) | `get-whatsapp-chat-context.test.ts` > «R51, R52, R53: devuelve cada pedido abierto con sus líneas, envases como Pedidos y total nulo», «R51: un pedido sin progreso sale sin líneas…», «R51, R54: solo salen los abiertos del cliente…» |
+| R54 (caso de uso) | `get-whatsapp-chat-context.test.ts` > «R54: el directorio se pide con los estados no en curso excluidos, el límite de 20…», «R54: tres lecturas por lote…», «R54: sin pedidos abiertos no lee progreso…», «R54: sin orderId el elegido es el abierto más reciente», «R54: con orderId de un pedido abierto del cliente, ese es el elegido», «R54, R57: orderId %s da order_not_found sin leer el detalle» |
+| R55, R56 (caso de uso) | `get-whatsapp-chat-context.test.ts` > «R55, R56: trae las siete constantes del pedido elegido…», «R54, R56: sin pedidos abiertos el elegido es nulo y todas las pedido.* son nulas…», «R55, R56: un valor que no se resuelve sale nulo…» |
+| R57 | `get-whatsapp-chat-context.test.ts` > «R57: pedir el contexto no llama a ningún método que escriba ni mueve la marca de lectura»; adaptador: guardia de ámbito (única escritura, la marca) |
+| R63 | `get-whatsapp-chat-context.test.ts` > «R63: con whatsapp.consultar y ningún permiso de Pedidos recibe los pedidos y los valores pedido.*» |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.
