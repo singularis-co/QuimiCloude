@@ -157,4 +157,74 @@ describe('documentos — interpretacion tolerante del texto de catalogo', () => 
       expect(Object.keys(modulo)).toContain('extractCatalogFromText');
     });
   });
+
+  describe('QT-296 — tipo y subtipo de cada linea', () => {
+    function lineaCon(campos: string): string {
+      return `{"lines":[{"name":"Frasco 500","cost":"1.2000"${campos}}]}`;
+    }
+
+    it('R29 — lee type y packagingSubtype cuando son codigos validos', () => {
+      const [linea] = extractCatalogFromText(
+        lineaCon(',"type":"PACKAGING_MATERIAL","packagingSubtype":"CONTAINER"'),
+      ).lines;
+      expect(linea?.type).toBe('PACKAGING_MATERIAL');
+      expect(linea?.packagingSubtype).toBe('CONTAINER');
+    });
+
+    it('R29 — RAW_MATERIAL sin subtipo se lee tal cual', () => {
+      const [linea] = extractCatalogFromText(lineaCon(',"type":"RAW_MATERIAL","packagingSubtype":null')).lines;
+      expect(linea?.type).toBe('RAW_MATERIAL');
+      expect(linea?.packagingSubtype).toBeNull();
+    });
+
+    it.each([
+      ['ausentes', ''],
+      ['null', ',"type":null,"packagingSubtype":null'],
+      ['un numero', ',"type":3,"packagingSubtype":2'],
+      ['en minuscula o en espanol', ',"type":"packaging_material","packagingSubtype":"tapa"'],
+    ])('R29 — tipo y subtipo %s quedan en null y la linea sigue con sus otros datos', (_caso, campos) => {
+      const resultado = extractCatalogFromText(lineaCon(campos));
+      expect(resultado.lines).toHaveLength(1);
+      expect(resultado.lines[0]?.name).toBe('Frasco 500');
+      expect(resultado.lines[0]?.cost).toBe('1.2000');
+      expect(resultado.lines[0]?.type).toBeNull();
+      expect(resultado.lines[0]?.packagingSubtype).toBeNull();
+    });
+
+    it('R29 — un subtipo «tapa» en minuscula queda null aunque el tipo sea empaque', () => {
+      const [linea] = extractCatalogFromText(
+        lineaCon(',"type":"PACKAGING_MATERIAL","packagingSubtype":"tapa"'),
+      ).lines;
+      expect(linea?.type).toBe('PACKAGING_MATERIAL');
+      expect(linea?.packagingSubtype).toBeNull();
+    });
+
+    it('R29 — un tipo invalido en una linea no invalida las demas ni el documento', () => {
+      const texto =
+        '{"lines":[{"name":"A","type":"OTRO"},{"name":"B","type":"TOOL"}]}';
+      const resultado = extractCatalogFromText(texto);
+      expect(resultado.lines.map((linea) => [linea.name, linea.type])).toEqual([
+        ['A', null],
+        ['B', 'TOOL'],
+      ]);
+    });
+
+    it('R30 — RAW_MATERIAL + CAP deja el subtipo en null y conserva el tipo', () => {
+      const [linea] = extractCatalogFromText(lineaCon(',"type":"RAW_MATERIAL","packagingSubtype":"CAP"')).lines;
+      expect(linea?.type).toBe('RAW_MATERIAL');
+      expect(linea?.packagingSubtype).toBeNull();
+    });
+
+    it('R30 — null + CAP deja el subtipo en null sin deducir el tipo empaque', () => {
+      const [linea] = extractCatalogFromText(lineaCon(',"type":null,"packagingSubtype":"CAP"')).lines;
+      expect(linea?.type).toBeNull();
+      expect(linea?.packagingSubtype).toBeNull();
+    });
+
+    it('R30 — un subtipo sin clave type tampoco deduce el tipo', () => {
+      const [linea] = extractCatalogFromText(lineaCon(',"packagingSubtype":"MEASURER"')).lines;
+      expect(linea?.type).toBeNull();
+      expect(linea?.packagingSubtype).toBeNull();
+    });
+  });
 });

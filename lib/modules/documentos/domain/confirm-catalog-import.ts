@@ -38,6 +38,8 @@ function toClassifyRow(row: ReviewedLineInput): ClassifyRowInput {
     deliveryTime: row.deliveryTime,
     material: row.material,
     measurements: row.measurements,
+    type: row.type ?? null,
+    packagingSubtype: row.packagingSubtype ?? null,
   };
 }
 
@@ -210,6 +212,8 @@ export function createConfirmCatalogImport(
         deliveryTime: row.deliveryTime,
         material: row.material,
         measurements: row.measurements,
+        type: row.type ?? null,
+        packagingSubtype: row.packagingSubtype ?? null,
       };
     });
 

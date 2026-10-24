@@ -318,3 +318,78 @@ describe('createConfirmCatalogImport', () => {
     expect(lineas[0]?.imagePath).toBe(rutaImagen);
   });
 });
+
+describe('createConfirmCatalogImport — QT-296, tipo y subtipo', () => {
+  function depsConPresentacion(importLines: CatalogImportDeps['catalog']['importLines']): CatalogImportDeps {
+    return crearDeps({
+      presentations: dobleDePresentaciones([
+        { id: PRESENTACION_LITRO, name: 'Bidon 20L', nameNormalized: 'bidon20l', unitId: UNIDAD_LITRO },
+      ]),
+      catalog: { findAliveByIdentity: vi.fn(async () => []), importLines },
+    });
+  }
+
+  it('R33 — los fields que llegan a importLines llevan el tipo y el subtipo de cada fila', async () => {
+    const importLines = vi.fn<CatalogImportDeps['catalog']['importLines']>(async () => ({ created: 3, updated: 0, unchanged: 0 }));
+    const confirm = createConfirmCatalogImport(depsConPresentacion(importLines));
+
+    await confirm(
+      actorConPermiso(),
+      entradaBase([
+        filaRevisada({ name: 'Frasco 500', type: 'PACKAGING_MATERIAL', packagingSubtype: 'CONTAINER' }),
+        filaRevisada({ name: 'Glicerina', type: 'RAW_MATERIAL', packagingSubtype: null }),
+        filaRevisada({ name: 'Espatula' }),
+      ]),
+    );
+
+    const lineas = (importLines.mock.calls[0]?.[1] ?? []) as readonly Record<string, unknown>[];
+    expect(lineas.map((linea) => [linea.name, linea.type, linea.packagingSubtype])).toEqual([
+      ['Frasco 500', 'PACKAGING_MATERIAL', 'CONTAINER'],
+      ['Glicerina', 'RAW_MATERIAL', null],
+      ['Espatula', null, null],
+    ]);
+  });
+
+  it('R31 — una fila marcada para revisar (empaque sin subtipo) no rechaza la confirmacion', async () => {
+    const importLines = vi.fn<CatalogImportDeps['catalog']['importLines']>(async () => ({ created: 2, updated: 0, unchanged: 0 }));
+    const confirm = createConfirmCatalogImport(depsConPresentacion(importLines));
+
+    const resumen = await confirm(
+      actorConPermiso(),
+      entradaBase([
+        filaRevisada({ name: 'Frasco 500', type: 'PACKAGING_MATERIAL', packagingSubtype: null }),
+        filaRevisada({ name: 'Glicerina', type: null, packagingSubtype: null }),
+      ]),
+    );
+
+    expect(resumen).toEqual({ created: 2, updated: 0, unchanged: 0, presentationsCreated: 0 });
+    expect(importLines).toHaveBeenCalledTimes(1);
+  });
+
+  it('R32 — una fila confirmada con subtipo bajo TOOL rechaza la confirmacion entera sin escribir', async () => {
+    const deps = depsConPresentacion(
+      dobleQueFallaSiSeLlama('catalog.importLines') as CatalogImportDeps['catalog']['importLines'],
+    );
+    const confirm = createConfirmCatalogImport(deps);
+
+    const error = await confirm(
+      actorConPermiso(),
+      entradaBase([filaRevisada({ type: 'TOOL', packagingSubtype: 'CAP' })]),
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as ValidationError).diagnostic).toBe('fila 1: incompleta (packagingSubtype)');
+    expect(deps.catalog.importLines).not.toHaveBeenCalled();
+  });
+
+  it('R32 — un tipo ajeno en una fila de la confirmacion da ValidationError', async () => {
+    const deps = depsConPresentacion(
+      dobleQueFallaSiSeLlama('catalog.importLines') as CatalogImportDeps['catalog']['importLines'],
+    );
+    const confirm = createConfirmCatalogImport(deps);
+
+    await expect(
+      confirm(actorConPermiso(), entradaBase([filaRevisada({ type: 'Empaque' })])),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(deps.repository.readFileForReview).not.toHaveBeenCalled();
+  });
+});

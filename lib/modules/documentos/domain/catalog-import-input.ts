@@ -9,6 +9,8 @@
  */
 import { z } from 'zod';
 
+import { CATALOG_LINE_PACKAGING_SUBTYPES_VALUES, CATALOG_LINE_TYPE_VALUES } from '@/lib/modules/proveedores';
+
 /** Mismo tipo que `ExtractedMeasurement` (`catalog-extraction.ts`): valor y unidad como texto
  *  suelto, sin patron ni lista cerrada aqui, para las mismas razones que el resto de este archivo. */
 const measurementInputSchema = z
@@ -31,6 +33,11 @@ const measurementsInputSchema = z
  * IA y sirve para sugerir la unidad de una presentacion nueva la primera vez que se abre la
  * revision; una vez que el revisor edita la fila, la sugerencia ya se hizo y no hace falta
  * reenviarla.
+ *
+ * `type` y `packagingSubtype` son opcionales para que una pantalla que no los manda siga
+ * funcionando; ausentes valen `null`. A diferencia del resto, un valor fuera de la lista rechaza
+ * la peticion: es una entrada del navegador, que solo puede ofrecer los codigos validos. Que el
+ * subtipo case con el tipo lo decide la clasificacion, por fila.
  */
 export const reviewedLineInputSchema = z.strictObject({
   name: z.string(),
@@ -41,6 +48,8 @@ export const reviewedLineInputSchema = z.strictObject({
   material: z.string().nullable(),
   measurements: measurementsInputSchema,
   imagePath: z.string().nullable(),
+  type: z.enum(CATALOG_LINE_TYPE_VALUES).nullable().optional(),
+  packagingSubtype: z.enum(CATALOG_LINE_PACKAGING_SUBTYPES_VALUES).nullable().optional(),
 });
 
 export type ReviewedLineInput = z.infer<typeof reviewedLineInputSchema>;

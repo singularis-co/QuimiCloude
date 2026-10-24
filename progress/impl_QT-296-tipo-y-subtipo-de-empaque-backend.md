@@ -533,3 +533,93 @@ segunda:
 **Veredicto T6:** R26–R28 y R33–R35 (lado `proveedores`) en verde. `scope.test.ts`,
 `catalog-service.test.ts`, typecheck, lint, guardias y `vitest related` también en verde. Hay dos
 divergencias de forma, anotadas arriba.
+
+## T5 — Columna «Subtipo» en el Excel: BLOQUEADA (2026-10-23)
+
+Sin cambios en el árbol. Añadir `subtype` a `INVENTORY_IMPORT_COLUMNS` (design §4.5) amplía
+`ImportColumnKey`, y `app/(private)/inventario/importar/components/import-texts.ts:370`
+(`GUIDE_COLUMN_DESCRIPTION_TEXTS: Readonly<Record<ImportColumnKey, string>>`) exige una entrada
+por clave: el typecheck no pasa sin escribir ahí un texto de UI que el spec no da (es de QT-297).
+`tasks.md > T5` manda parar si hace falta tocar UI. Opciones para el leader / humano:
+1. permitir la línea `subtype: '<texto>'` en `import-texts.ts`, con el texto dado por el humano o QT-297;
+2. que QT-297 añada la entrada antes y T5 espere;
+3. enmendar el spec para no ampliar `ImportColumnKey` (no recomendado).
+Notas para retomarla: los defaults de `productRef` del kit de tests necesitan `packagingSubtype`
+(`CONTAINER` en empaques) o los tests R14/QC-284 dan `subtype_mismatch`; el borrador de fila de
+tapa/medidor no debe llevar `presentationId`.
+
+## T7 — Lectura del PDF: interpretación, clasificación, vista previa y confirmación (2026-10-23)
+
+### Archivos
+Producción (`lib/modules/documentos/domain/`, solo el barrel de `proveedores`):
+- `catalog-extraction.ts`:
+  - `extractedLineSchema` gana `type` y `packagingSubtype` (`z.enum(...).nullable().catch(null)`);
+  - `ExtractedLine` gana los dos campos;
+  - `trimLine` deja el subtipo en `null` si el tipo no es `PACKAGING_MATERIAL`.
+- `catalog-import-input.ts`: `reviewedLineInputSchema` gana `type` y `packagingSubtype`
+  (`z.enum(...).nullable().optional()`).
+- `classify-catalog-import.ts`:
+  - `ClassifyRowInput` y `AliveCatalogLine` ganan los dos campos;
+  - `FIELD_VALIDATORS` gana `packagingSubtype`;
+  - «cambia» = costo distinto **o** `resolveImportedClassification(viva, fila)` distinto de lo guardado.
+- `preview-catalog-import.ts`:
+  - `CatalogImportPreviewRow` gana `type`, `packagingSubtype` y `needsTypeReview`;
+  - `fromExtractedLine`, `fromReviewedLine` y `toClassifyRow` pasan los dos campos, igual que el mapeo de las líneas vivas.
+- `confirm-catalog-import.ts`: `toClassifyRow` y los `fields` de `importLines` pasan `type ?? null`
+  y `packagingSubtype ?? null`.
+
+Tests:
+- `tests/unit/documentos/catalog-extraction.test.ts`: bloque nuevo «QT-296 — tipo y subtipo de cada linea».
+- `tests/unit/documentos/preview-catalog-import.test.ts`: bloque nuevo «QT-296 — tipo, subtipo y marca de revision por fila».
+- `tests/unit/documentos/classify-catalog-import.test.ts`:
+  - bloque nuevo «classifyCatalogImportRows — QT-296, tipo y subtipo»;
+  - el helper `fila` y las dos líneas vivas de los casos R9 ganan `type: null, packagingSubtype: null`, sin tocar ninguna aserción.
+- `tests/unit/documentos/confirm-catalog-import.test.ts`: bloque nuevo «createConfirmCatalogImport — QT-296, tipo y subtipo».
+- **Arreglo de compilación fuera de `documentos`:** `tests/unit/proveedores-ui/catalog-import-review.test.tsx`.
+  - Su fixture `fila()` gana `type: null, packagingSubtype: null, needsTypeReview: true`, porque `CatalogImportPreviewRow` gana campos obligatorios.
+  - No se toca ninguna aserción. Es el mismo precedente que en T6.
+
+Lo que no se tocó:
+- `ai-reader-canned.ts` (es de T8) y la UI. `catalog-import-review.tsx` arma `ReviewedLineInput` campo a campo y no reenvía la fila de la vista previa. Compila sin cambios y no manda los campos nuevos, que valen `null` (R32).
+- `tests/integration/aislamiento.json`: T7 no añade ningún `.int`.
+- `lib/modules/inventario/**`: es de T5.
+
+### Divergencias
+1. **`createCatalogLineSchema.shape.*` se mantiene en `classify-catalog-import.ts`.** T6 dejó como opción pasar a `catalogLineFieldsShape`. El diseño §6.3 no lo pide y con zod 4 `.shape` sigue igual tras `superRefine`. Lo dejé así para no ampliar el alcance.
+2. **`ReviewedLineInput.type` y `.packagingSubtype` son opcionales en el tipo inferido.** No se usa `.transform(v => v ?? null)` en el borde: eso volvería obligatorios los campos en el tipo y rompería la compilación de `catalog-import-review.tsx`, que es UI de QT-297. El `?? null` se aplica en `fromReviewedLine` y en `confirm-catalog-import.ts`, y el efecto es el del diseño: si faltan, valen `null`.
+3. **Subtipo sin tipo en una fila revisada.** Esa fila también sale «incompleta» por `packagingSubtype`. Es la regla de §6.3: es inválido si no es `null` y el tipo no es empaque. Hay un test.
+
+### Mapa R → test (lado `documentos`)
+| R | Test |
+|---|---|
+| R29 | `catalog-extraction.test.ts` › «R29 — lee type y packagingSubtype cuando son codigos validos», «R29 — RAW_MATERIAL sin subtipo se lee tal cual», «R29 — tipo y subtipo {ausentes, null, un numero, en minuscula o en espanol} quedan en null y la linea sigue…», «R29 — un subtipo «tapa» en minuscula queda null aunque el tipo sea empaque», «R29 — un tipo invalido en una linea no invalida las demas ni el documento» |
+| R30 | `catalog-extraction.test.ts` › «R30 — RAW_MATERIAL + CAP deja el subtipo en null y conserva el tipo», «R30 — null + CAP deja el subtipo en null sin deducir el tipo empaque», «R30 — un subtipo sin clave type tampoco deduce el tipo» |
+| R31 | `preview-catalog-import.test.ts` › «R31 — {sin tipo, empaque sin subtipo, materia prima, empaque con subtipo envase}: needsTypeReview = …», «R31 — la marca sale tambien de las filas leidas de la IA», «R31 — la marca no cambia kind: …«sin cambios»»; `confirm-catalog-import.test.ts` › «R31 — una fila marcada para revisar (empaque sin subtipo) no rechaza la confirmacion» |
+| R32 | `preview-catalog-import.test.ts` › «R32 — las filas revisadas sin type ni packagingSubtype se aceptan…», «R32 — {un tipo ajeno, un subtipo ajeno} en una fila revisada rechaza la peticion con ValidationError», «R32 — una fila revisada con subtipo y tipo TOOL sale «incompleta»…»; `classify-catalog-import.test.ts` › «R32 — un subtipo con tipo TOOL sale «incompleta» con packagingSubtype en invalidFields», «R32 — un subtipo sin tipo tambien…», «R32 — empaque con subtipo, o un tipo sin subtipo, no invalida la fila»; `confirm-catalog-import.test.ts` › «R32 — una fila confirmada con subtipo bajo TOOL rechaza la confirmacion entera sin escribir», «R32 — un tipo ajeno en una fila de la confirmacion da ValidationError» |
+| R33 | `confirm-catalog-import.test.ts` › «R33 — los fields que llegan a importLines llevan el tipo y el subtipo de cada fila» |
+| R35 | `classify-catalog-import.test.ts` › «R35 — con el mismo costo y un tipo nuevo sale «cambia»», «R35 — con el mismo costo y solo un subtipo nuevo sale «cambia»», «R35 — un tipo null frente a uno guardado sale «sin cambios»…», «R35 — empaque sin subtipo frente a una tapa guardada sale «sin cambios»», «R35 — el mismo tipo y subtipo con el mismo costo sale «sin cambios»» |
+
+### Verificación
+`pnpm run typecheck`: `tsc --noEmit`, exit 0.
+`pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 de antes.
+- Una primera pasada dio 12: dos `_args` nuevos en mocks de `confirm-catalog-import.test.ts`.
+- Se corrigieron tipando el mock con `vi.fn<CatalogImportDeps['catalog']['importLines']>`.
+
+`pnpm exec vitest run guard`:
+```
+ Test Files  87 passed (87)
+      Tests  1276 passed | 22 skipped (1298)
+```
+`pnpm exec vitest related --run`, con los 5 de producción, los 4 tests de `documentos` y `catalog-import-review.test.tsx`. Una sola corrida, sin `Hook timed out`:
+```
+ Test Files  471 passed (471)
+      Tests  8021 passed | 3 skipped (8024)
+   Duration  943.22s
+```
+`catalog-import-authorization.test.ts` y `catalog-import-actions.test.ts`, solos:
+```
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+```
+
+**Veredicto T7:** R29–R33 y R35 (lado `documentos`) en verde. Typecheck, lint, guardias y `vitest related` también en verde, sin dependencias nuevas.

@@ -25,8 +25,13 @@ import { ValidationError } from './errors';
 import type { CropCatalog } from '../ports/crop-catalog';
 import type { DocumentBatchRepository } from '../ports/document-batch-repository';
 
-import { normalizeSupplierName } from '@/lib/modules/proveedores';
-import type { createFindCatalogLinesByIdentity, createImportCatalogLines } from '@/lib/modules/proveedores';
+import { CATALOG_LINE_TYPES, normalizeSupplierName } from '@/lib/modules/proveedores';
+import type {
+  CatalogLinePackagingSubtype,
+  CatalogLineType,
+  createFindCatalogLinesByIdentity,
+  createImportCatalogLines,
+} from '@/lib/modules/proveedores';
 import { normalizePresentationName } from '@/lib/modules/inventario';
 import type { createCreatePresentation, PresentationCatalog } from '@/lib/modules/inventario';
 import type { UnitCatalog } from '@/lib/modules/unidades';
@@ -79,6 +84,10 @@ export type CatalogImportPreviewRow = {
   readonly measurements: unknown;
   readonly imagePath: string | null;
   readonly imageUrl: string | null;
+  readonly type: CatalogLineType | null;
+  readonly packagingSubtype: CatalogLinePackagingSubtype | null;
+  /** Aviso para el revisor: sin tipo, o empaque sin subtipo. No cambia `kind` ni impide confirmar. */
+  readonly needsTypeReview: boolean;
 };
 
 export type CatalogImportPreview = {
@@ -102,6 +111,8 @@ type PreviewRow = {
   readonly page: number | null;
   /** Solo tiene sentido para filas revisadas: la imagen que trae la fila, sin validar todavia. */
   readonly requestedImagePath: string | null;
+  readonly type: CatalogLineType | null;
+  readonly packagingSubtype: CatalogLinePackagingSubtype | null;
 };
 
 function fromExtractedLine(line: ExtractedLine): PreviewRow {
@@ -116,6 +127,8 @@ function fromExtractedLine(line: ExtractedLine): PreviewRow {
     measurements: line.measurements,
     page: line.page,
     requestedImagePath: null,
+    type: line.type,
+    packagingSubtype: line.packagingSubtype,
   };
 }
 
@@ -131,6 +144,8 @@ function fromReviewedLine(line: ReviewedLineInput): PreviewRow {
     measurements: line.measurements,
     page: null,
     requestedImagePath: line.imagePath,
+    type: line.type ?? null,
+    packagingSubtype: line.packagingSubtype ?? null,
   };
 }
 
@@ -143,7 +158,14 @@ function toClassifyRow(row: PreviewRow): ClassifyRowInput {
     deliveryTime: row.deliveryTime,
     material: row.material,
     measurements: row.measurements,
+    type: row.type,
+    packagingSubtype: row.packagingSubtype,
   };
+}
+
+function needsTypeReview(row: PreviewRow): boolean {
+  if (row.type === null) return true;
+  return row.type === CATALOG_LINE_TYPES.PACKAGING_MATERIAL && row.packagingSubtype === null;
 }
 
 /** Los nombres de presentacion normalizados y sin repetir de todas las filas, para una sola
@@ -232,6 +254,9 @@ function toPreviewRow(
     measurements: row.measurements,
     imagePath,
     imageUrl,
+    type: row.type,
+    packagingSubtype: row.packagingSubtype,
+    needsTypeReview: needsTypeReview(row),
   };
 }
 
@@ -276,6 +301,8 @@ export function createPreviewCatalogImport(
       nameNormalized: line.nameNormalized,
       presentationId: line.presentationId,
       cost: line.cost,
+      type: line.type,
+      packagingSubtype: line.packagingSubtype,
     }));
 
     const classified = classifyCatalogImportRows(rows.map(toClassifyRow), presentationMatches, aliveLines);

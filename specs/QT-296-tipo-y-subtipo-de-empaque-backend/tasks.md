@@ -185,7 +185,7 @@ verde.
 **Hecho cuando:** R26–R28 y R33–R35 (lado `proveedores`) en verde, `proveedores/scope.test.ts`
 en verde (sin importar `inventario`) y `catalog-service.test.ts` en verde.
 
-## [ ] T7 — Lectura del PDF: interpretación, clasificación, vista previa y confirmación `[depende de T6]`
+## [x] T7 — Lectura del PDF: interpretación, clasificación, vista previa y confirmación `[depende de T6]`
 
 - `catalog-extraction.ts`, `catalog-import-input.ts`, `classify-catalog-import.ts`,
   `preview-catalog-import.ts` y `confirm-catalog-import.ts` (`design.md > 6.2–6.5`).
