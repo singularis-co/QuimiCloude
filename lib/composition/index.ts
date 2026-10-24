@@ -2915,6 +2915,10 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.sendMessage(input)
       : whatsappGraphClientFetch.sendMessage(input),
+  downloadMedia: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.downloadMedia(input)
+      : whatsappGraphClientFetch.downloadMedia(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {

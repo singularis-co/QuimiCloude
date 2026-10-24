@@ -132,7 +132,7 @@
     ningún entregado ni cancelado; orden `created_at` DESC, `id` DESC; respeta `limit`; un cliente de
     otra empresa da `[]`. `OrderCatalog` sin cambios.
 
-- [ ] **T12 [P] Graph: `downloadMedia`** (R45–R47; design §15.1).
+- [x] **T12 [P] Graph: `downloadMedia`** (R45–R47; design §15.1).
   - `ports/whatsapp-graph-client.ts` (+ `GraphMediaDownload`), `whatsapp-graph-client-fetch.ts`
     (dos pasos, host `.fbsbx.com`, tope por `file_size`, `Content-Length` y stream),
     `whatsapp-graph-client-canned.ts` (PNG fijo).

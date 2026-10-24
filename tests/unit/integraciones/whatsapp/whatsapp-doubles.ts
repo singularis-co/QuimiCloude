@@ -161,8 +161,21 @@ export function makeGraph(result: GraphProbeResult = GOOD_PROBE) {
   }))
   const deleteTemplate = vi.fn<WhatsappGraphClient['deleteTemplate']>(async () => ({ ok: true }))
   const sendMessage = vi.fn<WhatsappGraphClient['sendMessage']>(async () => ({ ok: true, wamid: SENT_WAMID }))
-  const graph: WhatsappGraphClient = { fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate, sendMessage }
-  return { graph, fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate, sendMessage }
+  const downloadMedia = vi.fn<WhatsappGraphClient['downloadMedia']>(async () => ({
+    ok: true,
+    contentType: 'image/png',
+    contentLength: 3,
+    body: new Blob([new Uint8Array([1, 2, 3])]).stream(),
+  }))
+  const graph: WhatsappGraphClient = {
+    fetchPhoneNumber,
+    createTemplate,
+    listTemplatesPage,
+    deleteTemplate,
+    sendMessage,
+    downloadMedia,
+  }
+  return { graph, fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate, sendMessage, downloadMedia }
 }
 
 /** Repositorio en memoria que respeta el ambito: una fila de otra empresa o borrada no se ve. */

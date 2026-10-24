@@ -129,6 +129,50 @@ Salida:
   doble, `conversations/`: 6 archivos, 151 passed)
 - guardias: 87 archivos, 1320 passed, 22 skipped
 
+## T7 — Composición, contrato y Server Actions (R34, R40, R41)
+
+Archivos:
+- `lib/composition/index.ts` (solo el bloque de WhatsApp de `integraciones`, sin reordenar)
+- `lib/modules/integraciones/index.ts` (cuatro fábricas + tipos DTO del §B)
+- `lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions.ts` (nuevo, las cuatro acciones del §A)
+- `tests/unit/integraciones/whatsapp/conversations/whatsapp-conversation-actions.test.ts` (nuevo, 18 casos)
+- tensados: `tests/unit/integraciones/module-shape.test.ts` (también recoge los archivos de T4–T6),
+  `tests/unit/identity/session-once-per-request-actions.test.ts` (registra la acción),
+  `tests/unit/integraciones/encryption-keys-env.test.ts` (lista cerrada de miembros de `integraciones`)
+
+Pregunta abierta para el leader (no bloquea): `ChatTarget` aparece en línea en el §A y no en el §B,
+así que el barril no lo exporta. Exportarlo sería ampliar el contrato.
+
+Salida:
+- typecheck: 1 error ajeno a T7 (el `downloadMedia` de T12 aún sin cablear; el árbol commiteado de T7 no lo tiene)
+- lint 0 errores · tests de la tarea: 4 archivos, 264 passed, 1 skipped
+- `vitest run tests/unit/integraciones`: 100 archivos, 2137 passed, 1 skipped
+- guardias: 87 archivos, 1320 passed, 22 skipped
+
+## T8 — Flujo de integración (R5, R6, R14, R16, R34–R39, R43)
+
+Archivos: `tests/integration/integraciones/whatsapp-conversations-flow.int.test.ts` (nuevo, composición
+real, doble de Graph por `INTEGRATIONS_E2E_DOUBLES=1` + espía, entrantes por el webhook firmado) y
+`tests/integration/aislamiento.json` (entrada `commit`, `motivo`, `desde: 2026-10-23`).
+
+Salida: 1 archivo, 9 passed, sobre su base efímera.
+
+## T12 — Graph `downloadMedia` (R45–R47)
+
+Archivos: `ports/whatsapp-graph-client.ts` (+ `GraphMediaDownload`, `downloadMedia`),
+`adapters/driven/graph/whatsapp-graph-client-fetch.ts` (dos pasos, `https:` y host `.fbsbx.com`, tope
+por `file_size`, `Content-Length` y stream, sin logs, redirecciones no seguidas),
+`whatsapp-graph-client-canned.ts` (PNG 1×1), `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`,
+`whatsapp-graph-client-media.test.ts` (nuevo), `whatsapp-graph-client-canned.test.ts` (ampliado);
+cableado en `lib/composition/index.ts` (ver commit de T12).
+
+Decisiones del subagente: un 5xx de la descarga del binario es `unreachable` (como pide el «Hecho» de
+T12; el paso 2 del diseño decía `rejected`) — el caso de uso mapea ambos a `unavailable`, así que la
+respuesta 502 es la misma. Las redirecciones no se siguen (`redirect: 'manual'` ⇒ `rejected`) para que
+el token no viaje a otro host.
+
+Salida: lint 0 errores · 4 archivos de cliente Graph, 71 passed · guardias 87 archivos, 1320 passed.
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -175,5 +219,18 @@ Salida:
 | R31 (caso de uso) | `get-whatsapp-chat.test.ts` > «R31: el tamaño de página se acota a 50» |
 | R32 | `list-sendable-whatsapp-templates.test.ts` > «R32: sin conexión viva devuelve una lista vacía…», «R32: solo las enviables de la conexión…» |
 | R33 | `list-sendable-whatsapp-templates.test.ts` > «R33: cada plantilla trae id, nombre, idioma, categoría, contenido y variables…» |
+
+| R5 | `whatsapp-conversations-flow.int.test.ts` > «R5: whatsapp.enviar sin whatsapp.consultar envia pero no consulta», «R5: whatsapp.consultar sin whatsapp.enviar consulta pero no envia» |
+| R6, R14, R39, R43 (flujo) | `whatsapp-conversations-flow.int.test.ts` > «R6, R14, R39, R43: el listado trae solo la conversacion con cliente vivo y mensajes, con sus no leidos», «R39: un contacto, un cliente o un mensaje de otra empresa se tratan como inexistentes» |
+| R14, R16 (flujo) | `whatsapp-conversations-flow.int.test.ts` > «R14, R16, R43: marcar leido sin mensaje deja los no leidos en 0…» |
+| R34 | `module-shape.test.ts` > «R34, R40: whatsapp-conversation-actions.ts exporta exactamente las cuatro consultas y ninguna accion de envio»; `whatsapp-conversations-flow.int.test.ts` > «R34, R43: el envio de texto de siempre llega al chat como saliente del usuario» |
+| R35 | `whatsapp-conversations-flow.int.test.ts` > «R35: una plantilla no enviable y una constante faltante se rechazan sin escribir nada y sin llamar a Meta» |
+| R36–R38 | `whatsapp-conversations-flow.int.test.ts` > «R36, R37, R38: la baja oculta la conversacion y bloquea el envio…» |
+| R40 | `whatsapp-conversation-actions.test.ts` > casos R40 (exactamente cuatro, success, actor null, ErrorState por código, `unexpected`, copia campo a campo, el borde no decide) |
+| R41 | `whatsapp-conversation-actions.test.ts` > «R41: la accion no lee el diagnostico ni escribe en la consola», «R41: una consulta correcta no escribe nada en el log», «R41: con el cuerpo, el numero y el nombre … ningun log los lleva» |
+| R43 | `whatsapp-conversations-flow.int.test.ts` > «R43: el chat se pagina hacia atras con el cursor…» y los casos R43 de arriba; unitarios de T6 |
+| R45 | `whatsapp-graph-client-media.test.ts` > «R45: primero pide los datos del medio a Graph y luego descarga el binario…», «R45: el id del medio va codificado…», «R45: el tipo es la cabecera sin parametros…», «R45: sin `Content-Length`…»; `whatsapp-graph-client-canned.test.ts` > «R45: devuelve siempre el mismo PNG de 1x1…» |
+| R46 (Graph) | `whatsapp-graph-client-media.test.ts` > casos R46 (sin red, 5xx, 4xx, datos inválidos, `file_size`, `Content-Length`, stream cortado, tope exacto); canned > «R46: un tope menor que el PNG es un rechazo» |
+| R47 (Graph) | `whatsapp-graph-client-media.test.ts` > «R47: el token va solo en `Authorization: Bearer`…», «R47: una redireccion no se sigue…», «R47: una URL de %s es un rechazo…», «R47: nada de la URL de Meta ni del token acaba en la consola», «R47: el resultado no lleva la URL de Meta ni el token» |
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.
