@@ -68,29 +68,29 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 
 ## Bloque 2 — Componentes del chat (dep. T1, T3–T6)
 
-- [ ] **T8** `[P]` — `chat-message.tsx`, `chat-message-status.tsx`, `chat-location-card.tsx`,
+- [x] **T8** `[P]` — `chat-message.tsx`, `chat-message-status.tsx`, `chat-location-card.tsx`,
   `chat-media-image.tsx`, `chat-image-viewer.tsx`.
   *Hecho:* tests de componente de R18, R19, R20, R21 (con `src`: abre y cierra con botón y Escape;
   sin `src`: «[Imagen]» y no abre; `error` en el `<img>`: «Imagen no disponible» en la miniatura y en
   el visor), R22 (sticker de 128 px; sin `src`: «[Sticker]»; `error`: «Imagen no disponible»), R23
   (enlace en pestaña nueva con las coordenadas), R24 (nombre accesible de la reacción), R41 (botón
   solo en `retryable` con `canSend`).
-- [ ] **T9** `[P]` — `chat-message-list.tsx` y `use-end-sentinel.ts`.
+- [x] **T9** `[P]` — `chat-message-list.tsx` y `use-end-sentinel.ts`.
   *Hecho:* tests de R17 (separadores), R25 (pide con `nextCursor` al ver el centinela, «Cargando
   mensajes anteriores…»), R26 (al final al abrir; desplaza solo si estaba al final).
-- [ ] **T10** `[P]` — `chat-header.tsx`, `chat-window-badge.tsx`, `chat-order-detail.tsx`.
+- [x] **T10** `[P]` — `chat-header.tsx`, `chat-window-badge.tsx`, `chat-order-detail.tsx`.
   *Hecho:* tests de R15, R16 (pasa a cerrada al llegar `closesAt` con reloj falso), R38 (selector solo
   con más de un pedido abierto, por número, con `selectedOrderId` elegido), R39 (flecha con
   `aria-expanded`/`aria-controls`; número, estado, producto, filas por línea; total oculto si es
   `null` y visible con valor; ninguna fecha de entrega), R6 (botón «Volver a conversaciones»), R54
   (error al cambiar de pedido junto al selector).
-- [ ] **T11** — `chat-composer.tsx`, `chat-template-chips.tsx`, `send-template-dialog.tsx` (dep. T4,
+- [x] **T11** — `chat-composer.tsx`, `chat-template-chips.tsx`, `send-template-dialog.tsx` (dep. T4,
   T8).
   *Hecho:* tests de R29 (Enter, Shift+Enter, vacío, 4096), R30, R31 (sin campos de variables; pedido
   solo con más de uno abierto), R32, R33 (rellenar, `aria-pressed`, quitar), R34 (solo lectura), R36
   (envío deshabilitado con `[falta pedido.total]`), R37 (`recipient` por cliente, `constants` de
   `values`, recarga), R40, R47 (sin `whatsapp.enviar` no hay caja ni plantillas).
-- [ ] **T12** — `chat-panel.tsx` (dep. T8–T11).
+- [x] **T12** — `chat-panel.tsx` (dep. T8–T11).
   *Hecho:* tests de R27 (marca leído al abrir con el último id), R33 (vacío del chat), R4 (error del
   chat y del contexto con «Reintentar»), R49 (ningún botón ni enlace con nombre que contenga
   «Vincular», «Desvincular» o «Bloquear», con contacto vinculado, bloqueado y sin contacto).

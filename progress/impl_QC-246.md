@@ -85,3 +85,136 @@ hizo falta corregir nada.
 - `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
 
 Veredicto: T3–T7 hechas con su «Hecho»; typecheck, lint y tests relacionados en verde.
+
+## Tanda 3 — Bloque 2 (T8–T12, frontend_dev, un encargo por task)
+
+### T8 — burbujas del chat
+
+#### Archivos
+- Creados (`app/(private)/clientes/contactos/components/`): `chat-message.tsx`, `chat-message-status.tsx`,
+  `chat-location-card.tsx`, `chat-media-image.tsx`, `chat-image-viewer.tsx`. Paso 4 de la regla de
+  decisión, sin fila en el catálogo; reutilizan `Dialog`, `Button` (`touch`) y el patrón de `EntityImage`.
+- Modificado: `contact-texts.ts` (`CHAT_MESSAGE_TEXT`, `CHAT_DELIVERY_LABELS`, `CHAT_IMAGE_TEXT`,
+  `CHAT_LOCATION_TEXT`, testids `chat-message` y `chat-image-viewer`).
+- Test nuevo: `tests/unit/contactos-ui/chat-message.test.tsx` (31 casos). `index.ts` sin tocar (T15).
+
+#### Mapa R<n> → test (`chat-message.test.tsx`)
+| R | Casos |
+|---|---|
+| R18 | «nombre de quien lo envió», «Sistema», «un entrante no muestra autor» |
+| R19 | 4 × «… icono y nombre accesible» (Enviando/Enviado/Entregado/Leído), «fallido en tono de error con No se pudo enviar», «hora HH:mm» |
+| R20 | «texto», 3 × «[Audio]/[Video]/[Documento] con caption», «Mensaje no soportado» |
+| R21 | «abre el visor con cliente y hora», «Cerrar imagen cierra», «Escape cierra», «sin src [Imagen] y no abre», «alt sin caption», «no carga: Imagen no disponible en miniatura y visor», «falla dentro del visor» |
+| R22 | «128 px sin burbuja con hora debajo», «[Sticker] del mismo tamaño», «Imagen no disponible del mismo tamaño» |
+| R23 | «pestaña nueva con coordenadas y rel», «sin lugar ni dirección» |
+| R24 | «nombre accesible Reacción del cliente», «sin reacción» |
+| R41 | «retryable + canSend llama al callback con su id», «sin canSend no hay botón», «no reintentable no hay botón» |
+
+#### Decisiones y huecos del spec
+- Enlace del mapa: default de P5 (`https://www.google.com/maps/search/?api=1&query=<lat>,<lng>`), recuadro con icono, sin imagen de mapa.
+- Fallido sin `errorReason`: «No se pudo enviar» sin «: <motivo>» (el spec no lo dice).
+- Saliente de usuario con `name: null`: no se pinta autor (el spec no lo dice).
+- Visor: la hora es `HH:mm` (R21 dice «la hora»; el tablero pinta «Hoy 10:40», el día no se añade).
+- «Ubicación» (cabecera de la tarjeta) y «Abrir imagen» (nombre del botón de la miniatura) salen del tablero, no de requirements.
+- El enlace de ubicación no lleva el `aria-label` del tablero («Abrir ubicación en el mapa»): su nombre accesible contiene el texto visible «Abrir en el mapa».
+- El fallo de carga de imagen se guarda por mensaje y `src`, compartido entre miniatura y visor; con la miniatura fallida el visor sigue abriendo y muestra «Imagen no disponible».
+
+#### Salida real (T8 sola)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la tanda.
+- `pnpm exec vitest related --run <6 archivos de la ruta + test>`: `Test Files 7 passed (7)` · `Tests 95 passed (95)`.
+- `pnpm exec vitest run tests/unit/contactos-ui/chat-message.test.tsx`: `Tests 31 passed (31)`.
+
+### T9 — historial y centinela
+- Nuevos: `chat-message-list.tsx` (`ChatMessageList`, `CHAT_BOTTOM_THRESHOLD_PX = 48`), `use-end-sentinel.ts`
+  (`useEndSentinel({ onVisible, enabled, rootMargin })` → callback ref; sin `IntersectionObserver` no hace nada).
+  `contact-texts.ts`: `CHAT_HISTORY_TEXT.loadingOlder` y testids. Test: `tests/unit/contactos-ui/chat-message-list.test.tsx` (17).
+
+| R | Casos (`chat-message-list.test.tsx`) |
+|---|---|
+| R17 | orden antiguo → reciente con separadores «dd/MM/yyyy», «Ayer», «Hoy»; entrantes a la izquierda, salientes a la derecha |
+| R25 | con `nextCursor` pide al verse el centinela; sin verse no pide; sin cursor no hay centinela; «Cargando mensajes anteriores…» sin repetir la petición; conserva la posición al anteponer; pide `cur-2` con el cursor nuevo |
+| R26 | al abrir queda al final; mensaje nuevo estando al final desplaza; a 40 px cuenta como al final; leyendo arriba no desplaza |
+| R13, R25 | hook: avisa al verse, deshabilitado no observa, se desconecta, sin `IntersectionObserver` no falla |
+
+Decisiones: la distancia al fondo se guarda en cada scroll/render y se restaura en `useLayoutEffect` al cambiar el primer
+id; el scroll al final solo al montar (el panel se monta con `key` por cliente). El historial no lleva `role="log"`: el spec
+no da texto para su nombre accesible.
+
+### T10 — cabecera, ventana y detalle del pedido
+- Nuevos: `chat-window-badge.tsx`, `chat-header.tsx`, `chat-order-detail.tsx`. `contact-texts.ts`: `CHAT_HEADER_TEXT`,
+  `CHAT_ORDER_DETAIL_TEXT` y testids. Test: `tests/unit/contactos-ui/chat-header.test.tsx` (20). Reutiliza
+  `SharedSelectControl`, `Collapsible`, `Button` (`touch`), `ErrorAlert`, `StatusBadge`, `Avatar`; sin filas nuevas de catálogo.
+
+| R | Casos (`chat-header.test.tsx`) |
+|---|---|
+| R15 | nombre y teléfono; «… 21 h 18 min»; «… 42 min»; «Ventana cerrada» |
+| R16 | con reloj falso recalcula cada minuto y pasa sola a «Ventana cerrada» al llegar `closesAt` |
+| R38 | sin pedidos ni selector ni flecha; con uno flecha sin selector; con dos, opciones por número y `selectedOrderId`; elegir llama `onSelectOrder`; deshabilitado y `aria-busy` mientras carga |
+| R39 | flecha con `aria-expanded`/`aria-controls`; número, estado, producto, filas por línea; detalle del pedido elegido; total `null` oculto y con valor visible; ninguna fecha de entrega |
+| R6 | «Volver a conversaciones» llama `onBack` |
+| R54 | el `message` del error junto al selector (`role="alert"`, `aria-describedby`); el pedido anterior se conserva |
+
+Decisiones: `aria-controls` solo con el detalle abierto (Base UI quita el panel cerrado del DOM); el producto va una vez por
+pedido (`ChatOrderLineView` no trae producto por línea); estado del pedido en tono `info` (la vista no trae el código); el
+tablero pinta fecha de entrega y no se pinta (R39).
+
+### T11 — caja, burbujas de plantillas y diálogo
+- Nuevos: `chat-composer.tsx` (`CHAT_TEXT_MAX_LENGTH = 4096`; llama `sendWhatsappMessageAction` de
+  `@/lib/modules/integraciones/adapters/driving/whatsapp-message-actions`), `chat-template-chips.tsx`,
+  `send-template-dialog.tsx`. `contact-texts.ts`: `CHAT_COMPOSER_TEXT`, `CHAT_TEMPLATE_CHIPS_TEXT`,
+  `SEND_TEMPLATE_DIALOG_TEXT` y testids. Tests: `tests/unit/contactos-ui/chat-composer.test.tsx` y
+  `tests/unit/contactos-ui/send-template-dialog.test.tsx` (31).
+
+| R | Casos (`chat-composer.test.tsx`, `send-template-dialog.test.tsx`) |
+|---|---|
+| R29 | Enter envía; Shift+Enter salto sin enviar; IME no envía; vacío/espacios deshabilitado; 4097 deshabilitado con `aria-invalid`, 4096 sí |
+| R30 | caja deshabilitada, aviso literal y «Enviar plantilla» |
+| R31 | abre el diálogo; solo enviables; vista previa resuelta sin campos de variables; «Pedido» solo con más de uno y llama `onSelectOrder` |
+| R32 | provisional `pending:<n>` «Enviando», caja vacía, reemplazo con `onSent` |
+| R33 | una burbuja por plantilla con `flex-wrap`; elegir rellena con `aria-pressed=true`; pulsar otra vez quita |
+| R34 | caja `readOnly`; vista previa no editable y sigue los `values` del pedido nuevo |
+| R36 | `[falta pedido.total]` deshabilita el envío con «Falta el valor de Total del pedido»; `missing_values` muestra su `message` |
+| R37 | por `customerId`: `constants` de `values` sin las propias, `constantLabels`, recarga; con `contactId` no recarga |
+| R40 | error: se quita el provisional, el texto vuelve a la caja (o el diálogo sigue abierto) y sale el `message` |
+| R47 | sin `canSend` no hay caja, burbujas, «Enviar plantilla» ni aviso |
+
+Decisiones: el implementer quitó «El mensaje no puede pasar de 4096 caracteres.», que el subagente había inventado (no está
+en requirements); con más de 4096 el botón queda deshabilitado y la caja `aria-invalid`. Textos sacados de los tableros:
+«Enter envía · Shift+Enter hace un salto de línea», «Solo plantillas aprobadas por WhatsApp.», «Las variables se rellenan
+solas.», «Elige una plantilla para empezar», «Plantillas aprobadas», «Cancelar», «Cerrar». Sin plantillas enviables,
+«Enviar plantilla» queda deshabilitado; ventana abierta sin mensajes → burbujas. Abierto: un rechazo de red de la acción
+no se captura (el contrato no da `ErrorState` para eso).
+
+### T12 — panel del chat
+- Nuevo `chat-panel.tsx` (`ChatPanel`; se reinicia con `key={chat.customer.id}`; une por id lo que trae la prop `chat`;
+  carga anteriores con `pageSize: 30`; marca leído una vez por apertura y avisa con `onChatRead(contactId)`).
+  `chat-composer.tsx`: solo `export` de `sentMessage`. `contact-texts.ts`: `CHAT_PANEL_TEXT` y testids.
+  Test: `tests/unit/contactos-ui/chat-panel.test.tsx`.
+
+| R | Casos (`chat-panel.test.tsx`) |
+|---|---|
+| R27 | marca con el último id mostrado (`upToMessageId`) y llama `onChatRead`; la reacción no cuenta; sin contacto no marca; una consulta nueva no vuelve a marcar; si falla no avisa |
+| R33 | literales del vacío del chat; con mensajes no hay vacío |
+| R4 | error del chat (catalogado e inesperado) con su `message` y «Reintentar» → `onRetryChat`; error del contexto → `onRetryContext` con el historial visible |
+| R49 | con contacto vinculado, bloqueado y sin contacto: ningún botón ni enlace con «Vincular», «Desvincular» ni «Bloquear» |
+| R25 | pide con `before` y muestra «Cargando mensajes anteriores…»; antepone sin duplicar; error con su `message` |
+| R41 | reintenta con el `messageId`; el devuelto entra como nuevo y el fallido se queda; error tal cual; sin `canSend` no hay botón |
+| R32 | el provisional entra en el historial y se reemplaza por el devuelto |
+
+Huecos (abiertos, sin inventar): `WhatsappChat` sin contacto no trae teléfono (cabecera con `phone=''`; T14 lo resuelve o
+falta en el contrato); sin título ni texto para el error y la carga del chat (`ErrorAlert` + «Reintentar» y un `Spinner` con
+`aria-busy`); el error del contexto va como franja bajo la cabecera. **Desvío de design 5.4:** el reintento de plantilla manda
+como `constants` todas las de sistema con valor en `values`, no `systemConstantsFor(template, values)`, porque la vista del
+fallido no trae la plantilla (el backend solo usa las que pide la plantilla).
+
+### Salida real de la tanda (implementer)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos de la tanda.
+- `pnpm exec vitest related --run <22 archivos de la tanda>`: `Test Files 12 passed (12)` · `Tests 183 passed (183)`.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+- `./init.sh`: rojo solo por `feature_list.json` (ids 290–298 duplicados, en vuelo sin assignee QC-162/166/262/263/264,
+  zona backend 4/3), ajeno a la tanda.
+- E2E: no procede todavía (T19).
+
+Veredicto: T8–T12 hechas con su «Hecho»; los cuatro comandos en verde.
