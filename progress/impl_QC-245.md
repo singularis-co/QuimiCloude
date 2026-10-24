@@ -300,6 +300,29 @@ Salida (implementer, 2026-10-24):
 - guardias: 86/87 con el WIP (la del censo, por la entrada de T17); tras retirarla, la guardia del
   censo 6/6
 
+## T17 — Flujo del contexto y cierre de la enmienda (R44, R45, R49, R51–R57, R59–R63)
+
+Archivos: `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` (nuevo: `GET` de
+la ruta real con la sesión doblada en `identity`, espía en `downloadMedia` del doble canned, entrantes
+por el webhook firmado, pedidos por `order-delivery-seed` y `pedidos.deliverOrder`; el cancelado se
+crea PENDIENTE y se pasa a CANCELADO con motivo por el CHECK de `cancellation_reason`) y
+`tests/integration/aislamiento.json` (entrada `commit`, `desde: 2026-10-24`). Sin código de producción.
+
+Verificación de cierre (T9 repetida sobre todo el diff, sin `./init.sh` por decisión del humano):
+- `pnpm run typecheck`: 0 errores
+- `pnpm run lint`: 0 errores, 10 avisos ajenos
+- `whatsapp-chat-context-flow.int.test.ts`: 8/8 (subagente)
+- los tres de integración de `integraciones` de la ficha (flujo de conversaciones, adaptador, flujo del
+  contexto), corridos por el implementer: 3 archivos, 40 passed
+- guardia del censo: 6/6 · `pnpm exec vitest run guard`: 87 archivos, 1324 passed, 22 skipped
+- `vitest run tests/unit/integraciones` (T16, implementer): 105 archivos, verde tras el arreglo de la lista cerrada
+- La suite completa la corre `gate-completo` en CI.
+
+Pendiente para el leader: republicar el §«Contrato para la pantalla» en QC-246. El único cambio de
+spec en la implementación es interno (`design.md > 15.1`: dónde vive la base de la ruta de medios y
+el 5xx de la descarga); ninguna acción, ruta de import, tipo ni código de error del contrato cambió.
+Pregunta sin bloquear: `ChatTarget` no se exporta desde el barril (está en línea en el §A).
+
 ## Mapa R → test
 
 | R | Test (caso) |
@@ -389,5 +412,13 @@ Salida (implementer, 2026-10-24):
 | R46 (ruta) | `whatsapp-media-route.test.ts` > «R46: el resultado unavailable responde 502 sin cuerpo y sin log», «R46: un error de dominio fuera de los de 404 responde 500…», «R46: un error ajeno responde 500 sin cuerpo y deja una linea en el log» |
 | R47 (ruta) | `whatsapp-media-route.test.ts` > «R47: sin largo conocido no manda Content-Length…», «R47: ninguna respuesta lleva el id del archivo en Meta, su URL ni el token» |
 | R58 | `whatsapp-media-route.test.ts` > «R58: pasa { messageId } y el actor de la sesion», «R58: el archivo de ruta reexporta GET del adaptador y fija runtime nodejs…», «R58: el adaptador no decide…», «R58: el exito, el 404 y el 502 no escriben nada», «R58: el log de un 500 no lleva el id del mensaje…», «R58: el adaptador solo escribe en la consola desde el registro del 500»; `guard-rutas-fuera-de-sesion.test.ts` > «QC-245 R58: la ruta del archivo de un medio es del añadido `integraciones`…»; `whatsapp-conversation-actions.test.ts` y `module-shape.test.ts` (cinco acciones) |
+
+| R44, R45, R47, R48 (flujo) | `whatsapp-chat-context-flow.int.test.ts` > «R44, R45, R47, R48: la imagen entrante de un cliente vivo se sirve por la ruta real con el PNG del doble de Graph», «R44: la imagen pedida desde otra empresa, el audio y la imagen de un cliente dado de baja dan 404 sin cuerpo y sin llamar a Meta» |
+| R49 (flujo) | `whatsapp-chat-context-flow.int.test.ts` > «R49: la reaccion se casa con el id interno del mensaje reaccionado del mismo contacto, y una a un mensaje no guardado da null, sin ningun wamid» |
+| R51–R56, R60–R63 (flujo) | `whatsapp-chat-context-flow.int.test.ts` > «R51, R52, R53, R55, R56, R60, R61, R62, R63: el contexto trae los pedidos abiertos con sus envases, el numero y las siete constantes del pedido elegido», «R54: un pedido entregado y uno cancelado, aunque sean los mas recientes, no salen en orders», «R54, R55, R56: un cliente con solo pedidos cerrados da orders vacio, ningun elegido y todas las pedido.* nulas», «R54, R57: un orderId de otra empresa, de otro cliente o entregado se rechaza con order_not_found» |
+| R57 (flujo) | `whatsapp-chat-context-flow.int.test.ts` > «R57: pedir el contexto no mueve la marca de lectura ni escribe nada» |
+| R59 | `whatsapp-chat-context-flow.int.test.ts` (el archivo entero: composición real, base de test y doble de Graph) y los unitarios de T12–T15 (`whatsapp-graph-client-media.test.ts`, `whatsapp-media.test.ts`, `whatsapp-chat-context.test.ts`, `get-whatsapp-media.test.ts`, `get-whatsapp-chat-context.test.ts`) |
+
+Comprobado por script (2026-10-24): R1–R63 tienen al menos una fila en este mapa.
 
 Veredicto T2/T3: verdes; sin dependencias nuevas ni preguntas abiertas.

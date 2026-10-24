@@ -199,7 +199,7 @@
   - **Hecho:** guardias verdes; firmas y tipos idénticos al §A/§B v2 del contrato; la respuesta 200
     lleva `Cache-Control: private, max-age=3600` y `X-Content-Type-Options: nosniff`.
 
-- [ ] **T17 Integración del flujo y cierre de la enmienda** (R44, R45, R49, R51–R57, R59–R63).
+- [x] **T17 Integración del flujo y cierre de la enmienda** (R44, R45, R49, R51–R57, R59–R63).
   Depende de T8 y T16.
   - `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts` sobre la composición
     real con Graph doble (+ `aislamiento.json`): imagen entrante servida; otra empresa, cliente dado

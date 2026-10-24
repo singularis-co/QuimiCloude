@@ -826,6 +826,11 @@
       "archivo": "asignaciones/conditioning-steps-progress.int.test.ts",
       "motivo": "QC-299 T14 (R27, R28, R32): completar, revisitar y cambiar responsables de los pasos de acondicionamiento con la composicion real ('asignaciones' de '@/lib/composition'), que escribe con el cliente GLOBAL; lo que se mide en R27 es que el indice unico 'order_execution_entries_conditioning_step_once' rechace el segundo completado del mismo paso, incluida la carrera de dos llamadas simultaneas, que necesita conexiones distintas, asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso fabrica sus empresas efimeras con randomUUID y las borra en su 'finally' en orden de FK (anotaciones -> equipo -> pedidos -> recetas -> usuarios -> roles -> tipos de documento -> empresas).",
       "desde": "2026-10-21"
+    },
+    {
+      "archivo": "integraciones/whatsapp-chat-context-flow.int.test.ts",
+      "motivo": "recorre el archivo de un medio (la ruta GET real con la sesion doblada en identity), las reacciones del chat y el contexto del chat por la fachada real de lib/composition, con el doble canned de Graph; la siembra pasa por clientes.createCustomer, clientes.deleteCustomer, pedidos.deliverOrder (withOrderTransaction) y receiveWhatsappWebhook (su PROPIA 'prisma.$transaction'), todos con el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria. Cada empresa es efimera (tests/helpers/order-delivery-seed.ts, randomUUID) y 'afterAll' borra por 'company_id' mensajes -> variables -> contactos -> conexiones -> vinculos -> numeros, afirma contando que no queda ninguno y despues borrarEmpresaDeEntrega limpia pedidos, entregas, lotes, clientes, usuarios y empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-24"
     }
   ]
 }
