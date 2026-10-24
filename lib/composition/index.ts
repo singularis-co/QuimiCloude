@@ -538,6 +538,8 @@ import {
 } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { createGetCompanyCountry, createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
+import { createGetCompanyName } from '@/lib/modules/identity';
+import { createCompanyNameReader } from '@/lib/modules/identity/adapters/driven/persistence/company-name-prisma';
 import {
   createCreateCompany,
   createDeleteCompany,
@@ -1021,6 +1023,7 @@ export const identity = {
   // Operacion de plataforma: el actor no lleva empresa.
   setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
   getCompanyCountry: createGetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  getCompanyName: createGetCompanyName({ companies: createCompanyNameReader() }),
   // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
   createCompany: createCreateCompany({
     companies: companyRepository,

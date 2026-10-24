@@ -32,6 +32,7 @@
     "identity/administrator.int.test.ts",
     "identity/company-addons.int.test.ts",
     "identity/company-country-read.int.test.ts",
+    "identity/company-name-read.int.test.ts",
     "identity/company-country.int.test.ts",
     "identity/company-directory-addons.int.test.ts",
     "identity/company-membership.int.test.ts",

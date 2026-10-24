@@ -113,7 +113,7 @@
 
 ### Tanda 6 — servicios de otros módulos y Graph (sin dependencias entre sí)
 
-- [ ] **T10 [P] `identity`: `getCompanyName`** (R56; design §15.5).
+- [x] **T10 [P] `identity`: `getCompanyName`** (R56; design §15.5).
   - `domain/get-company-name.ts`, `ports/company-name-reader.ts`,
     `adapters/driven/persistence/company-name-prisma.ts`, barril, composición
     (`identity.getCompanyName`).
