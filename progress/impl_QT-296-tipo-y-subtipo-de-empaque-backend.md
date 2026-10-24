@@ -963,3 +963,19 @@ informar. El implementer revisó el diff y corrió la verificación (abajo).
 - Int `qt296-packaging-subtype-product` e `inventory-import-confirm`: 2 archivos, **15 pasados y 1 omitido** (el `skipIf(QC209_MEDIR_2000)` de siempre).
 - Int `qc195-packaging-list` y `qc195-packaging-catalog` (siembran legados): **9/9**. `qc195-packaging-product`: **8/8**.
 - `pnpm exec vitest run guard`: 87/87 archivos, 1276 pasados, 22 omitidos.
+
+## F2.3 — Merge de `origin/dev` (2026-10-24)
+
+- Conflicto único (review m1): `tests/guards/guard-identificador-de-request.test.ts`, `MIGRACIONES_ESPERADAS`.
+  Se conservan las tres entradas en orden cronológico: `20261023120000_whatsapp_send_permission`,
+  `20261023130000_whatsapp_outbound_messages` y `20261023150000_packaging_subtype`. `db/schema.prisma` y
+  `tests/integration/aislamiento.json` se mezclaron solos. Nada ambiguo.
+- Migraciones nuevas aplicadas a `QuimiCloude_QT296` con `prisma migrate deploy` (las dos de WhatsApp) y `prisma generate`.
+- m2 queda como deuda aceptada (`design.md > 4.3`).
+
+### Verificación tras el merge (un proceso cada vez, `--maxWorkers=2`)
+- `pnpm run typecheck`: exit 0. `eslint` del guard resuelto: sin salida.
+- `pnpm exec vitest run guard`: 87/87 archivos, 1303 pasados, 22 omitidos.
+- Unit `packaging-subtype`, `qt296-packaging-subtype-migration` y `whatsapp-send-permission-migration`: 3 archivos, **22/22**.
+- Int `qt296-packaging-subtype-migration` (UP/DOWN/UP), `whatsapp-send-permission-migration` y `whatsapp-outbound-messages-migration`: 3 archivos, **15/15**.
+- El `vitest related` del diff completo queda para `gate-completo` en CI.
