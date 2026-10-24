@@ -790,3 +790,40 @@ $ pnpm exec playwright test e2e/documentos.spec.ts              (exit 0)
   6 passed (38.7s)
 ```
 Ninguna de las dos se tocó. R38 (mitad E2E) en verde.
+
+## T9 — Aislamiento y alcance (R36, R40)
+
+### Archivos
+- Nuevo `tests/integration/inventario/qt296-company-scope.int.test.ts` (commit, dos empresas efimeras por caso; limpia con `borrarEmpresa`, la ajena primero porque su presentacion usa una unidad sembrada a cuenta de la propia).
+- Nuevo `tests/unit/documentos/qt296-alcance.test.ts` (mismo enfoque que `qc158-alcance.test.ts`: los casos de diff contra `origin/dev`/`dev` solo miden en `feature/QT-296-tipo-y-subtipo-de-empaque-backend`, se saltan ruidosamente fuera y fallan si el diff no trae nada bajo `specs/QT-296-.../`).
+- `tests/integration/aislamiento.json`: entrada `commit` para `inventario/qt296-company-scope.int.test.ts`, junto a las otras de qt296.
+- Codigo de produccion: ninguno. Los tres tests de autorizacion no se tocaron.
+
+### Mapa
+| R | Test |
+|---|---|
+| R36 | `qt296-alcance.test.ts` > R36a «ningun archivo del diff contra dev vive bajo borradores-de-prompts/» (+ detector) |
+| R36 | `qt296-alcance.test.ts` > R36b «ningun archivo de produccion fuera de strategy-prompt-env.ts (y de playwright.config.ts, que la pone) nombra CATALOG_PROMPT» (+ detector) |
+| R36 | `qt296-alcance.test.ts` > R36c «el diff contra dev no trae package.json ni pnpm-lock.yaml» (+ detector) |
+| R40 | `qt296-company-scope.int.test.ts` > «un empaque de otra empresa con el mismo nombre y otro subtipo no da action_not_allowed en el alta» (control: el homonimo propio si da `ActionNotAllowedError`) |
+| R40 | `qt296-company-scope.int.test.ts` > «... no da subtype_mismatch en el Excel» (vista previa y confirmacion; control: el homonimo propio en el mismo archivo si da `subtype_mismatch`) |
+| R40 | `qt296-company-scope.int.test.ts` > «el filtro por subtipo no devuelve productos de otra empresa» (control: desde la otra empresa se ve lo suyo) |
+| R40 | `qt296-company-scope.int.test.ts` > «el id de una tapa de otra empresa en el reparto da packaging_not_found» (`resolveDistributionLines`, el resolutor que comparten alta, edicion, «Reparto y unidad» y disponible, con los catalogos reales; controles: el envase ajeno tampoco existe, el propio se resuelve) |
+| R40 | `tests/unit/inventario/authorization.test.ts`, `tests/unit/proveedores/authorization.test.ts`, `tests/unit/documentos/catalog-import-authorization.test.ts`: en verde sin cambiar expectativas |
+
+### Verificacion (con `.env` cargado)
+`pnpm run typecheck`: `tsc --noEmit`, exit 0.
+`pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos 10 de antes; `eslint` sobre los dos archivos nuevos: `No issues found`.
+`pnpm exec vitest run <2 nuevos> <3 de autorizacion>`:
+```
+ Test Files  5 passed (5)
+      Tests  51 passed (51)
+```
+(los 11 casos nuevos corren todos, ninguno saltado: 7 de R36 y 4 de R40)
+`pnpm exec vitest run guard`:
+```
+ Test Files  87 passed (87)
+      Tests  1276 passed | 22 skipped (1298)
+```
+
+**Veredicto T9:** R36 y R40 en verde, sin codigo de produccion ni dependencias nuevas; no aparecio ningun bug real.

@@ -224,7 +224,7 @@ en verde (sin importar `inventario`) y `catalog-service.test.ts` en verde.
 
 **Hecho cuando:** R38 en verde y el resultado de las dos E2E anotado en `progress/impl_QT-296.md`.
 
-## [ ] T9 — Aislamiento y alcance `[depende de T2–T8]`
+## [x] T9 — Aislamiento y alcance `[depende de T2–T8]`
 
 - Tests:
   - `tests/integration/inventario/qt296-company-scope.int.test.ts`:

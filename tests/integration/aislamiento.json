@@ -574,6 +574,11 @@
       "desde": "2026-10-23"
     },
     {
+      "archivo": "inventario/qt296-company-scope.int.test.ts",
+      "motivo": "QT-296 T9: ejercita el alta de producto, la vista previa y la confirmacion de la importacion, 'listAliveProducts' y el catalogo de envases ('findPackagingRefs') con los adaptadores reales, que usan el cliente Prisma GLOBAL; la siembra ('createWithFirstBatch') y el alta abren SU PROPIA 'prisma.$transaction' y cada fila de la importacion la suya: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica DOS empresas efimeras con randomUUID (usuario, rol, tipo de documento, unidad, presentaciones, envases, tapas y medidores) y las limpia en un 'finally' con 'borrarEmpresa', la ajena primero, en orden de FK (asientos -> lotes -> productos -> importaciones -> presentaciones -> unidades -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-23"
+    },
+    {
       "archivo": "pedidos/qt296-distribution-rejects-caps.int.test.ts",
       "motivo": "QT-296 T4: ejercita alta, edicion, «Reparto y unidad» y Terminar el empaque de 'pedidos' con los adaptadores reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' sobre el cliente GLOBAL y la siembra de empaques ('createWithFirstBatch') tambien: una transaccion del test con ROLLBACK no los envolveria. Cada caso fabrica su empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, ingrediente, receta, envase, tapa y medidor) y la limpia en un 'finally' en orden de FK (los dos libros -> lineas -> anotaciones -> pedidos -> producto terminado -> receta -> lotes y productos -> presentacion -> unidad -> usuario -> rol -> tipo de documento -> empresa). Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-23"
