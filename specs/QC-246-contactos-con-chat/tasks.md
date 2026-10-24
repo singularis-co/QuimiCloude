@@ -15,16 +15,16 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 - [x] **T0** — Copiar los siete tableros aprobados del canvas a `docs/diseno/canvas/` con los nombres
   de `design.md > Referencia de diseño`. **Hecha por el leader (2026-10-23, `requirements.md > D10`).**
   El implementer no los toca.
-- [ ] **T1** `[P]` — Subir `WaBubble` a `components/shared/wa-bubble.tsx`; el archivo viejo
+- [x] **T1** `[P]` — Subir `WaBubble` a `components/shared/wa-bubble.tsx`; el archivo viejo
   queda como `export * from '@/components/shared/wa-bubble'`. Fila nueva en `CATALOGO.md` con
   `Diseño` = `docs/diseno/canvas/WaBurbuja.dc.html`.
   *Hecho:* `tests/unit/integraciones-ui/wa-bubble.test.tsx` y los de plantillas siguen verdes sin
   cambiar; `guard-catalogo-de-componentes` verde.
-- [ ] **T2** `[P]` — Subir `whatsapp-system-constants.ts` a `lib/shared/ui/`; el viejo reexporta.
+- [x] **T2** `[P]` — Subir `whatsapp-system-constants.ts` a `lib/shared/ui/`; el viejo reexporta.
   Fila en `CATALOGO.md` (`sin UI`). Solo el movimiento: la lista no cambia aquí.
   *Hecho:* tests de QC-243 verdes sin cambios; ningún importador de QC-243 cambia su import;
   guardias verdes.
-- [ ] **T21** (dep. T2) — Las cuatro constantes nuevas al final de `SYSTEM_CONSTANTS` en
+- [x] **T21** (dep. T2) — Las cuatro constantes nuevas al final de `SYSTEM_CONSTANTS` en
   `lib/shared/ui/whatsapp-system-constants.ts`, con los textos de `design.md > 6.1` (default de P12).
   Ampliar —nunca relajar— los tests de QC-243 que enumeran la lista. Sin cambios en ningún archivo de
   `app/(private)/integraciones/whatsapp/components/` salvo la reexportación de T2.

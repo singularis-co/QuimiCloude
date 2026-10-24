@@ -396,7 +396,7 @@ describe('alta de plantilla', () => {
     expect(footerCount).toHaveClass('text-destructive');
   });
 
-  it('R27: «Insertar variable» abre los dos grupos con etiqueta y clave, «Nueva variable propia» y la ayuda junto al botón', async () => {
+  it('R27 R52: «Insertar variable» abre los dos grupos (las siete constantes) con etiqueta y clave, «Nueva variable propia» y la ayuda junto al botón', async () => {
     const user = setupUser();
     renderSheet();
     expect(screen.getByTestId(WHATSAPP_VARIABLE_MENU_HINT_TESTID)).toHaveTextContent('Se escribe como {{clave}}.');
@@ -408,6 +408,10 @@ describe('alta de plantilla', () => {
       ['Nombre del cliente', 'nombre_del_cliente'],
       ['Número de pedido', 'numero_de_pedido'],
       ['Nombre de la empresa', 'nombre_de_la_empresa'],
+      ['Estado del pedido', 'estado_del_pedido'],
+      ['Fecha de solicitud', 'fecha_de_solicitud'],
+      ['Total del pedido', 'total_del_pedido'],
+      ['Detalle del pedido', 'detalle_del_pedido'],
     ]) {
       const item = within(system).getByTestId(WHATSAPP_VARIABLE_MENU_ITEM_TESTID(key));
       expect(item).toHaveTextContent(label);
@@ -607,6 +611,29 @@ describe('alta de plantilla', () => {
       footer: 'Responde BAJA para no recibir más',
       buttons: [],
       constantLabels: { 'empresa.nombre': 'Nombre de la empresa' },
+    });
+  });
+
+  it('R52: insertar «Detalle del pedido» escribe {{detalle_del_pedido}} y al enviar va como pedido.detalle con su etiqueta', async () => {
+    createMock.mockResolvedValue({ status: 'success', data: CREADA });
+    const user = setupUser();
+    renderSheet();
+    await rellenar(user, 'pedido_detalle', 'Tu pedido: ');
+    await insertar(user, 'detalle_del_pedido');
+    expect(mensaje()).toHaveValue('Tu pedido: {{detalle_del_pedido}}');
+
+    await user.click(enviarARevision());
+    await user.click(await screen.findByTestId(WHATSAPP_TEMPLATE_CONFIRM_SUBMIT_TESTID));
+
+    expect(createMock).toHaveBeenCalledWith({
+      name: 'pedido_detalle',
+      language: 'es',
+      category: 'UTILITY',
+      header: null,
+      body: { text: 'Tu pedido: {{pedido.detalle}}' },
+      footer: null,
+      buttons: [],
+      constantLabels: { 'pedido.detalle': 'Detalle del pedido' },
     });
   });
 

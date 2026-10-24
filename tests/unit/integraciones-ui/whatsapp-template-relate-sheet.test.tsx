@@ -171,7 +171,7 @@ describe('Relacionar variables', () => {
     expect(screen.getByTestId(WHATSAPP_RELATE_SELECT_TESTID('body.2'))).toHaveTextContent('Elige un dato…');
   });
 
-  it('R42: el selector agrupa «Constantes del sistema» y «Variables propias», cada dato con etiqueta y clave', async () => {
+  it('R42 R52: el selector agrupa «Constantes del sistema» (las siete) y «Variables propias», cada dato con etiqueta y clave', async () => {
     const user = setupUser();
     renderSheet();
     await user.click(screen.getByTestId(WHATSAPP_RELATE_SELECT_TESTID('body.2')));
@@ -183,6 +183,10 @@ describe('Relacionar variables', () => {
       'Nombre del clientenombre_del_cliente',
       'Número de pedidonumero_de_pedido',
       'Nombre de la empresanombre_de_la_empresa',
+      'Estado del pedidoestado_del_pedido',
+      'Fecha de solicitudfecha_de_solicitud',
+      'Total del pedidototal_del_pedido',
+      'Detalle del pedidodetalle_del_pedido',
     ]);
     expect(grupos[1]).toHaveTextContent('Variables propias');
     expect(within(grupos[1]!).getAllByRole('option').map((option) => option.textContent)).toEqual([
@@ -278,6 +282,35 @@ describe('Relacionar variables', () => {
       templateId: 't9',
       bindings: [
         { slot: 'header', key: 'pedido.numero' },
+        { slot: 'body.1', key: 'cliente.nombre' },
+        { slot: 'body.2', key: 'empresa.nombre' },
+        { slot: 'body.3', key: 'numero_de_cuenta' },
+        { slot: 'button.0', key: 'horario' },
+      ],
+    });
+  });
+
+  it('R52: relacionar un hueco con «Estado del pedido» lo previsualiza con su ejemplo y guarda pedido.estado', async () => {
+    relateMock.mockResolvedValue({ status: 'success', data: RELACIONADA });
+    const user = setupUser();
+    renderSheet();
+    await elegir(user, 'header', /Estado del pedido/);
+    await elegir(user, 'body.2', /Nombre de la empresa/);
+    await elegir(user, 'button.0', /Horario/);
+    expect(screen.getByTestId(WA_BUBBLE_HEADER_TESTID)).toHaveTextContent('Pedido en preparación');
+
+    await user.click(guardar());
+    const dialogo = await screen.findByTestId(WHATSAPP_RELATE_CONFIRM_DIALOG_TESTID);
+    expect(within(dialogo).getAllByTestId(WHATSAPP_RELATE_CONFIRM_LINE_TESTID)[0]).toHaveTextContent(
+      'Encabezado {{1}}Estado del pedidoestado_del_pedido',
+    );
+    await user.click(await screen.findByTestId(WHATSAPP_RELATE_CONFIRM_SUBMIT_TESTID));
+
+    await waitFor(() => expect(relateMock).toHaveBeenCalledTimes(1));
+    expect(relateMock).toHaveBeenCalledWith({
+      templateId: 't9',
+      bindings: [
+        { slot: 'header', key: 'pedido.estado' },
         { slot: 'body.1', key: 'cliente.nombre' },
         { slot: 'body.2', key: 'empresa.nombre' },
         { slot: 'body.3', key: 'numero_de_cuenta' },
