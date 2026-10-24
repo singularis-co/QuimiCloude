@@ -16,6 +16,7 @@ export {
   DEFAULT_ORDER_PRIORITY,
   DEFAULT_ORDER_STATUS,
   STARTED_ORDER_STATUSES,
+  ORDER_STATUSES_NOT_IN_PROGRESS,
   isStartedOrderStatus,
 } from './domain/order-classification';
 export type { OrderPriority, OrderStatus } from './domain/order-classification';
@@ -33,6 +34,10 @@ export type {
   OrderSummaryOrdering,
   FinishedGoodsReceipt,
 } from './domain/order-catalog';
+
+/** Los pedidos de un cliente, para otros modulos. Solo el tipo y la interfaz: el adaptador lo
+ *  instancia `lib/composition`, como con `OrderCatalog`. */
+export type { CustomerOrderDirectory, CustomerOrderSummary } from './domain/customer-order-directory';
 
 // ---------------------------------------------------------------------------------------
 // QC-34 (T14). Lo que el modulo publica para poder ser USADO: el actor, los esquemas del

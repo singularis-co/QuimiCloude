@@ -22,6 +22,7 @@ export {
   WhatsappTemplateNotMappedError,
   WhatsappTemplateNotMappableError,
   WhatsappTemplateValuesMissingError,
+  WhatsappOrderNotFoundError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -123,3 +124,23 @@ export { createSyncAllWhatsappTemplates } from './domain/sync-all-whatsapp-templ
 export type { WhatsappOutboundMessageView } from './domain/whatsapp-outbound-message';
 export { createSendWhatsappMessage } from './domain/send-whatsapp-message';
 export { createRetryWhatsappMessage } from './domain/retry-whatsapp-message';
+export type {
+  WhatsappMessageDirection,
+  WhatsappMessageStatus,
+  WhatsappMessageType,
+} from './domain/whatsapp-message';
+export type {
+  WhatsappChat,
+  WhatsappChatAttachment,
+  WhatsappChatMessage,
+  WhatsappConversationItem,
+  WhatsappConversationList,
+  WhatsappSendableTemplate,
+} from './domain/whatsapp-conversation';
+export { createListWhatsappConversations } from './domain/list-whatsapp-conversations';
+export { createGetWhatsappChat } from './domain/get-whatsapp-chat';
+export { createMarkWhatsappChatRead } from './domain/mark-whatsapp-chat-read';
+export { createListSendableWhatsappTemplates } from './domain/list-sendable-whatsapp-templates';
+export type { WhatsappChatContext, WhatsappCustomerOrder } from './domain/whatsapp-chat-context';
+export { createGetWhatsappChatContext } from './domain/get-whatsapp-chat-context';
+export { createGetWhatsappMedia, type WhatsappMediaResult } from './domain/get-whatsapp-media';

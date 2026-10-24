@@ -384,3 +384,10 @@ export const WHATSAPP_WEBHOOK_ROUTE_BASE = '/api/integraciones/whatsapp/webhook'
 export function whatsappWebhookPath(connectionId: string): string {
   return `${WHATSAPP_WEBHOOK_ROUTE_BASE}/${connectionId}`;
 }
+
+/** Ruta de la imagen de un mensaje de WhatsApp: relativa a la aplicación, la pide el navegador con su sesión. */
+export const WHATSAPP_MEDIA_ROUTE_BASE = '/api/integraciones/whatsapp/media';
+
+export function whatsappMediaPath(messageId: string): string {
+  return `${WHATSAPP_MEDIA_ROUTE_BASE}/${messageId}`;
+}

@@ -8,7 +8,7 @@ export const ADDON_PERMISSIONS: Readonly<Record<Addon, readonly PermissionCode[]
   proveedores: ['proveedores.consultar', 'proveedores.modificar'],
   lectura_pdf: ['documentos.consultar', 'documentos.modificar'],
   importacion_excel: [],
-  integraciones: ['integraciones.modificar', 'whatsapp.enviar'],
+  integraciones: ['integraciones.modificar', 'whatsapp.enviar', 'whatsapp.consultar'],
 };
 
 export const ADDON_REQUIRES: Readonly<Record<Addon, readonly Addon[]>> = {

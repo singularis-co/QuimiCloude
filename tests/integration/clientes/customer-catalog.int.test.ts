@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  findAliveCustomerIdsMatchingName,
   findAliveCustomerRefById,
   findCustomerRefsIncludingDeleted,
   searchCustomerRefs,
@@ -191,5 +192,43 @@ describe('searchCustomerRefs', () => {
     expect(acotada.pageSize).toBe(25)
     expect(acotada.items).toHaveLength(25)
     expect(acotada.totalPages).toBe(2)
+  })
+})
+
+describe('findAliveCustomerIdsMatchingName', () => {
+  it('R10: de los ids pedidos devuelve solo los vivos de la empresa que casan por nombre', async () => {
+    const grupo = letras(8)
+    const casa = await sembrar(propia, { firstNames: `Ana ${grupo}`, lastNames: 'Pérez' })
+    const otroNombre = await sembrar(propia, { firstNames: `Luis ${grupo}`, lastNames: 'Gómez' })
+    const deBaja = await sembrar(propia, { firstNames: `Eva ${grupo}`, lastNames: 'Pérez', deleted: true })
+    const deOtra = await sembrar(ajena, { firstNames: `Rosa ${grupo}`, lastNames: 'Pérez' })
+    const fueraDeLosIds = await sembrar(propia, { firstNames: `Juan ${grupo}`, lastNames: 'Pérez' })
+
+    const pedidos = [casa, otroNombre, deBaja, deOtra, randomUUID()]
+
+    expect(await findAliveCustomerIdsMatchingName(`perez ${grupo}`, pedidos, propia)).toEqual([casa])
+    expect(await findAliveCustomerIdsMatchingName(`perez ${grupo}`, pedidos, propia)).not.toContain(fueraDeLosIds)
+    // El de otra empresa no vuelve ni pidiendolo con el ambito propio.
+    expect(await findAliveCustomerIdsMatchingName(`perez ${grupo}`, [deOtra], propia)).toEqual([])
+  })
+
+  it('R10: misma normalizacion que la busqueda de Clientes: sin acentos, sin mayusculas y cada palabra tiene que casar', async () => {
+    const grupo = letras(8)
+    const jose = await sembrar(propia, { firstNames: `José ${grupo}`, lastNames: 'Núñez' })
+    const marta = await sembrar(propia, { firstNames: `Marta ${grupo}`, lastNames: 'Pérez' })
+    const ids = [jose, marta]
+
+    expect(await findAliveCustomerIdsMatchingName('PEREZ', ids, propia)).toEqual([marta])
+    expect(await findAliveCustomerIdsMatchingName('jose  NUNEZ', ids, propia)).toEqual([jose])
+    expect(await findAliveCustomerIdsMatchingName(`${grupo} inexistentezz`, ids, propia)).toEqual([])
+  })
+
+  it('R10: un texto sin palabras utiles no filtra por nombre y devuelve los ids vivos de la empresa', async () => {
+    const grupo = letras(8)
+    const vivo = await sembrar(propia, { firstNames: `Ana ${grupo}`, lastNames: 'Alfa' })
+    const deBaja = await sembrar(propia, { firstNames: `Beto ${grupo}`, lastNames: 'Beta', deleted: true })
+    const deOtra = await sembrar(ajena, { firstNames: `Carla ${grupo}`, lastNames: 'Gama' })
+
+    expect(await findAliveCustomerIdsMatchingName('¡!', [vivo, deBaja, deOtra], propia)).toEqual([vivo])
   })
 })
