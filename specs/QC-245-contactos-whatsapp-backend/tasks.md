@@ -85,7 +85,7 @@
     exporta exactamente las cuatro).
   - **Hecho:** guardias verdes; firmas y tipos idénticos al §A/§B del contrato.
 
-- [ ] **T8 Test de integración del flujo** (R5, R6, R14, R16, R34–R39, R43). Depende de T7.
+- [x] **T8 Test de integración del flujo** (R5, R6, R14, R16, R34–R39, R43). Depende de T7.
   - `tests/integration/integraciones/whatsapp-conversations-flow.int.test.ts` sobre la composición
     real con el doble de Graph inyectado; entrada en `aislamiento.json` (`commit`, `motivo`, `desde`).
   - Casos: listado solo con vinculados a clientes activos y no leídos correctos; marcar leído ⇒ 0;
