@@ -19,13 +19,14 @@ const prismaDouble = vi.hoisted(() => ({
 vi.mock('@/lib/shared/db/prisma', () => ({ prisma: prismaDouble }))
 
 import {
+  findAliveCustomerIdsMatchingName,
   findAliveCustomerRefById,
   findCustomerRefsIncludingDeleted,
   searchCustomerRefs,
 } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
 import { searchCondition } from '@/lib/modules/clientes/adapters/driven/persistence/customer-prisma'
 
-import type { CustomerRef } from '@/lib/modules/clientes'
+import type { CustomerCatalog, CustomerRef } from '@/lib/modules/clientes'
 
 const SCOPE = { companyId: '11111111-1111-4111-8111-111111111111' } as const
 const ID_A = '22222222-2222-4222-8222-222222222222'
@@ -156,5 +157,45 @@ describe('customer-catalog-prisma: searchCustomerRefs', () => {
     )
     expect(primeraLlamada(prismaDouble.customer.findMany)).toMatchObject({ skip: 0, take: 25 })
     expect(acotada).toMatchObject({ pageSize: 25, totalPages: 3 })
+  })
+})
+
+describe('customer-catalog-prisma: findAliveCustomerIdsMatchingName', () => {
+  it('R10: el contrato del catalogo recibe texto, ids y empresa y devuelve solo ids', () => {
+    expectTypeOf<CustomerCatalog['findAliveIdsMatchingName']>().toEqualTypeOf<
+      (search: string, ids: readonly string[], companyId: string) => Promise<readonly string[]>
+    >()
+  })
+
+  it('R10: exige vivo, de la empresa y entre los ids, con la MISMA searchCondition del listado; solo pide el id', async () => {
+    prismaDouble.customer.findMany.mockResolvedValue([{ id: ID_A }])
+
+    expect(await findAliveCustomerIdsMatchingName('José  Pérez', [ID_A, ID_B], SCOPE)).toEqual([ID_A])
+
+    const llamada = primeraLlamada(prismaDouble.customer.findMany)
+    expect(llamada.where).toEqual({
+      id: { in: [ID_A, ID_B] },
+      deletedAt: null,
+      companyId: SCOPE.companyId,
+      AND: searchCondition('José  Pérez'),
+    })
+    expect(llamada.select).toEqual({ id: true })
+    expect(prismaDouble.customer.count).not.toHaveBeenCalled()
+  })
+
+  it('R10: un texto sin palabras utiles no filtra por nombre: solo vivos, de la empresa y entre los ids', async () => {
+    await findAliveCustomerIdsMatchingName('  ¡!  ', [ID_A], SCOPE)
+    const where = primeraLlamada(prismaDouble.customer.findMany).where
+    expect(where).toEqual({ id: { in: [ID_A] }, deletedAt: null, companyId: SCOPE.companyId })
+    expect(where).not.toHaveProperty('AND')
+  })
+
+  it('R10: una lista vacia, o sin ningun uuid, devuelve [] sin consultar; los ids sin forma de uuid se descartan', async () => {
+    expect(await findAliveCustomerIdsMatchingName('perez', [], SCOPE)).toEqual([])
+    expect(await findAliveCustomerIdsMatchingName('perez', ['no-es-un-uuid', ''], SCOPE)).toEqual([])
+    expect(prismaDouble.customer.findMany).not.toHaveBeenCalled()
+
+    await findAliveCustomerIdsMatchingName('perez', ['basura', ID_B], SCOPE)
+    expect(primeraLlamada(prismaDouble.customer.findMany).where.id).toEqual({ in: [ID_B] })
   })
 })

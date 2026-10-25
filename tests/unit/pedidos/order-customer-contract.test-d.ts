@@ -55,7 +55,7 @@ expectTypeOf<keyof CustomerRefSearch>().toEqualTypeOf<'search' | 'includeDeleted
 expectTypeOf<CustomerRefSearch['pageSize']>().toEqualTypeOf<number | undefined>()
 
 expectTypeOf<keyof CustomerCatalog>().toEqualTypeOf<
-  'findRefsIncludingDeleted' | 'findAliveRefById' | 'searchRefs'
+  'findRefsIncludingDeleted' | 'findAliveRefById' | 'searchRefs' | 'findAliveIdsMatchingName'
 >()
 expectTypeOf<CustomerCatalog['findRefsIncludingDeleted']>().toEqualTypeOf<
   (ids: readonly string[], companyId: string) => Promise<readonly CustomerRef[]>
@@ -65,6 +65,10 @@ expectTypeOf<CustomerCatalog['findAliveRefById']>().toEqualTypeOf<
 >()
 expectTypeOf<CustomerCatalog['searchRefs']>().toEqualTypeOf<
   (query: CustomerRefSearch, companyId: string) => Promise<Page<CustomerRef>>
+>()
+// Solo ids: buscar por nombre desde otro modulo no saca ningun dato del cliente.
+expectTypeOf<CustomerCatalog['findAliveIdsMatchingName']>().toEqualTypeOf<
+  (search: string, ids: readonly string[], companyId: string) => Promise<readonly string[]>
 >()
 
 // --- pedidos: el cliente del pedido ----------------------------------------------------------

@@ -21,7 +21,7 @@ export type SendFailure = {
   readonly effect: 'token_invalid' | null;
 };
 
-function reasonOf(code: number): string {
+export function sendFailureReasonOf(code: number): string {
   if (code === TOKEN_INVALID_CODE) return TOKEN_INVALID_MESSAGE;
   if (code === WINDOW_CLOSED_CODE) return WINDOW_CLOSED_REASON;
   if (RATE_LIMITED_CODES.includes(code)) return RATE_LIMITED_REASON;
@@ -35,7 +35,7 @@ export function sendFailureOf(failure: GraphFailure): SendFailure {
   if (code === null) return { errorCode: null, errorReason: REJECTED_WITHOUT_CODE_REASON, effect: null };
   return {
     errorCode: String(code),
-    errorReason: reasonOf(code),
+    errorReason: sendFailureReasonOf(code),
     effect: code === TOKEN_INVALID_CODE ? 'token_invalid' : null,
   };
 }

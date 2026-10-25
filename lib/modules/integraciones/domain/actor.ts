@@ -12,6 +12,7 @@ export type Actor = {
 
 const CONFIGURE_PERMISSION = 'integraciones.modificar';
 export const WHATSAPP_SEND_PERMISSION = 'whatsapp.enviar';
+export const WHATSAPP_READ_PERMISSION = 'whatsapp.consultar';
 
 /**
  * Primera línea de cada caso de uso, antes de validar la entrada y de tocar un puerto. Un actor
@@ -39,6 +40,14 @@ export function requireCustomerLinkPermission(actor: Actor | null | undefined): 
 /** El permiso ya llega quitado si el añadido está apagado: no hace falta comprobar el añadido. */
 export function requireSendPermission(actor: Actor | null | undefined): asserts actor is Actor {
   assertPermission(actor, WHATSAPP_SEND_PERMISSION, () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
+/** Las consultas de conversaciones no exigen el permiso de envío, ni los envíos este. */
+export function requireReadPermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, WHATSAPP_READ_PERMISSION, () => new UnauthorizedError());
   if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
     throw new UnauthorizedError();
   }
