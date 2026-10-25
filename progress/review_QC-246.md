@@ -237,3 +237,34 @@ eleve al humano.
 **RECHAZADO** (CAMBIOS): 1 bloqueante nuevo (B3, `gate-completo` rojo por guardias que rompe la feature)
 y B1 condicionado al resultado de los jobs E2E del run 40209402119 (en curso). B2, m1, m3–m6 resueltos;
 m2 aceptado por el humano.
+
+## Tercera pasada (acotada a c2642a2e..683894f8)
+
+Alcance: el commit `683894f8` contra B3 y B1 de la segunda pasada y sus regresiones.
+
+### Checklist
+- [x] R38 de Clientes (D19): `CARPETA_EXENTA_DE_PEDIDOS` se saca de `CUSTOMER_CONTACTS_ROUTE` y vale `app/(private)/clientes/contactos/`. El caso de sensibilidad nuevo comprueba que no disparan solo los archivos de esa carpeta, y que sí disparan `clientes/components/…`, `clientes/page.tsx`, `clientes/contactos-otro/…` (vecina por prefijo) y `clientes/x/contactos/…`. La aserción para el resto de `/clientes` no cambia y la sensibilidad anterior (qc155) se mantiene. La excepción no va más allá de D19.
+- [x] R40 de Clientes: las dos aserciones pasan a localizar por testid (`chat-composer`, el mismo del caso positivo) y por `customerChatLinkLabel`, la función del componente, con `toContain` del texto visible y del nombre. La guardia no cambia.
+- [x] R28 de Clientes: entra `contactos-chat.spec.ts` por nombre exacto, con su motivo. La lista sigue cerrada y el regex de marcadores no cambia.
+- [x] R19 de integraciones (D20): `toEqual` con la lista exacta. Entran los 16 archivos de `clientes/contactos/` por ruta, sin carpeta ni prefijo. 37 → 53 coincide con D20.
+- [x] R17 de integraciones: `isAllowedHolderOfTheCode` y `EXACT_HOLDERS_OUTSIDE_THE_CATALOG` no cambian, y el caso «rechaza un archivo vecino» sigue igual. La guardia no se relajó. Juicio más abajo.
+- [x] B1: T19 `[x]` con el run 40209402119 (e2e chromium/webkit en success, ya visto en la segunda pasada).
+- [x] Corrido en local: los 6 archivos afectados (`clientes-convenciones`, `contactos-page`, `customer-chat-link`, `clientes/scope`, `integraciones/module-shape`, `private-nav-clientes`) dan 236 passed y 4 skipped. Los skipped son previos: R22 de `module-shape` solo se ejecuta en la rama de QC-234. `tsc --noEmit` y `eslint` de los archivos tocados salen limpios.
+- [ ] `gate-completo` y `e2e` sobre `683894f8`: el run **40223658195** sigue `in_progress` en todos sus jobs (estatico, vitest 1-3/3, e2e chromium/webkit) al cerrar esta pasada.
+
+### R17: ¿uso legítimo o evasión?
+Es un **uso legítimo**, no una evasión. Motivos:
+1. La guardia existe para que el literal del permiso viva en sitios contados. Uno de esos sitios es `private-nav.ts`, cuyo papel declarado es decidir quién ve el enlace a cada pantalla. Ahí la entrada `WHATSAPP_INTEGRATION_ROUTE` exige `integraciones.modificar`, y la página destino exige lo mismo (`requirePagePermission('integraciones.modificar')`). Ahora la página de Contactos pregunta a esa fuente única «¿esta sesión ve el enlace a esa pantalla?» en vez de duplicar el permiso. Si mañana cambia el permiso de la pantalla de WhatsApp, el enlace lo sigue sin tocar Contactos, y eso es justo lo que la guardia busca.
+2. El comportamiento de R3 sigue anclado al permiso, no al menú. `contactos-page.test.tsx` pinta con sesión sin `integraciones.modificar` (no hay enlace) y con ella (enlace a `WHATSAPP_INTEGRATION_ROUTE`). Si el menú cambiara de permiso o perdiera la entrada, ese test lo detectaría.
+3. Ninguna regla se tocó para dejarlo pasar.
+
+Matiz: el mensaje de la guardia propone añadir la ruta exacta, y el implementer eligió otra vía sin decisión registrada. No hace falta humano porque no cambia ningún requisito, pero el diseño quedó desfasado (m5).
+
+### Hallazgos
+- **m5 · menor**: `design.md > 5.1` punto 2 sigue diciendo «`canOpenIntegrations` (`integraciones.modificar`) con `currentPlatformActor()` + `assertPermission`», y la bitácora repite lo mismo (`impl_QC-246.md`, línea ~327). Hay que alinearlos con `sessionSeesNavLink(WHATSAPP_INTEGRATION_ROUTE)` sobre `filterNavItemsByPermissions` y anotar por qué (R17 de integraciones).
+- **m6 · menor**: `sessionSeesNavLink` recorre solo un nivel de grupo. Basta con el menú de hoy. Si el menú anidara grupos, el enlace dejaría de verse, y lo detectaría el R3 positivo.
+
+Sin bloqueantes nuevos. B3 queda resuelto en local; su cierre definitivo depende de `gate-completo` del run 40223658195. B1 queda cerrado.
+
+### Veredicto
+**OK condicionado al run 40223658195**: pasa a OK solo si `gate-completo`, `e2e (chromium)` y `e2e (webkit)` salen success. Si alguno sale rojo, es RECHAZADO (B3/B1 reabiertos) y vuelve al implementer.
