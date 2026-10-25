@@ -261,8 +261,11 @@ app/(private)/clientes/contactos/
 ### 5.1 `page.tsx` (servidor)
 
 1. `await requirePagePermission('whatsapp.consultar')` en la primera línea (R1).
-2. `canSend` (`whatsapp.enviar`) y `canOpenIntegrations` (`integraciones.modificar`) con
-   `currentPlatformActor()` + `assertPermission` (de `@/lib/shared/auth`), no con
+2. `canSend` (`whatsapp.enviar`) con `currentPlatformActor()` + `assertPermission` (de
+   `@/lib/shared/auth`), y `canOpenIntegrations` con `sessionSeesNavLink`: la sesión ve en el menú
+   (`filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, …)`) el enlace a `WHATSAPP_INTEGRATION_ROUTE`,
+   que exige el mismo `integraciones.modificar`; así `page.tsx` no nombra ese permiso (R17 de
+   `module-shape`, tercera pasada del review). No con
    `canModifyCustomers` de `app/(private)/clientes/page.tsx`, que importa `@/lib/composition` y la
    frontera R48 lo prohíbe en esta ruta: presentación, no autorización (R3, R47, R48).
 3. Resuelve `searchParams` (`cliente`, `contacto`) **después** del corte.
