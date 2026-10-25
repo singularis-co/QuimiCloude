@@ -13,7 +13,13 @@ import {
   listSendableWhatsappTemplatesAction,
   listWhatsappConversationsAction,
 } from '@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions';
-import { BRAND_LABEL, CUSTOMER_CONTACTS_LABEL } from '@/lib/shared/navigation/private-nav';
+import {
+  BRAND_LABEL,
+  CUSTOMER_CONTACTS_LABEL,
+  PRIVATE_NAV_ITEMS,
+  filterNavItemsByPermissions,
+} from '@/lib/shared/navigation/private-nav';
+import { WHATSAPP_INTEGRATION_ROUTE } from '@/lib/shared/routes';
 
 import {
   CHAT_PAGE_SIZE,
@@ -46,6 +52,13 @@ async function sessionHolds(permission: PermissionCode): Promise<boolean> {
   }
 }
 
+// R3: el enlace se ve con el mismo permiso que el menu exige para esa pantalla.
+async function sessionSeesNavLink(href: string): Promise<boolean> {
+  const actor = await currentPlatformActor();
+  const visibles = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, actor?.permissions ?? []);
+  return visibles.some((item) => (item.kind === 'link' ? item.href === href : item.items.some((hijo) => hijo.href === href)));
+}
+
 function firstValue(params: ContactsSearchParams, name: string): string | null {
   const value = params[name];
   return (Array.isArray(value) ? value[0] : value) ?? null;
@@ -72,7 +85,7 @@ export default async function CustomerContactsPage({
 
   const [canSend, canOpenIntegrations, list, templates, chat, context, requestedCustomer] = await Promise.all([
     sessionHolds('whatsapp.enviar'),
-    sessionHolds('integraciones.modificar'),
+    sessionSeesNavLink(WHATSAPP_INTEGRATION_ROUTE),
     listWhatsappConversationsAction({ page: 1, pageSize: CONVERSATIONS_PAGE_SIZE }),
     listSendableWhatsappTemplatesAction(),
     selection === null ? null : getWhatsappChatAction({ target: selection, pageSize: CHAT_PAGE_SIZE }),

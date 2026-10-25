@@ -612,3 +612,45 @@ plantilla ni el visor de imagen se miden. Ningún R sin test.
 - **Síntoma 2 (webkit, línea 901 `tap` sobre «Enviar», 30 s):** el log dice `element is not enabled` (el botón existe, visible, no tapado). «Enviar» se deshabilita con el borrador vacío (`canSendText`). El chat se abre con `page.goto(?cliente=)` y la cabecera llega del servidor antes de hidratar; el `fill` cayó antes de la hidratación y no llegó al estado de React, así que el botón quedó deshabilitado. No es un desborde ni un control tapado a 360 px: no hay bug de R7 en la pantalla. En R42 (`:592`) no pasa porque abre el chat con `openConversation`, que ya reintenta. **Cambio:** `sendAndWaitSent` repite `fill('')` + `fill(text)` dentro de `toPass` hasta que `sendButton` está habilitado y luego toca; mismo patrón que `tapUntilVisible`/`openConversation` del archivo.
 - **Archivo:** `e2e/contactos-chat.spec.ts` (solo el paso «imagen, sticker, ubicación, reacción y fallido»). Componentes sin tocar.
 - **Salida:** `pnpm run typecheck` exit 0; `pnpm exec eslint e2e/contactos-chat.spec.ts` sin avisos; `vitest related --run e2e/contactos-chat.spec.ts`: sin tests relacionados (e2e excluido de vitest); `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`; `pnpm exec playwright test e2e/contactos-chat.spec.ts --list`: `Total: 10 tests in 1 file`. E2E sin correr en local (base sin migraciones de QC-245): se confirma en CI.
+
+## Segunda pasada del review · B3 (`gate-completo` rojo) y B1 (E2E de CI), 2026-10-25
+
+Decisiones del humano (2026-10-25), anotadas como D19 y D20 en `requirements.md > Decisiones cerradas`.
+
+### B3 — los 5 rojos de `gate-completo`
+
+| # | Guardia | Cambio |
+|---|---|---|
+| 1 | `clientes-convenciones.test.ts > R38` (pedidos) | Excepción D19 solo para `app/(private)/clientes/contactos/`, sacada de `CUSTOMER_CONTACTS_ROUTE` (`CARPETA_EXENTA_DE_PEDIDOS`, `culpablesDePedidos`). Caso nuevo de sensibilidad «la excepcion de Contactos (D19) es exacta»: árbol fabricado en tmpdir; el archivo de `contactos/` no dispara; disparan `clientes/components/…`, `clientes/page.tsx`, `clientes/contactos-otro/…` y `clientes/x/contactos/…`. |
+| 2 | `clientes-convenciones.test.ts > R40` (copy literal) | `contactos-page.test.tsx` R47: `queryByRole('textbox', { name: 'Mensaje' })` pasa a `queryByTestId('chat-composer')` (el mismo testid que usa el caso positivo). `customer-chat-link.test.tsx` R45: el nombre accesible sale de `customerChatLinkLabel('María Gómez')`, la función que usa el componente, y se comprueba que contiene `CUSTOMER_CHAT_LINK_TEXT` y el nombre. La regla no se toca. |
+| 3 | `clientes/scope.test.ts > R28` (E2E que nombran clientes) | Usé la vía que la regla ya declara: la lista cerrada `E2E_PERMITIDOS`, a la que cada feature añade su spec por nombre exacto y con comentario fechado. Entra `contactos-chat.spec.ts` (QC-246, T19): recorre `/clientes/contactos`, mide «Abrir chat» en Clientes y siembra clientes con `clientes.modificar`. El marcador y la sensibilidad no cambian. |
+| 4 | `integraciones/module-shape.test.ts > R19` (importadores) | D20: la lista exacta pasa de 37 a 53, con los 16 archivos de `clientes/contactos/` (15 componentes + `page.tsx`) por ruta exacta y un comentario «QC-246 Contactos (D20…)». El título del `it` nombra Contactos. |
+| 5 | `integraciones/module-shape.test.ts > R17` (`integraciones.modificar`) | La página sí lo necesita (R3: «Ir a Integraciones» solo con ese permiso). frontend_dev quitó el literal: `sessionSeesNavLink(WHATSAPP_INTEGRATION_ROUTE)` usa `filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, actor.permissions)`. El permiso se lee del enlace del menú (`private-nav.ts`, que ya está permitido) y no se reimplementa la pertenencia. `isAllowedHolderOfTheCode` no cambia. |
+
+Archivos: `app/(private)/clientes/contactos/page.tsx`, `tests/unit/clientes-ui/clientes-convenciones.test.ts`, `tests/unit/clientes-ui/contactos-page.test.tsx`, `tests/unit/clientes-ui/customer-chat-link.test.tsx`, `tests/unit/clientes/scope.test.ts`, `tests/unit/integraciones/module-shape.test.ts`, `specs/QC-246-contactos-con-chat/requirements.md` (D19, D20), `specs/QC-246-contactos-con-chat/tasks.md` (T19).
+
+### B1 — E2E de CI, run 40209402119 (`aaa8502b`)
+
+`gh run view 40209402119 --json jobs`:
+
+| Job | Conclusión |
+|---|---|
+| estatico | success |
+| vitest (shard 1/3, 2/3, 3/3) | success |
+| gate-completo | failure (los 5 rojos de B3, arreglados arriba) |
+| e2e (chromium) | success: `307 passed (21.0m)`, `1 flaky` |
+| e2e (webkit) | success: `307 passed (24.2m)`, `1 flaky` |
+| e2e | success |
+
+- Recuento de los logs para los specs de QC-246: en cada navegador pasan los 5 casos de `contactos-chat.spec.ts` (10 en total, igual que `--list`), los 3 de `clientes.spec.ts` y los 4 de `movimiento.spec.ts`. Ningún ✘.
+- Los dos flaky son ajenos a QC-246: chromium `e2e/integraciones-proveedor-ia.spec.ts:237` y webkit `e2e/operario-rediseno.spec.ts:827`.
+- T19 marcada `[x]` en `tasks.md`.
+
+### Salida real (implementer)
+
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los 10 preexistentes; ninguno en archivos de este cambio.
+- `pnpm exec vitest run` de los 3 archivos de guardia + `contactos-page.test.tsx` + `customer-chat-link.test.tsx`: `Test Files 5 passed (5)` · `Tests 207 passed | 4 skipped (211)`.
+- `pnpm exec vitest related --run <6 .ts/.tsx del cambio>`: `Test Files 5 passed (5)` · `Tests 207 passed | 4 skipped (211)`.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+- `pnpm exec vitest run tests/unit`: `Test Files 1258 passed (1258)` · `Tests 21448 passed | 126 skipped (21574)`. Sin rojos, ni propios ni ajenos.

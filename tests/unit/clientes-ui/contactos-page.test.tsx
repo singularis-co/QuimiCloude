@@ -313,7 +313,7 @@ describe('R47 · permiso de envío', () => {
     await pintarPagina({ cliente: 'cliente-9' });
 
     expect(screen.getByTestId('chat-header')).toBeTruthy();
-    expect(screen.queryByRole('textbox', { name: 'Mensaje' })).toBeNull();
+    expect(screen.queryByTestId('chat-composer')).toBeNull();
   });
 
   it('R47: con whatsapp.enviar el chat abierto trae la caja', async () => {

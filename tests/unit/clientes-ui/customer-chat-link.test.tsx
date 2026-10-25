@@ -17,6 +17,7 @@ import {
   CustomerChatLink,
   buildCustomerColumns,
   customerChatHref,
+  customerChatLinkLabel,
 } from '@/app/(private)/clientes/components';
 import { CONTACTS_SELECTION_PARAMS } from '@/app/(private)/clientes/contactos/components';
 import type { CustomerView } from '@/lib/modules/clientes';
@@ -79,7 +80,11 @@ describe('R45 — con `whatsapp.consultar` y teléfono válido, «Abrir chat» l
   it('R45 — el nombre accesible nombra al cliente y contiene el texto visible', () => {
     render(<CustomerChatLink customer={cliente()} canChat />);
 
-    expect(screen.getByRole('link', { name: `${CUSTOMER_CHAT_LINK_TEXT} de María Gómez` })).toBeInTheDocument();
+    const nombre = customerChatLinkLabel('María Gómez');
+
+    expect(nombre).toContain(CUSTOMER_CHAT_LINK_TEXT);
+    expect(nombre).toContain('María Gómez');
+    expect(screen.getByRole('link', { name: nombre })).toBeInTheDocument();
   });
 
   it('R45 — el identificador se codifica en la consulta', () => {

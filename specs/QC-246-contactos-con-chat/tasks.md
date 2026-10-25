@@ -134,11 +134,11 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 
 ## Bloque 5 — E2E y cierre
 
-- [ ] **T19** (dep. T15, T18) — `e2e/contactos-chat.spec.ts` con los dobles de Graph: webhook
+- [x] **T19** (dep. T15, T18) — `e2e/contactos-chat.spec.ts` con los dobles de Graph: webhook
   entrante → aparece en la lista y el chat sin recargar (R42) → responder (R32) → «Enviado» →
   status `delivered` por webhook → «Entregado» (R19); 404 sin `whatsapp.consultar` (R1); «Abrir chat»
   desde Clientes (R45, R46); a 390 × 844 lista ↔ chat (R6) y sin scroll horizontal (R7).
-  *Hecho:* el spec pasa en local. **Estado (2026-10-24):** escrito y en verde estático (`--list` 8 tests); sin correr: la base local compartida no tiene las migraciones de QC-245. Se cierra con el job E2E de CI o una base migrada.
+  *Hecho:* el spec pasa en local. **Estado (2026-10-24):** escrito y en verde estático (`--list` 8 tests); sin correr: la base local compartida no tiene las migraciones de QC-245. Se cierra con el job E2E de CI o una base migrada. **Cerrada (2026-10-25):** run 40209402119 (`aaa8502b`), `e2e (chromium)` y `e2e (webkit)` en success, 307 passed cada uno; los 5 casos de `contactos-chat.spec.ts` en verde en cada navegador (10) (salida en `progress/impl_QC-246.md`).
 - [x] **T20** — Mapa `R<n> → test` en `progress/impl_QC-246.md` (R1–R54), `./init.sh` verde y
   `node scripts/archivos-en-vuelo.mjs --candidata QC-246` sin choques sin aceptar.
   *Hecho:* cada `R<n>` con su test; gate local verde.
