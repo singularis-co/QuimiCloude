@@ -895,10 +895,19 @@ test.describe('el chat de WhatsApp de Contactos', () => {
         const composer = page.getByTestId(CHAT_COMPOSER_TESTID);
         const box = composer.getByPlaceholder(CHAT_COMPOSER_TEXT.placeholder);
 
+        const sendButton = composer.getByRole('button', { name: CHAT_COMPOSER_TEXT.send, exact: true });
+
+        // El chat se abre con `page.goto`: la cabecera llega pintada por el servidor antes de
+        // hidratar, y un `fill` antes de hidratar deja el texto sin llegar al estado (el boton
+        // sigue deshabilitado). Se repite hasta que «Enviar» se habilita.
         async function sendAndWaitSent(text: string): Promise<string> {
           await expect(box).toBeEnabled({ timeout: 60_000 });
-          await box.fill(text);
-          await composer.getByRole('button', { name: CHAT_COMPOSER_TEXT.send, exact: true }).tap();
+          await expect(async () => {
+            await box.fill('');
+            await box.fill(text);
+            await expect(sendButton).toBeEnabled({ timeout: 5_000 });
+          }).toPass({ timeout: 60_000 });
+          await sendButton.tap();
           await expect(messageBubble(page, 'out', text)).toHaveAttribute('data-delivery', 'sent', { timeout: 60_000 });
           const row = await prisma.whatsappMessage.findFirstOrThrow({
             where: { companyId: fixtureCompanyId(), direction: 'OUT', body: text },
@@ -915,10 +924,12 @@ test.describe('el chat de WhatsApp de Contactos', () => {
           reaction: { message_id: reactedWamid, emoji: REACTION_EMOJI },
         });
 
-        const failedText = `Le enviamos la factura ${RUN_ID.slice(0, 6)}`;
+        // La palabra larga va en el propio texto del fallido: el motivo que pinta la burbuja sale
+        // del codigo de Meta (131026), no de `error_data.details`, asi que ahi no se veria.
+        const failedText = `Le enviamos la factura ${longWord}`;
         const failedWamid = await sendAndWaitSent(failedText);
         await postOutboundStatus(page.request, connection, everyType, failedWamid, 'failed', [
-          { code: 131026, title: 'Message undeliverable', error_data: { details: `Destinatario no disponible ${longWord}` } },
+          { code: 131026, title: 'Message undeliverable', error_data: { details: 'Destinatario no disponible' } },
         ]);
 
         await expect(page.getByRole('button', { name: CHAT_IMAGE_TEXT.open })).toBeVisible();
