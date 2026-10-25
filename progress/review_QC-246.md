@@ -158,3 +158,82 @@ es ajeno y no cuenta. MCP del grafo: no usado; la exploración se hizo con Grep/
 ## Veredicto
 
 **RECHAZADO** (CAMBIOS): 2 bloqueantes (B1, B2), 6 menores.
+
+## Segunda pasada (2026-10-25, `aacbf406..aaa8502b`)
+
+Alcance: los commits `17e9e360`, `afde61bd`, `1276b897`, `aaa8502b` contra B1, B2 y m1–m6, más sus
+regresiones. MCP del grafo: no usado (Grep/Read).
+
+### Verificación ejecutada por el reviewer
+
+| Comando | Resultado |
+|---|---|
+| `pnpm run typecheck` | `tsc --noEmit`, exit 0 |
+| `pnpm run lint` | `✖ 10 problems (0 errors, 10 warnings)`, ninguno en archivos del diff |
+| `pnpm exec vitest related --run <70 .ts/.tsx del diff, sin e2e>` | `Test Files 178 passed (178)` · `Tests 2871 passed \| 22 skipped` |
+| `pnpm exec vitest run guard` | `Test Files 87 passed (87)` · `Tests 1324 passed \| 22 skipped` |
+| CI run 40209402119 (`aaa8502b`, `workflow_dispatch`) | `estatico` y los 3 shards de vitest en verde; **`gate-completo` en ROJO**; `e2e (chromium)` y `e2e (webkit)` **en curso** al cerrar esta pasada |
+| `pnpm exec vitest run` de los 3 archivos rojos de `gate-completo` | `Test Files 3 failed` · `Tests 5 failed` (reproducido en local, ver B3) |
+
+### Estado de los hallazgos de la primera pasada
+
+- **B1 — sigue abierto, condicionado al run 40209402119.** `tasks.md:137` T19 sigue `[ ]` y no hay
+  salida de una corrida E2E verde en `impl_QC-246.md` (los runs 40152044453 y 40155450179 dieron 2 y
+  1 rojos propios, ya corregidos en `1276b897` y `aaa8502b`). Se cierra cuando los jobs `e2e (chromium)`
+  y `e2e (webkit)` del run 40209402119 terminen sin rojos de `contactos-chat`, `clientes` y
+  `movimiento`, la salida se pegue en la bitácora y T19 pase a `[x]`. No se da por verde.
+- **B2 — resuelto (pendiente solo de B1).** `e2e/contactos-chat.spec.ts`: viewport 360 × 844
+  (`:118`); `expectNoHorizontalScroll` (`:509`) mide `documentElement` y los contenedores visibles;
+  el caso «R7: a 360 px…» (`:800`) mide burbujas de plantillas, plantilla marcada, detalle del pedido,
+  diálogo «Enviar plantilla», chat con imagen, sticker, ubicación, reacción y fallido con palabra larga,
+  y el visor. El desborde real del diálogo que destapó el CI se arregló en el componente
+  (`send-template-dialog.tsx`, `min-w-0` + truncado del disparador) con test estructural en
+  `send-template-dialog.test.tsx > R7`. Primitivos de `components/ui` sin tocar.
+- **m1 — resuelto.** `use-window-open.ts` (temporizador hasta `closesAt`, tope 2^31−1 ms) y
+  `chat-composer.tsx` decide el modo con él; dos tests nuevos en `chat-composer.test.tsx` (paso a
+  cerrada sin consulta y ventana > 24,8 días).
+- **m2 — aceptado como menor por el humano** (sin `displayName` en backend). No cuenta.
+- **m3 — resuelto.** `design.md` (tabla de acciones y §5.4) recoge el reintento con todas las constantes.
+- **m4 — resuelto.** `progress/features/QC-246.md > Decisiones` alineado con D17.
+- **m5 — resuelto.** `chat-panel.tsx:190` con `settleAction`; test `R27 · D4` sin rechazo sin capturar.
+- **m6 — resuelto.** `tasks.md > Archivos esperados` completo.
+- `e2e/clientes.spec.ts`: `enableAllAddons(companyId)` es correcto (Contactos exige `whatsapp.consultar`,
+  del añadido `integraciones`); el caso sin añadido sigue cubierto en `contactos-chat.spec.ts`; la
+  limpieza cae por cascada. No relaja asserts.
+
+### Trazabilidad
+- [x] R1–R54: cada uno con al menos un `it`/`test`/`step` con su id en los tests del diff (script).
+- [x] R7 con test fiel (B2).
+
+### Hallazgo nuevo
+
+#### B3 — BLOQUEANTE · `gate-completo` en rojo por 3 archivos de test que rompe esta feature
+`gate-completo` del run 40209402119 (y ya de 40152044453 y 40155450179) falla con «3 archivo(s) de test
+en rojo que NO estan en el baseline». Ninguno está en `tests/baseline-rojos.json` y los 5 fallos nombran
+archivos que crea o cambia QC-246 (no existen o no tienen ese contenido en
+`origin/feature/QC-245-contactos-whatsapp-backend`). `vitest related` no los ve porque barren el árbol
+por glob, no por import. Reproducido en local:
+
+- `tests/unit/clientes/scope.test.ts > R28`: «spec E2E ajeno con marca de clientes: contactos-chat.spec.ts».
+- `tests/unit/clientes-ui/clientes-convenciones.test.ts > R38`: «mencionan pedidos: chat-header.tsx,
+  chat-image-viewer.tsx, chat-order-detail.tsx, chat-view.ts, contact-texts.ts, send-template-dialog.tsx».
+- `tests/unit/clientes-ui/clientes-convenciones.test.ts > R40`: literal de copy en
+  `contactos-page.test.tsx:316` (`queryByRole('textbox', { name: 'Mensaje' })`) y en
+  `customer-chat-link.test.tsx` (`getByRole('link', { name: \`…\` })`).
+- `tests/unit/integraciones/module-shape.test.ts > R19`: 53 importadores de `@/lib/modules/integraciones`
+  frente a los 37 permitidos (los componentes nuevos de `clientes/contactos/`).
+- `tests/unit/integraciones/module-shape.test.ts > R17`: `integraciones.modificar` en
+  `app/(private)/clientes/contactos/page.tsx`, fuera de `isAllowedHolderOfTheCode`.
+
+Para cumplirlo: o bien ajustar el código/tests propios (p. ej. localizar por constante en R40), o bien
+ampliar esas guardias con la ruta **exacta** de la excepción y su motivo (lo que piden sus mensajes),
+sin relajar las aserciones para el resto; y que `gate-completo` salga verde. Recuerda: nadie mergea con
+`gate-completo` en rojo (`CLAUDE.md`, regla 5). La ampliación de la guardia de pedidos (R38 de Clientes)
+choca de fondo con la decisión del spec de mostrar el pedido en el chat: si hace falta, que el leader la
+eleve al humano.
+
+### Veredicto (segunda pasada)
+
+**RECHAZADO** (CAMBIOS): 1 bloqueante nuevo (B3, `gate-completo` rojo por guardias que rompe la feature)
+y B1 condicionado al resultado de los jobs E2E del run 40209402119 (en curso). B2, m1, m3–m6 resueltos;
+m2 aceptado por el humano.
