@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { useId, useState } from 'react';
 
 import { ErrorAlert } from '@/components/shared/error-alert';
-import { SharedSelectControl } from '@/components/shared/shared-select';
+import { SHARED_SELECT_TRIGGER_CLASS, SharedSelectControl } from '@/components/shared/shared-select';
 import { WaBubble, type WaBubbleVariable } from '@/components/shared/wa-bubble';
 import { Button } from '@/components/ui/button';
 import {
@@ -48,6 +48,11 @@ export type SendTemplateDialogProps = {
 };
 
 const EMPTY_VALUES: TemplateValues = {};
+
+// R7: un nombre de plantilla sin espacios no debe ensanchar el diálogo a 360 px. El disparador
+// encoge y trunca la etiqueta; las opciones parten la palabra en vez de desbordar la lista.
+const TRIGGER_CLASS = `${SHARED_SELECT_TRIGGER_CLASS} min-w-0 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate`;
+const OPTION_CLASS = '*:first:min-w-0 *:first:whitespace-normal *:first:[overflow-wrap:anywhere]';
 const MARKER = /\{\{([^{}]+)\}\}/g;
 
 function previewVariables(template: WhatsappSendableTemplate, values: TemplateValues): WaBubbleVariable[] {
@@ -93,10 +98,10 @@ export function SendTemplateDialog({
         data-testid={SEND_TEMPLATE_DIALOG_TESTID}
         className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 sm:max-w-3xl"
       >
-        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 md:px-6">
-          <div className="flex flex-col gap-1">
-            <DialogTitle className="text-lg font-semibold">{SEND_TEMPLATE_DIALOG_TEXT.title}</DialogTitle>
-            <DialogDescription className="text-[13px]">{SEND_TEMPLATE_DIALOG_TEXT.description}</DialogDescription>
+        <div className="flex min-w-0 items-start justify-between gap-3 px-5 pt-5 pb-3 md:px-6">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <DialogTitle className="text-lg font-semibold [overflow-wrap:anywhere]">{SEND_TEMPLATE_DIALOG_TEXT.title}</DialogTitle>
+            <DialogDescription className="text-[13px] [overflow-wrap:anywhere]">{SEND_TEMPLATE_DIALOG_TEXT.description}</DialogDescription>
           </div>
           <DialogClose
             aria-label={SEND_TEMPLATE_DIALOG_TEXT.close}
@@ -106,9 +111,9 @@ export function SendTemplateDialog({
           </DialogClose>
         </div>
 
-        <div className="flex flex-col gap-5 px-5 pb-5 md:flex-row md:px-6">
+        <div className="flex min-w-0 flex-col gap-5 px-5 pb-5 md:flex-row md:px-6">
           <div className="flex min-w-0 flex-1 flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <span id={templateLabelId} className="text-[13px] font-medium">
                 {SEND_TEMPLATE_DIALOG_TEXT.template}
               </span>
@@ -120,12 +125,14 @@ export function SendTemplateDialog({
                 disabled={sending || templates.length === 0}
                 labelledBy={templateLabelId}
                 triggerTestId={SEND_TEMPLATE_SELECT_TESTID}
+                triggerClassName={TRIGGER_CLASS}
+                optionClassName={OPTION_CLASS}
                 alignItemWithTrigger={false}
               />
             </div>
 
             {orders.length > 1 && selectedOrderId !== null && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <span id={orderLabelId} className="text-[13px] font-medium">
                   {SEND_TEMPLATE_DIALOG_TEXT.order}
                 </span>
@@ -141,6 +148,8 @@ export function SendTemplateDialog({
                   labelledBy={orderLabelId}
                   describedBy={orderHintId}
                   triggerTestId={SEND_TEMPLATE_ORDER_SELECT_TESTID}
+                  triggerClassName={TRIGGER_CLASS}
+                  optionClassName={OPTION_CLASS}
                   alignItemWithTrigger={false}
                 />
                 <span id={orderHintId} className="text-xs text-muted-foreground">
@@ -150,7 +159,7 @@ export function SendTemplateDialog({
             )}
           </div>
 
-          <div className="flex w-full flex-col gap-1.5 md:w-80 md:shrink-0">
+          <div className="flex w-full min-w-0 flex-col gap-1.5 md:w-80 md:shrink-0">
             <span className="text-[13px] font-medium">{SEND_TEMPLATE_DIALOG_TEXT.preview}</span>
             {template !== null && resolved !== null && (
               <WaBubble
@@ -163,7 +172,7 @@ export function SendTemplateDialog({
               />
             )}
             {missingText !== null && (
-              <p id={missingId} data-testid={SEND_TEMPLATE_MISSING_TESTID} className="text-xs text-destructive-text">
+              <p id={missingId} data-testid={SEND_TEMPLATE_MISSING_TESTID} className="text-xs text-destructive-text [overflow-wrap:anywhere]">
                 {missingText}
               </p>
             )}
@@ -172,18 +181,18 @@ export function SendTemplateDialog({
 
         {failure !== null &&
           (failure.status === 'missing_values' ? (
-            <p role="alert" data-testid={SEND_TEMPLATE_ERROR_TESTID} className="px-5 pb-4 text-sm text-destructive-text md:px-6">
+            <p role="alert" data-testid={SEND_TEMPLATE_ERROR_TESTID} className="min-w-0 px-5 pb-4 text-sm text-destructive-text [overflow-wrap:anywhere] md:px-6">
               {failure.message}
             </p>
           ) : (
             <ErrorAlert
               error={failure}
               testId={SEND_TEMPLATE_ERROR_TESTID}
-              className="px-5 pb-4 text-sm text-destructive-text md:px-6"
+              className="min-w-0 px-5 pb-4 text-sm text-destructive-text [overflow-wrap:anywhere] md:px-6"
             />
           ))}
 
-        <DialogFooter className="mx-0 mb-0 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
+        <DialogFooter className="mx-0 mb-0 min-w-0 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6">
           <DialogClose render={<Button type="button" variant="outline" touch />}>{SEND_TEMPLATE_DIALOG_TEXT.cancel}</DialogClose>
           <Button
             type="button"

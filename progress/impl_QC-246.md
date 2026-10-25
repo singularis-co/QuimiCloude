@@ -581,3 +581,27 @@ plantilla ni el visor de imagen se miden. Ningún R sin test.
 - `pnpm exec vitest related --run chat-composer.tsx chat-panel.tsx use-window-open.ts chat-composer.test.tsx chat-panel.test.tsx`: `Test Files 6 passed (6)` · `Tests 114 passed (114)`.
 - `pnpm exec vitest run guard`: 1.ª corrida `1 failed | 86 passed` (`guard-asignacion-componentizada`, ajena al diff; sola pasa 22/22 en 38 s: flake de saturación); 2.ª corrida `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
 - `pnpm exec playwright test e2e/contactos-chat.spec.ts --list`: `Total: 10 tests in 1 file` (incluye «R6, R7: a 360 × 844 …» y «R7: a 360 px …» en chromium y webkit). E2E sin correr: B1, en CI.
+
+## Fix R7 · diálogo «Enviar plantilla» desborda a 360 px (rojo E2E en CI, e2e/contactos-chat.spec.ts:888)
+
+- **Causa:** `DialogContent` es `grid` con pista `auto`; sus hijos no llevaban `min-w-0` y el `SelectTrigger` (`whitespace-nowrap`) aportaba como min-content el nombre entero de la plantilla (~558 px). `WaBubble` ya parte con `[overflow-wrap:anywhere]`.
+- **Archivos:** `app/(private)/clientes/contactos/components/send-template-dialog.tsx` (`min-w-0` en cabecera, cuerpo, columnas, error y footer; `[overflow-wrap:anywhere]` en título, descripción, faltantes y error; `triggerClassName` con `min-w-0` + `*:data-[slot=select-value]:min-w-0 truncate` en ambos selectores; `optionClassName` que parte el texto de la opción). `tests/unit/contactos-ui/send-template-dialog.test.tsx` (nuevo `R7: …`). Primitivos de `components/ui` sin tocar.
+- **R7 → test:** `send-template-dialog.test.tsx > R7: con un nombre de plantilla largo sin espacios, el cuerpo encoge y el selector trunca la etiqueta` (estructural; falla con el código anterior: verificado). Mide de verdad el E2E R7.
+- **Salida:** `pnpm exec tsc --noEmit` sin errores; `eslint` sobre los 2 archivos sin avisos; `vitest run send-template-dialog.test.tsx`: 13 passed (13); `vitest related --run send-template-dialog.tsx`: 6 files, 115 passed (115). E2E sin correr (CI).
+- **Veredicto:** desborde corregido en el componente; queda confirmar en la corrida E2E de CI.
+
+## Fix E2E · `e2e/clientes.spec.ts:438` sin el hijo «Contactos» en el menú (rojo en CI)
+
+- **Causa:** desde QC-246 el hijo «Contactos» exige `whatsapp.consultar` (D1, R1/R2), del añadido `integraciones`. La empresa efímera del `beforeAll` nacía sin añadidos y la sesión recortaba el permiso al Administrador.
+- **Archivo:** `e2e/clientes.spec.ts`: `enableAllAddons(companyId)` (de `./helpers/addons`) tras crear la empresa; cabecera («LO QUE ESTE SPEC NO CREA») y comentarios del `beforeAll`/`afterAll` explican el motivo y remiten el caso sin añadido a `e2e/contactos-chat.spec.ts` («R1, R45…»); título del test con `QC-246 R2`.
+- **Comprobado:** `CompanyAddonOverride.company` tiene `onDelete: Cascade` (`db/schema.prisma`), así que el `afterAll` borra la empresa igual. Aterrizaje: `homeHrefFor` toma el primer item visible; con más permisos solo puede salir uno igual o anterior, nunca `/clientes` ni `/clientes/contactos`. Operador sin permisos de añadidos (`SEED_ROLE_PERMISSIONS`): su test no cambia. No se relajó ningún assert.
+- **Salida:** `pnpm exec tsc --noEmit` exit 0; `pnpm exec eslint e2e/clientes.spec.ts` exit 0, sin avisos; `pnpm exec playwright test e2e/clientes.spec.ts --list`: `Total: 6 tests in 1 file`. E2E sin correr (base local sin migraciones de QC-245).
+- **Veredicto:** fixture corregida; queda confirmar en la corrida E2E de CI.
+
+### Verificación del implementer (fix de los 2 rojos E2E de CI, run 40152044453)
+
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)` (preexistentes; `eslint` sobre los 3 archivos tocados: `No issues found`).
+- `pnpm exec vitest related --run send-template-dialog.tsx send-template-dialog.test.tsx`: `Test Files 6 passed (6)` · `Tests 115 passed (115)`.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+- E2E sin correr en local (base compartida sin las migraciones de QC-245): se confirma en CI.

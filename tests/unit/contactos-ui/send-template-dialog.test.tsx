@@ -258,3 +258,35 @@ describe('R37 · envío desde el diálogo', () => {
     expect(botonEnviar().hasAttribute('disabled')).toBe(false);
   });
 });
+
+describe('R7 · el diálogo no desborda a 360 px', () => {
+  // jsdom no mide layout: aquí se fijan las clases que impiden el desborde. El que mide de verdad
+  // (scrollWidth <= clientWidth a 360 px) es el E2E R7 de e2e/contactos-chat.spec.ts.
+  const NOMBRE_LARGO = 'aviso_de_pedido_listo_para_recoger_en_la_planta_0123456789ab';
+  const LARGA = plantilla('t-larga', NOMBRE_LARGO, `Hola ${'x'.repeat(65)} {{cliente.nombre}}.`, [sistema('cliente.nombre')]);
+
+  it('R7: con un nombre de plantilla largo sin espacios, el cuerpo encoge y el selector trunca la etiqueta', async () => {
+    const user = setupUser();
+    pintar({
+      templates: [LARGA],
+      context: contexto([pedido('p131', 'PED-00131'), pedido('p132', 'PED-00132')]),
+    });
+    const contenido = screen.getByTestId('send-template-dialog');
+    const hijos = [...contenido.children].filter((hijo) => hijo instanceof HTMLElement);
+    expect(hijos.length).toBeGreaterThan(0);
+    for (const hijo of hijos) expect(hijo.className).toMatch(/(^|\s)min-w-0(\s|$)/);
+
+    for (const nombre of ['Plantilla', 'Pedido']) {
+      const disparador = within(dialogo()).getByRole('combobox', { name: nombre });
+      expect(disparador.className).toMatch(/(^|\s)min-w-0(\s|$)/);
+      expect(disparador.className).toContain('*:data-[slot=select-value]:truncate');
+      expect(disparador.className).toContain('*:data-[slot=select-value]:min-w-0');
+    }
+    expect(within(dialogo()).getByRole('combobox', { name: 'Plantilla' }).textContent).toContain(NOMBRE_LARGO);
+    expect(vistaPrevia().parentElement?.className).toMatch(/(^|\s)min-w-0(\s|$)/);
+
+    await user.click(within(dialogo()).getByRole('combobox', { name: 'Plantilla' }));
+    const opcion = await screen.findByRole('option', { name: NOMBRE_LARGO });
+    expect(opcion.className).toContain('*:first:[overflow-wrap:anywhere]');
+  });
+});
