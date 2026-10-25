@@ -510,20 +510,20 @@ Veredicto: T19 escrito y verificado estáticamente; falta correrlo contra una ba
 | R3 | `contacts-empty-states.test.tsx`, `clientes-ui/contactos-page.test.tsx` |
 | R4 | `conversation-list.test.tsx`, `chat-panel.test.tsx`, `clientes-ui/contactos-page.test.tsx` |
 | R5 | `contacts-screen.test.tsx`, `contacts-empty-states.test.tsx` |
-| R6 | `contacts-screen.test.tsx`, `chat-header.test.tsx`; E2E › «R6, R7: a 390 × 844…» |
-| R7 | solo E2E › «R6, R7: a 390 × 844 … sin scroll horizontal» (sin unit: jsdom no maqueta) |
+| R6 | `contacts-screen.test.tsx`, `chat-header.test.tsx`; E2E › «R6, R7: a 360 × 844…» |
+| R7 | solo E2E, a 360 px (sin unit: jsdom no maqueta, un `scrollWidth` en jsdom vale 0 y sería vacío): «R6, R7: a 360 × 844 …» (lista y chat de texto) y «R7: a 360 px no hay scroll horizontal con las burbujas de plantillas, el detalle del pedido, el dialogo «Enviar plantilla», cada tipo de mensaje y el visor de imagen» (imagen, sticker, ubicación, reacción, fallido). Mide `documentElement` y cada contenedor visible |
 | R8, R9, R11, R12 | `conversation-list.test.tsx` (R12 también `contacts-empty-states.test.tsx`) |
 | R10 | `chat-time-format.test.ts` |
 | R13 | `conversation-list-state.test.ts`, `conversation-list.test.tsx`, `chat-message-list.test.tsx` |
 | R14 | `conversation-list.test.tsx`, `contacts-screen.test.tsx` |
-| R15, R16 | `chat-header.test.tsx` (R15 también `chat-time-format.test.ts`) |
+| R15, R16 | `chat-header.test.tsx` (R15 también `chat-time-format.test.ts`); R16 → R30 también `chat-composer.test.tsx` › «R16 · R30: al llegar `closesAt` la caja pasa sola a ventana cerrada…» y «…más de 24,8 días…» |
 | R17 | `chat-time-format.test.ts`, `chat-timeline.test.ts`, `chat-message-list.test.tsx` |
 | R18, R20, R21, R22, R24 | `chat-view.test.ts`, `chat-message.test.tsx` |
 | R19 | `chat-view.test.ts`, `chat-message.test.tsx`; E2E › «R42, R32, R19: …» |
 | R23 | `chat-message.test.tsx` |
 | R25 | `chat-timeline.test.ts`, `chat-message-list.test.tsx`, `chat-panel.test.tsx` |
 | R26 | `chat-message-list.test.tsx` |
-| R27 | `chat-panel.test.tsx`, `conversation-list.test.tsx`, `contacts-screen.test.tsx` |
+| R27 | `chat-panel.test.tsx` (incl. «R27 · D4: si marcar leída rechaza, no deja promesa sin capturar ni pinta error»), `conversation-list.test.tsx`, `contacts-screen.test.tsx` |
 | R28 | `contacts-poller.test.ts`, `contacts-screen.test.tsx` |
 | R29, R30 | `chat-composer.test.tsx` |
 | R31, R34 | `chat-composer.test.tsx`, `send-template-dialog.test.tsx` |
@@ -562,3 +562,22 @@ plantilla ni el visor de imagen se miden. Ningún R sin test.
   `20261024120000_whatsapp_read_permission`, `20261024130000_whatsapp_contacts_last_read`) y tiene 3 de otra rama que
   aquí no existen. Migrarla rompería a las otras sesiones; Docker no está levantado para una base propia. Quedan
   para el job E2E de CI. `playwright test e2e/contactos-chat.spec.ts --list`: `Total: 8 tests in 1 file`.
+
+## Correcciones del review (2026-10-24, commit `aacbf406` → este)
+
+### Hallazgos
+- **B2 (R7):** `e2e/contactos-chat.spec.ts`: teléfono a 360 × 844; `expectNoHorizontalScroll` mide `documentElement` y los contenedores visibles (pantalla, lista, panel, cabecera, detalle del pedido, mensajes, vacío, caja, burbujas, diálogo, visor). Test hermano «R7: a 360 px …» con plantilla aprobada y pedido `PENDIENTE` sembrados, entrante de hace 25 h (ventana cerrada), imagen y sticker por el webhook (doble `downloadMedia`), ubicación, reacción y `status: failed`. Limpieza nueva `deleteOrderData`. Todos los estados caben en el E2E: no hizo falta test de componente. **Sin correr** (B1, CI): supuestos por confirmar en la primera corrida: el webhook acepta `timestamp` de hace 25 h, la consulta periódica trae la reacción y el `failed`, la vista previa del diálogo contiene el texto de la plantilla.
+- **m1:** `use-window-open.ts` (nuevo, `setTimeout` hasta `closesAt`, con tope de 2^31−1 ms y reprogramación); `chat-composer.tsx` decide el modo con él.
+- **m2 (R18): NO corregido, bloqueado.** El nombre del usuario actual no llega a la pantalla sin backend: `currentPlatformActor()` (`lib/modules/identity/adapters/driving/platform-session.ts`) devuelve `{ id, permissions }` sin `displayName`; la página no puede importar `@/lib/composition` (frontera R48) y en cliente no hay contexto con el usuario. Requiere que backend exponga `displayName` (o una función hermana); luego en front: `currentUserName` por `ContactsScreen` → `ChatPanel` → `ChatComposer`. Decisión del leader.
+- **m3:** `design.md` (tabla de acciones, `retryWhatsappMessageAction`, y §5.4 «Reintento») recoge el desvío aprobado: todas las constantes del sistema con valor.
+- **m4:** del leader (no tocado).
+- **m5:** `chat-panel.tsx`: `markWhatsappChatReadAction` dentro de `settleAction`.
+- **m6:** `tasks.md > Archivos esperados` completo contra `git diff --name-only origin/feature/QC-245-contactos-whatsapp-backend...HEAD` (+ `use-window-open.ts`); comprobado por script: ninguno falta.
+
+### Salida real (implementer)
+
+- `pnpm run typecheck`: `tsc --noEmit`, exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)` (ninguno en archivos tocados; `eslint e2e/contactos-chat.spec.ts`: sin problemas).
+- `pnpm exec vitest related --run chat-composer.tsx chat-panel.tsx use-window-open.ts chat-composer.test.tsx chat-panel.test.tsx`: `Test Files 6 passed (6)` · `Tests 114 passed (114)`.
+- `pnpm exec vitest run guard`: 1.ª corrida `1 failed | 86 passed` (`guard-asignacion-componentizada`, ajena al diff; sola pasa 22/22 en 38 s: flake de saturación); 2.ª corrida `Test Files 87 passed (87)` · `Tests 1324 passed | 22 skipped (1346)`.
+- `pnpm exec playwright test e2e/contactos-chat.spec.ts --list`: `Total: 10 tests in 1 file` (incluye «R6, R7: a 360 × 844 …» y «R7: a 360 px …» en chromium y webkit). E2E sin correr: B1, en CI.

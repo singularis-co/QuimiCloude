@@ -1,7 +1,7 @@
 // Caja del chat: texto con la ventana abierta, aviso y «Enviar plantilla» con la ventana cerrada,
 // burbujas de plantillas en un chat sin mensajes, envío con saliente provisional y errores.
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer, type ChatComposerProps } from '@/app/(private)/clientes/contactos/components/chat-composer';
@@ -237,6 +237,37 @@ describe('R30 · ventana cerrada con mensajes', () => {
     );
     expect(screen.getByRole('button', { name: 'Enviar plantilla' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Enviar' })).toBeNull();
+  });
+
+  it('R16 · R30: al llegar `closesAt` la caja pasa sola a ventana cerrada sin nueva consulta', () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 23, 10, 0) });
+    try {
+      pintar({ window: { open: true, closesAt: new Date(2026, 9, 23, 10, 2).toISOString() } });
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(caja().hasAttribute('disabled')).toBe(false);
+      expect(screen.getByRole('button', { name: 'Enviar' })).toBeTruthy();
+      act(() => vi.advanceTimersByTime(60_001));
+      expect(caja().hasAttribute('disabled')).toBe(true);
+      expect(screen.getByRole('status').textContent).toContain('solo puedes enviar una plantilla aprobada');
+      expect(screen.getByRole('button', { name: 'Enviar plantilla' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Enviar' })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('R16 · R30: con una ventana que cierra en más de 24,8 días no la da por cerrada antes de tiempo', () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 23, 10, 0) });
+    try {
+      const closesAt = new Date(2026, 9, 23, 10, 0).getTime() + 30 * 86_400_000;
+      pintar({ window: { open: true, closesAt: new Date(closesAt).toISOString() } });
+      act(() => vi.advanceTimersByTime(25 * 86_400_000));
+      expect(caja().hasAttribute('disabled')).toBe(false);
+      act(() => vi.advanceTimersByTime(5 * 86_400_000 + 1));
+      expect(caja().hasAttribute('disabled')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('R31: «Enviar plantilla» abre el diálogo', async () => {

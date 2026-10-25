@@ -209,6 +209,25 @@ describe('R27 · marca leída al abrir', () => {
     expect(p.onChatRead).not.toHaveBeenCalled();
   });
 
+  it('R27 · D4: si marcar leída rechaza, no deja promesa sin capturar ni pinta error', async () => {
+    const sinCapturar = vi.fn();
+    process.on('unhandledRejection', sinCapturar);
+    try {
+      actions.markRead.mockRejectedValue(new Error('red caída'));
+      const { props: p } = pintar();
+      await waitFor(() => expect(actions.markRead).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(sinCapturar).not.toHaveBeenCalled();
+      expect(p.onChatRead).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.getByText('Texto m2')).toBeTruthy();
+    } finally {
+      process.off('unhandledRejection', sinCapturar);
+    }
+  });
+
   it('R27: una consulta nueva del mismo chat no vuelve a marcarla', async () => {
     const p = props();
     const { rerender } = render(<ChatPanel {...p} />);

@@ -187,7 +187,7 @@ function ChatConversation({
   useEffect(() => {
     if (markedRef.current || contactId === null || lastShownId === null) return;
     markedRef.current = true;
-    void markWhatsappChatReadAction({ contactId, upToMessageId: lastShownId }).then((result) => {
+    void settleAction(() => markWhatsappChatReadAction({ contactId, upToMessageId: lastShownId })).then((result) => {
       if (result.status === 'success') onChatRead(contactId);
     });
   }, [contactId, lastShownId, onChatRead]);

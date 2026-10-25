@@ -26,6 +26,7 @@ import {
 } from './contact-texts';
 import { SendTemplateDialog, type TemplateSendFailure } from './send-template-dialog';
 import { missingValuesText, resolveTemplate, systemConstantsFor, type TemplateValues } from './template-values';
+import { useWindowOpen } from './use-window-open';
 
 export const CHAT_TEXT_MAX_LENGTH = 4096;
 
@@ -125,12 +126,13 @@ export function ChatComposer({
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<TemplateSendFailure | null>(null);
   const [dialogFailure, setDialogFailure] = useState<TemplateSendFailure | null>(null);
+  const windowOpen = useWindowOpen(chatWindow);
 
   if (!canSend) return null;
 
   const recipient: ChatTarget = contactId === null ? { customerId } : { contactId };
   const values = context?.values ?? EMPTY_VALUES;
-  const mode = modeOf(hasMessages, chatWindow.open);
+  const mode = modeOf(hasMessages, windowOpen);
 
   const chip = mode === 'chips' ? (templates.find((template) => template.id === chipId) ?? null) : null;
   const chipResolved = chip === null ? null : resolveTemplate(chip, values);

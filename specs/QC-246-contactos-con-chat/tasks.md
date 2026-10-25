@@ -199,6 +199,10 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 - `app/(private)/clientes/contactos/components/chat-time-format.ts`
 - `app/(private)/clientes/contactos/components/contacts-poller.ts`
 - `app/(private)/clientes/contactos/components/use-end-sentinel.ts`
+- `app/(private)/clientes/contactos/components/use-window-open.ts`
+- `app/(private)/clientes/contactos/components/action-rejection.ts`
+- `app/(private)/clientes/contactos/components/contacts-selection.ts`
+- `app/(private)/clientes/contactos/components/contacts-load-error.tsx`
 - `app/(private)/clientes/page.tsx`
 - `app/(private)/clientes/components/index.ts`
 - `app/(private)/clientes/components/customer-chat-link.tsx`
@@ -219,6 +223,7 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 - `tests/unit/contactos-ui/chat-panel.test.tsx`
 - `tests/unit/contactos-ui/conversation-list.test.tsx`
 - `tests/unit/contactos-ui/contacts-screen.test.tsx`
+- `tests/unit/contactos-ui/contacts-empty-states.test.tsx`
 - `tests/unit/contactos-ui/contactos-frontera.test.ts`
 - `tests/unit/shared-ui/whatsapp-system-constants.test.ts`
 - `tests/unit/integraciones-ui/whatsapp-template-rules.test.ts`
@@ -228,5 +233,11 @@ pueden hacerse antes. `[P]` = paralelizable con las demás `[P]` de su bloque.
 - `tests/unit/clientes-ui/contactos-page.test.tsx`
 - `tests/unit/clientes-ui/private-nav-clientes.test.ts`
 - `tests/unit/clientes-ui/customer-chat-link.test.tsx`
+- `tests/unit/clientes-ui/clientes-page.test.tsx`
+- `tests/unit/shell/nav-iconos.test.ts`
+- `tests/unit/paridad/__snapshots__/clientes-paridad.test.tsx.snap`
 - `tests/guards/guard-pantallas-exigen-permiso.test.ts`
+- `tests/guards/guard-identificador-de-request.test.ts`
 - `e2e/contactos-chat.spec.ts`
+- `e2e/clientes.spec.ts`
+- `e2e/movimiento.spec.ts`

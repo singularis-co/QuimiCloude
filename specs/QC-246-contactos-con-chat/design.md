@@ -118,7 +118,7 @@ los DTO (`WhatsappChat`, `WhatsappChatMessage`, `WhatsappChatAttachment`, `Whats
 | `getWhatsappChatContextAction` | Servidor si hay selección en la URL; cliente al abrir otra conversación y al cambiar el selector «Pedido». **Nunca** en la consulta periódica. | `{ target }` al abrir; `{ target, orderId }` al cambiar de pedido. `target` = el mismo del chat (`{ contactId }` o `{ customerId }`) | R35, R38, R39, R54 |
 | `GET /api/integraciones/whatsapp/media/<messageId>` | No se llama a mano: `attachment.mediaUrl` va tal cual como `src` del `<img>` de la miniatura, del sticker y del visor. | — | R21, R22 |
 | `sendWhatsappMessageAction` | Enviar texto o plantilla. | Texto: `{ kind: 'text', recipient, text }`. Plantilla: `{ kind: 'template', recipient, templateId, constants, constantLabels }`, con `constants` sacado de `context.values` (sección 4) | R29, R32, R36, R37, R40 |
-| `retryWhatsappMessageAction` | «Reintentar». | `{ messageId }`; en plantilla, además `constants` y `constantLabels` de los `values` del pedido elegido **ahora** | R41 |
+| `retryWhatsappMessageAction` | «Reintentar». | `{ messageId }`; en plantilla, además `constants` = **todas** las constantes del sistema que tienen valor en los `values` del pedido elegido **ahora** (el panel no sabe de qué plantilla salió el fallido; el servidor toma solo las que la plantilla pide, `whatsapp-template-message.ts`) y `constantLabels` = `constantLabelsForBackend()`. Desvío aprobado por el humano tras la tanda 3 (2026-10-24) | R41 |
 
 `recipient` = `{ contactId }` si el chat tiene `contact`; si no, `{ customerId }`. Tras enviar a un
 `customerId`, el chat se vuelve a pedir por `{ customerId }` y pasa a su `contact.id` (R37; QC-245
@@ -302,7 +302,10 @@ app/(private)/clientes/contactos/
   el mismo pedido elegido en la cabecera y los mismos `values` del contexto (R31, R38).
   `constants` = `systemConstantsFor(template, values)`; `constantLabels` = `constantLabelsForBackend()`.
 - Reintento: el fallido se queda; el devuelto entra como mensaje nuevo (R41). En plantilla, con los
-  `values` vigentes.
+  `values` vigentes: `constants` = todas las constantes del sistema con valor no nulo en `values`
+  (no `systemConstantsFor(template, values)`, porque el fallido no dice de qué plantilla salió; el
+  servidor usa solo las que la plantilla pide). Desvío aprobado por el humano tras la tanda 3
+  (2026-10-24, `progress/features/QC-246.md > Decisiones`).
 - Tras enviar a un `customerId` sin conversación, se recarga el chat por `{ customerId }` (R37); el
   contexto no cambia y no se vuelve a pedir.
 

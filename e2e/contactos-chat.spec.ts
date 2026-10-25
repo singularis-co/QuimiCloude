@@ -13,8 +13,12 @@
  *   «Abrir chat».
  * - **Desde Clientes** (R45, R46): «Abrir chat» lleva a `?cliente=<id>` con el chat de ese cliente
  *   abierto, o vacio y con la ventana cerrada si no tiene conversacion.
- * - **El telefono** (390 × 844, tactil): lista ↔ chat con «Volver a conversaciones» y con «Atrás»
- *   del navegador (R6), sin scroll horizontal en ninguno de los dos (R7).
+ * - **El telefono** (360 × 844, tactil): lista ↔ chat con «Volver a conversaciones» y con «Atrás»
+ *   del navegador (R6), y sin scroll horizontal (R7) en la lista, en el chat con cada tipo de
+ *   mensaje (imagen, sticker, ubicacion, reaccion y fallido), en las burbujas de plantillas, en el
+ *   detalle del pedido, en el dialogo «Enviar plantilla» y en el visor de imagen. Se mide el
+ *   documento y tambien cada contenedor con `overflow` propio: un desborde dentro de uno de ellos
+ *   no llega al `documentElement`.
  * - Corre en Chromium y en WebKit (proyectos de `playwright.config.ts`).
  *
  * VINCULO CON EL CLIENTE: el webhook vincula el contacto al cliente cuyo telefono E.164 casa con el
@@ -26,8 +30,8 @@
  * prefijo `qc246_e2e_` y el `RUN_ID` del proceso: una con todos los añadidos y otra sin ninguno (sin
  * el de integraciones su Administrador no recibe `whatsapp.consultar`). Cada caso parte de una
  * empresa sin conexion de WhatsApp: la borra antes, asi no depende del orden ni de un reintento. La
- * limpieza va de hijas a madres: mensajes, contactos, plantillas, conexion, vinculos de telefono,
- * numeros, clientes, usuarios y empresas.
+ * limpieza va de hijas a madres: mensajes, contactos, plantillas, conexion, pedidos (lineas,
+ * pedidos, recetas y presentaciones), vinculos de telefono, numeros, clientes, usuarios y empresas.
  *
  * Los textos y los `data-testid` salen de `contact-texts.ts` (modulo de textos, no de cliente) y de
  * `customer-chat-link.tsx`; ningun literal suelto donde hay constante exportada.
@@ -36,7 +40,7 @@
  */
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
 import {
   CUSTOMER_CHAT_LINK_TESTID,
@@ -51,8 +55,15 @@ import {
   CHAT_EMPTY_TESTID,
   CHAT_HEADER_TESTID,
   CHAT_HEADER_TEXT,
+  CHAT_IMAGE_TEXT,
+  CHAT_IMAGE_VIEWER_TESTID,
+  CHAT_LOCATION_TEXT,
+  CHAT_MESSAGE_LIST_TESTID,
   CHAT_MESSAGE_TESTID,
+  CHAT_MESSAGE_TEXT,
+  CHAT_ORDER_DETAIL_TESTID,
   CHAT_PANEL_TESTID,
+  CHAT_TEMPLATE_CHIPS_TESTID,
   CHAT_WINDOW_BADGE_TESTID,
   CHAT_WINDOW_TEXT,
   CONTACTS_CHAT_PANE_TESTID,
@@ -61,10 +72,13 @@ import {
   CONVERSATION_LIST_TESTID,
   CONVERSATIONS_EMPTY_TESTID,
   CUSTOMER_CONTACTS_TITLE_TESTID,
+  SEND_TEMPLATE_DIALOG_TESTID,
 } from '@/app/(private)/clientes/contactos/components/contact-texts';
 import { clientes } from '@/lib/composition';
 import { normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
+import { normalizePresentationName } from '@/lib/modules/inventario';
+import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   CUSTOMER_CONTACTS_ROUTE,
@@ -100,8 +114,8 @@ const NOT_FOUND_TESTID = 'private-not-found';
 
 const SIGNATURE_HEADER = 'x-hub-signature-256';
 
-/** Teléfono de `docs/architecture.md > Componentes`: 390 px y tactil. */
-const PHONE_VIEWPORT = { width: 390, height: 844 } as const;
+/** R7 se prueba a 360 px de ancho, tactil. */
+const PHONE_VIEWPORT = { width: 360, height: 844 } as const;
 
 /**
  * La consulta periodica es de 8 s (R42, nunca mas de 10 s entre consultas): dos turnos y el
@@ -111,6 +125,9 @@ const POLL_TIMEOUT_MS = 30_000;
 
 /** Lo que se retiene el envio del texto para poder ver el saliente «Enviando» (R32). */
 const SEND_DELAY_MS = 3_000;
+
+/** La reaccion del cliente al saliente: el pulgar arriba. */
+const REACTION_EMOJI = '\u{1F44D}';
 
 let companyId: string | null = null;
 let companyWithoutAddonsId: string | null = null;
@@ -157,7 +174,16 @@ async function deleteWhatsappData(companyIds: readonly string[]): Promise<void> 
   await prisma.whatsappConnection.deleteMany({ where });
 }
 
-/** Clientes y sus telefonos, de hijas a madres. Despues de `deleteWhatsappData`. */
+/** Pedidos y lo que cuelga de ellos, en el orden que imponen las FK RESTRICT. Antes de los clientes. */
+async function deleteOrderData(companyIds: readonly string[]): Promise<void> {
+  const where = { companyId: { in: [...companyIds] } };
+  await prisma.orderPresentationLine.deleteMany({ where });
+  await prisma.order.deleteMany({ where });
+  await prisma.recipe.deleteMany({ where });
+  await prisma.presentation.deleteMany({ where });
+}
+
+/** Clientes y sus telefonos, de hijas a madres. Despues de `deleteWhatsappData` y `deleteOrderData`. */
 async function deleteCustomerData(companyIds: readonly string[]): Promise<void> {
   const where = { companyId: { in: [...companyIds] } };
   await prisma.customerPhoneNumber.deleteMany({ where });
@@ -188,6 +214,7 @@ test.beforeAll(async () => {
   });
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
   await deleteWhatsappData(orphanCompanyIds);
+  await deleteOrderData(orphanCompanyIds);
   await deleteCustomerData(orphanCompanyIds);
   await prisma.user.deleteMany({
     where: { username: { startsWith: USERNAME_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -204,6 +231,7 @@ test.afterAll(async () => {
   try {
     const companyIds = [companyId, companyWithoutAddonsId].filter((id): id is string => id !== null);
     await deleteWhatsappData(companyIds);
+    await deleteOrderData(companyIds);
     await deleteCustomerData(companyIds);
     await prisma.user.deleteMany({
       where: { username: { startsWith: `${USERNAME_PREFIX}${RUN_ID}` } },
@@ -348,32 +376,61 @@ function nowInSeconds(): string {
   return String(Math.floor(Date.now() / 1000));
 }
 
+/** Hace `hours` horas: un entrante con esa hora deja la ventana de 24 h cerrada si pasa de 24. */
+function hoursAgoInSeconds(hours: number): string {
+  return String(Math.floor((Date.now() - hours * 60 * 60 * 1000) / 1000));
+}
+
+/**
+ * Un entrante del cliente de cualquier tipo: `content` lleva `type` y su objeto (`{ type: 'image',
+ * image: {...} }`). Devuelve su `wamid`.
+ */
+async function postInboundMessage(
+  request: APIRequestContext,
+  connection: FixtureConnection,
+  customer: FixtureCustomer,
+  content: Record<string, unknown>,
+  timestamp: string = nowInSeconds(),
+): Promise<string> {
+  const wamid = newInboundWamid();
+  const status = await postSignedWebhook(request, connection, {
+    contacts: [{ wa_id: customer.waId, profile: { name: customer.firstNames } }],
+    messages: [{ from: customer.waId, id: wamid, timestamp, ...content }],
+  });
+  expect(status, 'el webhook firmado tiene que aceptar el mensaje').toBe(200);
+  return wamid;
+}
+
 /** Un texto entrante del cliente: con su hora real, la ventana de 24 h queda abierta. */
 async function postInboundText(
   request: APIRequestContext,
   connection: FixtureConnection,
   customer: FixtureCustomer,
   body: string,
-): Promise<void> {
-  const status = await postSignedWebhook(request, connection, {
-    contacts: [{ wa_id: customer.waId, profile: { name: customer.firstNames } }],
-    messages: [
-      { from: customer.waId, id: newInboundWamid(), timestamp: nowInSeconds(), type: 'text', text: { body } },
-    ],
-  });
-  expect(status, 'el webhook firmado tiene que aceptar el mensaje').toBe(200);
+  timestamp?: string,
+): Promise<string> {
+  return postInboundMessage(request, connection, customer, { type: 'text', text: { body } }, timestamp);
 }
 
-/** El aviso de estado de un saliente, por su `wamid`. */
+/** El aviso de estado de un saliente, por su `wamid`; `failed` lleva el error que manda Meta. */
 async function postOutboundStatus(
   request: APIRequestContext,
   connection: FixtureConnection,
   customer: FixtureCustomer,
   wamid: string,
-  metaStatus: 'delivered',
+  metaStatus: 'delivered' | 'failed',
+  errors?: readonly Record<string, unknown>[],
 ): Promise<void> {
   const status = await postSignedWebhook(request, connection, {
-    statuses: [{ id: wamid, status: metaStatus, timestamp: nowInSeconds(), recipient_id: customer.waId }],
+    statuses: [
+      {
+        id: wamid,
+        status: metaStatus,
+        timestamp: nowInSeconds(),
+        recipient_id: customer.waId,
+        ...(errors === undefined ? {} : { errors }),
+      },
+    ],
   });
   expect(status, 'el webhook firmado tiene que aceptar el estado').toBe(200);
 }
@@ -411,8 +468,124 @@ async function openConversation(page: Page, contactId: string, how: 'click' | 't
   }).toPass({ timeout: 60_000 });
 }
 
-async function hasNoHorizontalScroll(page: Page): Promise<boolean> {
-  return page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+/**
+ * Los contenedores con `overflow` propio (la pantalla, la lista de mensajes, el dialogo) se tragan
+ * el desborde de lo que llevan dentro y el documento no lo ve: por eso se mide cada uno.
+ */
+const R7_CONTAINER_TESTIDS = [
+  CONTACTS_SCREEN_TESTID,
+  CONVERSATION_LIST_TESTID,
+  CONTACTS_CHAT_PANE_TESTID,
+  CHAT_PANEL_TESTID,
+  CHAT_HEADER_TESTID,
+  CHAT_ORDER_DETAIL_TESTID,
+  CHAT_MESSAGE_LIST_TESTID,
+  CHAT_EMPTY_TESTID,
+  CHAT_COMPOSER_TESTID,
+  CHAT_TEMPLATE_CHIPS_TESTID,
+  SEND_TEMPLATE_DIALOG_TESTID,
+  CHAT_IMAGE_VIEWER_TESTID,
+] as const;
+
+/** Lo que desborda en horizontal: el documento y cada contenedor visible. Vacio = sin scroll horizontal. */
+async function horizontalOverflows(page: Page): Promise<string[]> {
+  return page.evaluate((testIds) => {
+    const offenders: string[] = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth) offenders.push(`documento ${root.scrollWidth} > ${root.clientWidth}`);
+    for (const testId of testIds) {
+      for (const element of document.querySelectorAll<HTMLElement>(`[data-testid="${testId}"]`)) {
+        // Oculto (`display: none`, como la lista con el chat abierto en el telefono): no se ve.
+        if (element.clientWidth === 0) continue;
+        if (element.scrollWidth > element.clientWidth) {
+          offenders.push(`${testId} ${element.scrollWidth} > ${element.clientWidth}`);
+        }
+      }
+    }
+    return offenders;
+  }, R7_CONTAINER_TESTIDS);
+}
+
+async function expectNoHorizontalScroll(page: Page, where: string): Promise<void> {
+  expect(await horizontalOverflows(page), `${where} no produce scroll horizontal`).toEqual([]);
+}
+
+/** Un toque antes de hidratar se pierde sin error: se repite hasta que aparece lo que abre. */
+async function tapUntilVisible(target: Locator, opened: Locator): Promise<void> {
+  await expect(target).toBeVisible({ timeout: 60_000 });
+  await expect(async () => {
+    await target.tap();
+    await expect(opened).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 60_000 });
+}
+
+/**
+ * Una plantilla que el chat puede ofrecer: aprobada, mapeada y activada. Sin variables, para que su
+ * texto quede completo sin contexto. Se siembra antes de abrir la pantalla: la lista de plantillas
+ * se lee al cargar la pagina.
+ */
+async function seedSendableTemplate(connection: FixtureConnection, name: string, text: string): Promise<void> {
+  await prisma.whatsappTemplate.create({
+    data: {
+      companyId: fixtureCompanyId(),
+      connectionId: connection.connectionId,
+      metaTemplateId: `${Date.now()}${randomInt(100_000, 1_000_000)}`,
+      name,
+      language: 'es',
+      category: 'UTILITY',
+      components: [{ type: 'BODY', text }],
+      status: 'APPROVED',
+      mappingStatus: 'MAPPED',
+      enabled: true,
+    },
+  });
+}
+
+/**
+ * Un pedido en curso (`PENDIENTE`) del cliente, con una linea de envases: es lo que pinta el detalle
+ * del pedido de la cabecera. Borra antes los pedidos de la empresa: el numero (año, secuencia) y los
+ * nombres de receta y presentacion son unicos por empresa, y asi un reintento no choca.
+ */
+async function seedOpenOrder(
+  customer: FixtureCustomer,
+  names: { readonly recipe: string; readonly presentation: string },
+): Promise<void> {
+  const company = fixtureCompanyId();
+  await deleteOrderData([company]);
+  const unit = await prisma.unit.findFirstOrThrow({
+    where: { nameNormalized: 'litro', companyId: null },
+    select: { id: true },
+  });
+  const recipe = await prisma.recipe.create({
+    data: { name: names.recipe, nameNormalized: normalizeRecipeName(names.recipe), companyId: company },
+    select: { id: true },
+  });
+  const presentation = await prisma.presentation.create({
+    data: {
+      name: names.presentation,
+      nameNormalized: normalizePresentationName(names.presentation),
+      unitId: unit.id,
+      content: 1,
+      companyId: company,
+    },
+    select: { id: true },
+  });
+  // El CHECK `orders_order_year_matches_created_at` ata el año a `created_at`.
+  const order = await prisma.order.create({
+    data: {
+      companyId: company,
+      orderYear: new Date().getUTCFullYear(),
+      orderSequence: 1,
+      recipeId: recipe.id,
+      quantity: 12,
+      unitId: unit.id,
+      customerId: customer.id,
+    },
+    select: { id: true },
+  });
+  await prisma.orderPresentationLine.create({
+    data: { orderId: order.id, companyId: company, presentationId: presentation.id, packages: 12, presentationContent: 1 },
+  });
 }
 
 test.describe('el chat de WhatsApp de Contactos', () => {
@@ -576,7 +749,7 @@ test.describe('el chat de WhatsApp de Contactos', () => {
   test.describe('en el telefono', () => {
     test.use({ viewport: PHONE_VIEWPORT, hasTouch: true });
 
-    test('R6, R7: a 390 × 844 se ve la lista o el chat, se vuelve con «Volver a conversaciones» y con «Atrás», sin scroll horizontal', async ({
+    test('R6, R7: a 360 × 844 se ve la lista o el chat, se vuelve con «Volver a conversaciones» y con «Atrás», sin scroll horizontal', async ({
       page,
     }) => {
       const admin = await createAdministrador('movil', fixtureCompanyId());
@@ -595,7 +768,7 @@ test.describe('el chat de WhatsApp de Contactos', () => {
         await openContacts(page);
         await expect(list).toBeVisible();
         await expect(chatPane).toBeHidden();
-        expect(await hasNoHorizontalScroll(page), 'la lista no produce scroll horizontal').toBe(true);
+        await expectNoHorizontalScroll(page, 'la lista');
       });
 
       await test.step('R6, R7: al tocar la conversacion se ve solo el chat, sin scroll horizontal', async () => {
@@ -603,7 +776,7 @@ test.describe('el chat de WhatsApp de Contactos', () => {
         await expect(chatPane).toBeVisible();
         await expect(list).toBeHidden();
         await expect(messageBubble(page, 'in', inbound)).toBeVisible();
-        expect(await hasNoHorizontalScroll(page), 'el chat no produce scroll horizontal').toBe(true);
+        await expectNoHorizontalScroll(page, 'el chat');
       });
 
       await test.step('R6: «Volver a conversaciones» vuelve a la lista', async () => {
@@ -611,7 +784,7 @@ test.describe('el chat de WhatsApp de Contactos', () => {
         await backButton.tap();
         await expect(list).toBeVisible();
         await expect(chatPane).toBeHidden();
-        expect(await hasNoHorizontalScroll(page)).toBe(true);
+        await expectNoHorizontalScroll(page, 'la lista');
       });
 
       await test.step('R6: «Atrás» del navegador desde el chat tambien vuelve a la lista', async () => {
@@ -620,7 +793,154 @@ test.describe('el chat de WhatsApp de Contactos', () => {
         await page.goBack();
         await expect(list).toBeVisible();
         await expect(chatPane).toBeHidden();
-        expect(await hasNoHorizontalScroll(page)).toBe(true);
+        await expectNoHorizontalScroll(page, 'la lista');
+      });
+    });
+
+    test('R7: a 360 px no hay scroll horizontal con las burbujas de plantillas, el detalle del pedido, el dialogo «Enviar plantilla», cada tipo de mensaje y el visor de imagen', async ({
+      page,
+    }) => {
+      // Tres clientes, dos envios por la UI y el visor: no cabe en el tope comun del archivo.
+      test.setTimeout(480_000);
+      const admin = await createAdministrador('movil7', fixtureCompanyId());
+      await loginAndLand(page, admin);
+      const connection = await createActiveConnection(page, 'movil7');
+
+      // Palabras largas sin espacios: si una pieza no corta la linea, es la que desborda.
+      const longWord = `sinespaciosparaverquecortalalinea${RUN_ID}`;
+      const templateName = `aviso_de_pedido_listo_para_recoger_en_la_planta_${RUN_ID.slice(0, 12)}`;
+      await seedSendableTemplate(
+        connection,
+        templateName,
+        `Hola, su pedido ya esta listo para recoger en la planta. Referencia ${longWord}.`,
+      );
+
+      const withoutChat = await createCustomerWithPhone(admin, fixtureCompanyId(), 'Plantilla');
+      const closedWindow = await createCustomerWithPhone(admin, fixtureCompanyId(), 'Cerrada');
+      const everyType = await createCustomerWithPhone(admin, fixtureCompanyId(), 'Tipos');
+
+      await seedOpenOrder(closedWindow, {
+        recipe: `Detergente multiusos concentrado ${longWord}`,
+        presentation: `Garrafa de cinco litros con tapa ${longWord}`,
+      });
+      // Hace 25 h: el cliente tiene conversacion pero la ventana de 24 h ya se cerro.
+      await postInboundText(page.request, connection, closedWindow, `Gracias ${RUN_ID.slice(0, 6)}`, hoursAgoInSeconds(25));
+      await linkedContactId(connection, closedWindow);
+
+      const imageCaption = `Foto del envase roto ${longWord}`;
+      const locationName = `Bodega principal ${longWord}`;
+      await postInboundText(page.request, connection, everyType, `Le paso los datos ${RUN_ID.slice(0, 6)}`);
+      await postInboundMessage(page.request, connection, everyType, {
+        type: 'image',
+        image: { id: `media-image-${RUN_ID}`, mime_type: 'image/jpeg', caption: imageCaption },
+      });
+      await postInboundMessage(page.request, connection, everyType, {
+        type: 'sticker',
+        sticker: { id: `media-sticker-${RUN_ID}`, mime_type: 'image/webp' },
+      });
+      await postInboundMessage(page.request, connection, everyType, {
+        type: 'location',
+        location: { latitude: 4.711, longitude: -74.0721, name: locationName, address: `Calle 26 # 68-35 ${longWord}` },
+      });
+      await linkedContactId(connection, everyType);
+
+      const chatPane = page.getByTestId(CONTACTS_CHAT_PANE_TESTID);
+
+      async function openCustomerChat(customer: FixtureCustomer): Promise<void> {
+        await page.goto(customerChatHref(customer.id));
+        await expect(page.getByTestId(CHAT_HEADER_TESTID)).toContainText(customer.firstNames, { timeout: 60_000 });
+        await expect(chatPane).toBeVisible();
+      }
+
+      await test.step('R7: el chat sin mensajes con las burbujas de plantillas, sin scroll horizontal', async () => {
+        await openCustomerChat(withoutChat);
+        await expect(page.getByTestId(CHAT_EMPTY_TESTID)).toBeVisible();
+        await expect(page.getByTestId(CHAT_WINDOW_BADGE_TESTID)).toHaveText(CHAT_WINDOW_TEXT.closed);
+        const chip = page.getByTestId(CHAT_TEMPLATE_CHIPS_TESTID).getByRole('button', { name: templateName });
+        await expect(chip).toBeVisible();
+        await expectNoHorizontalScroll(page, 'las burbujas de plantillas');
+
+        // Con la burbuja marcada, el texto de la plantilla rellena la caja.
+        await expect(async () => {
+          await chip.tap();
+          await expect(chip).toHaveAttribute('aria-pressed', 'true', { timeout: 5_000 });
+        }).toPass({ timeout: 60_000 });
+        await expect(page.getByTestId(CHAT_COMPOSER_TESTID).getByRole('textbox')).toHaveValue(new RegExp(longWord));
+        await expectNoHorizontalScroll(page, 'la burbuja de plantilla marcada');
+      });
+
+      await test.step('R7: el detalle del pedido desplegado, sin scroll horizontal', async () => {
+        await openCustomerChat(closedWindow);
+        await expect(page.getByTestId(CHAT_WINDOW_BADGE_TESTID)).toHaveText(CHAT_WINDOW_TEXT.closed);
+        const detail = page.getByTestId(CHAT_ORDER_DETAIL_TESTID);
+        await tapUntilVisible(page.getByRole('button', { name: CHAT_HEADER_TEXT.orderDetailsToggle }), detail);
+        await expect(detail).toContainText(longWord);
+        await expectNoHorizontalScroll(page, 'el detalle del pedido');
+      });
+
+      await test.step('R7: el dialogo «Enviar plantilla», sin scroll horizontal', async () => {
+        const dialog = page.getByTestId(SEND_TEMPLATE_DIALOG_TESTID);
+        await tapUntilVisible(
+          page.getByTestId(CHAT_COMPOSER_TESTID).getByRole('button', { name: CHAT_COMPOSER_TEXT.sendTemplate, exact: true }),
+          dialog,
+        );
+        await expect(dialog).toContainText(longWord);
+        await expectNoHorizontalScroll(page, 'el dialogo «Enviar plantilla»');
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+      });
+
+      await test.step('R7: el chat con imagen, sticker, ubicacion, reaccion y fallido, sin scroll horizontal', async () => {
+        await openCustomerChat(everyType);
+        const composer = page.getByTestId(CHAT_COMPOSER_TESTID);
+        const box = composer.getByPlaceholder(CHAT_COMPOSER_TEXT.placeholder);
+
+        async function sendAndWaitSent(text: string): Promise<string> {
+          await expect(box).toBeEnabled({ timeout: 60_000 });
+          await box.fill(text);
+          await composer.getByRole('button', { name: CHAT_COMPOSER_TEXT.send, exact: true }).tap();
+          await expect(messageBubble(page, 'out', text)).toHaveAttribute('data-delivery', 'sent', { timeout: 60_000 });
+          const row = await prisma.whatsappMessage.findFirstOrThrow({
+            where: { companyId: fixtureCompanyId(), direction: 'OUT', body: text },
+            select: { wamid: true },
+          });
+          if (row.wamid === null) throw new Error('el saliente enviado tiene que guardar su wamid');
+          return row.wamid;
+        }
+
+        const reacted = `Recibido, lo revisamos ${RUN_ID.slice(0, 6)}`;
+        const reactedWamid = await sendAndWaitSent(reacted);
+        await postInboundMessage(page.request, connection, everyType, {
+          type: 'reaction',
+          reaction: { message_id: reactedWamid, emoji: REACTION_EMOJI },
+        });
+
+        const failedText = `Le enviamos la factura ${RUN_ID.slice(0, 6)}`;
+        const failedWamid = await sendAndWaitSent(failedText);
+        await postOutboundStatus(page.request, connection, everyType, failedWamid, 'failed', [
+          { code: 131026, title: 'Message undeliverable', error_data: { details: `Destinatario no disponible ${longWord}` } },
+        ]);
+
+        await expect(page.getByRole('button', { name: CHAT_IMAGE_TEXT.open })).toBeVisible();
+        await expect(page.getByTestId(CHAT_MESSAGE_LIST_TESTID)).toContainText(imageCaption);
+        await expect(page.getByRole('img', { name: CHAT_IMAGE_TEXT.stickerAlt, exact: true })).toBeVisible();
+        await expect(page.getByRole('link', { name: new RegExp(CHAT_LOCATION_TEXT.openMap) })).toContainText(locationName);
+        await expect(
+          messageBubble(page, 'out', reacted).getByRole('img', { name: CHAT_MESSAGE_TEXT.reaction(REACTION_EMOJI) }),
+        ).toBeVisible({ timeout: POLL_TIMEOUT_MS });
+        const failed = messageBubble(page, 'out', failedText);
+        await expect(failed).toHaveAttribute('data-delivery', 'failed', { timeout: POLL_TIMEOUT_MS });
+        await expect(failed).toContainText(longWord);
+        await expectNoHorizontalScroll(page, 'el chat con cada tipo de mensaje');
+      });
+
+      await test.step('R7: el visor de imagen abierto, sin scroll horizontal', async () => {
+        const viewer = page.getByTestId(CHAT_IMAGE_VIEWER_TESTID);
+        await tapUntilVisible(page.getByRole('button', { name: CHAT_IMAGE_TEXT.open }), viewer);
+        await expect(viewer).toContainText(imageCaption);
+        await expectNoHorizontalScroll(page, 'el visor de imagen');
+        await viewer.getByRole('button', { name: CHAT_IMAGE_TEXT.close }).tap();
+        await expect(viewer).toBeHidden();
       });
     });
   });
