@@ -347,7 +347,7 @@ export const PRIVATE_NAV_ITEMS: readonly NavItem[] = [
         href: CUSTOMER_CONTACTS_ROUTE,
         label: CUSTOMER_CONTACTS_LABEL,
         testId: 'nav-clientes-contactos',
-        permission: 'clientes.consultar',
+        permission: 'whatsapp.consultar',
       },
     ],
   },

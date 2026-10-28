@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Contactos · estados vacíos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F6B66}a:hover{color:#164E4A}
+</style>
+</helmet>
+<div style="width: 1440px; height: 520px; box-sizing: border-box; padding: 40px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1F2426; background: #F8FBFB">
+
+  <section aria-labelledby="v1" style="background: #FFFFFF; border: 1px solid #E3E8EA; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px; text-align: center">
+    <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 50%; background: #F1F4F5; color: #4A5254; display: flex; align-items: center; justify-content: center">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 15l6-6"></path><path d="M11 6l1.5-1.5a4 4 0 0 1 5.7 5.7L16.7 11.7"></path><path d="M13 18l-1.5 1.5a4 4 0 0 1-5.7-5.7L7.3 12.3"></path><path d="M3 3l18 18"></path></svg>
+    </div>
+    <h2 id="v1" style="margin: 0; font-size: 17px; font-weight: 600">WhatsApp no está conectado</h2>
+    <p style="margin: 0; font-size: 14px; color: #4A5254; line-height: 1.5; max-width: 320px">Conecta la cuenta de WhatsApp de la empresa para ver y responder las conversaciones con tus clientes.</p>
+    <a href="#" style="display: inline-flex; align-items: center; height: 40px; padding: 0 16px; border-radius: 8px; background: #1F6B66; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 500">Ir a Integraciones</a>
+  </section>
+
+  <section aria-labelledby="v2" style="background: #FFFFFF; border: 1px solid #E3E8EA; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px; text-align: center">
+    <div aria-hidden="true" style="width: 56px; height: 56px; border-radius: 50%; background: #F1F4F5; color: #4A5254; display: flex; align-items: center; justify-content: center">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"></path></svg>
+    </div>
+    <h2 id="v2" style="margin: 0; font-size: 17px; font-weight: 600">Aún no hay conversaciones</h2>
+    <p style="margin: 0; font-size: 14px; color: #4A5254; line-height: 1.5; max-width: 320px">Cuando un cliente te escriba por WhatsApp, o abras un chat desde Clientes, aparecerá aquí.</p>
+  </section>
+
+  <section aria-labelledby="v3" style="background: #FFFFFF; border: 1px solid #E3E8EA; border-radius: 8px; display: flex; flex-direction: column; gap: 14px; padding: 24px">
+    <h2 id="v3" style="margin: 0; font-size: 15px; font-weight: 600">Desde Clientes: acción «Abrir chat»</h2>
+    <div style="border: 1px solid #E3E8EA; border-radius: 6px; overflow: hidden; font-size: 14px">
+      <div style="display: flex; justify-content: space-between; padding: 10px 12px; background: #F1F4F5; font-size: 12px; font-weight: 600; color: #4A5254"><span>Cliente</span><span>Acciones</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-top: 1px solid #E3E8EA">
+        <span>Hotel Mirador</span>
+        <a href="#" style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; text-decoration: none; border: 1px solid #DCE2E4; border-radius: 6px; padding: 5px 10px; color: #1F6B66">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"></path></svg>
+          Abrir chat
+        </a>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-top: 1px solid #E3E8EA">
+        <span>Taller Vásconez</span>
+        <span style="font-size: 12px; color: #5E6668">Sin teléfono válido</span>
+      </div>
+    </div>
+    <p style="margin: 0; font-size: 13px; color: #4A5254; line-height: 1.5">Lleva a /clientes/contactos?cliente=&lt;id&gt;. Solo con whatsapp.consultar y teléfono válido. Si el cliente no tiene conversación, se abre un chat vacío.</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":520}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

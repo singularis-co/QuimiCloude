@@ -121,7 +121,7 @@ describe('iconos del menú lateral', () => {
       { kind: 'link', label: 'Proveedores', href: '/proveedores', testId: 'nav-proveedores', permission: 'proveedores.consultar', section: 'Directorio' },
       { kind: 'group', label: 'Clientes', testId: 'nav-clientes', section: 'Directorio' },
       { kind: 'link', label: 'Clientes', href: '/clientes', testId: 'nav-clientes-lista', permission: 'clientes.consultar', section: undefined },
-      { kind: 'link', label: 'Contactos', href: '/clientes/contactos', testId: 'nav-clientes-contactos', permission: 'clientes.consultar', section: undefined },
+      { kind: 'link', label: 'Contactos', href: '/clientes/contactos', testId: 'nav-clientes-contactos', permission: 'whatsapp.consultar', section: undefined },
       { kind: 'link', label: 'Usuarios', href: '/configuracion/usuarios', testId: 'nav-usuarios', permission: 'usuarios.consultar', section: 'Configuración' },
       { kind: 'link', label: 'Presentaciones', href: '/configuracion/presentaciones', testId: 'nav-presentaciones', permission: 'inventario.modificar', section: 'Configuración' },
       { kind: 'link', label: 'Unidades', href: '/configuracion/unidades', testId: 'nav-unidades', permission: 'unidades.consultar', section: 'Configuración' },

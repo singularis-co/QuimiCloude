@@ -26,6 +26,11 @@ import {
   usageBadgeOf,
 } from '@/app/(private)/integraciones/whatsapp/components/whatsapp-template-rules';
 import {
+  VARIABLE_RULES_TEXTS,
+  keyFromLabel,
+  keyProblemOf,
+} from '@/app/(private)/integraciones/whatsapp/components/whatsapp-variable-rules';
+import {
   WHATSAPP_TEMPLATE_LANGUAGES,
   type WhatsappTemplateContent,
   type WhatsappTemplateView,
@@ -58,7 +63,7 @@ function viewOf(overrides: Partial<WhatsappTemplateView> = {}): WhatsappTemplate
 const OWN = [{ id: 'k1', key: 'numero_de_cuenta', label: 'Número de cuenta', value: '123456', usedBy: 0 }];
 
 describe('constantes del sistema', () => {
-  it('R48: son exactamente tres, con sus textos de pantalla', () => {
+  it('R48 R50: son exactamente siete, las tres de siempre primero y luego las cuatro del pedido, con sus textos de pantalla', () => {
     expect(SYSTEM_CONSTANTS.map(({ displayKey, label, description, example }) => ({ displayKey, label, description, example }))).toEqual([
       {
         displayKey: 'nombre_del_cliente',
@@ -78,14 +83,42 @@ describe('constantes del sistema', () => {
         description: 'El nombre de tu empresa en QuimiCloude.',
         example: EMPTY_MARK,
       },
+      {
+        displayKey: 'estado_del_pedido',
+        label: 'Estado del pedido',
+        description: 'Estado del pedido como lo ve el cliente: recibido, en preparación, entregado o cancelado.',
+        example: 'en preparación',
+      },
+      {
+        displayKey: 'fecha_de_solicitud',
+        label: 'Fecha de solicitud',
+        description: 'Día en que se pidió el pedido (DD/MM/AAAA).',
+        example: '23/10/2026',
+      },
+      {
+        displayKey: 'total_del_pedido',
+        label: 'Total del pedido',
+        description: 'Importe total del pedido. Aún no disponible: el mensaje no se envía hasta que lo esté.',
+        example: EMPTY_MARK,
+      },
+      {
+        displayKey: 'detalle_del_pedido',
+        label: 'Detalle del pedido',
+        description: 'Presentaciones pedidas, con lo entregado y lo que falta, en una línea.',
+        example: '10 × Bidón 20 L (entregado 6, faltan 4)',
+      },
     ]);
   });
 
-  it('P1: las tres claves van al backend con punto y vuelven a la de pantalla', () => {
+  it('P1 R51: las siete claves van al backend con punto y vuelven a la de pantalla', () => {
     const pairs = [
       ['nombre_del_cliente', 'cliente.nombre'],
       ['numero_de_pedido', 'pedido.numero'],
       ['nombre_de_la_empresa', 'empresa.nombre'],
+      ['estado_del_pedido', 'pedido.estado'],
+      ['fecha_de_solicitud', 'pedido.fecha_solicitud'],
+      ['total_del_pedido', 'pedido.total'],
+      ['detalle_del_pedido', 'pedido.detalle'],
     ] as const;
     for (const [display, backend] of pairs) {
       expect(toBackendKey(display)).toBe(backend);
@@ -103,19 +136,32 @@ describe('constantes del sistema', () => {
     expect(toBackendKey('numero_de_cuenta')).toBe('numero_de_cuenta');
   });
 
-  it('P1: las etiquetas de las constantes van al backend por su clave con punto', () => {
+  it('P1 R51: las etiquetas de las siete constantes van al backend por su clave con punto', () => {
     expect(constantLabelsForBackend()).toEqual({
       'cliente.nombre': 'Nombre del cliente',
       'pedido.numero': 'Número de pedido',
       'empresa.nombre': 'Nombre de la empresa',
+      'pedido.estado': 'Estado del pedido',
+      'pedido.fecha_solicitud': 'Fecha de solicitud',
+      'pedido.total': 'Total del pedido',
+      'pedido.detalle': 'Detalle del pedido',
     });
+  });
+
+  it('R53: una variable propia con la clave de una de las cuatro del pedido da el aviso de clave ocupada', () => {
+    expect(keyFromLabel('Estado del pedido')).toBe('estado_del_pedido');
+    expect(keyProblemOf('estado_del_pedido', [])).toBe(VARIABLE_RULES_TEXTS.keyTaken('estado_del_pedido'));
+    for (const key of ['fecha_de_solicitud', 'total_del_pedido', 'detalle_del_pedido']) {
+      expect(keyProblemOf(key, [])).toBe(VARIABLE_RULES_TEXTS.keyTaken(key));
+    }
+    expect(keyProblemOf('nombre_de_la_empresa', [])).toBe(VARIABLE_RULES_TEXTS.keyTaken('nombre_de_la_empresa'));
   });
 });
 
 describe('diccionario de pantalla', () => {
   it('R32: una constante se previsualiza por su ejemplo y una propia por su valor', () => {
     const dictionary = dictionaryOf(OWN);
-    expect(dictionary).toHaveLength(4);
+    expect(dictionary).toHaveLength(8);
     expect(dictionary[0]).toEqual({
       key: 'nombre_del_cliente',
       label: 'Nombre del cliente',
@@ -123,7 +169,8 @@ describe('diccionario de pantalla', () => {
       kind: 'system',
     });
     expect(dictionary[1]).toMatchObject({ key: 'numero_de_pedido', label: 'Número de pedido', preview: 'PED-00128' });
-    expect(dictionary[3]).toEqual({ key: 'numero_de_cuenta', label: 'Número de cuenta', preview: '123456', kind: 'company' });
+    expect(dictionary[3]).toEqual({ key: 'estado_del_pedido', label: 'Estado del pedido', preview: 'en preparación', kind: 'system' });
+    expect(dictionary[7]).toEqual({ key: 'numero_de_cuenta', label: 'Número de cuenta', preview: '123456', kind: 'company' });
   });
 
   it('R32: una constante sin ejemplo (EMPTY_MARK) se previsualiza por su etiqueta', () => {
@@ -135,6 +182,19 @@ describe('diccionario de pantalla', () => {
       kind: 'system',
     });
     expect(empresa?.preview).not.toBe(EMPTY_MARK);
+  });
+
+  it('R52: el diccionario trae las siete constantes en orden, con el total del pedido previsualizado por su etiqueta', () => {
+    const dictionary = dictionaryOf([]);
+    expect(dictionary.map((entry) => [entry.key, entry.preview, entry.kind])).toEqual([
+      ['nombre_del_cliente', 'Laura Gómez', 'system'],
+      ['numero_de_pedido', 'PED-00128', 'system'],
+      ['nombre_de_la_empresa', 'Nombre de la empresa', 'system'],
+      ['estado_del_pedido', 'en preparación', 'system'],
+      ['fecha_de_solicitud', '23/10/2026', 'system'],
+      ['total_del_pedido', 'Total del pedido', 'system'],
+      ['detalle_del_pedido', '10 × Bidón 20 L (entregado 6, faltan 4)', 'system'],
+    ]);
   });
 
   it('P1: una clave que no está en el diccionario se muestra con la clave como etiqueta', () => {

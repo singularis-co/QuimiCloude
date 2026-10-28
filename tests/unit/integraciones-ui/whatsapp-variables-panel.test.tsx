@@ -104,7 +104,7 @@ describe('WhatsappVariablesPanel', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Variables propias' })).toBeTruthy();
   });
 
-  it('R48: la tabla de constantes trae exactamente las tres, con clave, etiqueta, descripción y ejemplo', () => {
+  it('R48 R52: la tabla de constantes trae exactamente las siete (las tres de siempre y las cuatro del pedido), con clave, etiqueta, descripción y ejemplo', () => {
     montar([]);
 
     const filas = within(screen.getByTestId(WHATSAPP_CONSTANTS_TABLE_TESTID)).getAllByRole('row').slice(1);
@@ -117,8 +117,27 @@ describe('WhatsappVariablesPanel', () => {
       ['Nombre del cliente', 'nombre_del_cliente', 'Nombres y apellidos del cliente que recibe el mensaje.', 'Laura Gómez'],
       ['Número de pedido', 'numero_de_pedido', 'Número del pedido del que trata el mensaje.', 'PED-00128'],
       ['Nombre de la empresa', 'nombre_de_la_empresa', 'El nombre de tu empresa en QuimiCloude.', EMPTY_MARK],
+      [
+        'Estado del pedido',
+        'estado_del_pedido',
+        'Estado del pedido como lo ve el cliente: recibido, en preparación, entregado o cancelado.',
+        'en preparación',
+      ],
+      ['Fecha de solicitud', 'fecha_de_solicitud', 'Día en que se pidió el pedido (DD/MM/AAAA).', '23/10/2026'],
+      [
+        'Total del pedido',
+        'total_del_pedido',
+        'Importe total del pedido. Aún no disponible: el mensaje no se envía hasta que lo esté.',
+        EMPTY_MARK,
+      ],
+      [
+        'Detalle del pedido',
+        'detalle_del_pedido',
+        'Presentaciones pedidas, con lo entregado y lo que falta, en una línea.',
+        '10 × Bidón 20 L (entregado 6, faltan 4)',
+      ],
     ]);
-    expect(within(screen.getByTestId(WHATSAPP_CONSTANTS_CARDS_TESTID)).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(screen.getByTestId(WHATSAPP_CONSTANTS_CARDS_TESTID)).getAllByRole('listitem')).toHaveLength(7);
   });
 
   it('R49: la sección de propias tiene su texto, «Nueva variable» y la tabla sin columna Descripción (R58), con editar y eliminar', () => {

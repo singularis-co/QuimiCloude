@@ -708,7 +708,7 @@ describe('la forma del modulo integraciones', () => {
     expect(ajenos).toEqual([])
   })
 
-  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, la ruta del webhook (QC-238), la del cron de plantillas (QC-242) y, R58, la del archivo de un medio', () => {
+  it('R19: fuera del modulo solo lo importan lib/composition/index.ts, documentos (lectura con el proveedor IA) y, por ruta exacta, la pantalla de WhatsApp y sus componentes, la de Contactos y sus componentes (QC-246), la ruta del webhook (QC-238), la del cron de plantillas (QC-242) y, R58, la del archivo de un medio', () => {
     expect(filesImportingTheModule()).toEqual([
       'lib/composition/index.ts',
       'lib/modules/documentos/adapters/driven/ai/ai-reader-anthropic.ts',
@@ -717,6 +717,25 @@ describe('la forma del modulo integraciones', () => {
       'lib/modules/documentos/domain/errors.ts',
       'lib/modules/documentos/domain/run-document-job.ts',
       'lib/modules/documentos/ports/ai-provider-gateway.ts',
+      // QC-246 Contactos (D20, humano 2026-10-25): la pantalla de Contactos con chat de WhatsApp
+      // lee conversaciones, chat, contexto y plantillas y envia por el modulo. Entran sus 16
+      // archivos por ruta EXACTA (de 37 a 53), no la carpeta.
+      'app/(private)/clientes/contactos/components/chat-composer.tsx',
+      'app/(private)/clientes/contactos/components/chat-header.tsx',
+      'app/(private)/clientes/contactos/components/chat-panel.tsx',
+      'app/(private)/clientes/contactos/components/chat-template-chips.tsx',
+      'app/(private)/clientes/contactos/components/chat-time-format.ts',
+      'app/(private)/clientes/contactos/components/chat-view.ts',
+      'app/(private)/clientes/contactos/components/chat-window-badge.tsx',
+      'app/(private)/clientes/contactos/components/contacts-poller.ts',
+      'app/(private)/clientes/contactos/components/contacts-screen.tsx',
+      'app/(private)/clientes/contactos/components/conversation-list-item.tsx',
+      'app/(private)/clientes/contactos/components/conversation-list-state.ts',
+      'app/(private)/clientes/contactos/components/conversation-list.tsx',
+      'app/(private)/clientes/contactos/components/send-template-dialog.tsx',
+      'app/(private)/clientes/contactos/components/template-values.ts',
+      'app/(private)/clientes/contactos/components/use-window-open.ts',
+      'app/(private)/clientes/contactos/page.tsx',
       'app/(private)/integraciones/proveedor-ia/components/ai-model-select.tsx',
       'app/(private)/integraciones/proveedor-ia/components/ai-provider-brand.ts',
       'app/(private)/integraciones/proveedor-ia/components/ai-provider-card.tsx',

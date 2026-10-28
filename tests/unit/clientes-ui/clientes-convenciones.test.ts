@@ -31,7 +31,7 @@ import { dirname, join, relative } from 'node:path';
 
 import { describe, expect, it, type TestContext } from 'vitest';
 
-import { CUSTOMERS_ROUTE } from '@/lib/shared/routes';
+import { CUSTOMER_CONTACTS_ROUTE, CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
@@ -437,10 +437,44 @@ function nombraPedidos(fuente: string): boolean {
   return /@\/lib\/modules\/pedidos\b/.test(codigo) || /\bprisma\.order\b/.test(codigo) || /\border\b/i.test(codigo);
 }
 
+/**
+ * La UNICA excepcion de R38 (QC-246, D19, humano 2026-10-25): la pantalla de Contactos muestra el
+ * pedido dentro del chat, asi que su carpeta —y solo ella, derivada de su constante de ruta— puede
+ * nombrarlo. El resto de `/clientes` sigue sin poder hablar de pedidos.
+ */
+const CARPETA_EXENTA_DE_PEDIDOS = `app/(private)${CUSTOMER_CONTACTS_ROUTE}/`;
+
+function exentoDePedidos(relativa: string): boolean {
+  return relativa.startsWith(CARPETA_EXENTA_DE_PEDIDOS);
+}
+
+function culpablesDePedidos(raiz: string, relativas: readonly string[]): string[] {
+  return relativas.filter((archivo) => !exentoDePedidos(archivo) && nombraPedidos(leer(join(raiz, archivo))));
+}
+
 describe('la pantalla no nombra pedidos ni ofrece ningun vinculo con ellos (R38)', () => {
   it('ningun archivo de la ruta menciona pedidos, la orden ni el modelo de pedidos', () => {
-    const culpables = FUENTES_DE_LA_RUTA.filter((archivo) => nombraPedidos(leer(join(RAIZ, archivo))));
+    const culpables = culpablesDePedidos(RAIZ, FUENTES_DE_LA_RUTA);
     expect(culpables, `mencionan pedidos: ${culpables.join(', ')}`).toEqual([]);
+  });
+
+  it('la excepcion de Contactos (D19) es exacta: solo su carpeta queda fuera; Clientes y una carpeta vecina disparan', () => {
+    expect(CARPETA_EXENTA_DE_PEDIDOS).toBe('app/(private)/clientes/contactos/');
+    const raiz = tmpdirDePrueba('qc246-convenciones-r38-');
+    const pedido = "import type { OrderSummary } from '@/lib/modules/pedidos';\nexport type { OrderSummary };\n";
+    try {
+      const relativas = [
+        'app/(private)/clientes/contactos/components/chat-order-detail.tsx',
+        'app/(private)/clientes/components/customer-orders.tsx',
+        'app/(private)/clientes/page.tsx',
+        'app/(private)/clientes/contactos-otro/x.ts',
+        'app/(private)/clientes/x/contactos/y.ts',
+      ];
+      for (const relativa of relativas) fabricar(raiz, relativa, pedido);
+      expect(culpablesDePedidos(raiz, relativas)).toEqual(relativas.slice(1));
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
   });
 
   it('sensibilidad: un archivo FABRICADO que importa el modulo de pedidos dispara', () => {
