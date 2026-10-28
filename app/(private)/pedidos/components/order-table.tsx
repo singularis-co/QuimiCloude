@@ -25,6 +25,7 @@ import {
   ORDER_NUMBER_COLUMN_ID,
   PRODUCTION_COST_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
+  SALE_PRICE_COLUMN_ID,
 } from './order-columns';
 import { OrderCustomerFilter } from './order-customer-filter';
 import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
@@ -108,15 +109,21 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
 };
 
 /**
- * La tarjeta de telefono: los dos costes van en los datos secundarios, en el orden de
- * la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion propia: la
+ * La tarjeta de telefono: el precio de venta y los dos costes van en los datos secundarios, en el
+ * orden de la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion propia: la
  * pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
  */
 const ORDER_TABLE_CARD: DataTableCardLayout = {
   primary: ORDER_NUMBER_COLUMN_ID,
   status: STATUS_COLUMN_ID,
   title: RECIPE_NAME_COLUMN_ID,
-  meta: [ORDER_CUSTOMER_NAME_COLUMN_ID, CREATED_AT_COLUMN_ID, PRODUCTION_COST_COLUMN_ID, ACTUAL_COST_COLUMN_ID],
+  meta: [
+    ORDER_CUSTOMER_NAME_COLUMN_ID,
+    CREATED_AT_COLUMN_ID,
+    SALE_PRICE_COLUMN_ID,
+    PRODUCTION_COST_COLUMN_ID,
+    ACTUAL_COST_COLUMN_ID,
+  ],
   footer: PRIORITY_COLUMN_ID,
 };
 

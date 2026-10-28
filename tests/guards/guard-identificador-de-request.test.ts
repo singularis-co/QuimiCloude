@@ -344,6 +344,9 @@ export const E2E_ESPERADOS = [
   // el listado y en el lote de producto terminado. No lee ni afirma nada sobre el identificador de
   // peticion.
   'coste-real-de-produccion.spec.ts',
+  // Alta por el mismo motivo que las demas. Crea un pedido con precio de venta, lo ve en su
+  // columna y precargado al editarlo. No lee ni afirma nada sobre el identificador de peticion.
+  'pedido-precio-de-venta.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.

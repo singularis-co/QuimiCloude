@@ -116,7 +116,7 @@
 
 ## Tanda 3 — pantalla (depende de T5; espera a P1 si el humano pide tablero)
 
-- [ ] **T6 · Columna y tarjeta** (frontend) [P] — R19, R20
+- [x] **T6 · Columna y tarjeta** (frontend) [P] — R19, R20
   - `order-columns.tsx`: `AmountCell` y la columna `salePrice` antes de «Costo estimado»
     (`design.md > 6.2`).
   - `order-list-skeleton.tsx`: 15.
@@ -132,7 +132,7 @@
     - `order-list-skeleton.test.tsx` en verde sin tocarlo;
     - `guard-pantalla-pedidos-se-amplia.test.ts` en verde, porque solo se ganan exportaciones.
 
-- [ ] **T7 · Campo del formulario** (frontend) [P] — R21
+- [x] **T7 · Campo del formulario** (frontend) [P] — R21
   - `order-form.tsx`: `ORDER_BUSINESS_FIELDS`, `FIELD_MESSAGES`, `FIELD_LABELS` y el `OrderField`
     (`design.md > 6.1`).
   - Test nuevo `tests/unit/pedidos-ui/order-form-sale-price.test.tsx`:
@@ -143,7 +143,7 @@
   - **Hecho:** test en verde; `formularios-paridad` y `campos-paridad` en verde. Si cambia una
     instantánea, se revisa y se actualiza a conciencia, con nota en `progress/impl_QC-307.md`.
 
-- [ ] **T8 · E2E** (frontend) — depende de T6, T7 — R22
+- [x] **T8 · E2E** (frontend) — depende de T6, T7 — R22
   - `e2e/pedido-precio-de-venta.spec.ts`, el recorrido de `design.md > 7`.
   - **Hecho:** `pnpm exec playwright test e2e/pedido-precio-de-venta.spec.ts` en verde.
 

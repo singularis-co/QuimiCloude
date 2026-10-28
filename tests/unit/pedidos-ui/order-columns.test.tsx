@@ -39,6 +39,8 @@ import {
   PRODUCTION_COST_COLUMN_ID,
   PRODUCTION_COST_TESTID,
   RESPONSIBLES_COLUMN_ID,
+  SALE_PRICE_COLUMN_ID,
+  SALE_PRICE_TESTID,
   STATUS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
   STATUS_PARAM,
@@ -130,9 +132,9 @@ afterEach(() => {
 // CLIENTE y a TRECE con POR ENTREGAR, que llega desde el dashboard. El 2026-10-16 baja a DOCE: sale
 // CANTIDAD (decision humana). El 2026-10-20 sube a TRECE con el costo y despues a CATORCE con el
 // costo real. El 2026-10-22 POR ENTREGAR pasa delante de PRESENTACION. Sigue siendo cerrada y en un
-// orden acordado.
-describe('las columnas declaradas son exactamente las catorce acordadas (R8, R20, R35)', () => {
-  it('en positivo: los catorce ids, en el orden acordado', () => {
+// orden acordado. El 2026-10-28 sube a QUINCE con el PRECIO DE VENTA, delante de los costes.
+describe('las columnas declaradas son exactamente las quince acordadas (R8, R20, R35)', () => {
+  it('QC-307 R19: los quince ids, en el orden acordado', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
@@ -145,11 +147,12 @@ describe('las columnas declaradas son exactamente las catorce acordadas (R8, R20
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
+      SALE_PRICE_COLUMN_ID,
       PRODUCTION_COST_COLUMN_ID,
       ACTUAL_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
     ]);
-    expect(ORDER_COLUMNS).toHaveLength(14);
+    expect(ORDER_COLUMNS).toHaveLength(15);
   });
 
   it('en negativo: ninguna columna es `total`, `createdBy`, `updatedBy`, unidad ni precio', () => {
@@ -201,6 +204,7 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
+      SALE_PRICE_COLUMN_ID,
       PRODUCTION_COST_COLUMN_ID,
       ACTUAL_COST_COLUMN_ID,
       ACTIONS_COLUMN_ID,
@@ -588,7 +592,7 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids).not.toContain('ingredientsCost');
     expect(ids).not.toContain('importe');
-    expect(ids).toHaveLength(14);
+    expect(ids).toHaveLength(15);
 
     const VALOR_DELATOR = '999999.9999';
     const order = pedido({ ingredientsCost: VALOR_DELATOR, actualCost: VALOR_DELATOR });
@@ -711,6 +715,77 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
     expect(celda).toHaveTextContent('$12.50');
     expect(celda).not.toHaveTextContent('$14.50');
     expect(celda).not.toHaveAttribute('title');
+  });
+});
+
+describe('la columna «Precio de venta»', () => {
+  it('QC-307 R19: va justo antes de «Costo estimado» y se rotula «Precio de venta»', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+
+    expect(ids.indexOf(SALE_PRICE_COLUMN_ID)).toBe(ids.indexOf(PRODUCTION_COST_COLUMN_ID) - 1);
+    expect(ORDER_COLUMNS.find((column) => column.id === SALE_PRICE_COLUMN_ID)?.label).toBe(
+      'Precio de venta',
+    );
+  });
+
+  it('QC-307 R19: con precio pinta el importe con dos decimales y separador de miles', () => {
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: '1250.5000' }));
+
+    const celda = screen.getByTestId(SALE_PRICE_TESTID);
+    expect(celda.textContent).toBe('$1,250.50');
+    expect(celda).not.toHaveAttribute('title');
+  });
+
+  it('QC-307 R19: el `title` lleva el valor exacto cuando lo pintado se redondea', () => {
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: '12752.5512' }));
+
+    const celda = screen.getByTestId(SALE_PRICE_TESTID);
+    expect(celda.textContent).toBe('$12,752.55');
+    expect(celda).toHaveAttribute('title', '12752.5512');
+  });
+
+  it('QC-307 R19: sin precio pinta el marcador de ausencia, nunca 0 ni vacio', () => {
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: null, ingredientsCost: '50.0000' }));
+
+    expect(screen.queryByTestId(SALE_PRICE_TESTID)).toBeNull();
+    const guion = screen.getByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`);
+    expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(guion).toHaveAccessibleName('Sin dato');
+    expect(document.body).not.toHaveTextContent('50.00');
+  });
+
+  it('QC-307 R19: un precio 0 se pinta como importe cero, no como ausencia', () => {
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: '0.0000' }));
+
+    expect(screen.getByTestId(SALE_PRICE_TESTID).textContent).toBe('$0.00');
+    expect(screen.queryByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`)).toBeNull();
+  });
+
+  it('QC-307 R19: se pinta de `salePrice` y no de ningun coste', () => {
+    pintarCelda(
+      SALE_PRICE_COLUMN_ID,
+      pedido({ salePrice: '10.0000', ingredientsCost: '99.0000', actualCost: '77.0000' }),
+    );
+
+    const celda = screen.getByTestId(SALE_PRICE_TESTID);
+    expect(celda.textContent).toBe('$10.00');
+    expect(document.body).not.toHaveTextContent('99.00');
+    expect(document.body).not.toHaveTextContent('77.00');
+  });
+
+  it('QC-307 R20: no declara `sortable` ni `filter`', () => {
+    const precio = ORDER_COLUMNS.find((column) => column.id === SALE_PRICE_COLUMN_ID);
+
+    expect(precio).toBeDefined();
+    expect(precio?.sortable).not.toBe(true);
+    expect(precio?.filter).toBeUndefined();
+  });
+
+  it('QC-307 R19: alinea al final y en cifras tabulares, como los costes', () => {
+    const precio = ORDER_COLUMNS.find((column) => column.id === SALE_PRICE_COLUMN_ID);
+
+    expect(precio?.align).toBe('end');
+    expect(precio?.tabular).toBe(true);
   });
 });
 

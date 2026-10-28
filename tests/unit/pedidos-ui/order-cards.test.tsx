@@ -24,6 +24,8 @@ import {
   PAGE_PARAM,
   PRODUCTION_COST_COLUMN_ID,
   PRODUCTION_COST_TESTID,
+  SALE_PRICE_COLUMN_ID,
+  SALE_PRICE_TESTID,
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
@@ -395,5 +397,31 @@ describe('R19: los costes en la tarjeta de telefono', () => {
 
     const tabla = readFileSync(join(process.cwd(), 'app/(private)/pedidos/components/order-table.tsx'), 'utf8');
     expect(tabla).not.toMatch(/canSee\w*Cost|hasPermission|requirePermission/);
+  });
+});
+
+describe('el precio de venta en la tarjeta de telefono', () => {
+  const CON_PRECIO = pedido('o4', 10, { salePrice: '1250.5000', ingredientsCost: '120.0000' });
+
+  it('QC-307 R19: la tarjeta pinta «Precio de venta» con su rotulo y su importe, antes del costo estimado', () => {
+    montar({ orders: [CON_PRECIO] });
+    const card = tarjeta(CON_PRECIO);
+
+    const precio = campo(card, SALE_PRICE_COLUMN_ID);
+    expect(within(precio).getByText('Precio de venta')).toHaveAttribute('data-card-label');
+    expect(within(precio).getByTestId(SALE_PRICE_TESTID).textContent).toBe('$1,250.50');
+
+    const estimado = campo(card, PRODUCTION_COST_COLUMN_ID);
+    expect(precio.compareDocumentPosition(estimado) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('QC-307 R19: sin precio, la tarjeta pinta el guion con el rotulo accesible «Sin dato»', () => {
+    montar({ orders: [SIN_CLIENTE] });
+    const card = tarjeta(SIN_CLIENTE);
+
+    const celda = campo(card, SALE_PRICE_COLUMN_ID);
+    const guion = within(celda).getByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`);
+    expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(guion).toHaveAccessibleName('Sin dato');
   });
 });

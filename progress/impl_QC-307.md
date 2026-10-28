@@ -77,3 +77,59 @@ Tests:
 
 - `vitest related` no es practicable para adaptadores que cuelgan de `lib/composition`; queda a `./init.sh` (T10) y a `gate-completo` en CI.
 - Rama 193 commits detrás de `origin/dev`; no se mergeó (encargo). Nada falló atribuible a ello.
+
+## Tanda 3 — T6, T7, T8 · Pantalla (frontend_dev)
+
+Sin tablero de diseño (P1): campo con `OrderField`, columna con la celda de importe (`AmountCell`,
+renombre de `CostCell`) y `withCardFieldLabel`. Ningún componente nuevo.
+
+### Archivos
+- Modificados: `app/(private)/pedidos/components/order-columns.tsx`, `order-form.tsx`,
+  `order-list-skeleton.tsx` (15), `order-table.tsx` (meta de la tarjeta), `index.ts` (barrel:
+  `SALE_PRICE_COLUMN_ID`, `SALE_PRICE_LABEL`, `SALE_PRICE_TESTID`).
+- Tests modificados: `tests/unit/pedidos-ui/order-columns.test.tsx`, `order-cards.test.tsx`,
+  `pedidos-viewport.test.tsx` (14 → 15), `tests/guards/guard-identificador-de-request.test.ts`
+  (alta de `pedido-precio-de-venta.spec.ts` en `E2E_ESPERADOS`, mismo camino que QC-305).
+- Instantáneas: `tests/unit/paridad/__snapshots__/formularios-paridad.test.tsx.snap` y
+  `pedidos-paridad.test.tsx.snap`.
+- Nuevos: `tests/unit/pedidos-ui/order-form-sale-price.test.tsx`, `e2e/pedido-precio-de-venta.spec.ts`.
+
+### Desvíos del spec
+- `order-table.tsx` no figuraba en el design (6.2 dice «no hay archivo aparte que tocar»): la
+  tarjeta solo pinta los ids listados en `ORDER_TABLE_CARD.meta`, así que `salePrice` se añade ahí,
+  delante de los costes. Sin ese cambio R19 (tarjeta) no se cumple.
+- `pedidos-viewport.test.tsx` fijaba `toHaveLength(14)`; pasa a 15.
+- Guardia `guard-identificador-de-request`: la lista cerrada de E2E gana el spec nuevo.
+- E2E: sin reparto toda la cantidad queda sin envasar y Guardar pide confirmar el sobrante; se usa
+  `submitOrderWithLeftover` (como `pedido-conversion-de-unidad.spec.ts`).
+
+### Instantáneas cambiadas (revisadas una a una, solo altas)
+- `formularios-paridad`: los 5 estados del formulario de pedido ganan la fila con el input
+  `order-field-salePrice` («Precio de venta (opcional)», `type=number`, sin `required`); el
+  FormData de alta y edición gana `salePrice=""` (los fixtures no tienen precio).
+- `pedidos-paridad`: la cabecera, las filas y la tarjeta ganan la columna `salePrice` con «Sin
+  dato» antes de «Costo estimado»; el esqueleto pasa de 14 a 15 celdas. Nada se borra ni cambia.
+- `campos-paridad`: sin cambios.
+
+### Mapa R → test (Tanda 3)
+| R | Archivo | Caso |
+|---|---|---|
+| R19 | `order-columns.test.tsx` | `QC-307 R19: los quince ids, en el orden acordado`; `…va justo antes de «Costo estimado» y se rotula «Precio de venta»`; `…con precio pinta el importe con dos decimales y separador de miles`; `…el \`title\` lleva el valor exacto cuando lo pintado se redondea`; `…sin precio pinta el marcador de ausencia, nunca 0 ni vacio`; `…un precio 0 se pinta como importe cero, no como ausencia`; `…se pinta de \`salePrice\` y no de ningun coste`; `…alinea al final y en cifras tabulares, como los costes` |
+| R19 | `order-cards.test.tsx` | `QC-307 R19: la tarjeta pinta «Precio de venta» con su rotulo y su importe, antes del costo estimado`; `QC-307 R19: sin precio, la tarjeta pinta el guion con el rotulo accesible «Sin dato»` |
+| R20 | `order-columns.test.tsx` | `QC-307 R20: no declara \`sortable\` ni \`filter\`` |
+| R21 | `order-form-sale-price.test.tsx` | `QC-307 R21: el alta envia salePrice en el FormData`; `…sin precio el alta se envia igual, con salePrice vacio`; `…el campo es opcional, no \`required\`, y se rotula «Precio de venta (opcional)»`; `QC-307 R21: precarga '1250.5' desde '1250.5000' y lo reenvia`; `…sin precio guardado el campo arranca vacio`; `QC-307 R21: '-1' senala el campo, no llama a la action y conserva lo escrito` |
+| R22 | `e2e/pedido-precio-de-venta.spec.ts` | `QC-307 R22 — registra un pedido con precio, lo ve en la columna y precargado al editarlo` |
+
+### Salida de los comandos
+- `pnpm typecheck` → exit 0, sin errores.
+- `pnpm lint` → exit 0; `✖ 10 problems (0 errors, 10 warnings)`, todos en archivos ajenos al diff
+  (`step-evidence.tsx`, `list-execution-traces.test.ts`, `confirm-catalog-import.test.ts`,
+  `order-service.test.ts`).
+- `pnpm exec vitest run <tocados> tests/unit/pedidos-ui tests/unit/paridad` → `Test Files 78 passed
+  (78)`, `Tests 1540 passed | 3 skipped (1543)`, exit 0 (tras `-u` en las dos instantáneas).
+- `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1276 passed | 22 skipped
+  (1298)`, exit 0.
+- `pnpm exec playwright test e2e/pedido-precio-de-venta.spec.ts` → `2 passed` (chromium y
+  webkit), exit 0. La base local ya tenía `orders.sale_price` (consulta de solo lectura).
+
+**Veredicto:** T6, T7 y T8 hechas y en verde; R19–R22 con test.

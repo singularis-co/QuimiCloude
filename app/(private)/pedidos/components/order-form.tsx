@@ -138,6 +138,7 @@ export const ORDER_BUSINESS_FIELDS = [
   PRESENTATION_UNIT_FIELD,
   'priority',
   RECIPE_VERSION_FIELD,
+  'salePrice',
 ] as const;
 
 const PRESENTATION_LINES_FIELD = 'presentationLines';
@@ -197,12 +198,14 @@ const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
     'Revisa el reparto: envases enteros mayores que cero, una línea por envase y por presentación.',
   priority: 'Elige una de las prioridades disponibles.',
   recipeVersionId: 'Elige una versión de la lista.',
+  salePrice: 'Ingresa un número mayor o igual a 0, con hasta 4 decimales.',
 };
 
 const FIELD_LABELS = {
   quantity: 'Cantidad',
   priority: 'Prioridad',
   customer: 'Cliente (opcional)',
+  salePrice: 'Precio de venta (opcional)',
 } as const;
 
 /** Nombre del campo del `FormData` con el id del cliente; vacio = sin cliente. */
@@ -825,6 +828,23 @@ export function OrderForm({
             error={fieldErrors.presentationLines}
             submitLines
           />
+
+          {/* Sin `roundDecimals`: el esquema admite 4 decimales y redondear al soltar el foco
+              cambiaria en silencio el precio escrito. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
+            <div className="sm:col-span-4">
+              <OrderField
+                name="salePrice"
+                label={FIELD_LABELS.salePrice}
+                type="number"
+                step="any"
+                min="0"
+                inputMode="decimal"
+                defaultValue={initialValue('salePrice', trimDecimal(order?.salePrice ?? ''))}
+                error={fieldErrors.salePrice}
+              />
+            </div>
+          </div>
 
           {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
               de receta elegida, para verse con guion sin receta. */}
