@@ -661,3 +661,10 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Riesgo:** ninguno funcional; ocupa disco.
 - **Qué falta:** cerrar procesos que usen la carpeta, borrarla, `git branch -d feature/QC-203-agrupar-insumos-por-familia-de-unidad` y `git worktree prune`.
 - **Dueño:** Christian Quevedo.
+
+### D83 — Restos del worktree de QC-245
+- **Origen:** F2.5 de QC-245 (2026-10-28).
+- **Qué pasa:** git ya no registra el worktree, pero la carpeta `.worktrees/QC-245-contactos-whatsapp-backend` sigue en disco. La rama local `feature/QC-245-contactos-whatsapp-backend` sigue, ya mergeada en `origin/dev` (#306).
+- **Riesgo:** ninguno funcional; ocupa disco.
+- **Qué falta:** borrar la carpeta, `git branch -d feature/QC-245-contactos-whatsapp-backend` y `git worktree prune`.
+- **Dueño:** Christian Quevedo.
