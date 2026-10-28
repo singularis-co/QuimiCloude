@@ -350,6 +350,9 @@ export const E2E_ESPERADOS = [
   // el listado y en el lote de producto terminado. No lee ni afirma nada sobre el identificador de
   // peticion.
   'coste-real-de-produccion.spec.ts',
+  // Alta por el mismo motivo que las demas. Crea un pedido con precio de venta, lo ve en su
+  // columna y precargado al editarlo. No lee ni afirma nada sobre el identificador de peticion.
+  'pedido-precio-de-venta.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un insumo eligiendo su unidad y lo
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
@@ -842,6 +845,8 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-10-22: el catalogo de modelos de IA y la eleccion de modelo en la conexion; no toca el
   // identificador.
   '20261022120000_ai_models',
+  // 2026-10-22: precio de venta del pedido entero; no toca el identificador.
+  '20261022120000_orders_sale_price',
   // 2026-10-23: el permiso whatsapp.enviar y la columna de idioma con la FK de `sent_by` de los
   // mensajes de WhatsApp; no tocan el identificador.
   '20261023120000_whatsapp_send_permission',

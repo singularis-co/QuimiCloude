@@ -173,6 +173,7 @@ export function toOrderView(
     ingredientsCost: row.ingredientsCost,
     packagingCost: row.packagingCost,
     actualCost: row.actualCost,
+    salePrice: row.salePrice,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,

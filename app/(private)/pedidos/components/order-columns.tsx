@@ -41,7 +41,7 @@ import {
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 /**
- * Las CATORCE columnas de la lista de pedidos (trece de datos y la de acciones), declaradas
+ * Las QUINCE columnas de la lista de pedidos (catorce de datos y la de acciones), declaradas
  * **como datos** (R8-R12, R14, R19, R23, `design.md > 7`).
  *
  * **Modulo de CLIENTE, y no por gusto** (`design.md > 6.1`): la columna de acciones devuelve
@@ -81,6 +81,9 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  *
  * **Costo estimado y costo real**, las dos ultimas columnas de datos, justo antes de las acciones.
  * No ordenan ni filtran. Son costes guardados, no precios de venta.
+ *
+ * **Precio de venta**, justo antes de los costes: es otra columna, la escribe el usuario y no se
+ * deriva del coste. Tampoco ordena ni filtra.
  */
 
 /** Id de la columna del correlativo. Se exporta porque la tabla la fija por defecto (R19). */
@@ -100,6 +103,8 @@ export const PRODUCTION_COST_COLUMN_ID = 'productionCost';
 export const PRODUCTION_COST_TESTID = 'order-production-cost';
 export const ACTUAL_COST_COLUMN_ID = 'actualCost';
 export const ACTUAL_COST_TESTID = 'order-actual-cost';
+export const SALE_PRICE_COLUMN_ID = 'salePrice';
+export const SALE_PRICE_TESTID = 'order-sale-price';
 export const ACTIONS_COLUMN_ID = 'actions';
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
@@ -227,26 +232,28 @@ function producedProductsOf(
  */
 export const PRODUCTION_COST_LABEL = 'Costo estimado';
 export const ACTUAL_COST_LABEL = 'Costo real';
+export const SALE_PRICE_LABEL = 'Precio de venta';
 
-const COST_TESTIDS = {
-  [PRODUCTION_COST_COLUMN_ID]: PRODUCTION_COST_TESTID,
-  [ACTUAL_COST_COLUMN_ID]: ACTUAL_COST_TESTID,
+const AMOUNT_TESTIDS = {
+  [SALE_PRICE_COLUMN_ID]: { testId: SALE_PRICE_TESTID, label: SALE_PRICE_LABEL },
+  [PRODUCTION_COST_COLUMN_ID]: { testId: PRODUCTION_COST_TESTID, label: PRODUCTION_COST_LABEL },
+  [ACTUAL_COST_COLUMN_ID]: { testId: ACTUAL_COST_TESTID, label: ACTUAL_COST_LABEL },
 } as const;
 
-function CostCell({
+function AmountCell({
   value,
   field,
 }: {
   readonly value: string | null;
-  readonly field: keyof typeof COST_TESTIDS;
+  readonly field: keyof typeof AMOUNT_TESTIDS;
 }) {
-  const label = field === PRODUCTION_COST_COLUMN_ID ? PRODUCTION_COST_LABEL : ACTUAL_COST_LABEL;
+  const { testId, label } = AMOUNT_TESTIDS[field];
   return withCardFieldLabel(
     label,
     value === null ? (
       <MissingValue field={field} />
     ) : (
-      <span data-testid={COST_TESTIDS[field]} title={exactDecimalTitle(value)}>
+      <span data-testid={testId} title={exactDecimalTitle(value)}>
         {formatMoneyDisplay(value)}
       </span>
     ),
@@ -391,18 +398,25 @@ export function buildOrderColumns({
       ),
     },
     {
+      id: SALE_PRICE_COLUMN_ID,
+      label: SALE_PRICE_LABEL,
+      align: 'end',
+      tabular: true,
+      cell: (order) => <AmountCell value={order.salePrice} field={SALE_PRICE_COLUMN_ID} />,
+    },
+    {
       id: PRODUCTION_COST_COLUMN_ID,
       label: PRODUCTION_COST_LABEL,
       align: 'end',
       tabular: true,
-      cell: (order) => <CostCell value={order.ingredientsCost} field={PRODUCTION_COST_COLUMN_ID} />,
+      cell: (order) => <AmountCell value={order.ingredientsCost} field={PRODUCTION_COST_COLUMN_ID} />,
     },
     {
       id: ACTUAL_COST_COLUMN_ID,
       label: ACTUAL_COST_LABEL,
       align: 'end',
       tabular: true,
-      cell: (order) => <CostCell value={order.actualCost} field={ACTUAL_COST_COLUMN_ID} />,
+      cell: (order) => <AmountCell value={order.actualCost} field={ACTUAL_COST_COLUMN_ID} />,
     },
     actionsColumn({
       id: ACTIONS_COLUMN_ID,

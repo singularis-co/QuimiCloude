@@ -284,7 +284,8 @@ export type AssignedOrderPresentationLine = {
 /**
  * Sin autoria, sin motivo de cancelacion y sin marcas de tiempo: lo que no esta en el tipo no se
  * filtra por descuido. `quantity` es cadena decimal, nunca `number`
- * (`docs/architecture.md > Anti-patrones`).
+ * (`docs/architecture.md > Anti-patrones`). Tampoco el precio de venta (`salePrice`), a proposito:
+ * `asignaciones` no lo recibe.
  */
 export type AssignedOrderSummary = {
   readonly id: string;

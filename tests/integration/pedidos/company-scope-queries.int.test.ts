@@ -166,6 +166,7 @@ async function sembrarPedido(empresa: Empresa, datos: SiembraDePedido): Promise<
 
 function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
   return {
+    salePrice: null,
     recipeId: recetaId,
     quantity: '7.0000',
     priority: 'BAJA',

@@ -748,7 +748,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // estrena tabla: recorre la lista de inventario, ya en esta lista, y lee el nombre del producto
   // por `data-table-cell-name` para comprobar que el lote convertido entro en el homonimo. El
   // centinela pasa de CINCUENTA Y SEIS a CINCUENTA Y SIETE; la lista sigue CERRADA.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y siete', () => {
+  //
+  // 2026-10-28: entra `e2e/pedido-precio-de-venta.spec.ts` (QC-307), y no afloja la lista. No
+  // estrena tabla: recorre la lista de pedidos, ya en esta lista, y lee la columna «Precio de
+  // venta» de sus filas. El centinela pasa de CINCUENTA Y SIETE a CINCUENTA Y OCHO; la lista sigue
+  // CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y ocho', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -758,7 +763,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y ocho E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -868,6 +873,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       // Ver la nota de arriba (2026-10-13, QC-262). Entre `pedido-con-cliente` y `pedidos-asignados`
       // porque la lista esta ORDENADA: 'c' precede a 'e', y '-' precede a 's'.
       'e2e/pedido-en-varias-presentaciones.spec.ts',
+      // Ver la nota de arriba (2026-10-28, QC-307). Entre `pedido-en-varias-presentaciones` y
+      // `pedidos-asignados` porque la lista esta ORDENADA: 'e' precede a 'p', y '-' precede a 's'.
+      'e2e/pedido-precio-de-venta.spec.ts',
       // Ver la nota de arriba. Va antes que `pedidos-busqueda` porque la lista esta ORDENADA.
       'e2e/pedidos-asignados.spec.ts',
       // La VIGESIMA la trae QC-122 el 2026-09-23: ver la nota de arriba. Va antes que

@@ -63,6 +63,9 @@ export {
   ACTUAL_COST_TESTID,
   RECIPE_NAME_COLUMN_ID,
   RESPONSIBLES_COLUMN_ID,
+  SALE_PRICE_COLUMN_ID,
+  SALE_PRICE_LABEL,
+  SALE_PRICE_TESTID,
   buildOrderColumns,
   type OrderColumnsDeps,
 } from './order-columns';

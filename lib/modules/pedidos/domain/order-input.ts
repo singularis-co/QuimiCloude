@@ -16,11 +16,12 @@ import type { DistributionLineInput } from './resolve-distribution';
  */
 
 /**
- * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio sigue fuera,
- * pero la UNIDAD vuelve (`unitId`, obligatoria en el alta y en la edicion): la cantidad se
- * interpreta siempre en ella, con o sin reparto, y cada linea del reparto la usa para convertir
- * `envases x contenido` de la unidad de su presentacion a la del pedido. `unitPriceSchema` sigue
- * sin existir: lo que el esquema no declara no puede llegar.
+ * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio **unitario**
+ * sigue fuera -el precio del pedido entero es `salePrice`-, pero la UNIDAD vuelve (`unitId`,
+ * obligatoria en el alta y en la edicion): la cantidad se interpreta siempre en ella, con o sin
+ * reparto, y cada linea del reparto la usa para convertir `envases x contenido` de la unidad de
+ * su presentacion a la del pedido. `unitPriceSchema` sigue sin existir: lo que el esquema no
+ * declara no puede llegar.
  */
 
 /**
@@ -44,6 +45,16 @@ const quantitySchema = z
   .regex(DECIMAL_14_4, { message: 'La cantidad debe ser un numero decimal valido.' })
   .refine((value) => Number.parseFloat(value) > 0, {
     message: 'La cantidad debe ser mayor que cero.',
+  });
+
+/** Precio de venta del pedido entero. Ausente, '' o solo espacios = sin precio (`null`); el 0 SI
+ *  vale (se regala). El patron no admite signo, asi que un negativo muere aqui. */
+const salePriceSchema = z
+  .string()
+  .optional()
+  .transform((value) => (value === undefined || value.trim() === '' ? null : value.trim()))
+  .refine((value) => value === null || DECIMAL_14_4.test(value), {
+    message: 'El precio debe ser un número decimal mayor o igual que cero.',
   });
 
 /**
@@ -140,6 +151,7 @@ export const createOrderSchema = z.object({
     .string()
     .optional()
     .transform((value) => (value === undefined || value.trim() === '' ? null : value)),
+  salePrice: salePriceSchema,
 });
 
 /**

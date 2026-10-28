@@ -78,6 +78,7 @@ const ORDER_UNIT_ID = '99999999-9999-4999-8999-999999999999'
 
 function filaExistente(): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId: RECIPE_ID,

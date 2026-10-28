@@ -20,6 +20,7 @@ const PRES_ANTIGUA = '79797979-7979-4979-8979-797979797979'
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
   return {
+    salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,
@@ -51,6 +52,7 @@ function edicion(overrides: Partial<ComparableEdit> = {}): ComparableEdit {
     quantity: '10',
     priority: 'MEDIA',
     unitId: UNIDAD,
+    salePrice: null,
     presentationLines: [
       { packagingProductId: ENVASE_A, packages: 4 },
       { packagingProductId: ENVASE_B, packages: 2 },
@@ -172,6 +174,27 @@ describe('isCustomerOnlyEdit — la tabla de «igual al guardado» (R13)', () =>
   it('R13: no mira el cliente', () => {
     const conCliente = fila({ customerId: '99999999-9999-4999-8999-999999999999' })
     expect(isCustomerOnlyEdit(conCliente, edicion())).toBe(true)
+  })
+})
+
+// El precio de venta cuenta para el atajo «solo cambia el cliente». Si no contara, un cambio de
+// cliente Y de precio tomaria el atajo y el precio se perderia.
+describe('isCustomerOnlyEdit — el precio de venta (QC-307)', () => {
+  it('QC-307 R12: sin precio en la edicion y sin precio guardado es igual', () => {
+    expect(isCustomerOnlyEdit(fila({ salePrice: null }), edicion({ salePrice: null }))).toBe(true)
+  })
+
+  it('QC-307 R12: sin precio frente a un precio 0 no es igual, en los dos sentidos', () => {
+    expect(isCustomerOnlyEdit(fila({ salePrice: null }), edicion({ salePrice: '0' }))).toBe(false)
+    expect(isCustomerOnlyEdit(fila({ salePrice: '0.0000' }), edicion({ salePrice: null }))).toBe(false)
+  })
+
+  it('QC-307 R12: "12.5" es igual al guardado "12.5000"', () => {
+    expect(isCustomerOnlyEdit(fila({ salePrice: '12.5000' }), edicion({ salePrice: '12.5' }))).toBe(true)
+  })
+
+  it('QC-307 R12: "12.5" frente a "13" no es igual', () => {
+    expect(isCustomerOnlyEdit(fila({ salePrice: '13.0000' }), edicion({ salePrice: '12.5' }))).toBe(false)
   })
 })
 

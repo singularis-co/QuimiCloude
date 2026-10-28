@@ -43,6 +43,7 @@ const REF_VERSION: RecipeRef = {
 
 function fila(recipeId: string): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId,
@@ -365,6 +366,41 @@ describe('QC-305 — getOrder: el coste real y quien lo ve (R24)', () => {
       expect(d.orders.findAliveById).not.toHaveBeenCalled()
       expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
       expect(d.findCustomerRefs).not.toHaveBeenCalled()
+    })
+  }
+})
+
+// La ficha lleva el precio de venta tal como viene de la fila, aparte del coste, y
+// solo para quien tiene `pedidos.consultar`.
+describe('QC-307 — getOrder: el precio de venta', () => {
+  it('QC-307 R16: con pedidos.consultar la ficha trae salePrice tal como viene de la fila, y el coste aparte', async () => {
+    const d = dobles({ ...fila(ORIGINAL), salePrice: '1250.5000', ingredientsCost: '30.0000' })
+
+    const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
+
+    expect(vista.salePrice).toBe('1250.5000')
+    expect(vista.ingredientsCost).toBe('30.0000')
+  })
+
+  it('QC-307 R6: un pedido sin precio sale con salePrice null, no "0.0000" ni ausente; un 0 sale como 0', async () => {
+    const sinPrecio = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
+    const conCero = await createGetOrder(dobles({ ...fila(ORIGINAL), salePrice: '0.0000' }))(ORDER_ID, ADMIN)
+
+    expect(sinPrecio).toHaveProperty('salePrice')
+    expect(sinPrecio.salePrice).toBeNull()
+    expect(conCero.salePrice).toBe('0.0000')
+  })
+
+  for (const [etiqueta, actor] of [
+    ['un actor sin pedidos.consultar', { id: 'operador-1', companyId: COMPANY, permissions: ['asignaciones.consultar'] }],
+    ['un actor ausente', null],
+  ] as const) {
+    it(`QC-307 R16: ${etiqueta} se rechaza sin leer el repositorio ni los catalogos`, async () => {
+      const d = dobles({ ...fila(ORIGINAL), salePrice: '1250.5000' })
+
+      await expect(createGetOrder(d)(ORDER_ID, actor)).rejects.toBeInstanceOf(UnauthorizedError)
+      expect(d.orders.findAliveById).not.toHaveBeenCalled()
+      expect(d.findRefsIncludingDeleted).not.toHaveBeenCalled()
     })
   }
 })

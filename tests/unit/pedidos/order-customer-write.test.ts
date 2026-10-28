@@ -135,6 +135,7 @@ function catalogosQueExplotan() {
 
 function filaGuardada(overrides: Partial<OrderRow> = {}): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId: RECETA,

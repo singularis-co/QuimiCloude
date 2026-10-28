@@ -442,7 +442,7 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      const sinCambios: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const sinCambios: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, sinCambios, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 

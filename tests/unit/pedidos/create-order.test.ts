@@ -62,6 +62,7 @@ const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
 function filaCreada(): OrderRow {
   return {
+    salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA_DE_A,
@@ -1449,5 +1450,98 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
     expect(m.create).not.toHaveBeenCalled();
     expect(m.syncForOrder).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();
+  });
+});
+
+// El precio de venta del pedido entero en el alta. Lo escribe el usuario y viaja en `NewOrder`;
+// el coste no depende de el.
+describe('QC-307 — el precio de venta en el alta', () => {
+  function altaConCoste() {
+    const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
+    const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
+    const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
+    const repo = repositorioDePedidos();
+    const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
+      unitOfWork: repo.unitOfWork,
+      recipes: cat.recipes,
+      products: prod.products,
+      units: uni.units,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
+      now: () => AHORA,
+    });
+    return { createOrder, repo };
+  }
+
+  function datosEscritos(repo: ReturnType<typeof repositorioDePedidos>): { salePrice: unknown } {
+    expect(repo.create).toHaveBeenCalledTimes(1);
+    return (repo.create.mock.calls[0] as unknown as readonly [{ salePrice: unknown }])[0];
+  }
+
+  function costeEscrito(repo: ReturnType<typeof repositorioDePedidos>): unknown {
+    return (repo.create.mock.calls[0] as unknown as readonly unknown[])[4];
+  }
+
+  it('QC-307 R6: con precio, el puerto recibe la cadena; con 0, "0"; sin precio o en blanco, null', async () => {
+    const casos: ReadonlyArray<readonly [Record<string, unknown>, string | null]> = [
+      [{ salePrice: '1250.5' }, '1250.5'],
+      [{ salePrice: '0' }, '0'],
+      [{}, null],
+      [{ salePrice: '' }, null],
+      [{ salePrice: '   ' }, null],
+    ];
+    for (const [extra, esperado] of casos) {
+      const { createOrder, repo } = altaConCoste();
+      await createOrder({ recipeId: RECETA_DE_A, quantity: '20.0000', unitId: UNIT_ID, ...extra }, ACTOR_A);
+      expect(datosEscritos(repo).salePrice, JSON.stringify(extra)).toBe(esperado);
+    }
+  });
+
+  it('QC-307 R15: sin pedidos.modificar falla con unauthorized antes de validar, aunque el precio sea invalido, y sin escribir', async () => {
+    const catalogos = catalogosQueExplotan();
+    const ACTOR_SIN_MODIFICAR: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
+    const createOrder = createCreateOrder({
+      customerCatalog: fakeCustomerCatalog(),
+      unitOfWork: catalogos.unitOfWork,
+      recipes: catalogos.recipes,
+      products: catalogos.products,
+      units: catalogos.units,
+      presentations: catalogos.presentations,
+      packaging: fakePackagingCatalog(),
+      now: () => AHORA,
+    });
+
+    // Un precio negativo daria `invalid_input` si el `parse` corriera primero.
+    const codigo = await codigoDelFallo(() =>
+      createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID, salePrice: '-1' }, ACTOR_SIN_MODIFICAR),
+    );
+
+    expect(codigo).toBe('unauthorized');
+    expect(catalogos.unitOfWork.run).not.toHaveBeenCalled();
+  });
+
+  it('QC-307 R7: un precio "-1" falla con invalid_input y no escribe', async () => {
+    const { createOrder, repo } = altaConCoste();
+
+    const codigo = await codigoDelFallo(() =>
+      createOrder({ recipeId: RECETA_DE_A, quantity: '20.0000', unitId: UNIT_ID, salePrice: '-1' }, ACTOR_A),
+    );
+
+    expect(codigo).toBe('invalid_input');
+    expect(repo.create).not.toHaveBeenCalled();
+  });
+
+  it('QC-307 R23: el coste estimado que se escribe es el mismo con precio que sin el', async () => {
+    const sinPrecio = altaConCoste();
+    await sinPrecio.createOrder({ recipeId: RECETA_DE_A, quantity: '20.0000', unitId: UNIT_ID }, ACTOR_A);
+    const conPrecio = altaConCoste();
+    await conPrecio.createOrder(
+      { recipeId: RECETA_DE_A, quantity: '20.0000', unitId: UNIT_ID, salePrice: '9999.9999' },
+      ACTOR_A,
+    );
+
+    expect(costeEscrito(sinPrecio.repo)).toEqual({ total: '60.0000', packaging: '0.0000' });
+    expect(costeEscrito(conPrecio.repo)).toEqual(costeEscrito(sinPrecio.repo));
   });
 });

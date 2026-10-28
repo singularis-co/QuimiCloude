@@ -190,6 +190,8 @@ describe('pedidos — createOrderSchema (alta)', () => {
       'quantity',
       'recipeId',
       'recipeVersionId',
+      // El precio de venta del pedido entero es un campo declarado del alta y la edicion.
+      'salePrice',
       'unitId',
     ])
     expect(parsed).not.toHaveProperty('status')
@@ -225,6 +227,8 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
       'quantity',
       'recipeId',
       'recipeVersionId',
+      // El precio de venta del pedido entero es un campo declarado del alta y la edicion.
+      'salePrice',
       'unitId',
     ])
   })
@@ -556,5 +560,80 @@ describe('QC-195 — la linea del reparto nombra su envase', () => {
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: '30' }],
       }).success,
     ).toBe(true)
+  })
+})
+
+// El precio de venta del pedido entero. Opcional, cadena decimal(14,4) sin signo; el 0
+// vale. La edicion acotada del reparto es `.strict()` y no lo declara: una clave `salePrice` alli
+// rechaza la entrada entera.
+describe('QC-307 — salePrice en el alta y la edicion', () => {
+  function conPrecio(salePrice: unknown): Record<string, unknown> {
+    return { ...altaValida(), salePrice }
+  }
+
+  it('R4: ausente es un pedido sin precio (null)', () => {
+    expect(createOrderSchema.parse(altaValida()).salePrice).toBeNull()
+    expect(updateOrderSchema.parse(altaValida()).salePrice).toBeNull()
+  })
+
+  it("R4: '' es un pedido sin precio (null)", () => {
+    expect(createOrderSchema.parse(conPrecio('')).salePrice).toBeNull()
+  })
+
+  it("R4: '   ' (solo espacios) es un pedido sin precio (null)", () => {
+    expect(createOrderSchema.parse(conPrecio('   ')).salePrice).toBeNull()
+  })
+
+  it("R6: '0' y '0.0000' se aceptan (se regala)", () => {
+    expect(createOrderSchema.parse(conPrecio('0')).salePrice).toBe('0')
+    expect(createOrderSchema.parse(conPrecio('0.0000')).salePrice).toBe('0.0000')
+  })
+
+  it("R5: '1250.5' se acepta como cadena, no como number", () => {
+    const parsed = createOrderSchema.parse(conPrecio('1250.5'))
+    expect(parsed.salePrice).toBe('1250.5')
+    expect(typeof parsed.salePrice).toBe('string')
+    expect(updateOrderSchema.parse(conPrecio('1250.5')).salePrice).toBe('1250.5')
+  })
+
+  it("R5: '9999999999.9999' (el maximo de decimal(14,4)) se acepta", () => {
+    expect(createOrderSchema.parse(conPrecio('9999999999.9999')).salePrice).toBe('9999999999.9999')
+  })
+
+  it("R7: '-1' falla", () => {
+    expect(createOrderSchema.safeParse(conPrecio('-1')).success).toBe(false)
+    expect(updateOrderSchema.safeParse(conPrecio('-1')).success).toBe(false)
+  })
+
+  it("R8: '1,5' (coma decimal) falla", () => {
+    expect(createOrderSchema.safeParse(conPrecio('1,5')).success).toBe(false)
+  })
+
+  it("R8: '1e3' (notacion exponencial) falla", () => {
+    expect(createOrderSchema.safeParse(conPrecio('1e3')).success).toBe(false)
+  })
+
+  it("R8: '1.12345' (cinco decimales) falla", () => {
+    expect(createOrderSchema.safeParse(conPrecio('1.12345')).success).toBe(false)
+  })
+
+  it("R8: '12345678901' (once enteros) falla", () => {
+    expect(createOrderSchema.safeParse(conPrecio('12345678901')).success).toBe(false)
+  })
+
+  it("R8: 'abc' falla", () => {
+    expect(createOrderSchema.safeParse(conPrecio('abc')).success).toBe(false)
+  })
+
+  it('R3: una clave currency se descarta', () => {
+    const parsed = createOrderSchema.parse({ ...conPrecio('10'), currency: 'USD' })
+    expect(parsed).not.toHaveProperty('currency')
+    expect(updateOrderSchema.parse({ ...conPrecio('10'), currency: 'USD' })).not.toHaveProperty('currency')
+  })
+
+  it('R14: updateOrderDistributionSchema con salePrice falla por .strict()', () => {
+    const reparto = { unitId: UNIT_ID, presentationLines: [] }
+    expect(updateOrderDistributionSchema.safeParse(reparto).success).toBe(true)
+    expect(updateOrderDistributionSchema.safeParse({ ...reparto, salePrice: '10' }).success).toBe(false)
   })
 })

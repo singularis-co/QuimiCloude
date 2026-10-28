@@ -178,6 +178,7 @@ export function createCreateOrder(
           status: STATUS_DE_ALTA,
           presentationLines: distribution.lines,
           customerId: data.customerId,
+          salePrice: data.salePrice,
         },
         instant.getUTCFullYear(),
         actor.id,

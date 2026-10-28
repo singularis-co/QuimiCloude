@@ -785,6 +785,10 @@ model Order {
   /// terminado antes de existir la columna o sin calculo posible; nunca 0. Los CHECK
   /// `orders_actual_cost_non_negative` y `orders_actual_cost_requires_packed` son drift.
   actualCost          Decimal?      @map("actual_cost") @db.Decimal(14, 4)
+  /// Precio de venta del pedido ENTERO, escrito a mano. NULL = sin precio; 0 = se regala, y no es
+  /// lo mismo. No es el coste ni se deriva de el. El CHECK `orders_sale_price_non_negative` es
+  /// drift, escrito a mano en la migracion.
+  salePrice           Decimal?      @map("sale_price") @db.Decimal(14, 4)
   /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
   /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
   /// entregar lo vacian.

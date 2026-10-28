@@ -44,6 +44,7 @@ const CLIENTES: readonly { readonly companyId: string; readonly ref: CustomerRef
 
 function fila(overrides: Partial<OrderRow> = {}): OrderRow {
   return {
+    salePrice: null,
     id: ORDER_ID,
     number: { year: 2026, sequence: 7 },
     recipeId: '22222222-2222-4222-8222-222222222222',
@@ -430,5 +431,22 @@ describe('setOrderCustomer — dependencias (R15)', () => {
 
     const e = escenario()
     expect(Object.keys(e.deps).sort()).toEqual(['customerCatalog', 'now', 'orders', 'unitOfWork'])
+  })
+})
+
+// Cambiar el cliente conserva el precio de venta porque no lo escribe: el puerto
+// (`setCustomerAlive`) solo recibe el cliente, y la entrada no puede colarle un precio (`z.object`
+// descarta la clave).
+describe('QC-307 — setOrderCustomer no escribe el precio de venta', () => {
+  it('QC-307 R13: con un pedido que tiene precio y una entrada que trae salePrice, el puerto solo recibe el cliente', async () => {
+    const e = escenario({ fila: fila({ salePrice: '1250.5000' }) })
+
+    await e.setOrderCustomer(ORDER_ID, { customerId: CLIENTE_B, salePrice: '1' }, ACTOR)
+
+    expect(e.setCustomerAlive).toHaveBeenCalledTimes(1)
+    expect(e.setCustomerAlive).toHaveBeenCalledWith(ORDER_ID, CLIENTE_B, ACTOR.id, AHORA, SCOPE)
+    const argumentos = e.setCustomerAlive.mock.calls[0] as readonly unknown[]
+    expect(JSON.stringify(argumentos)).not.toContain('salePrice')
+    expect(otrasLlamadas(e.uow)).toEqual([])
   })
 })

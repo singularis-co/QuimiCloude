@@ -228,6 +228,8 @@ function buildCreateCandidate(formData: FormData): unknown {
     confirmBlocked: formData.get('confirmBlocked') === 'true',
     recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
     customerId: readOptionalFormString(formData, 'customerId'),
+    // Que hacer con un blanco lo decide `salePriceSchema`, no el borde.
+    salePrice: readOptionalFormString(formData, 'salePrice'),
   };
 }
 

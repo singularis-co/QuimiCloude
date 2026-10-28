@@ -253,6 +253,7 @@ function instantIn(year: number, month: number, day: number, ms = 0): Date {
 
 function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
   return {
+    salePrice: null,
     recipeId,
     quantity: '10.0000',
     priority: 'MEDIA',

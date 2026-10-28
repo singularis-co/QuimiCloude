@@ -166,6 +166,7 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['conditionedBy', 'conditioned_by'], // quien tiene o tuvo el pedido en acondicionamiento, opcional
   ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
   ['customerId', 'customer_id'], // QC-156 R1: el cliente del pedido, opcional
+  ['salePrice', 'sale_price'], // precio de venta del pedido entero, opcional
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
@@ -329,12 +330,12 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
 
-    // Los CUATRO unicos decimales del modelo: la cantidad, el importe, su parte de envases
-    // (QC-195 R47) y el coste real. La copia del contenido de la presentacion vive
-    // en la linea de reparto.
+    // Los CINCO unicos decimales del modelo: la cantidad, el importe, su parte de envases,
+    // el coste real y el precio de venta del pedido entero (no es un precio unitario).
+    // La copia del contenido de la presentacion vive en la linea de reparto.
     expect(
       order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
-    ).toEqual(['actualCost', 'ingredientsCost', 'packagingCost', 'quantity'])
+    ).toEqual(['actualCost', 'ingredientsCost', 'packagingCost', 'quantity', 'salePrice'])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {

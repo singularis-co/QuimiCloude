@@ -139,6 +139,7 @@ async function dropFixture(fixture: Fixture): Promise<void> {
 
 function pedido(unitId: string, overrides: Partial<NewOrder> = {}): NewOrder {
   return {
+    salePrice: null,
     recipeId: recetaId,
     quantity: '10.0000',
     priority: 'BAJA',

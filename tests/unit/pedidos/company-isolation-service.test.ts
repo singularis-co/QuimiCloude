@@ -102,6 +102,7 @@ const ENTRADA_EDICION_CON_REPARTO = { ...ENTRADA_ALTA_CON_REPARTO, status: 'EN_C
 
 function fila(id: string): OrderRow {
   return {
+    salePrice: null,
     id,
     number: { year: 2026, sequence: 7 },
     recipeId: RECETA,

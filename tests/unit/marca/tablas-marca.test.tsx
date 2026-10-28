@@ -241,8 +241,9 @@ const LISTA_CERRADA: readonly ColumnasDeArchivo[] = [
     archivo: 'order-columns.tsx',
     construir: async () =>
       buildOrderColumns({ units: [], bridge: null }),
-    // Los dos costes son cifras, como el «Costo unitario» de inventario.
-    esperadas: ['Fecha de solicitud', 'Costo estimado', 'Costo real'],
+    // Los dos costes son cifras, como el «Costo unitario» de inventario. El «Precio de venta»
+    // (QC-307) es otro importe y va en Mono igual que ellos (design.md de QC-307).
+    esperadas: ['Fecha de solicitud', 'Precio de venta', 'Costo estimado', 'Costo real'],
   },
   {
     archivo: 'customer-columns.tsx',

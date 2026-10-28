@@ -4,7 +4,10 @@ import type { DistributionLineInput } from './resolve-distribution';
 
 /** Lo que una edicion general trae y se compara con la fila guardada. `recipeId` llega ya
  *  resuelto a la receta efectiva (la version si se eligio una). */
-export type ComparableEdit = Pick<OrderEdit, 'recipeId' | 'quantity' | 'priority' | 'unitId'> & {
+export type ComparableEdit = Pick<
+  OrderEdit,
+  'recipeId' | 'quantity' | 'priority' | 'unitId' | 'salePrice'
+> & {
   readonly presentationLines: readonly DistributionLineInput[];
 };
 
@@ -12,6 +15,13 @@ function sameLine(edit: DistributionLineInput, saved: OrderPresentationLineRow):
   if (edit.packages !== saved.packages) return false;
   if ('packagingProductId' in edit) return saved.packagingProductId === edit.packagingProductId;
   return saved.packagingProductId === null && saved.presentationId === edit.presentationId;
+}
+
+/** `null` (sin precio) solo es igual a `null`: un 0 es un precio. Dos importes se comparan por
+ *  valor, asi que `'12.5'` y el `'12.5000'` guardado son el mismo. */
+function sameSalePrice(edit: string | null, saved: string | null): boolean {
+  if (edit === null || saved === null) return edit === saved;
+  return sameDecimal(edit, saved);
 }
 
 /** El orden no cuenta: cada linea entrante tiene que casar con una guardada distinta. */
@@ -30,9 +40,10 @@ function sameDistribution(
 }
 
 /**
- * `true` si receta, cantidad, prioridad, unidad y reparto de la edicion son iguales a los de la
- * fila. No mira el cliente. Un pedido guardado sin unidad nunca es igual: la edicion siempre
- * trae una, y es el camino completo el que se la asigna.
+ * `true` si receta, cantidad, prioridad, unidad, precio de venta y reparto de la edicion son
+ * iguales a los de la fila. No mira el cliente. El precio cuenta para que un cambio de cliente Y
+ * de precio no tome el atajo del cliente y pierda el precio. Un pedido guardado sin
+ * unidad nunca es igual: la edicion siempre trae una, y es el camino completo el que se la asigna.
  */
 export function isCustomerOnlyEdit(row: OrderRow, edit: ComparableEdit): boolean {
   return (
@@ -41,6 +52,7 @@ export function isCustomerOnlyEdit(row: OrderRow, edit: ComparableEdit): boolean
     edit.priority === row.priority &&
     row.unitId !== null &&
     edit.unitId === row.unitId &&
+    sameSalePrice(edit.salePrice, row.salePrice) &&
     sameDistribution(edit.presentationLines, row.presentationLines)
   );
 }

@@ -209,6 +209,8 @@ export function createUpdateOrder(
           unitId: data.unitId,
           presentationLines: distribution.lines,
           customerId: data.customerId,
+          // Se sustituye siempre, tambien a `null` (vaciar el campo quita el precio).
+          salePrice: data.salePrice,
         },
         actor.id,
         instant,

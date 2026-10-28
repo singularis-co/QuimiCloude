@@ -697,6 +697,22 @@ const _r15TipoSinImporte: AssignedOrderExecutionView = {
 };
 void _r15TipoSinImporte;
 
+// Lo mismo con el precio de venta del pedido: va en un literal aparte porque `tsc` solo señala
+// la primera propiedad de mas de cada literal.
+const _r17TipoSinPrecio: AssignedOrderExecutionView = {
+  orderId: PEDIDO,
+  numberText: '2026-0000001',
+  status: 'PENDIENTE',
+  recipeName: null,
+  orderQuantity: '200',
+  steps: [],
+  lines: [],
+  // @ts-expect-error `AssignedOrderExecutionView` no declara `salePrice`: si esto compila,
+  // la pantalla de ejecucion gano el precio de venta.
+  salePrice: '99.0000',
+};
+void _r17TipoSinPrecio;
+
 describe('la pantalla de ejecucion no lleva importe (R15)', () => {
   it('la pantalla de ejecucion no lleva importe (R15)', async () => {
     const { deps } = montar();
@@ -978,12 +994,13 @@ function clavesDeImporte(valor: unknown, ruta = ''): string[] {
 }
 
 describe('QC-305 — la pantalla de ejecucion no lleva el coste real (R24)', () => {
-  it('R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en toda la vista, aunque el resumen las traiga', async () => {
+  it('R24, R17 (QC-307): ninguna clave de importe (actualCost, ingredientsCost, packagingCost, salePrice...) en toda la vista, aunque el resumen las traiga', async () => {
     const conImportes = {
       ...resumen({ status: 'EN_CURSO', presentationLines: [{ id: uuid('5'), presentationId: PRESENTACION, packages: 2, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: null }] }),
       actualCost: '27.1250',
       ingredientsCost: '30.0000',
       packagingCost: '4.5000',
+      salePrice: '99.0000',
     } as unknown as AssignedOrderSummary;
     const { deps } = montar({
       order: { id: PEDIDO, status: 'EN_CURSO' },
@@ -998,10 +1015,12 @@ describe('QC-305 — la pantalla de ejecucion no lleva el coste real (R24)', () 
     expect(clavesDeImporte(view)).toEqual([]);
   });
 
-  it('R24: el contrato de la vista no declara actualCost (comprobacion de tipo)', () => {
+  it('R24, R17 (QC-307): el contrato de la vista no declara actualCost ni salePrice (comprobacion de tipo)', () => {
     const sinReal: 'actualCost' extends keyof AssignedOrderExecutionView ? false : true = true;
     const sinEstimado: 'ingredientsCost' extends keyof AssignedOrderExecutionView ? false : true = true;
     const resumenSinReal: 'actualCost' extends keyof AssignedOrderSummary ? false : true = true;
-    expect([sinReal, sinEstimado, resumenSinReal]).toEqual([true, true, true]);
+    const sinPrecio: 'salePrice' extends keyof AssignedOrderExecutionView ? false : true = true;
+    const resumenSinPrecio: 'salePrice' extends keyof AssignedOrderSummary ? false : true = true;
+    expect([sinReal, sinEstimado, resumenSinReal, sinPrecio, resumenSinPrecio]).toEqual([true, true, true, true, true]);
   });
 });

@@ -53,6 +53,7 @@ let secuencia = 0
 function fila(customerId: string | null): OrderRow {
   secuencia += 1
   return {
+    salePrice: null,
     id: `o-${secuencia}`,
     number: { year: 2026, sequence: secuencia },
     recipeId: RECETA,

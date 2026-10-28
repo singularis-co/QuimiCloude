@@ -79,6 +79,7 @@ const ORDER_SELECT = {
   ingredientsCost: true,
   packagingCost: true,
   actualCost: true,
+  salePrice: true,
   createdAt: true,
   updatedAt: true,
   createdBy: true,
@@ -130,6 +131,8 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
     packagingCost: row.packagingCost === null ? null : fromDecimal(row.packagingCost),
     actualCost: row.actualCost === null ? null : fromDecimal(row.actualCost),
+    // Igual que el coste, `null` (sin precio) no pasa a `'0.0000'` (se regala).
+    salePrice: row.salePrice === null ? null : fromDecimal(row.salePrice),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -557,6 +560,8 @@ export async function updateAliveOrder(
       updatedBy: actorId,
       unitId: data.unitId,
       customerId: data.customerId,
+      // Reemplazo completo, tambien a `null` (vaciar el campo quita el precio).
+      salePrice: data.salePrice === null ? null : toDecimalInput(data.salePrice),
     },
   });
   if (count !== 1) return 'not_found';
@@ -715,7 +720,7 @@ async function insertAliveOrder(
     INSERT INTO "orders" (
       "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
       "priority", "status", "ingredients_cost", "packaging_cost", "created_by", "updated_by",
-      "created_at", "updated_at", "unit_id", "customer_id"
+      "created_at", "updated_at", "unit_id", "customer_id", "sale_price"
     ) VALUES (
       ${companyId}::uuid,
       ${year}::integer,
@@ -734,7 +739,8 @@ async function insertAliveOrder(
       ${now}::timestamptz,
       ${now}::timestamptz,
       ${data.unitId}::uuid,
-      ${data.customerId}::uuid
+      ${data.customerId}::uuid,
+      ${data.salePrice}::numeric
     )
     RETURNING "id", "order_year", "order_sequence"
   `);
@@ -761,6 +767,7 @@ async function insertAliveOrder(
     ingredientsCost: cost === null ? null : fromDecimal(toDecimalInput(cost.total)),
     packagingCost: cost === null ? null : fromDecimal(toDecimalInput(cost.packaging)),
     actualCost: null,
+    salePrice: data.salePrice === null ? null : fromDecimal(toDecimalInput(data.salePrice)),
     createdAt: now,
     updatedAt: now,
     createdBy: actorId,
