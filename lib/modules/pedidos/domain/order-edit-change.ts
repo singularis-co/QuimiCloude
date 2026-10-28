@@ -17,8 +17,8 @@ function sameLine(edit: DistributionLineInput, saved: OrderPresentationLineRow):
   return saved.packagingProductId === null && saved.presentationId === edit.presentationId;
 }
 
-/** `null` (sin precio) solo es igual a `null`: un 0 es un precio (R6). Dos importes se comparan
- *  por valor, asi que `'12.5'` y el `'12.5000'` guardado son el mismo (QC-307). */
+/** `null` (sin precio) solo es igual a `null`: un 0 es un precio. Dos importes se comparan por
+ *  valor, asi que `'12.5'` y el `'12.5000'` guardado son el mismo. */
 function sameSalePrice(edit: string | null, saved: string | null): boolean {
   if (edit === null || saved === null) return edit === saved;
   return sameDecimal(edit, saved);
@@ -42,7 +42,7 @@ function sameDistribution(
 /**
  * `true` si receta, cantidad, prioridad, unidad, precio de venta y reparto de la edicion son
  * iguales a los de la fila. No mira el cliente. El precio cuenta para que un cambio de cliente Y
- * de precio no tome el atajo del cliente y pierda el precio (QC-307 R12). Un pedido guardado sin
+ * de precio no tome el atajo del cliente y pierda el precio. Un pedido guardado sin
  * unidad nunca es igual: la edicion siempre trae una, y es el camino completo el que se la asigna.
  */
 export function isCustomerOnlyEdit(row: OrderRow, edit: ComparableEdit): boolean {

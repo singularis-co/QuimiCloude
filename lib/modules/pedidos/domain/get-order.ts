@@ -173,7 +173,6 @@ export function toOrderView(
     ingredientsCost: row.ingredientsCost,
     packagingCost: row.packagingCost,
     actualCost: row.actualCost,
-    // QC-307: el precio de venta, aparte del coste y sin derivar nada de el. `null` = sin precio.
     salePrice: row.salePrice,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

@@ -177,8 +177,8 @@ describe('isCustomerOnlyEdit — la tabla de «igual al guardado» (R13)', () =>
   })
 })
 
-// QC-307: el precio de venta cuenta para el atajo «solo cambia el cliente». Si no contara, un
-// cambio de cliente Y de precio tomaria el atajo y el precio se perderia (R12).
+// El precio de venta cuenta para el atajo «solo cambia el cliente». Si no contara, un cambio de
+// cliente Y de precio tomaria el atajo y el precio se perderia.
 describe('isCustomerOnlyEdit — el precio de venta (QC-307)', () => {
   it('QC-307 R12: sin precio en la edicion y sin precio guardado es igual', () => {
     expect(isCustomerOnlyEdit(fila({ salePrice: null }), edicion({ salePrice: null }))).toBe(true)

@@ -203,7 +203,7 @@ void _r15TipoSinImporte;
 // la primera propiedad de mas de cada literal.
 const _r17TipoSinPrecio: AssignedOrderSummary = {
   ...resumen(pedidoId(0)),
-  // @ts-expect-error `AssignedOrderSummary` no declara `salePrice` (R17): si esto compila, el
+  // @ts-expect-error `AssignedOrderSummary` no declara `salePrice`: si esto compila, el
   // pedido asignado gano el precio de venta.
   salePrice: '99.0000',
 };

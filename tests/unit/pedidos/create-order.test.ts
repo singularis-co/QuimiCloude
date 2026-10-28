@@ -1453,8 +1453,8 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
   });
 });
 
-// QC-307 — el precio de venta del pedido entero en el alta. Lo escribe el usuario y viaja en
-// `NewOrder` (`design.md > 2.2`); el coste no depende de el (R23).
+// El precio de venta del pedido entero en el alta. Lo escribe el usuario y viaja en `NewOrder`;
+// el coste no depende de el.
 describe('QC-307 — el precio de venta en el alta', () => {
   function altaConCoste() {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));

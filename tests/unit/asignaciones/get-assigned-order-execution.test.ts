@@ -707,7 +707,7 @@ const _r17TipoSinPrecio: AssignedOrderExecutionView = {
   orderQuantity: '200',
   steps: [],
   lines: [],
-  // @ts-expect-error `AssignedOrderExecutionView` no declara `salePrice` (R17): si esto compila,
+  // @ts-expect-error `AssignedOrderExecutionView` no declara `salePrice`: si esto compila,
   // la pantalla de ejecucion gano el precio de venta.
   salePrice: '99.0000',
 };

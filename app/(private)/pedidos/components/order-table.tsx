@@ -110,8 +110,8 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
 
 /**
  * La tarjeta de telefono: el precio de venta y los dos costes van en los datos secundarios, en el
- * orden de la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion propia: la
- * pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
+ * orden de la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion
+ * propia: la pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
  */
 const ORDER_TABLE_CARD: DataTableCardLayout = {
   primary: ORDER_NUMBER_COLUMN_ID,

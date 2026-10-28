@@ -296,7 +296,10 @@ usa `sameDecimal`, que ya existe (`order-distribution.ts:56`).
 - `order-list-skeleton.tsx`: `ORDER_SKELETON_COLUMN_COUNT` pasa de 14 a 15. El test
   `order-list-skeleton.test.tsx` ya exige que coincida con `ORDER_COLUMNS.length`.
 - **Tarjeta del teléfono**: la compone la misma declaración de columnas, con `withCardFieldLabel`
-  dentro de la celda. No hay archivo aparte que tocar (R19).
+  dentro de la celda. **Desvío anotado en la implementación:** la tarjeta solo pinta las
+  columnas que lista `ORDER_TABLE_CARD.meta` en `order-table.tsx`, así que hay que añadir ahí
+  `SALE_PRICE_COLUMN_ID`; sin esa entrada el precio no sale en el teléfono (R19,
+  `order-cards.test.tsx`).
 - El comentario de cabecera de `order-columns.tsx:82-83` («Son costes guardados, no precios de
   venta») se completa: la columna del precio es otra, y va aparte.
 

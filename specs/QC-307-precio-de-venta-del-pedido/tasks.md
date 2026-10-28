@@ -187,6 +187,8 @@
 ### Pantalla
 
 - `app/(private)/pedidos/components/order-form.tsx`
+- `app/(private)/pedidos/components/order-table.tsx` (`ORDER_TABLE_CARD.meta`; desvío de
+  `design.md > 6.2`)
 - `app/(private)/pedidos/components/order-columns.tsx`
 - `app/(private)/pedidos/components/order-list-skeleton.tsx`
 

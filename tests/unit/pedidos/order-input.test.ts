@@ -190,7 +190,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
       'quantity',
       'recipeId',
       'recipeVersionId',
-      // QC-307: el precio de venta del pedido entero es un campo declarado del alta y la edicion.
+      // El precio de venta del pedido entero es un campo declarado del alta y la edicion.
       'salePrice',
       'unitId',
     ])
@@ -227,7 +227,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
       'quantity',
       'recipeId',
       'recipeVersionId',
-      // QC-307: el precio de venta del pedido entero es un campo declarado del alta y la edicion.
+      // El precio de venta del pedido entero es un campo declarado del alta y la edicion.
       'salePrice',
       'unitId',
     ])
@@ -563,7 +563,7 @@ describe('QC-195 — la linea del reparto nombra su envase', () => {
   })
 })
 
-// QC-307 — el precio de venta del pedido entero. Opcional, cadena decimal(14,4) sin signo; el 0
+// El precio de venta del pedido entero. Opcional, cadena decimal(14,4) sin signo; el 0
 // vale. La edicion acotada del reparto es `.strict()` y no lo declara: una clave `salePrice` alli
 // rechaza la entrada entera.
 describe('QC-307 — salePrice en el alta y la edicion', () => {

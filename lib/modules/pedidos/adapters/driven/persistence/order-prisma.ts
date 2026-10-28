@@ -131,7 +131,7 @@ export function toOrderRow(row: OrderPrismaRow): OrderRow {
     ingredientsCost: row.ingredientsCost === null ? null : fromDecimal(row.ingredientsCost),
     packagingCost: row.packagingCost === null ? null : fromDecimal(row.packagingCost),
     actualCost: row.actualCost === null ? null : fromDecimal(row.actualCost),
-    // QC-307 R6: igual que el coste, `null` (sin precio) no pasa a `'0.0000'` (se regala).
+    // Igual que el coste, `null` (sin precio) no pasa a `'0.0000'` (se regala).
     salePrice: row.salePrice === null ? null : fromDecimal(row.salePrice),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -560,7 +560,7 @@ export async function updateAliveOrder(
       updatedBy: actorId,
       unitId: data.unitId,
       customerId: data.customerId,
-      // QC-307 R10: reemplazo completo, tambien a `null` (vaciar el campo quita el precio).
+      // Reemplazo completo, tambien a `null` (vaciar el campo quita el precio).
       salePrice: data.salePrice === null ? null : toDecimalInput(data.salePrice),
     },
   });

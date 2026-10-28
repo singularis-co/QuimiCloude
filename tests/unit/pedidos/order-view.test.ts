@@ -145,7 +145,7 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
 
 describe('pedidos — el coste de ingredientes en la salida', () => {
   it('la salida del pedido no declara precio por unidad ni total (R1)', () => {
-    // QC-307: el precio del pedido entero SI existe (`salePrice`, abajo); lo que sigue sin
+    // El precio del pedido entero SI existe (`salePrice`, abajo); lo que sigue sin
     // existir es un precio por unidad, un `price` generico o un total derivado.
     const precio: Declara<OrderView, 'price'> = false
     const precioUnitario: Declara<OrderView, 'unitPrice'> = false
@@ -187,10 +187,10 @@ describe('QC-307 — el precio de venta del pedido entero en el contrato', () =>
     const enElListado: Declara<OrderSummary, 'salePrice'> = true
     expect([enLaEscritura, enLaFila, enLaVista, enElListado]).toEqual([true, true, true, true])
 
-    // Cadena decimal, nunca `number` (R2).
+    // Cadena decimal, nunca `number`.
     const conPrecio: NewOrder = { ...NEW_ORDER, salePrice: '1250.5000' }
     const sinPrecio: OrderView['salePrice'] = null
-    // @ts-expect-error salePrice no admite number (R2)
+    // @ts-expect-error salePrice no admite number
     const comoNumero: NewOrder = { ...NEW_ORDER, salePrice: 1250.5 }
     expect([conPrecio.salePrice, sinPrecio, comoNumero.salePrice]).toEqual(['1250.5000', null, 1250.5])
   })

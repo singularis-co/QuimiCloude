@@ -863,7 +863,7 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
   });
 });
 
-// QC-307 R13 — la edicion del reparto conserva el precio de venta porque no lo escribe: el puerto
+// La edicion del reparto conserva el precio de venta porque no lo escribe: el puerto
 // que llama (`updatePresentationLinesAlive`) solo recibe unidad y lineas, y `updateAlive` -el unico
 // que escribe el precio- no se toca.
 describe('QC-307 — updateOrderPresentationLines no escribe el precio de venta', () => {

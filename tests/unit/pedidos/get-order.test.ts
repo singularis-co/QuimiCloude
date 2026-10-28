@@ -370,7 +370,7 @@ describe('QC-305 — getOrder: el coste real y quien lo ve (R24)', () => {
   }
 })
 
-// QC-307 — la ficha lleva el precio de venta tal como viene de la fila, aparte del coste, y
+// La ficha lleva el precio de venta tal como viene de la fila, aparte del coste, y
 // solo para quien tiene `pedidos.consultar`.
 describe('QC-307 — getOrder: el precio de venta', () => {
   it('QC-307 R16: con pedidos.consultar la ficha trae salePrice tal como viene de la fila, y el coste aparte', async () => {

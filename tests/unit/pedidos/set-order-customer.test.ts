@@ -434,7 +434,7 @@ describe('setOrderCustomer — dependencias (R15)', () => {
   })
 })
 
-// QC-307 R13 — cambiar el cliente conserva el precio de venta porque no lo escribe: el puerto
+// Cambiar el cliente conserva el precio de venta porque no lo escribe: el puerto
 // (`setCustomerAlive`) solo recibe el cliente, y la entrada no puede colarle un precio (`z.object`
 // descarta la clave).
 describe('QC-307 — setOrderCustomer no escribe el precio de venta', () => {

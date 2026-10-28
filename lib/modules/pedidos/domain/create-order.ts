@@ -178,7 +178,6 @@ export function createCreateOrder(
           status: STATUS_DE_ALTA,
           presentationLines: distribution.lines,
           customerId: data.customerId,
-          // QC-307: lo escribe el usuario; no entra en el coste de arriba (R23).
           salePrice: data.salePrice,
         },
         instant.getUTCFullYear(),

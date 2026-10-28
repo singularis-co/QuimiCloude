@@ -219,7 +219,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       unitId: UNIT_ID,
       presentationLines: [],
       customerId: null,
-      // QC-307: sin precio en la entrada, el alta lo escribe como `null`, no como 0.
+      // Sin precio en la entrada, el alta lo escribe como `null`, no como 0.
       salePrice: null,
     })
   })
@@ -499,7 +499,7 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       unitId: UNIT_ID,
       presentationLines: [],
       customerId: null,
-      // QC-307 R10: la edicion sustituye el precio siempre, tambien a `null`.
+      // La edicion sustituye el precio siempre, tambien a `null`.
       salePrice: null,
     })
     expect(actorId).toBe(ADMIN.id)

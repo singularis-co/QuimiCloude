@@ -133,3 +133,31 @@ renombre de `CostCell`) y `withCardFieldLabel`. Ningún componente nuevo.
   webkit), exit 0. La base local ya tenía `orders.sale_price` (consulta de solo lectura).
 
 **Veredicto:** T6, T7 y T8 hechas y en verde; R19–R22 con test.
+
+## Correcciones review 1 y sync
+
+### Arreglos (review vuelta 1)
+- **B1** (backend_dev): sin cita `QC-307`/`R<n>` en los comentarios que añade la rama (9 archivos
+  de `lib/modules/pedidos/`, 12 de tests). Borrados enteros por repetir el código: el de
+  `create-order.ts` y el de `get-order.ts`. Los ids en nombres de `it`/`describe` se quedan.
+  Comprobado con `git diff 2b6eb3bba -- lib tests app | grep` sobre líneas `+` de comentario: 0.
+- **m1**: mapa completado abajo (R1, R3, R4, R5, R8, R14; tests de la tanda 1).
+- **m2**: `design.md > 6.2` anota el desvío de `ORDER_TABLE_CARD.meta`; `tasks.md > Archivos
+  esperados > Pantalla` lista `order-table.tsx`.
+- **m3**: partidas `order-input.ts:19-23` (backend_dev) y `order-table.tsx:112-114`
+  (frontend_dev). Ninguna línea de comentario añadida pasa de 100 columnas.
+- **m4**: `update-order.test.ts` «QC-307 R15: en la edicion, sin pedidos.modificar falla con
+  unauthorized antes de validar el precio» (`salePrice: '-1'`, sin `findAliveById` ni
+  `unitOfWork.run`).
+
+### Mapa R → test (Tanda 1, completa m1)
+| R | Archivo | Caso |
+|---|---|---|
+| R1 | `tests/unit/pedidos/order-view.test.ts` | `R1, R2: NewOrder, OrderRow y OrderView declaran salePrice como cadena o null`; `R1, R2: salePrice es obligatorio en el tipo, no opcional` |
+| R3 | `tests/unit/pedidos/order-input.test.ts` | `R3: una clave currency se descarta` |
+| R3 | `tests/unit/pedidos/schema/orders-sale-price-migration.test.ts` | `R2: sin columna de moneda, sin tabla nueva: solo se altera orders`; `R2: el modelo no declara moneda para el precio` |
+| R4 | `order-input.test.ts` | `R4: ausente es un pedido sin precio (null)`; `R4: '' es un pedido sin precio (null)`; `R4: '   ' (solo espacios) es un pedido sin precio (null)` |
+| R5 | `order-input.test.ts` | `R5: '1250.5' se acepta como cadena, no como number`; `R5: '9999999999.9999' (el maximo de decimal(14,4)) se acepta` |
+| R8 | `order-input.test.ts` | `R8: '1,5' (coma decimal) falla`; `R8: '1e3' (notacion exponencial) falla`; `R8: '1.12345' (cinco decimales) falla`; `R8: '12345678901' (once enteros) falla`; `R8: 'abc' falla` |
+| R14 | `order-input.test.ts` | `R14: updateOrderDistributionSchema con salePrice falla por .strict()` |
+| R15 | `tests/unit/pedidos/update-order.test.ts` | `QC-307 R15: en la edicion, sin pedidos.modificar falla con unauthorized antes de validar el precio` (nuevo, m4) |

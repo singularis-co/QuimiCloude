@@ -1126,9 +1126,9 @@ describe('QC-305 — listOrders: el coste real y quien lo ve (R24)', () => {
   }
 })
 
-// QC-307 — el listado lleva el precio de venta de cada fila, solo para quien tiene
-// `pedidos.consultar`, y el precio no es ordenable ni filtrable: `ORDER_QUERYABLE` no lo declara
-// y pedirlo se poda y se anota, como el importe de QC-123 R17.
+// El listado lleva el precio de venta de cada fila, solo para quien tiene `pedidos.consultar`,
+// y el precio no es ordenable ni filtrable: `ORDER_QUERYABLE` no lo declara y pedirlo se poda y
+// se anota.
 describe('QC-307 — listOrders: el precio de venta', () => {
   it('QC-307 R16: cada fila lleva salePrice tal como viene de la fila; sin precio, null', async () => {
     const d = dobles({

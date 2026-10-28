@@ -17,10 +17,11 @@ import type { DistributionLineInput } from './resolve-distribution';
 
 /**
  * Desde 2026-09-07 el precio unitario y la unidad salieron del pedido; el precio **unitario**
- * sigue fuera -el precio del pedido entero es `salePrice` (QC-307)-, pero la UNIDAD vuelve (`unitId`, obligatoria en el alta y en la edicion): la cantidad se
- * interpreta siempre en ella, con o sin reparto, y cada linea del reparto la usa para convertir
- * `envases x contenido` de la unidad de su presentacion a la del pedido. `unitPriceSchema` sigue
- * sin existir: lo que el esquema no declara no puede llegar.
+ * sigue fuera -el precio del pedido entero es `salePrice`-, pero la UNIDAD vuelve (`unitId`,
+ * obligatoria en el alta y en la edicion): la cantidad se interpreta siempre en ella, con o sin
+ * reparto, y cada linea del reparto la usa para convertir `envases x contenido` de la unidad de
+ * su presentacion a la del pedido. `unitPriceSchema` sigue sin existir: lo que el esquema no
+ * declara no puede llegar.
  */
 
 /**
@@ -47,7 +48,7 @@ const quantitySchema = z
   });
 
 /** Precio de venta del pedido entero. Ausente, '' o solo espacios = sin precio (`null`); el 0 SI
- *  vale (se regala). El patron no admite signo, asi que un negativo muere aqui (R7). */
+ *  vale (se regala). El patron no admite signo, asi que un negativo muere aqui. */
 const salePriceSchema = z
   .string()
   .optional()

@@ -1753,6 +1753,18 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
       updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, SIN_PERMISO),
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
+
+  it('QC-307 R15: en la edicion, sin pedidos.modificar falla con unauthorized antes de validar el precio', async () => {
+    const catalogos = catalogosQueExplotan();
+    const updateOrder = createUpdateOrder({ customerCatalog: fakeCustomerCatalog(), ...catalogos, now: () => AHORA });
+    const SIN_PERMISO: Actor = { id: 'u-1', companyId: EMPRESA_A, permissions: ['pedidos.consultar'] };
+
+    await expect(
+      updateOrder(ORDER_ID, { ...ENTRADA, salePrice: '-1' }, SIN_PERMISO),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(catalogos.orders.findAliveById).not.toHaveBeenCalled();
+    expect(catalogos.unitOfWork.run).not.toHaveBeenCalled();
+  });
 });
 
 describe('QC-204 — la edicion convierte la necesidad con la unidad editada', () => {
@@ -1988,9 +2000,8 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
   );
 });
 
-// QC-307 — el precio de venta en la edicion general: se sustituye como el resto del pedido
-// (R10), cuenta para el atajo «solo cambia el cliente» (R12, R13) y no se escribe en un estado
-// sin edicion general (R11).
+// El precio de venta en la edicion general: se sustituye como el resto del pedido, cuenta para
+// el atajo «solo cambia el cliente» y no se escribe en un estado sin edicion general.
 describe('QC-307 — el precio de venta en la edicion', () => {
   const CLIENTE = 'c0000000-0000-4000-8000-00000000000b';
 
