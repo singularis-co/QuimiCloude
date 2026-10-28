@@ -389,14 +389,14 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
       expect(await ingredientsCostCrudo(orderId)).toBe('20.0000')
 
       // Edicion #1: sube la cantidad sin desbordar la existencia. Recalcula a OTRO numero.
-      const editadoInput: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [], salePrice: null }
+      const editadoInput: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editadoInput, actorDe(A))
       // necesaria = 8 * 100 % = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('40.0000')
 
       // Edicion #2: sube la cantidad hasta que la existencia YA NO cubre -> sustituye por NULL.
       // QC-138 R6/R11: sin confirmar no se escribe nada; confirmada, el pedido queda BLOQUEADO.
-      const editadoSinCubrir: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [], salePrice: null }
+      const editadoSinCubrir: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, { ...editadoSinCubrir, confirmBlocked: true }, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
       const pedido = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })
@@ -546,7 +546,7 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       expect(despuesDeAlta.batches).toBe(antesDeAlta.batches)
       expect(despuesDeAlta.movements).toBe(antesDeAlta.movements)
 
-      const editado: Omit<NewOrder, 'customerId'> = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [], salePrice: null }
+      const editado: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editado, actorDe(A))
 
       const despuesDeEdicion = await fotoDeInventario(A)

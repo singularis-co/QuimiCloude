@@ -487,7 +487,9 @@ describe('el pedido como fila completa', () => {
   it('la tabla real no tiene columna de total, subtotal ni impuesto; el cliente es una sola referencia, customer_id (QC-156 R5)', async () => {
     // R10 (y de paso R3 y R11) leidos contra `information_schema`, no contra el texto del
     // esquema: es la unica forma de que la AUSENCIA se compruebe donde de verdad importa.
-    // La lista se lee entera para que anadir una columna prohibida se vea aqui.
+    // La lista se lee entera para que anadir una columna prohibida se vea aqui. Desde QC-307 la
+    // tabla SI tiene precio de venta (`sale_price`, el del pedido entero); total, subtotal e
+    // impuesto siguen prohibidos.
     const columns = await prisma.$queryRaw<{ column_name: string }[]>`
       SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'`
@@ -537,6 +539,10 @@ describe('el pedido como fila completa', () => {
       // `reserved_at`: el instante desde el que cuenta la caducidad de la reserva, o `null` si
       // el pedido no tiene material apartado.
       'reserved_at',
+      // `sale_price` la anade QC-307: el precio de venta del pedido ENTERO, opcional, que escribe
+      // el usuario. No es un precio por linea ni un total, un subtotal o un impuesto: esos siguen
+      // sin existir. Entre `reserved_at` y `status` por el mismo `sort()` lexicografico ('r' < 'sa' < 'st').
+      'sale_price',
       'status',
       // `unit_id` es la unidad en que se expresa `quantity`: no es un total, un impuesto ni un
       // cliente. Entre `status` y `updated_at` por el mismo `sort()` lexicografico ('status' <

@@ -191,3 +191,30 @@ listas; las negativas de `unitPrice`/`unit_price` siguen intactas.
 - `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1324 passed | 22 skipped
   (1346)`, exit 0.
 - No corridos: `./init.sh`, suite completa, E2E (por encargo). T10 sigue `[ ]` hasta el gate.
+
+## Rojos de gate-completo (run 40777416877)
+
+Diagnóstico desde los logs de los shards del run (artefactos `informe-shard-*`), no reproducido
+en local para los `.int` (por encargo: el gate lo corre GitHub). Los 8 son de QC-307; ninguno
+ajeno, nada va al baseline.
+
+- `order-cost-quote`, `order-expiry`, `order-ingredients-cost`, `order-reservation`,
+  `order-reservation-concurrency` (`.int`): `ValidationError` en `create-order.ts:110`. Los
+  helpers de ENTRADA a `createOrder`/`updateOrder` llevaban `salePrice: null`, y el borde
+  (`salePriceSchema`, `z.string().optional()`) solo admite ausente o `''`. El R16 de
+  concurrencia («ganadores 0») es la misma causa. Arreglo: se quita `salePrice` de esas
+  entradas (tipo `Omit<NewOrder, 'customerId' | 'salePrice'>`). El esquema no cambia. Los
+  fixtures que van al repositorio (tipo `NewOrder`) conservan `salePrice: null`.
+- `pedidos-constraints.int`: la lista cerrada de columnas de `orders` no tenía `sale_price`.
+  Se añade en su orden alfabético; total, subtotal e impuesto siguen prohibidos.
+- `tests/unit/shared/data-table-alcance.test.ts`: lista cerrada de E2E que usan data-table
+  (R36 QC-55) sin `e2e/pedido-precio-de-venta.spec.ts`. Se añade; 57 → 58.
+- `tests/unit/marca/tablas-marca.test.tsx`: columnas tabulares de `order-columns.tsx` sin
+  «Precio de venta», que es tabular por diseño (`design.md` de QC-307). Se añade a la lista.
+
+Salida local:
+- `pnpm exec vitest run tests/unit/shared/data-table-alcance.test.ts tests/unit/marca/tablas-marca.test.tsx`
+  → `Test Files 2 passed (2)`, `Tests 39 passed | 2 skipped (41)`.
+- `pnpm typecheck` → exit 0.
+- No corridos por encargo: los `.int`, guard, lint completo. La verificación es
+  `gate-completo` en el PR #310.
