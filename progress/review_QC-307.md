@@ -179,3 +179,48 @@ detrás de `origin/dev` y no se ha sincronizado. No he visto ningún rojo que ve
 comentario de producción y de las 22 de tests listadas. Si abulta, va en un commit
 `chore(QC-307): limpia comentarios de …` que solo toque comentarios. De paso conviene cerrar m1
 (mapa completo + T10) y m2. La vuelta 2 puede acotarse al diff de esa limpieza.
+
+## Vuelta 2 (acotada a `982f72117..f71e493cc`)
+
+### Checklist
+- [x] **B1 cerrado.** `git diff origin/dev..HEAD -- lib app components tests`: ninguna línea `+`
+  de comentario cita `QC-307` ni `R<n>`. Solo quedan ids en nombres de `it`/`describe` (permitido)
+  y en el `motivo` de `tests/integration/aislamiento.json`, que es dato, no comentario, y sigue la
+  convención del archivo (73 entradas con `"motivo": "QC-…"`).
+- [x] **m1.** Mapa R → test completo (R1, R3, R4, R5, R8, R14 y tanda 1) en
+  `progress/impl_QC-307.md`. T10 sigue `[ ]` a propósito: se marca con `./init.sh` verde al cierre.
+- [x] **m2.** `design.md > 6.2` anota el desvío de `ORDER_TABLE_CARD.meta`; `tasks.md` lista
+  `order-table.tsx`.
+- [x] **m3.** Ninguna línea de comentario añadida en `lib`/`app`/`components` pasa de 100 columnas.
+- [x] **m4.** Caso gemelo en `update-order.test.ts`: `salePrice: '-1'` sin permiso → `UnauthorizedError`,
+  sin `findAliveById` ni `unitOfWork.run`.
+- [x] **Conflictos del merge.**
+  - Guardia de identificador de request: solo añade el spec E2E y la migración de la rama a sus
+    listas; lo de dev queda intacto.
+  - `aislamiento.json`: solo añade la entrada de `order-sale-price.int.test.ts`.
+  - Snapshot `pedidos-paridad`: frente a dev, las tres filas `tr` cambiadas solo difieren en
+    «Precio de venta[Sin dato]»; el resto son la columna, la celda y los esqueletos nuevos del
+    precio. «Fórmula» ya viene de dev, no se pierde nada.
+  - `formularios-paridad`: solo añade el campo del precio y `salePrice=""`.
+- [x] **f71e493cc no relaja asserts.** `qc138-transversales` (R21) y `pedidos-schema` siguen siendo
+  listas cerradas `toEqual` y solo suman `salePrice`. `ORDER_COLUMNS` suma `sale_price`.
+- [x] **Ejecutado.** Hay 7 archivos afectados: qc138-transversales, pedidos-schema,
+  orders-sale-price-migration, pedidos-paridad, formularios-paridad, update-order y la guardia de
+  identificador. Resultado: 243/243 verde. No se aplicaron migraciones.
+
+### Timestamp compartido `20261022120000` (ai_models / orders_sale_price)
+Prisma ordena por nombre de carpeta: `…_ai_models` va antes que `…_orders_sale_price`. El orden
+es determinista y el mismo en todas las bases. Las dos migraciones son independientes:
+`ai_models` no toca `orders` y la nuestra solo hace `ALTER TABLE orders`. Prisma tampoco exige que
+una migración nueva vaya detrás de la última aplicada. En una base que ya tenga
+`orders_sale_price` y reciba después `ai_models`, `migrate deploy` la aplica sin más, y
+`migrate dev` no avisa de drift porque no hay dependencia. El repo ya tiene 8 timestamps
+duplicados más (p. ej. `20261013120000`, `20261019120000`, `20261020120000`). **Aceptable, sin
+riesgo real.** No conviene renombrar: cambiaría el nombre de una migración que quizá ya está
+aplicada en alguna base de prueba.
+
+### Hallazgos
+Ninguno nuevo.
+
+### Veredicto
+**OK.**
