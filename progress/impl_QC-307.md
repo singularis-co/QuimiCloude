@@ -161,3 +161,33 @@ renombre de `CostCell`) y `withCardFieldLabel`. Ningún componente nuevo.
 | R8 | `order-input.test.ts` | `R8: '1,5' (coma decimal) falla`; `R8: '1e3' (notacion exponencial) falla`; `R8: '1.12345' (cinco decimales) falla`; `R8: '12345678901' (once enteros) falla`; `R8: 'abc' falla` |
 | R14 | `order-input.test.ts` | `R14: updateOrderDistributionSchema con salePrice falla por .strict()` |
 | R15 | `tests/unit/pedidos/update-order.test.ts` | `QC-307 R15: en la edicion, sin pedidos.modificar falla con unauthorized antes de validar el precio` (nuevo, m4) |
+
+### Sync F2.3 (`merge(QC-307): origin/dev en la rama`, 193 commits)
+Conflictos, todos triviales (altas en listas paralelas):
+- `tests/guards/guard-identificador-de-request.test.ts > MIGRACIONES_ESPERADAS`: se quedan las
+  dos ramas; `20261022120000_orders_sale_price` va tras `20261022120000_ai_models` (orden
+  cronológico). Las dos migraciones comparten timestamp; Prisma las ordena por nombre
+  (`ai_models` < `orders_sale_price`) y no se tocan entre sí. La guardia pasa.
+- `tests/integration/aislamiento.json`: se quedan las dos entradas (la nuestra y la de WhatsApp).
+- `pedidos-paridad.test.tsx.snap`: dev renombró «Receta» a «Fórmula». Tomada la de dev y
+  regenerada con `-u`; frente a `origin/dev` solo añade la columna del precio (3 líneas cambiadas,
+  idénticas salvo «Precio de venta…», más el `th`/`td` y la celda extra del esqueleto).
+- Migraciones entrantes (5: `ai_models` y 4 de WhatsApp) **no aplicadas**: la base local
+  `QuimiCloude` es compartida, no de la feature. Solo `prisma generate` (no toca la base).
+
+### Rojos que la rama ya tenía antes del sync (fuera de la review)
+`qc138-transversales.test.ts` «R21: el esquema del formulario… no declara estado…» y
+`schema/pedidos-schema.test.ts` (2 casos de listas cerradas) no conocían `salePrice`. No están
+en `baseline-rojos.json` y no cambian con el merge. backend_dev añadió `salePrice` a las tres
+listas; las negativas de `unitPrice`/`unit_price` siguen intactas.
+
+### Salida de los comandos (tras A y B)
+- `pnpm typecheck` → exit 0 (tras `prisma generate`; antes, 2 errores TS de `templateLanguage`
+  en un `.int` de WhatsApp por cliente sin regenerar).
+- `pnpm lint` → exit 0, `✖ 10 problems (0 errors, 10 warnings)`, todos preexistentes.
+- `pnpm exec vitest run <tests tocados por la rama> tests/unit/pedidos tests/unit/pedidos-ui
+  tests/unit/paridad tests/integration/pedidos/order-sale-price.int.test.ts` →
+  `Test Files 177 passed (177)`, `Tests 3863 passed | 3 skipped (3866)`, exit 0.
+- `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1324 passed | 22 skipped
+  (1346)`, exit 0.
+- No corridos: `./init.sh`, suite completa, E2E (por encargo). T10 sigue `[ ]` hasta el gate.

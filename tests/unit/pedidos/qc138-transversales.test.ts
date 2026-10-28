@@ -276,6 +276,7 @@ describe('R21 — no hay accion manual de desbloqueo', () => {
       'quantity',
       'recipeId',
       'recipeVersionId',
+      'salePrice',
       'unitId',
     ]);
 
