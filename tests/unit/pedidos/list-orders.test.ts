@@ -1125,3 +1125,53 @@ describe('QC-305 — listOrders: el coste real y quien lo ve (R24)', () => {
     })
   }
 })
+
+// QC-307 — el listado lleva el precio de venta de cada fila, solo para quien tiene
+// `pedidos.consultar`, y el precio no es ordenable ni filtrable: `ORDER_QUERYABLE` no lo declara
+// y pedirlo se poda y se anota, como el importe de QC-123 R17.
+describe('QC-307 — listOrders: el precio de venta', () => {
+  it('QC-307 R16: cada fila lleva salePrice tal como viene de la fila; sin precio, null', async () => {
+    const d = dobles({
+      pagina: pagina([fila({ id: 'o-1', salePrice: '1250.5000' }), fila({ id: 'o-2' })]),
+    })
+
+    const salida = await createListOrders(d)({ page: 1 }, ADMIN)
+
+    expect(salida.items.map((item) => item.salePrice)).toEqual(['1250.5000', null])
+  })
+
+  for (const [etiqueta, actor] of [
+    ['al Operador', OPERADOR],
+    ['al actor ausente', null],
+  ] as const) {
+    it(`QC-307 R16: rechaza ${etiqueta} sin leer el repositorio`, async () => {
+      const d = dobles({ pagina: pagina([fila({ id: 'o-1', salePrice: '1250.5000' })]) })
+
+      await expect(createListOrders(d)({ page: 1 }, actor)).rejects.toBeInstanceOf(UnauthorizedError)
+      expect(d.listAlive).toHaveBeenCalledTimes(0)
+      expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(0)
+    })
+  }
+
+  it('QC-307 R20: el precio no esta en la lista blanca y pedirlo como orden o filtro se poda y se anota', async () => {
+    expect(ORDER_QUERYABLE.sortable).not.toContain('salePrice')
+    expect(Object.keys(ORDER_QUERYABLE.filterable)).not.toContain('salePrice')
+
+    const porOrden = dobles({ pagina: pagina([]) })
+    const salidaOrden = await createListOrders(porOrden)(
+      { page: 1, sort: { columnId: 'salePrice', direction: 'desc' } },
+      ADMIN,
+    )
+    expect(salidaOrden.items).toEqual([])
+    expect(consultaRecibida(porOrden.listAlive.mock.calls).sort).toBeNull()
+    expect(porOrden.log.ignoredFields).toHaveBeenCalledWith('orders', ['salePrice'])
+
+    const porFiltro = dobles({ pagina: pagina([]) })
+    await createListOrders(porFiltro)(
+      { page: 1, filters: { salePrice: { kind: 'numberRange', min: 100, max: 200 } } },
+      ADMIN,
+    )
+    expect(consultaRecibida(porFiltro.listAlive.mock.calls).filters).toEqual({})
+    expect(porFiltro.log.ignoredFields).toHaveBeenCalledWith('orders', ['salePrice'])
+  })
+})

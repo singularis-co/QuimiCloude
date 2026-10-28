@@ -1987,3 +1987,118 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
     },
   );
 });
+
+// QC-307 — el precio de venta en la edicion general: se sustituye como el resto del pedido
+// (R10), cuenta para el atajo «solo cambia el cliente» (R12, R13) y no se escribe en un estado
+// sin edicion general (R11).
+describe('QC-307 — el precio de venta en la edicion', () => {
+  const CLIENTE = 'c0000000-0000-4000-8000-00000000000b';
+
+  /** Fila con unidad y sin reparto, para que una edicion que repite todo sea «igual». */
+  function filaConPrecio(salePrice: string | null, status: OrderStatus = 'PENDIENTE'): OrderRow {
+    return {
+      ...filaExistente(),
+      status,
+      cancellationReason: status === 'CANCELADO' ? 'anulado' : null,
+      unitId: UNIT_ID,
+      presentationLines: [],
+      customerId: null,
+      salePrice,
+    };
+  }
+
+  /** La misma edicion que la fila, salvo lo que el caso pise. */
+  function edicion(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      recipeId: RECETA_DE_A,
+      quantity: '10.0000',
+      priority: 'BAJA',
+      unitId: UNIT_ID,
+      presentationLines: [],
+      ...extra,
+    };
+  }
+
+  function escenario(fila: OrderRow) {
+    const findAliveById = vi.fn(async () => fila);
+    const findAliveRefById = vi.fn(async (id: string) => ({ id, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false }));
+    const uow = fakeUnitOfWork({
+      orders: {
+        lockAliveById: vi.fn(async () => ({ ...fila, reservedAt: null })),
+        updateAlive: vi.fn(async () => 'ok' as const),
+        setCustomerAlive: vi.fn(async () => 'ok' as const),
+        setReservedAt: vi.fn(async () => undefined),
+      },
+      reservations: { syncForOrder: vi.fn(async () => ({ kind: 'reserved' as const })) },
+    });
+    const updateOrder = createUpdateOrder({
+      customerCatalog: { ...fakeCustomerCatalog(), findAliveRefById },
+      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
+      unitOfWork: uow.unitOfWork,
+      recipes: catalogoDeRecetas().recipes,
+      products: catalogoDeProductos().products,
+      units: catalogoDeUnidades().units,
+      presentations: catalogoDePresentaciones().presentations,
+      packaging: fakePackagingCatalog(),
+      now: () => AHORA,
+    });
+    return { updateOrder, orders: uow.orders };
+  }
+
+  function editado(orders: ReturnType<typeof escenario>['orders']): { salePrice: unknown; customerId: unknown } {
+    expect(orders.updateAlive).toHaveBeenCalledTimes(1);
+    return (orders.updateAlive.mock.calls[0] as unknown as readonly [string, { salePrice: unknown; customerId: unknown }])[1];
+  }
+
+  it('QC-307 R10: la edicion sustituye el precio guardado, lo pone a 0 y lo quita con el campo vacio o ausente', async () => {
+    const casos: ReadonlyArray<readonly [Record<string, unknown>, string | null]> = [
+      [{ salePrice: '99.5' }, '99.5'],
+      [{ salePrice: '0' }, '0'],
+      [{ salePrice: '' }, null],
+      [{}, null],
+    ];
+    for (const [extra, esperado] of casos) {
+      const e = escenario(filaConPrecio('1250.5000'));
+      await e.updateOrder(ORDER_ID, edicion(extra), ACTOR_A);
+      expect(editado(e.orders).salePrice, JSON.stringify(extra)).toBe(esperado);
+      expect(e.orders.setCustomerAlive, JSON.stringify(extra)).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each<OrderStatus>([
+    'POR_EMPACAR',
+    'EN_EMPAQUE',
+    'POR_ACONDICIONAR',
+    'EN_ACONDICIONAMIENTO',
+    'TERMINADO',
+    'ENTREGADO',
+    'CANCELADO',
+  ])('QC-307 R11: en %s, cambiar el precio falla con invalid_transition y no escribe', async (status) => {
+    const e = escenario(filaConPrecio('1250.5000', status));
+
+    expect(await codigoDelFallo(() => e.updateOrder(ORDER_ID, edicion({ salePrice: '10' }), ACTOR_A))).toBe(
+      'invalid_transition',
+    );
+    expect(e.orders.updateAlive).not.toHaveBeenCalled();
+    expect(e.orders.setCustomerAlive).not.toHaveBeenCalled();
+  });
+
+  it('QC-307 R12: cliente y precio cambiados a la vez van por el camino completo y escriben los dos', async () => {
+    const e = escenario(filaConPrecio('1250.5000'));
+
+    await e.updateOrder(ORDER_ID, edicion({ customerId: CLIENTE, salePrice: '13' }), ACTOR_A);
+
+    expect(e.orders.setCustomerAlive).not.toHaveBeenCalled();
+    expect(editado(e.orders)).toMatchObject({ customerId: CLIENTE, salePrice: '13' });
+  });
+
+  it('QC-307 R13: solo el cliente cambiado (el precio llega igual, "1250.5" frente a "1250.5000") va por el atajo y updateAlive no se llama', async () => {
+    const e = escenario(filaConPrecio('1250.5000'));
+
+    await e.updateOrder(ORDER_ID, edicion({ customerId: CLIENTE, salePrice: '1250.5' }), ACTOR_A);
+
+    expect(e.orders.setCustomerAlive).toHaveBeenCalledWith(ORDER_ID, CLIENTE, ACTOR_A.id, AHORA, { companyId: EMPRESA_A });
+    expect(e.orders.lockAliveById).not.toHaveBeenCalled();
+    expect(e.orders.updateAlive).not.toHaveBeenCalled();
+  });
+});

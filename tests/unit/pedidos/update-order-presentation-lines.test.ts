@@ -862,3 +862,26 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
     expect(m.setReservedAt).not.toHaveBeenCalled();
   });
 });
+
+// QC-307 R13 — la edicion del reparto conserva el precio de venta porque no lo escribe: el puerto
+// que llama (`updatePresentationLinesAlive`) solo recibe unidad y lineas, y `updateAlive` -el unico
+// que escribe el precio- no se toca.
+describe('QC-307 — updateOrderPresentationLines no escribe el precio de venta', () => {
+  it('QC-307 R13: con un pedido que tiene precio, el puerto recibe unidad y reparto y ningun precio; updateAlive no se llama', async () => {
+    const { orders, updatePresentationLinesAlive } = ordersDoble(
+      filaBloqueada({ quantity: '10.0000', salePrice: '1250.5000' }),
+    );
+    const update = montar({ orders });
+
+    await expect(
+      update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] }),
+    ).resolves.toBe('ok');
+
+    expect(updatePresentationLinesAlive).toHaveBeenCalledTimes(1);
+    const argumentos = updatePresentationLinesAlive.mock.calls[0] as readonly unknown[];
+    expect(argumentos).toHaveLength(6);
+    expect(JSON.stringify(argumentos)).not.toContain('salePrice');
+    expect(JSON.stringify(argumentos)).not.toContain('1250.5');
+    expect(orders.updateAlive).not.toHaveBeenCalled();
+  });
+});

@@ -803,6 +803,11 @@
       "archivo": "asignaciones/conditioning-steps-progress.int.test.ts",
       "motivo": "QC-299 T14 (R27, R28, R32): completar, revisitar y cambiar responsables de los pasos de acondicionamiento con la composicion real ('asignaciones' de '@/lib/composition'), que escribe con el cliente GLOBAL; lo que se mide en R27 es que el indice unico 'order_execution_entries_conditioning_step_once' rechace el segundo completado del mismo paso, incluida la carrera de dos llamadas simultaneas, que necesita conexiones distintas, asi que una transaccion del test con ROLLBACK no lo envolveria. Cada caso fabrica sus empresas efimeras con randomUUID y las borra en su 'finally' en orden de FK (anotaciones -> equipo -> pedidos -> recetas -> usuarios -> roles -> tipos de documento -> empresas).",
       "desde": "2026-10-21"
+    },
+    {
+      "archivo": "pedidos/order-sale-price.int.test.ts",
+      "motivo": "QC-307 T5: el precio de venta contra la base real -alta por 'withOrderTransaction' + 'createOrderWriteRepository', edicion, cambio de cliente, reparto, cancelacion, borrado logico y los resumenes de 'OrderCatalog' que lee 'asignaciones'-. 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' y el resto de adaptadores hablan con el cliente Prisma GLOBAL, asi que una transaccion del test no los envolveria. Una empresa efimera (randomUUID, con usuario, rol, tipo de documento, unidad, presentacion, receta y cliente) nace en 'beforeAll' y muere en 'afterAll'; cada caso siembra su pedido y lo borra en un 'finally' por su id exacto. El caso del CHECK usa SQL crudo dentro de un SAVEPOINT porque la escritura se espera que falle. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-22"
     }
   ]
 }

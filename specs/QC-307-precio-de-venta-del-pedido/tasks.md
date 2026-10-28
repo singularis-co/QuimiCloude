@@ -64,7 +64,7 @@
   - **Hecho:** `pnpm run typecheck` en verde y `vitest related` de esos archivos en verde, sin un
     solo cambio de expectativa.
 
-- [ ] **T5 · Casos de uso y adaptadores** (backend) — depende de T2, T3 — R6, R10, R11, R12, R13, R15, R16, R17, R20, R23
+- [x] **T5 · Casos de uso y adaptadores** (backend) — depende de T2, T3 — R6, R10, R11, R12, R13, R15, R16, R17, R20, R23
   - `create-order.ts` y `update-order.ts` pasan `salePrice` en `NewOrder` / `OrderEdit`
     (`design.md > 3.1`, `> 3.2`).
   - `order-edit-change.ts`: `ComparableEdit.salePrice` y `sameSalePrice`.

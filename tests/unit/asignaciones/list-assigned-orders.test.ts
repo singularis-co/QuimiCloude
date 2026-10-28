@@ -199,6 +199,16 @@ const _r15TipoSinImporte: AssignedOrderSummary = {
 };
 void _r15TipoSinImporte;
 
+// Lo mismo con el precio de venta del pedido: va en un literal aparte porque `tsc` solo señala
+// la primera propiedad de mas de cada literal.
+const _r17TipoSinPrecio: AssignedOrderSummary = {
+  ...resumen(pedidoId(0)),
+  // @ts-expect-error `AssignedOrderSummary` no declara `salePrice` (R17): si esto compila, el
+  // pedido asignado gano el precio de venta.
+  salePrice: '99.0000',
+};
+void _r17TipoSinPrecio;
+
 describe('QC-88 — listAssignedOrders: autorizacion (R5, R6, R40)', () => {
   it('R5: exige `asignaciones.consultar` ANTES de tocar ningun puerto', async () => {
     const { deps, todos } = montar();
@@ -686,7 +696,7 @@ function clavesDeImporte(valor: unknown, ruta = ''): string[] {
 }
 
 describe('QC-305 — la lista de pedidos asignados no lleva el coste real (R24)', () => {
-  it('R24: ninguna clave de importe (actualCost, ingredientsCost, packagingCost...) en ninguna fila, aunque el resumen las traiga', async () => {
+  it('R24, R17 (QC-307): ninguna clave de importe (actualCost, ingredientsCost, packagingCost, salePrice...) en ninguna fila, aunque el resumen las traiga', async () => {
     const ids = [pedidoId(1), pedidoId(2)];
     const items = [
       {
@@ -698,8 +708,9 @@ describe('QC-305 — la lista de pedidos asignados no lleva el coste real (R24)'
         actualCost: '27.1250',
         ingredientsCost: '30.0000',
         packagingCost: '4.5000',
+        salePrice: '99.0000',
       },
-      { ...resumen(pedidoId(2)), actualCost: null, ingredientsCost: null, packagingCost: null },
+      { ...resumen(pedidoId(2)), actualCost: null, ingredientsCost: null, packagingCost: null, salePrice: '0.0000' },
     ] as unknown as AssignedOrderSummary[];
     const { deps } = montar({
       ids,
@@ -717,9 +728,10 @@ describe('QC-305 — la lista de pedidos asignados no lleva el coste real (R24)'
     expect(clavesDeImporte(pagina)).toEqual([]);
   });
 
-  it('R24: el contrato del resumen asignado no declara actualCost (comprobacion de tipo)', () => {
+  it('R24, R17 (QC-307): el contrato del resumen asignado no declara actualCost ni salePrice (comprobacion de tipo)', () => {
     const sinReal: 'actualCost' extends keyof AssignedOrderSummary ? false : true = true;
     const sinEnvases: 'packagingCost' extends keyof AssignedOrderSummary ? false : true = true;
-    expect([sinReal, sinEnvases]).toEqual([true, true]);
+    const sinPrecio: 'salePrice' extends keyof AssignedOrderSummary ? false : true = true;
+    expect([sinReal, sinEnvases, sinPrecio]).toEqual([true, true, true]);
   });
 });

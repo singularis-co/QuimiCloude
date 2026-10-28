@@ -219,6 +219,8 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       unitId: UNIT_ID,
       presentationLines: [],
       customerId: null,
+      // QC-307: sin precio en la entrada, el alta lo escribe como `null`, no como 0.
+      salePrice: null,
     })
   })
 
@@ -262,6 +264,7 @@ describe('createOrder — alta (R8, R9, R10, R6, R15, R16)', () => {
       'priority',
       'quantity',
       'recipeId',
+      'salePrice',
       'status',
       'unitId',
     ])
@@ -337,6 +340,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       ingredientsCost: null,
       packagingCost: null,
       actualCost: null,
+      salePrice: null,
       createdAt: new Date('2026-01-02T03:04:05.000Z'),
       updatedAt: new Date('2026-01-02T03:04:05.000Z'),
       // R46: los dos autores salen como IDENTIFICADORES; resolver sus nombres es de QC-35.
@@ -495,6 +499,8 @@ describe('updateOrder — edicion (R6, R8, R9, R20, R21, R22, R24, R25, R33)', (
       unitId: UNIT_ID,
       presentationLines: [],
       customerId: null,
+      // QC-307 R10: la edicion sustituye el precio siempre, tambien a `null`.
+      salePrice: null,
     })
     expect(actorId).toBe(ADMIN.id)
     expect(instante).toBe(AHORA)

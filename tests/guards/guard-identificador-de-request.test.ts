@@ -820,6 +820,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261021140000_orders_actual_cost',
   // 2026-10-21: lote de producto terminado sin coste unitario; no toca el identificador.
   '20261021150000_finished_goods_lot_cost_optional',
+  // 2026-10-22: precio de venta del pedido entero; no toca el identificador.
+  '20261022120000_orders_sale_price',
 ] as const
 
 export function hallazgosDeMigraciones(
