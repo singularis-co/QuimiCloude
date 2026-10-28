@@ -1,5 +1,10 @@
 import { requireAddon, requirePermission, type Actor } from './actor';
-import { ActionNotAllowedError, BatchDuplicateLotError } from './errors';
+import {
+  ActionNotAllowedError,
+  BatchDuplicateLotError,
+  ConvertedCostOutOfRangeError,
+  ConvertedStockOutOfRangeError,
+} from './errors';
 import { createImportFinishedGoods } from './import-finished-goods';
 import { importRowIssue, type ImportRowWrite } from './plan-inventory-import';
 import { civilDateUtc, readInventoryImport, type InventoryImportReadDeps } from './preview-inventory-import';
@@ -115,6 +120,12 @@ async function writeRow(
     return errorRow(row, importRowIssue('presentation_without_content', 'presentation'));
   } catch (error) {
     if (error instanceof BatchDuplicateLotError) return lotClash(row, lot);
+    if (error instanceof ConvertedStockOutOfRangeError) {
+      return errorRow(row, importRowIssue('converted_stock_out_of_range', 'stock'));
+    }
+    if (error instanceof ConvertedCostOutOfRangeError) {
+      return errorRow(row, importRowIssue('converted_cost_out_of_range', 'unitCost'));
+    }
     if (error instanceof ActionNotAllowedError) {
       return errorRow(
         row,

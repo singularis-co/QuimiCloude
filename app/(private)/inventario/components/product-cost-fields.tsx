@@ -17,6 +17,8 @@ type ProductCostFieldsProps = {
   /** La existencia del lote tal como esta en el formulario: de ella sale el total. */
   readonly quantity: string;
   readonly unitCostError?: string;
+  /** Avisa del costo unitario que viajará, el escrito. */
+  readonly onUnitCostChange?: (unitCost: string) => void;
 };
 
 /**
@@ -36,9 +38,15 @@ export function ProductCostFields({
   initialUnitCost,
   quantity,
   unitCostError,
+  onUnitCostChange,
 }: ProductCostFieldsProps) {
-  const [unitCost, setUnitCost] = useState(initialUnitCost);
+  const [unitCost, setUnitCostState] = useState(initialUnitCost);
   const totalCost = unitCost === '' ? '' : (multiplyCost(unitCost, quantity.trim()) ?? '');
+
+  function setUnitCost(next: string) {
+    setUnitCostState(next);
+    onUnitCostChange?.(next);
+  }
 
   function handleUnitCostChange(event: ChangeEvent<HTMLInputElement>) {
     setUnitCost(sanitizeCostInput(event.currentTarget.value));

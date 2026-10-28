@@ -466,6 +466,12 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
     // cubriendo `inventario.spec.ts`-. Va entre `inventario-importar` y `inventario.spec.ts` porque la
     // lista esta en el orden del matcher (alfabetico): 'i' precede a 'r', y '-' precede a '.'. La
     // guardia no se afloja; se le añade un renglon.
+    // ACTUALIZADO 2026-10-23 (QC-203, T12): entra `inventario-familia-de-unidad.spec.ts`, por el
+    // MISMO motivo que las demas: la lista es CERRADA y darse de alta es su punto de extension. Lo
+    // que ejercita: el alta de un insumo cuyo homonimo esta en otra unidad de la misma familia (aviso
+    // de conversion y lote convertido) y la unidad de la materia prima nueva al importar una formula.
+    // Casa con `screenPattern` por la palabra «inventario» y no es una segunda pantalla del catalogo:
+    // usa el alta que ya existe. Va antes de `inventario-importar` porque 'f' precede a 'i'.
     const E2E_DE_AISLAMIENTO = 'aislamiento-inventario.spec.ts'
     const e2eMatches = matchingFiles(join(repoRoot, 'e2e'))
     expect(e2eMatches, `spec E2E de catalogo inesperado: ${e2eMatches.join(', ')}`).toEqual([
@@ -475,6 +481,7 @@ describe('alcance de QC-20 (crud-de-productos): sin route handlers; la pantalla,
       'entregar-producto-terminado.spec.ts',
       'fixtures/inventario-importar-mixto.csv',
       'helpers/product-name-cell.ts',
+      'inventario-familia-de-unidad.spec.ts',
       'inventario-importar.spec.ts',
       'inventario-rediseno.spec.ts',
       'inventario.spec.ts',

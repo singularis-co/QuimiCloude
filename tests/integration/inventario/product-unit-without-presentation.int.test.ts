@@ -1,6 +1,6 @@
 /**
  * El insumo que se cuenta en una unidad elegida, sin presentacion en sus lotes, contra Postgres
- * real: la escritura (`createWithFirstBatch` con `unitId`), la busqueda del homonimo por unidad,
+ * real: la escritura (`createWithFirstBatch` con `unitId`), la busqueda de homonimos con unidad,
  * la traduccion del rechazo del disparador y la vista de lotes por la unidad del producto.
  *
  * AISLAMIENTO: el adaptador usa el cliente Prisma GLOBAL, asi que lo sembrado queda confirmado.
@@ -16,7 +16,7 @@ import { PRODUCT_TYPES, ValidationError } from '@/lib/modules/inventario';
 import {
   addBatchToAlive,
   createWithFirstBatch,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findBatchesOfAliveProduct,
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
@@ -169,7 +169,7 @@ describe('QC-199 — escritura y busqueda del insumo por unidad', () => {
     });
   });
 
-  it('R10 findAliveIdByNameInUnit encuentra el homonimo de la misma unidad y no el de otra', async () => {
+  it('R10 findAliveSupplyHomonyms encuentra el homonimo con unidad y no el de otra empresa', async () => {
     await withFixture(async (fixture) => {
       const name = `Acido ${token()}`;
       const enKg = await createWithFirstBatch(
@@ -180,14 +180,12 @@ describe('QC-199 — escritura y busqueda del insumo por unidad', () => {
       );
 
       // El nombre se normaliza: mayusculas y espacios de mas no cambian el producto.
-      expect(await findAliveIdByNameInUnit(`  ${name.toUpperCase()} `, fixture.kgId, scopeOf(fixture))).toEqual({
-        id: enKg.id,
-        type: PRODUCT_TYPES.PRODUCT,
-      });
-      expect(await findAliveIdByNameInUnit(name, fixture.mlId, scopeOf(fixture))).toBeNull();
+      expect(await findAliveSupplyHomonyms(`  ${name.toUpperCase()} `, scopeOf(fixture))).toEqual([
+        { id: enKg.id, name, type: PRODUCT_TYPES.PRODUCT, unitId: fixture.kgId, stock: '3.0000' },
+      ]);
 
-      // Otra empresa con el mismo nombre y la misma unidad no lo ve.
-      expect(await findAliveIdByNameInUnit(name, fixture.kgId, { companyId: randomUUID() })).toBeNull();
+      // Otra empresa con el mismo nombre no lo ve.
+      expect(await findAliveSupplyHomonyms(name, { companyId: randomUUID() })).toEqual([]);
 
       // Un lote mas por el camino del homonimo: tambien sin presentacion.
       const added = await addBatchToAlive(enKg.id, batchOf(fixture, { stock: '2' }), new Date(), scopeOf(fixture));

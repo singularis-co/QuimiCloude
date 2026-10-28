@@ -61,6 +61,9 @@ producto vivo de la misma empresa con el mismo nombre normalizado.
 - **R10** — CUANDO un alta de insumo válida encuentra un homónimo con la misma unidad, el sistema
   DEBE agregar el lote, sin presentación, a ese producto y NO DEBE crear otro producto; SI el
   homónimo existente tiene otra unidad, ENTONCES el sistema DEBE crear un producto distinto.
+  *Enmendado por QC-203 (2026-10-14): el homónimo se busca por **familia**, no por unidad; uno en
+  otra unidad de la familia recibe el lote convertido, y entre varios gana el de más existencia
+  (QC-203 R4, R5).*
 - **R11** — El alta de un envase y el alta de un instrumento DEBEN conservar su comportamiento
   actual: el envase exige su presentación y cuenta su existencia en la unidad de envases; el
   instrumento no lleva unidad ni presentación.

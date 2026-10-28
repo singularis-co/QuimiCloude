@@ -211,3 +211,22 @@ export {
   type ProductTableCardOptions,
   type ProductTableProps,
 } from './product-table';
+export {
+  SUPPLY_CONVERSION_COST_LINE_TESTID,
+  SUPPLY_CONVERSION_NOTICE_TESTID,
+  SUPPLY_CONVERSION_STOCK_LINE_TESTID,
+  SupplyConversionNotice,
+  checkConvertedSupplyBatch,
+  convertsUnit,
+  displayDecimal,
+  resolveSupplyDestination,
+  supplyUnitHint,
+  unitDisplayLabel,
+  type SupplyBatchFieldError,
+  type SupplyDestination,
+} from './supply-conversion-notice';
+export {
+  SUPPLY_HOMONYMS_DEBOUNCE_MS,
+  useSupplyHomonyms,
+  type SupplyHomonymsLookup,
+} from './use-supply-homonyms';

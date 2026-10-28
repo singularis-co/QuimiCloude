@@ -67,6 +67,7 @@ import {
   createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
+  createFindSupplyHomonyms,
   createGetFinishedProduct,
   createGetProduct,
   createListBatchMovements,
@@ -104,7 +105,7 @@ import {
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
@@ -1094,7 +1095,7 @@ const productRepository: ProductRepository = {
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
   findAliveIdByNameInPresentationUnit,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
@@ -1231,7 +1232,7 @@ const inventoryImportReadDeps = {
 
 export const inventario = {
   createProduct: createProductUseCase,
-  createRawMaterial: createCreateRawMaterial({ products: productRepository }),
+  createRawMaterial: createCreateRawMaterial({ products: productRepository, units: { findRefs: findUnitRefs } }),
   updateProduct: createUpdateProduct({ products: productRepository, images: productImageStorage }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository, images: productImageStorage }),
@@ -1274,6 +1275,7 @@ export const inventario = {
   }),
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
+  findSupplyHomonyms: createFindSupplyHomonyms({ products: productRepository }),
   previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
   getInventoryImportTemplate: createGetInventoryImportTemplate({
     values: importTemplateValuesReader,
@@ -2645,6 +2647,7 @@ const formulaImportDeps: FormulaImportDeps = {
   recipes: recipeCatalog,
   products: productCatalog,
   productNames: productNameLookup,
+  units: unitCatalog,
   createRawMaterial: inventario.createRawMaterial,
   createRecipe: recetas.createRecipe,
   updateRecipe: recetas.updateRecipe,

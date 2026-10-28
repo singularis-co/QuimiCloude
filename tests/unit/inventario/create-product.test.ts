@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import type { Mock } from 'vitest';
 
-import { PRODUCT_TYPES } from '@/lib/modules/inventario';
+import { PRODUCT_TYPES, type ProductType, type SupplyHomonym } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/inventario/domain/actor';
 import { createCreateProduct } from '@/lib/modules/inventario/domain/create-product';
 import {
@@ -40,6 +40,7 @@ const PRESENTACION = '11111111-1111-4111-8111-111111111111';
 
 const UNIDAD_KG = '33333333-3333-4333-8333-333333333333';
 const UNIDAD_AJENA = '44444444-4444-4444-8444-444444444444';
+const UNIDAD_ML = '55555555-5555-4555-8555-555555555555';
 
 const ALTA_VALIDA = {
   name: 'Acido sulfurico',
@@ -71,7 +72,7 @@ function montarRepositorio(overrides: Partial<DobleDelPuerto> = {}): DobleDelPue
       totalPages: 1,
     })),
     findAliveIdByNameInPresentationUnit: vi.fn<ProductRepository['findAliveIdByNameInPresentationUnit']>(async () => null),
-    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+    findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => []),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-nuevo-1',
@@ -100,21 +101,26 @@ function afirmarPuertoIntacto(products: Repositorio): void {
   expect(products.softDeleteAlive).not.toHaveBeenCalled();
   expect(products.listAlive).not.toHaveBeenCalled();
   expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
-  expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+  expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
   expect(products.findAlivePackagingByName).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }
 
-/** Catalogo de unidades de la empresa: solo `UNIDAD_KG` es visible. */
+/** Catalogo de unidades de la empresa: `UNIDAD_KG` y `UNIDAD_ML`, de familias distintas. */
 function unidadesVisibles() {
+  const visibles = [
+    { id: UNIDAD_KG, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null },
+    { id: UNIDAD_ML, name: 'mililitro', symbol: 'ml', baseUnitId: null, factor: null },
+  ];
   return {
-    findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) =>
-      ids
-        .filter((id) => id === UNIDAD_KG)
-        .map((id) => ({ id, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null })),
-    ),
+    findRefs: vi.fn<UnitCatalog['findRefs']>(async (ids) => visibles.filter((unidad) => ids.includes(unidad.id))),
   };
+}
+
+/** Homonimo vivo en kg, la unidad de `ALTA_VALIDA`. */
+function homonimo(id: string, type: ProductType, overrides: Partial<SupplyHomonym> = {}): SupplyHomonym {
+  return { id, name: 'Acido sulfurico', type, unitId: UNIDAD_KG, stock: '1.0000', ...overrides };
 }
 
 function loteCreado(products: Repositorio): NewProductBatch {
@@ -221,7 +227,7 @@ describe('QC-103 — el lote asignado viaja de vuelta con el resultado del alta'
 
   it('createProduct devuelve el lote asignado al agregar batch a un producto existente (R13)', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => ({
         batchId: 'lote-2',
         lot: 'ACME-2026-07',
@@ -248,19 +254,15 @@ describe('QC-103 — el lote asignado viaja de vuelta con el resultado del alta'
 });
 
 describe('R15, R16, R21 — producto nuevo', () => {
-  it('busca por el nombre ESCRITO y la unidad recibida, y crea producto y lote en una sola operacion del puerto', async () => {
+  it('busca por el nombre ESCRITO y crea producto y lote en una sola operacion del puerto', async () => {
     // Normalizar el nombre y descartar los borrados es del adaptador: el caso de uso pasa el
-    // nombre y la unidad tal cual y USA lo que el puerto devuelva.
+    // nombre tal cual y USA lo que el puerto devuelva.
     const products = montarRepositorio();
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
     const resultado = await createProduct(ALTA_VALIDA, ADMIN);
 
-    expect(products.findAliveIdByNameInUnit).toHaveBeenCalledWith(
-      'Acido sulfurico',
-      UNIDAD_KG,
-      { companyId: EMPRESA },
-    );
+    expect(products.findAliveSupplyHomonyms).toHaveBeenCalledWith('Acido sulfurico', { companyId: EMPRESA });
     expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
     expect(products.createWithFirstBatch).toHaveBeenCalledTimes(1);
     expect(products.addBatchToAlive).not.toHaveBeenCalled();
@@ -557,7 +559,7 @@ describe('QC-81 R8, R10 y QC-90 R12 — lote que pide generarse y expiracion opc
 
   it('pide la generacion tambien por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -602,7 +604,7 @@ describe('R22 — autoria del lote', () => {
 
   it('tambien por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -615,7 +617,7 @@ describe('R22 — autoria del lote', () => {
 describe('R17, R18 — el nombre corresponde a un producto que ya existe', () => {
   function montarConExistente() {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
     });
     return { products, createProduct: createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA }) };
   }
@@ -654,11 +656,10 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
     ]);
   });
 
-  it('R20 — usa el identificador que el puerto devuelve, sea cual sea', async () => {
-    // El desempate entre homonimos vivos es del ADAPTADOR, con su `orderBy`, y se prueba contra
-    // la base. Al caso de uso solo le toca no aplicar ningun criterio propio.
+  it('R20 — con un solo homonimo de la familia, le agrega el lote a ese', async () => {
+    // Entre varios decide la existencia (QC-203 R5), probado en `create-product-familia.test.ts`.
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'el-mas-viejo', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('el-mas-viejo', PRODUCT_TYPES.PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -669,9 +670,9 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
   it('rechaza si el producto dejo de estar vivo entre la consulta y la escritura', async () => {
     // Se LANZA en vez de crear: crear escribiria en silencio el nombre, la existencia y la alerta
     // del panel, que en este camino se ignoran. Quien reintenta vuelve a pasar por
-    // `findAliveIdByNameInUnit`, que ya dira `null`, y creara.
+    // `findAliveSupplyHomonyms`, que ya no lo devolvera, y creara.
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => null),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
@@ -684,13 +685,13 @@ describe('R17, R18 — el nombre corresponde a un producto que ya existe', () =>
 
 describe('R19 — sin id del puerto, el alta crea producto nuevo', () => {
   // Vivo contra borrado lo distingue el ADAPTADOR (`deleted_at IS NULL`): desde el dominio, sin
-  // homonimo y con el homonimo borrado son el mismo `null`. Lo borrado se prueba contra Postgres
+  // homonimo y con el homonimo borrado son la misma lista vacia. Lo borrado se prueba contra Postgres
   // en `tests/integration/inventario/product-batch-write.int.test.ts`.
   it('crea un producto nuevo en vez de agregarle el lote a otro', async () => {
-    // El `null` explicito repite el valor por defecto del doble a proposito: deja el escenario
+    // La lista vacia explicita repite el valor por defecto del doble a proposito: deja el escenario
     // escrito en el propio caso en vez de obligar a ir a leer `montarRepositorio`.
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => []),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -701,15 +702,13 @@ describe('R19 — sin id del puerto, el alta crea producto nuevo', () => {
   });
 });
 
-describe('QC-121 R6 — mismo nombre en otra unidad: nace otro producto, sin aviso', () => {
-  it('el puerto no encuentra homonimo en la unidad de esta presentacion y el alta crea sin rechazar', async () => {
-    // El adaptador es quien decide «misma unidad»; el dominio solo actua sobre lo que devuelve.
-    // Un `null` aqui es indistinguible de «no existe ningun homonimo»: es el mismo caso que R19,
-    // pero el motivo de fondo es distinto (hay homonimo, en otra unidad).
+describe('QC-121 R6 — mismo nombre en una unidad de otra familia: nace otro producto', () => {
+  it('el homonimo en ml no cuenta para un alta en kg y el alta crea sin rechazar', async () => {
+    // Dentro de una misma familia el homonimo recibe el lote convertido (QC-203 R4).
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<
-        ProductRepository['findAliveIdByNameInUnit']
-      >(async () => null),
+      findAliveSupplyHomonyms: vi.fn<
+        ProductRepository['findAliveSupplyHomonyms']
+      >(async () => [homonimo('en-ml', PRODUCT_TYPES.PRODUCT, { unitId: UNIDAD_ML })]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -721,15 +720,13 @@ describe('QC-121 R6 — mismo nombre en otra unidad: nace otro producto, sin avi
   });
 });
 
-describe('QC-121 R7 — con varios homonimos en la misma unidad, usa el que el puerto elige', () => {
-  it('no aplica ningun criterio propio de desempate: usa el id que devuelve el puerto', async () => {
-    // El desempate -el mas antiguo, por id ascendente- es del ADAPTADOR, contra la base
-    // (`product-prisma.test.ts`, `product-unit.int.test.ts`). Aqui solo se afirma que el
-    // dominio no reimplementa ese criterio.
+describe('QC-121 R7 — con un homonimo en la misma unidad, le agrega el lote', () => {
+  it('usa el id del homonimo que devuelve el puerto', async () => {
+    // Entre varios gana el de mas existencia (QC-203 R5): `create-product-familia.test.ts`.
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<
-        ProductRepository['findAliveIdByNameInUnit']
-      >(async () => ({ id: 'el-mas-viejo', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<
+        ProductRepository['findAliveSupplyHomonyms']
+      >(async () => [homonimo('el-mas-viejo', PRODUCT_TYPES.PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -759,9 +756,9 @@ describe('QC-121 R3 — el rechazo de la base por unidad llega al llamante como 
 
   it('lo mismo por el camino del producto que ya existe', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<
-        ProductRepository['findAliveIdByNameInUnit']
-      >(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<
+        ProductRepository['findAliveSupplyHomonyms']
+      >(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => {
         throw new ValidationError('lote en otra unidad que la del producto');
       }),
@@ -809,7 +806,7 @@ describe('QC-81 R2 — sin fecha de compra, al puerto le llega HOY del mismo rel
 
   it('tambien cuando la fecha viene explicitamente en null, y por el camino del producto existente', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
     });
     const now = vi.fn(() => AHORA);
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now });
@@ -847,7 +844,7 @@ describe('QC-81 R3, R5 — la fecha escrita, si no es futura, llega al puerto id
 
   it('pasa la fecha escrita identica tambien al agregar el lote a un producto existente', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -936,9 +933,9 @@ describe('QC-81 R24 — sin permiso no se valida, no se toca el puerto ni se cal
 describe('R28 — el homonimo vivo es un producto terminado', () => {
   it('rechaza antes de tocar el puerto de escritura cuando el homonimo ya es FINISHED_PRODUCT', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<
-        ProductRepository['findAliveIdByNameInUnit']
-      >(async () => ({ id: 'terminado-1', type: PRODUCT_TYPES.FINISHED_PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<
+        ProductRepository['findAliveSupplyHomonyms']
+      >(async () => [homonimo('terminado-1', PRODUCT_TYPES.FINISHED_PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -951,9 +948,9 @@ describe('R28 — el homonimo vivo es un producto terminado', () => {
     // El homonimo era PRODUCT en la lectura, pero el adaptador -con la fila ya bloqueada-
     // descubre que nacio FINISHED_PRODUCT entre esa lectura y la escritura.
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<
-        ProductRepository['findAliveIdByNameInUnit']
-      >(async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT })),
+      findAliveSupplyHomonyms: vi.fn<
+        ProductRepository['findAliveSupplyHomonyms']
+      >(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => 'finished_product'),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
@@ -1018,8 +1015,8 @@ describe('QC-138 — el alta de un lote avisa de la entrada de material (R13, R2
   it('R13: un lote adicional de un producto que ya existe avisa una vez, despues de escribirlo', async () => {
     const o = oyente();
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(
-        async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT }),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(
+        async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)],
       ),
     });
     products.addBatchToAlive.mockImplementation(async () => {
@@ -1037,8 +1034,8 @@ describe('QC-138 — el alta de un lote avisa de la entrada de material (R13, R2
   it('R20: un alta rechazada no avisa', async () => {
     const o = oyente();
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(
-        async () => ({ id: 'producto-9', type: PRODUCT_TYPES.PRODUCT }),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(
+        async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)],
       ),
       addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(async () => null),
     });
@@ -1071,7 +1068,7 @@ describe('QC-195 — alta de envase (PACKAGING)', () => {
     await createProduct(ALTA_ENVASE, ADMIN);
 
     expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
-    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
     expect(products.findAlivePackagingByName).toHaveBeenCalledWith('Botella PET 500 ml', { companyId: EMPRESA });
     const llamada = products.createWithFirstBatch.mock.calls[0];
     expect(llamada?.[0]).toEqual({ name: 'Botella PET 500 ml', qtyAlert: '0', type: PRODUCT_TYPES.PACKAGING });
@@ -1150,7 +1147,10 @@ describe('QC-199 — alta de insumo por unidad', () => {
 
     expect(error.code).toBe('invalid_input');
     expect(units.findRefs).toHaveBeenCalledWith([UNIDAD_AJENA], EMPRESA);
-    afirmarPuertoIntacto(products);
+    // Los homonimos se leen antes, para pedir sus unidades en la misma consulta; nada se escribe.
+    expect(products.createWithFirstBatch).not.toHaveBeenCalled();
+    expect(products.addBatchToAlive).not.toHaveBeenCalled();
+    expect(products.create).not.toHaveBeenCalled();
   });
 
   it('R8 sin inventario.modificar se rechaza antes de zod y sin consultar unidades ni productos', async () => {
@@ -1187,26 +1187,25 @@ describe('QC-199 — alta de insumo por unidad', () => {
 
   it('R10 con homonimo de la misma unidad agrega el lote sin presentacion', async () => {
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => ({
-        id: 'producto-9',
-        type: PRODUCT_TYPES.PRODUCT,
-      })),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [homonimo('producto-9', PRODUCT_TYPES.PRODUCT)]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
     await expect(createProduct(ALTA_VALIDA, ADMIN)).resolves.toEqual({ id: 'producto-9', lot: '1' });
 
-    expect(products.findAliveIdByNameInUnit).toHaveBeenCalledWith('Acido sulfurico', UNIDAD_KG, { companyId: EMPRESA });
+    expect(products.findAliveSupplyHomonyms).toHaveBeenCalledWith('Acido sulfurico', { companyId: EMPRESA });
     const llamada = products.addBatchToAlive.mock.calls[0];
     expect(llamada?.[0]).toBe('producto-9');
     expect(llamada?.[1]).toMatchObject({ presentationId: null, stock: '4' });
     expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   });
 
-  it('R10 con homonimo de otra unidad crea otro producto', async () => {
-    // «Misma unidad» la decide el adaptador: un homonimo en otra unidad es un `null` del puerto.
+  it('R10 con homonimo en una unidad de otra familia crea otro producto', async () => {
+    // Dentro de una misma familia el homonimo recibe el lote convertido (QC-203 R4).
     const products = montarRepositorio({
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => [
+        homonimo('en-ml', PRODUCT_TYPES.PRODUCT, { unitId: UNIDAD_ML }),
+      ]),
     });
     const createProduct = createCreateProduct({ units: unidadesVisibles(), products, now: () => AHORA });
 
@@ -1239,7 +1238,7 @@ describe('QC-199 — alta de insumo por unidad', () => {
     expect(products.createWithFirstBatch.mock.calls[1]?.[0]).toEqual({ name: 'Balanza', type: PRODUCT_TYPES.MACHINE });
 
     expect(units.findRefs).not.toHaveBeenCalled();
-    expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+    expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
   });
 
   it('sin el catalogo de unidades cableado, el alta de insumo falla sin escribir', async () => {

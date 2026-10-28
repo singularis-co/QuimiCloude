@@ -81,6 +81,11 @@ import { deriveUnitCost } from './unit-cost';
 const DECIMAL_PATTERN = /^\d{1,10}(\.\d{1,4})?$/;
 const ZERO_PATTERN = /^0+(\.0*)?$/;
 
+/** Cabe en una columna `decimal(14,4)` sin redondear y sin signo. */
+export function isStoredDecimal(value: string): boolean {
+  return DECIMAL_PATTERN.test(value);
+}
+
 const amountSchema = z
   .string()
   .trim()

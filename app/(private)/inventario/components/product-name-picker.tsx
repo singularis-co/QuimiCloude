@@ -64,6 +64,8 @@ type ProductNamePickerProps = {
   readonly onDeselect?: () => void;
   /** Tipo elegido en el formulario: solo se ofrecen productos de ese tipo. */
   readonly productType: ProductType;
+  /** Avisa del nombre que viajará, escrito o elegido. */
+  readonly onNameChange?: (name: string) => void;
 };
 
 export function ProductNamePicker({
@@ -72,6 +74,7 @@ export function ProductNamePicker({
   onSelect,
   onDeselect,
   productType,
+  onNameChange,
 }: ProductNamePickerProps) {
   const labelId = useId();
   const inputId = useId();
@@ -114,6 +117,7 @@ export function ProductNamePicker({
   function handleValueChange(next: string) {
     setDraft(next);
     setName(next);
+    onNameChange?.(next);
     if (selectedNameRef.current !== null && next !== selectedNameRef.current) {
       selectedNameRef.current = null;
       onDeselect?.();
@@ -127,6 +131,7 @@ export function ProductNamePicker({
     selectedNameRef.current = option.name;
     setName(option.name);
     setDraft(null);
+    onNameChange?.(option.name);
     onSelect?.(option);
   }
 

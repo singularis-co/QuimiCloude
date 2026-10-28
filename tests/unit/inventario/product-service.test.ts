@@ -92,7 +92,7 @@ function montarRepositorio(overrides: Partial<ProductRepository> = {}): ProductR
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(async () => null),
-    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+    findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => []),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
       id: 'producto-1',
@@ -138,7 +138,7 @@ describe('R12 — nombres duplicados', () => {
     // al puerto, ninguna rechazada.
     //
     // QC-90 acota lo que este caso mide, y conviene decirlo: quien decide si hay homonimo
-    // es el PUERTO (`findAliveIdByNameInUnit`), y aqui devuelve `null` -no hay producto vivo con
+    // es el PUERTO (`findAliveSupplyHomonyms`), y aqui devuelve `null` -no hay producto vivo con
     // ese nombre-. Lo que sigue vigente es que el DOMINIO no rechaza por nombre repetido;
     // con un producto vivo homonimo, el alta agrega lote en vez de crear (R17), y eso se
     // prueba en `create-product.test.ts`.
@@ -233,7 +233,7 @@ describe('el borrado usa la operacion logica del puerto, nunca una fisica', () =
 function afirmarPuertoIntacto(products: ProductRepository): void {
   expect(products.create).not.toHaveBeenCalled();
   expect(products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled();
-  expect(products.findAliveIdByNameInUnit).not.toHaveBeenCalled();
+  expect(products.findAliveSupplyHomonyms).not.toHaveBeenCalled();
   expect(products.createWithFirstBatch).not.toHaveBeenCalled();
   expect(products.addBatchToAlive).not.toHaveBeenCalled();
 }

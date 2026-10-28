@@ -24,7 +24,12 @@ import { normalizeProductName, PRODUCT_NAME_MAX_LENGTH } from '@/lib/modules/inv
 
 export type DraftLine =
   | { readonly kind: 'existing'; readonly productId: string; readonly percentage: string | null }
-  | { readonly kind: 'new'; readonly newProductName: string; readonly percentage: string | null }
+  | {
+      readonly kind: 'new';
+      readonly newProductName: string;
+      readonly unitId: string | null;
+      readonly percentage: string | null;
+    }
   | { readonly kind: 'unassigned'; readonly percentage: string | null };
 
 export type FormulaDraft = {
@@ -40,6 +45,7 @@ export type RowProblem =
   | 'percentage_missing'
   | 'percentage_invalid'
   | 'new_name_invalid'
+  | 'new_unit_missing'
   | 'repeated';
 
 export type FormulaReviewIssues = {
@@ -125,6 +131,7 @@ function lineProblems(line: DraftLine, index: number, repeated: ReadonlySet<numb
   if (line.kind === 'new' && !isValidNewName(line.newProductName)) {
     problems.push('new_name_invalid');
   }
+  if (line.kind === 'new' && line.unitId === null) problems.push('new_unit_missing');
 
   if (repeated.has(index)) problems.push('repeated');
 

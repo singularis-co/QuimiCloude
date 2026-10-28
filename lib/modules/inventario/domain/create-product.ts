@@ -1,13 +1,21 @@
-import type { PackageUnitSource, UnitCatalog } from '@/lib/modules/unidades';
+import type { PackageUnitSource, UnitCatalog, UnitConversion, UnitId } from '@/lib/modules/unidades';
 
 import { requirePermission, type Actor } from './actor';
-import { ActionNotAllowedError, ExpiryDateNotFutureError, ProductNotFoundError, ValidationError } from './errors';
+import {
+  ActionNotAllowedError,
+  ConvertedCostOutOfRangeError,
+  ConvertedStockOutOfRangeError,
+  ExpiryDateNotFutureError,
+  ProductNotFoundError,
+  ValidationError,
+} from './errors';
 import {
   createProductSchema,
   type CreateProductInput,
 } from './product-input';
 import { validateProductImage } from './product-image';
 import { PRODUCT_TYPES, type ProductType } from './product-type';
+import { convertSupplyBatch, pickSupplyTarget } from './supply-family';
 import { deriveUnitCost } from './unit-cost';
 
 import type { NewProductBatch } from './product-batch';
@@ -34,6 +42,16 @@ export type CreateProductDeps = {
    */
   readonly acceptsPastExpiry?: boolean;
 };
+
+/** El lote que se agrego convertido: existencia y unidad del destino. */
+export type SupplyConversion = {
+  readonly productName: string;
+  readonly stock: string;
+  readonly unitId: UnitId;
+};
+
+/** `conversion` solo viene cuando el lote se convirtio a la unidad de un homonimo. */
+export type CreateProductResult = { id: string; lot?: string; conversion?: SupplyConversion };
 
 /** La imagen ya validada, pendiente de subir; `null` si el alta no trae ninguna. */
 type ImagenPendiente = ProductImageUpload | null;
@@ -132,13 +150,13 @@ function resolverFechaDeCompra(entrada: EntradaConLote, instante: Date): string 
  */
 export function createCreateProduct(
   deps: CreateProductDeps,
-): (input: unknown, actor: Actor | null | undefined) => Promise<{ id: string; lot?: string }> {
+): (input: unknown, actor: Actor | null | undefined) => Promise<CreateProductResult> {
   const now = deps.now ?? (() => new Date());
 
   return async function createProduct(
     input: unknown,
     actor: Actor | null | undefined,
-  ): Promise<{ id: string; lot?: string }> {
+  ): Promise<CreateProductResult> {
     requirePermission(actor, 'inventario.modificar');
 
     // La empresa sale del actor y nunca de la entrada, para que nadie pueda escribir en otra.
@@ -238,9 +256,32 @@ async function addOrCreate(
 type EntradaInsumo = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PRODUCT }>;
 
 /**
- * El insumo se cuenta en la unidad que se elige al darlo de alta y sus lotes no llevan
- * presentacion. La unidad se comprueba antes de buscar el homonimo: una de otra empresa no
- * puede servir ni para encontrarlo.
+ * Existencia y costo del lote en la unidad del destino. Con solo costo total, el unitario se
+ * deriva sobre la existencia ya convertida: es la que queda escrita en el lote.
+ */
+function loteEnUnidadDelDestino(
+  entrada: EntradaInsumo,
+  desde: UnitConversion,
+  hasta: UnitConversion,
+): { readonly stock: string; readonly unitCost: string } {
+  const convertido = convertSupplyBatch(
+    { stock: entrada.stock, unitCost: entrada.unitCost ?? null },
+    desde,
+    hasta,
+  );
+  if (convertido.kind === 'stock_out_of_range') throw new ConvertedStockOutOfRangeError();
+  if (convertido.kind === 'cost_out_of_range') throw new ConvertedCostOutOfRangeError();
+  if (convertido.unitCost !== null) return { stock: convertido.stock, unitCost: convertido.unitCost };
+
+  if (entrada.totalCost == null) throw new ValidationError();
+  const derivado = deriveUnitCost(entrada.totalCost, convertido.stock);
+  if (derivado === null) throw new ValidationError();
+  return { stock: convertido.stock, unitCost: derivado };
+}
+
+/**
+ * El insumo se identifica por nombre y familia de unidad. Con homonimo en otra unidad de la
+ * familia, el lote se le agrega convertido a la suya; todo rechazo ocurre antes de escribir.
  */
 async function createSupply(
   deps: CreateProductDeps,
@@ -250,37 +291,65 @@ async function createSupply(
   purchaseDate: string,
   scope: Scope,
   imagen: ImagenPendiente,
-): Promise<{ id: string; lot?: string }> {
+): Promise<CreateProductResult> {
   if (deps.units === undefined) {
     throw new Error('alta de insumo sin el catalogo de unidades: falta el cableado');
   }
 
-  const batch: NewProductBatch = {
+  const candidatos = await deps.products.findAliveSupplyHomonyms(entrada.name, scope);
+
+  const unitIds = [...new Set([entrada.unitId, ...candidatos.map((candidato) => candidato.unitId)])];
+  const unidades = await deps.units.findRefs(unitIds, scope.companyId);
+  const unidadDelAlta = unidades.find((unidad) => unidad.id === entrada.unitId);
+  if (unidadDelAlta === undefined) {
+    throw new ValidationError('unitId: la unidad no existe o no es visible para la empresa');
+  }
+
+  const loteBase = {
     presentationId: null,
-    stock: entrada.stock,
-    unitCost: resolverCostoUnitario(entrada),
     lot: entrada.lot ?? null,
     expiryDate: entrada.expiryDate ?? null,
     purchaseDate,
     createdBy: actor.id,
   };
 
-  const visibles = await deps.units.findRefs([entrada.unitId], scope.companyId);
-  if (!visibles.some((unidad) => unidad.id === entrada.unitId)) {
-    throw new ValidationError('unitId: la unidad no existe o no es visible para la empresa');
+  const destino = pickSupplyTarget(entrada.unitId, candidatos, unidades)?.target ?? null;
+
+  if (destino === null || destino.unitId === entrada.unitId) {
+    const batch: NewProductBatch = { ...loteBase, stock: entrada.stock, unitCost: resolverCostoUnitario(entrada) };
+    return addOrCreate(
+      deps,
+      destino,
+      { name: entrada.name, qtyAlert: entrada.qtyAlert, type: PRODUCT_TYPES.PRODUCT, unitId: entrada.unitId },
+      batch,
+      instante,
+      scope,
+      imagen,
+    );
   }
 
-  const existente = await deps.products.findAliveIdByNameInUnit(entrada.name, entrada.unitId, scope);
+  if (destino.type === PRODUCT_TYPES.FINISHED_PRODUCT) throw new ActionNotAllowedError();
 
-  return addOrCreate(
+  const unidadDelDestino = unidades.find((unidad) => unidad.id === destino.unitId);
+  if (unidadDelDestino === undefined) {
+    throw new Error('destino sin su unidad en el catalogo: pickSupplyTarget no deberia haberlo elegido');
+  }
+
+  const convertido = loteEnUnidadDelDestino(entrada, unidadDelAlta, unidadDelDestino);
+  const creado = await addOrCreate(
     deps,
-    existente,
+    destino,
     { name: entrada.name, qtyAlert: entrada.qtyAlert, type: PRODUCT_TYPES.PRODUCT, unitId: entrada.unitId },
-    batch,
+    { ...loteBase, ...convertido },
     instante,
     scope,
     imagen,
   );
+
+  return {
+    ...creado,
+    conversion: { productName: destino.name, stock: convertido.stock, unitId: destino.unitId },
+  };
 }
 type EntradaEnvase = Extract<CreateProductInput, { type: typeof PRODUCT_TYPES.PACKAGING }>;
 

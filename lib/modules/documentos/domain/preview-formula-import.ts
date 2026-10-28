@@ -29,6 +29,7 @@ import {
 } from '@/lib/modules/inventario';
 import type { createCreateRecipe, createUpdateRecipe } from '@/lib/modules/recetas';
 import type { RecipeCatalog, RecipeStepDocument } from '@/lib/modules/recetas';
+import type { UnitCatalog } from '@/lib/modules/unidades';
 
 /** El caso de uso de `inventario` ya construido, no su fabrica: quien lo cablea es
  *  `lib/composition`, nunca este modulo. */
@@ -44,6 +45,7 @@ export type FormulaImportDeps = {
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly productNames: ProductNameLookup;
+  readonly units: Pick<UnitCatalog, 'findRefs'>;
   readonly createRawMaterial: CreateRawMaterial;
   readonly createRecipe: CreateRecipe;
   readonly updateRecipe: UpdateRecipe;

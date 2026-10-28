@@ -78,7 +78,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 82 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 97 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
       // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
@@ -102,6 +102,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-214 2026-10-13: 93 y no 88: entran `evidence_required`, `evidence_limit`,
       // `evidence_invalid_file`, `evidence_not_found` y `recipe_steps_locked`.
       // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
+      // QC-203 2026-10-14: 97 y no 95: entran `converted_stock_out_of_range` y `converted_cost_out_of_range`.
       // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
       // `company_name_mismatch` y `company_not_deleted`.
       // 2026-10-14: 101 y no 99: entran dos errores de Terminar el empaque.
@@ -123,7 +124,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // `conditioning_steps_pending`.
       // Merge de dev en QC-299 (2026-10-21): 121 = 117 + 4 de los pasos de acondicionamiento.
       // QC-240 2026-10-23: 131 = 121 + 10 del envio de mensajes de WhatsApp.
-      expect(ERROR_CODES).toHaveLength(131)
+      // Merge de dev en QC-203 (2026-10-23): 133 = 131 + 2 de la conversion por familia de unidad.
+      expect(ERROR_CODES).toHaveLength(133)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

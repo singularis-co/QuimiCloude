@@ -25,7 +25,7 @@ import {
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
@@ -677,7 +677,7 @@ const repositorioReal: ProductRepository = {
   softDeleteAlive: softDeleteAliveProduct,
   listAlive: listAliveProducts,
   findAliveIdByNameInPresentationUnit,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
@@ -769,7 +769,7 @@ async function lotOfProduct(productId: string): Promise<string> {
 
 describe('R34, R35, R36: el lote tecleado de solo digitos no llega a 60 y el generado cabe siempre', () => {
   it('R35, R36, R34: por el caso de uso, 59 nueves tecleados se escriben, los dos siguientes generados tienen 60 caracteres sin reintento y 60 digitos tecleados dan ValidationError sin filas nuevas', async () => {
-    // Por el caso de uso: el esquema de entrada solo se aplica ahi. `findAliveIdByNameInUnit`
+    // Por el caso de uso: el esquema de entrada solo se aplica ahi. `findAliveSupplyHomonyms`
     // no abre transaccion, asi que una sola por alta es la escritura sin reintento.
     const fixture = await createFixture();
     const spy = vi.spyOn(prisma, '$transaction');

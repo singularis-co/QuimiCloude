@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import type { UnitCatalog } from '@/lib/modules/unidades';
+
 import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { productNameSchema } from './product-input';
@@ -10,21 +12,21 @@ import type { ProductRepository } from '../ports/product-repository';
 
 export type CreateRawMaterialDeps = {
   readonly products: Pick<ProductRepository, 'create'>;
+  readonly units: Pick<UnitCatalog, 'findRefs'>;
   /** Inyectable para que los tests fijen el instante sin tocar el reloj global. */
   readonly now?: () => Date;
 };
 
 /** Sin `type`, sin lote: es SIEMPRE una materia prima (`PRODUCT`), con el nombre leido de la
- *  revision de la formula. */
-const createRawMaterialSchema = z.strictObject({ name: productNameSchema });
+ *  revision de la formula y la unidad elegida en ella. */
+const createRawMaterialSchema = z.strictObject({ name: productNameSchema, unitId: z.string().uuid() });
 
 /**
  * Alta de MATERIA PRIMA desde la revision de una formula: excepcion, acotada a esta revision,
  * a la regla general de que el alta de inventario SIEMPRE crea lote. El producto nace de tipo
- * `PRODUCT`, SIN lote, sin unidad y con existencia 0 -por el `DEFAULT` de la columna, no porque
- * este caso de uso la escriba-, usando `products.create`, el metodo del puerto que ya existe y
- * hasta ahora no tenia llamantes. El alta manual de inventario (`createCreateProduct`) sigue
- * creando siempre su lote: este caso de uso no la toca.
+ * `PRODUCT`, SIN lote, con la unidad elegida y con existencia 0 -por el `DEFAULT` de la columna,
+ * no porque este caso de uso la escriba-. El alta manual de inventario (`createCreateProduct`)
+ * sigue creando siempre su lote: este caso de uso no la toca.
  *
  * `requirePermission(actor, 'inventario.modificar')` es la PRIMERA linea, antes de zod y antes
  * de tocar el puerto: quien no puede crear materia prima no dispara ninguna consulta.
@@ -42,11 +44,18 @@ export function createCreateRawMaterial(
 
     const parsed = createRawMaterialSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
+    const { name, unitId } = parsed.data;
+
+    const unidades = await deps.units.findRefs([unitId], actor.companyId);
+    if (!unidades.some((unidad) => unidad.id === unitId)) {
+      throw new ValidationError('unitId: la unidad no existe o no es visible para la empresa');
+    }
 
     const producto: NewProduct = {
-      name: parsed.data.name,
+      name,
       type: PRODUCT_TYPES.PRODUCT,
       qtyAlert: null,
+      unitId,
     };
 
     return deps.products.create(producto, now(), { companyId: actor.companyId });

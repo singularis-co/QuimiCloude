@@ -64,6 +64,17 @@ export function compareQuantities(a: string, b: string): -1 | 0 | 1 {
   return left < right ? -1 : 1;
 }
 
+/** Como `compareQuantities`, pero sin truncar: compara con todas las cifras de los dos. */
+export function compareDecimals(a: string, b: string): -1 | 0 | 1 {
+  const left = parseDecimal(a);
+  const right = parseDecimal(b);
+  const scale = Math.max(left.scale, right.scale);
+  const leftUnscaled = left.unscaled * pow10(scale - left.scale);
+  const rightUnscaled = right.unscaled * pow10(scale - right.scale);
+  if (leftUnscaled === rightUnscaled) return 0;
+  return leftUnscaled < rightUnscaled ? -1 : 1;
+}
+
 /** El menor de los dos, normalizado a cuatro decimales. */
 export function minQuantity(a: string, b: string): string {
   return compareQuantities(a, b) <= 0 ? formatScaled(toScale(parseDecimal(a))) : formatScaled(toScale(parseDecimal(b)));
