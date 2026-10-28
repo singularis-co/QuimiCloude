@@ -640,3 +640,24 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Riesgo:** bajo; necesita dos acciones del Administrador casi a la vez y ningún requisito lo cubre.
 - **Qué falta:** bloquear la fila de la variable al relacionar, o comprobar la clave dentro de la misma transacción.
 - **Dueño:** Christian Quevedo.
+
+### D80 — Worktree de QC-246 retenido por HOLD
+- **Origen:** F2.5 de QC-246 (2026-10-28), `./scripts/wt.sh done QC-246-contactos-con-chat`.
+- **Qué pasa:** `.worktrees/QC-246-contactos-con-chat` tiene `specs/QC-246-contactos-con-chat/design.md` sin commitear. El cambio es la redacción vieja de §5.1 punto 2, ya reemplazada en `56c3eea8` (mergeado en #308).
+- **Riesgo:** ninguno funcional; ocupa disco.
+- **Qué falta:** descartar el cambio (`git -C .worktrees/QC-246-contactos-con-chat checkout -- specs/QC-246-contactos-con-chat/design.md`) y repetir `wt.sh done`.
+- **Dueño:** Christian Quevedo.
+
+### D81 — `sessionSeesNavLink` mira un solo nivel de grupo del menú (QC-246)
+- **Origen:** review de QC-246, segunda pasada (m6).
+- **Qué pasa:** `canOpenIntegrations` en `app/(private)/clientes/contactos/page.tsx` depende de que el enlace a `WHATSAPP_INTEGRATION_ROUTE` esté como mucho un nivel dentro de un grupo del menú.
+- **Riesgo:** bajo; si el menú anida grupos, el enlace a Integraciones deja de verse en el estado «WhatsApp no está conectado». El test R3 positivo lo detectaría.
+- **Qué falta:** recorrer el menú de forma recursiva si se anidan grupos.
+- **Dueño:** Christian Quevedo.
+
+### D82 — Restos del worktree de QC-203
+- **Origen:** F2.5 de QC-203 (2026-10-28), `./scripts/wt.sh done QC-203-agrupar-insumos-por-familia-de-unidad`.
+- **Qué pasa:** git ya des-registró el worktree, pero `.worktrees/QC-203-agrupar-insumos-por-familia-de-unidad` quedó con archivos (probablemente un archivo bloqueado en Windows). La rama local `feature/QC-203-agrupar-insumos-por-familia-de-unidad` sigue, ya mergeada en `origin/dev`.
+- **Riesgo:** ninguno funcional; ocupa disco.
+- **Qué falta:** cerrar procesos que usen la carpeta, borrarla, `git branch -d feature/QC-203-agrupar-insumos-por-familia-de-unidad` y `git worktree prune`.
+- **Dueño:** Christian Quevedo.

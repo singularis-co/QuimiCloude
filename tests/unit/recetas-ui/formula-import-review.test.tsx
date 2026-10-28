@@ -170,6 +170,9 @@ describe('la preseleccion de producto segun las coincidencias (R11)', () => {
 
     expect(screen.getByTestId('formula-import-row-mode-0')).toHaveAttribute('data-mode', 'create');
     expect(screen.getByTestId('formula-import-row-new-name-0')).toHaveValue('Perfume floral');
+    // QC-203 R21: la materia prima nueva pide su unidad, obligatoria; sin unidad leida, vacia.
+    expect(screen.getByTestId('formula-import-row-new-unit-0')).toHaveTextContent('Unidad');
+    expect(screen.getByTestId('presentation-unit-hint')).toHaveTextContent('El PDF no trae unidad. Elige una.');
   });
 
   it('con mas de una coincidencia la fila queda sin producto y el revisor debe elegir', () => {
@@ -622,6 +625,8 @@ describe('la confirmacion escribe solo al confirmar y navega al resultado (R29)'
       outcome: 'created',
       rawMaterialsCreated: 1,
       rawMaterialsReused: 0,
+      created: [{ name: 'Perfume floral', unitId: 'unidad-sin-catalogo' }],
+      reused: [],
     };
     resolverConfirmacion({ status: 'success', data: resumen });
 
@@ -807,6 +812,8 @@ describe('ninguna imagen ni recorte, y accesibilidad tactil (R35, R38)', () => {
     expect(screen.getByTestId('formula-import-row-choose-button-2')).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.getByTestId('formula-import-row-new-name-2')).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.getByTestId('formula-import-row-percentage-2')).toHaveClass('min-h-11', 'min-w-11');
+    // QC-203: y el selector de unidad de la materia prima nueva.
+    expect(screen.getByTestId('presentation-unit-select')).toHaveClass('min-h-11', 'min-w-11');
   });
 
   it('los campos de texto de la revision tienen letra de 16px (text-base) (R38)', () => {

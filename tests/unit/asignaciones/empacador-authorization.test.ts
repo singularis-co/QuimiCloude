@@ -192,7 +192,7 @@ describe('QC-144 R13 — el Empacador rechaza en inventario, sin invocar ningun 
     softDeleteAlive: explode(),
     listAlive: explode(),
     findAliveIdByNameInPresentationUnit: explode(),
-    findAliveIdByNameInUnit: explode(),
+    findAliveSupplyHomonyms: explode(),
     findAlivePackagingByName: explode(),
     createWithFirstBatch: explode(),
     addBatchToAlive: explode(),

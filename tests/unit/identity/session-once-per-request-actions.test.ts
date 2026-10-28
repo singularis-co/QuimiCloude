@@ -672,6 +672,50 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).listWhatsappDictionaryAction(),
   },
   {
+    // QC-240: el envio de WhatsApp. Sin permisos el caso de uso rechaza antes de tocar un puerto, y
+    // la accion devuelve el estado de error.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-message-actions.ts',
+    nombre: 'sendWhatsappMessageAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-message-actions')
+      ).sendWhatsappMessageAction({
+        kind: 'text',
+        recipient: { contactId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31' },
+        text: 'Hola',
+      }),
+  },
+  {
+    // QC-245: el listado de conversaciones. Sin permisos el caso de uso rechaza antes de tocar un
+    // puerto, y la accion devuelve el estado de error.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions.ts',
+    nombre: 'listWhatsappConversationsAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions')
+      ).listWhatsappConversationsAction({}),
+  },
+  {
+    // El contexto del chat: sin permisos el caso de uso rechaza antes de tocar un puerto.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions.ts',
+    nombre: 'getWhatsappChatContextAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-conversation-actions')
+      ).getWhatsappChatContextAction({ target: { contactId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31' } }),
+  },
+  {
+    // La ruta del archivo de un medio lee la sesion ella misma: `/api/**` no pasa por el
+    // middleware. Sin permisos responde 404 sin tocar la base.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-media-route.ts',
+    nombre: 'GET /api/integraciones/whatsapp/media/[mensajeId]',
+    invocar: async () =>
+      (await import('@/lib/modules/integraciones/adapters/driving/whatsapp-media-route')).GET(
+        new Request('http://localhost/media'),
+        { params: Promise.resolve({ mensajeId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31' }) },
+      ),
+  },
+  {
     // QC-137: el resumen de la campana, que el navegador consulta cada 30 s. Sin permisos responde
     // `forbidden` antes de tocar la bandeja.
     archivo: 'lib/modules/notificaciones/adapters/driving/notification-actions.ts',

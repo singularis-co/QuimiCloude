@@ -341,7 +341,7 @@ describe('formulario de receta — versiones dentro del formulario (R13, R14)', 
     const versiones = screen.getByTestId('recipe-versions');
     expect(screen.getByTestId('recipe-form').contains(versiones)).toBe(true);
     expect(within(versiones).getByTestId('recipe-versions-empty')).toHaveTextContent(
-      'Esta receta todavía no tiene versiones.',
+      'Esta fórmula todavía no tiene versiones.',
     );
     expect(
       within(screen.getByTestId('recipe-form-footer')).getByTestId('recipe-version-new'),

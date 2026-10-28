@@ -193,3 +193,102 @@ export class WhatsappTemplateNotMappableError extends IntegracionesError {
     super('whatsapp_template_not_mappable', diagnostic);
   }
 }
+
+/** La conexión existe y es de la empresa, pero no está en `ACTIVE`: con ella no se envía nada. */
+export class WhatsappConnectionNotActiveError extends IntegracionesError {
+  readonly code = 'whatsapp_connection_not_active';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_connection_not_active', diagnostic);
+  }
+}
+
+/** El contacto no tiene cliente o su cliente está dado de baja: el texto no distingue los dos casos. */
+export class WhatsappRecipientNotCustomerError extends IntegracionesError {
+  readonly code = 'whatsapp_recipient_not_customer';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_recipient_not_customer', diagnostic);
+  }
+}
+
+export class WhatsappCustomerWithoutPhoneError extends IntegracionesError {
+  readonly code = 'whatsapp_customer_without_phone';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_customer_without_phone', diagnostic);
+  }
+}
+
+export class WhatsappContactLinkedElsewhereError extends IntegracionesError {
+  readonly code = 'whatsapp_contact_linked_elsewhere';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_contact_linked_elsewhere', diagnostic);
+  }
+}
+
+export class WhatsappContactBlockedError extends IntegracionesError {
+  readonly code = 'whatsapp_contact_blocked';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_contact_blocked', diagnostic);
+  }
+}
+
+export class WhatsappWindowClosedError extends IntegracionesError {
+  readonly code = 'whatsapp_window_closed';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_window_closed', diagnostic);
+  }
+}
+
+export class WhatsappTemplateNotSendableError extends IntegracionesError {
+  readonly code = 'whatsapp_template_not_sendable';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_template_not_sendable', diagnostic);
+  }
+}
+
+/**
+ * El texto del catálogo es fijo; `missing` lleva las claves y etiquetas para que el borde arme el
+ * texto que las nombra.
+ */
+export class WhatsappTemplateValuesMissingError extends IntegracionesError {
+  readonly code = 'whatsapp_template_values_missing';
+
+  readonly missing: readonly { readonly key: string; readonly label: string }[];
+
+  constructor(missing: readonly { readonly key: string; readonly label: string }[], diagnostic?: string) {
+    super('whatsapp_template_values_missing', diagnostic);
+    this.missing = missing;
+  }
+}
+
+/** El mensaje no existe o es de otra empresa: el texto no distingue los dos casos. */
+export class WhatsappMessageNotFoundError extends IntegracionesError {
+  readonly code = 'whatsapp_message_not_found';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_message_not_found', diagnostic);
+  }
+}
+
+export class WhatsappMessageNotRetryableError extends IntegracionesError {
+  readonly code = 'whatsapp_message_not_retryable';
+
+  constructor(diagnostic?: string) {
+    super('whatsapp_message_not_retryable', diagnostic);
+  }
+}
+
+/** El pedido no existe, es de otra empresa o de otro cliente, o ya no está abierto: el texto no distingue los casos. */
+export class WhatsappOrderNotFoundError extends IntegracionesError {
+  readonly code = 'order_not_found';
+
+  constructor(diagnostic?: string) {
+    super('order_not_found', diagnostic);
+  }
+}

@@ -20,8 +20,10 @@ function existingLine(productId: string, percentage: string | null): DraftLine {
   return { kind: 'existing', productId, percentage };
 }
 
-function newLine(newProductName: string, percentage: string | null): DraftLine {
-  return { kind: 'new', newProductName, percentage };
+const UNIDAD = '00000000-0000-4000-8000-0000000000a1';
+
+function newLine(newProductName: string, percentage: string | null, unitId: string | null = UNIDAD): DraftLine {
+  return { kind: 'new', newProductName, unitId, percentage };
 }
 
 describe('documentos — reviewFormulaImport', () => {
@@ -261,6 +263,17 @@ describe('documentos — reviewFormulaImport', () => {
       );
       expect(issues.steps).toBe('invalid');
       expect(issues.packingSteps).toBe('ok');
+    });
+  });
+
+  describe('QC-203 — materia prima nueva sin unidad', () => {
+    it('R23 una fila nueva sin unidad da new_unit_missing y no se puede confirmar', () => {
+      const issues = reviewFormulaImport(
+        draft({ lines: [existingLine('p1', '60.00'), newLine('Glicerina', '40.00', null)], steps: [STEP] }),
+      );
+      expect(issues.rows).toEqual([{ index: 1, problems: ['new_unit_missing'] }]);
+      expect(issues.isComplete).toBe(true);
+      expect(issues.canConfirm).toBe(false);
     });
   });
 

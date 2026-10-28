@@ -213,7 +213,7 @@ describe('selector de receta (R31, R43)', () => {
   it('la X de borrar aparece con una receta ya elegida', () => {
     renderPicker({ defaultValue: RECETA_LEJANA.id, defaultLabel: RECETA_LEJANA.name });
 
-    expect(screen.getByTestId(testId.borrar)).toHaveAccessibleName('Borrar receta');
+    expect(screen.getByTestId(testId.borrar)).toHaveAccessibleName('Borrar fórmula');
   });
 
   it('pulsar la X vacia el texto, el campo oculto y avisa con null', async () => {

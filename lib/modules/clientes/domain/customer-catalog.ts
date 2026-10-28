@@ -35,4 +35,9 @@ export interface CustomerCatalog {
   findAliveRefById(id: string, companyId: string): Promise<CustomerRef | null>;
   /** Orden apellidos, nombres, id. Busca por palabra normalizada en nombres, apellidos y ciudad. */
   searchRefs(query: CustomerRefSearch, companyId: string): Promise<Page<CustomerRef>>;
+  /**
+   * De `ids`, los clientes vivos de la empresa que casan con `search` con la misma regla que el
+   * listado de clientes. Un texto sin palabras utiles no filtra: devuelve los `ids` vivos.
+   */
+  findAliveIdsMatchingName(search: string, ids: readonly string[], companyId: string): Promise<readonly string[]>;
 }

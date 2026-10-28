@@ -1303,6 +1303,7 @@ model WhatsappContact {
   blockedBy        String?   @map("blocked_by") @db.Uuid
   lastInboundAt    DateTime? @map("last_inbound_at") @db.Timestamptz(6)
   lastMessageAt    DateTime? @map("last_message_at") @db.Timestamptz(6)
+  lastReadAt       DateTime? @map("last_read_at") @db.Timestamptz(6)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1331,6 +1332,7 @@ model WhatsappMessage {
   origin         WhatsappMessageOrigin?
   sentById       String?                  @map("sent_by") @db.Uuid
   templateName   String?                  @map("template_name")
+  templateLanguage String?                @map("template_language")
   attempts       Int                      @default(0)
   queueMessageId String?                  @map("queue_message_id")
   createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1481,35 +1483,51 @@ enum AiProviderConnectionStatus {
   @@map("ai_provider_connection_status")
 }
 
-/// Catalogo global sembrado por migracion: cambiar un modelo es otra migracion con su `down.sql`.
+/// Catalogo global de proveedores sembrado por migracion. Sus modelos viven en `ai_models`.
 /// @module integraciones
 model AiProvider {
-  code         AiProviderCode @id
-  name         String
-  recipeModel  String         @map("recipe_model")
-  catalogModel String         @map("catalog_model")
-  sortOrder    Int            @map("sort_order")
+  code      AiProviderCode @id
+  name      String
+  sortOrder Int            @map("sort_order")
 
   @@map("ai_providers")
 }
 
-/// Una por empresa. Sin `@relation`: las FK de `company_id`, `provider`, `created_by` y
-/// `updated_by` estan escritas a mano en la migracion.
+/// Catalogo global de modelos por proveedor, sembrado por migracion. El id solo es unico dentro de
+/// su proveedor. Un solo predeterminado por proveedor: lo impone un indice unico parcial escrito en
+/// la migracion, igual que la FK a `ai_providers`.
+/// @module integraciones
+model AiModel {
+  provider  AiProviderCode
+  modelId   String         @map("model_id")
+  isDefault Boolean        @default(false) @map("is_default")
+  sortOrder Int            @map("sort_order")
+
+  @@id([provider, modelId], map: "ai_models_pkey")
+  @@map("ai_models")
+}
+
+/// Una por empresa. Sin `@relation`: las FK de `company_id`, `provider`, `created_by`,
+/// `updated_by` y la compuesta `(provider, model_id)` estan escritas a mano en la migracion.
+/// `model` nulo = sin eleccion, se usa el predeterminado. `unavailableModel` no lleva FK: guarda
+/// el id que el proveedor dijo no ofrecer, aunque sea el predeterminado.
 /// @module integraciones
 model AiProviderConnection {
-  id            String                     @id @db.Uuid
-  companyId     String                     @unique(map: "ai_provider_connections_company_id_key") @map("company_id") @db.Uuid
-  provider      AiProviderCode
-  apiKeyEnc     String                     @map("api_key_enc")
-  status        AiProviderConnectionStatus @default(ACTIVE)
-  lastError     String?                    @map("last_error")
-  lastErrorAt   DateTime?                  @map("last_error_at") @db.Timestamptz(6)
-  lastCheckedAt DateTime?                  @map("last_checked_at") @db.Timestamptz(6)
-  keyUpdatedAt  DateTime                   @map("key_updated_at") @db.Timestamptz(6)
-  createdById   String                     @map("created_by") @db.Uuid
-  updatedById   String                     @map("updated_by") @db.Uuid
-  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String                     @id @db.Uuid
+  companyId        String                     @unique(map: "ai_provider_connections_company_id_key") @map("company_id") @db.Uuid
+  provider         AiProviderCode
+  apiKeyEnc        String                     @map("api_key_enc")
+  status           AiProviderConnectionStatus @default(ACTIVE)
+  lastError        String?                    @map("last_error")
+  lastErrorAt      DateTime?                  @map("last_error_at") @db.Timestamptz(6)
+  lastCheckedAt    DateTime?                  @map("last_checked_at") @db.Timestamptz(6)
+  keyUpdatedAt     DateTime                   @map("key_updated_at") @db.Timestamptz(6)
+  createdById      String                     @map("created_by") @db.Uuid
+  updatedById      String                     @map("updated_by") @db.Uuid
+  createdAt        DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  model            String?                    @map("model_id")
+  unavailableModel String?                    @map("unavailable_model")
 
   @@index([provider], map: "ai_provider_connections_provider_idx")
   @@map("ai_provider_connections")

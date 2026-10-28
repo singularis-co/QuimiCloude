@@ -56,6 +56,10 @@ export const RUTAS_FUERA_DE_SESION: Readonly<Record<string, Clasificacion>> = {
     anadido: 'integraciones',
     prueba: 'tests/unit/integraciones/whatsapp/templates/sync-all-whatsapp-templates.test.ts',
   },
+  'app/api/integraciones/whatsapp/media/[mensajeId]/route.ts': {
+    anadido: 'integraciones',
+    prueba: 'tests/unit/integraciones/whatsapp/conversations/whatsapp-media-route.test.ts',
+  },
 };
 
 export function listApiRoutes(root: string): readonly string[] {
@@ -141,6 +145,14 @@ describe('guardia: rutas que corren sin sesión', () => {
     expect(RUTAS_FUERA_DE_SESION['app/api/cron/sincronizar-plantillas-whatsapp/route.ts']).toEqual({
       anadido: 'integraciones',
       prueba: 'tests/unit/integraciones/whatsapp/templates/sync-all-whatsapp-templates.test.ts',
+    });
+  });
+
+  it('QC-245 R58: la ruta del archivo de un medio es del añadido `integraciones`, con la prueba de que sin el permiso responde 404', () => {
+    expect(rutas).toContain('app/api/integraciones/whatsapp/media/[mensajeId]/route.ts');
+    expect(RUTAS_FUERA_DE_SESION['app/api/integraciones/whatsapp/media/[mensajeId]/route.ts']).toEqual({
+      anadido: 'integraciones',
+      prueba: 'tests/unit/integraciones/whatsapp/conversations/whatsapp-media-route.test.ts',
     });
   });
 

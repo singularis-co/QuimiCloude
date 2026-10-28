@@ -86,14 +86,14 @@ export const ORDER_EXECUTION_FINISH_CONFIRM_TEXTS = {
 } as const;
 
 export const ORDER_EXECUTION_TEXTS = {
-  recipeMissing: 'Esta receta está dada de baja.',
+  recipeMissing: 'Esta fórmula está dada de baja.',
   orderQuantity: 'Pedido',
   presentation: 'Presentación:',
   actions: (numberText: string) => `Acciones del pedido ${numberText}`,
   back: 'Volver a mis pedidos asignados',
   start: 'Comenzar',
   startPending: 'Comenzando…',
-  notStarted: 'Pulsa «Comenzar» para ejecutar los pasos de la receta.',
+  notStarted: 'Pulsa «Comenzar» para ejecutar los pasos de la fórmula.',
 } as const;
 
 const MIN_STEP_SECONDS = 5;

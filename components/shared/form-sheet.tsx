@@ -65,6 +65,8 @@ export type FormSheetProps = {
   readonly footerWrapperClassName?: string;
   readonly cancelTouch?: TouchMode;
   readonly saveTouch?: TouchMode;
+  /** Con `false` no se pinta la X de `SheetContent` (p. ej. para poner una propia de 44 px). */
+  readonly showCloseButton?: boolean;
 };
 
 /**
@@ -96,6 +98,7 @@ export function FormSheet({
   footerWrapperClassName,
   cancelTouch = 'class',
   saveTouch = 'prop',
+  showCloseButton,
 }: FormSheetProps) {
   const actions = (
     <>
@@ -128,6 +131,7 @@ export function FormSheet({
     <SheetContent
       side={side}
       minScreenWidth={minScreenWidth}
+      showCloseButton={showCloseButton}
       className={className}
       data-testid={testIds.sheet}
       {...sheetData}

@@ -93,8 +93,8 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 const LOTE = 'L-2026-07';
 
 vi.mock('@/app/(private)/inventario/components/product-form', () => ({
-  ProductForm: ({ product, onSaved }: { product?: ProductView; onSaved: (lot?: string) => void }) => (
-    <button type="button" data-testid="product-form-saved" onClick={() => onSaved(product ? undefined : LOTE)}>
+  ProductForm: ({ product, onSaved }: { product?: ProductView; onSaved: (saved?: { lot?: string }) => void }) => (
+    <button type="button" data-testid="product-form-saved" onClick={() => onSaved(product ? undefined : { lot: LOTE })}>
       Guardar
     </button>
   ),

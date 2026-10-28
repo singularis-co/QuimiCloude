@@ -21,6 +21,8 @@ export {
   WhatsappVariableKeyInUseError,
   WhatsappTemplateNotMappedError,
   WhatsappTemplateNotMappableError,
+  WhatsappTemplateValuesMissingError,
+  WhatsappOrderNotFoundError,
 } from './domain/errors';
 export type { SecretContext } from './domain/secret-context';
 export type { Actor } from './domain/actor';
@@ -47,18 +49,19 @@ export type {
   AiProviderConnectionStatus,
   AiProviderConnectionView,
   AiProviderEntry,
-  AiReadUse,
+  AiModelOption,
 } from './domain/ai-provider';
 export type {
   AiProviderFailure,
   AiProviderFailureKind,
   AiProviderProbeResult,
 } from './domain/ai-provider-failure';
-export { isAccountFailure } from './domain/ai-provider-failure';
+export { isAccountFailure, marksConnection } from './domain/ai-provider-failure';
 export type { AiProviderConnectionOverview } from './domain/get-ai-provider-connection';
 export type { AiProviderTestResult } from './domain/test-ai-provider-key';
 export type { TestSavedAiProviderResult } from './domain/test-saved-ai-provider';
 export type { SaveAiProviderConnectionResult } from './domain/save-ai-provider-connection';
+export type { SelectAiModelResult } from './domain/select-ai-model';
 export type { AiProviderReadiness } from './domain/get-ai-provider-readiness';
 export type {
   AiProviderReadingResolution,
@@ -69,6 +72,7 @@ export { createGetAiProviderConnection } from './domain/get-ai-provider-connecti
 export { createTestAiProviderKey } from './domain/test-ai-provider-key';
 export { createTestSavedAiProvider } from './domain/test-saved-ai-provider';
 export { createSaveAiProviderConnection } from './domain/save-ai-provider-connection';
+export { createSelectAiModel } from './domain/select-ai-model';
 export { createDisconnectAiProvider } from './domain/disconnect-ai-provider';
 export { createGetAiProviderReadiness } from './domain/get-ai-provider-readiness';
 export {
@@ -117,3 +121,26 @@ export { createCreateWhatsappTemplate } from './domain/create-whatsapp-template'
 export { createDeleteWhatsappTemplate } from './domain/delete-whatsapp-template';
 export { createResyncWhatsappTemplates, createSyncWhatsappTemplates } from './domain/sync-whatsapp-templates';
 export { createSyncAllWhatsappTemplates } from './domain/sync-all-whatsapp-templates';
+export type { WhatsappOutboundMessageView } from './domain/whatsapp-outbound-message';
+export { createSendWhatsappMessage } from './domain/send-whatsapp-message';
+export { createRetryWhatsappMessage } from './domain/retry-whatsapp-message';
+export type {
+  WhatsappMessageDirection,
+  WhatsappMessageStatus,
+  WhatsappMessageType,
+} from './domain/whatsapp-message';
+export type {
+  WhatsappChat,
+  WhatsappChatAttachment,
+  WhatsappChatMessage,
+  WhatsappConversationItem,
+  WhatsappConversationList,
+  WhatsappSendableTemplate,
+} from './domain/whatsapp-conversation';
+export { createListWhatsappConversations } from './domain/list-whatsapp-conversations';
+export { createGetWhatsappChat } from './domain/get-whatsapp-chat';
+export { createMarkWhatsappChatRead } from './domain/mark-whatsapp-chat-read';
+export { createListSendableWhatsappTemplates } from './domain/list-sendable-whatsapp-templates';
+export type { WhatsappChatContext, WhatsappCustomerOrder } from './domain/whatsapp-chat-context';
+export { createGetWhatsappChatContext } from './domain/get-whatsapp-chat-context';
+export { createGetWhatsappMedia, type WhatsappMediaResult } from './domain/get-whatsapp-media';

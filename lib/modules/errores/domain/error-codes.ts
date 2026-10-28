@@ -35,6 +35,7 @@
  * **2026-10-13**: `company_not_found`.
  * **2026-10-13**: `evidence_required`, `evidence_limit`, `evidence_invalid_file`,
  * `evidence_not_found`, `recipe_steps_locked`.
+ * **2026-10-14**: `converted_stock_out_of_range`, `converted_cost_out_of_range`.
  * **2026-10-14**: `company_duplicate_name`, `company_duplicate_tax_id`, `company_name_mismatch`,
  * `company_not_deleted`.
  * **2026-10-14**: `packaging_stock_insufficient`.
@@ -51,6 +52,10 @@
  * `whatsapp_variable_key_in_use`, `whatsapp_template_not_mapped`, `whatsapp_template_not_mappable`.
  * **2026-10-21**: `conditioning_step_out_of_order`, `conditioning_responsibles_required`,
  * `conditioning_responsible_not_allowed`, `conditioning_steps_pending`.
+ * **2026-10-23**: `whatsapp_connection_not_active`, `whatsapp_recipient_not_customer`,
+ * `whatsapp_customer_without_phone`, `whatsapp_contact_linked_elsewhere`, `whatsapp_contact_blocked`,
+ * `whatsapp_window_closed`, `whatsapp_template_not_sendable`, `whatsapp_template_values_missing`,
+ * `whatsapp_message_not_found`, `whatsapp_message_not_retryable`.
  */
 export const ERROR_CODES = [
   'unauthorized',
@@ -226,6 +231,10 @@ export const ERROR_CODES = [
   'recipe_steps_locked',
   'ai_provider_missing',
   'ai_provider_error',
+  // Distintos de `invalid_input`: la entrada tiene forma valida y lo que no cabe en 4 decimales es
+  // el resultado de convertirla a la unidad del producto.
+  'converted_stock_out_of_range',
+  'converted_cost_out_of_range',
   'company_duplicate_name',
   'company_duplicate_tax_id',
   'company_name_mismatch',
@@ -259,6 +268,16 @@ export const ERROR_CODES = [
   'whatsapp_variable_key_in_use',
   'whatsapp_template_not_mapped',
   'whatsapp_template_not_mappable',
+  'whatsapp_connection_not_active',
+  'whatsapp_recipient_not_customer',
+  'whatsapp_customer_without_phone',
+  'whatsapp_contact_linked_elsewhere',
+  'whatsapp_contact_blocked',
+  'whatsapp_window_closed',
+  'whatsapp_template_not_sendable',
+  'whatsapp_template_values_missing',
+  'whatsapp_message_not_found',
+  'whatsapp_message_not_retryable',
   // Distinto de `invalid_input`: la peticion es valida, pero la pantalla quedo atras del avance
   // guardado o de la formula.
   'conditioning_step_out_of_order',

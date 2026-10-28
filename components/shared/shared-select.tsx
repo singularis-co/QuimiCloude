@@ -54,6 +54,15 @@ export type SharedSelectControlProps = {
   /** Contenido del disparador; por defecto, la etiqueta de la opción elegida. */
   readonly children?: ReactNode;
   readonly rootTestId?: string;
+  /** No abre la lista ni deja elegir. */
+  readonly disabled?: boolean;
+  /** `aria-busy` en el disparador mientras el consumidor espera una respuesta. */
+  readonly busy?: boolean;
+  /** `false` abre la lista debajo del disparador, con la entrada de opacidad y escala. */
+  readonly alignItemWithTrigger?: boolean;
+  /** Contenido de cada opción; por defecto, su etiqueta. */
+  readonly renderOption?: (option: SharedSelectOption) => ReactNode;
+  readonly optionClassName?: string;
 };
 
 export function SharedSelectControl({
@@ -75,6 +84,11 @@ export function SharedSelectControl({
   optionValueAttribute = false,
   children,
   rootTestId,
+  disabled,
+  busy,
+  alignItemWithTrigger,
+  renderOption,
+  optionClassName,
 }: SharedSelectControlProps) {
   // Las `items` solo las lee `SelectValue` para pintar la etiqueta; con contenido propio sobran.
   const items =
@@ -94,6 +108,7 @@ export function SharedSelectControl({
       {...(items === undefined ? {} : { items })}
       {...(onValueChange === undefined ? {} : { onValueChange })}
       {...(required === undefined ? {} : { required })}
+      {...(disabled === undefined ? {} : { disabled })}
       {...(rootTestId === undefined ? {} : { 'data-testid': rootTestId })}
     >
       <SelectTrigger
@@ -101,12 +116,13 @@ export function SharedSelectControl({
         aria-labelledby={labelledBy}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}
+        aria-busy={busy ? true : undefined}
         className={triggerClassName}
         data-testid={triggerTestId}
       >
         {children ?? <SelectValue />}
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent {...(alignItemWithTrigger === undefined ? {} : { alignItemWithTrigger })}>
         {noneOption === undefined ? null : (
           <SelectItem value={noneOption.value} data-testid={noneOption.testId}>
             {noneOption.label}
@@ -118,8 +134,9 @@ export function SharedSelectControl({
             value={option.value}
             data-testid={optionTestId}
             data-value={optionValueAttribute ? option.value : undefined}
+            className={optionClassName}
           >
-            {option.label}
+            {renderOption === undefined ? option.label : renderOption(option)}
           </SelectItem>
         ))}
       </SelectContent>

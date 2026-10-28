@@ -1414,7 +1414,7 @@ describe('el selector de version en el formulario', () => {
       renderFormulario(elPedido);
 
       expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(RECETA.id);
-      expect(screen.getByRole('combobox', { name: 'Receta' })).toHaveValue(RECETA.name);
+      expect(screen.getByRole('combobox', { name: 'Fórmula' })).toHaveValue(RECETA.name);
       await waitFor(() => expect(selectorDeVersion()).toHaveTextContent(nota));
       expect(selectorDeVersion()).toHaveTextContent(actual.name);
       expect(selectorDeVersion()).toBeEnabled();

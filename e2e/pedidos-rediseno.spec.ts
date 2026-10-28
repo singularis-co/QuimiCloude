@@ -118,19 +118,25 @@ const TESTIDS = {
   unitOption: 'presentation-unit-option',
 } as const;
 
-/** Las doce columnas de la lista, en su orden. */
+/**
+ * Las catorce columnas de la lista, en su orden (el de `tests/unit/pedidos-ui/order-columns.test.tsx`).
+ * R16 nacio con doce; despues sale «Cantidad» (2026-10-16), entra «Por entregar» delante de
+ * «Presentación» y entran «Costo estimado» y «Costo real», contiguas y en ese orden (QC-305 R19).
+ */
 const COLUMN_IDS = [
   'orderNumber',
   'status',
   'priority',
   'recipeName',
   'customer',
-  'quantity',
+  'pendingDelivery',
   'presentationName',
   'createdAt',
   'cancellationReason',
   'coverage',
   'responsibles',
+  'productionCost',
+  'actualCost',
   'actions',
 ] as const;
 
@@ -391,11 +397,17 @@ async function box(locator: Locator): Promise<Box> {
   return found as Box;
 }
 
+function toHundredthPx(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 async function expectTarget(locator: Locator, label: string, minHeight = MIN_TARGET_PX): Promise<Box> {
   await expect(locator, label).toBeVisible();
   const found = await box(locator);
-  expect(found.width, `${label}: ancho`).toBeGreaterThanOrEqual(MIN_TARGET_PX);
-  expect(found.height, `${label}: alto`).toBeGreaterThanOrEqual(minHeight);
+  // El motor devuelve la caja con error de coma flotante (43.99996... para un alto de 44 px): se
+  // redondea a la centesima de pixel antes de comparar, sin tocar el umbral.
+  expect(toHundredthPx(found.width), `${label}: ancho`).toBeGreaterThanOrEqual(MIN_TARGET_PX);
+  expect(toHundredthPx(found.height), `${label}: alto`).toBeGreaterThanOrEqual(minHeight);
   return found;
 }
 
@@ -512,7 +524,7 @@ async function menuSequence(menu: Locator): Promise<string[]> {
 }
 
 test.describe('Pedidos rediseñado', () => {
-  test('a 1440 px: una sola barra en orden, menú con separador y destructivos, y doce columnas con el número fijado (R2, R11, R14, R16)', async ({
+  test('a 1440 px: una sola barra en orden, menú con separador y destructivos, y catorce columnas con el número fijado (R2, R11, R14, R16, QC-305 R19)', async ({
     page,
   }) => {
     await openOrders(page, DESKTOP);
@@ -537,7 +549,7 @@ test.describe('Pedidos rediseñado', () => {
     expect(chipLabels[1]).toContain('Prioridad');
     expect(chipLabels[2]).toContain('Fecha de solicitud');
 
-    // R16: tabla visible, tarjetas ocultas, doce columnas en su orden y el número fijado a la izquierda.
+    // R16: tabla visible, tarjetas ocultas, las columnas de hoy (catorce) en su orden y el número fijado a la izquierda.
     await expect(row(page, toPack)).toBeVisible();
     await expect(card(page, toPack)).toBeHidden();
     const headIds = await page

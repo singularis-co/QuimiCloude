@@ -16,6 +16,8 @@ export {
   BatchNotFoundError,
   BatchStockNegativeError,
   ActionNotAllowedError,
+  ConvertedStockOutOfRangeError,
+  ConvertedCostOutOfRangeError,
   ExpiryDateNotFutureError,
 } from './domain/errors';
 export { type Page, type PageQuery, pageQuerySchema } from './domain/page';
@@ -51,6 +53,7 @@ export {
   updateProductSchema,
   productNameSchema,
   PRODUCT_NAME_MAX_LENGTH,
+  isStoredDecimal,
   type CreateProductInput,
   type UpdateProductInput,
 } from './domain/product-input';
@@ -69,7 +72,17 @@ export { aliveBatches, type ProductBatchView } from './domain/product-batch-view
 export { type InventoryMovementView, type NewInventoryMovement } from './domain/inventory-movement';
 export { MOVEMENT_REASONS, STOCK_INCREASE_REASONS, type MovementReason } from './domain/movement-reason';
 
-export { createCreateProduct, type CreateProductDeps } from './domain/create-product';
+export {
+  createCreateProduct,
+  type CreateProductDeps,
+  type CreateProductResult,
+  type SupplyConversion,
+} from './domain/create-product';
+export {
+  createFindSupplyHomonyms,
+  type FindSupplyHomonyms,
+  type FindSupplyHomonymsDeps,
+} from './domain/find-supply-homonyms';
 export type { StockIncreaseListener } from './domain/stock-increase-listener';
 export {
   createCreateRawMaterial,
@@ -197,9 +210,17 @@ export {
   addQuantities,
   subtractQuantities,
   compareQuantities,
+  compareDecimals,
   minQuantity,
   ceilToScale4,
 } from './domain/decimal-quantity';
+export {
+  pickSupplyTarget,
+  convertSupplyBatch,
+  type SupplyHomonym,
+  type SupplyTarget,
+  type ConvertedSupplyBatch,
+} from './domain/supply-family';
 export { compareBatchesOldestFirst, type OrderableBatch } from './domain/batch-order';
 export {
   planFinishedGoodsLine,

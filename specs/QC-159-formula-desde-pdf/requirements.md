@@ -164,10 +164,16 @@ empresa del actor un producto de tipo **«Producto»** con el nombre revisado (d
 recortar), **sin lotes**, sin unidad y con existencia 0, y DEBE usarlo como ingrediente de esa fila.
 `[D4]` `[P1]`
 
+> Enmendado por QC-203 (2026-10-14): la materia prima nueva nace **con unidad**, la elegida en la
+> revisión (QC-203 R25); ya no «sin unidad».
+
 **R26.** SI al confirmar ya existe **exactamente un** producto vivo de la empresa, no terminado, con el
 nombre normalizado de una materia prima que se pide crear, ENTONCES el sistema DEBE **reutilizarlo** en
 vez de crear otro; SI existe más de uno, ENTONCES DEBE rechazar la confirmación con `invalid_input` sin
 escribir nada. `[D4]`
+
+> Enmendado por QC-203 (2026-10-14): el homónimo se busca por nombre normalizado **+ familia** de la
+> unidad elegida (QC-203 R26); se mantiene «uno reutiliza, más de uno rechaza».
 
 **R27.** El sistema DEBE comprobar todo lo que puede rechazar la confirmación —R15, R16, R20, R24, R26 y
 los permisos de R30 y R31— **antes** de crear ninguna materia prima. La escritura de la receta DEBE ser

@@ -67,6 +67,7 @@ import {
   createCreateRawMaterial,
   createDeletePresentation,
   createDeleteProduct,
+  createFindSupplyHomonyms,
   createGetFinishedProduct,
   createGetProduct,
   createListBatchMovements,
@@ -104,7 +105,7 @@ import {
   createProduct,
   createWithFirstBatch,
   findAliveIdByNameInPresentationUnit,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findAlivePackagingByName,
   findAliveProductById,
   findBatchesOfAliveProduct,
@@ -538,6 +539,8 @@ import {
 } from '@/lib/modules/identity/adapters/driven/persistence/company-directory-prisma';
 import { createGetCompanyCountry, createSetCompanyCountry } from '@/lib/modules/identity';
 import { createCompanyCountryRepository } from '@/lib/modules/identity/adapters/driven/persistence/company-country-prisma';
+import { createGetCompanyName } from '@/lib/modules/identity';
+import { createCompanyNameReader } from '@/lib/modules/identity/adapters/driven/persistence/company-name-prisma';
 import {
   createCreateCompany,
   createDeleteCompany,
@@ -573,6 +576,8 @@ import {
 import { readSeedScopeFromEnv } from '@/lib/modules/identity/adapters/driven/config/seed-scope-env';
 import type { CompanyOpenOrdersCounter } from '@/lib/modules/identity/ports/company-open-orders-counter';
 import { countOpenOrdersInCompany } from '@/lib/modules/pedidos/adapters/driven/persistence/order-company-stats-prisma';
+import type { CustomerOrderDirectory } from '@/lib/modules/pedidos';
+import { createCustomerOrderDirectory } from '@/lib/modules/pedidos/adapters/driven/persistence/customer-order-directory-prisma';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
 // `documentos` — las DOS factories salen del CONTRATO del modulo (solo dominio), los dos puertos de
 // `ports/` y las dos implementaciones de `adapters/driven/` por su ruta exacta. La Server Action del
@@ -677,6 +682,7 @@ import type { ListQueryLog as ClientesListQueryLog } from '@/lib/modules/cliente
 import type { CustomerRepository } from '@/lib/modules/clientes/ports/customer-repository';
 import type { CustomerCatalog } from '@/lib/modules/clientes';
 import {
+  findAliveCustomerIdsMatchingName,
   findAliveCustomerRefById,
   findCustomerRefsIncludingDeleted,
   searchCustomerRefs,
@@ -1020,6 +1026,7 @@ export const identity = {
   // Operacion de plataforma: el actor no lleva empresa.
   setCompanyCountry: createSetCompanyCountry({ companies: createCompanyCountryRepository() }),
   getCompanyCountry: createGetCompanyCountry({ companies: createCompanyCountryRepository() }),
+  getCompanyName: createGetCompanyName({ companies: createCompanyNameReader() }),
   // Operaciones de plataforma sobre empresas: el actor no lleva empresa.
   createCompany: createCreateCompany({
     companies: companyRepository,
@@ -1088,7 +1095,7 @@ const productRepository: ProductRepository = {
   // -`createProduct: createCreateProduct({ products: productRepository })` sigue igual-,
   // porque el alta que ya existia es la MISMA que ahora escribe el lote (`design.md > 10 C`).
   findAliveIdByNameInPresentationUnit,
-  findAliveIdByNameInUnit,
+  findAliveSupplyHomonyms,
   findAlivePackagingByName,
   createWithFirstBatch,
   addBatchToAlive,
@@ -1225,7 +1232,7 @@ const inventoryImportReadDeps = {
 
 export const inventario = {
   createProduct: createProductUseCase,
-  createRawMaterial: createCreateRawMaterial({ products: productRepository }),
+  createRawMaterial: createCreateRawMaterial({ products: productRepository, units: { findRefs: findUnitRefs } }),
   updateProduct: createUpdateProduct({ products: productRepository, images: productImageStorage }),
   deleteProduct: createDeleteProduct({ products: productRepository }),
   getProduct: createGetProduct({ products: productRepository, images: productImageStorage }),
@@ -1268,6 +1275,7 @@ export const inventario = {
   }),
   // El adaptador y no `unitCatalog`, que se declara mas abajo.
   listProductFormUnits: createListProductFormUnits({ units: { listVisibleRefs: listVisibleUnitRefs } }),
+  findSupplyHomonyms: createFindSupplyHomonyms({ products: productRepository }),
   previewInventoryImport: createPreviewInventoryImport(inventoryImportReadDeps),
   getInventoryImportTemplate: createGetInventoryImportTemplate({
     values: importTemplateValuesReader,
@@ -1929,6 +1937,8 @@ const orderSummaryReader: OrderSummaryReader = {
   listHistoryByIdsIncludingDeleted: listOrderHistoryByIdsIncludingDeleted,
 };
 
+const customerOrderDirectory: CustomerOrderDirectory = createCustomerOrderDirectory();
+
 const orderCatalog: OrderCatalog = {
   findAliveById: findAliveOrderTargetById,
   listAliveSummariesByIds: createListAliveSummariesByIds({ summaries: orderSummaryReader, packaging: packagingCatalog }),
@@ -2431,14 +2441,14 @@ const READER_BY_PROVIDER: Record<AiProviderCode, ReaderFactory> = {
  */
 const aiProviderGateway: AiProviderGateway = {
   isConfigured: async (companyId) => (await integraciones.getAiProviderStatus(companyId)) !== null,
-  readerFor: async (companyId, use) => {
+  readerFor: async (companyId) => {
     if (documentsE2EDoublesEnabled()) {
       const status = await integraciones.getAiProviderStatus(companyId);
       return status === null
         ? { status: 'missing' }
         : { status: 'ready', reader: { read: readCannedText }, connectionStatus: status.connectionStatus };
     }
-    const resolution = await integraciones.resolveAiProviderForReading(companyId, use);
+    const resolution = await integraciones.resolveAiProviderForReading(companyId);
     if (resolution.status !== 'ready') return { status: resolution.status };
     return {
       status: 'ready',
@@ -2449,8 +2459,8 @@ const aiProviderGateway: AiProviderGateway = {
       connectionStatus: resolution.connectionStatus,
     };
   },
-  reportAccountFailure: (companyId, failure) =>
-    integraciones.reportAiProviderOutcome(companyId, { kind: 'account_failure', failure }),
+  reportConnectionFailure: (companyId, failure) =>
+    integraciones.reportAiProviderOutcome(companyId, { kind: 'connection_failure', failure }),
   reportRecovered: (companyId) => integraciones.reportAiProviderOutcome(companyId, { kind: 'recovered' }),
 };
 
@@ -2637,6 +2647,7 @@ const formulaImportDeps: FormulaImportDeps = {
   recipes: recipeCatalog,
   products: productCatalog,
   productNames: productNameLookup,
+  units: unitCatalog,
   createRawMaterial: inventario.createRawMaterial,
   createRecipe: recetas.createRecipe,
   updateRecipe: recetas.updateRecipe,
@@ -2779,6 +2790,8 @@ function buildCustomerCatalog(): CustomerCatalog {
     findRefsIncludingDeleted: (ids, companyId) => findCustomerRefsIncludingDeleted(ids, { companyId }),
     findAliveRefById: (id, companyId) => findAliveCustomerRefById(id, { companyId }),
     searchRefs: (query, companyId) => searchCustomerRefs(query, { companyId }),
+    findAliveIdsMatchingName: (search, ids, companyId) =>
+      findAliveCustomerIdsMatchingName(search, ids, { companyId }),
   };
 }
 
@@ -2826,6 +2839,14 @@ import {
   createLinkWhatsappContact,
   createUnlinkWhatsappContact,
   createSetWhatsappContactBlocked,
+  createSendWhatsappMessage,
+  createRetryWhatsappMessage,
+  createListWhatsappConversations,
+  createGetWhatsappChat,
+  createMarkWhatsappChatRead,
+  createListSendableWhatsappTemplates,
+  createGetWhatsappChatContext,
+  createGetWhatsappMedia,
 } from '@/lib/modules/integraciones';
 import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
 import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
@@ -2864,6 +2885,9 @@ import {
   updateWhatsappVariableKey,
 } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-variable-key-prisma';
 import { companyOfWhatsappConnection } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-webhook-directory-prisma';
+import { createWhatsappOutboxRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-outbox-prisma';
+import { createWhatsappConversationRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-conversation-prisma';
+import { createWhatsappSendLogConsole } from '@/lib/modules/integraciones/adapters/driven/observability/whatsapp-send-log-console';
 import { randomSourceNode } from '@/lib/modules/integraciones/adapters/driven/security/random-source-node';
 import { webhookSignatureHmac } from '@/lib/modules/integraciones/adapters/driven/security/webhook-signature-hmac';
 import type { IntegrationsSwitch } from '@/lib/modules/integraciones/ports/integrations-switch';
@@ -2875,7 +2899,11 @@ import type { WhatsappInboxRepository } from '@/lib/modules/integraciones/ports/
 import type { WhatsappTemplateRepository } from '@/lib/modules/integraciones/ports/whatsapp-template-repository';
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository';
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory';
-import { whatsappWebhookPath } from '@/lib/shared/routes';
+import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository';
+import type { WhatsappConversationRepository } from '@/lib/modules/integraciones/ports/whatsapp-conversation-repository';
+import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log';
+import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links';
+import { whatsappMediaPath, whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
 const whatsappGraphClient: WhatsappGraphClient = {
@@ -2895,6 +2923,14 @@ const whatsappGraphClient: WhatsappGraphClient = {
     integrationsE2EDoublesEnabled()
       ? whatsappGraphClientCanned.deleteTemplate(input)
       : whatsappGraphClientFetch.deleteTemplate(input),
+  sendMessage: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.sendMessage(input)
+      : whatsappGraphClientFetch.sendMessage(input),
+  downloadMedia: (input) =>
+    integrationsE2EDoublesEnabled()
+      ? whatsappGraphClientCanned.downloadMedia(input)
+      : whatsappGraphClientFetch.downloadMedia(input),
 };
 
 const whatsappConnectionRepository: WhatsappConnectionRepository = {
@@ -2973,6 +3009,53 @@ const whatsappContactUnitOfWork: WhatsappContactUnitOfWork = {
 
 const whatsappTemplateCronDeps = { ...whatsappWebhookDeps, listCompanyIds: listActiveCompanyIds };
 
+const whatsappOutboxRepository: WhatsappOutboxRepository = createWhatsappOutboxRepository();
+/** Fuera de transacción: el envío solo lee el teléfono principal y si el cliente sigue vivo. */
+const whatsappSendCustomerPhones: CustomerPhoneLinks = createCustomerPhoneLinks({
+  phones: createCustomerPhoneRepository(),
+});
+const whatsappSendLog: WhatsappSendLog = createWhatsappSendLogConsole();
+
+const whatsappSendDeps = {
+  connections: whatsappConnectionRepository,
+  cipher: secretCipher,
+  outbox: whatsappOutboxRepository,
+  customerPhones: whatsappSendCustomerPhones,
+  templates: whatsappTemplateRepository,
+  variableKeys: whatsappVariableKeyRepository,
+  graph: whatsappGraphClient,
+  sendLog: whatsappSendLog,
+};
+
+const whatsappConversationRepository: WhatsappConversationRepository = createWhatsappConversationRepository();
+const whatsappConversationDeps = {
+  connections: whatsappConnectionRepository,
+  conversations: whatsappConversationRepository,
+  customers: customerCatalog,
+  people: peopleDirectory,
+  templates: whatsappTemplateRepository,
+  variableKeys: whatsappVariableKeyRepository,
+  mediaUrlOf: whatsappMediaPath,
+};
+const whatsappChatContextDeps = {
+  connections: whatsappConnectionRepository,
+  conversations: whatsappConversationRepository,
+  customers: customerCatalog,
+  customerOrders: customerOrderDirectory,
+  deliveryProgress: { listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted },
+  presentations: presentationCatalog,
+  recipes: recipeCatalog,
+  companyName: identity.getCompanyName,
+  variableKeys: whatsappVariableKeyRepository,
+};
+const whatsappMediaDeps = {
+  connections: whatsappConnectionRepository,
+  conversations: whatsappConversationRepository,
+  customers: customerCatalog,
+  graph: whatsappGraphClient,
+  cipher: secretCipher,
+};
+
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
 /** Sin `APP_BASE_URL` devuelve la ruta relativa: la pantalla avisa en vez de fallar. */
@@ -2994,6 +3077,7 @@ import {
   createReportAiProviderOutcome,
   createResolveAiProviderForReading,
   createSaveAiProviderConnection,
+  createSelectAiModel,
   createTestAiProviderKey,
   createTestSavedAiProvider,
   type AiProviderProbeResult,
@@ -3072,6 +3156,7 @@ export const integraciones = {
   testAiProviderKey: createTestAiProviderKey(aiProviderDeps),
   testSavedAiProvider: createTestSavedAiProvider(aiProviderDeps),
   saveAiProviderConnection: createSaveAiProviderConnection(aiProviderDeps),
+  selectAiModel: createSelectAiModel(aiProviderDeps),
   disconnectAiProvider: createDisconnectAiProvider(aiProviderDeps),
   getAiProviderReadiness: createGetAiProviderReadiness(aiProviderDeps),
   getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
@@ -3096,6 +3181,14 @@ export const integraciones = {
   relateWhatsappTemplateVariables: createRelateWhatsappTemplateVariables(whatsappDeps),
   setWhatsappTemplateEnabled: createSetWhatsappTemplateEnabled(whatsappDeps),
   verifyCronSecret,
+  sendWhatsappMessage: createSendWhatsappMessage(whatsappSendDeps),
+  retryWhatsappMessage: createRetryWhatsappMessage(whatsappSendDeps),
+  listWhatsappConversations: createListWhatsappConversations(whatsappConversationDeps),
+  getWhatsappChat: createGetWhatsappChat(whatsappConversationDeps),
+  markWhatsappChatRead: createMarkWhatsappChatRead(whatsappConversationDeps),
+  listSendableWhatsappTemplates: createListSendableWhatsappTemplates(whatsappConversationDeps),
+  getWhatsappChatContext: createGetWhatsappChatContext(whatsappChatContextDeps),
+  getWhatsappMedia: createGetWhatsappMedia(whatsappMediaDeps),
 } as const;
 
 import {

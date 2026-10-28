@@ -4,6 +4,9 @@ import { readGraphApiVersion } from '../config/whatsapp-config-env';
 
 import type { GraphFailure } from '../../../domain/graph-failure';
 import type {
+  GraphMediaDownload,
+  GraphMessageSent,
+  GraphOutboundMessage,
   GraphProbeResult,
   GraphTemplateCreated,
   GraphTemplateDeleted,
@@ -17,6 +20,8 @@ const PHONE_NUMBER_FIELDS = 'display_phone_number,verified_name';
 const TEMPLATE_FIELDS = 'id,name,language,status,category,components,rejected_reason';
 const TEMPLATE_PAGE_LIMIT = 100;
 const GRAPH_TIMEOUT_MS = 10_000;
+/** Meta sirve los archivos de los medios desde este dominio; a otro host no va el token. */
+const MEDIA_HOST_SUFFIX = '.fbsbx.com';
 
 const phoneNumberBody = z.object({
   display_phone_number: z.string(),
@@ -52,6 +57,16 @@ const templatePageBody = z.object({
 });
 
 const deletedTemplateBody = z.object({ success: z.literal(true) });
+
+const sentMessageBody = z.object({
+  messages: z.array(z.object({ id: z.string().min(1) })).min(1),
+});
+
+const mediaMetadataBody = z.object({
+  url: z.url(),
+  mime_type: z.string(),
+  file_size: z.number().int().optional(),
+});
 
 type TemplateFailure = { readonly ok: false } & GraphFailure;
 
@@ -228,9 +243,127 @@ async function deleteTemplate(input: {
   return deletedTemplateBody.safeParse(reply.body).success ? { ok: true } : TEMPLATE_REJECTED_WITHOUT_DETAIL;
 }
 
+function outboundBodyOf(to: string, message: GraphOutboundMessage): Record<string, unknown> {
+  const envelope = { messaging_product: 'whatsapp', recipient_type: 'individual', to };
+  if (message.type === 'text') {
+    return { ...envelope, type: 'text', text: { body: message.body, preview_url: false } };
+  }
+  return {
+    ...envelope,
+    type: 'template',
+    template: { name: message.name, language: { code: message.language }, components: message.components },
+  };
+}
+
+async function sendMessage(input: {
+  readonly phoneNumberId: string;
+  readonly accessToken: string;
+  readonly to: string;
+  readonly message: GraphOutboundMessage;
+}): Promise<GraphMessageSent> {
+  const url = `${GRAPH_BASE_URL}/${readGraphApiVersion()}/${encodeURIComponent(input.phoneNumberId)}/messages`;
+  const reply = await callGraph(url, 'POST', input.accessToken, outboundBodyOf(input.to, input.message));
+  if (!reply.reached || !isSuccess(reply.status)) return templateFailureOf(reply);
+  const parsed = sentMessageBody.safeParse(reply.body);
+  const first = parsed.success ? parsed.data.messages[0] : undefined;
+  return first === undefined ? TEMPLATE_UNREACHABLE : { ok: true, wamid: first.id };
+}
+
+function isMetaMediaUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith(MEDIA_HOST_SUFFIX);
+  } catch {
+    return false;
+  }
+}
+
+function mediaTypeOf(header: string | null): string | null {
+  const type = (header ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  return type === '' ? null : type;
+}
+
+function declaredLengthOf(header: string | null): number | null {
+  if (header === null || !/^\d+$/.test(header.trim())) return null;
+  const length = Number(header.trim());
+  return Number.isSafeInteger(length) ? length : null;
+}
+
+/** Defensa si la cabecera miente: el stream se corta con error en cuanto pasa del tope. */
+function cappedBody(body: ReadableStream<Uint8Array>, maxBytes: number): ReadableStream<Uint8Array> {
+  let received = 0;
+  return body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > maxBytes) {
+          controller.error(new Error('El archivo del medio supera el tamaño máximo.'));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+}
+
+async function discardBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // El cuerpo descartado no importa: el resultado ya está decidido.
+  }
+}
+
+/**
+ * Dos pasos: Graph da la URL del archivo y luego se descarga el binario. La URL de Meta lleva
+ * firma y no se registra en ningún sitio. `redirect: 'manual'` impide que una redirección lleve el
+ * token a otro host: una respuesta 3xx es un rechazo.
+ */
+async function downloadMedia(input: {
+  readonly mediaId: string;
+  readonly accessToken: string;
+  readonly maxBytes: number;
+}): Promise<GraphMediaDownload> {
+  const metadataUrl = `${GRAPH_BASE_URL}/${readGraphApiVersion()}/${encodeURIComponent(input.mediaId)}`;
+  const reply = await callGraph(metadataUrl, 'GET', input.accessToken);
+  if (!reply.reached || !isSuccess(reply.status)) return templateFailureOf(reply);
+  const metadata = mediaMetadataBody.safeParse(reply.body);
+  if (!metadata.success) return TEMPLATE_REJECTED_WITHOUT_DETAIL;
+  const { url, mime_type: mimeType, file_size: fileSize } = metadata.data;
+  if (fileSize !== undefined && fileSize > input.maxBytes) return TEMPLATE_REJECTED_WITHOUT_DETAIL;
+  if (!isMetaMediaUrl(url)) return TEMPLATE_REJECTED_WITHOUT_DETAIL;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${input.accessToken}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_MS),
+      cache: 'no-store',
+      redirect: 'manual',
+    });
+  } catch {
+    return TEMPLATE_UNREACHABLE;
+  }
+
+  if (!isSuccess(response.status)) {
+    await discardBody(response);
+    return response.status >= 500 ? TEMPLATE_UNREACHABLE : TEMPLATE_REJECTED_WITHOUT_DETAIL;
+  }
+  const contentLength = declaredLengthOf(response.headers.get('content-length'));
+  const contentType = mediaTypeOf(response.headers.get('content-type')) ?? mediaTypeOf(mimeType);
+  if ((contentLength !== null && contentLength > input.maxBytes) || response.body === null || contentType === null) {
+    await discardBody(response);
+    return TEMPLATE_REJECTED_WITHOUT_DETAIL;
+  }
+  return { ok: true, contentType, contentLength, body: cappedBody(response.body, input.maxBytes) };
+}
+
 export const whatsappGraphClientFetch = {
   fetchPhoneNumber,
   createTemplate,
   listTemplatesPage,
   deleteTemplate,
+  sendMessage,
+  downloadMedia,
 } satisfies WhatsappGraphClient;

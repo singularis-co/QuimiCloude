@@ -175,6 +175,12 @@ export const E2E_ESPERADOS = [
   // el numero, la empresa sin pais, los avisos de los migrados en la lista y el campo a 390 px. NO
   // lee ni afirma nada sobre el identificador de peticion ni sobre `reference`.
   'clientes-telefono.spec.ts',
+  // Alta el 2026-10-24 (QC-246 T19) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: en `/clientes/contactos` un entrante firmado al webhook aparece en la lista y en el
+  // chat sin recargar, la respuesta pasa por «Enviando», «Enviado» y «Entregado», el 404 sin
+  // `whatsapp.consultar`, «Abrir chat» desde Clientes y lista ↔ chat a 390 px. NO lee ni afirma
+  // nada sobre el identificador de peticion ni sobre `reference`.
+  'contactos-chat.spec.ts',
   // Alta el 2026-10-09 (QC-219) por el MISMO motivo y en el MISMO sitio que las demas: la lista es
   // CERRADA y darse de alta en ella es su punto de extension por diseno. El ancla NO se relaja -el
   // archivo se nombra, uno a uno-. Lo que ejercita: el acondicionador ve Terminar bloqueado, la
@@ -351,6 +357,10 @@ export const E2E_ESPERADOS = [
   // ve en esa unidad en el listado y en el panel de lotes. No lee ni afirma nada sobre el
   // identificador de peticion.
   'insumo-por-unidad.spec.ts',
+  // Alta por el mismo motivo que las demas (QC-203 R30). Recorre el alta de «Glicerina» en ml sobre
+  // la misma en l: aviso de conversion, guardado y existencia sumada en l. No lee ni afirma nada
+  // sobre el identificador de peticion.
+  'inventario-familia-de-unidad.spec.ts',
   // Alta por el mismo motivo que las demas. Recorre el alta de un pedido en g y otro en ml sobre un
   // insumo en kg: cantidad requerida, marca de aproximacion, costo cotizado y guardado y cantidad
   // apartada. No lee ni afirma nada sobre el identificador de peticion.
@@ -556,6 +566,15 @@ export const E2E_ESPERADOS = [
   // responsable del paso. No lee ni afirma nada sobre el identificador de peticion ni sobre
   // `reference`.
   'pasos-de-acondicionamiento.spec.ts',
+  // Alta el 2026-10-22 (QC-243 T13) por el MISMO motivo y en el MISMO sitio que las demas: la lista
+  // es CERRADA y darse de alta en ella es su punto de extension por diseno. Lo que ejercita: en
+  // chromium y webkit, el Administrador crea la conexion de WhatsApp con el doble de Graph, una
+  // variable propia en «Variables» y una plantilla que la usa desde «Insertar variable», que queda
+  // «Pendiente»; un aviso firmado al webhook de la conexion la aprueba y, al volver a entrar en
+  // «Plantillas», se ve «Aprobada»; a 390 px el alta ocupa la pantalla con «Formulario | Vista
+  // previa» y el motivo de una rechazada se lee como texto en la tarjeta. No lee ni afirma nada sobre
+  // el identificador de peticion ni sobre `reference`.
+  'integraciones-whatsapp-plantillas.spec.ts',
 ] as const
 
 /** Prueba el cruce borde -> Server Action en lugar de un E2E. */
@@ -823,8 +842,19 @@ export const MIGRACIONES_ESPERADAS = [
   '20261021140000_orders_actual_cost',
   // 2026-10-21: lote de producto terminado sin coste unitario; no toca el identificador.
   '20261021150000_finished_goods_lot_cost_optional',
+  // 2026-10-22: el catalogo de modelos de IA y la eleccion de modelo en la conexion; no toca el
+  // identificador.
+  '20261022120000_ai_models',
   // 2026-10-22: precio de venta del pedido entero; no toca el identificador.
   '20261022120000_orders_sale_price',
+  // 2026-10-23: el permiso whatsapp.enviar y la columna de idioma con la FK de `sent_by` de los
+  // mensajes de WhatsApp; no tocan el identificador.
+  '20261023120000_whatsapp_send_permission',
+  '20261023130000_whatsapp_outbound_messages',
+  // 2026-10-24: el permiso whatsapp.consultar; no toca el identificador.
+  '20261024120000_whatsapp_read_permission',
+  // 2026-10-24: la marca de lectura de los contactos de WhatsApp; no toca el identificador.
+  '20261024130000_whatsapp_contacts_last_read',
 ] as const
 
 export function hallazgosDeMigraciones(

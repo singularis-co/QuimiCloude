@@ -45,6 +45,16 @@ import {
   WhatsappVariableKeyInUseError,
   WhatsappVariableKeyNotFoundError,
   WhatsappVariableKeyTakenError,
+  WhatsappConnectionNotActiveError,
+  WhatsappContactBlockedError,
+  WhatsappContactLinkedElsewhereError,
+  WhatsappCustomerWithoutPhoneError,
+  WhatsappMessageNotFoundError,
+  WhatsappMessageNotRetryableError,
+  WhatsappRecipientNotCustomerError,
+  WhatsappTemplateNotSendableError,
+  WhatsappTemplateValuesMissingError,
+  WhatsappWindowClosedError,
 } from '@/lib/modules/integraciones/domain/errors'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -68,7 +78,7 @@ function readModuleFile(relPath: string): string {
 
 describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
   describe('R1 — un codigo, una clave, un texto', () => {
-    it('las 82 entradas estan, y cada codigo tiene exactamente una clave', () => {
+    it('las 97 entradas estan, y cada codigo tiene exactamente una clave', () => {
       // Conteo LITERAL a proposito: un codigo nuevo que nadie anote aqui pone esta linea en rojo.
       // 65 y no 60: entran `order_without_distribution`, `order_presentation_line_not_editable`,
       // `order_distribution_exceeds_quantity` y `order_without_unit` (QC-170) y
@@ -92,6 +102,7 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // QC-214 2026-10-13: 93 y no 88: entran `evidence_required`, `evidence_limit`,
       // `evidence_invalid_file`, `evidence_not_found` y `recipe_steps_locked`.
       // QC-275 2026-10-13: 95 y no 93: entran `ai_provider_missing` y `ai_provider_error`.
+      // QC-203 2026-10-14: 97 y no 95: entran `converted_stock_out_of_range` y `converted_cost_out_of_range`.
       // QC-162 2026-10-14: 99 y no 95: entran `company_duplicate_name`, `company_duplicate_tax_id`,
       // `company_name_mismatch` y `company_not_deleted`.
       // 2026-10-14: 101 y no 99: entran dos errores de Terminar el empaque.
@@ -112,7 +123,9 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // `conditioning_responsibles_required`, `conditioning_responsible_not_allowed` y
       // `conditioning_steps_pending`.
       // Merge de dev en QC-299 (2026-10-21): 121 = 117 + 4 de los pasos de acondicionamiento.
-      expect(ERROR_CODES).toHaveLength(121)
+      // QC-240 2026-10-23: 131 = 121 + 10 del envio de mensajes de WhatsApp.
+      // Merge de dev en QC-203 (2026-10-23): 133 = 131 + 2 de la conversion por familia de unidad.
+      expect(ERROR_CODES).toHaveLength(133)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 
@@ -771,5 +784,61 @@ describe('diccionario de variables de WhatsApp — codigos de variable y de mape
       expect(error.code).toBe(code)
       expect(error.message).toBe(esperados[code])
     }
+  })
+})
+
+describe('envio de mensajes de WhatsApp — codigos del envio y del reintento', () => {
+  const esperados = {
+    whatsapp_connection_not_active: 'La conexión de WhatsApp no está activa. Revísala en Integraciones.',
+    whatsapp_recipient_not_customer: 'Solo se pueden enviar mensajes a clientes de la empresa.',
+    whatsapp_customer_without_phone: 'El cliente no tiene un teléfono válido para WhatsApp.',
+    whatsapp_contact_linked_elsewhere:
+      'Ese número está vinculado a otro cliente. Cámbialo desde Contactos.',
+    whatsapp_contact_blocked: 'El contacto está bloqueado.',
+    whatsapp_window_closed:
+      'Pasaron más de 24 horas desde el último mensaje del cliente: usa una plantilla.',
+    whatsapp_template_not_sendable: 'La plantilla no está habilitada o no está aprobada por Meta.',
+    whatsapp_template_values_missing: 'Faltan valores de la plantilla.',
+    whatsapp_message_not_found: 'No se encontró el mensaje.',
+    whatsapp_message_not_retryable: 'Solo se puede reintentar un mensaje que falló.',
+  } as const satisfies Partial<Record<ErrorCode, string>>
+
+  it('los diez codigos estan en el catalogo con su clave y su texto en español', () => {
+    const codigos: readonly string[] = ERROR_CODES
+    for (const [code, texto] of Object.entries(esperados) as [keyof typeof esperados, string][]) {
+      expect(codigos, `falta el codigo ${code}`).toContain(code)
+      expect(ERROR_MESSAGE_KEY[code]).toBe(`errors.${code}`)
+      expect(errorMessage(code)).toBe(texto)
+    }
+  })
+
+  it('cada clase de integraciones lleva su codigo y su texto', () => {
+    const casos = [
+      [new WhatsappConnectionNotActiveError(), 'whatsapp_connection_not_active'],
+      [new WhatsappRecipientNotCustomerError(), 'whatsapp_recipient_not_customer'],
+      [new WhatsappCustomerWithoutPhoneError(), 'whatsapp_customer_without_phone'],
+      [new WhatsappContactLinkedElsewhereError(), 'whatsapp_contact_linked_elsewhere'],
+      [new WhatsappContactBlockedError(), 'whatsapp_contact_blocked'],
+      [new WhatsappWindowClosedError(), 'whatsapp_window_closed'],
+      [new WhatsappTemplateNotSendableError(), 'whatsapp_template_not_sendable'],
+      [new WhatsappTemplateValuesMissingError([]), 'whatsapp_template_values_missing'],
+      [new WhatsappMessageNotFoundError(), 'whatsapp_message_not_found'],
+      [new WhatsappMessageNotRetryableError(), 'whatsapp_message_not_retryable'],
+    ] as const
+    for (const [error, code] of casos) {
+      expect(error.code).toBe(code)
+      expect(error.message).toBe(esperados[code])
+    }
+  })
+
+  it('las faltantes viajan en el error con su clave y su etiqueta, sin tocar el texto del catalogo', () => {
+    const missing = [
+      { key: 'cliente.nombre', label: 'Nombre del cliente' },
+      { key: 'horario', label: 'horario' },
+    ]
+    const error = new WhatsappTemplateValuesMissingError(missing, 'diagnostico')
+    expect(error.missing).toEqual(missing)
+    expect(error.message).toBe('Faltan valores de la plantilla.')
+    expect(error.diagnostic).toBe('diagnostico')
   })
 })

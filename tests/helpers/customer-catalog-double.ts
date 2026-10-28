@@ -8,10 +8,12 @@ export function fakeCustomerCatalog(): CustomerCatalog & {
   readonly findRefsIncludingDeleted: ReturnType<typeof vi.fn>;
   readonly findAliveRefById: ReturnType<typeof vi.fn>;
   readonly searchRefs: ReturnType<typeof vi.fn>;
+  readonly findAliveIdsMatchingName: ReturnType<typeof vi.fn>;
 } {
   return {
     findRefsIncludingDeleted: vi.fn(async () => []),
     findAliveRefById: vi.fn(async () => null),
     searchRefs: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 0 })),
+    findAliveIdsMatchingName: vi.fn(async () => []),
   };
 }

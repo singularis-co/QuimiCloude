@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Plantillas de WhatsApp en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; box-sizing: border-box; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="PlantillasWhatsapp" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">PlantillasWhatsapp · ficha</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">ui/tabs</span> (las pestañas de QC-237, ahora «Conexión | Plantillas | Variables») · la tabla de los listados con su versión en tarjetas · estado vacío, esqueleto de carga y toast compartidos · panel lateral de alta del repo · confirmación de eliminar · filtros en chips · interruptor de Fórmula (<span class="mono">.sw</span>) para «Habilitada»</dd>
+      <dt>Nuevo</dt><dd><span class="mono">WaBurbuja</span>: la vista previa con estilo de chat (encabezado en negrita, mensaje, pie gris, hora y botones debajo) · <span class="mono">PlantillaAlta</span>: el formulario con contadores e «Insertar variable», sin botones</dd>
+      <dt>Librerías</dt><dd><span class="mono">lucide-react</span> · <span class="mono">sonner</span> para los avisos · nada nuevo</dd>
+      <dt>Escritorio</dt><dd>Barra de sincronización arriba con la hora y el tipo (automática o manual) y, tras sincronizar a mano, el resumen en etiquetas · aviso de plantillas sin relacionar · buscador, chips de estado y «Nueva plantilla» · tabla con nombre (y el inicio del texto), idioma, categoría, estado en Meta (con el motivo si es rechazada), uso en el sistema y última sincronización · el alta abre un panel de 1040 px con el formulario y la vista previa lado a lado · el alta no ofrece encabezado (HEADER de Meta): solo mensaje, pie y botones; una plantilla importada que ya traiga encabezado lo muestra en la vista previa · la categoría es un desplegable: cada opción muestra su explicación, y al elegir queda solo el nombre con la explicación debajo del campo</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · la tabla pasa a tarjetas por debajo del ancho de la tabla · el alta ocupa todo el ancho con formulario y vista previa lado a lado</dd>
+      <dt>Teléfono</dt><dd>Cada plantilla es una tarjeta: nombre, estado, idioma, categoría y fecha; abajo el interruptor «Habilitada» o «Relacionar variables» y «Acciones» (hoja inferior con Relacionar, Duplicar y Eliminar) · los chips de estado hacen scroll en una fila · el alta y la relación ocupan toda la pantalla con pestañas «Formulario | Vista previa» · objetivos de 44 px</dd>
+      <dt>Animación</dt><dd>Las variables nuevas y los botones entran en la burbuja con un fundido corto de 240 ms (sin animación con reduced-motion) · el icono de sincronizar gira mientras corre · la fila recién relacionada entra con <span class="mono">fade</span> · paneles y diálogos con las transiciones del sistema</dd>
+      <dt>Decidido</dt><dd>Constantes de ejemplo (<span class="mono">nombre_del_cliente</span>, <span class="mono">numero_de_pedido</span>, <span class="mono">nombre_de_la_empresa</span>) · la vista previa muestra el valor de una variable propia y la etiqueta de una constante · idiomas: español e inglés · «No compatible» con su motivo y sin Relacionar · Variables sin exigir conexión</dd>
+      <dt>Por confirmar</dt><dd>El texto sobre reutilizar el nombre de una plantilla eliminada (lo confirma el spec) · [MOTIVO DEL RECHAZO QUE DA META] y [ERROR DE META TRADUCIDO POR EL BACKEND] los da el backend</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

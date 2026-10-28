@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   CANNED_DISPLAY_PHONE_NUMBER,
+  CANNED_MEDIA_CONTENT_TYPE,
+  cannedMediaBytes,
   CANNED_GRAPH_ERROR_MESSAGE,
   CANNED_VERIFIED_NAME,
   whatsappGraphClientCanned,
@@ -61,5 +63,36 @@ describe('whatsappGraphClientCanned', () => {
     } finally {
       if (saved !== undefined) process.env.WHATSAPP_GRAPH_API_VERSION = saved
     }
+  })
+})
+
+describe('whatsappGraphClientCanned.downloadMedia', () => {
+  const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
+
+  it('R45: devuelve siempre el mismo PNG de 1x1 con su tipo y su tamaño, sin red', async () => {
+    const result = await whatsappGraphClientCanned.downloadMedia({
+      mediaId: 'cualquiera',
+      accessToken: 'EAAG-cualquiera',
+      maxBytes: 5 * 1024 * 1024,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const bytes = new Uint8Array(await new Response(result.body).arrayBuffer())
+    expect(result.contentType).toBe('image/png')
+    expect(CANNED_MEDIA_CONTENT_TYPE).toBe('image/png')
+    expect(result.contentLength).toBe(bytes.byteLength)
+    expect([...bytes.slice(0, 8)]).toEqual(PNG_SIGNATURE)
+    expect(bytes).toEqual(cannedMediaBytes())
+    // IHDR: ancho y alto de 1 pixel.
+    const view = new DataView(bytes.buffer)
+    expect(view.getUint32(16)).toBe(1)
+    expect(view.getUint32(20)).toBe(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('R46: un tope menor que el PNG es un rechazo', async () => {
+    await expect(
+      whatsappGraphClientCanned.downloadMedia({ mediaId: 'm', accessToken: 't', maxBytes: 1 }),
+    ).resolves.toMatchObject({ ok: false, kind: 'rejected' })
   })
 })

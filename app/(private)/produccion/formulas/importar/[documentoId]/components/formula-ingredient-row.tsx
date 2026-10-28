@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import { XIcon } from 'lucide-react';
 
+import { PresentationUnitSelect } from '@/components/shared/presentation-unit-select';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,13 +19,37 @@ import type { IngredientRowState } from './formula-import-review';
 
 const FIELD_TEXT = 'text-base';
 
+/** Entrada del campo «Unidad» al pasar a «Crear materia prima», igual que el resto de avisos. */
+const FADE_IN = 'animate-in fade-in duration-(--dur-base) ease-(--ease-enter)';
+
 const ROW_PROBLEM_LABELS: Record<RowProblem, string> = {
   unassigned: 'sin producto asignado',
   percentage_missing: 'porcentaje vacío',
   percentage_invalid: 'porcentaje inválido',
   new_name_invalid: 'nombre de materia prima inválido',
+  new_unit_missing: 'sin unidad',
   repeated: 'ingrediente repetido',
 };
+
+/** Error del campo «Unidad» tras pulsar «Confirmar» sin elegirla. */
+export const NEW_UNIT_ERROR = 'Elige la unidad de la materia prima.';
+
+/** La ayuda bajo «Unidad» segun de donde salio. */
+function newUnitHint(row: IngredientRowState): string {
+  const read = row.unitRead ?? '';
+  switch (row.newUnitSource) {
+    case 'suggested':
+      return `Sugerida del PDF: «${read}».`;
+    case 'none':
+      return `El PDF dice «${read}»: no coincide con ninguna unidad. Elige una.`;
+    case 'ambiguous':
+      return `El PDF dice «${read}»: coincide con más de una unidad. Elige una.`;
+    case 'missing':
+      return 'El PDF no trae unidad. Elige una.';
+    case 'picked':
+      return 'Elegida por ti.';
+  }
+}
 
 /** «20 kg», «20» o «kg», segun lo que trajo el PDF; `null` si no hay nada que mostrar. */
 function referenceText(quantityRead: string | null, unitRead: string | null): string | null {
@@ -36,6 +61,9 @@ type FormulaIngredientRowProps = {
   readonly index: number;
   readonly row: IngredientRowState;
   readonly problems: readonly RowProblem[];
+  /** Se pulso «Confirmar» con alguna materia prima sin unidad: la de esta fila, si falta, se
+   *  marca con su error. */
+  readonly showUnitError: boolean;
   readonly units: readonly UnitRef[];
   readonly initialProductPage: { readonly items: readonly ProductPickerOption[]; readonly totalPages: number };
   /** Productos ya elegidos en OTRAS filas: se apartan del selector (mismo criterio que las
@@ -55,6 +83,7 @@ export function FormulaIngredientRow({
   index,
   row,
   problems,
+  showUnitError,
   units,
   initialProductPage,
   excludedIds,
@@ -63,6 +92,7 @@ export function FormulaIngredientRow({
 }: FormulaIngredientRowProps) {
   const fieldId = useId();
   const reference = referenceText(row.quantityRead, row.unitRead);
+  const unitError = showUnitError && row.newUnitId === '' ? NEW_UNIT_ERROR : undefined;
 
   function handlePercentageChange(raw: string) {
     onChange({ percentage: sanitizePercentageInput(raw) });
@@ -184,15 +214,29 @@ export function FormulaIngredientRow({
           ) : null}
 
           {row.mode === 'create' ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`${fieldId}-new-name`}>Nombre de la materia prima</Label>
-              <Input
-                id={`${fieldId}-new-name`}
-                value={row.newProductName}
-                onChange={(event) => onChange({ newProductName: event.target.value })}
-                className={`${touchTarget} ${FIELD_TEXT}`}
-                data-testid={`formula-import-row-new-name-${index}`}
-              />
+            // Escritorio: «Unidad» (~200 px) junto al nombre. Telefono: debajo, a todo el ancho.
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_12.5rem]">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={`${fieldId}-new-name`}>Nombre de la materia prima</Label>
+                <Input
+                  id={`${fieldId}-new-name`}
+                  value={row.newProductName}
+                  onChange={(event) => onChange({ newProductName: event.target.value })}
+                  className={`${touchTarget} ${FIELD_TEXT}`}
+                  data-testid={`formula-import-row-new-name-${index}`}
+                />
+              </div>
+              <div className={FADE_IN} data-testid={`formula-import-row-new-unit-${index}`}>
+                {/* `name={null}`: la revision no es un `<form>`; el valor vive en el estado de la fila. */}
+                <PresentationUnitSelect
+                  units={units}
+                  name={null}
+                  value={row.newUnitId}
+                  onValueChange={(unitId) => onChange({ newUnitId: unitId, newUnitSource: 'picked' })}
+                  hint={unitError === undefined ? newUnitHint(row) : undefined}
+                  error={unitError}
+                />
+              </div>
             </div>
           ) : null}
 

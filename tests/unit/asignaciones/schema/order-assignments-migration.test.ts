@@ -885,6 +885,10 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
       'entregas.modificar',
       // 2026-10-09
       'entregas.anular',
+      // 2026-10-23
+      'whatsapp.enviar',
+      // 2026-10-24
+      'whatsapp.consultar',
     ]
     const CODIGOS_QC66 = [
       'dashboard.consultar',

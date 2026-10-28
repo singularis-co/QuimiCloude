@@ -269,7 +269,8 @@ function describir(infracciones: readonly Infraccion[]): string {
 // el caso de uso con `empresas.modificar`.
 //
 // TENSADA: de veintinueve a TREINTA, con `/clientes/contactos`. Llama a `requirePagePermission` UNA
-// sola vez, con `clientes.consultar`, el mismo permiso que `/clientes`.
+// sola vez, con `whatsapp.consultar` (antes `clientes.consultar`): la pantalla es el chat de
+// WhatsApp. `whatsapp.enviar` e `integraciones.modificar` no cortan, solo ocultan.
 const RUTAS_ESPERADAS_HOY = [
   '/asignacion',
   '/asignacion/[id]',

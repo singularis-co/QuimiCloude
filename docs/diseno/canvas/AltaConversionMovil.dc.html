@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Alta con conversión en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="AltaConversion" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Alta con conversión de unidad · ficha</h2>
+    <dl class="spec">
+      <dt>Dónde</dt><dd>Sheet «Nuevo producto» de /inventario, tipo Producto (insumo). Solo cambia cuando el nombre ya existe en otra unidad de la misma familia (l y ml, kg y gr). Sin homónimo, o en otra familia, el formulario queda como hoy</dd>
+      <dt>Reutiliza</dt><dd><span class="mono">ui/sheet</span> y el formulario de alta actual · <span class="mono">shared/notice</span> variante info (<span class="mono">nt n-i</span>) · ayuda de campo (<span class="mono">help</span>) y error de campo (<span class="mono">err</span> + <span class="mono">aria-invalid</span>) · toast de éxito</dd>
+      <dt>Pieza nueva</dt><dd>Ninguna: solo compone piezas del catálogo dentro del formulario existente</dd>
+      <dt>Librerías</dt><dd>Ninguna nueva: <span class="mono">@base-ui/react</span> · <span class="mono">lucide-react</span> (info, circle-alert)</dd>
+      <dt>Estados</dt><dd>Convierte (aviso con cantidad y costo convertidos, ayuda bajo Unidad) · varios homónimos ya partidos (el aviso nombra a cuál va: el de más existencia) · la cantidad no cabe en 4 decimales (error bajo Existencia, no guarda) · el costo convertido no cabe (error bajo Costo unitario, no guarda) · sin homónimo (sin aviso, como hoy) · guardado (toast «Se agregó un lote de 0,5 l a Glicerina · l.»)</dd>
+      <dt>Cuándo aparece</dt><dd>Antes de guardar, en cuanto hay nombre, unidad y existencia. Se recalcula al cambiar cualquiera de los tres; el texto se anuncia con <span class="mono">aria-live="polite"</span></dd>
+      <dt>Escritorio</dt><dd>Sheet de 600 px a la derecha · el aviso va entre Tipo y la rejilla de cantidades, a todo el ancho</dd>
+      <dt>Tablet</dt><dd>Igual que escritorio</dd>
+      <dt>Teléfono</dt><dd>Sheet a pantalla completa · la rejilla pasa a una columna · el aviso queda encima de Existencia, a todo el ancho</dd>
+      <dt>Animación</dt><dd>El aviso entra con <span class="mono">qc-rise</span> (<span class="mono">nt.enter</span>) · el error con <span class="mono">qc-err</span></dd>
+      <dt>Por confirmar</dt><dd>Texto exacto del aviso y de los dos errores · el aviso muestra el costo solo si se ingresó costo unitario (con costo total, el unitario se deriva tras convertir)</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

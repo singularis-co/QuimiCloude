@@ -22,6 +22,7 @@ const PRODUCTO_AGUA = '55555555-5555-4555-8555-555555555555';
 const PRODUCTO_SODA = '66666666-6666-4666-8666-666666666666';
 const RECETA_VIVA = '77777777-7777-4777-8777-777777777777';
 const RECETA_OTRA = '88888888-8888-4888-8888-888888888888';
+const UNIDAD = '99999999-9999-4999-8999-999999999999';
 
 const ARCHIVO_LISTO: FileForReview = { status: 'done', strategy: 'formula', extractedText: null };
 
@@ -36,7 +37,7 @@ function filaExistente(productId: string, percentage: string | null = '100.00') 
 }
 
 function filaNueva(newProductName: string, percentage: string | null = '100.00') {
-  return { kind: 'new' as const, newProductName, percentage };
+  return { kind: 'new' as const, newProductName, unitId: UNIDAD, percentage };
 }
 
 function entradaBase(overrides: Record<string, unknown> = {}) {
@@ -109,6 +110,15 @@ function dobleDeNombresDeProducto(
   };
 }
 
+function dobleDeUnidades(bitacora: Bitacora) {
+  return {
+    findRefs: vi.fn(async (ids: readonly string[]) => {
+      bitacora.push('units.findRefs');
+      return ids.includes(UNIDAD) ? [{ id: UNIDAD, name: 'kilogramo', symbol: 'kg', baseUnitId: null, factor: null }] : [];
+    }),
+  };
+}
+
 function dobleDeCreateRawMaterial(bitacora: Bitacora) {
   return vi.fn(async (input: { name: string }) => {
     bitacora.push('createRawMaterial');
@@ -138,6 +148,7 @@ function crearDeps(bitacora: Bitacora, overrides: Partial<FormulaImportDeps> = {
       { id: PRODUCTO_AGUA, name: 'Agua', unitId: null, stockByUnit: [], type: PRODUCT_TYPES.PRODUCT },
     ]) as unknown as FormulaImportDeps['products'],
     productNames: dobleDeNombresDeProducto(bitacora) as unknown as FormulaImportDeps['productNames'],
+    units: dobleDeUnidades(bitacora),
     createRawMaterial: dobleDeCreateRawMaterial(bitacora) as FormulaImportDeps['createRawMaterial'],
     createRecipe: dobleDeCreateRecipe(bitacora) as FormulaImportDeps['createRecipe'],
     updateRecipe: dobleDeUpdateRecipe(bitacora) as FormulaImportDeps['updateRecipe'],
@@ -314,7 +325,7 @@ describe('createConfirmFormulaImport', () => {
         actorConPermiso(),
         entradaBase({ lines: [filaExistente(PRODUCTO_AGUA, '50.00'), filaNueva('Sosa', '50.00')] }),
       );
-      expect(deps.createRawMaterial).toHaveBeenCalledWith({ name: 'Sosa' }, expect.anything());
+      expect(deps.createRawMaterial).toHaveBeenCalledWith({ name: 'Sosa', unitId: UNIDAD }, expect.anything());
       expect(resumen.rawMaterialsReused).toBe(0);
     });
 
@@ -417,7 +428,7 @@ describe('createConfirmFormulaImport', () => {
         entradaBase({ lines: [filaExistente(PRODUCTO_AGUA, '50.00'), filaNueva('Sosa', '50.00')] }),
       );
 
-      expect(deps.createRawMaterial).toHaveBeenCalledWith({ name: 'Sosa' }, expect.anything());
+      expect(deps.createRawMaterial).toHaveBeenCalledWith({ name: 'Sosa', unitId: UNIDAD }, expect.anything());
       expect(resumen.rawMaterialsCreated).toBe(1);
       expect(resumen.rawMaterialsReused).toBe(0);
     });
@@ -426,7 +437,7 @@ describe('createConfirmFormulaImport', () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora, {
         productNames: dobleDeNombresDeProducto(bitacora, [
-          { id: PRODUCTO_SODA, name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: null },
+          { id: PRODUCTO_SODA, name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: UNIDAD },
         ]) as unknown as FormulaImportDeps['productNames'],
       });
       const confirm = createConfirmFormulaImport(deps);
@@ -445,8 +456,8 @@ describe('createConfirmFormulaImport', () => {
       const bitacora: Bitacora = [];
       const deps = crearDeps(bitacora, {
         productNames: dobleDeNombresDeProducto(bitacora, [
-          { id: PRODUCTO_SODA, name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: null },
-          { id: 'otro-id', name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: null },
+          { id: PRODUCTO_SODA, name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: UNIDAD },
+          { id: 'otro-id', name: 'Sosa', nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: UNIDAD },
         ]) as unknown as FormulaImportDeps['productNames'],
       });
       const confirm = createConfirmFormulaImport(deps);
@@ -466,7 +477,7 @@ describe('createConfirmFormulaImport', () => {
           { id: PRODUCTO_AGUA, name: 'Agua', unitId: null, stockByUnit: [], type: PRODUCT_TYPES.PRODUCT },
         ]) as unknown as FormulaImportDeps['products'],
         productNames: dobleDeNombresDeProducto(bitacora, [
-          { id: PRODUCTO_AGUA, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PRODUCT, unitId: null },
+          { id: PRODUCTO_AGUA, name: 'Agua', nameNormalized: 'agua', type: PRODUCT_TYPES.PRODUCT, unitId: UNIDAD },
         ]) as unknown as FormulaImportDeps['productNames'],
       });
       const confirm = createConfirmFormulaImport(deps);
@@ -541,6 +552,8 @@ describe('createConfirmFormulaImport', () => {
         outcome: 'created',
         rawMaterialsCreated: 1,
         rawMaterialsReused: 0,
+        created: [{ name: 'Sosa', unitId: UNIDAD }],
+        reused: [],
       });
     });
   });
@@ -594,8 +607,8 @@ describe('createConfirmFormulaImport', () => {
         productNames: {
           findAliveByNormalizedNames: vi.fn(async () => (creada === null ? [] : [creada])),
         } as unknown as FormulaImportDeps['productNames'],
-        createRawMaterial: vi.fn(async (input: { name: string }) => {
-          creada = { id: 'materia-nueva', name: input.name, nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: null };
+        createRawMaterial: vi.fn(async (input: { name: string; unitId: string }) => {
+          creada = { id: 'materia-nueva', name: input.name, nameNormalized: 'sosa', type: PRODUCT_TYPES.PRODUCT, unitId: input.unitId };
           return { id: 'materia-nueva' };
         }) as FormulaImportDeps['createRawMaterial'],
         recipes: {

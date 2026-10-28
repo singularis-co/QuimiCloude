@@ -191,7 +191,7 @@ function describeOrder(recipeName: string, quantity: string): string | null {
  * solo se traduce su incumplimiento.
  */
 const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
-  recipeId: 'Elige una receta de la lista.',
+  recipeId: 'Elige una fórmula de la lista.',
   quantity: 'Ingresa un número mayor a 0.',
   unitId: 'Elige la unidad del pedido.',
   presentationLines:

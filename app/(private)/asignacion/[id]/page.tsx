@@ -7,7 +7,7 @@ import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { OrderExecutionError, OrderExecutionScreen } from './components';
 
 export const metadata: Metadata = {
-  title: `Ejecutar receta · ${BRAND_LABEL}`,
+  title: `Ejecutar fórmula · ${BRAND_LABEL}`,
 };
 
 /**

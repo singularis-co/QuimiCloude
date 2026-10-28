@@ -303,7 +303,7 @@ export function buildOrderColumns({
     },
     {
       id: RECIPE_NAME_COLUMN_ID,
-      label: 'Receta',
+      label: 'Fórmula',
       align: 'start',
       width: 500,
       hideText: false,

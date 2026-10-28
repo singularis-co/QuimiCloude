@@ -55,7 +55,7 @@ function montarProductos() {
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(),
-    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(),
+    findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(),

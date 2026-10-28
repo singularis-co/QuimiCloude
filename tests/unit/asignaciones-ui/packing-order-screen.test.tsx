@@ -671,11 +671,11 @@ describe('QC-265 — el empaque sobre el marco del operario', () => {
     expect(within(cabecera()).getByRole('button', { name: 'Cambiar tema' })).toBeInTheDocument();
   });
 
-  it('R39: con la receta dada de baja el h1 dice «Esta receta está dada de baja.»', () => {
+  it('R39: con la receta dada de baja el h1 dice «Esta fórmula está dada de baja.»', () => {
     pintar(fila({ recipeName: null }));
 
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(
-      'Esta receta está dada de baja.',
+      'Esta fórmula está dada de baja.',
     );
   });
 

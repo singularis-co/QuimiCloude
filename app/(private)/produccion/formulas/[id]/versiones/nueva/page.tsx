@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 const FIRST_PAGE = 1;
-const BACK_LABEL = 'Volver a la receta';
+const BACK_LABEL = 'Volver a la fórmula';
 
 // Los mismos testids que el error de la lista: los vigila el E2E de errores.
 const LOAD_ERROR = {

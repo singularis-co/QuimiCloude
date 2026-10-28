@@ -297,6 +297,8 @@ const CLAVES_PERMITIDAS = [
   'productId',
   'newProductName',
   'replaceRecipeId',
+  // QC-203 R24: la linea «nueva» de la confirmacion trae la unidad de la materia prima.
+  'unitId',
 ] as const;
 
 export function infraccionesDeClaves(claves: readonly string[]): string[] {

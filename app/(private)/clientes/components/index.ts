@@ -1,3 +1,4 @@
+export * from './customer-chat-link';
 export * from './customer-columns';
 export * from './customer-form';
 export * from './customer-labels';

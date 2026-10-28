@@ -47,11 +47,11 @@ describe('EntityImage size="fill"', () => {
         path={null}
         name=""
         testId="order-recipe-image"
-        emptyAlt="Sin receta elegida"
+        emptyAlt="Sin fórmula elegida"
       />,
     );
 
-    expect(screen.getByTestId('order-recipe-image')).toHaveAttribute('alt', 'Sin receta elegida');
+    expect(screen.getByTestId('order-recipe-image')).toHaveAttribute('alt', 'Sin fórmula elegida');
   });
 
   it('R28: sin imagen pinta el marcador', () => {

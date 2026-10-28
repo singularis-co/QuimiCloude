@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Plantillas de WhatsApp</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.sw{display:inline-flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--fg);font:500 13px 'IBM Plex Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.sw:hover{background:var(--muted)}
+.sw:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.sw-t{position:relative;width:36px;height:20px;flex:none;border-radius:999px;background:var(--input);transition:background-color var(--d-b) var(--e-std)}
+.sw-t i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:var(--card);box-shadow:0 1px 2px rgb(0 0 0 / .3);transition:translate var(--d-b) var(--e-std)}
+.sw[aria-checked="true"] .sw-t{background:var(--primary)}
+.sw[aria-checked="true"] .sw-t i{translate:16px 0}
+.tab .tab-sub{display:block;font-size:12px;font-weight:400;color:var(--muted-fg)}
+.syncbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px}
+.rej-ic{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:0;border-radius:999px;background:var(--d-fg);color:var(--card);font:700 12px/1 'IBM Plex Sans',sans-serif;cursor:help}
+.rej-ic::before{content:"";position:absolute;inset:-12px}
+.rej-tip{position:absolute;left:50%;bottom:calc(100% + 8px);translate:-50% 0;width:max-content;max-width:280px;padding:8px 10px;border-radius:8px;background:var(--fg);color:var(--bg);font:500 12px/1.4 'IBM Plex Sans',sans-serif;text-align:left;white-space:normal;opacity:0;pointer-events:none;z-index:30;transition:opacity .15s ease}
+.rej-ic:hover .rej-tip,.rej-ic:focus-visible .rej-tip{opacity:1}
+.rej{display:block;max-width:280px;font-size:12px;line-height:1.35;color:var(--d-fg);padding-top:4px;white-space:normal}
+.unm{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.notice{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid color-mix(in oklch,var(--primary) 35%,var(--border));border-radius:10px;background:color-mix(in oklch,var(--primary) 5%,var(--card));font-size:14px}
+.slotrow{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center}
+.rel-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+@container (max-width:760px){.rel-grid{grid-template-columns:1fr}}
+</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="whatsapp" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><span class="crumb">Integraciones<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px"><path d="m9 6 6 6-6 6"></path></svg></span><h1 class="h1">WhatsApp</h1></div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+          <div class="tabs" role="tablist" aria-label="Secciones de WhatsApp" style="align-self: flex-start">
+            <button class="tab" type="button" role="tab" aria-selected="{{ tConn }}" onClick="{{ goConn }}">Conexión</button>
+            <button class="tab" type="button" role="tab" aria-selected="{{ tTpl }}" onClick="{{ goTpl }}" disabled="{{ noConn }}" aria-describedby="wa-nc">Plantillas</button>
+            <button class="tab" type="button" role="tab" aria-selected="{{ tVar }}" onClick="{{ goVar }}">Variables</button>
+          </div>
+          <sc-if value="{{ noConn }}" hint-placeholder-val="{{ false }}"><span id="wa-nc" class="help">Conecta tu número primero para ver Plantillas.</span></sc-if>
+        </div>
+
+        <sc-if value="{{ showConn }}" hint-placeholder-val="{{ false }}">
+          <div class="box" style="padding: 32px 20px"><p class="sub">Contenido de la pestaña «Conexión» (QC-237, sin cambios).</p></div>
+        </sc-if>
+
+        <sc-if value="{{ showTpl }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 16px">
+
+            <sc-if value="{{ viewTpl }}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; flex-direction: column; gap: 16px">
+                <div class="card syncbar">
+                  <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+                    <span class="strong">Sincronización con Meta</span>
+                    <span class="sub" style="font-size: 13px">Última: <span class="mono">{{ syncAt }}</span> · {{ syncKind }}</span>
+                    <sc-if value="{{ hasSyncSum }}" hint-placeholder-val="{{ false }}"><span class="fade" style="display: flex; gap: 6px; flex-wrap: wrap; padding-top: 2px"><span class="sb t-success"><i></i>3 importadas</span><span class="sb t-info"><i></i>2 actualizadas</span><span class="sb t-neutral"><i></i>1 eliminada</span></span></sc-if>
+                  </div>
+                  <button class="b b-out b-touch-m" type="button" onClick="{{ sync }}" disabled="{{ syncing }}"><svg class="{{ syncIc }}" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2M18 2v4h-4M6 22v-4h4"></path></svg>{{ syncLabel }}</button>
+                </div>
+
+                <sc-if value="{{ hasUnmapped }}" hint-placeholder-val="{{ true }}">
+                  <div class="notice" role="status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--primary); flex: none"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg><span>{{ unmappedMsg }}</span></div>
+                </sc-if>
+
+                <div class="toolbar" role="toolbar" aria-label="Buscar y filtrar plantillas" style="flex-wrap: wrap">
+                  <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar por nombre" aria-label="Buscar plantillas por nombre" value="{{ q }}" onInput="{{ setQ }}"></label>
+                  <div class="chips" role="group" aria-label="Filtrar por estado"><sc-for list="{{ filters }}" as="f" hint-placeholder-count="6"><button class="{{ f.cls }}" type="button" aria-pressed="{{ f.on }}" onClick="{{ f.pick }}">{{ f.label }}</button></sc-for></div>
+                  <span style="flex: 1"></span>
+                  <button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva plantilla</button>
+                </div>
+
+                <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+                  <div class="tw" aria-busy="true" aria-label="Cargando plantillas"><div style="display: flex; flex-direction: column; gap: 18px; padding: 20px"><span class="sk" style="width: 40%"></span><span class="sk" style="width: 72%"></span><span class="sk" style="width: 64%"></span><span class="sk" style="width: 70%"></span><span class="sk" style="width: 55%"></span></div></div>
+                </sc-if>
+
+                <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div class="box"><span class="bi"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4zM8 9h8M8 12h5"></path></svg></span><span class="h3">Todavía no hay plantillas.</span><p class="sub">Crea una aquí o trae las que ya tienes aprobadas en Meta.</p><div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center"><button class="b b-out" type="button" onClick="{{ sync }}">Sincronizar con Meta</button><button class="b b-pri" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva plantilla</button></div></div>
+                </sc-if>
+
+                <sc-if value="{{ noMatch }}" hint-placeholder-val="{{ false }}">
+                  <div class="box"><span class="h3">Ninguna plantilla coincide con la búsqueda.</span><button class="b b-out" type="button" onClick="{{ clearFilters }}">Quitar filtros</button></div>
+                </sc-if>
+
+                <sc-if value="{{ hasRows }}" hint-placeholder-val="{{ true }}">
+                  <div class="tw">
+                    <div class="scroll">
+                      <table class="collapse">
+                        <thead><tr><th scope="col">Nombre</th><th scope="col">Idioma</th><th scope="col">Categoría</th><th scope="col">Estado en Meta</th><th scope="col">Uso en el sistema</th><th scope="col" class="num">Última sincronización</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+                        <tbody>
+                          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                            <tr class="{{ r.trCls }}">
+                              <td><span class="mono strong">{{ r.name }}</span><span class="sub" style="display: block; font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ r.snippet }}</span></td>
+                              <td class="mono">{{ r.lang }}</td>
+                              <td>{{ r.cat }}</td>
+                              <td><span style="display: inline-flex; align-items: center; gap: 6px"><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span><sc-if value="{{ r.hasReason }}" hint-placeholder-val="{{ false }}"><button class="rej-ic" type="button" aria-label="{{ r.reasonLabel }}" aria-describedby="{{ r.tipId }}">!<span id="{{ r.tipId }}" role="tooltip" class="rej-tip">{{ r.reason }}</span></button></sc-if></span></td>
+                              <td>
+                                <sc-if value="{{ r.mapped }}" hint-placeholder-val="{{ true }}"><button class="sw" type="button" role="switch" aria-checked="{{ r.onStr }}" aria-label="{{ r.swLabel }}" onClick="{{ r.toggleOn }}"><span class="sw-t"><i></i></span>{{ r.onLabel }}</button></sc-if>
+                                <sc-if value="{{ r.unmapped }}" hint-placeholder-val="{{ false }}"><span class="unm"><span class="sb t-waiting"><i></i>Sin relacionar</span><button class="b b-lnk b-sm" type="button" onClick="{{ r.relate }}">Relacionar</button></span></sc-if>
+                                <sc-if value="{{ r.incompatible }}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-direction: column; gap: 4px"><span class="sb t-muted" style="align-self: flex-start"><i></i>No compatible</span><span class="help" style="max-width: 240px; white-space: normal">{{ r.why }}</span></span></sc-if>
+                              </td>
+                              <td class="num mono">{{ r.sync }}</td>
+                              <td class="rowact anchor">
+                                <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                                <div class="{{ r.menuCls }}" role="menu">
+                                  <sc-if value="{{ r.canRelate }}" hint-placeholder-val="{{ true }}"><button class="mi" type="button" role="menuitem" onClick="{{ r.relate }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg>Relacionar variables</button></sc-if>
+                                  <button class="mi" type="button" role="menuitem" onClick="{{ r.dup }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h12v12H8zM4 16V4h12"></path></svg>Duplicar</button>
+                                  <div class="sep"></div>
+                                  <button class="mi danger" type="button" role="menuitem" onClick="{{ r.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                                </div>
+                              </td>
+                            </tr>
+                          </sc-for>
+                        </tbody>
+                      </table>
+                      <div class="rows-m">
+                        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                          <div class="rm">
+                            <div class="rm-top"><span class="mono strong" style="overflow-wrap: anywhere">{{ r.name }}</span><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></div>
+                            <div class="rm-meta"><span class="mono">{{ r.lang }}</span><span>{{ r.cat }}</span><span class="mono">{{ r.sync }}</span></div>
+                            <sc-if value="{{ r.hasReason }}" hint-placeholder-val="{{ false }}"><span class="rej" style="display: flex; gap: 6px; align-items: flex-start"><span class="rej-ic" aria-hidden="true" style="cursor: default">!</span>{{ r.reason }}</span></sc-if>
+                            <div class="rm-top">
+                              <sc-if value="{{ r.mapped }}" hint-placeholder-val="{{ true }}"><button class="sw" type="button" role="switch" aria-checked="{{ r.onStr }}" aria-label="{{ r.swLabel }}" onClick="{{ r.toggleOn }}" style="min-height: 44px"><span class="sw-t"><i></i></span>{{ r.onLabel }}</button></sc-if>
+                              <sc-if value="{{ r.unmapped }}" hint-placeholder-val="{{ false }}"><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ r.relate }}">Relacionar variables</button></sc-if>
+                              <sc-if value="{{ r.incompatible }}" hint-placeholder-val="{{ false }}"><span style="display: flex; flex-direction: column; gap: 4px; min-width: 0"><span class="sb t-muted" style="align-self: flex-start"><i></i>No compatible</span><span class="help" style="white-space: normal">{{ r.why }}</span></span></sc-if>
+                              <button class="b b-out b-sm b-touch-m" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button>
+                            </div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div class="pg"><span><span class="mono">{{ count }}</span> plantillas</span></div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ viewVar }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 16px">
+                <p class="sub" style="max-width: 720px">Las variables se insertan en las plantillas como <span class="mono">{{ exKey }}</span>. Al enviar, el sistema pone el dato real. Meta ve la etiqueta como ejemplo cuando revisa la plantilla.</p>
+                <div class="card" style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="display: flex; flex-direction: column; gap: 4px"><h2 class="h2">Constantes del sistema</h2><p class="sub" style="font-size: 13px">Las resuelve el sistema con el dato de cada envío. No se editan.</p></div>
+                  <div class="tw"><div class="scroll">
+                    <table class="collapse">
+                      <thead><tr><th scope="col">Etiqueta</th><th scope="col">Clave</th><th scope="col">Descripción</th><th scope="col">Ejemplo</th></tr></thead>
+                      <tbody><sc-for list="{{ consts }}" as="c" hint-placeholder-count="3"><tr><td class="strong">{{ c.label }}</td><td class="mono">{{ c.key }}</td><td class="sub" style="white-space: normal; max-width: 360px">{{ c.desc }}</td><td>{{ c.ex }}</td></tr></sc-for></tbody>
+                    </table>
+                    <div class="rows-m"><sc-for list="{{ consts }}" as="c" hint-placeholder-count="3"><div class="rm"><div class="rm-top"><span class="strong">{{ c.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ c.key }}</span></div><div class="rm-meta"><span>{{ c.desc }}</span></div><div class="rm-meta"><span>Ejemplo: {{ c.ex }}</span></div></div></sc-for></div>
+                  </div></div>
+                </div>
+                <div class="card" style="display: flex; flex-direction: column; gap: 12px">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap"><div style="display: flex; flex-direction: column; gap: 4px"><h2 class="h2">Variables propias</h2><p class="sub" style="font-size: 13px">Datos fijos de tu empresa, como un número de cuenta. Se guardan una vez y sirven para todas las plantillas; se envía el valor guardado.</p></div><button class="b b-pri b-touch-m" type="button" onClick="{{ openVarNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva variable</button></div>
+                  <div class="tw"><div class="scroll">
+                    <table class="collapse">
+                      <thead><tr><th scope="col">Etiqueta</th><th scope="col">Clave</th><th scope="col">Descripción</th><th scope="col">Valor</th><th scope="col" class="num">Plantillas que la usan</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+                      <tbody><sc-for list="{{ owns }}" as="o" hint-placeholder-count="2"><tr><td class="strong">{{ o.label }}</td><td class="mono">{{ o.key }}</td><td class="sub" style="max-width: 280px; white-space: normal">{{ o.desc }}</td><td>{{ o.value }}</td><td class="num mono">{{ o.used }}</td><td class="rowact"><span style="display: inline-flex; gap: 4px"><button class="b b-gho b-ico" type="button" aria-label="{{ o.editLabel }}" onClick="{{ o.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button><button class="b b-gho b-ico" type="button" aria-label="{{ o.delLabel }}" onClick="{{ o.del }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></button></span></td></tr></sc-for></tbody>
+                    </table>
+                    <div class="rows-m"><sc-for list="{{ owns }}" as="o" hint-placeholder-count="2"><div class="rm"><div class="rm-top"><span class="strong">{{ o.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ o.key }}</span></div><div class="rm-meta"><span>{{ o.desc }}</span></div><div class="rm-meta"><span>{{ o.value }}</span><span>Usada en <span class="mono">{{ o.used }}</span></span></div><div class="rm-top"><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ o.edit }}">Editar</button><button class="b b-out b-sm b-touch-m" type="button" onClick="{{ o.del }}">Eliminar</button></div></div></sc-for></div>
+                  </div></div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="whatsapp" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ altaCls }}" role="dialog" aria-modal="true" aria-label="{{ altaTitle }}" style="width: min(1040px, 100%)">
+    <sc-if value="{{ altaOpen }}" hint-placeholder-val="{{ false }}"><div class="frame-in"><dc-import name="PlantillaAlta" modo="{{ altaMode }}" oscuro="{{ dark }}" close="{{ closeAll }}" done="{{ altaDone }}" hint-size="100%,100%"></dc-import></div></sc-if>
+  </aside>
+
+  <aside class="{{ relCls }}" role="dialog" aria-modal="true" aria-labelledby="rel-t" style="width: min(860px, 100%); container-type: inline-size">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="rel-t" class="h2">Relacionar variables</h2><p class="sub"><span class="mono">{{ relName }}</span> · Elige qué dato va en cada hueco. Con todos relacionados puedes habilitarla.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="rel-grid">
+        <div style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+          <div class="lbox" style="padding: 10px 12px; gap: 4px"><span class="cap">Texto de la plantilla</span><p style="margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap">{{ relText }}</p></div>
+          <sc-for list="{{ slots }}" as="sl" hint-placeholder-count="2">
+            <div class="slotrow"><span class="mono strong">{{ sl.mark }}</span>
+              <div class="anchor" style="position: relative; min-width: 0">
+                <button class="in trig" type="button" aria-haspopup="listbox" aria-expanded="{{ sl.openStr }}" aria-label="{{ sl.aria }}" onClick="{{ sl.toggle }}" style="width: 100%"><span class="{{ sl.valCls }}" style="flex: 1">{{ sl.value }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ sl.key }}</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+                <div class="{{ sl.popCls }}" role="listbox" aria-label="{{ sl.aria }}" style="top: 44px; left: 0; right: 0">
+                  <span class="grp" style="padding: 6px 10px 2px">Constantes del sistema</span>
+                  <sc-for list="{{ sl.consts }}" as="o" hint-placeholder-count="2"><button class="opt" type="button" role="option" aria-selected="{{ o.selStr }}" onClick="{{ o.pick }}"><span style="flex: 1">{{ o.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ o.key }}</span></button></sc-for>
+                  <div class="sep"></div>
+                  <span class="grp" style="padding: 6px 10px 2px">Variables propias</span>
+                  <sc-for list="{{ sl.owns }}" as="o" hint-placeholder-count="2"><button class="opt" type="button" role="option" aria-selected="{{ o.selStr }}" onClick="{{ o.pick }}"><span style="flex: 1">{{ o.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ o.key }}</span></button></sc-for>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+          <span class="help">¿Falta un dato? Créalo en Variables y vuelve aquí.</span>
+        </div>
+        <div style="min-height: 360px; display: flex"><dc-import name="WaBurbuja" tpl="{{ relTpl }}" oscuro="{{ dark }}" hint-size="100%,360px"></dc-import></div>
+      </div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveRel }}" disabled="{{ relIncomplete }}">Guardar</button></div>
+  </aside>
+
+  <aside class="{{ varCls }}" role="dialog" aria-modal="true" aria-labelledby="var-t">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="var-t" class="h2">{{ varTitle }}</h2><p class="sub">Un dato fijo de tu empresa para usar en las plantillas.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <div class="f"><label for="v-l">Etiqueta <span class="req">*</span></label><input id="v-l" class="in" type="text" value="{{ vf.label }}" onInput="{{ setVLabel }}"><span class="help">Cómo se ve en la app. Hasta 60 caracteres.</span></div>
+      <div class="f"><label for="v-k">Clave</label><input id="v-k" class="in mono" type="text" value="{{ vf.key }}" readonly="true" aria-describedby="v-k-h" style="background: var(--muted)"><span id="v-k-h" class="help">{{ vf.keyHelp }}</span></div>
+      <div class="f"><label for="v-d">Descripción</label><textarea id="v-d" class="in" rows="2" style="height: auto; padding-top: 8px; padding-bottom: 8px; resize: vertical">{{ vf.desc }}</textarea><span class="help">Para qué sirve el dato, para quien arma las plantillas.</span></div>
+      <div class="f"><label for="v-v">Valor <span class="req">*</span></label><input id="v-v" class="in" type="text" value="{{ vf.value }}" onInput="{{ setVValue }}"><span class="help">{{ vf.valueHelp }}</span></div>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ saveVar }}">Guardar</button></div>
+  </aside>
+
+  <div class="{{ relCfCls }}" role="alertdialog" aria-modal="true" aria-labelledby="rel-cf-t">
+    <div class="dlg-ic info"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg></div>
+    <h2 id="rel-cf-t" class="h2">Revisa la relación</h2>
+    <p class="sub"><span class="mono">{{ relName }}</span> enviará estos datos en cada mensaje:</p>
+    <div class="lbox" style="gap: 6px; padding: 10px 12px; font-size: 13px"><sc-for list="{{ relSummary }}" as="r" hint-placeholder-count="2"><div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap"><span class="mono strong">{{ r.mark }}</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; color: var(--muted-fg)"><path d="M5 12h14M13 6l6 6-6 6"></path></svg><span>{{ r.label }}</span><span class="mono cap" style="text-transform: none; letter-spacing: 0">{{ r.key }}</span></div></sc-for></div>
+    
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ backToRel }}">Volver a revisar</button><button class="b b-pri" type="button" onClick="{{ confirmRel }}">Guardar relación</button></div>
+  </div>
+
+  <div class="{{ varCfCls }}" role="alertdialog" aria-modal="true" aria-labelledby="var-cf-t">
+    <div class="dlg-ic warn"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></div>
+    <h2 id="var-cf-t" class="h2">Revisa el cambio</h2>
+    <p class="sub">«{{ vcName }}» se envía en {{ vcUsed }} plantillas. Desde el próximo mensaje, los clientes recibirán el valor nuevo.</p>
+    <div class="lbox" style="gap: 8px; padding: 10px 12px; font-size: 14px">
+      <div style="display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; align-items: baseline"><span class="cap">Antes</span><span style="text-decoration: line-through; color: var(--muted-fg); overflow-wrap: anywhere">{{ vcBefore }}</span></div>
+      <div style="display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; align-items: baseline"><span class="cap">Ahora</span><span class="strong" style="overflow-wrap: anywhere">{{ vcAfter }}</span></div>
+    </div>
+    <sc-if value="{{ vcWarn }}" hint-placeholder-val="{{ false }}"><p class="err" style="margin: 0">{{ vcWarnMsg }}</p></sc-if>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ backToVar }}">Volver a revisar</button><button class="b b-pri" type="button" onClick="{{ confirmVar }}">Guardar cambio</button></div>
+  </div>
+
+  <div class="{{ delCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pl-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="pl-de" class="h2">Eliminar la plantilla</h2>
+    <p class="sub">Se va a eliminar <span class="mono">{{ delName }}</span>. Esta acción no se puede deshacer.</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDel }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ delVarCls }}" role="alertdialog" aria-modal="true" aria-labelledby="var-de">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg></div>
+    <h2 id="var-de" class="h2">Eliminar la variable</h2>
+    <p class="sub">{{ delVarMsg }}</p>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ confirmDelVar }}" disabled="{{ delVarBlocked }}">Eliminar</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones de la plantilla">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3 mono">{{ actsName }}</span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <sc-if value="{{ actsCanRelate }}" hint-placeholder-val="{{ true }}"><button class="mi" type="button" role="menuitem" onClick="{{ actsRelate }}">Relacionar variables</button></sc-if>
+    <button class="mi" type="button" role="menuitem" onClick="{{ actsDup }}">Duplicar</button>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ actsDel }}">Eliminar</button>
+  </div>
+
+  <div style="position: absolute; left: 50%; bottom: 20px; translate: -50% 0; z-index: 45; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px; border-radius: 14px; border: 1px dashed var(--input); background: color-mix(in oklch, var(--card) 92%, transparent); box-shadow: var(--shadow-pop)">
+    <span class="cap">Selector del tablero (no es parte de la app)</span>
+    <div class="tabs" role="tablist" aria-label="Estado que se muestra"><sc-for list="{{ states }}" as="v" hint-placeholder-count="4"><button class="tab" type="button" role="tab" aria-selected="{{ v.sel }}" onClick="{{ v.pick }}">{{ v.label }}</button></sc-for></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite" style="bottom: 110px"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastMsg }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["datos","vacio","cargando","sin-conexion"],"default":"datos"},"vista":{"editor":"enum","options":["plantillas","variables"],"default":"plantillas"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); clearTimeout(this.st); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const estado = s.estado || this.props.estado || 'datos';
+const noConn = estado === 'sin-conexion';
+const tab0 = s.tab || (this.props.vista === 'variables' ? 'var' : (noConn ? 'conn' : 'tpl'));
+const tab = noConn && tab0 === 'tpl' ? 'conn' : tab0;
+const CONSTS = [['nombre_del_cliente', 'Nombre del cliente', 'Nombres y apellidos del cliente que recibe el mensaje.', 'Laura Gómez'], ['numero_de_pedido', 'Número de pedido', 'Número del pedido del que trata el mensaje.', 'PED-00128'], ['nombre_de_la_empresa', 'Nombre de la empresa', 'El nombre de tu empresa en QuimiCloude.', '[NOMBRE DE TU EMPRESA]']];
+const OWNS0 = [['v1', 'numero_de_cuenta', 'Número de cuenta', '2200345678', 2, 'Cuenta de ahorros para recibir pagos por transferencia.'], ['v2', 'horario_de_atencion', 'Horario de atención', 'Lunes a viernes, 8:00 a 17:00', 0, 'Horario en que se atiende por WhatsApp.']]
+const slug = (t) => (t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^[^a-z]+|_+$/g, '').slice(0, 40);
+const labels = {}; CONSTS.forEach((c) => { labels[c[0]] = c[1]; }); OWNS0.forEach((o) => { labels[o[1]] = o[2]; });
+const preview = Object.assign({}, labels); OWNS0.forEach((o) => { preview[o[1]] = o[3]; });
+const ST = { APPROVED: ['Aprobada', 'sb t-success'], PENDING: ['Pendiente', 'sb t-waiting'], REJECTED: ['Rechazada', 'sb t-danger'], PAUSED: ['Pausada', 'sb t-progress'], DISABLED: ['Deshabilitada', 'sb t-neutral'], OTHER: ['Otro', 'sb t-muted'] };
+const CAT = { UTILITY: 'Utilidad', MARKETING: 'Marketing', AUTHENTICATION: 'Autenticación' };
+const data = [
+  { id: 't1', name: 'pedido_listo', lang: 'es', cat: 'UTILITY', st: 'APPROVED', mapped: true, on: true, sync: '22/10/2026 09:14', text: 'Hola {{1}}, tu pedido ya está listo para recoger.', slots: ['nombre_del_cliente'] },
+  { id: 't2', name: 'recordatorio_pago', lang: 'es', cat: 'UTILITY', st: 'PENDING', mapped: true, on: false, sync: '22/10/2026 09:14', text: 'Hola {{1}}, recuerda pagar a la cuenta {{2}}.', slots: ['nombre_del_cliente', 'numero_de_cuenta'] },
+  { id: 't3', name: 'promo_octubre', lang: 'es', cat: 'MARKETING', st: 'REJECTED', reason: '[MOTIVO DEL RECHAZO QUE DA META]', mapped: true, on: false, sync: '21/10/2026 18:02', text: 'Este mes, 10 % en tu próximo pedido.', slots: [] },
+  { id: 't4', name: 'bienvenida_cliente', lang: 'es_EC', cat: 'UTILITY', st: 'APPROVED', mapped: false, on: false, sync: '22/10/2026 09:14', text: 'Hola {{1}}, bienvenido a {{2}}. Te escribiremos por aquí cuando tu pedido avance.', slots: ['', ''] },
+  { id: 't5', name: 'aviso_entrega', lang: 'en', cat: 'UTILITY', st: 'PAUSED', mapped: true, on: true, sync: '20/10/2026 07:40', text: 'Your order {{1}} is on its way.', slots: ['numero_de_pedido'] },
+  { id: 't6', name: 'encuesta_servicio', lang: 'es', cat: 'MARKETING', st: 'DISABLED', mapped: true, on: false, sync: '19/10/2026 11:25', text: '¿Cómo calificas nuestro servicio?', slots: [] },
+  { id: 't7', name: 'hello_world', lang: 'en_US', cat: 'UTILITY', st: 'OTHER', raw: 'IN_APPEAL', mapped: false, on: false, sync: '22/10/2026 09:14', text: 'Hello {{1}}', slots: [''] },
+  { id: 't8', name: 'catalogo_con_imagen', lang: 'es', cat: 'MARKETING', st: 'APPROVED', mapped: false, incompatible: true, why: 'Lleva una imagen en el encabezado. El sistema solo envía plantillas de texto.', on: false, sync: '22/10/2026 09:14', text: 'Mira nuestro catálogo de temporada.', slots: [] }
+];
+const over = s.over || {};
+const removed = s.removed || {};
+const live = data.filter((d) => !removed[d.id]).map((d) => Object.assign({}, d, over[d.id] || {}));
+const q = (s.q || '').trim().toLowerCase();
+const flt = s.flt || 'ALL';
+const FL = [['ALL', 'Todas'], ['APPROVED', 'Aprobadas'], ['PENDING', 'Pendientes'], ['REJECTED', 'Rechazadas'], ['PAUSED', 'Pausadas'], ['DISABLED', 'Deshabilitadas'], ['UNMAPPED', 'Sin relacionar']];
+const shown = live.filter((d) => (!q || d.name.indexOf(q) >= 0) && (flt === 'ALL' || (flt === 'UNMAPPED' ? !d.mapped : d.st === flt)));
+const byId = (id) => live.filter((d) => d.id === id)[0] || live[0] || data[0];
+const toast = (msg, extra) => { this.setState(Object.assign({ toast: true, toastMsg: msg, sheet: null, dlg: null, acts: null, open: null }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: false }), 3200); };
+const setOver = (id, patch) => Object.assign({}, over, { [id]: Object.assign({}, over[id] || {}, patch) });
+const unm = live.filter((d) => !d.mapped && !d.incompatible).length;
+const loading = estado === 'cargando' || !!s.syncing;
+const empty = estado === 'vacio' && !s.synced;
+const rel = s.relId ? byId(s.relId) : data[3];
+const relPick = s.relPick || rel.slots;
+const relDone = relPick.every((k) => !!k);
+const splitPos = (text) => text.replace(/\{\{(\d+)\}\}/g, (m0, n) => (relPick[Number(n) - 1] ? '{{' + relPick[Number(n) - 1] + '}}' : '[' + m0.replace(/[{}]/g, '') + ' sin relacionar]'));
+const owns = OWNS0.filter((o) => !(s.removedVars || {})[o[0]]);
+const ov = s.editVar ? owns.filter((o) => o[0] === s.editVar)[0] : null;
+const dv = s.delVar ? OWNS0.filter((o) => o[0] === s.delVar)[0] : null;
+const syncAt = s.synced ? '22/10/2026 10:02' : '22/10/2026 09:14';
+return {
+  rootCls: dark ? 'qc app dk' : 'qc app', dark: dark,
+  toggleDark: () => this.setState({ dark: !dark }),
+  menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+  menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+  noConn: noConn,
+  tConn: tab === 'conn' ? 'true' : 'false', tTpl: tab === 'tpl' ? 'true' : 'false', tVar: tab === 'var' ? 'true' : 'false',
+  goConn: () => this.setState({ tab: 'conn' }), goTpl: () => this.setState({ tab: 'tpl' }), goVar: () => this.setState({ tab: 'var' }),
+  showConn: tab === 'conn', showTpl: tab !== 'conn',
+  viewTpl: tab === 'tpl', viewVar: tab === 'var',
+  syncAt: syncAt, syncKind: s.synced ? 'manual' : 'automática',
+  hasSyncSum: !!s.synced && !s.syncing,
+  syncing: !!s.syncing, syncIc: s.syncing ? 'ic spin' : 'ic', syncLabel: s.syncing ? 'Sincronizando…' : 'Sincronizar con Meta',
+  sync: () => { if (s.syncing) return; this.setState({ syncing: true }); clearTimeout(this.st); this.st = setTimeout(() => toast('Plantillas sincronizadas con Meta.', { syncing: false, synced: true }), 1200); },
+  hasUnmapped: unm > 0 && !loading && !empty,
+  unmappedMsg: unm === 1 ? '1 plantilla importada de Meta está sin relacionar. Relaciónala para usarla en el sistema.' : unm + ' plantillas importadas de Meta están sin relacionar. Relaciónalas para usarlas en el sistema.',
+  q: s.q || '', setQ: (e) => this.setState({ q: e.target.value }),
+  filters: FL.map((f) => ({ label: f[1], on: f[0] === flt ? 'true' : 'false', cls: f[0] === flt ? 'chip on' : 'chip', pick: () => this.setState({ flt: f[0] }) })),
+  clearFilters: () => this.setState({ q: '', flt: 'ALL' }),
+  isLoading: loading, isEmpty: empty && !loading,
+  noMatch: !loading && !empty && shown.length === 0,
+  hasRows: !loading && !empty && shown.length > 0,
+  count: String(shown.length),
+  rows: shown.map((d) => ({
+    name: d.name, snippet: d.text, lang: d.lang, cat: CAT[d.cat], sync: d.sync,
+    st: d.st === 'OTHER' ? 'Otro · ' + d.raw : ST[d.st][0], stCls: ST[d.st][1],
+    hasReason: d.st === 'REJECTED', reason: d.reason || '', reasonLabel: 'Motivo del rechazo: ' + (d.reason || ''), tipId: 'rej-' + d.id,
+    mapped: d.mapped, unmapped: !d.mapped && !d.incompatible, incompatible: !!d.incompatible, why: d.why || '', canRelate: !d.incompatible,
+    onStr: d.on ? 'true' : 'false', onLabel: d.on ? 'Habilitada' : 'Deshabilitada',
+    swLabel: (d.on ? 'Deshabilitar ' : 'Habilitar ') + d.name + ' para usarla en el sistema',
+    toggleOn: () => toast(d.on ? 'Plantilla deshabilitada.' : 'Plantilla habilitada.', { over: setOver(d.id, { on: !d.on }) }),
+    trCls: s.fresh === d.id ? 'fade' : '',
+    open: s.open === d.id ? 'true' : 'false', menuCls: s.open === d.id ? 'pop right at-row open' : 'pop right at-row',
+    menuLabel: 'Acciones de ' + d.name,
+    toggle: () => this.setState({ open: s.open === d.id ? null : d.id }),
+    relate: () => this.setState({ sheet: 'rel', relId: d.id, relPick: null, open: null, acts: null }),
+    dup: () => this.setState({ sheet: 'alta', altaMode: 'duplicar', open: null, acts: null }),
+    del: () => this.setState({ dlg: 'del', delId: d.id, open: null, acts: null }),
+    mobileActs: () => this.setState({ acts: d.id })
+  })),
+  actsCls: s.acts ? 'dlg menu open' : 'dlg menu', actsName: s.acts ? byId(s.acts).name : '',
+  actsCanRelate: !(s.acts && byId(s.acts).incompatible),
+  actsRelate: () => this.setState({ sheet: 'rel', relId: s.acts, relPick: null, acts: null }),
+  actsDup: () => this.setState({ sheet: 'alta', altaMode: 'duplicar', acts: null }),
+  actsDel: () => this.setState({ dlg: 'del', delId: s.acts, acts: null }),
+  openNew: () => this.setState({ sheet: 'alta', altaMode: 'nueva' }),
+  altaOpen: s.sheet === 'alta', altaCls: s.sheet === 'alta' ? 'sheet wide open' : 'sheet wide',
+  altaMode: s.altaMode || 'nueva', altaTitle: s.altaMode === 'duplicar' ? 'Duplicar plantilla' : 'Nueva plantilla',
+  altaDone: () => toast('Plantilla enviada para autorización.'),
+  relCls: s.sheet === 'rel' ? 'sheet wide open' : 'sheet wide',
+  relName: rel.name, relText: rel.text,
+  slots: relPick.map((k, i) => {
+    const choose = (key) => () => { const next = relPick.slice(); next[i] = key; this.setState({ relPick: next, slotOpen: null }); };
+    const isOpen = s.slotOpen === i;
+    return {
+      mark: '{{' + (i + 1) + '}}', aria: 'Dato para el hueco ' + (i + 1),
+      value: k ? labels[k] : 'Elige un dato…', valCls: k ? '' : 'dim', key: k || '',
+      openStr: isOpen ? 'true' : 'false', popCls: isOpen ? 'pop open' : 'pop',
+      toggle: () => this.setState({ slotOpen: isOpen ? null : i }),
+      consts: CONSTS.map((c) => ({ key: c[0], label: c[1], selStr: c[0] === k ? 'true' : 'false', pick: choose(c[0]) })),
+      owns: owns.map((o) => ({ key: o[1], label: o[2], selStr: o[1] === k ? 'true' : 'false', pick: choose(o[1]) }))
+    };
+  }),
+  relTpl: { header: '', body: splitPos(rel.text), footer: '', buttons: [], labels: preview },
+  relIncomplete: !relDone,
+  saveRel: () => this.setState({ dlg: 'relcf' }),
+  relCfCls: s.dlg === 'relcf' ? 'dlg open' : 'dlg',
+  relSummary: relPick.map((k, i) => ({ mark: '{{' + (i + 1) + '}}', label: labels[k] || '', key: k })),
+  backToRel: () => this.setState({ dlg: null }),
+  confirmRel: () => toast('Variables relacionadas. Ya puedes habilitarla.', { over: setOver(rel.id, { mapped: true, slots: relPick }), fresh: rel.id }),
+  delCls: s.dlg === 'del' ? 'dlg open' : 'dlg', delName: s.delId ? byId(s.delId).name : '',
+  confirmDel: () => toast('Plantilla eliminada.', { removed: Object.assign({}, removed, { [s.delId]: true }) }),
+  exKey: '{{clave}}',
+  consts: CONSTS.map((c) => ({ key: c[0], label: c[1], desc: c[2], ex: c[3] })),
+  setVLabel: (e) => this.setState({ vLabel: e.target.value }),
+  owns: owns.map((o) => ({ key: o[1], label: o[2], value: o[3], desc: o[5], used: String(o[4]), editLabel: 'Editar ' + o[2], delLabel: 'Eliminar ' + o[2], edit: () => this.setState({ sheet: 'var', editVar: o[0], vValue: undefined }), del: () => this.setState({ dlg: 'delvar', delVar: o[0] }) })),
+  openVarNew: () => this.setState({ sheet: 'var', editVar: null, vLabel: '' }),
+  varCls: s.sheet === 'var' ? 'sheet open' : 'sheet',
+  varTitle: ov ? 'Editar variable' : 'Nueva variable',
+  vf: (() => {
+    const free = 'Se arma sola desde la etiqueta: sin tildes ni mayúsculas, espacios como _. No se puede cambiar después.';
+    if (!ov) { const l = s.vLabel || ''; return { label: l, key: slug(l), desc: '', value: '', locked: true, keyHelp: free, valueHelp: 'Lo que se envía al cliente. Hasta 50 caracteres.' }; }
+    const n = ov[4];
+    return {
+      label: ov[2], key: ov[1], value: ov[3], desc: ov[5], locked: true,
+      keyHelp: 'La clave no se cambia después de crear la variable.',
+      valueHelp: n > 0 ? 'Lo usan ' + n + ' plantillas. El valor nuevo se envía desde el próximo mensaje. Hasta 50 caracteres.' : 'Lo que se envía al cliente. Hasta 50 caracteres.'
+    };
+  })(),
+  saveVar: () => { if (ov && ov[4] > 0 && s.vValue !== undefined && s.vValue.trim() !== ov[3]) this.setState({ dlg: 'varcf' }); else toast(ov ? 'Variable actualizada.' : 'Variable creada.'); },
+  setVValue: (e) => this.setState({ vValue: e.target.value }),
+  varCfCls: s.dlg === 'varcf' ? 'dlg open' : 'dlg',
+  vcName: ov ? ov[2] : '', vcUsed: ov ? String(ov[4]) : '0',
+  vcBefore: ov ? ov[3] : '', vcAfter: (s.vValue || '').trim(),
+  vcWarn: !!(ov && s.vValue !== undefined && (s.vValue !== s.vValue.trim() || /\s{2,}/.test(s.vValue) || (/^\d+$/.test(ov[3]) && !/^\d+$/.test(s.vValue.trim())))),
+  vcWarnMsg: 'El valor nuevo tiene espacios de más o no tiene el mismo formato que el anterior (antes solo números). Revísalo.',
+  backToVar: () => this.setState({ dlg: null }),
+  confirmVar: () => toast('Variable actualizada. El valor nuevo se envía desde el próximo mensaje.'),
+  delVarCls: s.dlg === 'delvar' ? 'dlg open' : 'dlg',
+  delVarBlocked: !!(dv && dv[4] > 0),
+  delVarMsg: dv ? (dv[4] > 0 ? 'No se puede eliminar «' + dv[2] + '»: la usan ' + dv[4] + ' plantillas. Quítala de esas plantillas primero.' : 'Se va a eliminar «' + dv[2] + '». Esta acción no se puede deshacer.') : '',
+  confirmDelVar: () => toast('Variable eliminada.', { removedVars: Object.assign({}, s.removedVars || {}, { [s.delVar]: true }) }),
+  ovCls: (s.sheet || s.dlg || s.menu || s.acts) ? 'ov open' : 'ov',
+  closeAll: () => this.setState({ sheet: null, dlg: null, menu: false, acts: null, open: null }),
+  states: [['datos', 'Con datos'], ['vacio', 'Vacío'], ['cargando', 'Cargando'], ['sin-conexion', 'Sin conexión']].map((v) => ({ label: v[1], sel: v[0] === estado ? 'true' : 'false', pick: () => this.setState({ estado: v[0], synced: false, sheet: null, dlg: null, tab: null }) })),
+  toastCls: s.toast ? 'toast show' : 'toast', toastMsg: s.toastMsg || ''
+};
+}
+}
+</script>
+</body>
+</html>

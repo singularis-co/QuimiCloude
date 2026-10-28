@@ -36,6 +36,8 @@ export type CustomerListSectionProps = {
   readonly params: DataTableParams;
   /** Si la sesion trae `clientes.modificar`. Llega por props desde la pagina. */
   readonly canModify: boolean;
+  /** Si la sesión trae `whatsapp.consultar`. */
+  readonly canChat?: boolean;
   /** País de la empresa. Llega por props desde la pagina. */
   readonly companyCountry?: CountryCode | null;
 };
@@ -43,6 +45,7 @@ export type CustomerListSectionProps = {
 export async function CustomerListSection({
   params,
   canModify,
+  canChat = false,
   companyCountry = null,
 }: CustomerListSectionProps) {
   const result = await listCustomersAction(params);
@@ -56,6 +59,7 @@ export async function CustomerListSection({
         params={params}
         totalPages={0}
         canModify={canModify}
+        canChat={canChat}
         companyCountry={companyCountry}
       />
     );
@@ -74,6 +78,7 @@ export async function CustomerListSection({
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        canChat={canChat}
         companyCountry={companyCountry}
         empty={{
           firstPageHref: outOfRange ? customerListHref({ ...params, page: FIRST_PAGE }) : undefined,
@@ -92,6 +97,7 @@ export async function CustomerListSection({
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        canChat={canChat}
         companyCountry={companyCountry}
         outOfRange={{ firstPageHref: customerListHref({ ...params, page: FIRST_PAGE }) }}
       />
@@ -107,6 +113,7 @@ export async function CustomerListSection({
         params={params}
         totalPages={totalPages}
         canModify={canModify}
+        canChat={canChat}
         companyCountry={companyCountry}
         noMatches={{ clearHref: customerListHref(clearSearchAndFilters(params)) }}
       />
@@ -119,6 +126,7 @@ export async function CustomerListSection({
       params={params}
       totalPages={totalPages}
       canModify={canModify}
+      canChat={canChat}
       companyCountry={companyCountry}
     />
   );

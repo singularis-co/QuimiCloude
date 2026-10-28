@@ -39,7 +39,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { normalizeCustomerText } from '@/lib/modules/clientes';
 import { DOCUMENT_TYPE_CC, ROLE_ADMINISTRADOR, normalizeCompanyName } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
-import { CUSTOMER_CONTACTS_TITLE_TESTID } from '@/app/(private)/clientes/contactos/components';
+import { CUSTOMER_CONTACTS_TITLE_TESTID } from '@/app/(private)/clientes/contactos/components/contact-texts';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   CUSTOMER_CONTACTS_ROUTE,

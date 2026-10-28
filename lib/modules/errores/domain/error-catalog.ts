@@ -100,6 +100,8 @@ export const ERROR_MESSAGE_KEY = {
   recipe_steps_locked: 'errors.recipe_steps_locked',
   ai_provider_missing: 'errors.ai_provider_missing',
   ai_provider_error: 'errors.ai_provider_error',
+  converted_stock_out_of_range: 'errors.converted_stock_out_of_range',
+  converted_cost_out_of_range: 'errors.converted_cost_out_of_range',
   company_duplicate_name: 'errors.company_duplicate_name',
   company_duplicate_tax_id: 'errors.company_duplicate_tax_id',
   company_name_mismatch: 'errors.company_name_mismatch',
@@ -122,6 +124,16 @@ export const ERROR_MESSAGE_KEY = {
   whatsapp_variable_key_in_use: 'errors.whatsapp_variable_key_in_use',
   whatsapp_template_not_mapped: 'errors.whatsapp_template_not_mapped',
   whatsapp_template_not_mappable: 'errors.whatsapp_template_not_mappable',
+  whatsapp_connection_not_active: 'errors.whatsapp_connection_not_active',
+  whatsapp_recipient_not_customer: 'errors.whatsapp_recipient_not_customer',
+  whatsapp_customer_without_phone: 'errors.whatsapp_customer_without_phone',
+  whatsapp_contact_linked_elsewhere: 'errors.whatsapp_contact_linked_elsewhere',
+  whatsapp_contact_blocked: 'errors.whatsapp_contact_blocked',
+  whatsapp_window_closed: 'errors.whatsapp_window_closed',
+  whatsapp_template_not_sendable: 'errors.whatsapp_template_not_sendable',
+  whatsapp_template_values_missing: 'errors.whatsapp_template_values_missing',
+  whatsapp_message_not_found: 'errors.whatsapp_message_not_found',
+  whatsapp_message_not_retryable: 'errors.whatsapp_message_not_retryable',
   conditioning_step_out_of_order: 'errors.conditioning_step_out_of_order',
   conditioning_responsibles_required: 'errors.conditioning_responsibles_required',
   conditioning_responsible_not_allowed: 'errors.conditioning_responsible_not_allowed',
@@ -146,7 +158,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.presentation_duplicate_name': 'Ya existe una presentacion con un nombre equivalente.',
   'errors.presentation_in_use': 'La presentacion tiene productos asignados y no se puede borrar.',
   'errors.order_not_found': 'El pedido solicitado no existe.',
-  'errors.recipe_not_found': 'La receta indicada no existe o esta dada de baja.',
+  'errors.recipe_not_found': 'La fórmula indicada no existe o esta dada de baja.',
   'errors.invalid_transition': 'El pedido no admite ese cambio de estado.',
   'errors.not_cancellable': 'El pedido no se puede cancelar en su estado actual.',
   'errors.not_deletable': 'El pedido no se puede borrar en su estado actual.',
@@ -155,7 +167,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.catalog_line_not_found': 'La linea de catalogo solicitada no existe.',
   'errors.supplier_duplicate_name': 'Ya existe un proveedor con un nombre equivalente.',
   'errors.duplicate_catalog_line': 'Ese proveedor ya tiene una linea con ese nombre y esa presentacion.',
-  'errors.recipe_duplicate_name': 'Ya existe una receta con un nombre equivalente.',
+  'errors.recipe_duplicate_name': 'Ya existe una fórmula con un nombre equivalente.',
   'errors.unit_not_found': 'La unidad no existe.',
   'errors.unit_duplicate_name': 'Ya existe una unidad con ese nombre.',
   'errors.duplicate_symbol': 'Ya existe una unidad con ese simbolo.',
@@ -215,7 +227,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.insufficient_material':
     'No hay material suficiente en inventario para entregar el pedido.',
   'errors.recipe_without_lines':
-    'La receta del pedido no tiene ingredientes: completala antes de entregarlo.',
+    'La fórmula del pedido no tiene ingredientes: completala antes de entregarlo.',
   'errors.user_cannot_be_responsible': 'Esta persona no puede ser responsable de un pedido.',
   'errors.customer_not_found': 'El cliente solicitado no existe.',
   'errors.presentation_without_content':
@@ -243,7 +255,7 @@ export const ERROR_MESSAGES_ES = {
   'errors.recipe_version_under_review':
     'La versión elegida está por revisar: ajústala antes de usarla en un pedido.',
   'errors.order_unit_not_convertible':
-    'La unidad del pedido no se puede convertir a la de algún insumo de la receta: revisa los insumos marcados en la tabla o elige otra unidad.',
+    'La unidad del pedido no se puede convertir a la de algún insumo de la fórmula: revisa los insumos marcados en la tabla o elige otra unidad.',
   'errors.batch_stock_changed':
     'La existencia del lote cambio mientras ajustabas: revisa la diferencia y confirma de nuevo.',
   'errors.adjustment_reason_not_allowed':
@@ -279,6 +291,10 @@ export const ERROR_MESSAGES_ES = {
   'errors.ai_provider_missing': 'Para leer PDF, conecta el proveedor IA de tu empresa.',
   'errors.ai_provider_error':
     'Error con tu proveedor IA. Revisa la conexión en Integraciones > Proveedor IA.',
+  'errors.converted_stock_out_of_range':
+    'La existencia convertida a la unidad del producto no cabe en 4 decimales. Ingrésala en la unidad del producto.',
+  'errors.converted_cost_out_of_range':
+    'El costo unitario convertido a la unidad del producto no cabe en 4 decimales. Ingresa el lote en la unidad del producto.',
   'errors.company_duplicate_name': 'Ya existe una empresa activa con ese nombre.',
   'errors.company_duplicate_tax_id':
     'Ya existe una empresa activa con esa identificación fiscal.',
@@ -311,6 +327,21 @@ export const ERROR_MESSAGES_ES = {
     'Relaciona todas las variables de la plantilla antes de habilitarla.',
   'errors.whatsapp_template_not_mappable':
     'Esta plantilla tiene contenido que la app todavía no admite y no se puede relacionar.',
+  'errors.whatsapp_connection_not_active':
+    'La conexión de WhatsApp no está activa. Revísala en Integraciones.',
+  'errors.whatsapp_recipient_not_customer':
+    'Solo se pueden enviar mensajes a clientes de la empresa.',
+  'errors.whatsapp_customer_without_phone': 'El cliente no tiene un teléfono válido para WhatsApp.',
+  'errors.whatsapp_contact_linked_elsewhere':
+    'Ese número está vinculado a otro cliente. Cámbialo desde Contactos.',
+  'errors.whatsapp_contact_blocked': 'El contacto está bloqueado.',
+  'errors.whatsapp_window_closed':
+    'Pasaron más de 24 horas desde el último mensaje del cliente: usa una plantilla.',
+  'errors.whatsapp_template_not_sendable':
+    'La plantilla no está habilitada o no está aprobada por Meta.',
+  'errors.whatsapp_template_values_missing': 'Faltan valores de la plantilla.',
+  'errors.whatsapp_message_not_found': 'No se encontró el mensaje.',
+  'errors.whatsapp_message_not_retryable': 'Solo se puede reintentar un mensaje que falló.',
   'errors.conditioning_step_out_of_order': 'La pantalla quedó desactualizada. Recárgala para seguir.',
   'errors.conditioning_responsibles_required': 'Elige al menos un responsable para avanzar.',
   'errors.conditioning_responsible_not_allowed': 'Solo puedes elegir a personas del equipo o a ti.',

@@ -24,6 +24,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Prisma } from '@prisma/client';
 
+import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
 import { errorMessage } from '@/lib/modules/errores';
 import {
   DOCUMENT_TYPE_CC,
@@ -57,6 +58,7 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
+  startOpenedAssignedOrder,
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
@@ -323,6 +325,13 @@ async function finishProduction(page: Page, orderId: string, numberText: string)
   await expect(
     page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
   ).toHaveText(numberText);
+
+  // Entrar no comienza: un pedido `PENDIENTE` muestra el paso a paso tras «Comenzar».
+  const { status } = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
+    select: { status: true },
+  });
+  if (status === 'PENDIENTE') await startOpenedAssignedOrder(page);
 
   // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
   const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
@@ -698,11 +707,30 @@ test.describe('pedido en varias presentaciones', () => {
     const packingScreen = await openPackingScreen(page, orderId);
     const packingLines = packingScreen.getByTestId(PACKING_LINE_TESTID);
     await expect(packingLines).toHaveCount(2);
+    // Cada linea nombra el envase y el volumen de su presentacion (9a330ab2), con el mismo formateo
+    // que la etiqueta compartida; las dos presentaciones van en litros (`unit.symbol ?? unit.name`).
+    const litreUnit = await prisma.unit.findUniqueOrThrow({
+      where: { id: litroUnitId! },
+      select: { symbol: true, name: true },
+    });
+    const litreLabel = litreUnit.symbol ?? litreUnit.name;
     await expect(packingLines.filter({ hasText: PACKAGING_A_NAME })).toHaveText(
-      `${PACKAGES_A} × ${PACKAGING_A_NAME}`,
+      orderDistributionLineText({
+        presentationName: PRESENTATION_A_NAME,
+        packagingName: PACKAGING_A_NAME,
+        packages: Number(PACKAGES_A),
+        presentationContent: PRESENTATION_A_CONTENT,
+        presentationUnitLabel: litreLabel,
+      }),
     );
     await expect(packingLines.filter({ hasText: PACKAGING_B_NAME })).toHaveText(
-      `${PACKAGES_B} × ${PACKAGING_B_NAME}`,
+      orderDistributionLineText({
+        presentationName: PRESENTATION_B_NAME,
+        packagingName: PACKAGING_B_NAME,
+        packages: Number(PACKAGES_B),
+        presentationContent: PRESENTATION_B_CONTENT,
+        presentationUnitLabel: litreLabel,
+      }),
     );
 
     await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
@@ -887,10 +915,15 @@ test.describe('pedido en varias presentaciones', () => {
       );
       await expect(staleLine).toHaveValue(BARE_PACKAGES);
 
-      // --- 5. R47: el Empacador ve el reparto en solo lectura y comienza.
+      // --- 5. R47: el Empacador ve el reparto en solo lectura y comienza. La linea nombra el
+      // envase y el volumen de su presentacion, sembrados aqui: contenido y unidad del litro.
+      const litro = await prisma.unit.findUniqueOrThrow({
+        where: { id: litroUnitId! },
+        select: { symbol: true, name: true },
+      });
       packingScreen = await openPackingScreen(page, orderId);
       await expect(packingScreen.getByTestId(PACKING_LINE_TESTID)).toHaveText([
-        `${BARE_PACKAGES} × ${PACKAGING_A_NAME}`,
+        `${BARE_PACKAGES} × ${PACKAGING_A_NAME} · ${PRESENTATION_A_CONTENT} ${litro.symbol ?? litro.name}`,
       ]);
       await expect(packingScreen.getByTestId(PACKING_MISSING_DISTRIBUTION_TESTID)).toHaveCount(0);
       await expect(packingScreen.locator(EDITING_CONTROLS)).toHaveCount(0);

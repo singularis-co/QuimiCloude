@@ -136,7 +136,7 @@ function repositorioProductoQueFalla(): ProductRepository {
     findAliveIdByNameInPresentationUnit: vi.fn<
       ProductRepository['findAliveIdByNameInPresentationUnit']
     >(explota),
-    findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(explota),
+    findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(explota),
     findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(explota),
     createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(explota),
     addBatchToAlive: vi.fn<ProductRepository['addBatchToAlive']>(explota),
@@ -271,7 +271,7 @@ function montarReposPermisivos(): Repos {
       findAliveIdByNameInPresentationUnit: vi.fn<
         ProductRepository['findAliveIdByNameInPresentationUnit']
       >(async () => null),
-      findAliveIdByNameInUnit: vi.fn<ProductRepository['findAliveIdByNameInUnit']>(async () => null),
+      findAliveSupplyHomonyms: vi.fn<ProductRepository['findAliveSupplyHomonyms']>(async () => []),
       findAlivePackagingByName: vi.fn<ProductRepository['findAlivePackagingByName']>(async () => null),
       createWithFirstBatch: vi.fn<ProductRepository['createWithFirstBatch']>(async () => ({
         id: 'producto-1',
@@ -334,7 +334,7 @@ function todosLosMetodos(repos: Repos): ReadonlyArray<() => void> {
     // QC-90 (R23): «sin una sola llamada al repositorio» incluye los tres metodos del alta
     // con primer lote. Un metodo nuevo en el puerto que no se anada aqui es un hueco.
     () => expect(repos.products.findAliveIdByNameInPresentationUnit).not.toHaveBeenCalled(),
-    () => expect(repos.products.findAliveIdByNameInUnit).not.toHaveBeenCalled(),
+    () => expect(repos.products.findAliveSupplyHomonyms).not.toHaveBeenCalled(),
     () => expect(repos.units.findRefs).not.toHaveBeenCalled(),
     () => expect(repos.products.createWithFirstBatch).not.toHaveBeenCalled(),
     () => expect(repos.products.addBatchToAlive).not.toHaveBeenCalled(),

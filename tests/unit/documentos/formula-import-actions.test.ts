@@ -98,6 +98,8 @@ const RESUMEN: FormulaImportSummary = {
   outcome: 'created',
   rawMaterialsCreated: 0,
   rawMaterialsReused: 0,
+  created: [],
+  reused: [],
 };
 
 beforeEach(() => {

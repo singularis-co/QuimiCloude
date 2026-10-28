@@ -59,11 +59,19 @@
  * el fixture. Si el rol falta, el `beforeAll` falla diciendolo, en vez de dar un rojo
  * incomprensible a medio camino.
  *
+ * Tampoco crea el catalogo de añadidos, pero SI prende los de su empresa (`enableAllAddons`): el
+ * hijo «Contactos» del grupo «Clientes» exige `whatsapp.consultar` (QC-246 R1/R2), que pertenece al
+ * añadido `integraciones` (`domain/company-addons.ts`), y una empresa nace sin añadidos, asi que la
+ * sesion le recortaria ese permiso al Administrador aunque su rol lo tenga. Lo que pasa SIN el
+ * añadido -sin el hijo en el menu y 404 en la ruta- no es de este spec: lo cubre
+ * `e2e/contactos-chat.spec.ts` («R1, R45…»). El Operador no cambia: su rol no tiene permisos de
+ * ningun añadido.
+ *
  * LOS `data-testid` VAN COMO CONSTANTES LOCALES y no importados del barrel de la ruta: sus
  * modulos son de CLIENTE (`'use client'`, JSX, `useActionState`) e importarlos desde el proceso de
  * Node del runner arrastraria React sin aportar nada. Es el mismo criterio que
- * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Los de contactos si se importan: su modulo de
- * textos no es de cliente. Ningun assert mira copy escrito a mano: todo se localiza por
+ * `e2e/usuarios.spec.ts` y `e2e/unidades.spec.ts`. Los de contactos si se importan, de `contact-texts`
+ * y no del barrel: ese modulo de textos no es de cliente. Ningun assert mira copy escrito a mano: todo se localiza por
  * `data-testid`, por rol ARIA, por valores del fixture o por la constante de la etiqueta.
  *
  * VARIABLES DE ENTORNO: no se cargan a mano. `@prisma/client` lee el `.env` del proyecto al
@@ -88,14 +96,16 @@ import {
 } from '@/lib/modules/identity';
 import { createPasswordHash } from '@/lib/modules/identity/adapters/driven/security/password-hash';
 import {
-  CUSTOMER_CONTACTS_EMPTY_TESTID,
+  CONTACTS_NOT_CONNECTED_TESTID,
+  CONTACTS_SCREEN_TESTID,
   CUSTOMER_CONTACTS_TITLE_TESTID,
-} from '@/app/(private)/clientes/contactos/components';
+} from '@/app/(private)/clientes/contactos/components/contact-texts';
 import { prisma } from '@/lib/shared/db/prisma';
 import { CUSTOMER_CONTACTS_LABEL } from '@/lib/shared/navigation/private-nav';
 import { CUSTOMER_CONTACTS_ROUTE, CUSTOMERS_ROUTE } from '@/lib/shared/routes';
 
 // La entrada y su aterrizaje, derivado de los permisos del usuario en la base.
+import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -274,6 +284,10 @@ test.beforeAll(async () => {
       select: { id: true },
     })
   ).id;
+  // Con sus añadidos prendidos: Contactos exige `whatsapp.consultar`, del añadido `integraciones`
+  // (QC-246 R1/R2; ver cabecera). Sin el, la sesion lo recorta y el hijo no se emite. Sus filas en
+  // `company_addon_overrides` caen con la empresa en el `afterAll` (FK `onDelete: Cascade`).
+  await enableAllAddons(companyId);
 
   await createUserWithRole(adminUser, ROLE_ADMINISTRADOR);
   await createUserWithRole(operatorUser, ROLE_OPERADOR);
@@ -283,7 +297,8 @@ test.afterAll(async () => {
   // Borra SIEMPRE, aunque el `beforeAll` fallara a medias o un test reventara. El orden lo impone
   // la FK restrictiva: clientes -> usuarios -> empresa, todos de ESTE worker (por `companyId`
   // exacto, nunca por `FIXTURE_PREFIX`: el otro proyecto de Playwright tiene su propio worker con
-  // su propia empresa corriendo a la vez).
+  // su propia empresa corriendo a la vez). Las excepciones de añadidos no piden paso propio: caen
+  // con la empresa (FK `onDelete: Cascade`).
   try {
     if (companyId) await prisma.customer.deleteMany({ where: { companyId } });
   } finally {
@@ -434,7 +449,7 @@ test.describe('pantalla de clientes', () => {
     ).toHaveCount(0);
   });
 
-  test('el Administrador despliega «Clientes» en el menu, ve sus dos hijos y navega a Contactos y de vuelta a la lista (R4, R6, R7)', async ({
+  test('el Administrador despliega «Clientes» en el menu, ve sus dos hijos y navega a Contactos y de vuelta a la lista (R4, R6, R7; QC-246 R2)', async ({
     page,
   }) => {
     const landing = await loginAndLand(page, adminUser);
@@ -455,7 +470,9 @@ test.describe('pantalla de clientes', () => {
     await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveText(CUSTOMER_CONTACTS_LABEL, {
       timeout: 60_000,
     });
-    await expect(page.getByTestId(CUSTOMER_CONTACTS_EMPTY_TESTID)).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.getByTestId(CONTACTS_SCREEN_TESTID).or(page.getByTestId(CONTACTS_NOT_CONNECTED_TESTID)),
+    ).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId(NAV_CUSTOMERS_LIST_TESTID).click();
     await page.waitForURL((url) => url.pathname === CUSTOMERS_ROUTE, { timeout: 60_000 });
@@ -529,6 +546,7 @@ test.describe('pantalla de clientes', () => {
       ).toBe(false);
     }
     await expect(page.getByTestId(CUSTOMER_CONTACTS_TITLE_TESTID)).toHaveCount(0);
-    await expect(page.getByTestId(CUSTOMER_CONTACTS_EMPTY_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(CONTACTS_SCREEN_TESTID)).toHaveCount(0);
+    await expect(page.getByTestId(CONTACTS_NOT_CONNECTED_TESTID)).toHaveCount(0);
   });
 });

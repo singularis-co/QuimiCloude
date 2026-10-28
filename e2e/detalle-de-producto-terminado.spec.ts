@@ -544,16 +544,19 @@ test.describe('ficha de producto terminado', () => {
     );
 
     // La pestana lista pedidos: el producto aparece al desplegar el de la receta.
+    // Se busca en las FILAS de la tabla: la lista pinta cada fila tambien como tarjeta (oculta en
+    // una pantalla ancha, QC-263) y la tarjeta repite la celda «Nombre» con los mismos testids.
+    const tableRows = page.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`);
     const groupName = page.getByTestId(FINISHED_STOCK_NAME_TESTID).filter({ hasText: exactText(RECIPE_NAME) });
-    await expect(groupName).toHaveCount(1, { timeout: 60_000 });
-    const toggle = page
-      .locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`)
-      .filter({ has: groupName })
-      .getByTestId(FINISHED_STOCK_TOGGLE_TESTID);
+    const groupRow = tableRows.filter({ has: groupName });
+    await expect(groupRow).toHaveCount(1, { timeout: 60_000 });
+    const toggle = groupRow.getByTestId(FINISHED_STOCK_TOGGLE_TESTID);
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-    const lineLink = page.getByTestId(FINISHED_STOCK_LINE_LINK_TESTID).filter({ hasText: exactText(FINISHED_NAME) });
+    const lineLink = tableRows
+      .getByTestId(FINISHED_STOCK_LINE_LINK_TESTID)
+      .filter({ hasText: exactText(FINISHED_NAME) });
     await expect(lineLink).toHaveCount(1, { timeout: 60_000 });
     await expect(lineLink).toHaveAttribute('href', finishedProductDetailRoute(product));
     await lineLink.click();

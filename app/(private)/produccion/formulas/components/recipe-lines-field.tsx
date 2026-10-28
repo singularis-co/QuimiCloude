@@ -441,7 +441,7 @@ export function RecipeLinesField({
       )}
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList aria-label="Líneas de la receta por tipo" className={TAB_LIST_CLASS}>
+        <TabsList aria-label="Líneas de la fórmula por tipo" className={TAB_LIST_CLASS}>
           <TabsIndicator />
           <TabsTrigger value="ingredients" data-testid="recipe-lines-tab-ingredients" className={TAB_CLASS}>
             <span>Ingredientes</span>{' '}

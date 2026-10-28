@@ -2,7 +2,7 @@ import Anthropic, { APIError } from '@anthropic-ai/sdk';
 
 import { AiProviderError } from '../../../domain/errors';
 
-import { isAccountFailure } from '@/lib/modules/integraciones';
+import { marksConnection } from '@/lib/modules/integraciones';
 
 import type { AiDocumentPart, AiReader, AiReadRequest } from '../../../ports/ai-reader';
 import type { AiProviderFailure, AiProviderProbeResult } from '@/lib/modules/integraciones';
@@ -80,7 +80,7 @@ function isAbort(error: unknown): boolean {
 
 /**
  * El tipo del fallo, solo por el código HTTP: el texto del proveedor no se mira ni se guarda.
- * `model` es el que se estaba consultando en la prueba; al leer va `null` y un 404 no es de cuenta.
+ * `model` es el que se consultaba o con el que se leía; sin él, un 404 no es de modelo.
  */
 export function classifyAnthropicError(error: unknown, model: string | null): AiProviderFailure {
   if (error instanceof APIError) {
@@ -113,8 +113,8 @@ async function readWithAnthropic(config: AnthropicReaderConfig, request: AiReadR
     );
     return textFromAnthropicMessage(message);
   } catch (error) {
-    const failure = classifyAnthropicError(error, null);
-    if (isAccountFailure(failure)) {
+    const failure = classifyAnthropicError(error, config.model);
+    if (marksConnection(failure)) {
       throw new AiProviderError(failure, `claude messages.create respondió ${failure.httpStatus}`);
     }
     throw error;

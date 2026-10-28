@@ -21,6 +21,31 @@ export type GraphTemplatePage =
 
 export type GraphTemplateDeleted = { readonly ok: true } | ({ readonly ok: false } & GraphFailure);
 
+/** `components` viaja con la forma de Meta, ya armada por el dominio. */
+export type GraphOutboundMessage =
+  | { readonly type: 'text'; readonly body: string }
+  | {
+      readonly type: 'template';
+      readonly name: string;
+      readonly language: string;
+      readonly components: readonly unknown[];
+    };
+
+export type GraphMessageSent = { readonly ok: true; readonly wamid: string } | ({ readonly ok: false } & GraphFailure);
+
+/**
+ * `contentType` va sin parámetros. `contentLength` es la cabecera de Meta si la manda. Si Meta
+ * declara un tamaño y mintió, el cuerpo se corta con error al pasar del tope pedido.
+ */
+export type GraphMediaDownload =
+  | {
+      readonly ok: true;
+      readonly contentType: string;
+      readonly contentLength: number | null;
+      readonly body: ReadableStream<Uint8Array>;
+    }
+  | ({ readonly ok: false } & GraphFailure);
+
 /** Un fallo de Meta o de red es un resultado, no una excepción: el caso de uso decide qué guardar. */
 export interface WhatsappGraphClient {
   fetchPhoneNumber(input: {
@@ -47,4 +72,17 @@ export interface WhatsappGraphClient {
     readonly hsmId: string;
     readonly name: string;
   }): Promise<GraphTemplateDeleted>;
+  /** `to` es el `waId` del contacto. Sin `wamid` en la respuesta no hay prueba de entrega: es un fallo. */
+  sendMessage(input: {
+    readonly phoneNumberId: string;
+    readonly accessToken: string;
+    readonly to: string;
+    readonly message: GraphOutboundMessage;
+  }): Promise<GraphMessageSent>;
+  /** Un archivo que se sabe de más de `maxBytes` es un rechazo y no se descarga. */
+  downloadMedia(input: {
+    readonly mediaId: string;
+    readonly accessToken: string;
+    readonly maxBytes: number;
+  }): Promise<GraphMediaDownload>;
 }

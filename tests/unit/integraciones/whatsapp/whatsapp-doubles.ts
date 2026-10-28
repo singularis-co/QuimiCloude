@@ -4,7 +4,8 @@
 
 import { vi } from 'vitest'
 
-import { phoneMatchesWaId } from '@/lib/modules/clientes'
+import { phoneMatchesWaId, type CustomerCatalog, type CustomerRef } from '@/lib/modules/clientes'
+import type { PeopleDirectory } from '@/lib/modules/identity'
 
 import type { Actor } from '@/lib/modules/integraciones/domain/actor'
 import {
@@ -22,6 +23,10 @@ import type {
   WhatsappTemplateRecord,
 } from '@/lib/modules/integraciones/domain/whatsapp-template'
 import { sameComponents } from '@/lib/modules/integraciones/domain/whatsapp-template-components'
+import type {
+  OutboundContact,
+  OutboundMessageRecord,
+} from '@/lib/modules/integraciones/domain/whatsapp-outbound-message'
 import type { WhatsappVariableKeyRecord } from '@/lib/modules/integraciones/domain/whatsapp-variable-key'
 import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links'
 import type { CustomerPhoneOwners } from '@/lib/modules/integraciones/ports/customer-phone-owners'
@@ -49,6 +54,14 @@ import type {
   TemplateSyncRow,
   WhatsappTemplateRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-template-repository'
+import type {
+  ChatMessageRow,
+  ConversationContactRow,
+  ConversationRow,
+  WhatsappConversationRepository,
+} from '@/lib/modules/integraciones/ports/whatsapp-conversation-repository'
+import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository'
+import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log'
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory'
 
@@ -131,6 +144,7 @@ export function makeRandom(tokens: string[] = ['verify-token-1', 'verify-token-2
 }
 
 export const CREATED_META_TEMPLATE_ID = '1234567890123456'
+export const SENT_WAMID = 'wamid.HBgMNTczMDAxMjM0NTY3FQIAERgS'
 
 export function makeGraph(result: GraphProbeResult = GOOD_PROBE) {
   const fetchPhoneNumber = vi.fn<WhatsappGraphClient['fetchPhoneNumber']>(async () => result)
@@ -146,8 +160,22 @@ export function makeGraph(result: GraphProbeResult = GOOD_PROBE) {
     next: null,
   }))
   const deleteTemplate = vi.fn<WhatsappGraphClient['deleteTemplate']>(async () => ({ ok: true }))
-  const graph: WhatsappGraphClient = { fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate }
-  return { graph, fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate }
+  const sendMessage = vi.fn<WhatsappGraphClient['sendMessage']>(async () => ({ ok: true, wamid: SENT_WAMID }))
+  const downloadMedia = vi.fn<WhatsappGraphClient['downloadMedia']>(async () => ({
+    ok: true,
+    contentType: 'image/png',
+    contentLength: 3,
+    body: new Blob([new Uint8Array([1, 2, 3])]).stream(),
+  }))
+  const graph: WhatsappGraphClient = {
+    fetchPhoneNumber,
+    createTemplate,
+    listTemplatesPage,
+    deleteTemplate,
+    sendMessage,
+    downloadMedia,
+  }
+  return { graph, fetchPhoneNumber, createTemplate, listTemplatesPage, deleteTemplate, sendMessage, downloadMedia }
 }
 
 /** Repositorio en memoria que respeta el ambito: una fila de otra empresa o borrada no se ve. */
@@ -364,12 +392,23 @@ export function makeCustomerPhoneLinks(
   results: {
     add?: Awaited<ReturnType<CustomerPhoneLinks['addWaId']>>
     remove?: Awaited<ReturnType<CustomerPhoneLinks['removeWaId']>>
+    mainPhone?: Awaited<ReturnType<CustomerPhoneLinks['mainPhoneOf']>>
+    alive?: boolean
   } = {},
 ) {
   const addWaId = vi.fn<CustomerPhoneLinks['addWaId']>(async () => results.add ?? { numbers: [] })
   const removeWaId = vi.fn<CustomerPhoneLinks['removeWaId']>(async () => results.remove ?? { numbers: [] })
-  const customerPhones: CustomerPhoneLinks = { addWaId, removeWaId }
-  return { customerPhones, addWaId, removeWaId }
+  const mainPhoneOf = vi.fn<CustomerPhoneLinks['mainPhoneOf']>(async () => results.mainPhone ?? 'no_phone')
+  const isCustomerAlive = vi.fn<CustomerPhoneLinks['isCustomerAlive']>(async () => results.alive ?? true)
+  const customerPhones: CustomerPhoneLinks = { addWaId, removeWaId, mainPhoneOf, isCustomerAlive }
+  return { customerPhones, addWaId, removeWaId, mainPhoneOf, isCustomerAlive }
+}
+
+/** Registro del fallo de un envío: anota cada aviso sin escribir en la consola. */
+export function makeSendLog() {
+  const sendFailed = vi.fn<WhatsappSendLog['sendFailed']>()
+  const sendLog: WhatsappSendLog = { sendFailed }
+  return { sendLog, sendFailed }
 }
 
 /** Unidad de trabajo sin base: corre el trabajo con los puertos dados y cuenta las aperturas. */
@@ -731,4 +770,503 @@ export function makeVariableKeyRepository(
     },
     all: () => [...rows.values()].map((row) => ({ ...row })),
   }
+}
+
+export type OutboxContactRow = OutboundContact & {
+  readonly companyId: string
+  readonly connectionId: string
+  readonly lastMessageAt: Date | null
+}
+
+export type OutboxMessageRow = OutboundMessageRecord & {
+  readonly companyId: string
+  readonly wamid: string | null
+  readonly attempts: number
+}
+
+/** Un contacto de la conexion por defecto, vinculado a `CUSTOMER_ID` y con la ventana abierta. */
+export function outboxContact(overrides: Partial<OutboxContactRow> = {}): OutboxContactRow {
+  return {
+    id: CONTACT_ID,
+    companyId: COMPANY_ID,
+    connectionId: CONNECTION_ID,
+    waId: '573001234567',
+    customerId: CUSTOMER_ID,
+    customerLinkedBy: null,
+    blockedAt: null,
+    lastInboundAt: new Date(NOW.getTime() - 60 * 60 * 1000),
+    lastMessageAt: null,
+    ...overrides,
+  }
+}
+
+export const FAILED_MESSAGE_ID = '00000000-0000-4000-8000-000000000301'
+
+/** Un saliente fallido de texto, del actor, al contacto por defecto. */
+export function outboxMessage(overrides: Partial<OutboxMessageRow> = {}): OutboxMessageRow {
+  return {
+    id: FAILED_MESSAGE_ID,
+    companyId: COMPANY_ID,
+    connectionId: CONNECTION_ID,
+    contactId: CONTACT_ID,
+    sentById: ACTOR_ID,
+    type: 'TEXT',
+    body: 'Hola, su pedido salio hoy',
+    templateName: null,
+    templateLanguage: null,
+    payload: {},
+    status: 'FAILED',
+    direction: 'OUT',
+    origin: 'USER',
+    errorCode: '131026',
+    errorReason: 'Meta no acepto el mensaje (codigo 131026). Intenta de nuevo o revisa la conexion.',
+    createdAt: new Date('2026-10-08T12:00:00.000Z'),
+    wamid: null,
+    attempts: 1,
+    ...overrides,
+  }
+}
+
+/**
+ * Contactos y mensajes salientes en memoria con las reglas del adaptador: ambito de empresa, la
+ * conexion en las lecturas de contacto, `markSent`/`markFailed` solo desde `SENDING` y
+ * `touchContact` que no retrocede.
+ */
+export function makeOutbox(
+  initial: { contacts?: readonly OutboxContactRow[]; messages?: readonly OutboxMessageRow[] } = {},
+  now: () => Date = () => NOW,
+) {
+  const contacts = new Map((initial.contacts ?? []).map((row) => [row.id, { ...row }]))
+  const messages = new Map((initial.messages ?? []).map((row) => [row.id, { ...row }]))
+  let counter = 0
+  const newId = (prefix: number) => {
+    counter += 1
+    return `00000000-0000-4000-8000-${String(prefix + counter)}`
+  }
+  const toContact = (row: OutboxContactRow): OutboundContact => ({
+    id: row.id,
+    waId: row.waId,
+    customerId: row.customerId,
+    customerLinkedBy: row.customerLinkedBy,
+    blockedAt: row.blockedAt,
+    lastInboundAt: row.lastInboundAt,
+  })
+  const toRecord = (row: OutboxMessageRow): OutboundMessageRecord => ({
+    id: row.id,
+    connectionId: row.connectionId,
+    contactId: row.contactId,
+    sentById: row.sentById,
+    type: row.type,
+    body: row.body,
+    templateName: row.templateName,
+    templateLanguage: row.templateLanguage,
+    payload: { ...row.payload },
+    status: row.status,
+    direction: row.direction,
+    origin: row.origin,
+    errorCode: row.errorCode,
+    errorReason: row.errorReason,
+    createdAt: row.createdAt,
+  })
+  const contactOf = (id: string, scope: IntegracionesScope) => {
+    const row = contacts.get(id)
+    return row !== undefined && row.companyId === scope.companyId ? row : undefined
+  }
+  const messageOf = (id: string, scope: IntegracionesScope) => {
+    const row = messages.get(id)
+    return row !== undefined && row.companyId === scope.companyId ? row : undefined
+  }
+
+  const findContact = vi.fn<WhatsappOutboxRepository['findContact']>(async (id, connectionId, scope) => {
+    const row = contactOf(id, scope)
+    return row === undefined || row.connectionId !== connectionId ? null : toContact(row)
+  })
+  const findContactsByWaIds = vi.fn<WhatsappOutboxRepository['findContactsByWaIds']>(async (connectionId, waIds, scope) =>
+    [...contacts.values()]
+      .filter((row) => row.companyId === scope.companyId && row.connectionId === connectionId && waIds.includes(row.waId))
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map(toContact),
+  )
+  const ensureContact = vi.fn<WhatsappOutboxRepository['ensureContact']>(async (connectionId, waId, scope) => {
+    const existing = [...contacts.values()].find((row) => row.connectionId === connectionId && row.waId === waId)
+    if (existing !== undefined) {
+      if (existing.companyId !== scope.companyId) throw new Error('doble: el contacto es de otra empresa')
+      return toContact(existing)
+    }
+    const row: OutboxContactRow = {
+      id: newId(700000000000),
+      companyId: scope.companyId,
+      connectionId,
+      waId,
+      customerId: null,
+      customerLinkedBy: null,
+      blockedAt: null,
+      lastInboundAt: null,
+      lastMessageAt: null,
+    }
+    contacts.set(row.id, row)
+    return toContact(row)
+  })
+  const linkContact = vi.fn<WhatsappOutboxRepository['linkContact']>(async (id, link, scope) => {
+    const row = contactOf(id, scope)
+    if (row !== undefined) contacts.set(id, { ...row, customerId: link.customerId, customerLinkedBy: link.linkedBy })
+  })
+  const insertSending = vi.fn<WhatsappOutboxRepository['insertSending']>(async (input, scope) => {
+    const row: OutboxMessageRow = {
+      ...input,
+      payload: { ...input.payload },
+      id: newId(600000000000),
+      companyId: scope.companyId,
+      status: 'SENDING',
+      direction: 'OUT',
+      origin: 'USER',
+      errorCode: null,
+      errorReason: null,
+      createdAt: now(),
+      wamid: null,
+      attempts: 1,
+    }
+    messages.set(row.id, row)
+    return toRecord(row)
+  })
+  const markSent = vi.fn<WhatsappOutboxRepository['markSent']>(async (id, wamid, scope) => {
+    const row = messageOf(id, scope)
+    if (row === undefined || row.status !== 'SENDING') return null
+    const next: OutboxMessageRow = { ...row, status: 'SENT', wamid }
+    messages.set(id, next)
+    return toRecord(next)
+  })
+  const markFailed = vi.fn<WhatsappOutboxRepository['markFailed']>(async (id, errorCode, errorReason, scope) => {
+    const row = messageOf(id, scope)
+    if (row === undefined || row.status !== 'SENDING') return null
+    const next: OutboxMessageRow = { ...row, status: 'FAILED', errorCode, errorReason }
+    messages.set(id, next)
+    return toRecord(next)
+  })
+  const findOutbound = vi.fn<WhatsappOutboxRepository['findOutbound']>(async (id, scope) => {
+    const row = messageOf(id, scope)
+    return row === undefined ? null : toRecord(row)
+  })
+  const touchContact = vi.fn<WhatsappOutboxRepository['touchContact']>(async (id, at, scope) => {
+    const row = contactOf(id, scope)
+    if (row === undefined) return
+    if (row.lastMessageAt === null || row.lastMessageAt < at) contacts.set(id, { ...row, lastMessageAt: at })
+  })
+
+  const outbox: WhatsappOutboxRepository = {
+    findContact,
+    findContactsByWaIds,
+    ensureContact,
+    linkContact,
+    insertSending,
+    markSent,
+    markFailed,
+    findOutbound,
+    touchContact,
+  }
+  return {
+    outbox,
+    findContact,
+    findContactsByWaIds,
+    ensureContact,
+    linkContact,
+    insertSending,
+    markSent,
+    markFailed,
+    findOutbound,
+    touchContact,
+    contact: (id: string) => {
+      const row = contacts.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+    message: (id: string) => {
+      const row = messages.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+    allContacts: () => [...contacts.values()].map((row) => ({ ...row })),
+    allMessages: () => [...messages.values()].map((row) => ({ ...row })),
+  }
+}
+
+export type ConversationDoubleContact = ConversationContactRow & {
+  readonly companyId: string
+  readonly connectionId: string
+  readonly lastReadAt: Date | null
+}
+
+/** Sin `reactedMessageId`: el doble lo resuelve como el adaptador, por `wamid` dentro del mismo contacto. */
+export type ConversationDoubleMessage = Omit<ChatMessageRow, 'reactedMessageId'> & {
+  readonly companyId: string
+  readonly contactId: string
+  readonly wamid: string | null
+}
+
+export function conversationContact(overrides: Partial<ConversationDoubleContact> = {}): ConversationDoubleContact {
+  return {
+    id: CONTACT_ID,
+    companyId: COMPANY_ID,
+    connectionId: CONNECTION_ID,
+    waId: '5215512345678',
+    customerId: CUSTOMER_ID,
+    blockedAt: null,
+    lastInboundAt: null,
+    lastReadAt: null,
+    ...overrides,
+  }
+}
+
+export function conversationMessage(overrides: Partial<ConversationDoubleMessage> = {}): ConversationDoubleMessage {
+  return {
+    id: '00000000-0000-4000-8000-000000000401',
+    companyId: COMPANY_ID,
+    contactId: CONTACT_ID,
+    direction: 'IN',
+    type: 'TEXT',
+    body: 'Hola',
+    payload: {},
+    status: 'RECEIVED',
+    errorCode: null,
+    errorReason: null,
+    origin: null,
+    sentById: null,
+    templateName: null,
+    at: new Date('2026-10-09T10:00:00.000Z'),
+    wamid: null,
+    ...overrides,
+  }
+}
+
+const newestFirst = (a: ConversationDoubleMessage, b: ConversationDoubleMessage) =>
+  b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
+
+/**
+ * Conversaciones en memoria con las reglas del adaptador: ámbito de empresa, conexión, hora del
+ * mensaje, orden `(hora, id)` y una marca de lectura que nunca retrocede.
+ */
+export function makeConversationRepository(
+  initialContacts: readonly ConversationDoubleContact[] = [],
+  initialMessages: readonly ConversationDoubleMessage[] = [],
+) {
+  const contacts = new Map(initialContacts.map((row) => [row.id, { ...row }]))
+  const messages = initialMessages.map((row) => ({ ...row }))
+
+  const contactOf = (id: string, connectionId: string, scope: IntegracionesScope) => {
+    const row = contacts.get(id)
+    return row !== undefined && row.companyId === scope.companyId && row.connectionId === connectionId ? row : null
+  }
+  const messagesOf = (contactId: string, scope: IntegracionesScope) =>
+    messages.filter((row) => row.contactId === contactId && row.companyId === scope.companyId).sort(newestFirst)
+  const unreadOf = (contact: ConversationDoubleContact, scope: IntegracionesScope) =>
+    messagesOf(contact.id, scope).filter(
+      (row) => row.direction === 'IN' && (contact.lastReadAt === null || row.at > contact.lastReadAt),
+    ).length
+  const contactRow = (row: ConversationDoubleContact): ConversationContactRow => ({
+    id: row.id,
+    waId: row.waId,
+    customerId: row.customerId,
+    blockedAt: row.blockedAt,
+    lastInboundAt: row.lastInboundAt,
+  })
+  const reactedIdOf = (row: ConversationDoubleMessage): string | null => {
+    if (row.type !== 'REACTION') return null
+    const payload = row.payload as { readonly message_id?: unknown } | null
+    const wamid = payload?.message_id
+    if (typeof wamid !== 'string') return null
+    const reacted = messages.find(
+      (other) => other.wamid === wamid && other.contactId === row.contactId && other.companyId === row.companyId,
+    )
+    return reacted?.id ?? null
+  }
+  const conversationsOf = (connectionId: string, scope: IntegracionesScope) =>
+    [...contacts.values()].filter(
+      (row) =>
+        row.companyId === scope.companyId &&
+        row.connectionId === connectionId &&
+        messagesOf(row.id, scope).length > 0,
+    )
+
+  const listLinkedCustomerIds = vi.fn<WhatsappConversationRepository['listLinkedCustomerIds']>(
+    async (connectionId, scope) => [
+      ...new Set(
+        conversationsOf(connectionId, scope).flatMap((row) => (row.customerId === null ? [] : [row.customerId])),
+      ),
+    ],
+  )
+  const listPage = vi.fn<WhatsappConversationRepository['listPage']>(async (query, scope) => {
+    const matching = conversationsOf(query.connectionId, scope)
+      .filter((row) => row.customerId !== null && query.customerIds.includes(row.customerId))
+      .filter((row) =>
+        query.blocked === 'all' ? true : query.blocked === 'blocked' ? row.blockedAt !== null : row.blockedAt === null,
+      )
+      .filter((row) => {
+        if (query.search === null) return true
+        const byName = row.customerId !== null && query.search.nameMatchIds.includes(row.customerId)
+        const byDigits = query.search.digits !== '' && row.waId.includes(query.search.digits)
+        return byName || byDigits
+      })
+      .map((row): ConversationRow => {
+        const last = messagesOf(row.id, scope)[0]
+        return {
+          ...contactRow(row),
+          unreadCount: unreadOf(row, scope),
+          lastMessage: {
+            direction: last.direction,
+            type: last.type,
+            body: last.body,
+            status: last.status,
+            at: last.at,
+          },
+        }
+      })
+      .sort(
+        (a, b) =>
+          (b.lastMessage?.at.getTime() ?? 0) - (a.lastMessage?.at.getTime() ?? 0) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
+    return { rows: matching.slice(query.offset, query.offset + query.limit), total: matching.length }
+  })
+  const findContact = vi.fn<WhatsappConversationRepository['findContact']>(async (id, connectionId, scope) => {
+    const row = contactOf(id, connectionId, scope)
+    return row === null ? null : contactRow(row)
+  })
+  const findLatestContactOfCustomer = vi.fn<WhatsappConversationRepository['findLatestContactOfCustomer']>(
+    async (customerId, connectionId, scope) => {
+      const latest = conversationsOf(connectionId, scope)
+        .filter((row) => row.customerId === customerId)
+        .sort((a, b) => newestFirst(messagesOf(a.id, scope)[0], messagesOf(b.id, scope)[0]))[0]
+      return latest === undefined ? null : contactRow(latest)
+    },
+  )
+  const listMessages = vi.fn<WhatsappConversationRepository['listMessages']>(
+    async (contactId, connectionId, page, scope) => {
+      if (contactOf(contactId, connectionId, scope) === null) return []
+      const all = messagesOf(contactId, scope)
+      let start = 0
+      if (page.before !== null) {
+        const index = all.findIndex((row) => row.id === page.before)
+        if (index === -1) return 'cursor_not_found'
+        start = index + 1
+      }
+      return all.slice(start, start + page.limit).map(
+        (row): ChatMessageRow => ({
+          id: row.id,
+          direction: row.direction,
+          type: row.type,
+          body: row.body,
+          payload: row.payload,
+          status: row.status,
+          errorCode: row.errorCode,
+          errorReason: row.errorReason,
+          origin: row.origin,
+          sentById: row.sentById,
+          templateName: row.templateName,
+          at: row.at,
+          reactedMessageId: reactedIdOf(row),
+        }),
+      )
+    },
+  )
+  const findMediaMessage = vi.fn<WhatsappConversationRepository['findMediaMessage']>(
+    async (messageId, connectionId, scope) => {
+      const row = messages.find((message) => message.id === messageId && message.companyId === scope.companyId)
+      if (row === undefined) return null
+      const contact = contactOf(row.contactId, connectionId, scope)
+      if (contact === null) return null
+      return { direction: row.direction, type: row.type, payload: row.payload, customerId: contact.customerId }
+    },
+  )
+  const countUnread = vi.fn<WhatsappConversationRepository['countUnread']>(async (contactId, scope) => {
+    const row = contacts.get(contactId)
+    return row === undefined || row.companyId !== scope.companyId ? 0 : unreadOf(row, scope)
+  })
+  const advanceLastRead = vi.fn<WhatsappConversationRepository['advanceLastRead']>(
+    async (contactId, upToMessageId, scope) => {
+      const row = contacts.get(contactId)
+      if (row === undefined || row.companyId !== scope.companyId) return 'ok'
+      const own = messagesOf(contactId, scope)
+      const target = upToMessageId === null ? own[0] : own.find((message) => message.id === upToMessageId)
+      if (target === undefined) return upToMessageId === null ? 'ok' : 'message_not_found'
+      if (row.lastReadAt === null || target.at > row.lastReadAt) contacts.set(contactId, { ...row, lastReadAt: target.at })
+      return 'ok'
+    },
+  )
+
+  const conversations: WhatsappConversationRepository = {
+    listLinkedCustomerIds,
+    listPage,
+    findContact,
+    findLatestContactOfCustomer,
+    listMessages,
+    countUnread,
+    findMediaMessage,
+    advanceLastRead,
+  }
+  const spies = {
+    listLinkedCustomerIds,
+    listPage,
+    findContact,
+    findLatestContactOfCustomer,
+    listMessages,
+    countUnread,
+    findMediaMessage,
+    advanceLastRead,
+  }
+  return {
+    conversations,
+    ...spies,
+    allSpies: () => Object.values(spies),
+    contact: (id: string) => {
+      const row = contacts.get(id)
+      return row === undefined ? undefined : { ...row }
+    },
+  }
+}
+
+export function customerRef(overrides: Partial<CustomerRef> = {}): CustomerRef {
+  return { id: CUSTOMER_ID, firstNames: 'Laura', lastNames: 'Gómez', isDeleted: false, ...overrides }
+}
+
+/** Catálogo de clientes por empresa. La búsqueda por nombre es un subcadena sin mayúsculas: basta aquí. */
+export function makeCustomerCatalog(byCompany: Record<string, readonly CustomerRef[]> = { [COMPANY_ID]: [customerRef()] }) {
+  const of = (companyId: string) => byCompany[companyId] ?? []
+  const findRefsIncludingDeleted = vi.fn<CustomerCatalog['findRefsIncludingDeleted']>(async (ids, companyId) =>
+    of(companyId).filter((ref) => ids.includes(ref.id)),
+  )
+  const findAliveRefById = vi.fn<CustomerCatalog['findAliveRefById']>(
+    async (id, companyId) => of(companyId).find((ref) => ref.id === id && !ref.isDeleted) ?? null,
+  )
+  const searchRefs = vi.fn<CustomerCatalog['searchRefs']>(async () => ({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 10,
+    totalPages: 1,
+  }))
+  const findAliveIdsMatchingName = vi.fn<CustomerCatalog['findAliveIdsMatchingName']>(async (search, ids, companyId) =>
+    of(companyId)
+      .filter(
+        (ref) =>
+          !ref.isDeleted &&
+          ids.includes(ref.id) &&
+          `${ref.firstNames} ${ref.lastNames}`.toLowerCase().includes(search.toLowerCase()),
+      )
+      .map((ref) => ref.id),
+  )
+  const customers: CustomerCatalog = { findRefsIncludingDeleted, findAliveRefById, searchRefs, findAliveIdsMatchingName }
+  return { customers, findRefsIncludingDeleted, findAliveRefById, searchRefs, findAliveIdsMatchingName }
+}
+
+/** Directorio de personas de la empresa: `names` es id → nombre mostrable, incluidas las dadas de baja. */
+export function makePeopleDirectory(names: Record<string, string> = {}) {
+  const findRefsIncludingDeletedInCompany = vi.fn<PeopleDirectory['findRefsIncludingDeletedInCompany']>(
+    async (companyId, ids) =>
+      companyId !== COMPANY_ID
+        ? []
+        : ids.flatMap((id) =>
+            names[id] === undefined
+              ? []
+              : [{ id, displayName: names[id], isActive: false, permissions: [], roleName: 'Administrador' }],
+          ),
+  )
+  return { people: { findRefsIncludingDeletedInCompany }, findRefsIncludingDeletedInCompany }
 }

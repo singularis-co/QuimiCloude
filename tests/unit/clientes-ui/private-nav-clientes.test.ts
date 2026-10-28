@@ -3,6 +3,10 @@
 // Se ITERA `PRIVATE_NAV_ITEMS` y se afirma sobre las constantes de ruta y de etiqueta y sobre los
 // `testId`, nunca sobre el literal del copy. El permiso de cada hijo se compara con el que exige
 // la `page.tsx` de su destino, leido de su fuente.
+//
+// Los `R<n>` sin prefijo son de QC-244 (el grupo y su cascaron). Los marcados `QC-246 R2` son de
+// QC-246: el hijo «Contactos» pasa a exigir `whatsapp.consultar` y desaparece del menu de quien no
+// lo trae, aunque tenga `clientes.consultar`.
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,6 +32,8 @@ import { CUSTOMER_CONTACTS_ROUTE, CUSTOMERS_ROUTE, SUPPLIERS_ROUTE } from '@/lib
 const RAIZ = join(__dirname, '..', '..', '..');
 
 const PERMISO = 'clientes.consultar';
+/** QC-246 D1: Contactos se ve con `whatsapp.consultar`, no con el permiso de la lista. */
+const PERMISO_CONTACTOS = 'whatsapp.consultar';
 const TESTID_GRUPO = 'nav-clientes';
 const TESTID_LISTA = 'nav-clientes-lista';
 const TESTID_CONTACTOS = 'nav-clientes-contactos';
@@ -128,7 +134,7 @@ describe('el grupo «Clientes» del menu', () => {
         href: CUSTOMER_CONTACTS_ROUTE,
         label: CUSTOMER_CONTACTS_LABEL,
         testId: TESTID_CONTACTOS,
-        permission: PERMISO,
+        permission: PERMISO_CONTACTOS,
       },
     ]);
     for (const hijo of GRUPO?.items ?? []) {
@@ -156,7 +162,7 @@ describe('el permiso de cada hijo es EL MISMO que exige su pantalla', () => {
       const permisos = permisosDeLaPantalla(hijo.href);
 
       expect(permisos).toEqual([hijo.permission]);
-      expect(hijo.permission).toBe(PERMISO);
+      expect(hijo.permission).toBe(hijo.testId === TESTID_CONTACTOS ? PERMISO_CONTACTOS : PERMISO);
     },
   );
 });
@@ -202,6 +208,54 @@ describe('el grupo se ve con el permiso y desaparece sin el', () => {
       }
     },
   );
+});
+
+describe('QC-246: el hijo «Contactos» exige whatsapp.consultar', () => {
+  const ROLES_SIN_WHATSAPP = ROLES_DEL_SEED.filter(
+    (rol) => !permisosDe(rol).includes(PERMISO_CONTACTOS),
+  );
+
+  /** Los `testId` de los hijos del grupo que sobreviven al filtrado, o `[]` si el grupo cae. */
+  function hijosVisibles(permisos: readonly string[]): readonly string[] {
+    const grupo = filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisos).find(
+      (item): item is NavGroup => item.kind === 'group' && item.testId === TESTID_GRUPO,
+    );
+    return grupo?.items.map((hijo) => hijo.testId) ?? [];
+  }
+
+  it('QC-246 R2: el hijo declara whatsapp.consultar, el mismo y unico que exige su page.tsx', () => {
+    const contactos = GRUPO?.items.find((hijo) => hijo.testId === TESTID_CONTACTOS);
+
+    expect(contactos?.permission).toBe(PERMISO_CONTACTOS);
+    // Anti-vacuidad: el codigo se leyo de la fuente de la pagina (T15) y no de una copia aqui.
+    expect(permisosDeLaPantalla(CUSTOMER_CONTACTS_ROUTE)).toEqual([PERMISO_CONTACTOS]);
+  });
+
+  it('QC-246 R2: con clientes.consultar y sin whatsapp.consultar se ve la lista y NO Contactos', () => {
+    const permisos = [PERMISO];
+
+    expect(hijosVisibles(permisos)).toEqual([TESTID_LISTA]);
+    const serializado = JSON.stringify(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisos));
+    for (const prohibido of [CUSTOMER_CONTACTS_ROUTE, CUSTOMER_CONTACTS_LABEL, TESTID_CONTACTOS]) {
+      expect(serializado, prohibido).not.toContain(prohibido);
+    }
+  });
+
+  it('QC-246 R2: con whatsapp.consultar el hijo aparece (Administrador del seed)', () => {
+    expect(permisosDe(ROLE_ADMINISTRADOR)).toContain(PERMISO_CONTACTOS);
+    expect(hijosVisibles(permisosDe(ROLE_ADMINISTRADOR))).toContain(TESTID_CONTACTOS);
+  });
+
+  it('QC-246 R2: ancla: hay roles del seed sin whatsapp.consultar', () => {
+    expect(ROLES_SIN_WHATSAPP.length).toBeGreaterThan(0);
+  });
+
+  it.each(ROLES_SIN_WHATSAPP)('QC-246 R2: %s, sin whatsapp.consultar, no recibe el hijo Contactos', (rol) => {
+    expect(hijosVisibles(permisosDe(rol))).not.toContain(TESTID_CONTACTOS);
+    expect(JSON.stringify(filterNavItemsByPermissions(PRIVATE_NAV_ITEMS, permisosDe(rol)))).not.toContain(
+      CUSTOMER_CONTACTS_ROUTE,
+    );
+  });
 });
 
 describe('lo que no cambia', () => {

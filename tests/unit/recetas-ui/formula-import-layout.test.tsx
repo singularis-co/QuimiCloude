@@ -321,7 +321,7 @@ describe('el resumen', () => {
     const user = setupUser();
     confirmFormulaImportActionMock.mockResolvedValue({
       status: 'success',
-      data: { recipeId: 'receta-nueva-id', outcome: 'replaced', rawMaterialsCreated: 2, rawMaterialsReused: 3 },
+      data: { recipeId: 'receta-nueva-id', outcome: 'replaced', rawMaterialsCreated: 2, rawMaterialsReused: 3, created: [], reused: [] },
     });
     renderReview({ ingredients: [ingrediente({ percentage: '100.00' })] });
 
@@ -362,7 +362,7 @@ describe('el resumen', () => {
     const user = setupUser();
     confirmFormulaImportActionMock.mockResolvedValue({
       status: 'success',
-      data: { recipeId: 'receta-nueva-id', outcome: 'created', rawMaterialsCreated: 0, rawMaterialsReused: 1 },
+      data: { recipeId: 'receta-nueva-id', outcome: 'created', rawMaterialsCreated: 0, rawMaterialsReused: 1, created: [], reused: [] },
     });
     renderReview({ ingredients: [ingrediente({ percentage: '100.00' })] });
 

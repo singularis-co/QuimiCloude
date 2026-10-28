@@ -26,16 +26,16 @@ import { recipeRowActionsSpec, type RecipeRowAction } from './recipe-row-actions
 export const RECIPE_TABLE_ID = 'recetas';
 
 export const RECIPE_TABLE_TEXTS: DataTableTexts = {
-  empty: 'No hay recetas que mostrar.',
-  loading: 'Cargando recetas…',
-  error: 'No se pudo cargar el catálogo de recetas.',
-  search: 'Buscar receta',
+  empty: 'No hay fórmulas que mostrar.',
+  loading: 'Cargando fórmulas…',
+  error: 'No se pudo cargar el catálogo de fórmulas.',
+  search: 'Buscar fórmula',
   filters: 'Filtros',
   columnMenu: 'opciones de la columna',
   previousPage: 'Página anterior',
   nextPage: 'Página siguiente',
   pageIndicator: (page, totalPages) => `Página ${page} de ${totalPages}`,
-  pageSize: 'Recetas por página',
+  pageSize: 'Fórmulas por página',
   sortAscending: 'Orden ascendente',
   sortDescending: 'Orden descendente',
   pinColumn: 'Fijar columna',
@@ -57,7 +57,7 @@ const RECIPE_TABLE_CARD: DataTableCardLayout = {
 
 type ActiveRecipe = { readonly recipe: RecipeSummary; readonly open: boolean };
 
-export const RECIPE_NO_RESULTS_TEXT = 'Ninguna receta coincide con la búsqueda o los filtros.';
+export const RECIPE_NO_RESULTS_TEXT = 'Ninguna fórmula coincide con la búsqueda o los filtros.';
 
 const CLEAR_SEARCH_LABEL = 'Limpiar búsqueda y filtros';
 const FIRST_PAGE_LABEL = 'Volver a la primera página';
@@ -118,8 +118,8 @@ function buildRecipeTableStates(
             testId: 'recipe-list-empty',
             message:
               empty.firstPageHref === undefined
-                ? 'Todavía no hay recetas en el catálogo.'
-                : 'Esta página ya no tiene recetas.',
+                ? 'Todavía no hay fórmulas en el catálogo.'
+                : 'Esta página ya no tiene fórmulas.',
             firstPage:
               empty.firstPageHref === undefined
                 ? undefined

@@ -27,6 +27,7 @@ import {
   SUPPLIERS_ROUTE,
   UNITS_ROUTE,
   USERS_ROUTE,
+  WHATSAPP_INTEGRATION_ROUTE,
 } from '@/lib/shared/routes'
 
 /** Sube desde este archivo hasta la raiz del repo (la carpeta con `package.json`). */
@@ -200,6 +201,13 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
   // Administradores del maestro- por la misma decision de diseno (`design.md > Componentes nuevos`
   // y `> 7.4`: `AdministratorTable` es `DataTable` con filtro «Empresa» y tarjeta). El ancla sube de
   // once a doce; una DECIMOTERCERA pantalla vuelve a poner esto en rojo.
+  //
+  // AMPLIADO el 2026-10-22 (QC-243, plantillas-whatsapp-frontend): entra la DECIMOTERCERA -el
+  // listado de plantillas de la pantalla de WhatsApp- y la trae una decision de diseno aprobada,
+  // no un descuido: `specs/QC-243-plantillas-whatsapp-frontend/design.md > Componentes: filas del
+  // catalogo consultadas y paso de la regla de decision`, fila «Listado de plantillas»: «reutiliza
+  // `DataTable` con `card`, `searchable`, `toolbarActions`». El ancla sube de doce a trece; una
+  // DECIMOCUARTA pantalla vuelve a poner esto en rojo.
   const consumerDirs = ['app', 'lib/modules', 'db', 'e2e']
 
   /**
@@ -236,6 +244,10 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     // 2026-10-16 (QC-166): la lista de Administradores del maestro, por la misma decision
     // (`design.md` de QC-166 > 7.4). Es la DUODECIMA.
     MAESTRO_ADMINISTRATORS_ROUTE,
+    // 2026-10-22 (QC-243): el listado de plantillas de WhatsApp se monta sobre la tabla compartida
+    // por decision de diseno (`design.md` de QC-243 > Componentes, fila «Listado de plantillas»).
+    // Es la DECIMOTERCERA.
+    WHATSAPP_INTEGRATION_ROUTE,
   ].map(carpetaDeRuta)
 
   function carpetaDeRuta(ruta: string): string {
@@ -248,7 +260,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     )
   }
 
-  it('solo las doce pantallas autorizadas importan components/shared/data-table', () => {
+  it('solo las trece pantallas autorizadas importan components/shared/data-table', () => {
     let consumidores = 0
     for (const relDir of consumerDirs) {
       const files = walkCodeFiles(join(repoRoot, ...relDir.split('/')))
@@ -256,7 +268,7 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
         if (!/components\/shared\/data-table/.test(readSource(file))) continue
         expect(
           autorizada(file),
-          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las doce pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes, dashboard, empresas y administradores del maestro): migrar una decimotercera es una decision, no un descuido (R29, R34)`,
+          `${relative(repoRoot, file)} importa components/shared/data-table y no es ninguna de las trece pantallas autorizadas (pedidos, inventario, proveedores, presentaciones, unidades, usuarios, recetas, asignacion, clientes, dashboard, empresas y administradores del maestro, y WhatsApp): migrar una decimocuarta es una decision, no un descuido (R29, R34)`,
         ).toBe(true)
         consumidores += 1
       }
@@ -265,8 +277,8 @@ describe('Alcance QC-55: sus consumidores son una lista CERRADA (R34)', () => {
     // TENSA con cada alta: hoy son NUEVE pantallas autorizadas, asi que se exige al menos un
     // consumidor por pantalla (2026-09-25; antes eran ocho). 2026-10-08 (QC-167): DIEZ, con el
     // dashboard. 2026-10-16 (QC-166): ONCE, con la lista de empresas del maestro, y DOCE con la de
-    // Administradores.
-    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(11)
+    // Administradores. 2026-10-22 (QC-243): TRECE, con el listado de plantillas de WhatsApp.
+    expect(consumidores, 'las pantallas autorizadas deberian consumir la tabla compartida').toBeGreaterThan(12)
   })
 
   it('la pantalla de recetas SI consume la tabla compartida (R29)', () => {
@@ -731,7 +743,12 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
   // pedido por `data-table-row-<id>` y `data-table-cell-orderNumber`. El centinela pasa de
   // CINCUENTA Y CINCO a CINCUENTA Y SEIS; la lista sigue CERRADA, y un spec mas que referencie
   // `data-table` vuelve a ponerla en rojo.
-  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y seis', () => {
+  //
+  // 2026-10-23: entra `e2e/inventario-familia-de-unidad.spec.ts` (QC-203), y no afloja la lista. No
+  // estrena tabla: recorre la lista de inventario, ya en esta lista, y lee el nombre del producto
+  // por `data-table-cell-name` para comprobar que el lote convertido entro en el homonimo. El
+  // centinela pasa de CINCUENTA Y SEIS a CINCUENTA Y SIETE; la lista sigue CERRADA.
+  it('la lista de specs E2E que referencian data-table es cerrada, y son estos cincuenta y siete', () => {
     const e2eFiles = walkCodeFiles(join(repoRoot, 'e2e'))
     expect(e2eFiles.length, 'e2e/ deberia tener specs que mirar').toBeGreaterThan(0)
     const referencian = e2eFiles
@@ -741,7 +758,7 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
     expect(referencian, 'e2e/errores.spec.ts no referencia la tabla compartida').not.toContain(
       'e2e/errores.spec.ts',
     )
-    expect(referencian, 'solo estos cincuenta y seis E2E pueden referenciar la tabla compartida (R36)').toEqual([
+    expect(referencian, 'solo estos cincuenta y siete E2E pueden referenciar la tabla compartida (R36)').toEqual([
       // Las pestanas del acondicionador: ver la nota de arriba (2026-10-08).
       'e2e/acondicionamiento.spec.ts',
       // Ver la nota de arriba (2026-10-12, QC-265). Tras `acondicionamiento` porque la lista esta
@@ -814,6 +831,9 @@ describe('Alcance QC-55: los E2E que lo referencian son una lista CERRADA (R36)'
       'e2e/helpers/product-name-cell.ts',
       // QC-199: ver la nota de arriba.
       'e2e/insumo-por-unidad.spec.ts',
+      // Ver la nota de arriba (2026-10-23, QC-203). Antes de `inventario-importar` porque la lista
+      // esta ORDENADA: 'f' precede a 'i'.
+      'e2e/inventario-familia-de-unidad.spec.ts',
       // Ver la nota de arriba (2026-10-06, QC-209). Va antes que `inventario.spec.ts` porque la
       // lista esta ORDENADA y '-' precede a '.'.
       'e2e/inventario-importar.spec.ts',

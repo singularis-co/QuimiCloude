@@ -86,6 +86,8 @@ export type CustomerTableProps = CustomerTableStatusProps & {
   readonly totalPages: number;
   /** Si la sesion trae `clientes.modificar`. Decision de presentacion, bajada por props. */
   readonly canModify: boolean;
+  /** Si la sesión trae `whatsapp.consultar`. */
+  readonly canChat?: boolean;
   /** País de la empresa, para el teléfono del alta y de la edición. */
   readonly companyCountry?: CountryCode | null;
   /**
@@ -168,6 +170,7 @@ export function CustomerTable({
   params,
   totalPages,
   canModify,
+  canChat = false,
   companyCountry = null,
   status = 'idle',
   error,
@@ -210,6 +213,7 @@ export function CustomerTable({
   const columns = useMemo(
     () =>
       buildCustomerColumns({
+        canChat,
         rowActions: (customer) => (
           <CustomerRowActions
             customer={customer}
@@ -218,7 +222,7 @@ export function CustomerTable({
           />
         ),
       }),
-    [canModify, companyCountry],
+    [canModify, canChat, companyCountry],
   );
 
   /*
