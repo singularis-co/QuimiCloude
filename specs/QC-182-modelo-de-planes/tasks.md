@@ -11,31 +11,31 @@
 
 ## Tanda 1 — Modelo y migración del esquema
 
-- [ ] **T1.1** Constante de moneda.
+- [x] **T1.1** Constante de moneda.
   - Archivos: `lib/modules/identity/domain/plan-currency.ts` (nuevo), `lib/modules/identity/index.ts`
     (reexporta `PLAN_CURRENCIES` y `PlanCurrency`).
   - Hecho: typecheck verde; el barril la exporta.
-- [ ] **T1.2** Modelos Prisma `Plan` y `PlanAddon`, relación inversa en `Addon` (design § 2.2).
+- [x] **T1.2** Modelos Prisma `Plan` y `PlanAddon`, relación inversa en `Addon` (design § 2.2).
   - Archivos: `db/schema.prisma`.
   - Depende de: —.
   - Hecho: `pnpm exec prisma validate` y `prisma generate` sin errores; los dos modelos con
     `/// @module identity`.
-- [ ] **T1.3** Migración `20261028120000_plans` con `migration.sql` y `down.sql` (design § 2.3).
+- [x] **T1.3** Migración `20261028120000_plans` con `migration.sql` y `down.sql` (design § 2.3).
   - Depende de: T1.2.
   - Hecho: `migrate deploy` sobre la base de test aplica; `pnpm run db:rollback` la revierte;
     `prisma migrate diff` solo muestra el drift conocido (`CHECK`, índice parcial).
-- [ ] **T1.4** Guardias y docs (design § 2.4).
+- [x] **T1.4** Guardias y docs (design § 2.4).
   - Archivos: `tests/guards/guard-empresa-en-esquema.test.ts` (`EXENTAS` + recuento a catorce),
     `docs/architecture.md` (bullet de exentas; frase en «Moneda por empresa»),
     `tests/guards/guard-identificador-de-request.test.ts` (`MIGRACIONES_ESPERADAS`).
   - Depende de: T1.3.
   - Hecho: `pnpm exec vitest run guard` verde (incluida `guard-rls-force`).
-- [ ] **T1.5** Test estático del esquema.
+- [x] **T1.5** Test estático del esquema.
   - Archivo: `tests/unit/identity/schema/plans-migration.test.ts`.
   - Cubre: **R1, R3, R7, R13, R26, R33** (design § 7). Cada predicado con su copia mutada en
     memoria que lo pone rojo.
   - Depende de: T1.1, T1.3.
-- [ ] **T1.6** Tests de integración del esquema.
+- [x] **T1.6** Tests de integración del esquema.
   - Archivos: `tests/integration/identity/plans-constraints.int.test.ts`,
     `tests/integration/identity/plans-migration.int.test.ts`, `tests/integration/aislamiento.json`
     (los dos en `transaccion`).

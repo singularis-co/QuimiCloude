@@ -436,6 +436,7 @@ export {
   createSetAllCompanyAddons,
   type SetAllCompanyAddonsDeps,
 } from './domain/set-all-company-addons';
+export { PLAN_CURRENCIES, type PlanCurrency } from './domain/plan-currency';
 
 // Administradores de cualquier empresa, gestionados desde la plataforma.
 export { CompanyLastAdministratorError } from './domain/errors';
