@@ -827,7 +827,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
   it('no nace ninguna columna de moneda (R16)', () => {
     const MONEDA = /currency|moneda|divisa|iso4217/i
     expect(order.fields.filter((candidate) => MONEDA.test(candidate.name))).toEqual([])
-    expect(schema).not.toMatch(/currency|moneda|divisa/i)
+    // QC-182 2026-10-29: se excluye el bloque `model Plan`, cuya moneda es propia de cada plan
+    // (CRC/USD); la moneda de los costes sigue implicita y prohibida en el resto del esquema.
+    const schemaSinPlan = schema.replace(/^model\s+Plan\s*\{[\s\S]*?^\}/m, '')
+    expect(schemaSinPlan).not.toMatch(/currency|moneda|divisa/i)
     for (const forbidden of ['currency', 'currencyCode', 'ingredientsCostCurrency']) {
       expect(has(order, forbidden), `Order.${forbidden} no debe existir`).toBe(false)
     }

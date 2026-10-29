@@ -411,7 +411,10 @@ describe('db/schema.prisma — modelo de proveedor y linea de catalogo', () => {
         expect(has(model, forbidden), `${forbidden} no debe existir`).toBe(false)
       }
     }
-    expect(schema).not.toMatch(/currency/i)
+    // QC-182 2026-10-29: se excluye el bloque `model Plan`, cuya moneda es propia de cada plan
+    // (CRC/USD); la moneda de los costes sigue implicita y prohibida en el resto del esquema.
+    const schemaSinPlan = schema.replace(/^model\s+Plan\s*\{[\s\S]*?^\}/m, '')
+    expect(schemaSinPlan).not.toMatch(/currency/i)
   })
 
   it('model Product no cambia y no gana ninguna relacion ni campo nuevo hacia proveedores', () => {
