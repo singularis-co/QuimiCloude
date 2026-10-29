@@ -877,7 +877,7 @@ describe('seedInitialAccess', () => {
     expect(codigosDe(ROLE_EMPACADOR)).not.toContain('documentos.modificar');
   });
 
-  it('QC-161 R8, R9: sobre una base vacia el Maestro recibe exactamente empresas.consultar y empresas.modificar; el Administrador, el Operador y el Empacador ningun empresas.*', async () => {
+  it('QC-161 R8, R9 y R28: sobre una base vacia el Maestro recibe exactamente empresas.consultar, empresas.modificar, planes.consultar y planes.modificar; el Administrador, el Operador y el Empacador ningun empresas.* ni planes.*', async () => {
     const repository = crearRepositorioFalso();
     const passwordHasher = crearHasherFalso();
     const checkCredentialPolicy = crearPoliticaFalsa();
@@ -896,9 +896,14 @@ describe('seedInitialAccess', () => {
     const codigosDe = (rol: string): string[] =>
       paresCreados.filter((par) => par.roleId === rolesCreados.get(rol)).map((par) => par.permissionCode);
     const deEmpresas = (codigos: readonly string[]): string[] =>
-      codigos.filter((codigo) => codigo.startsWith('empresas.'));
+      codigos.filter((codigo) => codigo.startsWith('empresas.') || codigo.startsWith('planes.'));
 
-    expect(codigosDe(ROLE_MAESTRO)).toEqual(['empresas.consultar', 'empresas.modificar']);
+    expect(codigosDe(ROLE_MAESTRO)).toEqual([
+      'empresas.consultar',
+      'empresas.modificar',
+      'planes.consultar',
+      'planes.modificar',
+    ]);
     expect(codigosDe(ROLE_ADMINISTRADOR)).toEqual([...(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [])]);
     expect(codigosDe(ROLE_ADMINISTRADOR).length).toBeGreaterThan(0);
     expect(deEmpresas(codigosDe(ROLE_ADMINISTRADOR))).toEqual([]);

@@ -179,6 +179,7 @@ model Company {
 model Addon {
   key       String                 @id
   overrides CompanyAddonOverride[]
+  plans     PlanAddon[]
 
   @@map("addons")
 }
@@ -202,6 +203,41 @@ model CompanyAddonOverride {
   @@index([addonKey], map: "company_addon_overrides_addon_key_idx")
   @@index([createdBy], map: "company_addon_overrides_created_by_idx")
   @@map("company_addon_overrides")
+}
+
+/// Plan de la plataforma, no de una empresa. Al menos uno de los dos precios, en la moneda del
+/// plan. La unicidad del nombre, los CHECK y la moneda permitida van escritos a mano en la
+/// migración: Prisma no los modela.
+/// @module identity
+model Plan {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  description  String?
+  currency     String    @db.VarChar(3)
+  monthlyPrice Decimal?  @map("monthly_price") @db.Decimal(14, 4)
+  annualPrice  Decimal?  @map("annual_price") @db.Decimal(14, 4)
+  active       Boolean
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  addons PlanAddon[]
+
+  @@map("plans")
+}
+
+/// Módulo que trae un plan. El núcleo no se lista: solo caben claves del catálogo de añadidos.
+/// @module identity
+model PlanAddon {
+  planId   String @map("plan_id") @db.Uuid
+  addonKey String @map("addon_key")
+
+  plan  Plan  @relation(fields: [planId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  addon Addon @relation(fields: [addonKey], references: [key], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([planId, addonKey], map: "plan_addons_pkey")
+  @@index([addonKey], map: "plan_addons_addon_key_idx")
+  @@map("plan_addons")
 }
 
 /// Sin `updatedAt` ni `deletedAt`: un evento no se corrige ni se borra. `kind` es texto con forma

@@ -31,12 +31,13 @@ consecuencias de arquitectura que no son opinables:
      autoriza por si solo**.
    - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la
      columna `company_id` exista, obligatoria u opcional. Las exentas son una lista corta
-     y cerrada de doce tablas: los catalogos compartidos por todas las empresas
+     y cerrada de catorce tablas: los catalogos compartidos por todas las empresas
      (`document_types`, `roles`, `permissions`, `role_permissions`, `ai_providers`, `ai_models`,
      `addons`), la propia empresa
      (`companies`), las que cuelgan de un usuario que ya tiene empresa
-     (`credential_setup_tokens`, `revoked_sessions`) y las que heredan la empresa de su
-     receta (`recipe_lines`, `recipe_tools`). La tabla de usuarios no es exenta: lleva su empresa. La
+     (`credential_setup_tokens`, `revoked_sessions`), las que heredan la empresa de su
+     receta (`recipe_lines`, `recipe_tools`) y los planes de la plataforma (`plans`,
+     `plan_addons`). La tabla de usuarios no es exenta: lleva su empresa. La
      lista la hace cumplir `tests/guards/guard-empresa-en-esquema.test.ts`, que la guarda
      con el motivo de cada entrada. Anadir una tabla de operacion sin empresa es BLOQUEANTE.
    - **Nada de infraestructura «por si acaso».** Es sobre-ingenieria —y el reviewer la
@@ -113,7 +114,8 @@ Cerrada: 4.** La historia de cada una esta en el `### Por qué` de esta seccion.
 5. **Moneda por empresa — ABIERTA.** La moneda del costo es hoy **implicita y no se guarda**.
    Si dos empresas pueden operar en monedas distintas, es columna nueva y conversion sobre
    datos ya cargados. **No se rellena con supuestos**: la cierra la primera ficha de
-   aislamiento que toque importes.
+   aislamiento que toque importes. La moneda de los **planes** de la plataforma si se guarda, una
+   por plan (`CRC` o `USD`), y eso **no** cierra esta pregunta: la moneda del costo sigue implicita.
 
 ### Por qué
 

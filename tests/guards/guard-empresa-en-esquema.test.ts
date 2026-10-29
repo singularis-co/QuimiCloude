@@ -96,6 +96,8 @@ export const EXENTAS: readonly Exenta[] = [
   { tabla: 'ai_providers', motivo: 'catalogo de proveedores de IA, compartido por todas las empresas' },
   { tabla: 'ai_models', motivo: 'catalogo de modelos de IA, compartido por todas las empresas' },
   { tabla: 'addons', motivo: 'catalogo de añadidos, compartido por todas las empresas' },
+  { tabla: 'plans', motivo: 'planes de la plataforma, compartidos por todas las empresas' },
+  { tabla: 'plan_addons', motivo: 'cuelga de un plan de la plataforma y del catalogo de añadidos' },
 ]
 
 function mensajeSinEmpresa(modelo: ModeloLeido): string {
@@ -262,7 +264,7 @@ describe('guardia — company_id en el esquema', () => {
     ])
   })
 
-  it('R7 EXENTAS son exactamente las doce y users no esta', () => {
+  it('R7 EXENTAS son exactamente las catorce y users no esta', () => {
     const tablas = EXENTAS.map((exenta) => exenta.tabla)
     expect(new Set(tablas)).toEqual(
       new Set([
@@ -278,9 +280,12 @@ describe('guardia — company_id en el esquema', () => {
         'ai_providers',
         'ai_models',
         'addons',
+        'plans',
+        'plan_addons',
       ]),
     )
-    expect(tablas).toHaveLength(12)
+    expect(tablas).toHaveLength(14)
+    expect(tablas.slice(-2)).toEqual(['plans', 'plan_addons'])
     expect(tablas).not.toContain('users')
   })
 
@@ -348,7 +353,8 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens` y',
-      '     `revoked_sessions`, `recipe_tools`, `ai_providers`, `ai_models` y `addons`.',
+      '     `revoked_sessions`, `recipe_tools`, `ai_providers`, `ai_models`, `addons`, `plans` y',
+      '     `plan_addons`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletSinRecipeLines, EXENTAS)).toEqual([
@@ -359,7 +365,8 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,',
-      '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers`, `ai_models`, `addons` y `users`.',
+      '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers`, `ai_models`, `addons`,',
+      '     `plans`, `plan_addons` y `users`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletConUsersDeMas, EXENTAS)).toEqual([
