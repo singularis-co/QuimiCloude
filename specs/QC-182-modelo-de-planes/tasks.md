@@ -77,7 +77,7 @@
 
 ## Tanda 3 — Cierre
 
-- [ ] **T3.1** Trazabilidad `R<n> → test` en `progress/impl_QC-182.md`, con los 33 requisitos y
+- [x] **T3.1** Trazabilidad `R<n> → test` en `progress/impl_QC-182.md`, con los 33 requisitos y
   la marca [P1] en R24 y R25.
 - [ ] **T3.2** `./init.sh` verde y todas las tareas de arriba marcadas. Sin E2E.
 
