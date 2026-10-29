@@ -258,7 +258,9 @@ async function indiceDelNombreDeUsuario(tx: Prisma.TransactionClient): Promise<s
 const MAESTRO_ROW = SEED_ROLES.find((role) => role.name === ROLE_MAESTRO)
 if (MAESTRO_ROW === undefined) throw new Error('SEED_ROLES no declara al Maestro')
 const EMPRESAS = PERMISSIONS.filter((permission) => permission.module === 'empresas')
-const CODIGOS_DEL_MAESTRO = [...(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? [])].sort()
+// Esta migracion solo reparte empresas.*; los planes.* del Maestro los reparte
+// 20261028120100_plans_permissions (QC-182).
+const CODIGOS_DEL_MAESTRO = (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).filter((code) => code.startsWith('empresas.')).sort()
 const ROLES_DE_EMPRESA = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR] as const
 
 // ---------------------------------------------------------------------------

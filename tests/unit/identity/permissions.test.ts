@@ -55,6 +55,9 @@ const CODIGOS_DEL_REQUISITO = [
   'whatsapp.enviar',
   // 2026-10-24: entra `whatsapp.consultar`, al final.
   'whatsapp.consultar',
+  // 2026-10-28: entran `planes.consultar` y `planes.modificar`, al final.
+  'planes.consultar',
+  'planes.modificar',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
@@ -78,7 +81,14 @@ const ENVIAR = 'whatsapp.enviar'
 // apoyan en ella) devuelve ahora el catalogo previo sin ninguno de los dos; los casos de
 // `whatsapp.enviar` comparan sin `whatsapp.consultar` con `sinConsultarWhatsapp`.
 const CONSULTAR_WHATSAPP = 'whatsapp.consultar'
-const sinConsultarWhatsapp = (codigo: string): boolean => codigo !== CONSULTAR_WHATSAPP
+// 2026-10-28: `planes.consultar` y `planes.modificar` entran detras de `whatsapp.consultar`.
+// `sinConsultarWhatsapp` (y las que se apoyan en ella) devuelve ahora el catalogo previo sin ellos;
+// los casos de `whatsapp.consultar` y los que fijan el Maestro comparan sin ellos con `sinPlanes`.
+const CODIGOS_DE_PLANES = ['planes.consultar', 'planes.modificar'] as const
+const esDePlanes = (codigo: string): boolean => codigo.startsWith('planes.')
+const sinPlanes = (codigo: string): boolean => !esDePlanes(codigo)
+const sinConsultarWhatsapp = (codigo: string): boolean =>
+  codigo !== CONSULTAR_WHATSAPP && sinPlanes(codigo)
 const sinEnviar = (codigo: string): boolean => codigo !== ENVIAR && sinConsultarWhatsapp(codigo)
 const sinAnular = (codigo: string): boolean => codigo !== ANULAR && sinEnviar(codigo)
 const sinEntregas = (codigo: string): boolean => codigo !== ENTREGAS && sinAnular(codigo)
@@ -233,6 +243,8 @@ const MODULOS = [
   'entregas',
   // 2026-10-23: como `usuarios`, no es carpeta de `lib/modules/`.
   'whatsapp',
+  // 2026-10-28: como `empresas`, no es carpeta de `lib/modules/`.
+  'planes',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -247,6 +259,7 @@ const MODULOS_CON_ESCRITURA = [
   'clientes',
   'documentos',
   'empresas',
+  'planes',
 ]
 const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 /** Modulos que solo escriben, sin consulta propia (R34): quien tiene el permiso ya ve el pedido
@@ -803,7 +816,7 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
   })
 
   it('R8: el Maestro recibe exactamente empresas.consultar y empresas.modificar, escritos uno a uno', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]?.filter(sinPlanes)).toEqual(['empresas.consultar', 'empresas.modificar'])
   })
 
   it('R9: el Administrador no tiene ningun empresas.* y sigue siendo el catalogo menos los excluidos', () => {
@@ -815,7 +828,8 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
           !esDeEmpresas(codigo) &&
           codigo !== 'empaque.modificar' &&
           codigo !== ACONDICIONAMIENTO &&
-          sinConsultarAsignaciones(codigo),
+          sinConsultarAsignaciones(codigo) &&
+          sinPlanes(codigo),
       ),
     )
   })
@@ -1001,13 +1015,13 @@ describe('QC-201 — el permiso asignaciones.ejecutar (R1, R2, R3, R4, R14)', ()
       'empaque.modificar',
     ])
     expect(SEED_ROLE_PERMISSIONS[ROLE_EMPACADOR]).not.toContain('asignaciones.ejecutar')
-    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]?.filter(sinPlanes)).toEqual(['empresas.consultar', 'empresas.modificar'])
     expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).not.toContain('asignaciones.ejecutar')
   })
 
   it('R14: asignaciones.ejecutar no entra en ADMIN_EXCLUDED_PERMISSIONS', () => {
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain('asignaciones.ejecutar')
-    expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
+    expect(ADMIN_EXCLUDED_PERMISSIONS.filter(sinPlanes)).toEqual([
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
@@ -1177,7 +1191,7 @@ describe('QC-216 — el permiso acondicionamiento.modificar y el Administrador d
       'terminados.consultar',
       'empaque.modificar',
     ])
-    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]?.filter(sinPlanes)).toEqual(['empresas.consultar', 'empresas.modificar'])
     for (const rol of [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO]) {
       expect(SEED_ROLE_PERMISSIONS[rol], rol).not.toContain(ACONDICIONAMIENTO)
     }
@@ -1304,7 +1318,7 @@ describe('QC-221 — el permiso integraciones.modificar', () => {
     expect(admin.indexOf(INTEGRACIONES)).toBe(admin.lastIndexOf(INTEGRACIONES))
     expect(admin.slice(0, -1)).toEqual(PERMISOS_DEL_ADMINISTRADOR_PREVIOS.filter(sinConsultarAsignaciones))
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(INTEGRACIONES)
-    expect(ADMIN_EXCLUDED_PERMISSIONS).toEqual([
+    expect(ADMIN_EXCLUDED_PERMISSIONS.filter(sinPlanes)).toEqual([
       'empaque.modificar',
       'empresas.consultar',
       'empresas.modificar',
@@ -1324,7 +1338,7 @@ describe('QC-221 — el permiso integraciones.modificar', () => {
       'terminados.consultar',
       'empaque.modificar',
     ])
-    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(['empresas.consultar', 'empresas.modificar'])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]?.filter(sinPlanes)).toEqual(['empresas.consultar', 'empresas.modificar'])
     expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([
       'asignaciones.consultar',
       'acondicionamiento.modificar',
@@ -1489,7 +1503,7 @@ describe('QC-137 — las notificaciones no tienen permiso propio', () => {
       'terminados.consultar',
       'empaque.modificar',
     ])
-    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual([...CODIGOS_DE_EMPRESAS])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]?.filter(sinPlanes)).toEqual([...CODIGOS_DE_EMPRESAS])
     expect(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]).toEqual([CONSULTAR_ASIGNACIONES, ACONDICIONAMIENTO])
   })
 })
@@ -1589,7 +1603,7 @@ describe('el permiso whatsapp.consultar', () => {
   }
 
   it('R1: el catalogo contiene whatsapp.consultar con su modulo, accion y descripcion exactos, al final y una sola vez', () => {
-    expect(PERMISSIONS.at(-1)).toEqual(ENTRADA_DE_CONSULTAR)
+    expect(PERMISSIONS.filter((permiso) => sinPlanes(permiso.code)).at(-1)).toEqual(ENTRADA_DE_CONSULTAR)
     expect(codigos.filter((codigo) => codigo === CONSULTAR_WHATSAPP)).toHaveLength(1)
     expect(codigos.filter((codigo) => codigo.startsWith('whatsapp.'))).toEqual([
       ENVIAR,
@@ -1598,7 +1612,10 @@ describe('el permiso whatsapp.consultar', () => {
   })
 
   it('R1: el catalogo es el previo, en el mismo orden y con los mismos campos, mas whatsapp.consultar', () => {
-    expect(codigos).toEqual([...codigos.filter(sinConsultarWhatsapp), CONSULTAR_WHATSAPP])
+    expect(codigos.filter(sinPlanes)).toEqual([
+      ...codigos.filter(sinConsultarWhatsapp),
+      CONSULTAR_WHATSAPP,
+    ])
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
     expect(PERMISSIONS.find((permiso) => permiso.code === ENVIAR)).toEqual({
       code: 'whatsapp.enviar',
@@ -1628,6 +1645,101 @@ describe('el permiso whatsapp.consultar', () => {
   it('R1: el JSDoc del catalogo tiene el parrafo de whatsapp.consultar, corto y sin citas', () => {
     const parrafo = parrafoDeConsultar()
     expect(parrafo).toBeDefined()
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).not.toMatch(citaFichaORequisito)
+  })
+})
+
+describe('los permisos de planes', () => {
+  const citaFichaORequisito = /QC-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADAS_DE_PLANES = [
+    {
+      code: 'planes.consultar',
+      module: 'planes',
+      action: 'consultar',
+      description: 'Consultar los planes de la plataforma.',
+    },
+    {
+      code: 'planes.modificar',
+      module: 'planes',
+      action: 'modificar',
+      description: 'Dar de alta, editar y desactivar los planes de la plataforma.',
+    },
+  ] as const
+
+  /** El Maestro exacto: el contrato es el conjunto, no «al menos estos». */
+  const PERMISOS_DEL_MAESTRO = [...CODIGOS_DE_EMPRESAS, ...CODIGOS_DE_PLANES]
+
+  function parrafoDePlanes(): string | undefined {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .find((bloque) => bloque.includes('planes.consultar'))
+  }
+
+  it('R27: el catalogo contiene planes.consultar y planes.modificar con sus campos exactos, al final y una sola vez cada uno', () => {
+    expect(PERMISSIONS.slice(-2)).toEqual([...ENTRADAS_DE_PLANES])
+    for (const codigo of CODIGOS_DE_PLANES) {
+      expect(codigos.filter((c) => c === codigo), codigo).toHaveLength(1)
+    }
+    expect(codigos.filter(esDePlanes)).toEqual([...CODIGOS_DE_PLANES])
+  })
+
+  it('R27: el catalogo es el previo, en el mismo orden y con los mismos campos, mas los dos de planes', () => {
+    expect(codigos).toEqual([...codigos.filter(sinPlanes), ...CODIGOS_DE_PLANES])
+    expect(codigos.filter(sinPlanes)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinPlanes))
+    expect(PERMISSIONS.find((permiso) => permiso.code === CONSULTAR_WHATSAPP)).toEqual({
+      code: 'whatsapp.consultar',
+      module: 'whatsapp',
+      action: 'consultar',
+      description: 'Ver las conversaciones de WhatsApp con los clientes de la empresa.',
+    })
+    for (const previo of PERMISOS_PREVIOS) {
+      expect(PERMISSIONS.find((permiso) => permiso.code === previo.code), previo.code).toEqual(previo)
+    }
+  })
+
+  it('R28: el Maestro recibe exactamente empresas.consultar, empresas.modificar, planes.consultar y planes.modificar', () => {
+    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(PERMISOS_DEL_MAESTRO)
+
+    // Caso simetrico: quitar cualquiera de los dos de planes rompe la igualdad.
+    for (const codigo of CODIGOS_DE_PLANES) {
+      const sinUno = (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).filter((c) => c !== codigo)
+      expect(sinUno, codigo).not.toEqual(PERMISOS_DEL_MAESTRO)
+    }
+  })
+
+  it('R29: ningun rol que no sea el Maestro recibe planes.consultar ni planes.modificar', () => {
+    const otrosRoles = Object.keys(SEED_ROLE_PERMISSIONS).filter((rol) => rol !== ROLE_MAESTRO)
+    expect(otrosRoles.sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    for (const rol of otrosRoles) {
+      expect((SEED_ROLE_PERMISSIONS[rol] ?? []).filter(esDePlanes), rol).toEqual([])
+    }
+
+    // Caso simetrico: el detector caza un rol de empresa que si los recibe.
+    const conPlanes = [...(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? []), 'planes.consultar']
+    expect(conPlanes.filter(esDePlanes)).not.toEqual([])
+  })
+
+  it('R29: el Administrador no los recibe porque estan en ADMIN_EXCLUDED_PERMISSIONS, y sigue siendo el catalogo menos los excluidos', () => {
+    expect(ADMIN_EXCLUDED_PERMISSIONS.slice(-2)).toEqual([...CODIGOS_DE_PLANES])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(CODIGOS_DEL_ADMINISTRADOR.filter(esDePlanes)).toEqual([])
+  })
+
+  it('R27: el JSDoc del catalogo tiene el parrafo de planes, corto y sin citas', () => {
+    const parrafo = parrafoDePlanes()
+    expect(parrafo).toBeDefined()
+    expect(parrafo).toContain('planes.modificar')
     expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
     expect(parrafo).not.toMatch(citaFichaORequisito)
   })

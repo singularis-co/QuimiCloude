@@ -88,6 +88,10 @@ import {
  * bandeja no necesita escribir, y quien envia desde otra pantalla no necesita leer. Lo recibe
  * unicamente el Administrador.
  *
+ * `planes` suma `planes.consultar` y `planes.modificar`, ver y mantener los planes de la
+ * plataforma. Como `empresas`, su modulo no es una carpeta de `lib/modules/`. Solo los recibe el
+ * Maestro.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -273,6 +277,18 @@ export const PERMISSIONS = [
     action: 'consultar',
     description: 'Ver las conversaciones de WhatsApp con los clientes de la empresa.',
   },
+  {
+    code: 'planes.consultar',
+    module: 'planes',
+    action: 'consultar',
+    description: 'Consultar los planes de la plataforma.',
+  },
+  {
+    code: 'planes.modificar',
+    module: 'planes',
+    action: 'modificar',
+    description: 'Dar de alta, editar y desactivar los planes de la plataforma.',
+  },
 ] as const;
 
 /**
@@ -292,8 +308,8 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
  * `empaque.modificar`, sin `inventario.consultar` ni `asignaciones.modificar`.
  *
- * El Maestro nace con exactamente `empresas.consultar` y `empresas.modificar`, y ningun rol de
- * empresa recibe ninguno de los dos.
+ * El Maestro nace con exactamente `empresas.consultar`, `empresas.modificar`, `planes.consultar`
+ * y `planes.modificar`, y ningun rol de empresa recibe ninguno de los cuatro.
  *
  * El Administrador de acondicionamiento nace con exactamente `asignaciones.consultar` y
  * `acondicionamiento.modificar`.
@@ -328,14 +344,19 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],
-  [ROLE_MAESTRO]: ['empresas.consultar', 'empresas.modificar'],
+  [ROLE_MAESTRO]: [
+    'empresas.consultar',
+    'empresas.modificar',
+    'planes.consultar',
+    'planes.modificar',
+  ],
   [ROLE_ACONDICIONAMIENTO]: ['asignaciones.consultar', 'acondicionamiento.modificar'],
 };
 
 /**
  * Los codigos del catalogo que el Administrador NO recibe, aunque exista un modulo que los
- * declare: el empaque es tarea del Empacador y las empresas son cosa de la plataforma, no de una
- * empresa. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
+ * declare: el empaque es tarea del Empacador y las empresas y los planes son cosa de la
+ * plataforma, no de una empresa. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
  * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
  *
  * El acondicionamiento es tarea del Administrador de acondicionamiento; el Administrador lo
@@ -351,4 +372,6 @@ export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = [
   'empresas.modificar',
   'acondicionamiento.modificar',
   'asignaciones.consultar',
+  'planes.consultar',
+  'planes.modificar',
 ];

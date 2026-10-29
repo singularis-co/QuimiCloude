@@ -187,3 +187,23 @@ describe('el permiso whatsapp.consultar viaja con el añadido integraciones', ()
     expect(effectivePermissions(rol, ['integraciones'])).toEqual(rol)
   })
 })
+
+describe('los permisos de planes son del núcleo', () => {
+  const PLANES = ['planes.consultar', 'planes.modificar']
+
+  it('R30 — CORE_PERMISSIONS los contiene y ningún añadido los declara', () => {
+    for (const codigo of PLANES) {
+      expect(CORE_PERMISSIONS as readonly string[], codigo).toContain(codigo)
+      expect(deAnadidos, codigo).not.toContain(codigo)
+    }
+  })
+
+  it('R30 — effectivePermissions los conserva con ningún añadido activo y con cualquiera', () => {
+    const maestro = ['empresas.consultar', 'empresas.modificar', ...PLANES]
+    expect(effectivePermissions(maestro, [])).toEqual(maestro)
+    for (const addon of ADDONS) {
+      expect(effectivePermissions(maestro, [addon]), addon).toEqual(maestro)
+    }
+    expect(effectivePermissions(maestro, [...ADDONS])).toEqual(maestro)
+  })
+})

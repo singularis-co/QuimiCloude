@@ -203,7 +203,9 @@ export function writesUserRows(sql: string): boolean {
 
 const MAESTRO_ROW = SEED_ROLES.find((role) => role.name === ROLE_MAESTRO)
 const EMPRESAS_PERMISSIONS = PERMISSIONS.filter((permission) => permission.module === 'empresas')
-const CODIGOS_DEL_MAESTRO = SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []
+// Esta migracion solo reparte empresas.*; los planes.* del Maestro los reparte
+// 20261028120100_plans_permissions (QC-182).
+const CODIGOS_DEL_MAESTRO = (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).filter((code) => code.startsWith('empresas.'))
 
 function literalsOf(fragment: string): string[] {
   return [...fragment.matchAll(/'((?:[^']|'')*)'/g)].map((m) => (m[1] as string).replace(/''/g, "'"))

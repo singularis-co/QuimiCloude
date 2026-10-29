@@ -46,17 +46,17 @@
 
 ## Tanda 2 — Permisos de planes
 
-- [ ] **T2.1** Catálogo, seed por rol, exclusiones y núcleo (design § 4.1, § 4.2).
+- [x] **T2.1** Catálogo, seed por rol, exclusiones y núcleo (design § 4.1, § 4.2).
   - Archivos: `lib/modules/identity/domain/permissions.ts`,
     `lib/modules/identity/domain/company-addons.ts`.
   - Hecho: typecheck verde; `guard-permisos-sembrados` y `guard-permisos-no-administrables` verdes.
-- [ ] **T2.2** Migración de datos `20261028120100_plans_permissions` con `migration.sql` y
+- [x] **T2.2** Migración de datos `20261028120100_plans_permissions` con `migration.sql` y
   `down.sql` (design § 4.3).
   - Archivos: las dos de la carpeta; `tests/guards/guard-identificador-de-request.test.ts`
     (`MIGRACIONES_ESPERADAS`).
   - Depende de: T2.1, T1.4 (mismo archivo de guardia).
   - Hecho: aplica y revierte sobre la base de test.
-- [ ] **T2.3** Tests que fijan el catálogo y el Maestro, por arrastre (design § 6).
+- [x] **T2.3** Tests que fijan el catálogo y el Maestro, por arrastre (design § 6).
   - Archivos: `tests/unit/identity/permissions.test.ts`,
     `tests/unit/identity/seed/seed-initial-access.test.ts`,
     `tests/unit/navegacion/qc75-convenciones.test.ts`,
@@ -67,7 +67,7 @@
   - Depende de: T2.1.
   - Hecho: los casos previos siguen verdes comparando sin `planes.*`; los nuevos fallan si se
     quita cualquiera de los dos códigos del Maestro o se le da a otro rol.
-- [ ] **T2.4** Tests de la migración de permisos y del seed.
+- [x] **T2.4** Tests de la migración de permisos y del seed.
   - Archivos: `tests/unit/identity/schema/plans-permissions-migration.test.ts`,
     `tests/integration/identity/plans-permissions-migration.int.test.ts`,
     `tests/integration/identity/identity-seed.int.test.ts`, `tests/integration/aislamiento.json`.

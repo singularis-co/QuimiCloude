@@ -85,6 +85,9 @@ export const CODIGOS_QC74 = [
   'whatsapp.enviar',
   // 2026-10-24
   'whatsapp.consultar',
+  // 2026-10-28
+  'planes.consultar',
+  'planes.modificar',
 ] as const;
 
 /** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
@@ -175,6 +178,8 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         // 2026-10-23: `whatsapp` tampoco es carpeta de `lib/modules/`; lleva `enviar` y, desde
         // 2026-10-24, `consultar`.
         'whatsapp',
+        // 2026-10-28: como `empresas`, `planes` no es carpeta de `lib/modules/`.
+        'planes',
       ]),
     ].sort();
     expect(modulos).toEqual(esperados);
