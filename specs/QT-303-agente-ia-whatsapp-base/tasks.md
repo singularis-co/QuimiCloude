@@ -34,13 +34,13 @@
 
 ## Tanda 2 — Esquema `[P]` con la tanda 1
 
-- [ ] **T2.1** `db/schema.prisma`: enums `WhatsappConversationMode` y
+- [x] **T2.1** `db/schema.prisma`: enums `WhatsappConversationMode` y
   `WhatsappConversationModeReason` (con `COMPLAINT`, `NEGATIVE_SENTIMENT`, `UNSUPPORTED_MEDIA`,
   D14), cuatro campos en `WhatsappContact`, modelo `WhatsappAgentSettings`
   (`/// @module integraciones`, con `assistantName` opcional) y `AGENT` en
   `WhatsappMessageOrigin` (D6). *Hecho:* `prisma validate` y `guard-arquitectura-modulos` /
   `guard-empresa-en-esquema` verdes.
-- [ ] **T2.2** Migración `20261030120000_whatsapp_agent` (`migration.sql` + `down.sql`) según
+- [x] **T2.2** Migración `20261030120000_whatsapp_agent` (`migration.sql` + `down.sql`) según
   `design.md > Migración 1`. *Hecho:* test de integración que comprueba: contactos existentes en
   `AGENT` con motivo y fecha nulos (R19), CHECK que rechaza `HUMAN` sin motivo/fecha y motivo sin
   fecha (R31), los tres motivos nuevos admitidos en `HUMAN` (R21), CHECK de rangos, mensajes y
@@ -48,7 +48,7 @@
   → admitido), una sola fila por empresa (R17), RLS activada y forzada (R32), `AGENT` admitido
   como origen sin tocar mensajes existentes (R33), y que `down.sql` deja el esquema como estaba.
   Depende de T2.1.
-- [ ] **T2.3** `WHATSAPP_MESSAGE_ORIGINS` gana `'AGENT'` en `domain/whatsapp-message.ts` (D6).
+- [x] **T2.3** `WHATSAPP_MESSAGE_ORIGINS` gana `'AGENT'` en `domain/whatsapp-message.ts` (D6).
   *Hecho:* typecheck verde; test unitario de R33 (el dominio admite `AGENT`).
 
 ## Tanda 3 — Configuración del agente (depende de 1 y 2)

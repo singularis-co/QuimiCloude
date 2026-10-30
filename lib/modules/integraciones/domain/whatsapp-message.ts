@@ -29,7 +29,7 @@ export const WHATSAPP_MESSAGE_STATUSES = [
 ] as const;
 export type WhatsappMessageStatus = (typeof WHATSAPP_MESSAGE_STATUSES)[number];
 
-export const WHATSAPP_MESSAGE_ORIGINS = ['USER', 'SYSTEM'] as const;
+export const WHATSAPP_MESSAGE_ORIGINS = ['USER', 'SYSTEM', 'AGENT'] as const;
 export type WhatsappMessageOrigin = (typeof WHATSAPP_MESSAGE_ORIGINS)[number];
 
 /** Un entrante nace con este estado y ningún status de Meta lo cambia. */

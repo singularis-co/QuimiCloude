@@ -859,6 +859,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261028120000_plans',
   // 2026-10-28: los permisos planes.consultar y planes.modificar; no toca el identificador.
   '20261028120100_plans_permissions',
+  // 2026-10-30: el modo de las conversaciones y la configuracion del agente; no toca el identificador.
+  '20261030120000_whatsapp_agent',
 ] as const
 
 export function hallazgosDeMigraciones(

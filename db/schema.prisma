@@ -1318,8 +1318,32 @@ enum WhatsappMessageStatus {
 enum WhatsappMessageOrigin {
   USER
   SYSTEM
+  AGENT
 
   @@map("whatsapp_message_origin")
+}
+
+enum WhatsappConversationMode {
+  AGENT
+  HUMAN
+
+  @@map("whatsapp_conversation_mode")
+}
+
+enum WhatsappConversationModeReason {
+  MANUAL
+  CUSTOMER_REQUEST
+  MISSING_DATA
+  LOW_CONFIDENCE
+  AI_ERROR
+  USAGE_LIMIT
+  USER_REPLY
+  COMPLAINT
+  NEGATIVE_SENTIMENT
+  UNSUPPORTED_MEDIA
+  INACTIVITY
+
+  @@map("whatsapp_conversation_mode_reason")
 }
 
 /// Sin `@relation`: las FK compuestas con `company_id` (a la conexion, al cliente y, en los
@@ -1343,10 +1367,16 @@ model WhatsappContact {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  conversationMode          WhatsappConversationMode        @default(AGENT) @map("conversation_mode")
+  conversationModeReason    WhatsappConversationModeReason? @map("conversation_mode_reason")
+  conversationModeChangedAt DateTime?                       @map("conversation_mode_changed_at") @db.Timestamptz(6)
+  conversationModeChangedBy String?                         @map("conversation_mode_changed_by") @db.Uuid
+
   @@unique([connectionId, waId], map: "whatsapp_contacts_connection_id_wa_id_key")
   @@unique([companyId, id], map: "whatsapp_contacts_company_id_id_key")
   @@unique([companyId, connectionId, id], map: "whatsapp_contacts_company_connection_id_key")
   @@index([customerId], map: "whatsapp_contacts_customer_id_idx")
+  @@index([conversationModeChangedBy], map: "whatsapp_contacts_conversation_mode_changed_by_idx")
   @@map("whatsapp_contacts")
 }
 
@@ -1567,6 +1597,28 @@ model AiProviderConnection {
 
   @@index([provider], map: "ai_provider_connections_provider_idx")
   @@map("ai_provider_connections")
+}
+
+/// Sin fila, la empresa usa los valores por defecto del dominio: por eso ningún campo de negocio
+/// lleva `@default`. Sin `@relation`: las FK a `companies` y `users` y los CHECK están escritos a
+/// mano en la migración. `greetingMessage` guarda la plantilla con `{nombre}` sin resolver.
+/// @module integraciones
+model WhatsappAgentSettings {
+  companyId               String   @id(map: "whatsapp_agent_settings_pkey") @map("company_id") @db.Uuid
+  enabled                 Boolean
+  confidenceThreshold     Decimal  @map("confidence_threshold") @db.Decimal(3, 2)
+  dailyReplyLimit         Int      @map("daily_reply_limit")
+  contactHourlyReplyLimit Int      @map("contact_hourly_reply_limit")
+  inactivityHours         Int      @map("inactivity_hours")
+  handoffMessage          String   @map("handoff_message")
+  greetingMessage         String   @map("greeting_message")
+  assistantName           String?  @map("assistant_name")
+  updatedById             String   @map("updated_by") @db.Uuid
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([updatedById], map: "whatsapp_agent_settings_updated_by_idx")
+  @@map("whatsapp_agent_settings")
 }
 
 /// Sin `@relation`: las FK a `companies`, `users` y `roles` cruzan de módulo y están escritas a mano

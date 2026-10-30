@@ -55,6 +55,7 @@
     "identity/whatsapp-read-permission-migration.int.test.ts",
     "identity/whatsapp-send-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
+    "integraciones/whatsapp-agent-schema.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
     "integraciones/whatsapp-contacts-last-read-migration.int.test.ts",
     "integraciones/whatsapp-conversation-prisma.int.test.ts",
