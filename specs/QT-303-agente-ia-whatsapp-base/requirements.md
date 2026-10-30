@@ -34,14 +34,26 @@ que tocan a esta ficha.
 |---|---|---|
 | D1 | Nuevo añadido `agente_ia_whatsapp` que requiere `integraciones`, con permisos propios (consultar y modificar la configuración). | R1–R7 |
 | D2 | Configuración por empresa: activo, umbral de confianza (0.6), respuestas por día (500), respuestas por contacto por hora (20), horas de inactividad para volver al agente (12), mensaje de paso a humano. | R8–R18 |
-| D3 | El agente se presenta como asistente virtual al iniciar e indica cómo pedir un asesor (aquí: el texto de presentación vive en la configuración). | R8, R14 |
+| D3 | El agente se presenta como asistente virtual al iniciar e indica cómo pedir un asesor (aquí: el texto de presentación vive en la configuración). | R8, R14, R35 |
 | D4 | Modo por conversación `AGENTE`/`HUMANO`, con motivo y fecha del último cambio. | R19–R21, R31 |
 | D5 | La conversación vuelve al agente a mano (botón) o sola tras las horas de inactividad configuradas. | R24–R25, R29–R30 |
 
+Respuestas del humano del 2026-10-30 a las preguntas abiertas P1–P9 del primer borrador.
+
+| # | Decisión | Cubierta por |
+|---|---|---|
+| D6 (P1) | Los mensajes del agente tienen un origen propio: valor nuevo `AGENT` en `WhatsappMessageOrigin` (solo el valor; nadie lo escribe hasta QT-307). | R33 |
+| D7 (P2) | Pasar a humano y devolver al agente: `whatsapp.enviar` + añadido `agente_ia_whatsapp` activo. Consultar el modo: `whatsapp.consultar` + añadido activo. | R26, R28 |
+| D8 (P3) | `agente_ia.consultar` y `agente_ia.modificar` solo para el rol Administrador. | R5 |
+| D9 (P4) | Al aplicar la migración, el añadido nace **prendido** en las empresas existentes que hoy tienen `integraciones` prendido, y apagado en las demás. La configuración del agente sigue naciendo con activo = `false`. | R6, R8 |
+| D10 (P5) | Textos del añadido en la plataforma: nombre «Agente de IA para WhatsApp», descripción «Responde por WhatsApp con la IA de la empresa y pasa a una persona cuando hace falta.», icono `BotIcon`. | R7 |
+| D11 (P6) | Campo opcional «nombre del asistente». El saludo es personalizable; su valor por defecto es «Hola, soy el asistente virtual {nombre}. Si prefieres hablar con una persona, escribe "asesor".», donde `{nombre}` se resuelve con el nombre del asistente o se quita con su espacio si no hay nombre, también en un saludo escrito por la empresa. Mensaje de paso a humano por defecto: «Te comunico con una persona del equipo. Te responderá en cuanto pueda.» | R8, R14, R16, R34–R36 |
+| D12 (P7) | Rangos: umbral en [0, 1] con hasta dos decimales; respuestas por día, por contacto por hora y horas de inactividad enteros ≥ 1 sin tope superior. Apagar el agente es activo = `false`. | R11–R13 |
+| D13 (P8) | Modo inicial `AGENTE` para conversaciones nuevas y existentes. | R19 |
+| D14 (P9) | Los motivos de paso a `HUMANO` incluyen ya reclamo, sentimiento negativo y medio no soportado, además de los del contexto común. | R21 |
+
 ## Requisitos (EARS)
 
-> Los requisitos marcados **[Pn]** dependen de la propuesta por defecto de la pregunta abierta
-> Pn; si el humano la responde de otra forma, cambian o salen.
 > «Rechaza» significa: lanza el error del módulo y no lee ni escribe datos de negocio.
 
 ### Añadido y permisos
@@ -56,53 +68,74 @@ que tocan a esta ficha.
 - **R4.** MIENTRAS `agente_ia_whatsapp` no esté activo en la empresa del usuario, el sistema DEBE
   quitar `agente_ia.consultar` y `agente_ia.modificar` de sus permisos efectivos.
 - **R5.** El sistema DEBE dar `agente_ia.consultar` y `agente_ia.modificar` al rol Administrador,
-  en el sembrado del código y en la base, y a ningún otro rol. **[P3]**
-- **R6.** CUANDO se aplica la migración, el sistema NO DEBE prender `agente_ia_whatsapp` en
-  ninguna empresa existente. **[P4]**
-- **R7.** El sistema DEBE tener nombre visible, descripción e icono para `agente_ia_whatsapp` en
-  los catálogos de nombres y detalles de añadidos. **[P5]**
+  en el sembrado del código y en la base, y a ningún otro rol.
+- **R6.** CUANDO se aplica la migración, el sistema DEBE prender `agente_ia_whatsapp` en cada
+  empresa existente (también las de baja) que tenga `integraciones` prendido, NO DEBE prenderlo en
+  ninguna otra empresa y NO DEBE cambiar ninguna otra excepción de añadidos; al revertirla, DEBE
+  quitar las excepciones de `agente_ia_whatsapp` sin tocar las de los demás añadidos.
+- **R7.** El sistema DEBE tener para `agente_ia_whatsapp` el nombre visible «Agente de IA para
+  WhatsApp», la descripción «Responde por WhatsApp con la IA de la empresa y pasa a una persona
+  cuando hace falta.» y el icono `BotIcon` en los catálogos de nombres y detalles de añadidos.
 
 ### Configuración del agente por empresa
 
 - **R8.** CUANDO se consulta la configuración de una empresa que nunca la guardó, el sistema DEBE
   devolver: activo `false`, umbral de confianza `0.6`, 500 respuestas por día, 20 respuestas por
-  contacto por hora, 12 horas de inactividad, y los textos por defecto del mensaje de paso a
-  humano y del mensaje de presentación. **[P6]**
+  contacto por hora, 12 horas de inactividad, sin nombre del asistente, el mensaje de paso a
+  humano «Te comunico con una persona del equipo. Te responderá en cuanto pueda.» y el saludo
+  «Hola, soy el asistente virtual {nombre}. Si prefieres hablar con una persona, escribe
+  "asesor".» (con `{nombre}` literal, sin resolver).
 - **R9.** SI quien consulta la configuración no tiene `agente_ia.consultar` o no tiene empresa,
   ENTONCES el sistema DEBE rechazar la consulta.
 - **R10.** SI quien guarda la configuración no tiene `agente_ia.modificar` o no tiene empresa,
   ENTONCES el sistema DEBE rechazar el guardado.
 - **R11.** SI el umbral de confianza no es un número entre 0 y 1, ambos incluidos, o tiene más de
-  dos decimales, ENTONCES el sistema DEBE rechazar el guardado. **[P7]**
+  dos decimales, ENTONCES el sistema DEBE rechazar el guardado.
 - **R12.** SI las respuestas por día o las respuestas por contacto por hora no son un entero mayor
-  o igual que 1, ENTONCES el sistema DEBE rechazar el guardado. **[P7]**
+  o igual que 1, ENTONCES el sistema DEBE rechazar el guardado.
 - **R13.** SI las horas de inactividad no son un entero mayor o igual que 1, ENTONCES el sistema
-  DEBE rechazar el guardado. **[P7]**
-- **R14.** SI el mensaje de paso a humano o el mensaje de presentación está vacío o solo tiene
-  espacios, o supera la longitud máxima de un texto de WhatsApp (4096 caracteres), ENTONCES el
-  sistema DEBE rechazar el guardado.
-- **R15.** SI a la entrada del guardado le falta un campo o trae el campo `activo` con un valor que
-  no es booleano, ENTONCES el sistema DEBE rechazar el guardado.
+  DEBE rechazar el guardado.
+- **R14.** SI el mensaje de paso a humano o el saludo está vacío o solo tiene espacios, o supera
+  la longitud máxima de un texto de WhatsApp (4096 caracteres), ENTONCES el sistema DEBE rechazar
+  el guardado.
+- **R15.** SI a la entrada del guardado le falta un campo distinto del nombre del asistente, o
+  trae el campo `activo` con un valor que no es booleano, ENTONCES el sistema DEBE rechazar el
+  guardado.
 - **R16.** CUANDO se guarda una configuración válida, el sistema DEBE reemplazar todos los campos
-  de la configuración de la empresa del usuario, guardar los mensajes sin los espacios de los
-  extremos y registrar quién y cuándo la cambió por última vez; la consulta siguiente DEBE
-  devolver los valores guardados.
+  de la configuración de la empresa del usuario, guardar los mensajes y el nombre del asistente
+  sin los espacios de los extremos y registrar quién y cuándo la cambió por última vez; la
+  consulta siguiente DEBE devolver los valores guardados.
 - **R17.** El sistema DEBE guardar como máximo una configuración por empresa, también con dos
   guardados concurrentes de la misma empresa.
 - **R18.** El sistema DEBE tomar la empresa de la configuración del usuario que actúa y nunca de la
   entrada: una empresa no puede leer ni escribir la configuración de otra.
+- **R34.** CUANDO se guarda una configuración sin nombre del asistente, con nombre nulo o con un
+  nombre que solo tiene espacios, el sistema DEBE guardarla sin nombre del asistente; SI el nombre
+  recortado supera 60 caracteres o no es un texto, ENTONCES el sistema DEBE rechazar el guardado.
+  *(60 es un supuesto del spec: D11 pide «una longitud máxima razonable» sin fijar el número; se
+  cambia en una sola constante.)*
+- **R35.** CUANDO se resuelve el saludo con un nombre del asistente, el sistema DEBE reemplazar
+  cada `{nombre}` del saludo por ese nombre, sin volver a resolver un `{nombre}` que venga dentro
+  del propio nombre; CUANDO se resuelve sin nombre del asistente, DEBE quitar cada `{nombre}` junto
+  con el espacio que lo precede o, si no lo precede un espacio, con el que lo sigue. Con el saludo
+  por defecto y sin nombre el resultado DEBE ser «Hola, soy el asistente virtual. Si prefieres
+  hablar con una persona, escribe "asesor".». La regla vale igual para un saludo escrito por la
+  empresa y para uno sin `{nombre}`, que queda tal cual.
+- **R36.** SI el saludo resuelto con el nombre del asistente que se guarda queda vacío o solo con
+  espacios, o supera 4096 caracteres, ENTONCES el sistema DEBE rechazar el guardado.
 
 ### Modo de la conversación
 
 - **R19.** El sistema DEBE guardar para cada conversación un modo, `AGENTE` o `HUMANO`; una
   conversación cuyo modo nunca cambió DEBE estar en `AGENTE`, también las que ya existen al aplicar
-  la migración. **[P8]**
+  la migración.
 - **R20.** CUANDO cambia el modo de una conversación, el sistema DEBE guardar el motivo, la fecha
   del cambio y el usuario que lo hizo, o ningún usuario si el cambio lo hizo el sistema.
 - **R21.** SI se pide un cambio de modo con un motivo que no es de los admitidos para el modo de
   destino, ENTONCES el sistema DEBE rechazarlo. Motivos de paso a `HUMANO`: a mano por un usuario,
   el cliente lo pide, falta el dato, confianza baja, error de IA, tope de uso, un usuario respondió
-  a mano. Motivos de vuelta a `AGENTE`: a mano por un usuario, inactividad. **[P9]**
+  a mano, reclamo, sentimiento negativo, medio no soportado. Motivos de vuelta a `AGENTE`: a mano
+  por un usuario, inactividad.
 - **R22.** CUANDO un usuario pasa a humano una conversación en `AGENTE`, el sistema DEBE dejarla en
   `HUMANO` con el motivo «a mano por un usuario», la fecha actual y ese usuario.
 - **R23.** SI un usuario pasa a humano una conversación que ya está en `HUMANO`, ENTONCES el sistema
@@ -113,14 +146,13 @@ que tocan a esta ficha.
   sistema NO DEBE cambiar su modo, motivo, fecha ni usuario, y NO DEBE fallar.
 - **R26.** SI quien pasa a humano o devuelve al agente no tiene `whatsapp.enviar`, no tiene
   `agente_ia_whatsapp` activo o no tiene empresa, ENTONCES el sistema DEBE rechazar el cambio.
-  **[P2]**
 - **R27.** SI la conversación pedida no existe, es de otra empresa o su identificador no tiene
   forma de uuid, ENTONCES el sistema DEBE responder «contacto no encontrado» sin distinguir los
   casos y sin escribir nada.
 - **R28.** CUANDO un usuario con `whatsapp.consultar` y `agente_ia_whatsapp` activo consulta el modo
   de una conversación de su empresa, el sistema DEBE devolver el modo, el motivo y la fecha del
   último cambio (motivo y fecha vacíos si nunca cambió); sin ese permiso o sin el añadido activo,
-  DEBE rechazar la consulta. **[P2]**
+  DEBE rechazar la consulta.
 
 ### Vuelta automática al agente (regla pura)
 
@@ -137,43 +169,12 @@ que tocan a esta ficha.
   o con motivo sin fecha o fecha sin motivo, ENTONCES la base DEBE rechazarla.
 - **R32.** El sistema DEBE tener la seguridad a nivel de fila activada y forzada en la tabla de
   configuración del agente.
-- **R33.** DONDE el humano confirme el origen `AGENT` (P1), el sistema DEBE admitir `AGENT` como
-  origen de un mensaje, además de `USER` y `SYSTEM`, sin cambiar el origen de ningún mensaje
-  existente. **[P1]**
+- **R33.** El sistema DEBE admitir `AGENT` como origen de un mensaje, además de `USER` y `SYSTEM`,
+  sin cambiar el origen de ningún mensaje existente.
+
+> Numeración: R34–R36 se añadieron el 2026-10-30 (D11) y viven en su sección, no al final, para
+> no renumerar R19–R33 y conservar la trazabilidad del primer borrador.
 
 ## Preguntas abiertas
 
-- **P1. Origen de los mensajes del agente.** ¿`SYSTEM` (ya existe en `WhatsappMessageOrigin`) o un
-  valor nuevo `AGENT`? **Propuesta por defecto: `AGENT`, añadido en esta ficha (solo el valor; nadie
-  lo escribe hasta QT-307).** Motivo: el tope de 500 respuestas por día y por contacto por hora
-  (QT-307) y la evaluación (QT-309) cuentan respuestas del agente; con `SYSTEM` se mezclarían con
-  los envíos del sistema de QC-241 y los avisos de QC-247. Si el humano elige `SYSTEM`, R33 sale.
-  Lo cierra el humano en F1.4.
-- **P2. Permiso para pasar a humano y devolver al agente.** La ficha solo nombra permisos para la
-  configuración. **Propuesta: `whatsapp.enviar` + añadido `agente_ia_whatsapp` activo** (lo usa quien
-  atiende el chat, el mismo que puede escribir a mano); para consultar el modo, `whatsapp.consultar`
-  + añadido activo. Alternativa: `agente_ia.modificar`.
-- **P3. Roles que reciben `agente_ia.*`.** **Propuesta: solo el Administrador**, como
-  `integraciones.modificar` y `whatsapp.*`.
-- **P4. Empresas existentes.** **Propuesta: el añadido nace apagado en todas**; se prende por
-  empresa (excepción o plan).
-- **P5. Textos del añadido en la plataforma.** **Propuesta:** nombre «Agente de IA para WhatsApp»,
-  descripción «Responde por WhatsApp con la IA de la empresa y pasa a una persona cuando hace
-  falta.», icono `BotIcon` de `lucide-react` (ya instalado).
-- **P6. Textos por defecto de los mensajes.** No están en la ficha. **Propuesta:**
-  - paso a humano: «Te comunico con una persona del equipo. Te responderá en cuanto pueda.»
-  - presentación: «Hola, soy el asistente virtual. Si prefieres hablar con una persona, escribe
-    "asesor".»
-
-  La palabra «asesor» tiene que estar en la lista de palabras de pedir asesor de QT-306.
-- **P7. Rangos de la configuración.** La ficha da los valores por defecto, no los límites.
-  **Propuesta:** umbral en [0, 1] con hasta dos decimales; límites y horas enteros ≥ 1, sin tope
-  superior. Apagar el agente es `activo = false`, no un límite en 0.
-- **P8. Modo inicial.** **Propuesta: `AGENTE`** para conversaciones nuevas y existentes. Con
-  `activo = false` no responde nadie automáticamente, así que no cambia nada hasta que la empresa
-  prende el agente; al prenderlo, cubre todas las conversaciones.
-- **P9. Lista de motivos.** **Propuesta:** la de R21, tomada del contexto común de la ficha
-  (pasa a humano si el cliente lo pide, si falta el dato, si la confianza es baja, si hay error de
-  IA o tope de uso; QT-307: si un usuario escribe a mano). Reclamo, sentimiento negativo y medios
-  no texto (QT-306) caben en «confianza baja»/«falta el dato» o se añaden en QT-306 con su
-  migración. Confirmar si QT-306 necesita motivos propios ya ahora.
+(ninguna)
