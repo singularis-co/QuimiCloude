@@ -6,14 +6,14 @@
 
 ## Tanda 1 — Añadido y permisos (identity) `[P]` con la tanda 2
 
-- [ ] **T1.1** `company-addons.ts`: `agente_ia_whatsapp` en `ADDONS` (al final), `ADDON_REQUIRES`
+- [x] **T1.1** `company-addons.ts`: `agente_ia_whatsapp` en `ADDONS` (al final), `ADDON_REQUIRES`
   (`['integraciones']`) y `ADDON_PERMISSIONS` (`agente_ia.consultar`, `agente_ia.modificar`).
   *Hecho:* tests de `company-addons.test.ts` actualizados y nuevos casos verdes para R1 (catálogo),
   R2 (sin `integraciones` no es activo) y R4 (permisos quitados con el añadido apagado).
-- [ ] **T1.2** `permissions.ts`: las dos entradas en `PERMISSIONS` y en
+- [x] **T1.2** `permissions.ts`: las dos entradas en `PERMISSIONS` y en
   `SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]` (D8). *Hecho:* `permissions.test.ts` verde con casos
   R3 y R5 (solo el Administrador las tiene).
-- [ ] **T1.3** Migración `20261030120100_whatsapp_agent_permissions` (`migration.sql` + `down.sql`)
+- [x] **T1.3** Migración `20261030120100_whatsapp_agent_permissions` (`migration.sql` + `down.sql`)
   según `design.md > Migración 2`: `addons`, permisos, `role_permissions` del Administrador y
   excepción prendida de `agente_ia_whatsapp` para cada empresa con la excepción de
   `integraciones` prendida (D9).
@@ -27,7 +27,7 @@
   del agente y deja las demás. Además, A sigue sin configuración del agente (lectura = defaults
   con activo `false`, R8).
   Depende de T1.1, T1.2 y de que la migración de la tanda 2 tenga timestamp anterior.
-- [ ] **T1.4** `[P]` `addon-names.ts` y `addon-details.ts` con la entrada nueva (D10); filas de
+- [x] **T1.4** `[P]` `addon-names.ts` y `addon-details.ts` con la entrada nueva (D10); filas de
   `CATALOGO.md` a «seis añadidos»; listas `ORDEN` de los tests del Maestro. *Hecho:* typecheck
   verde, `addon-names.test.ts` (R7: nombre, descripción e icono exactos) y tests de
   `tests/ui/maestro/` verdes.

@@ -4,7 +4,8 @@ export type AddonNameKey =
   | 'proveedores'
   | 'lectura_pdf'
   | 'importacion_excel'
-  | 'integraciones';
+  | 'integraciones'
+  | 'agente_ia_whatsapp';
 
 export const ADDON_NAMES: Readonly<Record<AddonNameKey, string>> = {
   dashboard: 'Dashboard y recorrido',
@@ -12,4 +13,5 @@ export const ADDON_NAMES: Readonly<Record<AddonNameKey, string>> = {
   lectura_pdf: 'Lectura de PDF con IA',
   importacion_excel: 'Importación desde Excel',
   integraciones: 'Integraciones',
+  agente_ia_whatsapp: 'Agente de IA para WhatsApp',
 };

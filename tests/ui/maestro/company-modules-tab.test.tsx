@@ -65,15 +65,22 @@ const MODULOS = join(
 
 const ID = '2d8e9f0a-3142-4c5d-8e6f-7a8b9c0d1e2f';
 const EMPRESA = 'Químicos del Valle S.A.S.';
-const ORDEN: readonly Addon[] = ['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'];
+const ORDEN: readonly Addon[] = [
+  'dashboard',
+  'proveedores',
+  'lectura_pdf',
+  'importacion_excel',
+  'integraciones',
+  'agente_ia_whatsapp',
+];
 
 const VISTA: CompanyAddonsView = {
   companyId: ID,
   addons: ORDEN.map((addon) => ({
     addon,
     enabled: addon !== 'integraciones',
-    active: addon !== 'integraciones' && addon !== 'lectura_pdf',
-    requires: addon === 'lectura_pdf' ? ['integraciones'] : [],
+    active: addon !== 'integraciones' && addon !== 'lectura_pdf' && addon !== 'agente_ia_whatsapp',
+    requires: addon === 'lectura_pdf' || addon === 'agente_ia_whatsapp' ? ['integraciones'] : [],
   })),
 };
 

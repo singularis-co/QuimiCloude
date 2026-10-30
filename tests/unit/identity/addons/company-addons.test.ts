@@ -30,14 +30,22 @@ describe('catálogo de añadidos', () => {
     expect(CORE_PERMISSIONS.filter((p) => deAnadidos.includes(p))).toEqual([])
   })
 
-  it('R2 — exactamente cinco añadidos, con sus permisos', () => {
-    expect([...ADDONS]).toEqual(['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'])
+  it('R2 — exactamente seis añadidos, con sus permisos', () => {
+    expect([...ADDONS]).toEqual([
+      'dashboard',
+      'proveedores',
+      'lectura_pdf',
+      'importacion_excel',
+      'integraciones',
+      'agente_ia_whatsapp',
+    ])
     expect(ADDON_PERMISSIONS).toEqual({
       dashboard: ['dashboard.consultar'],
       proveedores: ['proveedores.consultar', 'proveedores.modificar'],
       lectura_pdf: ['documentos.consultar', 'documentos.modificar'],
       importacion_excel: [],
       integraciones: ['integraciones.modificar', 'whatsapp.enviar', 'whatsapp.consultar'],
+      agente_ia_whatsapp: ['agente_ia.consultar', 'agente_ia.modificar'],
     })
   })
 
@@ -45,7 +53,7 @@ describe('catálogo de añadidos', () => {
     expect(ADDON_PERMISSIONS.importacion_excel).toEqual([])
   })
 
-  it('R2 — isAddon reconoce solo las cinco claves, exactas', () => {
+  it('R2 — isAddon reconoce solo las seis claves, exactas', () => {
     for (const addon of ADDONS) expect(isAddon(addon)).toBe(true)
     for (const otra of ['pedidos', 'x', '', 'Dashboard', ' dashboard', 'lectura-pdf']) {
       expect(isAddon(otra)).toBe(false)
@@ -61,6 +69,7 @@ describe('catálogo de añadidos', () => {
       }
     }
     expect(ADDON_REQUIRES.lectura_pdf).toEqual(['integraciones'])
+    expect(ADDON_REQUIRES.agente_ia_whatsapp).toEqual(['integraciones'])
   })
 })
 
@@ -144,7 +153,14 @@ describe('assertAddon / hasAddon', () => {
 describe('QC-137 — las notificaciones son núcleo', () => {
   it('QC-137 R18: ADDONS no incluye notificaciones', () => {
     // Lista escrita a mano: un añadido nuevo rompe la igualdad sin tener que nombrarlo aquí.
-    expect([...ADDONS]).toEqual(['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'])
+    expect([...ADDONS]).toEqual([
+      'dashboard',
+      'proveedores',
+      'lectura_pdf',
+      'importacion_excel',
+      'integraciones',
+      'agente_ia_whatsapp',
+    ])
     expect(Object.keys(ADDON_PERMISSIONS).sort()).toEqual([...ADDONS].sort())
     expect(Object.keys(ADDON_REQUIRES).sort()).toEqual([...ADDONS].sort())
   })
@@ -205,5 +221,44 @@ describe('los permisos de planes son del núcleo', () => {
       expect(effectivePermissions(maestro, [addon]), addon).toEqual(maestro)
     }
     expect(effectivePermissions(maestro, [...ADDONS])).toEqual(maestro)
+  })
+})
+
+describe('el añadido agente_ia_whatsapp', () => {
+  const AGENTE = ['agente_ia.consultar', 'agente_ia.modificar']
+
+  it('R1 — está en el catálogo de añadidos, al final, y isAddon lo reconoce solo con su clave exacta', () => {
+    expect(ADDONS.at(-1)).toBe('agente_ia_whatsapp')
+    expect(isAddon('agente_ia_whatsapp')).toBe(true)
+    for (const otra of ['agente_ia', 'Agente_ia_whatsapp', 'agente-ia-whatsapp', ' agente_ia_whatsapp']) {
+      expect(isAddon(otra), otra).toBe(false)
+    }
+  })
+
+  it('R2 — requiere integraciones: prendido sin integraciones no es activo; con integraciones, sí', () => {
+    expect(ADDON_REQUIRES.agente_ia_whatsapp).toEqual(['integraciones'])
+    expect(effectiveAddons(['agente_ia_whatsapp'])).toEqual([])
+    expect(effectiveAddons(['agente_ia_whatsapp', 'dashboard', 'lectura_pdf'])).toEqual(['dashboard'])
+    expect(effectiveAddons(['agente_ia_whatsapp', 'integraciones'])).toEqual(['integraciones', 'agente_ia_whatsapp'])
+    // Integraciones sola no prende el agente.
+    expect(effectiveAddons(['integraciones'])).toEqual(['integraciones'])
+  })
+
+  it('R3, R4 — sus permisos son solo suyos, no del núcleo ni de otro añadido', () => {
+    expect(ADDON_PERMISSIONS.agente_ia_whatsapp).toEqual(AGENTE)
+    for (const addon of ADDONS.filter((a) => a !== 'agente_ia_whatsapp')) {
+      for (const codigo of AGENTE) {
+        expect(ADDON_PERMISSIONS[addon] as readonly string[], addon).not.toContain(codigo)
+      }
+    }
+    for (const codigo of AGENTE) expect(CORE_PERMISSIONS as readonly string[], codigo).not.toContain(codigo)
+  })
+
+  it('R4 — con el añadido no activo se quitan agente_ia.consultar y agente_ia.modificar; activo, se conservan', () => {
+    const rol = ['clientes.consultar', 'whatsapp.consultar', ...AGENTE]
+    expect(effectivePermissions(rol, [])).toEqual(['clientes.consultar'])
+    expect(effectivePermissions(rol, ['integraciones'])).toEqual(['clientes.consultar', 'whatsapp.consultar'])
+    expect(effectivePermissions(rol, effectiveAddons(['agente_ia_whatsapp']))).toEqual(['clientes.consultar'])
+    expect(effectivePermissions(rol, effectiveAddons(['agente_ia_whatsapp', 'integraciones']))).toEqual(rol)
   })
 })

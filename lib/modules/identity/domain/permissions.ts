@@ -92,6 +92,10 @@ import {
  * plataforma. Como `empresas`, su modulo no es una carpeta de `lib/modules/`. Solo los recibe el
  * Maestro.
  *
+ * `agente_ia` suma `agente_ia.consultar` y `agente_ia.modificar`, ver y cambiar la configuracion
+ * del agente de IA de WhatsApp. Su modulo no es una carpeta de `lib/modules/`: vive en
+ * `integraciones`. Solo los recibe el Administrador.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -289,6 +293,18 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Dar de alta, editar y desactivar los planes de la plataforma.',
   },
+  {
+    code: 'agente_ia.consultar',
+    module: 'agente_ia',
+    action: 'consultar',
+    description: 'Ver la configuración del agente de IA de WhatsApp de la empresa.',
+  },
+  {
+    code: 'agente_ia.modificar',
+    module: 'agente_ia',
+    action: 'modificar',
+    description: 'Cambiar la configuración del agente de IA de WhatsApp de la empresa.',
+  },
 ] as const;
 
 /**
@@ -341,6 +357,8 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'entregas.anular',
     'whatsapp.enviar',
     'whatsapp.consultar',
+    'agente_ia.consultar',
+    'agente_ia.modificar',
   ],
   [ROLE_OPERADOR]: ['inventario.consultar', 'asignaciones.consultar', 'asignaciones.ejecutar'],
   [ROLE_EMPACADOR]: ['asignaciones.consultar', 'terminados.consultar', 'empaque.modificar'],

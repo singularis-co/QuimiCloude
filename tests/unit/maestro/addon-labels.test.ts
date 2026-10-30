@@ -23,7 +23,7 @@ function vista(prendidos: readonly Addon[]): CompanyAddonsView {
       addon,
       enabled: prendidos.includes(addon),
       active: prendidos.includes(addon),
-      requires: addon === 'lectura_pdf' ? ['integraciones'] : [],
+      requires: addon === 'lectura_pdf' || addon === 'agente_ia_whatsapp' ? ['integraciones'] : [],
     })),
   };
 }
@@ -48,6 +48,7 @@ describe('ADDON_LABELS', () => {
       lectura_pdf: 'Lee fórmulas y catálogos desde un PDF.',
       importacion_excel: 'Carga inventario y catálogos desde una hoja de cálculo.',
       integraciones: 'Proveedor IA, Inventarios y WhatsApp.',
+      agente_ia_whatsapp: 'Responde por WhatsApp con la IA de la empresa y pasa a una persona cuando hace falta.',
     });
   });
 });

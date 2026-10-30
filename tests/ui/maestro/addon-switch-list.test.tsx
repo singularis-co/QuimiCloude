@@ -57,13 +57,21 @@ const ARCHIVO = join(
 
 const ID = '2d8e9f0a-3142-4c5d-8e6f-7a8b9c0d1e2f';
 const EMPRESA = 'Químicos del Valle S.A.S.';
-const ORDEN: readonly Addon[] = ['dashboard', 'proveedores', 'lectura_pdf', 'importacion_excel', 'integraciones'];
+const ORDEN: readonly Addon[] = [
+  'dashboard',
+  'proveedores',
+  'lectura_pdf',
+  'importacion_excel',
+  'integraciones',
+  'agente_ia_whatsapp',
+];
 const NOMBRES: Readonly<Record<Addon, string>> = {
   dashboard: 'Dashboard y recorrido',
   proveedores: 'Proveedores',
   lectura_pdf: 'Lectura de PDF con IA',
   importacion_excel: 'Importación desde Excel',
   integraciones: 'Integraciones',
+  agente_ia_whatsapp: 'Agente de IA para WhatsApp',
 };
 
 type Fila = Pick<CompanyAddonState, 'enabled' | 'active'> & { readonly requires?: readonly Addon[] };
@@ -75,7 +83,9 @@ function vista(filas: Readonly<Record<Addon, Fila>>, orden: readonly Addon[] = O
       addon,
       enabled: filas[addon].enabled,
       active: filas[addon].active,
-      requires: filas[addon].requires ?? (addon === 'lectura_pdf' ? ['integraciones'] : []),
+      requires:
+        filas[addon].requires ??
+        (addon === 'lectura_pdf' || addon === 'agente_ia_whatsapp' ? ['integraciones'] : []),
     })),
   };
 }
@@ -91,6 +101,7 @@ const BASE = vista({
   lectura_pdf: SIN_EFECTO,
   importacion_excel: OFF,
   integraciones: OFF,
+  agente_ia_whatsapp: OFF,
 });
 
 const TODO_PRENDIDO = vista({
@@ -99,6 +110,7 @@ const TODO_PRENDIDO = vista({
   lectura_pdf: ON,
   importacion_excel: ON,
   integraciones: ON,
+  agente_ia_whatsapp: ON,
 });
 
 const TODO_APAGADO = vista({
@@ -107,6 +119,7 @@ const TODO_APAGADO = vista({
   lectura_pdf: OFF,
   importacion_excel: OFF,
   integraciones: OFF,
+  agente_ia_whatsapp: OFF,
 });
 
 const ERROR_INESPERADO = {
@@ -176,11 +189,11 @@ afterEach(() => {
 });
 
 describe('AddonSwitchList', () => {
-  it('R5: pinta los cinco añadidos en el orden de la vista con nombre, descripción y estado', () => {
+  it('R5: pinta los seis añadidos en el orden de la vista con nombre, descripción y estado', () => {
     const invertido = [...ORDEN].reverse();
     montar({
       initialView: vista(
-        { dashboard: ON, proveedores: ON, lectura_pdf: SIN_EFECTO, importacion_excel: OFF, integraciones: OFF },
+        { dashboard: ON, proveedores: ON, lectura_pdf: SIN_EFECTO, importacion_excel: OFF, integraciones: OFF, agente_ia_whatsapp: OFF },
         invertido,
       ),
     });
@@ -225,14 +238,14 @@ describe('AddonSwitchList', () => {
     expect(activo).toHaveAttribute('data-tone', 'neutral');
   });
 
-  it('R8: la cabecera cuenta los interruptores prendidos de cinco', () => {
+  it('R8: la cabecera cuenta los interruptores prendidos de seis', () => {
     montar();
     expect(screen.getByTestId(IDS.count)).toHaveTextContent(
-      '3 de 5 prendidos. Al apagar uno, desaparece para todos los usuarios de la empresa desde su siguiente acción.',
+      '3 de 6 prendidos. Al apagar uno, desaparece para todos los usuarios de la empresa desde su siguiente acción.',
     );
     cleanup();
     montar({ initialView: TODO_APAGADO });
-    expect(screen.getByTestId(IDS.count)).toHaveTextContent('0 de 5 prendidos.');
+    expect(screen.getByTestId(IDS.count)).toHaveTextContent('0 de 6 prendidos.');
   });
 
   it('R9: prender un añadido llama a setCompanyAddonAction sin diálogo', async () => {
@@ -255,7 +268,7 @@ describe('AddonSwitchList', () => {
   it('R10: apagar un añadido abre la confirmación con su nombre, la empresa y lo que se descarta', async () => {
     setCompanyAddonActionMock.mockResolvedValue({
       status: 'success',
-      data: vista({ dashboard: ON, proveedores: ON, lectura_pdf: OFF, importacion_excel: OFF, integraciones: OFF }),
+      data: vista({ dashboard: ON, proveedores: ON, lectura_pdf: OFF, importacion_excel: OFF, integraciones: OFF, agente_ia_whatsapp: OFF }),
     });
     const { user, dialogo } = await abrirApagar('lectura_pdf');
 
@@ -319,6 +332,7 @@ describe('AddonSwitchList', () => {
         lectura_pdf: ON,
         importacion_excel: ON,
         integraciones: ON,
+        agente_ia_whatsapp: OFF,
       }),
     });
 
@@ -352,6 +366,7 @@ describe('AddonSwitchList', () => {
         lectura_pdf: ON,
         importacion_excel: OFF,
         integraciones: OFF,
+        agente_ia_whatsapp: OFF,
       }),
     });
 
@@ -420,6 +435,7 @@ describe('AddonSwitchList', () => {
       lectura_pdf: ON,
       importacion_excel: OFF,
       integraciones: ON,
+      agente_ia_whatsapp: OFF,
     });
     setCompanyAddonActionMock.mockResolvedValue({ status: 'success', data: despues });
     const user = setupUser();
@@ -431,12 +447,12 @@ describe('AddonSwitchList', () => {
     expect(interruptor('integraciones')).toHaveAttribute('aria-checked', 'true');
     expect(estado('integraciones')).toBe('Prendido');
     expect(estado('lectura_pdf')).toBe('Prendido');
-    expect(screen.getByTestId(IDS.count)).toHaveTextContent('4 de 5 prendidos.');
+    expect(screen.getByTestId(IDS.count)).toHaveTextContent('4 de 6 prendidos.');
     expect(getCompanyAddonsActionMock).not.toHaveBeenCalled();
 
     setAllCompanyAddonsActionMock.mockResolvedValue({ status: 'success', data: TODO_PRENDIDO });
     await user.click(screen.getByTestId(IDS.allOn));
-    await waitFor(() => expect(toastMock.success).toHaveBeenLastCalledWith('Se prendió 1 módulo.'));
+    await waitFor(() => expect(toastMock.success).toHaveBeenLastCalledWith('Se prendieron 2 módulos.'));
     expect(getCompanyAddonsActionMock).not.toHaveBeenCalled();
   });
 
@@ -476,6 +492,7 @@ describe('AddonSwitchList', () => {
       'true',
       'true',
       'true',
+      'false',
       'false',
       'false',
     ]);
@@ -558,6 +575,7 @@ describe('AddonSwitchList', () => {
         proveedores: { enabled: true, active: false },
         importacion_excel: OFF,
         integraciones: OFF,
+        agente_ia_whatsapp: OFF,
       }),
     });
     expect(estado('lectura_pdf')).toBe('Prendido');
@@ -587,6 +605,7 @@ describe('AddonSwitchList', () => {
       'Apagar Lectura de PDF con IA',
       'Prender Importación desde Excel',
       'Prender Integraciones',
+      'Prender Agente de IA para WhatsApp',
     ]);
     expect(screen.getByRole('switch', { name: 'Prender Importación desde Excel' })).toBe(interruptor('importacion_excel'));
 
