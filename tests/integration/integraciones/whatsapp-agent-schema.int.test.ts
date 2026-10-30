@@ -489,7 +489,7 @@ describe('migracion whatsapp_agent contra Postgres real', () => {
     })
   })
 
-  it('la base rechaza mensajes vacios, solo con espacios o de mas de 4096 caracteres y admite 4096', async () => {
+  it('R14: la base rechaza mensajes vacios, solo con blancos (espacio, tab, salto de linea) o de mas de 4096 caracteres y admite 4096', async () => {
     await inRolledBackTransaction(async (tx) => {
       const s = await seed(tx)
       const rechazos: Partial<SettingsRow>[] = [
@@ -497,11 +497,19 @@ describe('migracion whatsapp_agent contra Postgres real', () => {
         { handoffMessage: '   ' },
         { greetingMessage: '' },
         { greetingMessage: '      ' },
+        { handoffMessage: '\t\t' },
+        { handoffMessage: '\n\n' },
+        { greetingMessage: '\t' },
+        { greetingMessage: '\n' },
+        { greetingMessage: '\r\n' },
+        { handoffMessage: ' \t\r\n ' },
         { handoffMessage: 'a'.repeat(4097) },
         { greetingMessage: 'a'.repeat(4097) },
       ]
       for (const override of rechazos) {
-        expect(await settingsOutcome(tx, s, override)).toMatch(/whatsapp_agent_settings_messages_not_blank/)
+        expect(await settingsOutcome(tx, s, override), JSON.stringify(override)).toMatch(
+          /whatsapp_agent_settings_messages_not_blank/,
+        )
       }
       expect(
         await settingsOutcome(tx, s, { handoffMessage: 'a'.repeat(4096), greetingMessage: 'b'.repeat(4096) }),

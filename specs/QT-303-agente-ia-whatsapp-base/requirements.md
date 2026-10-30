@@ -52,6 +52,12 @@ Respuestas del humano del 2026-10-30 a las preguntas abiertas P1–P9 del primer
 | D13 (P8) | Modo inicial `AGENTE` para conversaciones nuevas y existentes. | R19 |
 | D14 (P9) | Los motivos de paso a `HUMANO` incluyen ya reclamo, sentimiento negativo y medio no soportado, además de los del contexto común. | R21 |
 
+Decisión del humano del 2026-10-30, tras la tanda 2 (esquema).
+
+| # | Decisión | Cubierta por |
+|---|---|---|
+| D15 | En la base, el mensaje de paso a humano y el saludo hechos solo de blancos (espacio, tabulador, salto de línea, retorno de carro) se rechazan igual que los vacíos: el CHECK `whatsapp_agent_settings_messages_not_blank` recorta `E' \t\n\r'`, no solo espacios. **Abierto:** el CHECK del nombre del asistente (`assistant_name_valid`, «sin espacios en los extremos») sigue recortando solo espacios; la decisión habla de mensajes y R34 de «espacios», así que no se cambia hasta que el humano lo diga. | R14 |
+
 ## Requisitos (EARS)
 
 > «Rechaza» significa: lanza el error del módulo y no lee ni escribe datos de negocio.

@@ -45,7 +45,7 @@ CREATE TABLE "whatsapp_agent_settings" (
     CONSTRAINT "whatsapp_agent_settings_limits_positive"
         CHECK ("daily_reply_limit" >= 1 AND "contact_hourly_reply_limit" >= 1 AND "inactivity_hours" >= 1),
     CONSTRAINT "whatsapp_agent_settings_messages_not_blank"
-        CHECK (btrim("handoff_message") <> '' AND btrim("greeting_message") <> ''
+        CHECK (btrim("handoff_message", E' \t\n\r') <> '' AND btrim("greeting_message", E' \t\n\r') <> ''
            AND char_length("handoff_message") <= 4096 AND char_length("greeting_message") <= 4096),
     CONSTRAINT "whatsapp_agent_settings_assistant_name_valid"
         CHECK ("assistant_name" IS NULL

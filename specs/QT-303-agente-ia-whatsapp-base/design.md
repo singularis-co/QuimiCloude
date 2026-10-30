@@ -85,7 +85,7 @@ CREATE TABLE "whatsapp_agent_settings" (
   CONSTRAINT "whatsapp_agent_settings_limits_positive"
     CHECK ("daily_reply_limit" >= 1 AND "contact_hourly_reply_limit" >= 1 AND "inactivity_hours" >= 1),
   CONSTRAINT "whatsapp_agent_settings_messages_not_blank"
-    CHECK (btrim("handoff_message") <> '' AND btrim("greeting_message") <> ''
+    CHECK (btrim("handoff_message", E' \t\n\r') <> '' AND btrim("greeting_message", E' \t\n\r') <> ''
        AND char_length("handoff_message") <= 4096 AND char_length("greeting_message") <= 4096),
   CONSTRAINT "whatsapp_agent_settings_assistant_name_valid"
     CHECK ("assistant_name" IS NULL
@@ -108,6 +108,11 @@ ALTER TYPE "whatsapp_message_origin" ADD VALUE 'AGENT';
   profundidad; la frontera es el zod del caso de uso. R31 solo se prueba contra la base. La
   longitud del saludo **resuelto** (R36) no se repite en la base: depende de la regla de render,
   que vive solo en el dominio.
+- **Blancos en `messages_not_blank` (D15, 2026-10-30):** `btrim(x)` a secas solo quita espacios,
+  y un mensaje hecho solo de `\t`, `\n` o `\r` pasaba el CHECK. Se usa `btrim(x, E' \t\n\r') <> ''`
+  y no la regex `x ~ '\S'`: el conjunto de caracteres queda escrito en el CHECK y no depende de la
+  clase `\S` del motor de regex ni del locale de la base. Es defensa en profundidad: la frontera
+  sigue siendo el zod del caso de uso (R14). `assistant_name_valid` no cambia (ver D15 en requirements).
 - **Motivo en enum** inglés, como los demás enums del esquema (`IN/OUT`, `USER/SYSTEM`). Mapeo a
   la ficha: `AGENT`=`AGENTE`, `HUMAN`=`HUMANO`; `MANUAL` vale en los dos sentidos;
   `COMPLAINT`=reclamo, `NEGATIVE_SENTIMENT`=sentimiento negativo, `UNSUPPORTED_MEDIA`=medio no

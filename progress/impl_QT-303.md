@@ -128,3 +128,16 @@ Veredicto: tanda 2 hecha y verde (schema, migración con down, dominio `AGENT`).
 - `docs/diseno/canvas/MaestroEmpresaMovil.dc.html` dice «5 añadidos»; es tablero de diseño, no se toca.
 
 Veredicto: tanda 1 hecha y verde (catálogo de añadidos y permisos, migración de datos con down, textos D10).
+
+## Fix 2026-10-30: `messages_not_blank` rechaza blancos (D15)
+
+- Archivos: `db/migrations/20261030120000_whatsapp_agent/migration.sql` (CHECK con `btrim(x, E' \t\n\r')`;
+  `down.sql` sin cambios: borra la tabla entera), `specs/QT-303-agente-ia-whatsapp-base/design.md > Migración 1`,
+  `requirements.md > Decisiones cerradas` (D15), `tests/integration/integraciones/whatsapp-agent-schema.int.test.ts`
+  (casos `\t\t`, `\n\n`, `\t`, `\n`, `\r\n`, ` \t\r\n ` rechazados; el test pasa a nombrar R14).
+- Abierto: `assistant_name_valid` sigue con `btrim(x) = x` (solo espacios); no se cambia sin decisión del humano.
+- `pnpm exec vitest run --project integration tests/integration/integraciones/whatsapp-agent-schema.int.test.ts`:
+  plantilla reconstruida `qct_tpl_483e168a5880` (huella nueva por la migración editada); 1 archivo, 19/19 pasados.
+- `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores, 10 warnings (ninguno en archivos tocados).
+
+Veredicto: CHECK corregido y probado contra la base; verde.
