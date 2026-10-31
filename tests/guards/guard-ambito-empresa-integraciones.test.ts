@@ -98,7 +98,7 @@ const PUERTO_CONTACTOS: PuertoVigilado = {
   nombre: 'WhatsappContactRepository',
   ruta: join(MODULE_ROOT, 'ports', 'whatsapp-contact-repository.ts'),
   constante: 'whatsappContactRepository',
-  metodosEsperados: 4,
+  metodosEsperados: 6,
   adaptador: ADAPTADOR_CONTACTOS,
   ayudantes: [],
   fabrica: 'createWhatsappContactRepository',

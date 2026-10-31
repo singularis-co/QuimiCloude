@@ -41,6 +41,7 @@ import type {
 } from '@/lib/modules/integraciones/ports/whatsapp-connection-repository'
 import type { GraphProbeResult, WhatsappGraphClient } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
 import type {
+  ConversationModeState,
   WhatsappContactBlock,
   WhatsappContactLinkRow,
   WhatsappContactRepository,
@@ -304,6 +305,18 @@ export type ContactDoubleRow = {
   readonly waId: string
   readonly link: ContactLink
   readonly blocked: WhatsappContactBlock | null
+  /** Ausente: el contacto nunca cambio de modo (AGENT, sin motivo, fecha ni autor). */
+  readonly conversation?: ContactModeDouble
+}
+
+export type ContactModeDouble = ConversationModeState & { readonly changedBy: string | null }
+
+export const NEVER_CHANGED_MODE: ContactModeDouble = {
+  mode: 'AGENT',
+  reason: null,
+  changedAt: null,
+  changedBy: null,
+  lastMessageAt: null,
 }
 
 export function contactRow(overrides: Partial<ContactDoubleRow> = {}): ContactDoubleRow {
@@ -369,8 +382,35 @@ export function makeContactRepository(initial: readonly ContactDoubleRow[] = [])
     return 'ok'
   })
 
-  const contacts: WhatsappContactRepository = { findById, findByWaIds, setLink, setBlocked }
-  return { contacts, findById, findByWaIds, setLink, setBlocked, row: (id: string) => rows.get(id) }
+  const findMode = vi.fn<WhatsappContactRepository['findMode']>(async (id, scope) => {
+    const row = rows.get(id)
+    if (!visible(row, scope)) return null
+    const { mode, reason, changedAt, lastMessageAt } = row.conversation ?? NEVER_CHANGED_MODE
+    return { mode, reason, changedAt, lastMessageAt }
+  })
+  const setMode = vi.fn<WhatsappContactRepository['setMode']>(async (id, change, scope) => {
+    const row = rows.get(id)
+    if (!visible(row, scope)) return 'not_found'
+    const current = row.conversation ?? NEVER_CHANGED_MODE
+    if (current.mode === change.mode) return 'unchanged'
+    rows.set(id, {
+      ...row,
+      conversation: { ...current, mode: change.mode, reason: change.reason, changedAt: change.at, changedBy: change.by },
+    })
+    return 'changed'
+  })
+
+  const contacts: WhatsappContactRepository = { findById, findByWaIds, setLink, setBlocked, findMode, setMode }
+  return {
+    contacts,
+    findById,
+    findByWaIds,
+    setLink,
+    setBlocked,
+    findMode,
+    setMode,
+    row: (id: string) => rows.get(id),
+  }
 }
 
 /**

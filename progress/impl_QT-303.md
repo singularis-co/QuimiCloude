@@ -279,3 +279,104 @@ Veredicto: nombre del asistente endurecido en base y probado en dominio; verde.
   para el E2E de CI o tras aplicar las migraciones de QT-303 a esa base.
 
 Veredicto: textos ajustados y unit verde; E2E local bloqueado por base sin migrar.
+
+## Tanda 4 — Modo de la conversación (T4.1–T4.4) · backend_dev · 2026-10-31
+
+### Archivos
+
+Creados:
+- `lib/modules/integraciones/domain/whatsapp-conversation-mode.ts`: `CONVERSATION_MODES`,
+  `CONVERSATION_MODE_REASONS` (11), `REASONS_BY_TARGET` (congelado; HUMAN ← 10, AGENT ← `MANUAL`,
+  `INACTIVITY`), `planModeChange`, `isDueForAgentReturn`, `conversationModeInputSchema`
+  (`{ contactId: uuid }`) y `ConversationModeView`.
+- `lib/modules/integraciones/domain/hand-off-whatsapp-conversation.ts`,
+  `return-whatsapp-conversation-to-agent.ts`, `get-whatsapp-conversation-mode.ts`.
+- `tests/unit/integraciones/agente/whatsapp-conversation-mode.test.ts`,
+  `conversation-mode-use-cases.test.ts`.
+- `tests/integration/integraciones/whatsapp-conversation-mode-prisma.int.test.ts` (modo `commit`).
+
+Modificados:
+- `lib/modules/integraciones/domain/actor.ts`: `requireAgentOperatePermission` (`whatsapp.enviar` +
+  añadido `agente_ia_whatsapp` + empresa) y `requireAgentModeReadPermission` (`whatsapp.consultar` +
+  añadido + empresa), D7.
+- `lib/modules/integraciones/ports/whatsapp-contact-repository.ts`: `ConversationModeState`,
+  `ConversationModeChange`, `findMode`, `setMode`.
+- `lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma.ts`:
+  `findWhatsappContactMode`, `setWhatsappContactMode` (`updateMany` con `conversation_mode <> destino`
+  y, si no cambia filas, `findFirst` para distinguir `unchanged` de `not_found`); cableadas en la fábrica.
+- `lib/modules/integraciones/adapters/driving/whatsapp-agent-actions.ts`:
+  `handOffWhatsappConversationAction`, `returnWhatsappConversationToAgentAction`,
+  `getWhatsappConversationModeAction` (contratos de `design.md > Contratos`).
+- `lib/modules/integraciones/index.ts`: reexporta tipos y reglas del modo y las tres fábricas.
+- `lib/composition/index.ts`: los tres casos de uso en la fachada `integraciones`, sobre el
+  `whatsappContactRepository` existente.
+- `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: `ContactDoubleRow.conversation` opcional,
+  `ContactModeDouble`, `NEVER_CHANGED_MODE`, `findMode`/`setMode` en `makeContactRepository`.
+- `tests/unit/integraciones/agente/whatsapp-agent-actions.test.ts`: las tres acciones nuevas.
+- Listas escritas a mano: `tests/unit/composition/integraciones-graph-doubles.test.ts` y
+  `tests/unit/integraciones/encryption-keys-env.test.ts` (claves de la fachada:
+  `getWhatsappConversationMode`, `handOffWhatsappConversation`, `returnWhatsappConversationToAgent`);
+  `tests/guards/guard-ambito-empresa-integraciones.test.ts` (`PUERTO_CONTACTOS.metodosEsperados` 4 → 6);
+  `tests/integration/aislamiento.json` (el `.int` nuevo en `commit` con motivo).
+  `tests/unit/identity/session-once-per-request-actions.test.ts` no cambia: es una fila por archivo
+  de acciones y `whatsapp-agent-actions.ts` ya estaba. `tests/unit/integraciones/module-shape.test.ts`
+  no cambia: no hay modelo nuevo.
+- `specs/QT-303-agente-ia-whatsapp-base/tasks.md`: T4.1–T4.4 en `[x]`.
+
+Decisiones de implementación (dentro del design):
+- Los casos de uso de cambio leen el modo (`findMode`) y aplican `planModeChange`; si ya está en el
+  destino vuelven sin llamar a `setMode` (R23/R25 visibles con el puerto simulado). `setMode` sigue
+  filtrando por modo en la base, así que dos clics simultáneos no pisan el primer cambio (probado en
+  el `.int`).
+- `requireAgentModeReadPermission` es un helper nuevo en `actor.ts` para la consulta (D7); el design
+  describe la regla sin nombrar el helper.
+- `isDueForAgentReturn` recibe `{ mode, modeChangedAt, lastMessageAt }` como dice el design; el
+  puerto devuelve `changedAt`. QT-307 mapea uno a otro.
+
+### Mapa R -> test (tanda 4)
+
+| R | Archivo | Casos |
+|---|---|---|
+| R19 | whatsapp-conversation-mode-prisma.int.test.ts | «R19, R28 — un contacto nuevo se lee en AGENT, sin motivo ni fecha, con su último mensaje» |
+| R20 | conversation-mode-use-cases.test.ts | «R22, R20 — …queda en HUMAN con motivo MANUAL, la fecha actual y el usuario»; «R24, R20 — …queda en AGENT…» |
+| R20 | whatsapp-conversation-mode-prisma.int.test.ts | «R20, R22 — setMode a HUMAN cambia y guarda motivo, fecha y usuario»; «R20 — un cambio del sistema guarda el usuario nulo» |
+| R21 | whatsapp-conversation-mode.test.ts | «R21 — hay once motivos y dos modos…»; «R21 — HUMAN admite los diez de paso a humano (también reclamo, sentimiento negativo y medio no soportado); AGENT, a mano e inactividad»; «R21 — <motivo> hacia <destino>: se admite / rechaza con ValidationError» (22 casos: once motivos × dos destinos, cada uno desde los dos modos actuales); «R21 — un motivo fuera del catálogo rechaza» |
+| R22 | conversation-mode-use-cases.test.ts | «R22, R20 — …»; «R22 — una conversación devuelta antes al agente también pasa a HUMAN» |
+| R22 | whatsapp-agent-actions.test.ts | «R22 — pasar a humano baja la entrada tal cual con el actor (con sus añadidos) y devuelve `success`» |
+| R22, R24, R28 | whatsapp-conversation-mode-prisma.int.test.ts | «R22, R24, R28 — pasar a humano, consultar, devolver al agente y consultar otra vez» |
+| R23 | conversation-mode-use-cases.test.ts | «R23 — ya en HUMAN no falla y no reescribe modo, motivo, fecha ni usuario»; «R23 — si otro cambio gana la carrera entre la lectura y la escritura, no falla» |
+| R23 | whatsapp-conversation-mode-prisma.int.test.ts | «R23 — ya en el destino devuelve unchanged sin tocar motivo, fecha ni usuario»; «R23 — ocho cambios simultáneos al mismo destino: uno cambia, los demás no pisan su motivo ni su fecha»; «R23 — pasar a humano dos veces a la vez no falla y deja un solo cambio» |
+| R23, R25 | whatsapp-conversation-mode.test.ts | «R23, R25 — ya en el destino con un motivo válido no hay cambio» |
+| R24 | conversation-mode-use-cases.test.ts | «R24, R20 — una conversación en HUMAN queda en AGENT con motivo MANUAL, la fecha actual y el usuario» |
+| R24 | whatsapp-conversation-mode-prisma.int.test.ts | «R24 — de HUMAN a AGENT cambia con el motivo, la fecha y el usuario nuevos» |
+| R24 | whatsapp-agent-actions.test.ts | «R24 — devolver al agente baja la entrada tal cual con el actor y devuelve `success`» |
+| R25 | conversation-mode-use-cases.test.ts | «R25 — ya en AGENT (nunca cambió) no falla y no escribe»; «R25 — ya en AGENT por un cambio anterior conserva motivo, fecha y usuario de ese cambio» |
+| R25 | whatsapp-conversation-mode-prisma.int.test.ts | «R25 — un contacto que nunca cambió ya está en AGENT: unchanged y sigue sin motivo ni fecha» |
+| R26 | conversation-mode-use-cases.test.ts | «R26 — <pasar a humano / devolver al agente> <sin actor, actor indefinido, sin empresa, sin whatsapp.enviar, solo con whatsapp.consultar, solo con los permisos de configuración del agente, sin el añadido del agente, sin la lista de añadidos>: rechaza con unauthorized sin llamar al puerto» (16 casos); «R26 — …: el permiso se comprueba antes que la entrada» |
+| R26, R27, R28 | whatsapp-agent-actions.test.ts | «R26, R27, R28 — las acciones de modo traducen unauthorized, contacto no encontrado e invalid_input del catálogo» |
+| R27 | conversation-mode-use-cases.test.ts | «R27 — <operación> con <un id sin forma de uuid / un id que no existe / un contacto de otra empresa / sin id>: whatsapp_contact_not_found y no escribe» (8); «R27 — consultar el modo con …» (4); «R27 — el contacto de otra empresa se pide con el ámbito del actor, nunca con el de la entrada»; «R27 — si el contacto desaparece entre la lectura y la escritura, responde no encontrado» |
+| R27 | whatsapp-conversation-mode-prisma.int.test.ts | «R27 — un contacto de otra empresa no se lee ni se escribe: null y not_found»; «R27 — un id que no existe: null y not_found»; «R27 — el contacto de otra empresa responde no encontrado y queda intacto» |
+| R28 | conversation-mode-use-cases.test.ts | «R28 — una conversación que nunca cambió devuelve AGENT con motivo y fecha vacíos»; «R28 — devuelve el modo, el motivo y la fecha del último cambio, sin el autor ni el último mensaje»; «R28 — tras pasar a humano, la consulta devuelve el cambio»; «R28 — <sin actor, sin empresa, sin whatsapp.consultar, solo con agente_ia.consultar, sin el añadido del agente>: rechaza con unauthorized sin leer» (5); «R28 — con whatsapp.enviar pero sin whatsapp.consultar no se consulta: son permisos distintos» |
+| R28 | whatsapp-agent-actions.test.ts | «R28 — consultar el modo devuelve `success` con modo, motivo y fecha»; «R28 — una conversación que nunca cambió sale con motivo y fecha nulos» |
+| R29 | whatsapp-conversation-mode.test.ts | «R29 — justo a las N horas del cambio vuelve; un milisegundo antes, no»; «R29 — la referencia es la más reciente de las dos fechas: un mensaje posterior al cambio reinicia la cuenta»; «R29 — un mensaje anterior al cambio no adelanta la vuelta: cuenta la fecha del cambio»; «R29 — con solo la fecha del último mensaje, cuenta desde ella»; «R29 — las horas configuradas mandan: 1 hora y 48 horas» |
+| R30 | whatsapp-conversation-mode.test.ts | «R30 — una conversación en AGENT nunca vuelve, por vieja que sea»; «R30 — una conversación en HUMAN sin fecha de cambio ni de último mensaje no vuelve» |
+| T4.4 | whatsapp-agent-actions.test.ts | «cada acción lee la sesión una sola vez y no revalida ninguna ruta» (ahora las cinco acciones); «el borde no decide…» (ahora también sin `whatsapp.enviar/consultar`, `agente_ia_whatsapp`, `planModeChange`) |
+
+### Verificación (salida real)
+
+- `pnpm run typecheck` → `tsc --noEmit` sin errores (la primera corrida, antes de ampliar los dobles,
+  dio el rojo esperado `whatsapp-doubles.ts(372,9): TS2739 … missing … findMode, setMode`).
+- `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)`; los 10 avisos son previos y ajenos.
+- `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1327 passed | 22 skipped (1349)`.
+- `pnpm exec vitest run tests/unit/integraciones/agente tests/unit/composition/integraciones-graph-doubles.test.ts
+  tests/unit/integraciones/encryption-keys-env.test.ts tests/unit/integraciones/whatsapp/authorization.test.ts
+  tests/unit/integraciones/whatsapp/set-whatsapp-contact-blocked.test.ts` → `Test Files 10 passed (10)`,
+  `Tests 298 passed (298)`.
+- Integración (con `.env` cargado, base efímera sobre la plantilla `qct_tpl_4bf16c205f06`):
+  `whatsapp-conversation-mode-prisma.int.test.ts` → `Tests 12 passed (12)`;
+  `whatsapp-contact-links.int.test.ts` (usa el mismo repositorio) → `Tests 17 passed (17)`.
+- `pnpm exec vitest related --run <17 archivos TS tocados>`: **no terminó**. Claude Code lo paró
+  porque la máquina se quedó sin memoria (no es un fallo de los tests). No se relanzó; queda
+  pendiente para `./init.sh` o la CI.
+
+Veredicto: tanda 4 hecha; typecheck, lint, guardias, unit de la tanda e int verdes; `vitest related` sin terminar (se paró por falta de memoria).

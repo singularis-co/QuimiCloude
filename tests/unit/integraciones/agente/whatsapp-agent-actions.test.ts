@@ -1,4 +1,4 @@
-// Las Server Actions de configuración del agente contra dobles de `@/lib/composition`: se prueba el
+// Las Server Actions de configuración del agente y del modo de la conversación contra dobles de `@/lib/composition`: se prueba el
 // borde (actor con añadidos, una sola lectura de sesión, entrada que baja tal cual, `success` o
 // `ErrorState` del catálogo y ninguna revalidación), nunca el dominio ni la sesión reales.
 
@@ -10,14 +10,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   getWhatsappAgentSettingsAction,
+  getWhatsappConversationModeAction,
+  handOffWhatsappConversationAction,
+  returnWhatsappConversationToAgentAction,
   saveWhatsappAgentSettingsAction,
 } from '@/lib/modules/integraciones/adapters/driving/whatsapp-agent-actions'
 import { errorMessage } from '@/lib/modules/errores'
-import { UnauthorizedError, ValidationError, WHATSAPP_AGENT_DEFAULTS } from '@/lib/modules/integraciones'
+import {
+  UnauthorizedError,
+  ValidationError,
+  WHATSAPP_AGENT_DEFAULTS,
+  WhatsappContactNotFoundError,
+} from '@/lib/modules/integraciones'
 
 const {
   getSettingsMock,
   saveSettingsMock,
+  handOffMock,
+  giveBackMock,
+  getModeMock,
   getSessionUserMock,
   getSessionContextMock,
   revalidatePathMock,
@@ -25,6 +36,9 @@ const {
 } = vi.hoisted(() => ({
   getSettingsMock: vi.fn(),
   saveSettingsMock: vi.fn(),
+  handOffMock: vi.fn(),
+  giveBackMock: vi.fn(),
+  getModeMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   revalidatePathMock: vi.fn(),
@@ -40,6 +54,9 @@ vi.mock('@/lib/composition', () => ({
   integraciones: {
     getWhatsappAgentSettings: getSettingsMock,
     saveWhatsappAgentSettings: saveSettingsMock,
+    handOffWhatsappConversation: handOffMock,
+    returnWhatsappConversationToAgent: giveBackMock,
+    getWhatsappConversationMode: getModeMock,
   },
 }))
 
@@ -51,7 +68,7 @@ const SESSION_USER = {
   username: 'ana.perez',
   displayName: 'Ana Perez',
   roleName: 'Administrador',
-  permissions: ['agente_ia.consultar', 'agente_ia.modificar'],
+  permissions: ['agente_ia.consultar', 'agente_ia.modificar', 'whatsapp.consultar', 'whatsapp.enviar'],
   addons: ['integraciones', 'agente_ia_whatsapp'],
 }
 
@@ -73,12 +90,26 @@ const ENTRADA = {
   assistantName: 'Ana',
 }
 
+const CONTACT_ID = '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31'
+const CHANGED_AT = new Date('2026-10-30T09:00:00.000Z')
+
 const ACTIONS = {
   get: () => getWhatsappAgentSettingsAction(),
   save: () => saveWhatsappAgentSettingsAction(ENTRADA),
+  handOff: () => handOffWhatsappConversationAction({ contactId: CONTACT_ID }),
+  giveBack: () => returnWhatsappConversationToAgentAction({ contactId: CONTACT_ID }),
+  getMode: () => getWhatsappConversationModeAction({ contactId: CONTACT_ID }),
 } as const
 
-const USE_CASE_OF = { get: getSettingsMock, save: saveSettingsMock } as const
+const USE_CASE_OF = {
+  get: getSettingsMock,
+  save: saveSettingsMock,
+  handOff: handOffMock,
+  giveBack: giveBackMock,
+  getMode: getModeMock,
+} as const
+
+const MODE_ACTIONS = ['handOff', 'giveBack', 'getMode'] as const
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -86,6 +117,9 @@ beforeEach(() => {
   getSessionContextMock.mockResolvedValue({ companyId: COMPANY_ID })
   getSettingsMock.mockResolvedValue(WHATSAPP_AGENT_DEFAULTS)
   saveSettingsMock.mockResolvedValue(undefined)
+  handOffMock.mockResolvedValue(undefined)
+  giveBackMock.mockResolvedValue(undefined)
+  getModeMock.mockResolvedValue({ mode: 'HUMAN', reason: 'MANUAL', changedAt: CHANGED_AT })
 })
 
 describe('acciones de configuración del agente', () => {
@@ -98,6 +132,55 @@ describe('acciones de configuración del agente', () => {
     expect(await saveWhatsappAgentSettingsAction(ENTRADA)).toEqual({ status: 'success' })
     expect(saveSettingsMock).toHaveBeenCalledTimes(1)
     expect(saveSettingsMock).toHaveBeenCalledWith(ENTRADA, ACTOR)
+  })
+
+  it('R22 — pasar a humano baja la entrada tal cual con el actor (con sus añadidos) y devuelve `success`', async () => {
+    expect(await handOffWhatsappConversationAction({ contactId: CONTACT_ID })).toEqual({ status: 'success' })
+    expect(handOffMock).toHaveBeenCalledTimes(1)
+    expect(handOffMock).toHaveBeenCalledWith({ contactId: CONTACT_ID }, ACTOR)
+  })
+
+  it('R24 — devolver al agente baja la entrada tal cual con el actor y devuelve `success`', async () => {
+    expect(await returnWhatsappConversationToAgentAction({ contactId: CONTACT_ID })).toEqual({ status: 'success' })
+    expect(giveBackMock).toHaveBeenCalledTimes(1)
+    expect(giveBackMock).toHaveBeenCalledWith({ contactId: CONTACT_ID }, ACTOR)
+  })
+
+  it('R28 — consultar el modo devuelve `success` con modo, motivo y fecha', async () => {
+    expect(await getWhatsappConversationModeAction({ contactId: CONTACT_ID })).toEqual({
+      status: 'success',
+      mode: 'HUMAN',
+      reason: 'MANUAL',
+      changedAt: CHANGED_AT,
+    })
+    expect(getModeMock).toHaveBeenCalledWith({ contactId: CONTACT_ID }, ACTOR)
+  })
+
+  it('R28 — una conversación que nunca cambió sale con motivo y fecha nulos', async () => {
+    getModeMock.mockResolvedValueOnce({ mode: 'AGENT', reason: null, changedAt: null })
+    expect(await getWhatsappConversationModeAction({ contactId: CONTACT_ID })).toEqual({
+      status: 'success',
+      mode: 'AGENT',
+      reason: null,
+      changedAt: null,
+    })
+  })
+
+  it('R26, R27, R28 — las acciones de modo traducen unauthorized, contacto no encontrado e invalid_input del catálogo', async () => {
+    const CASES = [
+      { error: new UnauthorizedError('diagnostico interno'), code: 'unauthorized' },
+      { error: new WhatsappContactNotFoundError(), code: 'whatsapp_contact_not_found' },
+      { error: new ValidationError('diagnostico interno'), code: 'invalid_input' },
+    ] as const
+
+    for (const name of MODE_ACTIONS) {
+      for (const { error, code } of CASES) {
+        USE_CASE_OF[name].mockRejectedValueOnce(error)
+        const result = await ACTIONS[name]()
+        expect(result, `${name} / ${code}`).toEqual({ status: 'error', code, message: errorMessage(code) })
+        expect(JSON.stringify(result)).not.toContain('diagnostico interno')
+      }
+    }
   })
 
   it('cada acción lee la sesión una sola vez y no revalida ninguna ruta', async () => {
@@ -163,7 +246,8 @@ describe('acciones de configuración del agente', () => {
       'utf8',
     )
     expect(source.startsWith("'use server';")).toBe(true)
-    expect(source).not.toMatch(/requireAgent|agente_ia\./)
+    expect(source).not.toMatch(/requireAgent|agente_ia\.|whatsapp\.(enviar|consultar)|agente_ia_whatsapp/)
+    expect(source).not.toMatch(/planModeChange|isDueForAgentReturn/)
     expect(source).not.toMatch(/Schema\b/)
     expect(source).not.toMatch(/@prisma\/client|prisma\./)
     expect(source).not.toMatch(/adapters\/driven|\.\.\/driven/)

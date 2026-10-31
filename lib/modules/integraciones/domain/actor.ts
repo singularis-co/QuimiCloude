@@ -71,6 +71,27 @@ export function requireAgentConfigurePermission(actor: Actor | null | undefined)
   }
 }
 
+/**
+ * Pasar a humano o devolver al agente usa el permiso de envío, que no depende del añadido del
+ * agente: por eso el añadido se comprueba aparte.
+ */
+export function requireAgentOperatePermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, WHATSAPP_SEND_PERMISSION, () => new UnauthorizedError());
+  assertAddon(actor, 'agente_ia_whatsapp', () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
+/** Mismo motivo que `requireAgentOperatePermission`, con el permiso de consulta. */
+export function requireAgentModeReadPermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, WHATSAPP_READ_PERMISSION, () => new UnauthorizedError());
+  assertAddon(actor, 'agente_ia_whatsapp', () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
 /** No lanza: decide qué se muestra, no autoriza. El corte real sigue en `requirePermission`. */
 export function hasConfigurePermission(actor: Actor | null | undefined): boolean {
   try {

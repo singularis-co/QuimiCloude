@@ -3098,6 +3098,9 @@ import type { AiProviderConnectionRepository } from '@/lib/modules/integraciones
 import type { AiProviderProbe } from '@/lib/modules/integraciones/ports/ai-provider-probe';
 import {
   createGetWhatsappAgentSettings,
+  createGetWhatsappConversationMode,
+  createHandOffWhatsappConversation,
+  createReturnWhatsappConversationToAgent,
   createSaveWhatsappAgentSettings,
 } from '@/lib/modules/integraciones';
 import { createWhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-agent-settings-prisma';
@@ -3200,6 +3203,9 @@ export const integraciones = {
   getWhatsappMedia: createGetWhatsappMedia(whatsappMediaDeps),
   getWhatsappAgentSettings: createGetWhatsappAgentSettings(whatsappAgentSettingsDeps),
   saveWhatsappAgentSettings: createSaveWhatsappAgentSettings(whatsappAgentSettingsDeps),
+  handOffWhatsappConversation: createHandOffWhatsappConversation({ contacts: whatsappContactRepository }),
+  returnWhatsappConversationToAgent: createReturnWhatsappConversationToAgent({ contacts: whatsappContactRepository }),
+  getWhatsappConversationMode: createGetWhatsappConversationMode({ contacts: whatsappContactRepository }),
 } as const;
 
 import {

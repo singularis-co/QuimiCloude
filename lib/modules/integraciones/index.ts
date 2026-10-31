@@ -154,3 +154,18 @@ export {
 } from './domain/whatsapp-agent-settings';
 export { createGetWhatsappAgentSettings } from './domain/get-whatsapp-agent-settings';
 export { createSaveWhatsappAgentSettings } from './domain/save-whatsapp-agent-settings';
+export {
+  CONVERSATION_MODES,
+  CONVERSATION_MODE_REASONS,
+  REASONS_BY_TARGET,
+  isDueForAgentReturn,
+  planModeChange,
+  type AgentReturnCandidate,
+  type ConversationMode,
+  type ConversationModeInput,
+  type ConversationModeReason,
+  type ConversationModeView,
+} from './domain/whatsapp-conversation-mode';
+export { createHandOffWhatsappConversation } from './domain/hand-off-whatsapp-conversation';
+export { createReturnWhatsappConversationToAgent } from './domain/return-whatsapp-conversation-to-agent';
+export { createGetWhatsappConversationMode } from './domain/get-whatsapp-conversation-mode';

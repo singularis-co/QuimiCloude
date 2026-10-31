@@ -84,22 +84,22 @@
 
 ## Tanda 4 — Modo de la conversación (depende de 1 y 2; después de la 3 por `composition` y `actor.ts`)
 
-- [ ] **T4.1** `domain/whatsapp-conversation-mode.ts`: `planModeChange` e `isDueForAgentReturn`.
+- [x] **T4.1** `domain/whatsapp-conversation-mode.ts`: `planModeChange` e `isDueForAgentReturn`.
   *Hecho:* tests unitarios puros: R21 (cada uno de los once motivos contra cada destino), R29
   (justo en N horas vuelve, un milisegundo antes no; la referencia es la más reciente de las dos
   fechas; mensaje posterior al cambio reinicia la cuenta), R30 (`AGENT` nunca; `HUMAN` sin fechas
   no).
-- [ ] **T4.2** Puerto `whatsapp-contact-repository.ts` (`findMode`, `setMode`) y adaptador
+- [x] **T4.2** Puerto `whatsapp-contact-repository.ts` (`findMode`, `setMode`) y adaptador
   `whatsapp-contact-prisma.ts`; dobles de `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`.
   *Hecho:* test de integración: `setMode` cambia, devuelve `unchanged` sin tocar motivo/fecha/autor
   si ya está en el destino (también con dos llamadas concurrentes), `not_found` para otra empresa;
   guarda autor nulo cuando `by` es `null` (R20).
-- [ ] **T4.3** `actor.ts`: `requireAgentOperatePermission` (D7). Casos de uso
+- [x] **T4.3** `actor.ts`: `requireAgentOperatePermission` (D7). Casos de uso
   `hand-off-whatsapp-conversation.ts`, `return-whatsapp-conversation-to-agent.ts`,
   `get-whatsapp-conversation-mode.ts`. *Hecho:* tests unitarios R20, R22–R28 (sin permiso, sin
   añadido activo, sin empresa → rechaza sin llamar al puerto; id no uuid, inexistente o de otra
   empresa → no encontrado; ya en el destino → no falla y no reescribe).
-- [ ] **T4.4** Acciones de modo en `whatsapp-agent-actions.ts`, cableado en `composition`,
+- [x] **T4.4** Acciones de modo en `whatsapp-agent-actions.ts`, cableado en `composition`,
   reexportes en `lib/modules/integraciones/index.ts` (incluido `renderGreeting`). *Hecho:* test de
   acciones verde; guardias verdes.
 

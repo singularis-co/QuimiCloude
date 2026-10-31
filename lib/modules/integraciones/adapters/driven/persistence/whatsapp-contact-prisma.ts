@@ -7,6 +7,8 @@ import { whatsappContactCompanyScope } from './company-scope';
 import type { IntegracionesScope } from '../../../domain/integraciones-scope';
 import type { ContactLink } from '../../../domain/whatsapp-contact-link';
 import type {
+  ConversationModeChange,
+  ConversationModeState,
   WhatsappContactBlock,
   WhatsappContactLinkRow,
   WhatsappContactRepository,
@@ -80,6 +82,55 @@ export async function setWhatsappContactBlocked(
   return existing === null ? 'not_found' : 'ok';
 }
 
+export async function findWhatsappContactMode(
+  db: PrismaLike,
+  id: string,
+  scope: IntegracionesScope,
+): Promise<ConversationModeState | null> {
+  const row = await db.whatsappContact.findFirst({
+    where: { id, ...whatsappContactCompanyScope(scope) },
+    select: {
+      conversationMode: true,
+      conversationModeReason: true,
+      conversationModeChangedAt: true,
+      lastMessageAt: true,
+    },
+  });
+  if (row === null) return null;
+  return {
+    mode: row.conversationMode,
+    reason: row.conversationModeReason,
+    changedAt: row.conversationModeChangedAt,
+    lastMessageAt: row.lastMessageAt,
+  };
+}
+
+export async function setWhatsappContactMode(
+  db: PrismaLike,
+  id: string,
+  change: ConversationModeChange,
+  scope: IntegracionesScope,
+): Promise<'changed' | 'unchanged' | 'not_found'> {
+  // El filtro por modo hace que, de dos cambios simultáneos al mismo destino, el segundo no pise
+  // el motivo ni la fecha del primero.
+  const result = await db.whatsappContact.updateMany({
+    where: { id, conversationMode: { not: change.mode }, ...whatsappContactCompanyScope(scope) },
+    data: {
+      conversationMode: change.mode,
+      conversationModeReason: change.reason,
+      conversationModeChangedAt: change.at,
+      conversationModeChangedBy: change.by,
+    },
+  });
+  if (result.count > 0) return 'changed';
+
+  const existing = await db.whatsappContact.findFirst({
+    where: { id, ...whatsappContactCompanyScope(scope) },
+    select: { id: true },
+  });
+  return existing === null ? 'not_found' : 'unchanged';
+}
+
 /**
  * Choque de dos escrituras simultáneas en los teléfonos que escribe `clientes` dentro de la misma
  * transacción: contra uno de los dos únicos parciales de los vínculos vivos de un cliente, o contra
@@ -106,5 +157,7 @@ export function createWhatsappContactRepository(db: PrismaLike = prisma): Whatsa
     findByWaIds: (waIds, scope) => findWhatsappContactsByWaIds(db, waIds, scope),
     setLink: (id, link, scope) => setWhatsappContactLink(db, id, link, scope),
     setBlocked: (id, blocked, scope) => setWhatsappContactBlocked(db, id, blocked, scope),
+    findMode: (id, scope) => findWhatsappContactMode(db, id, scope),
+    setMode: (id, change, scope) => setWhatsappContactMode(db, id, change, scope),
   };
 }

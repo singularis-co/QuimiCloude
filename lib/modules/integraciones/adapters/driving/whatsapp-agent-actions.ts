@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * Server Actions del agente de IA de WhatsApp. No deciden nada: resuelven el actor, pasan la
+ * Server Actions del agente de IA de WhatsApp: su configuración y el modo de cada conversación. No deciden nada: resuelven el actor, pasan la
  * entrada tal cual al caso de uso (que la valida) y traducen el error.
  *
  * Reciben un objeto y no `FormData`. No revalidan ninguna ruta: aún no hay pantalla que las use.
@@ -15,6 +15,8 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   IntegracionesError,
   type Actor,
+  type ConversationModeInput,
+  type ConversationModeView,
   type SaveWhatsappAgentSettingsInput,
   type WhatsappAgentSettings,
 } from '@/lib/modules/integraciones';
@@ -26,9 +28,13 @@ export type GetWhatsappAgentSettingsActionResult =
 
 export type SaveWhatsappAgentSettingsActionResult = { status: 'success' } | ErrorState;
 
+export type ChangeWhatsappConversationModeActionResult = { status: 'success' } | ErrorState;
+
+export type GetWhatsappConversationModeActionResult = ({ status: 'success' } & ConversationModeView) | ErrorState;
+
 const toErrorState = createErrorStateTranslator(IntegracionesError, observabilidad.readRequestIdHeader);
 
-/** Lleva los añadidos de la empresa, aunque los casos de uso de configuración solo miren el permiso. */
+/** Lleva los añadidos de la empresa: los casos de uso del modo de la conversación los miran. */
 async function currentActor(): Promise<Actor | null> {
   const [sessionUser, sessionContext] = await runInRequestScope(() =>
     Promise.all([identity.getSessionUser(), identity.getSessionContext()]),
@@ -61,6 +67,45 @@ export async function saveWhatsappAgentSettingsAction(
   try {
     await integraciones.saveWhatsappAgentSettings(input, actor);
     return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function handOffWhatsappConversationAction(
+  input: ConversationModeInput,
+): Promise<ChangeWhatsappConversationModeActionResult> {
+  const actor = await currentActor();
+
+  try {
+    await integraciones.handOffWhatsappConversation(input, actor);
+    return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function returnWhatsappConversationToAgentAction(
+  input: ConversationModeInput,
+): Promise<ChangeWhatsappConversationModeActionResult> {
+  const actor = await currentActor();
+
+  try {
+    await integraciones.returnWhatsappConversationToAgent(input, actor);
+    return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export async function getWhatsappConversationModeAction(
+  input: ConversationModeInput,
+): Promise<GetWhatsappConversationModeActionResult> {
+  const actor = await currentActor();
+
+  try {
+    const view = await integraciones.getWhatsappConversationMode(input, actor);
+    return { status: 'success', mode: view.mode, reason: view.reason, changedAt: view.changedAt };
   } catch (error) {
     return toErrorState(error);
   }
