@@ -51,7 +51,7 @@ QT-311 (pantalla del Maestro, otra ficha)
   └─ integraciones.saveAiModelPair(input, actor)              domain/save-ai-model-pair.ts
         ├─ AiProviderCatalog (puerto existente)
         └─ AiModelPairRepository (puerto nuevo)               ports/ai-model-pair-repository.ts
-              └─ adaptador Prisma                             adapters/driven/persistence/ai-model-pair-prisma.ts
+              └─ adaptador Prisma                             adapters/driven/catalog/ai-model-pair-prisma.ts
 
 QT-306 / QT-307 (desde composition)
   └─ integraciones.generateAgentText(companyId, request)      domain/generate-agent-text.ts

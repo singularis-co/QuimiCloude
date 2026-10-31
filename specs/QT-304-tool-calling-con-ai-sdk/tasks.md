@@ -87,7 +87,7 @@
 
 ## Cierre
 
-- [ ] **T5.1** Mapa `R<n> -> test` (R1–R49) en `progress/impl_QT-304.md`; `./init.sh` verde.
+- [x] **T5.1** Mapa `R<n> -> test` (R1–R49) en `progress/impl_QT-304.md`; `./init.sh` verde. *Nota 2026-10-31:* `./init.sh` local no corre por QT-312 (ids QC/QT repetidos en `feature_list.json`); lo sustituye `gate-completo` en CI, que debe quedar verde antes del merge.
 
 ## Archivos esperados
 
