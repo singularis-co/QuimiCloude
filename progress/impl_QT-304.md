@@ -164,3 +164,78 @@ board, ajeno.
 - `./init.sh`: no se corre (para en el paso 4 por `feature_list.json`, QT-312).
 
 Veredicto tanda 2: hecha, R5, R10–R15 con test; gate a mano verde.
+
+## Tanda 3 — Puerto, resolución, respaldo y casos de uso de generación (2026-10-31)
+
+### Archivos creados
+
+- `lib/modules/integraciones/ports/conversational-model.ts`: tipos de §4.1 (solo `zod` y tipos del
+  módulo); se nombran además `TextGenerationInput` y `ObjectGenerationInput<T>` para el puerto.
+- `lib/modules/integraciones/domain/model-fallback.ts`: `OVERLOAD_STATUSES` (503, 529),
+  `shouldFallBack`, `withFallback` (un solo intento con el respaldo; bloqueado si alguna
+  `toolCalls[i].executed` o si hacen falta herramientas y el respaldo no las admite).
+- `lib/modules/integraciones/domain/resolve-conversation-model.ts` (interno):
+  `resolveConversationModel`, `assertConversationRequest` (rol, plazo, turnos) y
+  `assertToolRequest` (tope 1–8, nombres `^[a-zA-Z0-9_-]{1,64}$` únicos).
+- `lib/modules/integraciones/domain/generate-agent-text.ts` y `generate-agent-object.ts`.
+- Tests: `tests/unit/integraciones/agente/model-fallback.test.ts`, `generate-agent-text.test.ts`,
+  `generate-agent-object.test.ts` y el doble `conversational-model-doubles.ts`.
+
+### Archivos modificados
+
+- `lib/modules/integraciones/index.ts`: `createGenerateAgentText`, `createGenerateAgentObject` y los
+  tipos `AgentTextRequest`, `AgentTextResult`, `AgentObjectRequest`, `AgentObjectResult`,
+  `ConversationTurn`, `ConversationalTool`, `ToolCallRecord`, `TokenUsage`. Los cuatro últimos son
+  del puerto y salen reexportados desde `domain/generate-agent-text.ts`, porque el contrato solo
+  reexporta de `./domain` (`module-shape.test.ts`).
+- Arrastre: `tests/unit/integraciones/module-shape.test.ts` (cinco archivos de código y las dos
+  listas del contrato).
+
+### Desviaciones y notas
+
+- La resolución **no** usa `decryptStoredKey`: esa función marca la conexión en `ERROR` con una key
+  ilegible, y R46 / design §5.3 piden no marcarla. Se llama a `cipher.decrypt` con el mismo
+  contexto (`aiProviderKeyContext`).
+- Un modelo del par que no esté en el catálogo cuenta como «sin herramientas» (la FK lo impide;
+  es la salida segura si el catálogo y la tabla se desfasan).
+- Las validaciones de §4.2 incluyen el rol (debe estar en `AI_MODEL_ROLES`).
+- `generateAgentObject` re-valida dentro de cada intento: un valor inválido del principal sale como
+  `invalid_output` y no pasa al respaldo.
+- Sin cableado en `lib/composition/index.ts`: necesita el adaptador del AI SDK (T4.6).
+- «Sin key funcional no responde el modo agente» se cubre con R20: sin conexión → `missing`, key
+  ilegible → `unreadable`, sin llamar. No se filtra por `connection.status === 'ERROR'`: el spec no
+  lo pide (una key rechazada sale como `failed` / `rejected_key` y QT-307 decide).
+
+### Mapa R → test (tanda 3)
+
+| R | Test |
+|---|---|
+| R18 | `generate-agent-text.test.ts` > dos casos R18; `generate-agent-object.test.ts` > «R40: llama al puerto con el par del rol…» |
+| R19 | text > «R19: sin par…»; object > «sin par devuelve su estado…» |
+| R20 | text > «R20: sin conexion…», «R20, R46: con la key ilegible…»; object > «sin conexion», «key ilegible» |
+| R21 | text > dos casos R21 |
+| R22 | text > dos casos R22 (resultados y error de petición) |
+| R23 | `model-fallback.test.ts` > 5 casos R23 + `withFallback`; text > 4 casos R23 (404, sin respuesta, 503, 529); object > dos casos R23 |
+| R24 | `model-fallback.test.ts` > 8 casos R24; text > 10 casos R24 (401, 403, 402, 429, 500, 502, 504, sin código, tope, vacía); object > dos casos R24 |
+| R25 | text > «R25: si el respaldo tambien falla…» |
+| R26 | text > tres casos R26 |
+| R27 | text > dos casos R27 |
+| R28 | text > casos R23 (`model` + `fallbackFrom`) y «R28: un resultado del principal…» |
+| R34 | text > «R34: el tope de pasos 1/8…», «R34: tope de pasos sale tal cual», validaciones de tope |
+| R37 | text > 15 casos «R34, R37: … lanza un error…», «R37: nombres validos…» |
+| R38 | object > «R38: devuelve el valor que resulta de validar…» |
+| R39 | object > «R39: …salida invalida, sin el valor ni respaldo» (dominio; el adaptador lo cubre en T4.5) |
+| R40 | object > «R40: …sin herramientas», «R23, R40: …respaldo que no las admite tambien se usa» |
+| R46 | text > «R20, R46…», «R46: generar… no cambia la conexion»; object > casos de estado (sin `update`) |
+
+### Verificación (salida real, 2026-10-31)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `0 errors, 10 warnings` (los mismos de T1/T2, archivos no tocados).
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1327 passed | 22 skipped`.
+- `pnpm exec vitest run tests/unit/integraciones tests/unit/composition`: `Test Files 127 passed
+  (127)`, `Tests 2719 passed | 1 skipped`.
+- Los tres tests nuevos: `Test Files 3 passed`, `Tests 78 passed`.
+- Sin int tests tocados (la tanda no toca base). `./init.sh` no se corre (QT-312).
+
+Veredicto tanda 3: hecha, R18–R28, R34, R37–R40 y R46 con test en dominio; gate a mano verde.

@@ -49,15 +49,16 @@
 
 ## Tanda 3 — Puerto, resolución, respaldo y casos de uso de generación (depende de T2.1; `[P]` con T2.2–T2.3)
 
-- [ ] **T3.1** `ports/conversational-model.ts` con los tipos de `design.md > 4.1` (solo `zod` y tipos
+- [x] **T3.1** `ports/conversational-model.ts` con los tipos de `design.md > 4.1` (solo `zod` y tipos
   del módulo). *Hecho:* typecheck y `guard-arquitectura-modulos` verdes.
-- [ ] **T3.2** `domain/model-fallback.ts`: `shouldFallBack` y el orquestador de intentos
+- [x] **T3.2** `domain/model-fallback.ts`: `shouldFallBack` y el orquestador de intentos
   (`design.md > 5.4`). *Hecho:* `model-fallback.test.ts` verde (R23, R24).
-- [ ] **T3.3** `domain/resolve-conversation-model.ts` (interno) y validaciones de
+- [x] **T3.3** `domain/resolve-conversation-model.ts` (interno) y validaciones de
   `design.md > 4.2`. *Hecho:* cubierto por T3.4.
-- [ ] **T3.4** `domain/generate-agent-text.ts` y `domain/generate-agent-object.ts`, exportados en
+- [x] **T3.4** `domain/generate-agent-text.ts` y `domain/generate-agent-object.ts`, exportados en
   `index.ts` (`design.md > 5.5`). *Hecho:* `generate-agent-text.test.ts` (R18–R28, R34, R37, R46) y
-  `generate-agent-object.test.ts` (R23, R24, R38–R40) verdes con un puerto simulado.
+  `generate-agent-object.test.ts` (R23, R24, R38–R40) verdes con un puerto simulado. Exportados en
+  `index.ts`; el cableado en `lib/composition/index.ts` espera al adaptador (T4.6).
 
 ## Tanda 4 — Adaptador del AI SDK (depende de la aprobación F1.4 y de la tanda 3)
 

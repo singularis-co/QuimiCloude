@@ -88,6 +88,17 @@ export type { SaveAiModelPairResult } from './domain/save-ai-model-pair';
 export { createGetAiModelPairs } from './domain/get-ai-model-pairs';
 export { createSaveAiModelPair } from './domain/save-ai-model-pair';
 export type {
+  AgentTextRequest,
+  AgentTextResult,
+  ConversationalTool,
+  ConversationTurn,
+  TokenUsage,
+  ToolCallRecord,
+} from './domain/generate-agent-text';
+export type { AgentObjectRequest, AgentObjectResult } from './domain/generate-agent-object';
+export { createGenerateAgentText } from './domain/generate-agent-text';
+export { createGenerateAgentObject } from './domain/generate-agent-object';
+export type {
   TemplateSyncSummary,
   WhatsappTemplateCategory,
   WhatsappTemplateList,
