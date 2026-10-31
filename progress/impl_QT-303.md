@@ -467,3 +467,45 @@ Pendiente del *Hecho* de T5.1: `./init.sh` verde no se corrió (el leader lo res
 el `vitest related` de la tanda 4, que se paró por falta de memoria).
 
 Veredicto: trazabilidad R1–R36 completa, sin huecos.
+
+## Fix vuelta 1 de review (B1, m1, m2, m3) · backend_dev · 2026-10-31
+
+### Archivos
+- `tests/unit/integraciones/module-shape.test.ts` (B1): las tres listas exactas reciben lo de las
+  tandas 3 y 4. R20: 21 nombres en el barrel (7 de ellos también en la lista de solo tipo). R18: 10
+  archivos del módulo. R19: 5 claves de la fachada `integraciones`. Títulos de los tres `it` con QT-303.
+- `db/migrations/20261030120100_whatsapp_agent_permissions/down.sql` (m1): `DELETE FROM "plan_addons"`
+  del añadido, después de las excepciones y antes de borrar la clave.
+- `tests/unit/identity/schema/whatsapp-agent-permissions-migration.test.ts` (m1): el DOWN esperado
+  pasa a cinco `DELETE`.
+- `tests/integration/identity/whatsapp-agent-permissions-migration.int.test.ts` (m1): caso nuevo,
+  plan que incluye el añadido → el DOWN funciona, quita esa fila y deja el plan y sus otros añadidos.
+  Comprobado que con el DOWN anterior falla (`23503 plan_addons_addon_key_fkey`).
+- `specs/QT-303-agente-ia-whatsapp-base/design.md` (m2): `save(settings, by, at, scope)`, igual que el puerto.
+
+### Mapa R → test (añadidos)
+- R6 → `whatsapp-agent-permissions-migration.int.test.ts` «el DOWN funciona con un plan que incluye el añadido…».
+- R18/R19/R20 de la forma del módulo → `module-shape.test.ts` (listas actualizadas).
+
+### Otras listas a mano
+Grep de los nombres nuevos y de vecinos (`getWhatsappMedia`, `markWhatsappChatRead`, `agente_ia_whatsapp`…)
+en `tests/`. Corridos los no tocados por el diff que podían fijar listas: `tests/unit/composition`,
+`navegacion/qc75-convenciones`, `identity/permissions`, `identity/schema`, `identity/addons`,
+`encryption-keys-env`, `whatsapp-message-actions`, `contactos-page`, `order-assignments-migration`,
+`session-once-per-request-actions`, `guard-identificador-de-request`, `addon-names`, `addon-labels`:
+48 archivos, 916 verdes, 3 omitidos. Ninguna lista más rota.
+
+### Verificación (salida real)
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm exec eslint` sobre los tres tests tocados: sin salida, 0 errores.
+- `pnpm exec vitest run tests/unit/integraciones/module-shape.test.ts`: 1 archivo, 107 verdes, 1 omitido (antes 3 rojos).
+- `pnpm exec vitest run tests/unit/identity/schema/whatsapp-agent-permissions-migration.test.ts`: 13/13 verdes.
+- `pnpm exec vitest run tests/integration/identity/whatsapp-agent-permissions-migration.int.test.ts` (base efímera): 7/7 verdes.
+- `pnpm exec vitest run guard`: 87 archivos, 1327 verdes, 22 omitidos, 0 rojos.
+
+### Deuda (m3)
+- Sin E2E de los permisos nuevos (`agente_ia.consultar` / `agente_ia.modificar`) ni del modo de la
+  conversación: QT-303 no trae pantalla. El E2E de ese flujo crítico llega con la UI en QT-308. Hasta
+  entonces la cobertura es unit + `.int`.
+
+Veredicto: hallazgos B1, m1, m2 y m3 de la vuelta 1 resueltos; tests tocados, guardias, typecheck y lint en verde.

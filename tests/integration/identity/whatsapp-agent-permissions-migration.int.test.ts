@@ -262,4 +262,30 @@ describe('migracion whatsapp_agent_permissions contra Postgres real', () => {
       ).toEqual(otrasAsignaciones)
     })
   })
+
+  it('R6: el DOWN funciona con un plan que incluye el añadido: quita esa fila del plan y deja el plan y sus otros añadidos', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      await seedBeforeMigration(tx)
+      await apply(tx, UP)
+      const plan = await tx.plan.create({
+        data: {
+          name: `Plan agente ${tag()}`,
+          currency: 'USD',
+          monthlyPrice: new Prisma.Decimal('10'),
+          active: true,
+          addons: { create: [{ addonKey: ADDON }, { addonKey: 'integraciones' }] },
+        },
+        select: { id: true },
+      })
+
+      await apply(tx, DOWN)
+
+      expect(await tx.addon.count({ where: { key: ADDON } })).toBe(0)
+      expect(await tx.planAddon.count({ where: { addonKey: ADDON } })).toBe(0)
+      expect(
+        (await tx.planAddon.findMany({ where: { planId: plan.id }, select: { addonKey: true } })).map((f) => f.addonKey),
+      ).toEqual(['integraciones'])
+      expect(await tx.plan.count({ where: { id: plan.id } })).toBe(1)
+    })
+  })
 })

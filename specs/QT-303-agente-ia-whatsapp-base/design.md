@@ -267,8 +267,10 @@ Puerto nuevo `ports/whatsapp-agent-settings-repository.ts`:
 
 ```ts
 find(scope): Promise<WhatsappAgentSettings | null>;
-save(settings: WhatsappAgentSettings, by: string, scope): Promise<void>; // upsert por company_id
+save(settings: WhatsappAgentSettings, by: string, at: Date, scope): Promise<void>; // upsert por company_id
 ```
+
+`at` lo pasa el caso de uso desde su reloj inyectado (como `setMode`), no el adaptador.
 
 ## Adaptadores
 

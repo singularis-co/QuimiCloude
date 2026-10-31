@@ -189,12 +189,13 @@ export function nonInsertWrites(sql: string): readonly string[] {
 
 const DOWN_ESPERADO = [
   `DELETE FROM "company_addon_overrides" WHERE "addon_key" = '${ADDON}'`,
+  `DELETE FROM "plan_addons" WHERE "addon_key" = '${ADDON}'`,
   `DELETE FROM "role_permissions" WHERE "permission_code" IN (${lista})`,
   `DELETE FROM "permissions" WHERE "code" IN (${lista})`,
   `DELETE FROM "addons" WHERE "key" = '${ADDON}'`,
 ]
 
-/** El DOWN son exactamente los cuatro `DELETE` acotados, las hijas antes que sus catalogos. */
+/** El DOWN son exactamente los cinco `DELETE` acotados, las hijas antes que sus catalogos. */
 export function downDeletesChildrenBeforeCatalogs(sql: string): boolean {
   const sentencias = statements(sql)
   return sentencias.length === DOWN_ESPERADO.length && DOWN_ESPERADO.every((s, i) => sentencias[i] === s)
@@ -370,8 +371,8 @@ describe('migration.sql — cuatro INSERT, solo datos', () => {
 
 // --- El DOWN ----------------------------------------------------------------------------------
 
-describe('down.sql — cuatro DELETE acotados', () => {
-  it('R6: borra excepciones, asignaciones, permisos y la clave del añadido, en ese orden', () => {
+describe('down.sql — cinco DELETE acotados', () => {
+  it('R6: borra excepciones, filas de planes, asignaciones, permisos y la clave del añadido, en ese orden', () => {
     expect(downDeletesChildrenBeforeCatalogs(downSource)).toBe(true)
 
     const invertido = withReversedStatements(downSource)
