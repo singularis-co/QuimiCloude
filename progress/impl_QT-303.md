@@ -260,3 +260,22 @@ Veredicto: tanda 3 hecha; configuración del agente leída y guardada por empres
 - `pnpm exec tsc --noEmit`: exit 0. `eslint` sobre los dos tests tocados: sin salida (0 problemas).
 
 Veredicto: nombre del asistente endurecido en base y probado en dominio; verde.
+
+## Textos «cinco añadidos» → seis (2026-10-31)
+
+- Archivos: `e2e/modulos-por-empresa.spec.ts` (comentario de `setAddons` y título del test de la
+  línea 226), `e2e/helpers/addons.ts` (comentario de `enableAllAddons`), `tests/unit/e2e-helpers/landing.test.ts`
+  (título del `describe` de la línea 200). Solo texto: ambos archivos cuentan con `ADDONS.length` y
+  recorren `ADDONS`, que ya trae `agente_ia_whatsapp`; ninguna aserción listaba nombres ni el número 5.
+- Nota de proceso: estos cambios entraron por error en el commit `324ebd136` (fix del nombre del
+  asistente, `git add -A`) y ya estaba pusheado; no se reescribió la historia sin autorización.
+  Este commit `test(QT-303)` solo lleva esta sección.
+- `pnpm exec vitest run tests/unit/e2e-helpers/landing.test.ts`: `Test Files 1 passed (1)`, `Tests 14 passed (14)`.
+- E2E `pnpm exec playwright test e2e/modulos-por-empresa.spec.ts`: **no viable en local**. 10/10 fallan
+  (chromium y webkit) en `setAddons` con `PrismaClientKnownRequestError: Foreign key constraint violated`
+  sobre `company_addon_overrides_addon_key_fkey`: la base del `.env` (la que usa el `webServer` del E2E)
+  no tiene aplicada `20261030120100_whatsapp_agent_permissions`, así que falta la fila
+  `addons.key = 'agente_ia_whatsapp'`. No se migró esa base (no es una base desechable de test). Queda
+  para el E2E de CI o tras aplicar las migraciones de QT-303 a esa base.
+
+Veredicto: textos ajustados y unit verde; E2E local bloqueado por base sin migrar.
