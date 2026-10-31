@@ -13,6 +13,8 @@ export type Actor = {
 const CONFIGURE_PERMISSION = 'integraciones.modificar';
 export const WHATSAPP_SEND_PERMISSION = 'whatsapp.enviar';
 export const WHATSAPP_READ_PERMISSION = 'whatsapp.consultar';
+export const AGENT_READ_PERMISSION = 'agente_ia.consultar';
+export const AGENT_CONFIGURE_PERMISSION = 'agente_ia.modificar';
 
 /**
  * Primera línea de cada caso de uso, antes de validar la entrada y de tocar un puerto. Un actor
@@ -48,6 +50,22 @@ export function requireSendPermission(actor: Actor | null | undefined): asserts 
 /** Las consultas de conversaciones no exigen el permiso de envío, ni los envíos este. */
 export function requireReadPermission(actor: Actor | null | undefined): asserts actor is Actor {
   assertPermission(actor, WHATSAPP_READ_PERMISSION, () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
+/** El permiso ya llega quitado si el añadido del agente está apagado. */
+export function requireAgentReadPermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, AGENT_READ_PERMISSION, () => new UnauthorizedError());
+  if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
+    throw new UnauthorizedError();
+  }
+}
+
+/** El permiso ya llega quitado si el añadido del agente está apagado. */
+export function requireAgentConfigurePermission(actor: Actor | null | undefined): asserts actor is Actor {
+  assertPermission(actor, AGENT_CONFIGURE_PERMISSION, () => new UnauthorizedError());
   if (typeof actor?.companyId !== 'string' || actor.companyId === '') {
     throw new UnauthorizedError();
   }

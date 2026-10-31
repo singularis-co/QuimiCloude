@@ -141,3 +141,101 @@ Veredicto: tanda 1 hecha y verde (catálogo de añadidos y permisos, migración 
 - `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores, 10 warnings (ninguno en archivos tocados).
 
 Veredicto: CHECK corregido y probado contra la base; verde.
+
+## Tanda 3 — Configuración del agente (T3.1–T3.4)
+
+### Archivos
+
+Creados:
+- `lib/modules/integraciones/domain/whatsapp-agent-settings.ts`: tipo, `WHATSAPP_AGENT_DEFAULTS`
+  (congelado), `WHATSAPP_ASSISTANT_NAME_MAX_LENGTH = 60`, `GREETING_NAME_PLACEHOLDER`,
+  `renderGreeting`, `saveWhatsappAgentSettingsSchema` (zod; sin `strict`: una clave de más, como una
+  empresa, se descarta) y `SaveWhatsappAgentSettingsInput`.
+- `lib/modules/integraciones/domain/get-whatsapp-agent-settings.ts`, `save-whatsapp-agent-settings.ts`.
+- `lib/modules/integraciones/ports/whatsapp-agent-settings-repository.ts`.
+- `lib/modules/integraciones/adapters/driven/persistence/whatsapp-agent-settings-prisma.ts` (upsert
+  por `company_id`; umbral a `Decimal` por texto con `toFixed(2)` y de vuelta con `toNumber()`).
+- `lib/modules/integraciones/adapters/driving/whatsapp-agent-actions.ts`
+  (`getWhatsappAgentSettingsAction`, `saveWhatsappAgentSettingsAction`).
+- `tests/unit/integraciones/agente/whatsapp-agent-settings.test.ts`, `render-greeting.test.ts`,
+  `save-whatsapp-agent-settings.test.ts`, `whatsapp-agent-actions.test.ts`.
+- `tests/integration/integraciones/whatsapp-agent-settings-prisma.int.test.ts`.
+
+Modificados:
+- `lib/modules/integraciones/domain/actor.ts`: `AGENT_READ_PERMISSION`, `AGENT_CONFIGURE_PERMISSION`,
+  `requireAgentReadPermission`, `requireAgentConfigurePermission`.
+- `lib/modules/integraciones/index.ts`: reexporta tipos, defaults, `renderGreeting` y las dos fábricas
+  (adelanta el reexporte de `renderGreeting` que T4.4 pedía).
+- `lib/composition/index.ts`: repositorio de configuración y `getWhatsappAgentSettings` /
+  `saveWhatsappAgentSettings` en la fachada `integraciones`.
+- `tests/integration/aislamiento.json`: el `.int` nuevo en `commit` con su motivo (lo exige
+  `guard-aislamiento-integracion`).
+- `tests/unit/identity/session-once-per-request-actions.test.ts`: lista a mano `ACCIONES` (una
+  entrada por archivo de acciones) con `whatsapp-agent-actions.ts` → `getWhatsappAgentSettingsAction`.
+- `tests/unit/composition/integraciones-graph-doubles.test.ts` y
+  `tests/unit/integraciones/encryption-keys-env.test.ts`: listas a mano (ordenadas) de las claves de
+  la fachada `integraciones`; se añaden `getWhatsappAgentSettings` y `saveWhatsappAgentSettings`.
+- `specs/QT-303-agente-ia-whatsapp-base/tasks.md`: T3.1–T3.4 en `[x]`.
+
+Desvío del design: el puerto es `save(settings, by, at, scope)` (el design decía
+`save(settings, by, scope)`). La fecha la pone el caso de uso con su reloj inyectable, como
+`set-whatsapp-contact-blocked`, para que el *Hecho* de T3.2 («guarda autor y fecha») se pruebe con
+el puerto simulado; el adaptador la escribe en `updated_at`.
+
+### Mapa R -> test (tanda 3)
+
+| R | Archivo | Casos |
+|---|---|---|
+| R8 | whatsapp-agent-settings.test.ts | «R8 — activo false, umbral 0.6, …textos exactos»; «R8 — el saludo por defecto guarda `{nombre}` literal…»; «R8 — los valores por defecto pasan el propio esquema»; «R8 — …no se pueden mutar» |
+| R8 | save-whatsapp-agent-settings.test.ts | «R8 — una empresa sin configuración guardada recibe los valores por defecto» |
+| R8 | whatsapp-agent-settings-prisma.int.test.ts | «R8 — una empresa sin fila lee null y el caso de uso devuelve los valores por defecto» |
+| R8 | whatsapp-agent-actions.test.ts | «R8 — leer devuelve `success` con la configuración del caso de uso» |
+| R9 | save-whatsapp-agent-settings.test.ts | «R9 — sin agente_ia.consultar / sin empresa / sin actor / actor indefinido: rechaza con unauthorized y no lee» |
+| R10 | save-whatsapp-agent-settings.test.ts | «R10 — sin agente_ia.modificar / sin empresa / sin actor: rechaza … antes de leer la entrada y sin escribir» |
+| R9, R10 | whatsapp-agent-actions.test.ts | «R9, R10 — sin sesión el actor baja nulo y el `unauthorized`…»; «R9, R10, R11 — cada error de dominio se traduce…» |
+| R11 | whatsapp-agent-settings.test.ts | «R11 — umbral 0, 1, 0.6, 0.01, 0.29, 0.99: acepta»; «R11 — umbral 1.01, -0.01, 0.655, 2, NaN, Infinity, '0.6', null: rechaza» |
+| R12 | whatsapp-agent-settings.test.ts | «R12 — dailyReplyLimit / contactHourlyReplyLimit: 1 acepta; 0, 1.5, -3 y texto rechazan» |
+| R13 | whatsapp-agent-settings.test.ts | «R13 — horas de inactividad: 1 acepta; 0, 1.5, -1 y texto rechazan» |
+| R14 | whatsapp-agent-settings.test.ts | «R14 — handoffMessage / greetingMessage vacío, solo espacios o solo blancos rechaza; 4096 acepta y 4097 rechaza»; «R14 — el tope de 4096 se cuenta después de recortar» |
+| R15 | whatsapp-agent-settings.test.ts | «R15 — sin el campo X rechaza» (los siete); «R15 — `enabled` no booleano rechaza»; «R15 — sin nombre del asistente no rechaza»; «R15 — una entrada que no es un objeto rechaza» |
+| R11–R15, R34, R36 | save-whatsapp-agent-settings.test.ts | «R11–R15, R34, R36 — …: rechaza con invalid_input y no escribe» (diez casos); «R15 — sin un campo obligatorio rechaza y no escribe» |
+| R16 | save-whatsapp-agent-settings.test.ts | «R16 — reemplaza todos los campos, recorta mensajes y nombre y registra autor y fecha»; «R16 — con configuración guardada devuelve la guardada» |
+| R16 | whatsapp-agent-settings-prisma.int.test.ts | «R16, R34 — guardar y leer con nombre…, con autor y fecha»; «R16 — un segundo guardado reemplaza todos los campos, el autor y la fecha»; «R16 — el umbral X vuelve exacto» (0, 1, 0.6, 0.29, 0.07, 0.99) |
+| R16 | whatsapp-agent-actions.test.ts | «R16 — guardar baja la entrada tal cual con el actor y devuelve `success`» |
+| R17 | whatsapp-agent-settings-prisma.int.test.ts | «R17 — guardados concurrentes de la misma empresa dejan una sola fila» (ocho a la vez, ninguno falla) |
+| R18 | save-whatsapp-agent-settings.test.ts | «R18 — lee siempre la empresa del actor»; «R18 — escribe en la empresa del actor aunque la entrada traiga otra, y no guarda esa clave» |
+| R18 | whatsapp-agent-settings-prisma.int.test.ts | «R18 — una empresa no lee ni pisa la configuración de otra»; «R16, R18 — el caso de uso guarda recortado en la empresa del actor aunque la entrada traiga otra» |
+| R34 | whatsapp-agent-settings.test.ts | «R34 — ausente, null, vacío o solo espacios se guarda sin nombre»; «R34 — …sin los espacios de los extremos»; «R34 — 60 pasan y 61 rechazan»; «R34 — un nombre que no es texto rechaza» |
+| R34 | save-whatsapp-agent-settings.test.ts / int | «R16, R34 — sin nombre del asistente guarda el nombre nulo»; «R16, R34 — guardar sin nombre… lo deja nulo en la base y en la lectura» |
+| R35 | render-greeting.test.ts | «R35 — …con nombre «Ana»…»; «R35 — …sin nombre quita `{nombre}` con el espacio que lo precede»; «R35 — `{nombre}` al inicio…»; «R35 — `{nombre}` pegado…»; «R35 — dos `{nombre}`…»; «R35 — un saludo propio sin `{nombre}` queda igual»; «R35 — un nombre que contiene `{nombre}` no se vuelve a resolver»; «R35 — no recorta ni colapsa otros espacios» |
+| R36 | whatsapp-agent-settings.test.ts | «R36 — un saludo que es solo `{nombre}` sin nombre rechaza»; «R36 — el mismo saludo con nombre acepta»; «R36 — un saludo de 4090 caracteres con `{nombre}` que el nombre lleva a más de 4096 rechaza» |
+| T3.4 | whatsapp-agent-actions.test.ts | «cada acción lee la sesión una sola vez y no revalida ninguna ruta»; «un error ajeno al dominio sale como `unexpected`…»; «el borde no decide…» |
+
+### Verificación (salida real)
+
+Verificado 2026-10-31 (backend_dev, retoma tras un agente colgado):
+
+- `pnpm run typecheck` → `tsc --noEmit` sin errores.
+- `pnpm run lint` → `✖ 10 problems (0 errors, 10 warnings)`; los 10 avisos son previos y en
+  archivos ajenos a la tanda.
+- `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1325 passed | 22 skipped (1347)`.
+- `pnpm exec vitest related --run <archivos de la tanda>` (primera corrida) →
+  `Test Files 2 failed | 527 passed (529)`, `Tests 2 failed | 9394 passed | 3 skipped (9399)`.
+  Los dos rojos eran las listas a mano de la fachada (`integraciones-graph-doubles.test.ts`,
+  `encryption-keys-env.test.ts`: «expected […(47)] to deeply equal […(45)]»). Tras añadir las dos
+  claves: `pnpm exec vitest run` de esos dos archivos → `Test Files 2 passed (2)`, `Tests 34 passed (34)`.
+- Integración, con `.env` cargado: `pnpm exec vitest run --project integration
+  tests/integration/integraciones/whatsapp-agent-settings-prisma.int.test.ts` →
+  `Test Files 1 passed (1)`, `Tests 13 passed (13)`; base efímera
+  `qct_qt303agentei_96508dfe_mvwewngl_32g` borrada al terminar.
+
+### Observaciones
+
+- Los enteros (R12, R13) no tienen tope superior (D12), pero las columnas son `INTEGER`: un valor
+  mayor que 2 147 483 647 pasa el zod y la base lo rechaza como error inesperado. No se pone tope
+  sin decisión del humano.
+- Abierto heredado (D15): `assistant_name_valid` solo recorta espacios. El zod recorta con
+  `String.prototype.trim` (todos los blancos), así que por el caso de uso nunca llega un nombre con
+  tabuladores en los extremos.
+
+Veredicto: tanda 3 hecha; configuración del agente leída y guardada por empresa, verde.

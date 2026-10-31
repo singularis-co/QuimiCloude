@@ -53,7 +53,7 @@
 
 ## Tanda 3 — Configuración del agente (depende de 1 y 2)
 
-- [ ] **T3.1** `domain/whatsapp-agent-settings.ts`: tipo, `WHATSAPP_AGENT_DEFAULTS` (D11),
+- [x] **T3.1** `domain/whatsapp-agent-settings.ts`: tipo, `WHATSAPP_AGENT_DEFAULTS` (D11),
   `WHATSAPP_ASSISTANT_NAME_MAX_LENGTH`, `renderGreeting` y esquema zod (D12). *Hecho:* tests
   unitarios:
   - R8: defaults exactos, `assistantName` nulo y el saludo con `{nombre}` literal;
@@ -69,17 +69,17 @@
     vuelve a resolver;
   - R36: saludo `'{nombre}'` sin nombre → rechaza; saludo de 4090 caracteres con `{nombre}` y un
     nombre que lo lleva a más de 4096 → rechaza.
-- [ ] **T3.2** `actor.ts`: `requireAgentReadPermission`, `requireAgentConfigurePermission`. Casos de
+- [x] **T3.2** `actor.ts`: `requireAgentReadPermission`, `requireAgentConfigurePermission`. Casos de
   uso `get-whatsapp-agent-settings.ts` y `save-whatsapp-agent-settings.ts`; puerto
   `whatsapp-agent-settings-repository.ts`. *Hecho:* tests unitarios con puerto simulado: R8 (sin
   fila → defaults), R9 y R10 (sin permiso o sin empresa: rechaza y el doble no registra llamadas),
   R16 (reemplaza todo, recorta mensajes y nombre, guarda autor y fecha), R18 (empresa del actor
   aunque la entrada traiga otra).
-- [ ] **T3.3** Adaptador `whatsapp-agent-settings-prisma.ts` y cableado en `lib/composition/index.ts`.
+- [x] **T3.3** Adaptador `whatsapp-agent-settings-prisma.ts` y cableado en `lib/composition/index.ts`.
   *Hecho:* test de integración: guardar y leer, también con nombre y sin él (R16, R34), dos
   guardados concurrentes → una fila (R17), aislamiento entre dos empresas (R18), el umbral vuelve
   exacto.
-- [ ] **T3.4** Acciones de configuración en `adapters/driving/whatsapp-agent-actions.ts`.
+- [x] **T3.4** Acciones de configuración en `adapters/driving/whatsapp-agent-actions.ts`.
   *Hecho:* test de acciones (traducción de errores, una sola lectura de sesión) verde.
 
 ## Tanda 4 — Modo de la conversación (depende de 1 y 2; después de la 3 por `composition` y `actor.ts`)
