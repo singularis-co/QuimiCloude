@@ -92,3 +92,42 @@ sobre un diff acotado.
 **RECHAZADO**: 1 bloqueante (B1), 0 mayores y 4 menores.
 
 Lo que falta para OK: actualizar las tres listas exactas de `tests/unit/integraciones/module-shape.test.ts` (R18 `:646`, R19 `:811`, R20 `:449`) con los archivos, las claves de la fachada y las reexportaciones nuevas, dejar ese archivo en verde y anotar la salida en `progress/impl_QT-303.md`. La vuelta 2 puede acotarse a ese diff. Los menores no bloquean.
+
+## Vuelta 2 (acotada a 63864301d..b888d6a98)
+
+Diff: 6 archivos (`down.sql`, `design.md`, `impl_QT-303.md`, el unit y el `.int` de la migración,
+`module-shape.test.ts`). No toca código de la app fuera de `down.sql`.
+
+### Verificación ejecutada por el reviewer
+
+| Comando | Resultado |
+|---|---|
+| `pnpm exec vitest run tests/unit/integraciones/module-shape.test.ts tests/unit/identity/schema/whatsapp-agent-permissions-migration.test.ts` | 2 archivos verdes, 120 pasan, 1 skipped |
+| `pnpm exec vitest run --project integration tests/integration/identity/whatsapp-agent-permissions-migration.int.test.ts` | 7/7 sobre base efímera `qct_qt303agentei_…` (copia de `qct_tpl_4bf16c205f06`, borrada al terminar) |
+| `pnpm exec eslint` sobre los 3 tests tocados | 0 problemas |
+| `pnpm exec tsc --noEmit` | 0 errores |
+
+### Checklist
+
+- [x] **B1 resuelto.** `module-shape.test.ts` recibe en R18 los 12 archivos nuevos, en R19 las 5
+  claves de la fachada y en R20 los 21 nombres del barrel (y los de solo tipo en su lista). Los
+  títulos de los `it` citan QT-303. El archivo sale verde.
+- [x] **m1 resuelto.** `down.sql` añade `DELETE FROM "plan_addons" WHERE "addon_key" = 'agente_ia_whatsapp'`
+  antes de borrar la clave. El unit fija los cinco `DELETE` en orden. El `.int` nuevo crea un plan
+  con el añadido y otro añadido, aplica el DOWN y comprueba que solo se va esa fila del plan.
+- [x] **m2 resuelto.** `design.md` dice `save(settings, by, at, scope)`, igual que
+  `ports/whatsapp-agent-settings-repository.ts:11`.
+- [x] **m3 resuelto.** La deuda E2E (permisos `agente_ia.*` y modo de la conversación → QT-308) queda
+  escrita en `progress/impl_QT-303.md > Fix vuelta 1 > Deuda (m3)`.
+- [x] Sin regresiones en el diff: no hay rojos nuevos en lo corrido; lint y typecheck verdes.
+
+### Hallazgos
+
+- **menor — m3, ubicación.** La vuelta 1 pedía dejar la deuda en `progress/features/QT-303.md > Cierre`
+  o en `progress/deudas.md`. Está en la bitácora del implementer. Al leader le toca pasarla a la
+  ficha en el cierre (F3) para que no se pierda. No bloquea.
+- m4 sigue siendo informativo; no se tocó y no hace falta.
+
+### Veredicto
+
+**OK**: 0 bloqueantes y 1 menor (m3, dónde queda anotado).
