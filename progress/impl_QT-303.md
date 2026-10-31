@@ -380,3 +380,90 @@ Decisiones de implementación (dentro del design):
   pendiente para `./init.sh` o la CI.
 
 Veredicto: tanda 4 hecha; typecheck, lint, guardias, unit de la tanda e int verdes; `vitest related` sin terminar (se paró por falta de memoria).
+
+## T5.1 — Trazabilidad R1–R36 · backend_dev · 2026-10-31
+
+Revisada contra los nombres reales de los casos en los archivos de las tandas 1–4 (grep de
+`it(`/`describe(` con `R<n>`). Rutas abreviadas: `unit/` = `tests/unit/`, `int/` = `tests/integration/`.
+Las coincidencias de `R<n>` de otras fichas en archivos compartidos (p. ej. «R32/R33» de
+`addon-names.test.ts`, que son de QC-278) no cuentan.
+
+| R | Archivo | Caso(s) |
+|---|---|---|
+| R1 | unit/identity/addons/company-addons.test.ts | «R1 — está en el catálogo de añadidos, al final, y isAddon lo reconoce solo con su clave exacta» |
+| R1 | unit/identity/schema/whatsapp-agent-permissions-migration.test.ts | «R1: siembra en addons exactamente la clave del catalogo del codigo, que es la ultima de ADDONS»; «R1, R3: ninguna otra migracion nombra …» |
+| R1, R3, R5 | int/identity/whatsapp-agent-permissions-migration.int.test.ts | «R1, R3, R5: tras las migraciones existen el añadido, los dos permisos y solo el Administrador los tiene» |
+| R2 | unit/identity/addons/company-addons.test.ts | «R2 — requiere integraciones: prendido sin integraciones no es activo; con integraciones, sí» |
+| R3 | unit/identity/permissions.test.ts | «R3: el catalogo contiene agente_ia.consultar y agente_ia.modificar con sus campos exactos, al final y una sola vez cada uno»; «R3: el catalogo es el previo, en el mismo orden y con los mismos campos, mas los dos del agente» |
+| R3 | unit/identity/schema/whatsapp-agent-permissions-migration.test.ts | «R3: las filas de permissions son exactamente las dos entradas agente_ia de PERMISSIONS…» |
+| R3, R4 | unit/identity/addons/company-addons.test.ts | «R3, R4 — sus permisos son solo suyos, no del núcleo ni de otro añadido» |
+| R4 | unit/identity/addons/company-addons.test.ts | «R4 — con el añadido no activo se quitan agente_ia.consultar y agente_ia.modificar; activo, se conservan» |
+| R5 | unit/identity/permissions.test.ts | «R5: el Administrador recibe los dos al final, una vez cada uno, y no figuran entre sus excluidos»; «R5: ningun rol que no sea el Administrador recibe agente_ia.consultar ni agente_ia.modificar» |
+| R5 | unit/identity/schema/whatsapp-agent-permissions-migration.test.ts | «R5: la asignacion reparte los dos codigos que el seed da al Administrador, y cae si falta uno»; «R5: la asignacion va solo al Administrador, por nombre y sin heredar de otro permiso» |
+| R6 | int/identity/whatsapp-agent-permissions-migration.int.test.ts | «R6: prende el agente en las empresas con integraciones prendido, también las de baja, y en ninguna otra»; «R6: aplicar el UP dos veces no duplica ni cambia nada»; «R6: el UP no pisa una excepción del agente que ya existía apagada»; «R6: el DOWN quita todas las excepciones del agente, sus permisos y su clave, y deja las demás» |
+| R6 | unit/identity/schema/whatsapp-agent-permissions-migration.test.ts | «R6: las excepciones salen solo de integraciones prendido, nacen prendidas y no tocan otras filas»; «R6: los cuatro INSERT llevan ON CONFLICT ... DO NOTHING…»; «R6: el UP no toca el esquema…»; «R6: borra excepciones, asignaciones, permisos y la clave del añadido, en ese orden»; «R6: cada DELETE va acotado…»; «R6: no lleva CASCADE…» |
+| R7 | unit/shared/addon-names.test.ts | «R7: nombre «Agente de IA para WhatsApp»»; «R7: descripción exacta e icono BotIcon»; «R7: hay detalle por cada añadido del catálogo…» |
+| R8 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R8 — activo false, umbral 0.6, 500 por día, 20 por contacto por hora, 12 horas y los textos exactos»; «R8 — el saludo por defecto guarda `{nombre}` literal…»; «R8 — los valores por defecto pasan el propio esquema del guardado»; «R8 — los valores por defecto no se pueden mutar» |
+| R8 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R8 — una empresa sin configuración guardada recibe los valores por defecto» |
+| R8 | int/integraciones/whatsapp-agent-settings-prisma.int.test.ts | «R8 — una empresa sin fila lee null y el caso de uso devuelve los valores por defecto» |
+| R8 | int/identity/whatsapp-agent-permissions-migration.int.test.ts | «R6, R8: la empresa con el agente prendido sigue sin configuración guardada del agente» |
+| R9 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R9 — sin agente_ia.consultar / sin empresa / sin actor / actor indefinido: rechaza con unauthorized y no lee» |
+| R10 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R10 — sin agente_ia.modificar / sin empresa / sin actor: rechaza … antes de leer la entrada y sin escribir» |
+| R9, R10 | unit/integraciones/agente/whatsapp-agent-actions.test.ts | «R9, R10 — sin sesión el actor baja nulo y el `unauthorized` del caso de uso sale del catálogo»; «R9, R10, R11 — cada error de dominio se traduce…» |
+| R11 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R11 — umbral %s dentro de [0, 1] con hasta dos decimales: acepta» (0, 1, 0.6, 0.01, 0.29, 0.99); «R11 — umbral … rechaza» (1.01, -0.01, 0.655, 2, NaN, Infinity, '0.6', null) |
+| R12 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R12 — %s: 1 acepta; 0, 1.5, -3 y texto rechazan» (dailyReplyLimit, contactHourlyReplyLimit) |
+| R13 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R13 — horas de inactividad: 1 acepta; 0, 1.5, -1 y texto rechazan» |
+| R14 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R14 — handoffMessage / greetingMessage vacío, solo espacios o solo blancos rechaza; 4096 acepta y 4097 rechaza»; «R14 — el tope de 4096 se cuenta después de quitar los espacios de los extremos» |
+| R14 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R14: la base rechaza mensajes vacios, solo con blancos (espacio, tab, salto de linea) o de mas de 4096 caracteres y admite 4096» |
+| R15 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R15 — sin el campo X rechaza» (los siete); «R15 — `enabled` no booleano rechaza»; «R15 — sin nombre del asistente no rechaza»; «R15 — una entrada que no es un objeto rechaza» |
+| R11–R15, R34, R36 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R11–R15, R34, R36 — …: rechaza con invalid_input y no escribe» (diez casos); «R15 — sin un campo obligatorio rechaza y no escribe» |
+| R16 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R16 — reemplaza todos los campos, recorta mensajes y nombre y registra autor y fecha»; «R16 — con configuración guardada devuelve la guardada» |
+| R16 | int/integraciones/whatsapp-agent-settings-prisma.int.test.ts | «R16, R34 — guardar y leer con nombre del asistente devuelve lo guardado, con autor y fecha»; «R16 — un segundo guardado reemplaza todos los campos, el autor y la fecha»; «R16 — el umbral %s vuelve exacto» |
+| R16 | unit/integraciones/agente/whatsapp-agent-actions.test.ts | «R16 — guardar baja la entrada tal cual con el actor y devuelve `success`» |
+| R17 | int/integraciones/whatsapp-agent-settings-prisma.int.test.ts | «R17 — guardados concurrentes de la misma empresa dejan una sola fila, con uno de los valores» |
+| R17 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R17: una sola fila de configuracion por empresa»; «R8 y R17: la tabla de configuracion tiene clave por empresa y ningun DEFAULT en los campos de negocio» |
+| R18 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R18 — lee siempre la empresa del actor»; «R18 — escribe en la empresa del actor aunque la entrada traiga otra, y no guarda esa clave» |
+| R18 | int/integraciones/whatsapp-agent-settings-prisma.int.test.ts | «R18 — una empresa no lee ni pisa la configuración de otra»; «R16, R18 — el caso de uso guarda recortado en la empresa del actor aunque la entrada traiga otra» |
+| R19 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R19: los contactos que ya existian al migrar quedan en AGENT con motivo, fecha y autor nulos»; «R19: un contacto nuevo nace en AGENT sin motivo ni fecha» |
+| R19 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R19, R28 — un contacto nuevo se lee en AGENT, sin motivo ni fecha, con su último mensaje» |
+| R20 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R31 y R20: la base admite HUMAN y AGENT con motivo y fecha, con usuario o sin el (el sistema)»; «R20: el autor del cambio debe ser un usuario existente» |
+| R20 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R20, R22 — setMode a HUMAN cambia y guarda motivo, fecha y usuario»; «R20 — un cambio del sistema guarda el usuario nulo» |
+| R20 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R22, R20 — …»; «R24, R20 — …» |
+| R21 | unit/integraciones/agente/whatsapp-conversation-mode.test.ts | «R21 — hay once motivos y dos modos…»; «R21 — HUMAN admite los diez de paso a humano…; AGENT, a mano e inactividad»; «R21 — <motivo> hacia <destino>: se admite / rechaza con ValidationError» (22); «R21 — un motivo fuera del catálogo rechaza» |
+| R21 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R21: la base admite en HUMAN cada motivo de paso a humano, tambien reclamo, sentimiento negativo y medio no soportado» |
+| R22 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R22, R20 — una conversación en AGENT queda en HUMAN con motivo MANUAL, la fecha actual y el usuario»; «R22 — una conversación devuelta antes al agente también pasa a HUMAN» |
+| R22 | unit/integraciones/agente/whatsapp-agent-actions.test.ts | «R22 — pasar a humano baja la entrada tal cual con el actor (con sus añadidos) y devuelve `success`» |
+| R22, R24, R28 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R22, R24, R28 — pasar a humano, consultar, devolver al agente y consultar otra vez» |
+| R23 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R23 — ya en HUMAN no falla y no reescribe modo, motivo, fecha ni usuario»; «R23 — si otro cambio gana la carrera entre la lectura y la escritura, no falla» |
+| R23 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R23 — ya en el destino devuelve unchanged sin tocar motivo, fecha ni usuario»; «R23 — ocho cambios simultáneos al mismo destino…»; «R23 — pasar a humano dos veces a la vez no falla y deja un solo cambio» |
+| R24 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R24, R20 — una conversación en HUMAN queda en AGENT con motivo MANUAL, la fecha actual y el usuario» |
+| R24 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R24 — de HUMAN a AGENT cambia con el motivo, la fecha y el usuario nuevos» |
+| R24 | unit/integraciones/agente/whatsapp-agent-actions.test.ts | «R24 — devolver al agente baja la entrada tal cual con el actor y devuelve `success`» |
+| R25 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R25 — ya en AGENT (nunca cambió) no falla y no escribe»; «R25 — ya en AGENT por un cambio anterior conserva motivo, fecha y usuario de ese cambio» |
+| R25 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R25 — un contacto que nunca cambió ya está en AGENT: unchanged y sigue sin motivo ni fecha» |
+| R23, R25 | unit/integraciones/agente/whatsapp-conversation-mode.test.ts | «R23, R25 — ya en el destino con un motivo válido no hay cambio» |
+| R26 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R26 — <operación> <ocho actores sin acceso>: rechaza con unauthorized sin llamar al puerto» (16); «R26 — <operación>: el permiso se comprueba antes que la entrada» |
+| R26, R27, R28 | unit/integraciones/agente/whatsapp-agent-actions.test.ts | «R26, R27, R28 — las acciones de modo traducen unauthorized, contacto no encontrado e invalid_input del catálogo» |
+| R27 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R27 — <operación> con <id sin forma de uuid / que no existe / de otra empresa / sin id>: whatsapp_contact_not_found y no escribe» (8); «R27 — consultar el modo con …» (4); «R27 — el contacto de otra empresa se pide con el ámbito del actor…»; «R27 — si el contacto desaparece entre la lectura y la escritura…» |
+| R27 | int/integraciones/whatsapp-conversation-mode-prisma.int.test.ts | «R27 — un contacto de otra empresa no se lee ni se escribe: null y not_found»; «R27 — un id que no existe: null y not_found»; «R27 — el contacto de otra empresa responde no encontrado y queda intacto» |
+| R28 | unit/integraciones/agente/conversation-mode-use-cases.test.ts | «R28 — una conversación que nunca cambió devuelve AGENT con motivo y fecha vacíos»; «R28 — devuelve el modo, el motivo y la fecha del último cambio…»; «R28 — tras pasar a humano, la consulta devuelve el cambio»; «R28 — <cinco actores sin acceso>: rechaza con unauthorized sin leer»; «R28 — con whatsapp.enviar pero sin whatsapp.consultar no se consulta…» |
+| R28 | unit/integraciones/agente/whatsapp-agent-actions.test.ts | «R28 — consultar el modo devuelve `success` con modo, motivo y fecha»; «R28 — una conversación que nunca cambió sale con motivo y fecha nulos» |
+| R29 | unit/integraciones/agente/whatsapp-conversation-mode.test.ts | «R29 — justo a las N horas del cambio vuelve; un milisegundo antes, no»; «R29 — la referencia es la más reciente de las dos fechas…»; «R29 — un mensaje anterior al cambio no adelanta la vuelta…»; «R29 — con solo la fecha del último mensaje, cuenta desde ella»; «R29 — las horas configuradas mandan: 1 hora y 48 horas» |
+| R30 | unit/integraciones/agente/whatsapp-conversation-mode.test.ts | «R30 — una conversación en AGENT nunca vuelve, por vieja que sea»; «R30 — una conversación en HUMAN sin fecha de cambio ni de último mensaje no vuelve» |
+| R31 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R31: la base rechaza HUMAN sin motivo ni fecha, motivo sin fecha y fecha sin motivo»; «R31 y R20: la base admite HUMAN y AGENT con motivo y fecha…» |
+| R32 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R32: la tabla de configuracion tiene RLS activada y forzada, sin policies» |
+| R33 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R33: AGENT es un origen admitido de mensaje, ademas de USER y SYSTEM»; «R33: aplicar la migracion no cambia el origen de ningun mensaje existente» |
+| R33 | unit/integraciones/whatsapp/whatsapp-message.test.ts | «R33: el dominio admite AGENT ademas de USER y SYSTEM»; «R33: el dominio y el enum del esquema tienen los mismos origenes» |
+| R34 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R34 — ausente, null, vacío o solo espacios se guarda sin nombre»; «R34 — se guarda sin los espacios de los extremos»; «R34/D15 — un nombre hecho solo de blancos (\t \n \r) se guarda sin nombre»; «R34 — 60 caracteres recortados pasan y 61 rechazan»; «R34 — un nombre que no es texto (%s) rechaza» |
+| R34 | int/integraciones/whatsapp-agent-settings-prisma.int.test.ts | «R16, R34 — guardar y leer con nombre…»; «R16, R34 — guardar sin nombre del asistente lo deja nulo en la base y en la lectura» |
+| R34 | int/integraciones/whatsapp-agent-schema.int.test.ts | «R34/D15: la base rechaza un nombre del asistente vacio, con blancos (espacio, \t, \n, \r) en los extremos o de 61 caracteres y admite NULL y 60» |
+| R35 | unit/integraciones/agente/render-greeting.test.ts | «R35 — …con nombre «Ana»…»; «R35 — …sin nombre quita `{nombre}` con el espacio que lo precede»; «R35 — `{nombre}` al inicio…»; «R35 — `{nombre}` pegado…»; «R35 — dos `{nombre}`…»; «R35 — un saludo propio sin `{nombre}` queda igual»; «R35 — un nombre que contiene `{nombre}` no se vuelve a resolver»; «R35 — no recorta ni colapsa otros espacios del texto» |
+| R36 | unit/integraciones/agente/whatsapp-agent-settings.test.ts | «R36 — un saludo que es solo `{nombre}` sin nombre rechaza»; «R36 — el mismo saludo con nombre acepta»; «R36 — un saludo de 4090 caracteres con `{nombre}` que el nombre lleva a más de 4096 rechaza» |
+| R36 | unit/integraciones/agente/save-whatsapp-agent-settings.test.ts | «R11–R15, R34, R36 — …: rechaza con invalid_input y no escribe» |
+
+**R sin test: ninguno.** Los 36 requisitos tienen al menos un caso con su `R<n>` en el nombre.
+
+Pendiente del *Hecho* de T5.1: `./init.sh` verde no se corrió (el leader lo reserva; tampoco terminó
+el `vitest related` de la tanda 4, que se paró por falta de memoria).
+
+Veredicto: trazabilidad R1–R36 completa, sin huecos.

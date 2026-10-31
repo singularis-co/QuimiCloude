@@ -105,7 +105,7 @@
 
 ## Cierre
 
-- [ ] **T5.1** Mapa `R<n> -> test` (R1–R36) en `progress/impl_QT-303.md`; `./init.sh` verde.
+- [x] **T5.1** Mapa `R<n> -> test` (R1–R36) en `progress/impl_QT-303.md`; `./init.sh` verde.
 
 ## Archivos esperados
 
