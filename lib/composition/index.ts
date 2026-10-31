@@ -3105,6 +3105,9 @@ import {
 } from '@/lib/modules/integraciones';
 import { createWhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-agent-settings-prisma';
 import type { WhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/ports/whatsapp-agent-settings-repository';
+import { createGetAiModelPairs, createSaveAiModelPair } from '@/lib/modules/integraciones';
+import { createAiModelPairPrisma } from '@/lib/modules/integraciones/adapters/driven/catalog/ai-model-pair-prisma';
+import type { AiModelPairRepository } from '@/lib/modules/integraciones/ports/ai-model-pair-repository';
 
 type ProviderProbe = (input: {
   apiKey: string;
@@ -3147,6 +3150,10 @@ const aiProviderDeps = {
   random: randomSource,
 };
 
+/** Pares de modelos de la plataforma: sin empresa, los elige el Maestro. */
+const aiModelPairs: AiModelPairRepository = createAiModelPairPrisma();
+const aiModelPairDeps = { catalog: aiProviderCatalog, pairs: aiModelPairs };
+
 const whatsappAgentSettingsRepository: WhatsappAgentSettingsRepository = createWhatsappAgentSettingsRepository();
 const whatsappAgentSettingsDeps = { agentSettings: whatsappAgentSettingsRepository };
 
@@ -3174,6 +3181,8 @@ export const integraciones = {
   getAiProviderStatus: createGetAiProviderStatus(aiProviderDeps),
   resolveAiProviderForReading: createResolveAiProviderForReading(aiProviderDeps),
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
+  getAiModelPairs: createGetAiModelPairs(aiModelPairDeps),
+  saveAiModelPair: createSaveAiModelPair(aiModelPairDeps),
   verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
   receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
   linkWhatsappContact: createLinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),

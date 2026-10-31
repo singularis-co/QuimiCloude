@@ -80,6 +80,13 @@ export {
   createResolveAiProviderForReading,
 } from './domain/resolve-ai-provider-for-reading';
 export { createReportAiProviderOutcome } from './domain/report-ai-provider-outcome';
+export type { AiCatalogModel } from './domain/ai-provider';
+export type { AiModelPair, AiModelRole } from './domain/ai-model-pair';
+export { AI_MODEL_ROLES } from './domain/ai-model-pair';
+export type { AiModelPairsOverview, AiModelPairsProvider } from './domain/get-ai-model-pairs';
+export type { SaveAiModelPairResult } from './domain/save-ai-model-pair';
+export { createGetAiModelPairs } from './domain/get-ai-model-pairs';
+export { createSaveAiModelPair } from './domain/save-ai-model-pair';
 export type {
   TemplateSyncSummary,
   WhatsappTemplateCategory,

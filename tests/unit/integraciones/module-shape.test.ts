@@ -133,6 +133,8 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
   'adapters/driven/ai/ai-provider-probe-canned.ts',
+  // QT-304 T2.2: los pares de modelos de la plataforma, tabla sin empresa (fuera de `persistence/`).
+  'adapters/driven/catalog/ai-model-pair-prisma.ts',
   'adapters/driven/catalog/ai-provider-catalog-prisma.ts',
   'adapters/driven/config/e2e-doubles-env.ts',
   'adapters/driven/config/encryption-keys-env.ts',
@@ -172,6 +174,8 @@ const MODULE_CODE_FILES = [
   'adapters/driving/whatsapp-webhook-route.ts',
   'domain/actor.ts',
   'domain/ai-model-input.ts',
+  'domain/ai-model-pair-input.ts',
+  'domain/ai-model-pair.ts',
   'domain/ai-provider-failure.ts',
   'domain/ai-provider-input.ts',
   'domain/ai-provider.ts',
@@ -182,6 +186,7 @@ const MODULE_CODE_FILES = [
   'domain/delete-whatsapp-template.ts',
   'domain/disconnect-ai-provider.ts',
   'domain/errors.ts',
+  'domain/get-ai-model-pairs.ts',
   'domain/get-ai-provider-connection.ts',
   'domain/get-ai-provider-readiness.ts',
   'domain/get-whatsapp-agent-settings.ts',
@@ -207,6 +212,7 @@ const MODULE_CODE_FILES = [
   'domain/resolve-ai-provider-for-reading.ts',
   'domain/retry-whatsapp-message.ts',
   'domain/return-whatsapp-conversation-to-agent.ts',
+  'domain/save-ai-model-pair.ts',
   'domain/save-ai-provider-connection.ts',
   'domain/save-whatsapp-agent-settings.ts',
   'domain/secret-context.ts',
@@ -257,6 +263,7 @@ const MODULE_CODE_FILES = [
   'domain/whatsapp-variable-key.ts',
   'domain/whatsapp-webhook-payload.ts',
   'index.ts',
+  'ports/ai-model-pair-repository.ts',
   'ports/ai-provider-catalog.ts',
   'ports/ai-provider-connection-repository.ts',
   'ports/ai-provider-probe.ts',
@@ -461,10 +468,16 @@ describe('la forma del modulo integraciones', () => {
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
     expect(reexports.map((r) => r.name).sort()).toEqual([
+      'AI_MODEL_ROLES',
       'ActionNotAllowedError',
       'Actor',
       'AgentReturnCandidate',
+      'AiCatalogModel',
       'AiModelOption',
+      'AiModelPair',
+      'AiModelPairsOverview',
+      'AiModelPairsProvider',
+      'AiModelRole',
       'AiProviderCode',
       'AiProviderConnectionOverview',
       'AiProviderConnectionStatus',
@@ -492,6 +505,7 @@ describe('la forma del modulo integraciones', () => {
       'REASONS_BY_TARGET',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
+      'SaveAiModelPairResult',
       'SaveAiProviderConnectionResult',
       'SaveWhatsappAgentSettingsInput',
       'SecretContext',
@@ -559,6 +573,7 @@ describe('la forma del modulo integraciones', () => {
       'createDeleteWhatsappTemplate',
       'createDeleteWhatsappVariableKey',
       'createDisconnectAiProvider',
+      'createGetAiModelPairs',
       'createGetAiProviderConnection',
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
@@ -585,6 +600,7 @@ describe('la forma del modulo integraciones', () => {
       'createResyncWhatsappTemplates',
       'createRetryWhatsappMessage',
       'createReturnWhatsappConversationToAgent',
+      'createSaveAiModelPair',
       'createSaveAiProviderConnection',
       'createSaveWhatsappAgentSettings',
       'createSelectAiModel',
@@ -613,7 +629,12 @@ describe('la forma del modulo integraciones', () => {
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
       'AgentReturnCandidate',
+      'AiCatalogModel',
       'AiModelOption',
+      'AiModelPair',
+      'AiModelPairsOverview',
+      'AiModelPairsProvider',
+      'AiModelRole',
       'AiProviderCode',
       'AiProviderConnectionOverview',
       'AiProviderConnectionStatus',
@@ -634,6 +655,7 @@ describe('la forma del modulo integraciones', () => {
       'ConversationModeView',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
+      'SaveAiModelPairResult',
       'SaveAiProviderConnectionResult',
       'SaveWhatsappAgentSettingsInput',
       'SecretContext',
@@ -857,6 +879,7 @@ describe('la forma del modulo integraciones', () => {
       'deleteWhatsappTemplate',
       'deleteWhatsappVariableKey',
       'disconnectAiProvider',
+      'getAiModelPairs',
       'getAiProviderConnection',
       'getAiProviderReadiness',
       'getAiProviderStatus',
@@ -882,6 +905,7 @@ describe('la forma del modulo integraciones', () => {
       'resyncWhatsappTemplates',
       'retryWhatsappMessage',
       'returnWhatsappConversationToAgent',
+      'saveAiModelPair',
       'saveAiProviderConnection',
       'saveWhatsappAgentSettings',
       'secretCipher',
@@ -915,6 +939,7 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.randomSource).toBe('RandomSource')
     expect(cableado?.typeOf.aiProviderConnectionRepository).toBe('AiProviderConnectionRepository')
     expect(cableado?.typeOf.aiProviderCatalog).toBe('AiProviderCatalog')
+    expect(cableado?.typeOf.aiModelPairs).toBe('AiModelPairRepository')
     expect(cableado?.typeOf.aiProviderProbe).toBe('AiProviderProbe')
     expect(cableado?.typeOf.aiProviderGateway).toBe('AiProviderGateway')
     expect(cableado?.typeOf.whatsappWebhookDirectory).toBe('WhatsappWebhookDirectory')

@@ -775,6 +775,11 @@
       "desde": "2026-10-13"
     },
     {
+      "archivo": "integraciones/ai-model-pair-prisma.int.test.ts",
+      "motivo": "QT-304 T2.2 (R5, R12): ejercita list, get y save de ai-model-pair-prisma.ts, que usa el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no lo envolveria. La tabla 'ai_agent_model_pairs' es de plataforma, sin empresa que la acote: 'beforeAll' fotografia los ocho pares sembrados y fabrica un usuario efimero con randomUUID (tipo de documento, rol, empresa y usuario) para el autor; 'afterAll' devuelve cada par a la foto (principal, respaldo, autor nulo y hora), borra lo que no estaba, afirma que la tabla es igual a la foto y que no queda ningun par con ese autor, y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-31"
+    },
+    {
       "archivo": "integraciones/whatsapp-agent-settings-prisma.int.test.ts",
       "motivo": "QT-303 T3.3 (R16, R17, R18, R34): ejercita el repositorio de whatsapp-agent-settings-prisma.ts, que usa el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no lo envolveria; ademas R17 necesita guardados concurrentes de verdad contra la clave primaria 'company_id'. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra su configuracion por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-30"

@@ -94,3 +94,73 @@
 
 Veredicto tanda 1: hecha, R1–R9, R16, R17 y R4 con test; gate local verde salvo el validador del
 board, ajeno.
+
+## Tanda 2 — Pares de plataforma (2026-10-31)
+
+### Archivos creados
+
+- `lib/modules/integraciones/domain/ai-model-pair.ts`: `AI_MODEL_ROLES`, `AiModelRole`,
+  `AiModelPairChoice`, `AiModelPair`, `aiModelPairProblems` (pura, sobre `AiCatalogEntry`).
+- `lib/modules/integraciones/domain/ai-model-pair-input.ts`: zod de la entrada.
+- `lib/modules/integraciones/domain/get-ai-model-pairs.ts` y `save-ai-model-pair.ts`
+  (`requirePlatformPermission` de `identity`, `PlatformActor`).
+- `lib/modules/integraciones/ports/ai-model-pair-repository.ts`.
+- `lib/modules/integraciones/adapters/driven/catalog/ai-model-pair-prisma.ts`
+  (`createAiModelPairPrisma(db = prisma)`, upsert por `(provider, role)` con autor y hora).
+- Tests: `tests/unit/integraciones/agente/ai-model-pair-rules.test.ts`,
+  `save-ai-model-pair.test.ts`, `get-ai-model-pairs.test.ts`, `ai-model-pair-doubles.ts`;
+  `tests/integration/integraciones/ai-model-pair-prisma.int.test.ts`.
+
+### Archivos modificados
+
+- `lib/modules/integraciones/index.ts`: tipos `AiCatalogModel`, `AiModelPair`, `AiModelRole`,
+  `AiModelPairsOverview`, `AiModelPairsProvider`, `SaveAiModelPairResult`; `AI_MODEL_ROLES`,
+  `createGetAiModelPairs`, `createSaveAiModelPair`.
+- `lib/composition/index.ts`: `aiModelPairs: AiModelPairRepository`, `getAiModelPairs` y
+  `saveAiModelPair` en la fachada `integraciones`.
+- Arrastre (listas a mano): `tests/unit/integraciones/module-shape.test.ts` (archivos, contrato,
+  fachada y tipo del puerto), `tests/unit/integraciones/encryption-keys-env.test.ts` y
+  `tests/unit/composition/integraciones-graph-doubles.test.ts` (miembros de la fachada),
+  `tests/integration/aislamiento.json` (entrada `commit` con motivo).
+
+### Desviaciones
+
+- **El adaptador vive en `adapters/driven/catalog/`, no en `persistence/`** (design §1 y T2.2 dicen
+  `persistence/`). `guard-ambito-empresa-integraciones` barre todo `persistence/` y exige
+  `scope: IntegracionesScope` en cada función que toca la base; la tabla de pares no tiene empresa.
+  Meterla en `persistence/` pedía una exención nueva en la guardia (decisión humana). Se sigue el
+  precedente de `ai-provider-catalog-prisma.ts` («tabla global sin empresa: por eso vive fuera de
+  `persistence/`»). Si el humano prefiere la exención, es mover el archivo y añadirla.
+- `createAiModelPairPrisma()` se cablea sin argumento (default `prisma`): la composición no importa
+  el cliente Prisma.
+- `saveAiModelPair` y `getAiModelPairs` lanzan el `UnauthorizedError` de `identity` (el que lanza
+  `requirePlatformPermission`, como pide design §5.2), no el de `integraciones`. Mismo `code`
+  (`unauthorized`). QT-311 lo tendrá en cuenta al mapear errores en su Server Action.
+
+### Mapa R → test (tanda 2)
+
+| R | Test |
+|---|---|
+| R5 | `ai-model-pair-prisma.int.test.ts` > «R5: list trae los ocho pares…», «R5: get devuelve…», «R5: get de un par que falta…», «R5: la base sigue cortando…» |
+| R10 | `ai-model-pair-rules.test.ts` (8 casos R10); `save-ai-model-pair.test.ts` > validación (zod, otro proveedor, fuera de catálogo, iguales, sin herramientas, principal de enrutador no económico, proveedor ausente, recorte) |
+| R11 | `ai-model-pair-rules.test.ts` > «R11: el respaldo del enrutador no se mira por economico»; `save-ai-model-pair.test.ts` > «R11: …se acepta» |
+| R12 | `save-ai-model-pair.test.ts` > dos casos R12; `ai-model-pair-prisma.int.test.ts` > dos casos R12 |
+| R13 | `save-ai-model-pair.test.ts` > 5 casos de autorización + «no exige empresa»; `get-ai-model-pairs.test.ts` > 4 casos + «basta con el permiso de consulta» |
+| R14 | `get-ai-model-pairs.test.ts` > dos casos R14 |
+| R15 | `save-ai-model-pair.test.ts` y `get-ai-model-pairs.test.ts` > dos casos R15 cada uno (espías y barrido del fuente) |
+
+### Verificación (salida real, 2026-10-31)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `0 errors, 10 warnings` (los mismos de la tanda 1, archivos no tocados).
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1327 passed | 22 skipped`.
+- `pnpm exec vitest run tests/unit/integraciones tests/unit/composition`: verde tras actualizar las
+  dos listas de la fachada (124 archivos).
+- Integración: `ai-model-pair-prisma.int.test.ts` + `ai-agent-model-pairs-migration.int.test.ts`:
+  `Test Files 2 passed`, `Tests 20 passed`.
+- `pnpm run test:rapido`: lanzado dos veces y **parado por el sistema por falta de memoria** (no es
+  un fallo del comando); no se relanzó. Lo relacionado con el diff ya está cubierto arriba (unit de
+  `integraciones` y `composition`, guardias, int tocados).
+- `./init.sh`: no se corre (para en el paso 4 por `feature_list.json`, QT-312).
+
+Veredicto tanda 2: hecha, R5, R10–R15 con test; gate a mano verde.

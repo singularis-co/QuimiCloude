@@ -36,12 +36,13 @@
 
 ## Tanda 2 — Pares de plataforma (depende de la 1)
 
-- [ ] **T2.1** `domain/ai-model-pair.ts` (tipos, `AI_MODEL_ROLES`, `aiModelPairProblems`) y
+- [x] **T2.1** `domain/ai-model-pair.ts` (tipos, `AI_MODEL_ROLES`, `aiModelPairProblems`) y
   `ports/ai-model-pair-repository.ts`. *Hecho:* `ai-model-pair-rules.test.ts` verde (R10, R11).
   **Desbloquea la tanda 3.**
-- [ ] **T2.2** `adapters/driven/persistence/ai-model-pair-prisma.ts`. *Hecho:*
-  `ai-model-pair-prisma.int.test.ts` verde (R5, R12) y en `aislamiento.json`.
-- [ ] **T2.3** `domain/ai-model-pair-input.ts`, `domain/get-ai-model-pairs.ts`,
+- [x] **T2.2** `adapters/driven/persistence/ai-model-pair-prisma.ts`. *Hecho:*
+  `ai-model-pair-prisma.int.test.ts` verde (R5, R12) y en `aislamiento.json`. Vive en
+  `adapters/driven/catalog/` y no en `persistence/` (ver `progress/impl_QT-304.md > Tanda 2`).
+- [x] **T2.3** `domain/ai-model-pair-input.ts`, `domain/get-ai-model-pairs.ts`,
   `domain/save-ai-model-pair.ts`, exports en `index.ts` y cableado en `lib/composition/index.ts`
   (`design.md > 5.2, 7.1`). *Hecho:* `get-ai-model-pairs.test.ts` y `save-ai-model-pair.test.ts`
   verdes (R10–R15).
