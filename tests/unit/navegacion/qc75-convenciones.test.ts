@@ -88,6 +88,9 @@ export const CODIGOS_QC74 = [
   // 2026-10-28
   'planes.consultar',
   'planes.modificar',
+  // 2026-10-30
+  'agente_ia.consultar',
+  'agente_ia.modificar',
 ] as const;
 
 /** Los modulos de negocio del ERP, en el orden en que cada uno entro al catalogo. */
@@ -180,6 +183,8 @@ describe('QC-75 R15 — el catalogo sigue siendo el de QC-74, sin comodines', ()
         'whatsapp',
         // 2026-10-28: como `empresas`, `planes` no es carpeta de `lib/modules/`.
         'planes',
+        // 2026-10-30: `agente_ia` vive en `integraciones`, no es carpeta de `lib/modules/`.
+        'agente_ia',
       ]),
     ].sort();
     expect(modulos).toEqual(esperados);

@@ -58,6 +58,9 @@ const CODIGOS_DEL_REQUISITO = [
   // 2026-10-28: entran `planes.consultar` y `planes.modificar`, al final.
   'planes.consultar',
   'planes.modificar',
+  // 2026-10-30: entran `agente_ia.consultar` y `agente_ia.modificar`, al final.
+  'agente_ia.consultar',
+  'agente_ia.modificar',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
@@ -86,7 +89,13 @@ const CONSULTAR_WHATSAPP = 'whatsapp.consultar'
 // los casos de `whatsapp.consultar` y los que fijan el Maestro comparan sin ellos con `sinPlanes`.
 const CODIGOS_DE_PLANES = ['planes.consultar', 'planes.modificar'] as const
 const esDePlanes = (codigo: string): boolean => codigo.startsWith('planes.')
-const sinPlanes = (codigo: string): boolean => !esDePlanes(codigo)
+// 2026-10-30: `agente_ia.consultar` y `agente_ia.modificar` entran detras de los de planes.
+// `sinPlanes` (y las que se apoyan en ella) devuelve ahora el catalogo previo sin ellos; los casos
+// de planes comparan sin ellos con `sinAgente`.
+const CODIGOS_DEL_AGENTE = ['agente_ia.consultar', 'agente_ia.modificar'] as const
+const esDelAgente = (codigo: string): boolean => codigo.startsWith('agente_ia.')
+const sinAgente = (codigo: string): boolean => !esDelAgente(codigo)
+const sinPlanes = (codigo: string): boolean => !esDePlanes(codigo) && sinAgente(codigo)
 const sinConsultarWhatsapp = (codigo: string): boolean =>
   codigo !== CONSULTAR_WHATSAPP && sinPlanes(codigo)
 const sinEnviar = (codigo: string): boolean => codigo !== ENVIAR && sinConsultarWhatsapp(codigo)
@@ -245,6 +254,8 @@ const MODULOS = [
   'whatsapp',
   // 2026-10-28: como `empresas`, no es carpeta de `lib/modules/`.
   'planes',
+  // 2026-10-30: vive en `integraciones`, no es carpeta de `lib/modules/`.
+  'agente_ia',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -260,6 +271,7 @@ const MODULOS_CON_ESCRITURA = [
   'documentos',
   'empresas',
   'planes',
+  'agente_ia',
 ]
 const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 /** Modulos que solo escriben, sin consulta propia (R34): quien tiene el permiso ya ve el pedido
@@ -297,7 +309,8 @@ describe('QC-74 — el catalogo de permisos (R1, R2, R3, R4, R6)', () => {
   it('R1: cada codigo es `<modulo>.<accion>` en español y en minusculas', () => {
     for (const permiso of PERMISSIONS) {
       expect(permiso.code).toBe(`${permiso.module}.${permiso.action}`)
-      expect(permiso.code).toMatch(/^[a-z]+\.[a-z]+$/)
+      // 2026-10-30: el modulo admite palabras unidas por `_` (`agente_ia`).
+      expect(permiso.code).toMatch(/^[a-z]+(?:_[a-z]+)*\.[a-z]+$/)
       expect(accionAdmitida(permiso), permiso.code).toBe(true)
     }
   })
@@ -829,7 +842,7 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
           codigo !== 'empaque.modificar' &&
           codigo !== ACONDICIONAMIENTO &&
           sinConsultarAsignaciones(codigo) &&
-          sinPlanes(codigo),
+          !esDePlanes(codigo),
       ),
     )
   })
@@ -1630,7 +1643,7 @@ describe('el permiso whatsapp.consultar', () => {
 
   it('R1: el Administrador recibe whatsapp.consultar al final, una vez, y no figura entre sus excluidos', () => {
     const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
-    expect(admin.at(-1)).toBe(CONSULTAR_WHATSAPP)
+    expect(admin.filter(sinAgente).at(-1)).toBe(CONSULTAR_WHATSAPP)
     expect(admin.filter((codigo) => codigo === CONSULTAR_WHATSAPP)).toHaveLength(1)
     expect(admin).toEqual(CODIGOS_DEL_ADMINISTRADOR)
     expect(ADMIN_EXCLUDED_PERMISSIONS).not.toContain(CONSULTAR_WHATSAPP)
@@ -1685,7 +1698,7 @@ describe('los permisos de planes', () => {
   }
 
   it('R27: el catalogo contiene planes.consultar y planes.modificar con sus campos exactos, al final y una sola vez cada uno', () => {
-    expect(PERMISSIONS.slice(-2)).toEqual([...ENTRADAS_DE_PLANES])
+    expect(PERMISSIONS.filter((permiso) => sinAgente(permiso.code)).slice(-2)).toEqual([...ENTRADAS_DE_PLANES])
     for (const codigo of CODIGOS_DE_PLANES) {
       expect(codigos.filter((c) => c === codigo), codigo).toHaveLength(1)
     }
@@ -1693,7 +1706,7 @@ describe('los permisos de planes', () => {
   })
 
   it('R27: el catalogo es el previo, en el mismo orden y con los mismos campos, mas los dos de planes', () => {
-    expect(codigos).toEqual([...codigos.filter(sinPlanes), ...CODIGOS_DE_PLANES])
+    expect(codigos.filter(sinAgente)).toEqual([...codigos.filter(sinPlanes), ...CODIGOS_DE_PLANES])
     expect(codigos.filter(sinPlanes)).toEqual(CODIGOS_DEL_REQUISITO.filter(sinPlanes))
     expect(PERMISSIONS.find((permiso) => permiso.code === CONSULTAR_WHATSAPP)).toEqual({
       code: 'whatsapp.consultar',
@@ -1740,6 +1753,86 @@ describe('los permisos de planes', () => {
     const parrafo = parrafoDePlanes()
     expect(parrafo).toBeDefined()
     expect(parrafo).toContain('planes.modificar')
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).not.toMatch(citaFichaORequisito)
+  })
+})
+
+describe('los permisos del agente de IA de WhatsApp', () => {
+  const citaFichaORequisito = /QC-\d+|QT-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADAS_DEL_AGENTE = [
+    {
+      code: 'agente_ia.consultar',
+      module: 'agente_ia',
+      action: 'consultar',
+      description: 'Ver la configuración del agente de IA de WhatsApp de la empresa.',
+    },
+    {
+      code: 'agente_ia.modificar',
+      module: 'agente_ia',
+      action: 'modificar',
+      description: 'Cambiar la configuración del agente de IA de WhatsApp de la empresa.',
+    },
+  ] as const
+
+  function parrafoDelAgente(): string | undefined {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .find((bloque) => bloque.includes('agente_ia.consultar'))
+  }
+
+  it('R3: el catalogo contiene agente_ia.consultar y agente_ia.modificar con sus campos exactos, al final y una sola vez cada uno', () => {
+    expect(PERMISSIONS.slice(-2)).toEqual([...ENTRADAS_DEL_AGENTE])
+    for (const codigo of CODIGOS_DEL_AGENTE) {
+      expect(codigos.filter((c) => c === codigo), codigo).toHaveLength(1)
+    }
+    expect(codigos.filter(esDelAgente)).toEqual([...CODIGOS_DEL_AGENTE])
+  })
+
+  it('R3: el catalogo es el previo, en el mismo orden y con los mismos campos, mas los dos del agente', () => {
+    expect(codigos).toEqual([...codigos.filter(sinAgente), ...CODIGOS_DEL_AGENTE])
+    expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
+    for (const previo of PERMISOS_PREVIOS) {
+      expect(PERMISSIONS.find((permiso) => permiso.code === previo.code), previo.code).toEqual(previo)
+    }
+  })
+
+  it('R5: el Administrador recibe los dos al final, una vez cada uno, y no figuran entre sus excluidos', () => {
+    const admin = SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? []
+    expect(admin.slice(-2)).toEqual([...CODIGOS_DEL_AGENTE])
+    for (const codigo of CODIGOS_DEL_AGENTE) {
+      expect(admin.filter((c) => c === codigo), codigo).toHaveLength(1)
+      expect(ADMIN_EXCLUDED_PERMISSIONS, codigo).not.toContain(codigo)
+    }
+    expect(admin).toEqual(CODIGOS_DEL_ADMINISTRADOR)
+  })
+
+  it('R5: ningun rol que no sea el Administrador recibe agente_ia.consultar ni agente_ia.modificar', () => {
+    const otrosRoles = Object.keys(SEED_ROLE_PERMISSIONS).filter((rol) => rol !== ROLE_ADMINISTRADOR)
+    expect(otrosRoles.sort()).toEqual(
+      [ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_MAESTRO, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    for (const rol of otrosRoles) {
+      expect((SEED_ROLE_PERMISSIONS[rol] ?? []).filter(esDelAgente), rol).toEqual([])
+    }
+
+    // Caso simetrico: el detector caza un rol que si los recibe.
+    const conAgente = [...(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? []), 'agente_ia.consultar']
+    expect(conAgente.filter(esDelAgente)).not.toEqual([])
+  })
+
+  it('R3: el JSDoc del catalogo tiene el parrafo del agente, corto y sin citas', () => {
+    const parrafo = parrafoDelAgente()
+    expect(parrafo).toBeDefined()
+    expect(parrafo).toContain('agente_ia.modificar')
     expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
     expect(parrafo).not.toMatch(citaFichaORequisito)
   })

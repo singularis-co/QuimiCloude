@@ -144,3 +144,28 @@ export { createListSendableWhatsappTemplates } from './domain/list-sendable-what
 export type { WhatsappChatContext, WhatsappCustomerOrder } from './domain/whatsapp-chat-context';
 export { createGetWhatsappChatContext } from './domain/get-whatsapp-chat-context';
 export { createGetWhatsappMedia, type WhatsappMediaResult } from './domain/get-whatsapp-media';
+export {
+  GREETING_NAME_PLACEHOLDER,
+  WHATSAPP_AGENT_DEFAULTS,
+  WHATSAPP_ASSISTANT_NAME_MAX_LENGTH,
+  renderGreeting,
+  type SaveWhatsappAgentSettingsInput,
+  type WhatsappAgentSettings,
+} from './domain/whatsapp-agent-settings';
+export { createGetWhatsappAgentSettings } from './domain/get-whatsapp-agent-settings';
+export { createSaveWhatsappAgentSettings } from './domain/save-whatsapp-agent-settings';
+export {
+  CONVERSATION_MODES,
+  CONVERSATION_MODE_REASONS,
+  REASONS_BY_TARGET,
+  isDueForAgentReturn,
+  planModeChange,
+  type AgentReturnCandidate,
+  type ConversationMode,
+  type ConversationModeInput,
+  type ConversationModeReason,
+  type ConversationModeView,
+} from './domain/whatsapp-conversation-mode';
+export { createHandOffWhatsappConversation } from './domain/hand-off-whatsapp-conversation';
+export { createReturnWhatsappConversationToAgent } from './domain/return-whatsapp-conversation-to-agent';
+export { createGetWhatsappConversationMode } from './domain/get-whatsapp-conversation-mode';

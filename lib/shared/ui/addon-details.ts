@@ -1,4 +1,5 @@
 import {
+  BotIcon,
   FileTextIcon,
   LayoutDashboardIcon,
   PuzzleIcon,
@@ -35,5 +36,9 @@ export const ADDON_DETAILS: Readonly<Record<AddonNameKey, AddonDetail>> = {
   integraciones: {
     description: 'Proveedor IA, Inventarios y WhatsApp.',
     icon: PuzzleIcon,
+  },
+  agente_ia_whatsapp: {
+    description: 'Responde por WhatsApp con la IA de la empresa y pasa a una persona cuando hace falta.',
+    icon: BotIcon,
   },
 };

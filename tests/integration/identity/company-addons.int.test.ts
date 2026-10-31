@@ -315,7 +315,7 @@ describe('apply', () => {
     })
   })
 
-  it('R29, R33: apagar todos con los cinco prendidos escribe cinco filas false y cinco eventos', async () => {
+  it('R29, R33: apagar todos con todos prendidos escribe una fila false y un evento por añadido', async () => {
     await inRolledBackTransaction(async (tx) => {
       const repo = createCompanyAddonRepository(tx)
       const actorId = await createMaestro(tx)
@@ -325,19 +325,19 @@ describe('apply', () => {
 
       expect(result).toEqual({ stored: [], changed: ADDONS.map((addon) => ({ addon, enabled: false })) })
       const filas = await overridesOf(tx, companyId)
-      expect(filas).toHaveLength(5)
+      expect(filas).toHaveLength(ADDONS.length)
       for (const fila of filas) {
         expect(fila, fila.addonKey).toMatchObject({ enabled: false, createdBy: actorId, createdAt: at(3) })
       }
       const eventos = await eventsOf(tx, companyId)
-      expect(eventos).toHaveLength(5)
+      expect(eventos).toHaveLength(ADDONS.length)
       expect(eventos.map((e) => (e.details as { addon: string }).addon).sort()).toEqual([...ADDONS].sort())
       for (const evento of eventos) expect(evento).toMatchObject({ kind: 'addon.disabled', actorId, occurredAt: at(3) })
       expect((await readCompany(tx, companyId)).updatedAt).toEqual(at(3))
     })
   })
 
-  it('R29, R33: si falla un evento a mitad de apagar todos, las cinco excepciones y updated_at quedan como estaban', async () => {
+  it('R29, R33: si falla un evento a mitad de apagar todos, todas las excepciones y updated_at quedan como estaban', async () => {
     await inRolledBackTransaction(async (tx) => {
       const actorId = await createMaestro(tx)
       const companyId = await seedCompany(tx, { addons: [...ADDONS] })

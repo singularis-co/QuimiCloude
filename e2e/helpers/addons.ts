@@ -8,7 +8,7 @@ import { ADDONS } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
 /**
- * Deja las cinco excepciones de la empresa `companyId` en `enabled = true`. Sin autor (P7): las
+ * Deja las seis excepciones de la empresa `companyId` en `enabled = true`. Sin autor (P7): las
  * siembra el fixture, no un Maestro. `upsert` para que sirva tambien sobre una empresa que ya tenia
  * alguna excepcion, prendida o apagada.
  */

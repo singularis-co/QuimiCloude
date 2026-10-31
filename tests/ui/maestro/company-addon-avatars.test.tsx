@@ -34,7 +34,7 @@ describe('CompanyAddonAvatars', () => {
   });
 
   it('pinta un avatar por añadido, con role img, aria-label con su nombre y su icono', () => {
-    montar(ADDONS);
+    montar(ADDONS, ADDONS.length);
     const avatares = screen.getAllByTestId('company-addon-avatar');
     expect(avatares).toHaveLength(ADDONS.length);
     for (const [i, addon] of ADDONS.entries()) {

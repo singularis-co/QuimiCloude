@@ -3096,6 +3096,15 @@ import {
 import type { AiProviderCatalog } from '@/lib/modules/integraciones/ports/ai-provider-catalog';
 import type { AiProviderConnectionRepository } from '@/lib/modules/integraciones/ports/ai-provider-connection-repository';
 import type { AiProviderProbe } from '@/lib/modules/integraciones/ports/ai-provider-probe';
+import {
+  createGetWhatsappAgentSettings,
+  createGetWhatsappConversationMode,
+  createHandOffWhatsappConversation,
+  createReturnWhatsappConversationToAgent,
+  createSaveWhatsappAgentSettings,
+} from '@/lib/modules/integraciones';
+import { createWhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-agent-settings-prisma';
+import type { WhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/ports/whatsapp-agent-settings-repository';
 
 type ProviderProbe = (input: {
   apiKey: string;
@@ -3137,6 +3146,9 @@ const aiProviderDeps = {
   cipher: secretCipher,
   random: randomSource,
 };
+
+const whatsappAgentSettingsRepository: WhatsappAgentSettingsRepository = createWhatsappAgentSettingsRepository();
+const whatsappAgentSettingsDeps = { agentSettings: whatsappAgentSettingsRepository };
 
 /**
  * Fachada de `integraciones`. `secretCipher` y `secretDigest` siguen expuestos para quien reciba
@@ -3189,6 +3201,11 @@ export const integraciones = {
   listSendableWhatsappTemplates: createListSendableWhatsappTemplates(whatsappConversationDeps),
   getWhatsappChatContext: createGetWhatsappChatContext(whatsappChatContextDeps),
   getWhatsappMedia: createGetWhatsappMedia(whatsappMediaDeps),
+  getWhatsappAgentSettings: createGetWhatsappAgentSettings(whatsappAgentSettingsDeps),
+  saveWhatsappAgentSettings: createSaveWhatsappAgentSettings(whatsappAgentSettingsDeps),
+  handOffWhatsappConversation: createHandOffWhatsappConversation({ contacts: whatsappContactRepository }),
+  returnWhatsappConversationToAgent: createReturnWhatsappConversationToAgent({ contacts: whatsappContactRepository }),
+  getWhatsappConversationMode: createGetWhatsappConversationMode({ contacts: whatsappContactRepository }),
 } as const;
 
 import {

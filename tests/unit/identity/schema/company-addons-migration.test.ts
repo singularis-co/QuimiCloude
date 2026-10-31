@@ -128,6 +128,10 @@ function downBorraLasDosTablas(sql: string): boolean {
   )
 }
 
+// Añadidos que llegaron despues, cada uno con su propia migracion: esta no los siembra.
+const ANADIDOS_POSTERIORES: readonly string[] = ['agente_ia_whatsapp']
+const ADDONS_DE_ESTA_MIGRACION = ADDONS.filter((addon) => !ANADIDOS_POSTERIORES.includes(addon))
+
 describe('migración: catálogo de añadidos y excepciones por empresa', () => {
   it('existe exactamente una carpeta, con su migration.sql y su down.sql', () => {
     expect(carpetas).toHaveLength(1)
@@ -141,8 +145,8 @@ describe('migración: catálogo de añadidos y excepciones por empresa', () => {
     expect(sentencias(up).some((s) => /^ALTER TABLE "companies"/.test(s))).toBe(false)
   })
 
-  it('R6 — crea `addons` con PK y CHECK de forma, y el INSERT lista exactamente ADDONS', () => {
-    expect(upCreaElCatalogo(up, ADDONS)).toBe(true)
+  it('R6 — crea `addons` con PK y CHECK de forma, y el INSERT lista exactamente ADDONS menos los añadidos posteriores', () => {
+    expect(upCreaElCatalogo(up, ADDONS_DE_ESTA_MIGRACION)).toBe(true)
   })
 
   it('R6 — crea `company_addon_overrides` con PK compuesta, índices y FK (empresa CASCADE, añadido y autor RESTRICT)', () => {
@@ -183,7 +187,7 @@ describe('migración: catálogo de añadidos y excepciones por empresa', () => {
 
     for (const mutado of [faltaUna, sobraUna, sinCheck]) {
       expect(mutado).not.toBe(up)
-      expect(upCreaElCatalogo(mutado, ADDONS)).toBe(false)
+      expect(upCreaElCatalogo(mutado, ADDONS_DE_ESTA_MIGRACION)).toBe(false)
     }
     for (const mutado of [empresaRestrict, sinIndiceAutor]) {
       expect(mutado).not.toBe(up)

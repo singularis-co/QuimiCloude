@@ -963,7 +963,7 @@ describe('getCompanyAddonsAction', () => {
     anadidos = cablearAnadidos();
   });
 
-  it('R27: envuelve el id y responde success con la vista de los cinco añadidos', async () => {
+  it('R27: envuelve el id y responde success con la vista de todos los añadidos', async () => {
     const resultado = await getCompanyAddonsAction(COMPANY_ID);
 
     expect(resultado).toEqual({
@@ -976,6 +976,7 @@ describe('getCompanyAddonsAction', () => {
           { addon: 'lectura_pdf', enabled: true, active: false, requires: ['integraciones'] },
           { addon: 'importacion_excel', enabled: false, active: false, requires: [] },
           { addon: 'integraciones', enabled: false, active: false, requires: [] },
+          { addon: 'agente_ia_whatsapp', enabled: false, active: false, requires: ['integraciones'] },
         ],
       },
     });

@@ -52,9 +52,11 @@
     "identity/plans-constraints.int.test.ts",
     "identity/plans-migration.int.test.ts",
     "identity/plans-permissions-migration.int.test.ts",
+    "identity/whatsapp-agent-permissions-migration.int.test.ts",
     "identity/whatsapp-read-permission-migration.int.test.ts",
     "identity/whatsapp-send-permission-migration.int.test.ts",
     "identity/work-groups-constraints.int.test.ts",
+    "integraciones/whatsapp-agent-schema.int.test.ts",
     "integraciones/whatsapp-connection-migration.int.test.ts",
     "integraciones/whatsapp-contacts-last-read-migration.int.test.ts",
     "integraciones/whatsapp-conversation-prisma.int.test.ts",
@@ -769,6 +771,16 @@
       "archivo": "integraciones/ai-provider-connection-prisma.int.test.ts",
       "motivo": "Ejercita las cuatro funciones de ai-provider-connection-prisma.ts y el catalogo, que llaman al cliente Prisma GLOBAL y no a un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no las envolveria; ademas R19 necesita dos altas y dos guardados concurrentes de verdad contra el indice unico de empresa. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra sus conexiones por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. El catalogo 'ai_providers' solo se lee. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-13"
+    },
+    {
+      "archivo": "integraciones/whatsapp-agent-settings-prisma.int.test.ts",
+      "motivo": "QT-303 T3.3 (R16, R17, R18, R34): ejercita el repositorio de whatsapp-agent-settings-prisma.ts, que usa el cliente Prisma GLOBAL y no un 'tx' inyectado, asi que una transaccion del test con ROLLBACK no lo envolveria; ademas R17 necesita guardados concurrentes de verdad contra la clave primaria 'company_id'. Cada caso fabrica sus empresas efimeras con randomUUID (tipo de documento, rol, empresa y usuario) y 'afterAll' borra su configuracion por 'company_id', afirma contando que no queda ninguna y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-30"
+    },
+    {
+      "archivo": "integraciones/whatsapp-conversation-mode-prisma.int.test.ts",
+      "motivo": "QT-303 T4.2 (R20, R23, R27): ejercita findMode y setMode de whatsapp-contact-prisma.ts con el repositorio construido sobre el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no lo envolveria; ademas R23 necesita cambios de modo simultaneos de verdad, por conexiones distintas, contra el filtro por modo del UPDATE. Cada caso fabrica sus contactos en dos empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' contactos -> conexiones, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-10-31"
     },
     {
       "archivo": "inventario/finished-product-detail.int.test.ts",

@@ -622,6 +622,16 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       }),
   },
   {
+    // La configuracion del agente de IA de WhatsApp: la accion captura el `unauthorized` del caso
+    // de uso y devuelve un estado.
+    archivo: 'lib/modules/integraciones/adapters/driving/whatsapp-agent-actions.ts',
+    nombre: 'getWhatsappAgentSettingsAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/integraciones/adapters/driving/whatsapp-agent-actions')
+      ).getWhatsappAgentSettingsAction(),
+  },
+  {
     // Las fotos de evidencia por paso: la accion captura el error de un pedido inexistente y
     // devuelve un estado, asi que la invocacion no rompe.
     archivo: 'lib/modules/asignaciones/adapters/driving/step-evidence-actions.ts',

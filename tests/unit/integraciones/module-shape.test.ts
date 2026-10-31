@@ -144,6 +144,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/observability/whatsapp-send-log-console.ts',
   'adapters/driven/persistence/ai-provider-connection-prisma.ts',
   'adapters/driven/persistence/company-scope.ts',
+  'adapters/driven/persistence/whatsapp-agent-settings-prisma.ts',
   'adapters/driven/persistence/whatsapp-connection-prisma.ts',
   'adapters/driven/persistence/whatsapp-contact-prisma.ts',
   'adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma.ts',
@@ -158,6 +159,7 @@ const MODULE_CODE_FILES = [
   'adapters/driven/security/secret-digest-sha256.ts',
   'adapters/driven/security/webhook-signature-hmac.ts',
   'adapters/driving/ai-provider-actions.ts',
+  'adapters/driving/whatsapp-agent-actions.ts',
   'adapters/driving/whatsapp-connection-actions.ts',
   // QC-239 2026-10-20: las cuatro Server Actions de vincular, desvincular y bloquear un contacto.
   'adapters/driving/whatsapp-contact-actions.ts',
@@ -182,11 +184,14 @@ const MODULE_CODE_FILES = [
   'domain/errors.ts',
   'domain/get-ai-provider-connection.ts',
   'domain/get-ai-provider-readiness.ts',
+  'domain/get-whatsapp-agent-settings.ts',
   'domain/get-whatsapp-chat-context.ts',
   'domain/get-whatsapp-chat.ts',
   'domain/get-whatsapp-connection.ts',
+  'domain/get-whatsapp-conversation-mode.ts',
   'domain/get-whatsapp-media.ts',
   'domain/graph-failure.ts',
+  'domain/hand-off-whatsapp-conversation.ts',
   'domain/integraciones-scope.ts',
   'domain/link-whatsapp-contact.ts',
   'domain/list-sendable-whatsapp-templates.ts',
@@ -201,7 +206,9 @@ const MODULE_CODE_FILES = [
   'domain/report-ai-provider-outcome.ts',
   'domain/resolve-ai-provider-for-reading.ts',
   'domain/retry-whatsapp-message.ts',
+  'domain/return-whatsapp-conversation-to-agent.ts',
   'domain/save-ai-provider-connection.ts',
+  'domain/save-whatsapp-agent-settings.ts',
   'domain/secret-context.ts',
   'domain/select-ai-model.ts',
   'domain/send-whatsapp-message.ts',
@@ -220,12 +227,14 @@ const MODULE_CODE_FILES = [
   'domain/update-whatsapp-connection.ts',
   'domain/verify-whatsapp-webhook.ts',
   'domain/webhook-connection.ts',
+  'domain/whatsapp-agent-settings.ts',
   'domain/whatsapp-chat-context.ts',
   'domain/whatsapp-connection-input.ts',
   'domain/whatsapp-connection.ts',
   'domain/whatsapp-contact-input.ts',
   'domain/whatsapp-contact-link.ts',
   'domain/whatsapp-conversation-input.ts',
+  'domain/whatsapp-conversation-mode.ts',
   'domain/whatsapp-conversation.ts',
   'domain/whatsapp-inbound-message.ts',
   'domain/whatsapp-media.ts',
@@ -259,6 +268,7 @@ const MODULE_CODE_FILES = [
   'ports/secret-cipher.ts',
   'ports/secret-digest.ts',
   'ports/webhook-signature.ts',
+  'ports/whatsapp-agent-settings-repository.ts',
   'ports/whatsapp-connection-repository.ts',
   'ports/whatsapp-contact-repository.ts',
   'ports/whatsapp-contact-unit-of-work.ts',
@@ -446,13 +456,14 @@ describe('la forma del modulo integraciones', () => {
     expect(adaptadores).toEqual(['driven/', 'driving/'])
   })
 
-  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, la regla, el recalculo y las tres acciones sobre contactos, QC-239, y las de plantillas con su diccionario, QC-242, y el envio y el reintento con su error de faltantes y su vista, QC-240, y R40: las cuatro consultas de conversaciones con sus tipos, QC-245, y R58: el contexto del chat y el archivo de un medio con sus tipos y el error de pedido), y solo desde ./domain; el validador sin claves ya no sale', () => {
+  it('R20: el contrato reexporta exactamente los errores, los tipos y las fabricas de casos de uso (con las dos del webhook, QC-238, la regla, el recalculo y las tres acciones sobre contactos, QC-239, y las de plantillas con su diccionario, QC-242, y el envio y el reintento con su error de faltantes y su vista, QC-240, y R40: las cuatro consultas de conversaciones con sus tipos, QC-245, y R58: el contexto del chat y el archivo de un medio con sus tipos y el error de pedido, y la configuracion del agente IA y el modo de la conversacion con sus tipos, QT-303), y solo desde ./domain; el validador sin claves ya no sale', () => {
     const { otherStatements, reexports } = contractReexports(readFileSync(join(moduleDir, 'index.ts'), 'utf8'))
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
     expect(reexports.map((r) => r.name).sort()).toEqual([
       'ActionNotAllowedError',
       'Actor',
+      'AgentReturnCandidate',
       'AiModelOption',
       'AiProviderCode',
       'AiProviderConnectionOverview',
@@ -467,13 +478,22 @@ describe('la forma del modulo integraciones', () => {
       'AiProviderReadingResolution',
       'AiProviderStatus',
       'AiProviderTestResult',
+      'CONVERSATION_MODES',
+      'CONVERSATION_MODE_REASONS',
       'CREATABLE_TEMPLATE_CATEGORIES',
       'ContactLink',
+      'ConversationMode',
+      'ConversationModeInput',
+      'ConversationModeReason',
+      'ConversationModeView',
+      'GREETING_NAME_PLACEHOLDER',
       'IntegracionesError',
       'LinkedCustomerNotFoundError',
+      'REASONS_BY_TARGET',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
       'SaveAiProviderConnectionResult',
+      'SaveWhatsappAgentSettingsInput',
       'SecretContext',
       'SecretUnreadableError',
       'SelectAiModelResult',
@@ -482,10 +502,13 @@ describe('la forma del modulo integraciones', () => {
       'TestSavedAiProviderResult',
       'UnauthorizedError',
       'ValidationError',
+      'WHATSAPP_AGENT_DEFAULTS',
+      'WHATSAPP_ASSISTANT_NAME_MAX_LENGTH',
       'WHATSAPP_CONSTANT_KEY_PATTERN',
       'WHATSAPP_TEMPLATE_LANGUAGES',
       'WHATSAPP_VARIABLE_KEY_LIMITS',
       'WHATSAPP_VARIABLE_KEY_PATTERN',
+      'WhatsappAgentSettings',
       'WhatsappChat',
       'WhatsappChatAttachment',
       'WhatsappChatContext',
@@ -539,11 +562,14 @@ describe('la forma del modulo integraciones', () => {
       'createGetAiProviderConnection',
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
+      'createGetWhatsappAgentSettings',
       'createGetWhatsappChat',
       'createGetWhatsappChatContext',
       'createGetWhatsappConnection',
+      'createGetWhatsappConversationMode',
       'createGetWhatsappMedia',
       'createGetWhatsappTemplate',
+      'createHandOffWhatsappConversation',
       'createLinkWhatsappContact',
       'createListSendableWhatsappTemplates',
       'createListWhatsappConversations',
@@ -558,7 +584,9 @@ describe('la forma del modulo integraciones', () => {
       'createResolveAiProviderForReading',
       'createResyncWhatsappTemplates',
       'createRetryWhatsappMessage',
+      'createReturnWhatsappConversationToAgent',
       'createSaveAiProviderConnection',
+      'createSaveWhatsappAgentSettings',
       'createSelectAiModel',
       'createSendWhatsappMessage',
       'createSetWhatsappConnectionEnabled',
@@ -574,13 +602,17 @@ describe('la forma del modulo integraciones', () => {
       'createUpdateWhatsappVariableKey',
       'createVerifyWhatsappWebhook',
       'isAccountFailure',
+      'isDueForAgentReturn',
       'marksConnection',
+      'planModeChange',
+      'renderGreeting',
       'resolveContactLink',
       'validateKeyedTemplateDraft',
       'validateWhatsappVariableKeyInput',
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
+      'AgentReturnCandidate',
       'AiModelOption',
       'AiProviderCode',
       'AiProviderConnectionOverview',
@@ -596,13 +628,19 @@ describe('la forma del modulo integraciones', () => {
       'AiProviderStatus',
       'AiProviderTestResult',
       'ContactLink',
+      'ConversationMode',
+      'ConversationModeInput',
+      'ConversationModeReason',
+      'ConversationModeView',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
       'SaveAiProviderConnectionResult',
+      'SaveWhatsappAgentSettingsInput',
       'SecretContext',
       'SelectAiModelResult',
       'TemplateSyncSummary',
       'TestSavedAiProviderResult',
+      'WhatsappAgentSettings',
       'WhatsappChat',
       'WhatsappChatAttachment',
       'WhatsappChatContext',
@@ -643,7 +681,7 @@ describe('la forma del modulo integraciones', () => {
     expect(reexports).toEqual([{ name: 'SecretCipher', typeOnly: true, from: './ports/secret-cipher' }])
   })
 
-  it('R18: los archivos de codigo del modulo son exactamente los del cifrado de secretos, los de la conexion de WhatsApp, los de su webhook (QC-238) y los del vinculo y el bloqueo de sus contactos (QC-239)', () => {
+  it('R18: los archivos de codigo del modulo son exactamente los del cifrado de secretos, los de la conexion de WhatsApp, los de su webhook (QC-238) y los del vinculo y el bloqueo de sus contactos (QC-239), y los del agente IA y el modo de la conversacion (QT-303)', () => {
     const relativos = listFiles(moduleDir).map((file) => toPosix(relative(moduleDir, file)))
     expect(codeFilesAmong(relativos).sort()).toEqual([...MODULE_CODE_FILES])
   })
@@ -808,7 +846,7 @@ describe('la forma del modulo integraciones', () => {
     ])
   })
 
-  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), vincular, desvincular y bloquear contactos (QC-239) y las plantillas con su diccionario, relacionar y habilitar, y el secreto del cron (QC-242), y el envio y el reintento (QC-240), y R40: las cuatro consultas de conversaciones (QC-245), y R58: el contexto del chat y el archivo de un medio, con sus puertos tipados', () => {
+  it('R19: lib/composition exporta integraciones con exactamente el cifrado, los casos de uso de las dos conexiones, la URL del webhook y su recepcion (QC-238), vincular, desvincular y bloquear contactos (QC-239) y las plantillas con su diccionario, relacionar y habilitar, y el secreto del cron (QC-242), y el envio y el reintento (QC-240), y R40: las cuatro consultas de conversaciones (QC-245), y R58: el contexto del chat y el archivo de un medio, y la configuracion del agente IA y el modo de la conversacion (QT-303), con sus puertos tipados', () => {
     const cableado = integracionesWiring(readFileSync(join(repoRoot, 'lib', 'composition', 'index.ts'), 'utf8'))
 
     expect(cableado, 'lib/composition/index.ts deberia exportar const integraciones = { ... }').not.toBeNull()
@@ -822,11 +860,14 @@ describe('la forma del modulo integraciones', () => {
       'getAiProviderConnection',
       'getAiProviderReadiness',
       'getAiProviderStatus',
+      'getWhatsappAgentSettings',
       'getWhatsappChat',
       'getWhatsappChatContext',
       'getWhatsappConnection',
+      'getWhatsappConversationMode',
       'getWhatsappMedia',
       'getWhatsappTemplate',
+      'handOffWhatsappConversation',
       'linkWhatsappContact',
       'listSendableWhatsappTemplates',
       'listWhatsappConversations',
@@ -840,7 +881,9 @@ describe('la forma del modulo integraciones', () => {
       'resolveAiProviderForReading',
       'resyncWhatsappTemplates',
       'retryWhatsappMessage',
+      'returnWhatsappConversationToAgent',
       'saveAiProviderConnection',
+      'saveWhatsappAgentSettings',
       'secretCipher',
       'secretDigest',
       'selectAiModel',
@@ -1001,7 +1044,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente nueve modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291) y AiProviderConnection', () => {
+  it('R13: db/schema.prisma tiene exactamente diez modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291), AiProviderConnection y WhatsappAgentSettings (QT-303)', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -1019,8 +1062,9 @@ describe('la forma del modulo integraciones', () => {
       'AiProvider',
       'AiModel',
       'AiProviderConnection',
+      'WhatsappAgentSettings',
     ])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(9)
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(10)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

@@ -81,6 +81,7 @@ describe('getCompanyAddons', () => {
         { addon: 'lectura_pdf', enabled: true, active: false, requires: ['integraciones'] },
         { addon: 'importacion_excel', enabled: false, active: false, requires: [] },
         { addon: 'integraciones', enabled: false, active: false, requires: [] },
+        { addon: 'agente_ia_whatsapp', enabled: false, active: false, requires: ['integraciones'] },
       ],
     });
     expect(vista.addons.map((a) => a.addon)).toEqual([...ADDONS]);
