@@ -197,7 +197,7 @@ describe('QC-277 — el aterrizaje E2E usa el permiso efectivo: rol recortado po
   });
 });
 
-describe('QC-277 — enableAllAddons prende los cinco añadidos a la empresa de fixture (R20, P7)', () => {
+describe('QC-277 — enableAllAddons prende los seis añadidos a la empresa de fixture (R20, P7)', () => {
   beforeEach(() => {
     overrideUpsertMock.mockReset();
     overrideUpsertMock.mockImplementation((args: unknown) => args);

@@ -155,6 +155,17 @@ describe('nombre del asistente', () => {
     expect(nombreGuardado(con({ assistantName: '  Ana  ' }))).toBe('Ana')
   })
 
+  it.each(['\tAna', 'Ana\n', '\r\nAna'])(
+    'R34/D15 — se guarda sin tabuladores ni saltos de línea en los extremos (%j)',
+    (valor) => {
+      expect(nombreGuardado(con({ assistantName: valor }))).toBe('Ana')
+    },
+  )
+
+  it('R34/D15 — un nombre hecho solo de blancos (\\t \\n \\r) se guarda sin nombre', () => {
+    expect(nombreGuardado(con({ assistantName: ' \t\r\n ' }))).toBeNull()
+  })
+
   it('R34 — 60 caracteres recortados pasan y 61 rechazan', () => {
     expect(WHATSAPP_ASSISTANT_NAME_MAX_LENGTH).toBe(60)
     expect(nombreGuardado(con({ assistantName: `  ${'a'.repeat(60)}  ` }))).toBe('a'.repeat(60))

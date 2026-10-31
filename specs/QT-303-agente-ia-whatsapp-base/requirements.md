@@ -56,7 +56,7 @@ Decisión del humano del 2026-10-30, tras la tanda 2 (esquema).
 
 | # | Decisión | Cubierta por |
 |---|---|---|
-| D15 | En la base, el mensaje de paso a humano y el saludo hechos solo de blancos (espacio, tabulador, salto de línea, retorno de carro) se rechazan igual que los vacíos: el CHECK `whatsapp_agent_settings_messages_not_blank` recorta `E' \t\n\r'`, no solo espacios. **Abierto:** el CHECK del nombre del asistente (`assistant_name_valid`, «sin espacios en los extremos») sigue recortando solo espacios; la decisión habla de mensajes y R34 de «espacios», así que no se cambia hasta que el humano lo diga. | R14 |
+| D15 | En la base, el mensaje de paso a humano y el saludo hechos solo de blancos (espacio, tabulador, salto de línea, retorno de carro) se rechazan igual que los vacíos: el CHECK `whatsapp_agent_settings_messages_not_blank` recorta `E' \t\n\r'`, no solo espacios. **Cerrado (humano, 2026-10-31):** el nombre del asistente se endurece igual: el CHECK `assistant_name_valid` exige `btrim(x, E' \t\n\r') = x`, así que un nombre con espacio, tabulador, salto de línea o retorno de carro en los extremos se rechaza en la base; el zod del dominio los recorta antes de guardar (R34). | R14, R34 |
 
 ## Requisitos (EARS)
 
@@ -116,8 +116,9 @@ Decisión del humano del 2026-10-30, tras la tanda 2 (esquema).
 - **R18.** El sistema DEBE tomar la empresa de la configuración del usuario que actúa y nunca de la
   entrada: una empresa no puede leer ni escribir la configuración de otra.
 - **R34.** CUANDO se guarda una configuración sin nombre del asistente, con nombre nulo o con un
-  nombre que solo tiene espacios, el sistema DEBE guardarla sin nombre del asistente; SI el nombre
-  recortado supera 60 caracteres o no es un texto, ENTONCES el sistema DEBE rechazar el guardado.
+  nombre que solo tiene blancos (espacio, tabulador, salto de línea, retorno de carro), el sistema
+  DEBE guardarla sin nombre del asistente; el nombre se guarda sin esos blancos en los extremos
+  (D15); SI el nombre recortado supera 60 caracteres o no es un texto, ENTONCES el sistema DEBE rechazar el guardado.
   *(60 es un supuesto del spec: D11 pide «una longitud máxima razonable» sin fijar el número; se
   cambia en una sola constante.)*
 - **R35.** CUANDO se resuelve el saludo con un nombre del asistente, el sistema DEBE reemplazar

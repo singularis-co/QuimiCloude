@@ -60,8 +60,8 @@
   - R11–R15: bordes 0, 1, 0.6, 1.01, -0.01, 0.655; enteros 0, 1, 1.5; mensajes vacíos, solo
     espacios, 4096 y 4097 caracteres; campo ausente; `enabled` no booleano; `assistantName`
     ausente no rechaza;
-  - R34: `assistantName` ausente, `null`, `''` y `'   '` → `null`; `'  Ana  '` → `'Ana'`; 60
-    caracteres pasa, 61 rechaza; número → rechaza;
+  - R34: `assistantName` ausente, `null`, `''` y `'   '` → `null`; `'  Ana  '` → `'Ana'`; `'\tAna'`,
+    `'Ana\n'`, `'\r\nAna'` → `'Ana'` (D15); 60 caracteres pasa, 61 rechaza; número → rechaza;
   - R35: saludo por defecto con `'Ana'` → «Hola, soy el asistente virtual Ana. Si prefieres…»;
     sin nombre → «Hola, soy el asistente virtual. Si prefieres hablar con una persona, escribe
     "asesor".»; `{nombre}` al inicio sin nombre quita el espacio siguiente; dos `{nombre}` se

@@ -49,7 +49,7 @@ CREATE TABLE "whatsapp_agent_settings" (
            AND char_length("handoff_message") <= 4096 AND char_length("greeting_message") <= 4096),
     CONSTRAINT "whatsapp_agent_settings_assistant_name_valid"
         CHECK ("assistant_name" IS NULL
-           OR (btrim("assistant_name") = "assistant_name" AND "assistant_name" <> ''
+           OR (btrim("assistant_name", E' \t\n\r') = "assistant_name" AND "assistant_name" <> ''
                AND char_length("assistant_name") <= 60))
 );
 

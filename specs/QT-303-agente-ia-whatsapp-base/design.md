@@ -89,7 +89,7 @@ CREATE TABLE "whatsapp_agent_settings" (
        AND char_length("handoff_message") <= 4096 AND char_length("greeting_message") <= 4096),
   CONSTRAINT "whatsapp_agent_settings_assistant_name_valid"
     CHECK ("assistant_name" IS NULL
-       OR (btrim("assistant_name") = "assistant_name" AND "assistant_name" <> ''
+       OR (btrim("assistant_name", E' \t\n\r') = "assistant_name" AND "assistant_name" <> ''
            AND char_length("assistant_name") <= 60))
 );
 -- FK a mano (drift, como ai_provider_connections): companies RESTRICT, users RESTRICT.
@@ -112,7 +112,12 @@ ALTER TYPE "whatsapp_message_origin" ADD VALUE 'AGENT';
   y un mensaje hecho solo de `\t`, `\n` o `\r` pasaba el CHECK. Se usa `btrim(x, E' \t\n\r') <> ''`
   y no la regex `x ~ '\S'`: el conjunto de caracteres queda escrito en el CHECK y no depende de la
   clase `\S` del motor de regex ni del locale de la base. Es defensa en profundidad: la frontera
-  sigue siendo el zod del caso de uso (R14). `assistant_name_valid` no cambia (ver D15 en requirements).
+  sigue siendo el zod del caso de uso (R14).
+- **Blancos en `assistant_name_valid` (D15, decisión del humano 2026-10-31):** mismo conjunto:
+  `btrim(x, E' \t\n\r') = x AND x <> ''`, así que `'\tAna'`, `'Ana\n'` y `'\r\nAna'` se rechazan
+  en la base. El zod del dominio no cambia de código: `String.prototype.trim()` ya quita
+  `\t \n \r` (y además el resto de blancos Unicode), así que todo nombre que sale del dominio
+  cumple el CHECK; la base es la defensa en profundidad, la frontera es el zod (R34).
 - **Motivo en enum** inglés, como los demás enums del esquema (`IN/OUT`, `USER/SYSTEM`). Mapeo a
   la ficha: `AGENT`=`AGENTE`, `HUMAN`=`HUMANO`; `MANUAL` vale en los dos sentidos;
   `COMPLAINT`=reclamo, `NEGATIVE_SENTIMENT`=sentimiento negativo, `UNSUPPORTED_MEDIA`=medio no

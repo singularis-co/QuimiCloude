@@ -517,10 +517,10 @@ describe('migracion whatsapp_agent contra Postgres real', () => {
     })
   })
 
-  it('R34: la base rechaza un nombre del asistente vacio, con espacios en los extremos o de 61 caracteres y admite NULL y 60', async () => {
+  it('R34/D15: la base rechaza un nombre del asistente vacio, con blancos (espacio, \\t, \\n, \\r) en los extremos o de 61 caracteres y admite NULL y 60', async () => {
     await inRolledBackTransaction(async (tx) => {
       const s = await seed(tx)
-      for (const assistantName of ['', '   ', ' Ana', 'Ana ', 'a'.repeat(61)]) {
+      for (const assistantName of ['', '   ', ' Ana', 'Ana ', '\tAna', 'Ana\n', '\r\nAna', '\t', 'a'.repeat(61)]) {
         expect(await settingsOutcome(tx, s, { assistantName }), JSON.stringify(assistantName)).toMatch(
           /whatsapp_agent_settings_assistant_name_valid/,
         )

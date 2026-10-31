@@ -239,3 +239,24 @@ Verificado 2026-10-31 (backend_dev, retoma tras un agente colgado):
   tabuladores en los extremos.
 
 Veredicto: tanda 3 hecha; configuración del agente leída y guardada por empresa, verde.
+
+## Fix 2026-10-31: `assistant_name_valid` rechaza blancos no espacio (D15, decisión del humano)
+
+- Archivos: `db/migrations/20261030120000_whatsapp_agent/migration.sql` (CHECK
+  `btrim("assistant_name", E' \t\n\r') = "assistant_name"`; `down.sql` sin cambios),
+  `specs/QT-303-agente-ia-whatsapp-base/requirements.md` (R34 habla de blancos; D15 deja de estar abierto),
+  `design.md > Migración 1` (SQL y nota de D15), `tasks.md` (casos de R34),
+  `tests/integration/integraciones/whatsapp-agent-schema.int.test.ts` (R34/D15: `'\tAna'`, `'Ana\n'`,
+  `'\r\nAna'`, `'\t'` rechazados), `tests/unit/integraciones/agente/whatsapp-agent-settings.test.ts`
+  (`'\tAna'`, `'Ana\n'`, `'\r\nAna'` → `'Ana'`; `' \t\r\n '` → `null`).
+- `lib/modules/integraciones/domain/whatsapp-agent-settings.ts` sin cambios: el zod usa
+  `String.prototype.trim()`, que ya quita `\t \n \r`; los tests nuevos lo fijan.
+- Rojo con el CHECK viejo: con `migration.sql` de HEAD restaurado temporalmente,
+  `vitest run ...whatsapp-agent-schema.int.test.ts -t R34` → `Tests 1 failed | 18 skipped (19)`.
+  Con el CHECK nuevo: `Test Files 1 passed (1)`, `Tests 19 passed (19)` (plantilla `qct_tpl_4bf16c205f06`).
+- `pnpm exec vitest run tests/unit/integraciones/agente/whatsapp-agent-settings.test.ts`: 53/53 pasados.
+- `pnpm exec vitest related --run lib/modules/integraciones/domain/whatsapp-agent-settings.ts tests/unit/integraciones/agente/whatsapp-agent-settings.test.ts`:
+  `Test Files 497 passed (497)`, `Tests 8606 passed | 3 skipped (8609)`.
+- `pnpm exec tsc --noEmit`: exit 0. `eslint` sobre los dos tests tocados: sin salida (0 problemas).
+
+Veredicto: nombre del asistente endurecido en base y probado en dominio; verde.
