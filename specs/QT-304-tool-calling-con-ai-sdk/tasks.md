@@ -62,25 +62,26 @@
 
 ## Tanda 4 — Adaptador del AI SDK (depende de la aprobación F1.4 y de la tanda 3)
 
-- [ ] **T4.1** Filas de las cuatro dependencias en `docs/dependencias.md` (las de `design.md > 8`, con
+- [x] **T4.1** Filas de las cuatro dependencias en `docs/dependencias.md` (las de `design.md > 8`, con
   la fecha de F1.4); `pnpm add ai@^7.0.159 @ai-sdk/anthropic@^4.0.94 @ai-sdk/openai@^4.0.106
   @ai-sdk/google@^4.0.109`; `DEPENDENCIAS_ESPERADAS` de 45 a 49 con su línea de historia. Confirmar
   el riesgo ESM: `pnpm run typecheck`, un `vitest` que importe `ai` y `pnpm run build`. *Hecho:*
   `guard-dependencias-aprobadas` y `guard-identificador-de-request` verdes (R48); si el ESM rompe
-  algo, se para y se pregunta.
-- [ ] **T4.2** Verificar contra los tipos instalados las firmas de la tabla de `design.md > 7`,
+  algo, se para y se pregunta. *Hecho 2026-10-31:* filas, instalación y 45 → 49; typecheck, vitest y
+  `next build` verdes sin tocar `"type"`.
+- [x] **T4.2** Verificar contra los tipos instalados las firmas de la tabla de `design.md > 7`,
   cómo expone el SDK una entrada de herramienta inválida y una herramienta desconocida
   (`design.md > 6`), y el formato de nombre de herramienta en Gemini (`design.md > 4.2`). *Hecho:*
   tabla de §7 a «verificado» o corregida en `design.md`; si algo obliga a cambiar el puerto, se para
-  y se pregunta.
-- [ ] **T4.3** `adapters/driven/ai/ai-sdk-models.ts`. *Hecho:* `ai-sdk-models.test.ts` verde (R41).
-- [ ] **T4.4** `classifyAiSdkError` con la tabla de `design.md > 6`. *Hecho:*
+  y se pregunta. *Hecho:* tabla de §7 al día (cinco correcciones de nombre, ninguna toca el puerto).
+- [x] **T4.3** `adapters/driven/ai/ai-sdk-models.ts`. *Hecho:* `ai-sdk-models.test.ts` verde (R41).
+- [x] **T4.4** `classifyAiSdkError` con la tabla de `design.md > 6`. *Hecho:*
   `classify-ai-sdk-error.test.ts` verde (R44, R45).
-- [ ] **T4.5** `adapters/driven/ai/conversational-model-ai-sdk.ts`: `generateText` y
+- [x] **T4.5** `adapters/driven/ai/conversational-model-ai-sdk.ts`: `generateText` y
   `generateObject`, envoltorio de `execute` con `executed` (R33), sin reintentos, plazo y tope de
   pasos. *Hecho:* `conversational-model-ai-sdk.test.ts` verde con el modelo simulado de `ai/test`
   (R29–R36, R39, R42, R43).
-- [ ] **T4.6** Cableado del adaptador en `lib/composition/index.ts` (`design.md > 7.1`) y guardia de
+- [x] **T4.6** Cableado del adaptador en `lib/composition/index.ts` (`design.md > 7.1`) y guardia de
   aislamiento. *Hecho:* `ai-sdk-isolation.test.ts` verde (R47, R49); `ai-model-literals.test.ts`,
   `openai-sdk-isolation.test.ts` y `run-document-job-ai-provider.test.ts` siguen verdes sin cambios.
 

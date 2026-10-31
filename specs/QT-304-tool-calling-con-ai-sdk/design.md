@@ -446,8 +446,7 @@ generateAgentObject<T>(companyId: string, request: {
 ## 6. Clasificación de fallos (R44, R45)
 
 La misma tabla que la lectura de PDF, por proveedor. El adaptador la aplica sobre el error del AI SDK
-(`APICallError`: código HTTP en `statusCode`, cuerpo en `responseBody` — **nombres a verificar en
-T4.2 contra los tipos instalados**). Del cuerpo solo se mira lo que la tabla dice, y nada de él sale.
+(`APICallError`: código HTTP en `statusCode`, cuerpo en `responseBody` — **verificado en T4.2**, ver §7). Del cuerpo solo se mira lo que la tabla dice, y nada de él sale.
 
 | Situación | ANTHROPIC | GOOGLE | OPENAI | OPENROUTER |
 |---|---|---|---|---|
@@ -467,11 +466,11 @@ La tabla **no cambia** respecto a la lectura de PDF: la sobrecarga (503/529, P9)
 `classifyAiSdkError(error, provider, model)` es pura y exportada para probarla sin red.
 
 Errores que **no** son del proveedor:
-- Salida estructurada que no valida (en el SDK, `NoObjectGeneratedError` — **a verificar en T4.2**)
+- Salida estructurada que no valida (en el SDK, `NoObjectGeneratedError`, o `NoOutputGeneratedError` al leer `result.output` — **verificado en T4.2**)
   → `invalid_output`, no `failed`.
 - Entrada de herramienta inválida o herramienta desconocida (R31, R32) → la llamada consta
   `ok: false, executed: false`. **Cómo** las expone el SDK (partes `tool-error` en los pasos o
-  excepción `InvalidToolInputError`/`NoSuchToolError`) se verifica en T4.2. Si el SDK lanzara en vez
+  excepción `InvalidToolInputError`/`NoSuchToolError`) se verificó en T4.2: no lanza, ver §7. Si el SDK lanzara en vez
   de seguir, el adaptador lo convierte en `failed` con `unexpected`; si eso obliga a cambiar el
   puerto, se para y se pregunta.
 - Excepción de `execute` (R33): el adaptador envuelve cada `execute` en un `try/catch` propio que
@@ -499,16 +498,19 @@ tipos instalados en T4.2**; si alguna no existe, se adapta el adaptador sin toca
 
 | Necesidad | API esperada | Estado |
 |---|---|---|
-| Texto con herramientas y tope de pasos | `generateText({ model, system, messages, tools, stopWhen: stepCountIs(n), maxRetries, abortSignal })` | por verificar (T4.2) |
-| Declarar una herramienta | `tool({ description, inputSchema, execute })` con un esquema zod | por verificar (T4.2) |
-| Salida estructurada | `generateObject({ model, schema, ... })` o `generateText({ output: Output.object({ schema }) })` | por verificar cuál es la vigente en `ai@7` (T4.2) |
-| Pasos y llamadas | `result.steps[].toolCalls` / `toolResults`, `result.text` | por verificar (T4.2) |
-| Tokens | `result.totalUsage` o `result.usage` con `inputTokens`/`outputTokens` | por verificar (T4.2) |
-| Error HTTP | `APICallError.isInstance(e)`, `e.statusCode`, `e.responseBody` | por verificar (T4.2) |
-| Modelo simulado para tests | `MockLanguageModelV*` de `ai/test` | por verificar el sufijo (T4.2) |
+| Texto con herramientas y tope de pasos | `generateText({ model, system, messages, tools, stopWhen: stepCountIs(n), maxRetries, abortSignal })` | **corregida en T4.2** (2026-10-31): `system` pasa a `instructions` (`system` queda como alias obsoleto) y `stepCountIs` a `isStepCount` (alias obsoleto exportado). Se usa `generateText({ model, instructions, messages, tools, stopWhen: isStepCount(n), maxRetries: 0, abortSignal })` |
+| Declarar una herramienta | `tool({ description, inputSchema, execute })` con un esquema zod | **verificado en T4.2**; `execute(input, { toolCallId })` |
+| Salida estructurada | `generateObject({ model, schema, ... })` o `generateText({ output: Output.object({ schema }) })` | **verificado en T4.2**: `generateObject` está `@deprecated` en `ai@7`; se usa `generateText({ output: Output.object({ schema }) })` y `result.output` |
+| Pasos y llamadas | `result.steps[].toolCalls` / `toolResults`, `result.text` | **verificado en T4.2**; en `ai@7` los campos de nivel superior suman todos los pasos y lo del último paso está en `result.finalStep` |
+| Tokens | `result.totalUsage` o `result.usage` con `inputTokens`/`outputTokens` | **corregida en T4.2**: `result.usage` ya suma todos los pasos y `totalUsage` está obsoleto |
+| Error HTTP | `APICallError.isInstance(e)`, `e.statusCode`, `e.responseBody` | **verificado en T4.2**; además `e.data` (cuerpo de error ya parseado). Sin respuesta: `APICallError` sin `statusCode`; aborto/plazo: error con `name` `AbortError`/`TimeoutError`. Con `maxRetries: 0` el SDK relanza el error original (sin `RetryError`) |
+| Entrada inválida / herramienta desconocida (§6) | excepción `InvalidToolInputError`/`NoSuchToolError` o parte `tool-error` | **verificado en T4.2 en el código instalado**: no lanzan; la llamada queda en `step.toolCalls` con `invalid: true`, el SDK devuelve un `tool-error` al modelo y el bucle sigue. La doc de `node_modules/ai/docs` dice que lanzan, pero `parseToolCall` (`dist/index.js`) no; el test del adaptador lo fija |
+| Modelo simulado para tests | `MockLanguageModelV*` de `ai/test` | **verificado en T4.2**: `MockLanguageModelV4` |
+| Proveedores | `createAnthropic`, `createGoogleGenerativeAI`, `createOpenAI` | **corregida en T4.2**: `createGoogleGenerativeAI` es alias obsoleto de `createGoogle`. `createOpenAI()(model)` usa la API de respuestas; `.chat(model)` la de chat |
+| Nombre de herramienta en Gemini (§4.2) | `^[a-zA-Z0-9_-]{1,64}$` | **no verificable en el paquete**: `@ai-sdk/google` pasa el nombre tal cual (`prepareFunctionDeclaration`), sin validarlo. Queda la regla de §4.2 |
 | zod 4 | peer `zod ^3.25.76 \|\| ^4.1.8`; el repo usa `^4.4.3` | **verificado en T0** (2026-10-31) |
 | Node | `engines.node >=22`; local 22.13.1, CI 24 | **verificado en T0** (2026-10-31) |
-| Módulos | AI SDK 7 es ESM; el repo no declara `"type": "module"` | riesgo: confirmar en T4.1 con typecheck, `vitest` y `next build` |
+| Módulos | AI SDK 7 es ESM; el repo no declara `"type": "module"` | **verificado en T4.1**: typecheck, `vitest` (importa `ai` y `ai/test`) y `next build` verdes sin tocar `package.json > type` |
 
 `OPENROUTER_BASE_URL` es configuración de proveedor, no de entorno, igual que en `documentos`.
 

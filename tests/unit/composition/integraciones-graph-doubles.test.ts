@@ -140,6 +140,8 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'deleteWhatsappTemplate',
       'deleteWhatsappVariableKey',
       'disconnectAiProvider',
+      'generateAgentObject',
+      'generateAgentText',
       'getAiModelPairs',
       'getAiProviderConnection',
       'getAiProviderReadiness',

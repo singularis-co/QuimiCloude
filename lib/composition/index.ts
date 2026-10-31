@@ -3105,9 +3105,16 @@ import {
 } from '@/lib/modules/integraciones';
 import { createWhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-agent-settings-prisma';
 import type { WhatsappAgentSettingsRepository } from '@/lib/modules/integraciones/ports/whatsapp-agent-settings-repository';
-import { createGetAiModelPairs, createSaveAiModelPair } from '@/lib/modules/integraciones';
+import {
+  createGenerateAgentObject,
+  createGenerateAgentText,
+  createGetAiModelPairs,
+  createSaveAiModelPair,
+} from '@/lib/modules/integraciones';
 import { createAiModelPairPrisma } from '@/lib/modules/integraciones/adapters/driven/catalog/ai-model-pair-prisma';
+import { createConversationalModelAiSdk } from '@/lib/modules/integraciones/adapters/driven/ai/conversational-model-ai-sdk';
 import type { AiModelPairRepository } from '@/lib/modules/integraciones/ports/ai-model-pair-repository';
+import type { ConversationalModel } from '@/lib/modules/integraciones/ports/conversational-model';
 
 type ProviderProbe = (input: {
   apiKey: string;
@@ -3154,6 +3161,15 @@ const aiProviderDeps = {
 const aiModelPairs: AiModelPairRepository = createAiModelPairPrisma();
 const aiModelPairDeps = { catalog: aiProviderCatalog, pairs: aiModelPairs };
 
+const conversationalModel: ConversationalModel = createConversationalModelAiSdk();
+const agentModelDeps = {
+  connections: aiProviderConnectionRepository,
+  catalog: aiProviderCatalog,
+  pairs: aiModelPairs,
+  cipher: secretCipher,
+  model: conversationalModel,
+};
+
 const whatsappAgentSettingsRepository: WhatsappAgentSettingsRepository = createWhatsappAgentSettingsRepository();
 const whatsappAgentSettingsDeps = { agentSettings: whatsappAgentSettingsRepository };
 
@@ -3183,6 +3199,8 @@ export const integraciones = {
   reportAiProviderOutcome: createReportAiProviderOutcome(aiProviderDeps),
   getAiModelPairs: createGetAiModelPairs(aiModelPairDeps),
   saveAiModelPair: createSaveAiModelPair(aiModelPairDeps),
+  generateAgentText: createGenerateAgentText(agentModelDeps),
+  generateAgentObject: createGenerateAgentObject(agentModelDeps),
   verifyWhatsappWebhook: createVerifyWhatsappWebhook(whatsappWebhookDeps),
   receiveWhatsappWebhook: createReceiveWhatsappWebhook(whatsappWebhookDeps),
   linkWhatsappContact: createLinkWhatsappContact({ unitOfWork: whatsappContactUnitOfWork }),

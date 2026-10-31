@@ -269,6 +269,8 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'deleteWhatsappTemplate',
         'deleteWhatsappVariableKey',
         'disconnectAiProvider',
+        'generateAgentObject',
+        'generateAgentText',
         'getAiModelPairs',
         'getAiProviderConnection',
         'getAiProviderReadiness',

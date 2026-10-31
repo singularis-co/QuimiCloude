@@ -239,3 +239,132 @@ Veredicto tanda 2: hecha, R5, R10–R15 con test; gate a mano verde.
 - Sin int tests tocados (la tanda no toca base). `./init.sh` no se corre (QT-312).
 
 Veredicto tanda 3: hecha, R18–R28, R34, R37–R40 y R46 con test en dominio; gate a mano verde.
+
+## Tanda 4 — Adaptador del AI SDK (2026-10-31)
+
+### Archivos creados
+
+- `lib/modules/integraciones/adapters/driven/ai/ai-sdk-models.ts`: `AI_SDK_MODELS`
+  (`Record<AiProviderCode, …>`), `aiSdkModel`, `OPENROUTER_BASE_URL`.
+- `lib/modules/integraciones/adapters/driven/ai/conversational-model-ai-sdk.ts`:
+  `createConversationalModelAiSdk(resolve = aiSdkModel)`, `classifyAiSdkError`, `TOOL_FAILED_RESULT`.
+- Tests: `tests/unit/integraciones/agente/ai-sdk-models.test.ts`, `classify-ai-sdk-error.test.ts`,
+  `conversational-model-ai-sdk.test.ts`, `ai-sdk-isolation.test.ts`.
+
+### Archivos modificados
+
+- `docs/dependencias.md`: cuatro filas `aprobada` (2026-10-31) tras `@google/genai`.
+- `package.json` / `pnpm-lock.yaml`: `ai ^7.0.159`, `@ai-sdk/anthropic ^4.0.94`,
+  `@ai-sdk/openai ^4.0.106`, `@ai-sdk/google ^4.0.109` (instaladas esas versiones exactas).
+  Transitivas nuevas sin fila: `@ai-sdk/provider`, `@ai-sdk/provider-utils`, `@ai-sdk/gateway`.
+- `tests/guards/guard-identificador-de-request.test.ts`: `DEPENDENCIAS_ESPERADAS` 45 → 49 con su línea.
+- `lib/composition/index.ts`: `conversationalModel`, `agentModelDeps` y `generateAgentText` /
+  `generateAgentObject` en la fachada `integraciones`.
+- `specs/QT-304-tool-calling-con-ai-sdk/design.md`: tabla de §7 verificada o corregida; §6 al día.
+- Arrastre (listas a mano): `tests/unit/integraciones/module-shape.test.ts` (dos archivos de código y
+  fachada), `tests/unit/integraciones/encryption-keys-env.test.ts` y
+  `tests/unit/composition/integraciones-graph-doubles.test.ts` (miembros de la fachada).
+
+### T4.2 — diferencias con design §7 (contra `node_modules/ai/dist/*.d.ts`, `dist/index.js` y `node_modules/ai/docs/`)
+
+- `system` → `instructions` (el primero queda como alias obsoleto). Se usa `instructions`.
+- `stepCountIs` → `isStepCount` (alias obsoleto exportado). Se usa `isStepCount`.
+- `generateObject` está `@deprecated` («Use `generateText` with an `output` setting»). Se usa
+  `generateText({ output: Output.object({ schema }) })`; un valor que no valida lanza
+  `NoObjectGeneratedError` y leer `result.output` sin salida lanza `NoOutputGeneratedError`: los dos
+  → `invalid_output`.
+- `result.usage` ya suma todos los pasos (`totalUsage` obsoleto); lo del último paso está en
+  `result.finalStep`. `step_limit` = el último paso aún tiene llamadas a herramientas.
+- `createGoogleGenerativeAI` es alias obsoleto de `createGoogle`. Se usa `createGoogle`.
+- **Entrada inválida y herramienta desconocida no lanzan** (la doc de `node_modules/ai/docs` dice
+  que sí; el código instalado, `parseToolCall`, no): quedan en `step.toolCalls` con `invalid: true`,
+  el SDK manda un `tool-error` al modelo y sigue. El adaptador las anota `ok: false, executed: false`
+  porque su envoltorio de `execute` no las vio. Cubierto por los tests R31/R32. El puerto no cambia.
+- `APICallError`: `statusCode`, `responseBody`, `isRetryable` y `data` (cuerpo de error parseado).
+  Sin conexión → `APICallError` sin `statusCode`; aborto o plazo → error `AbortError`/`TimeoutError`.
+  Con `maxRetries: 0` se relanza el error original, sin `RetryError`.
+- Modelo simulado: `MockLanguageModelV4` de `ai/test`.
+- Nombre de herramienta en Gemini: **no verificable en el paquete**; `@ai-sdk/google` lo pasa tal cual
+  sin validarlo. Se mantiene la regla de §4.2.
+
+### Notas
+
+- `createOpenAI({ apiKey })(model)` va por la API de respuestas de OpenAI (lo dice el tipo:
+  `(modelId: OpenAIResponsesModelId)`), como fija §7; OpenRouter va por `.chat(model)`.
+- `@ai-sdk/anthropic` y `@ai-sdk/openai` leen `ANTHROPIC_BASE_URL` / `OPENAI_BASE_URL` del entorno
+  si existen (igual que `@anthropic-ai/sdk` y `openai` en la lectura de PDF). No se fija la URL: §7 no
+  lo pide. El test de R41 anula esas dos variables para mirar la URL por defecto.
+- `classifyAiSdkError` vive en `conversational-model-ai-sdk.ts`: necesita `APICallError` de `ai` y
+  solo los dos archivos del adaptador pueden importarlo.
+- Las conexiones en `ERROR` no se filtran (decisión del leader: lo resuelve QT-307).
+
+### Mapa R → test (completo, R1–R49)
+
+| R | Test |
+|---|---|
+| R1 | `ai-agent-model-pairs-migration.int.test.ts` > «R1: …»; `ai-agent-model-pairs-migration.test.ts` > «R1: …» |
+| R2 | int > dos casos R2; estático > tres casos R2 |
+| R3 | int > dos casos R3; estático > dos casos R3 |
+| R4 | `ai-provider-connection-prisma.int.test.ts` > dos casos «QT-304 R4» |
+| R5 | `ai-agent-model-pairs-migration.int.test.ts` (tres casos R5) + estático «R5: RLS…»; `ai-model-pair-prisma.int.test.ts` (cuatro casos R5) |
+| R6 | int > «R6: la base rechaza un modelo de otro proveedor o fuera del catalogo…» |
+| R7 | int > «R7: …principal y respaldo son el mismo modelo» |
+| R8 | int > dos casos R8; estático > dos casos R8 |
+| R9 | int > «R9: un modelo que es principal o respaldo…» |
+| R10 | `ai-model-pair-rules.test.ts` (8 casos); `save-ai-model-pair.test.ts` > validación |
+| R11 | `ai-model-pair-rules.test.ts` > «R11: …»; `save-ai-model-pair.test.ts` > «R11: …» |
+| R12 | `save-ai-model-pair.test.ts` > dos casos R12; `ai-model-pair-prisma.int.test.ts` > dos casos R12 |
+| R13 | `save-ai-model-pair.test.ts` y `get-ai-model-pairs.test.ts` > casos de autorización |
+| R14 | `get-ai-model-pairs.test.ts` > dos casos R14 |
+| R15 | `save-ai-model-pair.test.ts` y `get-ai-model-pairs.test.ts` > dos casos R15 cada uno |
+| R16 | `permissions.test.ts` (7 casos); `company-addons.test.ts`; `seed-initial-access.test.ts`; `identity-seed.int.test.ts`; estático de permisos |
+| R17 | `ai-agent-model-pairs-permissions-migration.int.test.ts` (4 casos) y su estático |
+| R18 | `generate-agent-text.test.ts` > dos casos R18; `generate-agent-object.test.ts` > «R40: llama al puerto con el par del rol…» |
+| R19 | text > «R19: sin par…»; object > «sin par…» |
+| R20 | text > «R20: sin conexion…», «R20, R46: …key ilegible…»; object > dos casos |
+| R21 | text > dos casos R21 |
+| R22 | text > dos casos R22 |
+| R23 | `model-fallback.test.ts` (5 casos); text (4 casos); object (2 casos) |
+| R24 | `model-fallback.test.ts` (8 casos); text (10 casos); object (2 casos) |
+| R25 | text > «R25: si el respaldo tambien falla…» |
+| R26 | text > tres casos R26; `conversational-model-ai-sdk.test.ts` > «R26: si el proveedor falla despues de ejecutar una herramienta…» |
+| R27 | text > dos casos R27 |
+| R28 | text > casos R23 (`model` + `fallbackFrom`) y «R28: …» |
+| R29 | `conversational-model-ai-sdk.test.ts` > «R29: ofrece exactamente las herramientas…», «R29: el sistema va como instrucciones…» |
+| R30 | adaptador > «R30: ejecuta la herramienta con la entrada ya validada…» |
+| R31 | adaptador > «R31: con una entrada que no cumple el esquema…» |
+| R32 | adaptador > «R32: una herramienta que no se ofrecio…» |
+| R33 | adaptador > «R33: si execute lanza…» |
+| R34 | adaptador > «R34: limita los pasos al tope…», «R34: con tope 1…»; text > casos R34 de dominio |
+| R35 | adaptador > «R35: un texto final vacio o de solo espacios…» |
+| R36 | adaptador > «R36: el resultado trae texto, llamadas en orden, tokens…», «R36: …tokens desconocidos» |
+| R37 | text > 15 casos «R34, R37: …» y «R37: nombres validos…» |
+| R38 | object > «R38: …»; adaptador > dos casos R38 |
+| R39 | object > «R39: …»; adaptador > «R39: una respuesta que no cumple el esquema…» |
+| R40 | object > dos casos R40; adaptador > «R40: no ofrece herramientas al modelo…» |
+| R41 | `ai-sdk-models.test.ts` (7 casos: un constructor por código, id del modelo, URL y key de los cuatro, OpenRouter por chat en su URL, `Record`) |
+| R42 | adaptador > «R42: no reintenta…», «R42, R44: …» (texto y objeto) |
+| R43 | adaptador > «R43: si la llamada supera el plazo…», «R43: el plazo tambien corta la salida estructurada…»; `classify-ai-sdk-error.test.ts` > casos «R44, R43» |
+| R44 | `classify-ai-sdk-error.test.ts` (tabla de §6 por proveedor) |
+| R45 | `classify-ai-sdk-error.test.ts` > dos casos R45 |
+| R46 | text > «R20, R46…», «R46: …no cambia la conexion»; object > casos de estado |
+| R47 | `ai-sdk-isolation.test.ts` > cuatro casos R47 (barrido, importadores exactos, dominio/puertos/contrato, sensibilidad) |
+| R48 | `guard-dependencias-aprobadas.test.ts` (sin cambios) y `guard-identificador-de-request.test.ts` (49) |
+| R49 | `ai-sdk-isolation.test.ts` > «R49: la lectura de PDF de documentos no importa…»; `run-document-job-ai-provider.test.ts` (sin cambios) |
+
+### Verificación (salida real, 2026-10-31)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: `✖ 10 problems (0 errors, 10 warnings)`, los mismos de T1–T3 en archivos no
+  tocados; `eslint` sobre los archivos tocados: exit 0.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1327 passed | 22 skipped`.
+- `pnpm exec vitest run tests/unit/integraciones tests/unit/composition`: `Test Files 131 passed
+  (131)`, `Tests 2782 passed | 1 skipped`.
+- PDF sin cambios: `ai-model-literals.test.ts`, `openai-sdk-isolation.test.ts`,
+  `run-document-job-ai-provider.test.ts`: `Test Files 3 passed`, `Tests 27 passed`.
+- `pnpm run build`: exit 0 (`✓ Compiled successfully`, TypeScript y páginas generadas).
+- Sensibilidad: con `maxRetries: 2` y sin el `catch` de `execute` fallan 4 casos del adaptador (R33,
+  R42 ×2, R26); restaurado.
+- `./init.sh`: no se corre (QT-312). T5.1 queda abierta por eso.
+
+Veredicto tanda 4: hecha; adaptador del AI SDK cableado, R1–R49 con test; gate a mano verde con build.

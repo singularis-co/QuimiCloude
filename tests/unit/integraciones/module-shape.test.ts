@@ -133,6 +133,9 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
   'adapters/driven/ai/ai-provider-probe-canned.ts',
+  // QT-304 T4: el adaptador del AI SDK, los dos unicos archivos que importan `ai` y `@ai-sdk/*`.
+  'adapters/driven/ai/ai-sdk-models.ts',
+  'adapters/driven/ai/conversational-model-ai-sdk.ts',
   // QT-304 T2.2: los pares de modelos de la plataforma, tabla sin empresa (fuera de `persistence/`).
   'adapters/driven/catalog/ai-model-pair-prisma.ts',
   'adapters/driven/catalog/ai-provider-catalog-prisma.ts',
@@ -902,6 +905,8 @@ describe('la forma del modulo integraciones', () => {
       'deleteWhatsappTemplate',
       'deleteWhatsappVariableKey',
       'disconnectAiProvider',
+      'generateAgentObject',
+      'generateAgentText',
       'getAiModelPairs',
       'getAiProviderConnection',
       'getAiProviderReadiness',

@@ -938,13 +938,16 @@ export function hallazgosDeSchema(schemaSource: string): readonly string[] {
 // El 2026-10-14 entro `write-excel-file` -escribir la plantilla .xlsx de la importacion de
 // inventario con su hoja de valores disponibles-, con los cuatro checks, aprobacion humana y su
 // fila en `docs/dependencias.md`: de 44 a 45.
+// El 2026-10-31 entraron `ai`, `@ai-sdk/anthropic`, `@ai-sdk/openai` y `@ai-sdk/google` -el AI SDK
+// de Vercel para el tool calling del agente, QT-304-, con los cuatro checks, aprobacion humana en
+// la puerta F1.4 y su fila en `docs/dependencias.md`: de 45 a 49.
 //
 // Que este conteo sea un absoluto es fragil y conviene saberlo: no distingue «alguien colo una
 // libreria» de «entro una aprobada», asi que lo rompe cualquier feature posterior que anada una
 // legitima. La pregunta «toda dependencia declarada esta aprobada» ya la responde
 // `guard-dependencias-aprobadas.test.ts`, que compara contra el registro. Lo robusto aqui seria
 // comparar contra el merge-base de la propia rama en vez de contar absolutos.
-export const DEPENDENCIAS_ESPERADAS = 45
+export const DEPENDENCIAS_ESPERADAS = 49
 export const DEV_DEPENDENCIAS_ESPERADAS = 22
 
 /** `crypto.randomUUID()` es un global: una libreria de identificadores o de criptografia sobra. */
