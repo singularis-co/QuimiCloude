@@ -16,6 +16,12 @@ export type AiModelOption = {
   readonly isDefault: boolean;
 };
 
+/** Un modelo tal como lo lee el módulo del catálogo. Las marcas no salen a la pantalla de la empresa. */
+export type AiCatalogModel = AiModelOption & {
+  readonly supportsTools: boolean;
+  readonly isEconomic: boolean;
+};
+
 /** Una fila del catálogo global de proveedores, con sus modelos en orden. */
 export type AiProviderEntry = {
   readonly code: AiProviderCode;
@@ -23,6 +29,9 @@ export type AiProviderEntry = {
   readonly models: readonly AiModelOption[];
   readonly defaultModel: string;
 };
+
+/** La entrada que devuelve el catálogo: la misma, con las marcas de cada modelo. */
+export type AiCatalogEntry = Omit<AiProviderEntry, 'models'> & { readonly models: readonly AiCatalogModel[] };
 
 /** Lleva el valor cifrado: nunca sale del módulo. */
 export type AiProviderConnectionRecord = {

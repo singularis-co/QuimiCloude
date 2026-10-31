@@ -16,6 +16,8 @@ import {
   ROLE_ACONDICIONAMIENTO,
   SEED_ROLE_PERMISSIONS,
   ADMIN_EXCLUDED_PERMISSIONS,
+  UnauthorizedError,
+  requirePlatformPermission,
 } from '@/lib/modules/identity'
 
 /** Los codigos del catalogo, copiados a mano -no derivados de el-: si el catalogo cambia, este
@@ -61,6 +63,9 @@ const CODIGOS_DEL_REQUISITO = [
   // 2026-10-30: entran `agente_ia.consultar` y `agente_ia.modificar`, al final.
   'agente_ia.consultar',
   'agente_ia.modificar',
+  // 2026-10-31: entran `modelos_ia.consultar` y `modelos_ia.modificar`, al final.
+  'modelos_ia.consultar',
+  'modelos_ia.modificar',
 ] as const
 
 /** Los dos codigos de la plataforma: solo los recibe el Maestro. */
@@ -94,7 +99,13 @@ const esDePlanes = (codigo: string): boolean => codigo.startsWith('planes.')
 // de planes comparan sin ellos con `sinAgente`.
 const CODIGOS_DEL_AGENTE = ['agente_ia.consultar', 'agente_ia.modificar'] as const
 const esDelAgente = (codigo: string): boolean => codigo.startsWith('agente_ia.')
-const sinAgente = (codigo: string): boolean => !esDelAgente(codigo)
+// 2026-10-31: `modelos_ia.consultar` y `modelos_ia.modificar` entran detras de los del agente.
+// `sinAgente` (y las que se apoyan en ella) devuelve ahora el catalogo previo sin ellos; los casos
+// del agente comparan sin ellos con `sinModelosIa`.
+const CODIGOS_DE_MODELOS_IA = ['modelos_ia.consultar', 'modelos_ia.modificar'] as const
+const esDeModelosIa = (codigo: string): boolean => codigo.startsWith('modelos_ia.')
+const sinModelosIa = (codigo: string): boolean => !esDeModelosIa(codigo)
+const sinAgente = (codigo: string): boolean => !esDelAgente(codigo) && sinModelosIa(codigo)
 const sinPlanes = (codigo: string): boolean => !esDePlanes(codigo) && sinAgente(codigo)
 const sinConsultarWhatsapp = (codigo: string): boolean =>
   codigo !== CONSULTAR_WHATSAPP && sinPlanes(codigo)
@@ -256,6 +267,8 @@ const MODULOS = [
   'planes',
   // 2026-10-30: vive en `integraciones`, no es carpeta de `lib/modules/`.
   'agente_ia',
+  // 2026-10-31: vive en `integraciones`, no es carpeta de `lib/modules/`.
+  'modelos_ia',
 ]
 
 /** Modulos con casos de uso de escritura (R3) y sin ellos (R4). */
@@ -272,6 +285,7 @@ const MODULOS_CON_ESCRITURA = [
   'empresas',
   'planes',
   'agente_ia',
+  'modelos_ia',
 ]
 const MODULOS_SIN_ESCRITURA = ['dashboard', 'terminados']
 /** Modulos que solo escriben, sin consulta propia (R34): quien tiene el permiso ya ve el pedido
@@ -842,7 +856,8 @@ describe('QC-161 — los permisos de empresas y el Maestro (R5-R9)', () => {
           codigo !== 'empaque.modificar' &&
           codigo !== ACONDICIONAMIENTO &&
           sinConsultarAsignaciones(codigo) &&
-          !esDePlanes(codigo),
+          !esDePlanes(codigo) &&
+          sinModelosIa(codigo),
       ),
     )
   })
@@ -1720,11 +1735,11 @@ describe('los permisos de planes', () => {
   })
 
   it('R28: el Maestro recibe exactamente empresas.consultar, empresas.modificar, planes.consultar y planes.modificar', () => {
-    expect(SEED_ROLE_PERMISSIONS[ROLE_MAESTRO]).toEqual(PERMISOS_DEL_MAESTRO)
+    expect((SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).filter(sinModelosIa)).toEqual(PERMISOS_DEL_MAESTRO)
 
     // Caso simetrico: quitar cualquiera de los dos de planes rompe la igualdad.
     for (const codigo of CODIGOS_DE_PLANES) {
-      const sinUno = (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).filter((c) => c !== codigo)
+      const sinUno = (SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []).filter((c) => c !== codigo && sinModelosIa(c))
       expect(sinUno, codigo).not.toEqual(PERMISOS_DEL_MAESTRO)
     }
   })
@@ -1744,7 +1759,7 @@ describe('los permisos de planes', () => {
   })
 
   it('R29: el Administrador no los recibe porque estan en ADMIN_EXCLUDED_PERMISSIONS, y sigue siendo el catalogo menos los excluidos', () => {
-    expect(ADMIN_EXCLUDED_PERMISSIONS.slice(-2)).toEqual([...CODIGOS_DE_PLANES])
+    expect(ADMIN_EXCLUDED_PERMISSIONS.filter(sinModelosIa).slice(-2)).toEqual([...CODIGOS_DE_PLANES])
     expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
     expect(CODIGOS_DEL_ADMINISTRADOR.filter(esDePlanes)).toEqual([])
   })
@@ -1790,7 +1805,7 @@ describe('los permisos del agente de IA de WhatsApp', () => {
   }
 
   it('R3: el catalogo contiene agente_ia.consultar y agente_ia.modificar con sus campos exactos, al final y una sola vez cada uno', () => {
-    expect(PERMISSIONS.slice(-2)).toEqual([...ENTRADAS_DEL_AGENTE])
+    expect(PERMISSIONS.filter((permiso) => sinModelosIa(permiso.code)).slice(-2)).toEqual([...ENTRADAS_DEL_AGENTE])
     for (const codigo of CODIGOS_DEL_AGENTE) {
       expect(codigos.filter((c) => c === codigo), codigo).toHaveLength(1)
     }
@@ -1798,7 +1813,7 @@ describe('los permisos del agente de IA de WhatsApp', () => {
   })
 
   it('R3: el catalogo es el previo, en el mismo orden y con los mismos campos, mas los dos del agente', () => {
-    expect(codigos).toEqual([...codigos.filter(sinAgente), ...CODIGOS_DEL_AGENTE])
+    expect(codigos.filter(sinModelosIa)).toEqual([...codigos.filter(sinAgente), ...CODIGOS_DEL_AGENTE])
     expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
     for (const previo of PERMISOS_PREVIOS) {
       expect(PERMISSIONS.find((permiso) => permiso.code === previo.code), previo.code).toEqual(previo)
@@ -1833,6 +1848,103 @@ describe('los permisos del agente de IA de WhatsApp', () => {
     const parrafo = parrafoDelAgente()
     expect(parrafo).toBeDefined()
     expect(parrafo).toContain('agente_ia.modificar')
+    expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
+    expect(parrafo).not.toMatch(citaFichaORequisito)
+  })
+})
+
+describe('los permisos de los modelos de IA de la plataforma', () => {
+  const citaFichaORequisito = /QC-\d+|QT-\d+|\bR\d+\b|\bD\d+\b|design\.md|decisi[oó]n cerrada/i
+
+  const ENTRADAS_DE_MODELOS_IA = [
+    {
+      code: 'modelos_ia.consultar',
+      module: 'modelos_ia',
+      action: 'consultar',
+      description: 'Consultar los modelos de IA de la plataforma.',
+    },
+    {
+      code: 'modelos_ia.modificar',
+      module: 'modelos_ia',
+      action: 'modificar',
+      description: 'Elegir los modelos de IA de la plataforma.',
+    },
+  ] as const
+
+  function parrafoDeModelosIa(): string | undefined {
+    const raiz = join(__dirname, '..', '..', '..')
+    const fuente = readFileSync(
+      join(raiz, 'lib', 'modules', 'identity', 'domain', 'permissions.ts'),
+      'utf8',
+    ).replace(/\r\n/g, '\n')
+    const jsdoc = fuente.match(/\/\*\*([\s\S]*?)\*\/\s*export const PERMISSIONS/)?.[1] ?? ''
+    return jsdoc
+      .split(/\n\s*\*\s*\n/)
+      .map((bloque) => bloque.trim())
+      .find((bloque) => bloque.includes('modelos_ia.consultar'))
+  }
+
+  it('R16: el catalogo contiene modelos_ia.consultar y modelos_ia.modificar con sus campos exactos, al final y una sola vez cada uno', () => {
+    expect(PERMISSIONS.slice(-2)).toEqual([...ENTRADAS_DE_MODELOS_IA])
+    for (const codigo of CODIGOS_DE_MODELOS_IA) {
+      expect(codigos.filter((c) => c === codigo), codigo).toHaveLength(1)
+    }
+    expect(codigos.filter(esDeModelosIa)).toEqual([...CODIGOS_DE_MODELOS_IA])
+  })
+
+  it('R16: el catalogo es el previo, en el mismo orden y con los mismos campos, mas los dos de modelos de IA', () => {
+    expect(codigos).toEqual([...codigos.filter(sinModelosIa), ...CODIGOS_DE_MODELOS_IA])
+    expect(codigos).toEqual([...CODIGOS_DEL_REQUISITO])
+    for (const previo of PERMISOS_PREVIOS) {
+      expect(PERMISSIONS.find((permiso) => permiso.code === previo.code), previo.code).toEqual(previo)
+    }
+  })
+
+  it('R16: el Maestro recibe los dos al final, una vez cada uno, y el resto de sus permisos no cambia', () => {
+    const maestro = SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? []
+    expect(maestro).toEqual([...CODIGOS_DE_EMPRESAS, ...CODIGOS_DE_PLANES, ...CODIGOS_DE_MODELOS_IA])
+    for (const codigo of CODIGOS_DE_MODELOS_IA) {
+      expect(maestro.filter((c) => c === codigo), codigo).toHaveLength(1)
+    }
+  })
+
+  it('R16: ningun rol de empresa recibe modelos_ia.consultar ni modelos_ia.modificar', () => {
+    const otrosRoles = Object.keys(SEED_ROLE_PERMISSIONS).filter((rol) => rol !== ROLE_MAESTRO)
+    expect(otrosRoles.sort()).toEqual(
+      [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO].sort(),
+    )
+    for (const rol of otrosRoles) {
+      expect((SEED_ROLE_PERMISSIONS[rol] ?? []).filter(esDeModelosIa), rol).toEqual([])
+    }
+
+    // Caso simetrico: el detector caza un rol de empresa que si los recibe.
+    const conModelos = [...(SEED_ROLE_PERMISSIONS[ROLE_OPERADOR] ?? []), 'modelos_ia.consultar']
+    expect(conModelos.filter(esDeModelosIa)).not.toEqual([])
+  })
+
+  it('R16: el Administrador no los recibe porque estan en ADMIN_EXCLUDED_PERMISSIONS, y sigue siendo el catalogo menos los excluidos', () => {
+    expect(ADMIN_EXCLUDED_PERMISSIONS.slice(-2)).toEqual([...CODIGOS_DE_MODELOS_IA])
+    expect(SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR]).toEqual([...CODIGOS_DEL_ADMINISTRADOR])
+    expect(CODIGOS_DEL_ADMINISTRADOR.filter(esDeModelosIa)).toEqual([])
+  })
+
+  it('R16: el contrato de identity exporta requirePlatformPermission: el Maestro pasa; sin el permiso, la consulta sola o sin actor, no autorizado', () => {
+    const maestro = { id: 'maestro', permissions: SEED_ROLE_PERMISSIONS[ROLE_MAESTRO] ?? [] }
+    expect(() => requirePlatformPermission(maestro, 'modelos_ia.consultar')).not.toThrow()
+    expect(() => requirePlatformPermission(maestro, 'modelos_ia.modificar')).not.toThrow()
+
+    const soloConsulta = { id: 'x', permissions: ['modelos_ia.consultar'] }
+    expect(() => requirePlatformPermission(soloConsulta, 'modelos_ia.modificar')).toThrow(UnauthorizedError)
+    const administrador = { id: 'a', permissions: SEED_ROLE_PERMISSIONS[ROLE_ADMINISTRADOR] ?? [] }
+    expect(() => requirePlatformPermission(administrador, 'modelos_ia.consultar')).toThrow(UnauthorizedError)
+    expect(() => requirePlatformPermission(null, 'modelos_ia.consultar')).toThrow(UnauthorizedError)
+    expect(() => requirePlatformPermission(undefined, 'modelos_ia.consultar')).toThrow(UnauthorizedError)
+  })
+
+  it('R16: el JSDoc del catalogo tiene el parrafo de modelos de IA, corto y sin citas', () => {
+    const parrafo = parrafoDeModelosIa()
+    expect(parrafo).toBeDefined()
+    expect(parrafo).toContain('modelos_ia.modificar')
     expect(parrafo!.split('\n').length).toBeLessThanOrEqual(5)
     expect(parrafo).not.toMatch(citaFichaORequisito)
   })

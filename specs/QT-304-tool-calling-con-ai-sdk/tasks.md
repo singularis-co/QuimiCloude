@@ -18,19 +18,19 @@
 
 ## Tanda 1 — Esquema, catálogo y permisos
 
-- [ ] **T1.1** `db/schema.prisma`: `supportsTools` e `isEconomic` en `AiModel`; enum `AiModelRole`;
+- [x] **T1.1** `db/schema.prisma`: `supportsTools` e `isEconomic` en `AiModel`; enum `AiModelRole`;
   modelo `AiAgentModelPair` (`design.md > 2.1`). Sin comentarios con claves de ficha.
-- [ ] **T1.2** Migración `20261031120000_ai_agent_model_pairs` (`migration.sql` + `down.sql`) según
+- [x] **T1.2** Migración `20261031120000_ai_agent_model_pairs` (`migration.sql` + `down.sql`) según
   `design.md > 2.2`, con las tablas de §3.1 y §3.2. `ai_agent_model_pairs` en `EXENTAS` de
   `guard-empresa-en-esquema` (catorce → quince) y en el bullet de `docs/architecture.md`; carpeta en
   `guard-identificador-de-request`. *Hecho:* `ai-agent-model-pairs-migration.int.test.ts` y
   `ai-agent-model-pairs-migration.test.ts` verdes (R1–R3, R5–R9); guardias verdes.
-- [ ] **T1.3** `[P]` Permisos (`design.md > 2.3, 5.1`): `PERMISSIONS`, `SEED_ROLE_PERMISSIONS`,
+- [x] **T1.3** `[P]` Permisos (`design.md > 2.3, 5.1`): `PERMISSIONS`, `SEED_ROLE_PERMISSIONS`,
   `ADMIN_EXCLUDED_PERMISSIONS`, `CORE_PERMISSIONS`; migración `20261031120100_ai_agent_model_pairs_permissions`;
   export de `requirePlatformPermission` en `identity/index.ts`; tests de arrastre de `design.md > 10`.
   *Hecho:* tests de permisos estático e integración verdes, `permissions.test.ts` ampliado verde
   (R16, R17), tests de arrastre verdes.
-- [ ] **T1.4** `AiModelOption` (+`supportsTools`, `isEconomic`) y `ai-provider-catalog-prisma.ts`;
+- [x] **T1.4** `AiModelOption` (+`supportsTools`, `isEconomic`) y `ai-provider-catalog-prisma.ts`;
   dobles de `ai-provider-doubles.ts`. *Hecho:* `ai-provider-connection-prisma.int.test.ts` ampliado
   verde (R4); tests existentes de `tests/unit/integraciones/ai-provider/` verdes.
 

@@ -863,6 +863,10 @@ export const MIGRACIONES_ESPERADAS = [
   '20261030120000_whatsapp_agent',
   // 2026-10-30: el añadido y los permisos del agente; no toca el identificador.
   '20261030120100_whatsapp_agent_permissions',
+  // 2026-10-31: las marcas del catalogo de modelos y los pares de plataforma; no toca el identificador.
+  '20261031120000_ai_agent_model_pairs',
+  // 2026-10-31: los permisos modelos_ia.consultar y modelos_ia.modificar; no toca el identificador.
+  '20261031120100_ai_agent_model_pairs_permissions',
 ] as const
 
 export function hallazgosDeMigraciones(

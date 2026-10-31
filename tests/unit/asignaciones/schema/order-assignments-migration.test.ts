@@ -895,6 +895,9 @@ describe('down.sql — revertir deja la base exactamente como estaba antes del U
       // 2026-10-30
       'agente_ia.consultar',
       'agente_ia.modificar',
+      // 2026-10-31
+      'modelos_ia.consultar',
+      'modelos_ia.modificar',
     ]
     const CODIGOS_QC66 = [
       'dashboard.consultar',

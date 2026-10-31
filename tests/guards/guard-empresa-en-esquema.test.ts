@@ -95,6 +95,7 @@ export const EXENTAS: readonly Exenta[] = [
   { tabla: 'recipe_tools', motivo: 'hereda la empresa de la receta a la que pertenece' },
   { tabla: 'ai_providers', motivo: 'catalogo de proveedores de IA, compartido por todas las empresas' },
   { tabla: 'ai_models', motivo: 'catalogo de modelos de IA, compartido por todas las empresas' },
+  { tabla: 'ai_agent_model_pairs', motivo: 'pares de modelos de IA de la plataforma, compartidos por todas las empresas' },
   { tabla: 'addons', motivo: 'catalogo de añadidos, compartido por todas las empresas' },
   { tabla: 'plans', motivo: 'planes de la plataforma, compartidos por todas las empresas' },
   { tabla: 'plan_addons', motivo: 'cuelga de un plan de la plataforma y del catalogo de añadidos' },
@@ -264,7 +265,7 @@ describe('guardia — company_id en el esquema', () => {
     ])
   })
 
-  it('R7 EXENTAS son exactamente las catorce y users no esta', () => {
+  it('R7 EXENTAS son exactamente las quince y users no esta', () => {
     const tablas = EXENTAS.map((exenta) => exenta.tabla)
     expect(new Set(tablas)).toEqual(
       new Set([
@@ -279,12 +280,13 @@ describe('guardia — company_id en el esquema', () => {
         'recipe_tools',
         'ai_providers',
         'ai_models',
+        'ai_agent_model_pairs',
         'addons',
         'plans',
         'plan_addons',
       ]),
     )
-    expect(tablas).toHaveLength(14)
+    expect(tablas).toHaveLength(15)
     expect(tablas.slice(-2)).toEqual(['plans', 'plan_addons'])
     expect(tablas).not.toContain('users')
   })
@@ -353,7 +355,8 @@ describe('guardia — company_id en el esquema', () => {
       '   - **Toda tabla de negocio nueva nace con su columna de empresa.** Basta con que la',
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens` y',
-      '     `revoked_sessions`, `recipe_tools`, `ai_providers`, `ai_models`, `addons`, `plans` y',
+      '     `revoked_sessions`, `recipe_tools`, `ai_providers`, `ai_models`, `ai_agent_model_pairs`,',
+      '     `addons`, `plans` y',
       '     `plan_addons`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
@@ -366,7 +369,7 @@ describe('guardia — company_id en el esquema', () => {
       '     columna `company_id` exista. Las exentas son `document_types`, `roles`,',
       '     `permissions`, `role_permissions`, `companies`, `credential_setup_tokens`,',
       '     `revoked_sessions`, `recipe_lines`, `recipe_tools`, `ai_providers`, `ai_models`, `addons`,',
-      '     `plans`, `plan_addons` y `users`.',
+      '     `ai_agent_model_pairs`, `plans`, `plan_addons` y `users`.',
       '   - **Lo que la regla vieja protegia sigue en pie.**',
     ].join('\n')
     expect(hallazgosDocExentas(bulletConUsersDeMas, EXENTAS)).toEqual([

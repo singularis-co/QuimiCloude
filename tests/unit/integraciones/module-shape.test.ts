@@ -1044,7 +1044,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente diez modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291), AiProviderConnection y WhatsappAgentSettings (QT-303)', () => {
+  it('R13: db/schema.prisma tiene exactamente once modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291), AiAgentModelPair (QT-304), AiProviderConnection y WhatsappAgentSettings (QT-303)', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -1061,10 +1061,11 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappTemplateVariable',
       'AiProvider',
       'AiModel',
+      'AiAgentModelPair',
       'AiProviderConnection',
       'WhatsappAgentSettings',
     ])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(10)
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(11)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

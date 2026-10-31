@@ -96,6 +96,10 @@ import {
  * del agente de IA de WhatsApp. Su modulo no es una carpeta de `lib/modules/`: vive en
  * `integraciones`. Solo los recibe el Administrador.
  *
+ * `modelos_ia` suma `modelos_ia.consultar` y `modelos_ia.modificar`, ver y elegir los pares de
+ * modelos de IA de la plataforma. Su modulo no es una carpeta de `lib/modules/`: vive en
+ * `integraciones`. Solo los recibe el Maestro.
+ *
  * El catalogo solo cambia por migracion y seed: no hay via de aplicacion que lo edite (R5).
  */
 export const PERMISSIONS = [
@@ -305,6 +309,18 @@ export const PERMISSIONS = [
     action: 'modificar',
     description: 'Cambiar la configuración del agente de IA de WhatsApp de la empresa.',
   },
+  {
+    code: 'modelos_ia.consultar',
+    module: 'modelos_ia',
+    action: 'consultar',
+    description: 'Consultar los modelos de IA de la plataforma.',
+  },
+  {
+    code: 'modelos_ia.modificar',
+    module: 'modelos_ia',
+    action: 'modificar',
+    description: 'Elegir los modelos de IA de la plataforma.',
+  },
 ] as const;
 
 /**
@@ -324,8 +340,9 @@ export type PermissionCode = (typeof PERMISSIONS)[number]['code'];
  * El Empacador nace con exactamente `asignaciones.consultar`, `terminados.consultar` y
  * `empaque.modificar`, sin `inventario.consultar` ni `asignaciones.modificar`.
  *
- * El Maestro nace con exactamente `empresas.consultar`, `empresas.modificar`, `planes.consultar`
- * y `planes.modificar`, y ningun rol de empresa recibe ninguno de los cuatro.
+ * El Maestro nace con exactamente `empresas.consultar`, `empresas.modificar`, `planes.consultar`,
+ * `planes.modificar`, `modelos_ia.consultar` y `modelos_ia.modificar`, y ningun rol de empresa
+ * recibe ninguno de los seis.
  *
  * El Administrador de acondicionamiento nace con exactamente `asignaciones.consultar` y
  * `acondicionamiento.modificar`.
@@ -367,14 +384,16 @@ export const SEED_ROLE_PERMISSIONS: Readonly<Record<string, readonly PermissionC
     'empresas.modificar',
     'planes.consultar',
     'planes.modificar',
+    'modelos_ia.consultar',
+    'modelos_ia.modificar',
   ],
   [ROLE_ACONDICIONAMIENTO]: ['asignaciones.consultar', 'acondicionamiento.modificar'],
 };
 
 /**
  * Los codigos del catalogo que el Administrador NO recibe, aunque exista un modulo que los
- * declare: el empaque es tarea del Empacador y las empresas y los planes son cosa de la
- * plataforma, no de una empresa. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
+ * declare: el empaque es tarea del Empacador y las empresas, los planes y los modelos de IA son
+ * cosa de la plataforma, no de una empresa. Vive aqui, y no en un test, para que quien compare "lo que tiene el Administrador"
  * contra "el catalogo entero" lo haga restando esta lista en vez de escribiendo un total a mano.
  *
  * El acondicionamiento es tarea del Administrador de acondicionamiento; el Administrador lo
@@ -392,4 +411,6 @@ export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = [
   'asignaciones.consultar',
   'planes.consultar',
   'planes.modificar',
+  'modelos_ia.consultar',
+  'modelos_ia.modificar',
 ];

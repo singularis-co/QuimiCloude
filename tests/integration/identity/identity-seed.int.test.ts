@@ -1312,6 +1312,8 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
       expect(await codigosEnBaseDe(tx, ROLE_MAESTRO)).toEqual([
         'empresas.consultar',
         'empresas.modificar',
+        'modelos_ia.consultar',
+        'modelos_ia.modificar',
         'planes.consultar',
         'planes.modificar',
       ]);
@@ -1338,6 +1340,59 @@ describe('seedInitialAccess contra base real — la doble corrida', () => {
         credentials: fakeCredentialsProvider,
         maestroCredentials: fakeMaestroCredentialsProvider,
       });
+      expect(second.createdPermissions).toEqual([]);
+      expect(second.createdRolePermissions).toBe(0);
+      expect(await tx.permission.count()).toBe(permisosAntes + 2);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + 2);
+    });
+  });
+
+  // 2026-10-31: los permisos de los modelos de IA de la plataforma, solo del Maestro.
+  it('QT-304 R16: sobre la base ya sembrada salvo modelos_ia.*, el seed crea los dos permisos y solo las dos asignaciones del Maestro; ningun otro rol los tiene y la segunda corrida no cambia nada', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const MODELOS_IA = ['modelos_ia.consultar', 'modelos_ia.modificar'];
+      const OTROS_ROLES = [ROLE_ADMINISTRADOR, ROLE_OPERADOR, ROLE_EMPACADOR, ROLE_ACONDICIONAMIENTO];
+      await tx.rolePermission.deleteMany({ where: { permissionCode: { in: MODELOS_IA } } });
+      await tx.permission.deleteMany({ where: { code: { in: MODELOS_IA } } });
+
+      const permisosAntes = await tx.permission.count();
+      const asignacionesAntes = await tx.rolePermission.count();
+      const otrosAntes = await Promise.all(OTROS_ROLES.map((rol) => codigosEnBaseDe(tx, rol)));
+
+      const repository = createInitialAccessRepository(tx);
+      const correr = () =>
+        seedInitialAccess({
+          scope: 'full',
+          repository,
+          passwordHasher: identity.passwordHasher,
+          checkCredentialPolicy: identity.checkCredentialPolicy,
+          credentials: fakeCredentialsProvider,
+          maestroCredentials: fakeMaestroCredentialsProvider,
+        });
+
+      const first = await correr();
+
+      expect(first.createdPermissions).toEqual(MODELOS_IA);
+      expect(first.createdRolePermissions).toBe(2);
+      expect(await tx.permission.count()).toBe(permisosAntes + 2);
+      expect(await tx.rolePermission.count()).toBe(asignacionesAntes + 2);
+      expect(await codigosEnBaseDe(tx, ROLE_MAESTRO)).toEqual(codigosSembradosDe(ROLE_MAESTRO));
+      for (const [indice, rol] of OTROS_ROLES.entries()) {
+        const codigos = await codigosEnBaseDe(tx, rol);
+        expect(codigos, rol).toEqual(otrosAntes[indice]);
+        expect(codigos.filter((codigo) => codigo.startsWith('modelos_ia.')), rol).toEqual([]);
+      }
+      const asignadas = await tx.rolePermission.findMany({
+        where: { permissionCode: { in: MODELOS_IA } },
+        select: { permissionCode: true, role: { select: { name: true } } },
+        orderBy: { permissionCode: 'asc' },
+      });
+      expect(asignadas.map((fila) => [fila.permissionCode, fila.role.name])).toEqual([
+        ['modelos_ia.consultar', ROLE_MAESTRO],
+        ['modelos_ia.modificar', ROLE_MAESTRO],
+      ]);
+
+      const second = await correr();
       expect(second.createdPermissions).toEqual([]);
       expect(second.createdRolePermissions).toBe(0);
       expect(await tx.permission.count()).toBe(permisosAntes + 2);

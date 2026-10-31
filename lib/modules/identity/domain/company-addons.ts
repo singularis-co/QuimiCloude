@@ -47,6 +47,8 @@ export const CORE_PERMISSIONS: readonly PermissionCode[] = [
   'entregas.anular',
   'planes.consultar',
   'planes.modificar',
+  'modelos_ia.consultar',
+  'modelos_ia.modificar',
 ];
 
 export function isAddon(value: string): value is Addon {

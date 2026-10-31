@@ -168,14 +168,17 @@ describe('R4: el catalogo de proveedores', () => {
       expect(entry.models.filter((model) => model.isDefault).map((model) => model.modelId)).toEqual([
         entry.defaultModel,
       ])
-      for (const model of entry.models) expect(Object.keys(model).sort()).toEqual(['isDefault', 'modelId'])
+      // 2026-10-31: cada modelo trae tambien sus dos marcas.
+      for (const model of entry.models) {
+        expect(Object.keys(model).sort()).toEqual(['isDefault', 'isEconomic', 'modelId', 'supportsTools'])
+      }
     }
   })
 
   it('QT-291 R2, R3, R5 — los modelos de cada proveedor salen del catalogo de modelos en su orden, con el predeterminado sembrado', async () => {
     const entries = await listAiProviders()
     const google = entries.find((entry) => entry.code === 'GOOGLE')
-    expect(google?.models).toEqual([
+    expect(google?.models.map(({ modelId, isDefault }) => ({ modelId, isDefault }))).toEqual([
       { modelId: 'gemini-4-argon', isDefault: false },
       { modelId: 'gemini-3.8-flash', isDefault: true },
       { modelId: 'gemini-3.7-flash', isDefault: false },
@@ -235,6 +238,45 @@ describe('R4: el catalogo de proveedores', () => {
       })
     }
     expect((await getAiProvider('OPENROUTER'))?.defaultModel).toBe('anthropic/claude-haiku-5.5')
+  })
+
+  it('QT-304 R4 — cada modelo del catalogo expone si admite herramientas y si es economico, con los valores sembrados', async () => {
+    const entries = await listAiProviders()
+    const google = entries.find((entry) => entry.code === 'GOOGLE')
+    expect(google?.models).toEqual([
+      { modelId: 'gemini-4-argon', isDefault: false, supportsTools: true, isEconomic: false },
+      { modelId: 'gemini-3.8-flash', isDefault: true, supportsTools: true, isEconomic: true },
+      { modelId: 'gemini-3.7-flash', isDefault: false, supportsTools: true, isEconomic: true },
+      { modelId: 'gemini-3.5-flash-lite', isDefault: false, supportsTools: true, isEconomic: true },
+      { modelId: 'gemini-3.1-flash-lite', isDefault: false, supportsTools: true, isEconomic: false },
+    ])
+    const economicos = entries.flatMap((entry) =>
+      entry.models.filter((model) => model.isEconomic).map((model) => `${entry.code}|${model.modelId}`),
+    )
+    expect(economicos).toEqual([
+      'ANTHROPIC|claude-haiku-5-5',
+      'GOOGLE|gemini-3.8-flash',
+      'GOOGLE|gemini-3.7-flash',
+      'GOOGLE|gemini-3.5-flash-lite',
+      'OPENAI|gpt-6-luna',
+      'OPENAI|gpt-5.6-luna',
+      'OPENROUTER|google/gemini-3.8-flash',
+      'OPENROUTER|anthropic/claude-haiku-5.5',
+      'OPENROUTER|openai/gpt-6-luna',
+    ])
+  })
+
+  it('QT-304 R4 — las marcas se leen en cada llamada: un cambio en el catalogo se ve en la siguiente', async () => {
+    const where = { provider_modelId: { provider: 'OPENAI' as const, modelId: 'gpt-6-luna-pro' } }
+    const marcas = async () => (await getAiProvider('OPENAI'))?.models.find((model) => model.modelId === 'gpt-6-luna-pro')
+    expect(await marcas()).toMatchObject({ supportsTools: true, isEconomic: false })
+    try {
+      await prisma.aiModel.update({ where, data: { supportsTools: false, isEconomic: true } })
+      expect(await marcas()).toMatchObject({ supportsTools: false, isEconomic: true })
+    } finally {
+      await prisma.aiModel.update({ where, data: { supportsTools: true, isEconomic: false } })
+    }
+    expect(await marcas()).toMatchObject({ supportsTools: true, isEconomic: false })
   })
 
   it('R4 — get devuelve la fila de un codigo, igual a la de list', async () => {

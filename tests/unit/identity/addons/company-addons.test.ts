@@ -262,3 +262,23 @@ describe('el añadido agente_ia_whatsapp', () => {
     expect(effectivePermissions(rol, effectiveAddons(['agente_ia_whatsapp', 'integraciones']))).toEqual(rol)
   })
 })
+
+describe('los permisos de modelos de IA son del núcleo', () => {
+  const MODELOS_IA = ['modelos_ia.consultar', 'modelos_ia.modificar']
+
+  it('QT-304 R16 — CORE_PERMISSIONS los contiene y ningún añadido los declara', () => {
+    for (const codigo of MODELOS_IA) {
+      expect(CORE_PERMISSIONS as readonly string[], codigo).toContain(codigo)
+      expect(deAnadidos, codigo).not.toContain(codigo)
+    }
+  })
+
+  it('QT-304 R16 — effectivePermissions los conserva con ningún añadido activo y con cualquiera', () => {
+    const maestro = ['empresas.consultar', 'empresas.modificar', 'planes.consultar', 'planes.modificar', ...MODELOS_IA]
+    expect(effectivePermissions(maestro, [])).toEqual(maestro)
+    for (const addon of ADDONS) {
+      expect(effectivePermissions(maestro, [addon]), addon).toEqual(maestro)
+    }
+    expect(effectivePermissions(maestro, [...ADDONS])).toEqual(maestro)
+  })
+})

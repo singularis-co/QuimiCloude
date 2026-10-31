@@ -6,9 +6,9 @@ import { vi } from 'vitest'
 
 import type { Actor } from '@/lib/modules/integraciones/domain/actor'
 import type {
+  AiCatalogEntry,
   AiProviderCode,
   AiProviderConnectionRecord,
-  AiProviderEntry,
 } from '@/lib/modules/integraciones/domain/ai-provider'
 import type {
   AiProviderFailureKind,
@@ -38,21 +38,25 @@ export const EARLIER = new Date('2026-10-01T00:00:00.000Z')
 export const API_KEY = 'sk-key-en-claro-de-la-empresa'
 export const OLD_API_KEY = 'sk-key-anterior'
 
-/** Tres modelos por proveedor: el predeterminado va en medio para que no coincida con el primero. */
-function entry(code: AiProviderCode, name: string, suffix: string): AiProviderEntry {
+/**
+ * Tres modelos por proveedor: el predeterminado va en medio para que no coincida con el primero.
+ * Las marcas cubren las tres combinaciones que importan: con herramientas y no economico, con
+ * herramientas y economico, y economico sin herramientas.
+ */
+function entry(code: AiProviderCode, name: string, suffix: string): AiCatalogEntry {
   return {
     code,
     name,
     models: [
-      { modelId: `modelo-alto-${suffix}`, isDefault: false },
-      { modelId: `modelo-recomendado-${suffix}`, isDefault: true },
-      { modelId: `modelo-bajo-${suffix}`, isDefault: false },
+      { modelId: `modelo-alto-${suffix}`, isDefault: false, supportsTools: true, isEconomic: false },
+      { modelId: `modelo-recomendado-${suffix}`, isDefault: true, supportsTools: true, isEconomic: true },
+      { modelId: `modelo-bajo-${suffix}`, isDefault: false, supportsTools: false, isEconomic: true },
     ],
     defaultModel: `modelo-recomendado-${suffix}`,
   }
 }
 
-export const CATALOG: readonly AiProviderEntry[] = [
+export const CATALOG: readonly AiCatalogEntry[] = [
   entry('ANTHROPIC', 'Claude', 'a'),
   entry('GOOGLE', 'Gemini', 'g'),
   entry('OPENAI', 'OpenAI', 'o'),
@@ -101,7 +105,7 @@ export function makeCipher() {
 }
 
 /** Catalogo en memoria; `entries` es mutable para que un test cambie un modelo entre dos llamadas. */
-export function makeCatalog(entries: AiProviderEntry[] = [...CATALOG]) {
+export function makeCatalog(entries: AiCatalogEntry[] = [...CATALOG]) {
   const list = vi.fn(async () => [...entries])
   const get = vi.fn(async (code: AiProviderCode) => entries.find((entry) => entry.code === code) ?? null)
   const catalog: AiProviderCatalog = { list, get }
