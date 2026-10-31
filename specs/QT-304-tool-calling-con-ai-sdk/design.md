@@ -346,7 +346,7 @@ Puerto `ports/ai-model-pair-repository.ts`: `list(): Promise<readonly AiModelPai
 **`getAiModelPairs(actor)`** (R13–R15):
 1. `requirePlatformPermission(actor, 'modelos_ia.consultar')`.
 2. `catalog.list()` y `pairs.list()`.
-3. Devuelve `{ providers: [{ code, name, models: AiModelOption[], agent: AiModelPair | null,
+3. Devuelve `{ providers: [{ code, name, models: AiCatalogModel[], agent: AiModelPair | null,
    router: AiModelPair | null }] }` en el orden del catálogo.
 
 **`saveAiModelPair(input, actor)`** (R10–R13, R15):
@@ -437,7 +437,7 @@ generateAgentObject<T>(companyId: string, request: {
 
 ### 5.6 Cambios en código existente de `integraciones`
 
-- `AiModelOption` gana `supportsTools` e `isEconomic`; `ai-provider-catalog-prisma.ts` los
+- **Enmienda 2026-10-31 (T1, aceptada por el humano):** `AiModelOption` NO cambia, porque también lo usa la pantalla de la empresa; el puerto `AiProviderCatalog` devuelve los tipos nuevos `AiCatalogEntry`/`AiCatalogModel` con `supportsTools` e `isEconomic`. Texto original: `AiModelOption` gana `supportsTools` e `isEconomic`; `ai-provider-catalog-prisma.ts` los
   selecciona (R4). `ai-provider-actions.ts > toModelOptionState` copia campo a campo y por eso no los
   saca a la pantalla de la empresa: no se toca.
 - Los dobles de `tests/unit/integraciones/ai-provider/ai-provider-doubles.ts` ganan las dos marcas.
