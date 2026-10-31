@@ -661,3 +661,5 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Riesgo:** ninguno funcional; ocupa disco.
 - **Qué falta:** cerrar procesos que usen la carpeta, borrarla, `git branch -d feature/QC-203-agrupar-insumos-por-familia-de-unidad` y `git worktree prune`.
 - **Dueño:** Christian Quevedo.
+
+- 2026-10-31: `wt.sh done QT-303-agente-ia-whatsapp-base` falló al borrar el directorio (archivo en uso en Windows); se borró a mano con `rm -rf` el mismo día. Sin acción pendiente.
