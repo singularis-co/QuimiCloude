@@ -84,7 +84,7 @@ function montar(escenario: Escenario = {}) {
     if (escenario.bloqueadas?.has(id) === true) return escenario.bloqueadas.get(id) ?? null;
     return filas.get(id) ?? null;
   });
-  const syncForOrder = vi.fn(async (input: { orderId: string }) =>
+  const syncForLine = vi.fn(async (input: { orderId: string }) =>
     escenario.resultado === undefined ? ({ kind: 'reserved' } as const) : escenario.resultado(input.orderId),
   );
   const setStatus = vi.fn(
@@ -117,7 +117,7 @@ function montar(escenario: Escenario = {}) {
   const insumo = { id: PRODUCTO_X, name: 'x', unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' as const };
   const uow = fakeUnitOfWork({
     orders: { lockAliveById, setStatus, setIngredientsCost, setReservedAt },
-    reservations: { syncForOrder },
+    reservations: { syncForLine },
     recipes: { findExecutionContentById },
     products: fakeScopeProducts(escenario.insumoUnitId === undefined ? [] : [insumo]),
     units: fakeScopeUnits(escenario.unidades ?? []),
@@ -144,7 +144,7 @@ function montar(escenario: Escenario = {}) {
     findBlockedIds,
     findAliveById,
     lockAliveById,
-    syncForOrder,
+    syncForLine,
     setStatus,
     setIngredientsCost,
     setReservedAt,
@@ -210,7 +210,7 @@ describe('reviewBlockedOrders — desbloqueo', () => {
 
     await m.review({ companyId: EMPRESA_A, now: AHORA });
 
-    expect(m.syncForOrder).toHaveBeenCalledWith(
+    expect(m.syncForLine).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: PEDIDO_1, companyId: EMPRESA_A, actorId: null, now: AHORA }),
     );
     expect(m.setStatus.mock.calls[0]?.[3]).toBeNull();
@@ -269,7 +269,7 @@ describe('reviewBlockedOrders — orden y alcance', () => {
 
     expect(resultado).toEqual({ unblocked: 0, failed: [] });
     expect(m.lockAliveById).not.toHaveBeenCalled();
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
   });
 
   it('sin bloqueados no abre ninguna transaccion', async () => {
@@ -288,7 +288,7 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
       const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
 
       expect(resultado, status).toEqual({ unblocked: 0, failed: [] });
-      expect(m.syncForOrder, status).not.toHaveBeenCalled();
+      expect(m.syncForLine, status).not.toHaveBeenCalled();
       expect(m.setStatus, status).not.toHaveBeenCalled();
     }
   });
@@ -300,7 +300,7 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
 
       expect(await leido.review({ companyId: EMPRESA_A, now: AHORA }), status).toEqual({ unblocked: 0, failed: [] });
       expect(leido.lockAliveById, status).not.toHaveBeenCalled();
-      expect(leido.syncForOrder, status).not.toHaveBeenCalled();
+      expect(leido.syncForLine, status).not.toHaveBeenCalled();
       expect(leido.setStatus, status).not.toHaveBeenCalled();
       expect(leido.setIngredientsCost, status).not.toHaveBeenCalled();
       expect(leido.setReservedAt, status).not.toHaveBeenCalled();
@@ -309,7 +309,7 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
       const bloqueadoAntes = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { status })]]) });
 
       expect(await bloqueadoAntes.review({ companyId: EMPRESA_A, now: AHORA }), status).toEqual({ unblocked: 0, failed: [] });
-      expect(bloqueadoAntes.syncForOrder, status).not.toHaveBeenCalled();
+      expect(bloqueadoAntes.syncForLine, status).not.toHaveBeenCalled();
       expect(bloqueadoAntes.setStatus, status).not.toHaveBeenCalled();
       expect(bloqueadoAntes.setIngredientsCost, status).not.toHaveBeenCalled();
       expect(bloqueadoAntes.setReservedAt, status).not.toHaveBeenCalled();
@@ -320,21 +320,21 @@ describe('reviewBlockedOrders — concurrencia y fallos', () => {
     const m = montar({ bloqueadas: new Map([[PEDIDO_1, null]]) });
 
     expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
   });
 
   it('R15, R24: si una edicion cambio la cantidad entre la lectura y el candado, se deja para la siguiente revision', async () => {
     const m = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { quantity: '4.0000' })]]) });
 
     expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
   });
 
   it('R5: si una edicion cambio la unidad entre la lectura y el candado, se deja para la siguiente revision sin guardar el costo de la unidad vieja', async () => {
     const m = montar({ bloqueadas: new Map([[PEDIDO_1, bloqueado(PEDIDO_1, { unitId: 'ml' })]]) });
 
     expect(await m.review({ companyId: EMPRESA_A, now: AHORA })).toEqual({ unblocked: 0, failed: [] });
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
     expect(m.setStatus).not.toHaveBeenCalled();
     expect(m.setIngredientsCost).not.toHaveBeenCalled();
   });
@@ -401,7 +401,7 @@ describe('QC-195 reviewBlockedOrders — los envases del reparto', () => {
 
     await m.review({ companyId: EMPRESA_A, now: AHORA });
 
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
     expect(entrada.requirement).toEqual([
       { productId: PRODUCTO_X, quantity: '10' },
       { productId: ENVASE, quantity: '10' },
@@ -447,7 +447,7 @@ describe('QC-204 reviewBlockedOrders — la necesidad en la unidad del pedido', 
     expect(resultado).toEqual({ unblocked: 1, failed: [] });
     // 1000 g son 1 kg a 2.0000. Sin convertir serian 1000 kg: 2000.0000.
     expect(m.setIngredientsCost).toHaveBeenCalledWith(PEDIDO_1, { total: '2.0000', packaging: '0.0000' }, null, AHORA, SCOPE);
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
     expect(Number(entrada.requirement[0]?.quantity)).toBe(1);
   });
 
@@ -457,7 +457,7 @@ describe('QC-204 reviewBlockedOrders — la necesidad en la unidad del pedido', 
     const resultado = await m.review({ companyId: EMPRESA_A, now: AHORA });
 
     expect(resultado).toEqual({ unblocked: 0, failed: [] });
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
     expect(m.setStatus).not.toHaveBeenCalled();
     expect(m.setIngredientsCost).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();

@@ -76,8 +76,9 @@ export function createDeleteOrder(
       // Libera y limpia `reserved_at` ANTES de marcar `deleted_at`: `setReservedAt` solo
       // escribe sobre una fila viva (`WHERE deleted_at IS NULL`), asi que hacerlo despues del
       // borrado no tocaria nada.
-      await transaction.reservations.releaseForOrder({
+      await transaction.reservations.releaseForLine({
         orderId: id,
+        orderLineId: await transaction.orders.findOnlyLineId(id, scope),
         companyId: actor.companyId,
         reason: 'release',
         actorId: actor.id,

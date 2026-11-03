@@ -219,8 +219,9 @@ export function createUpdateOrder(
       );
       if (result === 'not_found') throw new OrderNotFoundError();
 
-      const outcome = await transaction.reservations.syncForOrder({
+      const outcome = await transaction.reservations.syncForLine({
         orderId: id,
+        orderLineId: await transaction.orders.findOnlyLineId(id, scope),
         companyId: actor.companyId,
         requirement,
         actorId: actor.id,

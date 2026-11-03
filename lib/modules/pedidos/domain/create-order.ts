@@ -187,8 +187,9 @@ export function createCreateOrder(
         scope,
       );
 
-      const outcome = await transaction.reservations.syncForOrder({
+      const outcome = await transaction.reservations.syncForLine({
         orderId: order.id,
+        orderLineId: await transaction.orders.findOnlyLineId(order.id, scope),
         companyId: actor.companyId,
         requirement,
         actorId: actor.id,

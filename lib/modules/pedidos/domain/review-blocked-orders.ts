@@ -142,8 +142,9 @@ async function reviewOne(
     // Entrar material no lo arregla: solo editar la unidad. Se queda bloqueado y sin tocar.
     if (requirement.kind === 'not_convertible') return false;
 
-    const outcome = await transaction.reservations.syncForOrder({
+    const outcome = await transaction.reservations.syncForLine({
       orderId: id,
+      orderLineId: await transaction.orders.findOnlyLineId(id, scope),
       companyId: scope.companyId,
       requirement: requirement.lines,
       actorId: null,

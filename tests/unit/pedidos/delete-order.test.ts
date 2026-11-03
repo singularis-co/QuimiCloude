@@ -77,14 +77,14 @@ function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found'
   const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
   const softDeleteAlive = vi.fn(async () => opciones.borrado ?? 'ok')
   const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
-  const releaseForOrder = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
+  const releaseForLine = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
 
   const { unitOfWork } = fakeUnitOfWork({
     orders: { lockAliveById, softDeleteAlive, setReservedAt },
-    reservations: { releaseForOrder },
+    reservations: { releaseForLine },
   })
 
-  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, softDeleteAlive, setReservedAt, releaseForOrder }
+  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, softDeleteAlive, setReservedAt, releaseForLine }
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -143,7 +143,7 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
 
     await createDeleteOrder(d)(ORDER_ID, ADMIN)
 
-    expect(d.releaseForOrder).toHaveBeenCalledTimes(1)
+    expect(d.releaseForLine).toHaveBeenCalledTimes(1)
     expect(d.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, { companyId: ADMIN.companyId })
     expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
   })
@@ -196,7 +196,7 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
         status,
       ).toBe('not_deletable')
       expect(d.softDeleteAlive, status).not.toHaveBeenCalled()
-      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.releaseForLine, status).not.toHaveBeenCalled()
     }
   })
 
@@ -209,7 +209,7 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
         status,
       ).toBe('not_deletable')
       expect(d.softDeleteAlive, status).not.toHaveBeenCalled()
-      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.releaseForLine, status).not.toHaveBeenCalled()
     }
   })
 
@@ -241,7 +241,7 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
 })
 
 describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
-  it('el orden real es lockAliveById -> releaseForOrder(release) -> setReservedAt(null) -> softDeleteAlive', async () => {
+  it('el orden real es lockAliveById -> releaseForLine(release) -> setReservedAt(null) -> softDeleteAlive', async () => {
     const d = dobles({ fila: fila('PENDIENTE') })
     const orden: string[] = []
     d.lockAliveById.mockImplementation(async () => {
@@ -252,8 +252,8 @@ describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
       orden.push('orders.softDeleteAlive')
       return 'ok' as const
     })
-    d.releaseForOrder.mockImplementation(async () => {
-      orden.push('reservations.releaseForOrder')
+    d.releaseForLine.mockImplementation(async () => {
+      orden.push('reservations.releaseForLine')
     })
     d.setReservedAt.mockImplementation(async () => {
       orden.push('orders.setReservedAt')
@@ -263,11 +263,11 @@ describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
 
     expect(orden).toEqual([
       'orders.lockAliveById',
-      'reservations.releaseForOrder',
+      'reservations.releaseForLine',
       'orders.setReservedAt',
       'orders.softDeleteAlive',
     ])
-    expect(d.releaseForOrder.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
+    expect(d.releaseForLine.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
     expect(d.setReservedAt.mock.calls[0]?.[1]).toBeNull()
   })
 

@@ -36,6 +36,8 @@ export function fakeOrderWriteRepository(
     });
   return {
     lockAliveById: vi.fn(explota('lockAliveById')),
+    // Todos los pedidos de los tests unitarios son, por ahora, pedidos sin linea.
+    findOnlyLineId: vi.fn(async () => null),
     create: vi.fn(explota('create')),
     updateAlive: vi.fn(explota('updateAlive')),
     cancelAlive: vi.fn(explota('cancelAlive')),
@@ -56,21 +58,21 @@ export function fakeOrderWriteRepository(
 export function fakeMaterialReservations(
   overrides: Partial<MaterialReservations> = {},
 ): MaterialReservations & Record<keyof MaterialReservations, ReturnType<typeof vi.fn>> {
-  const syncForOrder = vi.fn(
+  const syncForLine = vi.fn(
     async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }),
   );
-  const releaseForOrder = vi.fn(async (): Promise<void> => undefined);
-  const consumeForOrder = vi.fn(
+  const releaseForLine = vi.fn(async (): Promise<void> => undefined);
+  const consumeForLine = vi.fn(
     async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
   );
-  const settlePackagingForOrder = vi.fn(
+  const settlePackagingForLine = vi.fn(
     async (): Promise<ConsumptionOutcome> => ({ kind: 'consumed' }),
   );
   return {
-    syncForOrder,
-    releaseForOrder,
-    consumeForOrder,
-    settlePackagingForOrder,
+    syncForLine,
+    releaseForLine,
+    consumeForLine,
+    settlePackagingForLine,
     ...overrides,
   } as unknown as MaterialReservations & Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
 }

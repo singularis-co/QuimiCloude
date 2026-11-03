@@ -30,45 +30,48 @@ export type ConsumptionOutcome =
 
 export type OrderCoverage = 'full' | 'partial' | 'none';
 
+/** La clave de lo apartado: una linea del pedido. `orderLineId` `null` = las filas del pedido
+ *  escritas sin linea, una clave mas, que nunca lee ni toca las filas con linea del mismo pedido. */
+export type ReservationKey = {
+  readonly orderId: string;
+  readonly orderLineId: string | null;
+};
+
 /** Escritura. Siempre dentro de la transaccion que abre quien llama. */
 export interface MaterialReservations {
-  syncForOrder(input: {
-    readonly orderId: string;
+  syncForLine(input: ReservationKey & {
     readonly companyId: string;
     readonly requirement: readonly ReservationRequirementLine[];
     readonly actorId: string | null;
     readonly now: Date;
   }): Promise<ReservationOutcome>;
 
-  releaseForOrder(input: {
-    readonly orderId: string;
+  releaseForLine(input: ReservationKey & {
     readonly companyId: string;
     readonly reason: 'release' | 'expire';
     readonly actorId: string | null;
     readonly now: Date;
   }): Promise<void>;
 
-  consumeForOrder(input: {
-    readonly orderId: string;
+  consumeForLine(input: ReservationKey & {
     readonly companyId: string;
-    /** Solo se usa si el pedido no tiene nada apartado. Con `productIds`, si NINGUNO de esos
+    /** Solo se usa si la linea no tiene nada apartado. Con `productIds`, si NINGUNO de esos
      *  productos tiene nada apartado; no se decide producto a producto: si alguno tiene algo, se
      *  consume solo lo apartado y un producto del subconjunto sin apartado no se consume. */
     readonly fallbackRequirement: readonly ReservationRequirementLine[];
-    /** Si llega, solo se consume lo de estos productos (apartado y respaldo); lo demas que el
-     *  pedido tenga apartado queda intacto. */
+    /** Si llega, solo se consume lo de estos productos (apartado y respaldo); lo demas que la
+     *  linea tenga apartado queda intacto. */
     readonly productIds?: readonly ProductId[];
     readonly actorId: string;
     readonly now: Date;
   }): Promise<ConsumptionOutcome>;
 
-  /** Consume de cada producto de `requirement` exactamente su cantidad: primero de lo que el pedido
-   *  tiene apartado, y lo que exceda, del disponible que no aparta ningun otro pedido. Lo apartado
+  /** Consume de cada producto de `requirement` exactamente su cantidad: primero de lo que la linea
+   *  tiene apartado, y lo que exceda, del disponible que no aparta ninguna otra clave. Lo apartado
    *  que sobra se libera. Un producto con cantidad 0 se libera entero; uno que no viene en
    *  `requirement` no se toca. Con `insufficient` ya hay escrituras: quien llama deshace la
    *  transaccion. */
-  settlePackagingForOrder(input: {
-    readonly orderId: string;
+  settlePackagingForLine(input: ReservationKey & {
     readonly companyId: string;
     readonly requirement: readonly ReservationRequirementLine[];
     readonly actorId: string;

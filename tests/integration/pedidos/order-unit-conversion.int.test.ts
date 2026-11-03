@@ -269,7 +269,8 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
           { total: '300.0000', packaging: '0.0000' },
           scope,
         );
-        await createMaterialReservations(tx).syncForOrder({
+        await createMaterialReservations(tx).syncForLine({
+          orderLineId: null,
           orderId: order.id,
           companyId: fixture.companyId,
           requirement: [{ productId, quantity: '100' }],

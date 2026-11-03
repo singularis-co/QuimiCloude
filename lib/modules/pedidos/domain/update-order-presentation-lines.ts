@@ -177,8 +177,9 @@ export function createUpdateOrderPresentationLines(
         // La fila esta bloqueada desde `lockAliveById` en esta misma transaccion.
         if (outcome !== 'ok') return 'not_found';
 
-        const reservation = await transaction.reservations.syncForOrder({
+        const reservation = await transaction.reservations.syncForLine({
           orderId,
+          orderLineId: await transaction.orders.findOnlyLineId(orderId, scope),
           companyId,
           requirement,
           actorId,

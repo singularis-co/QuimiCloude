@@ -142,7 +142,8 @@ describe('QC-195 — el listado de productos sirve al selector de envases', () =
           },
           select: { id: true },
         });
-        await createMaterialReservations(prisma).syncForOrder({
+        await createMaterialReservations(prisma).syncForLine({
+          orderLineId: null,
           orderId: order.id,
           companyId,
           requirement: [{ productId, quantity }],

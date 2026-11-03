@@ -244,7 +244,7 @@ function funcionesQueEscribenLotes(fuente: string): string[] {
 
 /**
  * `consumeBatchStock` es la UNICA excepcion a proposito. Una entrega puede consumir de VARIOS
- * lotes del MISMO producto, y `consumeForOrder` -en `reservation-prisma.ts`, driven del mismo
+ * lotes del MISMO producto, y `consumeForLine` -en `reservation-prisma.ts`, driven del mismo
  * modulo- recalcula una vez por producto DESPUES de todos los decrementos, no una vez por lote:
  * sumar `product_batches` de nuevo en cada iteracion seria trabajo repetido para el mismo
  * resultado. El recalculo sigue pasando, en la misma transaccion: solo se mueve de sitio.
@@ -376,7 +376,7 @@ type FuncionDeNivelSuperior = { readonly nombre: string; readonly cuerpo: string
 
 /**
  * Toda funcion declarada con `function` en el nivel superior del archivo -exportada o no,
- * sincrona o `async`-. Un metodo dentro del objeto que ella devuelve (como `consumeForOrder`
+ * sincrona o `async`-. Un metodo dentro del objeto que ella devuelve (como `consumeForLine`
  * dentro de `createMaterialReservations`) queda dentro de SU cuerpo, asi que no hace falta
  * detectarlo aparte: `EXCEPCIONES_SIN_RECALCULO` (mas arriba) traslada la garantia de
  * `consumeBatchStock` a quien la envuelve, "en su cuerpo o en el de la funcion que la envuelve

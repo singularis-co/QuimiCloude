@@ -37,8 +37,8 @@ describe('createExpireStaleOrders — R21: cancela con el motivo exacto, sin aut
       orden.push('cancelAlive')
       return 'ok' as const
     })
-    d.reservations.releaseForOrder.mockImplementation(async () => {
-      orden.push('releaseForOrder')
+    d.reservations.releaseForLine.mockImplementation(async () => {
+      orden.push('releaseForLine')
     })
     d.orders.setReservedAt.mockImplementation(async () => {
       orden.push('setReservedAt')
@@ -53,7 +53,7 @@ describe('createExpireStaleOrders — R21: cancela con el motivo exacto, sin aut
       now: () => AHORA,
     })()
 
-    expect(orden).toEqual(['lockAliveById', 'cancelAlive', 'releaseForOrder', 'setReservedAt'])
+    expect(orden).toEqual(['lockAliveById', 'cancelAlive', 'releaseForLine', 'setReservedAt'])
     expect(d.orders.cancelAlive.mock.calls[0]).toEqual([
       PEDIDO_A_ID,
       EXPIRED_ORDER_REASON,
@@ -61,7 +61,7 @@ describe('createExpireStaleOrders — R21: cancela con el motivo exacto, sin aut
       AHORA,
       { companyId: EMPRESA_A },
     ])
-    expect(d.reservations.releaseForOrder.mock.calls[0]?.[0]).toMatchObject({
+    expect(d.reservations.releaseForLine.mock.calls[0]?.[0]).toMatchObject({
       orderId: PEDIDO_A_ID,
       companyId: EMPRESA_A,
       reason: 'expire',
@@ -89,7 +89,7 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
     })()
 
     expect(d.orders.cancelAlive).not.toHaveBeenCalled()
-    expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
     expect(d.orders.setReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
@@ -110,7 +110,7 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
       })()
 
       expect(d.orders.cancelAlive, status).not.toHaveBeenCalled()
-      expect(d.reservations.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.reservations.releaseForLine, status).not.toHaveBeenCalled()
       expect(d.orders.setReservedAt, status).not.toHaveBeenCalled()
       expect(resultado, status).toEqual({ expired: 0, failed: [] })
     }
@@ -149,7 +149,7 @@ describe('createExpireStaleOrders — R53: una edicion intercalada gana bajo el 
     })()
 
     expect(d.orders.cancelAlive).not.toHaveBeenCalled()
-    expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
     expect(d.orders.setReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
@@ -169,7 +169,7 @@ describe('createExpireStaleOrders — R53: una edicion intercalada gana bajo el 
     })()
 
     expect(d.orders.cancelAlive).not.toHaveBeenCalled()
-    expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
     expect(d.orders.setReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
@@ -191,7 +191,7 @@ describe('createExpireStaleOrders — R25: idempotente ante una repeticion o un 
     })()
 
     expect(d.orders.cancelAlive).not.toHaveBeenCalled()
-    expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
 })
@@ -443,7 +443,7 @@ describe('createExpireStaleOrders — los estados de acondicionamiento no caduca
       })()
 
       expect(d.orders.cancelAlive).not.toHaveBeenCalled()
-      expect(d.reservations.releaseForOrder).not.toHaveBeenCalled()
+      expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
       expect(d.orders.setReservedAt).not.toHaveBeenCalled()
       expect(resultado).toEqual({ expired: 0, failed: [] })
     },

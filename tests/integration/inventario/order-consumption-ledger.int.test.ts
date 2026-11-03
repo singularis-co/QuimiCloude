@@ -130,6 +130,7 @@ async function insertMovement(
     readonly orderId?: string | null;
     readonly reason?: string | null;
     readonly orderPresentationLineId?: string | null;
+    readonly orderLineId?: string | null;
   },
 ): Promise<void> {
   const kind = movement.kind ?? 'consumption';
@@ -141,9 +142,32 @@ async function insertMovement(
       reason: movement.reason ?? null,
       orderId: movement.orderId ?? null,
       orderPresentationLineId: movement.orderPresentationLineId ?? null,
+      orderLineId: movement.orderLineId ?? null,
       companyId: c.companyId,
     },
   });
+}
+
+/** Una linea del pedido con su propia receta: el unico parcial de `order_lines` no admite dos
+ *  lineas activas con la misma receta original. */
+async function insertLine(tx: Prisma.TransactionClient, c: Company, orderId: string, position: number): Promise<string> {
+  const marca = token();
+  const recipe = await tx.recipe.create({
+    data: { name: `Receta linea ${marca}`, nameNormalized: `recetalinea${marca}`, companyId: c.companyId },
+    select: { id: true },
+  });
+  const line = await tx.orderLine.create({
+    data: {
+      orderId,
+      companyId: c.companyId,
+      position,
+      recipeId: recipe.id,
+      originalRecipeId: recipe.id,
+      quantity: new Prisma.Decimal('10'),
+    },
+    select: { id: true },
+  });
+  return line.id;
 }
 
 function byBatch(lots: readonly ConsumedLot[]): ReadonlyMap<string, ConsumedLot> {
@@ -164,7 +188,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: envase, quantity: '-40.0000', orderId });
       await insertMovement(tx, c, { batchId: envase, quantity: '-3.0000', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId });
 
       expect(lots).toHaveLength(3);
       expect(byBatch(lots).get(lote1A)).toEqual({ batchId: lote1A, quantity: '8.0000', unitCost: '10.0000' });
@@ -190,7 +214,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       });
       await insertMovement(tx, c, { batchId: consumido, quantity: '-5.0000', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: consumido, quantity: '5.0000', unitCost: '30.0000' }]);
     });
@@ -221,7 +245,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: lote, quantity: '100.0000', kind: 'opening' });
       await insertMovement(tx, c, { batchId: lote, quantity: '-6.0000', kind: 'adjustment', reason: 'merma' });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: lote, quantity: '1.5000', unitCost: '10.0000' }]);
     });
@@ -237,8 +261,8 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
 
       const ledger = createOrderConsumptionLedger(tx);
 
-      expect(await ledger.findConsumedLots({ orderId, companyId: otra.companyId })).toEqual([]);
-      expect(await ledger.findConsumedLots({ orderId, companyId: c.companyId })).toHaveLength(1);
+      expect(await ledger.findConsumedLots({ orderLineId: null, orderId, companyId: otra.companyId })).toEqual([]);
+      expect(await ledger.findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId })).toHaveLength(1);
     });
   });
 
@@ -252,7 +276,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: neto0, quantity: '2.0000', orderId });
       await insertMovement(tx, c, { batchId: otro, quantity: '-1.0000', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: otro, quantity: '1.0000', unitCost: '20.0000' }]);
     });
@@ -265,7 +289,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       const sinCoste = await insertBatch(tx, c, null);
       await insertMovement(tx, c, { batchId: sinCoste, quantity: '-3.2500', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: sinCoste, quantity: '3.2500', unitCost: null }]);
     });
@@ -276,7 +300,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       const c = await seedCompany(tx);
       const orderId = await insertOrder(tx, c);
 
-      expect(await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId })).toEqual([]);
+      expect(await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId })).toEqual([]);
     });
   });
 
@@ -288,9 +312,40 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: lote, quantity: '-8.0000', orderId });
       await tx.productBatch.update({ where: { id: lote }, data: { unitCost: new Prisma.Decimal('12.5000') } });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: null, orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: lote, quantity: '8.0000', unitCost: '12.5000' }]);
+    });
+  });
+});
+
+describe('QT-313 OrderConsumptionLedger.findConsumedLots por linea', () => {
+  it('QT-313 R38: lee solo los asientos consumption de la linea pedida; con null, solo los del pedido sin linea', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const c = await seedCompany(tx);
+      const orderId = await insertOrder(tx, c);
+      const lineaA = await insertLine(tx, c, orderId, 0);
+      const lineaB = await insertLine(tx, c, orderId, 1);
+      const compartido = await insertBatch(tx, c, '10.0000');
+      const soloB = await insertBatch(tx, c, '4.0000');
+      await insertMovement(tx, c, { batchId: compartido, quantity: '-3.0000', orderId, orderLineId: lineaA });
+      await insertMovement(tx, c, { batchId: compartido, quantity: '-5.0000', orderId, orderLineId: lineaB });
+      await insertMovement(tx, c, { batchId: soloB, quantity: '-2.0000', orderId, orderLineId: lineaB });
+      await insertMovement(tx, c, { batchId: compartido, quantity: '-7.0000', orderId });
+      const ledger = createOrderConsumptionLedger(tx);
+
+      expect(await ledger.findConsumedLots({ orderId, orderLineId: lineaA, companyId: c.companyId })).toEqual([
+        { batchId: compartido, quantity: '3.0000', unitCost: '10.0000' },
+      ]);
+      expect(byBatch(await ledger.findConsumedLots({ orderId, orderLineId: lineaB, companyId: c.companyId }))).toEqual(
+        new Map([
+          [compartido, { batchId: compartido, quantity: '5.0000', unitCost: '10.0000' }],
+          [soloB, { batchId: soloB, quantity: '2.0000', unitCost: '4.0000' }],
+        ]),
+      );
+      expect(await ledger.findConsumedLots({ orderId, orderLineId: null, companyId: c.companyId })).toEqual([
+        { batchId: compartido, quantity: '7.0000', unitCost: '10.0000' },
+      ]);
     });
   });
 });

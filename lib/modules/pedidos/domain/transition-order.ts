@@ -91,8 +91,9 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
           }
 
           // Solo la receta: los envases del reparto siguen apartados hasta Terminar el empaque.
-          const outcome = await scope.reservations.consumeForOrder({
+          const outcome = await scope.reservations.consumeForLine({
             orderId: id,
+            orderLineId: await scope.orders.findOnlyLineId(id, { companyId }),
             companyId,
             fallbackRequirement: requirement.lines,
             productIds: recipeLines.map((line) => line.productId),

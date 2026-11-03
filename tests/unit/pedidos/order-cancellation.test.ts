@@ -62,14 +62,14 @@ function dobles(opciones: { estado?: OrderStatus | null; cancelacion?: 'ok' | 'n
   const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null, scope: { companyId: string }) => {
     void [id, reservedAt, scope]
   })
-  const releaseForOrder = vi.fn(async (input: unknown) => {
+  const releaseForLine = vi.fn(async (input: unknown) => {
     void input
   })
   const { unitOfWork } = fakeUnitOfWork({
     orders: { lockAliveById, cancelAlive, setReservedAt },
-    reservations: { releaseForOrder },
+    reservations: { releaseForLine },
   })
-  return { unitOfWork, lockAliveById, cancelAlive, setReservedAt, releaseForOrder }
+  return { unitOfWork, lockAliveById, cancelAlive, setReservedAt, releaseForLine }
 }
 
 describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R43)', () => {
@@ -113,15 +113,15 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
     expect(resultado).toBe('ok')
     expect(d.lockAliveById).toHaveBeenCalledWith(ORDER_ID, { companyId: COMPANY_ID })
     expect(d.cancelAlive.mock.calls).toEqual([[ORDER_ID, MOTIVO, ACTOR_ID, AHORA, { companyId: COMPANY_ID }]])
-    expect(d.releaseForOrder.mock.calls).toEqual([
-      [{ orderId: ORDER_ID, companyId: COMPANY_ID, reason: 'release', actorId: ACTOR_ID, now: AHORA }],
+    expect(d.releaseForLine.mock.calls).toEqual([
+      [{ orderId: ORDER_ID, orderLineId: null, companyId: COMPANY_ID, reason: 'release', actorId: ACTOR_ID, now: AHORA }],
     ])
     expect(d.setReservedAt.mock.calls).toEqual([[ORDER_ID, null, { companyId: COMPANY_ID }]])
 
     const orden = [
       d.lockAliveById.mock.invocationCallOrder[0],
       d.cancelAlive.mock.invocationCallOrder[0],
-      d.releaseForOrder.mock.invocationCallOrder[0],
+      d.releaseForLine.mock.invocationCallOrder[0],
       d.setReservedAt.mock.invocationCallOrder[0],
     ]
     expect(orden).toEqual([...orden].sort((a, b) => (a ?? 0) - (b ?? 0)))
@@ -155,7 +155,7 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
 
     expect(resultado).toBe('not_found')
     expect(d.cancelAlive).not.toHaveBeenCalled()
-    expect(d.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.releaseForLine).not.toHaveBeenCalled()
     expect(d.setReservedAt).not.toHaveBeenCalled()
   })
 
@@ -171,7 +171,7 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
     )
 
     expect(resultado).toBe('not_found')
-    expect(d.releaseForOrder).not.toHaveBeenCalled()
+    expect(d.releaseForLine).not.toHaveBeenCalled()
     expect(d.setReservedAt).not.toHaveBeenCalled()
   })
 
@@ -189,7 +189,7 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
 
       expect(resultado).toBe('not_cancellable')
       expect(d.cancelAlive).not.toHaveBeenCalled()
-      expect(d.releaseForOrder).not.toHaveBeenCalled()
+      expect(d.releaseForLine).not.toHaveBeenCalled()
       expect(d.setReservedAt).not.toHaveBeenCalled()
     })
   }
@@ -208,7 +208,7 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
 
       expect(resultado).toBe('not_cancellable')
       expect(d.cancelAlive).not.toHaveBeenCalled()
-      expect(d.releaseForOrder).not.toHaveBeenCalled()
+      expect(d.releaseForLine).not.toHaveBeenCalled()
       expect(d.setReservedAt).not.toHaveBeenCalled()
     })
   }

@@ -204,7 +204,8 @@ describe('R15 — un fallo forzado despues de apartar no deja escrito ni el pedi
         });
         createdOrderId = order.id;
 
-        const outcome = await scope.reservations.syncForOrder({
+        const outcome = await scope.reservations.syncForLine({
+          orderLineId: null,
           orderId: order.id,
           companyId: fixture.companyId,
           requirement: [{ productId, quantity: '5.0000' }],

@@ -1,5 +1,5 @@
 /**
- * `settlePackagingForOrder` (`reservation-prisma.ts`) contra Postgres real.
+ * `settlePackagingForLine` (`reservation-prisma.ts`) contra Postgres real.
  *
  * AISLAMIENTO -- igual que `reservation.int.test.ts`: `createWithFirstBatch` y `addBatchToAlive`
  * abren su propia `prisma.$transaction` contra el cliente global, asi que cada caso fabrica su
@@ -167,7 +167,8 @@ function req(productId: string, quantity: string): ReservationRequirementLine {
 }
 
 async function reserve(fixture: Fixture, orderId: string, requirement: readonly ReservationRequirementLine[]): Promise<void> {
-  const outcome = await createMaterialReservations(prisma).syncForOrder({
+  const outcome = await createMaterialReservations(prisma).syncForLine({
+    orderLineId: null,
     orderId,
     companyId: fixture.companyId,
     requirement,
@@ -178,7 +179,8 @@ async function reserve(fixture: Fixture, orderId: string, requirement: readonly 
 }
 
 async function settle(fixture: Fixture, orderId: string, requirement: readonly ReservationRequirementLine[]): Promise<ConsumptionOutcome> {
-  return createMaterialReservations(prisma).settlePackagingForOrder({
+  return createMaterialReservations(prisma).settlePackagingForLine({
+    orderLineId: null,
     orderId,
     companyId: fixture.companyId,
     requirement,
@@ -224,7 +226,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('settlePackagingForOrder', () => {
+describe('settlePackagingForLine', () => {
   it('R17: con menos envases reales consume solo los reales, libera la diferencia y el disponible del envase sube', async () => {
     const fixture = await createFixture();
     try {
@@ -329,7 +331,8 @@ describe('settlePackagingForOrder', () => {
       let outcome: ConsumptionOutcome | null = null;
       await expect(
         prisma.$transaction(async (tx) => {
-          outcome = await createMaterialReservations(tx).settlePackagingForOrder({
+          outcome = await createMaterialReservations(tx).settlePackagingForLine({
+            orderLineId: null,
             orderId,
             companyId: fixture.companyId,
             requirement: [req(envase.productId, '6')],
@@ -364,7 +367,8 @@ describe('settlePackagingForOrder', () => {
       let outcome: ConsumptionOutcome | null = null;
       await expect(
         prisma.$transaction(async (tx) => {
-          outcome = await createMaterialReservations(tx).settlePackagingForOrder({
+          outcome = await createMaterialReservations(tx).settlePackagingForLine({
+            orderLineId: null,
             orderId,
             companyId: fixture.companyId,
             requirement: [req(ajeno.productId, '2')],
@@ -394,7 +398,8 @@ describe('settlePackagingForOrder', () => {
       await reserve(fixture, orderId, [req(envase.productId, '4')]);
       const ledgerBefore = await ledgerOf(orderId);
 
-      const outcome = await createMaterialReservations(prisma).settlePackagingForOrder({
+      const outcome = await createMaterialReservations(prisma).settlePackagingForLine({
+        orderLineId: null,
         orderId,
         companyId: otherFixture.companyId,
         requirement: [req(envase.productId, '0')],

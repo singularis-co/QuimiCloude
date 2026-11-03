@@ -96,3 +96,30 @@ Verificacion (salida real, backend_dev de cierre):
 - `pnpm run typecheck` → exit 0; `pnpm run lint` → 0 errores
 - `vitest related --run` (node + ui + integration, base efimera) → 1184 archivos / 19939 tests en verde (node 576, ui 362, integration 246)
 - `pnpm exec vitest run guard` → 87 archivos en verde
+
+## Fase 3 — Reserva y consumo por linea (T7, 2026-11-03)
+
+Archivos de produccion: `lib/modules/inventario/domain/{reservation,order-consumption,inventory-movement}.ts`, `lib/modules/inventario/index.ts`, `lib/modules/inventario/adapters/driven/persistence/{reservation-prisma,order-consumption-prisma,batch-movement-prisma,product-prisma}.ts` (en `product-prisma.ts` solo `consumeBatchStock`), `lib/modules/pedidos/ports/order-write-repository.ts` y `adapters/driven/persistence/order-prisma.ts` (`findOnlyLineId`), y los llamantes de `pedidos`: `create-order`, `delete-order`, `expire-stale-orders`, `order-cancellation`, `order-packing`, `order-requirement`, `review-blocked-orders`, `transition-order`, `update-order-presentation-lines`, `update-order`.
+Tests: nuevo `tests/integration/pedidos/order-lines-repository.int.test.ts`; ampliados `tests/integration/inventario/{reservation,order-consumption-ledger}.int.test.ts`; ajustados los listados en `tasks.md > Archivos esperados` (bloque de la fase 3).
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R12 | `reservation.int` › «QT-313 R12, R37: dos lineas que comparten insumo apartan en orden; la segunda ve lo que aparto la primera» |
+| R27 | `reservation.int` › «QT-313 R27, R37: liberar una linea asienta solo su release y deja intacto lo de la otra» |
+| R36 | `reservation.int` › «QT-313 R36, R37: consumir una linea consume solo lo suyo y el asiento consumption lleva su linea» |
+| R37 (reserva y consumption) | `reservation.int` › los tres de arriba, «QT-313 R37: liquidar los envases de una linea…», «QT-313 R37: con orderLineId null el pedido aparta, libera y consume como hoy…»; `order-lines-repository.int` › cuatro de `findOnlyLineId` (una linea, ninguna, otra empresa, quitada/dos vivas) |
+| R38 | `order-consumption-ledger.int` › «QT-313 R38: lee solo los asientos consumption de la linea pedida; con null, solo los del pedido sin linea» |
+
+Verificacion (salida real):
+- backend_dev: `pnpm run typecheck` exit 0, `pnpm run lint` 0 errores, guardias en verde, los 3 `.int` de «Hecho» `Tests 46 passed (46)`, unit tocados en verde. Su `vitest related` completo murio por memoria.
+- implementer, integracion en tandas con `--maxWorkers=1` (base efimera):
+  - `settle-packaging`, `qc195-packaging-catalog`, `qc195-packaging-list`, `order-unit-of-work`, `order-unit-conversion`, `qc195-packaging-reservation` → `Test Files 6 passed (6)`, `Tests 45 passed (45)`
+  - `order-reservation`, `order-reservation-concurrency`, `order-reservation-tools`, `order-crud`, `order-expiry`, `review-blocked-orders`, `order-packing`, `order-conditioning`, `order-repository`, `order-cost-quote`, `order-ingredients-cost`, `actual-order-cost` → `Test Files 12 passed (12)`, `Tests 142 passed (142)`
+  - `company-scope`, `company-scope-queries`, `finish-with-finished-goods`, `order-customer`, `order-sale-price`, `order-content-copy`, `order-delivery-repository`, `order-delivery-void`, `direct-delivery-void`, `order-packed-counts`, `pedidos-constraints`, `order-lines-repository`, `order-finished-at`, `order-duplicate-number` → `Test Files 14 passed (14)`, `Tests 193 passed (193)`
+- Base huerfana `qct_qt313pedidoc_db1ee7f3_mw15rf1o_pew`: ya no existia al consultarla (`pg_database` sin `qct_qt313%`); la barrio la corrida siguiente.
+
+Desviaciones aceptadas por el humano (2026-11-03):
+- `inventory-movement.ts` tocado (anadido a Archivos esperados).
+- `findOnlyLineId` lanza si hay mas de una linea viva: valido porque antes de T9 no hay pedidos de varias lineas. **T14e lo elimina junto con el `orderLineId: null`.**
+- **Para revisar en T8–T13:** (1) `findReservedAndAvailableByBatch` y `findCoverageByOrderIds` siguen agrupando por pedido, no por linea; (2) el doble `tests/helpers/order-unit-of-work-double.ts` devuelve `null` en `findOnlyLineId`.

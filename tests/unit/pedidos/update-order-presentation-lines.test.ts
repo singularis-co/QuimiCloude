@@ -98,6 +98,7 @@ function ordersDoble(
   const setReservedAt = vi.fn(async () => undefined);
   const orders = {
     lockAliveById,
+    findOnlyLineId: vi.fn(async () => null),
     updatePresentationLinesAlive,
     setStatus,
     setIngredientsCost,
@@ -275,8 +276,8 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       const { orders, updatePresentationLinesAlive, setStatus, setIngredientsCost, setReservedAt } = ordersDoble(
         filaBloqueada({ status }),
       );
-      const syncForOrder = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
-      const update = montar({ orders, reservations: fakeMaterialReservations({ syncForOrder }) });
+      const syncForLine = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
+      const update = montar({ orders, reservations: fakeMaterialReservations({ syncForLine }) });
 
       await expect(
         update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
@@ -286,7 +287,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       expect(setStatus).not.toHaveBeenCalled();
       expect(setIngredientsCost).not.toHaveBeenCalled();
       expect(setReservedAt).not.toHaveBeenCalled();
-      expect(syncForOrder).not.toHaveBeenCalled();
+      expect(syncForLine).not.toHaveBeenCalled();
     },
   );
 
@@ -561,8 +562,9 @@ describe('updateOrderPresentationLines — R46: no toca quantity ni receta; QC-1
       update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] }),
     ).resolves.toBe('ok');
 
-    expect(reservations.syncForOrder).toHaveBeenCalledWith({
+    expect(reservations.syncForLine).toHaveBeenCalledWith({
       orderId: PEDIDO,
+      orderLineId: null,
       companyId: EMPRESA,
       requirement: [
         { productId: 'materia', quantity: '10' },
@@ -579,7 +581,7 @@ describe('QC-195 updateOrderPresentationLines — falta de envases y bloqueo', (
   const FALTA: ReservationOutcome = { kind: 'insufficient', productIds: [ENVASE_A] };
 
   function conFalta() {
-    return fakeMaterialReservations({ syncForOrder: vi.fn(async () => FALTA) });
+    return fakeMaterialReservations({ syncForLine: vi.fn(async () => FALTA) });
   }
 
   const LINEAS = { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] };
@@ -643,7 +645,7 @@ describe('QC-195 updateOrderPresentationLines — falta de envases y bloqueo', (
     const update = montar({ orders, reservations, recipeLines });
 
     await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
-    expect(reservations.syncForOrder).toHaveBeenCalledWith(
+    expect(reservations.syncForLine).toHaveBeenCalledWith(
       expect.objectContaining({ requirement: [{ productId: ENVASE_A, quantity: '2' }] }),
     );
   });
@@ -735,7 +737,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     const update = montar({
       orders: doble.orders,
       reservations: fakeMaterialReservations({
-        syncForOrder: vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'insufficient', productIds: [ENVASE_A] })),
+        syncForLine: vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'insufficient', productIds: [ENVASE_A] })),
       }),
       recipeLines: RECETA,
       costo,
@@ -781,7 +783,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
         const doble = ordersDoble(filaBloqueada({ status, ingredientsCost: '25.0000', packagingCost: '5.0000' }));
         const update = montar({
           orders: doble.orders,
-          reservations: fakeMaterialReservations({ syncForOrder: vi.fn(async () => resultado) }),
+          reservations: fakeMaterialReservations({ syncForLine: vi.fn(async () => resultado) }),
           recipeLines: RECETA,
           costo: catalogosDeCosto(RECETA, [LOTE_MATERIA]),
         });
@@ -820,17 +822,17 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
     costo.products.findRefs = vi.fn(async (ids: readonly string[]) =>
       ids.map((id) => ({ id, name: id, unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' as const })),
     );
-    const syncForOrder = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
+    const syncForLine = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
     const update = montar({
       orders: doble.orders,
-      reservations: fakeMaterialReservations({ syncForOrder }),
+      reservations: fakeMaterialReservations({ syncForLine }),
       units: catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILO.id, KILO], [PIEZA.id, PIEZA]])).units,
       recipeLines: RECETA,
       costo,
       scopeProducts: fakeScopeProducts([{ id: MATERIA, name: MATERIA, unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' }]),
       scopeUnits: fakeScopeUnits([GRAMO, KILO, PIEZA]),
     });
-    return { ...doble, update, syncForOrder };
+    return { ...doble, update, syncForLine };
   }
 
   const EN_GRAMOS = { unitId: GRAMO.id, lines: [] };
@@ -848,7 +850,7 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
       AHORA,
       ESCOPO,
     );
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
     expect(Number(entrada.requirement[0]?.quantity)).toBe(0.1);
   });
 
@@ -857,7 +859,7 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
 
     await expect(m.update(PEDIDO, ACTOR, EN_GRAMOS)).resolves.toBe('unit_not_convertible');
     expect(m.updatePresentationLinesAlive).not.toHaveBeenCalled();
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
     expect(m.setIngredientsCost).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();
   });

@@ -171,8 +171,9 @@ async function expireOne(
     );
     if (cancelled === 'not_found') return false;
 
-    await transaction.reservations.releaseForOrder({
+    await transaction.reservations.releaseForLine({
       orderId: id,
+      orderLineId: await transaction.orders.findOnlyLineId(id, scope),
       companyId,
       reason: 'expire',
       actorId: null,

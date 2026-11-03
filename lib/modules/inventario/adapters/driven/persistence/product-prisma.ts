@@ -1272,11 +1272,17 @@ export async function adjustBatchStock(
  * Como `adjustBatchStock`, asienta en la MISMA transaccion con `kind: 'consumption'`, cantidad EN
  * NEGATIVO -es una salida- y el pedido que la causa. No recalcula `products.stock`: con varios
  * lotes de un mismo producto consumidos en la misma entrega, recalcular una vez por producto (en
- * `consumeForOrder`) evita sumar la misma tabla varias veces por nada.
+ * `consumeForLine`) evita sumar la misma tabla varias veces por nada.
  */
 export async function consumeBatchStock(
   tx: Prisma.TransactionClient,
-  input: { readonly batchId: string; readonly quantity: string; readonly orderId: string; readonly actorId: string },
+  input: {
+    readonly batchId: string;
+    readonly quantity: string;
+    readonly orderId: string;
+    readonly orderLineId: string | null;
+    readonly actorId: string;
+  },
   now: Date,
   scope: InventoryScope,
 ): Promise<{ kind: 'consumed'; stock: string } | { kind: 'insufficient'; available: string }> {
@@ -1304,6 +1310,7 @@ export async function consumeBatchStock(
       quantity: negateQuantity(input.quantity),
       reason: null,
       orderId: input.orderId,
+      orderLineId: input.orderLineId,
       orderPresentationLineId: null,
       createdBy: input.actorId,
     },

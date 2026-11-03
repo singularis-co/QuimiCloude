@@ -277,6 +277,7 @@ export type {
   ConsumptionOutcome,
   OrderCoverage,
   MaterialReservations,
+  ReservationKey,
   ReservationQueries,
   OrderNumberDirectory,
   BatchHistoryEntry,

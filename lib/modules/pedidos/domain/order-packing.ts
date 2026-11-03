@@ -243,6 +243,7 @@ async function settlePackaging(
   scope: OrderTransactionScope,
   input: {
     readonly orderId: string;
+    readonly orderLineId: string | null;
     readonly companyId: string;
     readonly recipeId: string;
     readonly quantity: string;
@@ -263,8 +264,9 @@ async function settlePackaging(
 
   const settled = real.filter((line) => !ingredientIds.has(line.productId));
   if (settled.length > 0) {
-    const outcome = await scope.reservations.settlePackagingForOrder({
+    const outcome = await scope.reservations.settlePackagingForLine({
       orderId: input.orderId,
+      orderLineId: input.orderLineId,
       companyId: input.companyId,
       requirement: settled,
       actorId: input.actorId,
@@ -275,8 +277,9 @@ async function settlePackaging(
 
   const ingredientPackaging = real.filter((line) => ingredientIds.has(line.productId)).map((line) => line.productId);
   if (ingredientPackaging.length > 0) {
-    const consumption = await scope.reservations.consumeForOrder({
+    const consumption = await scope.reservations.consumeForLine({
       orderId: input.orderId,
+      orderLineId: input.orderLineId,
       companyId: input.companyId,
       fallbackRequirement: [],
       productIds: ingredientPackaging,
@@ -288,8 +291,13 @@ async function settlePackaging(
 }
 
 /** Calcula el coste real con lo que el pedido consumio hasta este instante y lo guarda. */
-async function saveActualCost(scope: OrderTransactionScope, orderId: string, companyId: string): Promise<string | null> {
-  const lots = await scope.consumption.findConsumedLots({ orderId, companyId });
+async function saveActualCost(
+  scope: OrderTransactionScope,
+  orderId: string,
+  orderLineId: string | null,
+  companyId: string,
+): Promise<string | null> {
+  const lots = await scope.consumption.findConsumedLots({ orderId, orderLineId, companyId });
   const actualCost = calculateActualOrderCost(lots);
   await scope.orders.setActualCost(orderId, actualCost, { companyId });
   return actualCost;
@@ -308,6 +316,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
       return await deps.unitOfWork.run(async (scope) => {
         const updated = await scope.orders.finishPackingAlive(id, packerId, now, { companyId });
         if (updated.kind !== 'ok') return updated.kind;
+        const orderLineId = await scope.orders.findOnlyLineId(id, { companyId });
 
         const lines = await scope.orders.findPresentationLinesForFinish(id, { companyId });
         if (checkPackingCounts(lines, counts).kind !== 'ok') {
@@ -315,7 +324,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         }
         // Sin reparto no hay envases que liquidar: el real sale solo de los ingredientes.
         if (lines.length === 0) {
-          await saveActualCost(scope, id, companyId);
+          await saveActualCost(scope, id, orderLineId, companyId);
           return { kind: 'ok' as const, finishedGoods: [] };
         }
 
@@ -330,6 +339,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
 
         await settlePackaging(scope, {
           orderId: id,
+          orderLineId,
           companyId,
           recipeId: updated.recipeId,
           quantity: updated.quantity,
@@ -339,7 +349,7 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         });
 
         // Despues de liquidar los envases: sus asientos ya estan escritos en esta transaccion.
-        const actualCost = await saveActualCost(scope, id, companyId);
+        const actualCost = await saveActualCost(scope, id, orderLineId, companyId);
 
         const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([updated.recipeId], companyId);
         if (recipeRef === undefined) throw new RecipeNotFoundError();

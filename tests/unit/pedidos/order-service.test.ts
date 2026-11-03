@@ -148,10 +148,10 @@ function dobles(opciones: {
   } as unknown as OrderRepository
 
   const setReservedAt = vi.fn(async () => undefined)
-  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
+  const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }))
   const { unitOfWork } = fakeUnitOfWork({
     orders: { lockAliveById, create, updateAlive, setReservedAt },
-    reservations: { syncForOrder },
+    reservations: { syncForLine },
   })
 
   // La unidad del pedido SIEMPRE resuelve: `createOrder`/`updateOrder` la exigen (R41), y este

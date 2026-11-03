@@ -192,15 +192,17 @@ function almacen() {
     return 'ok' as const
   })
   const setReservedAt = vi.fn(async () => undefined)
-  const writeOrders = { lockAliveById, create, updateAlive, cancelAlive, softDeleteAlive, setReservedAt }
+  // Ningun pedido de este almacen tiene lineas: la reserva va con la clave del pedido sin linea.
+  const findOnlyLineId = vi.fn(async () => null)
+  const writeOrders = { lockAliveById, findOnlyLineId, create, updateAlive, cancelAlive, softDeleteAlive, setReservedAt }
 
   // Reservas de `inventario`: no forman parte de lo que este archivo mide -el ambito de ESE
   // puerto es otro archivo-, asi que aparta y libera sin tocar el almacen de pedidos.
-  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
-  const releaseForOrder = vi.fn(async () => undefined)
-  const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
-  const settlePackagingForOrder = vi.fn(async () => ({ kind: 'consumed' as const }))
-  const reservations = { syncForOrder, releaseForOrder, consumeForOrder, settlePackagingForOrder }
+  const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }))
+  const releaseForLine = vi.fn(async () => undefined)
+  const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }))
+  const settlePackagingForLine = vi.fn(async () => ({ kind: 'consumed' as const }))
+  const reservations = { syncForLine, releaseForLine, consumeForLine, settlePackagingForLine }
 
   const recipes = {
     findRefsIncludingDeleted: vi.fn(async (ids: readonly string[]) =>
@@ -336,6 +338,7 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
         'findAliveById',
         'listAlive',
         'lockAliveById',
+        'findOnlyLineId',
         'updateAlive',
         'cancelAlive',
         'softDeleteAlive',
@@ -423,7 +426,7 @@ describe('QC-138 R38 — bloquear al crear o editar solo toca la empresa de quie
         setStatus,
         setIngredientsCost,
       } as never,
-      reservations: { syncForOrder: vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['p'] })) },
+      reservations: { syncForLine: vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['p'] })) },
     })
     const now = () => new Date('2026-09-15T10:00:00.000Z')
     const deps = {

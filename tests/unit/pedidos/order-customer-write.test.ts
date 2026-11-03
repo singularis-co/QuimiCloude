@@ -302,7 +302,7 @@ describe('createOrder — el cliente en el alta (R10, R11)', () => {
     expect(await codigoDelFallo(() => e.createOrder({ ...ALTA, customerId }, ACTOR))).toBe('customer_not_found')
     expect(e.clientes.findAliveRefById).toHaveBeenCalledTimes(1)
     expect(e.uow.orders.create).not.toHaveBeenCalled()
-    expect(e.uow.reservations.syncForOrder).not.toHaveBeenCalled()
+    expect(e.uow.reservations.syncForLine).not.toHaveBeenCalled()
   })
 
   it('R11: un id sin forma de uuid da customer_not_found con CERO llamadas al catalogo y sin escribir', async () => {
@@ -382,7 +382,7 @@ describe('updateOrder — el cliente en la edicion por el camino completo (R11, 
 
     expect(e.clientes.findAliveRefById).toHaveBeenCalledWith(CLIENTE_B, EMPRESA)
     expect(customerIdEscrito(e.uow.orders.updateAlive)).toBe(CLIENTE_B)
-    expect(e.uow.reservations.syncForOrder).toHaveBeenCalledTimes(1)
+    expect(e.uow.reservations.syncForLine).toHaveBeenCalledTimes(1)
     expect(e.uow.orders.setCustomerAlive).not.toHaveBeenCalled()
   })
 })
@@ -479,7 +479,7 @@ describe('updateOrder — el atajo de la edicion que solo cambia el cliente (R13
 
     expect(e.uow.orders.setCustomerAlive).not.toHaveBeenCalled()
     expect(e.uow.orders.updateAlive).toHaveBeenCalledTimes(1)
-    expect(e.uow.reservations.syncForOrder).toHaveBeenCalledTimes(1)
+    expect(e.uow.reservations.syncForLine).toHaveBeenCalledTimes(1)
     expect(customerIdEscrito(e.uow.orders.updateAlive)).toBe(CLIENTE_A)
   })
 
@@ -504,7 +504,7 @@ describe('updateOrder — el atajo de la edicion que solo cambia el cliente (R13
 
     expect(e.uow.orders.setCustomerAlive).not.toHaveBeenCalled()
     expect(e.uow.orders.updateAlive).toHaveBeenCalledTimes(1)
-    expect(e.uow.reservations.syncForOrder).toHaveBeenCalledTimes(1)
+    expect(e.uow.reservations.syncForLine).toHaveBeenCalledTimes(1)
     expect(e.vivos.espias.some((espia) => espia.mock.calls.length > 0)).toBe(true)
     expect(customerIdEscrito(e.uow.orders.updateAlive)).toBe(CLIENTE_B)
   })

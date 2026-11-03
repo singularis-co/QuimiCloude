@@ -853,6 +853,19 @@ async function setOrderActualCost(id: string, cost: string | null, scope: OrderS
  * Prisma siempre mueve `updated_at` con `@updatedAt`, y apartar o liberar material no es una
  * edicion del pedido que el usuario deba ver en esa columna.
  */
+/** `findOnlyLineId` de `OrderWriteRepository`. Con dos lineas leidas basta para saber que hay mas
+ *  de una. */
+async function findOnlyAliveLineId(orderId: string, scope: OrderScope, tx: PrismaLike): Promise<string | null> {
+  const { companyId } = companyScopeColumns(scope);
+  const lines = await tx.orderLine.findMany({
+    where: { orderId, companyId, deletedAt: null },
+    select: { id: true },
+    take: 2,
+  });
+  if (lines.length > 1) throw new Error(`findOnlyLineId: el pedido ${orderId} tiene mas de una linea`);
+  return lines[0]?.id ?? null;
+}
+
 async function setOrderReservedAt(
   id: string,
   reservedAt: Date | null,
@@ -956,6 +969,7 @@ export async function findExpirableOrders(
 export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteRepository {
   return {
     lockAliveById: (id, scope) => lockAliveOrderById(id, scope, tx),
+    findOnlyLineId: (orderId, scope) => findOnlyAliveLineId(orderId, scope, tx),
     create: (data, year, actorId, now, cost, scope) => insertAliveOrder(tx, data, year, actorId, now, cost, scope),
     updateAlive: (id, data, actorId, now, cost, scope) => updateAliveOrder(id, data, actorId, now, cost, scope, tx),
     cancelAlive: (id, reason, actorId, now, scope) => cancelAliveOrder(id, reason, actorId, now, scope, tx),

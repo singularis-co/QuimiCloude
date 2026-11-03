@@ -29,6 +29,8 @@ export type NewInventoryMovement = {
   readonly createdBy: string;
   readonly orderId: string | null;
   readonly orderPresentationLineId: string | null;
+  /** La linea del pedido; opcional mientras haya escritores con pedido que todavia no la conocen. */
+  readonly orderLineId?: string | null;
   /** Solo lo llevan `delivery` y `direct_delivery`, y siempre: opcional para que los demas escritores
    *  no lo nombren. `orderDeliveryVoidId`, igual, con `delivery_void` y `direct_delivery_void`. */
   readonly orderDeliveryId?: string | null;

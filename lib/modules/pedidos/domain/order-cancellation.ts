@@ -12,7 +12,7 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '../ports/order-unit
  *
  * `BLOQUEADO` si se cancela, con las mismas reglas que un `PENDIENTE` y su motivo: es la unica
  * salida manual de un pedido sin material -no se fabrico nada, y esperar lotes no es cancelar-.
- * No tiene nada apartado, asi que `releaseForOrder` no encuentra filas y no falla por eso.
+ * No tiene nada apartado, asi que `releaseForLine` no encuentra filas y no falla por eso.
  */
 const CANCELLABLE = {
   PENDIENTE: true,
@@ -61,8 +61,9 @@ export async function cancelInsideTransaction(
   const cancelled = await scope.orders.cancelAlive(id, reason, actorId, now, { companyId });
   if (cancelled === 'not_found') return 'not_found';
 
-  await scope.reservations.releaseForOrder({
+  await scope.reservations.releaseForLine({
     orderId: id,
+    orderLineId: await scope.orders.findOnlyLineId(id, { companyId }),
     companyId,
     reason: 'release',
     actorId,

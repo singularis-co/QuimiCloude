@@ -127,7 +127,7 @@ describe('quien escribe products.last_batch_at', () => {
 
     const outcome = await consumeBatchStock(
       tx,
-      { batchId: 'batch-1', quantity: '2', orderId: 'order-1', actorId: 'actor-1' },
+      { orderLineId: null, batchId: 'batch-1', quantity: '2', orderId: 'order-1', actorId: 'actor-1' },
       NOW,
       SCOPE,
     );

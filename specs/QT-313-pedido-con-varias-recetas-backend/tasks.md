@@ -81,7 +81,7 @@
 
 ## Fase 3 — Reserva y consumo por línea (`inventario`)
 
-- [ ] **T7 — `MaterialReservations` por línea.** `inventario/domain/reservation.ts`,
+- [x] **T7 — `MaterialReservations` por línea.** `inventario/domain/reservation.ts`,
   `reservation-ledger.ts`, `movement-ledger.ts`, `order-consumption.ts` y sus adaptadores
   (`reservation-prisma.ts`, `order-consumption-prisma.ts`, `batch-movement-prisma.ts`): la clave
   pasa a `(orderId, orderLineId)` con **`orderLineId: string | null`** (design § 3.1), métodos
@@ -399,3 +399,27 @@ Tocados en la fase 1 (T0, T1) para que el modelo nuevo no los rompa:
 - `tests/unit/asignaciones/list-order-responsibles.test.ts`
 - `tests/unit/integraciones/whatsapp/conversations/whatsapp-chat-context.test.ts`
 - `tests/unit/scripts/seed-demo-run.test.ts`
+
+Tocados en la fase 3 (T7) por el cambio de `MaterialReservations` y `findOnlyLineId`:
+
+- `lib/modules/inventario/domain/inventory-movement.ts`
+- `tests/helpers/order-unit-of-work-double.ts`
+- `tests/integration/inventario/qc195-packaging-catalog.int.test.ts`
+- `tests/integration/inventario/qc195-packaging-list.int.test.ts`
+- `tests/integration/inventario/settle-packaging.int.test.ts`
+- `tests/integration/pedidos/order-unit-conversion.int.test.ts`
+- `tests/integration/pedidos/order-unit-of-work.int.test.ts`
+- `tests/unit/inventario/product-last-batch-at.test.ts`
+- `tests/unit/inventario/qc121-alcance.test.ts`
+- `tests/unit/pedidos/cancel-order.test.ts`
+- `tests/unit/pedidos/company-isolation-service.test.ts`
+- `tests/unit/pedidos/create-order.test.ts`
+- `tests/unit/pedidos/delete-order.test.ts`
+- `tests/unit/pedidos/expire-stale-orders.test.ts`
+- `tests/unit/pedidos/order-customer-write.test.ts`
+- `tests/unit/pedidos/order-packing.test.ts`
+- `tests/unit/pedidos/order-service.test.ts`
+- `tests/unit/pedidos/review-blocked-orders.test.ts`
+- `tests/unit/pedidos/transition-order.test.ts`
+- `tests/unit/pedidos/update-order-presentation-lines.test.ts`
+- `tests/unit/pedidos/update-order.test.ts`

@@ -59,6 +59,11 @@ export interface OrderWriteRepository {
    *  nunca sobre la que leyo antes de abrir la transaccion. */
   lockAliveById(id: string, scope: OrderScope): Promise<LockedOrderRow | null>;
 
+  /** El id de la unica linea viva del pedido, o `null` si no tiene ninguna -pedido creado sin
+   *  lineas- o es de otra empresa. Lanza si tiene mas de una: quien opera un pedido de varias
+   *  lineas ya conoce la suya y no debe preguntar por «la unica». */
+  findOnlyLineId(orderId: string, scope: OrderScope): Promise<string | null>;
+
   /** Alta dentro de la transaccion ya abierta. El choque del correlativo (indice unico
    *  `orders_company_year_sequence_key`) se deja SUBIR: la transaccion entera ya quedo
    *  abortada, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`. */

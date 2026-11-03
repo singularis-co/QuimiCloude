@@ -89,14 +89,14 @@ function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_fo
     },
   )
   const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
-  const releaseForOrder = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
+  const releaseForLine = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
 
   const { unitOfWork } = fakeUnitOfWork({
     orders: { lockAliveById, cancelAlive, setReservedAt },
-    reservations: { releaseForOrder },
+    reservations: { releaseForLine },
   })
 
-  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, cancelAlive, setReservedAt, releaseForOrder }
+  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, cancelAlive, setReservedAt, releaseForLine }
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -171,7 +171,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
 
-    expect(d.releaseForOrder).toHaveBeenCalledTimes(1)
+    expect(d.releaseForLine).toHaveBeenCalledTimes(1)
     expect(d.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, { companyId: ADMIN.companyId })
   })
 
@@ -235,7 +235,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
         status,
       ).toBe('not_cancellable')
       expect(d.cancelAlive, status).not.toHaveBeenCalled()
-      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.releaseForLine, status).not.toHaveBeenCalled()
     }
   })
 
@@ -248,7 +248,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
         status,
       ).toBe('not_cancellable')
       expect(d.cancelAlive, status).not.toHaveBeenCalled()
-      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.releaseForLine, status).not.toHaveBeenCalled()
     }
   })
 
@@ -292,7 +292,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 })
 
 describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
-  it('el orden real es lockAliveById -> cancelAlive -> releaseForOrder(release) -> setReservedAt(null)', async () => {
+  it('el orden real es lockAliveById -> cancelAlive -> releaseForLine(release) -> setReservedAt(null)', async () => {
     const d = dobles({ fila: fila('PENDIENTE') })
     const orden: string[] = []
     d.lockAliveById.mockImplementation(async () => {
@@ -303,8 +303,8 @@ describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
       orden.push('orders.cancelAlive')
       return 'ok' as const
     })
-    d.releaseForOrder.mockImplementation(async () => {
-      orden.push('reservations.releaseForOrder')
+    d.releaseForLine.mockImplementation(async () => {
+      orden.push('reservations.releaseForLine')
     })
     d.setReservedAt.mockImplementation(async () => {
       orden.push('orders.setReservedAt')
@@ -315,10 +315,10 @@ describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
     expect(orden).toEqual([
       'orders.lockAliveById',
       'orders.cancelAlive',
-      'reservations.releaseForOrder',
+      'reservations.releaseForLine',
       'orders.setReservedAt',
     ])
-    expect(d.releaseForOrder.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
+    expect(d.releaseForLine.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
     expect(d.setReservedAt.mock.calls[0]?.[1]).toBeNull()
   })
 

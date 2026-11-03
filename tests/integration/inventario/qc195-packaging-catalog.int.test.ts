@@ -130,7 +130,8 @@ async function orderReserving(c: Company, productId: string, quantity: string): 
     },
     select: { id: true },
   });
-  const outcome = await createMaterialReservations(prisma).syncForOrder({
+  const outcome = await createMaterialReservations(prisma).syncForLine({
+    orderLineId: null,
     orderId: order.id,
     companyId: c.companyId,
     requirement: [{ productId, quantity }],
