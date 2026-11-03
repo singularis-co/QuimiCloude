@@ -866,6 +866,8 @@ export const MIGRACIONES_ESPERADAS = [
   // 2026-11-03: el estado PARCIAL y las lineas del pedido; no tocan el identificador.
   '20261103115900_order_status_partial',
   '20261103120000_order_lines',
+  // 2026-11-03: la linea del pedido en las tablas hijas; no toca el identificador.
+  '20261103120100_order_lines_references',
 ] as const
 
 export function hallazgosDeMigraciones(

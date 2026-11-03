@@ -2,7 +2,7 @@
 
 ## Fase 1 — Modelo (backend_dev, 2026-11-03)
 
-Hechas: **T0** y **T1**. **T2 bloqueada** (ver abajo). Commit de la tanda: lo hace el implementer.
+Hechas: **T0** y **T1** (commit 8b79a3328) y **T2** tras la enmienda df0c5c21f (paso 1 de 2: `order_line_id` nullable).
 
 ### Archivos
 
@@ -42,7 +42,8 @@ Tests existentes ajustados: lista al final de `tasks.md > Archivos esperados`.
 | R50 | `order-classification.test.ts` › «R50: PARCIAL no esta entre los estados que dejan de estar en curso»; `tests/unit/integraciones/whatsapp-chat-context.test.ts` › «R50: un pedido PARCIAL cuenta como abierto…» |
 | R52 | `order-classification.test.ts` › «R52: PARCIAL es el primero de la lista…», «R52: PARCIAL va delante de PENDIENTE…»; `order-status-partial-migration.int.test.ts` › los cuatro casos R52 (enum, orden asc/desc, bajada que aborta, bajada limpia) |
 | R53 | `tests/unit/shared-ui/order-status.test.ts` › «R53 — se nombra «Parcial» con el tono progress»; `tests/unit/integraciones/whatsapp-chat-context.test.ts` › «R53: un pedido PARCIAL se lee «en preparación»» |
-| R8 | pendiente: T2 bloqueada |
+| R8 | `tests/integration/pedidos/order-lines-references-migration.int.test.ts` › «R8, R37: los conteos de las seis tablas no cambian y toda fila de un pedido de una linea apunta a ella, delivery_void con la misma linea que su delivery», «R8: un pedido creado sin linea antes de la migracion la recibe…», «R8: la bajada se niega si una fila con linea es de un pedido de varias lineas…» y otros cinco R8 |
+| R37 (base, paso 1) | mismo archivo › «R37: la base rechaza linea en un asiento opening o adjustment y la admite en los cuatro tipos con pedido» |
 
 ### Verificacion (salida real)
 
@@ -56,13 +57,18 @@ Tests existentes ajustados: lista al final de `tasks.md > Archivos esperados`.
 - Integracion de todos los `.int` que leen un `down.sql` (56 archivos): 1 rojo (`pedidos/company-scope`, la FK nueva colgaba de `orders_id_company_id_key`), ajustado y vuelto a correr: `Tests 12 passed (12)`
 - `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1327 passed | 22 skipped`
 
-### Bloqueo de T2
+### T2 (2026-11-03, tras la enmienda)
 
-`order_line_id NOT NULL` en las seis tablas hijas rompe el codigo de hoy, que sigue escribiendo
-esas filas sin linea hasta T7/T8/T14a, y los pedidos nuevos no tienen linea hasta T8/T9
-(`order-prisma.ts` inserta `order_presentation_lines` en crudo; `reservation-prisma.ts`,
-`batch-movement-prisma.ts`, `execution-log-prisma.ts`, `step-evidence-prisma.ts`,
-`conditioning-team-prisma.ts` crean sin `orderLineId`; ~70 archivos de test siembran esas tablas).
-El gate no queda verde al cerrar la fase 1 como pide `tasks.md`. Hace falta decision humana.
+Archivos: `db/migrations/20261103120100_order_lines_references/{migration.sql,down.sql}` (nuevos),
+`tests/integration/pedidos/order-lines-references-migration.int.test.ts` (nuevo), `db/schema.prisma`
+(`orderLineId String?` + indice en los seis modelos), `tests/guards/guard-identificador-de-request.test.ts`,
+`tests/integration/aislamiento.json`.
 
-Veredicto: T0 y T1 en verde; T2 bloqueada a la espera de decision.
+Verificacion (salida real):
+- `pnpm run typecheck` → sin errores; `pnpm run lint` → 0 errores
+- `order-lines-references-migration.int` → `Test Files 1 passed (1)`, `Tests 8 passed (8)` (plantilla reconstruida)
+- 16 `.int` que bajan o tocan estas tablas/migraciones → `Test Files 16 passed (16)`, `Tests 133 passed (133)`
+- `pnpm exec vitest run guard` → `Test Files 87 passed (87)`, `Tests 1327 passed | 22 skipped`
+- Pendiente de CI: que ningun `.int` no corrido compare filas enteras de las seis tablas con `toEqual` (ahora llevan `orderLineId: null`).
+
+El bloqueo original de T2 lo resolvio la enmienda del spec (T2 en dos pasos; el paso 2 es T14e).

@@ -37,7 +37,7 @@
   empresa (R2), cantidad 0, precio negativo (R15), línea `PARCIAL` (R48) y dos líneas activas con
   la misma original, también original + versión (R5); las admite si una está cancelada o quitada
   (R5); `down.sql` deja el esquema como antes. Depende de T0.
-- [ ] **T2 — `order_line_id` nullable en las tablas hijas (paso 1 de 2).** Migración
+- [x] **T2 — `order_line_id` nullable en las tablas hijas (paso 1 de 2).** Migración
   `20261103120100_order_lines_references` (design § 1.4, punto 2): columna **nullable** e índice
   simple en reparto, reservas, movimientos de inventario, registro de ejecución, evidencias y equipo
   de acondicionamiento; CHECK suave de `inventory_movements` (solo los cuatro tipos con pedido
