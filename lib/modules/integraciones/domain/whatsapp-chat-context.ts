@@ -26,6 +26,7 @@ export type CustomerOrderStage = 'recibido' | 'en preparación' | 'entregado' | 
 
 // El único sitio con el texto que lee el cliente por estado: el `Record` obliga a etiquetar un estado nuevo.
 export const CUSTOMER_ORDER_STAGE: Readonly<Record<OrderStatus, CustomerOrderStage>> = {
+  PARCIAL: 'en preparación',
   PENDIENTE: 'recibido',
   EN_CURSO: 'en preparación',
   POR_EMPACAR: 'en preparación',

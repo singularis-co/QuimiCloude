@@ -218,6 +218,7 @@ describe('QC-87 — consultar los responsables de un pedido', () => {
         'EN_ACONDICIONAMIENTO',
         'EN_CURSO',
         'EN_EMPAQUE',
+        'PARCIAL',
         'PENDIENTE',
         'POR_ACONDICIONAR',
         'POR_EMPACAR',

@@ -32,6 +32,7 @@ const VOID_DATE_LABEL = 'Fecha de anulación';
 const VOID_ACTION_LABEL = 'Anular';
 
 const STATUS_ACCEPTS_VOID: Readonly<Record<OrderStatus, boolean>> = {
+  PARCIAL: false,
   PENDIENTE: false,
   EN_CURSO: false,
   POR_EMPACAR: false,

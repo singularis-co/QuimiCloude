@@ -77,6 +77,7 @@ import { type OrderStatus, type OrderSummary } from '@/lib/modules/pedidos';
  * `BLOQUEADO` NO es final: ver el comentario de cabecera.
  */
 const ORDER_STATUS_IS_FINAL: Readonly<Record<OrderStatus, boolean>> = {
+  PARCIAL: true,
   PENDIENTE: false,
   EN_CURSO: false,
   POR_EMPACAR: true,
@@ -104,6 +105,7 @@ export function isFinalOrderStatus(status: OrderStatus): boolean {
  * fijado.
  */
 const ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT: Readonly<Record<OrderStatus, boolean>> = {
+  PARCIAL: false,
   PENDIENTE: false,
   EN_CURSO: false,
   POR_EMPACAR: true,
@@ -124,6 +126,7 @@ export function acceptsDistributionEdit(status: OrderStatus): boolean {
 // No reutiliza `ORDER_STATUS_IS_FINAL`: los estados de acondicionamiento y `TERMINADO` cierran la
 // edicion pero siguen aceptando el cambio de cliente.
 const ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Readonly<Record<OrderStatus, boolean>> = {
+  PARCIAL: true,
   PENDIENTE: true,
   EN_CURSO: true,
   POR_EMPACAR: true,
@@ -137,6 +140,7 @@ const ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE: Readonly<Record<OrderStatus, boolean
 };
 
 const ORDER_STATUS_ACCEPTS_DELIVERY: Readonly<Record<OrderStatus, boolean>> = {
+  PARCIAL: false,
   PENDIENTE: false,
   EN_CURSO: false,
   POR_EMPACAR: false,
@@ -155,6 +159,7 @@ export function acceptsDelivery(status: OrderStatus): boolean {
 
 // No pide permiso propio: ver la lista ya lo cubre el permiso de consultar la pantalla.
 const ORDER_STATUS_HAS_DELIVERIES: Readonly<Record<OrderStatus, boolean>> = {
+  PARCIAL: false,
   PENDIENTE: false,
   EN_CURSO: false,
   POR_EMPACAR: false,

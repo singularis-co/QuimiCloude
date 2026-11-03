@@ -19,7 +19,7 @@ export {
   ORDER_STATUSES_NOT_IN_PROGRESS,
   isStartedOrderStatus,
 } from './domain/order-classification';
-export type { OrderPriority, OrderStatus } from './domain/order-classification';
+export type { OrderLineStatus, OrderPriority, OrderStatus } from './domain/order-classification';
 export type { OrderContents } from './domain/order-contents';
 
 /** QC-87 (T2, R45): el servicio que `pedidos` ofrece a otros modulos para saber el ESTADO de

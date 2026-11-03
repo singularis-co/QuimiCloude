@@ -11,7 +11,7 @@
 
 ## Fase 1 — Modelo (convive con las columnas viejas)
 
-- [ ] **T0 — Valor `PARCIAL` del enum.** Migración `20261103115900_order_status_partial` escrita a
+- [x] **T0 — Valor `PARCIAL` del enum.** Migración `20261103115900_order_status_partial` escrita a
   mano con `ADD VALUE 'PARCIAL' BEFORE 'PENDIENTE'` (`migration.sql` + `down.sql` que aborta si hay
   pedidos `PARCIAL` y recrea el tipo con los diez valores de hoy), `db/schema.prisma` con
   `PARCIAL` el primero del enum, `ORDER_STATUS_VALUES` con `'PARCIAL'` el primero (y su comentario
@@ -24,7 +24,7 @@
   *Hecho:* `module-contract.test.ts` verde con la lista nueva; test de migración: sube, el enum
   queda con `PARCIAL` delante de `PENDIENTE`, baja sin pedidos `PARCIAL` y se niega con uno; tests
   de R50, R52 (`ORDER_STATUS_FLOW[0]`) y R53 (etiqueta, tono y texto de WhatsApp).
-- [ ] **T1 — Tabla `order_lines` y relleno.** `db/schema.prisma` (modelo `OrderLine`, `/// @module
+- [x] **T1 — Tabla `order_lines` y relleno.** `db/schema.prisma` (modelo `OrderLine`, `/// @module
   pedidos`) y migración `20261103120000_order_lines` con `migration.sql` + `down.sql`, RLS
   `ENABLE` + `FORCE`, CHECK (incluido `status <> 'PARCIAL'`), único parcial `(order_id,
   original_recipe_id) WHERE deleted_at IS NULL AND status <> 'CANCELADO'`, índice de caducidad,
@@ -317,3 +317,28 @@ Los tests existentes de `tests/unit/pedidos/`, `tests/unit/asignaciones/`, `test
 `tests/integration/pedidos/` y `tests/integration/asignaciones/` que construyen pedidos con
 `recipeId` en `orders` se ajustarán al modelo nuevo en la task que rompa cada uno; el implementer
 añade su ruta aquí cuando lo toque.
+
+Tocados en la fase 1 (T0, T1) para que el modelo nuevo no los rompa:
+
+- `app/(private)/pedidos/components/order-row-actions.tsx`
+- `app/(private)/pedidos/components/order-delivery-list.tsx`
+- `lib/modules/pedidos/domain/set-order-customer.ts`
+- `lib/modules/asignaciones/domain/order-state.ts`
+- `lib/modules/asignaciones/domain/count-evidence-locking-orders.ts`
+- `lib/modules/pedidos/domain/order-cancellation.ts`
+- `scripts/seed-demo/data.ts`
+- `tests/helpers/migration-script.ts`
+- `tests/integration/aislamiento.json`
+- `tests/guards/guard-identificador-de-request.test.ts`
+- `tests/integration/pedidos/company-scope.int.test.ts`
+- `tests/integration/pedidos/order-status-blocked-rollback.int.test.ts`
+- `tests/integration/pedidos/order-conditioning-states-rollback.int.test.ts`
+- `tests/unit/pedidos/order-transitions.test.ts`
+- `tests/unit/pedidos/order-cancellation.test.ts`
+- `tests/unit/pedidos/set-order-customer.test.ts`
+- `tests/unit/pedidos-ui/order-status-badges.test.tsx`
+- `tests/unit/pedidos-ui/order-row-actions.test.tsx`
+- `tests/unit/asignaciones/list-company-orders.test.ts`
+- `tests/unit/asignaciones/list-order-responsibles.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/whatsapp-chat-context.test.ts`
+- `tests/unit/scripts/seed-demo-run.test.ts`

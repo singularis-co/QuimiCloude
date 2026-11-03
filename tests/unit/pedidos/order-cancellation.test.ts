@@ -74,6 +74,7 @@ function dobles(opciones: { estado?: OrderStatus | null; cancelacion?: 'ok' | 'n
 
 describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R43)', () => {
   const ESPERADO: Readonly<Record<OrderStatus, boolean>> = {
+    PARCIAL: false,
     PENDIENTE: true,
     EN_CURSO: true,
     BLOQUEADO: true,
@@ -86,7 +87,7 @@ describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R4
     CANCELADO: false,
   }
 
-  it('R29: clasifica los diez estados de OrderStatus, ni uno mas ni uno menos', () => {
+  it('R29: clasifica los once estados de OrderStatus, ni uno mas ni uno menos', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(Object.keys(ESPERADO).sort())
   })
 

@@ -88,7 +88,7 @@ const CUSTOMER = { firstNames: 'Laura', lastNames: 'Gómez Ruiz' }
 describe('tipos del contrato', () => {
   it('R51/R53: los tipos del contexto son los del contrato v2', () => {
     expectTypeOf<WhatsappCustomerOrderStatus>().toEqualTypeOf<
-      'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'BLOQUEADO' | 'POR_ACONDICIONAR' | 'EN_ACONDICIONAMIENTO' | 'TERMINADO'
+      'PARCIAL' | 'PENDIENTE' | 'EN_CURSO' | 'POR_EMPACAR' | 'EN_EMPAQUE' | 'BLOQUEADO' | 'POR_ACONDICIONAR' | 'EN_ACONDICIONAMIENTO' | 'TERMINADO'
     >()
     expectTypeOf<WhatsappCustomerOrder>().toEqualTypeOf<{
       readonly id: string
@@ -245,9 +245,9 @@ describe('CUSTOMER_ORDER_STAGE', () => {
     expect(new Set(Object.values(CUSTOMER_ORDER_STAGE))).toEqual(new Set(STAGES))
   })
 
-  it('R60: PENDIENTE va solo; los siete en curso comparten etiqueta; entregado y cancelado van aparte', () => {
+  it('R60: PENDIENTE va solo; los ocho en curso comparten etiqueta; entregado y cancelado van aparte', () => {
     const inProgress = OPEN_STATUSES.filter((status) => status !== 'PENDIENTE')
-    expect(inProgress).toHaveLength(7)
+    expect(inProgress).toHaveLength(8)
     const stageOf = (status: OrderStatus) => CUSTOMER_ORDER_STAGE[status]
     expect(new Set(inProgress.map(stageOf)).size).toBe(1)
     const distinct = new Set([stageOf('PENDIENTE'), stageOf(inProgress[0]), stageOf('ENTREGADO'), stageOf('CANCELADO')])

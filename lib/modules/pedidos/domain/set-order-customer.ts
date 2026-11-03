@@ -36,6 +36,7 @@ const setOrderCustomerSchema = z.object({
  * compatible con sus `CHECK`.
  */
 export const CUSTOMER_EDITABLE_STATUSES: readonly OrderStatus[] = [
+  'PARCIAL',
   'PENDIENTE',
   'EN_CURSO',
   'BLOQUEADO',

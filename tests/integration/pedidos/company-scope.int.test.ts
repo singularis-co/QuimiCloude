@@ -534,6 +534,9 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
  *
  * QC-214 2026-10-13: `20261013120000_order_step_evidence` anadio una sexta,
  * `order_step_evidence_order_id_company_id_fkey`, con la misma forma; se retira y restaura igual.
+ *
+ * 2026-11-03: `20261103120000_order_lines` anadio una septima,
+ * `order_lines_order_id_company_id_fkey`, con la misma forma; se retira y restaura igual.
  */
 const RESERVATION_ORDER_FK =
   'ALTER TABLE "reservation_movements" ADD CONSTRAINT "reservation_movements_order_id_fkey" ' +
@@ -560,6 +563,11 @@ const STEP_EVIDENCE_ORDER_FK =
   'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
   'ON DELETE RESTRICT ON UPDATE CASCADE'
 
+const ORDER_LINE_ORDER_FK =
+  'ALTER TABLE "order_lines" ADD CONSTRAINT "order_lines_order_id_company_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
+
 async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
   await tx.$executeRawUnsafe(
     'ALTER TABLE "reservation_movements" DROP CONSTRAINT "reservation_movements_order_id_fkey"',
@@ -577,6 +585,7 @@ async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transaction
   await tx.$executeRawUnsafe(
     'ALTER TABLE "order_step_evidence" DROP CONSTRAINT "order_step_evidence_order_id_company_id_fkey"',
   )
+  await tx.$executeRawUnsafe('ALTER TABLE "order_lines" DROP CONSTRAINT "order_lines_order_id_company_id_fkey"')
 }
 
 async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
@@ -586,6 +595,7 @@ async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transact
   await tx.$executeRawUnsafe(CONDITIONING_TEAM_ORDER_FK)
   await tx.$executeRawUnsafe(DELIVERY_ORDER_FK)
   await tx.$executeRawUnsafe(STEP_EVIDENCE_ORDER_FK)
+  await tx.$executeRawUnsafe(ORDER_LINE_ORDER_FK)
 }
 
 afterAll(async () => {

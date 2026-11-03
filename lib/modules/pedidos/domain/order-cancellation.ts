@@ -1,4 +1,4 @@
-import type { OrderStatus } from './order-classification';
+import type { OrderLineStatus, OrderStatus } from './order-classification';
 
 import type { OrderTransactionScope, OrderUnitOfWork } from '../ports/order-unit-of-work';
 
@@ -25,10 +25,10 @@ const CANCELLABLE = {
   TERMINADO: false,
   ENTREGADO: false,
   CANCELADO: false,
-} as const satisfies Record<OrderStatus, boolean>;
+} as const satisfies Record<OrderLineStatus, boolean>;
 
 export function isCancellableStatus(status: OrderStatus): boolean {
-  return CANCELLABLE[status];
+  return status !== 'PARCIAL' && CANCELLABLE[status];
 }
 
 export type OrderCancellationOutcome = 'ok' | 'not_found' | 'not_cancellable';

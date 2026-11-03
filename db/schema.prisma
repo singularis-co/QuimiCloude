@@ -759,15 +759,17 @@ model Unit {
 }
 
 /// Enum y no tabla: el conjunto es cerrado a proposito y anadir un valor es una migracion.
+/// Postgres ordena un enum por declaracion, y el listado ordena por estado con ese orden.
 enum OrderStatus {
+  /// Solo del pedido: sus lineas activas estan en estados distintos. Ninguna linea lo lleva.
+  PARCIAL
   PENDIENTE
   EN_CURSO
   ENTREGADO
   CANCELADO
   POR_EMPACAR
   EN_EMPAQUE
-  /// Un pedido cuyo material no alcanza queda en BLOQUEADO. Va el ultimo, como los dos de
-  /// empaque: reordenar obligaria a recrear el tipo en vez de anadir un valor.
+  /// Un pedido cuyo material no alcanza queda en BLOQUEADO.
   BLOQUEADO
   POR_ACONDICIONAR
   EN_ACONDICIONAMIENTO
@@ -852,6 +854,7 @@ model Order {
 
   presentationLines OrderPresentationLine[]
   deliveries        OrderDelivery[]
+  lines             OrderLine[]
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
@@ -863,6 +866,60 @@ model Order {
   @@index([unitId], map: "orders_unit_id_idx")
   @@index([companyId, customerId], map: "orders_company_id_customer_id_idx")
   @@map("orders")
+}
+
+/// Una receta del pedido, con su cantidad, su estado, sus costes, su precio y su plazo de reserva.
+/// `companyId` es copia de la del pedido y la FK `(order_id, company_id)` impide que difieran.
+/// `originalRecipeId` es la receta original de `recipeId` (ella misma si no es version): el unico
+/// parcial `order_lines_order_original_recipe_active_key` la usa para que un pedido no lleve dos
+/// veces la misma receta activa. Ese unico, los indices parciales, los CHECK y las FK hacia
+/// `recipes`, `units`, `users` y `companies` estan escritos a mano y son drift: hay que borrar a
+/// mano su `DROP` de toda migracion generada.
+/// @module pedidos
+model OrderLine {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String      @map("order_id") @db.Uuid
+  companyId          String      @map("company_id") @db.Uuid
+  /// Orden de alta dentro del pedido, desde 0. No se reutiliza al quitar una linea.
+  position           Int
+  /// La receta que se fabrica: la version, si se eligio una.
+  recipeId           String      @map("recipe_id") @db.Uuid
+  originalRecipeId   String      @map("original_recipe_id") @db.Uuid
+  quantity           Decimal     @db.Decimal(14, 4)
+  /// NULL solo en lineas migradas de pedidos antiguos sin unidad.
+  unitId             String?     @map("unit_id") @db.Uuid
+  /// Nunca PARCIAL: lo impide el CHECK `order_lines_status_not_partial`.
+  status             OrderStatus @default(PENDIENTE)
+  cancellationReason String?     @map("cancellation_reason")
+  ingredientsCost    Decimal?    @map("ingredients_cost") @db.Decimal(14, 4)
+  packagingCost      Decimal?    @map("packaging_cost") @db.Decimal(14, 4)
+  actualCost         Decimal?    @map("actual_cost") @db.Decimal(14, 4)
+  salePrice          Decimal?    @map("sale_price") @db.Decimal(14, 4)
+  /// Instante desde el que cuentan los dias de caducidad de lo apartado para esta linea.
+  reservedAt         DateTime?   @map("reserved_at") @db.Timestamptz(6)
+  finishedAt         DateTime?   @map("finished_at") @db.Timestamptz(6)
+  packedBy           String?     @map("packed_by") @db.Uuid
+  conditionedBy      String?     @map("conditioned_by") @db.Uuid
+  createdBy          String?     @map("created_by") @db.Uuid
+  updatedBy          String?     @map("updated_by") @db.Uuid
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Cascade, map: "order_lines_order_id_company_id_fkey")
+
+  @@unique([orderId, position], map: "order_lines_order_id_position_key")
+  @@unique([id, companyId], map: "order_lines_id_company_id_key")
+  @@unique([id, orderId], map: "order_lines_id_order_id_key")
+  @@index([companyId], map: "order_lines_company_id_idx")
+  @@index([recipeId], map: "order_lines_recipe_id_idx")
+  @@index([originalRecipeId], map: "order_lines_original_recipe_id_idx")
+  @@index([unitId], map: "order_lines_unit_id_idx")
+  @@index([packedBy], map: "order_lines_packed_by_idx")
+  @@index([conditionedBy], map: "order_lines_conditioned_by_idx")
+  @@index([createdBy], map: "order_lines_created_by_idx")
+  @@index([updatedBy], map: "order_lines_updated_by_idx")
+  @@map("order_lines")
 }
 
 /// El reparto de un pedido: en que presentaciones se entrega lo fabricado y cuantos envases de

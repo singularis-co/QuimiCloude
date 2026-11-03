@@ -195,6 +195,7 @@ describe('QC-145 — listCompanyOrders: R22 sin filtro trae todos los estados', 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
       [
+        'PARCIAL',
         'PENDIENTE',
         'EN_CURSO',
         'POR_EMPACAR',
@@ -392,6 +393,7 @@ describe('QC-145 — listCompanyOrders: R27 paginacion delegada al catalogo', ()
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
       [
+        'PARCIAL',
         'PENDIENTE',
         'EN_CURSO',
         'POR_EMPACAR',

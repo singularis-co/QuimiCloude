@@ -274,10 +274,11 @@ describe('con el pedido en estado final las tres acciones estan deshabilitadas (
 });
 
 describe('el predicado de estado final es UNO solo y sale del contrato (R24, R42)', () => {
-  it('R22: exactamente `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO` de los valores que publica `pedidos`', () => {
+  it('R22: exactamente `PARCIAL`, `ENTREGADO`, `CANCELADO`, `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` y `TERMINADO` de los valores que publica `pedidos`', () => {
     const finales = ORDER_STATUS_VALUES.filter((status) => isFinalOrderStatus(status));
 
     expect(finales).toEqual([
+      'PARCIAL',
       'ENTREGADO',
       'CANCELADO',
       'POR_EMPACAR',
@@ -409,9 +410,10 @@ describe('la accion «Cliente»', () => {
     (status) => !(CLIENTE_CERRADO as readonly OrderStatus[]).includes(status),
   );
 
-  it('R39: los diez estados del contrato quedan repartidos entre abiertos y cerrados', () => {
-    expect(ORDER_STATUS_VALUES).toHaveLength(10);
+  it('R39: los once estados del contrato quedan repartidos entre abiertos y cerrados', () => {
+    expect(ORDER_STATUS_VALUES).toHaveLength(11);
     expect(CLIENTE_ABIERTO).toEqual([
+      'PARCIAL',
       'PENDIENTE',
       'EN_CURSO',
       'POR_EMPACAR',
@@ -481,8 +483,8 @@ describe('la accion «Cliente»', () => {
 describe('la accion «Entregar»', () => {
   const NO_ENTREGABLES = ORDER_STATUS_VALUES.filter((status) => status !== 'TERMINADO');
 
-  it('R4: los otros nueve estados del contrato no admiten la entrega', () => {
-    expect(NO_ENTREGABLES).toHaveLength(9);
+  it('R4: los otros diez estados del contrato no admiten la entrega', () => {
+    expect(NO_ENTREGABLES).toHaveLength(10);
   });
 
   it('R4: con canDeliver aparece en TERMINADO, habilitada, y emite su enganche con la fila', async () => {
@@ -541,8 +543,8 @@ describe('la accion «Entregas»', () => {
     (status) => !(CON_ENTREGAS as readonly OrderStatus[]).includes(status),
   );
 
-  it('R5: los otros ocho estados del contrato no ofrecen la lista de entregas', () => {
-    expect(SIN_ENTREGAS).toHaveLength(8);
+  it('R5: los otros nueve estados del contrato no ofrecen la lista de entregas', () => {
+    expect(SIN_ENTREGAS).toHaveLength(9);
   });
 
   it.each(CON_ENTREGAS)(
@@ -617,6 +619,7 @@ const TESTID_DE: Readonly<Record<OrderRowAction, string>> = {
 };
 
 const FINALES: readonly OrderStatus[] = [
+  'PARCIAL',
   'POR_EMPACAR',
   'EN_EMPAQUE',
   'ENTREGADO',

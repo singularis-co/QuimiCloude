@@ -1,5 +1,5 @@
 import { InvalidTransitionError } from './errors';
-import type { OrderStatus } from './order-classification';
+import type { OrderLineStatus, OrderStatus } from './order-classification';
 
 /**
  * Lo unico que permite, escrito UNA SOLA VEZ. Cancelar NO esta aqui: es `cancelOrder` y solo
@@ -36,7 +36,7 @@ import type { OrderStatus } from './order-classification';
  * cancelado no se borre, que un cancelado tenga motivo, y que solo `EN_EMPAQUE` pueda llevar
  * quien empaca- si lo garantiza la base.
  */
-const ALLOWED: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
+const ALLOWED: Readonly<Record<OrderLineStatus, readonly OrderLineStatus[]>> = {
   PENDIENTE: ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'],
   EN_CURSO: ['EN_CURSO', 'POR_EMPACAR'],
   POR_EMPACAR: ['EN_EMPAQUE'],
@@ -52,6 +52,8 @@ const ALLOWED: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
 /** ¿Es legal pasar de `from` a `to` en una EDICION? Predicado puro, para poder probar todos los
  *  pares de la matriz sin capturar excepciones. */
 export function isAllowedTransition(from: OrderStatus, to: OrderStatus): boolean {
+  // El pedido PARCIAL no se transiciona: su estado sale de sus lineas.
+  if (from === 'PARCIAL' || to === 'PARCIAL') return false;
   return ALLOWED[from].includes(to);
 }
 

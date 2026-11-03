@@ -37,7 +37,7 @@ const PERMITIDOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = [
   ['BLOQUEADO', 'PENDIENTE'],
 ]
 
-/** Los 100 pares de la matriz, en el orden de declaracion del conjunto cerrado. */
+/** Los 121 pares de la matriz, en el orden de declaracion del conjunto cerrado. */
 const TODOS: ReadonlyArray<readonly [OrderStatus, OrderStatus]> = ORDER_STATUS_VALUES.flatMap(
   (from) => ORDER_STATUS_VALUES.map((to) => [from, to] as const),
 )
@@ -47,16 +47,17 @@ function esperado(from: OrderStatus, to: OrderStatus): boolean {
 }
 
 describe('pedidos — transiciones de estado', () => {
-  it('R3: la matriz es de 10x10 y hay exactamente 12 pares permitidos', () => {
-    // Si alguien anadiera un estado sin revisar esta tabla, el 100 dejaria de cuadrar.
-    expect(ORDER_STATUS_VALUES).toHaveLength(10)
-    expect(TODOS).toHaveLength(100)
+  it('R3: la matriz es de 11x11 y hay exactamente 12 pares permitidos', () => {
+    // Si alguien anadiera un estado sin revisar esta tabla, el 121 dejaria de cuadrar.
+    expect(ORDER_STATUS_VALUES).toHaveLength(11)
+    expect(TODOS).toHaveLength(121)
     expect(TODOS.filter(([from, to]) => esperado(from, to))).toHaveLength(PERMITIDOS.length)
     expect(PERMITIDOS).toHaveLength(12)
   })
 
-  it('R1: los tres estados nuevos van detras de los siete de antes, que conservan su orden', () => {
+  it('R1: los tres estados nuevos van detras de los siete de antes, que conservan su orden; PARCIAL va delante de todos', () => {
     expect(ORDER_STATUS_VALUES).toEqual([
+      'PARCIAL',
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
@@ -72,6 +73,7 @@ describe('pedidos — transiciones de estado', () => {
 
   it('R2: el orden del flujo pone el acondicionamiento y TERMINADO entre el empaque y la entrega', () => {
     expect(ORDER_STATUS_FLOW).toEqual([
+      'PARCIAL',
       'PENDIENTE',
       'EN_CURSO',
       'POR_EMPACAR',

@@ -21,6 +21,16 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { runDowns } from '../../helpers/migration-script'
+
+// Las migraciones de las lineas del pedido dependen del tipo `OrderStatus`: bajan antes.
+const ORDER_LINES_DOWNS = [
+  '_orders_drop_line_columns',
+  '_order_lines_references',
+  '_order_lines',
+  '_order_status_partial',
+] as const
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -255,6 +265,7 @@ describe('down.sql de order_conditioning_states', () => {
       ).toBe(0)
       expect(await indexNames(tx)).toContain('orders_company_terminated_idx')
 
+      await runDowns(tx, ORDER_LINES_DOWNS)
       await applyStatements(tx, ACTUAL_COST_DOWN_STATEMENTS)
       await applyStatements(tx, INDEX_DOWN_STATEMENTS)
       expect(await indexNames(tx)).not.toContain('orders_company_terminated_idx')

@@ -161,9 +161,10 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 }
 
 describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada, R15, QC-215 R37)', () => {
-  it('R14: los diez estados son exactamente los del catalogo', () => {
+  it('R14: los once estados son exactamente los del catalogo', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(
       [
+        'PARCIAL',
         'BLOQUEADO',
         'CANCELADO',
         'EN_ACONDICIONAMIENTO',
@@ -178,9 +179,10 @@ describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada,
     )
   })
 
-  it('R37: CUSTOMER_EDITABLE_STATUSES son los ocho estados abiertos, sin ENTREGADO ni CANCELADO', () => {
+  it('R37: CUSTOMER_EDITABLE_STATUSES son los nueve estados abiertos, sin ENTREGADO ni CANCELADO', () => {
     expect([...CUSTOMER_EDITABLE_STATUSES].sort()).toEqual(
       [
+        'PARCIAL',
         'PENDIENTE',
         'EN_CURSO',
         'BLOQUEADO',
@@ -192,7 +194,7 @@ describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada,
       ].sort(),
     )
     expect([...CUSTOMER_EDITABLE_STATUSES].sort()).toEqual([...ESTADOS_ABIERTOS].sort())
-    expect(ESTADOS_ABIERTOS).toHaveLength(8)
+    expect(ESTADOS_ABIERTOS).toHaveLength(9)
   })
 
   it.each<OrderStatus>([...ESTADOS_ABIERTOS])(

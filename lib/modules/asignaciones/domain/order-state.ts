@@ -37,7 +37,7 @@
  * **No se usa `assertTransition` de `pedidos`** aunque este publicado (`design.md > 4`): esa tabla
  * dice que CAMBIOS DE ESTADO son legales al editar un pedido, y aqui no se cambia ningun estado.
  */
-import type { OrderAssignmentTarget, OrderStatus } from '@/lib/modules/pedidos';
+import type { OrderAssignmentTarget, OrderLineStatus } from '@/lib/modules/pedidos';
 
 import {
   OrderCancelledNotAssignableError,
@@ -67,7 +67,7 @@ const ERROR_POR_ESTADO = {
   POR_ACONDICIONAR: (): AsignacionesError => new OrderProducedFrozenError(),
   EN_ACONDICIONAMIENTO: (): AsignacionesError => new OrderProducedFrozenError(),
   TERMINADO: (): AsignacionesError => new OrderProducedFrozenError(),
-} satisfies Record<OrderStatus, (() => AsignacionesError) | null>;
+} satisfies Record<OrderLineStatus, (() => AsignacionesError) | null>;
 
 /**
  * Deja pasar si el pedido existe y su estado admite escrituras; lanza en cualquier otro caso.
@@ -81,6 +81,8 @@ export function assertOrderAcceptsWrites(
   // R8: primero la existencia. Que este error sea distinto del de R10/R11 es el requisito R12.
   if (order === null) throw new OrderNotFoundError();
 
+  // Un PARCIAL tiene lineas activas sin entregar, y su responsable opera cualquiera de ellas.
+  if (order.status === 'PARCIAL') return;
   const error = ERROR_POR_ESTADO[order.status];
   if (error !== null) throw error();
 }

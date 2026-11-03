@@ -584,6 +584,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Cada valor nuevo se anade a las DOS listas a la vez; que sigan cuadrando valor a valor y
     // EN ORDEN es exactamente lo que R35 vigila.
     expect(enumValues('OrderStatus')).toEqual([
+      'PARCIAL',
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
