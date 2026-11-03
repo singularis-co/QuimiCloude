@@ -1,9 +1,8 @@
 # QT-313 — pedido-con-varias-recetas-backend · design.md
 
 > Escrito por `spec_author` (F1.2, 2026-11-03) y revisado en F1.4 (2026-11-03) con las respuestas
-> del humano a P1–P10, que ya están en `requirements.md > Decisiones cerradas`. Quedan abiertas
-> P11, P12 y P13 (§ 2.2, § 11); el diseño aplica la regla literal y no depende de ellas para lo
-> demás.
+> del humano a P1–P13, que ya están en `requirements.md > Decisiones cerradas`. No queda ninguna
+> pregunta abierta.
 
 ## Lo que ya existe
 
@@ -66,7 +65,8 @@ cambio visible.
   P10). Una línea cancelada o quitada libera su receta; la original y sus versiones chocan entre sí.
 - `order_lines_id_company_id_key` y `order_lines_id_order_id_key` (únicos): destino de las FK
   compuestas de las tablas hijas (§ 1.3).
-- `(company_id)`, `(recipe_id)`, `(company_id, status) WHERE deleted_at IS NULL`.
+- `(company_id)`, `(recipe_id)`, `(company_id, status) WHERE deleted_at IS NULL` y
+  `(order_id, status) WHERE deleted_at IS NULL` (el `EXISTS` del filtro de § 2.2.1).
 - CHECK `order_lines_delivered_not_deleted`: copia de `orders_delivered_not_deleted`.
 - **RLS:** `ENABLE` + `FORCE ROW LEVEL SECURITY`, con la misma policy que `orders`. Es defensa en
   profundidad; la frontera es el service (`docs/architecture.md > Acceso a datos`).
@@ -107,8 +107,8 @@ FK compuesta `(order_line_id, order_id)` garantiza que los dos apuntan al mismo 
 
 ### 1.4 Migraciones (cuatro, cada una con su `down.sql`)
 
-0. **`20261103115900_order_status_partial`** — `ALTER TYPE "OrderStatus" ADD VALUE 'PARCIAL'`, al
-   final, en su propia migración: Postgres no deja usar un valor añadido en la misma transacción
+0. **`20261103115900_order_status_partial`** — `ALTER TYPE "OrderStatus" ADD VALUE 'PARCIAL'
+   BEFORE 'PENDIENTE'` (§ 2.2.2), en su propia migración: Postgres no deja usar un valor añadido en la misma transacción
    que lo añade (mismo patrón que `order_status_blocked` + `orders_blocked_index`). `down.sql`:
    aborta si alguna fila de `orders` está en `PARCIAL`; si no, recrea el tipo sin el valor, como
    hizo el `down.sql` de `order_status_blocked`.
@@ -167,20 +167,66 @@ construcción y la migración no cambia ningún estado.
 
 | Sitio | Qué cambia |
 |---|---|
-| `ORDER_STATUS_VALUES` (`order-classification.ts`) | `'PARCIAL'` al final, igual que en el enum (`module-contract.test.ts` compara las dos listas en orden) |
-| Filtro por estado del listado (`order-queryable.ts`, `list-query-sql.ts`) | Admite `PARCIAL` porque el filtro es `select` contra `ORDER_STATUS_VALUES`; no hace falta código propio. Filtrar por otro estado no trae los `PARCIAL` (R49, literal; ver P11) |
-| Orden por estado en la base | El de declaración del enum, como hoy: `PARCIAL` queda el último. Ya hoy ese orden «no significa nada de negocio» (comentario de `ORDER_STATUS_VALUES`) |
-| `ORDER_STATUS_FLOW` (orden en pantalla) | Al final, tras `CANCELADO` y `BLOQUEADO`, como estado lateral que no es un paso del flujo. **Abierto: P12** |
+| `ORDER_STATUS_VALUES` (`order-classification.ts`) | `'PARCIAL'` **el primero**, igual que en el enum (§ 2.2.2; `module-contract.test.ts` compara las dos listas en orden) |
+| Filtro por estado del listado (`order-queryable.ts`, `order-prisma.ts`) | Regla de P11 (R49), § 2.2.1 |
+| Orden por estado en la base | `PARCIAL` primero por declaración del enum (R52), § 2.2.2 |
+| `ORDER_STATUS_FLOW` (orden en pantalla) | `PARCIAL` **el primero**, antes de `PENDIENTE` (decisión P12, R52) |
+| Etiqueta y tono (`lib/shared/ui/order-status.ts`) | «Parcial», tono `progress` (decisión P13, R53) |
+| Texto al cliente (`integraciones/domain/whatsapp-chat-context.ts`) | «en preparación» (decisión P13, R53) |
 | `ORDER_STATUSES_NOT_IN_PROGRESS` | **No** se añade: un `PARCIAL` siempre tiene una línea activa sin entregar, así que está en curso (R50). Lo heredan `order-company-stats-prisma.ts` y el contexto de chat de `integraciones` |
 | `STARTED_ORDER_STATUSES`, `isStartedOrderStatus` | Pasan a evaluarse sobre la **línea** (el coste congelado es de cada línea); `PARCIAL` no aparece |
 | `order-transitions.ts`, `order-cancellation.ts`, `delete-order.ts` | Tipados con `OrderLineStatus` (§ 2.1); el pedido no se transiciona, se deriva |
 | CHECK de `orders` que nombran estados (`cancellation_reason`, `delivered_not_deleted`) | No cambian: `PARCIAL` no está en sus listas, y un pedido `PARCIAL` tiene una línea activa, así que no lleva motivo de cancelación |
 | Colas de `asignaciones` | Leen el estado de la **línea**, no el del pedido (§ 5): `PARCIAL` no les llega |
 
-**Lo que no se ha podido derivar sin inventar** queda como pregunta abierta: P11 (si filtrar por
-un estado debe traer también los `PARCIAL` con alguna receta en él), P12 (dónde se pinta
-`PARCIAL` en `ORDER_STATUS_FLOW`) y P13 (su etiqueta, su tono y el texto que ve el cliente por
-WhatsApp, § 11). Ninguna cambia el modelo: P11 sería un filtro nuevo, y P12 y P13 son constantes.
+#### 2.2.1 Filtro por estado (decisión P11, R49)
+
+El filtro de estado vive en `orderFilterWhere` (`order-prisma.ts`); `order-queryable.ts` no cambia
+de forma (`status` sigue siendo `select` contra `ORDER_STATUS_VALUES`, que ya incluye `PARCIAL`).
+Con los valores pedidos `S`:
+
+```ts
+// S sin PARCIAL; si S trae PARCIAL, el primer término lo incluye y basta
+{ OR: [
+    { status: { in: S } },
+    { status: 'PARCIAL',
+      lines: { some: { deletedAt: null, status: { in: S, not: 'CANCELADO' } } } },
+] }
+```
+
+- Va en **su propio término** del `AND` de `buildOrderWhere`, después del ámbito y del borrado,
+  como cualquier otro filtro: el `OR` acota dentro de la empresa, nunca amplía (la regla del
+  comentario de `buildOrderWhere`).
+- «Línea activa» excluye las canceladas, así que filtrar por `CANCELADO` no trae un `PARCIAL` con
+  una receta cancelada: solo los pedidos `CANCELADO`.
+- Varios estados: un solo `OR` con `in: S` en los dos brazos; un pedido no sale dos veces porque
+  es una sola consulta sobre `orders` (la relación `lines` va en un `EXISTS`, no en un `JOIN`).
+- `total` sale del mismo `where` (no cambia la regla de hoy).
+- Necesita la relación `Order.lines` en Prisma, que existe porque `OrderLine` es del mismo módulo.
+- Índice: `order_lines (order_id, status) WHERE deleted_at IS NULL` para el `EXISTS` (§ 1.1).
+
+#### 2.2.2 Orden por estado (decisión P12, R52)
+
+Hoy `status` ordena por la **posición de declaración** del enum de Postgres (comentario de
+`orderOrderBy` en `order-prisma.ts`). Para que `PARCIAL` vaya el primero sin escribir el orden en
+la consulta, la migración 0 lo añade **delante**:
+
+```sql
+ALTER TYPE "OrderStatus" ADD VALUE 'PARCIAL' BEFORE 'PENDIENTE';
+```
+
+`db/schema.prisma` lo declara el primero en `enum OrderStatus` y `ORDER_STATUS_VALUES` también,
+para que `module-contract.test.ts` siga comparando en orden. El comentario de
+`ORDER_STATUS_VALUES` que dice que «añadir al final es lo único que Postgres sabe hacer» deja de
+ser cierto y se corrige: `ADD VALUE … BEFORE` existe y no recrea el tipo. Prisma no genera el
+`BEFORE`: la migración se escribe a mano.
+
+Descartado: ordenar con un `CASE` explícito en la consulta. Obliga a pasar el orden por estado a
+SQL crudo (Prisma no ordena por expresión) solo para un valor, y dejaría dos órdenes distintos
+para el mismo enum (el de la base y el de la consulta).
+
+El `down.sql` de la migración 0 recrea el tipo sin `PARCIAL` y con los diez valores en su orden
+de hoy, igual que el de `order_status_blocked`.
 
 ### 2.3 Cancelar
 
@@ -274,7 +320,7 @@ canceladas no cuentan (P9).
 | `quoteOrderCost` | Cotiza una línea (recibe `recipeId`, cantidad, unidad, reparto y, en edición, `orderLineId` para contar su propio apartado como disponible) |
 | `expireStaleOrders` | Por línea (§ 6, R51) |
 | `reviewBlockedOrders` | Por línea (R40) |
-| `getOrder`, `listOrders` | Devuelven líneas, totales y resumen (§ 4.3); filtro y orden con `PARCIAL` (R49) |
+| `getOrder`, `listOrders` | Devuelven líneas, totales y resumen (§ 4.3); filtro y orden con `PARCIAL` (R49, R52, § 2.2.1, § 2.2.2) |
 | `deliverOrder`, `voidDelivery` | Cuentan el reparto por línea; mueven `TERMINADO` ↔ `ENTREGADO` de la línea (R39) y derivan el pedido |
 
 ### 4.3 Salida
@@ -424,9 +470,9 @@ cabe sin rehacer el modelo.
 - **Valor de enum nuevo.** Todo `Record<OrderStatus, …>` exhaustivo deja de compilar hasta decidir
   `PARCIAL`; es lo buscado. Los mapas de línea pasan a `OrderLineStatus` (`order-transitions.ts`,
   `order-cancellation.ts`, `asignaciones/domain/order-state.ts`,
-  `count-evidence-locking-orders.ts`). Quedan dos mapas del **pedido** que necesitan un valor para
-  `PARCIAL` y cuyo valor no se deriva de ninguna decisión: la etiqueta y el tono de
-  `lib/shared/ui/order-status.ts` y el texto que ve el cliente en
-  `integraciones/domain/whatsapp-chat-context.ts`. **Abierto: P13.** Mientras se decide, el
-  diseño pone la etiqueta «Parcial», el tono `progress` y el texto «en preparación» (el mismo de
-  los estados en curso, coherente con R50), para que compile; cambiarlos es editar dos literales.
+  `count-evidence-locking-orders.ts`). Los dos mapas del **pedido** reciben el valor de la decisión
+  P13 (R53): «Parcial» con tono `progress` en `lib/shared/ui/order-status.ts`, y «en preparación»
+  en `integraciones/domain/whatsapp-chat-context.ts`.
+- **Valor del enum al principio.** `ADD VALUE … BEFORE` cambia la posición relativa de todos los
+  valores para `ORDER BY status`: cualquier test que fije el orden por estado de hoy tiene que
+  contar con `PARCIAL` delante. Los demás valores no cambian de orden entre sí.

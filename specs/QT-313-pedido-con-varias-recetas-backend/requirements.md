@@ -23,7 +23,7 @@
 ## Requisitos (EARS)
 
 > Escritos por `spec_author` (F1.2, 2026-11-03) y revisados con las respuestas del humano a
-> P1–P10 (F1.4, 2026-11-03). Vocabulario:
+> P1–P13 (F1.4, 2026-11-03). Vocabulario:
 > - **Línea**: una receta dentro de un pedido, con su cantidad, unidad, reparto, precio, coste y
 >   estado. «Receta» y «línea» son lo mismo visto desde el negocio y desde el modelo.
 > - **Línea viva**: no quitada (sin borrado lógico). Una línea cancelada sigue viva: se ve, con su
@@ -198,10 +198,19 @@
   **`PARCIAL`**. *[¿Cómo avanza el estado? · Estado del pedido entero]*
 - **R48** — Ninguna línea DEBE poder estar en `PARCIAL`: la base DEBE rechazar una línea con ese
   estado, aunque la escritura no pase por los casos de uso. *[Estado del pedido entero]*
-- **R49** — El listado de pedidos DEBE admitir `PARCIAL` como valor del filtro por estado y como
-  valor ordenable del estado, con las mismas reglas que los demás valores; filtrar por cualquier
-  otro estado DEBE devolver solo los pedidos cuyo estado derivado es ese, no los `PARCIAL` que
-  tengan alguna línea en él. *[Estado del pedido entero]*
+- **R49** — CUANDO el listado de pedidos se filtra por un estado X distinto de `PARCIAL`, el
+  sistema DEBE devolver los pedidos cuyo estado derivado es X **y también** los pedidos `PARCIAL`
+  que tienen al menos una línea activa en X. CUANDO se filtra por `PARCIAL`, DEBE devolver solo
+  los pedidos `PARCIAL`. CUANDO se filtra por varios estados a la vez, DEBE devolver la unión de lo
+  que devolvería cada uno, sin repetir ningún pedido. *[Estado del pedido entero · Filtrar por
+  estado con pedidos parciales]*
+- **R52** — El sistema DEBE poner `PARCIAL` **el primero**, antes de `PENDIENTE`, en la lista de
+  estados que publica para pintar filtros y columnas, y CUANDO el listado se ordena por estado de
+  forma ascendente, los pedidos `PARCIAL` DEBEN ir antes que los `PENDIENTE` (y los últimos en
+  orden descendente). *[Orden de `PARCIAL`]*
+- **R53** — El sistema DEBE nombrar el estado `PARCIAL` como «Parcial», con el tono `progress`, en
+  las pantallas, y como «en preparación» en el texto del pedido que lee el cliente por WhatsApp.
+  *[Cómo se nombra `PARCIAL`]*
 - **R50** — El sistema DEBE contar un pedido `PARCIAL` como pedido **en curso** en toda lectura
   que hoy separa los pedidos en curso de los entregados y cancelados (estadísticas de la empresa,
   contexto de chat de `integraciones`). *[Estado del pedido entero]*
@@ -287,7 +296,7 @@
 | ¿Hace falta E2E? | R46 |
 | Prioridad y cliente | R42 |
 | Caducidad de la reserva | R7, R41, R51 |
-| Estado del pedido entero | R34, R48, R49, R50 |
+| Estado del pedido entero | R34, R48, R49, R50, R52, R53 |
 | Avisos QC-293 y QC-294 | Sin requisito, por decisión (ver la fila) |
 | Pantallas de planta con varias recetas | R46 (y «Lo que NO entra») |
 | Cancelar el pedido con recetas fabricadas | R29 |
@@ -295,24 +304,13 @@
 | Sumas con huecos | R16, R18 |
 | Quitar y repetir | R4, R5, R22, R23 |
 | Versiones de receta | R4, R5 |
+| Filtrar por estado con pedidos parciales | R49 |
+| Orden de `PARCIAL` | R52 |
+| Cómo se nombra `PARCIAL` | R53 |
 
 ## Preguntas abiertas
 
-Abiertas en F1.4 al diseñar el estado `PARCIAL`; no bloquean el resto del spec.
-
-- **P11 — Filtrar por estado con pedidos `PARCIAL`.** R49 aplica la regla tal cual: filtrar por
-  `EN_CURSO` no devuelve un pedido `PARCIAL` que tenga una receta en curso. ¿Basta así, o el
-  listado debe poder encontrar también los pedidos que tienen **alguna receta** en un estado
-  (filtro por estado de receta)? Si es lo segundo, es un filtro nuevo, no un cambio del actual.
-- **P12 — Dónde se pinta `PARCIAL` en el orden del flujo** (`ORDER_STATUS_FLOW`, que usan las
-  pantallas para el orden de filtros y columnas). El diseño lo pone al final, junto a las salidas
-  laterales `CANCELADO` y `BLOQUEADO` (`design.md > 2.2`). El orden de la base (ordenar por
-  estado) no se decide aquí: es el de declaración del enum, igual que hoy, y `PARCIAL` va el
-  último. QT-314 puede pedir otro sitio para la pantalla.
-- **P13 — Cómo se nombra `PARCIAL`.** Dos sitios necesitan un valor para compilar y ninguna
-  decisión lo da: la etiqueta y el tono del estado en `lib/shared/ui/order-status.ts`, y el texto
-  que ve el cliente por WhatsApp (`integraciones/domain/whatsapp-chat-context.ts`). El diseño pone
-  «Parcial», tono `progress` y «en preparación» mientras tanto (`design.md > 11`).
+Ninguna. P1–P13 están cerradas en la tabla de abajo.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -338,3 +336,6 @@ Abiertas en F1.4 al diseñar el estado `PARCIAL`; no bloquean el resto del spec.
 | 2026-11-03 | Sumas con huecos (P8) | **Los totales excluyen las canceladas.** El precio suma las que tienen precio y dice cuántas no; el coste queda «sin coste» si a alguna activa le falta. |
 | 2026-11-03 | Quitar y repetir (P9) | **Se pueden quitar las recetas `PENDIENTE` y también las `BLOQUEADO`.** Una receta cancelada **libera** su receta, que se puede volver a añadir: la unicidad aplica solo entre líneas vivas no canceladas, también en la base. Precisa la fila «¿Se pueden añadir o quitar recetas?» en lo que toca a `BLOQUEADO`. |
 | 2026-11-03 | Versiones de receta (P10) | **La original y sus versiones (QC-172, `parent_recipe_id`) son la misma receta:** no pueden convivir en el mismo pedido. |
+| 2026-11-03 | Filtrar por estado con pedidos parciales (P11) | **Filtrar por un estado X trae los pedidos en X y también los `PARCIAL` que tienen alguna línea activa en X.** El filtro «Parcial» sigue existiendo y trae solo los parciales. |
+| 2026-11-03 | Orden de `PARCIAL` (P12) | **`PARCIAL` va el primero**, antes de `PENDIENTE`: en la lista de estados de la pantalla (`ORDER_STATUS_FLOW`, filtros y columnas) y en el orden por estado del listado. |
+| 2026-11-03 | Cómo se nombra `PARCIAL` (P13) | **«Parcial», con tono `progress`, en pantalla; «en preparación» en el texto que lee el cliente por WhatsApp.** Definitivo. |

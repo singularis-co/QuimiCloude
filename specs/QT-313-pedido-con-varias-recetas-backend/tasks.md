@@ -1,11 +1,9 @@
 # QT-313 — pedido-con-varias-recetas-backend · tasks.md
 
 > Escrito por `spec_author` (F1.2, 2026-11-03) y revisado en F1.4 (2026-11-03) con las decisiones
-> P1–P10. `[P]` = paralelizable con las otras `[P]` de su misma fase. Cada task cierra con
+> P1–P13. `[P]` = paralelizable con las otras `[P]` de su misma fase. Cada task cierra con
 > `pnpm run typecheck`, `pnpm run lint` y `pnpm exec vitest related --run <archivos tocados>` en
-> verde, y un commit `feat(QT-313): …`. Las tasks marcadas **(P11)**, **(P12)** o **(P13)** tocan
-> una pregunta todavía abierta: se implementan con la regla literal del design y, si el humano
-> decide otra cosa, se ajusta solo esa parte.
+> verde, y un commit `feat(QT-313): …`. No queda ninguna pregunta abierta.
 >
 > Orden por fases: el modelo nuevo convive con las columnas viejas de `orders` hasta la fase 5;
 > la migración que las borra (T15) va la **última**, cuando ya nadie las lee. Así cada fase deja
@@ -13,22 +11,24 @@
 
 ## Fase 1 — Modelo (convive con las columnas viejas)
 
-- [ ] **T0 — Valor `PARCIAL` del enum.** Migración `20261103115900_order_status_partial`
-  (`migration.sql` + `down.sql` que aborta si hay pedidos `PARCIAL` y recrea el tipo),
-  `db/schema.prisma`, `ORDER_STATUS_VALUES` con `'PARCIAL'` al final, tipo `OrderLineStatus`, los
-  mapas de línea retipados (`order-transitions.ts`, `order-cancellation.ts`,
-  `asignaciones/domain/order-state.ts`, `count-evidence-locking-orders.ts`), y los dos mapas de
-  pedido con el valor provisional (`lib/shared/ui/order-status.ts`,
-  `integraciones/domain/whatsapp-chat-context.ts`) **(P13)**; `ORDER_STATUS_FLOW` con `PARCIAL`
-  al final **(P12)**; `PARCIAL` fuera de `ORDER_STATUSES_NOT_IN_PROGRESS` (R50).
-  *Hecho:* `module-contract.test.ts` verde con la lista nueva; test de migración: sube, baja sin
-  pedidos `PARCIAL` y se niega con uno; test de R50 en las estadísticas de la empresa y en el
-  contexto de chat.
+- [ ] **T0 — Valor `PARCIAL` del enum.** Migración `20261103115900_order_status_partial` escrita a
+  mano con `ADD VALUE 'PARCIAL' BEFORE 'PENDIENTE'` (`migration.sql` + `down.sql` que aborta si hay
+  pedidos `PARCIAL` y recrea el tipo con los diez valores de hoy), `db/schema.prisma` con
+  `PARCIAL` el primero del enum, `ORDER_STATUS_VALUES` con `'PARCIAL'` el primero (y su comentario
+  corregido, design § 2.2.2), tipo `OrderLineStatus`, los mapas de línea retipados
+  (`order-transitions.ts`, `order-cancellation.ts`, `asignaciones/domain/order-state.ts`,
+  `count-evidence-locking-orders.ts`), «Parcial» con tono `progress` en
+  `lib/shared/ui/order-status.ts` y «en preparación» en
+  `integraciones/domain/whatsapp-chat-context.ts` (R53); `ORDER_STATUS_FLOW` con `PARCIAL` el
+  primero (R52); `PARCIAL` fuera de `ORDER_STATUSES_NOT_IN_PROGRESS` (R50).
+  *Hecho:* `module-contract.test.ts` verde con la lista nueva; test de migración: sube, el enum
+  queda con `PARCIAL` delante de `PENDIENTE`, baja sin pedidos `PARCIAL` y se niega con uno; tests
+  de R50, R52 (`ORDER_STATUS_FLOW[0]`) y R53 (etiqueta, tono y texto de WhatsApp).
 - [ ] **T1 — Tabla `order_lines` y relleno.** `db/schema.prisma` (modelo `OrderLine`, `/// @module
   pedidos`) y migración `20261103120000_order_lines` con `migration.sql` + `down.sql`, RLS
   `ENABLE` + `FORCE`, CHECK (incluido `status <> 'PARCIAL'`), único parcial `(order_id,
   original_recipe_id) WHERE deleted_at IS NULL AND status <> 'CANCELADO'`, índice de caducidad,
-  FK compuestas (design § 1.1, § 1.4). Relleno: una línea por pedido, borrados incluidos, con
+  índice `(order_id, status) WHERE deleted_at IS NULL` para el filtro de R49, FK compuestas (design § 1.1, § 1.4). Relleno: una línea por pedido, borrados incluidos, con
   `reserved_at` y `original_recipe_id`.
   *Hecho:* test de integración de migración: N pedidos → N líneas con los once valores iguales,
   `NULL` incluidos, y el estado de cada pedido sin cambiar (R7); la base rechaza línea de otra
@@ -124,10 +124,14 @@
   vencida y libera solo su material; el pedido queda `PARCIAL`). Depende de T8, T7.
 - [ ] **T13 — Lecturas.** `get-order.ts`, `list-orders.ts`, `order-view.ts`, `order-queryable.ts`,
   `list-order-summaries.ts`, `list-query-sql.ts`, `order-catalog-prisma.ts`: `OrderView.lines`,
-  totales y `progress` (design § 4.3); filtro y orden por estado con `PARCIAL` **(P11)**.
-  *Hecho:* tests de R6, R16, R18, R33, R34 en la salida; R49: filtrar por `PARCIAL` devuelve los
-  pedidos parciales, filtrar por `EN_CURSO` no los devuelve aunque tengan una línea en curso, y
-  ordenar por estado los pone según el enum. Depende de T3, T4, T8.
+  totales y `progress` (design § 4.3); filtro por estado de `orderFilterWhere` en
+  `order-prisma.ts` con el `OR` de design § 2.2.1, en su propio término del `AND`.
+  *Hecho:* tests de R6, R16, R18, R33, R34 en la salida; R49 en integración: filtrar por
+  `EN_CURSO` devuelve los `EN_CURSO` y los `PARCIAL` con una línea activa en curso, no los
+  `PARCIAL` cuya única línea en curso está cancelada; filtrar por `PARCIAL` devuelve solo los
+  parciales; filtrar por `EN_CURSO` y `PENDIENTE` a la vez no repite pedidos y `total` coincide;
+  el filtro nunca trae pedidos de otra empresa; R52: ordenar por estado ascendente pone los
+  `PARCIAL` antes que los `PENDIENTE`. Depende de T3, T4, T8.
 
 ## Fase 5 — Consumidores y puente
 
@@ -172,7 +176,7 @@
   pedido muestra la suma (enmienda de QC-307, decisión «¿Dónde va el precio de venta?»); y punto 2:
   la reserva elige lote **por receta del pedido**, con su propio plazo de caducidad.
   *Hecho:* el texto ya no dice «del pedido entero». Depende de T15.
-- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R51 → test`.
+- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R53 → test`.
   *Hecho:* cada `R<n>` tiene al menos un test con `R<n>` en el nombre. Depende de T16.
 
 ## Archivos esperados
@@ -292,6 +296,9 @@
 - `tests/unit/pedidos/expire-stale-order-lines.test.ts`
 - `tests/unit/pedidos/order-actions-bridge.test.ts`
 - `tests/unit/shared-ui/order-status.test.ts`
+- `tests/unit/pedidos/module-contract.test.ts`
+- `tests/unit/pedidos/order-classification.test.ts`
+- `tests/unit/integraciones/whatsapp-chat-context.test.ts`
 - `tests/integration/pedidos/order-status-partial-migration.int.test.ts`
 - `tests/integration/pedidos/order-lines-migration.int.test.ts`
 - `tests/integration/pedidos/order-lines-references-migration.int.test.ts`
