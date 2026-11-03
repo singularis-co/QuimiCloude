@@ -10,6 +10,9 @@
 > **Lo que NO entra.**
 > - La pantalla de alta, edición y consulta con varias recetas va en **QT-314**
 >   (`pedido-con-varias-recetas-frontend`).
+> - Las pantallas de planta con varias recetas (ejecución, empaque, acondicionamiento y entrega) y
+>   el E2E de un pedido de dos recetas van en **QT-315** (`planta-con-varias-recetas`, frontend,
+>   depende de ésta).
 > - El margen por receta y en total va en **QC-308** (`margen-del-pedido`). Su descripción se
 >   revisa cuando se acote.
 >
@@ -19,19 +22,20 @@
 
 ## Requisitos (EARS)
 
-> Escritos por `spec_author` (F1.2, 2026-11-03). Vocabulario:
+> Escritos por `spec_author` (F1.2, 2026-11-03) y revisados con las respuestas del humano a
+> P1–P10 (F1.4, 2026-11-03). Vocabulario:
 > - **Línea**: una receta dentro de un pedido, con su cantidad, unidad, reparto, precio, coste y
 >   estado. «Receta» y «línea» son lo mismo visto desde el negocio y desde el modelo.
 > - **Línea viva**: no quitada (sin borrado lógico). Una línea cancelada sigue viva: se ve, con su
 >   motivo.
+> - **Línea activa**: viva y no cancelada.
+> - **Misma receta**: la misma receta original, o la original y cualquiera de sus versiones
+>   (QC-172), o dos versiones de la misma original.
 > - **Estado editable**: `PENDIENTE`, `EN_CURSO` o `BLOQUEADO`, el mismo conjunto que hoy admite
 >   la edición general del pedido.
 > - **Estado cancelable**: `PENDIENTE`, `EN_CURSO` o `BLOQUEADO`, el mismo de
 >   `order-cancellation.ts`.
-> - **P1 a P4** son las cuatro preguntas sembradas, en su orden («Prioridad y cliente»,
->   «Caducidad de la reserva», «Estado del pedido entero», «Avisos QC-293 y QC-294»). P5 a P10 las
->   añade este spec. Un requisito marcado **[depende de Pn]** está escrito con la propuesta de
->   `design.md` y se reescribe si el humano decide otra cosa.
+> - **Línea terminada**: en `TERMINADO` o `ENTREGADO`.
 > - Entre corchetes, la fila de `## Decisiones cerradas` que cubre cada requisito.
 
 ### Modelo
@@ -49,12 +53,14 @@
   viva. SI el alta o la edición no trae ninguna línea, ENTONCES el sistema DEBE rechazarla con
   `invalid_input` sin escribir nada. *[¿Qué es un pedido con varias fórmulas?]*
 - **R4** — SI el alta o la edición traen dos líneas con la misma receta, o una línea nueva o
-  cambiada con la receta de otra línea viva del pedido, ENTONCES el sistema DEBE rechazar la
-  operación entera con el código `duplicate_order_recipe` sin escribir nada.
-  *[¿Se puede repetir una receta?]* [depende de P9 y P10]
-- **R5** — La base de datos DEBE rechazar dos líneas vivas del mismo pedido con la misma
-  receta, aunque la escritura no pase por los casos de uso. *[¿Se puede repetir una receta?]*
-  [depende de P9]
+  cambiada con la misma receta que otra línea activa del pedido, ENTONCES el sistema DEBE
+  rechazar la operación entera con el código `duplicate_order_recipe` sin escribir nada. Una
+  línea cancelada NO DEBE impedir volver a añadir su receta.
+  *[¿Se puede repetir una receta? · Versiones de receta · Quitar y repetir]*
+- **R5** — La base de datos DEBE rechazar dos líneas activas del mismo pedido con la misma
+  receta original guardada, aunque la escritura no pase por los casos de uso, y DEBE admitirlas
+  si una de las dos está cancelada o quitada. *[¿Se puede repetir una receta? · Versiones de
+  receta · Quitar y repetir]*
 - **R6** — El sistema DEBE devolver las líneas de un pedido siempre en el mismo orden: el de su
   alta en el pedido. *[¿Qué es un pedido con varias fórmulas?]*
 
@@ -63,8 +69,9 @@
 - **R7** — CUANDO se aplica la migración, el sistema DEBE crear para cada pedido existente,
   borrados incluidos, **exactamente una** línea con la receta, la cantidad, la unidad, el
   estado, el motivo de cancelación, el coste estimado y su parte de envases, el coste real, el
-  precio de venta, la fecha de terminado, el empacador y quien acondiciona que tenía el pedido,
-  sin alterar ningún valor (un `NULL` sigue siendo `NULL`). *[¿Qué es un pedido con varias
+  precio de venta, la fecha de terminado, el empacador, quien acondiciona y el instante desde el
+  que cuenta la caducidad de la reserva que tenía el pedido, sin alterar ningún valor (un `NULL`
+  sigue siendo `NULL`). El estado del pedido migrado DEBE quedar igual que antes. *[¿Qué es un pedido con varias
   fórmulas? · Identificadores, cifras y borrado]*
 - **R8** — CUANDO se aplica la migración, el sistema DEBE asociar a esa única línea todo lo que
   hoy cuelga del pedido y pasa a ser de la receta: las líneas del reparto, los asientos de
@@ -108,14 +115,15 @@
 - **R16** — El sistema DEBE devolver con cada pedido el **precio total**: la suma exacta, en
   cadena decimal de 4 decimales, de los precios de sus líneas vivas no canceladas que tienen
   precio, y «sin precio» si ninguna lo tiene; y DEBE devolver también cuántas de esas líneas no
-  tienen precio. El total NO DEBE guardarse. *[¿Dónde va el precio de venta?]* [depende de P8]
+  tienen precio. Las líneas canceladas NO DEBEN sumar ni contar. El total NO DEBE guardarse.
+  *[¿Dónde va el precio de venta? · Sumas con huecos]*
 - **R17** — CUANDO se crea una línea o se edita su receta, cantidad, unidad o reparto, el
   sistema DEBE calcular y guardar el coste estimado **de esa línea** con las reglas de hoy
   (QC-151, QC-195), y NO DEBE tocar el coste guardado de las demás líneas.
   *[¿Qué es un pedido con varias fórmulas?]*
 - **R18** — El sistema DEBE devolver con cada pedido el coste estimado total y el coste real
-  total como suma de los de sus líneas vivas no canceladas, y «sin coste» si alguna de ellas no
-  lo tiene. *[¿Qué es un pedido con varias fórmulas?]* [depende de P8]
+  total como suma de los de sus líneas activas, y «sin coste» si alguna de ellas no lo tiene. Las
+  líneas canceladas NO DEBEN sumar. *[¿Qué es un pedido con varias fórmulas? · Sumas con huecos]*
 - **R19** — El sistema NO DEBE incluir el precio de ninguna línea ni el total en los datos que
   `pedidos` entrega a `asignaciones` ni en ninguna salida de `asignaciones`.
   *[¿Dónde va el precio de venta?]*
@@ -130,13 +138,13 @@
   estado, el sistema DEBE crearla en `PENDIENTE` (o en `BLOQUEADO`, con las reglas de R13 y R14)
   y apartar su material, sin cambiar el estado, el material ni el coste de las demás.
   *[¿Se pueden añadir o quitar recetas?]*
-- **R22** — CUANDO una edición quita una línea en `PENDIENTE`, el sistema DEBE darla de baja
-  (borrado lógico) y liberar todo su material en la misma transacción, con quien edita como
-  autor. La línea quitada NO DEBE aparecer en ninguna lectura del pedido.
-  *[¿Se pueden añadir o quitar recetas?]* [depende de P9]
-- **R23** — SI una edición intenta quitar una línea que no está en `PENDIENTE`, ENTONCES el
-  sistema DEBE rechazar la edición entera con el código `order_line_not_removable` sin escribir
-  nada. *[¿Se pueden añadir o quitar recetas?]* [depende de P9]
+- **R22** — CUANDO una edición quita una línea en `PENDIENTE` o en `BLOQUEADO`, el sistema DEBE
+  darla de baja (borrado lógico) y liberar todo su material en la misma transacción, con quien
+  edita como autor. La línea quitada NO DEBE aparecer en ninguna lectura del pedido.
+  *[¿Se pueden añadir o quitar recetas? · Quitar y repetir]*
+- **R23** — SI una edición intenta quitar una línea que no está en `PENDIENTE` ni en `BLOQUEADO`,
+  ENTONCES el sistema DEBE rechazar la edición entera con el código `order_line_not_removable`
+  sin escribir nada. *[¿Se pueden añadir o quitar recetas? · Quitar y repetir]*
 - **R24** — SI una edición cambia algún dato de una línea que no está en un estado editable,
   ENTONCES el sistema DEBE rechazar la edición entera con `invalid_transition` sin escribir nada.
   Una línea en estado no editable que llega sin cambios NO DEBE impedir la edición del resto.
@@ -163,7 +171,7 @@
   ese motivo, en una sola transacción, todas sus líneas en estado cancelable y liberar su
   material; las líneas en otros estados NO DEBEN cambiar. SI ninguna línea está en estado
   cancelable, ENTONCES el sistema DEBE rechazar con `not_cancellable` sin escribir nada.
-  *[¿Se puede cancelar una sola receta?]* [depende de P6]
+  *[¿Se puede cancelar una sola receta? · Cancelar el pedido con recetas fabricadas]*
 - **R30** — SI quien edita, añade, quita o cancela una línea, o cancela el pedido, no tiene
   `pedidos.modificar`, ENTONCES el sistema DEBE rechazar con `unauthorized` antes de validar la
   entrada y sin leer ni escribir nada. El catálogo de permisos NO DEBE cambiar.
@@ -180,12 +188,23 @@
   desbloquear, cancelar), el sistema NO DEBE cambiar el estado de ninguna otra línea del pedido.
   *[¿Cómo avanza el estado?]*
 - **R33** — El sistema DEBE devolver con cada pedido un **resumen de avance**: cuántas líneas
-  vivas no canceladas tiene y cuántas de ellas están terminadas.
-  *[¿Cómo avanza el estado?]* [depende de P7]
-- **R34** — El sistema DEBE guardar en el pedido un estado **derivado** de los de sus líneas y
-  volver a derivarlo en la misma transacción que cualquier cambio de estado de una línea, para
-  que los listados y filtros por estado sigan funcionando. *[¿Cómo avanza el estado?]*
-  [depende de P3]
+  activas tiene (el total) y cuántas de ellas están terminadas (`TERMINADO` o `ENTREGADO`). Las
+  canceladas NO DEBEN contar ni en el total ni en las terminadas.
+  *[¿Cómo avanza el estado? · Qué cuenta como terminada]*
+- **R34** — El sistema DEBE guardar en el pedido un estado **derivado** de los de sus líneas
+  vivas y volver a derivarlo en la misma transacción que cualquier alta, baja o cambio de estado
+  de una línea: SI todas están canceladas, ENTONCES `CANCELADO`; SI todas las activas están en el
+  mismo estado, ENTONCES ese estado; SI las activas están en estados distintos, ENTONCES
+  **`PARCIAL`**. *[¿Cómo avanza el estado? · Estado del pedido entero]*
+- **R48** — Ninguna línea DEBE poder estar en `PARCIAL`: la base DEBE rechazar una línea con ese
+  estado, aunque la escritura no pase por los casos de uso. *[Estado del pedido entero]*
+- **R49** — El listado de pedidos DEBE admitir `PARCIAL` como valor del filtro por estado y como
+  valor ordenable del estado, con las mismas reglas que los demás valores; filtrar por cualquier
+  otro estado DEBE devolver solo los pedidos cuyo estado derivado es ese, no los `PARCIAL` que
+  tengan alguna línea en él. *[Estado del pedido entero]*
+- **R50** — El sistema DEBE contar un pedido `PARCIAL` como pedido **en curso** en toda lectura
+  que hoy separa los pedidos en curso de los entregados y cancelados (estadísticas de la empresa,
+  contexto de chat de `integraciones`). *[Estado del pedido entero]*
 
 ### Ejecución, empaque, acondicionamiento y entrega
 
@@ -210,14 +229,22 @@
   `BLOQUEADO` por separado, en el orden de alta de los pedidos y, dentro del pedido, en el de sus
   líneas, y pasar a `PENDIENTE` con su material apartado solo las líneas para las que alcanza.
   *[¿Cómo avanza el estado?]*
-- **R41** — CUANDO vence el plazo de la reserva, el sistema DEBE cancelar con el motivo de
-  caducidad de hoy las líneas `PENDIENTE` del pedido y liberar su material; las líneas en otros
-  estados NO DEBEN cambiar. *[¿Cómo avanza el estado?]* [depende de P2]
+- **R41** — El sistema DEBE contar los 15 días de caducidad de la reserva **por línea**, desde el
+  instante en que se apartó el material de esa línea: crear la línea o editarla lo reinicia;
+  cancelarla, quitarla, consumir su material o dejarla `BLOQUEADO` lo vacía; crear o editar
+  otra línea del mismo pedido NO DEBE tocarlo. *[¿Cómo avanza el estado? · Caducidad de la
+  reserva]*
+- **R51** — CUANDO vence el plazo de una línea `PENDIENTE`, el proceso diario DEBE cancelar esa
+  línea con el motivo de caducidad de hoy y liberar su material, y NO DEBE cambiar ninguna otra
+  línea del pedido, aunque también esté `PENDIENTE` con un plazo sin vencer.
+  *[¿Cómo avanza el estado? · Caducidad de la reserva]*
 
 ### Prioridad, cliente y avisos
 
 - **R42** — El sistema DEBE seguir guardando la prioridad y el cliente en el pedido, con las
-  reglas de hoy, y aplicarlos a todas sus líneas. *[¿Quién es responsable?]* [depende de P1]
+  reglas de hoy, y NO DEBE admitir prioridad ni cliente por línea: SI la entrada de una línea
+  trae esas claves, ENTONCES el sistema DEBE descartarlas sin guardarlas.
+  *[¿Quién es responsable? · Prioridad y cliente]*
 
 ### Ámbito, compatibilidad y verificación
 
@@ -234,8 +261,9 @@
   finalizarlo como operador y comprobar que el material apartado y consumido y el lote de
   producto terminado son los mismos que antes de esta ficha; y un test de integración contra la
   base DEBE recorrer un pedido de **dos** líneas que comparten un insumo (alta, cancelar una
-  línea, finalizar la otra) y comprobar lote a lote lo apartado, lo liberado y lo consumido.
-  *[¿Hace falta E2E?]* [depende de P5]
+  línea, finalizar la otra) y comprobar lote a lote lo apartado, lo liberado y lo consumido. El
+  E2E de un pedido de dos recetas por las pantallas de planta es de QT-315.
+  *[¿Hace falta E2E? · Pantallas de planta con varias recetas]*
 
 ### Baja del pedido
 
@@ -248,7 +276,7 @@
 | Decisión (fila) | Requisitos |
 |---|---|
 | ¿Qué es un pedido con varias fórmulas? | R1, R3, R6, R7, R8, R10, R11, R17, R18 |
-| ¿Cómo avanza el estado? | R12, R13, R14, R24, R25, R26, R31, R32, R33, R34, R36, R37, R38, R39, R40, R41 |
+| ¿Cómo avanza el estado? | R12, R13, R14, R24, R25, R26, R31, R32, R33, R34, R36, R37, R38, R39, R40, R41, R51 |
 | ¿Dónde va el precio de venta? | R1, R15, R16, R19 |
 | ¿Quién es responsable? | R30, R35, R42 |
 | ¿Se puede cancelar una sola receta? | R27, R28, R29 |
@@ -257,46 +285,34 @@
 | ¿Una ficha o dos? | R44, R45 |
 | Identificadores, cifras y borrado | R2, R7, R9, R43, R47 |
 | ¿Hace falta E2E? | R46 |
-
-La pregunta P4 (avisos QC-293 y QC-294) no tiene requisito aquí: las dos fichas están `pending`
-y no hay aviso implementado que cambiar. La decide quien las acote (`design.md > 9`).
+| Prioridad y cliente | R42 |
+| Caducidad de la reserva | R7, R41, R51 |
+| Estado del pedido entero | R34, R48, R49, R50 |
+| Avisos QC-293 y QC-294 | Sin requisito, por decisión (ver la fila) |
+| Pantallas de planta con varias recetas | R46 (y «Lo que NO entra») |
+| Cancelar el pedido con recetas fabricadas | R29 |
+| Qué cuenta como terminada | R33 |
+| Sumas con huecos | R16, R18 |
+| Quitar y repetir | R4, R5, R22, R23 |
+| Versiones de receta | R4, R5 |
 
 ## Preguntas abiertas
 
-- **Prioridad y cliente:** ¿son del pedido o de cada receta? No se preguntó al acotar.
-- **Caducidad de la reserva** (15 días, `orders.reserved_at`): ¿cuenta por receta o por pedido?
-- **Estado del pedido entero:** ¿cómo se deriva de los estados de sus recetas, para listados y
-  filtros?
-- **Avisos QC-293 y QC-294** (pedido asignado y listo, pedido bloqueado): ¿se mandan por receta
-  o por pedido?
+Abiertas en F1.4 al diseñar el estado `PARCIAL`; no bloquean el resto del spec.
 
-### Añadidas por spec_author (F1.2, 2026-11-03)
-
-Cada una lleva una propuesta en `design.md`; ninguna está decidida.
-
-- **P5 — Pantallas de planta con varias recetas.** QT-314 cubre alta, edición y consulta del
-  pedido. ¿Qué ficha lleva la ejecución del operador (`/asignacion/[id]`), el empaque, el
-  acondicionamiento y la entrega de un pedido con varias líneas, donde hay que elegir la receta?
-  Sin esas pantallas, un pedido de dos recetas no se puede fabricar desde la aplicación, y el E2E
-  de R46 solo puede recorrer uno de una. Propuesta: ficha frontend nueva en la épica QC-31.
-- **P6 — Cancelar el pedido con recetas ya fabricadas y sin terminar.** Una receta en
-  `POR_EMPACAR`, `EN_EMPAQUE`, `POR_ACONDICIONAR` o `EN_ACONDICIONAMIENTO` no está terminada pero
-  hoy no se cancela (su material ya se consumió). La decisión dice «cancelar el pedido cancela
-  todas las que no estén terminadas». ¿Esas quedan intactas, o se rechaza la cancelación del
-  pedido entero? Propuesta: quedan intactas (R29).
-- **P7 — Qué cuenta como «terminada»** en el resumen «1 de 2 terminadas»: ¿`TERMINADO`,
-  `ENTREGADO` o los dos? ¿Las canceladas cuentan en el total? Propuesta: `TERMINADO` y `ENTREGADO`
-  cuentan como terminadas; las canceladas no cuentan en ningún lado (R33).
-- **P8 — Sumas con huecos.** ¿El precio total suma las recetas canceladas? ¿Y si alguna receta
-  no tiene precio, o no tiene coste? Propuesta: canceladas fuera; el precio suma lo que hay y
-  dice cuántas faltan (R16); el coste total queda «sin coste» si falta alguno, porque un coste
-  parcial parecería completo (R18).
-- **P9 — Quitar y repetir.** ¿Una receta `BLOQUEADO` se puede quitar (tampoco ha empezado)? ¿Una
-  receta cancelada impide volver a añadir la misma receta al pedido? Propuesta: solo se quita la
-  `PENDIENTE`, como dice la decisión; la cancelada sigue ocupando su receta (R4, R5, R22, R23).
-- **P10 — Versiones de receta.** ¿La receta original y una versión suya (QC-172
-  `versiones-de-receta`, `recipes.parent_recipe_id`) cuentan como la misma receta para la regla de no repetir?
-  Propuesta: no; se compara la receta efectiva que se fabrica (R4).
+- **P11 — Filtrar por estado con pedidos `PARCIAL`.** R49 aplica la regla tal cual: filtrar por
+  `EN_CURSO` no devuelve un pedido `PARCIAL` que tenga una receta en curso. ¿Basta así, o el
+  listado debe poder encontrar también los pedidos que tienen **alguna receta** en un estado
+  (filtro por estado de receta)? Si es lo segundo, es un filtro nuevo, no un cambio del actual.
+- **P12 — Dónde se pinta `PARCIAL` en el orden del flujo** (`ORDER_STATUS_FLOW`, que usan las
+  pantallas para el orden de filtros y columnas). El diseño lo pone al final, junto a las salidas
+  laterales `CANCELADO` y `BLOQUEADO` (`design.md > 2.2`). El orden de la base (ordenar por
+  estado) no se decide aquí: es el de declaración del enum, igual que hoy, y `PARCIAL` va el
+  último. QT-314 puede pedir otro sitio para la pantalla.
+- **P13 — Cómo se nombra `PARCIAL`.** Dos sitios necesitan un valor para compilar y ninguna
+  decisión lo da: la etiqueta y el tono del estado en `lib/shared/ui/order-status.ts`, y el texto
+  que ve el cliente por WhatsApp (`integraciones/domain/whatsapp-chat-context.ts`). El diseño pone
+  «Parcial», tono `progress` y «en preparación» mientras tanto (`design.md > 11`).
 
 ## Decisiones cerradas (no reabrir)
 
@@ -312,3 +328,13 @@ Cada una lleva una propuesta en `design.md`; ninguna está decidida.
 | 2026-11-03 | ¿Una ficha o dos? | **Dos:** backend (ésta, QT-313) y frontend (QT-314, bloqueada por ésta). |
 | 2026-11-03 | Identificadores, cifras y borrado | Heredado: identificadores en inglés y borrado lógico (QC-4), decimal exacto (QC-4, QC-141) y ámbito por empresa (QC-60). |
 | 2026-11-03 | ¿Hace falta E2E? | **Sí:** la feature mueve inventario (`CHECKPOINTS.md`, igual que QC-170). |
+| 2026-11-03 | Prioridad y cliente: ¿del pedido o de cada receta? (P1) | **Del pedido entero.** No hay prioridad ni cliente por receta. |
+| 2026-11-03 | Caducidad de la reserva: ¿por receta o por pedido? (P2) | **Por receta.** `reserved_at` baja a la línea: lo reinicia crear o editar esa línea, y el proceso diario cancela y libera cada línea vencida por su lado. |
+| 2026-11-03 | Estado del pedido entero (P3) | **Estado propio `PARCIAL`** cuando las recetas no canceladas están en estados distintos; si coinciden, el pedido toma ese estado común; si todas están canceladas, `CANCELADO`. Los listados y filtros admiten `PARCIAL`. No es «el más atrasado». |
+| 2026-11-03 | Avisos QC-293 y QC-294 (P4) | **Sin requisito en esta ficha.** QC-293 y QC-294 siguen `pending`; deciden por receta o por pedido cuando se acoten. |
+| 2026-11-03 | Pantallas de planta con varias recetas (P5) | **Ficha nueva QT-315** `planta-con-varias-recetas` (frontend, QC-31, depende de QT-313): ejecución, empaque, acondicionamiento y entrega con varias recetas, y el E2E de un pedido de dos recetas. El E2E de QT-313 se queda con un pedido de una receta más el test de integración de dos. |
+| 2026-11-03 | Cancelar el pedido con recetas fabricadas y sin terminar (P6) | **Quedan intactas.** Cancelar el pedido cancela solo las recetas en estado cancelable. |
+| 2026-11-03 | ¿Qué cuenta como «terminada»? (P7) | **`TERMINADO` o `ENTREGADO`.** Las canceladas no cuentan ni en las terminadas ni en el total. |
+| 2026-11-03 | Sumas con huecos (P8) | **Los totales excluyen las canceladas.** El precio suma las que tienen precio y dice cuántas no; el coste queda «sin coste» si a alguna activa le falta. |
+| 2026-11-03 | Quitar y repetir (P9) | **Se pueden quitar las recetas `PENDIENTE` y también las `BLOQUEADO`.** Una receta cancelada **libera** su receta, que se puede volver a añadir: la unicidad aplica solo entre líneas vivas no canceladas, también en la base. Precisa la fila «¿Se pueden añadir o quitar recetas?» en lo que toca a `BLOQUEADO`. |
+| 2026-11-03 | Versiones de receta (P10) | **La original y sus versiones (QC-172, `parent_recipe_id`) son la misma receta:** no pueden convivir en el mismo pedido. |

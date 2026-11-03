@@ -1,8 +1,9 @@
 # QT-313 — pedido-con-varias-recetas-backend · design.md
 
-> Escrito por `spec_author` (F1.2, 2026-11-03). Lo marcado **PROPUESTA (Pn)** cubre una pregunta
-> abierta de `requirements.md` y no está decidido: lo cierra el humano en F1.4. Si decide otra
-> cosa, cambian la sección y los requisitos marcados `[depende de Pn]`, no el resto del diseño.
+> Escrito por `spec_author` (F1.2, 2026-11-03) y revisado en F1.4 (2026-11-03) con las respuestas
+> del humano a P1–P10, que ya están en `requirements.md > Decisiones cerradas`. Quedan abiertas
+> P11, P12 y P13 (§ 2.2, § 11); el diseño aplica la regla literal y no depende de ellas para lo
+> demás.
 
 ## Lo que ya existe
 
@@ -16,13 +17,16 @@ worktree** (`list_projects` no lista `.worktrees/QT-313-…`). La exploración s
 | Dónde | Qué apareció | Qué se hace con ello |
 |---|---|---|
 | Board | **QT-314** `pedido-con-varias-recetas-frontend` (`pending`, `depends_on: QT-313`) | Es la otra mitad de esta ficha (decisión «¿Una ficha o dos?»). No se solapa: aquí no hay pantalla |
+| Board | **QT-315** `planta-con-varias-recetas` (frontend, depende de QT-313), creada en F1.4 | Las pantallas de planta y el E2E de dos recetas. Esta ficha le deja el contrato por línea (§ 5) |
 | Board | **QC-308** `margen-del-pedido` | Fuera de alcance. Leerá el precio y el coste de la línea que deja esta ficha |
-| Board | **QC-293**, **QC-294** (avisos), `pending` | Sin código todavía. Ver § 9 (P4) |
+| Board | **QC-293**, **QC-294** (avisos), `pending` | Sin código todavía. Decisión P4: sin requisito aquí (§ 9) |
 | Specs | QC-219, QC-284, QC-288, QC-281 usan «línea del pedido» para la **línea del reparto** (`OrderPresentationLine`) o del lote, no para una receta | Nombre ocupado: la línea nueva se llama `OrderLine` / `order_lines`; la del reparto conserva su nombre |
 | Código | `OrderPresentationLine` (QC-170): el reparto ya es una tabla hija del pedido | **Se reutiliza**: gana `order_line_id` y pasa a colgar de la línea (§ 1.3) |
 | Código | `MaterialReservations` (`inventario/domain/reservation.ts`): `syncForOrder`, `releaseForOrder`, `consumeForOrder`, `settlePackagingForOrder` | **Se reutiliza** cambiando la clave: de pedido a línea (§ 3) |
 | Código | `order-transitions.ts`, `order-cancellation.ts`, `delete-order.ts`: las reglas de estado, cancelación y baja | **Se reutilizan tal cual** aplicadas a la línea (§ 2) |
 | Código | `resolve-ingredients-cost.ts`, `actual-order-cost.ts`, `resolve-distribution.ts`, `order-requirement.ts` | **Se reutilizan** con la línea como unidad de cálculo |
+| Código | `order-recipe.ts` (`resolveOrderRecipe`): ya distingue la original (`recipeId`) de la versión elegida (`recipeVersionId`) | **Se reutiliza**: da la receta original de cada línea para la unicidad (§ 1.1) |
+| Código | `create-recipe-version.ts` rechaza crear una versión de una versión (`original.original !== null`) | Las versiones tienen **un solo nivel**: la original de una línea es `parent_recipe_id ?? id`, sin recorrer cadenas |
 | Código | Ningún modelo, tabla, tipo ni caso de uso que permita más de una receta por pedido | Nada que reutilizar ni duplicar |
 
 **UI:** la ficha no toca pantalla (alcance). No se consultan filas de `components/shared/CATALOGO.md`
@@ -42,21 +46,24 @@ cambio visible.
 | `order_id` | `uuid` NOT NULL | FK compuesta `(order_id, company_id)` → `orders_id_company_id_key`. Con `@relation` (mismo módulo) |
 | `company_id` | `uuid` NOT NULL | Copia de la del pedido, igual que `order_presentation_lines` (R2). FK a mano, drift |
 | `position` | `int` NOT NULL | Orden de alta dentro del pedido, desde 0 (R6). Único `(order_id, position)`. No se reutiliza al quitar |
-| `recipe_id` | `uuid` NOT NULL | La receta **efectiva** (la versión, si se eligió). FK compuesta a mano con `company_id`, drift |
+| `recipe_id` | `uuid` NOT NULL | La receta **efectiva** que se fabrica (la versión, si se eligió). FK compuesta a mano con `company_id`, drift |
+| `original_recipe_id` | `uuid` NOT NULL | La receta **original**: `recipe_id` si es original, su `parent_recipe_id` si es versión. La escribe el caso de uso con lo que devuelve `resolveOrderRecipe`; FK compuesta a mano, drift. Es la columna de la unicidad (R5) |
 | `quantity` | `decimal(14,4)` NOT NULL | CHECK `> 0` |
 | `unit_id` | `uuid` NULL | NULL solo en líneas migradas de pedidos antiguos sin unidad (heredado de `orders.unit_id`) |
-| `status` | `"OrderStatus"` NOT NULL default `PENDIENTE` | El mismo enum: no nace tipo nuevo (R31) |
+| `status` | `"OrderStatus"` NOT NULL default `PENDIENTE` | El mismo enum. CHECK `order_lines_status_not_partial`: `status <> 'PARCIAL'` (R48) |
 | `cancellation_reason` | `text` NULL | CHECK `order_lines_cancellation_reason_matches_status` (copia del de `orders`) |
 | `ingredients_cost`, `packaging_cost` | `decimal(14,4)` NULL | CHECK «nulos a la vez» (copia de `orders_packaging_cost_matches_ingredients_cost`) |
 | `actual_cost` | `decimal(14,4)` NULL | CHECK no negativo y solo desde `POR_ACONDICIONAR` (copias de los de `orders`) |
 | `sale_price` | `decimal(14,4)` NULL | CHECK `order_lines_sale_price_non_negative` (R15) |
+| `reserved_at` | `timestamptz` NULL | Instante desde el que cuentan los 15 días de **esta** línea (R41). Índice parcial `(company_id, reserved_at) WHERE status = 'PENDIENTE' AND deleted_at IS NULL` para el proceso diario |
 | `finished_at` | `timestamptz` NULL | |
 | `packed_by`, `conditioned_by` | `uuid` NULL | FK compuestas a mano con `company_id`; CHECK `…_matches_status` copiados de `orders` |
 | `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Borrado lógico (QC-4) |
 
 Índices y restricciones:
-- `order_lines_order_id_recipe_id_alive_key`: **único parcial** `(order_id, recipe_id) WHERE
-  deleted_at IS NULL` (R5). Una línea cancelada sigue ocupando su receta — PROPUESTA (P9).
+- `order_lines_order_original_recipe_active_key`: **único parcial** `(order_id,
+  original_recipe_id) WHERE deleted_at IS NULL AND status <> 'CANCELADO'` (R5, decisiones P9 y
+  P10). Una línea cancelada o quitada libera su receta; la original y sus versiones chocan entre sí.
 - `order_lines_id_company_id_key` y `order_lines_id_order_id_key` (únicos): destino de las FK
   compuestas de las tablas hijas (§ 1.3).
 - `(company_id)`, `(recipe_id)`, `(company_id, status) WHERE deleted_at IS NULL`.
@@ -65,17 +72,22 @@ cambio visible.
   profundidad; la frontera es el service (`docs/architecture.md > Acceso a datos`).
 - `guard-empresa-en-esquema` la acepta sin tocar la lista de exentas: lleva `company_id`.
 
+Por qué una columna `original_recipe_id` guardada y no un índice sobre la receta: un índice único
+no puede leer `recipes.parent_recipe_id` de otra tabla, y la regla «la original y sus versiones
+son la misma» tiene que llegar a la base (R5). La columna no puede desincronizarse: una receta no
+cambia de original después de creada.
+
 ### 1.2 `orders` después de la ficha
 
-**Se queda:** `id`, correlativo, `priority` y `customer_id` (PROPUESTA P1), `company_id`, autores,
-fechas, `deleted_at`, `reserved_at` (PROPUESTA P2), `status` (**derivado**, § 2.2, PROPUESTA P3) y
-`cancellation_reason` (solo cuando el estado derivado es `CANCELADO`, § 2.3).
+**Se queda:** `id`, correlativo, `priority` y `customer_id` (decisión P1, R42), `company_id`,
+autores, fechas, `deleted_at`, `status` (**derivado**, § 2.2) y `cancellation_reason` (solo cuando
+el estado derivado es `CANCELADO`, § 2.3).
 
 **Se va** (a la línea): `recipe_id`, `quantity`, `unit_id`, `ingredients_cost`, `packaging_cost`,
-`actual_cost`, `sale_price`, `finished_at`, `packed_by`, `conditioned_by`, con sus CHECK, FK e
-índices (`orders_recipe_id_idx`, `orders_unit_id_idx`, `orders_packed_by_idx`,
-`orders_conditioned_by_idx`). Los índices parciales de listado de `list_query_indexes` que usen
-esas columnas se rehacen sobre `order_lines`.
+`actual_cost`, `sale_price`, `reserved_at` (decisión P2), `finished_at`, `packed_by`,
+`conditioned_by`, con sus CHECK, FK e índices (`orders_recipe_id_idx`, `orders_unit_id_idx`,
+`orders_packed_by_idx`, `orders_conditioned_by_idx` y el índice de la caducidad). Los índices
+parciales de listado de `list_query_indexes` que usen esas columnas se rehacen sobre `order_lines`.
 
 ### 1.3 Tablas que ganan `order_line_id`
 
@@ -93,11 +105,18 @@ esas columnas se rehacen sobre `order_lines`.
 `order_id` se conserva en todas: los listados por pedido y las FK actuales siguen valiendo, y la
 FK compuesta `(order_line_id, order_id)` garantiza que los dos apuntan al mismo pedido.
 
-### 1.4 Migraciones (tres, cada una con su `down.sql`)
+### 1.4 Migraciones (cuatro, cada una con su `down.sql`)
 
+0. **`20261103115900_order_status_partial`** — `ALTER TYPE "OrderStatus" ADD VALUE 'PARCIAL'`, al
+   final, en su propia migración: Postgres no deja usar un valor añadido en la misma transacción
+   que lo añade (mismo patrón que `order_status_blocked` + `orders_blocked_index`). `down.sql`:
+   aborta si alguna fila de `orders` está en `PARCIAL`; si no, recrea el tipo sin el valor, como
+   hizo el `down.sql` de `order_status_blocked`.
 1. **`20261103120000_order_lines`** — crea `order_lines` con sus restricciones y RLS, y la rellena
-   con un `INSERT … SELECT` desde `orders`: una línea por pedido, `position = 0`, copiando las diez
-   columnas de § 1.2 y `deleted_at` (R7). `down.sql`: `DROP TABLE order_lines`.
+   con un `INSERT … SELECT` desde `orders` (con `JOIN recipes` para `original_recipe_id`): una
+   línea por pedido, `position = 0`, copiando las once columnas de § 1.2 y `deleted_at` (R7). El
+   estado del pedido no se toca: con una línea, su derivado es el mismo. `down.sql`:
+   `DROP TABLE order_lines`.
 2. **`20261103120100_order_lines_references`** — añade `order_line_id` a las seis tablas de § 1.3,
    lo rellena con la única línea de cada pedido (`UPDATE … FROM order_lines`), y después pone
    `NOT NULL`, las FK, los únicos nuevos y los CHECK (R8). Antes de cerrar, un bloque `DO` compara
@@ -106,7 +125,8 @@ FK compuesta `(order_line_id, order_id)` garantiza que los dos apuntan al mismo 
 3. **`20261103120200_orders_drop_line_columns`** — quita de `orders` las columnas de § 1.2.
    `down.sql`: **aborta con `RAISE EXCEPTION`** si algún pedido tiene más de una línea viva,
    nombrando cuántos (R9); si no, vuelve a crear las columnas, las rellena desde la línea y
-   restaura CHECK, FK e índices.
+   restaura CHECK, FK e índices. Con una línea por pedido ninguno puede estar en `PARCIAL`, así que
+   después el `down.sql` de la migración 0 tampoco se niega.
 
 Las FK, CHECK e índices parciales escritos a mano son drift para Prisma, como en el resto del
 esquema: hay que borrar sus `DROP CONSTRAINT` de cualquier migración generada después
@@ -116,49 +136,62 @@ esquema: hay que borrar sus `DROP CONSTRAINT` de cualquier migración generada d
 
 ### 2.1 La línea
 
-`order_lines.status` recorre la tabla de `order-transitions.ts` **sin cambios** (R31). Las reglas
-de hoy pasan de leerse en el pedido a leerse en la línea:
+`order_lines.status` recorre la tabla de `order-transitions.ts` **sin cambios** (R31). En el
+dominio, `OrderLineStatus = Exclude<OrderStatus, 'PARCIAL'>`: las tablas de transición,
+cancelación y baja se tipan con él, así que `PARCIAL` no puede ser ni origen ni destino de una
+línea (R48, además del CHECK). Las reglas de hoy pasan de leerse en el pedido a leerse en la línea:
 
 | Regla | Archivo | Se aplica a |
 |---|---|---|
 | Transiciones permitidas, «quedarse igual» | `order-transitions.ts` | la línea |
 | Cancelable (`PENDIENTE`, `EN_CURSO`, `BLOQUEADO`) | `order-cancellation.ts` | la línea |
 | Editable (lo mismo, vía `assertTransition(s, s)`) | `update-order.ts` | la línea |
-| Quitable | nuevo, `order-line-removal.ts` | solo `PENDIENTE` — PROPUESTA (P9) |
+| Quitable | nuevo, `order-line-removal.ts` | `PENDIENTE` y `BLOQUEADO` (decisión P9, R22, R23) |
 
-### 2.2 El pedido — PROPUESTA (P3)
+### 2.2 El pedido: `PARCIAL` (decisión P3)
 
-`orders.status` se queda como **columna derivada** y la escribe `deriveOrderStatus(lines)`, función
-pura en `domain/order-status-derivation.ts`, en la misma transacción que cualquier cambio de estado
-de línea (R34). Regla propuesta, sobre las líneas vivas:
+**Valor nuevo del enum, en una columna derivada.** `orders.status` se queda como columna y gana el
+valor `PARCIAL` del mismo enum `OrderStatus` (migración 0). La escribe `deriveOrderStatus(lines)`,
+función pura en `domain/order-status-derivation.ts`, en la misma transacción que cualquier alta,
+baja o cambio de estado de línea (R34):
 
-1. Si todas están `CANCELADO` → `CANCELADO`.
-2. Si no, se ignoran las canceladas y el pedido toma el estado **menos avanzado** de las que quedan,
-   en el orden de `ORDER_STATUS_FLOW` (`PENDIENTE` < `EN_CURSO` < … < `ENTREGADO`).
-3. `BLOQUEADO` cuenta como `PENDIENTE` para el orden, y el pedido es `BLOQUEADO` solo si **todas**
-   las no canceladas lo están.
+1. Sin líneas vivas activas y con alguna cancelada → `CANCELADO`.
+2. Todas las activas en el mismo estado → ese estado (incluido `BLOQUEADO`).
+3. Activas en estados distintos → `PARCIAL`. Sin excepciones: `TERMINADO` + `ENTREGADO` es
+   `PARCIAL`, `PENDIENTE` + `BLOQUEADO` también.
 
-Por qué el menos avanzado: los listados de pedidos y las colas de planta filtran por estado, y un
-pedido con una receta todavía en `PENDIENTE` tiene trabajo pendiente. Con una sola línea, el
-estado del pedido es el de la línea: R44 y R45 se cumplen por construcción.
+Con una sola línea el estado del pedido es el de la línea, así que R44 y R45 se cumplen por
+construcción y la migración no cambia ningún estado.
 
-Las colas de `asignaciones` (por empacar, por acondicionar, terminados) dejan de leer el estado del
-pedido y leen el de la **línea**: devuelven una fila por línea (§ 5).
+**Dónde entra `PARCIAL`:**
 
-**Alternativa considerada:** quitar `orders.status` y calcularlo al leer. Se descarta: los
-listados con filtro y orden por estado (`list-query-sql.ts`, índices parciales) tendrían que
-agregar líneas en cada consulta, y el estado del pedido aparece en una decena de lecturas.
+| Sitio | Qué cambia |
+|---|---|
+| `ORDER_STATUS_VALUES` (`order-classification.ts`) | `'PARCIAL'` al final, igual que en el enum (`module-contract.test.ts` compara las dos listas en orden) |
+| Filtro por estado del listado (`order-queryable.ts`, `list-query-sql.ts`) | Admite `PARCIAL` porque el filtro es `select` contra `ORDER_STATUS_VALUES`; no hace falta código propio. Filtrar por otro estado no trae los `PARCIAL` (R49, literal; ver P11) |
+| Orden por estado en la base | El de declaración del enum, como hoy: `PARCIAL` queda el último. Ya hoy ese orden «no significa nada de negocio» (comentario de `ORDER_STATUS_VALUES`) |
+| `ORDER_STATUS_FLOW` (orden en pantalla) | Al final, tras `CANCELADO` y `BLOQUEADO`, como estado lateral que no es un paso del flujo. **Abierto: P12** |
+| `ORDER_STATUSES_NOT_IN_PROGRESS` | **No** se añade: un `PARCIAL` siempre tiene una línea activa sin entregar, así que está en curso (R50). Lo heredan `order-company-stats-prisma.ts` y el contexto de chat de `integraciones` |
+| `STARTED_ORDER_STATUSES`, `isStartedOrderStatus` | Pasan a evaluarse sobre la **línea** (el coste congelado es de cada línea); `PARCIAL` no aparece |
+| `order-transitions.ts`, `order-cancellation.ts`, `delete-order.ts` | Tipados con `OrderLineStatus` (§ 2.1); el pedido no se transiciona, se deriva |
+| CHECK de `orders` que nombran estados (`cancellation_reason`, `delivered_not_deleted`) | No cambian: `PARCIAL` no está en sus listas, y un pedido `PARCIAL` tiene una línea activa, así que no lleva motivo de cancelación |
+| Colas de `asignaciones` | Leen el estado de la **línea**, no el del pedido (§ 5): `PARCIAL` no les llega |
+
+**Lo que no se ha podido derivar sin inventar** queda como pregunta abierta: P11 (si filtrar por
+un estado debe traer también los `PARCIAL` con alguna receta en él), P12 (dónde se pinta
+`PARCIAL` en `ORDER_STATUS_FLOW`) y P13 (su etiqueta, su tono y el texto que ve el cliente por
+WhatsApp, § 11). Ninguna cambia el modelo: P11 sería un filtro nuevo, y P12 y P13 son constantes.
 
 ### 2.3 Cancelar
 
 - **Una línea** (R27, R28): caso de uso nuevo `cancelOrderLine(orderId, lineId, { reason }, actor)`.
   Bloquea pedido y línea (`FOR UPDATE`, en ese orden siempre para no cruzar candados), comprueba
-  cancelable bajo el candado, escribe estado y motivo, `releaseForLine`, vuelve a derivar el estado
-  del pedido.
-- **El pedido** (R29): `cancelOrder` mantiene su firma. Cancela con el mismo motivo cada línea
-  cancelable, en una transacción, y deja intactas las demás — PROPUESTA (P6). Si ninguna es
-  cancelable, `not_cancellable`. `orders.cancellation_reason` se escribe solo si el estado derivado
-  queda `CANCELADO`; el CHECK de `orders` sigue siendo el mismo.
+  cancelable bajo el candado, escribe estado y motivo, `releaseForLine`, vacía `reserved_at` de la
+  línea, vuelve a derivar el estado del pedido.
+- **El pedido** (R29, decisión P6): `cancelOrder` mantiene su firma. Cancela con el mismo motivo
+  cada línea cancelable, en una transacción, y deja intactas las demás. Si ninguna es cancelable,
+  `not_cancellable`. `orders.cancellation_reason` se escribe solo si el estado derivado queda
+  `CANCELADO`.
 - **Por otro módulo** (`createCancelAliveOrder`, usado por `asignaciones`): misma regla que
   `cancelOrder`.
 
@@ -181,14 +214,16 @@ menos lo apartado por **cualquier otra línea**, del mismo pedido o de otro. As�
 - R12: las líneas se sincronizan en orden de `position`; la segunda ve lo que apartó la primera.
 - R13, R14: el resultado `insufficient` es por línea. El alta acumula las líneas que no alcanzan;
   sin `confirmBlocked` lanza `OrderWouldBlockError` con sus posiciones (la transacción se deshace);
-  con él, esas líneas quedan `BLOQUEADO`, sin apartado y con `ingredients_cost = NULL`.
-- R27: cancelar una línea libera exactamente lo suyo.
+  con él, esas líneas quedan `BLOQUEADO`, sin apartado, con `ingredients_cost = NULL` y
+  `reserved_at = NULL`.
+- R27, R51: cancelar o caducar una línea libera exactamente lo suyo.
 - R36: finalizar consume exactamente lo apartado para esa línea; con insumos compartidos no toca
   lo de la otra.
 - R38: `OrderConsumptionLedger.findConsumedLots` filtra por `orderLineId`: el coste real es el de la
   línea.
 - R40: `review-blocked-orders.ts` itera líneas `BLOQUEADO` (pedido por `created_at`, línea por
-  `position`) y llama a `syncForLine` para cada una.
+  `position`) y llama a `syncForLine` para cada una; la que pasa a `PENDIENTE` estrena su
+  `reserved_at`.
 
 `inventario` sigue sin saber qué es una línea: recibe un identificador opaco más, igual que hoy
 recibe `orderId`.
@@ -201,18 +236,18 @@ recibe `orderId`.
 // order-input.ts
 const orderLineInputSchema = z.object({
   id: z.string().uuid().optional(),          // presente = editar esa línea (R20)
-  recipeId: recipeIdSchema,
+  recipeId: recipeIdSchema,                  // la original, como hoy
   recipeVersionId: /* igual que hoy */,
   quantity: quantitySchema,
   unitId: unitIdSchema,
   presentationLines: presentationLinesSchema,
   salePrice: salePriceSchema,                 // R15: el de QC-307, ahora por línea
-});
+});                                           // sin priority ni customerId: z.object los descarta (R42)
 
 export const createOrderSchema = z.object({
   lines: z.array(orderLineInputSchema).min(1), // R3
-  priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),  // PROPUESTA P1
-  customerId: /* igual que hoy */,                            // PROPUESTA P1
+  priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),  // del pedido (P1)
+  customerId: /* igual que hoy */,                            // del pedido (P1)
   confirmBlocked: z.boolean().default(false),
 });
 export const updateOrderSchema = createOrderSchema;          // reemplazo completo, como hoy
@@ -221,23 +256,25 @@ export const updateOrderDistributionSchema = /* igual */ .extend({ lineId: z.str
 ```
 
 En `createOrderSchema` una línea con `id` se rechaza (`invalid_input`). La receta duplicada (R4) se
-comprueba en el caso de uso con la receta **efectiva** (versión resuelta), no en el esquema —
-PROPUESTA (P10).
+comprueba en el caso de uso comparando la **receta original** de cada línea (`recipeId` de la
+entrada, ya validado por `resolveOrderRecipe` como original) contra las demás de la entrada y
+contra las líneas activas del pedido: la original y sus versiones son la misma receta (P10), y las
+canceladas no cuentan (P9).
 
 ### 4.2 Casos de uso
 
 | Caso de uso | Cambio |
 |---|---|
-| `createOrder` | Valida cada línea (R11, error con `linePosition`), costea cada una, abre **una** transacción: crea pedido, crea líneas, `syncForLine` en orden, deriva estado, `reserved_at` (P2) |
-| `updateOrder` | Diff contra las líneas vivas bajo candado: editar (R24, R25), añadir (R21), quitar (R22, R23). Solo las líneas cambiadas recalculan coste y apartado (R17) |
+| `createOrder` | Valida cada línea (R11, error con `linePosition`), costea cada una, abre **una** transacción: crea pedido, crea líneas, `syncForLine` en orden, `reserved_at` de cada línea que apartó, deriva estado |
+| `updateOrder` | Diff contra las líneas vivas bajo candado: editar (R24, R25), añadir (R21), quitar `PENDIENTE`/`BLOQUEADO` (R22, R23). Solo las líneas cambiadas recalculan coste, apartado y `reserved_at` (R17, R41) |
 | `cancelOrder` | § 2.3 (R29) |
 | `cancelOrderLine` | **Nuevo** (R27, R28) |
 | `deleteOrder` | § 2.4 (R47) |
 | `updateOrderPresentationLines` | Recibe `lineId`; solo esa línea (R26) |
 | `quoteOrderCost` | Cotiza una línea (recibe `recipeId`, cantidad, unidad, reparto y, en edición, `orderLineId` para contar su propio apartado como disponible) |
-| `expireStaleOrders` | § 6 (R41) |
+| `expireStaleOrders` | Por línea (§ 6, R51) |
 | `reviewBlockedOrders` | Por línea (R40) |
-| `getOrder`, `listOrders` | Devuelven líneas, totales y resumen (§ 4.3) |
+| `getOrder`, `listOrders` | Devuelven líneas, totales y resumen (§ 4.3); filtro y orden con `PARCIAL` (R49) |
 | `deliverOrder`, `voidDelivery` | Cuentan el reparto por línea; mueven `TERMINADO` ↔ `ENTREGADO` de la línea (R39) y derivan el pedido |
 
 ### 4.3 Salida
@@ -245,18 +282,18 @@ PROPUESTA (P10).
 ```ts
 type OrderLineView = {
   id: string; position: number; recipeId: string; recipeName: string;
-  quantity: string; unitId: string | null; status: OrderStatus; cancellationReason: string | null;
+  quantity: string; unitId: string | null; status: OrderLineStatus; cancellationReason: string | null;
   presentationLines: readonly OrderPresentationLineView[];
   salePrice: string | null; ingredientsCost: string | null; packagingCost: string | null;
-  actualCost: string | null; finishedAt: Date | null;
+  actualCost: string | null; finishedAt: Date | null; reservedAt: Date | null;
 };
 type OrderView = {
   /* lo de hoy menos los campos que pasan a la línea */
-  status: OrderStatus;                      // derivado (P3)
+  status: OrderStatus;                      // derivado, puede ser PARCIAL (R34)
   lines: readonly OrderLineView[];          // R6: por position
-  progress: { total: number; finished: number };            // R33, P7
-  salePriceTotal: string | null; linesWithoutPrice: number; // R16, P8
-  ingredientsCostTotal: string | null; actualCostTotal: string | null; // R18, P8
+  progress: { total: number; finished: number };            // R33: activas; TERMINADO o ENTREGADO
+  salePriceTotal: string | null; linesWithoutPrice: number; // R16: sin canceladas
+  ingredientsCostTotal: string | null; actualCostTotal: string | null; // R18: sin canceladas
 };
 ```
 
@@ -276,7 +313,8 @@ la limite.
 `OrderWouldBlockError` y los errores de validación de línea ganan un diagnóstico con la posición
 de la línea, que va al registro y a la respuesta como dato, no en el texto. Una línea ajena,
 quitada o de otro pedido responde `order_not_found` (R43): no nace `order_line_not_found`, para no
-distinguir «no existe» de «no es tuya».
+distinguir «no existe» de «no es tuya». La violación del único parcial de § 1.1 (carrera entre
+dos ediciones) se traduce a `duplicate_order_recipe` en el adaptador.
 
 ## 5. Contrato con `asignaciones`
 
@@ -285,23 +323,34 @@ distinguir «no existe» de «no es tuya».
 `startConditioningAliveById`, `finishConditioningAliveById` reciben `(orderId, lineId, …)`.
 
 - `AssignedOrderSummary` pasa a ser **una fila por línea**: lleva `lineId`, la receta, cantidad,
-  unidad y reparto de la línea, y el número, prioridad, cliente y responsables del pedido. Con un
-  pedido de una línea, la fila es la de hoy más `lineId` (R45).
+  unidad, estado y reparto de la línea, y el número, prioridad, cliente y responsables del pedido.
+  Las colas filtran por el estado de la **línea**. Con un pedido de una línea, la fila es la de hoy
+  más `lineId` (R45).
 - El registro de ejecución, las evidencias y el equipo de acondicionamiento escriben y leen por
   `order_line_id` (R37). Los adaptadores de `asignaciones` que se tocan: `execution-log-prisma.ts`,
   `step-evidence-prisma.ts`, `conditioning-team-prisma.ts`.
 - La asignación de responsables (`order_assignments`) no cambia: el responsable del pedido opera
   cualquier línea (R35). La comprobación «¿es responsable?» sigue mirando el pedido.
-- **Pantallas de planta:** esta ficha no las cambia. Sus Server Actions pasan la línea única del
-  pedido mientras no exista la pantalla que elige receta — PROPUESTA (P5): ficha frontend nueva.
+- **Pantallas de planta:** esta ficha no las cambia; son de **QT-315** (decisión P5). Hasta
+  entonces, sus Server Actions pasan la línea única del pedido. Este contrato por línea es lo que
+  QT-315 consume.
 
-## 6. Caducidad y bloqueo — PROPUESTA (P2)
+## 6. Caducidad por línea (decisión P2)
 
-`orders.reserved_at` se queda **por pedido**: crear o editar cualquier línea lo reinicia, y el
-proceso diario, al vencer, cancela con `EXPIRED_ORDER_REASON` las líneas `PENDIENTE` del pedido y
-libera su material (R41). Hoy el proceso solo mira pedidos `PENDIENTE`; pasa a mirar pedidos con
-alguna línea `PENDIENTE` y la reserva vencida. Si el humano decide «por receta», `reserved_at` baja
-a `order_lines` en la migración 1 y el proceso itera líneas; el resto del diseño no cambia.
+`reserved_at` vive en `order_lines` (§ 1.1) y la regla de hoy se aplica a cada línea por su lado
+(R41, R51):
+
+- **Se fija** al apartar el material de la línea: al crearla o al editarla con éxito, y cuando la
+  revisión de bloqueados la pasa a `PENDIENTE`.
+- **Se vacía** al cancelarla, quitarla, consumir su material (finalizar) o dejarla `BLOQUEADO`.
+- **No se toca** al crear, editar o cancelar **otra** línea del mismo pedido, ni al cambiar la
+  prioridad o el cliente del pedido.
+- **El proceso diario** (`expire-stale-orders.ts`, mismo cron y mismo `ORDER_RESERVATION_TTL_DAYS`)
+  busca, empresa por empresa, **líneas** `PENDIENTE` vivas con `reserved_at` vencido. Por cada una
+  bloquea pedido y línea, vuelve a comprobar estado y plazo bajo el candado, la cancela con
+  `EXPIRED_ORDER_REASON`, libera su material y re-deriva el estado del pedido. Una línea que falla
+  no impide las demás, igual que hoy con los pedidos (`ExpiredOrderFailure` pasa a llevar
+  `lineId`).
 
 ## 7. Compatibilidad con la pantalla actual (R44)
 
@@ -323,15 +372,17 @@ receta quitaría las demás. No hay cambio visible: no hace falta pase `/design`
 |---|---|---|
 | `inventario/.../finished-stock-prisma.ts` | `orders.recipe_id` por SQL | `order_lines.recipe_id` vía `order_presentation_lines.order_line_id` |
 | `pedidos/.../direct-delivery-prisma.ts`, `packed-lines-directory-prisma.ts`, `customer-order-directory-prisma.ts`, `order-catalog-prisma.ts` | receta y cantidad del pedido | las de la línea |
-| `integraciones/domain/get-whatsapp-chat-context.ts` | receta del pedido | lista de recetas del pedido (con una línea, igual que hoy, R45) |
-| `asignaciones/domain/count-evidence-locking-orders.ts`, `evidence-target.ts`, `compose-order-rows.ts`, `list-execution-traces.ts` | `recipeId` del resumen | `recipeId` de la línea |
+| `pedidos/.../order-company-stats-prisma.ts` | estado del pedido | sin cambio de código; `PARCIAL` cuenta en curso (R50) |
+| `integraciones/domain/get-whatsapp-chat-context.ts`, `whatsapp-chat-context.ts` | receta y estado del pedido | lista de recetas del pedido; `PARCIAL` como estado en curso (R45, R50) |
+| `asignaciones/domain/count-evidence-locking-orders.ts`, `evidence-target.ts`, `compose-order-rows.ts`, `list-execution-traces.ts`, `list-company-orders.ts` | `recipeId` y estado del resumen | los de la línea |
 | `inventario/domain/finished-goods-dispatch.ts`, `deliverable-batches-prisma.ts` | receta del pedido | receta de la línea del reparto |
 
-## 9. Avisos QC-293 y QC-294 (P4)
+## 9. Avisos QC-293 y QC-294 (decisión P4)
 
-No hay código que cambiar: las dos fichas están `pending`. Este diseño deja los dos hechos
-disponibles por línea y por pedido (cambio de estado de línea y estado derivado en la misma
-transacción), así que cualquiera de las dos respuestas cabe sin rehacer el modelo.
+Sin requisito en esta ficha. Las dos fichas siguen `pending` y decidirán si avisan por receta o por
+pedido cuando se acoten. El diseño deja los dos hechos disponibles (cambio de estado de línea y
+estado derivado del pedido, en la misma transacción), así que cualquiera de las dos respuestas
+cabe sin rehacer el modelo.
 
 ## 10. Alternativas descartadas
 
@@ -341,15 +392,25 @@ transacción), así que cualquiera de las dos respuestas cabe sin rehacer el mod
 2. **Reserva agregada por pedido** (dejar `reservation_movements` por `order_id` y sincronizar la
    suma de las líneas). Ahorra la columna en `inventario`, pero: no puede liberar lo de **una**
    receta sin recalcular todas; con un insumo compartido, finalizar una receta no sabe qué parte
-   del apartado es suya; el bloqueo deja de ser por receta (o alcanza todo o nada), y el coste real
-   por receta no se puede atribuir. Contradice R14, R27, R36 y R38.
+   del apartado es suya; el bloqueo deja de ser por receta (o alcanza todo o nada); el coste real
+   por receta no se puede atribuir, y la caducidad por receta (P2) no tendría qué liberar.
+   Contradice R14, R27, R36, R38 y R51.
 3. **Dejar la receta principal en `orders` y una tabla de líneas «adicionales».** Ahorra la
    migración de datos, pero deja dos caminos para todo (la primera receta en el pedido, las demás
    fuera) y cada regla habría que escribirla dos veces.
 4. **Una sola migración** que crea, rellena y borra columnas. Se descarta por la reversión: el
    `down.sql` de la parte destructiva tiene que poder negarse si ya hay pedidos de varias líneas
-   (R9) sin deshacer también el relleno. Tres migraciones dejan revertir por partes.
-5. **Quitar `orders.status` y calcularlo al leer.** Ver § 2.2.
+   (R9) sin deshacer también el relleno. Migraciones separadas dejan revertir por partes.
+5. **`PARCIAL` en un enum propio del pedido** (`OrderOverallStatus`, con los valores de hoy más
+   `PARCIAL`) y `OrderStatus` solo para la línea. Ahorra el CHECK de R48, pero obliga a cambiar el
+   tipo de `orders.status` (recrear la columna con conversión), duplica diez valores en dos enums
+   que tendrían que moverse juntos y rompe la comparación única de `module-contract.test.ts`. Un
+   valor más en el enum compartido y un CHECK en la línea cuestan menos.
+6. **Calcular el estado del pedido al leer, sin columna.** Los listados con filtro y orden por
+   estado (`list-query-sql.ts`, índices parciales) tendrían que agregar líneas en cada consulta, y
+   el estado del pedido aparece en una decena de lecturas.
+7. **Unicidad por `recipe_id` efectiva** (la propuesta de F1.2). Descartada por la decisión P10:
+   dejaría convivir la original y una versión suya.
 
 ## 11. Riesgos
 
@@ -358,4 +419,14 @@ transacción), así que cualquiera de las dos respuestas cabe sin rehacer el mod
 - **Choque con features en vuelo** en `pedidos`, `inventario` y `asignaciones`: lo detecta
   `scripts/archivos-en-vuelo.mjs` con `## Archivos esperados`; el leader decide en F1.0/F2.
 - **Concurrencia.** Orden fijo de candados: pedido, después líneas por `position`. Las operaciones
-  de una línea también bloquean el pedido, porque re-derivan su estado.
+  de una línea también bloquean el pedido, porque re-derivan su estado. El proceso diario sigue el
+  mismo orden.
+- **Valor de enum nuevo.** Todo `Record<OrderStatus, …>` exhaustivo deja de compilar hasta decidir
+  `PARCIAL`; es lo buscado. Los mapas de línea pasan a `OrderLineStatus` (`order-transitions.ts`,
+  `order-cancellation.ts`, `asignaciones/domain/order-state.ts`,
+  `count-evidence-locking-orders.ts`). Quedan dos mapas del **pedido** que necesitan un valor para
+  `PARCIAL` y cuyo valor no se deriva de ninguna decisión: la etiqueta y el tono de
+  `lib/shared/ui/order-status.ts` y el texto que ve el cliente en
+  `integraciones/domain/whatsapp-chat-context.ts`. **Abierto: P13.** Mientras se decide, el
+  diseño pone la etiqueta «Parcial», el tono `progress` y el texto «en preparación» (el mismo de
+  los estados en curso, coherente con R50), para que compile; cambiarlos es editar dos literales.
