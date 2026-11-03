@@ -329,6 +329,8 @@
 | `delivery_void` lleva línea | R37 |
 | `PARCIAL` en la pantalla actual | R54 |
 | Responsables en un pedido `PARCIAL` | R55 |
+| Pedido sin línea hasta T9 | R8, R37 (decisión de proceso: fija el orden de las tasks, no añade comportamiento) |
+| R37 por fases | R37 (repartido entre T7, T12 y T14a) |
 
 ## Preguntas abiertas
 
@@ -365,3 +367,5 @@ Ninguna. P1–P14 están cerradas en la tabla de abajo.
 | 2026-11-03 | `delivery_void` lleva línea (F2.1) | **El asiento `delivery_void` lleva `order_line_id`**, el mismo que el asiento de entrega que anula. El CHECK de `inventory_movements` lo exige. |
 | 2026-11-03 | `PARCIAL` en la pantalla actual (F2.1) | **Hasta QT-314, un pedido `PARCIAL` se trata como cerrado** en la pantalla actual: sin editar, cancelar, eliminar ni repartir. |
 | 2026-11-03 | Responsables en un pedido `PARCIAL` (P14, F2.1) | **Un `PARCIAL` admite asignar, desasignar y quitar grupo solo si al menos una receta activa está en `PENDIENTE`, `EN_CURSO` o `BLOQUEADO`.** Si no, se rechaza igual que hoy un pedido fabricado (`OrderProducedFrozenError`). Sustituye a la provisional del implementer, que admitía cualquier `PARCIAL`. |
+| 2026-11-03 | Pedido sin línea hasta T9 (F2.1) | **El contrato de reserva y consumo de `inventario` acepta `orderLineId: string \| null` hasta T14e**; `null` = las filas del pedido sin línea. Desde T9 el alta crea la línea, y T14e lo hace obligatorio y quita el `null`. `pedidos` publica en su puerto un lector de la única línea del pedido. Las fases no se reordenan. |
+| 2026-11-03 | R37 por fases (F2.1) | **T7 cubre solo los asientos `consumption`**; `production`, `delivery` y `delivery_void` se cubren en T12 y T14a, donde ya se tocan sus llamadas (`inventario/.../product-prisma.ts`). |

@@ -84,12 +84,16 @@
 - [ ] **T7 — `MaterialReservations` por línea.** `inventario/domain/reservation.ts`,
   `reservation-ledger.ts`, `movement-ledger.ts`, `order-consumption.ts` y sus adaptadores
   (`reservation-prisma.ts`, `order-consumption-prisma.ts`, `batch-movement-prisma.ts`): la clave
-  pasa a `(orderId, orderLineId)`, métodos renombrados `…ForLine` (design § 3). Los llamantes de
-  `pedidos` pasan la única línea del pedido mientras el resto de fases no exista.
+  pasa a `(orderId, orderLineId)` con **`orderLineId: string | null`** (design § 3.1), métodos
+  renombrados `…ForLine` (design § 3). Añade el lector `findOnlyLineId(orderId, scope)` en
+  `pedidos/ports/order-write-repository.ts` y `order-prisma.ts` (archivos de T8), y los llamantes
+  de `pedidos` pasan lo que devuelve: la única línea, o `null` en un pedido sin línea.
   *Hecho:* tests de integración de `reservation.int.test.ts` y `order-consumption-ledger` ampliados:
   dos líneas que comparten insumo aparta en orden (R12), liberar una no toca la otra (R27),
-  consumir una consume solo lo suyo (R36), el libro de consumo filtra por línea (R38), todo
-  asiento de pedido lleva su línea (R37). Depende de T2.
+  consumir una consume solo lo suyo (R36), el libro de consumo filtra por línea (R38), los
+  asientos de reserva y los `consumption` llevan su línea (R37, solo esos tipos); con `null`, un
+  pedido sin línea aparta, libera y consume como hoy y no lee ni toca filas con línea; test del
+  lector: una línea → su id, ninguna → `null`, otra empresa → `null`. Depende de T2.
 
 ## Fase 4 — Casos de uso de `pedidos`
 
@@ -125,9 +129,13 @@
   con motivo; baja con una línea consumida → rechazo. Depende de T8.
 - [ ] **T12 — Entrega, anulación, bloqueados y caducidad.** `deliver-order.ts`, `void-delivery.ts`,
   `order-pending-delivery.ts`, `review-blocked-orders.ts`, `expire-stale-orders.ts`,
-  `order-expiry.ts`, `order-expiry-cron-route.ts`.
+  `order-expiry.ts`, `order-expiry-cron-route.ts`, y las escrituras de los asientos `delivery` y
+  `delivery_void` en `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
+  (~línea 1587 y ~1667) con `orderLineId: string | null` (design § 3.1).
   *Hecho:* tests de R39 (entregar completa solo la línea cuyo reparto se completa; anular la
-  devuelve; el asiento `delivery_void` lleva la línea del `delivery` que anula, R37), R40 (dos
+  devuelve), R37 para `delivery` y `delivery_void` (la entrega escribe la línea de su línea del
+  reparto; la anulación, la del `delivery` que anula; un pedido sin línea escribe `null` en los
+  dos), R40 (dos
   líneas bloqueadas, entra material para una; la que pasa a `PENDIENTE`
   estrena plazo) y R51 (dos líneas `PENDIENTE` con plazos distintos: el proceso cancela solo la
   vencida y libera solo su material; el pedido queda `PARCIAL`). Depende de T8, T7.
@@ -150,9 +158,13 @@
   `evidence-target.ts`, `count-evidence-locking-orders.ts`, `list-execution-traces.ts`,
   `list-company-orders.ts`, y los adaptadores `execution-log-prisma.ts`, `step-evidence-prisma.ts`,
   `conditioning-team-prisma.ts` y sus Server Actions (pasan la única línea del pedido; las
-  pantallas por línea son de QT-315, design § 5).
-  *Hecho:* tests de R31, R32, R35, R36, R37, R38; R19: ninguna salida de `asignaciones` lleva
-  precio; R45: con una línea, las salidas son iguales a las de hoy más `lineId`. Depende de T8, T7.
+  pantallas por línea son de QT-315, design § 5); y la escritura del asiento `production` en
+  `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` (~línea 1418), que
+  recibe la línea de la línea del reparto.
+  *Hecho:* tests de R31, R32, R35, R36, R38; R37 para `production`, registro de ejecución,
+  evidencias y equipo de acondicionamiento (cada uno lleva la línea del reparto o de la línea que se
+  opera); R19: ninguna salida de `asignaciones` lleva precio; R45: con una línea, las salidas son
+  iguales a las de hoy más `lineId`. Depende de T8, T7.
 - [ ] **T14b [P] — Otros lectores.** `inventario/.../finished-stock-prisma.ts`,
   `deliverable-batches-prisma.ts`, `finished-goods-dispatch.ts`; `pedidos/.../direct-delivery-prisma.ts`,
   `packed-lines-directory-prisma.ts`, `customer-order-directory-prisma.ts`,
@@ -186,11 +198,16 @@
   bloque `DO` que aborta si queda una fila sin línea donde debe tenerla, `NOT NULL` en cinco
   tablas, CHECK definitivo de `inventory_movements` (los cuatro tipos con pedido llevan línea,
   `delivery_void` incluido), FK compuestas `(order_line_id, order_id)`, únicos y PK por línea.
-  `db/schema.prisma` pasa `orderLineId` a obligatorio donde corresponde.
+  `db/schema.prisma` pasa `orderLineId` a obligatorio donde corresponde. Quita el `null` del
+  contrato de `inventario` (`orderLineId: string` en `MaterialReservations`,
+  `OrderConsumptionLedger` y las escrituras de `product-prisma.ts`), borra la rama `IS NULL` de sus
+  adaptadores y el uso transitorio de `findOnlyLineId` (design § 3.1).
   *Hecho:* test de integración de la migración: un pedido creado sin línea antes de aplicarla la
-  recibe; una fila sin línea de un pedido de dos líneas la hace abortar nombrando tabla y cuántas;
-  después, la base rechaza filas sin línea, un `delivery` sin línea y una línea de otro pedido
-  (R37); `down.sql` revierte y se niega si los únicos por pedido chocarían. Depende de T14a, T14b,
+  recibe; un pedido con línea y filas sin ella las une a su línea; una fila sin línea de un pedido
+  de dos líneas la hace abortar nombrando tabla y cuántas; después, la base rechaza filas sin línea,
+  un `delivery` sin línea y una línea de otro pedido (R37); `down.sql` revierte y se niega si los
+  únicos por pedido chocarían; `typecheck` verde con `orderLineId: string` y ningún `IS NULL` /
+  `orderLineId: null` en los adaptadores de reserva, consumo y `product-prisma.ts`. Depende de T14a, T14b,
   T14c (todo el código escribe la línea).
 - [ ] **T15 — Quitar las columnas de `orders`.** Migración `20261103120200_orders_drop_line_columns`
   y `db/schema.prisma` (design § 1.2), `reserved_at` incluido. `down.sql` aborta si hay pedidos con
@@ -289,6 +306,7 @@
 - `lib/modules/inventario/adapters/driven/persistence/reservation-prisma.ts`
 - `lib/modules/inventario/adapters/driven/persistence/order-consumption-prisma.ts`
 - `lib/modules/inventario/adapters/driven/persistence/batch-movement-prisma.ts`
+- `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
 - `lib/modules/inventario/adapters/driven/persistence/finished-stock-prisma.ts`
 - `lib/modules/inventario/adapters/driven/persistence/deliverable-batches-prisma.ts`
 - `lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma.ts`

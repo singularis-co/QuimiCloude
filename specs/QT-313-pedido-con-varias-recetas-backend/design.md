@@ -309,6 +309,30 @@ menos lo apartado por **cualquier otra línea**, del mismo pedido o de otro. As�
 `inventario` sigue sin saber qué es una línea: recibe un identificador opaco más, igual que hoy
 recibe `orderId`.
 
+### 3.1 Transición: `orderLineId: string | null` hasta T14e (decisión «Pedido sin línea hasta T9»)
+
+Hasta T9 el alta sigue creando pedidos sin línea, y hasta T14e la columna es nullable (§ 1.4). Por
+eso, entre T7 y T14e, el contrato de `inventario` acepta **`orderLineId: string | null`** en los
+cuatro métodos de `MaterialReservations` y en `OrderConsumptionLedger.findConsumedLots`:
+
+| Valor | Qué filas toca o lee |
+|---|---|
+| un id | las de esa línea (`order_line_id = id`) |
+| `null` | las del pedido **sin línea** (`order_id = orderId AND order_line_id IS NULL`), es decir, las escritas por el código anterior o las de un pedido creado antes de T9 |
+
+Lo disponible sigue siendo la existencia menos lo apartado por cualquier **otra clave**, contando
+`(pedido, sin línea)` como una clave más: el algoritmo no cambia.
+
+**Quién pasa el valor.** `pedidos` lo resuelve con un lector nuevo de su puerto de escritura,
+`OrderWriteRepository.findOnlyLineId(orderId, scope): Promise<string | null>` (archivos de T8):
+devuelve el id de la única línea viva del pedido, o `null` si no tiene ninguna. Con más de una no
+se usa: desde T9 quien opera ya conoce la línea. Hasta que cada caso de uso trabaje con líneas
+(T9–T14a), los llamantes de hoy pasan lo que devuelve ese lector.
+
+**Cierre.** T14e quita el `null` del tipo (`orderLineId: string`) en `inventario` y en
+`findOnlyLineId` desaparece el uso transitorio; con el `NOT NULL` de la base, la rama `null` de
+los adaptadores se borra. Las fases no se reordenan.
+
 ## 4. Casos de uso y contratos (`pedidos`)
 
 ### 4.1 Entrada
@@ -528,10 +552,17 @@ cabe sin rehacer el modelo.
 - **Valor del enum al principio.** `ADD VALUE … BEFORE` cambia la posición relativa de todos los
   valores para `ORDER BY status`: cualquier test que fije el orden por estado de hoy tiene que
   contar con `PARCIAL` delante. Los demás valores no cambian de orden entre sí.
-- **Filas sin línea entre los dos pasos.** Mientras `order_line_id` es nullable, una lectura por
-  línea puede encontrar filas sin ella (pedidos creados por código anterior a T9). Hasta el paso 2,
-  las lecturas por línea tratan una fila sin línea de un pedido de una sola línea como de esa
-  línea; el paso 2 elimina el caso.
+- **Filas sin línea entre los dos pasos (§ 3.1).** Mientras `order_line_id` es nullable y el
+  contrato acepta `orderLineId: null`, un pedido sin línea (creado antes de T9) opera con la clave
+  `(pedido, sin línea)`, y uno con línea, con la de su línea. **Riesgo:** un pedido con línea que
+  aún tenga filas sin ella (escritas por código anterior a T7 después del relleno de T2) partiría
+  su apartado en dos claves. En la rama no hay datos persistentes que lo produzcan (las bases de
+  test nacen vacías en cada ejecución), y en una base con datos el relleno de T14e los une antes
+  del `NOT NULL`. Un test de T7 fija que `null` no lee ni toca filas con línea, y uno de T14e que
+  el relleno las une.
+- **Contrato con `null` olvidado.** Si T14e no quitara el `null` del tipo, quedaría una rama muerta
+  que nadie prueba. El «Hecho» de T14e exige que el tipo sea `string` y que no quede ninguna rama
+  `IS NULL` en los adaptadores de reserva y consumo.
 
 ## 12. Decisiones provisionales del implementer (F2.1)
 
