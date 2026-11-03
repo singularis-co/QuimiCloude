@@ -76,8 +76,11 @@
 - **R8** — CUANDO se aplica la migración, el sistema DEBE asociar a esa única línea todo lo que
   hoy cuelga del pedido y pasa a ser de la receta: las líneas del reparto, los asientos de
   reserva, los asientos de consumo, el registro de ejecución, las evidencias de los pasos y el
-  equipo de acondicionamiento. El número de filas de cada una de esas tablas DEBE ser el mismo
-  antes y después. *[¿Qué es un pedido con varias fórmulas?]*
+  equipo de acondicionamiento, y los asientos de producción, de entrega y de anulación de entrega.
+  El número de filas de cada una de esas tablas DEBE ser el mismo antes y después. Un pedido que
+  no tenga línea cuando se aplica el relleno (creado entre la migración que crea las líneas y la
+  que las exige) DEBE recibir su línea en ese momento, en vez de hacer fallar la migración.
+  *[¿Qué es un pedido con varias fórmulas? · `order_line_id` en dos pasos]*
 - **R9** — CUANDO se revierte la migración y algún pedido tiene más de una línea viva, el
   sistema DEBE abortar la reversión sin cambiar nada y nombrar en el error cuántos pedidos lo
   impiden. CUANDO ningún pedido tiene más de una, la reversión DEBE devolver al pedido los
@@ -211,6 +214,12 @@
 - **R53** — El sistema DEBE nombrar el estado `PARCIAL` como «Parcial», con el tono `progress`, en
   las pantallas, y como «en preparación» en el texto del pedido que lee el cliente por WhatsApp.
   *[Cómo se nombra `PARCIAL`]*
+- **R54** — MIENTRAS la pantalla de pedidos sea la actual (antes de QT-314), un pedido `PARCIAL`
+  DEBE mostrarse como un estado final: las acciones de editar, cancelar y eliminar deshabilitadas,
+  y sin editar el reparto, entregar ni ver o anular entregas. «Responsables» y el cambio de
+  cliente DEBEN seguir como en cualquier estado final de hoy (el primero abierto, por QC-102; el
+  segundo disponible, porque el servicio lo admite en `PARCIAL`). *[`PARCIAL` en la pantalla
+  actual]*
 - **R50** — El sistema DEBE contar un pedido `PARCIAL` como pedido **en curso** en toda lectura
   que hoy separa los pedidos en curso de los entregados y cancelados (estadísticas de la empresa,
   contexto de chat de `integraciones`). *[Estado del pedido entero]*
@@ -220,14 +229,23 @@
 - **R35** — Los responsables (operador y empacador) DEBEN seguir asignándose al pedido entero,
   con las reglas de QC-86 sin cambios, y quien es responsable del pedido DEBE poder ejecutar
   cualquiera de sus líneas. *[¿Quién es responsable?]*
+- **R55** — CUANDO se asignan responsables, se desasigna a uno o se quita un grupo de un pedido
+  `PARCIAL`, el sistema DEBE admitirlo SI al menos una de sus líneas activas está en `PENDIENTE`,
+  `EN_CURSO` o `BLOQUEADO`; SI ninguna lo está, ENTONCES DEBE rechazarlo con
+  `OrderProducedFrozenError`, igual que hoy un pedido fabricado, sin escribir nada.
+  *[¿Quién es responsable? · Responsables en un pedido `PARCIAL`]*
 - **R36** — CUANDO se finaliza la fabricación de una línea, el sistema DEBE consumir
   exactamente lo apartado para esa línea (o, sin apartado, su necesidad), dar de alta el lote de
   producto terminado de cada línea de su reparto con la receta de esa línea y dejarla en
   `POR_EMPACAR`, en una sola transacción, sin consumir material de otra línea.
   *[¿Cómo avanza el estado?]*
 - **R37** — El sistema DEBE asociar a su línea cada asiento de reserva, cada asiento de consumo,
-  cada movimiento del registro de ejecución, cada evidencia de un paso y cada miembro del equipo
-  de acondicionamiento de un pedido. *[¿Cómo avanza el estado?]*
+  de producción, de entrega y de anulación de entrega, cada movimiento del registro de ejecución,
+  cada evidencia de un paso y cada miembro del equipo de acondicionamiento de un pedido. El asiento
+  de anulación de entrega DEBE llevar la misma línea que el asiento de entrega que anula. Una vez
+  cerrada la migración en dos pasos, la base DEBE rechazar cualquiera de esas filas sin línea, y
+  un asiento de inventario sin pedido con línea. *[¿Cómo avanza el estado? · `delivery_void`
+  lleva línea · `order_line_id` en dos pasos]*
 - **R38** — CUANDO se termina el empaque de una línea, el sistema DEBE calcular y guardar el coste
   real **de esa línea** con los asientos de consumo de esa línea, con las reglas de QC-305.
   *[¿Cómo avanza el estado?]*
@@ -307,10 +325,14 @@
 | Filtrar por estado con pedidos parciales | R49 |
 | Orden de `PARCIAL` | R52 |
 | Cómo se nombra `PARCIAL` | R53 |
+| `order_line_id` en dos pasos | R8, R37 |
+| `delivery_void` lleva línea | R37 |
+| `PARCIAL` en la pantalla actual | R54 |
+| Responsables en un pedido `PARCIAL` | R55 |
 
 ## Preguntas abiertas
 
-Ninguna. P1–P13 están cerradas en la tabla de abajo.
+Ninguna. P1–P14 están cerradas en la tabla de abajo.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -339,3 +361,7 @@ Ninguna. P1–P13 están cerradas en la tabla de abajo.
 | 2026-11-03 | Filtrar por estado con pedidos parciales (P11) | **Filtrar por un estado X trae los pedidos en X y también los `PARCIAL` que tienen alguna línea activa en X.** El filtro «Parcial» sigue existiendo y trae solo los parciales. |
 | 2026-11-03 | Orden de `PARCIAL` (P12) | **`PARCIAL` va el primero**, antes de `PENDIENTE`: en la lista de estados de la pantalla (`ORDER_STATUS_FLOW`, filtros y columnas) y en el orden por estado del listado. |
 | 2026-11-03 | Cómo se nombra `PARCIAL` (P13) | **«Parcial», con tono `progress`, en pantalla; «en preparación» en el texto que lee el cliente por WhatsApp.** Definitivo. |
+| 2026-11-03 | `order_line_id` en dos pasos (F2.1) | **T2 añade `order_line_id` nullable** en las seis tablas hijas y rellena lo que exista. El `NOT NULL`, las FK y los únicos por línea van en una **migración nueva, después de T14**, cuando todo el código ya escribe la línea. Cada fase deja el gate en verde. Un pedido sin línea en el momento del relleno recibe su línea; el relleno no aborta por eso. |
+| 2026-11-03 | `delivery_void` lleva línea (F2.1) | **El asiento `delivery_void` lleva `order_line_id`**, el mismo que el asiento de entrega que anula. El CHECK de `inventory_movements` lo exige. |
+| 2026-11-03 | `PARCIAL` en la pantalla actual (F2.1) | **Hasta QT-314, un pedido `PARCIAL` se trata como cerrado** en la pantalla actual: sin editar, cancelar, eliminar ni repartir. |
+| 2026-11-03 | Responsables en un pedido `PARCIAL` (P14, F2.1) | **Un `PARCIAL` admite asignar, desasignar y quitar grupo solo si al menos una receta activa está en `PENDIENTE`, `EN_CURSO` o `BLOQUEADO`.** Si no, se rechaza igual que hoy un pedido fabricado (`OrderProducedFrozenError`). Sustituye a la provisional del implementer, que admitía cualquier `PARCIAL`. |

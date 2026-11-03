@@ -1,8 +1,10 @@
 # QT-313 — pedido-con-varias-recetas-backend · design.md
 
 > Escrito por `spec_author` (F1.2, 2026-11-03) y revisado en F1.4 (2026-11-03) con las respuestas
-> del humano a P1–P13, que ya están en `requirements.md > Decisiones cerradas`. No queda ninguna
-> pregunta abierta.
+> del humano a P1–P13, que ya están en `requirements.md > Decisiones cerradas`. Enmendado en F2.1
+> (2026-11-03): `order_line_id` en dos pasos (§ 1.4), `delivery_void` con línea (§ 1.3),
+> `PARCIAL` en la pantalla actual (§ 7) y las decisiones provisionales del implementer (§ 12),
+> con P14 cerrada. No queda ninguna pregunta abierta.
 
 ## Lo que ya existe
 
@@ -44,9 +46,9 @@ cambio visible.
 | `id` | `uuid` PK, `gen_random_uuid()` | |
 | `order_id` | `uuid` NOT NULL | FK compuesta `(order_id, company_id)` → `orders_id_company_id_key`. Con `@relation` (mismo módulo) |
 | `company_id` | `uuid` NOT NULL | Copia de la del pedido, igual que `order_presentation_lines` (R2). FK a mano, drift |
-| `position` | `int` NOT NULL | Orden de alta dentro del pedido, desde 0 (R6). Único `(order_id, position)`. No se reutiliza al quitar |
-| `recipe_id` | `uuid` NOT NULL | La receta **efectiva** que se fabrica (la versión, si se eligió). FK compuesta a mano con `company_id`, drift |
-| `original_recipe_id` | `uuid` NOT NULL | La receta **original**: `recipe_id` si es original, su `parent_recipe_id` si es versión. La escribe el caso de uso con lo que devuelve `resolveOrderRecipe`; FK compuesta a mano, drift. Es la columna de la unicidad (R5) |
+| `position` | `int` NOT NULL | Orden de alta dentro del pedido, desde 0 (R6). Único `(order_id, position)` y CHECK `order_lines_position_non_negative` (`>= 0`). No se reutiliza al quitar |
+| `recipe_id` | `uuid` NOT NULL | La receta **efectiva** que se fabrica (la versión, si se eligió). **FK simple** a `recipes(id)`, escrita a mano, drift (§ 12) |
+| `original_recipe_id` | `uuid` NOT NULL | La receta **original**: `recipe_id` si es original, su `parent_recipe_id` si es versión. La escribe el caso de uso con lo que devuelve `resolveOrderRecipe`; **FK simple** a `recipes(id)`, drift (§ 12). Es la columna de la unicidad (R5) |
 | `quantity` | `decimal(14,4)` NOT NULL | CHECK `> 0` |
 | `unit_id` | `uuid` NULL | NULL solo en líneas migradas de pedidos antiguos sin unidad (heredado de `orders.unit_id`) |
 | `status` | `"OrderStatus"` NOT NULL default `PENDIENTE` | El mismo enum. CHECK `order_lines_status_not_partial`: `status <> 'PARCIAL'` (R48) |
@@ -55,7 +57,7 @@ cambio visible.
 | `actual_cost` | `decimal(14,4)` NULL | CHECK no negativo y solo desde `POR_ACONDICIONAR` (copias de los de `orders`) |
 | `sale_price` | `decimal(14,4)` NULL | CHECK `order_lines_sale_price_non_negative` (R15) |
 | `reserved_at` | `timestamptz` NULL | Instante desde el que cuentan los 15 días de **esta** línea (R41). Índice parcial `(company_id, reserved_at) WHERE status = 'PENDIENTE' AND deleted_at IS NULL` para el proceso diario |
-| `finished_at` | `timestamptz` NULL | |
+| `finished_at` | `timestamptz` NULL | CHECK `order_lines_finished_at_requires_delivered` (solo en `TERMINADO`/`ENTREGADO`) y `order_lines_finished_requires_finished_at` (obligatorio en `TERMINADO`): copias de los dos de `orders` (`order_conditioning_states`) (§ 12) |
 | `packed_by`, `conditioned_by` | `uuid` NULL | FK compuestas a mano con `company_id`; CHECK `…_matches_status` copiados de `orders` |
 | `created_by`, `updated_by`, `created_at`, `updated_at`, `deleted_at` | | Borrado lógico (QC-4) |
 
@@ -91,11 +93,14 @@ parciales de listado de `list_query_indexes` que usen esas columnas se rehacen s
 
 ### 1.3 Tablas que ganan `order_line_id`
 
+Estado **final** de cada tabla; cómo se llega en dos pasos está en § 1.4 (decisión «`order_line_id`
+en dos pasos»).
+
 | Tabla | Módulo | Cambio |
 |---|---|---|
 | `order_presentation_lines` | pedidos | `order_line_id` NOT NULL, FK compuesta `(order_line_id, order_id)` → `order_lines_id_order_id_key` (impide colgar el reparto de la línea de otro pedido). El único `(order_id, presentation_id)` pasa a `(order_line_id, presentation_id)`: dos recetas pueden repartirse en la misma presentación. `order_id` se queda: lo usan las entregas |
-| `reservation_movements` | inventario | `order_line_id` NOT NULL tras el relleno. FK compuesta `(order_line_id, order_id)` a mano, drift. Índice `(order_line_id)` |
-| `inventory_movements` | inventario | `order_line_id` NULL. CHECK: obligatorio en `consumption`, `production` y `delivery`, vacío en los asientos sin pedido. FK compuesta a mano, drift |
+| `reservation_movements` | inventario | `order_line_id` NOT NULL. FK compuesta `(order_line_id, order_id)` a mano, drift. Índice `(order_line_id)` |
+| `inventory_movements` | inventario | `order_line_id` NULL en la columna. CHECK `inventory_movements_order_line_id_matches_kind`: `(kind IN ('consumption', 'production', 'delivery', 'delivery_void')) = (order_line_id IS NOT NULL)`, los mismos cuatro tipos que hoy llevan `order_id`. El `delivery_void` lleva la línea del `delivery` que anula (decisión «`delivery_void` lleva línea», R37): lo escribe `void-delivery.ts` copiándola del asiento anulado. La igualdad no la impone la base (exigiría un disparador, el primero del repositorio); la cubre un test de integración. FK compuesta `(order_line_id, order_id)` a mano, drift |
 | `order_execution_entries` | asignaciones | `order_line_id` NOT NULL. Índice `(order_line_id, occurred_at desc)` |
 | `order_step_evidence` | asignaciones | `order_line_id` NOT NULL. Único de slot pasa a `(order_line_id, phase, step_position, slot)`: los pasos son de la receta |
 | `order_conditioning_team_members` | asignaciones | `order_line_id` NOT NULL. PK pasa a `(order_line_id, user_id)`, único `(order_line_id, position)` |
@@ -105,11 +110,12 @@ parciales de listado de `list_query_indexes` que usen esas columnas se rehacen s
 `order_id` se conserva en todas: los listados por pedido y las FK actuales siguen valiendo, y la
 FK compuesta `(order_line_id, order_id)` garantiza que los dos apuntan al mismo pedido.
 
-### 1.4 Migraciones (cuatro, cada una con su `down.sql`)
+### 1.4 Migraciones (cinco, cada una con su `down.sql`)
 
 0. **`20261103115900_order_status_partial`** — `ALTER TYPE "OrderStatus" ADD VALUE 'PARCIAL'
-   BEFORE 'PENDIENTE'` (§ 2.2.2), en su propia migración: Postgres no deja usar un valor añadido en la misma transacción
-   que lo añade (mismo patrón que `order_status_blocked` + `orders_blocked_index`). `down.sql`:
+   BEFORE 'PENDIENTE'` (§ 2.2.2), en su propia migración: Postgres no deja usar un valor añadido
+   en la misma transacción que lo añade (mismo patrón que `order_status_blocked` +
+   `orders_blocked_index`). `down.sql`:
    aborta si alguna fila de `orders` está en `PARCIAL`; si no, recrea el tipo sin el valor, como
    hizo el `down.sql` de `order_status_blocked`.
 1. **`20261103120000_order_lines`** — crea `order_lines` con sus restricciones y RLS, y la rellena
@@ -117,20 +123,49 @@ FK compuesta `(order_line_id, order_id)` garantiza que los dos apuntan al mismo 
    línea por pedido, `position = 0`, copiando las once columnas de § 1.2 y `deleted_at` (R7). El
    estado del pedido no se toca: con una línea, su derivado es el mismo. `down.sql`:
    `DROP TABLE order_lines`.
-2. **`20261103120100_order_lines_references`** — añade `order_line_id` a las seis tablas de § 1.3,
-   lo rellena con la única línea de cada pedido (`UPDATE … FROM order_lines`), y después pone
-   `NOT NULL`, las FK, los únicos nuevos y los CHECK (R8). Antes de cerrar, un bloque `DO` compara
-   los conteos y aborta si alguna fila con `order_id` quedó sin línea. `down.sql`: quita las
-   columnas y restaura los únicos y la PK anteriores.
-3. **`20261103120200_orders_drop_line_columns`** — quita de `orders` las columnas de § 1.2.
+2. **`20261103120100_order_lines_references`** (T2, **paso 1 de 2**) — añade `order_line_id`
+   **nullable** a las seis tablas de § 1.3, con un índice simple `(order_line_id)` en cada una, y
+   ejecuta el **relleno** (abajo). Solo añade un CHECK, que el código de hoy ya cumple porque nunca
+   escribe la columna: en `inventory_movements`, `order_line_id IS NULL OR kind IN ('consumption',
+   'production', 'delivery', 'delivery_void')`. No pone `NOT NULL`, FK ni cambia únicos o PK: el
+   código anterior a T7/T8/T14a sigue escribiendo esas tablas sin línea y el gate queda verde.
+   **No aborta** por filas sin línea. `down.sql`: aborta con `RAISE EXCEPTION` si alguna fila con
+   `order_line_id` pertenece a un pedido con más de una línea (perdería a qué receta va), nombrando
+   cuántas; si no, quita el CHECK, los índices y las columnas.
+3. **`20261103120150_order_lines_references_required`** (T14d, **paso 2 de 2**, después de T14a–c,
+   cuando todo el código escribe la línea, y antes de T15 porque su relleno lee las columnas de
+   `orders` que T15 borra) — repite el **relleno**; después, un bloque `DO` aborta si queda alguna
+   fila sin línea donde debe tenerla (solo posible con datos escritos fuera de la aplicación sobre un
+   pedido de varias líneas), nombrando tabla y cuántas. Luego pone `NOT NULL` en cinco tablas,
+   sustituye el CHECK de `inventory_movements` por el definitivo de § 1.3, crea las FK compuestas
+   `(order_line_id, order_id)` y cambia únicos y PK a los de línea (§ 1.3). `down.sql`: aborta con
+   `RAISE EXCEPTION` si volver a los únicos y PK por pedido chocaría (un pedido con dos líneas que
+   repiten presentación, persona del equipo o slot de evidencia), nombrando cuántos; si no, deshace
+   los únicos, la PK, las FK, el CHECK y los `NOT NULL`, y vuelve al CHECK del paso 1.
+4. **`20261103120200_orders_drop_line_columns`** — quita de `orders` las columnas de § 1.2.
    `down.sql`: **aborta con `RAISE EXCEPTION`** si algún pedido tiene más de una línea viva,
    nombrando cuántos (R9); si no, vuelve a crear las columnas, las rellena desde la línea y
    restaura CHECK, FK e índices. Con una línea por pedido ninguno puede estar en `PARCIAL`, así que
    después el `down.sql` de la migración 0 tampoco se niega.
 
+**El relleno** (idéntico en los pasos 1 y 2, idempotente):
+
+1. **Pedidos sin línea.** Entre la migración 1 y T9, el código de hoy sigue creando pedidos sin
+   línea. El relleno les crea la suya con el mismo `INSERT … SELECT` de la migración 1, limitado
+   a `WHERE NOT EXISTS (SELECT 1 FROM order_lines WHERE order_id = o.id)`. Por eso el paso 2 tiene
+   que ir antes de T15: lee las columnas de `orders`.
+2. **Filas hijas sin línea.** `UPDATE … SET order_line_id = l.id FROM order_lines l` para cada fila
+   con `order_line_id IS NULL` cuyo pedido tiene **exactamente una** línea (contando las quitadas).
+   En `inventory_movements` el pedido sale de `order_id`, que llevan los cuatro tipos con línea;
+   un `delivery_void` recibe así la misma línea que su `delivery`, porque los dos son del mismo
+   pedido de una línea.
+3. Una fila sin línea cuyo pedido tiene varias **no se toca**: en el paso 1 se queda `NULL`; en el
+   paso 2 la detecta el bloque `DO` y aborta.
+
 Las FK, CHECK e índices parciales escritos a mano son drift para Prisma, como en el resto del
 esquema: hay que borrar sus `DROP CONSTRAINT` de cualquier migración generada después
-(comentario `///` en el modelo).
+(comentario `///` en el modelo). En `db/schema.prisma`, el paso 1 declara `orderLineId String?` y
+el paso 2 lo pasa a `String` en las cinco tablas con `NOT NULL`.
 
 ## 2. Estado
 
@@ -412,6 +447,23 @@ existirán. Si aun así llega uno al puente (datos escritos por tests o por cons
 el formulario actual se rechaza con `invalid_input` sin escribir nada, porque reenviar una sola
 receta quitaría las demás. No hay cambio visible: no hace falta pase `/design`.
 
+**`PARCIAL` en la pantalla actual** (decisión de F2.1, R54). Los mapas exhaustivos por estado de
+`app/(private)/pedidos/components/` necesitan un valor para `PARCIAL`, y se trata como un estado
+final. Revisado en el código que dejó backend_dev, y coincide con la decisión:
+
+| Mapa | Archivo | `PARCIAL` | Efecto |
+|---|---|---|---|
+| `ORDER_STATUS_IS_FINAL` | `order-row-actions.tsx` | `true` | Editar, cancelar y eliminar deshabilitados; «Responsables» sigue abierto, como en cualquier estado final (QC-102) |
+| `ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT` | `order-row-actions.tsx` | `false` | Sin editar el reparto |
+| `ORDER_STATUS_ACCEPTS_DELIVERY` | `order-row-actions.tsx` | `false` | Sin entregar |
+| `ORDER_STATUS_HAS_DELIVERIES` | `order-row-actions.tsx` | `false` | Sin la lista de entregas |
+| `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE` | `order-row-actions.tsx` | `true` | Cambio de cliente disponible, igual que el servicio (§ 12) |
+| `STATUS_ACCEPTS_VOID` | `order-delivery-list.tsx` | `false` | Sin anular entregas |
+
+Son literales de un mapa existente, no componentes ni cambios visibles en ningún pedido real (un
+`PARCIAL` no puede existir antes de QT-314): no hace falta pase `/design`. QT-314 y QT-315 los
+sustituyen al dar a cada receta sus acciones.
+
 ## 8. Otros lectores de las columnas que se van
 
 | Archivo | Qué lee | Pasa a leer |
@@ -476,3 +528,19 @@ cabe sin rehacer el modelo.
 - **Valor del enum al principio.** `ADD VALUE … BEFORE` cambia la posición relativa de todos los
   valores para `ORDER BY status`: cualquier test que fije el orden por estado de hoy tiene que
   contar con `PARCIAL` delante. Los demás valores no cambian de orden entre sí.
+- **Filas sin línea entre los dos pasos.** Mientras `order_line_id` es nullable, una lectura por
+  línea puede encontrar filas sin ella (pedidos creados por código anterior a T9). Hasta el paso 2,
+  las lecturas por línea tratan una fila sin línea de un pedido de una sola línea como de esa
+  línea; el paso 2 elimina el caso.
+
+## 12. Decisiones provisionales del implementer (F2.1)
+
+Revisadas contra el spec el 2026-11-03. Cuatro se aceptan; la quinta la sustituye la decisión P14.
+
+| Decisión | Dónde | Veredicto |
+|---|---|---|
+| FK **simple** de `order_lines.recipe_id` y `original_recipe_id` a `recipes(id)` | migración `20261103120000_order_lines` | **Aceptada.** `recipes` no tiene clave `(id, company_id)` (`db/schema.prisma`, modelo `Recipe`), y `orders.recipe_id` ya tenía FK simple. Que la receta sea de la empresa lo garantiza el caso de uso, que la lee con el catálogo de `recetas` acotado a la empresa del actor (R11, R43). Dar a `recipes` esa clave sería tocar otro módulo sin requisito que lo pida |
+| CHECK `order_lines_position_non_negative` (`position >= 0`) | misma migración | **Aceptada.** Concreta «desde 0» de R6 |
+| CHECK `order_lines_finished_requires_finished_at` | misma migración | **Aceptada.** Es copia de `orders_finished_requires_finished_at` (`order_conditioning_states`), uno de los CHECK de `orders` que § 1.1 manda copiar a la línea. La migración 1 no puede romperlo: copia filas que ya lo cumplían |
+| `CUSTOMER_EDITABLE_STATUSES` incluye `PARCIAL` | `pedidos/domain/set-order-customer.ts` | **Aceptada.** El cliente es del pedido (P1, R42) y se puede cambiar en todo estado salvo los finales. Un `PARCIAL` nunca es final: tiene al menos una línea activa sin entregar (R50) |
+| `assertOrderAcceptsWrites` deja escribir en **cualquier** `PARCIAL` | `asignaciones/domain/order-state.ts` | **No aceptada; sustituida por la decisión P14 (R55).** Un `PARCIAL` admite asignar, desasignar y quitar grupo solo si al menos una línea activa está en `PENDIENTE`, `EN_CURSO` o `BLOQUEADO`; si no, `OrderProducedFrozenError`, como un pedido fabricado. Para decidirlo, `OrderAssignmentTarget` (lo que devuelve `OrderCatalog.findAliveById`) gana los estados de sus líneas activas, y `assertOrderAcceptsWrites` aplica a un `PARCIAL` el mapa `ERROR_POR_ESTADO` línea a línea: admite si alguna da `null`. Solo afecta a esas tres escrituras: abrir, finalizar y registrar pasos comprueban la **línea** (T14a) |

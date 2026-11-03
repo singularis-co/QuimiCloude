@@ -3,7 +3,9 @@
 > Escrito por `spec_author` (F1.2, 2026-11-03) y revisado en F1.4 (2026-11-03) con las decisiones
 > P1–P13. `[P]` = paralelizable con las otras `[P]` de su misma fase. Cada task cierra con
 > `pnpm run typecheck`, `pnpm run lint` y `pnpm exec vitest related --run <archivos tocados>` en
-> verde, y un commit `feat(QT-313): …`. No queda ninguna pregunta abierta.
+> verde, y un commit `feat(QT-313): …`. Enmendado en F2.1 (2026-11-03): T2 pasa a ser el paso 1
+> de 2 de `order_line_id` y el paso 2 es T14e; T14d aplica la decisión P14 (R55). No queda ninguna
+> pregunta abierta. T0 y T1 están hechas (commit 8b79a3328) y no cambian.
 >
 > Orden por fases: el modelo nuevo convive con las columnas viejas de `orders` hasta la fase 5;
 > la migración que las borra (T15) va la **última**, cuando ya nadie las lee. Así cada fase deja
@@ -35,13 +37,19 @@
   empresa (R2), cantidad 0, precio negativo (R15), línea `PARCIAL` (R48) y dos líneas activas con
   la misma original, también original + versión (R5); las admite si una está cancelada o quitada
   (R5); `down.sql` deja el esquema como antes. Depende de T0.
-- [ ] **T2 — `order_line_id` en las tablas hijas.** Migración `20261103120100_order_lines_references`
-  (design § 1.3): reparto, reservas, movimientos de inventario, registro de ejecución, evidencias y
-  equipo de acondicionamiento; relleno, `NOT NULL`, FK `(order_line_id, order_id)`, únicos nuevos y
-  bloque `DO` que aborta si queda una fila sin línea. Schema de los seis modelos.
-  *Hecho:* test de integración: conteos iguales antes y después en las seis tablas y cada fila
-  apunta a la línea de su pedido (R8); la FK rechaza una línea de otro pedido; `down.sql` revierte.
-  Depende de T1.
+- [ ] **T2 — `order_line_id` nullable en las tablas hijas (paso 1 de 2).** Migración
+  `20261103120100_order_lines_references` (design § 1.4, punto 2): columna **nullable** e índice
+  simple en reparto, reservas, movimientos de inventario, registro de ejecución, evidencias y equipo
+  de acondicionamiento; CHECK suave de `inventory_movements` (solo los cuatro tipos con pedido
+  pueden llevar línea); el **relleno** de design § 1.4 (crea la línea de los pedidos que no la
+  tienen y asigna la única línea a cada fila hija). Sin `NOT NULL`, FK ni cambio de únicos o PK.
+  Schema de los seis modelos con `orderLineId String?`.
+  *Hecho:* test de integración de la migración: conteos iguales antes y después en las seis tablas
+  y cada fila de un pedido de una línea apunta a ella, `delivery_void` incluido, con la misma línea
+  que su `delivery` (R8, R37); un pedido creado sin línea antes de la migración la recibe y la
+  migración no aborta (R8); la base rechaza línea en un asiento `opening` o `adjustment`; `down.sql`
+  revierte y se niega si hay filas de un pedido de varias líneas. El gate completo sigue verde con
+  el código de hoy escribiendo sin línea. Depende de T1.
 
 ## Fase 2 — Dominio puro `[P]`
 
@@ -119,7 +127,8 @@
   `order-pending-delivery.ts`, `review-blocked-orders.ts`, `expire-stale-orders.ts`,
   `order-expiry.ts`, `order-expiry-cron-route.ts`.
   *Hecho:* tests de R39 (entregar completa solo la línea cuyo reparto se completa; anular la
-  devuelve), R40 (dos líneas bloqueadas, entra material para una; la que pasa a `PENDIENTE`
+  devuelve; el asiento `delivery_void` lleva la línea del `delivery` que anula, R37), R40 (dos
+  líneas bloqueadas, entra material para una; la que pasa a `PENDIENTE`
   estrena plazo) y R51 (dos líneas `PENDIENTE` con plazos distintos: el proceso cancela solo la
   vencida y libera solo su material; el pedido queda `PARCIAL`). Depende de T8, T7.
 - [ ] **T13 — Lecturas.** `get-order.ts`, `list-orders.ts`, `order-view.ts`, `order-queryable.ts`,
@@ -154,17 +163,42 @@
   (design § 7).
   *Hecho:* test de la acción: el `FormData` de hoy crea un pedido de una línea y la lectura del
   formulario devuelve los campos planos de hoy (R44); editar un pedido de dos líneas desde el
-  puente → `invalid_input` sin escribir. Depende de T9, T10, T13.
+  puente → `invalid_input` sin escribir. Además, `PARCIAL` como estado final en
+  `app/(private)/pedidos/components/order-row-actions.tsx` y `order-delivery-list.tsx` (design § 7;
+  los mapas ya los dejó backend_dev en T0/T1: aquí se comprueba que su test,
+  `tests/unit/pedidos-ui/order-row-actions.test.tsx`, cubre R54 con su nombre).
+  *Hecho (además):* test de R54: con un pedido `PARCIAL`, editar, cancelar y eliminar
+  deshabilitados, sin reparto, entrega ni entregas; «Responsables» y cliente disponibles.
+  Depende de T9, T10, T13.
+- [ ] **T14d — Responsables en un `PARCIAL` (R55).** `asignaciones/domain/order-state.ts`,
+  `pedidos/domain/order-catalog.ts` (`OrderAssignmentTarget` con los estados de sus líneas
+  activas) y `order-catalog-prisma.ts` (design § 12): sustituye la provisional que admitía
+  cualquier `PARCIAL`.
+  *Hecho:* tests de asignar, desasignar y quitar grupo: un `PARCIAL` con una línea `PENDIENTE`,
+  `EN_CURSO` o `BLOQUEADO` lo admite; uno con todas sus líneas activas en `POR_EMPACAR`…`TERMINADO`
+  lo rechaza con `OrderProducedFrozenError` sin escribir; una línea cancelada no cuenta.
+  Depende de T14a.
 
 ## Fase 6 — Contrato y cierre
 
+- [ ] **T14e — `order_line_id` obligatorio (paso 2 de 2).** Migración
+  `20261103120150_order_lines_references_required` (design § 1.4, punto 3): repite el relleno,
+  bloque `DO` que aborta si queda una fila sin línea donde debe tenerla, `NOT NULL` en cinco
+  tablas, CHECK definitivo de `inventory_movements` (los cuatro tipos con pedido llevan línea,
+  `delivery_void` incluido), FK compuestas `(order_line_id, order_id)`, únicos y PK por línea.
+  `db/schema.prisma` pasa `orderLineId` a obligatorio donde corresponde.
+  *Hecho:* test de integración de la migración: un pedido creado sin línea antes de aplicarla la
+  recibe; una fila sin línea de un pedido de dos líneas la hace abortar nombrando tabla y cuántas;
+  después, la base rechaza filas sin línea, un `delivery` sin línea y una línea de otro pedido
+  (R37); `down.sql` revierte y se niega si los únicos por pedido chocarían. Depende de T14a, T14b,
+  T14c (todo el código escribe la línea).
 - [ ] **T15 — Quitar las columnas de `orders`.** Migración `20261103120200_orders_drop_line_columns`
   y `db/schema.prisma` (design § 1.2), `reserved_at` incluido. `down.sql` aborta si hay pedidos con
   más de una línea viva.
   *Hecho:* test de integración de la migración: sube y baja con pedidos de una línea dejando los
   valores como antes; con un pedido de dos líneas, la bajada falla, nombra cuántos y no cambia
   nada (R9); grep sin lecturas de `recipeId`/`quantity`/`salePrice`/`reservedAt` de `orders`
-  fuera de la línea (R1). Depende de T14a, T14b, T14c.
+  fuera de la línea (R1). Depende de T14e (su relleno lee las columnas que esta task borra).
 - [ ] **T16 — Recorridos.** `e2e/pedido-con-varias-recetas.spec.ts` (pedido de una línea por la
   pantalla actual: alta, abrir y finalizar como operador; apartado, consumo y lote de producto
   terminado iguales a hoy) y `tests/integration/pedidos/order-lines-flow.int.test.ts` (dos líneas
@@ -176,7 +210,7 @@
   pedido muestra la suma (enmienda de QC-307, decisión «¿Dónde va el precio de venta?»); y punto 2:
   la reserva elige lote **por receta del pedido**, con su propio plazo de caducidad.
   *Hecho:* el texto ya no dice «del pedido entero». Depende de T15.
-- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R53 → test`.
+- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R55 → test`.
   *Hecho:* cada `R<n>` tiene al menos un test con `R<n>` en el nombre. Depende de T16.
 
 ## Archivos esperados
@@ -188,6 +222,8 @@
 - `db/migrations/20261103120000_order_lines/down.sql`
 - `db/migrations/20261103120100_order_lines_references/migration.sql`
 - `db/migrations/20261103120100_order_lines_references/down.sql`
+- `db/migrations/20261103120150_order_lines_references_required/migration.sql`
+- `db/migrations/20261103120150_order_lines_references_required/down.sql`
 - `db/migrations/20261103120200_orders_drop_line_columns/migration.sql`
 - `db/migrations/20261103120200_orders_drop_line_columns/down.sql`
 - `lib/shared/ui/order-status.ts`
@@ -304,8 +340,11 @@
 - `tests/integration/pedidos/order-lines-references-migration.int.test.ts`
 - `tests/integration/pedidos/orders-drop-line-columns-migration.int.test.ts`
 - `tests/integration/pedidos/order-lines-repository.int.test.ts`
+- `tests/integration/pedidos/order-lines-references-required-migration.int.test.ts`
 - `tests/integration/pedidos/order-lines-flow.int.test.ts`
 - `tests/integration/pedidos/list-query-orders.int.test.ts`
+- `tests/integration/pedidos/void-delivery-order-line.int.test.ts`
+- `tests/unit/asignaciones/order-state.test.ts`
 - `tests/integration/inventario/reservation.int.test.ts`
 - `tests/integration/inventario/order-consumption-ledger.int.test.ts`
 - `tests/integration/asignaciones/order-lines-execution.int.test.ts`
