@@ -72,3 +72,27 @@ Verificacion (salida real):
 - Pendiente de CI: que ningun `.int` no corrido compare filas enteras de las seis tablas con `toEqual` (ahora llevan `orderLineId: null`).
 
 El bloqueo original de T2 lo resolvio la enmienda del spec (T2 en dos pasos; el paso 2 es T14e).
+
+## Decisiones del humano (2026-11-03) sobre lo hecho fuera del spec en T3–T6
+
+- Todas las lineas canceladas: costes totales `"0.0000"`, precio total `null`. Se queda; lo fija un test en `order-totals.test.ts`.
+- Quitar la linea X y anadir otra X en la misma edicion: admitido; el adaptador escribe bajas antes que altas por el indice unico parcial. Test de integracion en T10.
+- Aceptadas tal cual: `id` repetido en una edicion → `invalid_input`; `id` de linea cancelada sin cambios pasa, con cambios → `invalid_transition`; `deriveOrderStatus([])` lanza error de programacion; textos «El pedido ya tiene esa fórmula.» y «Esa fórmula ya no se puede quitar del pedido.».
+- Nombres de los esquemas de T6 provisionales: T9, T10 y T14c los renombran a los del design y borran los planos.
+
+## Fase 2 — Dominio puro (T3–T6, 2026-11-03)
+
+Archivos: `lib/modules/pedidos/domain/{order-status-derivation,order-totals,order-line-diff,order-line-removal}.ts` (nuevos), `order-input.ts`, `order-edit-change.ts`, `errors.ts`, `lib/modules/errores/domain/{error-codes,error-catalog}.ts`; tests `tests/unit/pedidos/{order-status-derivation,order-totals,order-line-diff,order-input-lines}.test.ts` (nuevos), `tests/unit/errores/catalogo.test.ts`, `tests/unit/pedidos/module-contract.test.ts`.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R3, R15, R42 | `order-input-lines.test.ts` |
+| R4, R20, R22, R23, R24 | `order-line-diff.test.ts` (p. ej. «R4: la original y una version suya son la misma receta», «R23: quitar una EN_CURSO rechaza con order_line_not_removable…», «R24: una linea en estado no editable con cambios rechaza con invalid_transition») |
+| R16, R18, R33 | `order-totals.test.ts` (incl. «R16, R18: todas canceladas: costes 0.0000 y precio null», «R33: TERMINADO y ENTREGADO cuentan como terminadas») |
+| R34 | `order-status-derivation.test.ts` |
+
+Verificacion (salida real, backend_dev de cierre):
+- `pnpm run typecheck` → exit 0; `pnpm run lint` → 0 errores
+- `vitest related --run` (node + ui + integration, base efimera) → 1184 archivos / 19939 tests en verde (node 576, ui 362, integration 246)
+- `pnpm exec vitest run guard` → 87 archivos en verde

@@ -675,11 +675,15 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     //
     // QC-223 2026-10-08: `deliver-order.ts` tambien la consume, con `TERMINADO -> ENTREGADO`,
     // antes de abrir la unidad de trabajo de la entrega.
+    //
+    // QT-313 2026-11-03: `order-line-diff.ts` la consume para la linea editada con cambios, con el
+    // mismo «quedarse en su estado» que `update-order.ts` aplicaba al pedido.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
       'lib/modules/pedidos/domain/deliver-order.ts',
       'lib/modules/pedidos/domain/order-conditioning.ts',
+      'lib/modules/pedidos/domain/order-line-diff.ts',
       'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',

@@ -125,7 +125,8 @@ describe('catalogo de errores — forma y cierre (QC-70 T1)', () => {
       // Merge de dev en QC-299 (2026-10-21): 121 = 117 + 4 de los pasos de acondicionamiento.
       // QC-240 2026-10-23: 131 = 121 + 10 del envio de mensajes de WhatsApp.
       // Merge de dev en QC-203 (2026-10-23): 133 = 131 + 2 de la conversion por familia de unidad.
-      expect(ERROR_CODES).toHaveLength(133)
+      // QT-313 2026-11-03: 135 = 133 + `duplicate_order_recipe` y `order_line_not_removable`.
+      expect(ERROR_CODES).toHaveLength(135)
       expect(Object.keys(ERROR_MESSAGE_KEY).sort()).toEqual([...ERROR_CODES].sort())
     })
 

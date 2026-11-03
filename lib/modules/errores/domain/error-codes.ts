@@ -289,6 +289,10 @@ export const ERROR_CODES = [
   'conditioning_responsible_not_allowed',
   // Distinto de `conditioning_batch_data_missing`: los datos de lote pueden estar, faltan pasos.
   'conditioning_steps_pending',
+  // Distinto de `invalid_input`: cada linea es valida, lo que choca es repetir receta en el pedido.
+  'duplicate_order_recipe',
+  // Distinto de `invalid_transition`: la linea no cambia de estado, se quiere quitar del pedido.
+  'order_line_not_removable',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -138,6 +138,8 @@ export const ERROR_MESSAGE_KEY = {
   conditioning_responsibles_required: 'errors.conditioning_responsibles_required',
   conditioning_responsible_not_allowed: 'errors.conditioning_responsible_not_allowed',
   conditioning_steps_pending: 'errors.conditioning_steps_pending',
+  duplicate_order_recipe: 'errors.duplicate_order_recipe',
+  order_line_not_removable: 'errors.order_line_not_removable',
 } as const satisfies Record<ErrorCode, string>;
 
 export type ErrorMessageKey = (typeof ERROR_MESSAGE_KEY)[ErrorCode];
@@ -346,4 +348,6 @@ export const ERROR_MESSAGES_ES = {
   'errors.conditioning_responsibles_required': 'Elige al menos un responsable para avanzar.',
   'errors.conditioning_responsible_not_allowed': 'Solo puedes elegir a personas del equipo o a ti.',
   'errors.conditioning_steps_pending': 'Completa los pasos de acondicionamiento antes de terminar.',
+  'errors.duplicate_order_recipe': 'El pedido ya tiene esa fórmula.',
+  'errors.order_line_not_removable': 'Esa fórmula ya no se puede quitar del pedido.',
 } as const satisfies Record<ErrorMessageKey, string>;

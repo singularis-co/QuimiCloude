@@ -53,18 +53,18 @@
 
 ## Fase 2 — Dominio puro `[P]`
 
-- [ ] **T3 [P] — Estado derivado.** `domain/order-status-derivation.ts`: `deriveOrderStatus(lines)`
+- [x] **T3 [P] — Estado derivado.** `domain/order-status-derivation.ts`: `deriveOrderStatus(lines)`
   con la regla de design § 2.2 (todas canceladas → `CANCELADO`; activas iguales → ese estado;
   distintas → `PARCIAL`).
   *Hecho:* test unitario con todos los pares de estados de línea, `TERMINADO` + `ENTREGADO` y
   `PENDIENTE` + `BLOQUEADO` (→ `PARCIAL`), canceladas mezcladas, todas canceladas, una línea
   (= su estado) (R34). Depende de T0.
-- [ ] **T4 [P] — Totales y resumen.** `domain/order-totals.ts`: `sumDecimal4`, precio total con
+- [x] **T4 [P] — Totales y resumen.** `domain/order-totals.ts`: `sumDecimal4`, precio total con
   `linesWithoutPrice`, coste estimado y real totales, `progress`.
   *Hecho:* tests unitarios de R16, R18 y R33: canceladas fuera de sumas, total y terminadas;
   `TERMINADO` y `ENTREGADO` cuentan como terminadas; 0, vacíos y sumas de más de 10 dígitos
   enteros; sin `number` en el cálculo.
-- [ ] **T5 [P] — Diff de líneas y reglas por línea.** `domain/order-line-diff.ts` (editar / añadir /
+- [x] **T5 [P] — Diff de líneas y reglas por línea.** `domain/order-line-diff.ts` (editar / añadir /
   quitar a partir de la entrada y las líneas vivas, R20), `domain/order-line-removal.ts`
   (quitables `PENDIENTE` y `BLOQUEADO`, R22, R23), comprobación de receta duplicada sobre la
   **original** contra la entrada y las líneas activas (R4), y la regla «línea no editable con
@@ -72,7 +72,7 @@
   *Hecho:* tests unitarios de R4 (dos originales iguales, original + versión, dos versiones de la
   misma original, receta de una línea cancelada que se vuelve a añadir → admitida), R20, R22,
   R23 (quitar `EN_CURSO` → rechazo; quitar `BLOQUEADO` → admitido) y R24.
-- [ ] **T6 [P] — Esquemas de entrada y errores.** `order-input.ts` con `lines[]` (design § 4.1),
+- [x] **T6 [P] — Esquemas de entrada y errores.** `order-input.ts` con `lines[]` (design § 4.1),
   `cancelOrderLineSchema`, `lineId` en la edición acotada; `DuplicateOrderRecipeError` y
   `OrderLineNotRemovableError` en `domain/errors.ts` y sus códigos en el catálogo de `errores`.
   *Hecho:* tests de esquema: sin líneas → `invalid_input` (R3), línea con `id` en el alta →

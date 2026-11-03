@@ -360,3 +360,22 @@ export class DeliveryExceedsSurplusError extends PedidosError {
     super('delivery_exceeds_surplus', diagnostic);
   }
 }
+
+/** Dos lineas activas del pedido con la misma receta original: una version cuenta como su
+ *  original. */
+export class DuplicateOrderRecipeError extends PedidosError {
+  readonly code = 'duplicate_order_recipe';
+
+  constructor(diagnostic?: string) {
+    super('duplicate_order_recipe', diagnostic);
+  }
+}
+
+/** La edicion deja fuera una linea que ya empezo o termino, y esa ya no se puede quitar. */
+export class OrderLineNotRemovableError extends PedidosError {
+  readonly code = 'order_line_not_removable';
+
+  constructor(diagnostic?: string) {
+    super('order_line_not_removable', diagnostic);
+  }
+}

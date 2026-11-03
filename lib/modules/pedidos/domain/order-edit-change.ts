@@ -56,3 +56,30 @@ export function isCustomerOnlyEdit(row: OrderRow, edit: ComparableEdit): boolean
     sameDistribution(edit.presentationLines, row.presentationLines)
   );
 }
+
+/** Lo que una linea guardada tiene y una edicion puede cambiar. `recipeId` es la receta efectiva. */
+export type ComparableOrderLine = {
+  readonly recipeId: string;
+  readonly quantity: string;
+  readonly unitId: string | null;
+  readonly salePrice: string | null;
+  readonly presentationLines: readonly OrderPresentationLineRow[];
+};
+
+/** Lo que trae la edicion de una linea, con `recipeId` ya resuelto a la receta efectiva. */
+export type ComparableOrderLineEdit = Pick<ComparableOrderLine, 'recipeId' | 'quantity' | 'salePrice'> & {
+  readonly unitId: string;
+  readonly presentationLines: readonly DistributionLineInput[];
+};
+
+/** Una linea guardada sin unidad nunca es igual: la edicion siempre trae una. */
+export function isUnchangedOrderLine(saved: ComparableOrderLine, edit: ComparableOrderLineEdit): boolean {
+  return (
+    edit.recipeId === saved.recipeId &&
+    sameDecimal(edit.quantity, saved.quantity) &&
+    saved.unitId !== null &&
+    edit.unitId === saved.unitId &&
+    sameSalePrice(edit.salePrice, saved.salePrice) &&
+    sameDistribution(edit.presentationLines, saved.presentationLines)
+  );
+}
