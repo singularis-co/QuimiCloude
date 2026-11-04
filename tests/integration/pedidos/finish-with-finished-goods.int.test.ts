@@ -28,6 +28,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   findAliveOrderById,
+  findAliveOrderLines,
   createOrderWriteRepository,
   findBlockedOrderIds,
   startPackingAliveOrder,
@@ -134,7 +135,7 @@ const units: UnitCatalog = {
 const orderPackingRepository: OrderPackingRepository = { startPackingAlive: startPackingAliveOrder };
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
-const updateOrder = createUpdateOrder({ customerCatalog, orders: { findAliveById: findAliveOrderById, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
+const updateOrder = createUpdateOrder({ customerCatalog, orders: { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, listAlive: async () => { throw new Error('sin uso en este archivo'); }, findBlockedIds: findBlockedOrderIds }, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 
 const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging: packagingCatalog, presentations, units, unitOfWork });
 

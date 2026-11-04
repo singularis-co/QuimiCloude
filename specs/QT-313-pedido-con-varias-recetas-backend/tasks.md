@@ -97,7 +97,7 @@
 
 ## Fase 4 — Casos de uso de `pedidos`
 
-- [ ] **T8 — Puertos y persistencia de línea.** `ports/order-write-repository.ts`,
+- [x] **T8 — Puertos y persistencia de línea.** `ports/order-write-repository.ts`,
   `ports/order-repository.ts`, `order-prisma.ts`, `order-unit-of-work-prisma.ts`: crear, leer,
   bloquear (`FOR UPDATE`, pedido y luego líneas por `position`), actualizar, cancelar y dar de baja
   líneas; `reserved_at` por línea; escribir `orders.status` derivado; traducir la violación del
@@ -423,3 +423,23 @@ Tocados en la fase 3 (T7) por el cambio de `MaterialReservations` y `findOnlyLin
 - `tests/unit/pedidos/transition-order.test.ts`
 - `tests/unit/pedidos/update-order-presentation-lines.test.ts`
 - `tests/unit/pedidos/update-order.test.ts`
+
+Tocados en la fase 4 (T8) por el lector `findAliveLines` de `OrderRepository` y los metodos de linea de `OrderWriteRepository`:
+
+- `tests/unit/pedidos/order-view.test.ts`
+- `tests/integration/pedidos/finish-with-finished-goods.int.test.ts`
+- `tests/integration/pedidos/order-content-copy.int.test.ts`
+- `tests/integration/pedidos/order-cost-quote.int.test.ts`
+- `tests/integration/pedidos/order-customer.int.test.ts`
+- `tests/integration/pedidos/order-delivery-concurrency.int.test.ts`
+- `tests/integration/pedidos/order-delivery-void-concurrency.int.test.ts`
+- `tests/integration/pedidos/order-delivery-void.int.test.ts`
+- `tests/integration/pedidos/order-ingredients-cost.int.test.ts`
+- `tests/integration/pedidos/order-reservation-concurrency.int.test.ts`
+- `tests/integration/pedidos/order-reservation-tools.int.test.ts`
+- `tests/integration/pedidos/order-reservation.int.test.ts`
+- `tests/integration/pedidos/order-unit-conversion.int.test.ts`
+- `tests/integration/pedidos/qc170-distribution-company-scope.int.test.ts`
+- `tests/integration/pedidos/qc170-distribution-concurrency.int.test.ts`
+- `tests/integration/pedidos/qc195-packaging-reservation.int.test.ts`
+- `tests/integration/pedidos/review-blocked-orders.int.test.ts`

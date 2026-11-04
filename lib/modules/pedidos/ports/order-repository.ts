@@ -1,7 +1,7 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { OrderScope } from '../domain/order-scope';
-import type { OrderRow } from '../domain/order-view';
+import type { OrderLineRow, OrderRow } from '../domain/order-view';
 
 /**
  * Puerto de LECTURA del pedido. La escritura vive en `OrderWriteRepository`
@@ -26,6 +26,10 @@ export interface OrderRepository {
   /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
    *  caso. */
   findAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
+
+  /** Las lineas vivas del pedido, canceladas incluidas y quitadas no, por `position`. `[]` si el
+   *  pedido no existe, esta borrado o es de otra empresa. */
+  findAliveLines(orderId: string, scope: OrderScope): Promise<readonly OrderLineRow[]>;
 
   /**
    * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).

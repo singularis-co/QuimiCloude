@@ -21,6 +21,7 @@ import { createOrderDeliveryVoidRepository } from '@/lib/modules/pedidos/adapter
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -479,7 +480,7 @@ describe('voidDelivery contra Postgres', () => {
           }),
       },
       voids: createOrderDeliveryVoidRepository(),
-      orders: { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds },
+      orders: { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds },
     });
   }
 

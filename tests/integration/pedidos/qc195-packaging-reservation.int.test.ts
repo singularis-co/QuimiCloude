@@ -25,6 +25,7 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -70,7 +71,7 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
     withOrderTransaction((tx) => {

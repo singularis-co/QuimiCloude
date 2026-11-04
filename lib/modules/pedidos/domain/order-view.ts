@@ -1,4 +1,4 @@
-import type { OrderPriority, OrderStatus } from './order-classification';
+import type { OrderLineStatus, OrderPriority, OrderStatus } from './order-classification';
 import type { EditableOrderStatus } from './order-input';
 import type { OrderCustomer } from './order-customer';
 import type { OrderNumber } from './order-number';
@@ -141,6 +141,35 @@ export type OrderRow = {
   readonly customerId: string | null;
   /** Precio de venta del pedido entero; `null` = sin precio. Cadena con 4 decimales. */
   readonly salePrice: string | null;
+};
+
+/** Una receta del pedido tal como la devuelve el puerto. `recipeId` es la receta que se fabrica (la
+ *  version, si se eligio una) y `originalRecipeId`, su original. */
+export type OrderLineRow = {
+  readonly id: string;
+  readonly orderId: string;
+  readonly position: number;
+  readonly recipeId: string;
+  readonly originalRecipeId: string;
+  readonly quantity: string;
+  /** `null` solo en lineas migradas de pedidos antiguos sin unidad. */
+  readonly unitId: string | null;
+  readonly status: OrderLineStatus;
+  readonly cancellationReason: string | null;
+  readonly ingredientsCost: string | null;
+  readonly packagingCost: string | null;
+  readonly actualCost: string | null;
+  readonly salePrice: string | null;
+  readonly reservedAt: Date | null;
+  readonly finishedAt: Date | null;
+  readonly packedBy: string | null;
+  readonly conditionedBy: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  readonly createdBy: string | null;
+  readonly updatedBy: string | null;
+  /** El reparto de esta linea, en orden de alta. */
+  readonly presentationLines: readonly OrderPresentationLineRow[];
 };
 
 /**

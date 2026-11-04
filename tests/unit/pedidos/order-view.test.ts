@@ -230,6 +230,8 @@ describe('pedidos — el puerto declara sus metodos de LECTURA: los dos de desig
     // compartida con `inventario`; este puerto ya solo lee.
     const doble: OrderRepository = {
       findAliveById: async () => null,
+      // QT-313: las lineas del pedido, por `position`.
+      findAliveLines: async () => [],
       // `listAlive` devuelve una `Page` ya armada, no `{ rows, total }`: la firma se corrigio
       // el 2026-09-04 (nota al final de `design.md > 7.4`, aprobada por el leader) para que el
       // caso de uso no tenga que calcular el `offset`, que es la reimplementacion que R37
@@ -238,7 +240,7 @@ describe('pedidos — el puerto declara sus metodos de LECTURA: los dos de desig
       // QC-138: los bloqueados de la empresa, para la revision que los desbloquea.
       findBlockedIds: async () => [],
     }
-    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'findBlockedIds', 'listAlive'])
+    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'findAliveLines', 'findBlockedIds', 'listAlive'])
   })
 
   it('no existe ningun metodo de restaurar ni de listar borrados', () => {

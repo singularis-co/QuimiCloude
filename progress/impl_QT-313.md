@@ -123,3 +123,30 @@ Desviaciones aceptadas por el humano (2026-11-03):
 - `inventory-movement.ts` tocado (anadido a Archivos esperados).
 - `findOnlyLineId` lanza si hay mas de una linea viva: valido porque antes de T9 no hay pedidos de varias lineas. **T14e lo elimina junto con el `orderLineId: null`.**
 - **Para revisar en T8–T13:** (1) `findReservedAndAvailableByBatch` y `findCoverageByOrderIds` siguen agrupando por pedido, no por linea; (2) el doble `tests/helpers/order-unit-of-work-double.ts` devuelve `null` en `findOnlyLineId`.
+
+## Fase 4 — T8 Puertos y persistencia de linea (2026-11-04)
+
+Archivos de produccion: `lib/modules/pedidos/ports/{order-write-repository,order-repository}.ts`, `lib/modules/pedidos/adapters/driven/persistence/order-prisma.ts`, `lib/modules/pedidos/domain/order-view.ts` (`OrderLineRow`), `lib/composition/index.ts`.
+Tests: `tests/integration/pedidos/order-lines-repository.int.test.ts` (ampliado), `tests/unit/pedidos/order-view.test.ts`, `tests/helpers/order-unit-of-work-double.ts` y 16 `.int` de `pedidos` ajustados (listados en `tasks.md > Archivos esperados`).
+
+Mapa R → test (`order-lines-repository.int`):
+| R | Test |
+|---|---|
+| R5 | «QT-313 R5: anadir la version de una receta que ya esta activa lanza duplicate_order_recipe», «QT-313 R5: con la linea de esa receta cancelada, o quitada en la misma escritura, la receta se vuelve a anadir», «QT-313 R5: dos altas a la vez de la misma receta en el mismo pedido: una entra y la otra es duplicate_order_recipe» |
+| R6 | «QT-313 R6: leer y bloquear devuelven las lineas por position…», «QT-313 R6: las altas toman position despues de la mayor del pedido…» |
+| R34 (persistencia) | «QT-313 R34: el estado del pedido se deriva de sus lineas; todas canceladas dan CANCELADO con el motivo de la ultima» |
+| R41 (persistencia) | «QT-313 R41: el plazo de una linea se escribe sin mover su updated_at ni tocar la otra» |
+| R43 | «QT-313 R43: leer las lineas con el ambito de otra empresa devuelve [] y bloquear devuelve null», «QT-313 R43: una linea de otro pedido o quitada no se bloquea…», «QT-313 R43: una escritura de lineas que nombra una linea de otro pedido devuelve null y no la toca» |
+
+Verificacion (salida real):
+- backend_dev: `pnpm run typecheck` exit 0, `pnpm run lint` 0 errores, guardias en verde, `vitest related --project node` → `Test Files 124 passed`, `Tests 2871 passed`; `order-lines-repository.int` → 14/14.
+- implementer, `vitest related --project ui --maxWorkers=1` (archivos de produccion de T8) → `Test Files 1 failed | 337 passed (338)`, `Tests 1 failed | 5612 passed | 1 skipped`. El rojo: `tests/unit/inventario/batch-history.test.tsx` › «R23 — cerrar el historial con Escape…», `Test timed out in 20000ms` (corria en paralelo con la integracion). Solo: `Test Files 1 passed (1)`, `Tests 33 passed (33)`. No lo toca T8.
+- implementer, integracion `--maxWorkers=1`:
+  - tanda A (finish-with-finished-goods, order-content-copy, order-cost-quote, order-customer, order-delivery-concurrency, order-delivery-void-concurrency, order-delivery-void, order-ingredients-cost) → `Test Files 8 passed (8)`, `Tests 93 passed (93)`
+  - tanda B (order-reservation-concurrency, order-reservation-tools, order-reservation, order-unit-conversion, qc170-distribution-company-scope, qc170-distribution-concurrency, qc195-packaging-reservation, review-blocked-orders, order-lines-repository) → `Test Files 1 failed | 8 passed (9)`, `Tests 2 failed | 92 passed (94)`: los dos de `qc170-distribution-concurrency` por `Test timed out in 20000ms` con la corrida de ui en paralelo. Repetido solo → `9 passed (9)`; con sus vecinos dos veces → `Test Files 3 passed (3)`, `Tests 32 passed (32)` y `3 passed (3)`, `32 passed (32)`. Sin reproducir. Si CI lo vuelve a dar, mirar el orden de bloqueos de T8 (pedido y luego lineas).
+
+Decisiones del humano sobre T8 (2026-11-04):
+- Aceptados: `OrderLineRow` en `order-view.ts`, `setLineStatus`, `setLineIngredientsCost` y el borrado fisico del reparto de una linea quitada.
+- **Intercambio de recetas en una edicion** (A de X a Y y B de Y a X): lo resuelve T10, escribiendo primero las lineas que cambian de receta en un orden que no viole el indice, o con receta temporal. Si no hay forma limpia, parar y preguntar antes de rechazarlo.
+- **CHECK viejos de `orders` frente a `refreshStatus`:** los cubre T14a con un test que derive un estado de empaque o terminado.
+- **Limitacion transitoria:** en T9 `create` recibe `presentationLines: []`; hasta T14d dos lineas no pueden compartir presentacion.

@@ -1,12 +1,64 @@
-import type { OrderStatus } from '../domain/order-classification';
+import type { OrderLineStatus, OrderStatus } from '../domain/order-classification';
 import type { StoredOrderCost } from '../domain/order-cost';
 import type { OrderScope } from '../domain/order-scope';
 import type { PackedLineCount } from '../domain/packing-count';
-import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../domain/order-view';
+import type {
+  NewOrder,
+  OrderEdit,
+  OrderLineRow,
+  OrderPresentationLineWrite,
+  OrderRow,
+} from '../domain/order-view';
 
 /** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
  *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
 export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
+
+/** El pedido bloqueado y sus lineas vivas -canceladas incluidas-, bloqueadas despues por
+ *  `position`. */
+export type LockedOrderLines = {
+  readonly order: LockedOrderRow;
+  readonly lines: readonly OrderLineRow[];
+};
+
+/** El pedido bloqueado y una de sus lineas vivas, bloqueada despues. */
+export type LockedOrderLine = {
+  readonly order: LockedOrderRow;
+  readonly line: OrderLineRow;
+};
+
+/** Lo que se escribe de una linea en un alta o una edicion. `originalRecipeId` es la original de
+ *  `recipeId`, o ella misma: con ella la base rechaza dos lineas activas de la misma receta. */
+export type OrderLineWrite = {
+  readonly recipeId: string;
+  readonly originalRecipeId: string;
+  readonly quantity: string;
+  readonly unitId: string;
+  /** Precio de venta de la linea. `null` = sin precio. */
+  readonly salePrice: string | null;
+  /** El reparto de la linea, ya resuelto; reemplaza entero al guardado. */
+  readonly presentationLines: readonly OrderPresentationLineWrite[];
+};
+
+/** Una linea nueva: nace sin cancelar y con su coste, o `null` si no se pudo calcular. */
+export type NewOrderLine = OrderLineWrite & {
+  readonly status: Exclude<OrderLineStatus, 'CANCELADO'>;
+  readonly cost: StoredOrderCost | null;
+};
+
+/** Una linea guardada que cambia. Con `'keep'` su coste no se toca. */
+export type OrderLineEditWrite = {
+  readonly lineId: string;
+  readonly line: OrderLineWrite;
+  readonly cost: StoredOrderCost | null | 'keep';
+};
+
+/** Lo que una escritura de lineas cambia en el pedido: quitar, editar y anadir. */
+export type OrderLineChanges = {
+  readonly removedIds: readonly string[];
+  readonly edited: readonly OrderLineEditWrite[];
+  readonly added: readonly NewOrderLine[];
+};
 
 /** Lo que Terminar el empaque necesita del pedido cuando el `UPDATE` condicional SI lo mueve: la
  *  receta para el nombre del lote y la cantidad y unidad con que se reparte el coste. */
@@ -63,6 +115,73 @@ export interface OrderWriteRepository {
    *  lineas- o es de otra empresa. Lanza si tiene mas de una: quien opera un pedido de varias
    *  lineas ya conoce la suya y no debe preguntar por «la unica». */
   findOnlyLineId(orderId: string, scope: OrderScope): Promise<string | null>;
+
+  /** `FOR UPDATE` del pedido vivo y despues de sus lineas vivas por `position`, siempre en ese
+   *  orden para no cruzar candados. `null` si el pedido no existe, esta borrado o es de otra
+   *  empresa. */
+  lockAliveLines(orderId: string, scope: OrderScope): Promise<LockedOrderLines | null>;
+
+  /** `FOR UPDATE` del pedido vivo y despues de una de sus lineas. `null` si la linea es de otro
+   *  pedido, de otra empresa o esta quitada, igual que si el pedido no existe. */
+  lockAliveLine(orderId: string, lineId: string, scope: OrderScope): Promise<LockedOrderLine | null>;
+
+  /**
+   * Escribe en el pedido, bajo su candado, primero las bajas, despues las ediciones y por ultimo
+   * las altas: asi quitar una receta y volver a anadirla en la misma edicion no choca con el unico
+   * de receta activa. Las altas toman `position` a continuacion de la mayor del pedido, quitadas
+   * incluidas. Devuelve las lineas anadidas, en el orden de `changes.added`; `null` si el pedido o
+   * alguna de las lineas nombradas no es suya, en cuyo caso quien llama aborta la transaccion.
+   * Lanza `DuplicateOrderRecipeError` si la base rechaza dos lineas activas de la misma receta.
+   */
+  writeLines(
+    orderId: string,
+    changes: OrderLineChanges,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<readonly OrderLineRow[] | null>;
+
+  /** Escribe `CANCELADO` y el motivo de la linea en la misma sentencia. No toca `reserved_at`. */
+  cancelLine(
+    orderId: string,
+    lineId: string,
+    reason: string,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
+
+  /** `UPDATE` condicional `WHERE status = from` de la linea: `'stale'` si sigue viva en otro
+   *  estado. No escribe `CANCELADO`: eso es `cancelLine`, que lleva motivo. */
+  setLineStatus(
+    orderId: string,
+    lineId: string,
+    from: OrderLineStatus,
+    to: Exclude<OrderLineStatus, 'CANCELADO'>,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found' | 'stale'>;
+
+  /** Sustituye el coste de la linea, tambien por `null`, sin tocar sus datos ni su estado. */
+  setLineIngredientsCost(
+    orderId: string,
+    lineId: string,
+    cost: StoredOrderCost | null,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
+
+  /** Escribe `reserved_at` de la linea sin mover su `updated_at`. */
+  setLineReservedAt(orderId: string, lineId: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
+
+  /**
+   * Vuelve a derivar el estado del pedido de sus lineas vivas y lo escribe si cambio. El motivo de
+   * cancelacion del pedido es el de su ultima linea cancelada cuando el estado queda `CANCELADO`, y
+   * ninguno en cualquier otro. Devuelve el estado derivado, o `null` si el pedido no es suyo.
+   */
+  refreshStatus(orderId: string, actorId: string | null, now: Date, scope: OrderScope): Promise<OrderStatus | null>;
 
   /** Alta dentro de la transaccion ya abierta. El choque del correlativo (indice unico
    *  `orders_company_year_sequence_key`) se deja SUBIR: la transaccion entera ya quedo
