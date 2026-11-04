@@ -5,7 +5,9 @@
 > `pnpm run typecheck`, `pnpm run lint` y `pnpm exec vitest related --run <archivos tocados>` en
 > verde, y un commit `feat(QT-313): …`. Enmendado en F2.1 (2026-11-03): T2 pasa a ser el paso 1
 > de 2 de `order_line_id` y el paso 2 es T14e; T14d aplica la decisión P14 (R55). No queda ninguna
-> pregunta abierta. T0 y T1 están hechas (commit 8b79a3328) y no cambian.
+> pregunta abierta. T0 y T1 están hechas (commit 8b79a3328) y no cambian. Enmendado otra vez el
+> 2026-11-04 con los andamios de transición (design § 4.1.1): T0–T8 están hechas (`06a691cab`) y
+> no cambian; T9–T15 dicen qué andamio ponen o quitan.
 >
 > Orden por fases: el modelo nuevo convive con las columnas viejas de `orders` hasta la fase 5;
 > la migración que las borra (T15) va la **última**, cuando ya nadie las lee. Así cada fase deja
@@ -106,24 +108,38 @@
   `not_found` (R43); orden por `position` (R6); carrera de dos altas de la misma receta → una
   `duplicate_order_recipe` (R5). Depende de T2, T3.
 - [ ] **T9 — Alta con líneas.** `create-order.ts`, `order-recipe.ts`, `resolve-ingredients-cost.ts`,
-  `order-requirement.ts`: validar por línea con posición (R11), receta original de cada línea
-  (R4), costear cada una (R17), una transacción (R10), apartar en orden (R12), bloqueo por línea
-  (R13, R14), `reserved_at` por línea (R41), estado derivado (R34).
+  `order-requirement.ts`, y el puente de alta en `order-actions.ts` (design § 4.1.1): el caso de
+  uso valida con `createOrderWithLinesSchema` y el puente traduce el formulario plano. Validar por
+  línea con la posición en el diagnóstico (R11), receta original de cada línea (R4), costear cada
+  una (R17), una transacción (R10), apartar en orden (R12), bloqueo por línea con las posiciones en
+  el diagnóstico (R13, R14), `reserved_at` por línea (R41), estado derivado (R34), espejo en
+  `orders` de la línea de menor `position` (design § 4.1.1, punto 3).
   *Hecho:* tests unitarios con dobles y uno de integración: alta de 2 líneas, alta con una línea
   que no alcanza con y sin confirmación, fallo de la segunda línea no deja nada escrito, original
-  + versión → `duplicate_order_recipe`, sin permiso → `unauthorized` sin tocar puertos (R30).
-  Depende de T5, T6, T7, T8.
+  + versión → `duplicate_order_recipe`, sin permiso → `unauthorized` sin tocar puertos (R30); la
+  respuesta de R11 y R13 tiene los mismos campos que hoy y la posición sale en el diagnóstico;
+  `orders.recipe_id`/`quantity`/`unit_id`/`sale_price`/costes/`reserved_at` iguales a los de la
+  línea de menor `position`; la pantalla y sus tests sin cambios. Depende de T5, T6, T7, T8.
 - [ ] **T10 — Edición con líneas.** `update-order.ts`, `order-edit-change.ts`,
   `update-order-presentation-lines.ts`, `quote-order-cost.ts`, `order-presentation-availability.ts`:
   diff (R20), añadir con otras en producción (R21), quitar `PENDIENTE` o `BLOQUEADO` y liberar
   (R22), rechazar quitar en otro estado (R23), edición de línea no editable (R24), solo las
   cambiadas recalculan coste, apartado y plazo (R17, R25, R41), edición acotada por línea (R26).
+  Los casos de uso usan `updateOrderWithLinesSchema` y `updateOrderLineDistributionSchema`; el
+  puente de edición en `order-actions.ts` traduce (design § 4.1.1). `updateAlive` deja de
+  reemplazar el reparto por `order_id` y el espejo de `orders` se reescribe en cada edición. La
+  cotización en edición pasa `excludeOrderLineId` a `findCostingBatches` de producto y de envase
+  (`inventario/domain/product-catalog.ts`, `packaging-catalog.ts`, `product-catalog-prisma.ts`).
   *Hecho:* un test por requisito; el coste, lo apartado y `reserved_at` de las líneas no tocadas
-  son idénticos antes y después; re-añadir la receta de una línea cancelada funciona (R4).
-  Depende de T9.
+  son idénticos antes y después; re-añadir la receta de una línea cancelada funciona (R4); test de
+  integración de `findCostingBatches` con `excludeOrderLineId`: lo apartado por esa línea cuenta
+  como disponible y lo de otra línea del mismo pedido no; el reparto de una línea no toca el de
+  otra; la pantalla y sus tests sin cambios. Depende de T9.
 - [ ] **T11 — Cancelar línea, cancelar pedido, baja.** `cancel-order.ts`, `order-cancellation.ts`
-  (+ `cancelOrderLine` nuevo, `domain/cancel-order-line.ts`), `delete-order.ts`.
-  *Hecho:* tests de R27, R28, R29, R30 y R47: cancelar una libera solo lo suyo, no mueve las otras
+  (+ `cancelOrderLine` nuevo, `domain/cancel-order-line.ts`), `delete-order.ts`. Cancelar y dar de
+  baja pasan a escribir por línea y derivar el pedido: se **quita la copia** de estado pedido →
+  línea de `cancelAlive` y `softDeleteAlive` (design § 4.1.1, punto 2).
+  *Hecho:* ninguna copia de estado pedido → línea queda en esos dos métodos (test que lo fija); tests de R27, R28, R29, R30 y R47: cancelar una libera solo lo suyo, no mueve las otras
   y deja el pedido `PARCIAL` o en el estado común; cancelar el pedido con una línea `POR_EMPACAR`
   la deja intacta; ninguna cancelable → `not_cancellable`; todas canceladas → pedido `CANCELADO`
   con motivo; baja con una línea consumida → rechazo. Depende de T8.
@@ -131,8 +147,10 @@
   `order-pending-delivery.ts`, `review-blocked-orders.ts`, `expire-stale-orders.ts`,
   `order-expiry.ts`, `order-expiry-cron-route.ts`, y las escrituras de los asientos `delivery` y
   `delivery_void` en `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
-  (~línea 1587 y ~1667) con `orderLineId: string | null` (design § 3.1).
-  *Hecho:* tests de R39 (entregar completa solo la línea cuyo reparto se completa; anular la
+  (~línea 1587 y ~1667) con `orderLineId: string | null` (design § 3.1). Entrega, anulación,
+  desbloqueo y caducidad pasan a escribir el estado por línea y derivar el pedido: se **quita la
+  copia** de estado pedido → línea de esas operaciones (design § 4.1.1, punto 2).
+  *Hecho:* ninguna copia de estado pedido → línea queda en esas operaciones; tests de R39 (entregar completa solo la línea cuyo reparto se completa; anular la
   devuelve), R37 para `delivery` y `delivery_void` (la entrega escribe la línea de su línea del
   reparto; la anulación, la del `delivery` que anula; un pedido sin línea escribe `null` en los
   dos), R40 (dos
@@ -160,8 +178,11 @@
   `conditioning-team-prisma.ts` y sus Server Actions (pasan la única línea del pedido; las
   pantallas por línea son de QT-315, design § 5); y la escritura del asiento `production` en
   `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts` (~línea 1418), que
-  recibe la línea de la línea del reparto.
-  *Hecho:* tests de R31, R32, R35, R36, R38; R37 para `production`, registro de ejecución,
+  recibe la línea de la línea del reparto. Abrir, finalizar, empaque y acondicionamiento pasan a
+  escribir el estado por línea y derivar el pedido: se **quita la última copia** de estado pedido
+  → línea (`setStatus`, `finishPackingAlive` y los de acondicionamiento; design § 4.1.1, punto 2).
+  *Hecho:* ya no queda ninguna copia de estado pedido → línea en el adaptador (grep y test);
+  tests de R31, R32, R35, R36, R38; R37 para `production`, registro de ejecución,
   evidencias y equipo de acondicionamiento (cada uno lleva la línea del reparto o de la línea que se
   opera); R19: ninguna salida de `asignaciones` lleva precio; R45: con una línea, las salidas son
   iguales a las de hoy más `lineId`. Depende de T8, T7.
@@ -171,9 +192,13 @@
   `list-direct-delivery-surplus.ts`; `integraciones/domain/get-whatsapp-chat-context.ts`.
   *Hecho:* tests de integración de cada lector con un pedido de una línea dan lo mismo que hoy
   (R45) y ninguno lee las columnas de `orders` que se van. Depende de T8.
-- [ ] **T14c [P] — Puente del formulario actual.** `pedidos/adapters/driving/order-actions.ts`
-  (design § 7).
-  *Hecho:* test de la acción: el `FormData` de hoy crea un pedido de una línea y la lectura del
+- [ ] **T14c [P] — Puente del formulario actual.** `pedidos/adapters/driving/order-actions.ts`,
+  `pedidos/domain/order-input.ts` y `pedidos/index.ts` (design § 4.1.1 y § 7): renombra
+  `createOrderWithLinesSchema` → `createOrderSchema`, `updateOrderWithLinesSchema` →
+  `updateOrderSchema` y `updateOrderLineDistributionSchema` → `updateOrderDistributionSchema`,
+  borra los planos y deja el puente construyendo la entrada de líneas desde el `FormData`.
+  *Hecho:* ningún esquema plano ni nombre provisional queda en el repositorio (grep); test de la
+  acción: el `FormData` de hoy crea un pedido de una línea y la lectura del
   formulario devuelve los campos planos de hoy (R44); editar un pedido de dos líneas desde el
   puente → `invalid_input` sin escribir. Además, `PARCIAL` como estado final en
   `app/(private)/pedidos/components/order-row-actions.tsx` y `order-delivery-list.tsx` (design § 7;
@@ -211,8 +236,10 @@
   T14c (todo el código escribe la línea).
 - [ ] **T15 — Quitar las columnas de `orders`.** Migración `20261103120200_orders_drop_line_columns`
   y `db/schema.prisma` (design § 1.2), `reserved_at` incluido. `down.sql` aborta si hay pedidos con
-  más de una línea viva.
-  *Hecho:* test de integración de la migración: sube y baja con pedidos de una línea dejando los
+  más de una línea viva. En el mismo commit borra el **espejo** de `orders` (design § 4.1.1, punto
+  3) de los casos de uso de alta y edición y del adaptador.
+  *Hecho:* ningún escritor de las columnas borradas queda (grep y `typecheck`); test de
+  integración de la migración: sube y baja con pedidos de una línea dejando los
   valores como antes; con un pedido de dos líneas, la bajada falla, nombra cuántos y no cambia
   nada (R9); grep sin lecturas de `recipeId`/`quantity`/`salePrice`/`reservedAt` de `orders`
   fuera de la línea (R1). Depende de T14e (su relleno lee las columnas que esta task borra).
@@ -299,6 +326,10 @@
 - `lib/modules/pedidos/adapters/driving/order-expiry-cron-route.ts`
 - `lib/modules/inventario/index.ts`
 - `lib/modules/inventario/domain/reservation.ts`
+- `lib/modules/inventario/domain/product-catalog.ts`
+- `lib/modules/inventario/domain/packaging-catalog.ts`
+- `lib/modules/inventario/adapters/driven/persistence/product-catalog-prisma.ts`
+- `tests/integration/inventario/costing-batches-exclude-line.int.test.ts`
 - `lib/modules/inventario/domain/reservation-ledger.ts`
 - `lib/modules/inventario/domain/movement-ledger.ts`
 - `lib/modules/inventario/domain/order-consumption.ts`

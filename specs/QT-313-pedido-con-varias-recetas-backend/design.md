@@ -4,7 +4,9 @@
 > del humano a P1–P13, que ya están en `requirements.md > Decisiones cerradas`. Enmendado en F2.1
 > (2026-11-03): `order_line_id` en dos pasos (§ 1.4), `delivery_void` con línea (§ 1.3),
 > `PARCIAL` en la pantalla actual (§ 7) y las decisiones provisionales del implementer (§ 12),
-> con P14 cerrada. No queda ninguna pregunta abierta.
+> con P14 cerrada; contrato con `orderLineId: null` hasta T14e (§ 3.1). Enmendado otra vez en
+> F2.1 (2026-11-04): andamios de transición (§ 4.1.1), `excludeOrderLineId` (§ 4.2) y posición de
+> la línea solo en el diagnóstico (§ 4.4). No queda ninguna pregunta abierta.
 
 ## Lo que ya existe
 
@@ -366,6 +368,41 @@ entrada, ya validado por `resolveOrderRecipe` como original) contra las demás d
 contra las líneas activas del pedido: la original y sus versiones son la misma receta (P10), y las
 canceladas no cuentan (P9).
 
+Los nombres de arriba son el **estado final** (desde T14c). Antes, ver § 4.1.1.
+
+#### 4.1.1 Transición hasta T14c y T15 (decisiones de F2.1, 2026-11-04)
+
+Tres andamios mantienen verde el gate mientras el dominio pasa a líneas y la pantalla sigue siendo
+la de una receta. Cada uno tiene una task que lo quita; ninguno sobrevive a T15.
+
+**1. Esquemas en transición.** Conviven dos juegos en `order-input.ts`:
+
+| Juego | Nombres | Quién lo usa | Hasta |
+|---|---|---|---|
+| Plano (de hoy) | `createOrderSchema`, `updateOrderSchema`, `updateOrderDistributionSchema` | la pantalla y sus tests; el puente de `order-actions.ts` los parsea | T14c |
+| De líneas (provisional, existen desde T6) | `createOrderWithLinesSchema`, `updateOrderWithLinesSchema`, `updateOrderLineDistributionSchema` | los casos de uso (T9–T13) | T14c, que los renombra a los nombres de § 4.1 |
+
+El puente de `order-actions.ts` traduce plano → líneas (§ 7) desde T9. En T14c se renombran los de
+líneas, se borran los planos y el puente deja de parsear el formulario plano para reenviarlo como
+una línea. La pantalla y sus tests no cambian en T9–T13.
+
+**2. Estado de la línea en transición.** Mientras una operación todavía escribe el estado del
+**pedido** (`setStatus`, `cancelAlive`, `softDeleteAlive`, `finishPackingAlive`, los de
+acondicionamiento y la entrega), el adaptador copia el mismo estado —y el motivo de cancelación,
+`finished_at`, `packed_by` o `conditioned_by`, si los escribe— a la **única línea viva** del pedido,
+en la misma sentencia de la transacción. Así `orders.status` y el estado de la línea no divergen y
+los CHECK de `order_lines` se cumplen. Cada task que pasa una operación a escribir por línea (T11
+cancelar y baja, T12 entrega y caducidad, T14a ejecución, empaque y acondicionamiento) quita la
+copia de esa operación y pasa a derivar el pedido (§ 2.2). Un pedido de varias líneas no puede
+existir antes de T9, así que «única línea viva» siempre está definida mientras dura la copia.
+
+**3. Columnas viejas de `orders` en espejo hasta T15.** Los lectores que todavía leen `orders`
+(T14b los cambia) necesitan valores correctos. En cada alta o edición, el mismo caso de uso escribe
+en `orders` lo de la línea viva de **menor `position`**: `recipe_id`, `quantity`, `unit_id`,
+`sale_price`, `ingredients_cost`, `packaging_cost` y `reserved_at`. `updateAlive` deja de
+reemplazar el reparto por `order_id`: el reparto se escribe por línea (`order_line_id`). T15 borra
+el espejo en el mismo commit que borra las columnas.
+
 ### 4.2 Casos de uso
 
 | Caso de uso | Cambio |
@@ -376,7 +413,7 @@ canceladas no cuentan (P9).
 | `cancelOrderLine` | **Nuevo** (R27, R28) |
 | `deleteOrder` | § 2.4 (R47) |
 | `updateOrderPresentationLines` | Recibe `lineId`; solo esa línea (R26) |
-| `quoteOrderCost` | Cotiza una línea (recibe `recipeId`, cantidad, unidad, reparto y, en edición, `orderLineId` para contar su propio apartado como disponible) |
+| `quoteOrderCost` | Cotiza una línea (recibe `recipeId`, cantidad, unidad, reparto y, en edición, `orderLineId` para contar su propio apartado como disponible). En `inventario`, `findCostingBatches` de `ProductCatalog` y de `PackagingCatalog` gana `excludeOrderLineId?: string` y deja de restar lo apartado por esa línea, igual que hoy hace con el pedido (decisión «`excludeOrderLineId` en inventario») |
 | `expireStaleOrders` | Por línea (§ 6, R51) |
 | `reviewBlockedOrders` | Por línea (R40) |
 | `getOrder`, `listOrders` | Devuelven líneas, totales y resumen (§ 4.3); filtro y orden con `PARCIAL` (R49, R52, § 2.2.1, § 2.2.2) |
@@ -415,8 +452,12 @@ la limite.
 | `duplicate_order_recipe` | `DuplicateOrderRecipeError` | R4 |
 | `order_line_not_removable` | `OrderLineNotRemovableError` | R23 |
 
-`OrderWouldBlockError` y los errores de validación de línea ganan un diagnóstico con la posición
-de la línea, que va al registro y a la respuesta como dato, no en el texto. Una línea ajena,
+`OrderWouldBlockError` y los errores de validación de línea ganan la posición de la línea (o las
+posiciones, en `order_would_block`) **solo en su diagnóstico**, que va al registro del servidor y
+nunca al navegador, como el diagnóstico de `InvalidTransitionError`. La respuesta conserva el
+código y los campos de hoy: no se amplía la lista cerrada de campos de
+`errores/domain/error-state.ts` (decisión «Posición de la línea solo en el diagnóstico», R11, R13).
+Señalar la línea en pantalla, si hace falta, es de QT-314. Una línea ajena,
 quitada o de otro pedido responde `order_not_found` (R43): no nace `order_line_not_found`, para no
 distinguir «no existe» de «no es tuya». La violación del único parcial de § 1.1 (carrera entre
 dos ediciones) se traduce a `duplicate_order_recipe` en el adaptador.
@@ -463,8 +504,13 @@ QT-313 llega antes que QT-314. Mientras tanto, `order-actions.ts` (driving) trad
 `FormData` de hoy (una receta) a `{ lines: [una línea], … }`, y para editar adjunta el `id` de la
 única línea. La lectura que alimenta el formulario expone, para pedidos de una línea, los mismos
 campos planos que hoy (`recipeId`, `quantity`, `unitId`, `presentationLines`, `salePrice`) derivados
-de `lines[0]`. Con QT-314 ese puente se borra. El puente vive solo en el adaptador driving: el
-dominio ya trabaja con líneas.
+de `lines[0]`. El puente vive solo en el adaptador driving: el dominio ya trabaja con líneas.
+
+Por fases (§ 4.1.1): desde T9 el puente parsea el formulario con los esquemas planos y llama a los
+casos de uso con los de líneas (`createOrderWithLinesSchema`, `updateOrderWithLinesSchema`,
+`updateOrderLineDistributionSchema`). En T14c los de líneas toman los nombres de § 4.1, los planos
+se borran y el puente construye la entrada de líneas directamente desde el `FormData` de una receta.
+Con QT-314 el puente desaparece.
 
 Hasta QT-314 ninguna pantalla puede crear un pedido de **varias** líneas, así que en producción no
 existirán. Si aun así llega uno al puente (datos escritos por tests o por consola), la edición desde

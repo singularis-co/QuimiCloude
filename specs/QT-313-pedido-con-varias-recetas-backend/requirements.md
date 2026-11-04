@@ -96,14 +96,16 @@
 - **R11** — El sistema DEBE validar cada línea con las mismas reglas que hoy valida el pedido de
   una receta (receta y versión de la empresa, unidad del catálogo, reparto que no supera la
   cantidad, envases existentes) y, SI una línea no las cumple, ENTONCES DEBE rechazar el alta
-  entera con el mismo código de hoy e indicar la posición de la línea que falló.
-  *[¿Qué es un pedido con varias fórmulas?]*
+  entera con el mismo código de hoy, sin campos nuevos en la respuesta, y dejar la posición de la
+  línea que falló en el diagnóstico del error. *[¿Qué es un pedido con varias fórmulas? · Posición
+  de la línea solo en el diagnóstico]*
 - **R12** — El sistema DEBE apartar el material de las líneas **en su orden**: una línea compite
   por un insumo compartido con lo que ya apartaron las anteriores del mismo pedido.
   *[¿Cómo avanza el estado?]*
 - **R13** — SI el material no alcanza para una o más líneas y la entrada no confirma guardar
-  bloqueado, ENTONCES el sistema DEBE rechazar el alta con `order_would_block`, indicar qué
-  líneas no alcanzan y no escribir nada. *[¿Cómo avanza el estado?]*
+  bloqueado, ENTONCES el sistema DEBE rechazar el alta con `order_would_block`, sin campos nuevos
+  en la respuesta, dejar las posiciones de las líneas que no alcanzan en el diagnóstico del error
+  y no escribir nada. *[¿Cómo avanza el estado? · Posición de la línea solo en el diagnóstico]*
 - **R14** — SI el material no alcanza para una o más líneas y la entrada confirma guardar
   bloqueado, ENTONCES el sistema DEBE dejar **solo esas líneas** en `BLOQUEADO`, sin material
   apartado y sin coste estimado, y las demás en `PENDIENTE` con su material apartado.
@@ -331,6 +333,11 @@
 | Responsables en un pedido `PARCIAL` | R55 |
 | Pedido sin línea hasta T9 | R8, R37 (decisión de proceso: fija el orden de las tasks, no añade comportamiento) |
 | R37 por fases | R37 (repartido entre T7, T12 y T14a) |
+| Esquemas en transición | R44 (decisión de proceso) |
+| Estado de la línea en transición | R31, R34 (decisión de proceso) |
+| Columnas viejas de `orders` en espejo | R44, R45 (decisión de proceso) |
+| `excludeOrderLineId` en inventario | R17, R25 |
+| Posición de la línea solo en el diagnóstico | R11, R13 |
 
 ## Preguntas abiertas
 
@@ -369,3 +376,8 @@ Ninguna. P1–P14 están cerradas en la tabla de abajo.
 | 2026-11-03 | Responsables en un pedido `PARCIAL` (P14, F2.1) | **Un `PARCIAL` admite asignar, desasignar y quitar grupo solo si al menos una receta activa está en `PENDIENTE`, `EN_CURSO` o `BLOQUEADO`.** Si no, se rechaza igual que hoy un pedido fabricado (`OrderProducedFrozenError`). Sustituye a la provisional del implementer, que admitía cualquier `PARCIAL`. |
 | 2026-11-03 | Pedido sin línea hasta T9 (F2.1) | **El contrato de reserva y consumo de `inventario` acepta `orderLineId: string \| null` hasta T14e**; `null` = las filas del pedido sin línea. Desde T9 el alta crea la línea, y T14e lo hace obligatorio y quita el `null`. `pedidos` publica en su puerto un lector de la única línea del pedido. Las fases no se reordenan. |
 | 2026-11-03 | R37 por fases (F2.1) | **T7 cubre solo los asientos `consumption`**; `production`, `delivery` y `delivery_void` se cubren en T12 y T14a, donde ya se tocan sus llamadas (`inventario/.../product-prisma.ts`). |
+| 2026-11-04 | Esquemas en transición (F2.1) | **La pantalla conserva `createOrderSchema`/`updateOrderSchema` planos hasta T14c/QT-314.** Los casos de uso usan los esquemas de líneas con nombre provisional que existen desde T6 (`createOrderWithLinesSchema`, `updateOrderWithLinesSchema`, `updateOrderLineDistributionSchema`), y el puente de `order-actions.ts` traduce. En T14c se renombran a los nombres del design y se borran los planos. La pantalla y sus tests no cambian en T9–T13. |
+| 2026-11-04 | Estado de la línea en transición (F2.1) | **Hasta que T11, T12 y T14a escriban el estado por línea, cada cambio de estado del pedido (`setStatus`, `cancelAlive` y similares) se copia a su única línea viva, en la misma transacción.** Cada task que pasa a escribir por línea quita esa copia. |
+| 2026-11-04 | Columnas viejas de `orders` en espejo hasta T15 (F2.1) | **En cada alta o edición, `orders` copia la línea viva de menor `position`:** receta, cantidad, unidad, precio, coste y `reserved_at`. `updateAlive` deja de reemplazar el reparto por `order_id`. T15 borra el espejo junto con las columnas. |
+| 2026-11-04 | `excludeOrderLineId` en inventario (F2.1) | **`findCostingBatches`, de producto y de envase, acepta excluir lo apartado por una línea**, para la cotización en edición (design § 4.2). |
+| 2026-11-04 | Posición de la línea solo en el diagnóstico (F2.1) | **La posición de la línea que falla (R11, R13) va solo en el diagnóstico del error.** No se amplía la lista cerrada de campos de `errores/domain/error-state.ts`. |
