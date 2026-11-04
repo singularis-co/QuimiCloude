@@ -133,6 +133,11 @@ export function isAllowedHolderOfTheCode(relativePath: string): boolean {
 /** Los archivos de codigo del modulo, uno a uno. Un archivo nuevo entra aqui con su ruta exacta. */
 const MODULE_CODE_FILES = [
   'adapters/driven/ai/ai-provider-probe-canned.ts',
+  // QT-304 T4: el adaptador del AI SDK, los dos unicos archivos que importan `ai` y `@ai-sdk/*`.
+  'adapters/driven/ai/ai-sdk-models.ts',
+  'adapters/driven/ai/conversational-model-ai-sdk.ts',
+  // QT-304 T2.2: los pares de modelos de la plataforma, tabla sin empresa (fuera de `persistence/`).
+  'adapters/driven/catalog/ai-model-pair-prisma.ts',
   'adapters/driven/catalog/ai-provider-catalog-prisma.ts',
   'adapters/driven/config/e2e-doubles-env.ts',
   'adapters/driven/config/encryption-keys-env.ts',
@@ -172,6 +177,8 @@ const MODULE_CODE_FILES = [
   'adapters/driving/whatsapp-webhook-route.ts',
   'domain/actor.ts',
   'domain/ai-model-input.ts',
+  'domain/ai-model-pair-input.ts',
+  'domain/ai-model-pair.ts',
   'domain/ai-provider-failure.ts',
   'domain/ai-provider-input.ts',
   'domain/ai-provider.ts',
@@ -182,6 +189,9 @@ const MODULE_CODE_FILES = [
   'domain/delete-whatsapp-template.ts',
   'domain/disconnect-ai-provider.ts',
   'domain/errors.ts',
+  'domain/generate-agent-object.ts',
+  'domain/generate-agent-text.ts',
+  'domain/get-ai-model-pairs.ts',
   'domain/get-ai-provider-connection.ts',
   'domain/get-ai-provider-readiness.ts',
   'domain/get-whatsapp-agent-settings.ts',
@@ -199,14 +209,17 @@ const MODULE_CODE_FILES = [
   'domain/list-whatsapp-templates.ts',
   'domain/manage-whatsapp-variable-keys.ts',
   'domain/mark-whatsapp-chat-read.ts',
+  'domain/model-fallback.ts',
   'domain/receive-whatsapp-webhook.ts',
   'domain/refresh-whatsapp-contact-links.ts',
   'domain/regenerate-whatsapp-verify-token.ts',
   'domain/relate-whatsapp-template-variables.ts',
   'domain/report-ai-provider-outcome.ts',
   'domain/resolve-ai-provider-for-reading.ts',
+  'domain/resolve-conversation-model.ts',
   'domain/retry-whatsapp-message.ts',
   'domain/return-whatsapp-conversation-to-agent.ts',
+  'domain/save-ai-model-pair.ts',
   'domain/save-ai-provider-connection.ts',
   'domain/save-whatsapp-agent-settings.ts',
   'domain/secret-context.ts',
@@ -257,10 +270,12 @@ const MODULE_CODE_FILES = [
   'domain/whatsapp-variable-key.ts',
   'domain/whatsapp-webhook-payload.ts',
   'index.ts',
+  'ports/ai-model-pair-repository.ts',
   'ports/ai-provider-catalog.ts',
   'ports/ai-provider-connection-repository.ts',
   'ports/ai-provider-probe.ts',
   'ports/company-name-lookup.ts',
+  'ports/conversational-model.ts',
   'ports/customer-phone-links.ts',
   'ports/customer-phone-owners.ts',
   'ports/integrations-switch.ts',
@@ -461,10 +476,20 @@ describe('la forma del modulo integraciones', () => {
 
     expect(otherStatements, 'el contrato solo reexporta: ni declaraciones ni export *').toBe(0)
     expect(reexports.map((r) => r.name).sort()).toEqual([
+      'AI_MODEL_ROLES',
       'ActionNotAllowedError',
       'Actor',
+      'AgentObjectRequest',
+      'AgentObjectResult',
       'AgentReturnCandidate',
+      'AgentTextRequest',
+      'AgentTextResult',
+      'AiCatalogModel',
       'AiModelOption',
+      'AiModelPair',
+      'AiModelPairsOverview',
+      'AiModelPairsProvider',
+      'AiModelRole',
       'AiProviderCode',
       'AiProviderConnectionOverview',
       'AiProviderConnectionStatus',
@@ -486,12 +511,15 @@ describe('la forma del modulo integraciones', () => {
       'ConversationModeInput',
       'ConversationModeReason',
       'ConversationModeView',
+      'ConversationTurn',
+      'ConversationalTool',
       'GREETING_NAME_PLACEHOLDER',
       'IntegracionesError',
       'LinkedCustomerNotFoundError',
       'REASONS_BY_TARGET',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
+      'SaveAiModelPairResult',
       'SaveAiProviderConnectionResult',
       'SaveWhatsappAgentSettingsInput',
       'SecretContext',
@@ -500,6 +528,8 @@ describe('la forma del modulo integraciones', () => {
       'TEMPLATE_LIMITS',
       'TemplateSyncSummary',
       'TestSavedAiProviderResult',
+      'TokenUsage',
+      'ToolCallRecord',
       'UnauthorizedError',
       'ValidationError',
       'WHATSAPP_AGENT_DEFAULTS',
@@ -559,6 +589,9 @@ describe('la forma del modulo integraciones', () => {
       'createDeleteWhatsappTemplate',
       'createDeleteWhatsappVariableKey',
       'createDisconnectAiProvider',
+      'createGenerateAgentObject',
+      'createGenerateAgentText',
+      'createGetAiModelPairs',
       'createGetAiProviderConnection',
       'createGetAiProviderReadiness',
       'createGetAiProviderStatus',
@@ -585,6 +618,7 @@ describe('la forma del modulo integraciones', () => {
       'createResyncWhatsappTemplates',
       'createRetryWhatsappMessage',
       'createReturnWhatsappConversationToAgent',
+      'createSaveAiModelPair',
       'createSaveAiProviderConnection',
       'createSaveWhatsappAgentSettings',
       'createSelectAiModel',
@@ -612,8 +646,17 @@ describe('la forma del modulo integraciones', () => {
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
+      'AgentObjectRequest',
+      'AgentObjectResult',
       'AgentReturnCandidate',
+      'AgentTextRequest',
+      'AgentTextResult',
+      'AiCatalogModel',
       'AiModelOption',
+      'AiModelPair',
+      'AiModelPairsOverview',
+      'AiModelPairsProvider',
+      'AiModelRole',
       'AiProviderCode',
       'AiProviderConnectionOverview',
       'AiProviderConnectionStatus',
@@ -632,14 +675,19 @@ describe('la forma del modulo integraciones', () => {
       'ConversationModeInput',
       'ConversationModeReason',
       'ConversationModeView',
+      'ConversationTurn',
+      'ConversationalTool',
       'RefreshWhatsappContactLinks',
       'RefreshWhatsappContactLinksDeps',
+      'SaveAiModelPairResult',
       'SaveAiProviderConnectionResult',
       'SaveWhatsappAgentSettingsInput',
       'SecretContext',
       'SelectAiModelResult',
       'TemplateSyncSummary',
       'TestSavedAiProviderResult',
+      'TokenUsage',
+      'ToolCallRecord',
       'WhatsappAgentSettings',
       'WhatsappChat',
       'WhatsappChatAttachment',
@@ -857,6 +905,9 @@ describe('la forma del modulo integraciones', () => {
       'deleteWhatsappTemplate',
       'deleteWhatsappVariableKey',
       'disconnectAiProvider',
+      'generateAgentObject',
+      'generateAgentText',
+      'getAiModelPairs',
       'getAiProviderConnection',
       'getAiProviderReadiness',
       'getAiProviderStatus',
@@ -882,6 +933,7 @@ describe('la forma del modulo integraciones', () => {
       'resyncWhatsappTemplates',
       'retryWhatsappMessage',
       'returnWhatsappConversationToAgent',
+      'saveAiModelPair',
       'saveAiProviderConnection',
       'saveWhatsappAgentSettings',
       'secretCipher',
@@ -915,6 +967,7 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.randomSource).toBe('RandomSource')
     expect(cableado?.typeOf.aiProviderConnectionRepository).toBe('AiProviderConnectionRepository')
     expect(cableado?.typeOf.aiProviderCatalog).toBe('AiProviderCatalog')
+    expect(cableado?.typeOf.aiModelPairs).toBe('AiModelPairRepository')
     expect(cableado?.typeOf.aiProviderProbe).toBe('AiProviderProbe')
     expect(cableado?.typeOf.aiProviderGateway).toBe('AiProviderGateway')
     expect(cableado?.typeOf.whatsappWebhookDirectory).toBe('WhatsappWebhookDirectory')
@@ -1044,7 +1097,7 @@ describe('la forma del modulo integraciones', () => {
     expect(branchRange(FEATURE_BRANCH, 'abc')).toEqual({ mergeBase: 'abc' })
   })
 
-  it('R13: db/schema.prisma tiene exactamente diez modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291), AiProviderConnection y WhatsappAgentSettings (QT-303)', () => {
+  it('R13: db/schema.prisma tiene exactamente once modelos de integraciones: WhatsappConnection, WhatsappContact, WhatsappMessage (QC-238), WhatsappTemplate, WhatsappVariableKey y WhatsappTemplateVariable (QC-242), AiProvider, AiModel (QT-291), AiAgentModelPair (QT-304), AiProviderConnection y WhatsappAgentSettings (QT-303)', () => {
     const esquema = readFileSync(join(repoRoot, 'db', 'schema.prisma'), 'utf8').replace(/\r\n/g, '\n')
     // El `/// @module` va encima del `model`, con solo lineas `///` entre medias.
     const modelos = [
@@ -1061,10 +1114,11 @@ describe('la forma del modulo integraciones', () => {
       'WhatsappTemplateVariable',
       'AiProvider',
       'AiModel',
+      'AiAgentModelPair',
       'AiProviderConnection',
       'WhatsappAgentSettings',
     ])
-    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(10)
+    expect(esquema.match(/@module\s+integraciones\b/g)).toHaveLength(11)
     expect(esquema).toMatch(/@module\s+identity\b/)
   })
 })

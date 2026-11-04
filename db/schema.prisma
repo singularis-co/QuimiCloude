@@ -1564,13 +1564,39 @@ model AiProvider {
 /// la migracion, igual que la FK a `ai_providers`.
 /// @module integraciones
 model AiModel {
-  provider  AiProviderCode
-  modelId   String         @map("model_id")
-  isDefault Boolean        @default(false) @map("is_default")
-  sortOrder Int            @map("sort_order")
+  provider      AiProviderCode
+  modelId       String         @map("model_id")
+  isDefault     Boolean        @default(false) @map("is_default")
+  sortOrder     Int            @map("sort_order")
+  supportsTools Boolean        @default(false) @map("supports_tools")
+  isEconomic    Boolean        @default(false) @map("is_economic")
 
   @@id([provider, modelId], map: "ai_models_pkey")
   @@map("ai_models")
+}
+
+enum AiModelRole {
+  AGENT
+  ROUTER
+
+  @@map("ai_model_role")
+}
+
+/// Pares principal + respaldo de la plataforma, uno por proveedor y rol. Los elige el Maestro.
+/// Sin `@relation`: las FK a `ai_providers`, `ai_models` (dos compuestas) y `users`, y el CHECK,
+/// estan escritos a mano en la migracion. `updatedBy` nulo = lo sembro la migracion.
+/// @module integraciones
+model AiAgentModelPair {
+  provider        AiProviderCode
+  role            AiModelRole
+  primaryModelId  String         @map("primary_model_id")
+  fallbackModelId String         @map("fallback_model_id")
+  updatedBy       String?        @map("updated_by") @db.Uuid
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([provider, role], map: "ai_agent_model_pairs_pkey")
+  @@index([updatedBy], map: "ai_agent_model_pairs_updated_by_idx")
+  @@map("ai_agent_model_pairs")
 }
 
 /// Una por empresa. Sin `@relation`: las FK de `company_id`, `provider`, `created_by`,

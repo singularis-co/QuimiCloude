@@ -22,6 +22,9 @@
     "db:backfill:customer-phones": "tsx scripts/backfill-customer-phones.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.94",
+    "@ai-sdk/google": "^4.0.109",
+    "@ai-sdk/openai": "^4.0.106",
     "@anthropic-ai/sdk": "^0.131.0",
     "@base-ui/react": "^1.7.0",
     "@dnd-kit/core": "^6.3.1",
@@ -43,6 +46,7 @@
     "@tiptap/react": "3.31.3",
     "@upstash/qstash": "^2.11.3",
     "@zxcvbn-ts/language-common": "^4.1.3",
+    "ai": "^7.0.159",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

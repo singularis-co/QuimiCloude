@@ -26,6 +26,7 @@ async function inRolledBackTransaction(
   try {
     await prisma.$transaction(
       async (tx) => {
+        await applyStatements(tx, AI_AGENT_MODEL_PAIRS_DOWN)
         await body(tx)
         throw new RollbackSignal()
       },
@@ -63,6 +64,13 @@ function statementsOf(sql: string): readonly string[] {
 
 const UP_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8'))
 const DOWN_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8'))
+
+// La migracion posterior `*_ai_agent_model_pairs/` anade columnas a `ai_models` y cuelga de ella
+// FK de los pares. Cada caso aplica antes su DOWN para ver el esquema tal como lo dejo esta.
+const carpetasPares = readdirSync(migrationsDir).filter((name) => /_ai_agent_model_pairs$/.test(name))
+const AI_AGENT_MODEL_PAIRS_DOWN = statementsOf(
+  readFileSync(join(migrationsDir, carpetasPares[0] ?? '__falta__', 'down.sql'), 'utf8'),
+)
 
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
@@ -209,6 +217,7 @@ afterAll(async () => {
 describe('migracion ai_models contra Postgres real', () => {
   it('existe exactamente una carpeta de la migracion, con su down.sql', () => {
     expect(carpetas).toHaveLength(1)
+    expect(carpetasPares).toHaveLength(1)
     expect(existsSync(join(migrationDir, 'down.sql'))).toBe(true)
   })
 

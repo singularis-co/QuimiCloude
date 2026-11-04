@@ -72,6 +72,11 @@ const carpetasModelos = readdirSync(migrationsDir).filter((name) => /_ai_models$
 const AI_MODELS_DOWN = statementsOf(
   readFileSync(join(migrationsDir, carpetasModelos[0] ?? '__falta__', 'down.sql'), 'utf8'),
 )
+// Los pares de `*_ai_agent_model_pairs/` cuelgan de `ai_models`: su DOWN va antes que el de aquella.
+const carpetasPares = readdirSync(migrationsDir).filter((name) => /_ai_agent_model_pairs$/.test(name))
+const AI_AGENT_MODEL_PAIRS_DOWN = statementsOf(
+  readFileSync(join(migrationsDir, carpetasPares[0] ?? '__falta__', 'down.sql'), 'utf8'),
+)
 
 async function applyStatements(tx: Prisma.TransactionClient, statements: readonly string[]): Promise<void> {
   for (const statement of statements) {
@@ -80,6 +85,7 @@ async function applyStatements(tx: Prisma.TransactionClient, statements: readonl
 }
 
 async function withoutAiModels(tx: Prisma.TransactionClient): Promise<void> {
+  await applyStatements(tx, AI_AGENT_MODEL_PAIRS_DOWN)
   await applyStatements(tx, AI_MODELS_DOWN)
 }
 
@@ -206,6 +212,7 @@ describe('migracion ai_providers contra Postgres real', () => {
     expect(carpetas).toHaveLength(1)
     expect(existsSync(join(migrationDir, 'down.sql'))).toBe(true)
     expect(carpetasModelos).toHaveLength(1)
+    expect(carpetasPares).toHaveLength(1)
   })
 
   it('R4: el catalogo trae exactamente los cuatro proveedores, en orden, con sus modelos no vacios', async () => {
