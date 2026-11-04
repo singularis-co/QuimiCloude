@@ -15,6 +15,7 @@ import type {
   ReservationQueries,
   ReservationRequirementLine,
 } from '../../../domain/reservation';
+import type { CostingExclusion } from '../../../domain/costing-batch';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 
 import { consumeBatchStock, recalculateProductStock } from './product-prisma';
@@ -581,12 +582,12 @@ export function createReservationQueries(db: PrismaLike = prisma): ReservationQu
  *  Con `excludeOrderId`, lo apartado por ESE pedido no cuenta en `reserved` -y por tanto
  *  suma a `available`-: es lo que necesita el coste de un pedido que ya existe para contar su
  *  propia reserva como disponible para si mismo, sin abrir una segunda definicion del
- *  apartado. */
+ *  apartado. `excludeOrderLineId` hace lo mismo con una sola linea. */
 export async function findReservedAndAvailableByBatch(
   db: PrismaLike,
   companyId: string,
   batchIds: readonly string[],
-  options?: { readonly excludeOrderId?: string },
+  options?: CostingExclusion,
 ): Promise<ReadonlyMap<string, { readonly reserved: string; readonly available: string; readonly overReserved: boolean }>> {
   const result = new Map<string, { reserved: string; available: string; overReserved: boolean }>();
   if (batchIds.length === 0) return result;
@@ -600,6 +601,10 @@ export async function findReservedAndAvailableByBatch(
       companyId,
       batchId: { in: [...batchIds] },
       ...(options?.excludeOrderId !== undefined ? { NOT: { orderId: options.excludeOrderId } } : {}),
+      // Con `NOT` a secas, las filas sin linea tambien caerian: `NULL <> x` no es verdadero.
+      ...(options?.excludeOrderLineId !== undefined
+        ? { OR: [{ orderLineId: null }, { orderLineId: { not: options.excludeOrderLineId } }] }
+        : {}),
     },
     select: { batchId: true, kind: true, quantity: true },
   });

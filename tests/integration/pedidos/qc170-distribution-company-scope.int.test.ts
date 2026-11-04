@@ -47,11 +47,12 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
-  createCreateOrder,
-  createUpdateOrder,
-  createUpdateOrderPresentationLines,
+  createCreateOrder as createLinesOrder,
+  createUpdateOrder as createLinesUpdate,
+  createUpdateOrderPresentationLines as createLinesDistribution,
   OrderNotFoundError,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeDistribution, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -65,6 +66,14 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
+const createUpdateOrderPresentationLines = (deps: Parameters<typeof createLinesDistribution>[0]) =>
+  singleRecipeDistribution(createLinesDistribution(deps), findAliveOrderLines);
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -229,6 +238,8 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
@@ -274,8 +285,18 @@ async function pedidoDe(fixture: Fixture, status: 'PENDIENTE' | 'POR_EMPACAR'): 
   const creado = await createOrder(entradaDePedido(fixture, '100.0000', fixture.unitId, 5), actorDe(fixture));
   if (status !== 'PENDIENTE') {
     await prisma.order.update({ where: { id: creado.id }, data: { status } });
+    await prisma.orderLine.updateMany({ where: { orderId: creado.id }, data: { status } });
   }
   return creado.id;
+}
+
+/** La unica linea del pedido, con su receta, para escribirla por el adaptador. */
+async function lineaDe(orderId: string) {
+  const linea = await prisma.orderLine.findFirstOrThrow({
+    where: { orderId, deletedAt: null },
+    select: { id: true, recipeId: true, originalRecipeId: true, quantity: true, salePrice: true },
+  });
+  return { ...linea, quantity: linea.quantity.toFixed(4), salePrice: linea.salePrice?.toFixed(4) ?? null };
 }
 
 /** Todo lo que una escritura ajena podria tocar: la fila del pedido y su reparto. */
@@ -364,40 +385,75 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
     });
   });
 
-  it('R29: el adaptador `updatePresentationLinesAlive` con el ambito de B devuelve not_found y no escribe ni la fila ni las lineas de A', async () => {
+  it('R29, QT-313 R43: escribir el reparto de una linea de A con el ambito de B devuelve null y no escribe ni la fila ni las lineas de A', async () => {
     await conDosEmpresas(async (a, b) => {
       const pedidoA = await pedidoDe(a, 'POR_EMPACAR');
       const antes = await foto(pedidoA);
+      const linea = await lineaDe(pedidoA);
 
-      const resultado = await createOrderWriteRepository(prisma).updatePresentationLinesAlive(
-        pedidoA,
-        b.unitId,
-        [{ presentationId: b.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
-        b.actorId,
-        new Date(),
-        { companyId: b.companyId },
+      const resultado = await prisma.$transaction((tx) =>
+        createOrderWriteRepository(tx).writeLines(
+          pedidoA,
+          {
+            removedIds: [],
+            edited: [
+              {
+                lineId: linea.id,
+                line: {
+                  ...linea,
+                  unitId: b.unitId,
+                  presentationLines: [{ presentationId: b.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
+                },
+                cost: 'keep',
+              },
+            ],
+            added: [],
+          },
+          b.actorId,
+          new Date(),
+          { companyId: b.companyId },
+        ),
       );
 
-      expect(resultado).toBe('not_found');
+      expect(resultado).toBeNull();
       expect(await foto(pedidoA)).toEqual(antes);
       expect(await prisma.orderPresentationLine.count({ where: { companyId: b.companyId } })).toBe(0);
     });
   });
 
-  it('R29: control positivo, el adaptador `updatePresentationLinesAlive` con el ambito de A si escribe', async () => {
+  it('R29: control positivo, escribir el reparto de la linea con el ambito de A si escribe', async () => {
     await conDosEmpresas(async (a) => {
       const pedidoA = await pedidoDe(a, 'POR_EMPACAR');
+      const linea = await lineaDe(pedidoA);
 
-      const resultado = await createOrderWriteRepository(prisma).updatePresentationLinesAlive(
-        pedidoA,
-        a.unitConvertibleId,
-        [{ presentationId: a.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
-        a.actorId,
-        new Date(),
-        { companyId: a.companyId },
-      );
+      const resultado = await prisma.$transaction(async (tx) => {
+        const repo = createOrderWriteRepository(tx);
+        const escrito = await repo.writeLines(
+          pedidoA,
+          {
+            removedIds: [],
+            edited: [
+              {
+                lineId: linea.id,
+                line: {
+                  ...linea,
+                  unitId: a.unitConvertibleId,
+                  presentationLines: [{ presentationId: a.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
+                },
+                cost: 'keep',
+              },
+            ],
+            added: [],
+          },
+          a.actorId,
+          new Date(),
+          { companyId: a.companyId },
+        );
+        await repo.mirrorFirstLine(pedidoA, { companyId: a.companyId });
+        return escrito;
+      });
 
-      expect(resultado).toBe('ok');
+      expect(resultado).toEqual([]);
       const despues = await foto(pedidoA);
       expect(despues.fila.unitId).toBe(a.unitConvertibleId);
       expect(despues.lineas.map(({ presentationId, packages }) => ({ presentationId, packages }))).toEqual([
@@ -447,18 +503,9 @@ describe('R29 — aislamiento: la edicion general (cantidad, unidad y reparto) n
 
       const resultado = await createOrderWriteRepository(prisma).updateAlive(
         pedidoA,
-        {
-          salePrice: null,
-          recipeId: b.recipeId,
-          quantity: '80.0000',
-          priority: 'BAJA',
-          unitId: b.unitId,
-          customerId: null,
-          presentationLines: [{ presentationId: b.presentationId, packages: 2, content: '10.0000', packagingProductId: null }],
-        },
+        { priority: 'BAJA', customerId: null },
         b.actorId,
         new Date(),
-        null,
         { companyId: b.companyId },
       );
 

@@ -27,7 +27,7 @@ import type { StoredOrderCost } from '../../../domain/order-cost';
 import type { OrderScope } from '../../../domain/order-scope';
 import type {
   NewOrder,
-  OrderEdit,
+  OrderHeaderEdit,
   OrderLineRow,
   OrderPresentationLineRow,
   OrderPresentationLineWrite,
@@ -532,84 +532,88 @@ async function replacePresentationLines(
 }
 
 /**
- * `updateAlive` (R6, R20, R33, R40).
- *
- * El AMBITO viaja EN EL `where`, junto a `deletedAt: null`: un pedido de otra empresa no se
- * actualiza y sale como `'not_found'`.
- *
- * `updateMany` con `deletedAt: null` en el `where` y no `update`: si el pedido no existe o ya
- * esta borrado, `count` sale 0 y se devuelve `'not_found'` en vez de lanzar.
- *
- * `data` NUNCA incluye `createdBy` ni `createdAt`: conservar el autor y el instante de
- * la creacion solo se puede demostrar aqui. Tampoco incluye `status` ni
- * `cancellationReason`: `OrderEdit` no tiene esos campos, asi que esta sentencia no puede
- * escribirlos ni por accidente.
- *
- * `updatedAt` se escribe con el `now` INYECTADO y no con el `@updatedAt` de Prisma, para que
- * el reloj sea el mismo que fijo el caso de uso.
- *
- * `ingredientsCost` se SUSTITUYE entero, igual que el resto de `data`, aunque sea `null`; con
- * `'keep'` las dos columnas del importe quedan fuera del `UPDATE`.
- *
- * `presentationId`/`presentationContent` de la fila YA NO SE ESCRIBEN: el
- * reparto vive en `order_presentation_lines` (`replacePresentationLines`, misma transaccion) y
- * la columna se retira de `orders` en una migracion aparte -hasta entonces, sencillamente se
- * deja de tocar-. `unit_id` ocupa su lugar como dato propio del pedido.
+ * `updateAlive`: solo la prioridad y el cliente, con el AMBITO en el `where` junto a
+ * `deletedAt: null`; un pedido de otra empresa sale como `'not_found'`. Lo de cada receta -y su
+ * reparto- lo escribe `writeLines` por linea. `data` no lleva `createdBy` ni `createdAt`, asi que
+ * el autor de la creacion no se toca; tampoco estado ni motivo.
  */
 export async function updateAliveOrder(
   id: string,
-  data: OrderEdit,
+  data: OrderHeaderEdit,
   actorId: string,
   now: Date,
-  cost: StoredOrderCost | null | 'keep',
   scope: OrderScope,
   tx: PrismaLike = prisma,
 ): Promise<'ok' | 'not_found'> {
   const { count } = await tx.order.updateMany({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
-    data: {
-      recipeId: data.recipeId,
-      quantity: toDecimalInput(data.quantity),
-      priority: data.priority,
-      ...(cost === 'keep' ? {} : costColumns(cost)),
-      updatedAt: now,
-      updatedBy: actorId,
-      unitId: data.unitId,
-      customerId: data.customerId,
-      // Reemplazo completo, tambien a `null` (vaciar el campo quita el precio).
-      salePrice: data.salePrice === null ? null : toDecimalInput(data.salePrice),
-    },
+    data: { priority: data.priority, customerId: data.customerId, updatedAt: now, updatedBy: actorId },
   });
-  if (count !== 1) return 'not_found';
+  return count === 1 ? 'ok' : 'not_found';
+}
 
-  await replacePresentationLines(tx, id, scope, data.presentationLines, now);
-  return 'ok';
+/** `mirrorFirstLine` de `OrderWriteRepository`. `$executeRaw` para no mover `updated_at`. */
+async function mirrorFirstOrderLine(orderId: string, scope: OrderScope, tx: PrismaLike): Promise<void> {
+  const { companyId } = companyScopeColumns(scope);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "orders" AS o
+       SET "recipe_id" = l."recipe_id",
+           "quantity" = l."quantity",
+           "unit_id" = l."unit_id",
+           "sale_price" = l."sale_price",
+           "ingredients_cost" = l."ingredients_cost",
+           "packaging_cost" = l."packaging_cost",
+           "reserved_at" = l."reserved_at"
+      FROM (
+        SELECT "recipe_id", "quantity", "unit_id", "sale_price", "ingredients_cost", "packaging_cost", "reserved_at"
+          FROM "order_lines"
+         WHERE "order_id" = ${orderId}::uuid
+           AND "company_id" = ${companyId}::uuid
+           AND "deleted_at" IS NULL
+         ORDER BY "position"
+         LIMIT 1
+      ) AS l
+     WHERE o."id" = ${orderId}::uuid
+       AND o."company_id" = ${companyId}::uuid
+       AND o."deleted_at" IS NULL
+  `);
 }
 
 /**
- * `updatePresentationLinesAlive`: escribe SOLO `unit_id` y el reparto.
- * A diferencia de `updateAliveOrder`, `data` no lleva `quantity`, `recipeId` ni `priority` -el
- * TIPO de este metodo no puede ni expresarlos-, asi que esta sentencia no puede escribirlos ni
- * por accidente. Sin filtro de `status` en el `where`: quien llama ya bloqueo la fila con
- * `lockAliveById` en la MISMA transaccion y ya comprobo `REPARTO_EDITABLE_STATUSES` sobre ella.
+ * Mientras una operacion escribe el estado del PEDIDO, su unica linea viva copia ese estado en la
+ * misma transaccion, para que pedido y linea no diverjan. `true` si hay una linea que copie; un
+ * pedido sin lineas no tiene a quien, y uno con varias no puede pasar por aqui: su estado se
+ * deriva de ellas.
  */
-async function updatePresentationLinesAliveOrder(
-  id: string,
-  unitId: string,
-  lines: readonly OrderPresentationLineWrite[],
-  actorId: string,
-  now: Date,
-  scope: OrderScope,
-  tx: PrismaLike,
-): Promise<'ok' | 'not_found'> {
-  const { count } = await tx.order.updateMany({
-    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
-    data: { unitId, updatedAt: now, updatedBy: actorId },
-  });
-  if (count !== 1) return 'not_found';
+async function hasOnlyLineToCopy(orderId: string, scope: OrderScope, tx: PrismaLike): Promise<boolean> {
+  const { companyId } = companyScopeColumns(scope);
+  const alive = await tx.orderLine.count({ where: { orderId, companyId, deletedAt: null } });
+  if (alive > 1) {
+    throw new Error(`el pedido ${orderId} tiene ${String(alive)} lineas: su estado no se escribe en el pedido`);
+  }
+  return alive === 1;
+}
 
-  await replacePresentationLines(tx, id, scope, lines, now);
-  return 'ok';
+/** Copia estado, motivo, `finished_at`, `packed_by` y `conditioned_by`: los CHECK de la linea los
+ *  exigen juntos, igual que los del pedido. */
+async function copyOrderStateToOnlyLine(orderId: string, scope: OrderScope, tx: PrismaLike): Promise<void> {
+  if (!(await hasOnlyLineToCopy(orderId, scope, tx))) return;
+  const { companyId } = companyScopeColumns(scope);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "order_lines" AS l
+       SET "status" = o."status",
+           "cancellation_reason" = o."cancellation_reason",
+           "finished_at" = o."finished_at",
+           "packed_by" = o."packed_by",
+           "conditioned_by" = o."conditioned_by",
+           "updated_at" = o."updated_at",
+           "updated_by" = o."updated_by"
+      FROM "orders" AS o
+     WHERE o."id" = l."order_id"
+       AND l."order_id" = ${orderId}::uuid
+       AND l."company_id" = ${companyId}::uuid
+       AND l."deleted_at" IS NULL
+  `);
 }
 
 /**
@@ -645,7 +649,9 @@ export async function cancelAliveOrder(
       updatedBy: actorId,
     },
   });
-  return count === 1 ? 'ok' : 'not_found';
+  if (count !== 1) return 'not_found';
+  await copyOrderStateToOnlyLine(id, scope, tx);
+  return 'ok';
 }
 
 /**
@@ -671,7 +677,15 @@ export async function softDeleteAliveOrder(
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
     data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
   });
-  return count === 1 ? 'ok' : 'not_found';
+  if (count !== 1) return 'not_found';
+  if (await hasOnlyLineToCopy(id, scope, tx)) {
+    const { companyId } = companyScopeColumns(scope);
+    await tx.orderLine.updateMany({
+      where: { orderId: id, companyId, deletedAt: null },
+      data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
+    });
+  }
+  return 'ok';
 }
 
 /** Fila minima del bloqueo: el identificador para saber que la fila existia, era viva y de esta
@@ -824,7 +838,10 @@ async function setAliveOrderStatus(
       updatedBy: actorId,
     },
   });
-  if (count === 1) return 'ok';
+  if (count === 1) {
+    await copyOrderStateToOnlyLine(id, scope, tx);
+    return 'ok';
+  }
 
   const stillAlive = await tx.order.findFirst({
     where: { AND: [orderCompanyScope(scope), { id, deletedAt: null }] },
@@ -1130,9 +1147,51 @@ async function removeOrderLines(
   return true;
 }
 
+/**
+ * Dos o mas lineas que cambian de receta salen un momento del unico de receta activa -con
+ * `deleted_at` dentro de esta transaccion- y vuelven al final, para que dos lineas que se
+ * intercambian la receta no choquen a mitad de camino. Solo cambia de receta una linea en estado
+ * editable, y la base deja quitar las de esos estados. Devuelve las lineas apartadas.
+ */
+async function parkLinesChangingRecipe(
+  orderId: string,
+  edited: readonly OrderLineEditWrite[],
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<readonly string[]> {
+  if (edited.length < 2) return [];
+  const { companyId } = companyScopeColumns(scope);
+  const target = new Map(edited.map((edit) => [edit.lineId, edit.line.originalRecipeId]));
+  const current = await tx.orderLine.findMany({
+    where: { id: { in: [...target.keys()] }, orderId, companyId, deletedAt: null },
+    select: { id: true, originalRecipeId: true },
+  });
+  const ids = current.filter((row) => row.originalRecipeId !== target.get(row.id)).map((row) => row.id);
+  if (ids.length < 2) return [];
+  await tx.orderLine.updateMany({ where: { id: { in: ids }, orderId, companyId, deletedAt: null }, data: { deletedAt: now } });
+  return ids;
+}
+
+async function unparkLines(
+  orderId: string,
+  ids: readonly string[],
+  parkedAt: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { companyId } = companyScopeColumns(scope);
+  await translatingDuplicateRecipe(
+    () => tx.orderLine.updateMany({ where: { id: { in: [...ids] }, orderId, companyId, deletedAt: parkedAt }, data: { deletedAt: null } }),
+    `dos lineas del pedido ${orderId} acaban con la misma receta`,
+  );
+}
+
 async function editOrderLine(
   orderId: string,
   edit: OrderLineEditWrite,
+  parkedAt: Date | null,
   actorId: string,
   now: Date,
   scope: OrderScope,
@@ -1142,7 +1201,7 @@ async function editOrderLine(
   const { count } = await translatingDuplicateRecipe(
     () =>
       tx.orderLine.updateMany({
-        where: { id: edit.lineId, orderId, companyId, deletedAt: null },
+        where: { id: edit.lineId, orderId, companyId, deletedAt: parkedAt },
         data: {
           ...lineColumns(edit.line),
           ...(edit.cost === 'keep' ? {} : costColumns(edit.cost)),
@@ -1211,9 +1270,12 @@ async function writeOrderLines(
   if ((await lockAliveOrderById(orderId, scope, tx)) === null) return null;
 
   if (!(await removeOrderLines(orderId, changes.removedIds, actorId, now, scope, tx))) return null;
+  const parked = await parkLinesChangingRecipe(orderId, changes.edited, now, scope, tx);
   for (const edit of changes.edited) {
-    if (!(await editOrderLine(orderId, edit, actorId, now, scope, tx))) return null;
+    const parkedAt = parked.includes(edit.lineId) ? now : null;
+    if (!(await editOrderLine(orderId, edit, parkedAt, actorId, now, scope, tx))) return null;
   }
+  await unparkLines(orderId, parked, now, scope, tx);
   const ids = await addOrderLines(orderId, changes.added, actorId, now, scope, tx);
   if (ids.length === 0) return [];
 
@@ -1460,7 +1522,8 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setLineReservedAt: (orderId, lineId, reservedAt, scope) => setOrderLineReservedAt(orderId, lineId, reservedAt, scope, tx),
     refreshStatus: (orderId, actorId, now, scope) => refreshAliveOrderStatus(orderId, actorId, now, scope, tx),
     create: (data, year, actorId, now, cost, scope) => insertAliveOrder(tx, data, year, actorId, now, cost, scope),
-    updateAlive: (id, data, actorId, now, cost, scope) => updateAliveOrder(id, data, actorId, now, cost, scope, tx),
+    updateAlive: (id, data, actorId, now, scope) => updateAliveOrder(id, data, actorId, now, scope, tx),
+    mirrorFirstLine: (orderId, scope) => mirrorFirstOrderLine(orderId, scope, tx),
     cancelAlive: (id, reason, actorId, now, scope) => cancelAliveOrder(id, reason, actorId, now, scope, tx),
     softDeleteAlive: (id, actorId, now, scope) => softDeleteAliveOrder(id, actorId, now, scope, tx),
     setStatus: (id, from, to, actorId, now, scope) => setAliveOrderStatus(id, from, to, actorId, now, scope, tx),
@@ -1469,8 +1532,6 @@ export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteR
     setReservedAt: (id, reservedAt, scope) => setOrderReservedAt(id, reservedAt, scope, tx),
     setCustomerAlive: (id, customerId, actorId, now, scope) =>
       setAliveOrderCustomer(id, customerId, actorId, now, scope, tx),
-    updatePresentationLinesAlive: (id, unitId, lines, actorId, now, scope) =>
-      updatePresentationLinesAliveOrder(id, unitId, lines, actorId, now, scope, tx),
     finishPackingAlive: (id, packerId, now, scope) => finishPackingAliveOrder(id, packerId, now, scope, tx),
     findPresentationLinesForFinish: (id, scope) => findPresentationLinesForFinishOrder(id, scope, tx),
     recordPackedCounts: (id, counts, scope) => recordPackedCountsForOrder(id, counts, scope, tx),
@@ -1560,7 +1621,9 @@ async function lockAndStartPackingAlive(
   });
   // La fila sigue bloqueada desde el `SELECT ... FOR UPDATE` de arriba, en la MISMA
   // transaccion: ninguna otra conexion pudo moverla entre la lectura y esta escritura.
-  return count === 1 ? 'ok' : 'not_packable';
+  if (count !== 1) return 'not_packable';
+  await copyOrderStateToOnlyLine(id, scope, tx);
+  return 'ok';
 }
 
 /**
@@ -1604,10 +1667,11 @@ export async function startConditioningAliveOrder(
   scope: OrderScope,
   db: PrismaLike = prisma,
 ): Promise<'ok' | 'already_mine' | 'taken' | 'not_conditionable' | 'not_found'> {
-  const { count } = await db.order.updateMany({
-    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_ACONDICIONAR' }] },
-    data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId, updatedAt: now, updatedBy: conditionerId },
-  });
+  // Sobre el cliente global abre su transaccion, para que la copia a la linea vaya con el `UPDATE`.
+  const count =
+    db === prisma
+      ? await prisma.$transaction((tx) => startConditioningAndCopy(id, conditionerId, now, scope, tx))
+      : await startConditioningAndCopy(id, conditionerId, now, scope, db);
   if (count === 1) return 'ok';
 
   const row = await findAliveConditioningStatus(id, scope, db);
@@ -1616,6 +1680,21 @@ export async function startConditioningAliveOrder(
     return row.conditionedBy === conditionerId ? 'already_mine' : 'taken';
   }
   return 'not_conditionable';
+}
+
+async function startConditioningAndCopy(
+  id: string,
+  conditionerId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<number> {
+  const { count } = await tx.order.updateMany({
+    where: { AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'POR_ACONDICIONAR' }] },
+    data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId, updatedAt: now, updatedBy: conditionerId },
+  });
+  if (count === 1) await copyOrderStateToOnlyLine(id, scope, tx);
+  return count;
 }
 
 /** Implementa `OrderConditioningRepository['finishConditioningAlive']`: el estado y `finished_at`
@@ -1627,21 +1706,33 @@ export async function finishConditioningAliveOrder(
   scope: OrderScope,
   db: PrismaLike = prisma,
 ): Promise<'ok' | 'not_conditioner' | 'not_conditionable' | 'not_found'> {
-  const { count } = await db.order.updateMany({
-    where: {
-      AND: [
-        orderCompanyScope(scope),
-        { id, deletedAt: null, status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId },
-      ],
-    },
-    data: { status: 'TERMINADO', finishedAt: now, updatedAt: now, updatedBy: conditionerId },
-  });
+  const count =
+    db === prisma
+      ? await prisma.$transaction((tx) => finishConditioningAndCopy(id, conditionerId, now, scope, tx))
+      : await finishConditioningAndCopy(id, conditionerId, now, scope, db);
   if (count === 1) return 'ok';
 
   const row = await findAliveConditioningStatus(id, scope, db);
   if (row === null) return 'not_found';
   if (row.status === 'EN_ACONDICIONAMIENTO' && row.conditionedBy !== conditionerId) return 'not_conditioner';
   return 'not_conditionable';
+}
+
+async function finishConditioningAndCopy(
+  id: string,
+  conditionerId: string,
+  now: Date,
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<number> {
+  const { count } = await tx.order.updateMany({
+    where: {
+      AND: [orderCompanyScope(scope), { id, deletedAt: null, status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId }],
+    },
+    data: { status: 'TERMINADO', finishedAt: now, updatedAt: now, updatedBy: conditionerId },
+  });
+  if (count === 1) await copyOrderStateToOnlyLine(id, scope, tx);
+  return count;
 }
 
 /**
@@ -1682,6 +1773,7 @@ async function finishPackingAliveOrder(
     data: { status: 'POR_ACONDICIONAR', updatedAt: now, updatedBy: packerId },
   });
   if (count === 1) {
+    await copyOrderStateToOnlyLine(id, scope, tx);
     const row = await tx.order.findUniqueOrThrow({
       where: { id },
       select: { recipeId: true, quantity: true, unitId: true },

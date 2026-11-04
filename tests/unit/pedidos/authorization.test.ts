@@ -29,13 +29,14 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import { PedidosError, UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createQuoteOrderCost } from '@/lib/modules/pedidos/domain/quote-order-cost'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'

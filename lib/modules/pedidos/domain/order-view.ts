@@ -101,6 +101,9 @@ export type NewOrder = {
  */
 export type OrderEdit = Omit<NewOrder, 'status'>;
 
+/** Lo que una edicion escribe en el pedido mismo: lo de cada receta va en su linea. */
+export type OrderHeaderEdit = Pick<OrderEdit, 'priority' | 'customerId'>;
+
 /**
  * La fila tal como la devuelve el puerto: lo que vive en `orders` y nada mas. NO trae el
  * nombre de la receta -eso lo resuelve el caso de uso con el contrato publico de `recetas`, con

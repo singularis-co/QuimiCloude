@@ -167,6 +167,7 @@ describe('returnFinishedGoods — orden de pasos con un tx doblado', () => {
         reason: null,
         orderId: 'order-1',
         orderPresentationLineId: null,
+        orderLineId: null,
         orderDeliveryVoidId: 'void-1',
         createdBy: 'actor-1',
         companyId: COMPANY,

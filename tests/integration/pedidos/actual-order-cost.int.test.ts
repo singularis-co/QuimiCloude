@@ -49,7 +49,8 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
-import { createCreateOrder, createFinishPacking, createStartPacking, createTransitionOrder } from '@/lib/modules/pedidos';
+import { createCreateOrder as createLinesOrder, createFinishPacking, createStartPacking, createTransitionOrder } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor, PackedLineCount } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -62,6 +63,10 @@ import { crearCliente, type EmpresaDeEntrega } from '../../helpers/order-deliver
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -196,6 +201,8 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.orderDelivery.deleteMany({ where: { companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId } } });
   await prisma.productBatch.deleteMany({ where: { product: { companyId, type: 'FINISHED_PRODUCT' } } });

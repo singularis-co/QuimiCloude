@@ -290,6 +290,7 @@ async function altaReal(
 async function limpiar(creados: readonly string[]): Promise<void> {
   if (creados.length === 0) return
   await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...creados] } } })
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: [...creados] } } })
   await prisma.order.deleteMany({ where: { id: { in: [...creados] } } })
 }
 
@@ -667,10 +668,10 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       // completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee (`OrderEdit` no
       // tiene el campo): la fila se queda en el estado con el que nacio, `PENDIENTE`, aunque
       // `editado.status` pida `EN_CURSO`.
-      const editado = baseOrder({ quantity: '99.0000', priority: 'CRITICA', status: 'EN_CURSO' })
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
+      // QT-313: la cantidad es de la linea; `updateAliveOrder` escribe la prioridad y el cliente.
+      const editado = { priority: 'CRITICA', customerId: null } as const
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('ok')
       const relectura = await findAliveOrderById(pedido.id, scope())
-      expect(relectura?.quantity).toBe('99.0000')
       expect(relectura?.priority).toBe('CRITICA')
       expect(relectura?.status).toBe('PENDIENTE')
       // La edicion NO toca el autor ni el instante de la creacion.
@@ -679,13 +680,13 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
       expect(relectura?.updatedAt.toISOString()).toBe(despues.toISOString())
 
       // INEXISTENTE -> 'not_found' en las tres, sin lanzar.
-      expect(await updateAliveOrder(inexistente, editado, actorId, despues, null, scope())).toBe('not_found')
+      expect(await updateAliveOrder(inexistente, editado, actorId, despues, scope())).toBe('not_found')
       expect(await cancelAliveOrder(inexistente, 'da igual', actorId, despues, scope())).toBe('not_found')
       expect(await softDeleteAliveOrder(inexistente, actorId, despues, scope())).toBe('not_found')
 
       // YA BORRADO -> 'not_found' en las tres. El primer borrado si es 'ok'.
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('not_found')
+      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, scope())).toBe('not_found')
       expect(await cancelAliveOrder(pedido.id, 'da igual', actorId, despues, scope())).toBe('not_found')
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('not_found')
 
@@ -952,30 +953,46 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
   })
 })
 
-describe('QC-305 — updateAlive con keep conserva el estimado guardado', () => {
-  it('R12, R14: con keep el UPDATE escribe la edicion y deja ingredients_cost y packaging_cost como estaban', async () => {
+describe('QC-305 — la edicion de una linea con keep conserva su estimado guardado', () => {
+  it('R12, R14, QT-313 R17: con keep la escritura edita la linea y deja ingredients_cost y packaging_cost como estaban', async () => {
     const creados: string[] = []
     try {
       const now = instantIn(YEAR_DISCRIMINANTES, 5, 1)
       const despues = instantIn(YEAR_DISCRIMINANTES, 5, 2)
       const pedido = await altaReal(creados, YEAR_DISCRIMINANTES, now)
-      await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '45.6700', packaging: '5.6700' }, actorId, now, scope()),
+      const linea = { recipeId, originalRecipeId: recipeId, quantity: '10.0000', unitId, salePrice: null, presentationLines: [] }
+      const escrita = await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).writeLines(
+          pedido.id,
+          { removedIds: [], edited: [], added: [{ ...linea, status: 'PENDIENTE', cost: { total: '45.6700', packaging: '5.6700' } }] },
+          actorId,
+          now,
+          scope(),
+        ),
       )
+      const lineId = escrita?.[0]?.id ?? ''
 
-      const editado = baseOrder({ quantity: '77.0000', priority: 'ALTA' })
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, 'keep', scope())).toBe('ok')
+      const editar = (cost: 'keep' | null) =>
+        withOrderTransaction((tx) =>
+          createOrderWriteRepository(tx).writeLines(
+            pedido.id,
+            { removedIds: [], edited: [{ lineId, line: { ...linea, quantity: '77.0000' }, cost }], added: [] },
+            actorId,
+            despues,
+            scope(),
+          ),
+        )
 
-      const cruda = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      expect(await editar('keep')).toEqual([])
+      const cruda = await prisma.orderLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(cruda.quantity.toFixed(4)).toBe('77.0000')
-      expect(cruda.priority).toBe('ALTA')
       expect(cruda.updatedAt.toISOString()).toBe(despues.toISOString())
       expect(cruda.ingredientsCost?.toFixed(4)).toBe('45.6700')
       expect(cruda.packagingCost?.toFixed(4)).toBe('5.6700')
 
-      // Control: sin keep, el mismo UPDATE si sustituye el importe.
-      expect(await updateAliveOrder(pedido.id, editado, actorId, despues, null, scope())).toBe('ok')
-      const sustituida = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      // Control: sin keep, la misma escritura si sustituye el importe.
+      expect(await editar(null)).toEqual([])
+      const sustituida = await prisma.orderLine.findUniqueOrThrow({ where: { id: lineId } })
       expect(sustituida.ingredientsCost).toBeNull()
       expect(sustituida.packagingCost).toBeNull()
     } finally {

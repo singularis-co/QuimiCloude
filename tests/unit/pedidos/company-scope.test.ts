@@ -27,7 +27,8 @@ import {
   orderCompanyScope,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/company-scope'
 import { toOrderRow } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'

@@ -129,10 +129,11 @@ export { assertTransition, isAllowedTransition } from './domain/order-transition
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
- *  `OrderEdit` es lo que acepta `updateAlive`, sin `status`. */
+ *  `OrderHeaderEdit` es lo que acepta `updateAlive`. */
 export type {
   NewOrder,
   OrderEdit,
+  OrderHeaderEdit,
   OrderPresentationLineRow,
   OrderPresentationLineView,
   OrderPresentationLineWrite,
@@ -166,6 +167,8 @@ export type { GetOrderDeps } from './domain/get-order';
 export { createListOrders } from './domain/list-orders';
 export type { ListOrdersDeps } from './domain/list-orders';
 export { createUpdateOrder } from './domain/update-order';
+/** Las lineas vivas de un pedido, para que el formulario de una receta nombre la que edita. */
+export { createListOrderLineIds } from './domain/list-order-line-ids';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';

@@ -24,7 +24,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import {
   OrderNotFoundError,
@@ -33,7 +34,7 @@ import {
 } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 
 import { createAssignResponsibles } from '@/lib/modules/asignaciones/domain/assign-responsibles'
 import { OrderNotFoundError as AsignacionesOrderNotFoundError } from '@/lib/modules/asignaciones/domain/errors'
@@ -448,7 +449,12 @@ describe('QC-138 R38 — bloquear al crear o editar solo toca la empresa de quie
     const c = conReservaInsuficiente(a)
 
     await c.createOrder({ ...ENTRADA_ALTA, confirmBlocked: true, companyId: EMPRESA_B }, ACTOR_A)
-    await c.updateOrder(PEDIDO_DE_A, { ...ENTRADA_ALTA, confirmBlocked: true, companyId: EMPRESA_B }, ACTOR_A)
+    // La linea tiene que cambiar para volver a apartar: una linea que llega igual no se toca.
+    await c.updateOrder(
+      PEDIDO_DE_A,
+      { ...ENTRADA_ALTA, quantity: '11.0000', confirmBlocked: true, companyId: EMPRESA_B },
+      ACTOR_A,
+    )
 
     expect(c.setStatus).toHaveBeenCalledTimes(2)
     for (const args of c.setStatus.mock.calls) {

@@ -11,7 +11,8 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import {
   InvalidTransitionError,
   DuplicateOrderNumberError,
@@ -22,7 +23,7 @@ import {
 } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'

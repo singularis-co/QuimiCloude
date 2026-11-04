@@ -35,7 +35,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderEdit, OrderScope, OrderStatus } from '@/lib/modules/pedidos'
+import type { NewOrder, OrderScope, OrderStatus } from '@/lib/modules/pedidos'
 
 /** Un ano de prueba propio, distinto de los que ya usan `order-repository.int.test.ts` y
  *  `order-sequence.int.test.ts`, para que ningun archivo pueda heredar su secuencia. */
@@ -312,16 +312,7 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
   it('updateAliveOrder no anade ni cambia finished_at', async () => {
     const id = await seedOrder({ status: 'PENDIENTE' })
     try {
-      const edit: OrderEdit = {
-        salePrice: null,
-        recipeId,
-        quantity: '20.0000',
-        priority: 'ALTA',
-        unitId,
-        customerId: null,
-        presentationLines: [],
-      }
-      const resultado = await updateAliveOrder(id, edit, actorId, instant(20), null, scope())
+      const resultado = await updateAliveOrder(id, { priority: 'ALTA', customerId: null }, actorId, instant(20), scope())
       expect(resultado).toBe('ok')
 
       const stored = await readFinishedAt(id)

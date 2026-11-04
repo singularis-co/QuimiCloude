@@ -107,7 +107,7 @@
   *Hecho:* tests de integración: una línea de otra empresa o de otro pedido vuelve como `null` /
   `not_found` (R43); orden por `position` (R6); carrera de dos altas de la misma receta → una
   `duplicate_order_recipe` (R5). Depende de T2, T3.
-- [ ] **T9 — Alta con líneas.** `create-order.ts`, `order-recipe.ts`, `resolve-ingredients-cost.ts`,
+- [x] **T9 — Alta con líneas.** `create-order.ts`, `order-recipe.ts`, `resolve-ingredients-cost.ts`,
   `order-requirement.ts`, y el puente de alta en `order-actions.ts` (design § 4.1.1): el caso de
   uso valida con `createOrderWithLinesSchema` y el puente traduce el formulario plano. Validar por
   línea con la posición en el diagnóstico (R11), receta original de cada línea (R4), costear cada
@@ -120,7 +120,7 @@
   respuesta de R11 y R13 tiene los mismos campos que hoy y la posición sale en el diagnóstico;
   `orders.recipe_id`/`quantity`/`unit_id`/`sale_price`/costes/`reserved_at` iguales a los de la
   línea de menor `position`; la pantalla y sus tests sin cambios. Depende de T5, T6, T7, T8.
-- [ ] **T10 — Edición con líneas.** `update-order.ts`, `order-edit-change.ts`,
+- [x] **T10 — Edición con líneas.** `update-order.ts`, `order-edit-change.ts`,
   `update-order-presentation-lines.ts`, `quote-order-cost.ts`, `order-presentation-availability.ts`:
   diff (R20), añadir con otras en producción (R21), quitar `PENDIENTE` o `BLOQUEADO` y liberar
   (R22), rechazar quitar en otro estado (R23), edición de línea no editable (R24), solo las
@@ -474,3 +474,36 @@ Tocados en la fase 4 (T8) por el lector `findAliveLines` de `OrderRepository` y 
 - `tests/integration/pedidos/qc170-distribution-concurrency.int.test.ts`
 - `tests/integration/pedidos/qc195-packaging-reservation.int.test.ts`
 - `tests/integration/pedidos/review-blocked-orders.int.test.ts`
+
+Tocados en la fase 4 (T9, T10) por el alta y la edicion con lineas, el puente del formulario, `excludeOrderLineId` y los andamios de transicion:
+
+- `lib/modules/pedidos/domain/list-order-line-ids.ts`
+- `lib/modules/inventario/domain/costing-batch.ts`
+- `lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma.ts`
+- `tests/helpers/single-recipe-order.ts`
+- `tests/unit/pedidos/authorization.test.ts`
+- `tests/unit/pedidos/company-scope.test.ts`
+- `tests/unit/pedidos/order-actions.test.ts`
+- `tests/unit/pedidos/order-actions-customer.test.ts`
+- `tests/unit/pedidos/order-actions-distribution.test.ts`
+- `tests/unit/pedidos/order-catalog.test.ts`
+- `tests/unit/pedidos/order-customer-authorization.test.ts`
+- `tests/unit/pedidos/order-edit-change.test.ts`
+- `tests/unit/pedidos/qc145-estado-solo-planta.test.ts`
+- `tests/unit/pedidos/qc195-contrato-tipos.test.ts`
+- `tests/unit/pedidos/quote-order-cost.test.ts`
+- `tests/integration/pedidos/order-lines-use-cases.int.test.ts`
+- `tests/integration/documentos/formula-import.int.test.ts`
+- `tests/integration/pedidos/actual-order-cost.int.test.ts`
+- `tests/integration/pedidos/company-scope-queries.int.test.ts`
+- `tests/integration/pedidos/order-crud.int.test.ts`
+- `tests/integration/pedidos/order-expiry.int.test.ts`
+- `tests/integration/pedidos/order-finished-at.int.test.ts`
+- `tests/integration/pedidos/order-repository.int.test.ts`
+- `tests/integration/pedidos/order-sale-price.int.test.ts`
+- `scripts/seed-demo/gateway.ts`
+- `tests/integration/asignaciones/execution-atomicity.int.test.ts`
+- `tests/integration/scripts/seed-demo.int.test.ts`
+- `tests/unit/inventario/adjust-batch-stock-prisma.test.ts`
+- `tests/unit/inventario/finished-goods-dispatch-prisma.test.ts`
+- `tests/unit/inventario/finished-goods-return-prisma.test.ts`

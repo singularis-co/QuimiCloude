@@ -25,13 +25,14 @@ import {
   cancelAliveOrder,
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
   softDeleteAliveOrder,
-  updateAliveOrder,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderEdit, OrderScope } from '@/lib/modules/pedidos'
+import type { NewOrder, OrderScope } from '@/lib/modules/pedidos'
+import type { OrderLineWrite } from '@/lib/modules/pedidos/ports/order-write-repository'
 import { realOrderSummaries } from '../../helpers/order-summaries'
 
 /** Un ano de prueba propio, distinto de los demas archivos de `pedidos`, para no heredar secuencia. */
@@ -162,19 +163,6 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
   }
 }
 
-function edit(overrides: Partial<OrderEdit> = {}): OrderEdit {
-  return {
-    salePrice: null,
-    recipeId,
-    quantity: '10.0000',
-    priority: 'MEDIA',
-    unitId,
-    customerId: null,
-    presentationLines: [],
-    ...overrides,
-  }
-}
-
 async function seedOrder(overrides: Partial<NewOrder> = {}): Promise<string> {
   const result = await withOrderTransaction((tx) =>
     createOrderWriteRepository(tx).create(baseOrder(overrides), YEAR, actorId, instant(1), null, scope()),
@@ -282,21 +270,64 @@ describe('R9 — la base rechaza un precio negativo aunque no pase por los casos
   })
 })
 
+/** La unica linea del pedido, escrita por el adaptador real con su precio. */
+async function seedLine(orderId: string, salePrice: string | null): Promise<string> {
+  const written = await withOrderTransaction((tx) =>
+    createOrderWriteRepository(tx).writeLines(
+      orderId,
+      {
+        removedIds: [],
+        edited: [],
+        added: [{ ...lineOf(salePrice), status: 'PENDIENTE', cost: null }],
+      },
+      actorId,
+      instant(2),
+      scope(),
+    ),
+  )
+  const id = written?.[0]?.id
+  if (id === undefined) throw new Error(`no se escribio la linea del pedido ${orderId}`)
+  return id
+}
+
+function lineOf(salePrice: string | null, presentationLines: OrderLineWrite['presentationLines'] = []): OrderLineWrite {
+  return { recipeId, originalRecipeId: recipeId, quantity: '10.0000', unitId, salePrice, presentationLines }
+}
+
+/** Edita la linea como lo hace la edicion general y copia la linea al pedido, como hasta que las
+ *  columnas del pedido se retiren. */
+async function editLine(orderId: string, lineId: string, line: OrderLineWrite, at: Date): Promise<boolean> {
+  return withOrderTransaction(async (tx) => {
+    const repo = createOrderWriteRepository(tx)
+    const written = await repo.writeLines(orderId, { removedIds: [], edited: [{ lineId, line, cost: 'keep' }], added: [] }, actorId, at, scope())
+    await repo.mirrorFirstLine(orderId, scope())
+    return written !== null
+  })
+}
+
+async function dropOrder(id: string): Promise<void> {
+  await prisma.orderPresentationLine.deleteMany({ where: { orderId: id } })
+  await prisma.orderLine.deleteMany({ where: { orderId: id } })
+  await prisma.order.delete({ where: { id } })
+}
+
 describe('R10 — la edicion general sustituye el precio guardado', () => {
-  it('R10: updateAliveOrder sustituye el precio por uno nuevo, luego por 0 y luego lo quita', async () => {
+  it('R10, QT-313 R15: la edicion de la linea sustituye su precio por uno nuevo, luego por 0 y luego lo quita, y el pedido lo copia', async () => {
     const id = await seedOrder({ salePrice: '100' })
     try {
-      expect(await updateAliveOrder(id, edit({ salePrice: '250.75' }), actorId, instant(3), 'keep', scope())).toBe('ok')
+      const lineId = await seedLine(id, '100')
+
+      expect(await editLine(id, lineId, lineOf('250.75'), instant(3))).toBe(true)
       expect((await findAliveOrderById(id, scope()))?.salePrice).toBe('250.7500')
 
-      expect(await updateAliveOrder(id, edit({ salePrice: '0' }), actorId, instant(4), 'keep', scope())).toBe('ok')
+      expect(await editLine(id, lineId, lineOf('0'), instant(4))).toBe(true)
       expect((await findAliveOrderById(id, scope()))?.salePrice).toBe('0.0000')
 
-      expect(await updateAliveOrder(id, edit({ salePrice: null }), actorId, instant(5), 'keep', scope())).toBe('ok')
+      expect(await editLine(id, lineId, lineOf(null), instant(5))).toBe(true)
       expect((await findAliveOrderById(id, scope()))?.salePrice).toBeNull()
       expect(await storedSalePrice(id)).toBeNull()
     } finally {
-      await prisma.order.delete({ where: { id } })
+      await dropOrder(id)
     }
   })
 })
@@ -316,21 +347,19 @@ describe('R13 — cambiar el cliente, editar el reparto, cancelar y dar de baja 
     }
   })
 
-  it('R13: updatePresentationLinesAlive escribe el reparto y deja sale_price intacto', async () => {
+  it('R13, QT-313 R26: editar el reparto de la linea deja su sale_price y el del pedido intactos', async () => {
     const id = await seedOrder({ salePrice: '1250.5' })
     try {
+      const lineId = await seedLine(id, '1250.5')
       const lines = [{ presentationId, packages: 2, content: '5.0000', packagingProductId: null }]
-      const resultado = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).updatePresentationLinesAlive(id, unitId, lines, actorId, instant(7), scope()),
-      )
-      expect(resultado).toBe('ok')
+      expect(await editLine(id, lineId, lineOf('1250.5', lines), instant(7))).toBe(true)
 
-      const read = await findAliveOrderById(id, scope())
-      expect(read?.presentationLines).toHaveLength(1)
-      expect(read?.salePrice).toBe('1250.5000')
+      const [line] = await findAliveOrderLines(id, scope())
+      expect(line?.presentationLines).toHaveLength(1)
+      expect(line?.salePrice).toBe('1250.5000')
+      expect((await findAliveOrderById(id, scope()))?.salePrice).toBe('1250.5000')
     } finally {
-      await prisma.orderPresentationLine.deleteMany({ where: { orderId: id } })
-      await prisma.order.delete({ where: { id } })
+      await dropOrder(id)
     }
   })
 

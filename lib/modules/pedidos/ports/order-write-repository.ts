@@ -4,7 +4,7 @@ import type { OrderScope } from '../domain/order-scope';
 import type { PackedLineCount } from '../domain/packing-count';
 import type {
   NewOrder,
-  OrderEdit,
+  OrderHeaderEdit,
   OrderLineRow,
   OrderPresentationLineWrite,
   OrderRow,
@@ -195,16 +195,20 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<OrderRow>;
 
-  /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. Con `'keep'` el
-   *  importe guardado no se toca. */
+  /** La prioridad y el cliente del pedido; lo de cada receta lo escribe `writeLines`. No puede
+   *  escribir estado ni motivo. */
   updateAlive(
     id: string,
-    data: OrderEdit,
+    data: OrderHeaderEdit,
     actorId: string,
     now: Date,
-    cost: StoredOrderCost | null | 'keep',
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
+
+  /** Copia en `orders` la receta, cantidad, unidad, precio, coste y `reserved_at` de su linea viva
+   *  de menor `position`, sin mover `updated_at`: los lectores que aun leen esas columnas del
+   *  pedido ven los datos de su linea hasta que dejen de leerlas. */
+  mirrorFirstLine(orderId: string, scope: OrderScope): Promise<void>;
 
   /** `actorId` admite `null`: la caducidad automatica cancela sin que nadie la haya pedido. */
   cancelAlive(
@@ -253,18 +257,6 @@ export interface OrderWriteRepository {
   setCustomerAlive(
     id: string,
     customerId: string | null,
-    actorId: string,
-    now: Date,
-    scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
-
-  /** `updateOrderPresentationLines`: escribe SOLO la unidad y el
-   *  reparto, nunca `quantity`, la receta ni la prioridad -eso es `updateAlive`, del formulario
-   *  general-. Reemplazo completo del conjunto de lineas, igual que `updateAlive`. */
-  updatePresentationLinesAlive(
-    id: string,
-    unitId: string,
-    lines: readonly OrderPresentationLineWrite[],
     actorId: string,
     now: Date,
     scope: OrderScope,

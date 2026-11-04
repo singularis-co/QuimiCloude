@@ -65,11 +65,12 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createTransitionOrder,
-  createUpdateOrder,
-  createUpdateOrderPresentationLines,
+  createUpdateOrder as createLinesUpdate,
+  createUpdateOrderPresentationLines as createLinesDistribution,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeDistribution, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 import {
   IncompatibleUnitsError,
   OrderDistributionExceedsQuantityError,
@@ -87,6 +88,14 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
+const createUpdateOrderPresentationLines = (deps: Parameters<typeof createLinesDistribution>[0]) =>
+  singleRecipeDistribution(createLinesDistribution(deps), findAliveOrderLines);
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -272,6 +281,8 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[] = [
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
@@ -519,6 +530,19 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
         },
         select: { id: true },
       });
+      // La migracion de las lineas le dio su unica linea, con los mismos datos.
+      await prisma.orderLine.create({
+        data: {
+          orderId: legado.id,
+          companyId: fixture.companyId,
+          position: 0,
+          recipeId: fixture.recipeId,
+          originalRecipeId: fixture.recipeId,
+          quantity: new Prisma.Decimal('30.0000'),
+          status: 'PENDIENTE',
+          unitId: null,
+        },
+      });
 
       await updateOrder(
         legado.id,
@@ -553,6 +577,19 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
           unitId: null,
         },
         select: { id: true },
+      });
+      // La migracion de las lineas le dio su unica linea, con los mismos datos.
+      await prisma.orderLine.create({
+        data: {
+          orderId: legado.id,
+          companyId: fixture.companyId,
+          position: 0,
+          recipeId: fixture.recipeId,
+          originalRecipeId: fixture.recipeId,
+          quantity: new Prisma.Decimal('30.0000'),
+          status: 'POR_EMPACAR',
+          unitId: null,
+        },
       });
 
       const resultado = await updateOrderPresentationLines(legado.id, actorDe(fixture), {
@@ -621,6 +658,8 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
         actorDe(fixture),
       );
       await prisma.order.update({ where: { id: creado.id }, data: { status: 'POR_EMPACAR' } });
+      // QT-313: el reparto que se edita es el de la linea, con su estado.
+      await prisma.orderLine.updateMany({ where: { orderId: creado.id }, data: { status: 'POR_EMPACAR' } });
 
       await holder.connect();
       await holder.query('BEGIN');
@@ -670,6 +709,8 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
         actorDe(fixture),
       );
       await prisma.order.update({ where: { id: creado.id }, data: { status: 'POR_EMPACAR' } });
+      // QT-313: el reparto que se edita es el de la linea, con su estado.
+      await prisma.orderLine.updateMany({ where: { orderId: creado.id }, data: { status: 'POR_EMPACAR' } });
 
       await holder.connect();
       await holder.query('BEGIN');
@@ -691,6 +732,11 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
       // paso, este pedido nace con una).
       await holder.query(
         `UPDATE "orders" SET "status" = 'EN_EMPAQUE', "packed_by" = $2, "updated_at" = now(), "updated_by" = $2 WHERE "id" = $1`,
+        [creado.id, fixture.actorId],
+      );
+      // QT-313: Comenzar copia el estado a la unica linea viva del pedido en la misma transaccion.
+      await holder.query(
+        `UPDATE "order_lines" SET "status" = 'EN_EMPAQUE', "packed_by" = $2 WHERE "order_id" = $1 AND "deleted_at" IS NULL`,
         [creado.id, fixture.actorId],
       );
       await holder.query('COMMIT');

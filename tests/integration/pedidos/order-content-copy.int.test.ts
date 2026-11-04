@@ -51,7 +51,8 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
+import { createCreateOrder as createLinesOrder, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -66,6 +67,12 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -276,6 +283,8 @@ async function borrarEnvase(envase: { readonly presentationId: string; readonly 
 async function borrarPedido(orderId: string): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { orderId } })
   await prisma.orderPresentationLine.deleteMany({ where: { orderId } })
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { orderId } })
   await prisma.order.deleteMany({ where: { id: orderId } })
 }
 

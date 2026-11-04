@@ -30,7 +30,8 @@ const updateMany = vi.fn()
 const findMany = vi.fn()
 const count = vi.fn()
 vi.mock('@/lib/shared/db/prisma', () => ({
-  prisma: { order: { findFirst, updateMany, findMany, count } },
+  // Un pedido sin lineas: la copia de su estado a la unica linea viva no tiene a quien copiar.
+  prisma: { order: { findFirst, updateMany, findMany, count }, orderLine: { count: vi.fn(async () => 0) } },
 }))
 
 const {

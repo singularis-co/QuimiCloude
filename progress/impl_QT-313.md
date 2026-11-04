@@ -150,3 +150,50 @@ Decisiones del humano sobre T8 (2026-11-04):
 - **Intercambio de recetas en una edicion** (A de X a Y y B de Y a X): lo resuelve T10, escribiendo primero las lineas que cambian de receta en un orden que no viole el indice, o con receta temporal. Si no hay forma limpia, parar y preguntar antes de rechazarlo.
 - **CHECK viejos de `orders` frente a `refreshStatus`:** los cubre T14a con un test que derive un estado de empaque o terminado.
 - **Limitacion transitoria:** en T9 `create` recibe `presentationLines: []`; hasta T14d dos lineas no pueden compartir presentacion.
+
+## Fase 4 — T9 Alta con lineas y T10 Edicion con lineas (2026-11-04, enmienda 984d0b4d2)
+
+Produccion: `pedidos/domain/{create-order,update-order,update-order-presentation-lines,quote-order-cost,resolve-ingredients-cost,order-input,order-line-diff,order-edit-change,order-view}.ts`, `pedidos/domain/list-order-line-ids.ts` (nuevo), `pedidos/index.ts`, `pedidos/ports/order-write-repository.ts`, `pedidos/adapters/driven/persistence/order-prisma.ts`, `pedidos/adapters/driving/order-actions.ts` (puente), `inventario/domain/{costing-batch,product-catalog,packaging-catalog}.ts`, `inventario/index.ts`, `inventario/adapters/driven/persistence/{product-catalog-prisma,packaging-catalog-prisma,reservation-prisma}.ts`, `lib/composition/index.ts`, `scripts/seed-demo/gateway.ts`. Sin cambios en `app/`, `tests/unit/pedidos-ui` ni `errores/domain/error-state.ts`.
+Tests nuevos: `tests/unit/pedidos/{create-order-lines,update-order-lines}.test.ts`, `tests/integration/pedidos/order-lines-use-cases.int.test.ts`, helper `tests/helpers/single-recipe-order.ts`; ~40 ajustados (lista en `tasks.md > Archivos esperados`).
+
+Mapa R → test (Unit-alta = `create-order-lines.test.ts`, Unit-edicion = `update-order-lines.test.ts`, Int = `order-lines-use-cases.int.test.ts`, prefijo «QT-313» en Int):
+| R | Test |
+|---|---|
+| R4 | Unit-alta «R4: la original y una version suya…»; Unit-edicion «R4: volver a anadir…»; Int «R4: …duplicate_order_recipe», «R4: volver a anadir la receta de una linea cancelada», «R4, R5: quitar la linea… y anadir otra de la misma receta», «R4, R5: dos lineas que se intercambian la receta» |
+| R10, R17 | Unit-alta «R10, R17: un alta de dos lineas…», «R10: si falla la segunda linea…»; Int «R10, R12, R17, R34, R41…», «R10, R11…» |
+| R11 | Unit-alta «R11: una segunda linea invalida…» (mismos campos, posicion en el diagnostico); Int «R10, R11» |
+| R12, R41 | Unit-alta «R12, R41: aparta linea a linea…»; Int |
+| R13 | Unit-alta «R13: …sin campos nuevos y con la posicion en el diagnostico»; Int «R13: …no queda nada escrito» |
+| R14, R34 | Unit-alta «R14: …», «R34: …»; Int «R14, R34: …PARCIAL»; Unit-edicion «R34…» |
+| R20, R21, R22 | Unit-edicion «R20…», «R21…», «R22…»; Int «R20, R21, R22: …» |
+| R23 | Unit-edicion «R23: quitar una linea EN_CURSO…» |
+| R24 | Unit-edicion «R24: …si llega igual, no impide editar la otra» |
+| R17, R25, R41 (edicion) | Unit-edicion «R17, R25, R41…», «R25: …BLOQUEADO…»; Int «R17, R25, R41: …identicos», «R17, R25: findCostingBatches con excludeOrderLineId…»; `order-actions.test.ts` › «R25: la cotizacion de la edicion…» |
+| R26 | Unit-edicion «R26: …POR_EMPACAR…», «R26, R43»; Int «R26: editar el reparto de una linea no toca el de la otra» |
+| R30 | Unit-alta «R30: …sin validar la entrada ni tocar ningun puerto»; Unit-edicion «R30…» |
+| R42 | Unit-alta «R42: …» |
+| R43 | Unit-edicion «R43…»; `qc170-distribution-company-scope.int` › «R29, QT-313 R43: …» |
+| R44 | Int «R44: el pedido copia receta, cantidad, unidad, precio, costes y reserved_at…»; `order-actions.test.ts` › «R44: el alta envia una linea…», «R44: …dos lineas responde invalid_input» |
+
+Verificacion (salida real, backend_dev):
+- `pnpm run typecheck` exit 0; `pnpm run lint` 0 errores (10 warnings previos); guardias `Test Files 87 passed (87)`, `Tests 1334 passed | 22 skipped`
+- node, related de los 63 archivos → `Test Files 295 passed (295)`, `Tests 6477 passed | 6 skipped`
+- ui, proyecto entero en 3 tandas (superconjunto del related) → 149/149 (2785), 133/133 (2005), 141/141 (1862 + 1 skipped)
+- integracion entera en 5 tandas, `--maxWorkers=1`, base efimera:
+  - pedidos 64/65 → el rojo, una carrera en `qc170-distribution-concurrency`, se arreglo calculando el coste antes del candado; repetidos los 13 `.int` de edicion → 13 passed, 172 tests
+  - asignaciones+scripts+documentos 35 passed (268); inventario 55 passed (486 + 1 skipped); identity 41 passed (593); resto 71/72 (910/911, el rojo es `unidades-constraints`, abajo)
+  - tras el ultimo cambio de adaptador: 8 `.int` de acondicionamiento y lineas → 8 passed (75); `order-lines-use-cases.int` → 13/13
+
+Desviaciones de implementacion (no estaban escritas en el spec; para el reviewer):
+1. El puente construye el candidato de lineas directo del `FormData` (sin pasar por los esquemas planos) para que el permiso se compruebe antes que la validacion (R30). Los esquemas planos quedan intactos para la pantalla.
+2. Lectura nueva `listOrderLineIds` (dominio, contrato y composicion): el puente nombra la unica linea en edicion, reparto y cotizacion; con mas de una → `invalid_input`; sin ninguna, edicion y reparto → `invalid_input`, la cotizacion no excluye nada.
+3. Puerto: `updateAlive(id, {priority, customerId}, actorId, now, scope)` sin coste; `mirrorFirstLine` nuevo; `updatePresentationLinesAlive` eliminado.
+4. Copia de estado a la linea: lanza si hay mas de una linea viva; Comenzar/Terminar acondicionamiento abren su propia transaccion con el cliente global (`startConditioningAndCopy`, `finishConditioningAndCopy`).
+5. Edicion sin altas exige al menos una linea activa editable, si no `invalid_transition` (con una receta = hoy). Cambiar solo prioridad o cliente ya no recalcula ni vuelve a apartar (R25); se ajustaron los tests que fijaban lo anterior.
+6. `quoteOrderCostSchema`: `orderId` → `orderLineId`; el puente traduce el `orderId` de la pantalla.
+7. Intercambio de recetas: si dos o mas lineas cambian de receta, `writeLines` les pone `deleted_at`, las edita y las restaura en la misma transaccion; si al restaurar choca el unico → `duplicate_order_recipe`.
+8. `order-presentation-availability.ts` sin cambios (su entrada no tiene pedido ni linea).
+9. Rojos de tareas previas arreglados en el related: `qc145-estado-solo-planta.test.ts` (escritores de linea de T8) y 3 tests de inventario sin el `orderLineId: null` de T7.
+10. Los `.int` borran `order_lines` antes que `orders` (FK `RESTRICT`); los que fuerzan estados tambien los escriben en la linea.
+
+Rojos que vienen de T0/T1 (no del related de T9/T10; ninguno en `tests/baseline-rojos.json`): `tests/unit/pedidos/schema/pedidos-schema.test.ts` (4), `order-status-blocked-migration.test.ts` (1), `order-conditioning-states-migration.test.ts` (1), `tests/integration/unidades/unidades-constraints.int.test.ts` (1, falta `order_lines_unit_id_fkey`). Son regresiones de esta feature: se arreglan en la tanda siguiente.

@@ -2,10 +2,10 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// El alta y la edicion de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder, legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 import { UnauthorizedError, ValidationError } from '@/lib/modules/pedidos/domain/errors'
 import { createQuoteOrderCost, type QuoteOrderCostDeps } from '@/lib/modules/pedidos/domain/quote-order-cost'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
 import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
@@ -303,10 +303,10 @@ describe('R7: la empresa sale del actor, y una entrada con companyId de otra emp
   })
 })
 
-describe('R8: `orderId` opcional en la entrada llega a `findCostingBatches` como `excludeOrderId` (R65)', () => {
-  const OTHER_ORDER_ID = '99999999-9999-4999-8999-999999999999'
+describe('R8, QT-313 R25: `orderLineId` opcional en la entrada llega a `findCostingBatches` como `excludeOrderLineId` (R65)', () => {
+  const OTHER_LINE_ID = '99999999-9999-4999-8999-999999999999'
 
-  it('sin `orderId` en la entrada, `excludeOrderId` es `undefined` -alta, sin pedido que excluir-', async () => {
+  it('sin `orderLineId` en la entrada no se excluye nada -alta, sin linea que excluir-', async () => {
     const d = crearDobles()
     const cotizar = createQuoteOrderCost(depsDe(d))
     await cotizar({ recipeId: RECIPE_ID, quantity: '4.0000', unitId: ORDER_UNIT_ID }, actorCon('pedidos.modificar'))
@@ -314,23 +314,23 @@ describe('R8: `orderId` opcional en la entrada llega a `findCostingBatches` como
     expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: undefined })
   })
 
-  it('con `orderId` en la entrada -edicion-, se reenvia tal cual como `excludeOrderId`, sin leer el pedido', async () => {
+  it('con `orderLineId` en la entrada -edicion de una linea-, se reenvia tal cual como `excludeOrderLineId`, sin leer la linea', async () => {
     const d = crearDobles()
     const cotizar = createQuoteOrderCost(depsDe(d))
     await cotizar(
-      { recipeId: RECIPE_ID, quantity: '4.0000', unitId: ORDER_UNIT_ID, orderId: OTHER_ORDER_ID },
+      { recipeId: RECIPE_ID, quantity: '4.0000', unitId: ORDER_UNIT_ID, orderLineId: OTHER_LINE_ID },
       actorCon('pedidos.modificar'),
     )
 
-    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderId: OTHER_ORDER_ID })
+    expect(d.products.findCostingBatches).toHaveBeenCalledWith(['p-1'], COMPANY_ID, { excludeOrderLineId: OTHER_LINE_ID })
   })
 
-  it('un `orderId` que no es UUID rechaza con ValidationError, como el resto de la entrada', async () => {
+  it('un `orderLineId` que no es UUID rechaza con ValidationError, como el resto de la entrada', async () => {
     const d = crearDobles()
     const cotizar = createQuoteOrderCost(depsDe(d))
     await expect(
       cotizar(
-        { recipeId: RECIPE_ID, quantity: '4.0000', unitId: ORDER_UNIT_ID, orderId: 'no-es-un-uuid' },
+        { recipeId: RECIPE_ID, quantity: '4.0000', unitId: ORDER_UNIT_ID, orderLineId: 'no-es-un-uuid' },
         actorCon('pedidos.modificar'),
       ),
     ).rejects.toBeInstanceOf(ValidationError)
@@ -359,7 +359,7 @@ describe('QC-195 — la cotizacion suma los envases del reparto', () => {
     expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE], COMPANY_ID, { excludeOrderId: undefined })
   })
 
-  it('R30: en la edicion, lo apartado por el propio pedido cuenta como disponible del envase', async () => {
+  it('R30, QT-313 R25: en la edicion, lo apartado por la propia linea cuenta como disponible del envase', async () => {
     const d = crearDobles()
     const packaging = fakePackagingCatalog([], LOTES)
     const cotizar = createQuoteOrderCost({ ...depsDe(d), packaging })
@@ -369,13 +369,13 @@ describe('QC-195 — la cotizacion suma los envases del reparto', () => {
         recipeId: RECIPE_ID,
         quantity: '4.0000',
         unitId: ORDER_UNIT_ID,
-        orderId: ORDER_ID,
+        orderLineId: ORDER_ID,
         presentationLines: [{ packagingProductId: ENVASE, packages: 40 }],
       },
       actorCon('pedidos.modificar'),
     )
 
-    expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE], COMPANY_ID, { excludeOrderId: ORDER_ID })
+    expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE], COMPANY_ID, { excludeOrderLineId: ORDER_ID })
   })
 
   it('R28: si el disponible del envase no cubre el reparto, la cotizacion queda sin importe', async () => {

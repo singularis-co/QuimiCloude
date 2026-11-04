@@ -48,6 +48,7 @@ import {
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { singleLineInput } from '@/tests/helpers/single-recipe-order';
 
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { seedPackaging } from '../../helpers/packaging-seed';
@@ -169,6 +170,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.inventoryMovement.deleteMany({ where: { companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId } } });
   // El producto terminado referencia la receta: sus lotes y el producto caen antes que ella.
@@ -252,14 +254,14 @@ async function crearPedido(
   await prisma.recipeLine.create({ data: { recipeId: receta.id, productId: insumo.id, percentage: '100.00' } });
 
   const creado = await pedidos.createOrder(
-    {
+    singleLineInput({
       recipeId: receta.id,
       quantity: '10.0000',
       priority: 'BAJA',
       unitId: fixture.unitId,
       presentationLines: [{ packagingProductId: fixture.packagingProductId, packages: 10 }],
       confirmBlocked: opciones.confirmBlocked ?? false,
-    },
+    }),
     quienPide(fixture),
   );
   const ahora = new Date();

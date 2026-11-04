@@ -256,14 +256,21 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus o Term
     // acondicionamiento suman las dos ultimas.
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
 
+    // QT-313: las tres de la linea -nacer, cancelarse y moverse- escriben el estado de la LINEA,
+    // no el del pedido, que se deriva de ellas. Comenzar y Terminar el acondicionamiento mudan su
+    // `data:` a `...AndCopy`, que las exportadas envuelven en su transaccion para copiar el estado
+    // a la unica linea: es el MISMO bloque cambiado de funcion.
     expect(funcionesConStatusEnData(fuente)).toEqual(
       [
+        'addOrderLines',
         'cancelAliveOrder',
-        'finishConditioningAliveOrder',
+        'cancelAliveOrderLine',
+        'finishConditioningAndCopy',
         'finishPackingAliveOrder',
         'lockAndStartPackingAlive',
+        'setAliveOrderLineStatus',
         'setAliveOrderStatus',
-        'startConditioningAliveOrder',
+        'startConditioningAndCopy',
       ].sort(),
     );
   });

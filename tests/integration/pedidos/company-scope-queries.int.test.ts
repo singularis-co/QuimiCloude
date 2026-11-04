@@ -440,14 +440,7 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
     const ajeno = B.pedidos[1] ?? '';
     const antes = await foto(ajeno);
 
-    const resultado = await updateAliveOrder(
-      ajeno,
-      pedidoNuevo({ quantity: '1.0000' }),
-      A.userId,
-      new Date(),
-      null,
-      ambitoDe(A),
-    );
+    const resultado = await updateAliveOrder(ajeno, { priority: 'ALTA', customerId: null }, A.userId, new Date(), ambitoDe(A));
 
     expect(resultado).toBe('not_found');
     expect(await foto(ajeno)).toBe(antes);
@@ -456,19 +449,12 @@ describe('R21 — findAliveById / updateAlive / cancelAlive / softDeleteAlive co
   it('control positivo: el mismo updateAlive, desde B, SI escribe', async () => {
     // Sin este caso, un `updateMany` que nunca actualizara dejaria verde el anterior.
     // ENMIENDA: `updateAliveOrder` ya no escribe `status` -el pedido se queda en `PENDIENTE`, con
-    // el que nacio en la siembra-, asi que lo que demuestra el escrito es la prioridad y la
-    // cantidad, no el estado.
+    // el que nacio en la siembra- ni, desde QT-313, la cantidad, que es de la linea: lo que
+    // demuestra el escrito es la prioridad.
     const propio = B.pedidos[1] ?? '';
     const antes = await foto(propio);
 
-    const resultado = await updateAliveOrder(
-      propio,
-      pedidoNuevo({ quantity: '921.0000', priority: 'CRITICA' }),
-      B.userId,
-      new Date(),
-      null,
-      ambitoDe(B),
-    );
+    const resultado = await updateAliveOrder(propio, { priority: 'CRITICA', customerId: null }, B.userId, new Date(), ambitoDe(B));
 
     expect(resultado).toBe('ok');
     expect(await foto(propio)).not.toBe(antes);
@@ -610,10 +596,9 @@ async function retrato(empresa: Empresa, ajena: Empresa): Promise<string> {
   const catalogoAjeno = await findAliveOrderTargetById(ajena.pedidos[0] ?? '', empresa.companyId);
   const escrituraAjena = await updateAliveOrder(
     ajena.pedidos[0] ?? '',
-    pedidoNuevo({ quantity: '2.0000' }),
+    { priority: 'ALTA', customerId: null },
     empresa.userId,
     new Date(),
-    null,
     ambitoDe(empresa),
   );
   const cancelacionAjena = await cancelAliveOrder(

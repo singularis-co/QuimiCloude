@@ -279,14 +279,14 @@ export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
  * expresa en la unidad del pedido. Un `companyId` en la entrada no llega a
  * ninguna parte: `z.object` descarta las claves de mas.
  *
- * `orderId` es OPCIONAL y solo lo envia el formulario de EDICION: el pedido que ya existe
- * cuenta lo que el mismo tiene apartado como disponible para si mismo. Esta entrada NO abre
- * ninguna lectura del pedido: el identificador viaja como cadena opaca hasta
- * `findCostingBatches`, que lo usa para no restar lo que ese pedido aparto.
+ * `orderLineId` es OPCIONAL y solo llega al editar una linea que ya existe: lo que esa linea tiene
+ * apartado cuenta como disponible para ella, y lo de las demas lineas del pedido no. Esta entrada
+ * no abre ninguna lectura de la linea: el identificador viaja como cadena opaca hasta
+ * `findCostingBatches`.
  */
 export const quoteOrderCostSchema = createOrderSchema
   .pick({ recipeId: true, quantity: true, unitId: true })
-  .extend({ orderId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
+  .extend({ orderLineId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
 
 export type QuoteOrderCostInput = Omit<z.infer<typeof quoteOrderCostSchema>, 'presentationLines'> & {
   /** Las lineas antiguas no suman costo de envase. */

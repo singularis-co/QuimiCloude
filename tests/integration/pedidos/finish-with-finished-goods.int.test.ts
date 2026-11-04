@@ -46,14 +46,15 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createFinishPacking,
   createListAliveSummariesByIds,
   createStartPacking,
   createTransitionOrder,
-  createUpdateOrder,
-  createUpdateOrderPresentationLines,
+  createUpdateOrder as createLinesUpdate,
+  createUpdateOrderPresentationLines as createLinesDistribution,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeDistribution, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 import { createFinishAssignedOrder } from '@/lib/modules/asignaciones/domain/finish-assigned-order';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
 import { UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
@@ -75,6 +76,14 @@ import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
+const createUpdateOrderPresentationLines = (deps: Parameters<typeof createLinesDistribution>[0]) =>
+  singleRecipeDistribution(createLinesDistribution(deps), findAliveOrderLines);
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -310,6 +319,8 @@ async function borrarFixture(fixture: Fixture, productIds: readonly string[]): P
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   // El producto terminado que Terminar da de alta referencia la receta con

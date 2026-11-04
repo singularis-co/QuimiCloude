@@ -33,9 +33,8 @@ import {
   ORDER_DISTRIBUTION_PACKAGES_FIELD,
   ORDER_DISTRIBUTION_PACKAGING_FIELD,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
-  createOrderSchema,
-  updateOrderSchema,
 } from '@/lib/modules/pedidos'
+import { createOrderWithLinesSchema, updateOrderWithLinesSchema } from '@/lib/modules/pedidos/domain/order-input'
 import {
   cancelOrderAction,
   createOrderAction,
@@ -75,6 +74,7 @@ const {
   quoteOrderCostMock,
   quoteOrderPresentationAvailabilityMock,
   updateOrderPresentationLinesMock,
+  listOrderLineIdsMock,
   getSessionUserMock,
   getSessionContextMock,
 } = vi.hoisted(() => ({
@@ -90,6 +90,8 @@ const {
   // T11, T25: el disponible de solo lectura y la edicion acotada del reparto y la unidad.
   quoteOrderPresentationAvailabilityMock: vi.fn(),
   updateOrderPresentationLinesMock: vi.fn(),
+  // QT-313: el puente del formulario de una receta nombra la unica linea del pedido.
+  listOrderLineIdsMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   // QC-60 (R17): la action pide las DOS caras de la sesion. Sin contexto no hay actor.
   getSessionContextMock: vi.fn(),
@@ -117,6 +119,7 @@ vi.mock('@/lib/composition', () => ({
     quoteOrderCost: quoteOrderCostMock,
     quoteOrderPresentationAvailability: quoteOrderPresentationAvailabilityMock,
     updateOrderPresentationLines: updateOrderPresentationLinesMock,
+    listOrderLineIds: listOrderLineIdsMock,
   },
 }))
 
@@ -137,6 +140,7 @@ const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const RECIPE_ID = '22222222-2222-4222-8222-222222222222'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
 const UNIT_ID = '77777777-7777-4777-8777-777777777777'
+const LINE_ID = '0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e'
 
 function formDataOf(fields: Record<string, string>): FormData {
   const formData = new FormData()
@@ -182,6 +186,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
   getSessionContextMock.mockResolvedValue(SESSION_CONTEXT)
+  listOrderLineIdsMock.mockResolvedValue([LINE_ID])
 })
 
 describe('Server Actions de pedidos — actor, forma de entrada y errores', () => {
@@ -303,14 +308,12 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     deleteOrderMock.mockResolvedValue(undefined)
 
     // 1. El alta traslada los campos del formulario SIN tocarlos: la cantidad sigue siendo
-    //    cadena y el recorte/los rangos son de `zod`, no del borde.
+    //    cadena y el recorte/los rangos son de `zod`, no del borde. QT-313 R44: la receta del
+    //    formulario es la unica linea del pedido; prioridad, cliente y confirmacion, del pedido.
     await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
     expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
-      recipeId: RECIPE_ID,
-      quantity: '12.5000',
+      lines: [{ recipeId: RECIPE_ID, quantity: '12.5000', unitId: UNIT_ID, presentationLines: [] }],
       priority: 'ALTA',
-      unitId: UNIT_ID,
-      presentationLines: [],
       confirmBlocked: false,
     })
     // Y lo que el esquema no declara NO se envia: ni estado, ni motivo, ni correlativo, ni
@@ -341,14 +344,12 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // La edicion es REEMPLAZO COMPLETO de los datos de negocio; el `id` NO viaja en el
     // `FormData`, es argumento. Un `status` que el formulario siga enviando (aqui,
     // `VALID_UPDATE_FIELDS`) NUNCA llega al caso de uso: la edicion ya no mueve el estado.
+    // QT-313 R44: la edicion nombra la unica linea del pedido, para editarla y no reemplazarla.
     await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS))
     expect(updateOrderMock.mock.calls[0]?.[0]).toBe(ORDER_ID)
     expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({
-      recipeId: RECIPE_ID,
-      quantity: '12.5000',
+      lines: [{ id: LINE_ID, recipeId: RECIPE_ID, quantity: '12.5000', unitId: UNIT_ID, presentationLines: [] }],
       priority: 'ALTA',
-      unitId: UNIT_ID,
-      presentationLines: [],
       confirmBlocked: false,
     })
     expect(updateOrderMock.mock.calls[0]?.[1]).not.toHaveProperty('status')
@@ -1011,10 +1012,10 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
 
   beforeEach(() => {
     createOrderMock.mockImplementation((input: unknown, actor: unknown) =>
-      validatingWith(createOrderSchema)(input, actor),
+      validatingWith(createOrderWithLinesSchema)(input, actor),
     )
     updateOrderMock.mockImplementation((id: unknown, input: unknown, actor: unknown) => {
-      validatingWith(updateOrderSchema)(id, input, actor)
+      validatingWith(updateOrderWithLinesSchema)(id, input, actor)
     })
   })
 
@@ -1030,15 +1031,12 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
     )
 
     expect(createOrderMock.mock.calls[0]?.[0]).toEqual({
-      recipeId: RECIPE_ID,
-      quantity: '12.5000',
+      lines: [{ recipeId: RECIPE_ID, quantity: '12.5000', unitId: UNIT_ID, presentationLines: LINEAS_ESPERADAS }],
       priority: 'ALTA',
-      unitId: UNIT_ID,
-      presentationLines: LINEAS_ESPERADAS,
       confirmBlocked: false,
     })
     expect(result.status).toBe('success')
-    expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
+    expect(createOrderWithLinesSchema.parse(createOrderMock.mock.calls[0]?.[0]).lines[0]?.presentationLines).toEqual([
       { presentationId: PRESENTATION_ID, packages: 3 },
       { presentationId: OTRA_PRESENTATION_ID, packages: 5 },
     ])
@@ -1053,11 +1051,8 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
 
     expect(updateOrderMock.mock.calls[0]?.[0]).toBe(ORDER_ID)
     expect(updateOrderMock.mock.calls[0]?.[1]).toEqual({
-      recipeId: RECIPE_ID,
-      quantity: '12.5000',
+      lines: [{ id: LINE_ID, recipeId: RECIPE_ID, quantity: '12.5000', unitId: UNIT_ID, presentationLines: LINEAS_ESPERADAS }],
       priority: 'ALTA',
-      unitId: UNIT_ID,
-      presentationLines: LINEAS_ESPERADAS,
       confirmBlocked: false,
     })
     expect(result).toEqual({ status: 'success' })
@@ -1066,7 +1061,7 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
   it('R9: sin lineas el reparto llega vacio y el alta es valida', async () => {
     const result = await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
 
-    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ presentationLines: [] })
+    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ lines: [{ presentationLines: [] }] })
     expect(result.status).toBe('success')
   })
 
@@ -1093,7 +1088,8 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
 
     const candidato = createOrderMock.mock.calls[0]?.[0]
     expect(candidato).not.toHaveProperty('presentationId')
-    expect(candidato).toMatchObject({ unitId: '', presentationLines: [] })
+    expect(candidato).not.toHaveProperty('lines.0.presentationId')
+    expect(candidato).toMatchObject({ lines: [{ unitId: '', presentationLines: [] }] })
     expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
     expect(readActionsSource()).not.toMatch(/['"]presentationId['"]/)
   })
@@ -1111,7 +1107,7 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
     const result = await createOrderAction(CREATE_INITIAL, formData)
 
     expect(result.status).toBe('success')
-    expect(createOrderSchema.parse(createOrderMock.mock.calls[0]?.[0]).presentationLines).toEqual([
+    expect(createOrderWithLinesSchema.parse(createOrderMock.mock.calls[0]?.[0]).lines[0]?.presentationLines).toEqual([
       { packagingProductId: ENVASE_ID, packages: 40 },
       { presentationId: PRESENTATION_ID, packages: 2 },
     ])
@@ -1130,5 +1126,43 @@ describe('QC-170 T22 — alta y edicion leen la unidad y el reparto del FormData
     ninguno.append(ORDER_DISTRIBUTION_PRESENTATION_FIELD, '')
     ninguno.append(ORDER_DISTRIBUTION_PACKAGES_FIELD, '1')
     expect(await createOrderAction(CREATE_INITIAL, ninguno)).toMatchObject({ status: 'error', code: 'invalid_input' })
+  })
+})
+
+describe('QT-313 — el formulario de una receta es un pedido de una linea', () => {
+  beforeEach(() => {
+    createOrderMock.mockResolvedValue({ id: ORDER_ID, number: { year: 2026, sequence: 1 }, numberText: '2026-0000001' })
+    updateOrderMock.mockResolvedValue(undefined)
+    quoteOrderCostMock.mockResolvedValue({ ingredientsCost: null })
+  })
+
+  it('R44: el alta envia una linea con la receta y la edicion nombra la unica linea del pedido', async () => {
+    await createOrderAction(CREATE_INITIAL, formDataOf(VALID_CREATE_FIELDS))
+    await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS))
+
+    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ lines: [{ recipeId: RECIPE_ID }] })
+    expect((createOrderMock.mock.calls[0]?.[0] as { lines: readonly object[] }).lines[0]).not.toHaveProperty('id')
+    expect(listOrderLineIdsMock).toHaveBeenCalledWith(ORDER_ID, expect.objectContaining({ id: ADMIN_SESSION_USER.id }))
+    expect(updateOrderMock.mock.calls[0]?.[1]).toMatchObject({ lines: [{ id: LINE_ID, recipeId: RECIPE_ID }] })
+  })
+
+  it('R44: editar desde el formulario un pedido de dos lineas responde invalid_input sin llamar a la edicion', async () => {
+    listOrderLineIdsMock.mockResolvedValueOnce([LINE_ID, ORDER_ID])
+
+    const result = await updateOrderAction(ORDER_ID, MUTATION_INITIAL, formDataOf(VALID_UPDATE_FIELDS))
+
+    expect(result).toMatchObject({ status: 'error', code: 'invalid_input' })
+    expect(updateOrderMock).not.toHaveBeenCalled()
+  })
+
+  it('R25: la cotizacion de la edicion cambia el pedido por su unica linea', async () => {
+    await quoteOrderCostAction({ recipeId: RECIPE_ID, quantity: '12.5000', unitId: UNIT_ID, orderId: ORDER_ID })
+
+    expect(quoteOrderCostMock.mock.calls[0]?.[0]).toEqual({
+      recipeId: RECIPE_ID,
+      quantity: '12.5000',
+      unitId: UNIT_ID,
+      orderLineId: LINE_ID,
+    })
   })
 })

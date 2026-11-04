@@ -43,14 +43,15 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   createCancelOrder,
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createQuoteOrderCost,
   createDeleteOrder,
   createReviewBlockedOrders,
   createTransitionOrder,
-  createUpdateOrder,
-  createUpdateOrderPresentationLines,
+  createUpdateOrder as createLinesUpdate,
+  createUpdateOrderPresentationLines as createLinesDistribution,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeDistribution, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -62,6 +63,14 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
+const createUpdateOrderPresentationLines = (deps: Parameters<typeof createLinesDistribution>[0]) =>
+  singleRecipeDistribution(createLinesDistribution(deps), findAliveOrderLines);
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -190,6 +199,8 @@ async function borrarFixture(f: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: f.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: f.companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: f.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: f.companyId } });
   await prisma.order.deleteMany({ where: { companyId: f.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: f.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: f.companyId } });

@@ -8,9 +8,25 @@ import {
   type StoredOrderCost,
 } from './order-cost';
 
-import type { PackagingCatalog, PackagingCostingBatch, ProductCatalog } from '@/lib/modules/inventario';
+import type {
+  CostingExclusion,
+  PackagingCatalog,
+  PackagingCostingBatch,
+  ProductCatalog,
+} from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion } from '@/lib/modules/unidades';
+
+/** Lo apartado que cuenta como propio al costear: el del pedido entero o, desde que el pedido
+ *  tiene lineas, el de la linea que se edita. Un alta no excluye nada: aun no aparto. */
+export type OrderCostExclusion = {
+  readonly orderId?: string;
+  readonly orderLineId?: string;
+};
+
+function costingExclusion(options: OrderCostExclusion | undefined): CostingExclusion {
+  return { excludeOrderId: options?.orderId, excludeOrderLineId: options?.orderLineId };
+}
 
 /**
  * Lee los tres catalogos (`recetas`, `inventario`, `unidades`) y arma el `CostInput` que
@@ -33,14 +49,14 @@ async function loadCostInput(
   orderQuantity: string,
   orderUnitId: string | null,
   companyId: string,
-  options?: { readonly orderId?: string },
+  options?: OrderCostExclusion,
 ): Promise<CostInput> {
   const content = await recipes.findExecutionContentById(recipeId, companyId);
   const lines = content?.lines ?? [];
 
   const productIds = [...new Set(lines.map((line) => line.productId))];
   const [batches, productRefs] = await Promise.all([
-    products.findCostingBatches(productIds, companyId, { excludeOrderId: options?.orderId }),
+    products.findCostingBatches(productIds, companyId, costingExclusion(options)),
     products.findRefs(productIds, companyId),
   ]);
   const productUnitIds = new Map(productRefs.map((ref) => [ref.id, ref.unitId]));
@@ -76,7 +92,7 @@ export async function resolveIngredientsCost(
   orderQuantity: string,
   orderUnitId: string | null,
   companyId: string,
-  options?: { readonly orderId?: string },
+  options?: OrderCostExclusion,
 ): Promise<string | null> {
   const input = await loadCostInput(recipes, products, units, recipeId, orderQuantity, orderUnitId, companyId, options);
   return calculateIngredientsCost(input);
@@ -94,11 +110,11 @@ async function loadPackagingBatches(
   packaging: PackagingCatalog,
   lines: readonly PackagingCostLine[],
   companyId: string,
-  options?: { readonly orderId?: string },
+  options?: OrderCostExclusion,
 ): Promise<readonly PackagingCostingBatch[]> {
   if (lines.length === 0) return [];
   const ids = [...new Set(lines.map((line) => line.productId))];
-  return packaging.findCostingBatches(ids, companyId, { excludeOrderId: options?.orderId });
+  return packaging.findCostingBatches(ids, companyId, costingExclusion(options));
 }
 
 /** Importe del pedido: ingredientes de la receta mas los envases del reparto, con la misma regla
@@ -111,7 +127,7 @@ export async function resolveOrderCost(
   orderUnitId: string | null,
   packagingLines: readonly PackagingCostLine[],
   companyId: string,
-  options?: { readonly orderId?: string },
+  options?: OrderCostExclusion,
 ): Promise<string | null> {
   const cost = await resolveStoredOrderCost(
     catalogs,
@@ -133,7 +149,7 @@ export async function resolveStoredOrderCost(
   orderUnitId: string | null,
   packagingLines: readonly PackagingCostLine[],
   companyId: string,
-  options?: { readonly orderId?: string },
+  options?: OrderCostExclusion,
 ): Promise<StoredOrderCost | null> {
   const [ingredientsCost, packagingCost] = await Promise.all([
     resolveIngredientsCost(catalogs.recipes, catalogs.products, catalogs.units, recipeId, orderQuantity, orderUnitId, companyId, options),
@@ -147,7 +163,7 @@ export async function resolvePackagingCost(
   packaging: PackagingCatalog,
   packagingLines: readonly PackagingCostLine[],
   companyId: string,
-  options?: { readonly orderId?: string },
+  options?: OrderCostExclusion,
 ): Promise<string | null> {
   const batches = await loadPackagingBatches(packaging, packagingLines, companyId, options);
   return calculatePackagingCost(packagingLines, batches);

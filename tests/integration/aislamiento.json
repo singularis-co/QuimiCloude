@@ -864,6 +864,11 @@
       "archivo": "pedidos/order-lines-repository.int.test.ts",
       "motivo": "QT-313 T8: casi todos los casos corren en una transaccion que termina en ROLLBACK y pasan ese 'tx' al repositorio; la carrera de R5 no puede: dos 'withOrderTransaction' que abren cada una SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL tienen que confirmar para que el unico de receta activa rechace a la segunda. Ese caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, recetas, pedido y lineas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-11-03"
+    },
+    {
+      "archivo": "pedidos/order-lines-use-cases.int.test.ts",
+      "motivo": "QT-313 T9 y T10: el alta y la edicion con varias lineas por los casos de uso cableados a mano con los adaptadores driven reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con lote, recetas y, si hace falta, envases) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-04"
     }
   ]
 }

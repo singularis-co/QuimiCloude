@@ -14,3 +14,10 @@ export type CostingBatch = {
   readonly purchaseDate: string;
   readonly available: string;
 };
+
+/** Lo apartado que no se resta del disponible al costear: el de un pedido entero o el de una de
+ *  sus lineas, para que lo que ya se aparto para si mismo cuente como suyo. */
+export type CostingExclusion = {
+  readonly excludeOrderId?: string;
+  readonly excludeOrderLineId?: string;
+};

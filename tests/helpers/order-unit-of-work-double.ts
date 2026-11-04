@@ -11,7 +11,12 @@ import type {
   OrderTransactionScope,
   OrderUnitOfWork,
 } from '@/lib/modules/pedidos/ports/order-unit-of-work';
-import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { OrderLineRow, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type {
+  LockedOrderRow,
+  OrderLineChanges,
+  OrderWriteRepository,
+} from '@/lib/modules/pedidos/ports/order-write-repository';
 import type {
   ConsumedLot,
   ConsumptionOutcome,
@@ -48,6 +53,7 @@ export function fakeOrderWriteRepository(
     refreshStatus: vi.fn(explota('refreshStatus')),
     create: vi.fn(explota('create')),
     updateAlive: vi.fn(explota('updateAlive')),
+    mirrorFirstLine: vi.fn(explota('mirrorFirstLine')),
     cancelAlive: vi.fn(explota('cancelAlive')),
     softDeleteAlive: vi.fn(explota('softDeleteAlive')),
     setStatus: vi.fn(explota('setStatus')),
@@ -223,5 +229,87 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
     packagingCost: null,
     actualCost: null,
     ...overrides,
+  };
+}
+
+/** La linea de un pedido de una receta, con los datos de su fila: lo que la migracion le dio a
+ *  cada pedido existente. `id` fijo para que los tests la nombren. */
+export const ONLY_LINE_ID = '0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e';
+
+export function orderLineOf(row: OrderRow & { readonly reservedAt?: Date | null }, overrides: Partial<OrderLineRow> = {}): OrderLineRow {
+  if (row.status === 'PARCIAL') throw new Error('una linea no puede estar en PARCIAL');
+  return {
+    id: ONLY_LINE_ID,
+    orderId: row.id,
+    position: 0,
+    recipeId: row.recipeId,
+    originalRecipeId: row.recipeId,
+    quantity: row.quantity,
+    unitId: row.unitId,
+    status: row.status,
+    cancellationReason: row.cancellationReason,
+    ingredientsCost: row.ingredientsCost,
+    packagingCost: row.packagingCost,
+    actualCost: row.actualCost,
+    salePrice: row.salePrice,
+    reservedAt: row.reservedAt ?? null,
+    finishedAt: null,
+    packedBy: null,
+    conditionedBy: null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    createdBy: row.createdBy,
+    updatedBy: row.updatedBy,
+    presentationLines: row.presentationLines,
+    ...overrides,
+  };
+}
+
+/** Las escrituras por linea que hacen el alta y la edicion, funcionando: `writeLines` devuelve las
+ *  lineas anadidas con ids `linea-0`, `linea-1`..., y el resto resuelve sin hacer nada. Quien
+ *  necesite otra cosa la pisa con su propio doble. */
+export function lineWritingOrders(): Pick<
+  OrderWriteRepository,
+  'writeLines' | 'setLineStatus' | 'setLineIngredientsCost' | 'setLineReservedAt' | 'refreshStatus' | 'mirrorFirstLine' | 'updateAlive'
+> & Record<'writeLines' | 'setLineStatus' | 'setLineIngredientsCost' | 'setLineReservedAt' | 'refreshStatus' | 'mirrorFirstLine' | 'updateAlive', ReturnType<typeof vi.fn>> {
+  const writeLines = vi.fn(async (orderId: string, changes: OrderLineChanges): Promise<readonly OrderLineRow[]> =>
+    changes.added.map((line, index) => ({
+      id: `linea-${String(index)}`,
+      orderId,
+      position: index,
+      recipeId: line.recipeId,
+      originalRecipeId: line.originalRecipeId,
+      quantity: line.quantity,
+      unitId: line.unitId,
+      status: line.status,
+      cancellationReason: null,
+      ingredientsCost: line.cost?.total ?? null,
+      packagingCost: line.cost?.packaging ?? null,
+      actualCost: null,
+      salePrice: line.salePrice,
+      reservedAt: null,
+      finishedAt: null,
+      packedBy: null,
+      conditionedBy: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      createdBy: null,
+      updatedBy: null,
+      presentationLines: line.presentationLines.map((item) => ({
+        presentationId: item.presentationId,
+        packages: item.packages,
+        presentationContent: item.content,
+        packagingProductId: item.packagingProductId,
+      })),
+    })),
+  );
+  return {
+    writeLines,
+    setLineStatus: vi.fn(async () => 'ok' as const),
+    setLineIngredientsCost: vi.fn(async () => 'ok' as const),
+    setLineReservedAt: vi.fn(async () => undefined),
+    refreshStatus: vi.fn(async () => 'PENDIENTE' as const),
+    mirrorFirstLine: vi.fn(async () => undefined),
+    updateAlive: vi.fn(async () => 'ok' as const),
   };
 }

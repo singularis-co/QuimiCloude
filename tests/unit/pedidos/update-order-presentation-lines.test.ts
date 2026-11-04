@@ -11,16 +11,22 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  createUpdateOrderPresentationLines,
+  createUpdateOrderPresentationLines as createLineDistributionUpdate,
   REPARTO_EDITABLE_STATUSES,
   type UpdateOrderPresentationLinesDeps,
+  type UpdateOrderPresentationLinesInput,
 } from '@/lib/modules/pedidos/domain/update-order-presentation-lines';
 import { OrderPresentationLineNotEditableError } from '@/lib/modules/pedidos/domain/errors';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import { STARTED_ORDER_STATUSES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
-import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type {
+  LockedOrderRow,
+  OrderLineChanges,
+  OrderWriteRepository,
+} from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type {
   CostingBatch,
   MaterialReservations,
@@ -38,10 +44,20 @@ import {
   fakeOrderConsumptionLedger,
   fakeOrderUnitOfWork,
   fakeRecipeExecutionReader,
+  ONLY_LINE_ID,
+  orderLineOf,
 } from '../../helpers/order-unit-of-work-double';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
+
+// Estos casos son de un pedido de una receta: el reparto que se edita es el de su unica linea, como
+// lo nombra el formulario de hoy.
+type LineDistributionUpdate = ReturnType<typeof createLineDistributionUpdate>;
+const createUpdateOrderPresentationLines =
+  (deps: UpdateOrderPresentationLinesDeps) =>
+  (orderId: string, actor: Actor, input: Omit<UpdateOrderPresentationLinesInput, 'lineId'>): ReturnType<LineDistributionUpdate> =>
+    createLineDistributionUpdate(deps)(orderId, actor, { lineId: ONLY_LINE_ID, ...input });
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const PEDIDO = '11111111-1111-4111-8111-111111111111';
@@ -79,8 +95,10 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
   return { ...base, reservedAt: null, packagingCost: null, ...overrides };
 }
 
-/** Doble de `OrderWriteRepository`: los metodos que este caso de uso llama -bloquear, escribir el
- *  reparto, mover el estado, vaciar el importe y fijar `reserved_at`-; el resto explota. */
+/** Doble de `OrderWriteRepository`: bloquear el pedido y su unica linea, escribir el reparto,
+ *  mover el estado, vaciar el importe y fijar `reserved_at` de la linea; el resto explota. Los
+ *  espias conservan los nombres del pedido de una receta: `updatePresentationLinesAlive` recibe la
+ *  unidad y el reparto que se escriben en la linea, y los otros tres lo que se escribe en ella. */
 function ordersDoble(
   fila: LockedOrderRow | null,
   updateResult: 'ok' | 'not_found' = 'ok',
@@ -91,18 +109,33 @@ function ordersDoble(
   readonly setIngredientsCost: ReturnType<typeof vi.fn>;
   readonly setReservedAt: ReturnType<typeof vi.fn>;
 } {
-  const lockAliveById = vi.fn(async () => fila);
-  const updatePresentationLinesAlive = vi.fn(async () => updateResult);
-  const setStatus = vi.fn(async () => 'ok' as const);
-  const setIngredientsCost = vi.fn(async () => 'ok' as const);
-  const setReservedAt = vi.fn(async () => undefined);
+  type Espia<R> = (...args: unknown[]) => Promise<R>;
+  const updatePresentationLinesAlive = vi.fn<Espia<'ok' | 'not_found'>>(async () => updateResult);
+  const setStatus = vi.fn<Espia<'ok'>>(async () => 'ok');
+  const setIngredientsCost = vi.fn<Espia<'ok'>>(async () => 'ok');
+  const setReservedAt = vi.fn<Espia<undefined>>(async () => undefined);
   const orders = {
-    lockAliveById,
-    findOnlyLineId: vi.fn(async () => null),
-    updatePresentationLinesAlive,
-    setStatus,
-    setIngredientsCost,
-    setReservedAt,
+    lockAliveLine: vi.fn(async (orderId: string, lineId: string) =>
+      fila === null || orderId !== fila.id || lineId !== ONLY_LINE_ID ? null : { order: fila, line: orderLineOf(fila) },
+    ),
+    writeLines: vi.fn(async (orderId: string, changes: OrderLineChanges, actorId: string, now: Date, scope: OrderScope) => {
+      for (const edit of changes.edited) {
+        const result = await updatePresentationLinesAlive(orderId, edit.line.unitId, edit.line.presentationLines, actorId, now, scope);
+        if (result !== 'ok') return null;
+      }
+      return [];
+    }),
+    setLineStatus: vi.fn(async (orderId: string, _lineId: string, from: string, to: string, actorId: string, now: Date, scope: OrderScope) =>
+      setStatus(orderId, from, to, actorId, now, scope),
+    ),
+    setLineIngredientsCost: vi.fn(async (orderId: string, _lineId: string, cost: unknown, actorId: string, now: Date, scope: OrderScope) =>
+      setIngredientsCost(orderId, cost, actorId, now, scope),
+    ),
+    setLineReservedAt: vi.fn(async (orderId: string, _lineId: string, reservedAt: Date | null, scope: OrderScope) =>
+      setReservedAt(orderId, reservedAt, scope),
+    ),
+    refreshStatus: vi.fn(async () => fila?.status ?? null),
+    mirrorFirstLine: vi.fn(async () => undefined),
     // El resto del puerto no lo llama este caso de uso: si lo hiciera, el test que lo comprueba
     // (mas abajo, "no toca...") fallaria por una llamada inesperada al doble.
     create: vi.fn(async () => {
@@ -303,14 +336,14 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
 });
 
 describe('updateOrderPresentationLines — bloquea antes de validar (R37, R48)', () => {
-  it('llama lockAliveById con el pedido y el ambito de empresa antes de tocar ningun catalogo', async () => {
+  it('bloquea el pedido y la linea con el ambito de empresa antes de tocar ningun catalogo (QT-313 R26)', async () => {
     const { orders } = ordersDoble(filaBloqueada());
     const cat = catalogoDePresentaciones();
     const update = montar({ orders, catalogos: cat });
 
     await update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] });
 
-    expect(orders.lockAliveById).toHaveBeenCalledWith(PEDIDO, { companyId: EMPRESA });
+    expect(orders.lockAliveLine).toHaveBeenCalledWith(PEDIDO, ONLY_LINE_ID, { companyId: EMPRESA });
   });
 });
 
@@ -564,7 +597,7 @@ describe('updateOrderPresentationLines — R46: no toca quantity ni receta; QC-1
 
     expect(reservations.syncForLine).toHaveBeenCalledWith({
       orderId: PEDIDO,
-      orderLineId: null,
+      orderLineId: ONLY_LINE_ID,
       companyId: EMPRESA,
       requirement: [
         { productId: 'materia', quantity: '10' },
@@ -702,8 +735,9 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
         AHORA,
         ESCOPO,
       );
-      expect(costo.findCostingBatches).toHaveBeenCalledWith(['materia'], EMPRESA, { excludeOrderId: PEDIDO });
-      expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderId: PEDIDO });
+      // Lo apartado por la linea cuenta como suyo (QT-313 R25).
+      expect(costo.findCostingBatches).toHaveBeenCalledWith(['materia'], EMPRESA, { excludeOrderLineId: ONLY_LINE_ID });
+      expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderLineId: ONLY_LINE_ID });
     },
   );
 

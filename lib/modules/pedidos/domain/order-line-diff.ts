@@ -1,4 +1,4 @@
-import { DuplicateOrderRecipeError, OrderNotFoundError, ValidationError } from './errors';
+import { DuplicateOrderRecipeError, OrderNotFoundError, PedidosError, ValidationError } from './errors';
 import type { OrderLineStatus } from './order-classification';
 import { assertTransition } from './order-transitions';
 
@@ -67,4 +67,20 @@ export function assertNoDuplicateOrderRecipe(
     }
     positionByRecipe.set(line.originalRecipeId, position);
   });
+}
+
+/**
+ * Corre la validacion de una linea y, si falla con un error del modulo, lo relanza con el mismo
+ * codigo y la posicion de la linea en el diagnostico, que va al registro del servidor y nunca a la
+ * respuesta.
+ */
+export async function atLinePosition<T>(position: number, work: () => Promise<T> | T): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if (!(error instanceof PedidosError)) throw error;
+    const detail = error.diagnostic === undefined ? '' : `: ${error.diagnostic}`;
+    const SameError = error.constructor as new (diagnostic?: string) => PedidosError;
+    throw new SameError(`linea en la posicion ${String(position)}${detail}`);
+  }
 }

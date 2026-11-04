@@ -319,6 +319,7 @@ import {
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
+  createListOrderLineIds,
   createUpdateOrderPresentationLines,
   formatOrderNumber,
 } from '@/lib/modules/pedidos';
@@ -1783,6 +1784,7 @@ export const pedidos = {
     unitOfWork: orderUnitOfWork,
     customerCatalog,
   }),
+  listOrderLineIds: createListOrderLineIds({ orders: orderRepository }),
   cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   findCoverage: createFindCoverage({ reservations: reservationQueries }),

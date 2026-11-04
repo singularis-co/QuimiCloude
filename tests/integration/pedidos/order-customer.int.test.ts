@@ -51,11 +51,12 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createListOrders,
   createSetOrderCustomer,
-  createUpdateOrder,
+  createUpdateOrder as createLinesUpdate,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -65,6 +66,12 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -226,6 +233,8 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.customer.deleteMany({ where: { companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId } } });

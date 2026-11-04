@@ -48,8 +48,13 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
-import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
-import { createOrderWriteRepository, orderOrderBy } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { createCreateOrder as createLinesOrder, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
+import {
+  createOrderWriteRepository,
+  findAliveOrderLines,
+  orderOrderBy,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
@@ -63,6 +68,12 @@ import { findMassVolumeBridge } from '@/lib/modules/unidades/adapters/driven/per
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 // Ningun caso de este archivo asigna cliente: si se llamara, fallaria a la vista.
 const customerCatalog = {
@@ -997,6 +1008,7 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
   const orders = {
     findAliveById: (id: string, scope: { companyId: string }) =>
       createOrderWriteRepository(tx).lockAliveById(id, scope),
+    findAliveLines: (id: string, scope: { companyId: string }) => findAliveOrderLines(id, scope, tx),
   } as unknown as OrderRepository
   const recipes = {
     findRefsIncludingDeleted: async (ids: readonly string[], companyId: string) =>
@@ -1237,6 +1249,8 @@ describe('QC-138 — el alta y la edicion bloquean con confirmacion, contra la b
       const c = casosDeUsoSobre(tx)
       const creado = await c.createOrder(entrada(f, '10'), actorDelFixture(f))
       await tx.order.update({ where: { id: creado.id }, data: { status: 'EN_CURSO' } })
+      // QT-313: el estado que se edita es el de la linea.
+      await tx.orderLine.updateMany({ where: { orderId: creado.id }, data: { status: 'EN_CURSO' } })
       const antes = await estadoDe(tx, creado.id)
 
       expect(await codigoDe(c.updateOrder(creado.id, entrada(f, '30', true), actorDelFixture(f)))).toBe(

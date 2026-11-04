@@ -46,11 +46,12 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createExpireStaleOrders,
   EXPIRED_ORDER_REASON,
   ORDER_RESERVATION_TTL_DAYS,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor, NewOrder } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -61,6 +62,10 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -195,6 +200,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
