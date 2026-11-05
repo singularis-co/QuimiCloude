@@ -5,6 +5,7 @@ import { requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
 import { toDistributionLines, toDistributionPresentations, unitLabelOf } from './order-distribution-view';
+import { onlyLineOf } from './only-order-line';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { EvidenceStorage } from '../ports/evidence-storage';
@@ -68,7 +69,7 @@ export function createGetAssignedOrderExecution(
       1,
       1,
     );
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
 
     const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);

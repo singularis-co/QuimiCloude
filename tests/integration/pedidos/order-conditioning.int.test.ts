@@ -23,6 +23,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/order-conditioning-repository';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 const conditioningRepository: OrderConditioningRepository = {
   startConditioningAlive: startConditioningAliveOrder,
@@ -118,7 +119,7 @@ async function crearFixture(): Promise<Fixture> {
 }
 
 async function borrarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
-  await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: [...orderIds] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } }));
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
   await borrarUsuarios([fixture.packerId, fixture.conditionerId, fixture.otherConditionerId], fixture.documentTypeCodes);
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
@@ -187,7 +188,7 @@ describe('startConditioningAliveById contra la base', () => {
       const inventarioAntes = await inventarioDe(fixture.companyId);
       const ahora = new Date();
 
-      await expect(startConditioningAliveById(pedido, fixture.companyId, fixture.conditionerId, ahora)).resolves.toBe('ok');
+      await expect(onOnlyLine(startConditioningAliveById)(pedido, fixture.companyId, fixture.conditionerId, ahora)).resolves.toBe('ok');
 
       const fila = await readOrder(pedido);
       expect(fila.status).toBe('EN_ACONDICIONAMIENTO');
@@ -207,7 +208,7 @@ describe('startConditioningAliveById contra la base', () => {
     const pedido = await createOrder(fixture, 'EN_ACONDICIONAMIENTO');
     try {
       const antes = await readOrder(pedido);
-      await expect(startConditioningAliveById(pedido, fixture.companyId, fixture.conditionerId, new Date())).resolves.toBe(
+      await expect(onOnlyLine(startConditioningAliveById)(pedido, fixture.companyId, fixture.conditionerId, new Date())).resolves.toBe(
         'already_mine',
       );
       expect(await readOrder(pedido)).toEqual(antes);
@@ -222,7 +223,7 @@ describe('startConditioningAliveById contra la base', () => {
     try {
       const antes = await readOrder(pedido);
       await expect(
-        startConditioningAliveById(pedido, fixture.companyId, fixture.otherConditionerId, new Date()),
+        onOnlyLine(startConditioningAliveById)(pedido, fixture.companyId, fixture.otherConditionerId, new Date()),
       ).resolves.toBe('taken');
       expect(await readOrder(pedido)).toEqual(antes);
     } finally {
@@ -236,8 +237,8 @@ describe('startConditioningAliveById contra la base', () => {
     try {
       // Sin `await` entre las dos: compiten de verdad por el bloqueo de la fila.
       const [uno, dos] = await Promise.all([
-        startConditioningAliveById(pedido, fixture.companyId, fixture.conditionerId, new Date()),
-        startConditioningAliveById(pedido, fixture.companyId, fixture.otherConditionerId, new Date()),
+        onOnlyLine(startConditioningAliveById)(pedido, fixture.companyId, fixture.conditionerId, new Date()),
+        onOnlyLine(startConditioningAliveById)(pedido, fixture.companyId, fixture.otherConditionerId, new Date()),
       ]);
 
       expect([uno, dos].filter((r) => r === 'ok')).toHaveLength(1);
@@ -268,7 +269,7 @@ describe('startConditioningAliveById contra la base', () => {
       for (const estado of estados) pedidos.set(estado, await createOrder(fixture, estado));
       for (const [estado, pedido] of pedidos) {
         const antes = await readOrder(pedido);
-        const resultado = await startConditioningAliveById(pedido, fixture.companyId, fixture.conditionerId, new Date());
+        const resultado = await onOnlyLine(startConditioningAliveById)(pedido, fixture.companyId, fixture.conditionerId, new Date());
         expect(resultado, estado).toBe('not_conditionable');
         expect(await readOrder(pedido), estado).toEqual(antes);
       }
@@ -286,14 +287,14 @@ describe('startConditioningAliveById contra la base', () => {
     const propio = await createOrder(fixture, 'POR_ACONDICIONAR');
     try {
       await expect(
-        startConditioningAliveById(randomUUID(), fixture.companyId, fixture.conditionerId, new Date()),
+        onOnlyLine(startConditioningAliveById)(randomUUID(), fixture.companyId, fixture.conditionerId, new Date()),
       ).resolves.toBe('not_found');
-      await expect(startConditioningAliveById(borrado, fixture.companyId, fixture.conditionerId, new Date())).resolves.toBe(
+      await expect(onOnlyLine(startConditioningAliveById)(borrado, fixture.companyId, fixture.conditionerId, new Date())).resolves.toBe(
         'not_found',
       );
 
       const antes = await readOrder(propio);
-      await expect(startConditioningAliveById(propio, otraEmpresa, ajeno.id, new Date())).resolves.toBe('not_found');
+      await expect(onOnlyLine(startConditioningAliveById)(propio, otraEmpresa, ajeno.id, new Date())).resolves.toBe('not_found');
       expect(await readOrder(propio)).toEqual(antes);
     } finally {
       await borrarFixture(fixture, [borrado, propio]);
@@ -311,7 +312,7 @@ describe('finishConditioningAliveById contra la base', () => {
       const inventarioAntes = await inventarioDe(fixture.companyId);
       const ahora = new Date();
 
-      await expect(finishConditioningAliveById(pedido, fixture.companyId, fixture.conditionerId, ahora)).resolves.toBe('ok');
+      await expect(onOnlyLine(finishConditioningAliveById)(pedido, fixture.companyId, fixture.conditionerId, ahora)).resolves.toBe('ok');
 
       const fila = await readOrder(pedido);
       expect(fila.status).toBe('TERMINADO');
@@ -332,7 +333,7 @@ describe('finishConditioningAliveById contra la base', () => {
     try {
       const antes = await readOrder(pedido);
       await expect(
-        finishConditioningAliveById(pedido, fixture.companyId, fixture.otherConditionerId, new Date()),
+        onOnlyLine(finishConditioningAliveById)(pedido, fixture.companyId, fixture.otherConditionerId, new Date()),
       ).resolves.toBe('not_conditioner');
 
       const despues = await readOrder(pedido);
@@ -362,7 +363,7 @@ describe('finishConditioningAliveById contra la base', () => {
       for (const estado of estados) pedidos.set(estado, await createOrder(fixture, estado));
       for (const [estado, pedido] of pedidos) {
         const antes = await readOrder(pedido);
-        const resultado = await finishConditioningAliveById(pedido, fixture.companyId, fixture.conditionerId, new Date());
+        const resultado = await onOnlyLine(finishConditioningAliveById)(pedido, fixture.companyId, fixture.conditionerId, new Date());
         expect(resultado, estado).toBe('not_conditionable');
         expect(await readOrder(pedido), estado).toEqual(antes);
       }
@@ -379,14 +380,14 @@ describe('finishConditioningAliveById contra la base', () => {
     const propio = await createOrder(fixture, 'EN_ACONDICIONAMIENTO');
     try {
       await expect(
-        finishConditioningAliveById(randomUUID(), fixture.companyId, fixture.conditionerId, new Date()),
+        onOnlyLine(finishConditioningAliveById)(randomUUID(), fixture.companyId, fixture.conditionerId, new Date()),
       ).resolves.toBe('not_found');
-      await expect(finishConditioningAliveById(borrado, fixture.companyId, fixture.conditionerId, new Date())).resolves.toBe(
+      await expect(onOnlyLine(finishConditioningAliveById)(borrado, fixture.companyId, fixture.conditionerId, new Date())).resolves.toBe(
         'not_found',
       );
 
       const antes = await readOrder(propio);
-      await expect(finishConditioningAliveById(propio, otraEmpresa, ajeno.id, new Date())).resolves.toBe('not_found');
+      await expect(onOnlyLine(finishConditioningAliveById)(propio, otraEmpresa, ajeno.id, new Date())).resolves.toBe('not_found');
       expect(await readOrder(propio)).toEqual(antes);
     } finally {
       await borrarFixture(fixture, [borrado, propio]);

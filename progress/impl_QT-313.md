@@ -359,3 +359,76 @@ Desviaciones aceptadas por el humano (2026-11-05), para el reviewer:
 3. En WhatsApp, `productName` une los nombres de las lineas con «, ».
 4. `recipeIds` en el directorio de pedidos del cliente.
 5. Las entregas sin pedido cuentan la linea `TERMINADO`.
+
+## Fase 5 — T14a `asignaciones` por linea y espejo ampliado (2026-11-05, enmienda c69dd4f5e)
+
+Produccion:
+- `pedidos`:
+  - dominio: `order-catalog.ts`, `transition-order.ts`, `order-packing.ts`, `order-conditioning.ts`;
+  - puertos: `order-write-repository.ts`, `order-packing-repository.ts`, `order-conditioning-repository.ts`;
+  - `order-prisma.ts`: sin copia de estado pedido → linea, con `stampAliveOrderLineStatus`, `setOrderLineActualCost` y el espejo ampliado en `refreshStatus`/`mirrorFirstLine` (`packed_by`, `conditioned_by`, `finished_at`, `actual_cost`; NULL en `PARCIAL`; design § 4.1.1, punto 3b);
+  - `order-catalog-prisma.ts`: resumenes por linea.
+- `inventario`: `domain/finished-goods.ts`, `finished-goods-prisma.ts`, `product-prisma.ts` (el asiento `production` lleva la linea de su reparto).
+- `asignaciones`:
+  - `domain/only-order-line.ts` (nuevo);
+  - casos de uso de abrir, finalizar, empaque, acondicionamiento, pasos, evidencias, cancelar y lecturas de ejecucion/empaque/acondicionamiento;
+  - `compose-order-rows` por `lineId`;
+  - puertos y adaptadores de registro de ejecucion, evidencias y equipo de acondicionamiento.
+
+Tests:
+- Nuevos: `tests/integration/asignaciones/order-lines-execution.int.test.ts`, `tests/unit/pedidos/order-lines-no-copy.test.ts` y el helper `tests/helpers/only-order-line.ts`.
+- Unos 50 ajustados, listados al final de `tasks.md > Archivos esperados`.
+
+Mapa R → test (Int = `order-lines-execution.int`):
+| R | Test |
+|---|---|
+| R31, R32 | Int › «QT-313 R31, R32: una linea recorre todo el flujo y la otra se queda PENDIENTE…», «QT-313 R31: una linea que no esta en `from` responde stale…» |
+| R35 | Int › «QT-313 R35, R37: el responsable del pedido abre, finaliza y empaca su linea…», «QT-313 R35: con dos lineas en el mismo estado, abrir responde invalid_input sin escribir» |
+| R36 | Int › «QT-313 R36: finalizar una linea consume solo lo apartado para ella…» |
+| R37 (production), R38 | Int › «QT-313 R38, R37: terminar el empaque guarda el coste real de esa linea…» |
+| R37 (registro de ejecucion, equipo, evidencias) | Int › «QT-313 R35, R37…», «QT-313 R37: el equipo de acondicionamiento y las evidencias…» |
+| R19 | Int › «QT-313 R45, R19: el resumen de un pedido de una linea es el de hoy mas lineId, sin precio» |
+| R45 | Int › «QT-313 R45: un pedido de dos lineas en el mismo estado sale como dos filas…»; `order-catalog.test.ts` › tres «QT-313 R45: …» |
+| R44, R45 (espejo) | Int › «QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real…» |
+| CHECK de `orders` (espejo ampliado) | Int › «QT-313 orders_packed_by_matches_status…», «…orders_conditioned_by_matches_status…», «…orders_finished_requires_finished_at…», «…orders_finished_at_requires_delivered…», «…orders_actual_cost_requires_packed…» |
+| Sin copia pedido → linea | `order-lines-no-copy.test.ts` › tres «QT-313 R31, R32…» |
+
+Verificacion (salida real):
+- backend_dev:
+  - `pnpm run typecheck`: exit 0.
+  - Guardias: 87/87 archivos (1336 tests en verde, 22 skipped).
+  - `related --project node`: `Test Files 302 passed (302)`, `Tests 6696 passed | 6 skipped`.
+  - Integracion con `--maxWorkers=1` en lotes de ≤ 15:
+    - `order-lines-execution`: 15/15.
+    - asignaciones A: 6 rojos de fixtures, corregidos; verde al repetir.
+    - asignaciones B: 15/15 (131).
+    - pedidos C: 7 rojos de fixtures, corregidos; verde al repetir.
+    - pedidos D: 2 rojos, corregidos (`order-repository` 15/15, `order-sale-price`).
+    - inventario E: 9/9 (61).
+- implementer:
+  - `pnpm run lint`: `0 errors, 10 warnings` (los previos).
+  - `finished-orders.int`, `responsible-eligibility.int` y `order-lines-execution.int` repetidos tras quitar los imports: `Test Files 3 passed (3)`, `Tests 30 passed (30)`.
+- Sin correr:
+  - `related --project ui`: no se lanzo por riesgo de memoria. Ningun tipo de vista cambia y el typecheck incluye la UI.
+  - Los `.int` que quedaron fuera de los lotes. Los cubren el `./init.sh` del leader y CI.
+
+Desviaciones (para el reviewer):
+1. **Las Server Actions no cambian.** El caso de uso resuelve la unica linea del pedido en el estado que lee (`only-order-line.ts`). Con dos o mas lineas en ese estado responde `invalid_input` sin escribir. La entrada no gana `orderLineId`; eso queda para QT-315. Consecuencia: un pedido de varias lineas aun no se opera desde `asignaciones`. R35 se cubre con una linea, y las operaciones por linea con dos lineas se prueban en el catalogo.
+2. **Solo `AssignedOrderSummary` lleva `lineId`** (una fila por linea; `compose-order-rows` indexa por `lineId`). Las vistas de `asignaciones` no lo llevan, para no tocar los fixtures de pantalla. El «mas `lineId`» del «Hecho» de R45 se cumple en el contrato, no en las vistas.
+3. `OrderAssignmentTarget` no cambia (T14d).
+4. Puertos:
+   - `OrderCatalog`: las cinco operaciones del flujo reciben `(id, lineId, companyId, …)`.
+   - `OrderWriteRepository`: salen `finishPackingAlive` y `setActualCost`; entran `stampLineStatus` y `setLineActualCost`.
+   - `setReservedAt` queda sin llamante de produccion; lo quita T15.
+   - Comenzar el empaque y el acondicionamiento bloquean pedido y linea en su propia transaccion.
+5. `findPresentationLinesForFinish` lee todo el pedido y el dominio filtra por linea.
+6. `list-execution-traces` y `listDeliveryProgress…` siguen leyendo la receta del pedido, que es el espejo.
+7. `refreshStatus` reescribe siempre las cuatro columnas de etapa en una sola sentencia. `updated_at` solo se mueve si cambian el estado o el motivo.
+8. `transitionAliveById` con destino `CANCELADO` lanza `InvalidTransitionError`; antes fallaba contra el CHECK de la base.
+9. Lecturas nuevas:
+   - Comenzar el empaque lee el resumen antes de escribir y distingue `not_found` de `not_packable`.
+   - Abrir lee la linea aparte.
+   - `findOnlyLine` admite el estado al que puede pasar la linea en una carrera.
+10. Helper de test `tests/helpers/only-order-line.ts` (`ensureOnlyLine`, `syncOnlyLine`, `onOnlyLine`, `singleLineFlow`).
+11. Corregido un rojo previo de T7: `tests/unit/inventario/batch-movement-prisma.test.ts` no esperaba `orderLineId: null`.
+12. `qc145-estado-solo-planta.test.ts` cambia su lista de escritores de estado.

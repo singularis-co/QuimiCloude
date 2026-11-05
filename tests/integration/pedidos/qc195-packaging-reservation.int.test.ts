@@ -63,6 +63,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { onOnlyLine } from '../../helpers/only-order-line';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 
 
@@ -110,7 +111,7 @@ const createOrder = createCreateOrder({ customerCatalog, recipes, products, unit
 const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
 const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
-const transition = createTransitionOrder({ unitOfWork });
+const transition = onOnlyLine(createTransitionOrder({ unitOfWork }));
 const quoteOrderCost = createQuoteOrderCost({ recipes, products, units, packaging });
 const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging, presentations, units, unitOfWork });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging, unitOfWork });

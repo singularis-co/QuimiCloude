@@ -51,6 +51,7 @@ export const ACONDICIONADOR: Actor = {
 export function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id,
+    lineId: `linea-${id}`,
     number: { year: 2026, sequence: 7 },
     recipeId: RECETA,
     quantity: '10.0000',

@@ -17,6 +17,7 @@ export function createConditioningTeamRepository(db: PrismaLike = prisma): Condi
       const result = await db.orderConditioningTeamMember.createMany({
         data: rows.map((row) => ({
           orderId: row.orderId,
+          orderLineId: row.orderLineId,
           userId: row.userId,
           companyId: row.companyId,
           workGroupId: row.workGroupId,

@@ -189,7 +189,7 @@ function recibir(
     readonly now: Date;
   },
 ) {
-  return prisma.$transaction((tx) => receiveFinishedGoods(tx, input, ambito(companyId)));
+  return prisma.$transaction((tx) => receiveFinishedGoods(tx, { ...input, orderLineId: null }, ambito(companyId)));
 }
 
 describe('receiveFinishedGoods — R11, R13, R17, R41, R43: primera entrada', () => {

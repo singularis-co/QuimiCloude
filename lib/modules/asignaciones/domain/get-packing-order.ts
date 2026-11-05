@@ -16,6 +16,7 @@ import {
   type PackingOrderDetail,
   type PackingOrderViewDeps,
 } from './packing-order-view';
+import { onlyLineOf } from './only-order-line';
 
 import type { EvidenceStorage } from '../ports/evidence-storage';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
@@ -56,7 +57,7 @@ export function createGetPackingOrder(
       1,
       1,
     );
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
 
     const [row] = await composePackingOrderRows(deps, actor.companyId, [summary]);

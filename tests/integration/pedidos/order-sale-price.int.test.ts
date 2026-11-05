@@ -34,6 +34,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 import type { NewOrder, OrderScope } from '@/lib/modules/pedidos'
 import type { OrderLineWrite } from '@/lib/modules/pedidos/ports/order-write-repository'
 import { realOrderSummaries } from '../../helpers/order-summaries'
+import { ensureOnlyLine } from '../../helpers/only-order-line'
 
 /** Un ano de prueba propio, distinto de los demas archivos de `pedidos`, para no heredar secuencia. */
 const YEAR = 2892
@@ -396,6 +397,8 @@ describe('R17 — lo que `pedidos` entrega a `asignaciones` no lleva el precio',
     const id = await seedOrder({ salePrice: '1250.5' })
     try {
       expect(await storedSalePrice(id)).toBe('1250.5000')
+      // Los resumenes son por linea, y la linea lleva su propio precio: tampoco debe salir.
+      await ensureOnlyLine(prisma, id)
 
       const porIds = await listAliveSummariesByIds(companyId, [id], ['PENDIENTE'], 1)
       expect(porIds.items.map((item) => item.id)).toEqual([id])
@@ -408,7 +411,7 @@ describe('R17 — lo que `pedidos` entrega a `asignaciones` no lleva el precio',
 
       expect(clavesDeImporte({ porIds, enEmpresa, destino })).toEqual([])
     } finally {
-      await prisma.order.delete({ where: { id } })
+      await dropOrder(id)
     }
   })
 })

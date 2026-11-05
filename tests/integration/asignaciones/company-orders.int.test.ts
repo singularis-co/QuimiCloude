@@ -36,6 +36,7 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 
 import { NOW, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -115,7 +116,7 @@ describe('asignaciones · listCompanyOrders con los permisos del Administrador (
       await fixture.tx.order.update({
         where: { id: cancelado },
         data: { status: 'CANCELADO', cancellationReason: 'motivo de prueba' },
-      });
+      }).then(() => syncOnlyLine(fixture.tx, cancelado));
       const deOtraEmpresa = await createOrder(fixture, { companyId: fixture.companyB, status: 'PENDIENTE' });
 
       const administrador = await createPerson(fixture, fixture.companyA);
@@ -146,11 +147,11 @@ describe('asignaciones · listCompanyOrders con los permisos del Administrador (
       await fixture.tx.order.update({
         where: { id: entregadoAntiguo },
         data: { finishedAt: new Date('2026-01-01T00:00:00.000Z') },
-      });
+      }).then(() => syncOnlyLine(fixture.tx, entregadoAntiguo));
       await fixture.tx.order.update({
         where: { id: entregadoReciente },
         data: { finishedAt: new Date('2026-02-01T00:00:00.000Z') },
-      });
+      }).then(() => syncOnlyLine(fixture.tx, entregadoReciente));
       const pendiente = await createOrder(fixture, { status: 'PENDIENTE' });
 
       const administrador = await createPerson(fixture, fixture.companyA);

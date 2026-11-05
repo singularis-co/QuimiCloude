@@ -32,6 +32,7 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const LINEA = uuid('e');
 const RECETA = uuid('a');
 const PRODUCTO = uuid('c');
 const LITRO = uuid('d');
@@ -47,6 +48,7 @@ const ACTOR: Actor = {
 function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id: PEDIDO,
+    lineId: LINEA,
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,
     quantity: '200',

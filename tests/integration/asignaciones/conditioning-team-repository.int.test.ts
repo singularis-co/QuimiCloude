@@ -13,6 +13,7 @@ import { normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/iden
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewConditioningTeamMember } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 class RollbackSignal extends Error {
   constructor() {
@@ -131,6 +132,7 @@ async function createGroup(tx: Prisma.TransactionClient, companyId: string, name
 interface Scenario {
   readonly companyId: string;
   readonly orderId: string;
+  readonly orderLineId: string;
   readonly users: readonly [string, string, string];
   readonly groupId: string;
   readonly groupName: string;
@@ -139,9 +141,11 @@ interface Scenario {
 async function seedScenario(tx: Prisma.TransactionClient): Promise<Scenario> {
   const companyId = await createCompany(tx);
   const groupName = `Turno ${token()}`;
+  const orderId = await createOrder(tx, companyId);
   return {
     companyId,
-    orderId: await createOrder(tx, companyId),
+    orderId,
+    orderLineId: await ensureOnlyLine(tx, orderId),
     users: [await createUser(tx, companyId), await createUser(tx, companyId), await createUser(tx, companyId)],
     groupId: await createGroup(tx, companyId, groupName),
     groupName,
@@ -150,7 +154,7 @@ async function seedScenario(tx: Prisma.TransactionClient): Promise<Scenario> {
 
 /** Una suelta y dos del grupo, en el orden de composicion. */
 function teamOf(s: Scenario): readonly NewConditioningTeamMember[] {
-  const base = { orderId: s.orderId, companyId: s.companyId };
+  const base = { orderId: s.orderId, orderLineId: s.orderLineId, companyId: s.companyId };
   return [
     { ...base, userId: s.users[0], workGroupId: null, workGroupName: null, position: 0 },
     { ...base, userId: s.users[1], workGroupId: s.groupId, workGroupName: s.groupName, position: 1 },

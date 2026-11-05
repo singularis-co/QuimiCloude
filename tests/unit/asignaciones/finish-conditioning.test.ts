@@ -40,6 +40,7 @@ const ANA = uuid('1');
 const BETO = uuid('2');
 const LOTE = uuid('8');
 const PEDIDO = uuid('7');
+const LINEA = 'linea-unica';
 const RECETA = uuid('9');
 const AHORA = new Date('2026-10-08T12:00:00.000Z');
 
@@ -74,7 +75,7 @@ function montar(
   );
   const listAliveSummariesByIds = vi.fn(async () => ({
     items: options?.summaryItems ?? [
-      { id: PEDIDO, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: ANA, presentationLines: [] },
+      { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: ANA, presentationLines: [] },
     ],
     total: 1,
     page: 1,
@@ -218,7 +219,7 @@ describe('finishConditioning — lectura del numero y traduccion del resultado',
     expect(result).toEqual({ numberText: '2026-0000007' });
     expect(findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
     expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['EN_ACONDICIONAMIENTO'], 1, 1);
-    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
     expect(listAliveSummariesByIds.mock.invocationCallOrder[0]!).toBeLessThan(
       finishConditioningAliveById.mock.invocationCallOrder[0]!,
     );
@@ -268,7 +269,7 @@ describe('finishConditioning — lectura del numero y traduccion del resultado',
 
     await createFinishConditioning(deps)(otro, { orderId: PEDIDO });
     expect(findAliveById).toHaveBeenCalledWith(PEDIDO, uuid('9'));
-    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, uuid('9'), ANA, AHORA);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, uuid('9'), ANA, AHORA);
   });
 });
 
@@ -284,7 +285,7 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
   };
 
   function resumenCon(conditionedBy: string, lineas: readonly unknown[]) {
-    return [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy, presentationLines: lineas }];
+    return [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, conditionedBy, presentationLines: lineas }];
   }
 
   it('R15: si alguna linea no tiene datos rechaza con conditioning_batch_data_missing sin llamar a la transicion', async () => {
@@ -328,7 +329,7 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
       numberText: '2026-0000007',
     });
-    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
   });
 
   it('R16: un acondicionador que no es quien acondiciona recibe order_conditioning_taken aunque falten datos, sin leer los lotes', async () => {
@@ -380,12 +381,13 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
     });
 
     expect(pasos).toEqual(['transaccion', 'escribe-pedido', 'anota']);
-    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
     expect(append).toHaveBeenCalledTimes(1);
     expect(append).toHaveBeenCalledWith({
       action: 'conditioning_finish',
       companyId: EMPRESA,
       orderId: PEDIDO,
+      orderLineId: LINEA,
       userId: ANA,
       stepPosition: null,
       occurredAt: AHORA,
@@ -407,11 +409,11 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
   it('R6: los rechazos previos (datos de lote, otro acondicionador) no abren la transaccion', async () => {
     const linea = { presentationId: 'pres-1', packages: 2, packagingName: 'Botella 1 L' };
     const sinDatos = montar('ok', {
-      summaryItems: [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: [linea] }],
+      summaryItems: [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: [linea] }],
       batches: [],
     });
     const ajeno = montar('ok', {
-      summaryItems: [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: BETO, presentationLines: [] }],
+      summaryItems: [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, conditionedBy: BETO, presentationLines: [] }],
     });
 
     await expect(createFinishConditioning(sinDatos.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
@@ -448,7 +450,7 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
   };
 
   function resumenCon(lineas: readonly unknown[]) {
-    return [{ id: PEDIDO, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: lineas }];
+    return [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, conditionedBy: ANA, presentationLines: lineas }];
   }
 
   it('R23: una linea empacada con 0 envases no tiene lote y no bloquea Terminar', async () => {
@@ -532,7 +534,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
       numberText: '2026-0000007',
     });
-    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
   });
 
   it.each([
@@ -552,7 +554,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
     const { deps, findConditioningStepsById } = montar('ok', {
       pasos: PASOS,
       summaryItems: [
-        { id: PEDIDO, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: BETO, presentationLines: [] },
+        { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: BETO, presentationLines: [] },
       ],
     });
 

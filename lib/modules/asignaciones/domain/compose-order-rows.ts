@@ -1,7 +1,8 @@
 // lib/modules/asignaciones/domain/compose-order-rows.ts
 /**
- * Compone receta, reparto, unidad y responsables para una pagina de pedidos, con una llamada por cada
- * dependencia sin importar cuantas filas traiga la pagina. Extraido de `list-assigned-orders.ts`
+ * Compone receta, reparto, unidad y responsables para una pagina de lineas de pedido, por `lineId`,
+ * con una llamada por cada dependencia sin importar cuantas filas traiga la pagina. Los
+ * responsables son los del pedido de cada linea. Extraido de `list-assigned-orders.ts`
  * para que «Mis asignados», «Terminados» y «Todos» compartan la misma composicion en vez de tres
  * copias que podrian divergir.
  *
@@ -93,7 +94,7 @@ export async function composeOrderRows(
 
   const result = new Map<string, ComposedOrderRow>();
   for (const row of orders) {
-    result.set(row.id, {
+    result.set(row.lineId, {
       recipeName: recipeNames.get(row.recipeId) ?? null,
       presentationLines: toDistributionLines(row.presentationLines, distributionPresentations),
       unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,

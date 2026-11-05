@@ -52,6 +52,7 @@ import { singleLineInput } from '@/tests/helpers/single-recipe-order';
 
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { seedPackaging } from '../../helpers/packaging-seed';
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 /** El rechazo viene de Postgres: uno de los dos CHECK de posicion de la tabla. */
 const CHECK_DE_POSICION = /order_execution_entries_(step_position_positive|packing_has_no_step)/u;
@@ -524,7 +525,7 @@ describe('asignaciones · la anotacion y el pedido se confirman juntos (Postgres
       await asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) });
       expect((await pedidoEnBase(orderId)).status).toBe('POR_ACONDICIONAR');
       // Ninguna accion de la aplicacion escribe ENTREGADO: se fija a mano para sembrar el caso.
-      await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } });
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } }).then(() => syncOnlyLine(prisma, orderId));
       expect((await pedidoEnBase(orderId)).status).toBe('ENTREGADO');
       const antes = await anotaciones(orderId);
 

@@ -100,6 +100,7 @@ describe('quien escribe products.last_batch_at', () => {
       tx,
       {
         orderId: 'order-1',
+        orderLineId: 'order-line-1',
         recipeId: 'recipe-1',
         recipeName: 'Desengrasante',
         presentationId: 'presentation-1',

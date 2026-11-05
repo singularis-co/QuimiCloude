@@ -45,6 +45,7 @@ vi.mock(
 import { asignaciones } from '@/lib/composition';
 import { normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 
@@ -171,6 +172,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
   await prisma.orderConditioningTeamMember.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipe.deleteMany({ where: { companyId } });
   await prisma.workGroupMember.deleteMany({ where: { companyId } });
@@ -195,6 +197,7 @@ async function pedidoPorAcondicionar(fixture: Fixture): Promise<string> {
     },
     select: { id: true },
   });
+  await ensureOnlyLine(prisma, order.id);
   return order.id;
 }
 

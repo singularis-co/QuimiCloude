@@ -42,6 +42,7 @@ import { asignaciones } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 const CHECK_SIN_PASO = /order_execution_entries_conditioning_has_no_step/u;
 
@@ -155,6 +156,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.productBatch.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.product.deleteMany({ where: { id: { in: productIds } } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipe.deleteMany({ where: { companyId } });
   await prisma.presentation.deleteMany({ where: { id: { in: fixture.presentationIds } } });
@@ -179,6 +181,7 @@ async function pedidoPorAcondicionar(fixture: Fixture): Promise<string> {
     },
     select: { id: true },
   });
+  await ensureOnlyLine(prisma, order.id);
   return order.id;
 }
 
@@ -237,7 +240,7 @@ async function crearLote(fixture: Fixture, orderId: string, nombre: string): Pro
 /** Como `crearLote`, sobre una presentacion que ya existe (otra produccion de la misma). */
 async function crearLoteEn(fixture: Fixture, orderId: string, presentationId: string): Promise<Lote> {
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
     select: { id: true },
   });
   const outcome = await prisma.$transaction((tx) =>
@@ -245,6 +248,7 @@ async function crearLoteEn(fixture: Fixture, orderId: string, presentationId: st
       tx,
       {
         orderId,
+        orderLineId: null,
         recipeId: fixture.recipeId,
         recipeName: 'Limpiador',
         presentationId,
@@ -522,6 +526,7 @@ describe('Terminar anota en el registro de ejecucion', () => {
       await prisma.orderPresentationLine.create({
         data: {
           orderId: pedido,
+          orderLineId: await ensureOnlyLine(prisma, pedido),
           companyId: fixture.companyId,
           presentationId: await crearPresentacion(fixture, 'Bidon 20 L'),
           packages: 1,

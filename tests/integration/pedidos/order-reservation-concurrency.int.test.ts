@@ -67,6 +67,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -394,7 +395,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
       // abierto la pantalla antes de que arranque el combo.
       async function nuevaOrdenEnCurso(): Promise<string> {
         const id = await nuevaOrden();
-        await transitionAliveById(id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+        await onOnlyLine(transitionAliveById)(id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
         return id;
       }
 
@@ -403,7 +404,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
       const cancelar = (orderId: string) => cancelOrder(orderId, { reason: 'vuelta de concurrencia' }, actorDe(fixture));
       const borrar = (orderId: string) => deleteOrder(orderId, actorDe(fixture));
       const finalizar = (orderId: string) =>
-        transitionAliveById(orderId, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+        onOnlyLine(transitionAliveById)(orderId, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
 
       // Cada constructor de combo prepara lo que haga falta (secuencial, fuera de la carrera) y
       // devuelve las DOS promesas ya lanzadas -sin `await` entre ellas- para que compitan de

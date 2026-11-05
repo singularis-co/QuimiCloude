@@ -38,6 +38,7 @@ function pedidoId(i: number): string {
 function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id,
+    lineId: `linea-${id}`,
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,
     quantity: '10.0000',

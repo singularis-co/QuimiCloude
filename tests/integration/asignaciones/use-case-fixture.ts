@@ -63,6 +63,7 @@ import type { OrderResponsible } from '@/lib/modules/asignaciones/domain/assignm
 import type { OrderResponsiblesEntry } from '@/lib/modules/asignaciones/domain/list-responsibles-for-orders';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { realOrderSummaries } from '../../helpers/order-summaries';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -375,6 +376,7 @@ export async function createOrder(
     },
     select: { id: true },
   });
+  await ensureOnlyLine(fixture.tx, order.id);
   return order.id;
 }
 
@@ -409,6 +411,7 @@ export async function crearLinea(
   await tx.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: await ensureOnlyLine(tx, orderId),
       companyId,
       presentationId: presentation.id,
       packages,

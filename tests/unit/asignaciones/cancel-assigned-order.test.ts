@@ -33,6 +33,7 @@ const OTRA_EMPRESA = uuid('9');
 const ANA = uuid('1');
 const BETO = uuid('2');
 const PEDIDO = uuid('7');
+const LINEA = 'linea-unica';
 const OTRO_PEDIDO = uuid('8');
 const AHORA = new Date('2026-10-06T12:00:00.000Z');
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
@@ -67,7 +68,7 @@ function montar(options?: {
   const listAliveSummariesByIds = vi.fn(async () => {
     eventos.push('listAliveSummariesByIds');
     return {
-      items: [{ id: PEDIDO, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status }],
+      items: [{ id: PEDIDO, lineId: LINEA, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status }],
       total: 1,
       page: 1,
       pageSize: 1,
@@ -276,6 +277,7 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
       action: 'cancel',
       companyId: EMPRESA,
       orderId: PEDIDO,
+      orderLineId: LINEA,
       userId: ANA,
       stepPosition: 2,
       reason: ENTRADA.reason,

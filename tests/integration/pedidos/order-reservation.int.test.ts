@@ -66,6 +66,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -588,9 +589,9 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('100.0000');
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',
@@ -625,12 +626,12 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
-      await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
       // POR_EMPACAR solo admite EN_EMPAQUE: un segundo intento, con POR_EMPACAR como `from` y
       // `to`, es ilegal por construccion y no vuelve a tocar el inventario.
       await expect(
-        transitionAliveById(creado.id, fixture.companyId, 'POR_EMPACAR', 'POR_EMPACAR', fixture.actorId, new Date()),
+        onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'POR_EMPACAR', 'POR_EMPACAR', fixture.actorId, new Date()),
       ).rejects.toThrow();
 
       expect(await stockDe(batchId)).toBe('90.0000');
@@ -656,9 +657,9 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       // La existencia merma por fuera de la reserva (una merma de otro camino), y al Finalizar
       // ya no alcanza lo apartado ni el resto de lotes con disponible.
       await prisma.productBatch.update({ where: { id: batchId }, data: { stock: '0' } });
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',
@@ -692,9 +693,10 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       const creado = await createOrder(nuevoPedido(recipeVacia, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
       await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await prisma.orderLine.updateMany({ where: { orderId: creado.id }, data: { recipeId, originalRecipeId: recipeId } });
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',
@@ -723,9 +725,9 @@ describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',

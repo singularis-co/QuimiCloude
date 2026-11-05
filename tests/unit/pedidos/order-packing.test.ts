@@ -15,7 +15,8 @@ import * as transitions from '@/lib/modules/pedidos/domain/order-transitions';
 import { fakeOrderConsumptionLedger, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
 
 import type { OrderPackingRepository } from '@/lib/modules/pedidos/ports/order-packing-repository';
-import type { FinishPackingLine, FinishPackingUpdateOutcome } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { FinishPackingLine } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { OrderLineRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderCatalog, PackedLineCount } from '@/lib/modules/pedidos';
 import type { ConsumedLot, FinishedGoodsIntake, MaterialReservations, PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -23,6 +24,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const EMPRESA = 'c-1';
 const PEDIDO = 'o-1';
+const LINEA = 'ol-1';
 const EMPACADOR = 'u-1';
 const RECETA = 'r-1';
 const AHORA = new Date('2026-09-25T12:00:00Z');
@@ -72,7 +74,7 @@ function lineaDe(overrides: Partial<FinishPackingLine> = {}): FinishPackingLine 
     packages: 10,
     presentationContent: '1.0000',
     packagingProductId: null,
-    orderLineId: null,
+    orderLineId: LINEA,
     packedPackages: null,
     packedSurplusPackages: 0,
     ...overrides,
@@ -134,9 +136,9 @@ describe('createStartPacking (R10, R18-R20, R23, R24)', () => {
     const packing = packingDoble({ startPackingAlive });
     const startPackingAliveById = createStartPacking({ packing });
 
-    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('ok');
+    await expect(startPackingAliveById(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('ok');
 
-    expect(startPackingAlive).toHaveBeenCalledWith(PEDIDO, EMPACADOR, AHORA, { companyId: EMPRESA });
+    expect(startPackingAlive).toHaveBeenCalledWith(PEDIDO, LINEA, EMPACADOR, AHORA, { companyId: EMPRESA });
     expect(startPackingAlive).toHaveBeenCalledTimes(1);
   });
 
@@ -144,21 +146,21 @@ describe('createStartPacking (R10, R18-R20, R23, R24)', () => {
     const packing = packingDoble({ startPackingAlive: vi.fn(async () => 'already_mine' as const) });
     const startPackingAliveById = createStartPacking({ packing });
 
-    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('already_mine');
+    await expect(startPackingAliveById(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('already_mine');
   });
 
   it('R19, R20: taken (EN_EMPAQUE a nombre de otro, o la carrera del segundo Comenzar) se devuelve tal cual', async () => {
     const packing = packingDoble({ startPackingAlive: vi.fn(async () => 'taken' as const) });
     const startPackingAliveById = createStartPacking({ packing });
 
-    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('taken');
+    await expect(startPackingAliveById(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('taken');
   });
 
   it('R23: not_packable (el pedido no esta POR_EMPACAR) se devuelve tal cual', async () => {
     const packing = packingDoble({ startPackingAlive: vi.fn(async () => 'not_packable' as const) });
     const startPackingAliveById = createStartPacking({ packing });
 
-    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('not_packable');
+    await expect(startPackingAliveById(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('not_packable');
   });
 
   it('R10: without_distribution (POR_EMPACAR sin ninguna linea de reparto) se devuelve tal cual', async () => {
@@ -167,7 +169,7 @@ describe('createStartPacking (R10, R18-R20, R23, R24)', () => {
     });
     const startPackingAliveById = createStartPacking({ packing });
 
-    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe(
+    await expect(startPackingAliveById(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA)).resolves.toBe(
       'without_distribution',
     );
   });
@@ -176,13 +178,49 @@ describe('createStartPacking (R10, R18-R20, R23, R24)', () => {
     const packing = packingDoble({ startPackingAlive: vi.fn(async () => 'not_found' as const) });
     const startPackingAliveById = createStartPacking({ packing });
 
-    await expect(startPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('not_found');
+    await expect(startPackingAliveById(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA)).resolves.toBe('not_found');
   });
 });
 
+/** Lo que el `UPDATE` condicional de antes devolvia, ahora visto en la linea que se bloquea. */
+type LineaBloqueada =
+  | { readonly kind: 'ok'; readonly recipeId: string; readonly quantity: string; readonly unitId: string | null }
+  | { readonly kind: 'not_packer' | 'not_packable' | 'not_found' };
+
+function lineaBloqueada(outcome: LineaBloqueada): { order: never; line: OrderLineRow } | null {
+  if (outcome.kind === 'not_found') return null;
+  const base = {
+    id: LINEA,
+    orderId: PEDIDO,
+    position: 0,
+    originalRecipeId: RECETA,
+    cancellationReason: null,
+    ingredientsCost: null,
+    packagingCost: null,
+    actualCost: null,
+    salePrice: null,
+    reservedAt: null,
+    finishedAt: null,
+    conditionedBy: null,
+    createdAt: AHORA,
+    updatedAt: AHORA,
+    createdBy: EMPACADOR,
+    updatedBy: EMPACADOR,
+    presentationLines: [],
+  };
+  if (outcome.kind === 'ok') {
+    const { recipeId, quantity, unitId } = outcome;
+    return { order: undefined as never, line: { ...base, recipeId, quantity, unitId: unitId as string, status: 'EN_EMPAQUE', packedBy: EMPACADOR } };
+  }
+  const line = { ...base, recipeId: RECETA, quantity: '10.0000', unitId: LITRO };
+  return outcome.kind === 'not_packer'
+    ? { order: undefined as never, line: { ...line, status: 'EN_EMPAQUE', packedBy: 'otro-empacador' } }
+    : { order: undefined as never, line: { ...line, status: 'POR_EMPACAR', packedBy: null } };
+}
+
 describe('createFinishPacking (T14, R17-R21)', () => {
   function montar(options: {
-    readonly finishPackingAlive?: FinishPackingUpdateOutcome;
+    readonly finishPackingAlive?: LineaBloqueada;
     readonly lines?: readonly FinishPackingLine[];
     readonly receiveFromOrder?: ReturnType<typeof vi.fn>;
     readonly catalogos?: ReturnType<typeof catalogosGlobales>;
@@ -219,10 +257,12 @@ describe('createFinishPacking (T14, R17-R21)', () => {
   } {
     const catalogos = options.catalogos ?? catalogosGlobales();
     const orden: string[] = [];
-    const finishPackingAlive = vi.fn(
-      async (): Promise<FinishPackingUpdateOutcome> =>
-        options.finishPackingAlive ?? { kind: 'ok', recipeId: RECETA, quantity: '10.0000', unitId: LITRO },
+    // Bloquear la linea es lo que antes era el `UPDATE` condicional del pedido.
+    const finishPackingAlive = vi.fn(async () =>
+      lineaBloqueada(options.finishPackingAlive ?? { kind: 'ok', recipeId: RECETA, quantity: '10.0000', unitId: LITRO }),
     );
+    const setLineStatus = vi.fn(async () => 'ok' as const);
+    const refreshStatus = vi.fn(async () => 'POR_ACONDICIONAR' as const);
     const lineas = options.lines ?? [lineaDe()];
     const findPresentationLinesForFinish = vi.fn(async () => lineas);
     const recordPackedCounts = vi.fn(async () => undefined);
@@ -248,7 +288,14 @@ describe('createFinishPacking (T14, R17-R21)', () => {
       };
 
     const { unitOfWork, reservations, orders } = fakeUnitOfWork({
-      orders: { finishPackingAlive, findPresentationLinesForFinish, recordPackedCounts, setActualCost },
+      orders: {
+        lockAliveLine: finishPackingAlive,
+        setLineStatus,
+        refreshStatus,
+        findPresentationLinesForFinish,
+        recordPackedCounts,
+        setLineActualCost: setActualCost,
+      },
       reservations: {
         ...(options.consumeForLine === undefined ? {} : { consumeForLine: options.consumeForLine as unknown as MaterialReservations['consumeForLine'] }),
         settlePackagingForLine: conOrden('settlePackagingForLine', settlePackagingForLine) as unknown as MaterialReservations['settlePackagingForLine'],
@@ -292,7 +339,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     const finish = createFinishPacking(deps);
     return {
       finishPackingAliveById: (id, companyId, packerId, now, counts) =>
-        finish(id, companyId, packerId, now, counts ?? conteoDelPlan(lineas)),
+        finish(id, LINEA, companyId, packerId, now, counts ?? conteoDelPlan(lineas)),
       finishPackingAlive,
       findPresentationLinesForFinish,
       recordPackedCounts,
@@ -504,7 +551,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
     expect(settlePackagingForLine).toHaveBeenCalledTimes(1);
     expect(settlePackagingForLine).toHaveBeenCalledWith({
       orderId: PEDIDO,
-      orderLineId: null,
+      orderLineId: LINEA,
       companyId: EMPRESA,
       requirement: [
         { productId: 'envase-1', quantity: '8' },
@@ -671,8 +718,8 @@ describe('createFinishPacking (T14, R17-R21)', () => {
 
       await expect(m.finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
 
-      expect(m.findConsumedLots).toHaveBeenCalledExactlyOnceWith({ orderId: PEDIDO, orderLineId: null, companyId: EMPRESA });
-      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, '120.0000', { companyId: EMPRESA });
+      expect(m.findConsumedLots).toHaveBeenCalledExactlyOnceWith({ orderId: PEDIDO, orderLineId: LINEA, companyId: EMPRESA });
+      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, '120.0000', { companyId: EMPRESA });
       expect(m.deshecho()).toBe(false);
     });
 
@@ -734,7 +781,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
 
       await expect(m.finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toEqual({ kind: 'ok', finishedGoods: [] });
 
-      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, '120.0000', { companyId: EMPRESA });
+      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, '120.0000', { companyId: EMPRESA });
       expect(m.settlePackagingForLine).not.toHaveBeenCalled();
       expect(m.receiveFromOrder).not.toHaveBeenCalled();
       expect(m.deshecho()).toBe(false);
@@ -748,7 +795,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
         finishedGoods: [],
       });
 
-      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, '120.0000', { companyId: EMPRESA });
+      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, '120.0000', { companyId: EMPRESA });
       expect(m.receiveFromOrder).not.toHaveBeenCalled();
     });
 
@@ -757,7 +804,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
 
       await expect(m.finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toEqual({ kind: 'ok', finishedGoods: [] });
 
-      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, null, { companyId: EMPRESA });
+      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, null, { companyId: EMPRESA });
     });
 
     it('R16: los lotes llevan el real entre lo envasado: 120 entre 6 x 1 L + 2 x 2 L = 12.0000 por litro', async () => {
@@ -789,7 +836,7 @@ describe('createFinishPacking (T14, R17-R21)', () => {
 
       await expect(m.finishPackingAliveById(PEDIDO, EMPRESA, EMPACADOR, AHORA)).resolves.toMatchObject({ kind: 'ok' });
 
-      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, null, { companyId: EMPRESA });
+      expect(m.setActualCost).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, null, { companyId: EMPRESA });
       expect(m.receiveFromOrder).toHaveBeenCalledTimes(2);
       for (const call of m.receiveFromOrder.mock.calls) {
         expect(call[0]).toMatchObject({ unitCost: null });
@@ -814,18 +861,18 @@ describe('createFinishPacking con el conteo real de envases', () => {
     readonly actualCost?: string;
     readonly catalogos?: ReturnType<typeof catalogosGlobales>;
     readonly settlePackagingForLine?: ReturnType<typeof vi.fn>;
-    readonly finishPackingAlive?: FinishPackingUpdateOutcome;
+    readonly finishPackingAlive?: LineaBloqueada;
   }) {
     const orden: string[] = [];
-    const finishPackingAlive = vi.fn(async (): Promise<FinishPackingUpdateOutcome> => {
+    const finishPackingAlive = vi.fn(async () => {
       orden.push('finishPackingAlive');
-      return (
+      return lineaBloqueada(
         options.finishPackingAlive ?? {
           kind: 'ok',
           recipeId: RECETA,
           quantity: options.quantity ?? '10.0000',
           unitId: LITRO,
-        }
+        },
       );
     });
     const findPresentationLinesForFinish = vi.fn(async () => options.lines);
@@ -851,7 +898,14 @@ describe('createFinishPacking con el conteo real de envases', () => {
       orden.push('setActualCost');
     });
     const { unitOfWork, reservations } = fakeUnitOfWork({
-      orders: { finishPackingAlive, findPresentationLinesForFinish, recordPackedCounts, setActualCost },
+      orders: {
+        lockAliveLine: finishPackingAlive,
+        setLineStatus: vi.fn(async () => 'ok' as const),
+        refreshStatus: vi.fn(async () => 'POR_ACONDICIONAR' as const),
+        findPresentationLinesForFinish,
+        recordPackedCounts,
+        setLineActualCost: setActualCost,
+      },
       reservations: { settlePackagingForLine: settlePackagingForLine as unknown as MaterialReservations['settlePackagingForLine'] },
       consumption: fakeOrderConsumptionLedger(consumoDe(options.actualCost ?? '20.0000')),
       finishedGoods: { receiveFromOrder: receiveFromOrder as unknown as FinishedGoodsIntake['receiveFromOrder'] },
@@ -875,7 +929,7 @@ describe('createFinishPacking con el conteo real de envases', () => {
       presentations: catalogos.presentations,
     });
     return {
-      terminar: (counts: readonly PackedLineCount[]) => finish(PEDIDO, EMPRESA, EMPACADOR, AHORA, counts),
+      terminar: (counts: readonly PackedLineCount[]) => finish(PEDIDO, LINEA, EMPRESA, EMPACADOR, AHORA, counts),
       orden,
       findPresentationLinesForFinish,
       recordPackedCounts,
@@ -1106,7 +1160,7 @@ describe('createFinishPacking con el conteo real de envases', () => {
 
     expect(m.settlePackagingForLine).toHaveBeenCalledExactlyOnceWith({
       orderId: PEDIDO,
-      orderLineId: null,
+      orderLineId: LINEA,
       companyId: EMPRESA,
       requirement: [
         { productId: 'envase-1', quantity: '3' },

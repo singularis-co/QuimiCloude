@@ -65,6 +65,7 @@ function createData(row: NewStepEvidence, slot: number): Prisma.OrderStepEvidenc
   return {
     companyId: row.companyId,
     orderId: row.orderId,
+    orderLineId: row.orderLineId,
     phase: TO_DB_PHASE[row.phase],
     stepPosition: row.stepPosition,
     slot,

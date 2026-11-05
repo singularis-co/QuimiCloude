@@ -47,6 +47,7 @@ const BETO = uuid('2');
 const CARLA = uuid('4');
 const DIEGO = uuid('5');
 const PEDIDO = uuid('7');
+const LINEA = 'linea-unica';
 const GRUPO = uuid('8');
 const AHORA = new Date('2026-10-08T12:00:00.000Z');
 
@@ -106,8 +107,16 @@ function montar(opciones: Opciones = {}) {
     } as unknown as ExecutionWriters);
   });
 
+  // La unica linea del pedido, en el estado del pedido: la que Comenzar opera.
+  const listAliveSummariesByIds = vi.fn(async () => ({
+    items: [{ id: PEDIDO, lineId: LINEA }],
+    total: 1,
+    page: 1,
+    pageSize: 1,
+    totalPages: 1,
+  }));
   const deps: StartConditioningDeps = {
-    orders: { findAliveById } as unknown as OrderCatalog,
+    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
     people: { findAliveRefsInCompany } as unknown as PeopleDirectory,
     groups: { findSnapshotAliveInCompany } as unknown as WorkGroupDirectory,
     transaction: { run } as ExecutionTransaction,
@@ -229,10 +238,10 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
     expect(pasos[0]).toBe('pedido');
     expect(pasos.slice(1, 3).sort()).toEqual(['grupo', 'personas']);
     expect(pasos.slice(3)).toEqual(['personas', 'transaccion', 'escribe-pedido', 'escribe-equipo', 'anota']);
-    expect(startConditioningAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(startConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
     expect(insertAll).toHaveBeenCalledWith([
-      { orderId: PEDIDO, userId: BETO, companyId: EMPRESA, workGroupId: null, workGroupName: null, position: 0 },
-      { orderId: PEDIDO, userId: CARLA, companyId: EMPRESA, workGroupId: GRUPO, workGroupName: 'Turno manana', position: 1 },
+      { orderId: PEDIDO, orderLineId: LINEA, userId: BETO, companyId: EMPRESA, workGroupId: null, workGroupName: null, position: 0 },
+      { orderId: PEDIDO, orderLineId: LINEA, userId: CARLA, companyId: EMPRESA, workGroupId: GRUPO, workGroupName: 'Turno manana', position: 1 },
     ]);
   });
 
@@ -261,7 +270,7 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
     const { deps, startConditioningAliveById } = montar();
 
     await createStartConditioning({ ...deps, now: undefined })(ACTOR, ENTRADA);
-    expect((startConditioningAliveById.mock.calls[0] as unknown[] | undefined)?.[3]).toBeInstanceOf(Date);
+    expect((startConditioningAliveById.mock.calls[0] as unknown[] | undefined)?.[4]).toBeInstanceOf(Date);
   });
 
   it('R12: si insertar el equipo falla, el error sale de la transaccion para que la deshaga', async () => {
@@ -289,6 +298,7 @@ describe('startConditioning — anota Comenzar en el registro de ejecucion', () 
       action: 'conditioning_start',
       companyId: EMPRESA,
       orderId: PEDIDO,
+      orderLineId: LINEA,
       userId: ANA,
       stepPosition: null,
       occurredAt: AHORA,

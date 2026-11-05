@@ -5,11 +5,12 @@ import { requirePermission, type Actor } from './actor';
 import { EvidenceRequiredError, OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 import { assertOrderAcceptsWrites } from './order-state';
 import { stepRequiresEvidence } from './step-evidence';
+import { findOnlyLine } from './only-order-line';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
-import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 const recordStepMoveSchema = z.strictObject({
@@ -35,11 +36,9 @@ async function assertLeavingStepHasEvidence(
   deps: RecordStepMoveDeps,
   companyId: string,
   orderId: string,
+  summary: AssignedOrderSummary,
   position: number,
 ): Promise<void> {
-  const page = await deps.orders.listAliveSummariesByIds(companyId, [orderId], ['EN_CURSO'], 1, 1);
-  const summary = page.items[0];
-  if (summary === undefined) throw new OrderNotFoundError();
 
   const content = await deps.recipes.findExecutionContentById(summary.recipeId, companyId);
   if (!stepRequiresEvidence(content?.steps ?? [], position)) return;
@@ -87,15 +86,17 @@ export function createRecordStepMove(
       throw new OrderNotFoundError();
     }
 
+    const summary = await findOnlyLine(deps.orders, actor.companyId, orderId, ['EN_CURSO']);
     // Volver atras nunca se bloquea: corregir un paso anterior siempre se permite.
     if (direction === 'advance' && stepPosition !== null && stepPosition >= 2) {
-      await assertLeavingStepHasEvidence(deps, actor.companyId, orderId, stepPosition - 1);
+      await assertLeavingStepHasEvidence(deps, actor.companyId, orderId, summary, stepPosition - 1);
     }
 
     await deps.log.append({
       action: direction,
       companyId: actor.companyId,
       orderId,
+      orderLineId: summary.lineId,
       userId: actor.id,
       stepPosition,
       occurredAt: deps.now?.() ?? new Date(),

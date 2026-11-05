@@ -22,6 +22,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 
 import type { NewOrder, OrderScope, OrderStatus } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 const { listSummariesByIdsIncludingDeleted, listAliveSummariesByIds } = realOrderSummaries()
 
@@ -101,7 +102,7 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
 }
 
 async function limpiarEmpresa(e: Empresa): Promise<void> {
-  await prisma.order.deleteMany({ where: { companyId: e.companyId } })
+  await prisma.orderLine.deleteMany({ where: { companyId: e.companyId } }).then(() => prisma.order.deleteMany({ where: { companyId: e.companyId } }))
   await prisma.user.delete({ where: { id: e.userId } })
   await prisma.recipe.delete({ where: { id: e.recipeId } })
   await prisma.presentation.delete({ where: { id: e.presentationId } })
@@ -163,12 +164,12 @@ async function sembrar(e: Empresa, semilla: Semilla): Promise<string> {
       orderSequence: semilla.sequence,
       ...(semilla.deleted === true ? { deletedAt: now } : {}),
     },
-  })
+  }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 
 async function borrar(ids: readonly string[]): Promise<void> {
-  await prisma.order.deleteMany({ where: { id: { in: [...ids] } } })
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: [...ids] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [...ids] } } }))
 }
 
 beforeAll(async () => {

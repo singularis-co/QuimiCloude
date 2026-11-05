@@ -83,6 +83,7 @@ import type {
 import { realOrderSummaries } from '../../helpers/order-summaries'
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed'
+import { ensureOnlyLine } from '../../helpers/only-order-line'
 
 const { listAliveSummariesByIds: listAliveOrderSummariesByIds } = realOrderSummaries()
 
@@ -724,6 +725,8 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
         select: { id: true },
       })
       creados.push(filaSinReparto.id)
+      // Los resumenes son por linea: cada pedido sembrado recibe la suya, como en la migracion.
+      for (const id of creados) await ensureOnlyLine(prisma, id)
 
       const pagina = await listAliveOrderSummariesByIds(
         companyId,
@@ -756,6 +759,7 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
         presentationLines: [{ presentationId, packages: 5, content: null, packagingProductId: null }],
       })
 
+      for (const id of creados) await ensureOnlyLine(prisma, id)
       const pagina = await listAliveOrderSummariesByIds(companyId, [conEnvase.id, antiguo.id], ['PENDIENTE'], 1)
 
       expect(pagina.items.find((item) => item.id === conEnvase.id)?.presentationLines).toEqual([
@@ -820,9 +824,15 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
 /** Pasa un pedido recien creado de `PENDIENTE` a `BLOQUEADO` por `setStatus`, sin autor. */
 async function bloquear(id: string, now: Date): Promise<void> {
-  const resultado = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).setStatus(id, 'PENDIENTE', 'BLOQUEADO', null, now, scope()),
-  )
+  // Con linea, lo bloqueado es la linea y el pedido se deriva de ella; sin linea, el pedido.
+  const resultado = await withOrderTransaction(async (tx) => {
+    const writes = createOrderWriteRepository(tx)
+    const lineId = await writes.findOnlyLineId(id, scope())
+    if (lineId === null) return writes.setStatus(id, 'PENDIENTE', 'BLOQUEADO', null, now, scope())
+    const movida = await writes.setLineStatus(id, lineId, 'PENDIENTE', 'BLOQUEADO', null, now, scope())
+    await writes.refreshStatus(id, null, now, scope())
+    return movida
+  })
   expect(resultado).toBe('ok')
 }
 

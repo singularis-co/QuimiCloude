@@ -94,6 +94,7 @@ export function createRegisterEvidence(
     const row: NewStepEvidence = {
       companyId: actor.companyId,
       orderId,
+      orderLineId: target.lineId,
       phase,
       stepPosition,
       path,

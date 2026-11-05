@@ -186,6 +186,7 @@ async function recibir(
       tx,
       {
         orderId,
+        orderLineId: null,
         recipeId: receta.id,
         recipeName: receta.name,
         presentationId,

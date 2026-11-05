@@ -6,6 +6,7 @@ import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
 import { createGetAssignedOrderExecution, type GetAssignedOrderExecutionDeps } from './get-assigned-order-execution';
 import { assertOrderAcceptsWrites } from './order-state';
+import { findOnlyLine } from './only-order-line';
 
 import type { AssignedOrderExecutionView, StartedOrderExecution } from './assigned-order-execution-view';
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
@@ -16,6 +17,9 @@ import type { OrderAssignmentTarget } from '@/lib/modules/pedidos';
 const startAssignedOrderSchema = z.strictObject({
   orderId: z.string().uuid(),
 });
+
+/** Los dos estados en que se abre una linea: el de arrancar y el de retomar. */
+const STARTABLE = ['PENDIENTE', 'EN_CURSO'] as const;
 
 export type StartAssignedOrderDeps = GetAssignedOrderExecutionDeps & {
   readonly log: ExecutionLogRepository;
@@ -64,12 +68,14 @@ export function createStartAssignedOrder(
 
       if (order.status === 'EN_CURSO') {
         view ??= await getAssignedOrderExecution(actor, { orderId });
+        const { lineId } = await findOnlyLine(deps.orders, actor.companyId, orderId, STARTABLE);
         const last = await deps.log.findLastStepPosition(actor.companyId, orderId);
         const position = view.steps.length === 0 ? null : last ?? 1;
         await deps.log.append({
           action: 'resume',
           companyId: actor.companyId,
           orderId,
+          orderLineId: lineId,
           userId: actor.id,
           stepPosition: position,
           occurredAt: deps.now?.() ?? new Date(),
@@ -99,11 +105,13 @@ export function createStartAssignedOrder(
         }
       }
       const position = view.steps.length === 0 ? null : 1;
+      const { lineId } = await findOnlyLine(deps.orders, actor.companyId, orderId, STARTABLE);
       const now = deps.now?.() ?? new Date();
       try {
         await deps.transaction.run(async ({ orders, log }) => {
           const outcome = await orders.transitionAliveById(
             orderId,
+            lineId,
             actor.companyId,
             'PENDIENTE',
             'EN_CURSO',
@@ -115,6 +123,7 @@ export function createStartAssignedOrder(
             action: 'start',
             companyId: actor.companyId,
             orderId,
+            orderLineId: lineId,
             userId: actor.id,
             stepPosition: position,
             occurredAt: now,

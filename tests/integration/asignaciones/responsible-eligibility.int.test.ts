@@ -57,7 +57,7 @@ import {
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
-import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import type { OrderLineStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
@@ -117,16 +117,21 @@ const recipes: RecipeCatalog = {
  */
 async function transitionAliveByIdReal(
   id: string,
+  lineId: string,
   companyId: string,
-  from: OrderStatus,
-  to: OrderStatus,
+  from: OrderLineStatus,
+  to: OrderLineStatus,
   actorId: string,
   now: Date,
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
+  if (to === 'CANCELADO') throw new Error('cancelar no es una transicion de la ejecucion');
   // R15, R16: yendo a `POR_EMPACAR` el exito real vuelve a ser el literal `'ok'` -ya
   // no da de alta ningun lote-, asi que este doble no necesita distinguir el destino.
-  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+  const orders = createOrderWriteRepository();
+  const result = await orders.setLineStatus(id, lineId, from, to, actorId, now, { companyId });
+  if (result === 'ok') await orders.refreshStatus(id, actorId, now, { companyId });
+  return result;
 }
 
 /** El `OrderCatalog` REAL: los tres metodos de escritura y lectura que la ejecucion necesita. */

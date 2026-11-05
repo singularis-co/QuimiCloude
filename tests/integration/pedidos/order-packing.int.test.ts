@@ -50,6 +50,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
@@ -204,7 +205,7 @@ async function crearLinea(fixture: Fixture, orderId: string, packages = 1): Prom
 async function borrarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
   await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...orderIds] } } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
-  await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: [...orderIds] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } }));
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
@@ -319,7 +320,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     const pedido = await createOrder(fixture, { status: 'POR_EMPACAR' });
     try {
       const antes = await readOrder(pedido);
-      const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+      const resultado = await onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.packerId, new Date());
       expect(resultado).toBe('without_distribution');
 
       const despues = await readOrder(pedido);
@@ -337,7 +338,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     try {
       const antes = await movementCountDe(fixture.companyId);
       const ahora = new Date();
-      const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora);
+      const resultado = await onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.packerId, ahora);
       expect(resultado).toBe('ok');
 
       const fila = await readOrder(pedido);
@@ -356,8 +357,8 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     try {
       // Sin `await` entre las dos llamadas: compiten de verdad por el bloqueo de la fila.
       const [resultadoUno, resultadoDos] = await Promise.all([
-        startPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date()),
-        startPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date()),
+        onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.packerId, new Date()),
+        onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.otherPackerId, new Date()),
       ]);
 
       const resultados = [resultadoUno, resultadoDos];
@@ -378,7 +379,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
       const antes = await readOrder(pedido);
-      const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+      const resultado = await onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.packerId, new Date());
       expect(resultado).toBe('already_mine');
 
       const despues = await readOrder(pedido);
@@ -393,7 +394,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
       const antes = await readOrder(pedido);
-      const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date());
+      const resultado = await onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.otherPackerId, new Date());
       expect(resultado).toBe('taken');
 
       const despues = await readOrder(pedido);
@@ -413,7 +414,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     };
     try {
       for (const [estado, pedido] of Object.entries(pedidos)) {
-        const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date());
+        const resultado = await onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.packerId, new Date());
         expect(resultado, estado).toBe('not_packable');
       }
     } finally {
@@ -427,7 +428,7 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     try {
       for (const [estado, pedido] of Object.entries(pedidos)) {
         const antes = await readOrder(pedido);
-        const resultado = await startPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date());
+        const resultado = await onOnlyLine(startPackingAliveById)(pedido, fixture.companyId, fixture.otherPackerId, new Date());
         expect(resultado, estado).toBe('not_packable');
         expect(await readOrder(pedido), estado).toEqual(antes);
       }
@@ -444,15 +445,15 @@ describe('startPackingAliveById — R10, R18, R19, R20, R23, R24, R25', () => {
     const borrado = await createOrder(fixture, { status: 'PENDIENTE', deletedAt: new Date() });
     const propio = await createOrder(fixture, { status: 'POR_EMPACAR' });
     try {
-      const inexistente = await startPackingAliveById(randomUUID(), fixture.companyId, fixture.packerId, new Date());
+      const inexistente = await onOnlyLine(startPackingAliveById)(randomUUID(), fixture.companyId, fixture.packerId, new Date());
       expect(inexistente).toBe('not_found');
 
-      const dadoDeBaja = await startPackingAliveById(borrado, fixture.companyId, fixture.packerId, new Date());
+      const dadoDeBaja = await onOnlyLine(startPackingAliveById)(borrado, fixture.companyId, fixture.packerId, new Date());
       expect(dadoDeBaja).toBe('not_found');
 
       // El pedido es de `fixture`; se pide con la empresa AJENA como scope: misma fila, empresa
       // equivocada, igual de invisible que si no existiera.
-      const cruzado = await startPackingAliveById(propio, otra.companyId, otra.packerId, new Date());
+      const cruzado = await onOnlyLine(startPackingAliveById)(propio, otra.companyId, otra.packerId, new Date());
       expect(cruzado).toBe('not_found');
     } finally {
       await borrarFixture(fixture, [borrado, propio]);
@@ -468,7 +469,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     try {
       const antes = await movementCountDe(fixture.companyId);
       const ahora = new Date();
-      const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
+      const resultado = await onOnlyLine(finishPackingAliveById)(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
       // T14: sin ninguna linea de reparto -este pedido no la tiene-, el `'ok'` vuelve con
       // `finishedGoods` vacio: no hay nada que dar de alta.
       expect(resultado).toEqual({ kind: 'ok', finishedGoods: [] });
@@ -491,7 +492,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
       const antes = await readOrder(pedido);
-      const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.otherPackerId, new Date(), await packedCountsOfPlan(pedido));
+      const resultado = await onOnlyLine(finishPackingAliveById)(pedido, fixture.companyId, fixture.otherPackerId, new Date(), await packedCountsOfPlan(pedido));
       expect(resultado).toBe('not_packer');
 
       const despues = await readOrder(pedido);
@@ -512,7 +513,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     };
     try {
       for (const [estado, pedido] of Object.entries(pedidos)) {
-        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(pedido));
+        const resultado = await onOnlyLine(finishPackingAliveById)(pedido, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(pedido));
         expect(resultado, estado).toBe('not_packable');
       }
     } finally {
@@ -528,7 +529,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       for (const [estado, pedido] of Object.entries(pedidos)) {
         const antes = await readOrder(pedido);
         // El propio empacador: aun siendo quien empaco, el estado ya no admite Terminar.
-        const resultado = await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(pedido));
+        const resultado = await onOnlyLine(finishPackingAliveById)(pedido, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(pedido));
         expect(resultado, estado).toBe('not_packable');
         expect(await readOrder(pedido), estado).toEqual(antes);
       }
@@ -546,13 +547,13 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     const borrado = await createOrder(fixture, { status: 'PENDIENTE', deletedAt: new Date() });
     const propio = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
-      const inexistente = await finishPackingAliveById(randomUUID(), fixture.companyId, fixture.packerId, new Date(), []);
+      const inexistente = await onOnlyLine(finishPackingAliveById)(randomUUID(), fixture.companyId, fixture.packerId, new Date(), []);
       expect(inexistente).toBe('not_found');
 
-      const dadoDeBaja = await finishPackingAliveById(borrado, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(borrado));
+      const dadoDeBaja = await onOnlyLine(finishPackingAliveById)(borrado, fixture.companyId, fixture.packerId, new Date(), await packedCountsOfPlan(borrado));
       expect(dadoDeBaja).toBe('not_found');
 
-      const cruzado = await finishPackingAliveById(propio, otra.companyId, otra.packerId, new Date(), await packedCountsOfPlan(propio));
+      const cruzado = await onOnlyLine(finishPackingAliveById)(propio, otra.companyId, otra.packerId, new Date(), await packedCountsOfPlan(propio));
       expect(cruzado).toBe('not_found');
     } finally {
       await borrarFixture(fixture, [borrado, propio]);
@@ -565,7 +566,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
     const pedido = await createOrder(fixture, { status: 'EN_EMPAQUE', packedBy: fixture.packerId });
     try {
       const ahora = new Date();
-      await finishPackingAliveById(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
+      await onOnlyLine(finishPackingAliveById)(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
 
       const fila = await prisma.order.findUniqueOrThrow({
         where: { id: pedido },
@@ -590,7 +591,7 @@ describe('createOrderPackingRepository — Comenzar dentro de una transaccion aj
     try {
       const fallo = await prisma
         .$transaction(async (tx) => {
-          const resultado = await createOrderPackingRepository(tx).startPackingAlive(
+          const resultado = await onOnlyLine(createOrderPackingRepository(tx).startPackingAlive, tx)(
             pedido,
             fixture.packerId,
             new Date(),

@@ -206,6 +206,7 @@ async function recibirPorProduccion(
       tx,
       {
         orderId,
+        orderLineId: null,
         recipeId,
         recipeName: 'Limpiador',
         presentationId,

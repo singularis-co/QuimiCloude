@@ -28,6 +28,7 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const LINEA = 'linea-unica';
 const OTRA_EMPRESA = uuid('9');
 const AHORA = new Date('2026-09-25T12:00:00.000Z');
 
@@ -82,7 +83,7 @@ function montar(options?: {
 } {
   const findAliveById = vi.fn(async () => (options?.target === undefined ? { id: PEDIDO, status: 'EN_EMPAQUE' } : options.target));
   const listAliveSummariesByIds = vi.fn(async () => ({
-    items: options?.summaryItems ?? [{ id: PEDIDO, number: { year: 2026, sequence: 7 } }],
+    items: options?.summaryItems ?? [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 } }],
     total: 1,
     page: 1,
     pageSize: 1,
@@ -186,7 +187,7 @@ describe('finishPacking — R21, R26: exito devuelve el numero leido antes de es
 
     expect(result).toEqual({ numberText: expect.any(String) });
     expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['EN_EMPAQUE'], 1, 1);
-    expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, expect.any(Date), LINEAS);
+    expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date), LINEAS);
 
     const ordenDeLlamadas = listAliveSummariesByIds.mock.invocationCallOrder[0]!;
     const ordenDeEscritura = finishPackingAliveById.mock.invocationCallOrder[0]!;
@@ -310,7 +311,7 @@ describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de env
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, ENTRADA)).resolves.toEqual({ numberText: expect.any(String) });
-    expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, expect.any(Date), LINEAS);
+    expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date), LINEAS);
   });
 
   it.each([
@@ -403,7 +404,7 @@ describe('finishPacking — R42: empresa del actor y sin comprobacion de respons
     await expect(createFinishPacking(m.deps)(actorDeOtra, ENTRADA)).rejects.toBeInstanceOf(
       OrderNotFoundError,
     );
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_EMPRESA, ANA, AHORA, LINEAS);
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, OTRA_EMPRESA, ANA, AHORA, LINEAS);
     expect(m.filas).toEqual([]);
   });
 
@@ -446,7 +447,7 @@ describe('finishPacking — R41, R5bis, R8, R24: el exito es el objeto y deja un
     expect(m.run).toHaveBeenCalledTimes(1);
     expect(m.estado.confirmada).toBe(true);
     expect(m.filas).toEqual([
-      { companyId: EMPRESA, orderId: PEDIDO, userId: ANA, occurredAt: AHORA, action: 'pack_finish', stepPosition: null },
+      { companyId: EMPRESA, orderId: PEDIDO, orderLineId: LINEA, userId: ANA, occurredAt: AHORA, action: 'pack_finish', stepPosition: null },
     ]);
     expect(m.filas[0]).not.toHaveProperty('reason');
   });
@@ -456,7 +457,7 @@ describe('finishPacking — R41, R5bis, R8, R24: el exito es el objeto y deja un
 
     await createFinishPacking(m.deps)(ACTOR, ENTRADA);
 
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA, LINEAS);
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, LINEAS);
     expect(m.globalFinishPackingAliveById).not.toHaveBeenCalled();
     expect(m.depsAppend).not.toHaveBeenCalled();
     expect(m.estado.appendDentroDeRun).toBe(true);
@@ -471,7 +472,7 @@ describe('finishPacking — R41, R5bis, R8, R24: el exito es el objeto y deja un
     });
     m.listAliveSummariesByIds.mockImplementation(async () => {
       dentroAlLeer.push(m.estado.dentroDeRun);
-      return { items: [{ id: PEDIDO, number: { year: 2026, sequence: 7 } }], total: 1, page: 1, pageSize: 1, totalPages: 1 };
+      return { items: [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 } }], total: 1, page: 1, pageSize: 1, totalPages: 1 };
     });
 
     await createFinishPacking(m.deps)(ACTOR, ENTRADA);
@@ -592,7 +593,7 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
     const m = montar({ resultado: 'not_packer' });
 
     await expect(createFinishPacking(m.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderPackingTakenError);
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA, LINEAS);
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, LINEAS);
     expect(m.filas).toEqual([]);
   });
 
@@ -602,7 +603,7 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
 
     await createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO, lines });
 
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA, [
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, [
       { lineId: uuid('4'), packedPackages: 2, reason: 'otro', reasonOther: 'Se cayo' },
     ]);
   });
@@ -639,7 +640,7 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
       lines: [{ ...linea, reason: 'otro', reasonOther: ` ${texto} ` }],
     });
 
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA, [
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, [
       { ...linea, reason: 'otro', reasonOther: texto },
     ]);
   });
@@ -669,7 +670,7 @@ describe('finishPacking con excedente: mismo permiso y mismo empacador que hoy',
 
     await expect(createFinishPacking(m.deps)(ACTOR, CON_EXCEDENTE)).resolves.toMatchObject({ numberText: '2026-0000007' });
 
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA, CON_EXCEDENTE.lines);
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, CON_EXCEDENTE.lines);
     expect(m.estado.confirmada).toBe(true);
   });
 

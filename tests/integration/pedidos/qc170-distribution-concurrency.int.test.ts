@@ -89,6 +89,7 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -672,7 +673,7 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
       );
 
       // Comenzar REAL, por el pool de Prisma: se bloquea esperando la fila que retiene `holder`.
-      const comenzar = vigilar(startPackingAliveOrder(creado.id, fixture.actorId, new Date(), { companyId: fixture.companyId }));
+      const comenzar = vigilar(onOnlyLine(startPackingAliveOrder)(creado.id, fixture.actorId, new Date(), { companyId: fixture.companyId }));
       await esperarBloqueada(comenzar, 'Comenzar no quedo esperando el FOR UPDATE del guardado (orden a)');
 
       // El guardado GANA: vacia el reparto (mismo efecto que `updatePresentationLinesAliveOrder`
@@ -793,8 +794,8 @@ describe('R30, R46 — cambiar la unidad en POR_EMPACAR no altera reservas ni as
         nuevoPedido(fixture, '20.0000', [{ packagingProductId: fixture.packagingProductId, packages: 2 }]),
         actorDe(fixture),
       );
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
-      await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
 
       async function censo() {
         const reservas = await prisma.reservationMovement.count({ where: { orderId: creado.id } });

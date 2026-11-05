@@ -150,6 +150,7 @@ async function recibir(fixture: Fixture, orderId: string, presentationId: string
       tx,
       {
         orderId,
+        orderLineId: null,
         recipeId: fixture.recipeId,
         recipeName: 'Limpiador',
         presentationId,

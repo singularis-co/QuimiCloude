@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
+import { onlyLineOf } from './only-order-line';
 
 import type { ExecutionTransaction } from '../ports/execution-transaction';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -59,7 +60,7 @@ export function createCancelAssignedOrder(
     if (order === null) throw new OrderNotFoundError();
 
     const readSummary = async (status: typeof order.status) =>
-      (await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], [status], 1, 1)).items[0];
+      onlyLineOf(await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], [status], 1, 1));
 
     let summary = await readSummary(order.status);
     if (summary === undefined) {
@@ -73,6 +74,7 @@ export function createCancelAssignedOrder(
       if (summary === undefined) throw new OrderNotFoundError();
     }
     const numberText = formatOrderNumber(summary.number);
+    const lineId = summary.lineId;
 
     const now = deps.now?.() ?? new Date();
     try {
@@ -83,6 +85,7 @@ export function createCancelAssignedOrder(
           action: 'cancel',
           companyId: actor.companyId,
           orderId,
+          orderLineId: lineId,
           userId: actor.id,
           stepPosition,
           reason,

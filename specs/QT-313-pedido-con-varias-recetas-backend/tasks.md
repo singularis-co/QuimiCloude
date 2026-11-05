@@ -171,7 +171,7 @@
 
 ## Fase 5 — Consumidores y puente
 
-- [ ] **T14a [P] — `asignaciones` por línea.** `pedidos/domain/order-catalog.ts`,
+- [x] **T14a [P] — `asignaciones` por línea.** `pedidos/domain/order-catalog.ts`,
   `transition-order.ts`, `order-packing.ts`, `order-conditioning.ts`; en `asignaciones`: los casos
   de uso de abrir, finalizar, empaque y acondicionamiento, `compose-order-rows.ts`,
   `evidence-target.ts`, `count-evidence-locking-orders.ts`, `list-execution-traces.ts`,
@@ -597,3 +597,70 @@ Tocados en la fase 5 (T14b) por los otros lectores, que leen la receta de la lin
 - `tests/integration/pedidos/order-delivery.int.test.ts`
 - `tests/integration/pedidos/packed-lines-directory.int.test.ts`
 - `tests/unit/integraciones/whatsapp/conversations/get-whatsapp-chat-context.test.ts`
+
+Tocados en la fase 5 (T14a) por el flujo de planta por linea (los demas archivos de T14a ya estan arriba):
+- `lib/modules/asignaciones/domain/cancel-assigned-order.ts`
+- `lib/modules/asignaciones/domain/conditioning-order-view.ts`
+- `lib/modules/asignaciones/domain/conditioning-team.ts`
+- `lib/modules/asignaciones/domain/execution-entry.ts`
+- `lib/modules/asignaciones/domain/list-assigned-orders.ts`
+- `lib/modules/asignaciones/domain/list-conditioned-orders.ts`
+- `lib/modules/asignaciones/domain/list-finished-orders.ts`
+- `lib/modules/asignaciones/domain/only-order-line.ts`
+- `lib/modules/asignaciones/domain/packing-order-view.ts`
+- `lib/modules/asignaciones/domain/register-evidence.ts`
+- `lib/modules/asignaciones/domain/save-conditioning-batch-data.ts`
+- `lib/modules/asignaciones/ports/conditioning-team-repository.ts`
+- `lib/modules/asignaciones/ports/step-evidence-repository.ts`
+- `lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma.ts`
+- `lib/modules/inventario/domain/finished-goods.ts`
+- `lib/modules/pedidos/ports/order-conditioning-repository.ts`
+- `lib/modules/pedidos/ports/order-packing-repository.ts`
+- `tests/helpers/only-order-line.ts`
+- `tests/integration/asignaciones/batch-states.int.test.ts`
+- `tests/integration/asignaciones/company-orders.int.test.ts`
+- `tests/integration/asignaciones/conditioning-execution-log.int.test.ts`
+- `tests/integration/asignaciones/conditioning-steps-progress.int.test.ts`
+- `tests/integration/asignaciones/conditioning-team-repository.int.test.ts`
+- `tests/integration/asignaciones/execution-log-read.int.test.ts`
+- `tests/integration/asignaciones/finish-conditioning-batch-data.int.test.ts`
+- `tests/integration/asignaciones/finished-orders.int.test.ts`
+- `tests/integration/asignaciones/list-order-responsibles.int.test.ts`
+- `tests/integration/asignaciones/responsible-eligibility.int.test.ts`
+- `tests/integration/asignaciones/start-conditioning-team.int.test.ts`
+- `tests/integration/asignaciones/step-evidence-repository.int.test.ts`
+- `tests/integration/asignaciones/use-case-fixture.ts`
+- `tests/integration/inventario/deliverable-batches.int.test.ts`
+- `tests/integration/inventario/finished-batch-labels.int.test.ts`
+- `tests/integration/inventario/finished-goods.int.test.ts`
+- `tests/integration/inventario/finished-goods-receipts.int.test.ts`
+- `tests/integration/inventario/finished-goods-version.int.test.ts`
+- `tests/integration/inventario/order-batches.int.test.ts`
+- `tests/integration/inventario/product-type-lock.int.test.ts`
+- `tests/integration/pedidos/direct-delivery-concurrency.int.test.ts`
+- `tests/integration/pedidos/order-catalog-company-summary.int.test.ts`
+- `tests/integration/pedidos/order-catalog-conditioned-by.int.test.ts`
+- `tests/integration/pedidos/order-catalog-including-deleted.int.test.ts`
+- `tests/integration/pedidos/order-conditioning.int.test.ts`
+- `tests/integration/pedidos/order-packing.int.test.ts`
+- `tests/unit/asignaciones/acondicionamiento-authorization.test.ts`
+- `tests/unit/asignaciones/authorization.test.ts`
+- `tests/unit/asignaciones/cancel-assigned-order.test.ts`
+- `tests/unit/asignaciones/conditioning-doubles.ts`
+- `tests/unit/asignaciones/execution-log-prisma.test.ts`
+- `tests/unit/asignaciones/execution-log-repository.test.ts`
+- `tests/unit/asignaciones/finish-assigned-order.test.ts`
+- `tests/unit/asignaciones/finish-conditioning.test.ts`
+- `tests/unit/asignaciones/finish-packing.test.ts`
+- `tests/unit/asignaciones/get-assigned-order-execution.test.ts`
+- `tests/unit/asignaciones/list-assigned-orders.test.ts`
+- `tests/unit/asignaciones/list-finished-orders.test.ts`
+- `tests/unit/asignaciones/list-packing-orders.test.ts`
+- `tests/unit/asignaciones/record-conditioning-step.test.ts`
+- `tests/unit/asignaciones/start-assigned-order.test.ts`
+- `tests/unit/asignaciones/start-conditioning.test.ts`
+- `tests/unit/asignaciones/start-packing.test.ts`
+- `tests/unit/inventario/batch-movement-prisma.test.ts`
+- `tests/unit/inventario/finished-goods-prisma.test.ts`
+- `tests/unit/pedidos/order-conditioning.test.ts`
+- `tests/unit/pedidos/order-lines-no-copy.test.ts`

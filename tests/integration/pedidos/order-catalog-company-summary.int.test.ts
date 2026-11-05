@@ -20,6 +20,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 
 import type { NewOrder, OrderScope } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
+import { ensureOnlyLine, syncOnlyLine } from '../../helpers/only-order-line';
 
 const { listAliveSummariesInCompany } = realOrderSummaries()
 
@@ -140,6 +141,7 @@ async function seedOrder(e: Empresa, overrides: Partial<NewOrder> = {}): Promise
   const result = await withOrderTransaction((tx) =>
     createOrderWriteRepository(tx).create(baseOrder(e, overrides), YEAR, e.userId, now, null, scopeOf(e)),
   )
+  await ensureOnlyLine(prisma, result.id)
   return result.id
 }
 
@@ -165,8 +167,8 @@ describe('R17, R22 — el ambito acota por empresa, sin filtro de asignacion', (
       expect(ids).toContain(propio)
       expect(ids).not.toContain(ajeno)
     } finally {
-      await prisma.order.delete({ where: { id: propio } })
-      await prisma.order.delete({ where: { id: ajeno } })
+      await prisma.orderLine.deleteMany({ where: { orderId: propio } }).then(() => prisma.order.delete({ where: { id: propio } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: ajeno } }).then(() => prisma.order.delete({ where: { id: ajeno } }))
     }
   })
 })
@@ -176,7 +178,7 @@ describe('borrado logico — un pedido dado de baja no aparece ni cuenta en el t
     const vivo = await seedOrder(A, { status: 'PENDIENTE' })
     const borrado = await seedOrder(A, { status: 'PENDIENTE' })
     try {
-      await prisma.order.update({ where: { id: borrado }, data: { deletedAt: new Date() } })
+      await prisma.order.update({ where: { id: borrado }, data: { deletedAt: new Date() } }).then(() => syncOnlyLine(prisma, borrado))
 
       const pagina = await listAliveSummariesInCompany(
         A.companyId,
@@ -190,8 +192,8 @@ describe('borrado logico — un pedido dado de baja no aparece ni cuenta en el t
       expect(ids).toContain(vivo)
       expect(ids).not.toContain(borrado)
     } finally {
-      await prisma.order.delete({ where: { id: vivo } })
-      await prisma.order.delete({ where: { id: borrado } })
+      await prisma.orderLine.deleteMany({ where: { orderId: vivo } }).then(() => prisma.order.delete({ where: { id: vivo } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: borrado } }).then(() => prisma.order.delete({ where: { id: borrado } }))
     }
   })
 })
@@ -207,8 +209,8 @@ describe('R24 — el filtro de estado', () => {
       expect(ids).toContain(entregado)
       expect(ids).not.toContain(pendiente)
     } finally {
-      await prisma.order.delete({ where: { id: pendiente } })
-      await prisma.order.delete({ where: { id: entregado } })
+      await prisma.orderLine.deleteMany({ where: { orderId: pendiente } }).then(() => prisma.order.delete({ where: { id: pendiente } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: entregado } }).then(() => prisma.order.delete({ where: { id: entregado } }))
     }
   })
 
@@ -217,6 +219,7 @@ describe('R24 — el filtro de estado', () => {
     const entregado = await seedOrder(A, { status: 'ENTREGADO' })
     const cancelado = await seedOrder(A, { status: 'PENDIENTE' })
     await cancelAliveOrder(cancelado, 'Sin materia prima', A.userId, instant(20), scopeOf(A))
+    await syncOnlyLine(prisma, cancelado)
     try {
       const pagina = await listAliveSummariesInCompany(
         A.companyId,
@@ -231,9 +234,9 @@ describe('R24 — el filtro de estado', () => {
       expect(ids).toContain(entregado)
       expect(ids).not.toContain(cancelado)
     } finally {
-      await prisma.order.delete({ where: { id: pendiente } })
-      await prisma.order.delete({ where: { id: entregado } })
-      await prisma.order.delete({ where: { id: cancelado } })
+      await prisma.orderLine.deleteMany({ where: { orderId: pendiente } }).then(() => prisma.order.delete({ where: { id: pendiente } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: entregado } }).then(() => prisma.order.delete({ where: { id: entregado } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: cancelado } }).then(() => prisma.order.delete({ where: { id: cancelado } }))
     }
   })
 })
@@ -251,7 +254,7 @@ describe('orden de la lista de trabajo — prioridad mas alta primero y, a igual
       [critica, instant(15)],
     ])
     for (const [id, createdAt] of fechas) {
-      await prisma.order.update({ where: { id }, data: { createdAt } })
+      await prisma.order.update({ where: { id }, data: { createdAt } }).then(() => syncOnlyLine(prisma, id))
     }
     try {
       const pagina = await listAliveSummariesInCompany(A.companyId, ['PENDIENTE'], 'work_queue', 1, 25)
@@ -263,7 +266,7 @@ describe('orden de la lista de trabajo — prioridad mas alta primero y, a igual
         [critica, altaAntigua, altaReciente, bajaAntigua].map((id) => fechas.get(id)!.toISOString()),
       )
     } finally {
-      for (const id of fechas.keys()) await prisma.order.delete({ where: { id } })
+      for (const id of fechas.keys()) await prisma.orderLine.deleteMany({ where: { orderId: id } }).then(() => prisma.order.delete({ where: { id } }))
     }
   })
 })
@@ -285,9 +288,9 @@ describe('R27 — el total describe el conjunto ya filtrado, y la pagina lo resp
       // llego a correr, pero nunca menos de las suyas).
       expect(pagina.total).toBeGreaterThanOrEqual(2)
     } finally {
-      await prisma.order.delete({ where: { id: entregado1 } })
-      await prisma.order.delete({ where: { id: entregado2 } })
-      await prisma.order.delete({ where: { id: pendiente } })
+      await prisma.orderLine.deleteMany({ where: { orderId: entregado1 } }).then(() => prisma.order.delete({ where: { id: entregado1 } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: entregado2 } }).then(() => prisma.order.delete({ where: { id: entregado2 } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: pendiente } }).then(() => prisma.order.delete({ where: { id: pendiente } }))
     }
   })
 })
@@ -302,11 +305,11 @@ describe('R20 — el orden de terminados contra la base real', () => {
       await prisma.order.update({
         where: { id: antiguo },
         data: { status: 'ENTREGADO', finishedAt: new Date('2026-01-01T00:00:00.000Z') },
-      })
+      }).then(() => syncOnlyLine(prisma, antiguo))
       await prisma.order.update({
         where: { id: reciente },
         data: { status: 'ENTREGADO', finishedAt: new Date('2026-06-01T00:00:00.000Z') },
-      })
+      }).then(() => syncOnlyLine(prisma, reciente))
 
       const pagina = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 1, 25)
 
@@ -317,10 +320,10 @@ describe('R20 — el orden de terminados contra la base real', () => {
       expect(posicion(antiguo)).toBeLessThan(posicion(sinFechaMayor))
       expect(posicion(sinFechaMayor)).toBeLessThan(posicion(sinFechaMenor))
     } finally {
-      await prisma.order.delete({ where: { id: antiguo } })
-      await prisma.order.delete({ where: { id: reciente } })
-      await prisma.order.delete({ where: { id: sinFechaMenor } })
-      await prisma.order.delete({ where: { id: sinFechaMayor } })
+      await prisma.orderLine.deleteMany({ where: { orderId: antiguo } }).then(() => prisma.order.delete({ where: { id: antiguo } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: reciente } }).then(() => prisma.order.delete({ where: { id: reciente } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: sinFechaMenor } }).then(() => prisma.order.delete({ where: { id: sinFechaMenor } }))
+      await prisma.orderLine.deleteMany({ where: { orderId: sinFechaMayor } }).then(() => prisma.order.delete({ where: { id: sinFechaMayor } }))
     }
   })
 })
@@ -348,7 +351,7 @@ async function crearEmpacador(e: Empresa): Promise<string> {
 
 async function seedEntregado(e: Empresa, packedBy: string | null): Promise<string> {
   const id = await seedOrder(e, { status: 'ENTREGADO' })
-  if (packedBy !== null) await prisma.order.update({ where: { id }, data: { packedBy } })
+  if (packedBy !== null) await prisma.order.update({ where: { id }, data: { packedBy } }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 
@@ -380,7 +383,7 @@ describe('R20 — `packedBy` filtra en la base, con total y paginacion del conju
       expect(vistos.map((item) => item.id).sort()).toEqual([...suyos].sort())
       expect(vistos.every((item) => item.packedBy === empacador)).toBe(true)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: todos } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: todos } } }).then(() => prisma.order.deleteMany({ where: { id: { in: todos } } }))
       await prisma.user.deleteMany({ where: { id: { in: [empacador, otro] } } })
     }
   })
@@ -402,7 +405,7 @@ describe('R20 — `packedBy` filtra en la base, con total y paginacion del conju
       expect(ids).toContain(sinEmpacador)
       expect(sinFiltro.total).toBeGreaterThanOrEqual(2)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [suyo, sinEmpacador] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [suyo, sinEmpacador] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [suyo, sinEmpacador] } } }))
       await prisma.user.delete({ where: { id: empacador } })
     }
   })
@@ -418,7 +421,7 @@ describe('R20 — `packedBy` filtra en la base, con total y paginacion del conju
       expect(pagina.items).toEqual([])
       expect(pagina.total).toBe(0)
     } finally {
-      await prisma.order.delete({ where: { id: deB } })
+      await prisma.orderLine.deleteMany({ where: { orderId: deB } }).then(() => prisma.order.delete({ where: { id: deB } }))
       await prisma.user.delete({ where: { id: empacadorB } })
     }
   })

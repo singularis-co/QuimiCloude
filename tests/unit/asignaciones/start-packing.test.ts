@@ -23,6 +23,7 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const LINEA = uuid('e');
 const OTRA_EMPRESA = uuid('9');
 const AHORA = new Date('2026-09-25T12:00:00.000Z');
 
@@ -81,8 +82,16 @@ function montar(
 
   const globalStartPackingAliveById = vi.fn(async () => resultado);
   const depsAppend = vi.fn(async () => undefined);
+  // La unica linea del pedido, en un estado de empaque: la que Comenzar opera.
+  const listAliveSummariesByIds = vi.fn(async () => ({
+    items: [{ id: PEDIDO, lineId: LINEA }],
+    total: 1,
+    page: 1,
+    pageSize: 1,
+    totalPages: 1,
+  }));
   const deps = {
-    orders: { startPackingAliveById: globalStartPackingAliveById },
+    orders: { startPackingAliveById: globalStartPackingAliveById, listAliveSummariesByIds },
     log: { append: depsAppend, findLastStepPosition: vi.fn(async () => null) },
     transaction: { run },
     now: () => AHORA,
@@ -145,7 +154,7 @@ describe('startPacking — R18: `ok` deja al actor como quien empaca', () => {
     const startPacking = createStartPacking(deps);
 
     await expect(startPacking(ACTOR, { orderId: PEDIDO })).resolves.toBeUndefined();
-    expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, expect.any(Date));
+    expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date));
   });
 });
 
@@ -281,7 +290,7 @@ describe('startPacking — R42: empresa del actor y sin comprobacion de responsa
     expect(errorInexistente).toBeInstanceOf(OrderNotFoundError);
     expect((errorOtra as OrderNotFoundError).code).toBe((errorInexistente as OrderNotFoundError).code);
     expect((errorOtra as Error).message).toBe((errorInexistente as Error).message);
-    expect(otra.startPackingAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_EMPRESA, ANA, AHORA);
+    expect(otra.startPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, OTRA_EMPRESA, ANA, AHORA);
     expect(otra.append).not.toHaveBeenCalled();
     expect(otra.filas).toEqual([]);
   });
@@ -321,7 +330,7 @@ describe('startPacking — R41, R5bis, R8: el exito deja una fila `pack_start`',
     expect(run).toHaveBeenCalledTimes(1);
     expect(estado.confirmada).toBe(true);
     expect(filas).toEqual([
-      { companyId: EMPRESA, orderId: PEDIDO, userId: ANA, occurredAt: AHORA, action: 'pack_start', stepPosition: null },
+      { companyId: EMPRESA, orderId: PEDIDO, orderLineId: LINEA, userId: ANA, occurredAt: AHORA, action: 'pack_start', stepPosition: null },
     ]);
     expect(filas[0]).not.toHaveProperty('reason');
   });
@@ -331,7 +340,7 @@ describe('startPacking — R41, R5bis, R8: el exito deja una fila `pack_start`',
 
     await createStartPacking(deps)(ACTOR, { orderId: PEDIDO });
 
-    expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ANA, AHORA);
+    expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
     expect(globalStartPackingAliveById).not.toHaveBeenCalled();
     expect(depsAppend).not.toHaveBeenCalled();
     expect(estado.appendDentroDeRun).toBe(true);

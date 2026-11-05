@@ -1,7 +1,8 @@
 // lib/modules/pedidos/domain/order-conditioning.ts
 //
-// Comenzar y Terminar el acondicionamiento sobre `OrderConditioningRepository`: cada uno comprueba
-// su unica transicion y delega en el puerto. Sin unidad de trabajo: no tocan inventario.
+// Comenzar y Terminar el acondicionamiento de una linea sobre `OrderConditioningRepository`: cada
+// uno comprueba su unica transicion y delega en el puerto, que mueve la linea y deriva el pedido.
+// Sin unidad de trabajo: no tocan inventario.
 
 import { assertTransition } from './order-transitions';
 
@@ -13,6 +14,7 @@ export type ConditioningDeps = {
 
 export type StartConditioningAliveById = (
   id: string,
+  lineId: string,
   companyId: string,
   conditionerId: string,
   now: Date,
@@ -20,22 +22,23 @@ export type StartConditioningAliveById = (
 
 export type FinishConditioningAliveById = (
   id: string,
+  lineId: string,
   companyId: string,
   conditionerId: string,
   now: Date,
 ) => ReturnType<OrderConditioningRepository['finishConditioningAlive']>;
 
 export function createStartConditioning(deps: ConditioningDeps): StartConditioningAliveById {
-  return async function startConditioningAliveById(id, companyId, conditionerId, now) {
+  return async function startConditioningAliveById(id, lineId, companyId, conditionerId, now) {
     // Falla rapido si algun dia la matriz dejara de admitir la unica transicion de este metodo.
     assertTransition('POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO');
-    return deps.conditioning.startConditioningAlive(id, conditionerId, now, { companyId });
+    return deps.conditioning.startConditioningAlive(id, lineId, conditionerId, now, { companyId });
   };
 }
 
 export function createFinishConditioning(deps: ConditioningDeps): FinishConditioningAliveById {
-  return async function finishConditioningAliveById(id, companyId, conditionerId, now) {
+  return async function finishConditioningAliveById(id, lineId, companyId, conditionerId, now) {
     assertTransition('EN_ACONDICIONAMIENTO', 'TERMINADO');
-    return deps.conditioning.finishConditioningAlive(id, conditionerId, now, { companyId });
+    return deps.conditioning.finishConditioningAlive(id, lineId, conditionerId, now, { companyId });
   };
 }

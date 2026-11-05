@@ -84,7 +84,7 @@ export function composeConditioningTeam(
   requestedUserIds: readonly string[],
   groups: readonly WorkGroupSnapshot[],
   members: readonly PersonRef[],
-): readonly NewConditioningTeamMember[] {
+): readonly Omit<NewConditioningTeamMember, 'orderLineId'>[] {
   assertLooseTeamMembers(loose, requestedUserIds);
 
   const eligibleMemberIds = new Set(

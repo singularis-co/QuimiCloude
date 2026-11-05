@@ -150,6 +150,7 @@ async function finalizar(
       tx,
       {
         orderId: pedido.id,
+        orderLineId: null,
         recipeId,
         recipeName: ref.name,
         presentationId,

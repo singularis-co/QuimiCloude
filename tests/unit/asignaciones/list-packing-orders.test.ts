@@ -20,6 +20,7 @@ const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modif
 
 const RESUMEN_1 = {
   id: PEDIDO_1,
+  lineId: 'linea-1',
   number: { year: 2026, sequence: 7 },
   recipeId: 'receta-1',
   quantity: '10.0000',
@@ -35,6 +36,7 @@ const RESUMEN_1 = {
 
 const RESUMEN_2 = {
   id: PEDIDO_2,
+  lineId: 'linea-2',
   number: { year: 2026, sequence: 8 },
   recipeId: 'receta-2',
   quantity: '20.0000',

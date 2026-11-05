@@ -129,6 +129,7 @@ export function createExecutionLogRepository(db: PrismaLike = prisma): Execution
           data: {
             companyId: entry.companyId,
             orderId: entry.orderId,
+            orderLineId: entry.orderLineId,
             userId: entry.userId,
             action: EXECUTION_ACTION_TO_PRISMA[entry.action],
             stepPosition: entry.stepPosition,

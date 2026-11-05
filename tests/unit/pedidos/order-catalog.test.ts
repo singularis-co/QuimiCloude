@@ -29,10 +29,34 @@ const findFirst = vi.fn()
 const updateMany = vi.fn()
 const findMany = vi.fn()
 const count = vi.fn()
+/** Los resumenes salen de las lineas: una fila por linea, y su reparto en una segunda consulta. */
+const lineFindMany = vi.fn()
+const lineCount = vi.fn()
+const distributionFindMany = vi.fn()
 vi.mock('@/lib/shared/db/prisma', () => ({
-  // Un pedido sin lineas: la copia de su estado a la unica linea viva no tiene a quien copiar.
-  prisma: { order: { findFirst, updateMany, findMany, count }, orderLine: { count: vi.fn(async () => 0) } },
+  prisma: {
+    order: { findFirst, updateMany, findMany, count },
+    orderLine: { findMany: lineFindMany, count: lineCount },
+    orderPresentationLine: { findMany: distributionFindMany },
+  },
 }))
+
+/** Una fila de `order_lines` con su pedido, como la pide el resumen. */
+function filaDeLinea(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'l-1',
+    orderId: 'o-1',
+    recipeId: 'r-1',
+    quantity: { toFixed: () => '10.0000' },
+    status: 'POR_EMPACAR',
+    unitId: null,
+    finishedAt: null,
+    packedBy: null,
+    conditionedBy: null,
+    order: { orderYear: 2026, orderSequence: 1, priority: 'MEDIA', createdAt: new Date('2026-01-01T00:00:00.000Z') },
+    ...overrides,
+  }
+}
 
 const {
   findAliveOrderTargetById,
@@ -136,6 +160,10 @@ beforeEach(() => {
   updateMany.mockReset()
   findMany.mockReset()
   count.mockReset()
+  lineFindMany.mockReset()
+  lineCount.mockReset()
+  distributionFindMany.mockReset()
+  distributionFindMany.mockResolvedValue([])
 })
 
 describe('contrato OrderCatalog', () => {
@@ -213,9 +241,48 @@ describe('toOrderAssignmentTarget', () => {
   })
 })
 
+type FilaPlana = Omit<Parameters<typeof toOrderSummaryRecord>[0], 'orderId' | 'order'> & {
+  readonly orderYear: number
+  readonly orderSequence: number
+  readonly priority: string
+  readonly createdAt: Date
+  readonly presentationLines: readonly Omit<Parameters<typeof toOrderSummaryRecord>[1][number], 'orderLineId'>[]
+}
+
+/** La fila plana de antes, vista como su unica linea: el pedido es `id` y la linea, `linea-<id>`. */
+function resumenPlano(fila: FilaPlana) {
+  const { id, orderYear, orderSequence, priority, createdAt, presentationLines, ...linea } = fila
+  const lineId = `linea-${id}`
+  return toOrderSummaryRecord(
+    { ...linea, id: lineId, orderId: id, order: { orderYear, orderSequence, priority, createdAt } },
+    presentationLines.map((reparto) => ({ ...reparto, orderLineId: lineId })),
+  )
+}
+
 describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la unidad y la fecha de terminado', () => {
+  it('QT-313 R45: la fila es la de la linea, con el id del pedido y el de la linea', () => {
+    const resumen = resumenPlano({
+      id: 'o-0',
+      orderYear: 2026,
+      orderSequence: 6,
+      recipeId: 'r-1',
+      quantity: { toFixed: () => '10.0000' },
+      priority: 'MEDIA',
+      status: 'EN_CURSO',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      unitId: null,
+      presentationLines: [],
+      finishedAt: null,
+      packedBy: null,
+      conditionedBy: null,
+    })
+    expect(resumen.id).toBe('o-0')
+    expect(resumen.lineId).toBe('linea-o-0')
+    expect(resumen.status).toBe('EN_CURSO')
+  })
+
   it('T10: copia presentationLines EN EL ORDEN de la fila (createdAt, desempate id), con y sin reparto', () => {
-    const conReparto = toOrderSummaryRecord({
+    const conReparto = resumenPlano({
       id: 'o-1',
       orderYear: 2026,
       orderSequence: 7,
@@ -238,7 +305,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       { id: 'lp-2', presentationId: 'p-2', packages: 1, packedPackages: null, presentationContent: null, packagingProductId: null },
     ])
 
-    const sinReparto = toOrderSummaryRecord({
+    const sinReparto = resumenPlano({
       id: 'o-2',
       orderYear: 2026,
       orderSequence: 8,
@@ -272,13 +339,13 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       conditionedBy: null,
     } as const
 
-    expect(toOrderSummaryRecord({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
-    expect(toOrderSummaryRecord({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
+    expect(resumenPlano({ ...filaBase, unitId: 'u-1' }).unitId).toBe('u-1')
+    expect(resumenPlano({ ...filaBase, id: 'o-1c', unitId: null }).unitId).toBeNull()
   })
 
   it('copia la prioridad y la fecha de solicitud (createdAt) tal cual', () => {
     const solicitado = new Date('2026-03-04T05:06:07.000Z')
-    const resumen = toOrderSummaryRecord({
+    const resumen = resumenPlano({
       id: 'o-1d',
       orderYear: 2026,
       orderSequence: 8,
@@ -300,7 +367,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
 
   it('R20: copia finishedAt tal cual, con y sin fecha', () => {
     const fecha = new Date('2026-09-23T10:00:00.000Z')
-    const conFecha = toOrderSummaryRecord({
+    const conFecha = resumenPlano({
       id: 'o-3',
       orderYear: 2026,
       orderSequence: 9,
@@ -317,7 +384,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
     })
     expect(conFecha.finishedAt).toBe(fecha)
 
-    const sinFecha = toOrderSummaryRecord({
+    const sinFecha = resumenPlano({
       id: 'o-4',
       orderYear: 2026,
       orderSequence: 10,
@@ -336,7 +403,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
   })
 
   it('R14, R17: copia packedBy tal cual, con y sin empacador', () => {
-    const conEmpacador = toOrderSummaryRecord({
+    const conEmpacador = resumenPlano({
       id: 'o-5',
       orderYear: 2026,
       orderSequence: 11,
@@ -353,7 +420,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
     })
     expect(conEmpacador.packedBy).toBe('u-1')
 
-    const sinEmpacador = toOrderSummaryRecord({
+    const sinEmpacador = resumenPlano({
       id: 'o-6',
       orderYear: 2026,
       orderSequence: 12,
@@ -384,7 +451,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
       packedBy: 'u-1',
     } as const
 
-    const conAcondicionador = toOrderSummaryRecord({
+    const conAcondicionador = resumenPlano({
       ...filaBase,
       id: 'o-7',
       status: 'EN_ACONDICIONAMIENTO',
@@ -393,7 +460,7 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
     })
     expect(conAcondicionador.conditionedBy).toBe('u-2')
 
-    const sinAcondicionador = toOrderSummaryRecord({
+    const sinAcondicionador = resumenPlano({
       ...filaBase,
       id: 'o-8',
       status: 'POR_ACONDICIONAR',
@@ -540,36 +607,39 @@ describe('setAliveOrderStatus (createOrderWriteRepository(tx).setStatus), el cam
 
 describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
   beforeEach(() => {
-    findMany.mockResolvedValue([])
-    count.mockResolvedValue(0)
+    lineFindMany.mockResolvedValue([])
+    lineCount.mockResolvedValue(0)
   })
 
-  it('el WHERE acota por empresa y estado, SIN filtro de ids (R17, R22)', async () => {
+  /** Las lineas vivas de pedidos vivos de la empresa: el ambito va en la linea y en su pedido. */
+  const vivas = (statuses: readonly string[]) => ({
+    companyId: EMPRESA,
+    status: { in: statuses },
+    deletedAt: null,
+    order: { AND: [{ companyId: EMPRESA }, { deletedAt: null }] },
+  })
+
+  it('QT-313 R45: el WHERE acota por empresa y estado de la LINEA, SIN filtro de ids (R17, R22)', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
-    const llamada = findMany.mock.calls[0]?.[0]
-    expect(llamada.where).toEqual({
-      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null }],
-    })
-    expect(llamada.where).not.toHaveProperty('id')
-    expect(JSON.stringify(llamada.where)).not.toContain('"id"')
+    const llamada = lineFindMany.mock.calls[0]?.[0]
+    expect(llamada.where).toEqual(vivas(['ENTREGADO']))
+    expect(llamada.where).not.toHaveProperty('orderId')
   })
 
   it('R20: con `packedBy`, el WHERE de la pagina y el del total llevan empresa, estado y ese empacador', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 2, 10, { packedBy: 'emp-1' })
 
-    const esperado = {
-      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null, packedBy: 'emp-1' }],
-    }
-    const llamada = findMany.mock.calls[0]?.[0]
+    const esperado = { ...vivas(['ENTREGADO']), packedBy: 'emp-1' }
+    const llamada = lineFindMany.mock.calls[0]?.[0]
     expect(llamada.where).toEqual(esperado)
     expect(llamada.skip).toBe(10)
     expect(llamada.take).toBe(10)
-    expect(count.mock.calls[0]?.[0]?.where).toEqual(esperado)
+    expect(lineCount.mock.calls[0]?.[0]?.where).toEqual(esperado)
   })
 
   it('R20: con `packedBy`, el total y las paginas salen del recuento ya filtrado', async () => {
-    count.mockResolvedValue(3)
+    lineCount.mockResolvedValue(3)
 
     const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1, 2, {
       packedBy: 'emp-1',
@@ -583,12 +653,9 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1, undefined, {})
 
-    const sinFiltro = {
-      AND: [{ companyId: EMPRESA }, { status: { in: ['ENTREGADO'] }, deletedAt: null }],
-    }
-    expect(findMany.mock.calls[0]?.[0]?.where).toEqual(sinFiltro)
-    expect(findMany.mock.calls[1]?.[0]?.where).toEqual(sinFiltro)
-    expect(JSON.stringify(findMany.mock.calls[1]?.[0]?.where)).not.toContain('packedBy')
+    expect(lineFindMany.mock.calls[0]?.[0]?.where).toEqual(vivas(['ENTREGADO']))
+    expect(lineFindMany.mock.calls[1]?.[0]?.where).toEqual(vivas(['ENTREGADO']))
+    expect(JSON.stringify(lineFindMany.mock.calls[1]?.[0]?.where)).not.toContain('packedBy')
   })
 
   it('R11: con `conditionedBy`, el WHERE de la pagina y el del total llevan empresa, estado y quien acondiciona', async () => {
@@ -596,42 +663,41 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
       conditionedBy: 'acon-1',
     })
 
-    const esperado = {
-      AND: [{ companyId: EMPRESA }, { status: { in: ['TERMINADO'] }, deletedAt: null, conditionedBy: 'acon-1' }],
-    }
-    const llamada = findMany.mock.calls[0]?.[0]
+    const esperado = { ...vivas(['TERMINADO']), conditionedBy: 'acon-1' }
+    const llamada = lineFindMany.mock.calls[0]?.[0]
     expect(llamada.where).toEqual(esperado)
     expect(llamada.skip).toBe(10)
     expect(llamada.take).toBe(10)
-    expect(count.mock.calls[0]?.[0]?.where).toEqual(esperado)
+    expect(lineCount.mock.calls[0]?.[0]?.where).toEqual(esperado)
   })
 
   it('R11: sin `conditionedBy` el WHERE no acota por quien acondiciona', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['TERMINADO'], 'finished_recent_first', 1, undefined, {})
 
-    expect(JSON.stringify(findMany.mock.calls[0]?.[0]?.where)).not.toContain('conditionedBy')
+    expect(JSON.stringify(lineFindMany.mock.calls[0]?.[0]?.where)).not.toContain('conditionedBy')
   })
 
   it('R7: el SELECT del resumen pide `conditionedBy`', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['POR_ACONDICIONAR'], 'work_queue', 1)
 
-    expect(findMany.mock.calls[0]?.[0]?.select).toHaveProperty('conditionedBy', true)
+    expect(lineFindMany.mock.calls[0]?.[0]?.select).toHaveProperty('conditionedBy', true)
   })
 
   it('con `work_queue`, el ORDER BY es IDENTICO al de listAliveSummariesByIds', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE', 'EN_CURSO'], 'work_queue', 1)
-    const deTodaLaEmpresa = findMany.mock.calls[0]?.[0]?.orderBy
+    const deTodaLaEmpresa = lineFindMany.mock.calls[0]?.[0]?.orderBy
 
-    findMany.mockClear()
+    lineFindMany.mockClear()
     await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['PENDIENTE', 'EN_CURSO'], 1)
-    const porIds = findMany.mock.calls[0]?.[0]?.orderBy
+    const porIds = lineFindMany.mock.calls[0]?.[0]?.orderBy
 
     expect(deTodaLaEmpresa).toEqual(porIds)
     expect(deTodaLaEmpresa).toEqual([
-      { priority: 'desc' },
-      { createdAt: 'asc' },
-      { orderYear: 'asc' },
-      { orderSequence: 'asc' },
+      { order: { priority: 'desc' } },
+      { order: { createdAt: 'asc' } },
+      { order: { orderYear: 'asc' } },
+      { order: { orderSequence: 'asc' } },
+      { position: 'asc' },
       { id: 'asc' },
     ])
   })
@@ -639,11 +705,11 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
   it('con `finished_recent_first`, ordena por finishedAt DESC con nulls "last" explicito y desempata por numero DESC (R20, D14)', async () => {
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
-    const orderBy = findMany.mock.calls[0]?.[0]?.orderBy
-    expect(orderBy).toEqual([
+    expect(lineFindMany.mock.calls[0]?.[0]?.orderBy).toEqual([
       { finishedAt: { sort: 'desc', nulls: 'last' } },
-      { orderYear: 'desc' },
-      { orderSequence: 'desc' },
+      { order: { orderYear: 'desc' } },
+      { order: { orderSequence: 'desc' } },
+      { position: 'asc' },
       { id: 'asc' },
     ])
   })
@@ -658,84 +724,81 @@ describe('listAliveSummariesInCompany — R17, R20, R22, R24', () => {
       { packedBy: 'emp-1' },
     )
 
-    const orderBy = findMany.mock.calls[0]?.[0]?.orderBy
-    expect(orderBy).toEqual([
+    expect(lineFindMany.mock.calls[0]?.[0]?.orderBy).toEqual([
       { finishedAt: { sort: 'desc', nulls: 'first' } },
-      { orderYear: 'desc' },
-      { orderSequence: 'desc' },
+      { order: { orderYear: 'desc' } },
+      { order: { orderSequence: 'desc' } },
+      { position: 'asc' },
       { id: 'asc' },
     ])
   })
 
   it('el resumen paginado incluye finishedAt (R20, R21, R31)', async () => {
-    findMany.mockResolvedValue([
-      {
-        id: 'o-1',
-        orderYear: 2026,
-        orderSequence: 1,
-        recipeId: 'r-1',
-        quantity: { toFixed: () => '10.0000' },
-        priority: 'MEDIA',
-        status: 'ENTREGADO',
-        unitId: null,
-        presentationLines: [],
-        finishedAt: new Date('2026-09-23T10:00:00.000Z'),
-        packedBy: null,
-      },
-    ])
-    count.mockResolvedValue(1)
+    lineFindMany.mockResolvedValue([filaDeLinea({ status: 'ENTREGADO', finishedAt: new Date('2026-09-23T10:00:00.000Z') })])
+    lineCount.mockResolvedValue(1)
 
     const pagina = await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
     expect(pagina.items[0]?.finishedAt).toEqual(new Date('2026-09-23T10:00:00.000Z'))
+    expect(pagina.items[0]).toMatchObject({ id: 'o-1', lineId: 'l-1' })
   })
 
-  it('T10: el select pide unitId y las lineas del reparto en el orden de alta (createdAt, desempate id)', async () => {
+  it('T10, QT-313 R45: el select pide unitId, y el reparto de las lineas de la pagina sale en UNA consulta en el orden de alta', async () => {
+    lineFindMany.mockResolvedValue([filaDeLinea({ id: 'l-1' }), filaDeLinea({ id: 'l-2', orderId: 'o-2' })])
+    lineCount.mockResolvedValue(2)
+
     await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE'], 'work_queue', 1)
 
-    const seleccion = findMany.mock.calls[0]?.[0]?.select
-    expect(seleccion.unitId).toBe(true)
-    expect(seleccion.presentationLines).toEqual({
-      select: {
-        id: true,
-        presentationId: true,
-        packages: true,
-        packedPackages: true,
-        presentationContent: true,
-        packagingProductId: true,
-      },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    expect(lineFindMany.mock.calls[0]?.[0]?.select.unitId).toBe(true)
+    expect(distributionFindMany).toHaveBeenCalledTimes(1)
+    const reparto = distributionFindMany.mock.calls[0]?.[0]
+    expect(reparto.where).toEqual({ companyId: EMPRESA, orderLineId: { in: ['l-1', 'l-2'] } })
+    expect(reparto.select).toEqual({
+      id: true,
+      orderLineId: true,
+      presentationId: true,
+      packages: true,
+      packedPackages: true,
+      presentationContent: true,
+      packagingProductId: true,
     })
-    // Y ya no pide la columna que retiro T10: el reparto vive en `order_presentation_lines`.
-    expect(seleccion).not.toHaveProperty('presentationId')
+    expect(reparto.orderBy).toEqual([{ createdAt: 'asc' }, { id: 'asc' }])
+  })
+
+  it('QT-313 R45: una pagina sin lineas no consulta el reparto', async () => {
+    await listAliveSummariesInCompany(EMPRESA, ['PENDIENTE'], 'work_queue', 1)
+
+    expect(distributionFindMany).not.toHaveBeenCalled()
   })
 })
 
 describe('listAliveSummariesByIds — el nombre del envase de cada linea', () => {
   beforeEach(() => {
     findPackagingRefs.mockClear()
-    count.mockResolvedValue(1)
+    lineCount.mockResolvedValue(1)
+  })
+
+  it('QT-313 R45: acota por los pedidos pedidos, la empresa y el estado de la linea', async () => {
+    lineFindMany.mockResolvedValue([])
+    lineCount.mockResolvedValue(0)
+
+    await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['EN_CURSO'], 1)
+
+    expect(lineFindMany.mock.calls[0]?.[0]?.where).toEqual({
+      companyId: EMPRESA,
+      status: { in: ['EN_CURSO'] },
+      deletedAt: null,
+      order: { AND: [{ companyId: EMPRESA }, { deletedAt: null }] },
+      orderId: { in: ['o-1'] },
+    })
   })
 
   it('R44, R33: la linea con envase lleva su nombre, la antigua y la de un envase que no vuelve llevan null, en una sola llamada', async () => {
-    findMany.mockResolvedValue([
-      {
-        id: 'o-1',
-        orderYear: 2026,
-        orderSequence: 1,
-        recipeId: 'r-1',
-        quantity: { toFixed: () => '10.0000' },
-        priority: 'MEDIA',
-        status: 'POR_EMPACAR',
-        unitId: null,
-        presentationLines: [
-          { presentationId: 'p-1', packages: 4, presentationContent: { toFixed: () => '1.0000' }, packagingProductId: 'env-1' },
-          { presentationId: 'p-2', packages: 2, presentationContent: null, packagingProductId: null },
-          { presentationId: 'p-3', packages: 1, presentationContent: null, packagingProductId: 'env-de-baja' },
-        ],
-        finishedAt: null,
-        packedBy: null,
-      },
+    lineFindMany.mockResolvedValue([filaDeLinea()])
+    distributionFindMany.mockResolvedValue([
+      { orderLineId: 'l-1', presentationId: 'p-1', packages: 4, presentationContent: { toFixed: () => '1.0000' }, packagingProductId: 'env-1' },
+      { orderLineId: 'l-1', presentationId: 'p-2', packages: 2, presentationContent: null, packagingProductId: null },
+      { orderLineId: 'l-1', presentationId: 'p-3', packages: 1, presentationContent: null, packagingProductId: 'env-de-baja' },
     ])
 
     const pagina = await listAliveOrderSummariesByIds(EMPRESA, ['o-1'], ['POR_EMPACAR'], 1)
@@ -750,8 +813,8 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
   })
 
   it('R33: una pagina sin envases no consulta el catalogo de envases', async () => {
-    findMany.mockResolvedValue([])
-    count.mockResolvedValue(0)
+    lineFindMany.mockResolvedValue([])
+    lineCount.mockResolvedValue(0)
 
     await listAliveSummariesInCompany(EMPRESA, ['ENTREGADO'], 'finished_recent_first', 1)
 
@@ -772,21 +835,20 @@ describe('listAliveSummariesByIds — el nombre del envase de cada linea', () =>
       ...summaryDeps,
       packaging: { findRefs: findRefsConImagen, findCostingBatches: async () => [] },
     } as unknown as Parameters<typeof createListAliveSummariesInCompany>[0])
-    const pedido = (id: string, packagingProductId: string) => ({
-      id,
-      orderYear: 2026,
-      orderSequence: 1,
-      recipeId: 'r-1',
-      quantity: { toFixed: () => '10.0000' },
-      priority: 'MEDIA',
-      status: 'POR_EMPACAR',
-      unitId: null,
-      presentationLines: [{ presentationId: 'p-1', packages: 1, presentationContent: null, packagingProductId }],
-      finishedAt: null,
-      packedBy: null,
+    lineFindMany.mockResolvedValue([
+      filaDeLinea({ id: 'l-1', orderId: 'o-1' }),
+      filaDeLinea({ id: 'l-2', orderId: 'o-2' }),
+      filaDeLinea({ id: 'l-3', orderId: 'o-3' }),
+    ])
+    const reparto = (orderLineId: string, packagingProductId: string) => ({
+      orderLineId,
+      presentationId: 'p-1',
+      packages: 1,
+      presentationContent: null,
+      packagingProductId,
     })
-    findMany.mockResolvedValue([pedido('o-1', 'env-1'), pedido('o-2', 'env-2'), pedido('o-3', 'env-1')])
-    count.mockResolvedValue(3)
+    distributionFindMany.mockResolvedValue([reparto('l-1', 'env-1'), reparto('l-2', 'env-2'), reparto('l-3', 'env-1')])
+    lineCount.mockResolvedValue(3)
 
     const pagina = await listarConImagen(EMPRESA, ['POR_EMPACAR'], 'work_queue', 1)
 

@@ -42,6 +42,7 @@ import { ConditioningStepOutOfOrderError, OrderNotFoundError } from '@/lib/modul
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { ensureOnlyLine, syncOnlyLine } from '../../helpers/only-order-line';
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 
@@ -150,6 +151,7 @@ async function borrarEmpresas(empresas: readonly Empresa[]): Promise<void> {
   const roleIds = empresas.flatMap((empresa) => empresa.roleIds);
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.orderConditioningTeamMember.deleteMany({ where: { companyId: { in: companyIds } } });
+  await prisma.orderLine.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.order.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.recipe.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.user.deleteMany({ where: { companyId: { in: companyIds } } });
@@ -179,6 +181,7 @@ async function pedidoEnAcondicionamiento(empresa: Empresa, recipeId = empresa.re
     where: { id },
     data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: empresa.acondicionador },
   });
+  await syncOnlyLine(prisma, id);
   await prisma.orderConditioningTeamMember.create({
     data: { orderId: id, userId: empresa.operario, companyId: empresa.companyId, position: 0 },
   });
@@ -341,6 +344,7 @@ describe('QC-299 T14 — avance de los pasos de acondicionamiento contra la base
         action: 'conditioning_step_advance' as const,
         companyId: a.companyId,
         orderId: pedido,
+        orderLineId: await ensureOnlyLine(prisma, pedido),
         userId: a.acondicionador,
         stepPosition: 1,
         responsibleUserIds: null,

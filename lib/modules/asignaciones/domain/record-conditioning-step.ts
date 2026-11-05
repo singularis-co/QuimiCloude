@@ -20,6 +20,7 @@ import {
   OrderNotFoundError,
   ValidationError,
 } from './errors';
+import { onlyLineOf } from './only-order-line';
 
 import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
@@ -85,7 +86,7 @@ export function createRecordConditioningStep(
     const target = await deps.orders.findAliveById(orderId, companyId);
     if (target === null) throw new OrderNotFoundError();
     const page = await deps.orders.listAliveSummariesByIds(companyId, [orderId], [target.status], 1, 1);
-    const summary = page.items[0];
+    const summary = onlyLineOf(page);
     if (summary === undefined) throw new OrderNotFoundError();
     if (target.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) throw new OrderConditioningTakenError();
@@ -108,6 +109,7 @@ export function createRecordConditioningStep(
           action: 'conditioning_responsibles_change',
           companyId,
           orderId,
+          orderLineId: summary.lineId,
           userId: actor.id,
           stepPosition,
           responsibleUserIds,
@@ -134,6 +136,7 @@ export function createRecordConditioningStep(
       action: stepPosition === steps.length ? 'conditioning_steps_complete' : 'conditioning_step_advance',
       companyId,
       orderId,
+      orderLineId: summary.lineId,
       userId: actor.id,
       stepPosition,
       responsibleUserIds: assigned ? responsibleUserIds : null,

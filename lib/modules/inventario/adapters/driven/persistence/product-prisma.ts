@@ -1340,6 +1340,7 @@ export async function receiveFinishedGoods(
   tx: Prisma.TransactionClient,
   input: {
     readonly orderId: string;
+    readonly orderLineId: string | null;
     readonly recipeId: string;
     readonly recipeName: string;
     readonly presentationId: string;
@@ -1427,6 +1428,7 @@ export async function receiveFinishedGoods(
       reason: null,
       orderId: input.orderId,
       orderPresentationLineId: input.orderPresentationLineId,
+      orderLineId: input.orderLineId,
       createdBy: input.actorId,
     },
     input.now,

@@ -602,8 +602,9 @@ function dentroDeLaTransaccion(packing: Record<string, unknown>): { log: unknown
 describe('QC-168 — `startPacking` (R13, R18-R24)', () => {
   function montarDeps(): { deps: StartPackingDeps; startPackingAliveById: ReturnType<typeof vi.fn> } {
     const startPackingAliveById = vi.fn(async () => 'ok' as const);
+    const listAliveSummariesByIds = vi.fn(async () => ({ items: [{ id: PEDIDO, lineId: 'linea-unica' }], total: 1 }));
     const deps = {
-      orders: { startPackingAliveById },
+      orders: { startPackingAliveById, listAliveSummariesByIds },
       ...dentroDeLaTransaccion({ startPackingAliveById }),
     } as unknown as StartPackingDeps;
     return { deps, startPackingAliveById };

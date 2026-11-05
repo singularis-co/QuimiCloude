@@ -18,6 +18,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 
 import type { NewOrder, OrderStatus } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 const { listAliveSummariesInCompany } = realOrderSummaries()
 
@@ -145,7 +146,7 @@ async function seedOrder(e: Empresa, status: OrderStatus, conditionedBy: string 
       conditionedBy,
       finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? now : null,
     },
-  })
+  }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 
@@ -187,7 +188,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(vistos.map((item) => item.id).sort()).toEqual([...mios].sort())
       expect(vistos.every((item) => item.conditionedBy === yo)).toBe(true)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: todos } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: todos } } }).then(() => prisma.order.deleteMany({ where: { id: { in: todos } } }))
       await prisma.user.deleteMany({ where: { id: { in: [yo, otro] } } })
     }
   })
@@ -204,7 +205,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(filtrada.items.map((item) => item.id)).toEqual([mio])
       expect(filtrada.total).toBe(1)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [mio, sinAcondicionador] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [mio, sinAcondicionador] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [mio, sinAcondicionador] } } }))
       await prisma.user.delete({ where: { id: yo } })
     }
   })
@@ -223,7 +224,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(ids).toContain(mio)
       expect(ids).toContain(enCola)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [mio, enCola] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [mio, enCola] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [mio, enCola] } } }))
       await prisma.user.delete({ where: { id: yo } })
     }
   })
@@ -239,7 +240,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(pagina.items).toEqual([])
       expect(pagina.total).toBe(0)
     } finally {
-      await prisma.order.delete({ where: { id: pedidoB } })
+      await prisma.orderLine.deleteMany({ where: { orderId: pedidoB } }).then(() => prisma.order.delete({ where: { id: pedidoB } }))
       await prisma.user.delete({ where: { id: deB } })
     }
   })
@@ -263,7 +264,7 @@ describe('R7 — el resumen publica quien acondiciona', () => {
       expect(porId.get(enCola)?.conditionedBy).toBeNull()
       expect(porId.get(enCurso)?.conditionedBy).toBe(yo)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [enCola, enCurso] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [enCola, enCurso] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [enCola, enCurso] } } }))
       await prisma.user.delete({ where: { id: yo } })
     }
   })

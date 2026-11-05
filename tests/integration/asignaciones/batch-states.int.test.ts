@@ -49,6 +49,7 @@ import { NOW, actorOf, codeOf, createOrder, createPerson, inRolledBackTransactio
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, evidenceStorageUnused } from '../../helpers/evidence-off';
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -76,7 +77,7 @@ describe('asignaciones · la consulta EN LOTE y los cuatro estados (integracion)
             status: estado,
             cancellationReason: estado === 'CANCELADO' ? 'se cancelo en la prueba' : null,
           },
-        });
+        }).then(() => syncOnlyLine(fixture.tx, pedido));
         pedidos.push(pedido);
       }
 
@@ -100,14 +101,14 @@ describe('asignaciones · la consulta EN LOTE y los cuatro estados (integracion)
 
       const entregado = await createOrder(fixture);
       await fixture.useCases.assign(actor, { orderId: entregado, userIds: [persona], workGroupIds: [] }, NOW);
-      await fixture.tx.order.update({ where: { id: entregado }, data: { status: 'ENTREGADO' } });
+      await fixture.tx.order.update({ where: { id: entregado }, data: { status: 'ENTREGADO' } }).then(() => syncOnlyLine(fixture.tx, entregado));
 
       const cancelado = await createOrder(fixture);
       await fixture.useCases.assign(actor, { orderId: cancelado, userIds: [persona], workGroupIds: [] }, NOW);
       await fixture.tx.order.update({
         where: { id: cancelado },
         data: { status: 'CANCELADO', cancellationReason: 'se cancelo en la prueba' },
-      });
+      }).then(() => syncOnlyLine(fixture.tx, cancelado));
 
       const pendiente = await createOrder(fixture);
       await fixture.useCases.assign(actor, { orderId: pendiente, userIds: [persona], workGroupIds: [] }, NOW);
@@ -187,7 +188,7 @@ describe('QC-138 — el Operador ve el pedido BLOQUEADO y no lo arranca (integra
       const asignar = async (estado: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' | 'ENTREGADO'): Promise<string> => {
         const pedido = await createOrder(fixture);
         await fixture.useCases.assign(actorOf(fixture.companyA), { orderId: pedido, userIds: [operador], workGroupIds: [] }, NOW);
-        await fixture.tx.order.update({ where: { id: pedido }, data: { status: estado } });
+        await fixture.tx.order.update({ where: { id: pedido }, data: { status: estado } }).then(() => syncOnlyLine(fixture.tx, pedido));
         return pedido;
       };
       const pendiente = await asignar('PENDIENTE');
@@ -212,7 +213,7 @@ describe('QC-138 — el Operador ve el pedido BLOQUEADO y no lo arranca (integra
       const operador = await createPerson(fixture, fixture.companyA);
       const pedido = await createOrder(fixture);
       await fixture.useCases.assign(actorOf(fixture.companyA), { orderId: pedido, userIds: [operador], workGroupIds: [] }, NOW);
-      await fixture.tx.order.update({ where: { id: pedido }, data: { status: 'BLOQUEADO' } });
+      await fixture.tx.order.update({ where: { id: pedido }, data: { status: 'BLOQUEADO' } }).then(() => syncOnlyLine(fixture.tx, pedido));
 
       const actor: Actor = { id: operador, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
       const error = await casosDelOperador(fixture)

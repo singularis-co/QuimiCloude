@@ -186,6 +186,7 @@ async function recibir(
       tx,
       {
         orderId: input.orderId,
+        orderLineId: null,
         recipeId: input.recipeId,
         recipeName: `Receta ${input.orderId}`,
         presentationId: input.presentationId,

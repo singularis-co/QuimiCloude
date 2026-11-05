@@ -39,6 +39,7 @@ import {
   createWorkGroup,
   inRolledBackTransaction,
 } from './use-case-fixture';
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 describe('asignaciones · la consulta de responsables (integracion)', () => {
   it('R37: la persona de baja, la inactiva y la bloqueada siguen saliendo, con su nombre mostrable', async () => {
@@ -143,7 +144,7 @@ describe('asignaciones · la consulta de responsables (integracion)', () => {
         await fixture.tx.order.update({
           where: { id: conGente },
           data: { status, cancellationReason: status === 'CANCELADO' ? 'Prueba de T14' : null },
-        });
+        }).then(() => syncOnlyLine(fixture.tx, conGente));
         const responsables = await fixture.useCases.list(actor, conGente);
         expect(responsables.map((responsable) => responsable.userId)).toEqual([persona]);
       }

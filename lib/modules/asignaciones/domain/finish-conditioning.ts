@@ -26,6 +26,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
+import { onlyLineOf } from './only-order-line';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -96,7 +97,7 @@ export function createFinishConditioning(
       1,
       1,
     );
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
     const numberText = formatOrderNumber(summary.number);
 
@@ -113,12 +114,13 @@ export function createFinishConditioning(
     const companyId = actor.companyId;
     try {
       await deps.transaction.run(async ({ conditioning, log }) => {
-        const result = await conditioning.finishConditioningAliveById(orderId, companyId, actor.id, now);
+        const result = await conditioning.finishConditioningAliveById(orderId, summary.lineId, companyId, actor.id, now);
         if (result !== 'ok') throw new ExecutionAbortedError(result);
         await log.append({
           action: 'conditioning_finish',
           companyId,
           orderId,
+          orderLineId: summary.lineId,
           userId: actor.id,
           stepPosition: null,
           occurredAt: now,

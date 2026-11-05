@@ -256,6 +256,7 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
           tx,
           {
             orderId: orderId1,
+            orderLineId: null,
             recipeId,
             recipeName: 'Receta renombrable',
             presentationId,
@@ -286,6 +287,7 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
           tx,
           {
             orderId: orderId2,
+            orderLineId: null,
             recipeId,
             recipeName: 'Receta renombrable',
             presentationId,

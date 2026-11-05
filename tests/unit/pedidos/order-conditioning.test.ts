@@ -11,6 +11,7 @@ import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/or
 
 const EMPRESA = 'c-1';
 const PEDIDO = 'o-1';
+const LINEA = 'l-1';
 const ACONDICIONADOR = 'u-1';
 const AHORA = new Date('2026-10-07T12:00:00Z');
 
@@ -37,10 +38,10 @@ describe('createStartConditioning', () => {
     const finishConditioningAlive = vi.fn();
     const start = createStartConditioning({ conditioning: puertoDoble({ startConditioningAlive, finishConditioningAlive }) });
 
-    await expect(start(PEDIDO, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe('ok');
+    await expect(start(PEDIDO, LINEA, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe('ok');
 
     expect(assertSpy).toHaveBeenCalledWith('POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO');
-    expect(startConditioningAlive).toHaveBeenCalledExactlyOnceWith(PEDIDO, ACONDICIONADOR, AHORA, { companyId: EMPRESA });
+    expect(startConditioningAlive).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, ACONDICIONADOR, AHORA, { companyId: EMPRESA });
     expect(finishConditioningAlive).not.toHaveBeenCalled();
   });
 
@@ -51,7 +52,7 @@ describe('createStartConditioning', () => {
         conditioning: puertoDoble({ startConditioningAlive: vi.fn(async () => resultado) }),
       });
 
-      await expect(start(PEDIDO, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe(resultado);
+      await expect(start(PEDIDO, LINEA, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe(resultado);
     },
   );
 
@@ -62,7 +63,7 @@ describe('createStartConditioning', () => {
     const startConditioningAlive = vi.fn(async () => 'ok' as const);
     const start = createStartConditioning({ conditioning: puertoDoble({ startConditioningAlive }) });
 
-    await expect(start(PEDIDO, EMPRESA, ACONDICIONADOR, AHORA)).rejects.toThrow('transicion ilegal');
+    await expect(start(PEDIDO, LINEA, EMPRESA, ACONDICIONADOR, AHORA)).rejects.toThrow('transicion ilegal');
     expect(startConditioningAlive).not.toHaveBeenCalled();
   });
 });
@@ -74,10 +75,10 @@ describe('createFinishConditioning', () => {
     const finishConditioningAlive = vi.fn(async () => 'ok' as const);
     const finish = createFinishConditioning({ conditioning: puertoDoble({ startConditioningAlive, finishConditioningAlive }) });
 
-    await expect(finish(PEDIDO, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe('ok');
+    await expect(finish(PEDIDO, LINEA, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe('ok');
 
     expect(assertSpy).toHaveBeenCalledWith('EN_ACONDICIONAMIENTO', 'TERMINADO');
-    expect(finishConditioningAlive).toHaveBeenCalledExactlyOnceWith(PEDIDO, ACONDICIONADOR, AHORA, { companyId: EMPRESA });
+    expect(finishConditioningAlive).toHaveBeenCalledExactlyOnceWith(PEDIDO, LINEA, ACONDICIONADOR, AHORA, { companyId: EMPRESA });
     expect(startConditioningAlive).not.toHaveBeenCalled();
   });
 
@@ -88,7 +89,7 @@ describe('createFinishConditioning', () => {
         conditioning: puertoDoble({ finishConditioningAlive: vi.fn(async () => resultado) }),
       });
 
-      await expect(finish(PEDIDO, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe(resultado);
+      await expect(finish(PEDIDO, LINEA, EMPRESA, ACONDICIONADOR, AHORA)).resolves.toBe(resultado);
     },
   );
 
@@ -99,7 +100,7 @@ describe('createFinishConditioning', () => {
     const finishConditioningAlive = vi.fn(async () => 'ok' as const);
     const finish = createFinishConditioning({ conditioning: puertoDoble({ finishConditioningAlive }) });
 
-    await expect(finish(PEDIDO, EMPRESA, ACONDICIONADOR, AHORA)).rejects.toThrow('transicion ilegal');
+    await expect(finish(PEDIDO, LINEA, EMPRESA, ACONDICIONADOR, AHORA)).rejects.toThrow('transicion ilegal');
     expect(finishConditioningAlive).not.toHaveBeenCalled();
   });
 });

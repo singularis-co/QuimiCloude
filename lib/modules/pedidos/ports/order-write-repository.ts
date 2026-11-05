@@ -60,21 +60,12 @@ export type OrderLineChanges = {
   readonly added: readonly NewOrderLine[];
 };
 
-/** Lo que Terminar el empaque necesita del pedido cuando el `UPDATE` condicional SI lo mueve: la
- *  receta para el nombre del lote y la cantidad y unidad con que se reparte el coste. */
-export type FinishPackingOrderRow = {
-  readonly recipeId: string;
-  readonly quantity: string;
-  /** La unidad en que se reparte el coste entre los lotes; `null` solo con una fila escrita
-   *  fuera de la aplicacion. */
-  readonly unitId: string | null;
+/** Lo que una etapa escribe en la linea junto con su estado: quien empaca o quien acondiciona. Lo
+ *  que no se nombra se conserva. */
+export type LineStageStamp = {
+  readonly packedBy?: string;
+  readonly conditionedBy?: string;
 };
-
-/** `finishPackingAlive` clasifica en la MISMA llamada: si el `UPDATE` movio la fila, la fila que
- *  Terminar necesita; si no, por que -relectura interna, mismo criterio que hoy-. */
-export type FinishPackingUpdateOutcome =
-  | ({ readonly kind: 'ok' } & FinishPackingOrderRow)
-  | { readonly kind: 'not_packer' | 'not_packable' | 'not_found' };
 
 /** Una linea del reparto tal como Terminar el empaque la necesita: la presentacion,
  *  sus envases y el contenido copiado -`null` hace que Terminar recurra al vigente, y sin el
@@ -89,7 +80,8 @@ export type FinishPackingLine = {
   /** `null` = todavia sin contar. */
   readonly packedPackages: number | null;
   /** Envases del conteo real que el pedido no espera; 0 sin contar o sin excedente. */
-  readonly packedSurplusPackages: number;  /** La linea del pedido de la que es este reparto; `null` en un pedido sin lineas. */
+  readonly packedSurplusPackages: number;
+  /** La linea del pedido de la que es este reparto; `null` en un pedido sin lineas. */
   readonly orderLineId: string | null;
 };
 
@@ -247,9 +239,7 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** Escribe SOLO `actual_cost`, sin mover `updated_at`: Terminar ya lo sello en la misma
-   *  transaccion. `null` = sin importe, nunca `0`. */
-  setActualCost(id: string, cost: string | null, scope: OrderScope): Promise<void>;
+
 
   /** Escribe `reserved_at` SIN mover `updated_at`: apartar o liberar material no es una edicion
    *  que el usuario deba ver en esa columna. */
@@ -265,20 +255,25 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** Terminar el empaque: `UPDATE` condicional `WHERE
-   *  status = 'EN_EMPAQUE' AND packed_by = packerId`, con `finished_at` en la MISMA sentencia.
-   *  Dentro de `OrderUnitOfWork.run` para que el alta de los lotes de las lineas viva en la
-   *  MISMA transaccion y un fallo posterior deshaga tambien este `UPDATE`. */
-  finishPackingAlive(
-    id: string,
-    packerId: string,
+  /** `UPDATE` condicional `WHERE status = from` de la linea que escribe a la vez el sello de la
+   *  etapa: los CHECK de la linea exigen quien empaca o quien acondiciona en la misma sentencia que
+   *  el estado. `'stale'` si sigue viva en otro estado. */
+  stampLineStatus(
+    orderId: string,
+    lineId: string,
+    from: OrderLineStatus,
+    to: Exclude<OrderLineStatus, 'CANCELADO'>,
+    stamp: LineStageStamp,
+    actorId: string,
     now: Date,
     scope: OrderScope,
-  ): Promise<FinishPackingUpdateOutcome>;
+  ): Promise<'ok' | 'not_found' | 'stale'>;
 
-  /** Las lineas del reparto de un pedido, `FOR SHARE`, en el orden de alta: la MISMA
-   *  transaccion de `finishPackingAlive`, para que un fallo tras leerlas deshaga tambien el
-   *  `UPDATE`. */
+  /** Escribe SOLO `actual_cost` de la linea, sin mover `updated_at`. `null` = sin importe, nunca `0`. */
+  setLineActualCost(orderId: string, lineId: string, cost: string | null, scope: OrderScope): Promise<void>;
+
+  /** Las filas del reparto de un pedido, `FOR SHARE`, en el orden de alta: la MISMA transaccion
+   *  que mueve la linea, para que un fallo tras leerlas deshaga tambien ese cambio. */
   findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;
 
   /** Escribe el conteo y los libres de cada linea sin tocar `packages`. Una linea que no sea de

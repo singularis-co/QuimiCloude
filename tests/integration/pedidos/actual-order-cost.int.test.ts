@@ -63,6 +63,7 @@ import { crearCliente, type EmpresaDeEntrega } from '../../helpers/order-deliver
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -282,11 +283,11 @@ async function producir(
     },
     actorDe(fixture),
   );
-  expect(await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date())).toBe('ok');
-  expect(await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date())).toBe('ok');
-  expect(await startPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+  expect(await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date())).toBe('ok');
+  expect(await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date())).toBe('ok');
+  expect(await onOnlyLine(startPackingAliveById)(creado.id, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
   const conteo = await (counts ?? packedCountsOfPlan)(creado.id);
-  const terminado = await finishPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date(), conteo);
+  const terminado = await onOnlyLine(finishPackingAliveById)(creado.id, fixture.companyId, fixture.actorId, new Date(), conteo);
   expect(terminado).toMatchObject({ kind: 'ok' });
   return creado.id;
 }
@@ -376,8 +377,8 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       await prisma.productBatch.update({ where: { id: ingrediente.segundoLote }, data: { unitCost: '1.0000' } });
       expect((await costesDelPedido(orderId)).actualCost).toBe('145.0000');
 
-      expect(await startConditioningAliveOrder(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
-      expect(await finishConditioningAliveOrder(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
+      expect(await onOnlyLine(startConditioningAliveOrder)(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
+      expect(await onOnlyLine(finishConditioningAliveOrder)(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
       const customerId = await crearCliente({ companyId: fixture.companyId } as EmpresaDeEntrega, `Real ${token().slice(0, 6)}`);
       await prisma.order.update({ where: { id: orderId }, data: { customerId } });
       const { id: lineId } = await prisma.orderPresentationLine.findFirstOrThrow({ where: { orderId }, select: { id: true } });

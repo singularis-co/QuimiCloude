@@ -19,6 +19,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
+import { findOnlyLine } from './only-order-line';
 
 import type { NewConditioningTeamMember } from '../ports/conditioning-team-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -46,7 +47,7 @@ async function resolveTeam(
   userIds: readonly string[],
   workGroupIds: readonly string[],
   now: Date,
-): Promise<readonly NewConditioningTeamMember[]> {
+): Promise<readonly Omit<NewConditioningTeamMember, 'orderLineId'>[]> {
   const [loose, snapshots] = await Promise.all([
     userIds.length > 0 ? deps.people.findAliveRefsInCompany(companyId, userIds, now) : [],
     Promise.all(workGroupIds.map((workGroupId) => deps.groups.findSnapshotAliveInCompany(companyId, workGroupId, now))),
@@ -84,17 +85,22 @@ export function createStartConditioning(
       throw new OrderNotConditionableError();
     }
 
+    const { lineId } = await findOnlyLine(deps.orders, companyId, orderId, ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO']);
+
     const now = deps.now?.() ?? new Date();
     // `EN_ACONDICIONAMIENTO` va directo a la escritura sin equipo: el `UPDATE` exige
     // `POR_ACONDICIONAR`, asi que solo puede responder `already_mine` o `taken`.
     const team =
       target.status === 'POR_ACONDICIONAR'
-        ? await resolveTeam(deps, orderId, companyId, userIds, workGroupIds, now)
+        ? (await resolveTeam(deps, orderId, companyId, userIds, workGroupIds, now)).map((member) => ({
+            ...member,
+            orderLineId: lineId,
+          }))
         : [];
 
     try {
       await deps.transaction.run(async ({ conditioning, team: teamWriter, log }) => {
-        const result = await conditioning.startConditioningAliveById(orderId, companyId, actor.id, now);
+        const result = await conditioning.startConditioningAliveById(orderId, lineId, companyId, actor.id, now);
         if (result === 'already_mine') return;
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await teamWriter.insertAll(team);
@@ -102,6 +108,7 @@ export function createStartConditioning(
           action: 'conditioning_start',
           companyId,
           orderId,
+          orderLineId: lineId,
           userId: actor.id,
           stepPosition: null,
           occurredAt: now,
