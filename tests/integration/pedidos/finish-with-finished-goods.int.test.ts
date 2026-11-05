@@ -152,8 +152,8 @@ const updateDistribution = createUpdateOrderPresentationLines({ recipes, product
 
 const orderCatalog: OrderCatalog = {
   findAliveById: async (id, companyId) => {
-    const row = await findAliveOrderById(id, { companyId });
-    return row === null ? null : { id: row.id, status: row.status };
+    const { findAliveOrderTargetById } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
+    return findAliveOrderTargetById(id, companyId);
   },
   listAliveSummariesByIds: async (companyId, ids, statuses, page, pageSize) => {
     const { listAliveOrderSummariesByIds } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');

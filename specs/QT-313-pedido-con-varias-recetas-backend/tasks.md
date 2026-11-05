@@ -215,7 +215,7 @@
   *Hecho (además):* test de R54: con un pedido `PARCIAL`, editar, cancelar y eliminar
   deshabilitados, sin reparto, entrega ni entregas; «Responsables» y cliente disponibles.
   Depende de T9, T10, T13.
-- [ ] **T14d — Responsables en un `PARCIAL` (R55).** `asignaciones/domain/order-state.ts`,
+- [x] **T14d — Responsables en un `PARCIAL` (R55).** `asignaciones/domain/order-state.ts`,
   `pedidos/domain/order-catalog.ts` (`OrderAssignmentTarget` con los estados de sus líneas
   activas) y `order-catalog-prisma.ts` (design § 12): sustituye la provisional que admitía
   cualquier `PARCIAL`.
@@ -664,3 +664,6 @@ Tocados en la fase 5 (T14a) por el flujo de planta por linea (los demas archivos
 - `tests/unit/inventario/finished-goods-prisma.test.ts`
 - `tests/unit/pedidos/order-conditioning.test.ts`
 - `tests/unit/pedidos/order-lines-no-copy.test.ts`
+- `tests/unit/asignaciones/assign-responsibles.test.ts`
+- `tests/unit/asignaciones/remove-work-group-from-order.test.ts`
+- `tests/unit/asignaciones/unassign-responsible.test.ts`

@@ -753,7 +753,7 @@ describe('QC-60 R27 — `OrderCatalog` consultado desde `asignaciones` se acota 
   /** Catalogo que cumple el contrato de `pedidos`: `null` para lo que no es de ESA empresa. */
   function catalogo() {
     const pedidos = new Map<string, { companyId: string; target: OrderAssignmentTarget }>([
-      [PEDIDO_DE_A, { companyId: EMPRESA_A, target: { id: PEDIDO_DE_A, status: 'PENDIENTE' } }],
+      [PEDIDO_DE_A, { companyId: EMPRESA_A, target: { id: PEDIDO_DE_A, status: 'PENDIENTE', activeLineStatuses: ['PENDIENTE'] } }],
     ])
     const findAliveById = vi.fn(async (id: string, companyId: string) => {
       const pedido = pedidos.get(id)

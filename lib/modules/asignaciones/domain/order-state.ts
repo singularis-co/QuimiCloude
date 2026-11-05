@@ -8,6 +8,8 @@
  *
  * | Estado del pedido   | las TRES escrituras                       |
  * | ------------------- | ----------------------------------------- |
+ * | `PARCIAL`           | admitida si alguna linea activa esta en `PENDIENTE`, `EN_CURSO` o |
+ * |                     | `BLOQUEADO`; si no, `order_produced_frozen` (QT-313 R55)          |
  * | `PENDIENTE`         | admitida (R9)                             |
  * | `EN_CURSO`          | admitida (R9)                             |
  * | `POR_EMPACAR`       | `order_produced_frozen`                   |
@@ -81,8 +83,12 @@ export function assertOrderAcceptsWrites(
   // R8: primero la existencia. Que este error sea distinto del de R10/R11 es el requisito R12.
   if (order === null) throw new OrderNotFoundError();
 
-  // Un PARCIAL tiene lineas activas sin entregar, y su responsable opera cualquiera de ellas.
-  if (order.status === 'PARCIAL') return;
+  // QT-313 R55: un PARCIAL no tiene fila propia en el mapa. Se aplica el mapa a cada linea
+  // activa y basta con que una admita. Si ninguna admite, es un pedido ya fabricado.
+  if (order.status === 'PARCIAL') {
+    if (order.activeLineStatuses.some((status) => ERROR_POR_ESTADO[status] === null)) return;
+    throw new OrderProducedFrozenError();
+  }
   const error = ERROR_POR_ESTADO[order.status];
   if (error !== null) throw error();
 }

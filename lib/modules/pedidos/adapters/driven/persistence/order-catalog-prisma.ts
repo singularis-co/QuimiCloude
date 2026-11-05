@@ -44,12 +44,24 @@ import type { OrderSummaryLineRecord, OrderSummaryRecord } from '../../../ports/
 type OrderCatalogRow = {
   readonly id: string;
   readonly status: string;
+  readonly lines: readonly { readonly status: string }[];
 };
 
 /** Fila de Prisma -> `OrderAssignmentTarget`. Funcion pura, testeable sin base. */
 export function toOrderAssignmentTarget(row: OrderCatalogRow): OrderAssignmentTarget {
-  return { id: row.id, status: row.status as OrderStatus };
+  return {
+    id: row.id,
+    status: row.status as OrderStatus,
+    activeLineStatuses: row.lines.map((line) => line.status as OrderLineStatus),
+  };
 }
+
+/** QT-313 R55: solo las lineas ACTIVAS (vivas y no canceladas) deciden si un `PARCIAL` admite
+ *  responsables. El filtro va en la consulta para que una linea cancelada o de baja no llegue. */
+const ACTIVE_LINE_STATUSES_SELECT = {
+  where: { deletedAt: null, status: { not: 'CANCELADO' as const } },
+  select: { status: true },
+};
 
 export async function findAliveOrderTargetById(
   id: string,
@@ -57,7 +69,7 @@ export async function findAliveOrderTargetById(
 ): Promise<OrderAssignmentTarget | null> {
   const row = await prisma.order.findFirst({
     where: { AND: [orderCompanyScope({ companyId }), { id, deletedAt: null }] },
-    select: { id: true, status: true },
+    select: { id: true, status: true, lines: ACTIVE_LINE_STATUSES_SELECT },
   });
 
   return row === null ? null : toOrderAssignmentTarget(row);

@@ -16,7 +16,7 @@ import { Prisma } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
 import { asignaciones, pedidos } from '@/lib/composition';
-import { normalizeCompanyName } from '@/lib/modules/identity';
+import { normalizeCompanyName, ROLE_OPERADOR } from '@/lib/modules/identity';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
@@ -33,6 +33,7 @@ import { findCostingBatches, findProductRefs } from '@/lib/modules/inventario/ad
 import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma';
 import {
+  createCancelOrderLine,
   createCreateOrder,
   createFinishConditioning,
   createFinishPacking,
@@ -106,6 +107,7 @@ const startPacking = createStartPacking({ packing: createOrderPackingRepository(
 const finishPacking = createFinishPacking({ packing: createOrderPackingRepository(), unitOfWork, recipes, units, presentations });
 const startConditioning = createStartConditioning({ conditioning: createOrderConditioningRepository() });
 const finishConditioning = createFinishConditioning({ conditioning: createOrderConditioningRepository() });
+const cancelOrderLine = createCancelOrderLine({ unitOfWork });
 const summaries = realOrderSummaries();
 
 const PERMISOS = [
@@ -640,6 +642,164 @@ describe('QT-313 T14a — asignaciones opera la unica linea del pedido', () => {
       expect(await prisma.orderStepEvidence.findMany({ where: { orderId }, select: { orderLineId: true } })).toEqual([
         { orderLineId: linea },
       ]);
+    });
+  });
+});
+
+describe('QT-313 R55 — responsables en un pedido PARCIAL', () => {
+  /** El actor de las escrituras de responsables: las tres piden `asignaciones.modificar`. */
+  function quienAsigna(fixture: Fixture): PedidosActor {
+    return { id: fixture.actorId, companyId: fixture.companyId, permissions: [...PERMISOS, 'asignaciones.modificar'] };
+  }
+
+  /** Las asignaciones del pedido, para afirmar que un rechazo no escribio nada. */
+  async function asignacionesDe(orderId: string) {
+    return prisma.orderAssignment.findMany({ where: { orderId }, orderBy: { userId: 'asc' }, select: { userId: true, workGroupId: true } });
+  }
+
+  /** Las tres escrituras, con el codigo de cada una (o `'ok'`). */
+  async function lasTres(fixture: Fixture, orderId: string): Promise<readonly string[]> {
+    const actor = quienAsigna(fixture);
+    // Quien se asigna tiene que poder ser responsable: cuenta activa (el fixture la crea `pending`)
+    // y rol Operador, el rol base de la siembra.
+    const operador = await prisma.role.findUniqueOrThrow({ where: { name: ROLE_OPERADOR }, select: { id: true } });
+    await prisma.user.update({ where: { id: fixture.otherActorId }, data: { accountStatus: 'active', roleId: operador.id } });
+    const codigos: string[] = [];
+    const escrituras = [
+      () => asignaciones.assignResponsibles(actor, { orderId, userIds: [fixture.otherActorId], workGroupIds: [] }, new Date()),
+      () => asignaciones.removeWorkGroupFromOrder(actor, { orderId, workGroupId: randomUUID() }),
+      () => asignaciones.unassignResponsible(actor, { orderId, userId: fixture.actorId }),
+    ];
+    for (const escritura of escrituras) {
+      try {
+        await escritura();
+        codigos.push('ok');
+      } catch (error) {
+        codigos.push((error as { readonly code?: string }).code ?? String(error));
+      }
+    }
+    return codigos;
+  }
+
+  it('QT-313 R55: un PARCIAL con una linea PENDIENTE admite asignar, quitar grupo y desasignar', async () => {
+    await conFixture(async (fixture) => {
+      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
+      const [primera] = lines as [string, string];
+      const ahora = new Date();
+      expect(await transition(orderId, primera, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, ahora)).toBe('ok');
+      expect(await transition(orderId, primera, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, ahora)).toBe('ok');
+      expect((await pedidoDe(orderId)).status).toBe('PARCIAL');
+      await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
+
+      expect(await lasTres(fixture, orderId)).toEqual(['ok', 'ok', 'ok']);
+
+      // Entro el nuevo y salio el que estaba.
+      expect(await asignacionesDe(orderId)).toEqual([{ userId: fixture.otherActorId, workGroupId: null }]);
+    });
+  });
+
+  it('QT-313 R55: un PARCIAL con todas sus lineas activas fabricadas rechaza las tres con order_produced_frozen sin escribir', async () => {
+    await conFixture(async (fixture) => {
+      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
+      const [primera, segunda] = lines as [string, string];
+      const ahora = new Date();
+      expect(await transition(orderId, primera, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, ahora)).toBe('ok');
+      expect(await transition(orderId, primera, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, ahora)).toBe('ok');
+      await aEmpaque(fixture, orderId, segunda);
+      expect((await pedidoDe(orderId)).status).toBe('PARCIAL');
+      await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
+      const antes = await asignacionesDe(orderId);
+
+      expect(await lasTres(fixture, orderId)).toEqual(['order_produced_frozen', 'order_produced_frozen', 'order_produced_frozen']);
+
+      expect(await asignacionesDe(orderId)).toEqual(antes);
+    });
+  });
+
+  it('QT-313 R55: una linea cancelada no cuenta: con las demas fabricadas, el PARCIAL rechaza sin escribir', async () => {
+    await conFixture(async (fixture) => {
+      // La linea que se cancelara va sin reparto: dos lineas aun no comparten presentacion, y el
+      // fixture solo trae dos envases.
+      const conReparto = async (index: number, cantidad: string) => ({
+        recipeId: await crearReceta(fixture),
+        quantity: cantidad,
+        unitId: fixture.unitId,
+        presentationLines: [{ packagingProductId: fixture.packagingProductIds[index] as string, packages: Number(cantidad) }],
+      });
+      const creado = await createOrder(
+        {
+          lines: [
+            { recipeId: await crearReceta(fixture), quantity: '1', unitId: fixture.unitId, presentationLines: [] },
+            await conReparto(0, '2'),
+            await conReparto(1, '3'),
+          ],
+        },
+        actorDe(fixture),
+      );
+      const orderId = creado.id;
+      const filas = await prisma.orderLine.findMany({ where: { orderId }, orderBy: { position: 'asc' }, select: { id: true } });
+      const [cancelada, primera, segunda] = filas.map((fila) => fila.id) as [string, string, string];
+      const ahora = new Date();
+      expect(await transition(orderId, primera, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, ahora)).toBe('ok');
+      expect(await transition(orderId, primera, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, ahora)).toBe('ok');
+      await aEmpaque(fixture, orderId, segunda);
+      await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
+
+      // Con la linea PENDIENTE todavia activa, el pedido admite responsables...
+      expect(await lasTres(fixture, orderId)).toEqual(['ok', 'ok', 'ok']);
+      await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
+
+      // ...y al cancelarla deja de admitirlos: sigue siendo PARCIAL, pero ya fabricado.
+      await cancelOrderLine(orderId, cancelada, { reason: 'el cliente ya no la quiere' }, actorDe(fixture));
+      expect((await lineaDe(cancelada)).status).toBe('CANCELADO');
+      expect((await pedidoDe(orderId)).status).toBe('PARCIAL');
+      const antes = await asignacionesDe(orderId);
+
+      expect(await lasTres(fixture, orderId)).toEqual(['order_produced_frozen', 'order_produced_frozen', 'order_produced_frozen']);
+
+      expect(await asignacionesDe(orderId)).toEqual(antes);
+    });
+  });
+
+  it('QT-313 R55: una linea quitada (deleted_at) en PENDIENTE no cuenta: con las demas fabricadas, el PARCIAL rechaza sin escribir', async () => {
+    await conFixture(async (fixture) => {
+      // Fija el filtro `deletedAt: null` de la query de `findAliveOrderTargetById`: la linea
+      // quitada sigue PENDIENTE en su columna, pero no es activa y no abre el pedido.
+      const conReparto = async (index: number, cantidad: string) => ({
+        recipeId: await crearReceta(fixture),
+        quantity: cantidad,
+        unitId: fixture.unitId,
+        presentationLines: [{ packagingProductId: fixture.packagingProductIds[index] as string, packages: Number(cantidad) }],
+      });
+      const creado = await createOrder(
+        {
+          lines: [
+            { recipeId: await crearReceta(fixture), quantity: '1', unitId: fixture.unitId, presentationLines: [] },
+            await conReparto(0, '2'),
+            await conReparto(1, '3'),
+          ],
+        },
+        actorDe(fixture),
+      );
+      const orderId = creado.id;
+      const filas = await prisma.orderLine.findMany({ where: { orderId }, orderBy: { position: 'asc' }, select: { id: true } });
+      const [quitada, primera, segunda] = filas.map((fila) => fila.id) as [string, string, string];
+      const ahora = new Date();
+      expect(await transition(orderId, primera, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, ahora)).toBe('ok');
+      expect(await transition(orderId, primera, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, ahora)).toBe('ok');
+      await aEmpaque(fixture, orderId, segunda);
+      expect((await pedidoDe(orderId)).status).toBe('PARCIAL');
+
+      // La linea se quita directamente en la fila: sigue PENDIENTE, con `deleted_at` puesto.
+      await prisma.orderLine.update({ where: { id: quitada }, data: { deletedAt: ahora } });
+      expect((await lineaDe(quitada)).status).toBe('PENDIENTE');
+      expect((await pedidoDe(orderId)).status).toBe('PARCIAL');
+      await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
+      const antes = await asignacionesDe(orderId);
+
+      expect(await lasTres(fixture, orderId)).toEqual(['order_produced_frozen', 'order_produced_frozen', 'order_produced_frozen']);
+
+      expect(await asignacionesDe(orderId)).toEqual(antes);
     });
   });
 });

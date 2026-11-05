@@ -127,8 +127,16 @@ const adaptadorFuente = read(
 /** QC-60: el catalogo se acota por empresa, asi que el doble recibe una y el `where` la lleva. */
 const EMPRESA = 'c-1'
 
-const PEDIDO_VIVO: OrderAssignmentTarget = { id: 'o-viva', status: 'PENDIENTE' }
-const PEDIDO_DE_BAJA: OrderAssignmentTarget = { id: 'o-baja', status: 'EN_CURSO' }
+const PEDIDO_VIVO: OrderAssignmentTarget = {
+  id: 'o-viva',
+  status: 'PARCIAL',
+  activeLineStatuses: ['PENDIENTE', 'TERMINADO'],
+}
+const PEDIDO_DE_BAJA: OrderAssignmentTarget = {
+  id: 'o-baja',
+  status: 'EN_CURSO',
+  activeLineStatuses: ['EN_CURSO'],
+}
 
 /**
  * Doble que se comporta como la base: aplica el `where` que le llega. Si el adaptador pide
@@ -151,7 +159,9 @@ function baseConUnPedidoVivoYUnoDeBaja(): void {
     if (encontrada === undefined) return null
     const filtraBorrados = 'deletedAt' in where && where.deletedAt === null
     if (filtraBorrados && encontrada.borrado !== null) return null
-    return encontrada.fila
+    // La fila de Prisma: las lineas activas llegan anidadas como `lines: [{ status }]`.
+    const { id, status, activeLineStatuses } = encontrada.fila
+    return { id, status, lines: activeLineStatuses.map((linea) => ({ status: linea })) }
   })
 }
 
@@ -167,7 +177,7 @@ beforeEach(() => {
 })
 
 describe('contrato OrderCatalog', () => {
-  it('el dominio declara findAliveById y un OrderAssignmentTarget con SOLO id y status', () => {
+  it('el dominio declara findAliveById y un OrderAssignmentTarget con SOLO id, status y los estados de sus lineas activas (QT-313 R55)', () => {
     // Se afirma sobre el TEXTO y no en ejecucion a proposito: `OrderCatalog` y
     // `OrderAssignmentTarget` son SOLO TIPOS y desaparecen al compilar.
     expect(catalogoFuente).toMatch(/export interface OrderCatalog \{/)
@@ -229,15 +239,14 @@ describe('contrato OrderCatalog', () => {
 })
 
 describe('toOrderAssignmentTarget', () => {
-  it('devuelve el id y el estado, y nada mas', () => {
-    expect(toOrderAssignmentTarget({ id: 'o-1', status: 'ENTREGADO' })).toEqual({
+  it('QT-313 R55: devuelve el id, el estado y los estados de sus lineas activas, y nada mas', () => {
+    const fila = { id: 'o-1', status: 'PARCIAL', lines: [{ status: 'ENTREGADO' }, { status: 'POR_EMPACAR' }] }
+    expect(toOrderAssignmentTarget(fila)).toEqual({
       id: 'o-1',
-      status: 'ENTREGADO',
+      status: 'PARCIAL',
+      activeLineStatuses: ['ENTREGADO', 'POR_EMPACAR'],
     })
-    expect(Object.keys(toOrderAssignmentTarget({ id: 'o-1', status: 'ENTREGADO' }))).toEqual([
-      'id',
-      'status',
-    ])
+    expect(Object.keys(toOrderAssignmentTarget(fila))).toEqual(['id', 'status', 'activeLineStatuses'])
   })
 })
 
@@ -472,12 +481,13 @@ describe('toOrderSummaryRecord — el resumen publicado lleva el reparto, la uni
 })
 
 describe('findAliveOrderTargetById', () => {
-  it('un pedido vivo vuelve como {id, status}', async () => {
+  it('QT-313 R55: un pedido vivo vuelve como {id, status, activeLineStatuses}', async () => {
     baseConUnPedidoVivoYUnoDeBaja()
 
     await expect(findAliveOrderTargetById('o-viva', EMPRESA)).resolves.toEqual({
       id: 'o-viva',
-      status: 'PENDIENTE',
+      status: 'PARCIAL',
+      activeLineStatuses: ['PENDIENTE', 'TERMINADO'],
     })
   })
 
@@ -499,8 +509,13 @@ describe('findAliveOrderTargetById', () => {
     expect(args.where).toEqual({
       AND: [{ companyId: EMPRESA }, { id: 'o-viva', deletedAt: null }],
     })
-    // Y el `select` pide DOS columnas: el tipo publico no lleva ninguna mas.
-    expect(args.select).toEqual({ id: true, status: true })
+    // Y el `select` pide DOS columnas y el estado de las lineas ACTIVAS (QT-313 R55): una linea
+    // de baja o cancelada no llega y no cuenta.
+    expect(args.select).toEqual({
+      id: true,
+      status: true,
+      lines: { where: { deletedAt: null, status: { not: 'CANCELADO' } }, select: { status: true } },
+    })
   })
 
   it('hace UNA sola consulta', async () => {

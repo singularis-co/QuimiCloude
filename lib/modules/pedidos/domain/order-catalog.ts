@@ -25,10 +25,14 @@ import type { PackedLineCount } from './packing-count';
  *  lo que no esta en el tipo no se puede filtrar por descuido.
  *
  *  `status` es el `OrderStatus` de QC-34, IMPORTADO y no copiado: una segunda lista de
- *  estados se desincronizaria en silencio de la tabla de transiciones. */
+ *  estados se desincronizaria en silencio de la tabla de transiciones.
+ *
+ *  `activeLineStatuses` son los estados de sus lineas activas (vivas y no canceladas), sin orden
+ *  garantizado. Con ellos `asignaciones` decide si un `PARCIAL` admite responsables (R55). */
 export type OrderAssignmentTarget = {
   readonly id: string;
   readonly status: OrderStatus;
+  readonly activeLineStatuses: readonly OrderLineStatus[];
 };
 
 /** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,

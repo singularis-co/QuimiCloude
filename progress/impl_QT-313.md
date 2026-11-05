@@ -432,3 +432,30 @@ Desviaciones (para el reviewer):
 10. Helper de test `tests/helpers/only-order-line.ts` (`ensureOnlyLine`, `syncOnlyLine`, `onOnlyLine`, `singleLineFlow`).
 11. Corregido un rojo previo de T7: `tests/unit/inventario/batch-movement-prisma.test.ts` no esperaba `orderLineId: null`.
 12. `qc145-estado-solo-planta.test.ts` cambia su lista de escritores de estado.
+
+## Fase 5 — T14d Responsables en un PARCIAL (R55, 2026-11-05)
+
+Produccion:
+- `asignaciones/domain/order-state.ts`: `assertOrderAcceptsWrites` aplica el mapa linea a linea y basta con que una linea admita la escritura. Sustituye la regla provisional de T0, que admitia cualquier `PARCIAL`.
+- `pedidos/domain/order-catalog.ts`: `OrderAssignmentTarget` pasa a `{id, status, activeLineStatuses}`.
+- `order-catalog-prisma.ts`: `findAliveOrderTargetById` lee los estados de las lineas vivas y no canceladas.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R55 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R55: un PARCIAL con una linea PENDIENTE admite asignar, quitar grupo y desasignar», «QT-313 R55: un PARCIAL con todas sus lineas activas fabricadas rechaza las tres con order_produced_frozen sin escribir», «QT-313 R55: una linea cancelada no cuenta…», «QT-313 R55: una linea quitada (deleted_at) en PENDIENTE no cuenta…»; `tests/unit/asignaciones/order-state.test.ts` › «R55: un PARCIAL con una linea ${abierta} y otra TERMINADO admite…» (parametrizado), «R55: un PARCIAL con todas sus lineas activas en … rechaza…» (parametrizado), «R55: una linea cancelada no cuenta…», «R55: assertOrderAcceptsWrites aplica el mapa linea a linea…»; `tests/unit/pedidos/order-catalog.test.ts` › tres «QT-313 R55: …» |
+
+Verificacion (salida real):
+- backend_dev:
+  - `pnpm run typecheck` y `pnpm run lint` en verde.
+  - Guardias 87/87.
+  - `related --project node` → 125/125.
+  - `.int` por lotes con `--maxWorkers=1`, en verde.
+- Caso añadido despues, a peticion del humano (la linea quitada cuenta como fuera):
+  - `order-lines-execution.int` → `Test Files 1 passed (1)`, `Tests 19 passed (19)`.
+  - eslint del archivo, limpio.
+
+Desviaciones aceptadas por el humano (2026-11-05), para el reviewer:
+1. El campo nuevo se llama `activeLineStatuses`.
+2. Algunos fixtures de test necesitaron rodeos para fabricar un `PARCIAL` con lineas en estados concretos.
+3. Tres rutas nuevas en «Archivos esperados».
