@@ -38,7 +38,7 @@ const ENTREGA: DeliveryForVoid = {
 }
 
 function linea(id: string, customerId: string, batchId: string, packages: number, voided = false): DeliveryLineForVoid {
-  return { id, customerId, presentationLineId: null, batchId, packages, quantity: `${String(packages)}.0000`, voided }
+  return { id, customerId, presentationLineId: null, orderLineId: null, batchId, packages, quantity: `${String(packages)}.0000`, voided }
 }
 
 /** Bruno con una linea, Ana en dos lotes (3 + 1), y un tercero ya anulado. */

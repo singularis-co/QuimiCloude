@@ -63,6 +63,7 @@ import {
   fakeScopeProducts,
   fakeScopeUnits,
   fakeUnitOfWork,
+  orderLineOf,
 } from '@/tests/helpers/order-unit-of-work-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
@@ -161,7 +162,13 @@ function almacen() {
       .map((g) => g.row)
     return { items, total: items.length, page: 1, pageSize: 10, totalPages: 1 }
   })
-  const orders = { findAliveById, listAlive }
+  // QT-313: cada pedido de este almacen es de una receta; su unica linea lleva su estado.
+  const lineaDe = (guardado: Guardado) => orderLineOf({ ...guardado.row, status: guardado.status })
+  const findAliveLines = vi.fn(async (id: string, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    return guardado === null ? [] : [lineaDe(guardado)]
+  })
+  const orders = { findAliveById, findAliveLines, listAlive }
 
   // Escritura (`OrderWriteRepository`): solo dentro de `unitOfWork.run`.
   const lockAliveById = vi.fn(async (id: string, scope: OrderScope) => {
@@ -193,9 +200,41 @@ function almacen() {
     return 'ok' as const
   })
   const setReservedAt = vi.fn(async () => undefined)
-  // Ningun pedido de este almacen tiene lineas: la reserva va con la clave del pedido sin linea.
-  const findOnlyLineId = vi.fn(async () => null)
-  const writeOrders = { lockAliveById, findOnlyLineId, create, updateAlive, cancelAlive, softDeleteAlive, setReservedAt }
+  const lockAliveLines = vi.fn(async (id: string, scope: OrderScope) => {
+    const guardado = visible(id, scope)
+    return guardado === null
+      ? null
+      : { order: { ...guardado.row, status: guardado.status, reservedAt: null }, lines: [lineaDe(guardado)] }
+  })
+  const cancelLine = vi.fn(
+    async (id: string, _lineId: string, _reason: string, actorId: string, _now: Date, scope: OrderScope) => {
+      const guardado = visible(id, scope)
+      if (guardado === null) return 'not_found' as const
+      guardado.status = 'CANCELADO'
+      guardado.touchedBy = actorId
+      return 'ok' as const
+    },
+  )
+  const setLineReservedAt = vi.fn(async (_id: string, _lineId: string, _reservedAt: Date | null, scope: OrderScope) => {
+    void scope
+  })
+  const refreshStatus = vi.fn(async (id: string, _actorId: string | null, _now: Date, scope: OrderScope) => visible(id, scope)?.status ?? null)
+  const mirrorFirstLine = vi.fn(async (_id: string, scope: OrderScope) => {
+    void scope
+  })
+  const writeOrders = {
+    lockAliveById,
+    create,
+    updateAlive,
+    cancelAlive,
+    softDeleteAlive,
+    setReservedAt,
+    lockAliveLines,
+    cancelLine,
+    setLineReservedAt,
+    refreshStatus,
+    mirrorFirstLine,
+  }
 
   // Reservas de `inventario`: no forman parte de lo que este archivo mide -el ambito de ESE
   // puerto es otro archivo-, asi que aparta y libera sin tocar el almacen de pedidos.
@@ -258,7 +297,7 @@ function almacen() {
     // Los espias del puerto DE PEDIDOS -lectura y escritura-, con nombre, para que
     // `llamadasAlPuerto` los recorra igual que antes. Los de `reservations` quedan fuera: su
     // ambito -otro puerto, otro modulo- no es lo que este archivo mide aqui.
-    espias: { findAliveById, listAlive, ...writeOrders },
+    espias: { findAliveById, findAliveLines, listAlive, ...writeOrders },
     recipes: recipes as unknown as RecipeCatalog,
     products: products as unknown as ProductCatalog,
     units: units as unknown as UnitCatalog,
@@ -279,7 +318,7 @@ function casosDeUso(a: Almacen) {
     getOrder: createGetOrder({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units }),
     listOrders: createListOrders({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, presentations: a.presentations, packaging: fakePackagingCatalog(), units: a.units, log: a.log, deliveryProgress: fakeDeliveryProgress() }),
     updateOrder: createUpdateOrder({ customerCatalog: fakeCustomerCatalog(), orders: a.orders, recipes: a.recipes, products: a.products, units: a.units, presentations: a.presentations, packaging: fakePackagingCatalog(), unitOfWork: a.unitOfWork, now }),
-    cancelOrder: createCancelOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
+    cancelOrder: createCancelOrder({ unitOfWork: a.unitOfWork, now }),
     deleteOrder: createDeleteOrder({ orders: a.orders, unitOfWork: a.unitOfWork, now }),
   }
 }
@@ -337,11 +376,15 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
       new Set([
         'create',
         'findAliveById',
+        'findAliveLines',
         'listAlive',
         'lockAliveById',
-        'findOnlyLineId',
+        'lockAliveLines',
         'updateAlive',
-        'cancelAlive',
+        'cancelLine',
+        'setLineReservedAt',
+        'refreshStatus',
+        'mirrorFirstLine',
         'softDeleteAlive',
         'setReservedAt',
       ]),
@@ -506,6 +549,7 @@ describe('QC-60 R20, R21 — lo AJENO responde igual que lo INEXISTENTE, y no se
       // Y no se llego a ninguna ESCRITURA: el rechazo es sobre la lectura, en el service.
       expect(ajeno.espias.updateAlive).not.toHaveBeenCalled()
       expect(ajeno.espias.cancelAlive).not.toHaveBeenCalled()
+      expect(ajeno.espias.cancelLine).not.toHaveBeenCalled()
       expect(ajeno.espias.softDeleteAlive).not.toHaveBeenCalled()
       expect(ajeno.espias.create).not.toHaveBeenCalled()
     })

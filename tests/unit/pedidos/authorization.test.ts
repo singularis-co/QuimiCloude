@@ -185,7 +185,7 @@ const SIETE: readonly (readonly [string, string, Invocacion])[] = [
     'cancelOrder',
     MODIFICAR,
     (actor, entrada = { reason: 'sin stock' }) =>
-      createCancelOrder({ orders: depsDeTurno().orders, unitOfWork: depsDeTurno().unitOfWork })(
+      createCancelOrder({ unitOfWork: depsDeTurno().unitOfWork })(
         ORDER_ID,
         entrada,
         actor,
@@ -464,7 +464,7 @@ describe('QC-74 — requirePermission es la primera linea de los siete, con su c
       const validacion = cuerpo.indexOf('safeParse')
       if (validacion > -1) expect(autorizacion).toBeLessThan(validacion)
 
-      const primerPuerto = cuerpo.search(/\bdeps\s*\.\s*(orders|recipes)\b/)
+      const primerPuerto = cuerpo.search(/\bdeps\s*\.\s*(orders|recipes|unitOfWork)\b/)
       expect(primerPuerto, 'algun puerto tiene que usarse').toBeGreaterThan(-1)
       expect(autorizacion).toBeLessThan(primerPuerto)
     })

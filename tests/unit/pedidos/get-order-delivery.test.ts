@@ -29,9 +29,9 @@ const OTHER_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 const ENTREGADOR: Actor = { id: 'u-entrega', companyId: EMPRESA, permissions: ['entregas.modificar'] }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
-  { id: OTHER_PENDING_LINE_ID, presentationId: OTHER_PRESENTATION, packages: 2, presentationContent: '2.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: OTHER_PENDING_LINE_ID, presentationId: OTHER_PRESENTATION, packages: 2, presentationContent: '2.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
 ]
 
 const PRESENTACIONES: readonly PresentationRef[] = [
@@ -305,7 +305,7 @@ describe('QC-290 — getOrderDelivery espera solo lo pedido', () => {
       lineas: [
         { ...LINEAS[0]!, packedPackages: 6, packedSurplusPackages: 2 },
         { ...LINEAS[1]!, packedPackages: 12, packedSurplusPackages: 2 },
-        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0 },
+        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0, orderLineId: null },
       ],
     })
     const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
@@ -329,8 +329,8 @@ describe('QC-290 — getOrderDelivery espera solo lo pedido', () => {
     const m = montar({
       lineas: [
         { ...LINEAS[0]!, packedPackages: 6, packedSurplusPackages: 2 },
-        { ...LINEAS[1]!, packedPackages: 10, packedSurplusPackages: 0 },
-        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0 },
+        { ...LINEAS[1]!, packedPackages: 10, packedSurplusPackages: 0, orderLineId: null },
+        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0, orderLineId: null },
       ],
     })
     await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)

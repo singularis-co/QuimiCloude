@@ -1445,6 +1445,8 @@ export type FinishedGoodsDispatchOrigin =
   | {
       readonly origin: 'order';
       readonly orderId: string;
+      /** `null` en un pedido sin lineas. */
+      readonly orderLineId: string | null;
       readonly recipeId: string;
       readonly presentationId: string;
     }
@@ -1593,6 +1595,7 @@ export async function dispatchFinishedGoods(
         reason: null,
         orderId: input.origin === 'order' ? input.orderId : null,
         orderPresentationLineId: null,
+        orderLineId: input.origin === 'order' ? input.orderLineId : null,
         orderDeliveryId: input.orderDeliveryId,
         createdBy: input.actorId,
       },
@@ -1627,7 +1630,11 @@ export async function returnFinishedGoods(
   input: {
     readonly orderId: string | null;
     readonly orderDeliveryVoidId: string;
-    readonly lines: readonly { readonly batchId: string; readonly quantity: string }[];
+    readonly lines: readonly {
+      readonly batchId: string;
+      readonly quantity: string;
+      readonly orderLineId: string | null;
+    }[];
     readonly actorId: string;
     readonly now: Date;
   },
@@ -1656,8 +1663,10 @@ export async function returnFinishedGoods(
 
   // Un incremento y un asiento por lote: el indice unico del libro por (anulacion, lote) no admite dos.
   const quantityByBatch = new Map<string, string>();
+  const orderLineByBatch = new Map<string, string | null>();
   for (const line of input.lines) {
     quantityByBatch.set(line.batchId, addQuantities(quantityByBatch.get(line.batchId) ?? ZERO_QUANTITY, line.quantity));
+    orderLineByBatch.set(line.batchId, line.orderLineId);
   }
 
   for (const [batchId, quantity] of quantityByBatch) {
@@ -1676,6 +1685,7 @@ export async function returnFinishedGoods(
         reason: null,
         orderId: input.orderId,
         orderPresentationLineId: null,
+        orderLineId: input.orderId === null ? null : (orderLineByBatch.get(batchId) ?? null),
         orderDeliveryVoidId: input.orderDeliveryVoidId,
         createdBy: input.actorId,
       },

@@ -8,9 +8,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { createExpireStaleOrders } from '@/lib/modules/pedidos/domain/expire-stale-orders'
 import { EXPIRED_ORDER_REASON } from '@/lib/modules/pedidos/domain/order-expiry'
 
-import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, fakeUnitOfWork, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { ExpirableOrderCandidate } from '@/lib/modules/pedidos/domain/expire-stale-orders'
+import type { OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository'
 
 const AHORA = new Date('2026-09-23T07:00:00.000Z')
 const RESERVADO_HACE_RATO = new Date('2026-01-02T03:04:05.000Z')
@@ -20,28 +21,55 @@ const EMPRESA_B = '44444444-4444-4444-8444-444444444444'
 const PEDIDO_A_ID = '11111111-1111-4111-8111-111111111111'
 const PEDIDO_B_ID = '22222222-2222-4222-8222-222222222222'
 
+/** La linea candidata de cada pedido de estos tests: la unica, con un id derivado del pedido. */
+function lineaDe(orderId: string): string {
+  return `linea-${orderId}`
+}
+
 /** Un candidato del lote, con `reservedAt` por defecto ANTERIOR al umbral: el caso comun. */
 function candidato(id: string, reservedAt: Date = RESERVADO_HACE_RATO): ExpirableOrderCandidate {
-  return { id, reservedAt }
+  return { orderId: id, lineId: lineaDe(id), reservedAt }
+}
+
+/**
+ * Los puertos de la caducidad para pedidos de una linea: `lockAliveById` (configurable por cada test)
+ * da el pedido, y `lockAliveLine` lo bloquea con su linea, que lleva su estado y su plazo. Cancelar,
+ * vaciar el plazo y derivar el pedido resuelven sin hacer nada.
+ */
+function dobles(overrides: { readonly orders?: Partial<OrderWriteRepository> } = {}): ReturnType<typeof fakeUnitOfWork> {
+  const d = fakeUnitOfWork({
+    orders: {
+      cancelLine: vi.fn(async () => 'ok' as const),
+      setLineReservedAt: vi.fn(async () => undefined),
+      refreshStatus: vi.fn(async () => 'CANCELADO' as const),
+      mirrorFirstLine: vi.fn(async () => undefined),
+      ...overrides.orders,
+    },
+  })
+  d.orders.lockAliveLine.mockImplementation(async (orderId: string, lineId: string, scope: { companyId: string }) => {
+    const order = await d.orders.lockAliveById(orderId, scope)
+    return order === null ? null : { order, line: orderLineOf(order, { id: lineId }) }
+  })
+  return d
 }
 
 describe('createExpireStaleOrders — R21: cancela con el motivo exacto, sin autor, y libera como expire', () => {
   it('cada candidato se bloquea, se cancela y se libera en ESE orden', async () => {
-    const d = fakeUnitOfWork({ orders: { lockAliveById: vi.fn(async () => fakeOrderRow()) } })
+    const d = dobles({ orders: { lockAliveById: vi.fn(async () => fakeOrderRow()) } })
     const orden: string[] = []
     d.orders.lockAliveById.mockImplementation(async () => {
       orden.push('lockAliveById')
       return fakeOrderRow()
     })
-    d.orders.cancelAlive.mockImplementation(async () => {
-      orden.push('cancelAlive')
+    d.orders.cancelLine.mockImplementation(async () => {
+      orden.push('cancelLine')
       return 'ok' as const
     })
     d.reservations.releaseForLine.mockImplementation(async () => {
       orden.push('releaseForLine')
     })
-    d.orders.setReservedAt.mockImplementation(async () => {
-      orden.push('setReservedAt')
+    d.orders.setLineReservedAt.mockImplementation(async () => {
+      orden.push('setLineReservedAt')
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
     const findExpirable = vi.fn(async () => [candidato(PEDIDO_A_ID)])
@@ -53,9 +81,10 @@ describe('createExpireStaleOrders — R21: cancela con el motivo exacto, sin aut
       now: () => AHORA,
     })()
 
-    expect(orden).toEqual(['lockAliveById', 'cancelAlive', 'releaseForLine', 'setReservedAt'])
-    expect(d.orders.cancelAlive.mock.calls[0]).toEqual([
+    expect(orden).toEqual(['lockAliveById', 'cancelLine', 'releaseForLine', 'setLineReservedAt'])
+    expect(d.orders.cancelLine.mock.calls[0]).toEqual([
       PEDIDO_A_ID,
+      lineaDe(PEDIDO_A_ID),
       EXPIRED_ORDER_REASON,
       null,
       AHORA,
@@ -63,19 +92,24 @@ describe('createExpireStaleOrders — R21: cancela con el motivo exacto, sin aut
     ])
     expect(d.reservations.releaseForLine.mock.calls[0]?.[0]).toMatchObject({
       orderId: PEDIDO_A_ID,
+      orderLineId: lineaDe(PEDIDO_A_ID),
       companyId: EMPRESA_A,
       reason: 'expire',
       actorId: null,
       now: AHORA,
     })
-    expect(d.orders.setReservedAt.mock.calls[0]).toEqual([PEDIDO_A_ID, null, { companyId: EMPRESA_A }])
+    expect(d.orders.setLineReservedAt.mock.calls[0]).toEqual([PEDIDO_A_ID, lineaDe(PEDIDO_A_ID), null, { companyId: EMPRESA_A }])
+    // QT-313 R51: el estado del pedido no se escribe, se deriva.
+    expect(d.orders.refreshStatus).toHaveBeenCalledWith(PEDIDO_A_ID, null, AHORA, { companyId: EMPRESA_A })
+    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 1, failed: [] })
   })
 })
 
 describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo el candado', () => {
   it('si el candidato ya no esta PENDIENTE al bloquearlo, no cancela ni libera nada', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ status: 'EN_CURSO' })) },
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
@@ -88,15 +122,15 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
       now: () => AHORA,
     })()
 
-    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.cancelLine).not.toHaveBeenCalled()
     expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
-    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+    expect(d.orders.setLineReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
 
   it('un candidato POR_EMPACAR o EN_EMPAQUE bajo el candado no se cancela ni se libera (R30)', async () => {
     for (const status of ['POR_EMPACAR', 'EN_EMPAQUE'] as const) {
-      const d = fakeUnitOfWork({
+      const d = dobles({
         orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ status })) },
       })
       const listCompanyIds = vi.fn(async () => [EMPRESA_A])
@@ -109,15 +143,15 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
         now: () => AHORA,
       })()
 
-      expect(d.orders.cancelAlive, status).not.toHaveBeenCalled()
+      expect(d.orders.cancelLine, status).not.toHaveBeenCalled()
       expect(d.reservations.releaseForLine, status).not.toHaveBeenCalled()
-      expect(d.orders.setReservedAt, status).not.toHaveBeenCalled()
+      expect(d.orders.setLineReservedAt, status).not.toHaveBeenCalled()
       expect(resultado, status).toEqual({ expired: 0, failed: [] })
     }
   })
 
   it('si el candidato ya no existe (borrado o de otra empresa) al bloquearlo, no hace nada', async () => {
-    const d = fakeUnitOfWork({ orders: { lockAliveById: vi.fn(async () => null) } })
+    const d = dobles({ orders: { lockAliveById: vi.fn(async () => null) } })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
     const findExpirable = vi.fn(async () => [candidato(PEDIDO_A_ID)])
 
@@ -128,14 +162,14 @@ describe('createExpireStaleOrders — R22: solo toca lo que sigue PENDIENTE bajo
       now: () => AHORA,
     })()
 
-    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.cancelLine).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
 })
 
 describe('createExpireStaleOrders — R53: una edicion intercalada gana bajo el candado', () => {
   it('si la edicion reinicio el plazo (reserved_at posterior al umbral) al bloquear, no cancela ni libera', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ reservedAt: AHORA })) },
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
@@ -148,14 +182,14 @@ describe('createExpireStaleOrders — R53: una edicion intercalada gana bajo el 
       now: () => AHORA,
     })()
 
-    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.cancelLine).not.toHaveBeenCalled()
     expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
-    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+    expect(d.orders.setLineReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
 
   it('si la edicion dejo el pedido sin material apartado (reserved_at nulo) al bloquear, no cancela ni libera', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ reservedAt: null })) },
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
@@ -168,16 +202,16 @@ describe('createExpireStaleOrders — R53: una edicion intercalada gana bajo el 
       now: () => AHORA,
     })()
 
-    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.cancelLine).not.toHaveBeenCalled()
     expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
-    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+    expect(d.orders.setLineReservedAt).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
 })
 
 describe('createExpireStaleOrders — R25: idempotente ante una repeticion o un solape', () => {
   it('un pedido ya CANCELADO por una ejecucion anterior no se cancela ni se libera otra vez', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ status: 'CANCELADO', cancellationReason: EXPIRED_ORDER_REASON })) },
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A])
@@ -190,7 +224,7 @@ describe('createExpireStaleOrders — R25: idempotente ante una repeticion o un 
       now: () => AHORA,
     })()
 
-    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.cancelLine).not.toHaveBeenCalled()
     expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
     expect(resultado).toEqual({ expired: 0, failed: [] })
   })
@@ -203,10 +237,8 @@ class PedidoDeEjemploError extends Error {
 
 describe('createExpireStaleOrders — R26: un fallo no arrastra a los demas y queda anotado con su codigo', () => {
   it('el pedido cuya transaccion lanza se anota en `failed` con stage "order" y su codigo, y los demas se procesan igual', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: {
-        cancelAlive: vi.fn(async () => 'ok' as const),
-        setReservedAt: vi.fn(async () => undefined),
       },
     })
     d.orders.lockAliveById.mockImplementation(async (id: string) => {
@@ -225,15 +257,15 @@ describe('createExpireStaleOrders — R26: un fallo no arrastra a los demas y qu
 
     expect(resultado.expired).toBe(1)
     expect(resultado.failed).toEqual([
-      { stage: 'order', id: PEDIDO_A_ID, companyId: EMPRESA_A, code: 'fallo_de_ejemplo' },
+      { stage: 'order', id: PEDIDO_A_ID, lineId: lineaDe(PEDIDO_A_ID), companyId: EMPRESA_A, code: 'fallo_de_ejemplo' },
     ])
     // El pedido que SI se pudo procesar llego hasta el final.
-    expect(d.orders.cancelAlive).toHaveBeenCalledTimes(1)
-    expect(d.orders.cancelAlive.mock.calls[0]?.[0]).toBe(PEDIDO_B_ID)
+    expect(d.orders.cancelLine).toHaveBeenCalledTimes(1)
+    expect(d.orders.cancelLine.mock.calls[0]?.[0]).toBe(PEDIDO_B_ID)
   })
 
   it('un fallo sin codigo de catalogo se anota como "unexpected", nunca con su mensaje', async () => {
-    const d = fakeUnitOfWork({})
+    const d = dobles({})
     d.orders.lockAliveById.mockImplementation(async () => {
       throw new Error('detalle interno que no debe salir en el log')
     })
@@ -248,14 +280,14 @@ describe('createExpireStaleOrders — R26: un fallo no arrastra a los demas y qu
     })()
 
     expect(resultado.failed).toEqual([
-      { stage: 'order', id: PEDIDO_A_ID, companyId: EMPRESA_A, code: 'unexpected' },
+      { stage: 'order', id: PEDIDO_A_ID, lineId: lineaDe(PEDIDO_A_ID), companyId: EMPRESA_A, code: 'unexpected' },
     ])
   })
 })
 
 describe('createExpireStaleOrders — R54: un fallo al listar empresas o candidatos no detiene el proceso', () => {
   it('si `listCompanyIds` falla, la ejecucion termina marcada como fallida sin tocar ningun pedido', async () => {
-    const d = fakeUnitOfWork({})
+    const d = dobles({})
     const listCompanyIds = vi.fn(async () => {
       throw new PedidoDeEjemploError()
     })
@@ -277,11 +309,9 @@ describe('createExpireStaleOrders — R54: un fallo al listar empresas o candida
   })
 
   it('una empresa que falla AL BUSCAR sus candidatos se anota y la siguiente se procesa igual', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: {
         lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id })),
-        cancelAlive: vi.fn(async () => 'ok' as const),
-        setReservedAt: vi.fn(async () => undefined),
       },
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A, EMPRESA_B])
@@ -301,8 +331,8 @@ describe('createExpireStaleOrders — R54: un fallo al listar empresas o candida
       expired: 1,
       failed: [{ stage: 'candidates', companyId: EMPRESA_A, code: 'fallo_de_ejemplo' }],
     })
-    expect(d.orders.cancelAlive).toHaveBeenCalledTimes(1)
-    expect(d.orders.cancelAlive.mock.calls[0]?.[0]).toBe(PEDIDO_B_ID)
+    expect(d.orders.cancelLine).toHaveBeenCalledTimes(1)
+    expect(d.orders.cancelLine.mock.calls[0]?.[0]).toBe(PEDIDO_B_ID)
   })
 })
 
@@ -317,26 +347,24 @@ describe('createExpireStaleOrders — R55: un pedido que falla siempre no se rei
         new Date(RESERVADO_HACE_RATO.getTime() + i * 1000),
       ),
     )
-    const idsQueFallan = new Set(candidatosQueFallan.map((c) => c.id))
+    const idsQueFallan = new Set(candidatosQueFallan.map((c) => c.orderId))
 
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: {
         lockAliveById: vi.fn(async (id: string) => {
           if (idsQueFallan.has(id)) throw new PedidoDeEjemploError()
           return fakeOrderRow({ id })
         }),
-        cancelAlive: vi.fn(async () => 'ok' as const),
-        setReservedAt: vi.fn(async () => undefined),
       },
     })
 
     const listCompanyIds = vi.fn(async () => [EMPRESA_A, EMPRESA_B])
     let vueltasDeA = 0
     const findExpirable = vi.fn(
-      async (companyId: string, _threshold: Date, cursor: { readonly id: string } | null, limit: number) => {
+      async (companyId: string, _threshold: Date, cursor: { readonly lineId: string } | null, limit: number) => {
         if (companyId === EMPRESA_B) return [candidato(PEDIDO_B_ID)]
         vueltasDeA += 1
-        const desde = cursor === null ? 0 : candidatosQueFallan.findIndex((c) => c.id === cursor.id) + 1
+        const desde = cursor === null ? 0 : candidatosQueFallan.findIndex((c) => c.lineId === cursor.lineId) + 1
         return candidatosQueFallan.slice(desde, desde + limit)
       },
     )
@@ -354,17 +382,15 @@ describe('createExpireStaleOrders — R55: un pedido que falla siempre no se rei
     expect(new Set(resultado.failed.map((f) => (f.stage === 'order' ? f.id : null)))).toEqual(idsQueFallan)
     expect(resultado.failed.every((f) => f.stage === 'order' && f.companyId === EMPRESA_A)).toBe(true)
     // La empresa siguiente SI se proceso: su pedido se cancelo.
-    expect(d.orders.cancelAlive.mock.calls.map((call) => call[0])).toEqual([PEDIDO_B_ID])
+    expect(d.orders.cancelLine.mock.calls.map((call) => call[0])).toEqual([PEDIDO_B_ID])
   })
 })
 
 describe('createExpireStaleOrders — empresa por empresa, sin que una lea los pedidos de otra', () => {
   it('el candidato de la empresa B nunca se busca con el umbral de la empresa A', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: {
         lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id })),
-        cancelAlive: vi.fn(async () => 'ok' as const),
-        setReservedAt: vi.fn(async () => undefined),
       },
     })
     const listCompanyIds = vi.fn(async () => [EMPRESA_A, EMPRESA_B])
@@ -379,8 +405,8 @@ describe('createExpireStaleOrders — empresa por empresa, sin que una lea los p
       now: () => AHORA,
     })()
 
-    expect(d.orders.cancelAlive.mock.calls.map((call) => call[0])).toEqual([PEDIDO_A_ID, PEDIDO_B_ID])
-    expect(d.orders.cancelAlive.mock.calls.map((call) => call[4])).toEqual([
+    expect(d.orders.cancelLine.mock.calls.map((call) => call[0])).toEqual([PEDIDO_A_ID, PEDIDO_B_ID])
+    expect(d.orders.cancelLine.mock.calls.map((call) => call[5])).toEqual([
       { companyId: EMPRESA_A },
       { companyId: EMPRESA_B },
     ])
@@ -390,11 +416,9 @@ describe('createExpireStaleOrders — empresa por empresa, sin que una lea los p
 
 describe('createExpireStaleOrders — recorre lotes hasta vaciarlos, POR EMPRESA, con cursor', () => {
   it('pide un segundo lote de la MISMA empresa cuando el primero viene LLENO, con el cursor del ultimo candidato, y pasa a la siguiente cuando llega vacio', async () => {
-    const d = fakeUnitOfWork({
+    const d = dobles({
       orders: {
         lockAliveById: vi.fn(async (id: string) => fakeOrderRow({ id })),
-        cancelAlive: vi.fn(async () => 'ok' as const),
-        setReservedAt: vi.fn(async () => undefined),
       },
     })
     // El caso de uso pide de a 100: un primer lote de exactamente 100 fuerza una segunda vuelta
@@ -421,7 +445,7 @@ describe('createExpireStaleOrders — recorre lotes hasta vaciarlos, POR EMPRESA
     const ultimoCandidato = primerLote[primerLote.length - 1]
     expect(findExpirable.mock.calls[1]?.[2]).toEqual({
       reservedAt: ultimoCandidato?.reservedAt,
-      id: ultimoCandidato?.id,
+      lineId: ultimoCandidato?.lineId,
     })
     expect(resultado.expired).toBe(100)
   })
@@ -431,7 +455,7 @@ describe('createExpireStaleOrders — los estados de acondicionamiento no caduca
   it.each(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const)(
     'R23: un candidato %s bajo el candado no se cancela ni se libera',
     async (status) => {
-      const d = fakeUnitOfWork({
+      const d = dobles({
         orders: { lockAliveById: vi.fn(async () => fakeOrderRow({ status })) },
       })
 
@@ -442,9 +466,9 @@ describe('createExpireStaleOrders — los estados de acondicionamiento no caduca
         now: () => AHORA,
       })()
 
-      expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+      expect(d.orders.cancelLine).not.toHaveBeenCalled()
       expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
-      expect(d.orders.setReservedAt).not.toHaveBeenCalled()
+      expect(d.orders.setLineReservedAt).not.toHaveBeenCalled()
       expect(resultado).toEqual({ expired: 0, failed: [] })
     },
   )

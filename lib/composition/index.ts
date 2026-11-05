@@ -296,6 +296,7 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import {
   createCancelAliveOrder,
   createCancelOrder,
+  createCancelOrderLine,
   createCreateOrder,
   createDeleteOrder,
   createDeliverOrder,
@@ -1682,9 +1683,10 @@ const reviewBlockedOrders = createReviewBlockedOrders({
  * usa `toOffsetLimit`/`buildPage` directamente (R37, `design.md > 10`), asi que el dominio
  * no necesita recibirla.
  *
- * `cancelOrder` y `deleteOrder` reciben `orders` (SOLO lectura, para la comprobacion previa de
- * estado) y `unitOfWork` (para liberar): ninguno de los dos toca la receta, y darles catalogos
- * que no usan seria cablear una dependencia falsa. `getOrder` y `listOrders` reciben `recipes`,
+ * `deleteOrder` recibe `orders` (SOLO lectura, para la comprobacion previa de estado) y
+ * `unitOfWork` (para liberar); `cancelOrder` y `cancelOrderLine`, solo `unitOfWork`: deciden bajo
+ * el candado. Ninguno toca la receta, y darles catalogos que no usan seria cablear una dependencia
+ * falsa. `getOrder` y `listOrders` reciben `recipes`,
  * `presentations` y `units` -para la etiqueta de `unitId`-, pero no
  * `products` ni `unitOfWork`: no calculan ningun importe ni apartan nada. `createOrder` y
  * `updateOrder` son los dos que si costean y aparta, asi que son los dos que reciben tambien
@@ -1785,7 +1787,8 @@ export const pedidos = {
     customerCatalog,
   }),
   listOrderLineIds: createListOrderLineIds({ orders: orderRepository }),
-  cancelOrder: createCancelOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
+  cancelOrder: createCancelOrder({ unitOfWork: orderUnitOfWork }),
+  cancelOrderLine: createCancelOrderLine({ unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),
   findCoverage: createFindCoverage({ reservations: reservationQueries }),
   quoteOrderCost: createQuoteOrderCost({

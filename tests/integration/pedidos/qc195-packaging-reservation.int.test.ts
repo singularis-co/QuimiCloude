@@ -107,7 +107,7 @@ const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBa
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
-const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
+const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 const transition = createTransitionOrder({ unitOfWork });
 const quoteOrderCost = createQuoteOrderCost({ recipes, products, units, packaging });

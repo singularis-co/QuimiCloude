@@ -31,6 +31,11 @@ const NO_BORRABLES: readonly OrderStatus[] = [
   'TERMINADO',
 ];
 
+/** Se borra solo si el pedido y cada una de sus lineas vivas estan en un estado borrable. */
+function isDeletable(status: OrderStatus, lines: readonly { readonly status: OrderStatus }[]): boolean {
+  return !NO_BORRABLES.includes(status) && lines.every((line) => !NO_BORRABLES.includes(line.status));
+}
+
 /**
  * Borrado de pedido. Borrado LOGICO y sin restaurar: `softDeleteAlive`, jamas un borrado
  * fisico. El pedido conserva su fila entera y su numero correlativo -que no se libera ni se
@@ -39,8 +44,8 @@ const NO_BORRABLES: readonly OrderStatus[] = [
  * No existe ninguna operacion de restaurar ni ningun listado de borrados, y no por olvido:
  * el puerto no las declara, asi que no se pueden hacer por descuido.
  *
- * Un pedido vivo que se borra tambien libera su material, igual que cancelar, en la MISMA
- * operacion, sin persona autora en la reserva mas alla del actor que borro.
+ * Un pedido vivo que se borra da de baja tambien todas sus lineas y libera el material de cada
+ * una, en la MISMA transaccion, con el actor que borro como autor.
  */
 export function createDeleteOrder(
   deps: DeleteOrderDeps,
@@ -56,37 +61,35 @@ export function createDeleteOrder(
     // La empresa sale del ACTOR y jamas de la entrada: nadie puede elegir consultar otra.
     const scope: OrderScope = { companyId: actor.companyId };
 
-    // R33: no existe y ya esta borrado son el mismo caso, y el filtro `deleted_at IS NULL`
-    // es del puerto (R40).
+    // No existe y ya esta borrado son el mismo caso; el filtro `deleted_at IS NULL` es del puerto.
+    // Se lee antes de escribir para distinguir «no existe» de «no se puede borrar».
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
-
-    // R32, con `code` PROPIO (`not_deletable`), distinto del de la edicion rechazada. Se lee
-    // la fila ANTES de escribir precisamente para poder distinguir «no existe» de «no se
-    // puede borrar» (`design.md > 7.4`).
-    if (NO_BORRABLES.includes(row.status)) throw new NotDeletableError();
+    const lines = await deps.orders.findAliveLines(id, scope);
+    if (!isDeletable(row.status, lines)) throw new NotDeletableError();
 
     const instant = now();
 
     const result = await deps.unitOfWork.run(async (transaction) => {
-      const locked = await transaction.orders.lockAliveById(id, scope);
+      const locked = await transaction.orders.lockAliveLines(id, scope);
       if (locked === null) return 'not_found' as const;
-      if (NO_BORRABLES.includes(locked.status)) throw new NotDeletableError();
+      if (!isDeletable(locked.order.status, locked.lines)) throw new NotDeletableError();
 
-      // Libera y limpia `reserved_at` ANTES de marcar `deleted_at`: `setReservedAt` solo
-      // escribe sobre una fila viva (`WHERE deleted_at IS NULL`), asi que hacerlo despues del
-      // borrado no tocaria nada.
-      await transaction.reservations.releaseForLine({
-        orderId: id,
-        orderLineId: await transaction.orders.findOnlyLineId(id, scope),
-        companyId: actor.companyId,
-        reason: 'release',
-        actorId: actor.id,
-        now: instant,
-      });
-      await transaction.orders.setReservedAt(id, null, scope);
+      // Libera y vacia los plazos ANTES de marcar `deleted_at`: esas escrituras solo tocan filas
+      // vivas, asi que despues del borrado no tocarian nada.
+      for (const line of locked.lines) {
+        await transaction.reservations.releaseForLine({
+          orderId: id,
+          orderLineId: line.id,
+          companyId: actor.companyId,
+          reason: 'release',
+          actorId: actor.id,
+          now: instant,
+        });
+        await transaction.orders.setLineReservedAt(id, line.id, null, scope);
+      }
+      await transaction.orders.mirrorFirstLine(id, scope);
 
-      // El borrado tambien registra al actor como autor de la ultima modificacion.
       const deleted = await transaction.orders.softDeleteAlive(id, actor.id, instant, scope);
       if (deleted === 'not_found') return 'not_found' as const;
       return 'ok' as const;

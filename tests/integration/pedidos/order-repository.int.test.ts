@@ -826,8 +826,29 @@ async function bloquear(id: string, now: Date): Promise<void> {
   expect(resultado).toBe('ok')
 }
 
+/** La unica linea de un pedido sembrado sin ella, con su receta y su cantidad. */
+async function conLinea(
+  pedido: Pick<OrderRow, 'id' | 'recipeId' | 'quantity'>,
+  companyId: string,
+  status: 'PENDIENTE' | 'BLOQUEADO',
+): Promise<string> {
+  const { id } = await prisma.orderLine.create({
+    data: {
+      orderId: pedido.id,
+      companyId,
+      position: 0,
+      recipeId: pedido.recipeId,
+      originalRecipeId: pedido.recipeId,
+      quantity: new Prisma.Decimal(pedido.quantity),
+      status,
+    },
+    select: { id: true },
+  })
+  return id
+}
+
 describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', () => {
-  it('R16, R18 — solo BLOQUEADO vivos de la empresa, en orden (created_at, id)', async () => {
+  it('R16, R18, QT-313 R40 — solo las lineas BLOQUEADO vivas de pedidos vivos de la empresa, en orden (created_at, id) del pedido', async () => {
     const creados: string[] = []
     const ajenos: string[] = []
     const marca = token()
@@ -845,6 +866,11 @@ describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', (
       const empatadoB = await altaReal(creados, YEAR_BLOQUEADOS, empate)
       const pendiente = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
       const borrado = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
+      // QT-313: lo bloqueado es la linea; cada pedido lleva la suya y el bloqueo se le copia.
+      const lineas = new Map<string, string>()
+      for (const pedido of [ultimo, empatadoA, primero, empatadoB, pendiente, borrado]) {
+        lineas.set(pedido.id, await conLinea(pedido, scope().companyId, 'PENDIENTE'))
+      }
       for (const pedido of [ultimo, empatadoA, primero, empatadoB, borrado]) {
         await bloquear(pedido.id, tarde)
       }
@@ -876,14 +902,24 @@ describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', (
         select: { id: true },
       })
       ajenos.push(ajeno.id)
+      const lineaAjena = await conLinea(
+        { id: ajeno.id, recipeId: otraReceta, quantity: '1.0000' },
+        otraEmpresa,
+        'BLOQUEADO',
+      )
 
       const empatados = [empatadoA.id, empatadoB.id].sort()
-      expect(await findBlockedOrderIds(scope())).toEqual([primero.id, ...empatados, ultimo.id])
-      expect(await findBlockedOrderIds(scope())).not.toContain(pendiente.id)
-      expect(await findBlockedOrderIds({ companyId: otraEmpresa })).toEqual([ajeno.id])
+      const bloqueadas = await findBlockedOrderIds(scope())
+      expect(bloqueadas.map((b) => b.orderId)).toEqual([primero.id, ...empatados, ultimo.id])
+      expect(bloqueadas.every((b) => b.lineId === lineas.get(b.orderId))).toBe(true)
+      expect(bloqueadas.map((b) => b.orderId)).not.toContain(pendiente.id)
+      expect(await findBlockedOrderIds({ companyId: otraEmpresa })).toEqual([{ orderId: ajeno.id, lineId: lineaAjena }])
     } finally {
       await limpiar(creados)
-      if (ajenos.length > 0) await prisma.order.deleteMany({ where: { id: { in: ajenos } } })
+      if (ajenos.length > 0) {
+        await prisma.orderLine.deleteMany({ where: { orderId: { in: ajenos } } })
+        await prisma.order.deleteMany({ where: { id: { in: ajenos } } })
+      }
       if (otraReceta !== null) await prisma.recipe.delete({ where: { id: otraReceta } })
       if (otraEmpresa !== null) await prisma.company.delete({ where: { id: otraEmpresa } })
     }

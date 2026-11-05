@@ -46,6 +46,7 @@ import type {
   OrderWriteRepository,
   RecordedPackedLine,
 } from '../../../ports/order-write-repository';
+import type { BlockedOrderLineRef } from '../../../ports/order-repository';
 import type { OrderConditioningRepository } from '../../../ports/order-conditioning-repository';
 import type { OrderPackingRepository } from '../../../ports/order-packing-repository';
 
@@ -649,15 +650,13 @@ export async function cancelAliveOrder(
       updatedBy: actorId,
     },
   });
-  if (count !== 1) return 'not_found';
-  await copyOrderStateToOnlyLine(id, scope, tx);
-  return 'ok';
+  return count === 1 ? 'ok' : 'not_found';
 }
 
 /**
- * `softDeleteAlive` (R6, R31, R40). Borrado LOGICO: marca `deleted_at` -y sella
- * `updated_at`/`updated_by`-, JAMAS `prisma.order.delete`. La fila se conserva entera y su
- * correlativo no se libera ni se reutiliza (R13).
+ * `softDeleteAlive`. Borrado LOGICO: marca `deleted_at` -y sella `updated_at`/`updated_by`- del
+ * pedido y de todas sus lineas vivas, JAMAS `prisma.order.delete`. La fila se conserva entera y su
+ * correlativo no se libera ni se reutiliza.
  *
  * Que un pedido entregado o cancelado no se borre lo comprueba el caso de uso (R32) y ademas
  * lo impide el `CHECK orders_delivered_not_deleted` en la base. Ese `23514` NO se traduce a
@@ -678,13 +677,11 @@ export async function softDeleteAliveOrder(
     data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
   });
   if (count !== 1) return 'not_found';
-  if (await hasOnlyLineToCopy(id, scope, tx)) {
-    const { companyId } = companyScopeColumns(scope);
-    await tx.orderLine.updateMany({
-      where: { orderId: id, companyId, deletedAt: null },
-      data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
-    });
-  }
+  const { companyId } = companyScopeColumns(scope);
+  await tx.orderLine.updateMany({
+    where: { orderId: id, companyId, deletedAt: null },
+    data: { deletedAt: now, updatedAt: now, updatedBy: actorId },
+  });
   return 'ok';
 }
 
@@ -1439,25 +1436,23 @@ async function setAliveOrderCustomer(
   return count === 1 ? 'ok' : 'not_found';
 }
 
-/** `findBlockedIds`: el filtro y el orden coinciden con el indice parcial
- *  `orders_blocked_company_created_idx`. */
-export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly string[]> {
-  const rows = await prisma.order.findMany({
-    where: { AND: [orderCompanyScope(scope), { status: 'BLOQUEADO', deletedAt: null }] },
-    select: { id: true },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+/** `findBlockedIds`: el filtro coincide con el indice parcial `order_lines_company_status_idx`. */
+export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly BlockedOrderLineRef[]> {
+  const { companyId } = companyScopeColumns(scope);
+  const rows = await prisma.orderLine.findMany({
+    where: { companyId, status: 'BLOQUEADO', deletedAt: null, order: { deletedAt: null } },
+    select: { id: true, orderId: true },
+    orderBy: [{ order: { createdAt: 'asc' } }, { order: { id: 'asc' } }, { position: 'asc' }],
   });
-  return rows.map((row) => row.id);
+  return rows.map((row) => ({ orderId: row.orderId, lineId: row.id }));
 }
 
 /**
- * Candidatos a caducar de UNA empresa: `PENDIENTE`, vivos, con la
- * reserva vencida en el umbral o antes. Usa `orders_expirable_idx` -parcial, sobre
- * `reserved_at` con `status = 'PENDIENTE' AND deleted_at IS NULL AND reserved_at IS NOT NULL`-,
- * y el mismo orden que ese indice: `reserved_at, id`, para que dos lotes seguidos avancen sin
- * saltarse ni repetir un pedido que empata en `reserved_at`.
+ * Lineas candidatas a caducar de UNA empresa: `PENDIENTE`, vivas, de un pedido vivo, con la reserva
+ * vencida en el umbral o antes. Usa `order_lines_expirable_idx` y su mismo orden, `reserved_at, id`,
+ * para que dos lotes seguidos avancen sin saltarse ni repetir una linea que empata en `reserved_at`.
  *
- * `cursor` es el ultimo `(reservedAt, id)` que devolvio el lote anterior: `null` en el primero.
+ * `cursor` es el ultimo `(reservedAt, lineId)` que devolvio el lote anterior: `null` en el primero.
  * Con cursor, solo se piden filas ESTRICTAMENTE posteriores en ese orden, para que un candidato
  * que fallo en el lote anterior no vuelva a salir en esta ejecucion.
  *
@@ -1468,28 +1463,28 @@ export async function findBlockedOrderIds(scope: OrderScope): Promise<readonly s
 export async function findExpirableOrders(
   companyId: string,
   threshold: Date,
-  cursor: { readonly reservedAt: Date; readonly id: string } | null,
+  cursor: { readonly reservedAt: Date; readonly lineId: string } | null,
   limit: number,
   scope: OrderScope,
-): Promise<readonly { readonly id: string; readonly reservedAt: Date }[]> {
-  const rows = await prisma.order.findMany({
+): Promise<readonly { readonly orderId: string; readonly lineId: string; readonly reservedAt: Date }[]> {
+  const rows = await prisma.orderLine.findMany({
     where: {
       AND: [
-        orderCompanyScope(scope),
-        { status: 'PENDIENTE', deletedAt: null, reservedAt: { lte: threshold } },
+        companyScopeColumns(scope),
+        { status: 'PENDIENTE', deletedAt: null, reservedAt: { lte: threshold }, order: { deletedAt: null } },
         ...(cursor === null
           ? []
           : [
               {
                 OR: [
                   { reservedAt: { gt: cursor.reservedAt } },
-                  { reservedAt: cursor.reservedAt, id: { gt: cursor.id } },
+                  { reservedAt: cursor.reservedAt, id: { gt: cursor.lineId } },
                 ],
               },
             ]),
       ],
     },
-    select: { id: true, reservedAt: true },
+    select: { id: true, orderId: true, reservedAt: true },
     orderBy: [{ reservedAt: 'asc' }, { id: 'asc' }],
     take: limit,
   });
@@ -1497,7 +1492,7 @@ export async function findExpirableOrders(
     if (row.reservedAt === null) {
       throw new Error('candidato sin reserved_at pese al filtro de la consulta');
     }
-    return { id: row.id, reservedAt: row.reservedAt };
+    return { orderId: row.orderId, lineId: row.id, reservedAt: row.reservedAt };
   });
 }
 
@@ -1802,6 +1797,7 @@ type FinishPackingLineRow = {
   readonly packaging_product_id: string | null;
   readonly packed_packages: number | null;
   readonly packed_surplus_packages: number;
+  readonly order_line_id: string | null;
 };
 
 async function findPresentationLinesForFinishOrder(
@@ -1812,7 +1808,7 @@ async function findPresentationLinesForFinishOrder(
   const { companyId } = companyScopeColumns(scope);
   const rows = await tx.$queryRaw<ReadonlyArray<FinishPackingLineRow>>(Prisma.sql`
     SELECT "id", "presentation_id", "packages", "presentation_content"::text AS "presentation_content",
-           "packaging_product_id", "packed_packages", "packed_surplus_packages"
+           "packaging_product_id", "packed_packages", "packed_surplus_packages", "order_line_id"
       FROM "order_presentation_lines"
      WHERE "order_id" = ${id}::uuid
        AND "company_id" = ${companyId}::uuid
@@ -1827,6 +1823,7 @@ async function findPresentationLinesForFinishOrder(
     packagingProductId: row.packaging_product_id,
     packedPackages: row.packed_packages,
     packedSurplusPackages: row.packed_surplus_packages,
+    orderLineId: row.order_line_id,
   }));
 }
 

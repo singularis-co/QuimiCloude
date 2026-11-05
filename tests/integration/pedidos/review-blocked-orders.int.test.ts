@@ -140,7 +140,7 @@ const units: UnitCatalog = {
 };
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
-const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
+const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging: packagingCatalog, unitOfWork });
 
 // ---------------------------------------------------------------------------
@@ -550,6 +550,11 @@ describe('reviewBlockedOrders contra la base — concurrencia', () => {
             where: { id: orderId },
             data: { status: 'CANCELADO', cancellationReason: 'Cliente anulo' },
           });
+          // QT-313: cancelar escribe la linea bajo el mismo candado del pedido.
+          await tx.orderLine.updateMany({
+            where: { orderId },
+            data: { status: 'CANCELADO', cancellationReason: 'Cliente anulo' },
+          });
           avisarCandado();
           await suelta;
         },
@@ -744,7 +749,7 @@ describe('la fachada de inventario dispara la revision', () => {
       expect(avisos).toHaveLength(1);
       const campos = avisos[0]?.[1];
       expect(campos).toMatchObject({ companyId: fixture.companyId, failedCount: 1 });
-      expect(JSON.parse(String(campos?.failed))).toEqual([{ orderId, code: expect.any(String) }]);
+      expect(JSON.parse(String(campos?.failed))).toEqual([{ orderId, lineId: expect.any(String), code: expect.any(String) }]);
     } finally {
       await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${disparador}" ON "orders"`);
       await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${funcion}"()`);

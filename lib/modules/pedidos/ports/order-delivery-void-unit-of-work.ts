@@ -6,7 +6,7 @@ import type { OrderWriteRepository } from './order-write-repository';
 /** Lo que ve una anulacion de entrega dentro de la transaccion compartida con `inventario`. Va
  *  aparte de los otros ambitos de transaccion para no obligar a sus dobles a construirla. */
 export type OrderDeliveryVoidTransactionScope = {
-  readonly orders: Pick<OrderWriteRepository, 'lockAliveById' | 'setStatus'>;
+  readonly orders: Pick<OrderWriteRepository, 'lockAliveLines' | 'setStatus' | 'setLineStatus' | 'refreshStatus'>;
   readonly voids: OrderDeliveryVoidRepository;
   readonly finishedGoods: FinishedGoodsReturn;
 };

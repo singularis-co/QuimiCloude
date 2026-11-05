@@ -199,7 +199,7 @@ function returnInput(t: Tenant, voidId: string, lines: readonly { batchId: strin
     companyId: t.companyId,
     orderId: t.orderId,
     orderDeliveryVoidId: voidId,
-    lines,
+    lines: lines.map((line) => ({ ...line, orderLineId: null })),
     actorId: t.userId,
     now: new Date(),
   }

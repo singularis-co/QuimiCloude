@@ -197,3 +197,81 @@ Desviaciones de implementacion (no estaban escritas en el spec; para el reviewer
 10. Los `.int` borran `order_lines` antes que `orders` (FK `RESTRICT`); los que fuerzan estados tambien los escriben en la linea.
 
 Rojos que vienen de T0/T1 (no del related de T9/T10; ninguno en `tests/baseline-rojos.json`): `tests/unit/pedidos/schema/pedidos-schema.test.ts` (4), `order-status-blocked-migration.test.ts` (1), `order-conditioning-states-migration.test.ts` (1), `tests/integration/unidades/unidades-constraints.int.test.ts` (1, falta `order_lines_unit_id_fkey`). Son regresiones de esta feature: se arreglan en la tanda siguiente.
+
+## Regresiones de T0/T1 arregladas (2026-11-04)
+
+Solo tests; el schema y las migraciones no cambian:
+- `tests/unit/pedidos/schema/pedidos-schema.test.ts`: admite `OrderLine` y espera `PARCIAL` el primero.
+- `order-status-blocked-migration.test.ts` y `order-conditioning-states-migration.test.ts`: `valoresDelEsquema()` ya no incluye `PARCIAL`, porque ese valor entra después con `ADD VALUE … BEFORE`.
+- `tests/integration/unidades/unidades-constraints.int.test.ts`: añade `order_lines_unit_id_fkey`.
+
+Resultado: los 3 unit 68/68; `unidades-constraints` 30/30.
+
+## Fase 4 — T11 Cancelar linea/pedido y baja, T12 Entrega, anulacion, bloqueados y caducidad (2026-11-04)
+
+T11, produccion:
+- `pedidos/domain/cancel-order-line.ts` (nuevo).
+- `order-cancellation.ts`: añade `cancelLockedLine` y cancela por linea con `lockAliveLines`, `refreshStatus` y `mirrorFirstLine`.
+- `cancel-order.ts` y `delete-order.ts`.
+- `order-prisma.ts`: `cancelAlive` ya no copia el estado; `softDeleteAlive` marca el pedido y sus lineas vivas.
+- Puertos, `pedidos/index.ts` y `lib/composition/index.ts` (`pedidos.cancelOrderLine`).
+
+T12, produccion:
+- `pedidos/domain`: `deliver-order.ts`, `void-delivery.ts`, `order-delivery-target.ts` (nuevo), `review-blocked-orders.ts`, `expire-stale-orders.ts`, `order-expiry.ts` (solo comentarios) y `void-direct-delivery.ts`.
+- `order-delivery-void-prisma.ts`.
+- `inventario`: `finished-goods-dispatch.ts`, `finished-goods-dispatch-prisma.ts`, `finished-goods-return.ts` y `product-prisma.ts`, que escribe la linea en `delivery` y `delivery_void`.
+- `findBlockedOrderIds` y `findExpirableOrders` leen `order_lines`.
+
+Tests:
+- Nuevos: `tests/unit/pedidos/{cancel-order-line,delivery-by-line,expire-stale-order-lines}.test.ts` y `tests/integration/pedidos/{order-lines-state,order-lines-delivery}.int.test.ts`.
+- Los ajustados estan listados en `tasks.md > Archivos esperados`.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R27 | `cancel-order-line.test.ts` › «R27: cancela la linea con su motivo recortado, libera solo lo suyo…», «R27: cancela una linea BLOQUEADO…»; `order-lines-state.int` › «QT-313 R27, R34: cancelar una linea…» |
+| R28 | `cancel-order-line.test.ts` › «R28: una linea en estado no cancelable…», «R28: sin motivo, vacio…», «R28, R43: …»; `order-lines-state.int` › «QT-313 R28: una linea POR_EMPACAR responde not_cancellable…» |
+| R29 | `cancel-order-line.test.ts` › «R29: cancela con el mismo motivo todas las lineas cancelables… POR_EMPACAR», «R29: si ninguna linea es cancelable…», «R29: cancelar por encargo…»; `order-lines-state.int` › «QT-313 R29, R34: …POR_EMPACAR…», «QT-313 R29: con todas las lineas canceladas… CANCELADO…» |
+| R30 | `cancel-order-line.test.ts` › «R30: sin pedidos.modificar responde unauthorized antes de validar el motivo…», «R30: cancelar el pedido sin pedidos.modificar…» |
+| R47 | `cancel-order-line.test.ts` › «R47: libera el material de cada linea…», «R47: con una linea ya consumida…», «R47: si una linea se consumio entre la lectura y el candado…»; `order-lines-state.int` › «QT-313 R47: la baja marca el pedido y sus dos lineas…», «QT-313 R47: con una linea ya consumida…» |
+| R37 (delivery, delivery_void) | `delivery-by-line.test.ts` › «R37: cada salida de producto terminado lleva la linea y la receta de su reparto», «R37: cada devolucion lleva la linea del asiento de entrega que anula»; `order-lines-delivery.int` › «QT-313 R37, R39: …», «QT-313 R37: un pedido sin linea escribe null…» |
+| R39 | `delivery-by-line.test.ts` › cuatro «R39: …» de entrega y tres de anulacion; `order-lines-delivery.int` › «QT-313 R37, R39: …» |
+| R40 | `expire-stale-order-lines.test.ts` › «R40: con dos lineas BLOQUEADO y material para una…»; `order-lines-state.int` › «QT-313 R40: …estrena plazo…»; `order-repository.int` › «R16, R18, QT-313 R40 — solo las lineas BLOQUEADO…» |
+| R51 | `expire-stale-order-lines.test.ts` › «R51: con dos lineas PENDIENTE de plazos distintos…», «R51: si bajo el candado la linea ya tiene un plazo nuevo…»; `order-lines-state.int` › «QT-313 R51, R34: …» |
+| Andamio retirado (T11) | `order-lines-state.int` › «QT-313 T11: cancelAlive y softDeleteAlive ya no copian el estado…»; `order-cancellation.test.ts` › «QT-313 R27, R29, R51: ninguna operacion del modulo escribe el estado del pedido con cancelAlive…» |
+
+Verificacion (salida real, backend_dev):
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores (10 warnings previos).
+- Guardias: `Test Files 87 passed (87)`, `Tests 1334 passed | 22 skipped`.
+- related node: `Test Files 302 passed (302)`, `Tests 6606 passed | 6 skipped`.
+- related ui: `Test Files 1 failed | 339 passed (340)`, `Tests 1 failed | 5650 passed | 1 skipped`.
+  - El rojo es `tests/unit/paridad/confirmaciones-paridad.test.tsx`, que cae en una instantanea distinta cada vez.
+  - Repetido solo, fallo una vez en otro caso y despues paso 56/56. Es inestable y no tiene relacion con T11/T12; si sale en CI, revisarlo aparte.
+- Integracion con `--maxWorkers=1` sobre base efimera:
+  - pedidos (67 archivos): 4 archivos rojos (10 tests), de tests que forzaban el estado solo en `orders` o esperaban la forma vieja. Ajustados y repetidos: 5/5 archivos, 74 tests.
+  - `order-lines-state.int` 9/9 y `order-lines-delivery.int` 2/2.
+  - inventario 55/55 (486 tests, 1 skipped).
+  - asignaciones, scripts, documentos e integraciones 60/60 (627).
+  - clientes, proveedores, recetas, unidades, notificaciones e infra 47/47 (552).
+  - identity 41/41 (593).
+
+Desviaciones (para el reviewer; la 1 es para el leader):
+1. **El «Hecho» de T12 contradice a R34.**
+   - El «Hecho» de T12 dice que en R51 el pedido «queda `PARCIAL`».
+   - Con una linea cancelada y otra `PENDIENTE`, la regla de R34 (design § 2.2) da `PENDIENTE`: las canceladas no cuentan y, si todas las activas tienen el mismo estado, el pedido toma ese estado.
+   - R51 no dice nada del estado del pedido.
+   - Se siguio R34 y los tests lo fijan. Hay que corregir el texto del «Hecho» de T12.
+2. `cancelAlive` sigue en el puerto y el adaptador, sin copia y sin ningun llamante de dominio. Seis `.int` lo usan para sembrar pedidos cancelados.
+3. `findBlockedIds` conserva el nombre pero devuelve `{orderId, lineId}[]`.
+4. Entregar y anular pueden devolver `orderStatus` `PARCIAL`, y las respuestas a una clave ya registrada lo admiten.
+5. Los pedidos sin linea siguen la ruta de pedido en entrega y anulacion (`setStatus`); por eso existe el test R37 con `null`. La copia en `setStatus` se mantiene hasta T14a.
+6. **Riesgo para T14a:** el CHECK `orders_finished_at_requires_delivered` rechazaria un pedido `PARCIAL` con `finished_at`. Pasaria al entregar una linea de un pedido TERMINADO de varias lineas. Por eso R39 con varias lineas solo tiene test unitario. No se puede dar antes de T14a.
+7. Cancelar, baja, caducidad y revision llaman a `mirrorFirstLine` en lugar de a `setReservedAt` del pedido.
+8. `order-pending-delivery.ts` y `order-expiry-cron-route.ts` no cambian. `deliveryStateOf` trata `PARCIAL` como `not_packed`; es logica de listado que corresponde a T13/T14c.
+9. Los fallos de caducidad y revision llevan `lineId`, y los conteos son de lineas, no de pedidos.
+10. En `tests/helpers/order-delivery-seed.ts`, `crearPedido` crea una linea por defecto (con la opcion `sinLinea` para no crearla).
+11. No hay Server Action para `cancelOrderLine`: es trabajo de pantalla de QT-314.
+12. Dos regex ampliadas:
+    - `authorization.test.ts` admite `deps.unitOfWork`;
+    - la guardia `guard-ambito-empresa-pedidos.test.ts` comprueba `lockAliveLines`/`refreshStatus`.

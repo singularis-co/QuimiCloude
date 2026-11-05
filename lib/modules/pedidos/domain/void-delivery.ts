@@ -9,6 +9,13 @@ import {
   ValidationError,
 } from './errors';
 import { DELIVERY_MAX_ALLOCATIONS } from './order-delivery';
+import {
+  deliveryTargetsOf,
+  isDeliveryOrderStatus,
+  statusAfterDelivery,
+  type DeliveryOrderStatus,
+  type DeliveryTarget,
+} from './order-delivery-target';
 import type { OrderScope } from './order-scope';
 
 import type {
@@ -24,7 +31,7 @@ import type { OrderRepository } from '../ports/order-repository';
 
 export type VoidDeliveryResult = {
   readonly status: 'voided' | 'already_registered';
-  readonly orderStatus: 'TERMINADO' | 'ENTREGADO';
+  readonly orderStatus: DeliveryOrderStatus;
 };
 
 export type VoidDeliveryDeps = {
@@ -89,6 +96,11 @@ function linesToVoid(
   return selected;
 }
 
+/** Se anula el reparto de una receta `TERMINADO` o `ENTREGADO`. */
+function acceptsVoid(target: DeliveryTarget | undefined): target is DeliveryTarget {
+  return target !== undefined && (target.status === 'TERMINADO' || target.status === 'ENTREGADO');
+}
+
 async function voidInTransaction(
   tx: OrderDeliveryVoidTransactionScope,
   input: VoidDeliveryInput,
@@ -97,14 +109,21 @@ async function voidInTransaction(
   now: Date,
   scope: OrderScope,
 ): Promise<VoidDeliveryResult> {
-  const order = await tx.orders.lockAliveById(delivery.orderId, scope);
-  if (order === null) throw new OrderNotFoundError();
+  const locked = await tx.orders.lockAliveLines(delivery.orderId, scope);
+  if (locked === null) throw new OrderNotFoundError();
   // La clave antes que el estado: si otra peticion con la misma clave confirmo mientras esta
   // esperaba el bloqueo, tiene que responder que ya estaba registrada.
   if ((await tx.voids.findByKey(input.voidKey, scope)) !== null) throw new VoidAlreadyRegisteredSignal();
-  if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();
+  const targets = deliveryTargetsOf(locked);
+  if (![...targets.values()].some(acceptsVoid)) throw new ActionNotAllowedError();
 
   const lines = linesToVoid(await tx.voids.findDeliveryLines(delivery.id, scope), input.items);
+  const touched = new Set<DeliveryTarget>();
+  for (const line of lines) {
+    const target = targets.get(line.orderLineId);
+    if (!acceptsVoid(target)) throw new ActionNotAllowedError();
+    touched.add(target);
+  }
 
   const created = await tx.voids.create(
     { voidKey: input.voidKey, deliveryId: delivery.id, reason: input.reason, actorId, now },
@@ -124,7 +143,7 @@ async function voidInTransaction(
     companyId: scope.companyId,
     orderId: delivery.orderId,
     orderDeliveryVoidId: created.id,
-    lines: lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity })),
+    lines: lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: line.orderLineId })),
     actorId,
     now,
   });
@@ -132,11 +151,17 @@ async function voidInTransaction(
     throw new Error(`voidDelivery: el lote ${returned.batchId} de una linea de entrega no aparece`);
   }
 
-  if (order.status === 'ENTREGADO') {
-    const moved = await tx.orders.setStatus(delivery.orderId, 'ENTREGADO', 'TERMINADO', actorId, now, scope);
-    if (moved !== 'ok') throw new Error(`voidDelivery: setStatus devolvio '${moved}' con el pedido bloqueado`);
+  // Lo anulado sale de lo entregado, asi que una receta ENTREGADO tocada deja de tener el reparto
+  // completo y vuelve a TERMINADO; las demas no cambian.
+  for (const target of touched) {
+    if (target.status !== 'ENTREGADO') continue;
+    const moved =
+      target.lineId === null
+        ? await tx.orders.setStatus(delivery.orderId, 'ENTREGADO', 'TERMINADO', actorId, now, scope)
+        : await tx.orders.setLineStatus(delivery.orderId, target.lineId, 'ENTREGADO', 'TERMINADO', actorId, now, scope);
+    if (moved !== 'ok') throw new Error(`voidDelivery: el cambio de estado devolvio '${moved}' con el pedido bloqueado`);
   }
-  return { status: 'voided', orderStatus: 'TERMINADO' };
+  return { status: 'voided', orderStatus: await statusAfterDelivery(tx.orders, locked, 'TERMINADO', actorId, now, scope) };
 }
 
 /** Responde con el estado actual del pedido de la anulacion registrada: la clave es unica por
@@ -150,7 +175,7 @@ async function alreadyRegistered(
   if (orderId === null) throw new ValidationError();
   const order = await orders.findAliveById(orderId, scope);
   if (order === null) throw new OrderNotFoundError();
-  if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();
+  if (!isDeliveryOrderStatus(order.status)) throw new ActionNotAllowedError();
   return { status: 'already_registered', orderStatus: order.status };
 }
 

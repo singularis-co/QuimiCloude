@@ -62,6 +62,8 @@ export interface FinishedBatchCatalog {
 export type FinishedGoodsDispatchInput = {
   readonly companyId: string;
   readonly orderId: string;
+  /** La linea del pedido que se entrega; `null` en un pedido sin lineas. */
+  readonly orderLineId: string | null;
   readonly orderDeliveryId: string;
   readonly recipeId: string;
   readonly presentationId: string;

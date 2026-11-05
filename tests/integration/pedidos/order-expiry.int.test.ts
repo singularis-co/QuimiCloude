@@ -256,6 +256,7 @@ async function crearPedidoCaducado(fixture: Fixture, recipeId: string): Promise<
   const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
   const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
   await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${vencido}::timestamptz WHERE "id" = ${creado.id}::uuid`;
+  await prisma.$executeRaw`UPDATE "order_lines" SET "reserved_at" = ${vencido}::timestamptz WHERE "order_id" = ${creado.id}::uuid`;
   return creado.id;
 }
 
@@ -368,6 +369,7 @@ describe('R53 — una edicion intercalada entre el lote y el candado gana', () =
       ) => {
         const lote = await findExpirableOrders(companyId, threshold, cursor, limit, scope);
         await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${new Date()}::timestamptz WHERE "id" = ${orderId}::uuid`;
+        await prisma.$executeRaw`UPDATE "order_lines" SET "reserved_at" = ${new Date()}::timestamptz WHERE "order_id" = ${orderId}::uuid`;
         return lote;
       };
       const expireConEdicionIntercalada = createExpireStaleOrders({
@@ -458,8 +460,8 @@ describe('R17, R21 — aislamiento por empresa: la busqueda de A no devuelve ped
       const candidatosDeB = await findExpirableOrders(fixtureB.companyId, threshold, null, 100, {
         companyId: fixtureB.companyId,
       });
-      const idsDeA = candidatosDeA.map((c) => c.id);
-      const idsDeB = candidatosDeB.map((c) => c.id);
+      const idsDeA = candidatosDeA.map((c) => c.orderId);
+      const idsDeB = candidatosDeB.map((c) => c.orderId);
 
       expect(idsDeA).toContain(orderIdA);
       expect(idsDeA).not.toContain(orderIdB);
@@ -518,6 +520,7 @@ describe('QC-138 R29 — el proceso diario no toca un pedido BLOQUEADO', () => {
       );
       const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
       await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${vencido}::timestamptz WHERE "id" = ${creado.id}::uuid`;
+      await prisma.$executeRaw`UPDATE "order_lines" SET "reserved_at" = ${vencido}::timestamptz WHERE "order_id" = ${creado.id}::uuid`;
 
       const resultado = await expireStaleOrders();
 

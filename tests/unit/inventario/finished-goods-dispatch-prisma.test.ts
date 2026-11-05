@@ -76,6 +76,7 @@ function baseInput(overrides: Partial<OrderDispatchInput> = {}): OrderDispatchIn
   return {
     origin: 'order',
     orderId: 'order-1',
+    orderLineId: null,
     orderDeliveryId: 'delivery-1',
     recipeId: 'recipe-1',
     presentationId: 'presentation-1',

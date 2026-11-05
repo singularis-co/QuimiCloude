@@ -56,9 +56,9 @@ function baseInput(overrides: Partial<Parameters<typeof returnFinishedGoods>[1]>
     orderId: 'order-1',
     orderDeliveryVoidId: 'void-1',
     lines: [
-      { batchId: 'batch-1', quantity: '15.0000' },
-      { batchId: 'batch-2', quantity: '1.5000' },
-      { batchId: 'batch-3', quantity: '2.0000' },
+      { batchId: 'batch-1', quantity: '15.0000', orderLineId: null },
+      { batchId: 'batch-2', quantity: '1.5000', orderLineId: null },
+      { batchId: 'batch-3', quantity: '2.0000', orderLineId: null },
     ],
     actorId: 'actor-1',
     now: NOW,
@@ -201,9 +201,9 @@ describe('returnFinishedGoods — lote repetido entre lineas', () => {
       tx,
       baseInput({
         lines: [
-          { batchId: 'batch-1', quantity: '15.0000' },
-          { batchId: 'batch-2', quantity: '1.5000' },
-          { batchId: 'batch-1', quantity: '20.0000' },
+          { batchId: 'batch-1', quantity: '15.0000', orderLineId: null },
+          { batchId: 'batch-2', quantity: '1.5000', orderLineId: null },
+          { batchId: 'batch-1', quantity: '20.0000', orderLineId: null },
         ],
       }),
       SCOPE,

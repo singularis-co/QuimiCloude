@@ -51,8 +51,8 @@ const PEDIDO: OrderRow = fakeOrderRow({
 })
 
 const REPARTO: readonly FinishPackingLine[] = [
-  { id: OPEN_LINE_ID, presentationId: BOTELLA, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
-  { id: VOIDED_LINE_ID, presentationId: GALON, packages: 3, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: OPEN_LINE_ID, presentationId: BOTELLA, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: VOIDED_LINE_ID, presentationId: GALON, packages: 3, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
 ]
 
 const PRESENTACIONES: readonly PresentationRef[] = [

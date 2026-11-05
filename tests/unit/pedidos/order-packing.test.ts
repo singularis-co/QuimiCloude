@@ -72,6 +72,7 @@ function lineaDe(overrides: Partial<FinishPackingLine> = {}): FinishPackingLine 
     packages: 10,
     presentationContent: '1.0000',
     packagingProductId: null,
+    orderLineId: null,
     packedPackages: null,
     packedSurplusPackages: 0,
     ...overrides,

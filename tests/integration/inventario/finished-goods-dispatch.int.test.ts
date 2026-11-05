@@ -160,6 +160,7 @@ function dispatchInput(t: Tenant, allocations: readonly { batchId: string; packa
   return {
     companyId: t.companyId,
     orderId: t.orderId,
+    orderLineId: null,
     orderDeliveryId: t.deliveryId,
     recipeId: t.recipeId,
     presentationId: t.presentationId,

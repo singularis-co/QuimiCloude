@@ -4,8 +4,14 @@ export type FinishedGoodsReturnInput = {
   readonly orderId: string | null;
   readonly orderDeliveryVoidId: string;
   /** Una por linea de entrega anulada; `quantity` es la de esa linea, decimal(14,4), positiva. Puede
-   *  repetir `batchId`: cada lote recibe la suma en un solo incremento y un solo asiento. */
-  readonly lines: readonly { readonly batchId: string; readonly quantity: string }[];
+   *  repetir `batchId`: cada lote recibe la suma en un solo incremento y un solo asiento. `orderLineId`
+   *  es la linea del pedido del asiento `delivery` que se anula; `null` sin pedido o en un pedido sin
+   *  lineas. Las lineas de un mismo lote llevan la misma. */
+  readonly lines: readonly {
+    readonly batchId: string;
+    readonly quantity: string;
+    readonly orderLineId: string | null;
+  }[];
   readonly actorId: string;
   readonly now: Date;
 };

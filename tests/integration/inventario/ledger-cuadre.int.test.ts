@@ -369,6 +369,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       const finishedRecipeId = recipeId;
       const outcome = await prisma.$transaction((tx) =>
         createFinishedGoodsDispatch(tx).dispatchForDelivery({
+          orderLineId: null,
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryId: delivery.id,
@@ -474,6 +475,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       const finishedRecipeId = recipeId;
       const dispatched = await prisma.$transaction((tx) =>
         createFinishedGoodsDispatch(tx).dispatchForDelivery({
+          orderLineId: null,
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryId: delivery.id,
@@ -502,7 +504,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryVoidId: deliveryVoid.id,
-          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity })),
+          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: null })),
           actorId: fixture.actorId,
           now: new Date(),
         }),
@@ -605,6 +607,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       const packagesByCustomer = [3, 2];
       const dispatched = await prisma.$transaction(async (tx) => {
         const outcome = await createFinishedGoodsDispatch(tx).dispatchForDelivery({
+          orderLineId: null,
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryId: delivery.id,
@@ -659,7 +662,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryVoidId: deliveryVoid.id,
-          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity })),
+          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: null })),
           actorId: fixture.actorId,
           now: new Date(),
         }),
@@ -812,7 +815,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
           companyId: fixture.companyId,
           orderId: null,
           orderDeliveryVoidId: deliveryVoid.id,
-          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity })),
+          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: null })),
           actorId: fixture.actorId,
           now: new Date(),
         }),

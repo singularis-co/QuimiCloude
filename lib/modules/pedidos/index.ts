@@ -172,6 +172,8 @@ export { createListOrderLineIds } from './domain/list-order-line-ids';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';
+export { createCancelOrderLine } from './domain/cancel-order-line';
+export type { CancelOrderLineDeps } from './domain/cancel-order-line';
 /** Cancelar por encargo de otro modulo, con la unidad de trabajo que le cablee la composicion:
  *  mismas comprobaciones y la misma liberacion que `createCancelOrder`, sin permiso ni motivo. */
 export { createCancelAliveOrder } from './domain/order-cancellation';

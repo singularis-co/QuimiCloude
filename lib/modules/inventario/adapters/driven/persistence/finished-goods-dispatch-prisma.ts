@@ -27,6 +27,7 @@ export function createFinishedGoodsDispatch(tx: Prisma.TransactionClient): Finis
         {
           origin: 'order',
           orderId: input.orderId,
+          orderLineId: input.orderLineId,
           orderDeliveryId: input.orderDeliveryId,
           recipeId: input.recipeId,
           presentationId: input.presentationId,

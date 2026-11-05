@@ -135,7 +135,7 @@
   integración de `findCostingBatches` con `excludeOrderLineId`: lo apartado por esa línea cuenta
   como disponible y lo de otra línea del mismo pedido no; el reparto de una línea no toca el de
   otra; la pantalla y sus tests sin cambios. Depende de T9.
-- [ ] **T11 — Cancelar línea, cancelar pedido, baja.** `cancel-order.ts`, `order-cancellation.ts`
+- [x] **T11 — Cancelar línea, cancelar pedido, baja.** `cancel-order.ts`, `order-cancellation.ts`
   (+ `cancelOrderLine` nuevo, `domain/cancel-order-line.ts`), `delete-order.ts`. Cancelar y dar de
   baja pasan a escribir por línea y derivar el pedido: se **quita la copia** de estado pedido →
   línea de `cancelAlive` y `softDeleteAlive` (design § 4.1.1, punto 2).
@@ -143,7 +143,7 @@
   y deja el pedido `PARCIAL` o en el estado común; cancelar el pedido con una línea `POR_EMPACAR`
   la deja intacta; ninguna cancelable → `not_cancellable`; todas canceladas → pedido `CANCELADO`
   con motivo; baja con una línea consumida → rechazo. Depende de T8.
-- [ ] **T12 — Entrega, anulación, bloqueados y caducidad.** `deliver-order.ts`, `void-delivery.ts`,
+- [x] **T12 — Entrega, anulación, bloqueados y caducidad.** `deliver-order.ts`, `void-delivery.ts`,
   `order-pending-delivery.ts`, `review-blocked-orders.ts`, `expire-stale-orders.ts`,
   `order-expiry.ts`, `order-expiry-cron-route.ts`, y las escrituras de los asientos `delivery` y
   `delivery_void` en `lib/modules/inventario/adapters/driven/persistence/product-prisma.ts`
@@ -507,3 +507,31 @@ Tocados en la fase 4 (T9, T10) por el alta y la edicion con lineas, el puente de
 - `tests/unit/inventario/adjust-batch-stock-prisma.test.ts`
 - `tests/unit/inventario/finished-goods-dispatch-prisma.test.ts`
 - `tests/unit/inventario/finished-goods-return-prisma.test.ts`
+
+Tocados en la fase 4 (T11, T12) por cancelar, dar de baja, entregar, anular, caducar y desbloquear por linea, y por los rojos de T0/T1:
+
+- `lib/modules/inventario/domain/finished-goods-return.ts`
+- `lib/modules/pedidos/adapters/driven/persistence/order-delivery-void-prisma.ts`
+- `lib/modules/pedidos/domain/order-delivery-target.ts`
+- `lib/modules/pedidos/domain/void-direct-delivery.ts`
+- `lib/modules/pedidos/ports/order-delivery-unit-of-work.ts`
+- `lib/modules/pedidos/ports/order-delivery-void-repository.ts`
+- `lib/modules/pedidos/ports/order-delivery-void-unit-of-work.ts`
+- `tests/guards/guard-ambito-empresa-pedidos.test.ts`
+- `tests/helpers/order-delivery-seed.ts`
+- `tests/integration/inventario/finished-goods-dispatch.int.test.ts`
+- `tests/integration/inventario/finished-goods-return.int.test.ts`
+- `tests/integration/inventario/ledger-cuadre.int.test.ts`
+- `tests/integration/pedidos/order-lines-delivery.int.test.ts`
+- `tests/integration/pedidos/order-lines-state.int.test.ts`
+- `tests/integration/unidades/unidades-constraints.int.test.ts`
+- `tests/unit/pedidos/deliver-order.test.ts`
+- `tests/unit/pedidos/delivery-by-line.test.ts`
+- `tests/unit/pedidos/get-direct-delivery-for-void.test.ts`
+- `tests/unit/pedidos/get-order-delivery.test.ts`
+- `tests/unit/pedidos/list-order-deliveries.test.ts`
+- `tests/unit/pedidos/schema/order-conditioning-states-migration.test.ts`
+- `tests/unit/pedidos/schema/order-status-blocked-migration.test.ts`
+- `tests/unit/pedidos/schema/pedidos-schema.test.ts`
+- `tests/unit/pedidos/void-delivery.test.ts`
+- `tests/unit/pedidos/void-direct-delivery.test.ts`

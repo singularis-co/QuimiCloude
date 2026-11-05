@@ -66,6 +66,7 @@ async function findDeliveryLinesForVoid(
       packages: true,
       quantity: true,
       voidLine: { select: { id: true } },
+      presentationLine: { select: { orderLineId: true } },
     },
     orderBy: [{ orderPresentationLineId: 'asc' }, { customerId: 'asc' }, { batchId: 'asc' }],
   });
@@ -73,6 +74,7 @@ async function findDeliveryLinesForVoid(
     id: row.id,
     customerId: row.customerId,
     presentationLineId: row.orderPresentationLineId,
+    orderLineId: row.presentationLine?.orderLineId ?? null,
     batchId: row.batchId,
     packages: row.packages,
     quantity: row.quantity.toFixed(4),

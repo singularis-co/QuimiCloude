@@ -13,9 +13,8 @@
 // (decision cerrada 5, R10), SIN impuestos ni descuentos (decision cerrada 23, R11), SIN cliente
 // ni destinatario (decision cerrada 8, R3), SIN fecha de solicitud aparte de `createdAt`
 // (decision cerrada 10, R4), SIN el numero visible ya formateado (R24), SIN ninguna entidad de
-// linea o item GENERICO de receta (decision cerrada 1, R2 -la decision [Q4] de
-// `specs/QC-170-pedido-en-varias-presentaciones/design.md` deroga esa ausencia solo para el
-// reparto por presentacion: `OrderPresentationLine` existe y es la unica coleccion de `Order`-),
+// item GENERICO de pedido salvo `OrderLine` (QT-313 deroga la decision cerrada 1: cada receta del
+// pedido es una linea) y el reparto `OrderPresentationLine` (decision [Q4] de QC-170),
 // las cuatro referencias SIN `@relation` (decision cerrada 17, R33) y SIN campos de vuelta
 // `orders Order[]` en `Recipe`, `Unit` ni `User` (R5, R33). Una columna que NO esta no salta a la
 // vista: el test existe para que nadie las «arregle» sin darse cuenta.
@@ -205,31 +204,26 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toContain('@@map("orders")')
   })
 
-  it('no existe ningun modelo de linea o item GENERICO de pedido; Order solo tiene la coleccion del reparto por presentacion', () => {
-    // R2 y decision cerrada 1 siguen vigentes para la receta: el pedido apunta a UNA sola receta,
-    // sin cabecera ni items de receta. La decision [Q4] (`design.md` seccion 0.6) deroga la
-    // prohibicion de coleccion para el REPARTO: `OrderPresentationLine` es la unica lista que
-    // `Order` puede tener, y es de `pedidos` (una linea por presentacion elegida, no un item de
-    // receta).
+  it('QT-313 R1: la unica entidad de receta del pedido es OrderLine (order_lines); no hay otro item generico de pedido', () => {
+    // QT-313 deroga la decision cerrada 1 de QC-33 (una receta por pedido): cada receta del
+    // pedido es una `OrderLine`. Siguen sin existir otros modelos de item o detalle de pedido.
     const modelNames = [...schema.matchAll(/^model\s+(\w+)\s*\{/gm)]
       .map((match) => match[1])
       .filter((name): name is string => name !== undefined)
-    for (const forbidden of ['OrderLine', 'OrderItem', 'OrderDetail', 'Item', 'Line']) {
+    expect(modelNames).toContain('OrderLine')
+    for (const forbidden of ['OrderItem', 'OrderDetail', 'Item', 'Line']) {
       expect(modelNames, `el modelo ${forbidden} no debe existir`).not.toContain(forbidden)
     }
-    expect(schema).not.toMatch(/@@map\("(order_lines|order_items|order_details|orders_lines)"\)/)
+    expect(schema).toMatch(/@@map\("order_lines"\)/)
+    expect(schema).not.toMatch(/@@map\("(order_items|order_details|orders_lines)"\)/)
 
-    // La UNICA lista de `Order` es el reparto por presentacion, y apunta a `OrderPresentationLine`.
+    // Listas de `Order`: el reparto por presentacion, las entregas (QC-223) y sus lineas de receta.
     const listas = order.fields.filter((candidate) => candidate.isList)
-    // QC-223 2026-10-08: `Order` gana una segunda lista, `deliveries` (las entregas al cliente, de
-    // `pedidos`). Tampoco es un item de receta; el reparto sigue siendo la primera.
-    expect(listas.map((candidate) => candidate.name)).toEqual(['presentationLines', 'deliveries'])
+    expect(listas.map((candidate) => candidate.name)).toEqual(['presentationLines', 'deliveries', 'lines'])
     expect(listas[0]?.type).toBe('OrderPresentationLine')
     expect(listas[1]?.type).toBe('OrderDelivery')
-    // Y la receta sigue siendo UNA: un escalar, no una coleccion.
-    expect(field(order, 'recipeId').isList).toBe(false)
-    expect(field(order, 'recipeId').type).toBe('String')
-    for (const forbidden of ['recipeIds', 'recipes', 'lines', 'items']) {
+    expect(listas[2]?.type).toBe('OrderLine')
+    for (const forbidden of ['recipeIds', 'recipes', 'items']) {
       expect(has(order, forbidden), `Order.${forbidden} no debe existir`).toBe(false)
     }
   })
@@ -398,15 +392,15 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
   })
 
-  it('OrderStatus declara PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO, POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1)', () => {
+  it('OrderStatus declara PARCIAL, PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO, POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1, QT-313 R52)', () => {
     // R16 y decision cerrada 4: dos conjuntos CERRADOS del propio esquema, con esos valores
     // exactos. EL ORDEN DE DECLARACION DE LA PRIORIDAD ES SU ORDEN, de menor a mayor: Postgres
     // ordena un enum por declaracion, no alfabeticamente, asi que reordenar cambia el dato.
     //
-    // `POR_EMPACAR` y `EN_EMPAQUE` van al FINAL y eso NO es indiferente: `ALTER TYPE ... ADD
-    // VALUE` anade al final, y ponerlos en otra posicion obligaria a recrear el tipo. La lista
-    // sigue siendo cerrada: un valor mas pone este test rojo.
+    // `PARCIAL` va el PRIMERO (`ADD VALUE ... BEFORE`) para que ordenar por estado lo ponga
+    // delante. La lista sigue siendo cerrada: un valor mas pone este test rojo.
     expect(parseEnum('OrderStatus')).toEqual([
+      'PARCIAL',
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
@@ -636,6 +630,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'OrderDeliveryLine',
       'OrderDeliveryVoid',
       'OrderDeliveryVoidLine',
+      'OrderLine',
       'OrderPresentationLine',
     ])
     expect(owners.get('Recipe')).toBe('recetas')
@@ -754,6 +749,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'OrderDeliveryLine',
       'OrderDeliveryVoid',
       'OrderDeliveryVoidLine',
+      'OrderLine',
       'OrderPresentationLine',
     ])
     // `import` aqui es «importe». `InventoryImport` (QC-209, 2026-10-06) es el registro de una

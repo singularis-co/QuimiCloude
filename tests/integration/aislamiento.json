@@ -869,6 +869,16 @@
       "archivo": "pedidos/order-lines-use-cases.int.test.ts",
       "motivo": "QT-313 T9 y T10: el alta y la edicion con varias lineas por los casos de uso cableados a mano con los adaptadores driven reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con lote, recetas y, si hace falta, envases) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-11-04"
+    },
+    {
+      "archivo": "pedidos/order-lines-delivery.int.test.ts",
+      "motivo": "QT-313 T12: la entrega y su anulacion por la fachada real de lib/composition; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su empresa efimera (tests/helpers/order-delivery-seed.ts, randomUUID) y la limpia en un 'finally': asientos, lineas de anulacion y anulaciones, y despues borrarEmpresaDeEntrega. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-04"
+    },
+    {
+      "archivo": "pedidos/order-lines-state.int.test.ts",
+      "motivo": "QT-313 T11 y T12: cancelar una linea, cancelar el pedido, darlo de baja, caducar y desbloquear lineas por los casos de uso cableados a mano con los adaptadores driven reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con lote, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-04"
     }
   ]
 }

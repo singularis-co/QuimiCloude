@@ -22,6 +22,12 @@ import type { OrderLineRow, OrderRow } from '../domain/order-view';
  * «De otra empresa» vuelve como `null`, igual que «no existe»: distinguirlos seria un oraculo de
  * existencia sobre datos ajenos.
  */
+/** Una linea bloqueada y su pedido. */
+export type BlockedOrderLineRef = {
+  readonly orderId: string;
+  readonly lineId: string;
+};
+
 export interface OrderRepository {
   /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
    *  caso. */
@@ -63,7 +69,7 @@ export interface OrderRepository {
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
 
-  /** Identificadores de los pedidos vivos en `BLOQUEADO` de la empresa, del mas antiguo al mas
-   *  nuevo por `(created_at, id)`: en ese orden se les ofrece el material que entra. */
-  findBlockedIds(scope: OrderScope): Promise<readonly string[]>;
+  /** Las lineas vivas en `BLOQUEADO` de pedidos vivos de la empresa, por `(created_at, id)` del
+   *  pedido y despues por `position`: en ese orden se les ofrece el material que entra. */
+  findBlockedIds(scope: OrderScope): Promise<readonly BlockedOrderLineRef[]>;
 }

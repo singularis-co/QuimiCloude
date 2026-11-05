@@ -19,7 +19,7 @@ import {
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
 
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -63,6 +63,8 @@ function fila(status: OrderStatus): OrderRow {
 function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found' } = {}) {
   const filaVista = opciones.fila === undefined ? null : opciones.fila
   const findAliveById = vi.fn(async () => filaVista)
+  // El pedido de una receta: su unica linea lleva su estado.
+  const findAliveLines = vi.fn(async () => (filaVista === null ? [] : [orderLineOf(filaVista)]))
 
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -71,20 +73,34 @@ function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found'
 
   const orders = {
     findAliveById,
+    findAliveLines,
     listAlive: explota('orders.listAlive'),
   } as unknown as OrderRepository
 
-  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
+  const lockAliveLines = vi.fn(async () =>
+    filaVista === null ? null : { order: { ...filaVista, reservedAt: null }, lines: [orderLineOf(filaVista)] },
+  )
   const softDeleteAlive = vi.fn(async () => opciones.borrado ?? 'ok')
-  const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
+  const setLineReservedAt = vi.fn(async (id: string, lineId: string, reservedAt: Date | null) => { void [id, lineId, reservedAt] })
+  const mirrorFirstLine = vi.fn(async () => undefined)
   const releaseForLine = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
 
-  const { unitOfWork } = fakeUnitOfWork({
-    orders: { lockAliveById, softDeleteAlive, setReservedAt },
+  const { unitOfWork, orders: escritura } = fakeUnitOfWork({
+    orders: { lockAliveLines, softDeleteAlive, setLineReservedAt, mirrorFirstLine },
     reservations: { releaseForLine },
   })
 
-  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, softDeleteAlive, setReservedAt, releaseForLine }
+  return {
+    orders,
+    unitOfWork,
+    escritura,
+    now: () => AHORA,
+    findAliveById,
+    lockAliveLines,
+    softDeleteAlive,
+    setLineReservedAt,
+    releaseForLine,
+  }
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -144,7 +160,7 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
     await createDeleteOrder(d)(ORDER_ID, ADMIN)
 
     expect(d.releaseForLine).toHaveBeenCalledTimes(1)
-    expect(d.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, { companyId: ADMIN.companyId })
+    expect(d.setLineReservedAt).toHaveBeenCalledWith(ORDER_ID, ONLY_LINE_ID, null, { companyId: ADMIN.companyId })
     expect(d.softDeleteAlive).toHaveBeenCalledTimes(1)
   })
 
@@ -241,12 +257,13 @@ describe('deleteOrder — borrado logico (R31, R32, R33)', () => {
 })
 
 describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
-  it('el orden real es lockAliveById -> releaseForLine(release) -> setReservedAt(null) -> softDeleteAlive', async () => {
+  it('QT-313 R47: el orden real es lockAliveLines -> releaseForLine(release) -> setLineReservedAt(null) -> softDeleteAlive', async () => {
     const d = dobles({ fila: fila('PENDIENTE') })
     const orden: string[] = []
-    d.lockAliveById.mockImplementation(async () => {
-      orden.push('orders.lockAliveById')
-      return { ...fila('PENDIENTE'), reservedAt: null, packagingCost: null }
+    d.lockAliveLines.mockImplementation(async () => {
+      orden.push('orders.lockAliveLines')
+      const pendiente = fila('PENDIENTE')
+      return { order: { ...pendiente, reservedAt: null }, lines: [orderLineOf(pendiente)] }
     })
     d.softDeleteAlive.mockImplementation(async () => {
       orden.push('orders.softDeleteAlive')
@@ -255,20 +272,21 @@ describe('QC-141 T9 — borrar libera (R19, R41, N5)', () => {
     d.releaseForLine.mockImplementation(async () => {
       orden.push('reservations.releaseForLine')
     })
-    d.setReservedAt.mockImplementation(async () => {
-      orden.push('orders.setReservedAt')
+    d.setLineReservedAt.mockImplementation(async () => {
+      orden.push('orders.setLineReservedAt')
     })
 
     await createDeleteOrder(d)(ORDER_ID, ADMIN)
 
     expect(orden).toEqual([
-      'orders.lockAliveById',
+      'orders.lockAliveLines',
       'reservations.releaseForLine',
-      'orders.setReservedAt',
+      'orders.setLineReservedAt',
       'orders.softDeleteAlive',
     ])
-    expect(d.releaseForLine.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
-    expect(d.setReservedAt.mock.calls[0]?.[1]).toBeNull()
+    expect(d.releaseForLine.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id, orderLineId: ONLY_LINE_ID })
+    expect(d.setLineReservedAt.mock.calls[0]?.[2]).toBeNull()
+    expect(d.escritura.setReservedAt).not.toHaveBeenCalled()
   })
 
   it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {

@@ -253,6 +253,8 @@ describe('voidDelivery contra Postgres', () => {
     try {
       const deliveryId = await entregarTodo(e);
       await prisma.order.update({ where: { id: e.orderId }, data: { status: 'EN_ACONDICIONAMIENTO', finishedAt: null } });
+      // QT-313: el estado que decide es el de la linea.
+      await prisma.orderLine.updateMany({ where: { orderId: e.orderId }, data: { status: 'EN_ACONDICIONAMIENTO', finishedAt: null } });
 
       expect(await codigoDe(anular(e, deliveryId, [e.lineId]))).toBe('action_not_allowed');
 
@@ -459,8 +461,12 @@ describe('voidDelivery contra Postgres', () => {
               orders:
                 donde === 'set-status'
                   ? {
-                      lockAliveById: (id, scope) => orders.lockAliveById(id, scope),
+                      lockAliveLines: (id, scope) => orders.lockAliveLines(id, scope),
+                      refreshStatus: (id, actorId, now, scope) => orders.refreshStatus(id, actorId, now, scope),
                       setStatus: async () => {
+                        throw new Error('fallo forzado al cambiar el estado');
+                      },
+                      setLineStatus: async () => {
                         throw new Error('fallo forzado al cambiar el estado');
                       },
                     }

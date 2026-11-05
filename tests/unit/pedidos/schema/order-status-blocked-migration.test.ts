@@ -123,6 +123,9 @@ function valoresDelEsquema(): readonly string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith('///'))
+    // PARCIAL lo anade una migracion posterior con `ADD VALUE ... BEFORE`: no existia cuando
+    // esta migracion se escribio, asi que su `down.sql` no lo recrea.
+    .filter((line) => line !== 'PARCIAL')
 }
 
 describe('migration.sql del enum — un solo ADD VALUE, y al final', () => {

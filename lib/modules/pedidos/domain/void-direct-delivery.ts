@@ -86,7 +86,7 @@ async function voidInTransaction(
     companyId: scope.companyId,
     orderId: null,
     orderDeliveryVoidId: created.id,
-    lines: lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity })),
+    lines: lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: null })),
     actorId,
     now,
   });

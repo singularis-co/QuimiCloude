@@ -71,8 +71,8 @@ function entradaDeUnCliente(): DeliverOrderInput {
 }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
 ]
 
 /** Pedidos 4 + 10; entregados 4 + 3: a la segunda linea le faltan 7. */
@@ -97,8 +97,11 @@ type Montaje = {
   readonly tx: {
     readonly orders: {
       readonly lockAliveById: ReturnType<typeof vi.fn>
+      readonly lockAliveLines: ReturnType<typeof vi.fn>
       readonly findPresentationLinesForFinish: ReturnType<typeof vi.fn>
       readonly setStatus: ReturnType<typeof vi.fn>
+      readonly setLineStatus: ReturnType<typeof vi.fn>
+      readonly refreshStatus: ReturnType<typeof vi.fn>
     }
     readonly deliveries: {
       readonly findByKey: ReturnType<typeof vi.fn>
@@ -136,11 +139,27 @@ function montar(
     registradaDentro?: RegisteredOrderDelivery | null
   } = {},
 ): Montaje {
+  // Un pedido sin lineas, anterior a ellas: su reparto no nombra linea y el estado se escribe en el
+  // pedido. Los pedidos con lineas los cubre `delivery-by-line.test.ts`.
+  const lockAliveById = vi.fn(async (id: string, scope: { companyId: string }) => {
+    void [id, scope]
+    return opciones.pedido === undefined ? pedidoTerminado() : opciones.pedido
+  })
   const tx = {
     orders: {
-      lockAliveById: vi.fn(async () => (opciones.pedido === undefined ? pedidoTerminado() : opciones.pedido)),
+      lockAliveById,
+      lockAliveLines: vi.fn(async (id: string, scope: { companyId: string }) => {
+        const order = await lockAliveById(id, scope)
+        return order === null ? null : { order, lines: [] }
+      }),
       findPresentationLinesForFinish: vi.fn(async () => opciones.lineas ?? LINEAS),
       setStatus: vi.fn(async () => opciones.setStatus ?? 'ok'),
+      setLineStatus: vi.fn(() => {
+        throw new Error('setLineStatus no deberia llamarse en un pedido sin lineas')
+      }),
+      refreshStatus: vi.fn(() => {
+        throw new Error('refreshStatus no deberia llamarse en un pedido sin lineas')
+      }),
     },
     deliveries: {
       findByKey: vi.fn(async (deliveryKey: string, scope: { companyId: string }) =>
@@ -430,6 +449,7 @@ describe('deliverOrder — salida fisica de inventario (R19, R20, R24)', () => {
     expect(m.tx.finishedGoods.dispatchForDelivery).toHaveBeenCalledWith({
       companyId: EMPRESA,
       orderId: DELIVERY_ORDER_ID,
+      orderLineId: null,
       orderDeliveryId: DELIVERY_ID,
       recipeId: RECETA,
       presentationId: PENDING_PRESENTATION,
@@ -513,7 +533,7 @@ describe('deliverOrder — estado del pedido tras la entrega (R26, R27)', () => 
     const m = montar({ setStatus: 'stale' })
     const entrada = deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 7 }]) })
 
-    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).rejects.toThrow(/setStatus/)
+    await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).rejects.toThrow(/cambio de estado devolvio 'stale'/)
     expect(m.lanzoDentro()).not.toBeNull()
   })
 })
@@ -703,7 +723,7 @@ const GALLON_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 /** Las de QC-223 mas el galon: pedidos 5, ninguno entregado. */
 const LINEAS_VARIOS: readonly FinishPackingLine[] = [
   ...LINEAS,
-  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0 },
+  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
 ]
 
 type Bloque = DeliverOrderInput['customers'][number]

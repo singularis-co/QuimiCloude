@@ -89,7 +89,8 @@ export type FinishPackingLine = {
   /** `null` = todavia sin contar. */
   readonly packedPackages: number | null;
   /** Envases del conteo real que el pedido no espera; 0 sin contar o sin excedente. */
-  readonly packedSurplusPackages: number;
+  readonly packedSurplusPackages: number;  /** La linea del pedido de la que es este reparto; `null` en un pedido sin lineas. */
+  readonly orderLineId: string | null;
 };
 
 /** El conteo de una linea con los envases que, de ese conteo, quedan libres en el lote. */
@@ -210,7 +211,8 @@ export interface OrderWriteRepository {
    *  pedido ven los datos de su linea hasta que dejen de leerlas. */
   mirrorFirstLine(orderId: string, scope: OrderScope): Promise<void>;
 
-  /** `actorId` admite `null`: la caducidad automatica cancela sin que nadie la haya pedido. */
+  /** Escribe `CANCELADO` y el motivo en el pedido, no en sus lineas: cancelar, caducar y cancelar
+   *  por encargo cancelan cada linea con `cancelLine` y derivan el pedido con `refreshStatus`. */
   cancelAlive(
     id: string,
     reason: string,
@@ -219,7 +221,8 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** Borrado logico: marca `deleted_at`, jamas borra la fila ni libera el correlativo. */
+  /** Borrado logico del pedido y de todas sus lineas vivas: marca `deleted_at`, jamas borra la
+   *  fila ni libera el correlativo. */
   softDeleteAlive(id: string, actorId: string, now: Date, scope: OrderScope): Promise<'ok' | 'not_found'>;
 
   /** `UPDATE` condicional `WHERE status = from`: `'stale'` si la fila sigue viva pero ya no

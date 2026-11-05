@@ -68,10 +68,10 @@ const ENTREGA: DeliveryForVoid = {
 
 /** La presentacion abierta sale en dos lotes; la anulada, en uno; la otra, en uno. */
 const LINEAS: readonly DeliveryLineForVoid[] = [
-  { id: 'l-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
-  { id: 'l-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
-  { id: 'l-3', customerId: FIRST_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, batchId: THIRD_BATCH_ID, packages: 3, quantity: '12.0000', voided: true },
-  { id: 'l-4', customerId: FIRST_CUSTOMER_ID, presentationLineId: OTHER_LINE_ID, batchId: OTHER_BATCH_ID, packages: 5, quantity: '2.5000', voided: false },
+  { id: 'l-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'l-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'l-3', customerId: FIRST_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, orderLineId: null, batchId: THIRD_BATCH_ID, packages: 3, quantity: '12.0000', voided: true },
+  { id: 'l-4', customerId: FIRST_CUSTOMER_ID, presentationLineId: OTHER_LINE_ID, orderLineId: null, batchId: OTHER_BATCH_ID, packages: 5, quantity: '2.5000', voided: false },
 ]
 
 function pedido(status: OrderStatus = 'ENTREGADO'): LockedOrderRow {
@@ -83,7 +83,13 @@ type Fn = ReturnType<typeof vi.fn>
 type Montaje = {
   readonly deps: VoidDeliveryDeps
   readonly tx: {
-    readonly orders: { readonly lockAliveById: Fn; readonly setStatus: Fn }
+    readonly orders: {
+      readonly lockAliveById: Fn
+      readonly lockAliveLines: Fn
+      readonly setStatus: Fn
+      readonly setLineStatus: Fn
+      readonly refreshStatus: Fn
+    }
     readonly voids: {
       readonly findByKey: Fn
       readonly findDelivery: Fn
@@ -117,10 +123,26 @@ function montar(
     leido?: OrderRow | null
   } = {},
 ): Montaje {
+  // Un pedido sin lineas, anterior a ellas: el estado se escribe en el pedido. Los pedidos con
+  // lineas los cubre `delivery-by-line.test.ts`.
+  const lockAliveById = vi.fn(async (id: string, scope: { companyId: string }) => {
+    void [id, scope]
+    return opciones.pedido === undefined ? pedido() : opciones.pedido
+  })
   const tx = {
     orders: {
-      lockAliveById: vi.fn(async () => (opciones.pedido === undefined ? pedido() : opciones.pedido)),
+      lockAliveById,
+      lockAliveLines: vi.fn(async (id: string, scope: { companyId: string }) => {
+        const order = await lockAliveById(id, scope)
+        return order === null ? null : { order, lines: [] }
+      }),
       setStatus: vi.fn(async () => opciones.setStatus ?? 'ok'),
+      setLineStatus: vi.fn(() => {
+        throw new Error('setLineStatus no deberia llamarse en un pedido sin lineas')
+      }),
+      refreshStatus: vi.fn(() => {
+        throw new Error('refreshStatus no deberia llamarse en un pedido sin lineas')
+      }),
     },
     voids: {
       findByKey: vi.fn(async () => opciones.registradaDentro ?? null),
@@ -390,8 +412,8 @@ describe('voidDelivery — registro (R22, R23, R24)', () => {
       orderId: VOID_ORDER_ID,
       orderDeliveryVoidId: VOID_ID,
       lines: [
-        { batchId: FIRST_BATCH_ID, quantity: '4.0000' },
-        { batchId: SECOND_BATCH_ID, quantity: '2.0000' },
+        { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: null },
+        { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: null },
       ],
       actorId: ANULADOR.id,
       now: AHORA,
@@ -506,10 +528,10 @@ describe('voidDelivery — idempotencia (R28)', () => {
 // clientes que comparten presentacion y lote: el primero lleva la presentacion abierta en dos lotes
 // y comparte con el segundo el primer lote; el segundo tiene ademas la presentacion ya anulada.
 const DOS_CLIENTES: readonly DeliveryLineForVoid[] = [
-  { id: 'a-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
-  { id: 'a-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
-  { id: 'b-1', customerId: SECOND_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, batchId: FIRST_BATCH_ID, packages: 3, quantity: '3.0000', voided: false },
-  { id: 'b-2', customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, batchId: THIRD_BATCH_ID, packages: 1, quantity: '4.0000', voided: true },
+  { id: 'a-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'a-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'b-1', customerId: SECOND_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: FIRST_BATCH_ID, packages: 3, quantity: '3.0000', voided: false },
+  { id: 'b-2', customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, orderLineId: null, batchId: THIRD_BATCH_ID, packages: 1, quantity: '4.0000', voided: true },
 ]
 
 const par = (customerId: string, presentationLineId: string) => ({ customerId, presentationLineId })
@@ -601,8 +623,8 @@ describe('voidDelivery — pares cliente-presentacion (R3, R39, R40, R41)', () =
     expect(m.tx.finishedGoods.returnForDeliveryVoid).toHaveBeenCalledWith(
       expect.objectContaining({
         lines: [
-          { batchId: FIRST_BATCH_ID, quantity: '4.0000' },
-          { batchId: SECOND_BATCH_ID, quantity: '2.0000' },
+          { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: null },
+          { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: null },
         ],
       }),
     )
@@ -620,9 +642,9 @@ describe('voidDelivery — pares cliente-presentacion (R3, R39, R40, R41)', () =
       orderId: VOID_ORDER_ID,
       orderDeliveryVoidId: VOID_ID,
       lines: [
-        { batchId: FIRST_BATCH_ID, quantity: '4.0000' },
-        { batchId: SECOND_BATCH_ID, quantity: '2.0000' },
-        { batchId: FIRST_BATCH_ID, quantity: '3.0000' },
+        { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: null },
+        { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: null },
+        { batchId: FIRST_BATCH_ID, quantity: '3.0000', orderLineId: null },
       ],
       actorId: ANULADOR.id,
       now: AHORA,
