@@ -13,6 +13,7 @@
 > - Las pantallas de planta con varias recetas (ejecución, empaque, acondicionamiento y entrega) y
 >   el E2E de un pedido de dos recetas van en **QT-315** (`planta-con-varias-recetas`, frontend,
 >   depende de ésta).
+> - El renombrado y borrado de los esquemas de entrada del pedido va en **QT-314**.
 > - El margen por receta y en total va en **QC-308** (`margen-del-pedido`). Su descripción se
 >   revisa cuando se acote.
 >
@@ -338,6 +339,8 @@
 | Columnas viejas de `orders` en espejo | R44, R45 (decisión de proceso) |
 | `excludeOrderLineId` en inventario | R17, R25 |
 | Posición de la línea solo en el diagnóstico | R11, R13 |
+| Espejo ampliado hasta T15 | R34, R44, R45 (decisión de proceso) |
+| Esquemas planos | R44 (y «Lo que NO entra») |
 
 ## Preguntas abiertas
 
@@ -381,3 +384,5 @@ Ninguna. P1–P14 están cerradas en la tabla de abajo.
 | 2026-11-04 | Columnas viejas de `orders` en espejo hasta T15 (F2.1) | **En cada alta o edición, `orders` copia la línea viva de menor `position`:** receta, cantidad, unidad, precio, coste y `reserved_at`. `updateAlive` deja de reemplazar el reparto por `order_id`. T15 borra el espejo junto con las columnas. |
 | 2026-11-04 | `excludeOrderLineId` en inventario (F2.1) | **`findCostingBatches`, de producto y de envase, acepta excluir lo apartado por una línea**, para la cotización en edición (design § 4.2). |
 | 2026-11-04 | Posición de la línea solo en el diagnóstico (F2.1) | **La posición de la línea que falla (R11, R13) va solo en el diagnóstico del error.** No se amplía la lista cerrada de campos de `errores/domain/error-state.ts`. |
+| 2026-11-04 | Espejo ampliado hasta T15 (F2.1) | **Desde T14a, la escritura que re-deriva el estado del pedido y el espejo de la primera línea escriben también en `orders` `packed_by`, `conditioned_by`, `finished_at` y `actual_cost`**, coherentes con el estado derivado y en NULL cuando es `PARCIAL`, para respetar los CHECK de `orders` que siguen vivos hasta T15 y mantener `OrderView.actualCost`, R44 y R45. T15 borra el espejo y esos CHECK junto con las columnas. |
+| 2026-11-04 | Esquemas planos (F2.1) | **QT-313 no renombra ni borra los esquemas de entrada del pedido.** Los planos siguen para la pantalla y los de líneas conservan su nombre provisional; lo hace QT-314, que rehace el formulario. Enmienda la fila «Esquemas en transición» en lo que toca a T14c. |

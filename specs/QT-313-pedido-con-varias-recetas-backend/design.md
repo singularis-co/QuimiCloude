@@ -6,7 +6,8 @@
 > `PARCIAL` en la pantalla actual (§ 7) y las decisiones provisionales del implementer (§ 12),
 > con P14 cerrada; contrato con `orderLineId: null` hasta T14e (§ 3.1). Enmendado otra vez en
 > F2.1 (2026-11-04): andamios de transición (§ 4.1.1), `excludeOrderLineId` (§ 4.2) y posición de
-> la línea solo en el diagnóstico (§ 4.4). No queda ninguna pregunta abierta.
+> la línea solo en el diagnóstico (§ 4.4); y después, espejo ampliado (§ 4.1.1, punto 3b) y los
+> esquemas planos que se quedan para QT-314 (§ 4.1.1, § 7). No queda ninguna pregunta abierta.
 
 ## Lo que ya existe
 
@@ -198,7 +199,10 @@ baja o cambio de estado de línea (R34):
    `PARCIAL`, `PENDIENTE` + `BLOQUEADO` también.
 
 Con una sola línea el estado del pedido es el de la línea, así que R44 y R45 se cumplen por
-construcción y la migración no cambia ningún estado.
+construcción y la migración no cambia ningún estado. Hasta T15, la misma escritura que deja el
+estado derivado deja también `packed_by`, `conditioned_by`, `finished_at` y `actual_cost` de
+`orders` coherentes con él (§ 4.1.1, punto 3b), para que los CHECK de `orders` que nombran el
+estado se sigan cumpliendo.
 
 **Dónde entra `PARCIAL`:**
 
@@ -368,23 +372,26 @@ entrada, ya validado por `resolveOrderRecipe` como original) contra las demás d
 contra las líneas activas del pedido: la original y sus versiones son la misma receta (P10), y las
 canceladas no cuentan (P9).
 
-Los nombres de arriba son el **estado final** (desde T14c). Antes, ver § 4.1.1.
+Los nombres de arriba son el **estado final**, que deja QT-314 al rehacer el formulario. En
+QT-313, ver § 4.1.1.
 
-#### 4.1.1 Transición hasta T14c y T15 (decisiones de F2.1, 2026-11-04)
+#### 4.1.1 Transición hasta T15 y QT-314 (decisiones de F2.1, 2026-11-04)
 
 Tres andamios mantienen verde el gate mientras el dominio pasa a líneas y la pantalla sigue siendo
-la de una receta. Cada uno tiene una task que lo quita; ninguno sobrevive a T15.
+la de una receta. Los andamios 2 y 3 los quitan tasks de QT-313 y no sobreviven a T15; el 1 (los
+esquemas) lo quita QT-314.
 
 **1. Esquemas en transición.** Conviven dos juegos en `order-input.ts`:
 
 | Juego | Nombres | Quién lo usa | Hasta |
 |---|---|---|---|
-| Plano (de hoy) | `createOrderSchema`, `updateOrderSchema`, `updateOrderDistributionSchema` | la pantalla y sus tests; el puente de `order-actions.ts` los parsea | T14c |
-| De líneas (provisional, existen desde T6) | `createOrderWithLinesSchema`, `updateOrderWithLinesSchema`, `updateOrderLineDistributionSchema` | los casos de uso (T9–T13) | T14c, que los renombra a los nombres de § 4.1 |
+| Plano (de hoy) | `createOrderSchema`, `updateOrderSchema`, `updateOrderDistributionSchema` | la pantalla y sus tests; el puente de `order-actions.ts` los parsea | QT-314 |
+| De líneas (provisional, existen desde T6) | `createOrderWithLinesSchema`, `updateOrderWithLinesSchema`, `updateOrderLineDistributionSchema` | los casos de uso | QT-314, que los renombra a los nombres de § 4.1 |
 
-El puente de `order-actions.ts` traduce plano → líneas (§ 7) desde T9. En T14c se renombran los de
-líneas, se borran los planos y el puente deja de parsear el formulario plano para reenviarlo como
-una línea. La pantalla y sus tests no cambian en T9–T13.
+El puente de `order-actions.ts` traduce plano → líneas (§ 7) desde T9. **QT-313 no renombra ni
+borra ningún esquema** (decisión de F2.1, 2026-11-04): al cerrar esta ficha conviven los dos
+juegos, los de líneas con su nombre provisional. Lo hace QT-314, que rehace el formulario. La
+pantalla y sus tests no cambian en QT-313.
 
 **2. Estado de la línea en transición.** Mientras una operación todavía escribe el estado del
 **pedido** (`setStatus`, `cancelAlive`, `softDeleteAlive`, `finishPackingAlive`, los de
@@ -402,6 +409,34 @@ en `orders` lo de la línea viva de **menor `position`**: `recipe_id`, `quantity
 `sale_price`, `ingredients_cost`, `packaging_cost` y `reserved_at`. `updateAlive` deja de
 reemplazar el reparto por `order_id`: el reparto se escribe por línea (`order_line_id`). T15 borra
 el espejo en el mismo commit que borra las columnas.
+
+**3b. Espejo ampliado desde T14a** (decisión de F2.1, 2026-11-04). Cuando T14a quita la última
+copia pedido → línea (punto 2), `orders` deja de recibir `packed_by`, `conditioned_by`,
+`finished_at` y `actual_cost` por la vía vieja, pero sus CHECK siguen vivos hasta T15
+(`orders_packed_by_matches_status`, `orders_conditioned_by_matches_status`,
+`orders_finished_requires_finished_at`, `orders_finished_at_requires_delivered`,
+`orders_actual_cost_requires_packed`) y `OrderView.actualCost`, R44 y R45 leen esas columnas.
+Por eso `refreshStatus` (re-deriva el estado del pedido, § 2.2) y `mirrorFirstLine` (el espejo del
+punto 3) escriben también esas cuatro, en la misma sentencia que el estado derivado:
+
+| Estado derivado del pedido | `packed_by` | `conditioned_by` | `finished_at` | `actual_cost` |
+|---|---|---|---|---|
+| `PARCIAL`, `CANCELADO`, `PENDIENTE`, `EN_CURSO`, `BLOQUEADO`, `POR_EMPACAR` | NULL | NULL | NULL | NULL |
+| `EN_EMPAQUE` | el de la línea activa de menor `position` | NULL | NULL | NULL |
+| `POR_ACONDICIONAR` | ídem | NULL | NULL | suma de R18 |
+| `EN_ACONDICIONAMIENTO` | ídem | el de la línea activa de menor `position` | NULL | suma de R18 |
+| `TERMINADO`, `ENTREGADO` | ídem | ídem | el **mayor** `finished_at` de las líneas activas | suma de R18 |
+
+- Fuera de `PARCIAL`, todas las líneas activas comparten estado; cada línea cumple sus propios
+  CHECK (copias de los de `orders`), así que la de menor `position` tiene `packed_by` y
+  `conditioned_by` cuando el estado los exige, y todas tienen `finished_at` en `TERMINADO`. El
+  pedido termina cuando termina su última línea: de ahí el mayor `finished_at`.
+- `actual_cost` es la suma de R18 (líneas activas; NULL si a alguna le falta, o si la suma no cabe
+  en `decimal(14,4)`). Con una línea es el de la línea, así que R44 y R45 no cambian.
+- `PARCIAL` deja las cuatro en NULL: ningún CHECK de `orders` lista `PARCIAL`, así que NULL los
+  cumple todos.
+- Las líneas canceladas no cuentan (como en todo § 2.2).
+- T15 borra este espejo junto con las columnas y sus cinco CHECK.
 
 ### 4.2 Casos de uso
 
@@ -508,9 +543,9 @@ de `lines[0]`. El puente vive solo en el adaptador driving: el dominio ya trabaj
 
 Por fases (§ 4.1.1): desde T9 el puente parsea el formulario con los esquemas planos y llama a los
 casos de uso con los de líneas (`createOrderWithLinesSchema`, `updateOrderWithLinesSchema`,
-`updateOrderLineDistributionSchema`). En T14c los de líneas toman los nombres de § 4.1, los planos
-se borran y el puente construye la entrada de líneas directamente desde el `FormData` de una receta.
-Con QT-314 el puente desaparece.
+`updateOrderLineDistributionSchema`). Así se queda al cerrar QT-313: los esquemas planos no se
+borran ni los de líneas se renombran aquí. QT-314 rehace el formulario, renombra los esquemas a
+los nombres de § 4.1, borra los planos y quita el puente.
 
 Hasta QT-314 ninguna pantalla puede crear un pedido de **varias** líneas, así que en producción no
 existirán. Si aun así llega uno al puente (datos escritos por tests o por consola), la edición desde

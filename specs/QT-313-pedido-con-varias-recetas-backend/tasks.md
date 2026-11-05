@@ -156,7 +156,8 @@
   dos), R40 (dos
   líneas bloqueadas, entra material para una; la que pasa a `PENDIENTE`
   estrena plazo) y R51 (dos líneas `PENDIENTE` con plazos distintos: el proceso cancela solo la
-  vencida y libera solo su material; el pedido queda `PARCIAL`). Depende de T8, T7.
+  vencida y libera solo su material; el pedido queda `PENDIENTE`, porque por R34 la línea
+  cancelada no cuenta y la única activa sigue `PENDIENTE`). Depende de T8, T7.
 - [x] **T13 — Lecturas.** `get-order.ts`, `list-orders.ts`, `order-view.ts`, `order-queryable.ts`,
   `list-order-summaries.ts`, `list-query-sql.ts`, `order-catalog-prisma.ts`: `OrderView.lines`,
   totales y `progress` (design § 4.3); filtro por estado de `orderFilterWhere` en
@@ -181,7 +182,17 @@
   recibe la línea de la línea del reparto. Abrir, finalizar, empaque y acondicionamiento pasan a
   escribir el estado por línea y derivar el pedido: se **quita la última copia** de estado pedido
   → línea (`setStatus`, `finishPackingAlive` y los de acondicionamiento; design § 4.1.1, punto 2).
-  *Hecho:* ya no queda ninguna copia de estado pedido → línea en el adaptador (grep y test);
+  En el mismo cambio, `refreshStatus` y `mirrorFirstLine` amplían el espejo de `orders` con
+  `packed_by`, `conditioned_by`, `finished_at` y `actual_cost` según la tabla de design § 4.1.1,
+  punto 3b.
+  *Hecho:* ya no queda ninguna copia de estado pedido → línea en el adaptador (grep y test); un
+  test de integración por CHECK de `orders`, recorriendo el pedido por la vía nueva hasta el estado
+  que lo dispara: `orders_packed_by_matches_status` (`EN_EMPAQUE`, y `PARCIAL` con una línea en
+  empaque → NULL), `orders_conditioned_by_matches_status` (`EN_ACONDICIONAMIENTO`),
+  `orders_finished_requires_finished_at` (`TERMINADO`, con dos líneas: el mayor `finished_at`),
+  `orders_finished_at_requires_delivered` (`PARCIAL` con una línea `TERMINADO` → NULL) y
+  `orders_actual_cost_requires_packed` (`POR_ACONDICIONAR`: suma de R18; `PARCIAL` → NULL);
+  `OrderView.actualCost` de un pedido de una línea igual que hoy (R44, R45);
   tests de R31, R32, R35, R36, R38; R37 para `production`, registro de ejecución,
   evidencias y equipo de acondicionamiento (cada uno lleva la línea del reparto o de la línea que se
   opera); R19: ninguna salida de `asignaciones` lleva precio; R45: con una línea, las salidas son
@@ -192,13 +203,10 @@
   `list-direct-delivery-surplus.ts`; `integraciones/domain/get-whatsapp-chat-context.ts`.
   *Hecho:* tests de integración de cada lector con un pedido de una línea dan lo mismo que hoy
   (R45) y ninguno lee las columnas de `orders` que se van. Depende de T8.
-- [ ] **T14c [P] — Puente del formulario actual.** `pedidos/adapters/driving/order-actions.ts`,
-  `pedidos/domain/order-input.ts` y `pedidos/index.ts` (design § 4.1.1 y § 7): renombra
-  `createOrderWithLinesSchema` → `createOrderSchema`, `updateOrderWithLinesSchema` →
-  `updateOrderSchema` y `updateOrderLineDistributionSchema` → `updateOrderDistributionSchema`,
-  borra los planos y deja el puente construyendo la entrada de líneas desde el `FormData`.
-  *Hecho:* ningún esquema plano ni nombre provisional queda en el repositorio (grep); test de la
-  acción: el `FormData` de hoy crea un pedido de una línea y la lectura del
+- [ ] **T14c [P] — Puente del formulario actual.** `pedidos/adapters/driving/order-actions.ts`
+  (design § 4.1.1 y § 7). Los esquemas planos y los de líneas (con su nombre provisional) se
+  quedan como están: renombrarlos y borrar los planos es de QT-314.
+  *Hecho:* test de la acción: el `FormData` de hoy crea un pedido de una línea y la lectura del
   formulario devuelve los campos planos de hoy (R44); editar un pedido de dos líneas desde el
   puente → `invalid_input` sin escribir. Además, `PARCIAL` como estado final en
   `app/(private)/pedidos/components/order-row-actions.tsx` y `order-delivery-list.tsx` (design § 7;
@@ -236,9 +244,14 @@
   T14c (todo el código escribe la línea).
 - [ ] **T15 — Quitar las columnas de `orders`.** Migración `20261103120200_orders_drop_line_columns`
   y `db/schema.prisma` (design § 1.2), `reserved_at` incluido. `down.sql` aborta si hay pedidos con
-  más de una línea viva. En el mismo commit borra el **espejo** de `orders` (design § 4.1.1, punto
-  3) de los casos de uso de alta y edición y del adaptador.
-  *Hecho:* ningún escritor de las columnas borradas queda (grep y `typecheck`); test de
+  más de una línea viva. En el mismo commit borra el **espejo** de `orders` (design § 4.1.1, puntos
+  3 y 3b) de los casos de uso de alta y edición, de `refreshStatus`, de `mirrorFirstLine` y del
+  adaptador, y con las columnas caen sus CHECK (`orders_packed_by_matches_status`,
+  `orders_conditioned_by_matches_status`, `orders_finished_requires_finished_at`,
+  `orders_finished_at_requires_delivered`, `orders_actual_cost_requires_packed` y los demás de
+  esas columnas); `down.sql` los restaura.
+  *Hecho:* ningún escritor de las columnas borradas queda (grep y `typecheck`); `OrderView.actualCost`
+  sale de la suma de las líneas, no de `orders`; test de
   integración de la migración: sube y baja con pedidos de una línea dejando los
   valores como antes; con un pedido de dos líneas, la bajada falla, nombra cuántos y no cambia
   nada (R9); grep sin lecturas de `recipeId`/`quantity`/`salePrice`/`reservedAt` de `orders`
@@ -572,3 +585,15 @@ Tocados en la fase 4 (T13) por las lecturas con lineas (los fixtures de la panta
 - `tests/unit/pedidos-ui/pedidos-viewport.test.tsx`
 - `tests/unit/pedidos-ui/read-only.test.tsx`
 - `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`
+
+Tocados en la fase 5 (T14b) por los otros lectores, que leen la receta de la linea del pedido (los demas archivos de T14b ya estan arriba):
+- `lib/modules/pedidos/domain/customer-order-directory.ts`
+- `lib/modules/pedidos/ports/direct-delivery-repository.ts`
+- `tests/integration/integraciones/whatsapp-chat-context-flow.int.test.ts`
+- `tests/integration/inventario/finished-stock.int.test.ts`
+- `tests/integration/pedidos/customer-order-directory.int.test.ts`
+- `tests/integration/pedidos/direct-delivery-repository.int.test.ts`
+- `tests/integration/pedidos/direct-delivery.int.test.ts`
+- `tests/integration/pedidos/order-delivery.int.test.ts`
+- `tests/integration/pedidos/packed-lines-directory.int.test.ts`
+- `tests/unit/integraciones/whatsapp/conversations/get-whatsapp-chat-context.test.ts`
