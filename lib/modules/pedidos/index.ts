@@ -134,6 +134,7 @@ export type {
   NewOrder,
   OrderEdit,
   OrderHeaderEdit,
+  OrderLineView,
   OrderPresentationLineRow,
   OrderPresentationLineView,
   OrderPresentationLineWrite,

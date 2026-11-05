@@ -3,6 +3,7 @@ import type { EditableOrderStatus } from './order-input';
 import type { OrderCustomer } from './order-customer';
 import type { OrderNumber } from './order-number';
 import type { OrderDeliveryState } from './order-pending-delivery';
+import type { OrderProgress } from './order-totals';
 
 /**
  * Contratos de entrada y salida del pedido (`design.md > 7.3`). Viven en `domain/` -no en
@@ -240,6 +241,37 @@ export type OrderView = {
   readonly customer: OrderCustomer | null;
   /** Precio de venta del pedido entero; `null` = sin precio, distinto de `'0.0000'`. */
   readonly salePrice: string | null;
+  /** Las recetas vivas del pedido, canceladas incluidas, por `position`. */
+  readonly lines: readonly OrderLineView[];
+  /** Lineas activas y cuantas de ellas estan en `TERMINADO` o `ENTREGADO`. */
+  readonly progress: OrderProgress;
+  /** Suma de los precios de las lineas activas que lo tienen; `null` si ninguna lo tiene. */
+  readonly salePriceTotal: string | null;
+  readonly linesWithoutPrice: number;
+  /** `null` si alguna linea activa no tiene coste: una suma con huecos no es el coste. */
+  readonly ingredientsCostTotal: string | null;
+  readonly actualCostTotal: string | null;
+};
+
+/** Una receta del pedido en la ficha y el listado. Las sumas del pedido salen de estas lineas y no
+ *  se guardan. */
+export type OrderLineView = {
+  readonly id: string;
+  readonly position: number;
+  readonly recipeId: string;
+  /** El nombre mostrado; `null` si la receta no vuelve del catalogo. */
+  readonly recipeName: string | null;
+  readonly quantity: string;
+  readonly unitId: string | null;
+  readonly status: OrderLineStatus;
+  readonly cancellationReason: string | null;
+  readonly presentationLines: readonly OrderPresentationLineView[];
+  readonly salePrice: string | null;
+  readonly ingredientsCost: string | null;
+  readonly packagingCost: string | null;
+  readonly actualCost: string | null;
+  readonly finishedAt: Date | null;
+  readonly reservedAt: Date | null;
 };
 
 /**

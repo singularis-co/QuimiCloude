@@ -30,6 +30,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -65,7 +66,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
-  findAliveLines: findAliveOrderLines,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 };

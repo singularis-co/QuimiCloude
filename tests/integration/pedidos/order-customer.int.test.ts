@@ -35,6 +35,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -96,7 +97,7 @@ const customerCatalog = {
     findCustomerRefsIncludingDeleted(ids, { companyId }),
 };
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>

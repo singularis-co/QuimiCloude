@@ -21,6 +21,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   listAliveOrders,
   findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
@@ -87,7 +88,7 @@ function normalizeForTest(name: string): string {
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
-  findAliveLines: findAliveOrderLines,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 }

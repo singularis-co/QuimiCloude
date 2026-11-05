@@ -37,6 +37,10 @@ export interface OrderRepository {
    *  pedido no existe, esta borrado o es de otra empresa. */
   findAliveLines(orderId: string, scope: OrderScope): Promise<readonly OrderLineRow[]>;
 
+  /** Lo mismo que `findAliveLines` para varios pedidos en una sola consulta: el listado lee las
+   *  lineas de toda la pagina de una vez. Un pedido sin lineas o de otra empresa no sale. */
+  findAliveLinesByOrderIds(orderIds: readonly string[], scope: OrderScope): Promise<readonly OrderLineRow[]>;
+
   /**
    * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).
    *

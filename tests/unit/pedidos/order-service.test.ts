@@ -145,6 +145,7 @@ function dobles(opciones: {
 
   const orders = {
     findAliveById,
+    findAliveLines: vi.fn(async () => []),
     listAlive: explota('orders.listAlive'),
   } as unknown as OrderRepository
 
@@ -353,6 +354,13 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       unitId: UNIT_ID,
       unitLabel: 'L',
       customer: null,
+      // QT-313: este doble no tiene lineas; sin lineas activas las sumas de coste son 0.
+      lines: [],
+      progress: { total: 0, finished: 0 },
+      salePriceTotal: null,
+      linesWithoutPrice: 0,
+      ingredientsCostTotal: '0.0000',
+      actualCostTotal: '0.0000',
     })
   })
 
@@ -450,6 +458,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
     }))
     const orders = {
       findAliveById: vi.fn(),
+      findAliveLinesByOrderIds: vi.fn(async () => []),
       listAlive,
     } as unknown as OrderRepository
     const findRefsIncludingDeleted = vi.fn(async () => [RECETA_VIVA])

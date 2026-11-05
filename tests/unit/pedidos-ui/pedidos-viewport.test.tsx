@@ -92,6 +92,7 @@ import {
   resetViewport,
   setViewportWidth,
 } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 type CookieStoreStub = { get: (name: string) => { name: string; value: string } | undefined };
 
@@ -301,6 +302,7 @@ const PEDIDO_ID = crypto.randomUUID();
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

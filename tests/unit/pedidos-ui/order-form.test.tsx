@@ -89,6 +89,7 @@ import type {
 import type { RecipeDetail, RecipeVersionSummary } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const {
   createOrderActionMock,
@@ -283,6 +284,7 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: crypto.randomUUID(),
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

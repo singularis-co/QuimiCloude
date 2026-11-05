@@ -20,6 +20,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { listOrdersActionMock, listProducedProductsActionMock, routerMock, getSessionUserMock } =
   vi.hoisted(() => ({
@@ -150,6 +151,7 @@ const PARAMETROS: DataTableParams = {
 
 function pedido(id: string, sequence: number, status: OrderSummary['status']): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id,
     number: { year: 2026, sequence },
     numberText: formatOrderNumber({ year: 2026, sequence }),

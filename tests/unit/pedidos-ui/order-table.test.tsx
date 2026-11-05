@@ -28,6 +28,7 @@ import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
@@ -98,6 +99,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 
 function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id,
     number: { year: 2026, sequence },
     numberText: formatOrderNumber({ year: 2026, sequence }),

@@ -81,7 +81,7 @@ function dobles(
   return {
     customerCatalog: { findRefsIncludingDeleted: findCustomerRefs },
     findCustomerRefs,
-    orders: { findAliveById: vi.fn(async () => row) } as unknown as OrderRepository,
+    orders: { findAliveById: vi.fn(async () => row), findAliveLines: vi.fn(async () => []) } as unknown as OrderRepository,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),
@@ -183,7 +183,7 @@ describe('getOrder — el cliente del pedido (QC-156)', () => {
 
 describe('toOrderView — recibe el Map de RecipeRef', () => {
   it('R11: compone recipeVersion desde la referencia y no desde la fila', () => {
-    const vista = toOrderView(fila(VERSION), new Map([[VERSION, REF_VERSION]]))
+    const vista = toOrderView(fila(VERSION), [], new Map([[VERSION, REF_VERSION]]))
 
     expect(vista.recipeName).toBe('Crema base · Sin perfume')
     expect(vista.recipeVersion).toEqual({
@@ -245,7 +245,7 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
   })
 
   it('R33: toOrderView sin nombres de envase deja packagingName en null y conserva el id', () => {
-    const vista = toOrderView(filaConReparto(), new Map([[ORIGINAL, REF_ORIGINAL]]))
+    const vista = toOrderView(filaConReparto(), [], new Map([[ORIGINAL, REF_ORIGINAL]]))
 
     expect(vista.presentationLines[1]).toMatchObject({ packagingProductId: ENVASE, packagingName: null })
   })
@@ -300,6 +300,7 @@ describe('la ficha lleva el contenido y la unidad de la presentacion de cada lin
   it('toOrderView sin presentaciones resueltas deja contenido de la copia y unidad en null', () => {
     const vista = toOrderView(
       { ...fila(ORIGINAL), presentationLines: [{ presentationId: BOTELLA, packages: 1, packagingProductId: null, presentationContent: null }] },
+      [],
       new Map([[ORIGINAL, REF_ORIGINAL]]),
     )
 

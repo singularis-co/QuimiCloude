@@ -340,6 +340,22 @@ function toDecimalRange(
 }
 
 /**
+ * Un `PARCIAL` sale tambien cuando alguna de sus lineas activas esta en un estado pedido. Las
+ * lineas van en un `EXISTS` sobre `orders`, asi que un pedido no sale dos veces y el `count`
+ * coincide. Una linea nunca es `PARCIAL`, asi que ese valor solo cuenta en el primer brazo.
+ */
+function orderStatusFilterWhere(statuses: readonly OrderStatus[]): Prisma.OrderWhereInput {
+  const lineStatuses = statuses.filter((status) => status !== 'PARCIAL' && status !== 'CANCELADO');
+  if (lineStatuses.length === 0) return { status: { in: [...statuses] } };
+  return {
+    OR: [
+      { status: { in: [...statuses] } },
+      { status: 'PARCIAL', lines: { some: { deletedAt: null, status: { in: lineStatuses } } } },
+    ],
+  };
+}
+
+/**
  * Un filtro del contrato -> la condicion de la columna que le corresponde. Devuelve `null` -y
  * el filtro no aparece en el `where`- cuando el campo no es filtrable aqui o cuando el valor no
  * acota nada (rango con los dos extremos nulos, `select` con lista VACIA: no haber elegido nada
@@ -357,7 +373,7 @@ function orderFilterWhere(field: string, value: ListFilterValue): Prisma.OrderWh
       if (condition === null) return null;
       if (field === 'status') {
         const enumCondition = enumIn<OrderStatus>(condition.in, ORDER_STATUS_VALUES);
-        return enumCondition === null ? null : { status: enumCondition };
+        return enumCondition === null ? null : orderStatusFilterWhere(enumCondition.in);
       }
       if (field === 'priority') {
         const enumCondition = enumIn<OrderPriority>(condition.in, ORDER_PRIORITY_VALUES);
@@ -997,6 +1013,15 @@ export async function findAliveOrderLines(
   tx: PrismaLike = prisma,
 ): Promise<readonly OrderLineRow[]> {
   return readOrderLines({ orderId, deletedAt: null }, scope, tx);
+}
+
+/** `findAliveLinesByOrderIds` de `OrderRepository`. */
+export async function findAliveOrderLinesByOrderIds(
+  orderIds: readonly string[],
+  scope: OrderScope,
+): Promise<readonly OrderLineRow[]> {
+  if (orderIds.length === 0) return [];
+  return readOrderLines({ orderId: { in: [...orderIds] }, deletedAt: null }, scope, prisma);
 }
 
 /** `lockAliveLines` de `OrderWriteRepository`. El `ORDER BY` va antes del bloqueo, asi que las

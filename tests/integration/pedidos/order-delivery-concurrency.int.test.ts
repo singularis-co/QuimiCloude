@@ -21,6 +21,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -80,7 +81,7 @@ function deliverOrderConLecturaPreviaSincronizada(participantes: number) {
         return leida;
       },
     },
-    orders: { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds },
+    orders: { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds },
   });
 }
 

@@ -328,6 +328,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   findExpirableOrders,
   finishConditioningAliveOrder,
@@ -1610,6 +1611,7 @@ const pedidosListQueryLog: PedidosListQueryLog = { ignoredFields: logIgnoredList
 const orderRepository: OrderRepository = {
   findAliveById: findAliveOrderById,
   findAliveLines: findAliveOrderLines,
+  findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 };

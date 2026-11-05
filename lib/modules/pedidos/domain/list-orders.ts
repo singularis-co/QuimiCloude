@@ -15,7 +15,7 @@ import type { OrderScope } from './order-scope';
 
 import type { ListFilterValue, ListQuery } from './list-query';
 import type { OrderCatalog } from './order-catalog';
-import type { OrderSummary } from './order-view';
+import type { OrderLineRow, OrderSummary } from './order-view';
 import type { Page } from './page';
 
 import type { CustomerCatalog } from '@/lib/modules/clientes';
@@ -29,6 +29,7 @@ import {
   orderAndPresentationUnitIds,
   orderPackagingIds,
   orderPresentationIds,
+  orderRecipeIds,
   toPresentationDisplays,
   unitLabelOf,
 } from './get-order';
@@ -190,9 +191,24 @@ export function createListOrders(
 
     const page = await deps.orders.listAlive(podada.query, searchRecipeIds, scope);
 
+    // Las lineas de toda la pagina en una sola llamada.
+    const lines =
+      page.items.length === 0
+        ? []
+        : await deps.orders.findAliveLinesByOrderIds(
+            page.items.map((row) => row.id),
+            scope,
+          );
+    const linesByOrder = new Map<string, OrderLineRow[]>();
+    for (const line of lines) {
+      const list = linesByOrder.get(line.orderId) ?? [];
+      list.push(line);
+      linesByOrder.set(line.orderId, list);
+    }
+
     // R45: los ids se DEDUPLICAN antes de preguntar. Diez pedidos de la misma receta son UNA
     // sola entrada, y el numero de consultas no crece con el numero de filas.
-    const recipeIds = [...new Set(page.items.map((row) => row.recipeId))];
+    const recipeIds = orderRecipeIds(page.items, lines);
 
     // R44: `findRefsIncludingDeleted` -y no una consulta de solo vivas- porque un pedido
     // conserva su receta aunque la den de baja y la fila tiene que seguir diciendo que se
@@ -202,19 +218,23 @@ export function createListOrders(
     const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 
     // Las presentaciones de TODAS las lineas de la pagina, deduplicadas: una sola llamada.
-    const presentationIds = orderPresentationIds(page.items);
+    const presentationIds = orderPresentationIds([...page.items, ...lines]);
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
 
     // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS: los de los pedidos
     // y los de sus presentaciones (la etiqueta del contenido de cada linea).
-    const unitIds = orderAndPresentationUnitIds(page.items, presentations);
+    const unitIds = orderAndPresentationUnitIds([...page.items, ...lines], presentations);
     const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
     const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
     const presentationDisplays = toPresentationDisplays(presentations, unitLabels);
 
     // Los envases de la pagina, deduplicados: una sola llamada.
-    const packagingNames = await findPackagingNames(deps.packaging, orderPackagingIds(page.items), actor.companyId);
+    const packagingNames = await findPackagingNames(
+      deps.packaging,
+      orderPackagingIds([...page.items, ...lines]),
+      actor.companyId,
+    );
 
     const orderCustomers = await findOrderCustomers(deps.customerCatalog, page.items, actor.companyId);
 
@@ -229,7 +249,7 @@ export function createListOrders(
 
     return {
       items: page.items.map((row) => ({
-        ...toOrderView(row, recipesById, presentationDisplays, unitLabels, packagingNames, orderCustomers),
+        ...toOrderView(row, linesByOrder.get(row.id) ?? [], recipesById, presentationDisplays, unitLabels, packagingNames, orderCustomers),
         pendingDelivery: deliveryStateOf(progressById.get(row.id), row.status, presentationDisplays),
       })),
       total: page.total,

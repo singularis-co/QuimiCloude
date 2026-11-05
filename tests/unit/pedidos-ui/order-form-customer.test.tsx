@@ -21,6 +21,7 @@ import type {
 import type { RecipeDetail } from '@/lib/modules/recetas';
 import type { UnitView } from '@/lib/modules/unidades';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { createOrderActionMock, updateOrderActionMock, searchCustomersMock, prohibida } = vi.hoisted(() => ({
   createOrderActionMock: vi.fn<(prev: CreateOrderFormState, data: FormData) => Promise<CreateOrderFormState>>(),
@@ -118,6 +119,7 @@ const CLIENTE: OrderCustomer = { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601', nam
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: crypto.randomUUID(),
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

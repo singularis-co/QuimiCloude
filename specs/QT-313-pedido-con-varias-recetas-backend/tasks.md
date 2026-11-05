@@ -157,7 +157,7 @@
   líneas bloqueadas, entra material para una; la que pasa a `PENDIENTE`
   estrena plazo) y R51 (dos líneas `PENDIENTE` con plazos distintos: el proceso cancela solo la
   vencida y libera solo su material; el pedido queda `PARCIAL`). Depende de T8, T7.
-- [ ] **T13 — Lecturas.** `get-order.ts`, `list-orders.ts`, `order-view.ts`, `order-queryable.ts`,
+- [x] **T13 — Lecturas.** `get-order.ts`, `list-orders.ts`, `order-view.ts`, `order-queryable.ts`,
   `list-order-summaries.ts`, `list-query-sql.ts`, `order-catalog-prisma.ts`: `OrderView.lines`,
   totales y `progress` (design § 4.3); filtro por estado de `orderFilterWhere` en
   `order-prisma.ts` con el `OR` de design § 2.2.1, en su propio término del `AND`.
@@ -535,3 +535,40 @@ Tocados en la fase 4 (T11, T12) por cancelar, dar de baja, entregar, anular, cad
 - `tests/unit/pedidos/schema/pedidos-schema.test.ts`
 - `tests/unit/pedidos/void-delivery.test.ts`
 - `tests/unit/pedidos/void-direct-delivery.test.ts`
+
+Tocados en la fase 4 (T13) por las lecturas con lineas (los fixtures de la pantalla ganan los campos nuevos de `OrderView` vacios; el puerto de lectura gana `findAliveLinesByOrderIds`):
+
+- `tests/helpers/order-view-lines.ts`
+- `tests/unit/paridad/campos-paridad.test.tsx`
+- `tests/unit/paridad/confirmaciones-paridad.test.tsx`
+- `tests/unit/paridad/formularios-paridad.test.tsx`
+- `tests/unit/paridad/pedidos-paridad.test.tsx`
+- `tests/unit/pedidos/get-order.test.ts`
+- `tests/unit/pedidos/list-orders.test.ts`
+- `tests/unit/pedidos/list-orders-customer.test.ts`
+- `tests/unit/pedidos/order-customer-filter-where.test.ts`
+- `tests/unit/pedidos/order-view-lines.test.ts`
+- `tests/unit/pedidos-ui/cancel-order-dialog.test.tsx`
+- `tests/unit/pedidos-ui/delete-order-dialog.test.tsx`
+- `tests/unit/pedidos-ui/order-cards.test.tsx`
+- `tests/unit/pedidos-ui/order-columns.test.tsx`
+- `tests/unit/pedidos-ui/order-customer-dialog.test.tsx`
+- `tests/unit/pedidos-ui/order-delivery-sheet.test.tsx`
+- `tests/unit/pedidos-ui/order-distribution-dialog.test.tsx`
+- `tests/unit/pedidos-ui/order-form.test.tsx`
+- `tests/unit/pedidos-ui/order-form-customer.test.tsx`
+- `tests/unit/pedidos-ui/order-form-leftover.test.tsx`
+- `tests/unit/pedidos-ui/order-form-quote.test.tsx`
+- `tests/unit/pedidos-ui/order-form-sale-price.test.tsx`
+- `tests/unit/pedidos-ui/order-list-section.test.tsx`
+- `tests/unit/pedidos-ui/order-list-section-produced.test.tsx`
+- `tests/unit/pedidos-ui/order-row-wiring.test.tsx`
+- `tests/unit/pedidos-ui/order-sheet.test.tsx`
+- `tests/unit/pedidos-ui/order-sheet-coverage.test.tsx`
+- `tests/unit/pedidos-ui/order-sheet-responsibles.test.tsx`
+- `tests/unit/pedidos-ui/order-table.test.tsx`
+- `tests/unit/pedidos-ui/pedidos-page-header.test.tsx`
+- `tests/unit/pedidos-ui/pedidos-toasts.test.tsx`
+- `tests/unit/pedidos-ui/pedidos-viewport.test.tsx`
+- `tests/unit/pedidos-ui/read-only.test.tsx`
+- `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`

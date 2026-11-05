@@ -98,6 +98,7 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { clickRowAction } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 /** Lo que devuelve cualquier Server Action de baja de estas pantallas. */
 type EstadoDeBaja = { status: 'idle' } | { status: 'success' } | ErrorState;
@@ -530,6 +531,7 @@ describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
   const RECETAS: RecipePickerPage = { items: [], totalPages: 1 };
 
   const PEDIDO: OrderSummary = {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

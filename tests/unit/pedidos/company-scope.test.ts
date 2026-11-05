@@ -177,6 +177,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
   it('la vista del pedido (`toOrderView`) no la lleva', () => {
     const vista = toOrderView(
       filaConEmpresa(),
+      [],
       new Map([
         [
           RECETA,
@@ -191,6 +192,8 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
   it('la ficha, el resumen de la lista y el alta no la llevan, aunque el puerto la devolviera', async () => {
     const orders = {
       findAliveById: vi.fn(async () => filaConEmpresa()),
+      findAliveLines: vi.fn(async () => []),
+      findAliveLinesByOrderIds: vi.fn(async () => []),
       listAlive: vi.fn(async () => ({
         items: [filaConEmpresa()],
         total: 1,

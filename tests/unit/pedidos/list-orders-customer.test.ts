@@ -92,7 +92,7 @@ function dobles(filas: readonly OrderRow[] = [], idsQueCasan: readonly string[] 
   })
   const ignoredFields = vi.fn<ListQueryLog['ignoredFields']>()
   const deps: ListOrdersDeps = {
-    orders: { listAlive, findAliveById: vi.fn() } as unknown as OrderRepository,
+    orders: { listAlive, findAliveById: vi.fn(), findAliveLinesByOrderIds: vi.fn(async () => []) } as unknown as OrderRepository,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
     presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),

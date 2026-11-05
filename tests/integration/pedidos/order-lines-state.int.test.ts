@@ -31,6 +31,7 @@ import {
   createOrderWriteRepository,
   findAliveOrderById,
   findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   findExpirableOrders,
   listAliveOrders,
@@ -70,7 +71,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
-  findAliveLines: findAliveOrderLines,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 };

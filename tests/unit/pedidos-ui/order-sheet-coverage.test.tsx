@@ -21,6 +21,7 @@ import { ORDER_COVERAGE_TONES } from '@/lib/shared/ui/order-status';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
@@ -117,6 +118,7 @@ const PARAMS: DataTableParams = {
 
 function pedido(): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

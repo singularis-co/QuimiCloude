@@ -275,3 +275,50 @@ Desviaciones (para el reviewer; la 1 es para el leader):
 12. Dos regex ampliadas:
     - `authorization.test.ts` admite `deps.unitOfWork`;
     - la guardia `guard-ambito-empresa-pedidos.test.ts` comprueba `lockAliveLines`/`refreshStatus`.
+
+## Fase 4 — T13 Lecturas (2026-11-04)
+
+Produccion:
+- `pedidos/domain/order-view.ts`: tipo `OrderLineView`. `OrderView` añade `lines`, `progress`, `salePriceTotal`, `linesWithoutPrice`, `ingredientsCostTotal` y `actualCostTotal`, y conserva los campos planos.
+- `pedidos/domain/get-order.ts`: `toOrderView` recibe las lineas; nuevas `toOrderLineView`, `orderRecipeIds` y `toPresentationLineViews`.
+- `pedidos/domain/list-orders.ts`: hace una sola lectura de lineas por pagina.
+- `pedidos/ports/order-repository.ts`: añade `findAliveLinesByOrderIds`.
+- `order-prisma.ts`: añade `findAliveOrderLinesByOrderIds`, y `orderStatusFilterWhere` aplica el `OR` de design § 2.2.1 en su propio termino del `AND`.
+- `pedidos/index.ts` y `lib/composition/index.ts`.
+- Sin cambios: `order-queryable.ts`, `list-query-sql.ts`, `list-order-summaries.ts` y `order-catalog-prisma.ts` (vease la desviacion 5).
+
+Tests:
+- Nuevos: `tests/unit/pedidos/order-view-lines.test.ts`, un bloque «QT-313: filtro y orden por estado» en `tests/integration/pedidos/list-query-orders.int.test.ts` y el helper `tests/helpers/order-view-lines.ts`.
+- Ajustados: 8 unit de `pedidos`, 18 `.int` de `pedidos` (llevan el metodo nuevo del puerto) y 29 tests de pantalla, estos solo en su fixture. El bloque «T13» de `tasks.md > Archivos esperados` lista las rutas.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R6 | `order-view-lines.test.ts` › «R6: devuelve las lineas por position aunque lleguen desordenadas…», «R6, R33, R34: lee las lineas de toda la pagina en una sola llamada…»; `list-query-orders.int` › «QT-313 R6, R43: las lineas de varios pedidos salen por position y nunca las de otra empresa» |
+| R16 | `order-view-lines.test.ts` › «R16: el precio total suma las lineas activas con precio…», «R16: sin ninguna linea activa con precio el total es null…», «R16, R18: cada fila del listado lleva sus totales…» |
+| R18 | `order-view-lines.test.ts` › «R18: los costes totales suman las lineas activas exactas…», «R18: si una linea activa no tiene coste, el total es null» |
+| R33 | `order-view-lines.test.ts` › «R33: el avance cuenta las lineas activas…» y «R6, R33, R34» |
+| R34 | `order-view-lines.test.ts` › «R34: el pedido sale con su estado derivado PARCIAL y cada linea con el suyo» |
+| R44 (lectura) | `order-view-lines.test.ts` › «R44: un pedido de una linea conserva los campos planos de hoy junto a la linea» |
+| R49 | `list-query-orders.int` › «QT-313 R49: EN_CURSO trae…», «…PARCIAL trae solo los pedidos PARCIAL», «…EN_CURSO y PENDIENTE a la vez… total coincide», «…CANCELADO no trae un PARCIAL…», «…nunca trae pedidos de otra empresa…»; `order-customer-filter-where.test.ts` › «QT-313 R49: el estado va en su propio termino del AND…» |
+| R52 | `list-query-orders.int` › «QT-313 R52: ordenar por estado ascendente pone los PARCIAL antes que los PENDIENTE, y descendente los deja al final» |
+
+Verificacion (salida real, backend_dev):
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores.
+- Guardias: `Test Files 87 passed (87)`, `Tests 1335 passed | 22 skipped`.
+- node: la primera corrida dio 3 archivos y 9 tests en rojo, de dobles con la forma vieja. Ajustados: `Test Files 179 passed (179)`, `Tests 4200 passed | 1 skipped`.
+- ui: `Test Files 338 passed (338)`, `Tests 5613 passed | 1 skipped`.
+- Integracion con `--maxWorkers=1`:
+  - `list-query-orders.int`: 29/29. El primer rojo venia de una siembra que coincidia en fecha con otro caso; se corrigio.
+  - Los 18 `.int` ajustados: 9/102 y 9/93.
+  - El resto de `pedidos`: 24/261 y 24/213.
+  - 42 `.int` de otros modulos: 514 tests en verde, 1 skipped.
+
+Desviaciones (para el reviewer):
+1. **Fixtures de pantalla.** `OrderView` gano campos obligatorios (design § 4.3), y los 29 tests de pantalla que montan su `OrderSummary` a mano dejaron de compilar. A cada fixture se le añadio `...VISTA_SIN_LINEAS`; ninguna asercion cambia. La alternativa, campos opcionales, se apartaria del design.
+2. **Metodo nuevo del puerto `findAliveLinesByOrderIds`**, para que el listado no haga una consulta por fila.
+3. **Pedido sin lineas:** los costes totales valen `'0.0000'` y el precio `null`, la misma regla que el humano acepto en T4.
+4. **Brazo de lineas del filtro:** quita `PARCIAL` y `CANCELADO` de la lista y usa `in`. El resultado es el mismo que con el design.
+5. **Lo que T13 no toca:** `order-queryable` no cambia (design § 2.2.1). Los resumenes y el catalogo son de `asignaciones` (T14a/T14d). `deliveryStateOf` sigue tratando `PARCIAL` como `not_packed`, y la busqueda por nombre sigue mirando la receta copiada en `orders`; las dos quedan para T14c/T15.
+6. `OrderLineView` no lleva `unitLabel`, como dice design § 4.3.

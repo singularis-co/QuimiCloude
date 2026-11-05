@@ -74,11 +74,34 @@ describe('buildOrderWhere: el `OR` del cliente queda dentro de su propio termino
 
   it('R24: un solo termino de cliente, y los demas filtros siguen en el suyo', () => {
     const terminos = where.AND as readonly Record<string, unknown>[]
-    const deCliente = terminos.filter((t) => 'OR' in t || 'customerId' in t)
+    const deCliente = terminos.filter((t) => JSON.stringify(t).includes('customerId'))
     expect(deCliente).toEqual([
       { OR: [{ customerId: { in: [CLIENTE_1] } }, { customerId: null }] },
     ])
-    expect(terminos).toContainEqual({ status: { in: ['PENDIENTE'] } })
+    expect(terminos).toContainEqual({
+      OR: [
+        { status: { in: ['PENDIENTE'] } },
+        { status: 'PARCIAL', lines: { some: { deletedAt: null, status: { in: ['PENDIENTE'] } } } },
+      ],
+    })
+  })
+
+  it('QT-313 R49: el estado va en su propio termino del `AND`; PARCIAL y CANCELADO no se buscan en las lineas', () => {
+    const conEstados = (values: readonly string[]) =>
+      buildOrderWhere(
+        consulta({ status: { kind: 'select', values: [...values] } }),
+        null,
+        { companyId: EMPRESA },
+      ).AND as readonly Record<string, unknown>[]
+
+    expect(conEstados(['PARCIAL'])).toContainEqual({ status: { in: ['PARCIAL'] } })
+    expect(conEstados(['CANCELADO'])).toContainEqual({ status: { in: ['CANCELADO'] } })
+    expect(conEstados(['PARCIAL', 'CANCELADO', 'EN_CURSO'])).toContainEqual({
+      OR: [
+        { status: { in: ['PARCIAL', 'CANCELADO', 'EN_CURSO'] } },
+        { status: 'PARCIAL', lines: { some: { deletedAt: null, status: { in: ['EN_CURSO'] } } } },
+      ],
+    })
   })
 
   it('R23: sin filtros de cliente, el `where` no lleva ningun termino de cliente', () => {

@@ -139,6 +139,7 @@ function dobles(opciones: {
     create: explota('orders.create'),
     findAliveById: explota('orders.findAliveById'),
     listAlive,
+    findAliveLinesByOrderIds: vi.fn(async () => []),
     updateAlive: explota('orders.updateAlive'),
     cancelAlive: explota('orders.cancelAlive'),
     softDeleteAlive: explota('orders.softDeleteAlive'),

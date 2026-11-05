@@ -27,6 +27,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { arbolAccesible, arbolAccesibleDe } from './arbol-accesible';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 /**
  * Paridad de los dialogos de confirmacion de `design.md > 2.2`, congelada contra el codigo de hoy
@@ -280,6 +281,7 @@ const LINEA: CatalogLineView = {
 };
 
 const PEDIDO: OrderSummary = {
+  ...VISTA_SIN_LINEAS,
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   number: { year: 2026, sequence: 42 },
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

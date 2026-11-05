@@ -43,6 +43,7 @@ import {
   type OrderStatus,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -71,6 +72,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 
 function pedido(status: OrderStatus, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

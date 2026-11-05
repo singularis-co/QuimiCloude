@@ -168,7 +168,13 @@ function almacen() {
     const guardado = visible(id, scope)
     return guardado === null ? [] : [lineaDe(guardado)]
   })
-  const orders = { findAliveById, findAliveLines, listAlive }
+  const findAliveLinesByOrderIds = vi.fn(async (ids: readonly string[], scope: OrderScope) =>
+    ids.flatMap((id) => {
+      const guardado = visible(id, scope)
+      return guardado === null ? [] : [lineaDe(guardado)]
+    }),
+  )
+  const orders = { findAliveById, findAliveLines, findAliveLinesByOrderIds, listAlive }
 
   // Escritura (`OrderWriteRepository`): solo dentro de `unitOfWork.run`.
   const lockAliveById = vi.fn(async (id: string, scope: OrderScope) => {
