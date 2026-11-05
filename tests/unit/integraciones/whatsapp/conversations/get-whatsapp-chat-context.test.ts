@@ -70,7 +70,7 @@ function storedOrder(n: number, overrides: Partial<StoredOrder> = {}): StoredOrd
     customerId: CUSTOMER_ID,
     number: { year: 2026, sequence: 100 + n },
     status: 'EN_CURSO',
-    recipeId: RECIPE_ID,
+    recipeIds: [RECIPE_ID],
     createdAt: new Date(Date.UTC(2026, 9, 10 + n, 15, 0)),
     ...overrides,
   }
@@ -101,7 +101,7 @@ function makeOrderDirectory(orders: readonly StoredOrder[]) {
         )
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
         .slice(0, limit)
-        .map((row) => ({ id: row.id, number: row.number, status: row.status, recipeId: row.recipeId, createdAt: row.createdAt })),
+        .map((row) => ({ id: row.id, number: row.number, status: row.status, recipeIds: row.recipeIds, createdAt: row.createdAt })),
   )
   return { customerOrders: { listAliveOfCustomer }, listAliveOfCustomer }
 }
@@ -160,7 +160,7 @@ function setup(
   const directory = makeOrderDirectory(orders)
   const delivery = makeDeliveryProgress(
     options.progress ?? { [orderId(1)]: [progressLine({ deliveredPackages: 6 })] },
-    (id) => orders.find((row) => row.id === id)?.recipeId ?? RECIPE_ID,
+    (id) => orders.find((row) => row.id === id)?.recipeIds[0] ?? RECIPE_ID,
   )
   const presentations = makePresentations({ [BIDON]: 'Bidón 20 L', [GARRAFA]: 'Garrafa 5 L' })
   const recipes = makeRecipes({ [RECIPE_ID]: 'Cloro · Concentrado', [OTHER_RECIPE_ID]: 'Jabón líquido' })
@@ -315,7 +315,7 @@ describe('getWhatsappChatContext', () => {
       const unknownPresentation = '44444444-4444-4444-8444-444444444444'
       const unknownRecipe = '0a1b2c3d-4e5f-4a6b-8c7d-000000000000'
       const ctx = setup({
-        orders: [storedOrder(1), storedOrder(2, { recipeId: unknownRecipe })],
+        orders: [storedOrder(1), storedOrder(2, { recipeIds: [unknownRecipe] })],
         progress: { [orderId(2)]: [progressLine({ presentationId: unknownPresentation })] },
       })
 
@@ -364,7 +364,7 @@ describe('getWhatsappChatContext', () => {
 
     it('R54: tres lecturas por lote para todos los pedidos, ninguna por pedido', async () => {
       const ctx = setup({
-        orders: [storedOrder(1), storedOrder(2, { recipeId: OTHER_RECIPE_ID }), storedOrder(3)],
+        orders: [storedOrder(1), storedOrder(2, { recipeIds: [OTHER_RECIPE_ID] }), storedOrder(3)],
         progress: {
           [orderId(1)]: [progressLine({ presentationId: BIDON })],
           [orderId(2)]: [progressLine({ presentationId: BIDON }), progressLine({ presentationId: GARRAFA })],

@@ -338,6 +338,64 @@ describe('los estados de acondicionamiento son finales y no admiten la edicion d
   );
 });
 
+// QT-313 T14c: hasta QT-314 la pantalla trata `PARCIAL` como un estado final (design § 7).
+describe('un pedido PARCIAL en la pantalla actual (QT-313)', () => {
+  it('R54: editar, cancelar y eliminar deshabilitados, sin reparto, entrega ni entregas, con «Responsables» y «Cliente» disponibles', async () => {
+    const enganches = enganchesQueFallan();
+    const onResponsibles = vi.fn();
+    const onCustomer = vi.fn();
+    const noDebeAbrirse = (que: string) =>
+      vi.fn(() => {
+        throw new Error(`no se debe abrir ${que} de un pedido PARCIAL`);
+      });
+    render(
+      <OrderRowActions
+        order={pedido('PARCIAL')}
+        {...enganches}
+        onResponsibles={onResponsibles}
+        onCustomer={onCustomer}
+        canEditCustomer
+        canEditDistribution
+        canDeliver
+        onDistribution={noDebeAbrirse('el reparto')}
+        onDeliver={noDebeAbrirse('la entrega')}
+        onDeliveries={noDebeAbrirse('las entregas')}
+      />,
+    );
+
+    abrirMenu();
+    for (const testId of CONTROLES) {
+      expect(await screen.findByTestId(testId)).toHaveAttribute('aria-disabled', 'true');
+    }
+    for (const testId of CONTROLES) {
+      fireEvent.click(screen.getByTestId(testId));
+    }
+    expect(enganches.onEdit).not.toHaveBeenCalled();
+    expect(enganches.onCancel).not.toHaveBeenCalled();
+    expect(enganches.onDelete).not.toHaveBeenCalled();
+
+    expect(screen.queryByTestId(ORDER_ACTION_DISTRIBUTION_TESTID)).toBeNull();
+    expect(screen.queryByTestId(ORDER_ACTION_DELIVER_TESTID)).toBeNull();
+    expect(screen.queryByTestId('order-action-deliveries')).toBeNull();
+
+    const responsables = screen.getByTestId(RESPONSABLES_TESTID);
+    expect(responsables).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(responsables);
+    expect(onResponsibles).toHaveBeenCalledExactlyOnceWith(pedido('PARCIAL'));
+
+    abrirMenu();
+    const cliente = await screen.findByTestId(ORDER_ACTION_CUSTOMER_TESTID);
+    expect(cliente).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(cliente);
+    expect(onCustomer).toHaveBeenCalledExactlyOnceWith(pedido('PARCIAL'));
+  });
+
+  it('R54: PARCIAL es final y no acepta la edicion acotada de reparto', () => {
+    expect(isFinalOrderStatus('PARCIAL')).toBe(true);
+    expect(acceptsDistributionEdit('PARCIAL')).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------------------------
 // QC-102 T13 — La CUARTA accion del menu, «Responsables»: R24.
 //

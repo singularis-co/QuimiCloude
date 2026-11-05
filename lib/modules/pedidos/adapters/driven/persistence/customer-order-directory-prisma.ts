@@ -10,6 +10,11 @@ import { orderCompanyScope } from './company-scope';
 
 type OrderClient = Pick<typeof prisma, 'order'>;
 
+function recipeIdsOf(lines: readonly { readonly recipeId: string; readonly status: OrderStatus }[]): string[] {
+  const active = lines.filter((line) => line.status !== 'CANCELADO');
+  return (active.length === 0 ? lines : active).map((line) => line.recipeId);
+}
+
 /** Archivo propio, y no un metodo mas de `order-catalog-prisma.ts`, para que los cambios de un
  *  servicio no toquen el archivo del otro. Solo lectura. */
 export function createCustomerOrderDirectory(db: OrderClient = prisma): CustomerOrderDirectory {
@@ -36,8 +41,12 @@ export function createCustomerOrderDirectory(db: OrderClient = prisma): Customer
           orderYear: true,
           orderSequence: true,
           status: true,
-          recipeId: true,
           createdAt: true,
+          lines: {
+            where: { deletedAt: null },
+            orderBy: { position: 'asc' },
+            select: { recipeId: true, status: true },
+          },
         },
       });
 
@@ -45,7 +54,7 @@ export function createCustomerOrderDirectory(db: OrderClient = prisma): Customer
         id: row.id,
         number: { year: row.orderYear, sequence: row.orderSequence },
         status: row.status,
-        recipeId: row.recipeId,
+        recipeIds: recipeIdsOf(row.lines),
         createdAt: row.createdAt,
       }));
     },

@@ -88,6 +88,8 @@ type Fixture = {
   readonly recipeIds: string[];
   readonly presentationIds: string[];
   readonly orderIds: string[];
+  /** La linea de cada pedido sembrado, por pedido: los lotes cuelgan de ella. */
+  readonly lineOf: Map<string, string>;
 };
 
 async function sembrarFixture(): Promise<Fixture> {
@@ -98,7 +100,7 @@ async function sembrarFixture(): Promise<Fixture> {
     data: { name: `unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca}` },
     select: { id: true },
   });
-  return { empresa, scope: { companyId: empresa.companyId }, unitId: unit.id, recipeIds: [], presentationIds: [], orderIds: [] };
+  return { empresa, scope: { companyId: empresa.companyId }, unitId: unit.id, recipeIds: [], presentationIds: [], orderIds: [], lineOf: new Map() };
 }
 
 type Receta = { readonly id: string; readonly name: string };
@@ -141,6 +143,22 @@ async function sembrarPedido(fixture: Fixture, receta: Receta, year: number, seq
     select: { id: true },
   });
   fixture.orderIds.push(id);
+  fixture.lineOf.set(id, await sembrarLinea(fixture, id, receta, 0));
+  return id;
+}
+
+async function sembrarLinea(fixture: Fixture, orderId: string, receta: Receta, position: number): Promise<string> {
+  const { id } = await prisma.orderLine.create({
+    data: {
+      orderId,
+      companyId: fixture.empresa.companyId,
+      position,
+      recipeId: receta.id,
+      originalRecipeId: receta.id,
+      quantity: '10',
+    },
+    select: { id: true },
+  });
   return id;
 }
 
@@ -150,9 +168,17 @@ async function recibir(
   orderId: string,
   presentationId: string,
   packages: number,
+  orderLineId: string | undefined = fixture.lineOf.get(orderId),
 ): Promise<{ readonly productId: string; readonly batchId: string }> {
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: fixture.empresa.companyId, presentationId, packages, presentationContent: null },
+    data: {
+      orderId,
+      orderLineId: orderLineId ?? null,
+      companyId: fixture.empresa.companyId,
+      presentationId,
+      packages,
+      presentationContent: null,
+    },
     select: { id: true },
   });
   const outcome = await prisma.$transaction((tx) =>
@@ -209,6 +235,7 @@ async function limpiar(fixture: Fixture): Promise<void> {
   await prisma.productBatch.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.product.deleteMany({ where: { id: { in: productIds } } });
   await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: fixture.orderIds } } });
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: fixture.orderIds } } });
   await prisma.order.deleteMany({ where: { id: { in: fixture.orderIds } } });
   await prisma.recipe.deleteMany({ where: { id: { in: fixture.recipeIds } } });
   await prisma.presentation.deleteMany({ where: { id: { in: fixture.presentationIds } } });
@@ -426,6 +453,48 @@ describe('listStockGroups: la pestana de producto terminado por pedido', () => {
     } finally {
       await limpiar(fixture);
       await limpiar(ajena);
+    }
+  });
+  it('QT-313 R45: con una linea, la fila sale y se busca por la receta de la linea aunque orders.recipe_id diga otra', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const receta = await sembrarReceta(fixture, `Limpiador ${token()}`);
+      const ajena = await sembrarReceta(fixture, `Ajena ${token()}`);
+      const pedido = await sembrarPedido(fixture, receta, 2026, 1);
+      await recibir(fixture, receta, pedido, await sembrarPresentacion(fixture, 'Botella 500 ml', '0.5'), 2);
+      const hoy = await listStockGroups(consulta(), fixture.scope);
+      await prisma.order.update({ where: { id: pedido }, data: { recipeId: ajena.id } });
+
+      const page = await listStockGroups(consulta(), fixture.scope);
+
+      expect(page).toEqual(hoy);
+      expect(page.items[0]?.kind === 'order' ? page.items[0].recipeName : undefined).toBe(receta.name);
+      expect(claves((await listStockGroups(consulta({ search: receta.name }), fixture.scope)).items)).toEqual([`order:${pedido}`]);
+      expect((await listStockGroups(consulta({ search: ajena.name }), fixture.scope)).total).toBe(0);
+    } finally {
+      await limpiar(fixture);
+    }
+  });
+
+  it('QT-313 R45: un pedido de dos lineas es una fila con los lotes de las dos y la receta de la primera linea', async () => {
+    const fixture = await sembrarFixture();
+    try {
+      const primera = await sembrarReceta(fixture, `Limpiador ${token()}`);
+      const segunda = await sembrarReceta(fixture, `Jabon ${token()}`);
+      const pedido = await sembrarPedido(fixture, primera, 2026, 1);
+      const lineaDos = await sembrarLinea(fixture, pedido, segunda, 1);
+      await recibir(fixture, segunda, pedido, await sembrarPresentacion(fixture, 'Garrafa 1 L', '1'), 2, lineaDos);
+      await recibir(fixture, primera, pedido, await sembrarPresentacion(fixture, 'Botella 500 ml', '0.5'), 2);
+
+      const page = await listStockGroups(consulta(), fixture.scope);
+
+      expect(page.total).toBe(1);
+      const [fila] = page.items;
+      if (fila?.kind !== 'order') throw new Error('esperaba una fila de pedido');
+      expect(fila.recipeName).toBe(primera.name);
+      expect(fila.batches.map((lote) => lote.stock)).toEqual(['2.0000', '1.0000']);
+    } finally {
+      await limpiar(fixture);
     }
   });
 });

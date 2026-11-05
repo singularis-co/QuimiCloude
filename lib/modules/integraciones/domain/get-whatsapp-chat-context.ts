@@ -57,7 +57,7 @@ async function customerOrdersOf(
   );
   const progressById = new Map<string, OrderDeliveryProgress>(progress.map((entry) => [entry.id, entry]));
   const presentationIds = unique(progress.flatMap((entry) => entry.lines.map((line) => line.presentationId)));
-  const recipeIds = unique(summaries.map((summary) => summary.recipeId));
+  const recipeIds = unique(summaries.flatMap((summary) => summary.recipeIds));
   const [presentations, recipes] = await Promise.all([
     deps.presentations.findRefs(presentationIds, companyId),
     deps.recipes.findRefsIncludingDeleted(recipeIds, companyId),

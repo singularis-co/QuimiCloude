@@ -322,3 +322,40 @@ Desviaciones (para el reviewer):
 4. **Brazo de lineas del filtro:** quita `PARCIAL` y `CANCELADO` de la lista y usa `in`. El resultado es el mismo que con el design.
 5. **Lo que T13 no toca:** `order-queryable` no cambia (design § 2.2.1). Los resumenes y el catalogo son de `asignaciones` (T14a/T14d). `deliveryStateOf` sigue tratando `PARCIAL` como `not_packed`, y la busqueda por nombre sigue mirando la receta copiada en `orders`; las dos quedan para T14c/T15.
 6. `OrderLineView` no lleva `unitLabel`, como dice design § 4.3.
+
+## Fase 5 — T14b Otros lectores y T14c Puente (2026-11-05, enmienda c69dd4f5e)
+
+T14b, produccion:
+- `integraciones/domain/{get-whatsapp-chat-context,whatsapp-chat-context}.ts`
+- `inventario/adapters/driven/persistence/finished-stock-prisma.ts`
+- `pedidos/adapters/driven/persistence/{customer-order-directory-prisma,direct-delivery-prisma,packed-lines-directory-prisma}.ts`
+- `pedidos/domain/{customer-order-directory,get-order-delivery}.ts`
+- `pedidos/ports/direct-delivery-repository.ts`
+
+Todos dejan de leer de `orders` la receta, la cantidad, la unidad, el precio y los costes, y los toman de la linea.
+
+T14b, tests: `.int` de `finished-stock`, `customer-order-directory`, `direct-delivery`, `direct-delivery-repository`, `order-delivery`, `packed-lines-directory` y `whatsapp-chat-context-flow`, mas los unit de `get-whatsapp-chat-context`, `whatsapp-chat-context` y `get-order-delivery`, todos con casos `R45`.
+
+T14c (enmienda c69dd4f5e): los esquemas no se renombran ni se borran; eso pasa a QT-314. El puente y R44 quedaron hechos en T9/T10/T13; esta task solo añade el test de R54.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R44 | `order-actions.test.ts` › «R44: el alta envia una linea…», «R44: …dos lineas responde invalid_input»; `order-view-lines.test.ts` › «R44: un pedido de una linea conserva los campos planos de hoy junto a la linea» |
+| R45 (lectores) | los `.int` de T14b listados arriba: con un pedido de una linea, cada lector da lo mismo que hoy |
+| R54 | `tests/unit/pedidos-ui/order-row-actions.test.tsx` › «R54: editar, cancelar y eliminar deshabilitados, sin reparto, entrega ni entregas, con «Responsables» y «Cliente» disponibles», «R54: PARCIAL es final y no acepta la edicion acotada de reparto» |
+
+Verificacion (salida real):
+- backend_dev T14b: typecheck y lint en verde, guardias en verde, `related --project node` → 167/167, y los `.int` tocados en verde.
+- backend_dev T14c: `order-row-actions.test.tsx` → 219/219; eslint limpio; typecheck en verde.
+- implementer:
+  - Los ui que dieron rojo por plazo en la corrida del backend_dev, repetidos solos con `--maxWorkers=1` (`configuracion-ui/user-form` y `recetas-ui/`): `Test Files 33 passed (33)`, `Tests 666 passed (666)`. Era la maquina, no el codigo.
+  - `.int` de entregas repetidos tras el ultimo cambio de `get-order-delivery.ts` (`order-delivery`, `direct-delivery`, `direct-delivery-repository`, `order-delivery-repository`, `order-lines-delivery`), con `--maxWorkers=1`: `Test Files 5 passed (5)`, `Tests 70 passed (70)`.
+  - **Pendiente:** `vitest related --project ui` de los 9 archivos de produccion de T14b. Claude Code lo corto dos veces por falta de memoria del sistema, una en la corrida del backend_dev y otra en la mia, y no se ha relanzado. Los 9 archivos son adaptadores y dominio sin UI. Lo cubren el `./init.sh` del leader o CI.
+
+Desviaciones aceptadas por el humano (2026-11-05), para el reviewer:
+1. `get-order-delivery.ts` estaba fuera de la lista; ahora esta en «Archivos esperados».
+2. La fila de producto terminado lleva la receta de la primera linea.
+3. En WhatsApp, `productName` une los nombres de las lineas con «, ».
+4. `recipeIds` en el directorio de pedidos del cliente.
+5. Las entregas sin pedido cuentan la linea `TERMINADO`.

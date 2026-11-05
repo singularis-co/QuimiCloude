@@ -5,7 +5,8 @@ export type CustomerOrderSummary = {
   readonly id: string;
   readonly number: OrderNumber;
   readonly status: OrderStatus;
-  readonly recipeId: string;
+  /** Las recetas de sus lineas vivas por `position`, sin las canceladas salvo que lo esten todas. */
+  readonly recipeIds: readonly string[];
   readonly createdAt: Date;
 };
 

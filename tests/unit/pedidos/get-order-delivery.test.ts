@@ -7,14 +7,14 @@ import { createGetOrderDelivery, type GetOrderDeliveryDeps } from '@/lib/modules
 import { ORDER_STATUS_VALUES } from '@/lib/modules/pedidos/domain/order-classification'
 import { formatOrderNumber } from '@/lib/modules/pedidos/domain/order-number'
 import { COMPLETE_LINE_ID, DELIVERY_CUSTOMER_ID, DELIVERY_ORDER_ID, PENDING_LINE_ID } from '@/tests/fixtures/order-delivery'
-import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { DeliverableBatch, PresentationRef } from '@/lib/modules/inventario'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { OrderLineRow, OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { FinishPackingLine } from '@/lib/modules/pedidos/ports/order-write-repository'
 
@@ -29,9 +29,9 @@ const OTHER_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 const ENTREGADOR: Actor = { id: 'u-entrega', companyId: EMPRESA, permissions: ['entregas.modificar'] }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
-  { id: OTHER_PENDING_LINE_ID, presentationId: OTHER_PRESENTATION, packages: 2, presentationContent: '2.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: ONLY_LINE_ID },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: ONLY_LINE_ID },
+  { id: OTHER_PENDING_LINE_ID, presentationId: OTHER_PRESENTATION, packages: 2, presentationContent: '2.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: ONLY_LINE_ID },
 ]
 
 const PRESENTACIONES: readonly PresentationRef[] = [
@@ -77,9 +77,11 @@ function montar(
     entregados?: ReadonlyMap<string, number>
     cliente?: CustomerRef | null
     lineas?: readonly FinishPackingLine[]
+    lineasDelPedido?: readonly OrderLineRow[]
   } = {},
 ) {
   const findAliveById = vi.fn(async () => (opciones.pedido === undefined ? pedido() : opciones.pedido))
+  const findAliveLines = vi.fn(async () => opciones.lineasDelPedido ?? [orderLineOf(pedido())])
   const sumDeliveredPackages = vi.fn(
     async () =>
       opciones.entregados ??
@@ -90,7 +92,9 @@ function montar(
   )
   const findPresentationLinesForFinish = vi.fn(async () => opciones.lineas ?? LINEAS)
   const findRefs = vi.fn(async () => PRESENTACIONES)
-  const findDeliverableBatches = vi.fn(async () => LOTES)
+  const findDeliverableBatches = vi.fn<(recipeId: string, ids: readonly string[], companyId: string) => Promise<readonly DeliverableBatch[]>>(
+    async () => LOTES,
+  )
   const findAliveRefById = vi.fn(async () => (opciones.cliente === undefined ? CLIENTE : opciones.cliente))
   const explota = (nombre: string) =>
     vi.fn(() => {
@@ -98,7 +102,12 @@ function montar(
     })
 
   const deps: GetOrderDeliveryDeps = {
-    orders: { findAliveById, listAlive: explota('listAlive'), findBlockedIds: explota('findBlockedIds') } as unknown as OrderRepository,
+    orders: {
+      findAliveById,
+      findAliveLines,
+      listAlive: explota('listAlive'),
+      findBlockedIds: explota('findBlockedIds'),
+    } as unknown as OrderRepository,
     deliveries: { sumDeliveredPackages },
     lines: { findPresentationLinesForFinish },
     presentations: { findRefs },
@@ -238,6 +247,57 @@ describe('getOrderDelivery — lineas y lotes (R6, R8)', () => {
   })
 })
 
+describe('QT-313 — getOrderDelivery lee la receta de la linea del pedido', () => {
+  const LINEA_A = 'c0000000-0000-4000-8000-00000000000a'
+  const LINEA_B = 'c0000000-0000-4000-8000-00000000000b'
+  const OTRA_RECETA = '22222222-2222-4222-8222-2222222222bb'
+
+  it('QT-313 R45: con una linea pide los lotes con la receta de la linea, no con la del pedido, y la vista es la de hoy', async () => {
+    const hoy = await createGetOrderDelivery(montar().deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+    const m = montar({
+      pedido: pedido({ recipeId: OTRA_RECETA }),
+      lineas: LINEAS.map((linea) => ({ ...linea, orderLineId: LINEA_A })),
+      lineasDelPedido: [orderLineOf(pedido(), { id: LINEA_A, recipeId: RECETA })],
+    })
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(m.findDeliverableBatches).toHaveBeenCalledTimes(1)
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(RECETA, [PENDING_PRESENTATION, OTHER_PRESENTATION], EMPRESA)
+    expect(vista).toEqual(hoy)
+  })
+
+  it('QT-313 R45: un reparto sin linea del pedido no pide lotes ni lee la receta del pedido', async () => {
+    const m = montar({ lineas: LINEAS.map((linea) => ({ ...linea, orderLineId: null })), lineasDelPedido: [] })
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(m.findDeliverableBatches).not.toHaveBeenCalled()
+    expect(vista.lines.map((linea) => linea.batches)).toEqual([[], [], []])
+    expect(vista.lines.map((linea) => linea.remainingPackages)).toEqual([0, 7, 2])
+  })
+
+  it('QT-313 R45: con dos lineas cada reparto pendiente lleva solo los lotes de la receta de su linea', async () => {
+    const m = montar({
+      lineas: [
+        { ...LINEAS[0]!, orderLineId: LINEA_A },
+        { ...LINEAS[1]!, orderLineId: LINEA_A },
+        { ...LINEAS[2]!, orderLineId: LINEA_B },
+      ],
+      lineasDelPedido: [
+        orderLineOf(pedido(), { id: LINEA_A, recipeId: RECETA }),
+        orderLineOf(pedido(), { id: LINEA_B, position: 1, recipeId: OTRA_RECETA }),
+      ],
+    })
+    m.findDeliverableBatches.mockImplementation(async (recipeId) =>
+      recipeId === RECETA ? [LOTES[0]!, LOTES[2]!] : [LOTES[1]!],
+    )
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(RECETA, [PENDING_PRESENTATION], EMPRESA)
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(OTRA_RECETA, [OTHER_PRESENTATION], EMPRESA)
+    expect(vista.lines.map((linea) => linea.batches)).toEqual([[], [LOTES[0], LOTES[2]], [LOTES[1]]])
+  })
+})
+
 describe('getOrderDelivery — cliente precargado (R9)', () => {
   it('R9: el cliente vivo del pedido viene precargado', async () => {
     const m = montar()
@@ -305,7 +365,7 @@ describe('QC-290 — getOrderDelivery espera solo lo pedido', () => {
       lineas: [
         { ...LINEAS[0]!, packedPackages: 6, packedSurplusPackages: 2 },
         { ...LINEAS[1]!, packedPackages: 12, packedSurplusPackages: 2 },
-        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0, orderLineId: null },
+        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0 },
       ],
     })
     const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
@@ -329,8 +389,8 @@ describe('QC-290 — getOrderDelivery espera solo lo pedido', () => {
     const m = montar({
       lineas: [
         { ...LINEAS[0]!, packedPackages: 6, packedSurplusPackages: 2 },
-        { ...LINEAS[1]!, packedPackages: 10, packedSurplusPackages: 0, orderLineId: null },
-        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0, orderLineId: null },
+        { ...LINEAS[1]!, packedPackages: 10, packedSurplusPackages: 0 },
+        { ...LINEAS[2]!, packedPackages: 2, packedSurplusPackages: 0 },
       ],
     })
     await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)

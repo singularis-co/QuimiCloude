@@ -197,13 +197,13 @@
   evidencias y equipo de acondicionamiento (cada uno lleva la línea del reparto o de la línea que se
   opera); R19: ninguna salida de `asignaciones` lleva precio; R45: con una línea, las salidas son
   iguales a las de hoy más `lineId`. Depende de T8, T7.
-- [ ] **T14b [P] — Otros lectores.** `inventario/.../finished-stock-prisma.ts`,
+- [x] **T14b [P] — Otros lectores.** `inventario/.../finished-stock-prisma.ts`,
   `deliverable-batches-prisma.ts`, `finished-goods-dispatch.ts`; `pedidos/.../direct-delivery-prisma.ts`,
   `packed-lines-directory-prisma.ts`, `customer-order-directory-prisma.ts`,
   `list-direct-delivery-surplus.ts`; `integraciones/domain/get-whatsapp-chat-context.ts`.
   *Hecho:* tests de integración de cada lector con un pedido de una línea dan lo mismo que hoy
   (R45) y ninguno lee las columnas de `orders` que se van. Depende de T8.
-- [ ] **T14c [P] — Puente del formulario actual.** `pedidos/adapters/driving/order-actions.ts`
+- [x] **T14c [P] — Puente del formulario actual.** `pedidos/adapters/driving/order-actions.ts`
   (design § 4.1.1 y § 7). Los esquemas planos y los de líneas (con su nombre provisional) se
   quedan como están: renombrarlos y borrar los planos es de QT-314.
   *Hecho:* test de la acción: el `FormData` de hoy crea un pedido de una línea y la lectura del

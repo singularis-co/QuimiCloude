@@ -46,7 +46,7 @@ function summary(overrides: Partial<OpenCustomerOrderSummary> = {}): OpenCustome
     id: ORDER_ID,
     number: { year: 2026, sequence: 128 },
     status: 'EN_CURSO',
-    recipeId: RECIPE_ID,
+    recipeIds: [RECIPE_ID],
     createdAt: new Date('2026-10-20T15:30:00.000Z'),
     ...overrides,
   }
@@ -150,6 +150,17 @@ describe('customerOrderOf', () => {
     const result = customerOrderOf(summary(), null, PRESENTATIONS, new Map())
     expect(result.productName).toBeNull()
     expect(result.lines).toEqual([])
+  })
+
+  it('QT-313 R45: un pedido de varias recetas nombra las conocidas en el orden recibido; una sola da su nombre como hoy', () => {
+    const otra = '55555555-5555-4555-8555-555555555555'
+    const desconocida = '66666666-6666-4666-8666-666666666666'
+    const recetas = new Map([...RECIPES, [otra, { name: 'Jabón líquido' }]])
+    expect(customerOrderOf(summary({ recipeIds: [otra, desconocida, RECIPE_ID] }), null, PRESENTATIONS, recetas).productName).toBe(
+      'Jabón líquido, Cloro · Concentrado',
+    )
+    expect(customerOrderOf(summary({ recipeIds: [RECIPE_ID] }), null, PRESENTATIONS, recetas).productName).toBe('Cloro · Concentrado')
+    expect(customerOrderOf(summary({ recipeIds: [] }), null, PRESENTATIONS, recetas).productName).toBeNull()
   })
 
   it('R51: las líneas salen en el orden del reparto con su presentación', () => {

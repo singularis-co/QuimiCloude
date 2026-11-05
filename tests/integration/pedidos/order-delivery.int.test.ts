@@ -712,6 +712,29 @@ describe('QC-282 deliverOrder con varios clientes contra Postgres', () => {
 });
 
 describe('getOrderDelivery contra Postgres', () => {
+  it('QT-313 R45: con una linea ofrece los lotes de la receta de la linea aunque orders.recipe_id diga otra', async () => {
+    const e = await crearEscenario();
+    try {
+      const hoy = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const marca = randomUUID().replace(/-/gu, '');
+      const ajena = await prisma.recipe.create({
+        data: { name: `Ajena ${marca}`, nameNormalized: `ajena${marca}`, companyId: e.a.companyId },
+        select: { id: true },
+      });
+      await prisma.order.update({ where: { id: e.orderId }, data: { recipeId: ajena.id } });
+
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+
+      expect(vista).toEqual(hoy);
+      expect(vista.lines.map((linea) => linea.batches.map((lote) => lote.batchId))).toEqual([
+        [e.batchId, e.secondBatchId],
+        [e.smallBatchId],
+      ]);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
   it('R5, R6, R7, R9: devuelve pedidos, entregados y faltan por linea, los lotes entregables y el cliente vivo del pedido', async () => {
     const e = await crearEscenario();
     try {

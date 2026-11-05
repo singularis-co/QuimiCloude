@@ -145,6 +145,16 @@ async function createOrder(t: Tenant, seed: OrderSeed): Promise<{ id: string; nu
       ${seed.status === 'CANCELADO' ? 'Cliente desistio' : null},
       ${createdAt}, CURRENT_TIMESTAMP
     )`
+  // La linea del pedido, copiada de el como la deja el relleno de la migracion: el reparto cuelga de ella.
+  await prisma.$executeRaw`
+    INSERT INTO "order_lines" (
+      "order_id", "company_id", "position", "recipe_id", "original_recipe_id", "quantity", "status",
+      "packed_by", "conditioned_by", "finished_at", "cancellation_reason", "created_at", "updated_at"
+    )
+    SELECT o."id", o."company_id", 0, o."recipe_id", o."recipe_id", o."quantity", o."status",
+           o."packed_by", o."conditioned_by", o."finished_at", o."cancellation_reason", o."created_at", o."updated_at"
+      FROM "orders" o
+     WHERE o."id" = ${asUuid(id)}`
   return { id, number: `${String(year)}-${String(nextSequence).padStart(7, '0')}` }
 }
 
@@ -156,9 +166,11 @@ type LineSeed = {
 }
 
 async function createLine(t: Tenant, orderId: string, presentationId: string, seed: LineSeed = {}): Promise<string> {
+  const orderLine = await prisma.orderLine.findFirstOrThrow({ where: { orderId, position: 0 }, select: { id: true } })
   const { id } = await prisma.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: orderLine.id,
       companyId: t.companyId,
       presentationId,
       packages: seed.packages ?? 10,
@@ -174,6 +186,7 @@ async function createLine(t: Tenant, orderId: string, presentationId: string, se
 async function dropTenant(t: Tenant): Promise<void> {
   const where = { companyId: t.companyId }
   await prisma.orderPresentationLine.deleteMany({ where })
+  await prisma.orderLine.deleteMany({ where })
   await prisma.order.deleteMany({ where })
   await prisma.recipe.deleteMany({ where })
   await prisma.presentation.deleteMany({ where })
@@ -366,5 +379,21 @@ describe('listPackedLinesByCombination', () => {
       { page: 1 },
     )
     expect(own.total).toBe(1)
+  })
+  it('QT-313 R45: filtra por la receta y el estado de la linea del pedido; los de orders no cuentan', async () => {
+    const hoy = await listPackedLinesByCombination(seed.a.companyId, combinationA(), { page: 1 })
+    const pedidosA = { companyId: seed.a.companyId, recipeId: seed.a.recipeId }
+    const ids = (await prisma.order.findMany({ where: pedidosA, select: { id: true } })).map((o) => o.id)
+    try {
+      await prisma.order.updateMany({ where: { id: { in: ids } }, data: { recipeId: seed.a.otherRecipeId } })
+
+      expect(await listPackedLinesByCombination(seed.a.companyId, combinationA(), { page: 1 })).toEqual(hoy)
+      expect(
+        (await listPackedLinesByCombination(seed.a.companyId, { ...combinationA(), recipeId: seed.a.otherRecipeId }, { page: 1 }))
+          .total,
+      ).toBe(1)
+    } finally {
+      await prisma.order.updateMany({ where: { id: { in: ids } }, data: { recipeId: seed.a.recipeId } })
+    }
   })
 })

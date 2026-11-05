@@ -170,24 +170,26 @@ async function createOrder(
   tx: Prisma.TransactionClient,
   t: Tenant,
   seed: OrderSeed,
-): Promise<{ orderId: string; sequence: number; lineIds: readonly string[] }> {
+): Promise<{ orderId: string; sequence: number; orderLineId: string; lineIds: readonly string[] }> {
   const status = seed.status ?? 'TERMINADO'
   const empacado = ['EN_EMPAQUE', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].includes(status)
   const acondicionado = ['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].includes(status)
   const sequence = freshSequence()
+  const columnas = {
+    recipeId: seed.recipeId ?? t.recipeId,
+    quantity: new Prisma.Decimal('10'),
+    status,
+    packedBy: empacado ? t.userId : null,
+    conditionedBy: acondicionado ? t.userId : null,
+    finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? new Date('2026-10-01T10:00:00Z') : null,
+    deletedAt: seed.deletedAt ?? null,
+  }
   const { id: orderId } = await tx.order.create({
-    data: {
-      companyId: t.companyId,
-      orderYear: ANIO,
-      orderSequence: sequence,
-      recipeId: seed.recipeId ?? t.recipeId,
-      quantity: new Prisma.Decimal('10'),
-      status,
-      packedBy: empacado ? t.userId : null,
-      conditionedBy: acondicionado ? t.userId : null,
-      finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? new Date('2026-10-01T10:00:00Z') : null,
-      deletedAt: seed.deletedAt ?? null,
-    },
+    data: { companyId: t.companyId, orderYear: ANIO, orderSequence: sequence, ...columnas },
+    select: { id: true },
+  })
+  const { id: orderLineId } = await tx.orderLine.create({
+    data: { orderId, companyId: t.companyId, position: 0, originalRecipeId: columnas.recipeId, ...columnas },
     select: { id: true },
   })
   const lineIds: string[] = []
@@ -196,6 +198,7 @@ async function createOrder(
     const { id } = await tx.orderPresentationLine.create({
       data: {
         orderId,
+        orderLineId,
         companyId: t.companyId,
         presentationId: line.presentationId,
         packages: line.packages,
@@ -207,7 +210,7 @@ async function createOrder(
     })
     lineIds.push(id)
   }
-  return { orderId, sequence, lineIds }
+  return { orderId, sequence, orderLineId, lineIds }
 }
 
 async function createFinished(tx: Prisma.TransactionClient, t: Tenant): Promise<string> {
@@ -592,6 +595,57 @@ describe('WaitingOrdersReader contra Postgres real', () => {
           (f) => f.orderId,
         ),
       ).toEqual([deB.orderId])
+    })
+  })
+
+  it('QT-313 R45: con pedidos de una linea cuentan la receta y el estado de la linea, no los de orders', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const otraReceta = await createRecipe(tx, a.companyId)
+      const vale = await createOrder(tx, a, { lines: [{ presentationId: a.presentationId, packages: 4 }] })
+      const ajeno = await createOrder(tx, a, { recipeId: otraReceta, lines: [{ presentationId: a.presentationId, packages: 5 }] })
+      const reader = createWaitingOrdersReader(tx)
+      const par = [{ recipeId: a.recipeId, presentationId: a.presentationId }]
+      const hoy = await reader.listWaitingLines(par, { companyId: a.companyId })
+
+      await tx.order.update({ where: { id: vale.orderId }, data: { recipeId: otraReceta } })
+      await tx.order.update({ where: { id: ajeno.orderId }, data: { recipeId: a.recipeId } })
+
+      const filas = await reader.listWaitingLines(par, { companyId: a.companyId })
+      expect(filas).toEqual(hoy)
+      expect(filas.map((f) => [f.orderId, f.recipeId])).toEqual([[vale.orderId, a.recipeId]])
+    })
+  })
+
+  it('QT-313 R45: un pedido PARCIAL espera los envases de su linea TERMINADO y no los de la que sigue en curso', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const a = await createTenant(tx, 'A')
+      const otraReceta = await createRecipe(tx, a.companyId)
+      const otraPresentacion = await createPresentation(tx, a.companyId, a.unitId)
+      const pedido = await createOrder(tx, a, { lines: [{ presentationId: a.presentationId, packages: 4 }] })
+      const enCurso = await tx.orderLine.create({
+        data: { orderId: pedido.orderId, companyId: a.companyId, position: 1, recipeId: otraReceta, originalRecipeId: otraReceta, quantity: new Prisma.Decimal('5'), status: 'EN_CURSO' },
+        select: { id: true },
+      })
+      await tx.orderPresentationLine.create({
+        data: { orderId: pedido.orderId, orderLineId: enCurso.id, companyId: a.companyId, presentationId: otraPresentacion, packages: 6 },
+      })
+      await tx.order.update({
+        where: { id: pedido.orderId },
+        data: { status: 'PARCIAL', packedBy: null, conditionedBy: null, finishedAt: null },
+      })
+
+      const filas = await createWaitingOrdersReader(tx).listWaitingLines(
+        [
+          { recipeId: a.recipeId, presentationId: a.presentationId },
+          { recipeId: otraReceta, presentationId: otraPresentacion },
+        ],
+        { companyId: a.companyId },
+      )
+
+      expect(filas.map((f) => [f.orderId, f.recipeId, f.presentationId, f.orderedPackages])).toEqual([
+        [pedido.orderId, a.recipeId, a.presentationId, 4],
+      ])
     })
   })
 

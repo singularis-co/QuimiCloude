@@ -108,6 +108,15 @@ export function orderDetailTextOf(lines: readonly WhatsappCustomerOrderLine[]): 
   return lines.map(lineTextOf).join('; ');
 }
 
+/** Los nombres de las recetas del pedido en su orden; `null` si no se encuentra ninguno. */
+function productNameOf(recipeIds: readonly string[], recipes: NamedRefs): string | null {
+  const names = recipeIds.flatMap((id) => {
+    const name = recipes.get(id)?.name;
+    return name === undefined ? [] : [name];
+  });
+  return names.length === 0 ? null : names.join(', ');
+}
+
 export function customerOrderOf(
   summary: OpenCustomerOrderSummary,
   progress: OrderDeliveryProgress | null,
@@ -131,7 +140,7 @@ export function customerOrderOf(
     status: summary.status,
     requestedAt: summary.createdAt.toISOString(),
     total: null,
-    productName: recipes.get(summary.recipeId)?.name ?? null,
+    productName: productNameOf(summary.recipeIds, recipes),
     lines,
   };
 }
