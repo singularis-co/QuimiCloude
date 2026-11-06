@@ -263,7 +263,7 @@
   con insumo compartido: alta, cancelar una, finalizar la otra, lote a lote). El E2E de dos recetas
   por pantalla es de QT-315.
   *Hecho:* los dos en verde (R46). Depende de T15.
-- [ ] **T16b — Reintento de reserva de las líneas `BLOQUEADO` al editar (R56, R25, R44).**
+- [x] **T16b — Reintento de reserva de las líneas `BLOQUEADO` al editar (R56, R25, R44).**
   `lib/modules/pedidos/domain/update-order.ts` según design § 4.2.1: `retry` en `planEdit` (línea
   existente, sin cambios, guardada en `BLOQUEADO`); el atajo de «solo cambia el cliente» no se
   toma si hay alguna `retry`; coste precalculado y `prepareLine` para `changed || retry`; dentro

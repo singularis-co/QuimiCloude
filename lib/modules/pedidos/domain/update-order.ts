@@ -61,7 +61,8 @@ export type UpdateOrderDeps = {
 };
 
 /** Una linea de la entrada contrastada con las guardadas. `saved` falta en una linea nueva;
- *  `changed` es siempre verdadero en ella. */
+ *  `changed` es siempre verdadero en ella. `retry` marca una linea guardada en `BLOQUEADO` que llega
+ *  sin cambios: vuelve a intentar apartar su material sin cambiar sus datos (R56). */
 type PlannedLine = {
   readonly position: number;
   readonly input: OrderLineInput;
@@ -69,6 +70,7 @@ type PlannedLine = {
   readonly effectiveRecipeId: string;
   readonly originalRecipeId: string;
   readonly changed: boolean;
+  readonly retry: boolean;
 };
 
 type EditPlan = {
@@ -89,7 +91,8 @@ const EDITABLE_ACTIVE = (status: OrderLineStatus): boolean =>
  * Cada linea con identificador edita esa linea; cada una sin el es nueva, y cada linea viva sin
  * cancelar que falte se quita. Una linea con cambios tiene que estar en un estado editable y una que
  * se quita en `PENDIENTE` o `BLOQUEADO`; una que llega igual no se mira. Solo las lineas nuevas o
- * cambiadas recalculan coste, apartado y plazo: las demas no se tocan. Una edicion que no anade
+ * cambiadas recalculan coste, apartado y plazo, y tambien las `BLOQUEADO` que llegan igual, que
+ * reintentan su reserva (R56): las demas no se tocan. Una edicion que no anade
  * ninguna linea necesita alguna linea activa editable, como hasta ahora necesitaba el pedido.
  *
  * Todo se comprueba dos veces: antes de abrir la transaccion, para fallar sin escribir, y otra vez
@@ -127,8 +130,9 @@ export function createUpdateOrder(
     const plan = await planEdit(deps.recipes, entry, saved, refs, companyId);
 
     // Solo cambia el cliente: se escribe solo el cliente, sin catalogos, sin coste y sin tocar lo
-    // apartado. Sin bloquear: esta escritura no pisa ningun dato que otra edicion cambie.
-    const linesUnchanged = plan.removed.length === 0 && plan.lines.every((line) => !line.changed);
+    // apartado. Sin bloquear: esta escritura no pisa ningun dato que otra edicion cambie. Una linea
+    // bloqueada obliga al camino completo, que reintenta su reserva (R56).
+    const linesUnchanged = plan.removed.length === 0 && plan.lines.every((line) => !line.changed && !line.retry);
     if (linesUnchanged && priority === row.priority && customerId !== row.customerId) {
       if (customerId !== null) {
         await requireAliveCustomer(deps.customerCatalog, customerId, companyId);
@@ -148,7 +152,7 @@ export function createUpdateOrder(
     // El coste se calcula antes de abrir la transaccion, como siempre: pedir los catalogos con la
     // fila bloqueada retendria una conexion mientras se espera otra.
     const costs = new Map<number, StoredOrderCost | null | 'keep'>();
-    for (const line of plan.lines.filter((planned) => planned.changed)) {
+    for (const line of plan.lines.filter((planned) => planned.changed || planned.retry)) {
       costs.set(line.position, await atLinePosition(line.position, () => lineCost(deps, line, companyId)));
     }
 
@@ -158,9 +162,10 @@ export function createUpdateOrder(
       const locked = await transaction.orders.lockAliveLines(id, scope);
       if (locked === null) throw new OrderNotFoundError();
 
-      // Otra operacion pudo mover o quitar lineas entre la lectura de arriba y este candado.
+      // Otra operacion pudo mover o quitar lineas entre la lectura de arriba y este candado: el
+      // replanteo decide tambien que lineas bloqueadas siguen reintentando.
       const current = await planEdit(deps.recipes, entry, locked.lines, refs, companyId);
-      const touched = current.lines.filter((line) => line.changed);
+      const touched = current.lines.filter((line) => line.changed || line.retry);
 
       const prepared: PreparedLine[] = [];
       for (const line of touched) {
@@ -183,8 +188,9 @@ export function createUpdateOrder(
       const edited: OrderLineEditWrite[] = [];
       const added: PreparedLine[] = [];
       for (const line of prepared) {
+        // Una linea que reintenta su reserva no cambia sus datos: no se reescribe.
         if (line.planned.saved === undefined) added.push(line);
-        else edited.push({ lineId: line.planned.saved.id, line: line.write, cost: line.cost });
+        else if (!line.planned.retry) edited.push({ lineId: line.planned.saved.id, line: line.write, cost: line.cost });
       }
 
       const written = await transaction.orders.writeLines(
@@ -204,8 +210,8 @@ export function createUpdateOrder(
       );
       if (written === null) throw new OrderNotFoundError();
 
-      // Las editadas por su posicion y despues las nuevas, que van detras: cada una compite con lo
-      // que ya apartaron las anteriores.
+      // Las editadas y las que reintentan por su posicion y despues las nuevas, que van detras: cada
+      // una compite con lo que ya apartaron las anteriores.
       const toSync = [
         ...prepared
           .filter((line) => line.planned.saved !== undefined)
@@ -250,6 +256,11 @@ export function createUpdateOrder(
           }
         } else if (status === 'BLOQUEADO') {
           await moveLine(transaction, id, lineId, 'BLOQUEADO', 'PENDIENTE', actor.id, instant, scope);
+          // La editada ya llevo su coste en `writeLines`; la que reintenta lo recibe aqui.
+          if (line.planned.retry && line.cost !== 'keep') {
+            const costed = await transaction.orders.setLineIngredientsCost(id, lineId, line.cost, actor.id, instant, scope);
+            if (costed !== 'ok') throw new OrderNotFoundError(`linea ${lineId}`);
+          }
         }
         await transaction.orders.setLineReservedAt(id, lineId, outcome?.kind === 'reserved' ? instant : null, scope);
       }
@@ -310,7 +321,8 @@ async function planEdit(
     if (match !== undefined) {
       await atLinePosition(position, () => assertOrderLineEditable(match.status, changed));
     }
-    lines.push({ position, input, saved: match, effectiveRecipeId, originalRecipeId, changed });
+    const retry = match !== undefined && !changed && match.status === 'BLOQUEADO';
+    lines.push({ position, input, saved: match, effectiveRecipeId, originalRecipeId, changed, retry });
   }
 
   assertOrderLinesRemovable(diff.removed);
@@ -326,7 +338,7 @@ async function planEdit(
   return { lines, removed: diff.removed };
 }
 
-/** Lo que se escribe y se aparta de una linea nueva o cambiada. */
+/** Lo que se escribe y se aparta de una linea nueva, cambiada o que reintenta su reserva. */
 type PreparedLine = {
   readonly planned: PlannedLine;
   readonly write: OrderLineWrite;

@@ -1059,7 +1059,9 @@ describe('QC-215 R38 — la edicion de solo cliente en un estado sin edicion gen
     expect(e.setCustomerAlive).not.toHaveBeenCalled();
   });
 
-  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'])(
+  // En BLOQUEADO ya no hay atajo: la edicion reintenta la reserva de la linea (QT-313 R56, design
+  // § 4.2.1 punto 2). Lo prueba `update-order-lines.test.ts`.
+  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO'])(
     'R38 (control): en %s la misma entrada es de solo cliente y va por el atajo: solo setCustomerAlive',
     async (status) => {
       const e = escenario(status, true);

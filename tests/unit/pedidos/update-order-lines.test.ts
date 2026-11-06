@@ -6,6 +6,7 @@ import {
   InvalidTransitionError,
   OrderLineNotRemovableError,
   OrderNotFoundError,
+  OrderWouldBlockError,
   UnauthorizedError,
 } from '@/lib/modules/pedidos/domain/errors';
 import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
@@ -109,7 +110,11 @@ function guardada(id: string, recipeId: string, position: number, status: OrderL
 }
 
 /** Un pedido con estas lineas guardadas; `insuficientes` son los ids de linea que no alcanzan. */
-function escenario(lineas: readonly OrderLineRow[], insuficientes: readonly string[] = []) {
+function escenario(
+  lineas: readonly OrderLineRow[],
+  insuficientes: readonly string[] = [],
+  customerCatalog: ReturnType<typeof fakeCustomerCatalog> = fakeCustomerCatalog(),
+) {
   const orders = {
     findAliveById: vi.fn(async () => PEDIDO),
     findAliveLines: vi.fn(async () => lineas),
@@ -121,8 +126,9 @@ function escenario(lineas: readonly OrderLineRow[], insuficientes: readonly stri
       insuficientes.includes(input.orderLineId ?? '') ? { kind: 'insufficient', productIds: [PRODUCTO] } : { kind: 'reserved' },
   );
   const releaseForLine = vi.fn(async () => undefined);
+  const setCustomerAlive = vi.fn(async () => 'ok' as const);
   const uow = fakeUnitOfWork({
-    orders: { lockAliveLines, ...escrituras },
+    orders: { lockAliveLines, setCustomerAlive, ...escrituras },
     reservations: { syncForLine, releaseForLine },
     products: fakeScopeProducts([{ id: PRODUCTO, name: 'p', unitId: LITRO.id, stockByUnit: [], type: 'PRODUCT' }]),
     units: fakeScopeUnits(),
@@ -135,11 +141,20 @@ function escenario(lineas: readonly OrderLineRow[], insuficientes: readonly stri
     units: cat.units,
     presentations: cat.presentations,
     packaging: fakePackagingCatalog(),
-    customerCatalog: fakeCustomerCatalog(),
+    customerCatalog,
     unitOfWork: uow.unitOfWork,
     now: () => AHORA,
   });
-  return { update, escrituras, syncForLine, releaseForLine, lockAliveLines, findCostingBatches: cat.findCostingBatches, unitOfWork: uow.unitOfWork };
+  return {
+    update,
+    escrituras,
+    syncForLine,
+    releaseForLine,
+    lockAliveLines,
+    setCustomerAlive,
+    findCostingBatches: cat.findCostingBatches,
+    unitOfWork: uow.unitOfWork,
+  };
 }
 
 function entrada(id: string | undefined, recipeId: string, quantity = '10', extra: Record<string, unknown> = {}) {
@@ -148,6 +163,15 @@ function entrada(id: string | undefined, recipeId: string, quantity = '10', extr
 
 function cambios(writeLines: ReturnType<typeof vi.fn>): OrderLineChanges {
   return writeLines.mock.calls[0]?.[1] as OrderLineChanges;
+}
+
+function sincronizadas(syncForLine: ReturnType<typeof vi.fn>): readonly string[] {
+  return syncForLine.mock.calls.map((call) => ((call as unknown[])[0] as { orderLineId: string }).orderLineId);
+}
+
+/** Una linea guardada en `BLOQUEADO`: sin coste ni plazo y sin material apartado (QC-138 R5). */
+function bloqueada(id: string, recipeId: string, position: number): OrderLineRow {
+  return guardada(id, recipeId, position, 'BLOQUEADO', { ingredientsCost: null, packagingCost: null, reservedAt: null });
 }
 
 describe('QT-313 T10 — edicion con lineas', () => {
@@ -314,5 +338,104 @@ describe('QT-313 T10 — reparto de una linea', () => {
 
     expect(await e.run(ORDER_ID, ACTOR, { lineId: LINEA_AJENA, unitId: UNIT_ID, lines: [] })).toBe('not_found');
     expect(e.escrituras.writeLines).not.toHaveBeenCalled();
+  });
+});
+
+describe('QT-313 T16b — reintento de reserva de las lineas BLOQUEADO al editar', () => {
+  const CLIENTE = '88888888-8888-4888-8888-888888888888';
+
+  function clienteVivo(): ReturnType<typeof fakeCustomerCatalog> {
+    const clientes = fakeCustomerCatalog();
+    clientes.findAliveRefById.mockResolvedValue({ id: CLIENTE, firstNames: 'Ana', lastNames: 'Diaz', isDeleted: false });
+    return clientes;
+  }
+
+  it('R56, R41: una linea BLOQUEADO que llega igual y ya alcanza pasa a PENDIENTE con su coste y el plazo de ahora', async () => {
+    const e = escenario([bloqueada(LINEA_A, RECETA_A, 0)]);
+
+    await e.update(ORDER_ID, { lines: [entrada(LINEA_A, RECETA_A)] }, ACTOR);
+
+    expect(sincronizadas(e.syncForLine)).toEqual([LINEA_A]);
+    // Sus datos no cambian: no se reescribe.
+    expect(cambios(e.escrituras.writeLines).edited).toEqual([]);
+    expect(e.escrituras.setLineStatus.mock.calls).toEqual([[ORDER_ID, LINEA_A, 'BLOQUEADO', 'PENDIENTE', ACTOR.id, AHORA, SCOPE]]);
+    expect(e.escrituras.setLineIngredientsCost.mock.calls).toEqual([
+      [ORDER_ID, LINEA_A, { total: '30.0000', packaging: '0.0000' }, ACTOR.id, AHORA, SCOPE],
+    ]);
+    expect(e.escrituras.setLineReservedAt.mock.calls).toEqual([[ORDER_ID, LINEA_A, AHORA, SCOPE]]);
+    expect(e.escrituras.refreshStatus).toHaveBeenCalledWith(ORDER_ID, ACTOR.id, AHORA, SCOPE);
+  });
+
+  it('R56: una linea BLOQUEADO que sigue sin alcanzar rechaza con order_would_block sin escribir; con confirmacion sigue BLOQUEADO sin plazo', async () => {
+    const sinConfirmar = escenario([bloqueada(LINEA_A, RECETA_A, 0)], [LINEA_A]);
+    await expect(sinConfirmar.update(ORDER_ID, { lines: [entrada(LINEA_A, RECETA_A)] }, ACTOR)).rejects.toBeInstanceOf(
+      OrderWouldBlockError,
+    );
+    expect(sincronizadas(sinConfirmar.syncForLine)).toEqual([LINEA_A]);
+    expect(sinConfirmar.escrituras.setLineStatus).not.toHaveBeenCalled();
+    expect(sinConfirmar.escrituras.setLineIngredientsCost).not.toHaveBeenCalled();
+    expect(sinConfirmar.escrituras.setLineReservedAt).not.toHaveBeenCalled();
+    expect(sinConfirmar.escrituras.updateAlive).not.toHaveBeenCalled();
+    expect(sinConfirmar.escrituras.refreshStatus).not.toHaveBeenCalled();
+
+    const confirmado = escenario([bloqueada(LINEA_A, RECETA_A, 0)], [LINEA_A]);
+    await confirmado.update(ORDER_ID, { lines: [entrada(LINEA_A, RECETA_A)], confirmBlocked: true }, ACTOR);
+    // El estado guardado ya es BLOQUEADO: no se mueve.
+    expect(confirmado.escrituras.setLineStatus).not.toHaveBeenCalled();
+    expect(confirmado.escrituras.setLineIngredientsCost.mock.calls).toEqual([[ORDER_ID, LINEA_A, null, ACTOR.id, AHORA, SCOPE]]);
+    expect(confirmado.escrituras.setLineReservedAt.mock.calls).toEqual([[ORDER_ID, LINEA_A, null, SCOPE]]);
+    expect(confirmado.escrituras.refreshStatus).toHaveBeenCalledWith(ORDER_ID, ACTOR.id, AHORA, SCOPE);
+  });
+
+  it('R56, R25: con una linea PENDIENTE y otra BLOQUEADO sin cambios, solo la bloqueada reintenta; la PENDIENTE no cambia de material ni de plazo', async () => {
+    const e = escenario([guardada(LINEA_A, RECETA_A, 0, 'PENDIENTE'), bloqueada(LINEA_B, RECETA_B, 1)]);
+
+    await e.update(ORDER_ID, { lines: [entrada(LINEA_A, RECETA_A), entrada(LINEA_B, RECETA_B)] }, ACTOR);
+
+    expect(sincronizadas(e.syncForLine)).toEqual([LINEA_B]);
+    expect(cambios(e.escrituras.writeLines).edited).toEqual([]);
+    expect(e.escrituras.setLineStatus.mock.calls).toEqual([[ORDER_ID, LINEA_B, 'BLOQUEADO', 'PENDIENTE', ACTOR.id, AHORA, SCOPE]]);
+    expect(e.escrituras.setLineIngredientsCost.mock.calls.map((call) => (call as unknown[])[1])).toEqual([LINEA_B]);
+    expect(e.escrituras.setLineReservedAt.mock.calls).toEqual([[ORDER_ID, LINEA_B, AHORA, SCOPE]]);
+  });
+
+  it('R56: la que reintenta aparta por su posicion, entre las editadas y delante de las nuevas', async () => {
+    const e = escenario([guardada(LINEA_A, RECETA_A, 0, 'PENDIENTE'), bloqueada(LINEA_B, RECETA_B, 1)]);
+
+    await e.update(
+      ORDER_ID,
+      { lines: [entrada(undefined, RECETA_C), entrada(LINEA_B, RECETA_B), entrada(LINEA_A, RECETA_A, '12')] },
+      ACTOR,
+    );
+
+    expect(sincronizadas(e.syncForLine)).toEqual([LINEA_A, LINEA_B, 'linea-0']);
+    expect(cambios(e.escrituras.writeLines).edited.map((edit) => edit.lineId)).toEqual([LINEA_A]);
+  });
+
+  it('R56: cambiar solo el cliente con una linea BLOQUEADO va por el camino completo y reintenta su reserva', async () => {
+    const e = escenario([bloqueada(LINEA_A, RECETA_A, 0)], [], clienteVivo());
+
+    await e.update(ORDER_ID, { lines: [entrada(LINEA_A, RECETA_A)], customerId: CLIENTE }, ACTOR);
+
+    expect(e.setCustomerAlive).not.toHaveBeenCalled();
+    expect(sincronizadas(e.syncForLine)).toEqual([LINEA_A]);
+    expect(e.escrituras.setLineStatus.mock.calls).toEqual([[ORDER_ID, LINEA_A, 'BLOQUEADO', 'PENDIENTE', ACTOR.id, AHORA, SCOPE]]);
+    expect(e.escrituras.updateAlive).toHaveBeenCalledWith(
+      ORDER_ID,
+      { priority: PEDIDO.priority, customerId: CLIENTE },
+      ACTOR.id,
+      AHORA,
+      SCOPE,
+    );
+  });
+
+  it('R56: cambiar solo el cliente sin lineas BLOQUEADO sigue escribiendo solo el cliente', async () => {
+    const e = escenario([guardada(LINEA_A, RECETA_A, 0, 'PENDIENTE')], [], clienteVivo());
+
+    await e.update(ORDER_ID, { lines: [entrada(LINEA_A, RECETA_A)], customerId: CLIENTE }, ACTOR);
+
+    expect(e.setCustomerAlive).toHaveBeenCalledTimes(1);
+    expect(e.lockAliveLines).not.toHaveBeenCalled();
+    expect(e.syncForLine).not.toHaveBeenCalled();
   });
 });

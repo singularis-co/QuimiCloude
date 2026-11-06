@@ -891,6 +891,11 @@
       "archivo": "pedidos/order-lines-flow.int.test.ts",
       "motivo": "QT-313 T16: el recorrido de un pedido de dos lineas con un insumo compartido (alta, cancelar una linea, finalizar la otra) por los casos de uso cableados a mano con los adaptadores driven reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. El caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con dos lotes, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-11-06"
+    },
+    {
+      "archivo": "pedidos/order-lines-blocked-retry.int.test.ts",
+      "motivo": "QT-313 T16b: guardar sin cambios la edicion de un pedido de dos lineas (una PENDIENTE, otra BLOQUEADO) por los casos de uso cableados a mano con los adaptadores driven reales, con y sin material repuesto; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con sus lotes, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-06"
     }
   ]
 }

@@ -585,3 +585,32 @@ Verificacion (salida real, segun el informe del backend_dev al leader):
   - `e2e/pedidos-rediseno.spec.ts`: **ajeno**. A `COLUMN_IDS` le falta `salePrice` de QC-307. No se toca: va en otra rama.
   - `e2e/reserva-de-material.spec.ts`: **de esta feature**. Lo resuelve T16b (R56, reintento de reserva en lineas `BLOQUEADO`, enmienda 0ce3ec846).
 - **WebKit pendiente:** no corrio por falta de memoria. Si no hay memoria al cerrar, queda para CI.
+
+## Fase 6 — T16b Reintento de reserva de las lineas BLOQUEADO al editar (R56, 2026-11-06, enmienda 0ce3ec846)
+
+Produccion: `lib/modules/pedidos/domain/update-order.ts`, segun design § 4.2.1.
+- `retry` en `planEdit`.
+- El atajo de «solo cambia el cliente» no se toma si alguna linea es `retry`.
+- Las lineas `retry` se reservan en la misma transaccion, por `position` y antes que las nuevas.
+- Al final se llama a `refreshStatus`.
+
+Tests:
+- 6 unitarios en `tests/unit/pedidos/update-order-lines.test.ts` (describe «QT-313 T16b»).
+- `.int` nuevo `tests/integration/pedidos/order-lines-blocked-retry.int.test.ts`, con 2 tests, registrado en `aislamiento.json` como `commit`.
+- `e2e/reserva-de-material.spec.ts` en verde en chromium sin tocar sus aserciones.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R56 | `update-order-lines.test.ts` › describe «QT-313 T16b», casos (a)–(d) de `tasks.md`; `order-lines-blocked-retry.int` › los dos «R56: …» (con material repuesto pasa a `PENDIENTE` lote a lote sin tocar la otra linea; sin reponer, con confirmacion sigue `BLOQUEADO` y sin confirmacion no escribe nada); `e2e/reserva-de-material.spec.ts` (chromium) |
+
+Verificacion (salida real):
+- backend_dev: typecheck y lint en verde; guardias 87/87; `.int` → 5 archivos, 82 tests en verde; `reserva-de-material` en chromium → 1 passed.
+- implementer: `vitest related --run --project node --maxWorkers=1 lib/modules/pedidos/domain/update-order.ts` repetido tras el ultimo cambio → `Test Files 177 passed (177)`, `Tests 4286 passed | 1 skipped (4287)`.
+
+Desviaciones aceptadas por el humano (2026-11-06), para el reviewer:
+1. **Coste de una linea `retry` que logra reservar:** como no va en `edited`, tras pasar de `BLOQUEADO` a `PENDIENTE` se escribe con `setLineIngredientsCost(line.cost)`. En el `.int` queda 475.0000.
+2. **Control antiguo de QC-215.** En `update-order.test.ts`, el control «R38 (control): en %s … va por el atajo» ya no lista `BLOQUEADO`: contradecia el punto 2 de § 4.2.1. El caso queda comentado y lo cubre R56 (d).
+   - La frase historica de § 4.2.1, «antes cualquier edicion de un pedido bloqueado iba por el camino completo», no es exacta: el atajo de solo-cliente tambien se tomaba en `BLOQUEADO`.
+   - **Cambio de comportamiento:** cambiar solo el cliente de un pedido con una linea `BLOQUEADO` ahora reintenta la reserva y puede pedir confirmacion.
+3. El «nada escrito» del unitario (b) solo se comprueba de verdad en el `.int`, por el rollback.
