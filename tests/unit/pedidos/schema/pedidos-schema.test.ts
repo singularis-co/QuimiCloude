@@ -124,6 +124,7 @@ function scalarNames(model: PrismaModel, relationTypes: readonly string[]): read
 }
 
 const order = parseModel('Order')
+const orderLine = parseModel('OrderLine')
 const recipe = parseModel('Recipe')
 const unit = parseModel('Unit')
 const user = parseModel('User')
@@ -139,14 +140,14 @@ const user = parseModel('User')
  *  seccion 0.6). El reparto por presentacion retira `presentationId` y `presentationContent`
  *  (pasan a `OrderPresentationLine`) y quedan diecinueve. QC-195 (P6) anade `packagingCost`, la parte de
  *  envases del importe, y son veinte. QC-156 anade `customerId`, el cliente opcional, y son veintiuno. Despues entra `actualCost`, el
- *  coste real, y son veintidos. La lista sigue siendo cerrada: anadir o quitar cualquier otra columna pone este
- *  test rojo. */
+ *  coste real, y son veintidos; despues `salePrice`. QT-313 (T15, migracion
+ *  `20261103120200_orders_drop_line_columns`, `specs/QT-313-pedido-con-varias-recetas-backend/design.md`
+ *  § 1.2) mueve once a `OrderLine` (`LINE_COLUMNS_MOVED_FROM_ORDER`) y quedan trece. La lista sigue
+ *  siendo cerrada: anadir o quitar cualquier otra columna pone este test rojo. */
 const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['id', 'id'],
   ['orderYear', 'order_year'],
   ['orderSequence', 'order_sequence'],
-  ['recipeId', 'recipe_id'],
-  ['quantity', 'quantity'],
   ['priority', 'priority'],
   ['status', 'status'],
   ['cancellationReason', 'cancellation_reason'], // QC-34 R48, decision cerrada 4
@@ -156,32 +157,69 @@ const ORDER_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ['createdAt', 'created_at'],
   ['updatedAt', 'updated_at'],
   ['deletedAt', 'deleted_at'],
+  ['customerId', 'customer_id'], // QC-156 R1: el cliente del pedido, opcional
+]
+
+/** QT-313 (design § 1.2): las ONCE columnas que salen de `orders` y viven en `order_lines`. */
+const LINE_COLUMNS_MOVED_FROM_ORDER: ReadonlyArray<readonly [string, string]> = [
+  ['recipeId', 'recipe_id'],
+  ['quantity', 'quantity'],
+  ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
   ['ingredientsCost', 'ingredients_cost'],
   ['packagingCost', 'packaging_cost'], // QC-195 R47: parte de envases incluida en ingredients_cost
   ['actualCost', 'actual_cost'], // coste real, aparte del estimado, opcional
+  ['salePrice', 'sale_price'], // precio de venta de la linea, opcional
   ['reservedAt', 'reserved_at'],
-  ['finishedAt', 'finished_at'], // instante en que paso a ENTREGADO por Finalizar, opcional
-  ['packedBy', 'packed_by'], // quien tiene el pedido en empaque, opcional
-  ['conditionedBy', 'conditioned_by'], // quien tiene o tuvo el pedido en acondicionamiento, opcional
-  ['unitId', 'unit_id'], // la unidad en que se expresa quantity, opcional [Q4]
-  ['customerId', 'customer_id'], // QC-156 R1: el cliente del pedido, opcional
-  ['salePrice', 'sale_price'], // precio de venta del pedido entero, opcional
+  ['finishedAt', 'finished_at'], // instante en que paso a TERMINADO/ENTREGADO, opcional
+  ['packedBy', 'packed_by'], // quien tiene la linea en empaque, opcional
+  ['conditionedBy', 'conditioned_by'], // quien tiene o tuvo la linea en acondicionamiento, opcional
+]
+
+/** QT-313 (design § 1.1): los campos escalares de `OrderLine`, lista CERRADA. */
+const ORDER_LINE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+  ['id', 'id'],
+  ['orderId', 'order_id'],
+  ['companyId', 'company_id'],
+  ['position', 'position'],
+  ['originalRecipeId', 'original_recipe_id'],
+  ['status', 'status'],
+  ['cancellationReason', 'cancellation_reason'],
+  ['createdBy', 'created_by'],
+  ['updatedBy', 'updated_by'],
+  ['createdAt', 'created_at'],
+  ['updatedAt', 'updated_at'],
+  ['deletedAt', 'deleted_at'],
+  ...LINE_COLUMNS_MOVED_FROM_ORDER,
 ]
 
 /** Las CUATRO referencias que cruzan de modulo y por eso NO llevan `@relation` (R33). Fueron cuatro
  *  hasta el 2026-09-07, cuando `unitId` se fue con la unidad -y con ella la frontera hacia
  *  `unidades`- y quedaron tres. QC-60 anade `companyId` (FK a `companies`, de `identity`),
  *  OBLIGATORIA y tambien sin `@relation`: con ella, `pedidos` podria hacer
- *  `include: { company: true }` (`design.md > 2.1`). */
-const CROSS_MODULE_SCALARS: ReadonlyArray<readonly [string, string, boolean]> = [
+ *  `include: { company: true }` (`design.md > 2.1`). QT-313 mueve `recipeId` a `OrderLine`: las
+ *  cuatro se afirman en el modelo donde viven ahora. */
+const CROSS_MODULE_SCALARS: ReadonlyArray<readonly ['Order' | 'OrderLine', string, string, boolean]> = [
+  ['OrderLine', 'recipeId', 'recipe_id', false],
+  ['Order', 'companyId', 'company_id', false],
+  ['Order', 'createdBy', 'created_by', true],
+  ['Order', 'updatedBy', 'updated_by', true],
+]
+
+/** QT-313: las referencias ajenas de `OrderLine`, todas escalares uuid SIN `@relation`
+ *  (design § 1.1: FK escritas a mano, drift). */
+const ORDER_LINE_CROSS_MODULE_SCALARS: ReadonlyArray<readonly [string, string, boolean]> = [
   ['recipeId', 'recipe_id', false],
+  ['originalRecipeId', 'original_recipe_id', false],
   ['companyId', 'company_id', false],
+  ['unitId', 'unit_id', true],
+  ['packedBy', 'packed_by', true],
+  ['conditionedBy', 'conditioned_by', true],
   ['createdBy', 'created_by', true],
   ['updatedBy', 'updated_by', true],
 ]
 
 describe('db/schema.prisma — modelo de pedido', () => {
-  it('Order declara id uuid propio, receta, cantidad, prioridad y estado', () => {
+  it('Order declara id uuid propio, prioridad y estado; la receta y la cantidad, en OrderLine (QT-313)', () => {
     // R1: identificador propio, estable y NO derivado de ningun dato de negocio -en particular
     // no lo es el correlativo, que es dato de negocio y vive en otras dos columnas-, mas los
     // datos del pedido.
@@ -194,14 +232,40 @@ describe('db/schema.prisma — modelo de pedido', () => {
     // Ni el correlativo ni ningun otro dato de negocio forma parte de la clave primaria.
     expect(order.body).not.toMatch(/@@id\(/)
 
-    for (const nombre of ['recipeId', 'quantity', 'priority', 'status']) {
+    for (const nombre of ['priority', 'status']) {
       expect(has(order, nombre), `falta Order.${nombre}`).toBe(true)
       expect(field(order, nombre).isOptional, `Order.${nombre} no puede ser opcional`).toBe(false)
+    }
+    // QT-313: la receta y la cantidad son de cada linea, igual de obligatorias.
+    for (const nombre of ['recipeId', 'quantity']) {
+      expect(has(orderLine, nombre), `falta OrderLine.${nombre}`).toBe(true)
+      expect(field(orderLine, nombre).isOptional, `OrderLine.${nombre} no puede ser opcional`).toBe(false)
     }
 
     // La forma completa de la tabla: si alguien anade o quita una columna, este test lo dice.
     expect(scalarNames(order, [])).toEqual(ORDER_COLUMNS.map(([name]) => name).sort())
     expect(order.body).toContain('@@map("orders")')
+    // Y la de la linea (design § 1.1), tambien cerrada; `order` es el lado objeto de su relacion.
+    expect(scalarNames(orderLine, ['Order'])).toEqual(ORDER_LINE_COLUMNS.map(([name]) => name).sort())
+    expect(orderLine.body).toContain('@@map("order_lines")')
+  })
+
+  it('QT-313 R1: Order ya NO declara ninguna de las once columnas que pasan a OrderLine', () => {
+    // design § 1.2 y migracion `20261103120200_orders_drop_line_columns`: ni el campo ni su
+    // columna ni sus indices quedan en `orders`.
+    for (const [nombre, columna] of LINE_COLUMNS_MOVED_FROM_ORDER) {
+      expect(has(order, nombre), `Order.${nombre} no debe existir`).toBe(false)
+      expect(order.body, `orders no debe mapear ${columna}`).not.toContain(`@map("${columna}")`)
+      expect(has(orderLine, nombre), `falta OrderLine.${nombre}`).toBe(true)
+    }
+    for (const indice of [
+      'orders_recipe_id_idx',
+      'orders_unit_id_idx',
+      'orders_packed_by_idx',
+      'orders_conditioned_by_idx',
+    ]) {
+      expect(order.body, `${indice} no debe existir`).not.toContain(indice)
+    }
   })
 
   it('QT-313 R1: la unica entidad de receta del pedido es OrderLine (order_lines); no hay otro item generico de pedido', () => {
@@ -265,7 +329,13 @@ describe('db/schema.prisma — modelo de pedido', () => {
       .filter((candidate) => candidate.type === 'DateTime')
       .map((candidate) => candidate.name)
       .sort()
-    expect(fechas).toEqual(['createdAt', 'deletedAt', 'finishedAt', 'reservedAt', 'updatedAt'])
+    // QT-313: `finishedAt` y `reservedAt` pasan a la linea (design § 1.2).
+    expect(fechas).toEqual(['createdAt', 'deletedAt', 'updatedAt'])
+    const fechasDeLinea = orderLine.fields
+      .filter((candidate) => candidate.type === 'DateTime')
+      .map((candidate) => candidate.name)
+      .sort()
+    expect(fechasDeLinea).toEqual(['createdAt', 'deletedAt', 'finishedAt', 'reservedAt', 'updatedAt'])
 
     for (const forbidden of [
       'requestedAt',
@@ -277,6 +347,7 @@ describe('db/schema.prisma — modelo de pedido', () => {
       'deliveredAt',
     ]) {
       expect(has(order, forbidden), `Order.${forbidden} no debe existir`).toBe(false)
+      expect(has(orderLine, forbidden), `OrderLine.${forbidden} no debe existir`).toBe(false)
     }
   })
 
@@ -301,16 +372,16 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
   })
 
-  it('quantity es Decimal(14,4) y no hay ningun Float en Order', () => {
+  it('quantity es Decimal(14,4) y no hay ningun Float en Order ni en OrderLine (QT-313: quantity en la linea)', () => {
     // R6 y decision cerrada 7: decimal exacto, nunca coma flotante binaria
     // (`docs/architecture.md > Dominio` n.o 4). Sin `@default`: la cantidad se declara siempre.
-    const quantity = field(order, 'quantity')
+    const quantity = field(orderLine, 'quantity')
     expect(quantity.type).toBe('Decimal')
     expect(quantity.isOptional).toBe(false)
     expect(quantity.attributes).toMatch(/@db\.Decimal\(\s*14\s*,\s*4\s*\)/)
     expect(quantity.attributes).not.toMatch(/@default\(/)
 
-    for (const candidate of order.fields) {
+    for (const candidate of [...order.fields, ...orderLine.fields]) {
       expect(candidate.type, `${candidate.name} no puede ser Float`).not.toBe('Float')
       expect(candidate.attributes, `${candidate.name} no puede ser coma flotante`).not.toMatch(
         /@db\.(Real|DoublePrecision|Money)/,
@@ -323,13 +394,17 @@ describe('db/schema.prisma — modelo de pedido', () => {
     // caso- para que reintroducir la columna sin decidirlo de nuevo ponga el test rojo.
     expect(has(order, 'unitPrice')).toBe(false)
     expect(order.body).not.toContain('unit_price')
+    expect(has(orderLine, 'unitPrice')).toBe(false)
+    expect(orderLine.body).not.toContain('unit_price')
 
-    // Los CINCO unicos decimales del modelo: la cantidad, el importe, su parte de envases,
-    // el coste real y el precio de venta del pedido entero (no es un precio unitario).
-    // La copia del contenido de la presentacion vive en la linea de reparto.
+    // Los CINCO unicos decimales: la cantidad, el importe, su parte de envases, el coste real y
+    // el precio de venta de la linea entera (no es un precio unitario). QT-313: los cinco pasan
+    // a `OrderLine` y `Order` se queda sin ninguno. La copia del contenido de la presentacion
+    // vive en la linea de reparto.
     expect(
-      order.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
+      orderLine.fields.filter((candidate) => candidate.type === 'Decimal').map((c) => c.name).sort(),
     ).toEqual(['actualCost', 'ingredientsCost', 'packagingCost', 'quantity', 'salePrice'])
+    expect(order.fields.filter((candidate) => candidate.type === 'Decimal')).toEqual([])
   })
 
   it('Order no declara total, subtotal ni ninguna columna derivada', () => {
@@ -361,35 +436,47 @@ describe('db/schema.prisma — modelo de pedido', () => {
     }
   })
 
-  it('la unidad VUELVE al modelo como uuid anulable, sin @relation y con su indice [Q4]', () => {
+  it('la unidad VUELVE al modelo como uuid anulable, sin @relation y con su indice [Q4] (QT-313: en OrderLine)', () => {
     // La decision humana del 2026-09-07 sacaba `unit_id` de `orders` (y con ella la FK
     // `orders_unit_id_fkey`, su indice y la frontera con `unidades`); la decision [Q4]
     // (`design.md` seccion 0.6) la deroga: `quantity` necesita su unidad para que la ejecucion y
     // el reparto sepan en que se expresa. Vuelve como escalar drift -sin `@relation`, `Unit` sigue
-    // siendo de `unidades`- y opcional: NULL en los pedidos anteriores a la columna.
-    const unitId = field(order, 'unitId')
+    // siendo de `unidades`- y opcional: NULL en los pedidos anteriores a la columna. QT-313
+    // (design § 1.1) la lleva a `order_lines`, con la misma forma y su indice renombrado.
+    const unitId = field(orderLine, 'unitId')
     expect(unitId.type).toBe('String')
     expect(unitId.isOptional).toBe(true)
     expect(unitId.attributes).toContain('@db.Uuid')
     expect(unitId.attributes).toContain('@map("unit_id")')
     expect(unitId.attributes).not.toMatch(/@default\(/)
     expect(unitId.attributes).not.toMatch(/@relation/)
+    expect(has(orderLine, 'unit')).toBe(false)
+    expect(orderLine.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"order_lines_unit_id_idx"\)/)
+    expect(has(order, 'unitId')).toBe(false)
     expect(has(order, 'unit')).toBe(false)
-    expect(order.body).toMatch(/@@index\(\[unitId\],\s*map:\s*"orders_unit_id_idx"\)/)
+    expect(order.body).not.toContain('orders_unit_id_idx')
   })
 
-  it('recipeId es uuid OBLIGATORIO y sin @relation', () => {
+  it('recipeId es uuid OBLIGATORIO y sin @relation (QT-313: en OrderLine, con originalRecipeId)', () => {
     // R14 y decision cerrada 16: la receta es referencia y es obligatoria; si se da de baja
     // logicamente, el pedido conserva su referencia. Escalar sin `@relation` para que el cliente
-    // Prisma no pueda atravesar de `pedidos` a `recetas` con un `include` (R33).
-    const recipeId = field(order, 'recipeId')
-    expect(recipeId.type).toBe('String')
-    expect(recipeId.isOptional).toBe(false)
-    expect(recipeId.attributes).toContain('@db.Uuid')
-    expect(recipeId.attributes).toContain('@map("recipe_id")')
-    expect(recipeId.attributes).not.toMatch(/@default\(/)
-    expect(recipeId.attributes).not.toMatch(/@relation/)
-    expect(order.body).toMatch(/@@index\(\[recipeId\],\s*map:\s*"orders_recipe_id_idx"\)/)
+    // Prisma no pueda atravesar de `pedidos` a `recetas` con un `include` (R33). QT-313
+    // (design § 1.1): vive en la linea, y a su lado la receta original, con la misma forma.
+    for (const [nombre, columna, indice] of [
+      ['recipeId', 'recipe_id', 'order_lines_recipe_id_idx'],
+      ['originalRecipeId', 'original_recipe_id', 'order_lines_original_recipe_id_idx'],
+    ] as const) {
+      const candidate = field(orderLine, nombre)
+      expect(candidate.type).toBe('String')
+      expect(candidate.isOptional).toBe(false)
+      expect(candidate.attributes).toContain('@db.Uuid')
+      expect(candidate.attributes).toContain(`@map("${columna}")`)
+      expect(candidate.attributes).not.toMatch(/@default\(/)
+      expect(candidate.attributes).not.toMatch(/@relation/)
+      expect(orderLine.body).toMatch(new RegExp(`@@index\\(\\[${nombre}\\],\\s*map:\\s*"${indice}"\\)`))
+    }
+    expect(has(order, 'recipeId')).toBe(false)
+    expect(order.body).not.toContain('orders_recipe_id_idx')
   })
 
   it('OrderStatus declara PARCIAL, PENDIENTE, EN_CURSO, ENTREGADO, CANCELADO, POR_EMPACAR, EN_EMPAQUE, BLOQUEADO, POR_ACONDICIONAR, EN_ACONDICIONAMIENTO, TERMINADO y OrderPriority BAJA, MEDIA, ALTA, CRITICA, en ese orden y sin ningun valor mas (R1, QT-313 R52)', () => {
@@ -643,22 +730,37 @@ describe('db/schema.prisma — modelo de pedido', () => {
     // `@relation` en ninguno de los dos lados, NO hay `include` que atraviese de `pedidos` a
     // `recetas` ni a `identity` (`design.md > 8.1`). Eran cuatro hasta el 2026-09-07; `Unit`
     // sigue comprobandose abajo -no puede ganar un campo de vuelta aunque ya nadie lo apunte-.
-    for (const [nombre, columna, anulable] of CROSS_MODULE_SCALARS) {
-      const candidate = field(order, nombre)
-      expect(candidate.type, `${nombre} debe ser String`).toBe('String')
-      expect(candidate.attributes, `${nombre} debe ser uuid`).toContain('@db.Uuid')
-      expect(candidate.attributes, `${nombre} debe mapear a ${columna}`).toContain(
+    for (const [modelo, nombre, columna, anulable] of CROSS_MODULE_SCALARS) {
+      const candidate = field(modelo === 'Order' ? order : orderLine, nombre)
+      expect(candidate.type, `${modelo}.${nombre} debe ser String`).toBe('String')
+      expect(candidate.attributes, `${modelo}.${nombre} debe ser uuid`).toContain('@db.Uuid')
+      expect(candidate.attributes, `${modelo}.${nombre} debe mapear a ${columna}`).toContain(
         `@map("${columna}")`,
       )
-      expect(candidate.attributes, `${nombre} NO puede llevar @relation`).not.toMatch(/@relation/)
-      expect(candidate.isOptional, `${nombre} anulable=${String(anulable)}`).toBe(anulable)
+      expect(candidate.attributes, `${modelo}.${nombre} NO puede llevar @relation`).not.toMatch(/@relation/)
+      expect(candidate.isOptional, `${modelo}.${nombre} anulable=${String(anulable)}`).toBe(anulable)
+    }
+    // QT-313 (design § 1.1): todas las referencias ajenas de la linea, igual de escalares.
+    for (const [nombre, columna, anulable] of ORDER_LINE_CROSS_MODULE_SCALARS) {
+      const candidate = field(orderLine, nombre)
+      expect(candidate.type, `OrderLine.${nombre} debe ser String`).toBe('String')
+      expect(candidate.attributes, `OrderLine.${nombre} debe ser uuid`).toContain('@db.Uuid')
+      expect(candidate.attributes, `OrderLine.${nombre} debe mapear a ${columna}`).toContain(
+        `@map("${columna}")`,
+      )
+      expect(candidate.attributes, `OrderLine.${nombre} NO puede llevar @relation`).not.toMatch(/@relation/)
+      expect(candidate.isOptional, `OrderLine.${nombre} anulable=${String(anulable)}`).toBe(anulable)
     }
 
-    // `Order` no tiene NI UN `@relation`: no hay relacion intra-modulo tampoco, porque el modulo
-    // tiene un solo modelo.
+    // `Order` no tiene NI UN `@relation`: las relaciones intra-modulo las declara el lado hijo.
     expect(order.fields.filter((candidate) => /@relation/.test(candidate.attributes))).toEqual([])
-    // Y ningun campo de `Order` apunta a otro modelo como objeto.
-    for (const candidate of order.fields) {
+    // QT-313: el unico `@relation` de `OrderLine` es el de su pedido, del mismo modulo.
+    expect(
+      orderLine.fields.filter((candidate) => /@relation/.test(candidate.attributes)).map((c) => c.name),
+    ).toEqual(['order'])
+    expect(field(orderLine, 'order').type).toBe('Order')
+    // Y ningun campo de `Order` ni de `OrderLine` apunta a otro modelo como objeto.
+    for (const candidate of [...order.fields, ...orderLine.fields]) {
       for (const ajeno of ['Recipe', 'Unit', 'User', 'Product', 'RecipeLine']) {
         expect(candidate.type, `${candidate.name} no puede apuntar a ${ajeno}`).not.toBe(ajeno)
       }
@@ -674,6 +776,10 @@ describe('db/schema.prisma — modelo de pedido', () => {
         `${nombre} no debe declarar ningun campo de tipo Order`,
       ).toBe(false)
       expect(modelo.body, `${nombre} no debe nombrar Order[]`).not.toMatch(/Order\[\]/)
+      expect(
+        modelo.fields.some((candidate) => candidate.type === 'OrderLine'),
+        `${nombre} no debe declarar ningun campo de tipo OrderLine`,
+      ).toBe(false)
     }
   })
 
@@ -703,27 +809,61 @@ describe('db/schema.prisma — modelo de pedido', () => {
     const indexMaps = [...order.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)].map(
       (match) => match[1],
     )
+    // QT-313 (design § 1.2): `orders_recipe_id_idx`, `orders_unit_id_idx`, `orders_packed_by_idx`
+    // y `orders_conditioned_by_idx` se van con sus columnas; renacen en `order_lines`, abajo.
     expect(indexMaps).toEqual([
-      'orders_recipe_id_idx',
       'orders_created_by_idx',
       'orders_updated_by_idx',
-      'orders_packed_by_idx',
-      'orders_conditioned_by_idx',
-      'orders_unit_id_idx',
       'orders_company_id_customer_id_idx',
     ])
-    // `finished_at` no gana `@@index` en el esquema: su indice parcial vive solo en la
-    // migracion, como los de `list_query_indexes`.
     // Los dos unicos, tambien en ingles y `snake_case` (QC-60 sustituye el de QC-33).
     const uniqueMaps = [...order.body.matchAll(/@@unique\([^)]*map:\s*"([^"]+)"/g)].map(
       (match) => match[1],
     )
     expect(uniqueMaps).toEqual(['orders_company_year_sequence_key', 'orders_id_company_id_key'])
     for (const nombre of uniqueMaps) expect(nombre).toMatch(SNAKE_CASE)
+
+    // QT-313 (design § 1.1): la linea, con la misma regla y sus listas tambien cerradas.
+    expect(orderLine.body).toContain('@@map("order_lines")')
+    for (const [nombre, columna] of ORDER_LINE_COLUMNS) {
+      const mapped = /@map\("([^"]+)"\)/.exec(field(orderLine, nombre).attributes)
+      expect(mapped?.[1] ?? nombre, `OrderLine.${nombre} debe mapear a ${columna}`).toBe(columna)
+      expect(columna, `OrderLine.${nombre} -> ${columna}`).toMatch(SNAKE_CASE)
+    }
+    for (const candidate of orderLine.fields) {
+      if (candidate.isList || candidate.type === 'Order') continue
+      if (!/[A-Z]/.test(candidate.name)) continue
+      expect(candidate.attributes, `falta @map en OrderLine.${candidate.name}`).toMatch(/@map\("/)
+    }
+    const lineIndexMaps = [...orderLine.body.matchAll(/@@index\([^)]*map:\s*"([^"]+)"/g)].map(
+      (match) => match[1],
+    )
+    expect(lineIndexMaps).toEqual([
+      'order_lines_company_id_idx',
+      'order_lines_recipe_id_idx',
+      'order_lines_original_recipe_id_idx',
+      'order_lines_unit_id_idx',
+      'order_lines_packed_by_idx',
+      'order_lines_conditioned_by_idx',
+      'order_lines_created_by_idx',
+      'order_lines_updated_by_idx',
+    ])
+    // `finished_at` no gana `@@index` en el esquema, ni en `orders` antes ni en `order_lines`
+    // ahora: sus indices parciales viven solo en la migracion, como los de `list_query_indexes`.
+    expect(orderLine.body).not.toMatch(/@@index\(\[finishedAt\]/)
+    const lineUniqueMaps = [...orderLine.body.matchAll(/@@unique\([^)]*map:\s*"([^"]+)"/g)].map(
+      (match) => match[1],
+    )
+    expect(lineUniqueMaps).toEqual([
+      'order_lines_order_id_position_key',
+      'order_lines_id_company_id_key',
+      'order_lines_id_order_id_key',
+    ])
+    for (const nombre of [...lineIndexMaps, ...lineUniqueMaps]) expect(nombre).toMatch(SNAKE_CASE)
   })
 
-  it('orders gana una columna decimal(14,4) opcional en snake_case (R20)', () => {
-    const ingredientsCost = field(order, 'ingredientsCost')
+  it('orders gana una columna decimal(14,4) opcional en snake_case (R20) (QT-313: ahora en order_lines)', () => {
+    const ingredientsCost = field(orderLine, 'ingredientsCost')
     expect(ingredientsCost.type).toBe('Decimal')
     expect(ingredientsCost.isOptional).toBe(true)
     expect(ingredientsCost.attributes).toContain('@map("ingredients_cost")')
@@ -762,8 +902,8 @@ describe('db/schema.prisma — modelo de pedido', () => {
     ).toEqual([])
   })
 
-  it('QC-195 R47: orders gana packagingCost, decimal(14,4) opcional y sin default, junto a ingredientsCost', () => {
-    const packagingCost = field(order, 'packagingCost')
+  it('QC-195 R47: orders gana packagingCost, decimal(14,4) opcional y sin default, junto a ingredientsCost (QT-313: ahora en order_lines)', () => {
+    const packagingCost = field(orderLine, 'packagingCost')
     expect(packagingCost.type).toBe('Decimal')
     expect(packagingCost.isOptional).toBe(true)
     expect(packagingCost.attributes).toContain('@map("packaging_cost")')
@@ -771,8 +911,8 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(packagingCost.attributes).not.toMatch(/@default\(/)
   })
 
-  it('R23, R25: orders gana actualCost, decimal(14,4) opcional y sin default, aparte del estimado', () => {
-    const actualCost = field(order, 'actualCost')
+  it('R23, R25: orders gana actualCost, decimal(14,4) opcional y sin default, aparte del estimado (QT-313: ahora en order_lines)', () => {
+    const actualCost = field(orderLine, 'actualCost')
     expect(actualCost.type).toBe('Decimal')
     expect(actualCost.isOptional).toBe(true)
     expect(actualCost.attributes).toContain('@map("actual_cost")')
@@ -788,36 +928,52 @@ describe('db/schema.prisma — modelo de pedido', () => {
     expect(order.body).not.toContain('orders_presentation_id_idx')
   })
 
-  it('finishedAt es timestamptz anulable, sin default y sin indice en el esquema (R1)', () => {
-    const finishedAt = field(order, 'finishedAt')
+  it('finishedAt es timestamptz anulable, sin default y sin indice en el esquema (R1) (QT-313: en OrderLine)', () => {
+    const finishedAt = field(orderLine, 'finishedAt')
     expect(finishedAt.type).toBe('DateTime')
     expect(finishedAt.isOptional).toBe(true)
     expect(finishedAt.attributes).toContain('@map("finished_at")')
     expect(finishedAt.attributes).toContain('@db.Timestamptz(6)')
     expect(finishedAt.attributes).not.toMatch(/@default\(/)
-    expect(order.body).not.toMatch(/@@index\(\[finishedAt\]/)
+    expect(orderLine.body).not.toMatch(/@@index\(\[finishedAt\]/)
+    expect(has(order, 'finishedAt')).toBe(false)
   })
 
-  it('packedBy es uuid anulable, sin @relation y con su indice (R1, R46)', () => {
-    const packedBy = field(order, 'packedBy')
+  it('QT-313 R41: reservedAt es timestamptz anulable y sin default, en OrderLine y ya no en Order', () => {
+    // Antes solo lo cubria la lista cerrada de columnas de `Order`; design § 1.1 lo hace de la linea.
+    const reservedAt = field(orderLine, 'reservedAt')
+    expect(reservedAt.type).toBe('DateTime')
+    expect(reservedAt.isOptional).toBe(true)
+    expect(reservedAt.attributes).toContain('@map("reserved_at")')
+    expect(reservedAt.attributes).toContain('@db.Timestamptz(6)')
+    expect(reservedAt.attributes).not.toMatch(/@default\(/)
+    expect(has(order, 'reservedAt')).toBe(false)
+  })
+
+  it('packedBy es uuid anulable, sin @relation y con su indice (R1, R46) (QT-313: en OrderLine)', () => {
+    const packedBy = field(orderLine, 'packedBy')
     expect(packedBy.type).toBe('String')
     expect(packedBy.isOptional).toBe(true)
     expect(packedBy.attributes).toContain('@db.Uuid')
     expect(packedBy.attributes).toContain('@map("packed_by")')
     expect(packedBy.attributes).not.toMatch(/@default\(/)
     expect(packedBy.attributes).not.toMatch(/@relation/)
-    expect(order.body).toMatch(/@@index\(\[packedBy\],\s*map:\s*"orders_packed_by_idx"\)/)
+    expect(orderLine.body).toMatch(/@@index\(\[packedBy\],\s*map:\s*"order_lines_packed_by_idx"\)/)
+    expect(has(order, 'packedBy')).toBe(false)
+    expect(order.body).not.toContain('orders_packed_by_idx')
   })
 
-  it('R25: conditionedBy es uuid anulable, sin @relation y con su indice', () => {
-    const conditionedBy = field(order, 'conditionedBy')
+  it('R25: conditionedBy es uuid anulable, sin @relation y con su indice (QT-313: en OrderLine)', () => {
+    const conditionedBy = field(orderLine, 'conditionedBy')
     expect(conditionedBy.type).toBe('String')
     expect(conditionedBy.isOptional).toBe(true)
     expect(conditionedBy.attributes).toContain('@db.Uuid')
     expect(conditionedBy.attributes).toContain('@map("conditioned_by")')
     expect(conditionedBy.attributes).not.toMatch(/@default\(/)
     expect(conditionedBy.attributes).not.toMatch(/@relation/)
-    expect(order.body).toMatch(/@@index\(\[conditionedBy\],\s*map:\s*"orders_conditioned_by_idx"\)/)
+    expect(orderLine.body).toMatch(/@@index\(\[conditionedBy\],\s*map:\s*"order_lines_conditioned_by_idx"\)/)
+    expect(has(order, 'conditionedBy')).toBe(false)
+    expect(order.body).not.toContain('orders_conditioned_by_idx')
   })
 
   it('no nace ninguna columna de moneda (R16)', () => {

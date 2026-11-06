@@ -105,6 +105,13 @@ function orderModel(schema: string): string {
   return match[1] as string
 }
 
+/** QT-313 (T15, `20261103120200_orders_drop_line_columns`): el precio de venta pasa a la linea. */
+function orderLineModel(schema: string): string {
+  const match = /model OrderLine \{([\s\S]*?)\n\}/.exec(schema)
+  if (match === null) throw new Error('db/schema.prisma no tiene model OrderLine')
+  return match[1] as string
+}
+
 const SALE_PRICE_FIELD = /^\s*salePrice\s+Decimal\?\s+@map\("sale_price"\) @db\.Decimal\(14, 4\)\s*$/m
 
 describe('migration.sql de orders_sale_price', () => {
@@ -167,9 +174,9 @@ describe('migration.sql de orders_sale_price', () => {
   })
 })
 
-describe('db/schema.prisma > Order.salePrice', () => {
-  it('R2: campo opcional en ingles, decimal(14,4), mapeado a sale_price', () => {
-    const model = orderModel(schemaSource)
+describe('db/schema.prisma > OrderLine.salePrice (QT-313: sale de Order)', () => {
+  it('R2: campo opcional en ingles, decimal(14,4), mapeado a sale_price, ahora en OrderLine', () => {
+    const model = orderLineModel(schemaSource)
     expect(model).toMatch(SALE_PRICE_FIELD)
     const obligatorio = model.replace(/(salePrice\s+)Decimal\?/, '$1Decimal ')
     expect(obligatorio).not.toBe(model)
@@ -181,5 +188,12 @@ describe('db/schema.prisma > Order.salePrice', () => {
 
   it('R2: el modelo no declara moneda para el precio', () => {
     expect(orderModel(schemaSource)).not.toMatch(/currency|moneda/i)
+    expect(orderLineModel(schemaSource)).not.toMatch(/currency|moneda/i)
+  })
+
+  it('QT-313 R1: Order ya no declara salePrice ni la columna sale_price', () => {
+    const model = orderModel(schemaSource)
+    expect(model).not.toMatch(/^\s*salePrice\s/m)
+    expect(model).not.toContain('sale_price')
   })
 })

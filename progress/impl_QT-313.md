@@ -698,3 +698,21 @@ Rutas relativas a la raíz del repo. Cada test existe en el árbol de `1feb49af1
   - `e2e/pedido-con-varias-recetas.spec.ts`, chromium y webkit: en verde. En webkit, `1 passed (3.8 min)`. Corrida de T16 (backend_dev ab3cdf7512b3a4a7a), sobre `QuimiCloude_QT313`.
   - Esto corrige lo que dice la seccion T16: el spec nuevo si se corrio en WebKit. Siguen pendientes de WebKit los demas specs editados.
 - Quedan como deuda para el cierre, sin tocar: m1, m3, m4, m7 y los indices de terminados.
+
+## Rojos de gate-completo en el PR #317 (run 42255899967, 2026-11-06)
+
+Los 5 archivos rojos (18 tests) eran de esta feature y no se meten en el baseline. Solo cambian tests.
+- `tests/unit/pedidos/schema/pedidos-schema.test.ts` (14 rojos): buscaba en `model Order` las once columnas que T15 paso a `OrderLine`.
+  - Cada asercion pasa a `OrderLine` con el mismo rigor: tipo, `@map`, `Decimal(14,4)`, anulabilidad, sin `@relation` e indice `order_lines_*_idx`.
+  - Listas cerradas nuevas: `ORDER_LINE_COLUMNS` y `LINE_COLUMNS_MOVED_FROM_ORDER`.
+  - Tests nuevos: «QT-313 R1: Order ya NO declara ninguna de las once columnas…» y «QT-313 R41: reservedAt … en OrderLine y ya no en Order».
+- `orders-actual-cost-migration.test.ts` y `orders-sale-price-migration.test.ts` (1 rojo cada uno): la asercion de schema pasa a `OrderLine`. Cada archivo gana «QT-313 R1: Order ya no declara …».
+- `tests/unit/recetas/scope.test.ts` (1 rojo): a la lista cerrada de specs E2E de recetas le faltaba `pedido-con-varias-recetas.spec.ts` (T16). Se añade con su nota.
+- `tests/unit/shared/data-table-alcance.test.ts` (1 rojo): la lista cerrada de E2E que referencian data-table pasa de 58 a 59 con el spec nuevo, que usa `data-table-row-` y `data-table-cell-orderNumber`.
+- Barrido de otros tests que leen columnas quitadas de `orders` o listas cerradas de `e2e/`: solo hay comentarios o migraciones antiguas, todo en verde y sin deuda ajena de `dev`.
+
+Verificacion (salida real):
+- Los 5 archivos con `--project node --maxWorkers=1`: `Test Files 5 passed (5)`, `Tests 76 passed | 2 skipped (78)`. Repetido por el implementer.
+- Barrido de 23 archivos: 305 en verde, 77 skipped.
+- `tests/unit/{pedidos,inventario,asignaciones,recetas}/schema`: 53 archivos, 701 en verde.
+- `pnpm run typecheck` sin errores; `pnpm run lint` con 0 errores; guardias 87/87 (1333 en verde, 22 skipped).
