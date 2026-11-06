@@ -614,3 +614,74 @@ Desviaciones aceptadas por el humano (2026-11-06), para el reviewer:
    - La frase historica de § 4.2.1, «antes cualquier edicion de un pedido bloqueado iba por el camino completo», no es exacta: el atajo de solo-cliente tambien se tomaba en `BLOQUEADO`.
    - **Cambio de comportamiento:** cambiar solo el cliente de un pedido con una linea `BLOQUEADO` ahora reintenta la reserva y puede pedir confirmacion.
 3. El «nada escrito» del unitario (b) solo se comprueba de verdad en el `.int`, por el rollback.
+
+## T18 — Trazabilidad R1–R56 → test (2026-11-06)
+
+Cada requisito tiene al menos un test real de QT-313 con su `R<n>` en el nombre. Solo cuentan los tests de archivos creados por esta feature o con «QT-313» en el nombre o en su `describe`; los de otras features con el mismo numero no cuentan. Un script comprobo que los 78 nombres citados existen en el arbol actual. Los 10 archivos unit citados se volvieron a correr: `Test Files 10 passed (10)`, `Tests 328 passed (328)`. No hay huecos.
+
+Pendiente para CI o para el `./init.sh` del leader: el E2E en WebKit de los specs editados (en local no hubo memoria; habia 6,7 GB libres y hacen falta 8) y el related de ui de T14b/T14a, que no se corrio entero por memoria.
+
+## T18 — Trazabilidad `R1…R56 → test`
+
+Rutas relativas a la raíz del repo. Cada test existe en el árbol de `1feb49af1` y lleva `R<n>` en el nombre
+(el suyo o el del `describe` que lo envuelve). Todos están en archivos creados por QT-313 o llevan
+«QT-313» en el nombre o en su `describe`.
+
+| R | Test (archivo › nombre) |
+|---|---|
+| R1 | `tests/unit/pedidos/orders-header-only.test.ts` › «QT-313 R1: ningun SQL crudo de lib/ ni de scripts/ lee o escribe en orders las columnas de la linea» (el grep de R1); también «QT-313 R1: el modelo Order de Prisma no declara receta, cantidad, unidad, costes, precio, reserva ni etapas» y `tests/integration/pedidos/orders-drop-line-columns-migration.int.test.ts` › «QT-313 R1: orders queda sin las columnas de la linea, sin sus CHECK, FK e indices, y la cantidad se indexa en la linea» |
+| R2 | `tests/integration/pedidos/order-lines-migration.int.test.ts` › «R2: la base rechaza una linea cuya empresa no es la de su pedido», «R2: order_lines tiene RLS activada y forzada» |
+| R3 | `tests/unit/pedidos/order-input-lines.test.ts` › «R3: sin lineas se rechaza», «R3: con una o varias lineas se admite y aplica los defectos del pedido» |
+| R4 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R4: la original y una version suya en la misma alta rechazan con duplicate_order_recipe y no escriben nada» |
+| R5 | `tests/integration/pedidos/order-lines-migration.int.test.ts` › «R5: la base rechaza dos lineas activas con la misma original, y tambien original + version»; `order-lines-repository.int.test.ts` › «QT-313 R5: anadir la version de una receta que ya esta activa lanza duplicate_order_recipe» |
+| R6 | `tests/integration/pedidos/order-lines-repository.int.test.ts` › «QT-313 R6: leer y bloquear devuelven las lineas por position aunque se dieran de alta en otro orden; la quitada no sale y la cancelada si» |
+| R7 | `tests/integration/pedidos/order-lines-migration.int.test.ts` › «R7: cada pedido, borrados incluidos, queda con exactamente una linea con sus valores, NULL incluidos, y su estado intacto» |
+| R8 | `tests/integration/pedidos/order-lines-references-migration.int.test.ts` › «R8, R37: los conteos de las seis tablas no cambian y toda fila de un pedido de una linea apunta a ella, delivery_void con la misma linea que su delivery» |
+| R9 | `tests/integration/pedidos/orders-drop-line-columns-migration.int.test.ts` › «QT-313 R9: con pedidos de dos lineas vivas la bajada falla, nombra cuantos y no cambia nada» |
+| R10 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R10, R12, R17, R34, R41: dos lineas con un insumo compartido nacen en orden, cada una con su coste, su apartado y su plazo» |
+| R11 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R10, R11: una segunda linea con una receta de otra empresa rechaza el alta entera con recipe_not_found y no escribe nada»; `tests/unit/pedidos/create-order-lines.test.ts` › «R11: una segunda linea invalida rechaza el alta entera con el codigo de hoy y su posicion en el diagnostico, sin escribir» |
+| R12 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R10, R12, R17, R34, R41: dos lineas con un insumo compartido nacen en orden, cada una con su coste, su apartado y su plazo» |
+| R13 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R13: si la segunda linea no alcanza y no se confirma, order_would_block y no queda nada escrito» |
+| R14 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R14, R34: con confirmacion solo la linea que no alcanza queda BLOQUEADO, sin apartado, coste ni plazo; el pedido queda PARCIAL» |
+| R15 | `tests/unit/pedidos/order-input-lines.test.ts` › «R15: el 0 es un precio, distinto de vacio»; `tests/integration/pedidos/order-lines-migration.int.test.ts` › «R15: la base rechaza cantidad 0 y precio de linea negativo, y admite precio 0» |
+| R16 | `tests/unit/pedidos/order-totals.test.ts` › «R16, R18: suma exacta con 4 decimales, sin perder centimos» |
+| R17 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R17, R25, R41: editar una linea deja coste, apartado, plazo y fila de la otra identicos» |
+| R18 | `tests/unit/pedidos/order-totals.test.ts` › «R16, R18: suma exacta con 4 decimales, sin perder centimos», «R16, R18: pasa de 10 digitos enteros sin truncar ni redondear» |
+| R19 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R45, R19: el resumen de un pedido de una linea es el de hoy mas lineId, sin precio» |
+| R20 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R20, R21, R22: edita una linea, quita otra liberando su material y anade una nueva que aparta lo suyo» |
+| R21 | `tests/unit/pedidos/update-order-lines.test.ts` › «R21: anadir una linea a un pedido con otra en EN_EMPAQUE la crea PENDIENTE con su material, sin tocar la otra» |
+| R22 | `tests/unit/pedidos/update-order-lines.test.ts` › «R22: quitar una linea PENDIENTE y otra BLOQUEADO las da de baja y libera su material con quien edita como autor» |
+| R23 | `tests/unit/pedidos/order-line-diff.test.ts` › «R23: quitar una EN_CURSO rechaza con order_line_not_removable aunque las demas se puedan quitar» |
+| R24 | `tests/unit/pedidos/order-line-diff.test.ts` › «R24: una linea en estado no editable con cambios rechaza con invalid_transition» |
+| R25 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R17, R25: findCostingBatches con excludeOrderLineId cuenta como disponible lo de esa linea y no lo de otra linea del mismo pedido» |
+| R26 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R26: editar el reparto de una linea no toca el de la otra»; `tests/unit/pedidos/update-order-lines.test.ts` › «R26: editar el reparto y la unidad de una linea POR_EMPACAR escribe solo esa linea y aparta solo lo suyo» |
+| R27 | `tests/integration/pedidos/order-lines-state.int.test.ts` › «QT-313 R27, R34: cancelar una linea la deja CANCELADO con su motivo, libera todo lo suyo, vacia su plazo, no toca la otra y el pedido toma el estado de la que queda activa» |
+| R28 | `tests/integration/pedidos/order-lines-state.int.test.ts` › «QT-313 R28: una linea POR_EMPACAR responde not_cancellable y un motivo vacio invalid_input, sin escribir nada» |
+| R29 | `tests/integration/pedidos/order-lines-state.int.test.ts` › «QT-313 R29, R34: cancela las lineas cancelables con el mismo motivo, deja intacta la POR_EMPACAR y el pedido toma su estado» |
+| R30 | `tests/unit/pedidos/cancel-order-line.test.ts` › «R30: sin pedidos.modificar responde unauthorized antes de validar el motivo y sin abrir la transaccion», «R30: cancelar el pedido sin pedidos.modificar responde unauthorized antes de validar y sin abrir la transaccion»; `tests/unit/pedidos/create-order-lines.test.ts` › «R30: sin pedidos.modificar responde unauthorized sin validar la entrada ni tocar ningun puerto» |
+| R31 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R31, R32: una linea recorre todo el flujo y la otra se queda PENDIENTE; el pedido queda PARCIAL» |
+| R32 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R31, R32: una linea recorre todo el flujo y la otra se queda PENDIENTE; el pedido queda PARCIAL» |
+| R33 | `tests/unit/pedidos/order-totals.test.ts` › «R33: TERMINADO y ENTREGADO cuentan como terminadas», «R33: las canceladas no cuentan ni en el total ni en las terminadas» |
+| R34 | `tests/integration/pedidos/order-lines-repository.int.test.ts` › «QT-313 R34: el estado del pedido se deriva de sus lineas; todas canceladas dan CANCELADO con el motivo de la ultima» |
+| R35 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R35, R37: el responsable del pedido abre, finaliza y empaca su linea, y cada anotacion lleva la linea», «QT-313 R35: con dos lineas en el mismo estado, abrir responde invalid_input sin escribir» |
+| R36 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R36: finalizar una linea consume solo lo apartado para ella, con el insumo compartido» |
+| R37 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R37: el equipo de acondicionamiento y las evidencias se guardan con la linea que se opera»; `tests/integration/pedidos/order-lines-delivery.int.test.ts` › «QT-313 R37, R39: …» |
+| R38 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R38, R37: terminar el empaque guarda el coste real de esa linea y cada lote de producto terminado lleva su linea» |
+| R39 | `tests/integration/pedidos/order-lines-delivery.int.test.ts` › «QT-313 R37, R39: el asiento delivery lleva la linea del reparto, la entrega completa deja la linea ENTREGADO, y el delivery_void lleva la misma linea y la devuelve a TERMINADO» |
+| R40 | `tests/integration/pedidos/order-lines-state.int.test.ts` › «QT-313 R40: con dos lineas BLOQUEADO y material para una, la revision desbloquea la primera, que estrena plazo, y deja la otra» |
+| R41 | `tests/integration/pedidos/order-lines-repository.int.test.ts` › «QT-313 R41: el plazo de una linea se escribe sin mover su updated_at ni tocar la otra» |
+| R42 | `tests/unit/pedidos/create-order-lines.test.ts` › «R42: la prioridad y el cliente son del pedido; si llegan en una linea se descartan» |
+| R43 | `tests/integration/pedidos/order-lines-repository.int.test.ts` › «QT-313 R43: una linea de otro pedido o quitada no se bloquea, no se cancela, no cambia de estado ni de plazo» |
+| R44 | `tests/integration/pedidos/order-lines-use-cases.int.test.ts` › «QT-313 R44, R1: la ficha toma receta, cantidad, unidad, precio y coste de su linea de menor posicion, y el pedido no los guarda» |
+| R45 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R45: un pedido de dos lineas en el mismo estado sale como dos filas, cada una con la suya» |
+| R46 | `e2e/pedido-con-varias-recetas.spec.ts` › «QT-313 R46 - alta, abrir y finalizar como operador y empacar: apartado, consumo y lote de producto terminado iguales a hoy, lote a lote»; `tests/integration/pedidos/order-lines-flow.int.test.ts` › «QT-313 R46: alta, cancelar una linea y finalizar la otra; lote a lote, lo apartado, lo liberado y lo consumido» |
+| R47 | `tests/integration/pedidos/order-lines-state.int.test.ts` › «QT-313 R47: la baja marca el pedido y sus dos lineas, libera el material de cada una y ninguna linea vuelve en una lectura» |
+| R48 | `tests/integration/pedidos/order-lines-migration.int.test.ts` › «R48: la base rechaza una linea PARCIAL» |
+| R49 | `tests/integration/pedidos/list-query-orders.int.test.ts` › «QT-313 R49: EN_CURSO trae los EN_CURSO y los PARCIAL con una linea activa en curso, no el PARCIAL cuya linea en curso esta cancelada o quitada», «QT-313 R49: PARCIAL trae solo los pedidos PARCIAL», «QT-313 R49: EN_CURSO y PENDIENTE a la vez dan la union sin repetir ningun pedido, y el total coincide» |
+| R50 | `tests/unit/integraciones/whatsapp-chat-context.test.ts` › «R50: un pedido PARCIAL cuenta como abierto en el contexto de chat»; `tests/unit/pedidos/order-classification.test.ts` › «R50: PARCIAL no esta entre los estados que dejan de estar en curso» |
+| R51 | `tests/integration/pedidos/order-lines-state.int.test.ts` › «QT-313 R51, R34: con dos lineas PENDIENTE de plazos distintos el proceso cancela solo la vencida, libera solo lo suyo y el pedido sigue con el estado de la otra» |
+| R52 | `tests/integration/pedidos/order-status-partial-migration.int.test.ts` › «R52: el enum queda con PARCIAL delante de PENDIENTE y el resto en su orden», «R52: ordenar por estado ascendente pone los PARCIAL antes que los PENDIENTE» |
+| R53 | `tests/unit/integraciones/whatsapp-chat-context.test.ts` › «R53: un pedido PARCIAL se lee «en preparación»» |
+| R54 | `tests/unit/pedidos-ui/order-row-actions.test.tsx` › «un pedido PARCIAL en la pantalla actual (QT-313)» › «R54: editar, cancelar y eliminar deshabilitados, sin reparto, entrega ni entregas, con «Responsables» y «Cliente» disponibles», «R54: PARCIAL es final y no acepta la edicion acotada de reparto» |
+| R55 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R55: un PARCIAL con una linea PENDIENTE admite asignar, quitar grupo y desasignar», «QT-313 R55: un PARCIAL con todas sus lineas activas fabricadas rechaza las tres con order_produced_frozen sin escribir» |
+| R56 | `tests/integration/pedidos/order-lines-blocked-retry.int.test.ts` › «QT-313 R56, R34, R25: con material repuesto, guardar sin cambios deja la bloqueada PENDIENTE con su apartado lote a lote y no toca la otra», «QT-313 R56: sin reponer, sin confirmacion rechaza con order_would_block sin escribir; con confirmacion sigue BLOQUEADO sin apartado ni plazo» |

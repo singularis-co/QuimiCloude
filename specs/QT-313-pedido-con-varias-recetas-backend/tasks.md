@@ -292,7 +292,7 @@
   pedido muestra la suma (enmienda de QC-307, decisión «¿Dónde va el precio de venta?»); y punto 2:
   la reserva elige lote **por receta del pedido**, con su propio plazo de caducidad.
   *Hecho:* el texto ya no dice «del pedido entero». Depende de T15.
-- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R56 → test`.
+- [x] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R56 → test`.
   *Hecho:* cada `R<n>`, R56 incluido, tiene al menos un test con `R<n>` en el nombre. Depende de
   T16 y T16b.
 
