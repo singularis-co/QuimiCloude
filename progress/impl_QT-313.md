@@ -528,9 +528,29 @@ Verificacion (salida real):
   - En el lote 01 fallo `tests/unit/clientes-ui/clientes-viewport.test.tsx` («…cumplen 44x44 px y 16 px de fuente (R39)»). Corrido solo da `Tests 8 passed (8)`; es inestable bajo carga y T15 no toca `clientes`.
   - Total: 129/130 archivos y 2687/2688 tests en la pasada por lotes.
 
-Desviaciones para el reviewer. El backend_dev listo nueve en su informe al leader; aqui se anota la que el leader pidio resaltar y lo que se puede comprobar en la migracion. **El leader debe completar las desviaciones 1–9 con su texto exacto.**
+Desviaciones del backend_dev de T15, para el reviewer (texto que paso el leader el 2026-11-06):
+1. **Orden por `quantity`:** se ordena por la cantidad de la primera linea viva, como hacia el espejo.
+   - Va en dos pasos: primero los ids con Prisma segun el `where`; despues el orden y la pagina en SQL, acotado por empresa.
+   - El `numberRange` de `quantity` y la busqueda por nombre de receta aceptan cualquier linea viva.
+   - Con una linea, el resultado es identico al de antes.
+2. **`OrderView` de varias lineas:** los campos planos salen de `lines[0]`, la de menor `position`, igual que el espejo. Esa linea puede estar cancelada. `toOrderView` lanza un `Error` si un pedido vivo no tiene lineas, porque eso rompe un invariante.
+3. **`down.sql`:** aborta tambien si un pedido no tiene ninguna linea, porque no habria receta que devolver a `orders`. Es una proteccion añadida.
+4. **Indices de terminados:** vease abajo.
+5. **`refreshStatus`:** ya no escribe si no cambian ni el estado ni el motivo.
+6. **Tests retirados o reescritos:**
+   - Se borran los 5 de T14a «espejo de etapa en `orders` (CHECK por CHECK)».
+   - Los de T14b «… aunque `orders.recipe_id` diga otra» conservan solo la asercion sobre la linea.
+   - Los tests de CHECK de etapa (`order-packing-constraints`, `order-conditioning-constraints`, `pedidos-constraints`) pasan a comprobar los CHECK de `order_lines`.
+7. **Dobles de test antiguos:**
+   - Siguen ofreciendo `setIngredientsCost`/`setReservedAt` (`LegacyOrderWrites`).
+   - `singleRecipeWrites` rellena la receta y el coste en los argumentos registrados de `create`, para no reescribir unas 30 aserciones.
+   - `create-order.test.ts` si lee `writeLines`.
+8. **Rojos previos arreglados:** `conditioning-team-repository.int` y `finish-auto-assign-packers.int` no pasaban `orderLineId` desde T14e.
+9. **Limpiezas E2E:** las que borraban pedidos por receta ahora borran antes sus lineas. Las que borran por empresa sin borrar las lineas se quedan igual: las arregla T16.
+
+`guard-asignacion-componentizada` falla por plazo: se anota como deuda ajena en el cierre (acordado con el leader).
 - **(4) Indices de terminados:** `orders_company_finished_idx` y `orders_company_terminated_idx` caen con `finished_at` y no se rehicieron en `order_lines`. **El reviewer decide** si hacen falta por el rendimiento de los listados de terminados.
-- `orders_expirable_idx` cae con `reserved_at`. El indice de caducidad de `order_lines` ya existe desde T1.
+- `orders_expirable_idx` cae con `reserved_at`. Su equivalente en `order_lines` es `order_lines_expirable_idx`, que existe desde T1.
 - `orders_quantity_idx` pasa a ser `order_lines_quantity_idx`, parcial con `deleted_at IS NULL`.
 
 ## Fase 6 — T17 Documentacion del perfil (2026-11-06)
