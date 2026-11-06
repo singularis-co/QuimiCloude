@@ -443,7 +443,7 @@ punto 3) escriben también esas cuatro, en la misma sentencia que el estado deri
 | Caso de uso | Cambio |
 |---|---|
 | `createOrder` | Valida cada línea (R11, error con `linePosition`), costea cada una, abre **una** transacción: crea pedido, crea líneas, `syncForLine` en orden, `reserved_at` de cada línea que apartó, deriva estado |
-| `updateOrder` | Diff contra las líneas vivas bajo candado: editar (R24, R25), añadir (R21), quitar `PENDIENTE`/`BLOQUEADO` (R22, R23). Solo las líneas cambiadas recalculan coste, apartado y `reserved_at` (R17, R41) |
+| `updateOrder` | Diff contra las líneas vivas bajo candado: editar (R24, R25), añadir (R21), quitar `PENDIENTE`/`BLOQUEADO` (R22, R23). Solo las líneas cambiadas **y las `BLOQUEADO` sin cambios (R56, § 4.2.1)** recalculan coste, apartado y `reserved_at` (R17, R41) |
 | `cancelOrder` | § 2.3 (R29) |
 | `cancelOrderLine` | **Nuevo** (R27, R28) |
 | `deleteOrder` | § 2.4 (R47) |
@@ -453,6 +453,46 @@ punto 3) escriben también esas cuatro, en la misma sentencia que el estado deri
 | `reviewBlockedOrders` | Por línea (R40) |
 | `getOrder`, `listOrders` | Devuelven líneas, totales y resumen (§ 4.3); filtro y orden con `PARCIAL` (R49, R52, § 2.2.1, § 2.2.2) |
 | `deliverOrder`, `voidDelivery` | Cuentan el reparto por línea; mueven `TERMINADO` ↔ `ENTREGADO` de la línea (R39) y derivan el pedido |
+
+#### 4.2.1 Reintento de las líneas `BLOQUEADO` al editar (R56, enmienda F2.1 del 2026-11-06)
+
+Antes de QT-313, guardar la edición de un pedido `BLOQUEADO` sin cambiar nada recalculaba lo
+apartado desde cero y, si ya alcanzaba, lo dejaba en `PENDIENTE` (QC-141 R48, paso 5 de
+`e2e/reserva-de-material.spec.ts`). Con el diff de líneas, `update-order.ts` solo procesa las
+líneas con `changed === true`, y ese caso quedaba `BLOQUEADO` (rompe R44). La decisión «Reintento
+de reserva al editar» lo recupera así, en `lib/modules/pedidos/domain/update-order.ts`:
+
+1. **Plan (`planEdit`).** Cada línea planificada gana `retry: boolean`, verdadero cuando la línea
+   existe, llega **sin cambios** (`changed === false`) y su estado guardado es `BLOQUEADO`. Una
+   línea `BLOQUEADO` que cambia ya va por el camino de R25; una línea sin cambios en otro estado no
+   se marca. `retry` no relaja ninguna regla de `planEdit` (R23, R24, recetas repetidas).
+2. **Atajo de «solo cambia el cliente».** `linesUnchanged` pasa a exigir además que no haya
+   ninguna línea con `retry`. Con una línea `BLOQUEADO`, cambiar solo el cliente va por el camino
+   completo, igual que antes de QT-313 hacía cualquier edición de un pedido bloqueado.
+3. **Coste fuera de la transacción.** El bucle que precalcula `costs` recorre
+   `changed || retry`, con los datos guardados de la línea (receta, cantidad, unidad, reparto),
+   como hoy recalculaba el coste toda edición del pedido de una receta.
+4. **Dentro de la misma transacción y del mismo candado (`lockAliveLines`).** Tras volver a
+   planificar sobre `locked.lines`, `touched` es `changed || retry`: el replanteo bajo candado es
+   el que decide, así que una línea que otra operación desbloqueó entre la lectura y el candado
+   ya no se reintenta. Las líneas `retry` pasan por `prepareLine` (necesidad de material y
+   coste) pero **no** entran en `edited` de `writeLines`: sus datos no cambian.
+5. **Orden de reserva.** Las `retry` entran en `toSync` junto a las editadas, ordenadas por
+   `position`, y antes que las nuevas: compiten con lo que ya apartaron las anteriores, como
+   cualquier línea del pedido.
+6. **Resultado.** El bucle de `outcomes` existente ya cubre los dos casos: `reserved` →
+   `moveLine BLOQUEADO → PENDIENTE` y `setLineReservedAt(instant)`; `insufficient` → sigue en
+   `BLOQUEADO`, `reserved_at` en NULL y coste de ingredientes en NULL, sin material apartado
+   (QC-138 R5). Una línea `retry` que sigue sin alcanzar **cuenta** para `blocked`: sin
+   `confirmBlocked` la edición entera se rechaza con `order_would_block` y no escribe nada,
+   exactamente como hoy (QC-138 R6) al reeditar un pedido bloqueado que sigue sin alcanzar; con
+   confirmación queda `BLOQUEADO`. El estado guardado no cambia en ese caso, así que no hay
+   `moveLine`.
+7. **Estado del pedido.** `refreshStatus` al final, como en toda edición (R34).
+
+No hay tabla, columna, puerto ni error nuevos: el reintento reutiliza `syncForLine`,
+`moveLine`, `setLineReservedAt` y `setLineIngredientsCost`. `update-order-presentation-lines.ts`
+(R26) no cambia: solo toca la línea que recibe.
 
 ### 4.3 Salida
 
@@ -614,6 +654,12 @@ cabe sin rehacer el modelo.
    el estado del pedido aparece en una decena de lecturas.
 7. **Unicidad por `recipe_id` efectiva** (la propuesta de F1.2). Descartada por la decisión P10:
    dejaría convivir la original y una versión suya.
+8. **Reintentar la reserva de las líneas `BLOQUEADO` solo si el pedido es de una línea** (o
+   cambiar la aserción del paso 5 de `e2e/reserva-de-material.spec.ts`). Lo primero deja dos
+   reglas según el número de recetas y lo segundo pierde QC-141 R48 sin que nadie lo haya
+   decidido. Descartadas por el humano («Reintentar siempre», 2026-11-06). También se descartó
+   **reintentar todas las líneas sin cambios**: movería material y `reserved_at` de líneas
+   `PENDIENTE` que nadie tocó, contra R25 y R41.
 
 ## 11. Riesgos
 

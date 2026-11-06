@@ -158,7 +158,19 @@
 - **R25** — CUANDO una edición cambia una línea en estado editable, el sistema DEBE volver a
   apartar el material de esa línea y volver a calcular su coste con las reglas de hoy (incluido
   el paso a `BLOQUEADO` o de vuelta a `PENDIENTE`), sin tocar el material, el coste ni el estado
-  de las líneas que no cambian. *[¿Cómo avanza el estado?]*
+  de las líneas que no cambian, **salvo las líneas `BLOQUEADO` sin cambios, que reintentan su
+  reserva según R56**. *[¿Cómo avanza el estado? · Reintento de reserva al editar]*
+- **R56** — CUANDO se guarda una edición general de un pedido, el sistema DEBE reintentar, en la
+  misma transacción que la edición, apartar el material de cada línea viva en `BLOQUEADO` que
+  llega sin cambios, con las reglas de reserva de hoy: SI el material alcanza, ENTONCES esa línea
+  DEBE quedar en `PENDIENTE` con su material apartado y su plazo de reserva reiniciado (R41); SI
+  sigue faltando material, ENTONCES la línea DEBE seguir en `BLOQUEADO`, sin material apartado y
+  con su plazo de reserva vacío, y la edición DEBE pedir la misma confirmación de guardarla
+  bloqueada que hoy (`order_would_block`, sin escribir nada mientras no se confirme). Las demás
+  líneas sin cambios NO DEBEN
+  tocarse, y el estado del pedido DEBE derivarse de sus líneas como en R34. Vale igual para un
+  pedido de una línea que para uno de varias. *[Reintento de reserva al editar · ¿Cómo avanza el
+  estado?]*
 - **R26** — CUANDO se edita el reparto y la unidad de una línea en `POR_EMPACAR` (la edición
   acotada de hoy), el sistema DEBE aplicar las reglas de hoy a esa línea y NO DEBE tocar las
   demás. *[¿Cómo avanza el estado?]*
@@ -306,7 +318,7 @@
 | Decisión (fila) | Requisitos |
 |---|---|
 | ¿Qué es un pedido con varias fórmulas? | R1, R3, R6, R7, R8, R10, R11, R17, R18 |
-| ¿Cómo avanza el estado? | R12, R13, R14, R24, R25, R26, R31, R32, R33, R34, R36, R37, R38, R39, R40, R41, R51 |
+| ¿Cómo avanza el estado? | R12, R13, R14, R24, R25, R26, R31, R32, R33, R34, R36, R37, R38, R39, R40, R41, R51, R56 |
 | ¿Dónde va el precio de venta? | R1, R15, R16, R19 |
 | ¿Quién es responsable? | R30, R35, R42 |
 | ¿Se puede cancelar una sola receta? | R27, R28, R29 |
@@ -341,6 +353,7 @@
 | Posición de la línea solo en el diagnóstico | R11, R13 |
 | Espejo ampliado hasta T15 | R34, R44, R45 (decisión de proceso) |
 | Esquemas planos | R44 (y «Lo que NO entra») |
+| Reintento de reserva al editar | R25, R56 (y R44: conserva QC-141 R48) |
 
 ## Preguntas abiertas
 
@@ -386,3 +399,4 @@ Ninguna. P1–P14 están cerradas en la tabla de abajo.
 | 2026-11-04 | Posición de la línea solo en el diagnóstico (F2.1) | **La posición de la línea que falla (R11, R13) va solo en el diagnóstico del error.** No se amplía la lista cerrada de campos de `errores/domain/error-state.ts`. |
 | 2026-11-04 | Espejo ampliado hasta T15 (F2.1) | **Desde T14a, la escritura que re-deriva el estado del pedido y el espejo de la primera línea escriben también en `orders` `packed_by`, `conditioned_by`, `finished_at` y `actual_cost`**, coherentes con el estado derivado y en NULL cuando es `PARCIAL`, para respetar los CHECK de `orders` que siguen vivos hasta T15 y mantener `OrderView.actualCost`, R44 y R45. T15 borra el espejo y esos CHECK junto con las columnas. |
 | 2026-11-04 | Esquemas planos (F2.1) | **QT-313 no renombra ni borra los esquemas de entrada del pedido.** Los planos siguen para la pantalla y los de líneas conservan su nombre provisional; lo hace QT-314, que rehace el formulario. Enmienda la fila «Esquemas en transición» en lo que toca a T14c. |
+| 2026-11-06 | Reintento de reserva al editar (F2.1) | **Reintentar siempre.** Al guardar una edición, toda línea viva en `BLOQUEADO` reintenta apartar su material aunque no cambie; si lo consigue pasa a `PENDIENTE`. Las demás líneas sin cambios no se tocan. Vale para una y varias recetas. Conserva el comportamiento de QC-141 R48 (`e2e/reserva-de-material.spec.ts`) y precisa R25. |

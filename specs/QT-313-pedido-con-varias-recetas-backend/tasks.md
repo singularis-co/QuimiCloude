@@ -7,7 +7,8 @@
 > de 2 de `order_line_id` y el paso 2 es T14e; T14d aplica la decisión P14 (R55). No queda ninguna
 > pregunta abierta. T0 y T1 están hechas (commit 8b79a3328) y no cambian. Enmendado otra vez el
 > 2026-11-04 con los andamios de transición (design § 4.1.1): T0–T8 están hechas (`06a691cab`) y
-> no cambian; T9–T15 dicen qué andamio ponen o quitan.
+> no cambian; T9–T15 dicen qué andamio ponen o quitan. Enmendado el 2026-11-06 (F2.1, decisión
+> «Reintento de reserva al editar»): añade T16b (R56) y T18 pasa a cubrir `R1…R56`.
 >
 > Orden por fases: el modelo nuevo convive con las columnas viejas de `orders` hasta la fase 5;
 > la migración que las borra (T15) va la **última**, cuando ya nadie las lee. Así cada fase deja
@@ -262,13 +263,38 @@
   con insumo compartido: alta, cancelar una, finalizar la otra, lote a lote). El E2E de dos recetas
   por pantalla es de QT-315.
   *Hecho:* los dos en verde (R46). Depende de T15.
+- [ ] **T16b — Reintento de reserva de las líneas `BLOQUEADO` al editar (R56, R25, R44).**
+  `lib/modules/pedidos/domain/update-order.ts` según design § 4.2.1: `retry` en `planEdit` (línea
+  existente, sin cambios, guardada en `BLOQUEADO`); el atajo de «solo cambia el cliente» no se
+  toma si hay alguna `retry`; coste precalculado y `prepareLine` para `changed || retry`; dentro
+  de la misma transacción y del mismo `lockAliveLines`, las `retry` entran en `toSync` por
+  `position` (antes que las nuevas) y **no** en `edited` de `writeLines`; `refreshStatus` al final.
+  Tests:
+  - unitario en `tests/unit/pedidos/update-order-lines.test.ts`, con `R56` en el nombre: (a) pedido
+    de una línea `BLOQUEADO` sin cambios con material → `PENDIENTE`, `syncForLine` llamado,
+    `reserved_at` = instante; (b) sin material y sin `confirmBlocked` → `order_would_block` y nada
+    escrito; con `confirmBlocked` → sigue `BLOQUEADO`, `reserved_at` NULL; (c) pedido de dos
+    líneas, una `PENDIENTE` sin cambios y una `BLOQUEADO` sin cambios: solo la segunda llama a
+    `syncForLine`; la `PENDIENTE` no cambia ni de material ni de `reserved_at` (R25); (d) solo
+    cambia el cliente con una línea `BLOQUEADO`: va por el camino completo y reintenta.
+  - integración contra la base en `tests/integration/pedidos/order-lines-blocked-retry.int.test.ts`,
+    con `R56` en el nombre: pedido de dos líneas (una `PENDIENTE`, otra `BLOQUEADO`) que comparten
+    insumo; **con material repuesto**, guardar la edición sin cambios deja la bloqueada en
+    `PENDIENTE` con su apartado lote a lote y el pedido derivado (R34), sin tocar los asientos de
+    la otra línea; **sin reponer**, con confirmación sigue `BLOQUEADO`, sin asientos de reserva y
+    `reserved_at` NULL, y sin confirmación no escribe nada.
+  - `e2e/reserva-de-material.spec.ts` vuelve a verde **sin cambiar su aserción** (paso 5:
+    reeditar B sin tocar nada → `PENDIENTE`).
+  *Hecho:* los tres en verde con `pnpm run typecheck`, `pnpm run lint` y
+  `pnpm exec vitest related --run` sobre lo tocado; commit `feat(QT-313): …`. Depende de T15.
 - [x] **T17 [P] — Documentación del perfil.** `docs/architecture.md`, «Preguntas abiertas del
   dominio», punto 4: el precio de venta y el coste pasan a ser **de cada receta del pedido** y el
   pedido muestra la suma (enmienda de QC-307, decisión «¿Dónde va el precio de venta?»); y punto 2:
   la reserva elige lote **por receta del pedido**, con su propio plazo de caducidad.
   *Hecho:* el texto ya no dice «del pedido entero». Depende de T15.
-- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R55 → test`.
-  *Hecho:* cada `R<n>` tiene al menos un test con `R<n>` en el nombre. Depende de T16.
+- [ ] **T18 — Trazabilidad.** `progress/impl_QT-313.md` con el mapa `R1…R56 → test`.
+  *Hecho:* cada `R<n>`, R56 incluido, tiene al menos un test con `R<n>` en el nombre. Depende de
+  T16 y T16b.
 
 ## Archivos esperados
 
@@ -404,6 +430,7 @@
 - `tests/integration/pedidos/order-lines-repository.int.test.ts`
 - `tests/integration/pedidos/order-lines-references-required-migration.int.test.ts`
 - `tests/integration/pedidos/order-lines-flow.int.test.ts`
+- `tests/integration/pedidos/order-lines-blocked-retry.int.test.ts`
 - `tests/integration/pedidos/list-query-orders.int.test.ts`
 - `tests/integration/pedidos/void-delivery-order-line.int.test.ts`
 - `tests/unit/asignaciones/order-state.test.ts`
@@ -743,3 +770,4 @@ Tocados en la fase 6 (T15) por quitar las columnas de linea de `orders` (las sie
 - `tests/unit/pedidos/orders-header-only.test.ts`
 - `tests/integration/asignaciones/finish-auto-assign-packers.int.test.ts`
 - `tests/integration/inventario/list-query-indexes.int.test.ts`
+- `e2e/helpers/delete-orders.ts`
