@@ -29,6 +29,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   listAliveOrders,
   createOrderWriteRepository,
   findBlockedOrderIds,
@@ -47,13 +49,14 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   createCancelOrder,
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createDeleteOrder,
   createTransitionOrder,
-  createUpdateOrder,
+  createUpdateOrder as createLinesUpdate,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder, OrderCatalog } from '@/lib/modules/pedidos';
+import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
@@ -64,6 +67,13 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { onOnlyLine, type SingleLineNewOrder } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -88,7 +98,7 @@ function normalizeForTest(name: string): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`.
 // ---------------------------------------------------------------------------
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -125,7 +135,7 @@ const units: UnitCatalog = {
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
-const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
+const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 // R15, R16: `createTransitionOrder` ya no necesita `recipes`/`products`/`units` -el
 // alta de producto terminado se traslada a Terminar (T14)-.
@@ -204,6 +214,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
@@ -249,7 +261,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): Omit<NewOrder, 'customerId' | 'salePrice'> {
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: SingleLineNewOrder['status'] = 'PENDIENTE'): Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> {
   return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
@@ -265,7 +277,7 @@ async function movimientosDe(orderId: string): Promise<readonly ReservaResumen[]
 }
 
 async function reservedAtDe(orderId: string): Promise<Date | null> {
-  const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { reservedAt: true } });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { reservedAt: true } });
   return row.reservedAt;
 }
 
@@ -383,7 +395,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
       // abierto la pantalla antes de que arranque el combo.
       async function nuevaOrdenEnCurso(): Promise<string> {
         const id = await nuevaOrden();
-        await transitionAliveById(id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+        await onOnlyLine(transitionAliveById)(id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
         return id;
       }
 
@@ -392,7 +404,7 @@ describe('cien vueltas de crear, editar, cancelar, borrar y Finalizar sobre el m
       const cancelar = (orderId: string) => cancelOrder(orderId, { reason: 'vuelta de concurrencia' }, actorDe(fixture));
       const borrar = (orderId: string) => deleteOrder(orderId, actorDe(fixture));
       const finalizar = (orderId: string) =>
-        transitionAliveById(orderId, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+        onOnlyLine(transitionAliveById)(orderId, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
 
       // Cada constructor de combo prepara lo que haga falta (secuencial, fuera de la carrera) y
       // devuelve las DOS promesas ya lanzadas -sin `await` entre ellas- para que compitan de

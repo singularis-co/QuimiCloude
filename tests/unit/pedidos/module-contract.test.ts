@@ -584,6 +584,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // Cada valor nuevo se anade a las DOS listas a la vez; que sigan cuadrando valor a valor y
     // EN ORDEN es exactamente lo que R35 vigila.
     expect(enumValues('OrderStatus')).toEqual([
+      'PARCIAL',
       'PENDIENTE',
       'EN_CURSO',
       'ENTREGADO',
@@ -618,7 +619,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // devolviera siempre lo mismo, todo lo de arriba seria decorativo.
     expect(enumValues('OrderStatus')).not.toEqual(enumValues('OrderPriority'))
     expect(() => enumValues('OrderInexistente')).toThrow(/no existe/)
-    expect(() => defaultOf('quantity')).toThrow(/no declara @default/)
+    expect(() => defaultOf('orderYear')).toThrow(/no declara @default/)
     expect(() => defaultOf('campoInexistente')).toThrow(/no declara el campo/)
   })
 
@@ -674,11 +675,15 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     //
     // QC-223 2026-10-08: `deliver-order.ts` tambien la consume, con `TERMINADO -> ENTREGADO`,
     // antes de abrir la unidad de trabajo de la entrega.
+    //
+    // QT-313 2026-11-03: `order-line-diff.ts` la consume para la linea editada con cambios, con el
+    // mismo «quedarse en su estado» que `update-order.ts` aplicaba al pedido.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
       'lib/modules/pedidos/domain/deliver-order.ts',
       'lib/modules/pedidos/domain/order-conditioning.ts',
+      'lib/modules/pedidos/domain/order-line-diff.ts',
       'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',

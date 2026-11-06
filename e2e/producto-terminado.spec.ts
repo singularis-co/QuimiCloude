@@ -80,6 +80,7 @@ import { addPackagingLine, submitOrderWithLeftover } from './helpers/order-distr
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc150_e2e_';
 
@@ -371,16 +372,18 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
     // se borra DESPUES, cuando la receta ya cayo y se llevo sus lineas por cascada.
@@ -563,7 +566,7 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     () =>
-      scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
+      scopedCompanyId ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     // Todos los lotes primero, del producto de la receta y del terminado que Finalizar da de
     // alta: `product_batches.product_id` -> `products` RESTRINGE, y a esta altura ya no queda
     // ningun movimiento que restrinja el borrado del lote.
@@ -628,7 +631,7 @@ test.describe('producto terminado', () => {
     // contenido al crearlo.
     await createOrder(page, ORDER_QUANTITY, ORDER_PACKAGES);
     const order = await prisma.order.findFirstOrThrow({
-      where: { recipeId, deletedAt: null },
+      where: { lines: { some: { recipeId } }, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -711,10 +714,7 @@ test.describe('producto terminado', () => {
       { timeout: 60_000 },
     );
 
-    const deliveredOrder = await prisma.order.findUniqueOrThrow({
-      where: { id: order.id },
-      select: { status: true, packedBy: true },
-    });
+    const deliveredOrder = await prisma.orderLine.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true } });
     expect(deliveredOrder.status).toBe('POR_ACONDICIONAR');
     expect(deliveredOrder.packedBy).toBe(empacadorUserId);
 

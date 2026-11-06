@@ -86,7 +86,7 @@ async function readIndexes(): Promise<Map<string, string>> {
     SELECT indexname, indexdef FROM pg_indexes
     WHERE schemaname = 'public'
       AND tablename IN ('products', 'presentations', 'recipes', 'suppliers',
-                        'supplier_catalog_lines', 'units', 'orders')`
+                        'supplier_catalog_lines', 'units', 'orders', 'order_lines')`
   return new Map(rows.map((row) => [row.indexname, row.indexdef]))
 }
 
@@ -137,7 +137,9 @@ const PARTIAL_INDEXES = [
   'orders_status_idx',
   'orders_priority_idx',
   'orders_created_at_idx',
-  'orders_quantity_idx',
+  // `orders_quantity_idx` se rehizo sobre la linea el 2026-11-05 (QT-313): la cantidad es de cada
+  // receta del pedido, y `orders_drop_line_columns` se llevo la columna con su indice.
+  'order_lines_quantity_idx',
   // `orders_unit_price_idx` estuvo aqui hasta el 2026-09-07: cayo con su columna en
   // `db/migrations/20260907120000_orders_drop_unit_and_unit_price` (decision humana), y con ella
   // `unitPrice` salio de `ORDER_QUERYABLE.sortable`, asi que ya no hay orden que servir.
@@ -218,7 +220,8 @@ const PRE_EXISTING_INDEXES = [
   // como columna propia y fija: se afirma en `ALL_INDEXES`, no aqui.
   'supplier_catalog_lines_presentation_id_idx',
   'supplier_catalog_lines_unit_id_idx',
-  'orders_recipe_id_idx',
+  // `orders_recipe_id_idx` cayo el 2026-11-05 (QT-313) con la columna `orders.recipe_id`: la
+  // receta es de cada linea, que tiene su propio `order_lines_recipe_id_idx`.
   // `orders_unit_id_idx` (indice de la FK que QC-33 creo) cayo el 2026-09-07 con la columna
   // `orders.unit_id`, en la misma migracion.
   // `orders_order_year_order_sequence_key` (unico GLOBAL sobre `(order_year, order_sequence)`)

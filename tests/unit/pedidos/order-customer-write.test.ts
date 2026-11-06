@@ -10,10 +10,13 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { createCreateOrder, type CreateOrderDeps } from '@/lib/modules/pedidos/domain/create-order'
-import { createUpdateOrder, type UpdateOrderDeps } from '@/lib/modules/pedidos/domain/update-order'
+import type { CreateOrderDeps } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
+import type { UpdateOrderDeps } from '@/lib/modules/pedidos/domain/update-order'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 import { fakePackagingCatalog, packagingRef } from '@/tests/helpers/packaging-catalog-double'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -133,7 +136,7 @@ function catalogosQueExplotan() {
   }
 }
 
-function filaGuardada(overrides: Partial<OrderRow> = {}): OrderRow {
+function filaGuardada(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -190,7 +193,7 @@ function unidadDeTrabajo(fila: OrderRow, setCustomerAliveResult: 'ok' | 'not_fou
 }
 
 function escenarioDeEdicion(opciones: {
-  fila?: Partial<OrderRow>
+  fila?: Partial<SingleRecipeOrderRow>
   catalogos?: 'vivos' | 'explotan'
   setCustomerAlive?: 'ok' | 'not_found'
 } = {}) {
@@ -302,7 +305,7 @@ describe('createOrder — el cliente en el alta (R10, R11)', () => {
     expect(await codigoDelFallo(() => e.createOrder({ ...ALTA, customerId }, ACTOR))).toBe('customer_not_found')
     expect(e.clientes.findAliveRefById).toHaveBeenCalledTimes(1)
     expect(e.uow.orders.create).not.toHaveBeenCalled()
-    expect(e.uow.reservations.syncForOrder).not.toHaveBeenCalled()
+    expect(e.uow.reservations.syncForLine).not.toHaveBeenCalled()
   })
 
   it('R11: un id sin forma de uuid da customer_not_found con CERO llamadas al catalogo y sin escribir', async () => {
@@ -382,7 +385,7 @@ describe('updateOrder — el cliente en la edicion por el camino completo (R11, 
 
     expect(e.clientes.findAliveRefById).toHaveBeenCalledWith(CLIENTE_B, EMPRESA)
     expect(customerIdEscrito(e.uow.orders.updateAlive)).toBe(CLIENTE_B)
-    expect(e.uow.reservations.syncForOrder).toHaveBeenCalledTimes(1)
+    expect(e.uow.reservations.syncForLine).toHaveBeenCalledTimes(1)
     expect(e.uow.orders.setCustomerAlive).not.toHaveBeenCalled()
   })
 })
@@ -472,14 +475,14 @@ describe('updateOrder — el atajo de la edicion que solo cambia el cliente (R13
     )
   })
 
-  it('R13: el mismo cliente y nada mas cambia -> camino de siempre (recalcula y sincroniza)', async () => {
+  it('R13, QT-313 R25: el mismo cliente y nada mas cambia -> camino de siempre, sin recalcular ni sincronizar la linea que no cambia', async () => {
     const e = escenarioDeEdicion()
 
     await e.updateOrder(ORDER_ID, edicionIgual(), ACTOR)
 
     expect(e.uow.orders.setCustomerAlive).not.toHaveBeenCalled()
     expect(e.uow.orders.updateAlive).toHaveBeenCalledTimes(1)
-    expect(e.uow.reservations.syncForOrder).toHaveBeenCalledTimes(1)
+    expect(e.uow.reservations.syncForLine).not.toHaveBeenCalled()
     expect(customerIdEscrito(e.uow.orders.updateAlive)).toBe(CLIENTE_A)
   })
 
@@ -504,8 +507,9 @@ describe('updateOrder — el atajo de la edicion que solo cambia el cliente (R13
 
     expect(e.uow.orders.setCustomerAlive).not.toHaveBeenCalled()
     expect(e.uow.orders.updateAlive).toHaveBeenCalledTimes(1)
-    expect(e.uow.reservations.syncForOrder).toHaveBeenCalledTimes(1)
-    expect(e.vivos.espias.some((espia) => espia.mock.calls.length > 0)).toBe(true)
+    // QT-313 R25: la prioridad es del pedido; la linea, sin cambios, no vuelve a apartar.
+    expect(e.uow.reservations.syncForLine).toHaveBeenCalledTimes('priority' in cambio ? 0 : 1)
+    expect(e.vivos.espias.some((espia) => espia.mock.calls.length > 0)).toBe(!('priority' in cambio))
     expect(customerIdEscrito(e.uow.orders.updateAlive)).toBe(CLIENTE_B)
   })
 

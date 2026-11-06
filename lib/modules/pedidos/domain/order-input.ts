@@ -189,6 +189,68 @@ export const cancelOrderSchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 
+const recipeVersionIdSchema = z
+  .preprocess((value) => (value === '' ? null : value), z.string().uuid().nullable())
+  .default(null);
+
+const customerIdSchema = z
+  .string()
+  .optional()
+  .transform((value) => (value === undefined || value.trim() === '' ? null : value));
+
+/** Una receta del pedido. Prioridad y cliente son del pedido: si llegan aqui, `z.object` los
+ *  descarta. */
+export const orderLineInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  recipeId: recipeIdSchema,
+  recipeVersionId: recipeVersionIdSchema,
+  quantity: quantitySchema,
+  unitId: unitIdSchema,
+  presentationLines: presentationLinesSchema,
+  salePrice: salePriceSchema,
+});
+
+function hasNoRepeatedLineId(lines: readonly { readonly id?: string | undefined }[]): boolean {
+  const ids = lines.flatMap((line) => (line.id === undefined ? [] : [line.id]));
+  return new Set(ids).size === ids.length;
+}
+
+const orderWithLinesSchema = z.object({
+  lines: z
+    .array(orderLineInputSchema)
+    .min(1)
+    .refine(hasNoRepeatedLineId, { message: 'Cada línea aparece una sola vez.' }),
+  priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
+  customerId: customerIdSchema,
+  confirmBlocked: z.boolean().default(false),
+});
+
+// Conviven con `createOrderSchema` y `updateOrderSchema` mientras los casos de uso sigan con una
+// sola receta; al pasarlos a lineas, estos toman esos nombres.
+export const createOrderWithLinesSchema = orderWithLinesSchema.refine(
+  (order) => order.lines.every((line) => line.id === undefined),
+  { message: 'Una línea nueva no trae identificador.', path: ['lines'] },
+);
+
+export const updateOrderWithLinesSchema = orderWithLinesSchema;
+
+export const cancelOrderLineSchema = cancelOrderSchema;
+
+export const updateOrderLineDistributionSchema = z
+  .object({
+    lineId: z.string().uuid(),
+    unitId: unitIdSchema,
+    presentationLines: presentationLinesSchema,
+    confirmBlocked: z.boolean().default(false),
+  })
+  .strict();
+
+export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
+export type CreateOrderWithLinesInput = z.infer<typeof createOrderWithLinesSchema>;
+export type UpdateOrderWithLinesInput = z.infer<typeof updateOrderWithLinesSchema>;
+export type CancelOrderLineInput = z.infer<typeof cancelOrderLineSchema>;
+export type UpdateOrderLineDistributionInput = z.infer<typeof updateOrderLineDistributionSchema>;
+
 /**
  * QC-57 (R25): **`listOrdersSchema` DESAPARECIO.** El listado de pedidos ya no tiene forma
  * propia de consulta: el estado y la prioridad dejan de ser parametros suyos y entran como
@@ -217,14 +279,14 @@ export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
  * expresa en la unidad del pedido. Un `companyId` en la entrada no llega a
  * ninguna parte: `z.object` descarta las claves de mas.
  *
- * `orderId` es OPCIONAL y solo lo envia el formulario de EDICION: el pedido que ya existe
- * cuenta lo que el mismo tiene apartado como disponible para si mismo. Esta entrada NO abre
- * ninguna lectura del pedido: el identificador viaja como cadena opaca hasta
- * `findCostingBatches`, que lo usa para no restar lo que ese pedido aparto.
+ * `orderLineId` es OPCIONAL y solo llega al editar una linea que ya existe: lo que esa linea tiene
+ * apartado cuenta como disponible para ella, y lo de las demas lineas del pedido no. Esta entrada
+ * no abre ninguna lectura de la linea: el identificador viaja como cadena opaca hasta
+ * `findCostingBatches`.
  */
 export const quoteOrderCostSchema = createOrderSchema
   .pick({ recipeId: true, quantity: true, unitId: true })
-  .extend({ orderId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
+  .extend({ orderLineId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
 
 export type QuoteOrderCostInput = Omit<z.infer<typeof quoteOrderCostSchema>, 'presentationLines'> & {
   /** Las lineas antiguas no suman costo de envase. */

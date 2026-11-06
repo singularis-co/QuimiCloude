@@ -104,16 +104,41 @@ async function insertBatch(
 
 let nextSequence = 960_000;
 
+/** La unica linea de cada pedido de `insertOrder`. */
+const LINE_OF_ORDER = new Map<string, string>();
+
+function lineOf(orderId: string): string {
+  const lineId = LINE_OF_ORDER.get(orderId);
+  if (lineId === undefined) throw new Error(`el pedido ${orderId} no tiene linea sembrada`);
+  return lineId;
+}
+
+/** Un pedido con su unica linea, de la receta del pedido. */
 async function insertOrder(tx: Prisma.TransactionClient, c: Company): Promise<string> {
+  const orderId = await insertBareOrder(tx, c);
+  const line = await tx.orderLine.create({
+    data: {
+      orderId,
+      companyId: c.companyId,
+      position: 0,
+      recipeId: c.recipeId,
+      originalRecipeId: c.recipeId,
+      quantity: new Prisma.Decimal('20'),
+    },
+    select: { id: true },
+  });
+  LINE_OF_ORDER.set(orderId, line.id);
+  return orderId;
+}
+
+/** El pedido sin lineas: quien lo usa le crea las suyas. */
+async function insertBareOrder(tx: Prisma.TransactionClient, c: Company): Promise<string> {
   nextSequence += 1;
   const order = await tx.order.create({
     data: {
       companyId: c.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
-      recipeId: c.recipeId,
-      quantity: new Prisma.Decimal('20'),
-      unitId: c.unitId,
     },
     select: { id: true },
   });
@@ -130,6 +155,7 @@ async function insertMovement(
     readonly orderId?: string | null;
     readonly reason?: string | null;
     readonly orderPresentationLineId?: string | null;
+    readonly orderLineId?: string | null;
   },
 ): Promise<void> {
   const kind = movement.kind ?? 'consumption';
@@ -141,9 +167,34 @@ async function insertMovement(
       reason: movement.reason ?? null,
       orderId: movement.orderId ?? null,
       orderPresentationLineId: movement.orderPresentationLineId ?? null,
+      // Un asiento con pedido lleva su linea; sin decirla, la unica del pedido.
+      orderLineId:
+        movement.orderLineId ?? (movement.orderId === undefined || movement.orderId === null ? null : lineOf(movement.orderId)),
       companyId: c.companyId,
     },
   });
+}
+
+/** Una linea del pedido con su propia receta: el unico parcial de `order_lines` no admite dos
+ *  lineas activas con la misma receta original. */
+async function insertLine(tx: Prisma.TransactionClient, c: Company, orderId: string, position: number): Promise<string> {
+  const marca = token();
+  const recipe = await tx.recipe.create({
+    data: { name: `Receta linea ${marca}`, nameNormalized: `recetalinea${marca}`, companyId: c.companyId },
+    select: { id: true },
+  });
+  const line = await tx.orderLine.create({
+    data: {
+      orderId,
+      companyId: c.companyId,
+      position,
+      recipeId: recipe.id,
+      originalRecipeId: recipe.id,
+      quantity: new Prisma.Decimal('10'),
+    },
+    select: { id: true },
+  });
+  return line.id;
 }
 
 function byBatch(lots: readonly ConsumedLot[]): ReadonlyMap<string, ConsumedLot> {
@@ -164,7 +215,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: envase, quantity: '-40.0000', orderId });
       await insertMovement(tx, c, { batchId: envase, quantity: '-3.0000', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId });
 
       expect(lots).toHaveLength(3);
       expect(byBatch(lots).get(lote1A)).toEqual({ batchId: lote1A, quantity: '8.0000', unitCost: '10.0000' });
@@ -183,6 +234,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
         data: {
           companyId: c.companyId,
           orderId,
+          orderLineId: lineOf(orderId),
           batchId: apartado,
           kind: 'reserve',
           quantity: new Prisma.Decimal('5.0000'),
@@ -190,7 +242,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       });
       await insertMovement(tx, c, { batchId: consumido, quantity: '-5.0000', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: consumido, quantity: '5.0000', unitCost: '30.0000' }]);
     });
@@ -204,7 +256,14 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       const lote = await insertBatch(tx, c, '10.0000');
       const deOtro = await insertBatch(tx, c, '99.0000');
       const line = await tx.orderPresentationLine.create({
-        data: { orderId, companyId: c.companyId, presentationId: c.presentationId, packages: 4, presentationContent: '500' },
+        data: {
+          orderId,
+          orderLineId: lineOf(orderId),
+          companyId: c.companyId,
+          presentationId: c.presentationId,
+          packages: 4,
+          presentationContent: '500',
+        },
         select: { id: true },
       });
       await insertMovement(tx, c, { batchId: lote, quantity: '-1.5000', orderId });
@@ -221,7 +280,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: lote, quantity: '100.0000', kind: 'opening' });
       await insertMovement(tx, c, { batchId: lote, quantity: '-6.0000', kind: 'adjustment', reason: 'merma' });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: lote, quantity: '1.5000', unitCost: '10.0000' }]);
     });
@@ -237,8 +296,8 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
 
       const ledger = createOrderConsumptionLedger(tx);
 
-      expect(await ledger.findConsumedLots({ orderId, companyId: otra.companyId })).toEqual([]);
-      expect(await ledger.findConsumedLots({ orderId, companyId: c.companyId })).toHaveLength(1);
+      expect(await ledger.findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: otra.companyId })).toEqual([]);
+      expect(await ledger.findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId })).toHaveLength(1);
     });
   });
 
@@ -252,7 +311,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: neto0, quantity: '2.0000', orderId });
       await insertMovement(tx, c, { batchId: otro, quantity: '-1.0000', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: otro, quantity: '1.0000', unitCost: '20.0000' }]);
     });
@@ -265,7 +324,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       const sinCoste = await insertBatch(tx, c, null);
       await insertMovement(tx, c, { batchId: sinCoste, quantity: '-3.2500', orderId });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: sinCoste, quantity: '3.2500', unitCost: null }]);
     });
@@ -276,7 +335,7 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       const c = await seedCompany(tx);
       const orderId = await insertOrder(tx, c);
 
-      expect(await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId })).toEqual([]);
+      expect(await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId })).toEqual([]);
     });
   });
 
@@ -288,9 +347,36 @@ describe('OrderConsumptionLedger.findConsumedLots', () => {
       await insertMovement(tx, c, { batchId: lote, quantity: '-8.0000', orderId });
       await tx.productBatch.update({ where: { id: lote }, data: { unitCost: new Prisma.Decimal('12.5000') } });
 
-      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderId, companyId: c.companyId });
+      const lots = await createOrderConsumptionLedger(tx).findConsumedLots({ orderLineId: lineOf(orderId), orderId, companyId: c.companyId });
 
       expect(lots).toEqual([{ batchId: lote, quantity: '8.0000', unitCost: '12.5000' }]);
+    });
+  });
+});
+
+describe('QT-313 OrderConsumptionLedger.findConsumedLots por linea', () => {
+  it('QT-313 R38: lee solo los asientos consumption de la linea pedida', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const c = await seedCompany(tx);
+      const orderId = await insertBareOrder(tx, c);
+      const lineaA = await insertLine(tx, c, orderId, 0);
+      const lineaB = await insertLine(tx, c, orderId, 1);
+      const compartido = await insertBatch(tx, c, '10.0000');
+      const soloB = await insertBatch(tx, c, '4.0000');
+      await insertMovement(tx, c, { batchId: compartido, quantity: '-3.0000', orderId, orderLineId: lineaA });
+      await insertMovement(tx, c, { batchId: compartido, quantity: '-5.0000', orderId, orderLineId: lineaB });
+      await insertMovement(tx, c, { batchId: soloB, quantity: '-2.0000', orderId, orderLineId: lineaB });
+      const ledger = createOrderConsumptionLedger(tx);
+
+      expect(await ledger.findConsumedLots({ orderId, orderLineId: lineaA, companyId: c.companyId })).toEqual([
+        { batchId: compartido, quantity: '3.0000', unitCost: '10.0000' },
+      ]);
+      expect(byBatch(await ledger.findConsumedLots({ orderId, orderLineId: lineaB, companyId: c.companyId }))).toEqual(
+        new Map([
+          [compartido, { batchId: compartido, quantity: '5.0000', unitCost: '10.0000' }],
+          [soloB, { batchId: soloB, quantity: '2.0000', unitCost: '4.0000' }],
+        ]),
+      );
     });
   });
 });

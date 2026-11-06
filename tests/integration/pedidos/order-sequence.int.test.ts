@@ -43,7 +43,8 @@ import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/drive
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import { createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const YEAR_PRIMERA_ALTA = 2871;
 const YEAR_DOS_ALTAS = 2872;
@@ -73,7 +74,7 @@ type Fixture = {
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
-  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `SingleLineNewOrder`. */
   readonly presentationId: string;
 };
 
@@ -129,6 +130,7 @@ async function createFixture(): Promise<Fixture> {
 }
 
 async function dropFixture(fixture: Fixture): Promise<void> {
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
@@ -137,7 +139,7 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedido(unitId: string, overrides: Partial<NewOrder> = {}): NewOrder {
+function pedido(unitId: string, overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: recetaId,
@@ -151,9 +153,9 @@ function pedido(unitId: string, overrides: Partial<NewOrder> = {}): NewOrder {
   };
 }
 
-async function alta(fixture: Fixture, year: number, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
+async function alta(fixture: Fixture, year: number, overrides: Partial<SingleLineNewOrder> = {}): Promise<OrderRow> {
   return withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(
+    createSingleLineOrder(createOrderWriteRepository(tx), 
       pedido(unitId, overrides),
       year,
       fixture.actorId,
@@ -189,7 +191,10 @@ function sqlStateOf(error: unknown): string {
     }
     return error.code;
   }
-  return error instanceof Error ? error.message : String(error);
+  // Un CHECK que rechaza un `create` de la API tipada llega sin `meta`: el SQLSTATE va en el texto
+  // del error del conector, nunca traducido.
+  const message = error instanceof Error ? error.message : String(error);
+  return /code: "([0-9A-Z]{5})"/u.exec(message)?.[1] ?? message;
 }
 
 beforeAll(async () => {
@@ -273,7 +278,7 @@ describe('el correlativo por (empresa, ano) (QC-34 R11, R12, R13 sobre el mecani
     try {
       expect((await alta(fixture, YEAR_ABORTADA)).number.sequence).toBe(1);
 
-      // `quantity = 0` viola `orders_quantity_positive` (QC-33 R7) DENTRO de la transaccion del alta.
+      // `quantity = 0` viola `order_lines_quantity_positive` DENTRO de la transaccion del alta.
       let rechazo: unknown = null;
       try {
         await alta(fixture, YEAR_ABORTADA, { quantity: '0' });

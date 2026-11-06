@@ -63,6 +63,8 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { submitOrderWithLeftover } from './helpers/order-distribution';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc147_e2e_';
@@ -206,7 +208,7 @@ async function selectProductByName(page: Page, testId: string, name: string): Pr
  *  confundir `NULL` con `'0.0000'` (mismo criterio que `order-ingredients-cost.int.test.ts`). */
 async function ingredientsCostText(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`;
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`;
   const row = rows[0];
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
   return row.ingredients_cost;
@@ -232,7 +234,7 @@ test.beforeAll(async () => {
       where: { companyId: { in: orphanCompanyIds } },
     });
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -348,17 +350,14 @@ test.beforeAll(async () => {
   // UI es de otra pantalla y de otro E2E (`e2e/ejecucion-receta.spec.ts`)-, con el mismo criterio.
   const year = new Date().getUTCFullYear();
   assignedOrderId = (
-    await prisma.order.create({
-      data: {
+    await createOrderWithLine(prisma, {
         companyId,
         orderYear: year,
         orderSequence: 900_000 + Math.floor(Math.random() * 90_000),
         recipeId: recipeConLineaId,
         quantity: ORDER_QUANTITY_DB,
         status: 'PENDIENTE',
-      },
-      select: { id: true },
-    })
+      })
   ).id;
 
   await prisma.orderAssignment.create({
@@ -377,7 +376,7 @@ test.afterAll(async () => {
     () => prisma.orderAssignment.deleteMany({ where: { companyId } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
     () => prisma.orderExecutionEntry.deleteMany({ where: { companyId } }),
-    () => prisma.order.deleteMany({ where: { companyId } }),
+    () => deleteOrdersWithLines({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
     () => prisma.product.deleteMany({ where: { companyId } }),
@@ -552,7 +551,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
 
     // El pedido nuevo, distinguido del ya sembrado y asignado del escenario 4 (misma receta).
     const created = await prisma.order.findFirstOrThrow({
-      where: { recipeId: recipeConLineaId, id: { not: assignedOrderId } },
+      where: { lines: { some: { recipeId: recipeConLineaId } }, id: { not: assignedOrderId } },
       select: { id: true },
     });
 

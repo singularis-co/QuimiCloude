@@ -253,9 +253,22 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // pantalla de recetas -no navega a `FORMULAS_ROUTE` ni a `recipeEditRoute`; su unica
     // navegacion es a `ORDERS_ROUTE`- y siembra las recetas y su version por Prisma. El orden es
     // el que devuelve `readdirSync`, asi que va ULTIMO, tras `recetas.spec.ts`.
+    //
+    // AMPLIADA de nuevo el 2026-11-06 (QT-313, pedido-con-varias-recetas-backend): la lista pasa
+    // de SIETE a OCHO literales, y sigue siendo CERRADA -mismo criterio de siempre: un spec de
+    // recetas sin ficha tiene que seguir poniendo esto en rojo-. El spec que entra es
+    // `e2e/pedido-con-varias-recetas.spec.ts` (T16 de
+    // `specs/QT-313-pedido-con-varias-recetas-backend/tasks.md`). VERIFICADO antes de darlo de
+    // alta, no supuesto: ese spec NO pinta ni ejercita la pantalla de recetas -no navega a
+    // `FORMULAS_ROUTE` ni a `recipeEditRoute`; navega a `ORDERS_ROUTE`, `ASSIGNED_ORDERS_ROUTE`,
+    // `assignedOrderRoute` y `packingOrderRoute`-: siembra la receta por Prisma, la elige en el
+    // alta de pedido (`recipe-picker`) y comprueba la receta de la linea en la base. El orden es
+    // el que devuelve `readdirSync`, asi que va TERCERO, entre `ejecucion-receta.spec.ts` y
+    // `recetas-pasos.spec.ts`.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
       'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
       'ejecucion-receta.spec.ts', // QC-63 / R29, R30: E2E de la ejecucion desde un pedido asignado
+      'pedido-con-varias-recetas.spec.ts', // QT-313 / T16: E2E del pedido en lineas por la pantalla actual
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
       'recetas-porcentaje.spec.ts', // QC-147 / R22: E2E del porcentaje en lineas de receta
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas

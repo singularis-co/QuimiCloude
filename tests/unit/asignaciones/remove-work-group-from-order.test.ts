@@ -18,7 +18,12 @@ import { ValidationError, type AsignacionesError } from '@/lib/modules/asignacio
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
-import type { OrderAssignmentTarget, OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type {
+  OrderAssignmentTarget,
+  OrderCatalog,
+  OrderLineStatus,
+  OrderStatus,
+} from '@/lib/modules/pedidos';
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444';
@@ -118,8 +123,13 @@ function crearRepositorio() {
   };
 }
 
+function lineasActivasDe(status: OrderStatus): readonly OrderLineStatus[] {
+  return status === 'PARCIAL' || status === 'CANCELADO' ? [] : [status];
+}
+
 function pedido(status: OrderStatus): OrderAssignmentTarget {
-  return { id: PEDIDO, status };
+  // Un pedido de una linea: su linea activa esta en su mismo estado (QT-313 R55).
+  return { id: PEDIDO, status, activeLineStatuses: lineasActivasDe(status) };
 }
 
 function crearCasoDeUso(estado: OrderStatus | null = 'EN_CURSO') {

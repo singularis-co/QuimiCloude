@@ -79,7 +79,7 @@ export type OrderRequirementInput = {
 };
 
 /**
- * La necesidad completa del pedido: la unica que se pasa a `syncForOrder`, que libera lo apartado
+ * La necesidad completa del pedido: la unica que se pasa a `syncForLine`, que libera lo apartado
  * de cualquier producto que no venga aqui. Un mismo producto en dos lineas sale una vez, con la
  * suma, que se hace ya en la unidad del producto.
  */

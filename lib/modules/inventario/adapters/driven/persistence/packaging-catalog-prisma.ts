@@ -6,6 +6,7 @@ import { PRODUCT_TYPES } from '../../../domain/product-type';
 import { batchCompanyScope, presentationCompanyScope, productCompanyScope } from './company-scope';
 import { findReservedAndAvailableByBatch } from './reservation-prisma';
 
+import type { CostingExclusion } from '../../../domain/costing-batch';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { PackagingCostingBatch, PackagingRef } from '../../../domain/packaging-catalog';
 import type { ProductId } from '../../../domain/product-catalog';
@@ -128,7 +129,7 @@ async function findRefsWithImages(
 export async function findPackagingCostingBatches(
   ids: readonly ProductId[],
   companyId: string,
-  options?: { readonly excludeOrderId?: string },
+  options?: CostingExclusion,
 ): Promise<readonly PackagingCostingBatch[]> {
   if (ids.length === 0) return [];
   const scope: InventoryScope = { companyId };
@@ -141,7 +142,7 @@ export async function findPackagingCostingBatches(
     prisma,
     companyId,
     batches.map((b) => b.id),
-    { excludeOrderId: options?.excludeOrderId },
+    { excludeOrderId: options?.excludeOrderId, excludeOrderLineId: options?.excludeOrderLineId },
   );
 
   return batches.flatMap((batch) => {

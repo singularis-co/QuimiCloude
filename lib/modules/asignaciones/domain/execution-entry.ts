@@ -30,6 +30,8 @@ type StepAction = Exclude<ExecutionAction, 'cancel' | PackingAction | Conditioni
 type Base = {
   readonly companyId: string;
   readonly orderId: string;
+  /** La linea del pedido que se opera. */
+  readonly orderLineId: string;
   readonly userId: string;
   readonly occurredAt: Date;
 };

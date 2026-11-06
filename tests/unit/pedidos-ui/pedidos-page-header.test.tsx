@@ -16,6 +16,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { resolverServerComponents } from '../paridad/arbol-accesible';
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, clearSidebarStateCookie, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 type CookieStoreStub = { get: (name: string) => { name: string; value: string } | undefined };
 
@@ -117,6 +118,7 @@ vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
 
 function pedido(): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '33333333-3333-4333-8333-333333333333',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

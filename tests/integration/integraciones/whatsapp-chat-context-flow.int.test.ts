@@ -546,6 +546,21 @@ describe('Contexto del chat', () => {
     expect(elegido.values['pedido.detalle']).not.toMatch(/[\n\t]/u)
   })
 
+  it('QT-313 R45: con pedidos de una linea el contexto es el mismo', async () => {
+    const e = await escenarioDePedidos()
+    const pedirContexto = () =>
+      integraciones.getWhatsappChatContext({ target: { customerId: e.cliente.id }, orderId: e.terminado }, e.A.lector)
+    const hoy = await pedirContexto()
+
+    const contexto = await pedirContexto()
+
+    expect(contexto).toEqual(hoy)
+    expect(contexto.orders.map((o) => o.productName)).toEqual([
+      await nombreDeReceta(e.A.entrega.recipeId),
+      await nombreDeReceta(e.A.entrega.recipeId),
+    ])
+  })
+
   it('R54, D12: un pedido entregado y uno cancelado, aunque sean los mas recientes, no salen en orders', async () => {
     const e = await escenarioDePedidos()
 

@@ -29,6 +29,8 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -44,7 +46,8 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { createCreateOrder, createGetOrder } from '@/lib/modules/pedidos';
+import { createCreateOrder as createLinesOrder, createGetOrder } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -55,6 +58,11 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById, findCustomerRefsIncludingDeleted } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { createSingleLineOrder } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -75,7 +83,7 @@ function normalizeForTest(name: string): string {
     .replace(/[^a-z0-9]/gu, '');
 }
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -178,6 +186,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
@@ -241,10 +251,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
       );
 
       expect(await movimientosDe(creado.id)).toEqual([{ kind: 'reserve', quantity: '0.1000' }]);
-      const guardado = await prisma.order.findUniqueOrThrow({
-        where: { id: creado.id },
-        select: { ingredientsCost: true },
-      });
+      const guardado = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { ingredientsCost: true } });
       // 0.1 kg a 3.0000 el kg.
       expect(guardado.ingredientsCost?.toFixed(4)).toBe('0.3000');
     } finally {
@@ -261,15 +268,21 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
 
       // Lo que la formula anterior guardaba: 1000 g al 10 % leidos como 100 kg, a 3.0000.
       const orderId = await withOrderTransaction(async (tx) => {
-        const order = await createOrderWriteRepository(tx).create(
+        const orders = createOrderWriteRepository(tx);
+        const cost = { total: '300.0000', packaging: '0.0000' };
+        const order = await createSingleLineOrder(orders, 
           { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [], salePrice: null, customerId: null },
           instante.getUTCFullYear(),
           fixture.actorId,
           instante,
-          { total: '300.0000', packaging: '0.0000' },
+          cost,
           scope,
         );
-        await createMaterialReservations(tx).syncForOrder({
+        const lines = [{ id: order.lineId }];
+        const orderLineId = lines?.[0]?.id;
+        if (orderLineId === undefined) throw new Error('el alta no escribio la linea');
+        await createMaterialReservations(tx).syncForLine({
+          orderLineId,
           orderId: order.id,
           companyId: fixture.companyId,
           requirement: [{ productId, quantity: '100' }],
@@ -283,10 +296,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
 
       expect(vista.ingredientsCost).toBe('300.0000');
       expect(await movimientosDe(orderId)).toEqual([{ kind: 'reserve', quantity: '100.0000' }]);
-      const guardado = await prisma.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: { ingredientsCost: true },
-      });
+      const guardado = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { ingredientsCost: true } });
       expect(guardado.ingredientsCost?.toFixed(4)).toBe('300.0000');
     } finally {
       await borrarFixture(fixture);

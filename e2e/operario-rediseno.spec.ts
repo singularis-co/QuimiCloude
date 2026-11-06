@@ -41,6 +41,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc265_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -246,6 +247,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } }),
+    () => prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
     // `recipe_lines.product_id` RESTRINGE el borrado del producto: las líneas caen antes (también
     // caerían con la receta, por CASCADE), y los productos después de la receta.
@@ -377,8 +379,7 @@ test.beforeAll(async () => {
     },
   ): Promise<SeededOrder> {
     const sequence = BASE_SEQUENCE + offset;
-    const order = await prisma.order.create({
-      data: {
+    const order = await createOrderWithLine(prisma, {
         companyId: companyId!,
         orderYear: year,
         orderSequence: sequence,
@@ -389,9 +390,7 @@ test.beforeAll(async () => {
         packedBy: data.packedBy ?? null,
         conditionedBy: data.conditionedBy ?? null,
         finishedAt: data.finishedAt ?? null,
-      },
-      select: { id: true },
-    });
+      });
     return { id: order.id, numberText: formatOrderNumber({ year, sequence }) };
   }
 
@@ -435,6 +434,7 @@ test.beforeAll(async () => {
   await prisma.orderConditioningTeamMember.create({
     data: {
       orderId: seededOrders.condRunning.id,
+      orderLineId: await ensureOnlyLine(prisma, seededOrders.condRunning.id),
       userId: conditionerId,
       companyId,
       position: 0,

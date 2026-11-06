@@ -83,6 +83,7 @@ const EMPRESA = uuid('3');
 const ACONDICIONADOR = uuid('1');
 const OTRA_PERSONA = uuid('2');
 const PEDIDO = uuid('7');
+const LINEA = 'linea-unica';
 const GRUPO = uuid('9');
 const AHORA = new Date('2026-10-06T10:00:00.000Z');
 
@@ -160,7 +161,7 @@ describe('R14 — «Mis asignados» sale vacia para el rol sin consultar ningun 
   it('R14: listAssignedOrders devuelve total = 0 aunque el puerto tenga pedidos asignados al actor', async () => {
     const listOrderIdsByUserInCompany = vi.fn(async () => [PEDIDO]);
     const listAliveSummariesByIds = vi.fn(async () => ({
-      items: [{ id: PEDIDO, number: { year: 2026, sequence: 1 } }],
+      items: [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 1 } }],
       total: 1,
       page: 1,
       pageSize: 10,

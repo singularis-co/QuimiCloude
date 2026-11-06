@@ -36,8 +36,8 @@ export type WaitingOrderPair = { readonly recipeId: string; readonly presentatio
 
 export type WaitingOrderLineOfPair = WaitingOrderLine & WaitingOrderPair;
 
-/** Lineas del reparto de los pedidos vivos de la empresa en TERMINADO con esa receta y presentacion,
- *  con sus envases entregados sin las lineas anuladas. Una consulta para todos los pares. */
+/** Lineas del reparto de esa presentacion cuya linea del pedido, viva y de la empresa, esta en
+ *  TERMINADO con esa receta, con sus envases entregados sin las lineas anuladas. */
 export interface WaitingOrdersReader {
   listWaitingLines(
     pairs: readonly WaitingOrderPair[],
@@ -47,8 +47,8 @@ export interface WaitingOrdersReader {
 
 /** Sobre la transaccion de la entrega, antes de bloquear el producto. */
 export interface WaitingOrdersLock {
-  /** `FOR SHARE`, por id, de los pedidos vivos de la empresa con esa receta en `TERMINADO` o
-   *  `EN_ACONDICIONAMIENTO` que tienen linea de esa presentacion. Terminar el acondicionamiento no
+  /** `FOR SHARE`, por id, de los pedidos vivos de la empresa con una linea de esa receta en
+   *  `TERMINADO` o `EN_ACONDICIONAMIENTO` que reparte en esa presentacion. Terminar el acondicionamiento no
    *  bloquea el producto: asi espera, o se le espera, antes de que el pedido empiece a esperar envases. */
   lockWaitingCandidates(pair: WaitingOrderPair, scope: OrderScope): Promise<void>;
 }

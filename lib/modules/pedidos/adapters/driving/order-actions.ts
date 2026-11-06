@@ -214,32 +214,54 @@ function readPresentationLines(formData: FormData): unknown[] {
 }
 
 /**
- * El candidato `unknown` que espera `createOrderSchema`. No lleva `status`, ni motivo, ni
- * correlativo, ni autores: lo que el esquema no declara no puede llegar.
+ * El formulario de hoy envia una sola receta: el candidato es un pedido de una linea con esos
+ * campos, y la prioridad, el cliente y la confirmacion quedan en el pedido. No lleva `status`, ni
+ * motivo, ni correlativo, ni autores: lo que el esquema del caso de uso no declara no puede llegar.
+ * La validacion es la del caso de uso, despues de su comprobacion de permiso.
  */
-function buildCreateCandidate(formData: FormData): unknown {
+function buildCreateCandidate(formData: FormData, lineId?: string): unknown {
   return {
-    recipeId: readFormString(formData, 'recipeId'),
-    quantity: readFormString(formData, 'quantity'),
+    lines: [
+      {
+        ...(lineId === undefined ? {} : { id: lineId }),
+        recipeId: readFormString(formData, 'recipeId'),
+        quantity: readFormString(formData, 'quantity'),
+        unitId: readFormString(formData, 'unitId'),
+        presentationLines: readPresentationLines(formData),
+        recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
+        // Que hacer con un blanco lo decide el esquema, no el borde.
+        salePrice: readOptionalFormString(formData, 'salePrice'),
+      },
+    ],
     priority: readOptionalFormString(formData, 'priority'),
-    unitId: readFormString(formData, 'unitId'),
-    presentationLines: readPresentationLines(formData),
     // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
     confirmBlocked: formData.get('confirmBlocked') === 'true',
-    recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
     customerId: readOptionalFormString(formData, 'customerId'),
-    // Que hacer con un blanco lo decide `salePriceSchema`, no el borde.
-    salePrice: readOptionalFormString(formData, 'salePrice'),
   };
 }
 
 /**
- * El candidato de la edicion: los mismos campos del alta, porque la edicion es un REEMPLAZO
- * COMPLETO de los datos de negocio, y ya no mueve el estado. Un `status` que el
- * formulario siga enviando se ignora aqui, sin llegar siquiera a `updateOrderSchema`.
+ * La edicion es un reemplazo completo, asi que el candidato nombra la unica linea del pedido para
+ * editarla en vez de quitarla y anadir otra. Un `status` que el formulario siga enviando se ignora.
  */
-function buildUpdateCandidate(formData: FormData): unknown {
-  return buildCreateCandidate(formData);
+function buildUpdateCandidate(formData: FormData, lineId: string): unknown {
+  return buildCreateCandidate(formData, lineId);
+}
+
+/**
+ * La linea que edita el formulario de una receta: la unica del pedido. Con varias, reenviar una
+ * sola receta quitaria las demas, asi que se rechaza sin escribir; sin ninguna no hay que nombrar.
+ */
+async function singleLineIdOf(orderId: string, actor: Actor | null): Promise<string | undefined> {
+  const ids = await pedidos.listOrderLineIds(orderId, actor);
+  if (ids.length > 1) throw new ValidationError(`el pedido ${orderId} tiene ${String(ids.length)} lineas`);
+  return ids[0];
+}
+
+async function requireSingleLineIdOf(orderId: string, actor: Actor | null): Promise<string> {
+  const lineId = await singleLineIdOf(orderId, actor);
+  if (lineId === undefined) throw new ValidationError(`el pedido ${orderId} no tiene lineas`);
+  return lineId;
 }
 
 /** Alta de pedido (R8, R9, R15, R16). Devuelve el id y el numero visible ya compuesto. */
@@ -271,7 +293,8 @@ export async function updateOrderAction(
   const actor = await currentActor();
 
   try {
-    await pedidos.updateOrder(id, buildUpdateCandidate(formData), actor);
+    const lineId = await requireSingleLineIdOf(id, actor);
+    await pedidos.updateOrder(id, buildUpdateCandidate(formData, lineId), actor);
     return { status: 'success' };
   } catch (error) {
     return toErrorState(error);
@@ -401,11 +424,21 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
   const actor = await currentActor();
 
   try {
-    const data = await pedidos.quoteOrderCost(input, actor);
+    const data = await pedidos.quoteOrderCost(await withOrderLine(input, actor), actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }
+}
+
+/** El formulario de edicion cotiza con el `orderId` del pedido; el caso de uso cuenta como propio lo
+ *  apartado por su linea, asi que el pedido se cambia por su unica linea. */
+async function withOrderLine(input: unknown, actor: Actor | null): Promise<unknown> {
+  if (typeof input !== 'object' || input === null || !('orderId' in input)) return input;
+  const { orderId, ...rest } = input;
+  if (typeof orderId !== 'string') return input;
+  const orderLineId = await singleLineIdOf(orderId, actor);
+  return orderLineId === undefined ? rest : { ...rest, orderLineId };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -459,6 +492,7 @@ export async function updateOrderDistributionAction(
     if (!parsed.success) throw new ValidationError();
 
     const result = await pedidos.updateOrderPresentationLines(id, actor, {
+      lineId: await requireSingleLineIdOf(id, actor),
       unitId: parsed.data.unitId,
       lines: parsed.data.presentationLines,
       confirmBlocked: parsed.data.confirmBlocked,

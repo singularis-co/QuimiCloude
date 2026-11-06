@@ -15,6 +15,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { EvidencePhase } from '@/lib/modules/asignaciones';
 import type { NewStepEvidence, StepEvidenceRow } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
+import { ensureOnlyLine, syncOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 const repo = createStepEvidenceRepository();
 
@@ -75,19 +76,20 @@ async function createOrder(companyId: string): Promise<string> {
     select: { id: true },
   });
   nextSequence += 1;
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: recipe.id,
       quantity: new Prisma.Decimal('10'),
       status: 'EN_CURSO',
-    },
-    select: { id: true },
-  });
+    });
+  lineOf.set(order.id, await ensureOnlyLine(prisma, order.id));
   return order.id;
 }
+
+/** La unica linea de cada pedido sembrado, por pedido. */
+const lineOf = new Map<string, string>();
 
 function evidence(
   company: Company,
@@ -97,6 +99,7 @@ function evidence(
   return {
     companyId: company.companyId,
     orderId,
+    orderLineId: lineOf.get(orderId) ?? orderId,
     phase: 'manufacturing',
     stepPosition: 1,
     path: `${company.companyId}/${orderId}/${randomUUID()}`,
@@ -123,6 +126,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const ids = companies.map((company) => company.companyId);
   await prisma.orderStepEvidence.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.order.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.recipe.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.user.deleteMany({ where: { companyId: { in: ids } } });
@@ -411,7 +415,7 @@ describe('cancelar o dar de baja el pedido no borra sus fotos (R38)', () => {
     await prisma.order.update({
       where: { id: orderId },
       data: { status: 'CANCELADO', cancellationReason: 'Prueba de conservacion de fotos' },
-    });
+    }).then(() => syncOnlyLine(prisma, orderId));
 
     expect(await repo.listByOrder(a.companyId, orderId, 'manufacturing')).toEqual([photo]);
   });
@@ -420,7 +424,7 @@ describe('cancelar o dar de baja el pedido no borra sus fotos (R38)', () => {
     const orderId = await createOrder(a.companyId);
     const photo = inserted(await repo.insert(evidence(a, orderId, { phase: 'packing' })));
 
-    await prisma.order.update({ where: { id: orderId }, data: { deletedAt: new Date() } });
+    await prisma.order.update({ where: { id: orderId }, data: { deletedAt: new Date() } }).then(() => syncOnlyLine(prisma, orderId));
 
     expect(await repo.listByOrder(a.companyId, orderId, 'packing')).toEqual([photo]);
   });

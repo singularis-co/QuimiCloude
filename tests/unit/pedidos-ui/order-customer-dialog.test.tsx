@@ -30,6 +30,7 @@ import type {
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { setCustomerMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   setCustomerMock: vi.fn<(id: string, input: unknown) => Promise<OrderMutationFormState>>(),
@@ -89,6 +90,7 @@ const OTRO: OrderCustomer = { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f603', name: 
 
 function pedido(status: OrderStatus = 'ENTREGADO', overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

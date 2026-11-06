@@ -249,6 +249,12 @@ export const E2E_ESPERADOS = [
   // peticion: el spec no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que
   // el diferimiento de QC-71 R21 sigue INTACTO.
   'pedido-con-cliente.spec.ts',
+  // Alta el 2026-11-06 (QT-313 T16) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: un pedido de una receta por la pantalla actual, ya guardado en lineas, se crea, el
+  // Operador lo abre y lo finaliza y el Empacador lo empaca; afirma lote a lote lo apartado, lo
+  // consumido y el lote de producto terminado. NO lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'pedido-con-varias-recetas.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
@@ -863,6 +869,15 @@ export const MIGRACIONES_ESPERADAS = [
   '20261030120000_whatsapp_agent',
   // 2026-10-30: el añadido y los permisos del agente; no toca el identificador.
   '20261030120100_whatsapp_agent_permissions',
+  // 2026-11-03: el estado PARCIAL y las lineas del pedido; no tocan el identificador.
+  '20261103115900_order_status_partial',
+  '20261103120000_order_lines',
+  // 2026-11-03: la linea del pedido en las tablas hijas; no toca el identificador.
+  '20261103120100_order_lines_references',
+  // 2026-11-05: la linea del pedido pasa a obligatoria; no toca el identificador.
+  '20261103120150_order_lines_references_required',
+  // 2026-11-05: orders deja de guardar lo de cada receta; no toca el identificador.
+  '20261103120200_orders_drop_line_columns',
 ] as const
 
 export function hallazgosDeMigraciones(

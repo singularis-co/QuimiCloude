@@ -48,9 +48,11 @@ import {
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { singleLineInput } from '@/tests/helpers/single-recipe-order';
 
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { seedPackaging } from '../../helpers/packaging-seed';
+import { syncOnlyLine } from '../../helpers/only-order-line';
 
 /** El rechazo viene de Postgres: uno de los dos CHECK de posicion de la tabla. */
 const CHECK_DE_POSICION = /order_execution_entries_(step_position_positive|packing_has_no_step)/u;
@@ -169,6 +171,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.inventoryMovement.deleteMany({ where: { companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId } } });
   // El producto terminado referencia la receta: sus lotes y el producto caen antes que ella.
@@ -252,14 +255,14 @@ async function crearPedido(
   await prisma.recipeLine.create({ data: { recipeId: receta.id, productId: insumo.id, percentage: '100.00' } });
 
   const creado = await pedidos.createOrder(
-    {
+    singleLineInput({
       recipeId: receta.id,
       quantity: '10.0000',
       priority: 'BAJA',
       unitId: fixture.unitId,
       presentationLines: [{ packagingProductId: fixture.packagingProductId, packages: 10 }],
       confirmBlocked: opciones.confirmBlocked ?? false,
-    },
+    }),
     quienPide(fixture),
   );
   const ahora = new Date();
@@ -304,10 +307,7 @@ async function anotaciones(orderId: string) {
 }
 
 async function pedidoEnBase(orderId: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, packedBy: true, finishedAt: true, cancellationReason: true, updatedAt: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true, finishedAt: true, cancellationReason: true, updatedAt: true } });
 }
 
 async function movimientosDeReserva(orderId: string) {
@@ -522,7 +522,7 @@ describe('asignaciones · la anotacion y el pedido se confirman juntos (Postgres
       await asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) });
       expect((await pedidoEnBase(orderId)).status).toBe('POR_ACONDICIONAR');
       // Ninguna accion de la aplicacion escribe ENTREGADO: se fija a mano para sembrar el caso.
-      await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } });
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } }).then(() => syncOnlyLine(prisma, orderId));
       expect((await pedidoEnBase(orderId)).status).toBe('ENTREGADO');
       const antes = await anotaciones(orderId);
 

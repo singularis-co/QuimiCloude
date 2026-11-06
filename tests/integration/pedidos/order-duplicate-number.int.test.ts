@@ -30,7 +30,8 @@ import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/drive
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import { createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
@@ -51,7 +52,7 @@ type Fixture = {
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
-  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `SingleLineNewOrder`. */
   readonly presentationId: string;
   readonly unitId: string;
 };
@@ -113,6 +114,7 @@ async function createFixture(): Promise<Fixture> {
 }
 
 async function dropFixture(fixture: Fixture): Promise<void> {
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.unit.deleteMany({ where: { id: fixture.unitId } });
@@ -126,14 +128,14 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   await prisma.company.deleteMany({ where: { id: fixture.companyId } });
 }
 
-function pedidoNuevo(unitId: string): NewOrder {
+function pedidoNuevo(unitId: string): SingleLineNewOrder {
   return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [], salePrice: null, customerId: null };
 }
 
 function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
   return withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(
+    createSingleLineOrder(createOrderWriteRepository(tx), 
       pedidoNuevo(fixture.unitId),
       now.getUTCFullYear(),
       fixture.actorId,
@@ -186,10 +188,10 @@ describe('un 23505 real del correlativo agota los tres intentos y se traduce a d
       // Control: el trigger produce de verdad el 23505 del indice del correlativo, y no otro error.
       const control = await admin
         .query(
-          `INSERT INTO orders (company_id, order_year, order_sequence, recipe_id, quantity, priority,
+          `INSERT INTO orders (company_id, order_year, order_sequence, priority,
                                status, created_by, updated_by, created_at, updated_at)
-           VALUES ($1::uuid, $2::int, 999, $3::uuid, 1, 'BAJA', 'PENDIENTE', $4::uuid, $4::uuid, $5, $5)`,
-          [fixture.companyId, primera.number.year, recetaId, fixture.actorId, primera.createdAt],
+           VALUES ($1::uuid, $2::int, 999, 'BAJA', 'PENDIENTE', $3::uuid, $3::uuid, $4, $4)`,
+          [fixture.companyId, primera.number.year, fixture.actorId, primera.createdAt],
         )
         .then(
           () => null,

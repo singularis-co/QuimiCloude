@@ -16,6 +16,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line'
+
 import type { PackedLineCount } from '@/lib/modules/pedidos'
 import type { RecordedPackedLine } from '@/lib/modules/pedidos/ports/order-write-repository'
 
@@ -108,16 +110,13 @@ async function seedCompany(tx: Prisma.TransactionClient, label: string): Promise
 }
 
 async function seedOrder(tx: Prisma.TransactionClient, company: Company): Promise<string> {
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: company.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
       recipeId: company.recipeId,
       quantity: new Prisma.Decimal('100'),
-    },
-    select: { id: true },
-  })
+    })
   return order.id
 }
 
@@ -141,6 +140,7 @@ async function seedLine(
   const line = await tx.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: await ensureOnlyLine(tx, orderId),
       companyId: company.companyId,
       presentationId: presentation.id,
       packages,

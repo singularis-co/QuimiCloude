@@ -12,6 +12,7 @@ import {
 import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
 import { assertOrderAcceptsWrites } from './order-state';
+import { onlyLineOf } from './only-order-line';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -205,7 +206,7 @@ export function createFinishAssignedOrder(
       1,
       1,
     );
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
     const numberText = formatOrderNumber(summary.number);
 
@@ -219,11 +220,13 @@ export function createFinishAssignedOrder(
     // `stale` solo repite la transicion. Si esta falla despues, se compensa lo creado.
     const createdPackerIds = await ensurePackerAssignments(deps, actor.companyId, orderId, now);
     for (;;) {
-      const from = order.status;
+      // `assertFinishable` solo deja pasar `EN_CURSO`.
+      const from = 'EN_CURSO' as const;
       try {
         await deps.transaction.run(async ({ orders, log }) => {
           const outcome = await orders.transitionAliveById(
             orderId,
+            summary.lineId,
             actor.companyId,
             from,
             'POR_EMPACAR',
@@ -235,6 +238,7 @@ export function createFinishAssignedOrder(
             action: 'finish',
             companyId: actor.companyId,
             orderId,
+            orderLineId: summary.lineId,
             userId: actor.id,
             stepPosition,
             occurredAt: now,

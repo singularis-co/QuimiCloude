@@ -29,6 +29,7 @@ const {
   setOrderCustomerMock,
   searchOrderCustomersMock,
   getOrderCustomerFilterOptionMock,
+  listOrderLineIdsMock,
   getSessionUserMock,
   getSessionContextMock,
   REQUEST_ID,
@@ -38,6 +39,8 @@ const {
   setOrderCustomerMock: vi.fn(),
   searchOrderCustomersMock: vi.fn(),
   getOrderCustomerFilterOptionMock: vi.fn(),
+  // QT-313: la edicion desde el formulario de una receta nombra la unica linea del pedido.
+  listOrderLineIdsMock: vi.fn(async () => ['0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e']),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   REQUEST_ID: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
@@ -52,6 +55,7 @@ vi.mock('@/lib/composition', () => ({
     setOrderCustomer: setOrderCustomerMock,
     searchOrderCustomers: searchOrderCustomersMock,
     getOrderCustomerFilterOption: getOrderCustomerFilterOptionMock,
+    listOrderLineIds: listOrderLineIdsMock,
   },
 }))
 

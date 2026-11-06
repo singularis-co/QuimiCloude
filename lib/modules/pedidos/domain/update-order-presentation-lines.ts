@@ -1,6 +1,6 @@
 // lib/modules/pedidos/domain/update-order-presentation-lines.ts
 //
-// Edicion ACOTADA del reparto y la unidad del pedido, aparte de `updateOrder`:
+// Edicion ACOTADA del reparto y la unidad de una linea del pedido, aparte de `updateOrder`:
 // se permite tocar reparto y unidad hasta Comenzar empaque, `POR_EMPACAR` incluido,
 // donde `updateOrder` no deja tocar nada (`ALLOWED.POR_EMPACAR` sin «quedarse
 // igual»). Por eso este caso de uso NO pasa por `assertTransition`: `REPARTO_EDITABLE_STATUSES`
@@ -11,8 +11,9 @@
 // `finishAssignedOrder` con `startAssignedOrder`—: solo hay un llamador.
 //
 // Corre en la unidad de trabajo compartida con `inventario`: el reparto nombra envases y lo
-// apartado tiene que seguirlo. Nunca toca `quantity` ni la receta. Antes de Comenzar tambien
-// recalcula el importe, que incluye los envases; desde Comenzar lo conserva.
+// apartado tiene que seguirlo. Nunca toca `quantity` ni la receta, ni ninguna otra linea. Antes de
+// Comenzar tambien recalcula el importe de la linea, que incluye los envases; desde Comenzar lo
+// conserva.
 
 import type { Actor } from './actor';
 import {
@@ -22,7 +23,7 @@ import {
   OrderWouldBlockError,
 } from './errors';
 import { validateDistribution } from './order-distribution';
-import { isStartedOrderStatus, type OrderStatus } from './order-classification';
+import { isStartedOrderStatus, type OrderLineStatus } from './order-classification';
 import { buildOrderRequirement, packagingLinesOf } from './order-requirement';
 import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import type { OrderScope } from './order-scope';
@@ -40,7 +41,7 @@ import type { OrderWriteRepository } from '../ports/order-write-repository';
  * El reparto y la unidad se pueden editar hasta Comenzar empaque. `'BLOQUEADO'` entra porque el
  * bloqueo es por material y editar el reparto puede resolverlo.
  */
-export const REPARTO_EDITABLE_STATUSES: readonly OrderStatus[] = [
+export const REPARTO_EDITABLE_STATUSES: readonly OrderLineStatus[] = [
   'PENDIENTE',
   'EN_CURSO',
   'POR_EMPACAR',
@@ -48,6 +49,8 @@ export const REPARTO_EDITABLE_STATUSES: readonly OrderStatus[] = [
 ];
 
 export type UpdateOrderPresentationLinesInput = {
+  /** La linea cuyo reparto se edita; una de otro pedido, de otra empresa o quitada es `not_found`. */
+  readonly lineId: string;
   readonly unitId: string;
   readonly lines: readonly DistributionLineInput[];
   /** Permiso explicito para dejar el pedido bloqueado si un envase o material no alcanza. */
@@ -88,7 +91,7 @@ export type UpdateOrderPresentationLinesDeps = DistributionCatalogs &
 };
 
 /** Con la receta ya consumida no hay aviso posible: no existe `POR_EMPACAR -> BLOQUEADO`. */
-const BLOCKABLE_STATUSES: readonly OrderStatus[] = ['PENDIENTE', 'BLOQUEADO'];
+const BLOCKABLE_STATUSES: readonly OrderLineStatus[] = ['PENDIENTE', 'BLOQUEADO'];
 
 export function createUpdateOrderPresentationLines(
   deps: UpdateOrderPresentationLinesDeps,
@@ -107,25 +110,26 @@ export function createUpdateOrderPresentationLines(
 
     try {
       return await deps.unitOfWork.run(async (transaction): Promise<UpdateOrderPresentationLinesResult> => {
-        // La fila se bloquea ANTES de leer o escribir nada mas, asi que Comenzar y este
-        // guardado se serializan sobre la MISMA fila.
-        const locked = await transaction.orders.lockAliveById(orderId, scope);
+        // El pedido y la linea se bloquean antes de leer o escribir nada mas, asi que Comenzar y
+        // este guardado se serializan.
+        const locked = await transaction.orders.lockAliveLine(orderId, input.lineId, scope);
         if (locked === null) return 'not_found';
+        const { line } = locked;
 
-        if (!REPARTO_EDITABLE_STATUSES.includes(locked.status)) return 'not_editable';
+        if (!REPARTO_EDITABLE_STATUSES.includes(line.status)) return 'not_editable';
 
-        // Una linea antigua solo se conserva si llega igual que una de las que el pedido ya tiene.
+        // Una linea antigua solo se conserva si llega igual que una de las que la linea ya tiene.
         const resolution = await resolveDistributionLines(deps, companyId, input.unitId, input.lines, {
-          savedLines: locked.presentationLines,
+          savedLines: line.presentationLines,
         });
         if (resolution.kind !== 'resolved') return resolution.kind;
 
-        // El disponible o el primer fallo, con la CANTIDAD del pedido
-        // ya bloqueado -este caso de uso no la cambia-.
+        // El disponible o el primer fallo, con la cantidad de la linea ya bloqueada: este caso de uso
+        // no la cambia.
         const result = validateDistribution(
-          locked.quantity,
+          line.quantity,
           resolution.orderUnit,
-          resolution.lines.map((line) => line.distribution),
+          resolution.lines.map((item) => item.distribution),
         );
         switch (result.kind) {
           case 'without_unit':
@@ -140,45 +144,62 @@ export function createUpdateOrderPresentationLines(
             break;
         }
 
-        const writeLines = resolution.lines.map((line) => line.write);
+        const writeLines = resolution.lines.map((item) => item.write);
 
         // En POR_EMPACAR la receta ya se consumio: solo quedan por apartar los envases. La
-        // necesidad se arma antes de escribir, con la unidad NUEVA: una linea no convertible
+        // necesidad se arma antes de escribir, con la unidad nueva: una linea no convertible
         // rechaza el cambio sin tocar nada.
-        const materialsConsumed = locked.status === 'POR_EMPACAR';
+        const materialsConsumed = line.status === 'POR_EMPACAR';
         const recipeLines = materialsConsumed
           ? []
-          : ((await transaction.recipes.findExecutionContentById(locked.recipeId, companyId))?.lines ?? []);
+          : ((await transaction.recipes.findExecutionContentById(line.recipeId, companyId))?.lines ?? []);
         const packagingLines = packagingLinesOf(writeLines);
         const units = await loadRequirementUnits(
           transaction,
-          recipeLines.map((line) => line.productId),
+          recipeLines.map((recipeLine) => recipeLine.productId),
           input.unitId,
           companyId,
         );
         const requirement = requireConvertibleRequirement(
           buildOrderRequirement({
             recipeLines,
-            quantity: locked.quantity,
+            quantity: line.quantity,
             packagingLines,
             phase: materialsConsumed ? 'materials_consumed' : 'before_consumption',
             units,
           }),
         );
 
-        const outcome = await transaction.orders.updatePresentationLinesAlive(
+        const written = await transaction.orders.writeLines(
           orderId,
-          input.unitId,
-          writeLines,
+          {
+            removedIds: [],
+            edited: [
+              {
+                lineId: line.id,
+                line: {
+                  recipeId: line.recipeId,
+                  originalRecipeId: line.originalRecipeId,
+                  quantity: line.quantity,
+                  unitId: input.unitId,
+                  salePrice: line.salePrice,
+                  presentationLines: writeLines,
+                },
+                cost: 'keep',
+              },
+            ],
+            added: [],
+          },
           actorId,
           instant,
           scope,
         );
-        // La fila esta bloqueada desde `lockAliveById` en esta misma transaccion.
-        if (outcome !== 'ok') return 'not_found';
+        // El pedido y la linea estan bloqueados desde `lockAliveLine` en esta misma transaccion.
+        if (written === null) return 'not_found';
 
-        const reservation = await transaction.reservations.syncForOrder({
+        const reservation = await transaction.reservations.syncForLine({
           orderId,
+          orderLineId: line.id,
           companyId,
           requirement,
           actorId,
@@ -186,37 +207,42 @@ export function createUpdateOrderPresentationLines(
         });
 
         if (reservation.kind === 'insufficient') {
-          // Lanzar deshace las lineas, la unidad y lo apartado.
-          if (!BLOCKABLE_STATUSES.includes(locked.status)) throw new InsufficientMaterialError();
+          // Lanzar deshace el reparto, la unidad y lo apartado.
+          if (!BLOCKABLE_STATUSES.includes(line.status)) throw new InsufficientMaterialError();
           if (input.confirmBlocked !== true) throw new OrderWouldBlockError();
-          if (locked.status !== 'BLOQUEADO') {
-            await moveStatus(transaction.orders, orderId, locked.status, 'BLOQUEADO', actorId, instant, scope);
+          if (line.status !== 'BLOQUEADO') {
+            await moveLine(transaction.orders, orderId, line.id, line.status, 'BLOQUEADO', actorId, instant, scope);
           }
-          if (locked.ingredientsCost !== null) {
-            await transaction.orders.setIngredientsCost(orderId, null, actorId, instant, scope);
+          if (line.ingredientsCost !== null) {
+            await transaction.orders.setLineIngredientsCost(orderId, line.id, null, actorId, instant, scope);
           }
         } else {
-          if (locked.status === 'BLOQUEADO') {
-            await moveStatus(transaction.orders, orderId, 'BLOQUEADO', 'PENDIENTE', actorId, instant, scope);
+          if (line.status === 'BLOQUEADO') {
+            await moveLine(transaction.orders, orderId, line.id, 'BLOQUEADO', 'PENDIENTE', actorId, instant, scope);
           }
-          // La receta y la cantidad salen de la fila bloqueada, asi que el importe se calcula aqui
-          // y no antes de abrir la transaccion. Los catalogos leen lo ya confirmado, igual que la
-          // cotizacion, y `orderId` cuenta lo apartado por este pedido como suyo.
-          if (!isStartedOrderStatus(locked.status)) {
+          // La receta y la cantidad salen de la linea bloqueada, asi que el importe se calcula aqui y
+          // no antes de abrir la transaccion; lo apartado por esta linea cuenta como suyo.
+          if (!isStartedOrderStatus(line.status)) {
             const cost = await resolveStoredOrderCost(
               deps,
-              locked.recipeId,
-              locked.quantity,
+              line.recipeId,
+              line.quantity,
               input.unitId,
               packagingLines,
               companyId,
-              { orderId },
+              { orderLineId: line.id },
             );
-            await transaction.orders.setIngredientsCost(orderId, cost, actorId, instant, scope);
+            await transaction.orders.setLineIngredientsCost(orderId, line.id, cost, actorId, instant, scope);
           }
         }
 
-        await transaction.orders.setReservedAt(orderId, reservation.kind === 'reserved' ? instant : null, scope);
+        await transaction.orders.setLineReservedAt(
+          orderId,
+          line.id,
+          reservation.kind === 'reserved' ? instant : null,
+          scope,
+        );
+        await transaction.orders.refreshStatus(orderId, actorId, instant, scope);
         return 'ok';
       });
     } catch (error) {
@@ -229,17 +255,18 @@ export function createUpdateOrderPresentationLines(
   };
 }
 
-/** La fila ya esta bloqueada por `lockAliveById`: cualquier resultado distinto de `ok` es que el
- *  pedido dejo de existir para esta empresa. */
-async function moveStatus(
+/** La linea ya esta bloqueada: cualquier resultado distinto de `ok` es que dejo de existir para
+ *  esta empresa. */
+async function moveLine(
   orders: OrderWriteRepository,
-  id: string,
-  from: OrderStatus,
-  to: OrderStatus,
+  orderId: string,
+  lineId: string,
+  from: OrderLineStatus,
+  to: Exclude<OrderLineStatus, 'CANCELADO'>,
   actorId: string,
   now: Date,
   scope: OrderScope,
 ): Promise<void> {
-  const result = await orders.setStatus(id, from, to, actorId, now, scope);
-  if (result !== 'ok') throw new OrderNotFoundError();
+  const result = await orders.setLineStatus(orderId, lineId, from, to, actorId, now, scope);
+  if (result !== 'ok') throw new OrderNotFoundError(`linea ${lineId}`);
 }

@@ -16,8 +16,8 @@ import type { Page } from '../../../domain/page';
 import type { ProductView, ProductType } from '../../../domain/product-view';
 
 // EXCEPCION APROBADA (2026-10-04, humano + leader) a «cada modulo solo lee sus tablas»: este
-// listado hace JOIN en SQL a `orders` y `recipes` -y a `order_presentation_lines`, por el tope
-// de envases de cada lote-, que son de `pedidos` y `recetas`. Paginar, ordenar por el numero de
+// listado hace JOIN en SQL a `orders`, `order_lines` y `recipes` -y a `order_presentation_lines`,
+// por el tope de envases y la receta de cada lote-, que son de `pedidos` y `recetas`. Paginar, ordenar por el numero de
 // pedido y buscar por numero o por receta en la base no se puede hacer a traves de sus puertos
 // sin traer el conjunto entero a memoria. Vale SOLO para `listStockGroups`; ninguna otra
 // consulta de este modulo puede leer esas tablas, y aqui solo se leen, nunca se escriben.
@@ -96,19 +96,26 @@ function searchCondition(search: string): Prisma.Sql {
   )`;
 }
 
-/** Filas visibles: un grupo por pedido y uno por producto con lotes sin pedido, con stock > 0. */
+/**
+ * Filas visibles: un grupo por pedido y uno por producto con lotes sin pedido, con stock > 0. La
+ * receta de un grupo es la de la linea del pedido de menor `position` entre las de sus lotes.
+ */
 function listedGroups(companyId: string, search: string): Prisma.Sql {
   return Prisma.sql`
     WITH finished_batches AS (
-      SELECT b."product_id", b."stock", m."order_id"
+      SELECT b."product_id", b."stock", m."order_id", ol."recipe_id", ol."position"
         FROM "product_batches" b
         JOIN "products" p ON p."id" = b."product_id"
-        ${productionOf(companyId, Prisma.sql`im."order_id"`)}
+        ${productionOf(companyId, Prisma.sql`im."order_id", im."order_presentation_line_id"`)}
+        LEFT JOIN "order_presentation_lines" opl
+               ON opl."id" = m."order_presentation_line_id" AND opl."company_id" = ${companyId}::uuid
+        LEFT JOIN "order_lines" ol ON ol."id" = opl."order_line_id" AND ol."company_id" = ${companyId}::uuid
        WHERE ${finishedBatchesWhere(companyId)}
     ),
     stock_groups AS (
       SELECT fb."order_id",
-             CASE WHEN fb."order_id" IS NULL THEN fb."product_id" END AS "legacy_product_id"
+             CASE WHEN fb."order_id" IS NULL THEN fb."product_id" END AS "legacy_product_id",
+             (array_agg(fb."recipe_id" ORDER BY fb."position") FILTER (WHERE fb."recipe_id" IS NOT NULL))[1] AS "recipe_id"
         FROM finished_batches fb
        GROUP BY 1, 2
       HAVING SUM(fb."stock") > 0
@@ -121,7 +128,7 @@ function listedGroups(companyId: string, search: string): Prisma.Sql {
            lp."name" AS "legacyName"
       FROM stock_groups g
       LEFT JOIN "orders" o ON o."id" = g."order_id" AND o."company_id" = ${companyId}::uuid
-      LEFT JOIN "recipes" r ON r."id" = o."recipe_id" AND r."company_id" = ${companyId}::uuid
+      LEFT JOIN "recipes" r ON r."id" = g."recipe_id" AND r."company_id" = ${companyId}::uuid
       LEFT JOIN "products" lp ON lp."id" = g."legacy_product_id" AND lp."company_id" = ${companyId}::uuid
      WHERE ${searchCondition(search)}`;
 }

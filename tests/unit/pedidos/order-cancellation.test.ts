@@ -11,9 +11,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { ORDER_STATUS_VALUES, createCancelAliveOrder } from '@/lib/modules/pedidos'
 import { isCancellableStatus } from '@/lib/modules/pedidos/domain/order-cancellation'
 
-import { fakeOrderRow, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, fakeUnitOfWork, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { OrderStatus } from '@/lib/modules/pedidos'
+import type { OrderLineStatus } from '@/lib/modules/pedidos/domain/order-classification'
 
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const COMPANY_ID = '33333333-3333-4333-8333-333333333333'
@@ -47,33 +48,39 @@ function sinComentarios(texto: string): string {
     .join('\n')
 }
 
-function dobles(opciones: { estado?: OrderStatus | null; cancelacion?: 'ok' | 'not_found' } = {}) {
+const LINEA_ID = '0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e'
+
+function dobles(opciones: { estado?: OrderLineStatus | null; cancelacion?: 'ok' | 'not_found' } = {}) {
   const estado = opciones.estado === undefined ? 'PENDIENTE' : opciones.estado
-  const lockAliveById = vi.fn(async (id: string, scope: { companyId: string }) => {
+  const lockAliveLines = vi.fn(async (id: string, scope: { companyId: string }) => {
     void [id, scope]
-    return estado === null ? null : fakeOrderRow({ status: estado })
+    if (estado === null) return null
+    const order = fakeOrderRow({ status: estado })
+    return { order, lines: [orderLineOf(order)] }
   })
-  const cancelAlive = vi.fn(
-    async (id: string, reason: string, actorId: string | null, when: Date, scope: { companyId: string }) => {
-      void [id, reason, actorId, when, scope]
+  const cancelLine = vi.fn(
+    async (id: string, lineId: string, reason: string, actorId: string | null, when: Date, scope: { companyId: string }) => {
+      void [id, lineId, reason, actorId, when, scope]
       return opciones.cancelacion ?? 'ok'
     },
   )
-  const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null, scope: { companyId: string }) => {
-    void [id, reservedAt, scope]
+  const setLineReservedAt = vi.fn(async (id: string, lineId: string, reservedAt: Date | null, scope: { companyId: string }) => {
+    void [id, lineId, reservedAt, scope]
   })
-  const releaseForOrder = vi.fn(async (input: unknown) => {
+  const refreshStatus = vi.fn(async () => 'CANCELADO' as const)
+  const releaseForLine = vi.fn(async (input: unknown) => {
     void input
   })
-  const { unitOfWork } = fakeUnitOfWork({
-    orders: { lockAliveById, cancelAlive, setReservedAt },
-    reservations: { releaseForOrder },
+  const { unitOfWork, orders } = fakeUnitOfWork({
+    orders: { lockAliveLines, cancelLine, setLineReservedAt, refreshStatus },
+    reservations: { releaseForLine },
   })
-  return { unitOfWork, lockAliveById, cancelAlive, setReservedAt, releaseForOrder }
+  return { unitOfWork, orders, lockAliveLines, cancelLine, setLineReservedAt, refreshStatus, releaseForLine }
 }
 
 describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R43)', () => {
   const ESPERADO: Readonly<Record<OrderStatus, boolean>> = {
+    PARCIAL: false,
     PENDIENTE: true,
     EN_CURSO: true,
     BLOQUEADO: true,
@@ -86,7 +93,7 @@ describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R4
     CANCELADO: false,
   }
 
-  it('R29: clasifica los diez estados de OrderStatus, ni uno mas ni uno menos', () => {
+  it('R29: clasifica los once estados de OrderStatus, ni uno mas ni uno menos', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(Object.keys(ESPERADO).sort())
   })
 
@@ -98,7 +105,7 @@ describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R4
 })
 
 describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (R29, R43)', () => {
-  it('R29: un pedido cancelable devuelve ok, y cancela, libera con el autor recibido y vacia reserved_at, en ese orden', async () => {
+  it('R29: un pedido cancelable devuelve ok, y cancela su linea, libera con el autor recibido, vacia su plazo y deriva el pedido, en ese orden', async () => {
     const d = dobles({ estado: 'EN_CURSO' })
 
     const resultado = await createCancelAliveOrder({ unitOfWork: d.unitOfWork })(
@@ -110,20 +117,25 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
     )
 
     expect(resultado).toBe('ok')
-    expect(d.lockAliveById).toHaveBeenCalledWith(ORDER_ID, { companyId: COMPANY_ID })
-    expect(d.cancelAlive.mock.calls).toEqual([[ORDER_ID, MOTIVO, ACTOR_ID, AHORA, { companyId: COMPANY_ID }]])
-    expect(d.releaseForOrder.mock.calls).toEqual([
-      [{ orderId: ORDER_ID, companyId: COMPANY_ID, reason: 'release', actorId: ACTOR_ID, now: AHORA }],
+    expect(d.lockAliveLines).toHaveBeenCalledWith(ORDER_ID, { companyId: COMPANY_ID })
+    expect(d.cancelLine.mock.calls).toEqual([[ORDER_ID, LINEA_ID, MOTIVO, ACTOR_ID, AHORA, { companyId: COMPANY_ID }]])
+    expect(d.releaseForLine.mock.calls).toEqual([
+      [{ orderId: ORDER_ID, orderLineId: LINEA_ID, companyId: COMPANY_ID, reason: 'release', actorId: ACTOR_ID, now: AHORA }],
     ])
-    expect(d.setReservedAt.mock.calls).toEqual([[ORDER_ID, null, { companyId: COMPANY_ID }]])
+    expect(d.setLineReservedAt.mock.calls).toEqual([[ORDER_ID, LINEA_ID, null, { companyId: COMPANY_ID }]])
+    expect(d.refreshStatus).toHaveBeenCalledWith(ORDER_ID, ACTOR_ID, AHORA, { companyId: COMPANY_ID })
 
     const orden = [
-      d.lockAliveById.mock.invocationCallOrder[0],
-      d.cancelAlive.mock.invocationCallOrder[0],
-      d.releaseForOrder.mock.invocationCallOrder[0],
-      d.setReservedAt.mock.invocationCallOrder[0],
+      d.lockAliveLines.mock.invocationCallOrder[0],
+      d.cancelLine.mock.invocationCallOrder[0],
+      d.releaseForLine.mock.invocationCallOrder[0],
+      d.setLineReservedAt.mock.invocationCallOrder[0],
+      d.refreshStatus.mock.invocationCallOrder[0],
     ]
     expect(orden).toEqual([...orden].sort((a, b) => (a ?? 0) - (b ?? 0)))
+    // QT-313 R29: el estado del pedido no se escribe, se deriva.
+    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
   })
 
   it('R29: un BLOQUEADO tambien se cancela por encargo', async () => {
@@ -138,7 +150,7 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
     )
 
     expect(resultado).toBe('ok')
-    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+    expect(d.cancelLine).toHaveBeenCalledTimes(1)
   })
 
   it('R29: un pedido que no existe (o es de otra empresa) es not_found, sin cancelar ni liberar', async () => {
@@ -153,25 +165,19 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
     )
 
     expect(resultado).toBe('not_found')
-    expect(d.cancelAlive).not.toHaveBeenCalled()
-    expect(d.releaseForOrder).not.toHaveBeenCalled()
-    expect(d.setReservedAt).not.toHaveBeenCalled()
+    expect(d.cancelLine).not.toHaveBeenCalled()
+    expect(d.releaseForLine).not.toHaveBeenCalled()
+    expect(d.setLineReservedAt).not.toHaveBeenCalled()
   })
 
-  it('R29: si cancelAlive no encuentra la fila, es not_found y no libera', async () => {
+  it('R29: si la linea bloqueada no se puede escribir, lanza order_not_found sin liberar', async () => {
     const d = dobles({ estado: 'PENDIENTE', cancelacion: 'not_found' })
 
-    const resultado = await createCancelAliveOrder({ unitOfWork: d.unitOfWork })(
-      ORDER_ID,
-      COMPANY_ID,
-      MOTIVO,
-      ACTOR_ID,
-      AHORA,
-    )
-
-    expect(resultado).toBe('not_found')
-    expect(d.releaseForOrder).not.toHaveBeenCalled()
-    expect(d.setReservedAt).not.toHaveBeenCalled()
+    await expect(
+      createCancelAliveOrder({ unitOfWork: d.unitOfWork })(ORDER_ID, COMPANY_ID, MOTIVO, ACTOR_ID, AHORA),
+    ).rejects.toMatchObject({ code: 'order_not_found' })
+    expect(d.releaseForLine).not.toHaveBeenCalled()
+    expect(d.setLineReservedAt).not.toHaveBeenCalled()
   })
 
   for (const estado of ['POR_EMPACAR', 'EN_EMPAQUE', 'ENTREGADO', 'CANCELADO'] as const) {
@@ -187,9 +193,9 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
       )
 
       expect(resultado).toBe('not_cancellable')
-      expect(d.cancelAlive).not.toHaveBeenCalled()
-      expect(d.releaseForOrder).not.toHaveBeenCalled()
-      expect(d.setReservedAt).not.toHaveBeenCalled()
+      expect(d.cancelLine).not.toHaveBeenCalled()
+      expect(d.releaseForLine).not.toHaveBeenCalled()
+      expect(d.setLineReservedAt).not.toHaveBeenCalled()
     })
   }
 
@@ -206,9 +212,9 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
       )
 
       expect(resultado).toBe('not_cancellable')
-      expect(d.cancelAlive).not.toHaveBeenCalled()
-      expect(d.releaseForOrder).not.toHaveBeenCalled()
-      expect(d.setReservedAt).not.toHaveBeenCalled()
+      expect(d.cancelLine).not.toHaveBeenCalled()
+      expect(d.releaseForLine).not.toHaveBeenCalled()
+      expect(d.setLineReservedAt).not.toHaveBeenCalled()
     })
   }
 })
@@ -224,7 +230,6 @@ describe('pedidos — una sola definicion de «cancelable» y un solo cuerpo de 
     expect(cancelOrder).toBeDefined()
     expect(cancelOrder?.codigo).not.toMatch(/\bCANCELABLES?\b/)
     expect(cancelOrder?.codigo).not.toMatch(/'PENDIENTE'|'EN_CURSO'|'BLOQUEADO'/)
-    expect(cancelOrder?.codigo).toMatch(/\bisCancellableStatus\s*\(/)
     expect(cancelOrder?.codigo).toMatch(/\bcancelInsideTransaction\s*\(/)
   })
 
@@ -235,11 +240,10 @@ describe('pedidos — una sola definicion de «cancelable» y un solo cuerpo de 
     expect(definiciones).toEqual(['lib/modules/pedidos/domain/order-cancellation.ts'])
   })
 
-  it('R29: hay UNA sola llamada a cancelAlive fuera de la caducidad diaria, y es la del cuerpo unico', () => {
-    const llamadas = fuentes.flatMap((f) =>
-      [...f.codigo.matchAll(/\.cancelAlive\s*\(/g)].map(() => f.ruta),
-    )
-    const fueraDeLaCaducidad = llamadas.filter((ruta) => ruta !== 'lib/modules/pedidos/domain/expire-stale-orders.ts')
-    expect(fueraDeLaCaducidad).toEqual(['lib/modules/pedidos/domain/order-cancellation.ts'])
+  it('QT-313 R27, R29, R51: ninguna operacion del modulo escribe el estado del pedido con cancelAlive; cancelLine solo lo llama el cuerpo unico', () => {
+    const llamadas = (patron: RegExp) =>
+      fuentes.flatMap((f) => [...f.codigo.matchAll(patron)].map(() => f.ruta)).filter((ruta) => ruta.includes('/domain/'))
+    expect(llamadas(/\.cancelAlive\s*\(/g)).toEqual([])
+    expect([...new Set(llamadas(/\.cancelLine\s*\(/g))]).toEqual(['lib/modules/pedidos/domain/order-cancellation.ts'])
   })
 })

@@ -28,6 +28,8 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { submitOrderWithLeftover } from './helpers/order-distribution';
 import { netReservedInBatch } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc204_e2e_';
 
@@ -122,7 +124,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
 // `::text` para no perder decimales ni confundir `NULL` con `'0.0000'`.
 async function ingredientsCostText(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`;
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`;
   const row = rows[0];
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
   return row.ingredients_cost;
@@ -161,10 +163,12 @@ async function submitAndFindOrder(page: Page, recipeId: string) {
   await submitOrderWithLeftover(page, page.getByTestId('order-form'));
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
-  return prisma.order.findFirstOrThrow({
-    where: { recipeId, companyId, deletedAt: null },
-    select: { id: true, status: true, unitId: true },
-  });
+  return withFirstLine(
+    await prisma.order.findFirstOrThrow({
+      where: { lines: { some: { recipeId } }, companyId, deletedAt: null },
+      select: { id: true, status: true, lines: firstLineSelect({ unitId: true }) },
+    }),
+  );
 }
 
 test.beforeAll(async () => {
@@ -181,7 +185,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -281,7 +285,7 @@ test.afterAll(async () => {
     () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
-    () => prisma.order.deleteMany({ where: { companyId } }),
+    () => deleteOrdersWithLines({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }),
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
     () => prisma.product.deleteMany({ where: { companyId } }),

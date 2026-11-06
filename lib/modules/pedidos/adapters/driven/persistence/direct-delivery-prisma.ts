@@ -88,6 +88,25 @@ async function addDirectDeliveryLines(
   });
 }
 
+/** Las lineas del pedido vivas en `TERMINADO` con alguna de esas recetas, por id. */
+async function findWaitingOrderLineRecipes(
+  recipeIds: readonly string[],
+  scope: OrderScope,
+  tx: PrismaLike,
+): Promise<ReadonlyMap<string, string>> {
+  const lines = await tx.orderLine.findMany({
+    where: {
+      AND: [
+        companyScopeColumns(scope),
+        { deletedAt: null, status: 'TERMINADO', recipeId: { in: [...recipeIds] } },
+        { order: { AND: [orderCompanyScope(scope), { deletedAt: null }] } },
+      ],
+    },
+    select: { id: true, recipeId: true },
+  });
+  return new Map(lines.map((line) => [line.id, line.recipeId]));
+}
+
 /** Lo anulado no cuenta como entregado: vuelve a esperar. */
 async function listWaitingOrderLines(
   pairs: readonly WaitingOrderPair[],
@@ -95,18 +114,20 @@ async function listWaitingOrderLines(
   tx: PrismaLike,
 ): Promise<readonly WaitingOrderLineOfPair[]> {
   if (pairs.length === 0) return [];
+  const recipeByLine = await findWaitingOrderLineRecipes([...new Set(pairs.map((pair) => pair.recipeId))], scope, tx);
+  const matching = pairs.flatMap((pair) => {
+    const lineIds = [...recipeByLine].filter(([, recipeId]) => recipeId === pair.recipeId).map(([id]) => id);
+    return lineIds.length === 0 ? [] : [{ presentationId: pair.presentationId, orderLineId: { in: lineIds } }];
+  });
+  if (matching.length === 0) return [];
+
   const columns = companyScopeColumns(scope);
   const lines = await tx.orderPresentationLine.findMany({
     where: {
       AND: [
         columns,
-        { order: { AND: [orderCompanyScope(scope), { status: 'TERMINADO', deletedAt: null }] } },
-        {
-          OR: pairs.map((pair) => ({
-            presentationId: pair.presentationId,
-            order: { recipeId: pair.recipeId },
-          })),
-        },
+        { order: { AND: [orderCompanyScope(scope), { deletedAt: null }] } },
+        { OR: matching },
       ],
     },
     select: {
@@ -115,7 +136,8 @@ async function listWaitingOrderLines(
       packages: true,
       packedPackages: true,
       packedSurplusPackages: true,
-      order: { select: { id: true, recipeId: true, orderYear: true, orderSequence: true } },
+      orderLineId: true,
+      order: { select: { id: true, orderYear: true, orderSequence: true } },
     },
     orderBy: [{ order: { orderYear: 'asc' } }, { order: { orderSequence: 'asc' } }, { id: 'asc' }],
   });
@@ -134,14 +156,20 @@ async function listWaitingOrderLines(
   });
   const deliveredByLine = new Map(delivered.map((row) => [row.orderPresentationLineId, row._sum.packages ?? 0]));
 
-  return lines.map((line) => ({
-    orderId: line.order.id,
-    numberText: formatOrderNumber({ year: line.order.orderYear, sequence: line.order.orderSequence }),
-    orderedPackages: orderedPackages(line),
-    deliveredPackages: deliveredByLine.get(line.id) ?? 0,
-    recipeId: line.order.recipeId,
-    presentationId: line.presentationId,
-  }));
+  return lines.flatMap((line) => {
+    const recipeId = recipeByLine.get(line.orderLineId);
+    if (recipeId === undefined) return [];
+    return [
+      {
+        orderId: line.order.id,
+        numberText: formatOrderNumber({ year: line.order.orderYear, sequence: line.order.orderSequence }),
+        orderedPackages: orderedPackages(line),
+        deliveredPackages: deliveredByLine.get(line.id) ?? 0,
+        recipeId,
+        presentationId: line.presentationId,
+      },
+    ];
+  });
 }
 
 /** Solo bloquea: lo que esperan se vuelve a leer con el producto ya bloqueado. */
@@ -155,14 +183,18 @@ async function lockWaitingCandidateOrders(
     SELECT o."id"
       FROM "orders" o
      WHERE o."company_id" = ${companyId}::uuid
-       AND o."recipe_id" = ${pair.recipeId}::uuid
        AND o."deleted_at" IS NULL
-       AND o."status" IN ('TERMINADO'::"OrderStatus", 'EN_ACONDICIONAMIENTO'::"OrderStatus")
        AND EXISTS (
              SELECT 1
-               FROM "order_presentation_lines" l
-              WHERE l."order_id" = o."id"
+               FROM "order_lines" ol
+               JOIN "order_presentation_lines" l
+                 ON l."order_line_id" = ol."id"
                 AND l."company_id" = ${companyId}::uuid
+              WHERE ol."order_id" = o."id"
+                AND ol."company_id" = ${companyId}::uuid
+                AND ol."recipe_id" = ${pair.recipeId}::uuid
+                AND ol."deleted_at" IS NULL
+                AND ol."status" IN ('TERMINADO'::"OrderStatus", 'EN_ACONDICIONAMIENTO'::"OrderStatus")
                 AND l."presentation_id" = ${pair.presentationId}::uuid
            )
      ORDER BY o."id"

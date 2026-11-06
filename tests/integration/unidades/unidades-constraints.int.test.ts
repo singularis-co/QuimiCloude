@@ -625,13 +625,14 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
       // Lista exacta y no `toContain`: una FK nueva hacia `units` sin RESTRICT, o una perdida
       // por drift de `migrate dev`, tiene que poner rojo este caso.
       expect(foreignKeys).toEqual([
-        // La unidad del pedido: con RESTRICT, una unidad usada por un pedido no se borra.
+        // QT-313: la unidad de cada receta del pedido, tambien con RESTRICT.
         {
-          conname: 'orders_unit_id_fkey',
+          conname: 'order_lines_unit_id_fkey',
           referencia: 'units',
           confdeltype: 'r',
           confupdtype: 'c',
         },
+        // Desde QT-313 la unidad es de cada receta del pedido: `orders` ya no la guarda.
         {
           conname: 'presentations_unit_id_fkey',
           referencia: 'units',

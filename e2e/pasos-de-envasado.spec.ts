@@ -45,6 +45,7 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc211_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -273,6 +274,7 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: scope });
     await prisma.orderPresentationLine.deleteMany({ where: scope });
     await prisma.orderExecutionEntry.deleteMany({ where: scope });
+    await prisma.orderLine.deleteMany({ where: scope });
     await prisma.order.deleteMany({ where: scope });
     await prisma.productBatch.deleteMany({ where: scope });
     const orphanRecipes = await prisma.recipe.findMany({ where: scope, select: { id: true } });
@@ -390,6 +392,7 @@ test.afterAll(async () => {
     byCompany((id) => prisma.orderAssignment.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderPresentationLine.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderExecutionEntry.deleteMany({ where: { companyId: id } })),
+    byCompany((id) => prisma.orderLine.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.order.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.productBatch.deleteMany({ where: { companyId: id } })),
     async () => {
@@ -494,8 +497,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     // --- 2. El pedido de esa formula, asignado al Operario por el equipo que tambien trae al
     // Empacador: Finalizar asigna al Empacador.
     const year = new Date().getUTCFullYear();
-    const order = await prisma.order.create({
-      data: {
+    const order = await createOrderWithLine(prisma, {
         companyId,
         orderYear: year,
         orderSequence: BASE_SEQUENCE,
@@ -507,23 +509,21 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
             select: { id: true },
           })
         ).id,
-        presentationLines: {
-          create: [
-            {
-              companyId,
-              presentationId,
-              packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
-              presentationContent: PRESENTATION_CONTENT,
-              packagingProductId,
-            },
-          ],
-        },
         // PENDIENTE: solo asi Entrar pide la confirmacion de comenzar.
         status: 'PENDIENTE',
-      },
-      select: { id: true },
-    });
+      });
     const orderId = order.id;
+    await prisma.orderPresentationLine.create({
+      data: {
+        orderId,
+        orderLineId: await ensureOnlyLine(prisma, orderId),
+        companyId,
+        presentationId,
+        packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+        presentationContent: PRESENTATION_CONTENT,
+        packagingProductId,
+      },
+    });
     const orderNumber = formatOrderNumber({ year, sequence: BASE_SEQUENCE });
     await prisma.orderAssignment.create({
       data: {

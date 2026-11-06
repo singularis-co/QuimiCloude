@@ -2,9 +2,9 @@ import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { orderCompanyScope } from './company-scope';
+import { companyScopeColumns, orderCompanyScope } from './company-scope';
 
-import type { OrderStatus } from '../../../domain/order-classification';
+import type { OrderLineStatus, OrderStatus } from '../../../domain/order-classification';
 import type {
   AssignedOrderSummary,
   OrderAssignmentTarget,
@@ -44,12 +44,24 @@ import type { OrderSummaryLineRecord, OrderSummaryRecord } from '../../../ports/
 type OrderCatalogRow = {
   readonly id: string;
   readonly status: string;
+  readonly lines: readonly { readonly status: string }[];
 };
 
 /** Fila de Prisma -> `OrderAssignmentTarget`. Funcion pura, testeable sin base. */
 export function toOrderAssignmentTarget(row: OrderCatalogRow): OrderAssignmentTarget {
-  return { id: row.id, status: row.status as OrderStatus };
+  return {
+    id: row.id,
+    status: row.status as OrderStatus,
+    activeLineStatuses: row.lines.map((line) => line.status as OrderLineStatus),
+  };
 }
+
+/** Solo las lineas ACTIVAS (vivas y no canceladas) deciden si un `PARCIAL` admite
+ *  responsables. El filtro va en la consulta para que una linea cancelada o de baja no llegue. */
+const ACTIVE_LINE_STATUSES_SELECT = {
+  where: { deletedAt: null, status: { not: 'CANCELADO' as const } },
+  select: { status: true },
+};
 
 export async function findAliveOrderTargetById(
   id: string,
@@ -57,16 +69,17 @@ export async function findAliveOrderTargetById(
 ): Promise<OrderAssignmentTarget | null> {
   const row = await prisma.order.findFirst({
     where: { AND: [orderCompanyScope({ companyId }), { id, deletedAt: null }] },
-    select: { id: true, status: true },
+    select: { id: true, status: true, lines: ACTIVE_LINE_STATUSES_SELECT },
   });
 
   return row === null ? null : toOrderAssignmentTarget(row);
 }
 
-/** Una fila de `order_presentation_lines`, ya en el orden de alta: la
- *  consulta pide `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
+/** Una fila de `order_presentation_lines`, ya en el orden de alta: la consulta pide
+ *  `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
 type AssignedOrderPresentationLineRow = {
   readonly id: string;
+  readonly orderLineId: string;
   readonly presentationId: string;
   readonly packages: number;
   readonly packedPackages: number | null;
@@ -74,83 +87,72 @@ type AssignedOrderPresentationLineRow = {
   readonly packagingProductId: string | null;
 };
 
+/** Una linea con lo que su fila necesita de su pedido. */
 type AssignedOrderSummaryRow = {
   readonly id: string;
-  readonly orderYear: number;
-  readonly orderSequence: number;
+  readonly orderId: string;
   readonly recipeId: string;
   readonly quantity: { toFixed(digits: number): string };
-  readonly priority: string;
   readonly status: string;
-  readonly createdAt: Date;
   readonly unitId: string | null;
-  readonly presentationLines: readonly AssignedOrderPresentationLineRow[];
   readonly finishedAt: Date | null;
   readonly packedBy: string | null;
   readonly conditionedBy: string | null;
+  readonly order: {
+    readonly orderYear: number;
+    readonly orderSequence: number;
+    readonly priority: string;
+    readonly createdAt: Date;
+  };
 };
 
 /** `select` unico de los dos listados de resumen: si uno gana una columna y el otro no, el
- *  tipo `AssignedOrderSummaryRow` lo dice enseguida.
- *
- * El `orderBy` de `presentationLines` lleva sus literales fijados uno a uno -y no con un
- * `as const` de todo el objeto-, porque este archivo no importa `@prisma/client`
- * (`tests/unit/pedidos/module-contract.test.ts`) y Prisma exige un ARRAY MUTABLE de
- * `SortOrder`, no una tupla de solo lectura. */
+ *  tipo `AssignedOrderSummaryRow` lo dice enseguida. */
 const SUMMARY_SELECT = {
   id: true,
-  orderYear: true,
-  orderSequence: true,
+  orderId: true,
   recipeId: true,
   quantity: true,
-  priority: true,
   status: true,
-  createdAt: true,
   unitId: true,
-  presentationLines: {
-    select: {
-      id: true,
-      presentationId: true,
-      packages: true,
-      packedPackages: true,
-      presentationContent: true,
-      packagingProductId: true,
-    },
-    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
-  },
   finishedAt: true,
   packedBy: true,
   conditionedBy: true,
+  order: { select: { orderYear: true, orderSequence: true, priority: true, createdAt: true } },
 };
 
-/** El «orden de la lista de trabajo»: prioridad, antiguedad y numero, con `id ASC` de
- *  desempate para que sea total. Compartido por los dos listados de resumen para que no
- *  puedan divergir. */
+/** El «orden de la lista de trabajo»: prioridad, antiguedad y numero del pedido, y despues la
+ *  `position` de la linea, con `id ASC` de desempate para que sea total. Compartido por los dos
+ *  listados de resumen para que no puedan divergir. Este archivo no importa `@prisma/client`
+ *  (`tests/unit/pedidos/module-contract.test.ts`), asi que los literales se fijan uno a uno. */
 const WORK_QUEUE_ORDER_BY = [
-  { priority: 'desc' },
-  { createdAt: 'asc' },
-  { orderYear: 'asc' },
-  { orderSequence: 'asc' },
-  { id: 'asc' },
-] as const;
+  { order: { priority: 'desc' as const } },
+  { order: { createdAt: 'asc' as const } },
+  { order: { orderYear: 'asc' as const } },
+  { order: { orderSequence: 'asc' as const } },
+  { position: 'asc' as const },
+  { id: 'asc' as const },
+];
 
-/** El «orden de terminados»: fecha de terminado descendente con los nulos EXPLICITOS
+/** El «orden de terminados»: fecha de terminado de la linea descendente con los nulos EXPLICITOS
  *  al final, y entre los «sin fecha», numero de pedido descendente. */
 const FINISHED_RECENT_FIRST_ORDER_BY = [
-  { finishedAt: { sort: 'desc', nulls: 'last' } },
-  { orderYear: 'desc' },
-  { orderSequence: 'desc' },
-  { id: 'asc' },
-] as const;
+  { finishedAt: { sort: 'desc' as const, nulls: 'last' as const } },
+  { order: { orderYear: 'desc' as const } },
+  { order: { orderSequence: 'desc' as const } },
+  { position: 'asc' as const },
+  { id: 'asc' as const },
+];
 
-/** Como el «orden de terminados», pero con los nulos PRIMERO: los que aun no tienen fecha de
+/** Como el «orden de terminados», pero con los nulos PRIMERO: las que aun no tienen fecha de
  *  terminado (siguen en acondicionamiento) arriba, luego la fecha descendente. Mismo desempate. */
 const UNFINISHED_THEN_RECENT_ORDER_BY = [
-  { finishedAt: { sort: 'desc', nulls: 'first' } },
-  { orderYear: 'desc' },
-  { orderSequence: 'desc' },
-  { id: 'asc' },
-] as const;
+  { finishedAt: { sort: 'desc' as const, nulls: 'first' as const } },
+  { order: { orderYear: 'desc' as const } },
+  { order: { orderSequence: 'desc' as const } },
+  { position: 'asc' as const },
+  { id: 'asc' as const },
+];
 
 const ORDER_BY_BY_ORDERING = {
   work_queue: WORK_QUEUE_ORDER_BY,
@@ -160,17 +162,21 @@ const ORDER_BY_BY_ORDERING = {
 
 /** `quantity` llega como `Prisma.Decimal` -tipado aqui por su forma minima para no importar
  *  `@prisma/client`- y se fija a 4 decimales, la escala de la columna `Decimal(14,4)`. */
-export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummaryRecord {
+export function toOrderSummaryRecord(
+  row: AssignedOrderSummaryRow,
+  presentationLines: readonly AssignedOrderPresentationLineRow[],
+): OrderSummaryRecord {
   return {
-    id: row.id,
-    number: { year: row.orderYear, sequence: row.orderSequence },
+    id: row.orderId,
+    lineId: row.id,
+    number: { year: row.order.orderYear, sequence: row.order.orderSequence },
     recipeId: row.recipeId,
     quantity: row.quantity.toFixed(4),
-    priority: row.priority as AssignedOrderSummary['priority'],
-    status: row.status as OrderStatus,
-    createdAt: row.createdAt,
+    priority: row.order.priority as AssignedOrderSummary['priority'],
+    status: row.status as OrderLineStatus,
+    createdAt: row.order.createdAt,
     unitId: row.unitId,
-    presentationLines: row.presentationLines.map(
+    presentationLines: presentationLines.map(
       (line): OrderSummaryLineRecord => ({
         id: line.id,
         presentationId: line.presentationId,
@@ -186,12 +192,47 @@ export function toOrderSummaryRecord(row: AssignedOrderSummaryRow): OrderSummary
   };
 }
 
+/** El reparto de las lineas de la pagina en una sola consulta, ya en el orden de alta. */
+async function toSummaryRecords(
+  companyId: string,
+  rows: readonly AssignedOrderSummaryRow[],
+): Promise<readonly OrderSummaryRecord[]> {
+  if (rows.length === 0) return [];
+  const distribution = await prisma.orderPresentationLine.findMany({
+    where: { ...companyScopeColumns({ companyId }), orderLineId: { in: rows.map((row) => row.id) } },
+    select: {
+      id: true,
+      orderLineId: true,
+      presentationId: true,
+      packages: true,
+      packedPackages: true,
+      presentationContent: true,
+      packagingProductId: true,
+    },
+    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+  });
+  const byLine = new Map<string, AssignedOrderPresentationLineRow[]>();
+  for (const item of distribution) {
+    const list = byLine.get(item.orderLineId) ?? [];
+    list.push(item);
+    byLine.set(item.orderLineId, list);
+  }
+  return rows.map((row) => toOrderSummaryRecord(row, byLine.get(row.id) ?? []));
+}
+
+/** Lineas vivas de pedidos vivos de la empresa: el ambito va en la linea y en su pedido. */
+function aliveLinesWhere(companyId: string, statuses: readonly OrderStatus[]) {
+  return {
+    ...companyScopeColumns({ companyId }),
+    status: { in: [...statuses] },
+    deletedAt: null,
+    order: { AND: [orderCompanyScope({ companyId }), { deletedAt: null }] },
+  };
+}
+
 /**
  * Dos sentencias -`count` y `findMany`- para una lectura logica: asi el `total` describe el
- * conjunto ya filtrado por estado y por empresa, que es lo que se pagina.
- *
- * El orden repite el de `OrderRepository.listAlive` sin `sort`, con `id ASC` de desempate para
- * que sea total.
+ * conjunto ya filtrado por estado de la linea y por empresa, que es lo que se pagina.
  */
 export async function listAliveOrderSummariesByIds(
   companyId: string,
@@ -201,25 +242,20 @@ export async function listAliveOrderSummariesByIds(
   pageSize?: number,
 ): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
-  const where = {
-    AND: [
-      orderCompanyScope({ companyId }),
-      { id: { in: [...ids] }, status: { in: [...statuses] }, deletedAt: null },
-    ],
-  };
+  const where = { ...aliveLinesWhere(companyId, statuses), orderId: { in: [...ids] } };
 
   const [rows, total] = await Promise.all([
-    prisma.order.findMany({
+    prisma.orderLine.findMany({
       where,
       select: SUMMARY_SELECT,
-      orderBy: [...WORK_QUEUE_ORDER_BY],
+      orderBy: WORK_QUEUE_ORDER_BY,
       skip: offset,
       take: limit,
     }),
-    prisma.order.count({ where }),
+    prisma.orderLine.count({ where }),
   ]);
 
-  return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
+  return buildPage([...(await toSummaryRecords(companyId, rows))], total, page, limit);
 }
 
 /** A diferencia de las lecturas de vivos, el `where` NO lleva `deletedAt: null`: el historial
@@ -288,7 +324,8 @@ export async function listOrderHistoryByIdsIncludingDeleted(
 
 type OrderDeliveryProgressRow = {
   readonly id: string;
-  readonly recipeId: string;
+  /** La primera linea: la viva de menor `position` o, en un pedido dado de baja, la ultima quitada. */
+  readonly lines: readonly { readonly recipeId: string }[];
   readonly presentationLines: readonly {
     readonly presentationId: string;
     readonly packages: number;
@@ -300,9 +337,11 @@ type OrderDeliveryProgressRow = {
 
 /** Suma lo entregado de cada linea; la consulta ya deja fuera las lineas de entrega anuladas. */
 export function toOrderDeliveryProgress(row: OrderDeliveryProgressRow): OrderDeliveryProgress {
+  const first = row.lines[0];
+  if (first === undefined) throw new Error(`el pedido ${row.id} no tiene ninguna linea`);
   return {
     id: row.id,
-    recipeId: row.recipeId,
+    recipeId: first.recipeId,
     lines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
@@ -328,7 +367,11 @@ export async function listOrderDeliveryProgressByIdsIncludingDeleted(
     where: { AND: [orderCompanyScope({ companyId }), { id: { in: [...ids] } }] },
     select: {
       id: true,
-      recipeId: true,
+      lines: {
+        select: { recipeId: true },
+        orderBy: [{ deletedAt: { sort: 'desc' as const, nulls: 'first' as const } }, { position: 'asc' as const }],
+        take: 1,
+      },
       presentationLines: {
         select: {
           presentationId: true,
@@ -345,9 +388,9 @@ export async function listOrderDeliveryProgressByIdsIncludingDeleted(
 }
 
 /**
- * Implementa `OrderSummaryReader['listAliveInCompany']`: el mismo
- * resumen que `listAliveOrderSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para
- * «Terminados» y «Todos», que no acotan por quien esta asignado.
+ * Implementa `OrderSummaryReader['listAliveInCompany']`: el mismo resumen por linea que
+ * `listAliveOrderSummariesByIds`, pero SIN filtro de ids -toda la empresa-, para «Terminados» y
+ * «Todos», que no acotan por quien esta asignado.
  */
 export async function listAliveOrderSummariesInCompany(
   companyId: string,
@@ -359,29 +402,21 @@ export async function listAliveOrderSummariesInCompany(
 ): Promise<Page<OrderSummaryRecord>> {
   const { offset, limit } = toOffsetLimit(page, pageSize);
   const where = {
-    AND: [
-      orderCompanyScope({ companyId }),
-      {
-        status: { in: [...statuses] },
-        deletedAt: null,
-        ...(filter?.packedBy === undefined ? {} : { packedBy: filter.packedBy }),
-        ...(filter?.conditionedBy === undefined ? {} : { conditionedBy: filter.conditionedBy }),
-      },
-    ],
+    ...aliveLinesWhere(companyId, statuses),
+    ...(filter?.packedBy === undefined ? {} : { packedBy: filter.packedBy }),
+    ...(filter?.conditionedBy === undefined ? {} : { conditionedBy: filter.conditionedBy }),
   };
-  const orderBy = [...ORDER_BY_BY_ORDERING[ordering]];
 
   const [rows, total] = await Promise.all([
-    prisma.order.findMany({
+    prisma.orderLine.findMany({
       where,
       select: SUMMARY_SELECT,
-      orderBy,
+      orderBy: ORDER_BY_BY_ORDERING[ordering],
       skip: offset,
       take: limit,
     }),
-    prisma.order.count({ where }),
+    prisma.orderLine.count({ where }),
   ]);
 
-  return buildPage(rows.map(toOrderSummaryRecord), total, page, limit);
+  return buildPage([...(await toSummaryRecords(companyId, rows))], total, page, limit);
 }
-

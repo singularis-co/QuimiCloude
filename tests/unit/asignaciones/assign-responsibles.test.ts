@@ -795,7 +795,11 @@ function montarSobreBase(
   const deps: AssignResponsiblesDeps = {
     assignments: base.repo,
     orders: {
-      findAliveById: async () => ({ id: PEDIDO, status: 'PENDIENTE' as const }),
+      findAliveById: async () => ({
+        id: PEDIDO,
+        status: 'PENDIENTE' as const,
+        activeLineStatuses: ['PENDIENTE' as const],
+      }),
       listAliveSummariesByIds: async () => {
         throw new Error('QC-88: no lo usa `assignResponsibles`');
       },

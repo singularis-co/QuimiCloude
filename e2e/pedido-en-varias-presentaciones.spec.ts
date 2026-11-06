@@ -62,6 +62,8 @@ import {
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { createOrderWithLine, firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
 
@@ -398,7 +400,7 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: inOrphans });
     await prisma.orderPresentationLine.deleteMany({ where: inOrphans });
     await prisma.orderExecutionEntry.deleteMany({ where: inOrphans });
-    await prisma.order.deleteMany({ where: inOrphans });
+    await deleteOrdersWithLines({ where: inOrphans });
     await prisma.productBatch.deleteMany({ where: inOrphans });
     // El producto terminado restringe el borrado de la receta; el ingrediente, al reves.
     await prisma.product.deleteMany({ where: { ...inOrphans, type: 'FINISHED_PRODUCT' } });
@@ -544,7 +546,7 @@ test.afterAll(async () => {
     () =>
       byCompany ? prisma.orderPresentationLine.deleteMany({ where: byCompany }) : Promise.resolve(),
     () => (byCompany ? prisma.orderExecutionEntry.deleteMany({ where: byCompany }) : Promise.resolve()),
-    () => (byCompany ? prisma.order.deleteMany({ where: byCompany }) : Promise.resolve()),
+    () => (byCompany ? deleteOrdersWithLines({ where: byCompany }) : Promise.resolve()),
     () => (byCompany ? prisma.productBatch.deleteMany({ where: byCompany }) : Promise.resolve()),
     () =>
       byCompany
@@ -635,11 +637,13 @@ test.describe('pedido en varias presentaciones', () => {
     await submitOrderWithLeftover(page, createForm);
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
-    const created = await prisma.order.findFirstOrThrow({
-      where: { recipeId, companyId, deletedAt: null, orderSequence: { lt: BARE_ORDER_SEQUENCE } },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true, orderYear: true, orderSequence: true, unitId: true, status: true },
-    });
+    const created = withFirstLine(
+      await prisma.order.findFirstOrThrow({
+        where: { lines: { some: { recipeId } }, companyId, deletedAt: null, orderSequence: { lt: BARE_ORDER_SEQUENCE } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, orderYear: true, orderSequence: true, status: true, lines: firstLineSelect({ unitId: true }) },
+      }),
+    );
     const orderId = created.id;
     const numberText = formatOrderNumber({ year: created.orderYear, sequence: created.orderSequence });
     expect(created.unitId, 'el pedido guarda la unidad elegida').toBe(litroUnitId);
@@ -745,10 +749,7 @@ test.describe('pedido en varias presentaciones', () => {
     });
 
     // --- 6. Un lote por linea, con su cantidad, el mismo coste unitario y la existencia arriba.
-    const delivered = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, ingredientsCost: true },
-    });
+    const delivered = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, ingredientsCost: true } });
     expect(delivered.status).toBe('POR_ACONDICIONAR');
     expect(delivered.ingredientsCost, 'el pedido guardo el coste de sus ingredientes').not.toBeNull();
     expect(await batchStock(packagingABatchId!), 'Terminar consume los envases de A').toBe(
@@ -822,17 +823,14 @@ test.describe('pedido en varias presentaciones', () => {
     // Sin unidad ni reparto: el caso de un pedido anterior a la unidad obligatoria.
     const year = new Date().getUTCFullYear();
     const orderId = (
-      await prisma.order.create({
-        data: {
+      await createOrderWithLine(prisma, {
           companyId,
           orderYear: year,
           orderSequence: BARE_ORDER_SEQUENCE,
           recipeId,
           quantity: BARE_ORDER_QUANTITY,
           status: 'EN_CURSO',
-        },
-        select: { id: true },
-      })
+        })
     ).id;
     const numberText = formatOrderNumber({ year, sequence: BARE_ORDER_SEQUENCE });
     await prisma.orderAssignment.create({ data: { orderId, userId: operatorUserId, companyId } });
@@ -863,10 +861,7 @@ test.describe('pedido en varias presentaciones', () => {
       errorMessage('order_without_distribution'),
       { timeout: 60_000 },
     );
-    const notStarted = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, packedBy: true },
-    });
+    const notStarted = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true } });
     expect(notStarted.status).toBe('POR_EMPACAR');
     expect(notStarted.packedBy).toBeNull();
 
@@ -892,10 +887,7 @@ test.describe('pedido en varias presentaciones', () => {
         timeout: 60_000,
       });
 
-      const distributed = await prisma.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: { status: true, unitId: true, quantity: true },
-      });
+      const distributed = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, unitId: true, quantity: true } });
       expect(distributed.status).toBe('POR_EMPACAR');
       expect(distributed.unitId).toBe(litroUnitId);
       expect(distributed.quantity.equals(BARE_ORDER_QUANTITY), 'la cantidad no cambia').toBe(true);
@@ -930,10 +922,7 @@ test.describe('pedido en varias presentaciones', () => {
 
       await clickAndConfirm(page, page.getByTestId(PACKING_START_TESTID), PACKING_ORDER_START_CONFIRM_TESTID);
       await expect(page.getByTestId(PACKING_FINISH_TESTID)).toBeVisible({ timeout: 60_000 });
-      const started = await prisma.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: { status: true, packedBy: true },
-      });
+      const started = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true } });
       expect(started.status).toBe('EN_EMPAQUE');
       expect(started.packedBy).toBe(empacadorUserId);
 
@@ -948,10 +937,7 @@ test.describe('pedido en varias presentaciones', () => {
         { timeout: 60_000 },
       );
 
-      const frozen = await prisma.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: { status: true, unitId: true },
-      });
+      const frozen = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, unitId: true } });
       expect(frozen.status).toBe('EN_EMPAQUE');
       expect(frozen.unitId).toBe(litroUnitId);
       const frozenLines = await linesByPresentation(orderId);

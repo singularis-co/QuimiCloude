@@ -16,6 +16,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine, insertOnlyLine } from '../../helpers/only-order-line'
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -135,11 +137,12 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
   })
   const orderId = randomUUID()
   await tx.$executeRaw`
-    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "updated_at")
+    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "updated_at")
     VALUES (
       ${asUuid(orderId)}, ${asUuid(companyId)}, ${new Date().getUTCFullYear()}, ${freshSequence()},
-      ${asUuid(recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP
+      CURRENT_TIMESTAMP
     )`
+  await insertOnlyLine(tx, orderId, { recipeId: recipeId })
   const { id: unitId } = await tx.unit.create({
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca.slice(0, 8)}` },
     select: { id: true },
@@ -155,7 +158,7 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
   const lineIds: string[] = []
   for (const presentationId of presentationIds) {
     const { id } = await tx.orderPresentationLine.create({
-      data: { orderId, companyId, presentationId, packages: 10 },
+      data: { orderId, orderLineId: await ensureOnlyLine(tx, orderId), companyId, presentationId, packages: 10 },
       select: { id: true },
     })
     lineIds.push(id)

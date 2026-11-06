@@ -7,14 +7,15 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import { UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createGetOrderCustomerFilterOption } from '@/lib/modules/pedidos/domain/get-order-customer-filter-option'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createSearchOrderCustomers } from '@/lib/modules/pedidos/domain/search-order-customer-options'
 import { createSetOrderCustomer } from '@/lib/modules/pedidos/domain/set-order-customer'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 
 import type { CustomerCatalog } from '@/lib/modules/clientes'
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'

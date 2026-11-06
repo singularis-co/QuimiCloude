@@ -65,6 +65,7 @@ describe('writeMovement (R6, R12) — recibe la tx, no la abre', () => {
         quantity: '10',
         reason: null,
         orderId: null,
+        orderLineId: null,
         orderPresentationLineId: null,
         createdBy: ACTOR_ID,
         companyId: EMPRESA,

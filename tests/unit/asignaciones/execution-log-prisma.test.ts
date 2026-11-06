@@ -23,10 +23,11 @@ import { EXECUTION_ACTIONS, type NewExecutionEntry } from '@/lib/modules/asignac
 
 const COMPANY = '11111111-1111-4111-8111-111111111111'
 const ORDER = '22222222-2222-4222-8222-222222222222'
+const ORDER_LINE = '55555555-5555-4555-8555-555555555555'
 const USER = '33333333-3333-4333-8333-333333333333'
 const NOW = new Date('2026-10-06T12:00:00.000Z')
 
-const base = { companyId: COMPANY, orderId: ORDER, userId: USER, occurredAt: NOW } as const
+const base = { companyId: COMPANY, orderId: ORDER, orderLineId: ORDER_LINE, userId: USER, occurredAt: NOW } as const
 
 const REGISTRO_ABS = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -103,6 +104,7 @@ describe('execution-log-prisma: append', () => {
       data: {
         companyId: COMPANY,
         orderId: ORDER,
+        orderLineId: ORDER_LINE,
         userId: USER,
         action: 'CANCEL',
         stepPosition: 2,
@@ -316,6 +318,7 @@ describe('execution-log-prisma: la foto del guardado de lote', () => {
   const fila = (batchLines: unknown) => ({
     id: 'e9',
     orderId: ORDER,
+    orderLineId: ORDER_LINE,
     userId: USER,
     action: 'CONDITIONING_BATCH_SAVE',
     stepPosition: null,
@@ -426,6 +429,7 @@ describe('execution-log-prisma: anotaciones de paso de acondicionamiento', () =>
       expect(create.mock.calls[0][0].data).toEqual({
         companyId: COMPANY,
         orderId: ORDER,
+        orderLineId: ORDER_LINE,
         userId: USER,
         action: action.toUpperCase(),
         stepPosition: 2,

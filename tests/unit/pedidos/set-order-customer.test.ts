@@ -13,14 +13,12 @@ import {
   createSetOrderCustomer,
   type SetOrderCustomerDeps,
 } from '@/lib/modules/pedidos/domain/set-order-customer'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
-import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository'
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
@@ -42,7 +40,7 @@ const CLIENTES: readonly { readonly companyId: string; readonly ref: CustomerRef
   { companyId: OTRA_EMPRESA, ref: { id: CLIENTE_AJENO, firstNames: 'Otro', lastNames: 'Ajeno', isDeleted: false } },
 ]
 
-function fila(overrides: Partial<OrderRow> = {}): OrderRow {
+function fila(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -69,15 +67,15 @@ function fila(overrides: Partial<OrderRow> = {}): OrderRow {
 const ESTADOS_CERRADOS: readonly OrderStatus[] = ['ENTREGADO', 'CANCELADO']
 const ESTADOS_ABIERTOS: readonly OrderStatus[] = ORDER_STATUS_VALUES.filter((s) => !ESTADOS_CERRADOS.includes(s))
 
-function bloqueada(row: OrderRow): LockedOrderRow {
+function bloqueada(row: SingleRecipeOrderRow): SingleRecipeOrderRow {
   return { ...row, reservedAt: null, packagingCost: null }
 }
 
 function escenario(
   opciones: {
-    fila?: OrderRow | null
+    fila?: SingleRecipeOrderRow | null
     /** La fila que ve `lockAliveById` dentro de la transaccion; por defecto, la misma que se leyo. */
-    bloqueada?: OrderRow | null
+    bloqueada?: SingleRecipeOrderRow | null
     setCustomerAlive?: 'ok' | 'not_found'
     /** El catalogo de clientes, la unidad de trabajo y la escritura explotan si se tocan. */
     explotaSiEscribe?: boolean
@@ -161,9 +159,10 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 }
 
 describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada, R15, QC-215 R37)', () => {
-  it('R14: los diez estados son exactamente los del catalogo', () => {
+  it('R14: los once estados son exactamente los del catalogo', () => {
     expect([...ORDER_STATUS_VALUES].sort()).toEqual(
       [
+        'PARCIAL',
         'BLOQUEADO',
         'CANCELADO',
         'EN_ACONDICIONAMIENTO',
@@ -178,9 +177,10 @@ describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada,
     )
   })
 
-  it('R37: CUSTOMER_EDITABLE_STATUSES son los ocho estados abiertos, sin ENTREGADO ni CANCELADO', () => {
+  it('R37: CUSTOMER_EDITABLE_STATUSES son los nueve estados abiertos, sin ENTREGADO ni CANCELADO', () => {
     expect([...CUSTOMER_EDITABLE_STATUSES].sort()).toEqual(
       [
+        'PARCIAL',
         'PENDIENTE',
         'EN_CURSO',
         'BLOQUEADO',
@@ -192,7 +192,7 @@ describe('setOrderCustomer — en los estados de cliente abierto (R14 enmendada,
       ].sort(),
     )
     expect([...CUSTOMER_EDITABLE_STATUSES].sort()).toEqual([...ESTADOS_ABIERTOS].sort())
-    expect(ESTADOS_ABIERTOS).toHaveLength(8)
+    expect(ESTADOS_ABIERTOS).toHaveLength(9)
   })
 
   it.each<OrderStatus>([...ESTADOS_ABIERTOS])(

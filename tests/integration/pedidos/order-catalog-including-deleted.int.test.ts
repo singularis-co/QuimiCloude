@@ -20,8 +20,9 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderScope, OrderStatus } from '@/lib/modules/pedidos'
+import type { OrderScope, OrderStatus } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
+import { syncOnlyLine, createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const { listSummariesByIdsIncludingDeleted, listAliveSummariesByIds } = realOrderSummaries()
 
@@ -101,7 +102,7 @@ async function sembrarEmpresa(etiqueta: string): Promise<Empresa> {
 }
 
 async function limpiarEmpresa(e: Empresa): Promise<void> {
-  await prisma.order.deleteMany({ where: { companyId: e.companyId } })
+  await prisma.orderLine.deleteMany({ where: { companyId: e.companyId } }).then(() => prisma.order.deleteMany({ where: { companyId: e.companyId } }))
   await prisma.user.delete({ where: { id: e.userId } })
   await prisma.recipe.delete({ where: { id: e.recipeId } })
   await prisma.presentation.delete({ where: { id: e.presentationId } })
@@ -118,7 +119,7 @@ function scopeOf(e: Empresa): OrderScope {
   return { companyId: e.companyId }
 }
 
-function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(e: Empresa, overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: e.recipeId,
@@ -147,7 +148,7 @@ async function sembrar(e: Empresa, semilla: Semilla): Promise<string> {
   const year = semilla.year ?? YEAR
   const now = new Date(Date.UTC(year, 6, 1, 12, 0, 0, 0))
   const { id } = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(
+    createSingleLineOrder(createOrderWriteRepository(tx), 
       baseOrder(e, { status: status === 'CANCELADO' ? 'PENDIENTE' : status }),
       year,
       e.userId,
@@ -163,12 +164,12 @@ async function sembrar(e: Empresa, semilla: Semilla): Promise<string> {
       orderSequence: semilla.sequence,
       ...(semilla.deleted === true ? { deletedAt: now } : {}),
     },
-  })
+  }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 
 async function borrar(ids: readonly string[]): Promise<void> {
-  await prisma.order.deleteMany({ where: { id: { in: [...ids] } } })
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: [...ids] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [...ids] } } }))
 }
 
 beforeAll(async () => {

@@ -30,6 +30,7 @@ import { ASSIGNED_ORDERS_ROUTE, INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shar
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { submitOrderWithLeftover } from './helpers/order-distribution';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc138_e2e_';
 
@@ -233,7 +234,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // La receta cae antes que el producto: `recipe_lines.product_id` lo restringe.
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -368,7 +369,7 @@ test.afterAll(async () => {
         ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
-      scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
+      scopedCompanyId ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     () =>
       scopedCompanyId
         ? prisma.productBatch.deleteMany({ where: { companyId: scopedCompanyId } })
@@ -426,7 +427,7 @@ test.describe('pedido bloqueado por inventario insuficiente', () => {
     await expect(dialog.getByRole('button', { name: 'Volver', exact: true })).toBeVisible();
 
     expect(
-      await prisma.order.count({ where: { recipeId } }),
+      await prisma.order.count({ where: { lines: { some: { recipeId } } }}),
       'sin confirmar no se escribe el pedido',
     ).toBe(0);
 
@@ -436,7 +437,7 @@ test.describe('pedido bloqueado por inventario insuficiente', () => {
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     const order = await prisma.order.findFirstOrThrow({
-      where: { recipeId, deletedAt: null },
+      where: { lines: { some: { recipeId } }, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true, status: true },
     });
     expect(order.status).toBe('BLOQUEADO');
@@ -499,10 +500,7 @@ test.describe('pedido bloqueado por inventario insuficiente', () => {
     await loginAndLand(page, adminUser);
     await addBatchThroughInventory(page);
 
-    const unblocked = await prisma.order.findUniqueOrThrow({
-      where: { id: order.id },
-      select: { status: true, reservedAt: true },
-    });
+    const unblocked = await prisma.orderLine.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { position: 'asc' }, select: { status: true, reservedAt: true } });
     expect(unblocked.status).toBe('PENDIENTE');
     expect(unblocked.reservedAt).not.toBeNull();
 

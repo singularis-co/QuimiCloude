@@ -21,6 +21,7 @@ import type { UnitRef, UnitView } from '@/lib/modules/unidades';
 import { setupUser } from '../../helpers/user-event';
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 import { arbolAccesible } from './arbol-accesible';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 /**
  * Paridad de los formularios en panel de `design.md > 2.1`, congelada contra el codigo de hoy antes
@@ -364,6 +365,7 @@ const DETALLE_RECETA: RecipeDetail = {
 } as RecipeDetail;
 
 const PEDIDO: OrderSummary = {
+  ...VISTA_SIN_LINEAS,
   id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
   number: { year: 2026, sequence: 42 },
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

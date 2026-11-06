@@ -107,6 +107,13 @@ function orderModel(schema: string): string {
   return match[1] as string
 }
 
+/** QT-313 (T15, `20261103120200_orders_drop_line_columns`): el coste real pasa a la linea. */
+function orderLineModel(schema: string): string {
+  const match = /model OrderLine \{([\s\S]*?)\n\}/.exec(schema)
+  if (match === null) throw new Error('db/schema.prisma no tiene model OrderLine')
+  return match[1] as string
+}
+
 describe('migration.sql de orders_actual_cost', () => {
   it('R25: la columna nace en orders, opcional, decimal(14,4) y sin default', () => {
     expect(addsNullableColumn(upSource)).toBe(true)
@@ -164,9 +171,15 @@ describe('migration.sql de orders_actual_cost', () => {
   })
 })
 
-describe('db/schema.prisma > Order.actualCost', () => {
-  it('R23, R25: campo opcional en ingles, decimal(14,4), mapeado a actual_cost', () => {
-    expect(orderModel(schemaSource)).toMatch(/^\s*actualCost\s+Decimal\?\s+@map\("actual_cost"\) @db\.Decimal\(14, 4\)\s*$/m)
+describe('db/schema.prisma > OrderLine.actualCost (QT-313: sale de Order)', () => {
+  it('R23, R25: campo opcional en ingles, decimal(14,4), mapeado a actual_cost, ahora en OrderLine', () => {
+    expect(orderLineModel(schemaSource)).toMatch(/^\s*actualCost\s+Decimal\?\s+@map\("actual_cost"\) @db\.Decimal\(14, 4\)\s*$/m)
+  })
+
+  it('QT-313 R1: Order ya no declara actualCost ni la columna actual_cost', () => {
+    const model = orderModel(schemaSource)
+    expect(model).not.toMatch(/^\s*actualCost\s/m)
+    expect(model).not.toContain('actual_cost')
   })
 
   it('R25: orders conserva su borrado logico y sus marcas de tiempo', () => {

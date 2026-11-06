@@ -133,18 +133,28 @@ async function createOrder(t: Tenant, seed: OrderSeed): Promise<{ id: string; nu
   const finished = seed.status === 'TERMINADO'
   await prisma.$executeRaw`
     INSERT INTO "orders" (
-      "id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "status",
-      "packed_by", "conditioned_by", "finished_at", "cancellation_reason", "created_at", "updated_at"
+      "id", "company_id", "order_year", "order_sequence", "status", "cancellation_reason", "created_at", "updated_at"
     )
     VALUES (
       ${asUuid(id)}, ${asUuid(t.companyId)}, ${year}, ${nextSequence},
-      ${asUuid(seed.recipeId ?? t.recipeId)}, CAST('100' AS decimal(14,4)), CAST(${seed.status} AS "OrderStatus"),
-      ${packed ? asUuid(t.userId) : Prisma.sql`NULL`},
-      ${conditioned ? asUuid(t.userId) : Prisma.sql`NULL`},
-      ${finished ? Prisma.sql`CURRENT_TIMESTAMP` : Prisma.sql`NULL`},
+      CAST(${seed.status} AS "OrderStatus"),
       ${seed.status === 'CANCELADO' ? 'Cliente desistio' : null},
       ${createdAt}, CURRENT_TIMESTAMP
     )`
+  // La unica linea del pedido, con su receta, su estado y su etapa: el reparto cuelga de ella.
+  await prisma.$executeRaw`
+    INSERT INTO "order_lines" (
+      "order_id", "company_id", "position", "recipe_id", "original_recipe_id", "quantity", "status",
+      "packed_by", "conditioned_by", "finished_at", "cancellation_reason", "created_at", "updated_at"
+    )
+    SELECT o."id", o."company_id", 0, ${asUuid(seed.recipeId ?? t.recipeId)}, ${asUuid(seed.recipeId ?? t.recipeId)},
+           CAST('100' AS decimal(14,4)), o."status",
+           ${packed ? asUuid(t.userId) : Prisma.sql`NULL`},
+           ${conditioned ? asUuid(t.userId) : Prisma.sql`NULL`},
+           ${finished ? Prisma.sql`CURRENT_TIMESTAMP` : Prisma.sql`NULL`},
+           o."cancellation_reason", o."created_at", o."updated_at"
+      FROM "orders" o
+     WHERE o."id" = ${asUuid(id)}`
   return { id, number: `${String(year)}-${String(nextSequence).padStart(7, '0')}` }
 }
 
@@ -156,9 +166,11 @@ type LineSeed = {
 }
 
 async function createLine(t: Tenant, orderId: string, presentationId: string, seed: LineSeed = {}): Promise<string> {
+  const orderLine = await prisma.orderLine.findFirstOrThrow({ where: { orderId, position: 0 }, select: { id: true } })
   const { id } = await prisma.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: orderLine.id,
       companyId: t.companyId,
       presentationId,
       packages: seed.packages ?? 10,
@@ -174,6 +186,7 @@ async function createLine(t: Tenant, orderId: string, presentationId: string, se
 async function dropTenant(t: Tenant): Promise<void> {
   const where = { companyId: t.companyId }
   await prisma.orderPresentationLine.deleteMany({ where })
+  await prisma.orderLine.deleteMany({ where })
   await prisma.order.deleteMany({ where })
   await prisma.recipe.deleteMany({ where })
   await prisma.presentation.deleteMany({ where })
@@ -366,5 +379,14 @@ describe('listPackedLinesByCombination', () => {
       { page: 1 },
     )
     expect(own.total).toBe(1)
+  })
+  it('QT-313 R45: filtra por la receta y el estado de la linea del pedido', async () => {
+    const hoy = await listPackedLinesByCombination(seed.a.companyId, combinationA(), { page: 1 })
+
+    expect(await listPackedLinesByCombination(seed.a.companyId, combinationA(), { page: 1 })).toEqual(hoy)
+    expect(
+      (await listPackedLinesByCombination(seed.a.companyId, { ...combinationA(), recipeId: seed.a.otherRecipeId }, { page: 1 }))
+        .total,
+    ).toBe(1)
   })
 })

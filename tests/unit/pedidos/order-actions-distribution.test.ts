@@ -15,10 +15,18 @@ import {
   updateOrderDistributionAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions'
 
-const { quoteOrderPresentationAvailabilityMock, updateOrderPresentationLinesMock, getSessionUserMock, getSessionContextMock } =
+const {
+  quoteOrderPresentationAvailabilityMock,
+  updateOrderPresentationLinesMock,
+  listOrderLineIdsMock,
+  getSessionUserMock,
+  getSessionContextMock,
+} =
   vi.hoisted(() => ({
     quoteOrderPresentationAvailabilityMock: vi.fn(),
     updateOrderPresentationLinesMock: vi.fn(),
+    // QT-313: el formulario de una receta edita el reparto de la unica linea del pedido.
+    listOrderLineIdsMock: vi.fn(),
     getSessionUserMock: vi.fn(),
     getSessionContextMock: vi.fn(),
   }))
@@ -29,6 +37,7 @@ vi.mock('@/lib/composition', () => ({
   pedidos: {
     quoteOrderPresentationAvailability: quoteOrderPresentationAvailabilityMock,
     updateOrderPresentationLines: updateOrderPresentationLinesMock,
+    listOrderLineIds: listOrderLineIdsMock,
   },
 }))
 
@@ -52,11 +61,13 @@ const SESSION_CONTEXT = { companyId: '33333333-3333-4333-8333-333333333333' }
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const PRESENTATION_ID = '66666666-6666-4666-8666-666666666666'
 const UNIT_ID = '77777777-7777-4777-8777-777777777777'
+const LINE_ID = '0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e'
 
 beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
   getSessionContextMock.mockResolvedValue(SESSION_CONTEXT)
+  listOrderLineIdsMock.mockResolvedValue([LINE_ID])
 })
 
 describe('quoteOrderPresentationAvailabilityAction — T11', () => {
@@ -144,7 +155,7 @@ describe('updateOrderDistributionAction — T25', () => {
         companyId: SESSION_CONTEXT.companyId,
         permissions: ADMIN_SESSION_USER.permissions,
       },
-      { unitId: UNIT_ID, lines: [{ presentationId: PRESENTATION_ID, packages: 2 }], confirmBlocked: false },
+      { lineId: LINE_ID, unitId: UNIT_ID, lines: [{ presentationId: PRESENTATION_ID, packages: 2 }], confirmBlocked: false },
     )
   })
 
@@ -194,6 +205,7 @@ describe('updateOrderDistributionAction — T25', () => {
 
     expect(result).toEqual({ status: 'success' })
     expect(updateOrderPresentationLinesMock.mock.calls[0]?.[2]).toEqual({
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       lines: [{ packagingProductId: ENVASE_ID, packages: 30 }],
       confirmBlocked: false,

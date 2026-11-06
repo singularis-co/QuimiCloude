@@ -1,5 +1,7 @@
 export type NewConditioningTeamMember = {
   readonly orderId: string;
+  /** La linea del pedido que acondiciona este equipo. */
+  readonly orderLineId: string;
   readonly userId: string;
   readonly companyId: string;
   readonly workGroupId: string | null;

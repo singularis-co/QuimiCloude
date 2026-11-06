@@ -27,10 +27,11 @@ import {
   orderCompanyScope,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/company-scope'
 import { toOrderRow } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope'
@@ -176,6 +177,7 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
   it('la vista del pedido (`toOrderView`) no la lleva', () => {
     const vista = toOrderView(
       filaConEmpresa(),
+      [orderLineOf(filaConEmpresa())],
       new Map([
         [
           RECETA,
@@ -190,6 +192,8 @@ describe('QC-60 R23 — ninguna salida publica lleva la empresa', () => {
   it('la ficha, el resumen de la lista y el alta no la llevan, aunque el puerto la devolviera', async () => {
     const orders = {
       findAliveById: vi.fn(async () => filaConEmpresa()),
+      findAliveLines: vi.fn(async () => [orderLineOf(filaConEmpresa())]),
+      findAliveLinesByOrderIds: vi.fn(async () => [orderLineOf(filaConEmpresa())]),
       listAlive: vi.fn(async () => ({
         items: [filaConEmpresa()],
         total: 1,

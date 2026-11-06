@@ -32,7 +32,6 @@ import {
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import {
   createOrderWriteRepository,
-  findAliveOrderById,
   finishConditioningAliveOrder,
   startConditioningAliveOrder,
   startPackingAliveOrder,
@@ -49,7 +48,8 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
-import { createCreateOrder, createFinishPacking, createStartPacking, createTransitionOrder } from '@/lib/modules/pedidos';
+import { createCreateOrder as createLinesOrder, createFinishPacking, createStartPacking, createTransitionOrder } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor, PackedLineCount } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -62,6 +62,11 @@ import { crearCliente, type EmpresaDeEntrega } from '../../helpers/order-deliver
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
+import { onOnlyLine } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -196,6 +201,8 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.orderDelivery.deleteMany({ where: { companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId } } });
   await prisma.productBatch.deleteMany({ where: { product: { companyId, type: 'FINISHED_PRODUCT' } } });
@@ -275,20 +282,17 @@ async function producir(
     },
     actorDe(fixture),
   );
-  expect(await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date())).toBe('ok');
-  expect(await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date())).toBe('ok');
-  expect(await startPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
+  expect(await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date())).toBe('ok');
+  expect(await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date())).toBe('ok');
+  expect(await onOnlyLine(startPackingAliveById)(creado.id, fixture.companyId, fixture.actorId, new Date())).toBe('ok');
   const conteo = await (counts ?? packedCountsOfPlan)(creado.id);
-  const terminado = await finishPackingAliveById(creado.id, fixture.companyId, fixture.actorId, new Date(), conteo);
+  const terminado = await onOnlyLine(finishPackingAliveById)(creado.id, fixture.companyId, fixture.actorId, new Date(), conteo);
   expect(terminado).toMatchObject({ kind: 'ok' });
   return creado.id;
 }
 
 async function costesDelPedido(orderId: string) {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { actualCost: true, ingredientsCost: true, packagingCost: true },
-  });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { actualCost: true, ingredientsCost: true, packagingCost: true } });
   return {
     actualCost: row.actualCost?.toFixed(4) ?? null,
     ingredientsCost: row.ingredientsCost?.toFixed(4) ?? null,
@@ -336,8 +340,8 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       const lote = await loteTerminadoDe(orderId);
       expect(lote.unitCost).toBe('14.5000');
 
-      const fila = await findAliveOrderById(orderId, { companyId: fixture.companyId });
-      expect(fila?.actualCost).toBe('145.0000');
+      const vista = await pedidos.getOrder(orderId, actorDe(fixture));
+      expect(vista.actualCost).toBe('145.0000');
 
       const tab = await inventario.listFinishedProductCosts(lote.productId, {}, actorDeInventario(fixture));
       expect(tab.items).toHaveLength(1);
@@ -369,8 +373,8 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       await prisma.productBatch.update({ where: { id: ingrediente.segundoLote }, data: { unitCost: '1.0000' } });
       expect((await costesDelPedido(orderId)).actualCost).toBe('145.0000');
 
-      expect(await startConditioningAliveOrder(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
-      expect(await finishConditioningAliveOrder(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
+      expect(await onOnlyLine(startConditioningAliveOrder)(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
+      expect(await onOnlyLine(finishConditioningAliveOrder)(orderId, fixture.actorId, new Date(), { companyId: fixture.companyId })).toBe('ok');
       const customerId = await crearCliente({ companyId: fixture.companyId } as EmpresaDeEntrega, `Real ${token().slice(0, 6)}`);
       await prisma.order.update({ where: { id: orderId }, data: { customerId } });
       const { id: lineId } = await prisma.orderPresentationLine.findFirstOrThrow({ where: { orderId }, select: { id: true } });
@@ -436,7 +440,7 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       const lotePrimero = await loteTerminadoDe(primero);
       // Asi quedaba un lote de antes: el estimado repartido y el pedido sin real.
       await prisma.productBatch.update({ where: { id: lotePrimero.batchId }, data: { unitCost: '15.5000' } });
-      await prisma.$executeRaw`UPDATE "orders" SET "actual_cost" = NULL WHERE "id" = ${primero}::uuid`;
+      await prisma.$executeRaw`UPDATE "order_lines" SET "actual_cost" = NULL WHERE "order_id" = ${primero}::uuid`;
 
       await producir(fixture, recipeId, '5.0000', 5);
 

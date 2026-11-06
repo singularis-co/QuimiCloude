@@ -31,6 +31,7 @@ import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc261_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -93,8 +94,7 @@ async function seedOrder(params: {
 }): Promise<SeededOrder> {
   // El CHECK `orders_order_year_matches_created_at` ata el año a `created_at`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: params.companyId,
       orderYear: year,
       orderSequence: params.sequence,
@@ -102,9 +102,7 @@ async function seedOrder(params: {
       quantity: ORDER_QUANTITY,
       unitId: params.unitId,
       status: params.status,
-    },
-    select: { id: true },
-  });
+    });
   return { id: order.id, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
 }
 
@@ -115,10 +113,12 @@ async function seedEntries(
   entries: readonly EntrySpec[],
 ): Promise<void> {
   const start = Date.now() - (entries.length + 1) * ENTRY_SPACING_MS;
+  const orderLineId = await ensureOnlyLine(prisma, orderId);
   await prisma.orderExecutionEntry.createMany({
     data: entries.map((entry, index) => ({
       companyId: ownerCompanyId,
       orderId,
+      orderLineId,
       userId,
       action: entry.action,
       stepPosition: entry.step,
@@ -134,6 +134,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<void> {
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.orderAssignment.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.order.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.recipe.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.user.deleteMany({ where: { companyId: { in: ids } } });

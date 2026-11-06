@@ -1,7 +1,7 @@
 // lib/modules/inventario/domain/product-catalog.ts
 
 import type { ProductStockByUnit } from './product-stock';
-import type { CostingBatch } from './costing-batch';
+import type { CostingBatch, CostingExclusion } from './costing-batch';
 import type { ProductType } from './product-type';
 
 /** Identificador de un producto visto DESDE FUERA de `inventario`. Es lo unico que otro
@@ -47,11 +47,12 @@ export interface ProductCatalog {
    *  Con `excludeOrderId`, lo que ESE pedido tiene apartado no se resta del disponible: es
    *  para que la edicion y la cotizacion de un pedido que ya existe cuenten su propia reserva
    *  como disponible para si mismo. Un `excludeOrderId` de otra empresa no cambia nada: las
-   *  dos tablas que agregan el disponible siguen acotadas a `companyId`. */
+   *  dos tablas que agregan el disponible siguen acotadas a `companyId`. `excludeOrderLineId`
+   *  hace lo mismo con lo apartado por una sola linea del pedido. */
   findCostingBatches(
     ids: readonly ProductId[],
     companyId: string,
-    options?: { readonly excludeOrderId?: string },
+    options?: CostingExclusion,
   ): Promise<readonly CostingBatch[]>;
 
   /** Envases enteros que de verdad entraron por cada pedido, leidos del asiento `production` de

@@ -34,6 +34,8 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -50,11 +52,12 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createListOrders,
   createSetOrderCustomer,
-  createUpdateOrder,
+  createUpdateOrder as createLinesUpdate,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -64,6 +67,13 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { updateOrderAndLine } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -88,7 +98,7 @@ const customerCatalog = {
     findCustomerRefsIncludingDeleted(ids, { companyId }),
 };
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -225,6 +235,8 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId } });
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.customer.deleteMany({ where: { companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId } } });
@@ -293,9 +305,14 @@ async function crearPedido(fixture: Fixture, recipeId: string, customerId: strin
 }
 
 /** La fila completa del pedido, tal como la guarda la base. */
+/** La fila del pedido con lo de su unica receta, que desde QT-313 vive en la linea. */
 async function filaDe(orderId: string): Promise<Record<string, unknown>> {
   const rows = await prisma.$queryRaw<Record<string, unknown>[]>(
-    Prisma.sql`SELECT * FROM "orders" WHERE "id" = ${orderId}::uuid`,
+    Prisma.sql`SELECT o.*, l."recipe_id", l."quantity", l."unit_id", l."ingredients_cost", l."packaging_cost",
+                      l."actual_cost", l."sale_price", l."reserved_at", l."finished_at", l."packed_by", l."conditioned_by"
+                 FROM "orders" o
+                 JOIN "order_lines" l ON l."order_id" = o."id" AND l."deleted_at" IS NULL
+                WHERE o."id" = ${orderId}::uuid`,
   );
   const row = rows[0];
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
@@ -366,16 +383,13 @@ describe('setCustomerAlive escribe solo el cliente y el sello de modificacion', 
         const clienteId = await crearCliente(fixture, `Uno ${token()}`);
         // Quien empaco, quien acondiciona y (en TERMINADO) la fecha de terminado llevan valor, para
         // que un cambio se note.
-        await prisma.order.update({
-          where: { id: orderId },
-          data: {
+        await updateOrderAndLine(prisma, orderId, {
             status,
             packedBy: fixture.actorId,
             conditionedBy: fixture.otherActorId,
             finishedAt,
             updatedAt: new Date('2026-09-02T10:00:00.000Z'),
-          },
-        });
+          });
         await prisma.orderAssignment.create({ data: { orderId, userId: fixture.actorId, companyId: fixture.companyId } });
 
         const antes = await filaDe(orderId);
@@ -420,16 +434,13 @@ describe('setCustomerAlive escribe solo el cliente y el sello de modificacion', 
         const actual = await crearCliente(fixture, `Actual ${token()}`);
         const nuevo = await crearCliente(fixture, `Nuevo ${token()}`);
         const orderId = await crearPedido(fixture, recipeId, actual);
-        await prisma.order.update({
-          where: { id: orderId },
-          data: {
+        await updateOrderAndLine(prisma, orderId, {
             status,
             cancellationReason,
             packedBy: status === 'ENTREGADO' ? fixture.actorId : null,
             finishedAt: status === 'ENTREGADO' ? new Date('2026-09-02T10:00:00.000Z') : null,
             updatedAt: new Date('2026-09-02T10:00:00.000Z'),
-          },
-        });
+          });
 
         const antes = await filaDe(orderId);
         const librosAntes = await librosDe(fixture.companyId);
@@ -483,14 +494,11 @@ describe('la edicion que solo cambia el cliente', () => {
       const orderId = await crearPedido(fixture, recipeId, null);
       const clienteId = await crearCliente(fixture, `Uno ${token()}`);
       // Si la edicion recalculara, este importe a mano no sobreviviria.
-      await prisma.order.update({
-        where: { id: orderId },
-        data: {
+      await updateOrderAndLine(prisma, orderId, {
           ingredientsCost: new Prisma.Decimal('123.4567'),
           packagingCost: new Prisma.Decimal('0.0000'),
           updatedAt: new Date('2026-09-02T10:00:00.000Z'),
-        },
-      });
+        });
 
       const antes = await filaDe(orderId);
       const librosAntes = await librosDe(fixture.companyId);

@@ -1,28 +1,70 @@
-import type { OrderStatus } from '../domain/order-classification';
+import type { OrderLineStatus, OrderStatus } from '../domain/order-classification';
 import type { StoredOrderCost } from '../domain/order-cost';
 import type { OrderScope } from '../domain/order-scope';
 import type { PackedLineCount } from '../domain/packing-count';
-import type { NewOrder, OrderEdit, OrderPresentationLineWrite, OrderRow } from '../domain/order-view';
+import type {
+  NewOrder,
+  OrderHeaderEdit,
+  OrderLineRow,
+  OrderPresentationLineWrite,
+  OrderRow,
+} from '../domain/order-view';
 
-/** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
- *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
-export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
+/** La fila que bloquea `lockAliveById`. El plazo de reserva es de cada linea. */
+export type LockedOrderRow = OrderRow;
 
-/** Lo que Terminar el empaque necesita del pedido cuando el `UPDATE` condicional SI lo mueve: la
- *  receta para el nombre del lote y la cantidad y unidad con que se reparte el coste. */
-export type FinishPackingOrderRow = {
-  readonly recipeId: string;
-  readonly quantity: string;
-  /** La unidad en que se reparte el coste entre los lotes; `null` solo con una fila escrita
-   *  fuera de la aplicacion. */
-  readonly unitId: string | null;
+/** El pedido bloqueado y sus lineas vivas -canceladas incluidas-, bloqueadas despues por
+ *  `position`. */
+export type LockedOrderLines = {
+  readonly order: LockedOrderRow;
+  readonly lines: readonly OrderLineRow[];
 };
 
-/** `finishPackingAlive` clasifica en la MISMA llamada: si el `UPDATE` movio la fila, la fila que
- *  Terminar necesita; si no, por que -relectura interna, mismo criterio que hoy-. */
-export type FinishPackingUpdateOutcome =
-  | ({ readonly kind: 'ok' } & FinishPackingOrderRow)
-  | { readonly kind: 'not_packer' | 'not_packable' | 'not_found' };
+/** El pedido bloqueado y una de sus lineas vivas, bloqueada despues. */
+export type LockedOrderLine = {
+  readonly order: LockedOrderRow;
+  readonly line: OrderLineRow;
+};
+
+/** Lo que se escribe de una linea en un alta o una edicion. `originalRecipeId` es la original de
+ *  `recipeId`, o ella misma: con ella la base rechaza dos lineas activas de la misma receta. */
+export type OrderLineWrite = {
+  readonly recipeId: string;
+  readonly originalRecipeId: string;
+  readonly quantity: string;
+  readonly unitId: string;
+  /** Precio de venta de la linea. `null` = sin precio. */
+  readonly salePrice: string | null;
+  /** El reparto de la linea, ya resuelto; reemplaza entero al guardado. */
+  readonly presentationLines: readonly OrderPresentationLineWrite[];
+};
+
+/** Una linea nueva: nace sin cancelar y con su coste, o `null` si no se pudo calcular. */
+export type NewOrderLine = OrderLineWrite & {
+  readonly status: Exclude<OrderLineStatus, 'CANCELADO'>;
+  readonly cost: StoredOrderCost | null;
+};
+
+/** Una linea guardada que cambia. Con `'keep'` su coste no se toca. */
+export type OrderLineEditWrite = {
+  readonly lineId: string;
+  readonly line: OrderLineWrite;
+  readonly cost: StoredOrderCost | null | 'keep';
+};
+
+/** Lo que una escritura de lineas cambia en el pedido: quitar, editar y anadir. */
+export type OrderLineChanges = {
+  readonly removedIds: readonly string[];
+  readonly edited: readonly OrderLineEditWrite[];
+  readonly added: readonly NewOrderLine[];
+};
+
+/** Lo que una etapa escribe en la linea junto con su estado: quien empaca o quien acondiciona. Lo
+ *  que no se nombra se conserva. */
+export type LineStageStamp = {
+  readonly packedBy?: string;
+  readonly conditionedBy?: string;
+};
 
 /** Una linea del reparto tal como Terminar el empaque la necesita: la presentacion,
  *  sus envases y el contenido copiado -`null` hace que Terminar recurra al vigente, y sin el
@@ -38,6 +80,8 @@ export type FinishPackingLine = {
   readonly packedPackages: number | null;
   /** Envases del conteo real que el pedido no espera; 0 sin contar o sin excedente. */
   readonly packedSurplusPackages: number;
+  /** La linea del pedido de la que es este reparto. */
+  readonly orderLineId: string;
 };
 
 /** El conteo de una linea con los envases que, de ese conteo, quedan libres en el lote. */
@@ -59,30 +103,91 @@ export interface OrderWriteRepository {
    *  nunca sobre la que leyo antes de abrir la transaccion. */
   lockAliveById(id: string, scope: OrderScope): Promise<LockedOrderRow | null>;
 
-  /** Alta dentro de la transaccion ya abierta. El choque del correlativo (indice unico
-   *  `orders_company_year_sequence_key`) se deja SUBIR: la transaccion entera ya quedo
-   *  abortada, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`. */
-  create(
-    data: NewOrder,
-    year: number,
-    actorId: string,
-    now: Date,
-    cost: StoredOrderCost | null,
-    scope: OrderScope,
-  ): Promise<OrderRow>;
+  /** `FOR UPDATE` del pedido vivo y despues de sus lineas vivas por `position`, siempre en ese
+   *  orden para no cruzar candados. `null` si el pedido no existe, esta borrado o es de otra
+   *  empresa. */
+  lockAliveLines(orderId: string, scope: OrderScope): Promise<LockedOrderLines | null>;
 
-  /** Edicion como reemplazo completo. No puede escribir `CANCELADO` ni motivo. Con `'keep'` el
-   *  importe guardado no se toca. */
-  updateAlive(
-    id: string,
-    data: OrderEdit,
+  /** `FOR UPDATE` del pedido vivo y despues de una de sus lineas. `null` si la linea es de otro
+   *  pedido, de otra empresa o esta quitada, igual que si el pedido no existe. */
+  lockAliveLine(orderId: string, lineId: string, scope: OrderScope): Promise<LockedOrderLine | null>;
+
+  /**
+   * Escribe en el pedido, bajo su candado, primero las bajas, despues las ediciones y por ultimo
+   * las altas: asi quitar una receta y volver a anadirla en la misma edicion no choca con el unico
+   * de receta activa. Las altas toman `position` a continuacion de la mayor del pedido, quitadas
+   * incluidas. Devuelve las lineas anadidas, en el orden de `changes.added`; `null` si el pedido o
+   * alguna de las lineas nombradas no es suya, en cuyo caso quien llama aborta la transaccion.
+   * Lanza `DuplicateOrderRecipeError` si la base rechaza dos lineas activas de la misma receta.
+   */
+  writeLines(
+    orderId: string,
+    changes: OrderLineChanges,
     actorId: string,
     now: Date,
-    cost: StoredOrderCost | null | 'keep',
+    scope: OrderScope,
+  ): Promise<readonly OrderLineRow[] | null>;
+
+  /** Escribe `CANCELADO` y el motivo de la linea en la misma sentencia. No toca `reserved_at`. */
+  cancelLine(
+    orderId: string,
+    lineId: string,
+    reason: string,
+    actorId: string | null,
+    now: Date,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** `actorId` admite `null`: la caducidad automatica cancela sin que nadie la haya pedido. */
+  /** `UPDATE` condicional `WHERE status = from` de la linea: `'stale'` si sigue viva en otro
+   *  estado. No escribe `CANCELADO`: eso es `cancelLine`, que lleva motivo. */
+  setLineStatus(
+    orderId: string,
+    lineId: string,
+    from: OrderLineStatus,
+    to: Exclude<OrderLineStatus, 'CANCELADO'>,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found' | 'stale'>;
+
+  /** Sustituye el coste de la linea, tambien por `null`, sin tocar sus datos ni su estado. */
+  setLineIngredientsCost(
+    orderId: string,
+    lineId: string,
+    cost: StoredOrderCost | null,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
+
+  /** Escribe `reserved_at` de la linea sin mover su `updated_at`. */
+  setLineReservedAt(orderId: string, lineId: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
+
+  /**
+   * Vuelve a derivar el estado del pedido de sus lineas vivas y lo escribe si cambio. El motivo de
+   * cancelacion del pedido es el de su ultima linea cancelada cuando el estado queda `CANCELADO`, y
+   * ninguno en cualquier otro. Devuelve el estado derivado, o `null` si el pedido no es suyo.
+   */
+  refreshStatus(orderId: string, actorId: string | null, now: Date, scope: OrderScope): Promise<OrderStatus | null>;
+
+  /** Alta de la cabecera dentro de la transaccion ya abierta; las recetas las escribe
+   *  `writeLines`. El choque del correlativo (indice unico `orders_company_year_sequence_key`) se
+   *  deja SUBIR: la transaccion entera ya quedo abortada, y quien reintenta con una transaccion
+   *  nueva es `OrderUnitOfWork`. */
+  create(data: NewOrder, year: number, actorId: string, now: Date, scope: OrderScope): Promise<OrderRow>;
+
+  /** La prioridad y el cliente del pedido; lo de cada receta lo escribe `writeLines`. No puede
+   *  escribir estado ni motivo. */
+  updateAlive(
+    id: string,
+    data: OrderHeaderEdit,
+    actorId: string,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
+
+  /** Escribe `CANCELADO` y el motivo en el pedido, no en sus lineas: cancelar, caducar y cancelar
+   *  por encargo cancelan cada linea con `cancelLine` y derivan el pedido con `refreshStatus`. */
   cancelAlive(
     id: string,
     reason: string,
@@ -91,7 +196,8 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** Borrado logico: marca `deleted_at`, jamas borra la fila ni libera el correlativo. */
+  /** Borrado logico del pedido y de todas sus lineas vivas: marca `deleted_at`, jamas borra la
+   *  fila ni libera el correlativo. */
   softDeleteAlive(id: string, actorId: string, now: Date, scope: OrderScope): Promise<'ok' | 'not_found'>;
 
   /** `UPDATE` condicional `WHERE status = from`: `'stale'` si la fila sigue viva pero ya no
@@ -106,24 +212,6 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found' | 'stale'>;
 
-  /** Sustituye el importe y su parte de envases, tambien por `null`, y sella
-   *  `updated_at`/`updated_by` sin tocar los datos de negocio ni el estado. */
-  setIngredientsCost(
-    id: string,
-    cost: StoredOrderCost | null,
-    actorId: string | null,
-    now: Date,
-    scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
-
-  /** Escribe SOLO `actual_cost`, sin mover `updated_at`: Terminar ya lo sello en la misma
-   *  transaccion. `null` = sin importe, nunca `0`. */
-  setActualCost(id: string, cost: string | null, scope: OrderScope): Promise<void>;
-
-  /** Escribe `reserved_at` SIN mover `updated_at`: apartar o liberar material no es una edicion
-   *  que el usuario deba ver en esa columna. */
-  setReservedAt(id: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
-
   /** Escribe SOLO `customer_id`, `updated_by` y `updated_at` del pedido vivo: ni el estado, ni el
    *  coste, ni la cantidad, ni lo apartado. `customerId` `null` quita el cliente. */
   setCustomerAlive(
@@ -134,32 +222,25 @@ export interface OrderWriteRepository {
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
 
-  /** `updateOrderPresentationLines`: escribe SOLO la unidad y el
-   *  reparto, nunca `quantity`, la receta ni la prioridad -eso es `updateAlive`, del formulario
-   *  general-. Reemplazo completo del conjunto de lineas, igual que `updateAlive`. */
-  updatePresentationLinesAlive(
-    id: string,
-    unitId: string,
-    lines: readonly OrderPresentationLineWrite[],
+  /** `UPDATE` condicional `WHERE status = from` de la linea que escribe a la vez el sello de la
+   *  etapa: los CHECK de la linea exigen quien empaca o quien acondiciona en la misma sentencia que
+   *  el estado. `'stale'` si sigue viva en otro estado. */
+  stampLineStatus(
+    orderId: string,
+    lineId: string,
+    from: OrderLineStatus,
+    to: Exclude<OrderLineStatus, 'CANCELADO'>,
+    stamp: LineStageStamp,
     actorId: string,
     now: Date,
     scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
+  ): Promise<'ok' | 'not_found' | 'stale'>;
 
-  /** Terminar el empaque: `UPDATE` condicional `WHERE
-   *  status = 'EN_EMPAQUE' AND packed_by = packerId`, con `finished_at` en la MISMA sentencia.
-   *  Dentro de `OrderUnitOfWork.run` para que el alta de los lotes de las lineas viva en la
-   *  MISMA transaccion y un fallo posterior deshaga tambien este `UPDATE`. */
-  finishPackingAlive(
-    id: string,
-    packerId: string,
-    now: Date,
-    scope: OrderScope,
-  ): Promise<FinishPackingUpdateOutcome>;
+  /** Escribe SOLO `actual_cost` de la linea, sin mover `updated_at`. `null` = sin importe, nunca `0`. */
+  setLineActualCost(orderId: string, lineId: string, cost: string | null, scope: OrderScope): Promise<void>;
 
-  /** Las lineas del reparto de un pedido, `FOR SHARE`, en el orden de alta: la MISMA
-   *  transaccion de `finishPackingAlive`, para que un fallo tras leerlas deshaga tambien el
-   *  `UPDATE`. */
+  /** Las filas del reparto de un pedido, `FOR SHARE`, en el orden de alta: la MISMA transaccion
+   *  que mueve la linea, para que un fallo tras leerlas deshaga tambien ese cambio. */
   findPresentationLinesForFinish(id: string, scope: OrderScope): Promise<readonly FinishPackingLine[]>;
 
   /** Escribe el conteo y los libres de cada linea sin tocar `packages`. Una linea que no sea de

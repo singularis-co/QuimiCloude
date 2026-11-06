@@ -29,6 +29,8 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc156_e2e_';
 
@@ -187,8 +189,7 @@ async function createCustomer(customer: CustomerFixture, company: string): Promi
 
 /** El ano sale del reloj: el CHECK `orders_order_year_matches_created_at` lo ata a `created_at`. */
 async function seedOrder(sequence: number, customerId: string | null): Promise<string> {
-  const created = await prisma.order.create({
-    data: {
+  const created = await createOrderWithLine(prisma, {
       companyId: required(companyId, 'la empresa'),
       orderYear: new Date().getUTCFullYear(),
       orderSequence: sequence,
@@ -197,9 +198,7 @@ async function seedOrder(sequence: number, customerId: string | null): Promise<s
       status: 'PENDIENTE',
       createdBy: adminId,
       customerId,
-    },
-    select: { id: true },
-  });
+    });
   return created.id;
 }
 
@@ -266,7 +265,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: inCompanies });
     await prisma.orderAssignment.deleteMany({ where: inCompanies });
     await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
-    await prisma.order.deleteMany({ where: inCompanies });
+    await deleteOrdersWithLines({ where: inCompanies });
     await prisma.recipe.deleteMany({ where: inCompanies });
     await prisma.productBatch.deleteMany({ where: inCompanies });
     await prisma.product.deleteMany({ where: inCompanies });
@@ -365,7 +364,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: inCompany }),
     () => prisma.orderAssignment.deleteMany({ where: inCompany }),
     () => prisma.orderPresentationLine.deleteMany({ where: inCompany }),
-    () => prisma.order.deleteMany({ where: inCompany }),
+    () => deleteOrdersWithLines({ where: inCompany }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     // El envase, antes que su presentacion fija; la presentacion, antes que su unidad.
     () => prisma.productBatch.deleteMany({ where: inCompany }),
@@ -517,7 +516,7 @@ test.describe('pedido con cliente', () => {
         customerId: true,
         status: true,
         cancellationReason: true,
-        quantity: true,
+        lines: { select: { quantity: true } },
         deletedAt: true,
       },
     });
@@ -540,7 +539,7 @@ test.describe('pedido con cliente', () => {
         customerId: true,
         status: true,
         cancellationReason: true,
-        quantity: true,
+        lines: { select: { quantity: true } },
         deletedAt: true,
       },
     });

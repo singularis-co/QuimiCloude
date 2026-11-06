@@ -62,6 +62,8 @@ export interface FinishedBatchCatalog {
 export type FinishedGoodsDispatchInput = {
   readonly companyId: string;
   readonly orderId: string;
+  /** La linea del pedido que se entrega. */
+  readonly orderLineId: string;
   readonly orderDeliveryId: string;
   readonly recipeId: string;
   readonly presentationId: string;

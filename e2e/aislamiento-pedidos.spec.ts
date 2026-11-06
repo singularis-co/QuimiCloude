@@ -39,6 +39,8 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc60_e2e_';
 
@@ -137,8 +139,7 @@ async function createCompany(name: string): Promise<string> {
 /** El ano sale del reloj: el CHECK `orders_order_year_matches_created_at` lo ata a `created_at`. */
 async function seedOrder(companyId: string, sequence: number, createdBy: string | null) {
   if (!recipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
-  return prisma.order.create({
-    data: {
+  return createOrderWithLine(prisma, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: sequence,
@@ -146,9 +147,7 @@ async function seedOrder(companyId: string, sequence: number, createdBy: string 
       quantity: ORDER_QUANTITY,
       status: 'PENDIENTE',
       createdBy,
-    },
-    select: { id: true },
-  });
+    });
 }
 
 /** La foto de un pedido de B que no puede moverse con nada de lo que haga A. */
@@ -160,7 +159,7 @@ async function snapshotOrder(id: string) {
       orderYear: true,
       orderSequence: true,
       status: true,
-      quantity: true,
+      lines: { select: { quantity: true } },
       deletedAt: true,
       updatedAt: true,
       updatedBy: true,
@@ -239,7 +238,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     // El envase, ANTES que su presentacion fija.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -249,9 +248,11 @@ test.beforeAll(async () => {
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
   await prisma.user.deleteMany({
@@ -346,7 +347,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: companyIds } } }),
-    () => prisma.order.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => deleteOrdersWithLines({ where: { companyId: { in: companyIds } } }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     // El envase, ANTES que su presentacion fija.
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: companyIds } } }),

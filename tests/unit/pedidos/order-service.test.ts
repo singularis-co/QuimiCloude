@@ -11,7 +11,8 @@
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import {
   InvalidTransitionError,
   DuplicateOrderNumberError,
@@ -22,8 +23,8 @@ import {
 } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
+import { fakeUnitOfWork, type SingleRecipeOrderRow, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
@@ -66,7 +67,7 @@ const ENTRADA_ALTA = {
   unitId: UNIT_ID,
 }
 
-function fila(overrides: Partial<OrderRow> = {}): OrderRow {
+function fila(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -144,14 +145,15 @@ function dobles(opciones: {
 
   const orders = {
     findAliveById,
+    findAliveLines: vi.fn(async () => (filaVista === null ? [] : [orderLineOf(filaVista)])),
     listAlive: explota('orders.listAlive'),
   } as unknown as OrderRepository
 
   const setReservedAt = vi.fn(async () => undefined)
-  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }))
+  const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }))
   const { unitOfWork } = fakeUnitOfWork({
     orders: { lockAliveById, create, updateAlive, setReservedAt },
-    reservations: { syncForOrder },
+    reservations: { syncForLine },
   })
 
   // La unidad del pedido SIEMPRE resuelve: `createOrder`/`updateOrder` la exigen (R41), y este
@@ -352,6 +354,13 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       unitId: UNIT_ID,
       unitLabel: 'L',
       customer: null,
+      // QT-313: los campos planos son los de su unica linea, la que sigue.
+      lines: [expect.objectContaining({ recipeId: RECIPE_ID, quantity: '10.0000', unitId: UNIT_ID, status: 'PENDIENTE' })],
+      progress: { total: 1, finished: 0 },
+      salePriceTotal: null,
+      linesWithoutPrice: 1,
+      ingredientsCostTotal: null,
+      actualCostTotal: null,
     })
   })
 
@@ -449,6 +458,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
     }))
     const orders = {
       findAliveById: vi.fn(),
+      findAliveLinesByOrderIds: vi.fn(async () => [orderLineOf(CON_IMPORTE)]),
       listAlive,
     } as unknown as OrderRepository
     const findRefsIncludingDeleted = vi.fn(async () => [RECETA_VIVA])

@@ -21,7 +21,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order';
+import { createCreateOrder as createLinesOrder, type CreateOrderDeps } from '@/lib/modules/pedidos/domain/create-order';
 import {
   OrderUnitNotConvertibleError,
   RecipeNotFoundError,
@@ -29,16 +29,20 @@ import {
   UnauthorizedError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors';
-import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, lineWritingOrders, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import type { NewOrderLine, OrderLineChanges } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
+
+// Estos casos describen un pedido de una receta: entran como una linea, como desde el formulario.
+const createCreateOrder = (deps: CreateOrderDeps) => singleRecipeCreate(createLinesOrder(deps));
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444';
@@ -60,7 +64,7 @@ const OTRA_UNIDAD_INCOMPATIBLE = '88888888-8888-4888-8888-888888888888';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
-function filaCreada(): OrderRow {
+function filaCreada(): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',
@@ -171,15 +175,24 @@ function catalogoDeEnvases(content: string | null = null, unitId: string = UNIT_
   ]);
 }
 
+/** La unica receta que escribe el alta: la primera linea anadida, con su coste. */
+function lineaEscrita(writeLines: { readonly mock: { readonly calls: readonly (readonly unknown[])[] } }): NewOrderLine {
+  const changes = writeLines.mock.calls[0]?.[1] as OrderLineChanges | undefined;
+  const linea = changes?.added[0];
+  if (linea === undefined) throw new Error('el alta no escribio ninguna linea');
+  return linea;
+}
+
 function repositorioDePedidos() {
   const create = vi.fn(async () => filaCreada());
   const setReservedAt = vi.fn(async () => undefined);
-  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+  const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
+  const lineas = lineWritingOrders();
   const { unitOfWork } = fakeUnitOfWork({
-    orders: { create, setReservedAt },
-    reservations: { syncForOrder },
+    orders: { ...lineas, create, setLineReservedAt: setReservedAt },
+    reservations: { syncForLine },
   });
-  return { unitOfWork, create, setReservedAt, syncForOrder };
+  return { unitOfWork, create, setReservedAt, syncForLine, writeLines: lineas.writeLines };
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -387,10 +400,7 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
     await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
     expect(repo.create).toHaveBeenCalledTimes(1);
-    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
-      unitId: string;
-      presentationLines: readonly unknown[];
-    };
+    const data = lineaEscrita(repo.writeLines);
     expect(data.unitId).toBe(UNIT_ID);
     expect(data.presentationLines).toEqual([]);
   });
@@ -419,10 +429,10 @@ describe('QC-170 — el reparto en el alta (R2, R6-R9, R35, R36, R41, R42)', () 
       ACTOR_A,
     );
 
-    const data = (repo.create.mock.calls[0] as unknown as readonly unknown[])[0] as {
-      presentationLines: readonly { presentationId: string; packages: number; content: string | null; packagingProductId: string | null }[];
+    const data = (repo.writeLines.mock.calls[0] as unknown as readonly unknown[])[1] as {
+      added: readonly { presentationLines: readonly unknown[] }[];
     };
-    expect(data.presentationLines).toEqual([
+    expect(data.added[0]?.presentationLines).toEqual([
       { presentationId: PRESENTACION_DE_A, packages: 2, content: '5.0000', packagingProductId: ENVASE_DE_A },
     ]);
   });
@@ -698,7 +708,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
     // necesaria = 20 * 100 % = 20, cubierta por el unico lote a 3.0000: 20 * 3 = 60.
     expect(repo.create).toHaveBeenCalledTimes(1);
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '60.0000', packaging: '0.0000' });
+    expect(lineaEscrita(repo.writeLines).cost).toEqual({ total: '60.0000', packaging: '0.0000' });
   });
 
   it('las lecturas de lotes son UNA sola y las de unidades DOS -coste y reparto-, tenga la receta 1 o 20 lineas', async () => {
@@ -779,7 +789,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.create).toHaveBeenCalledTimes(1);
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBeNull();
+    expect(lineaEscrita(repo.writeLines).cost).toBeNull();
   });
 
   it('el alta no excluye ningun pedido del disponible: todavia no aparto nada (R65)', async () => {
@@ -809,7 +819,7 @@ describe('T5 — el alta calcula el importe de los ingredientes', () => {
 
 describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
   /** Registra el ORDEN real de las llamadas al `scope` de la unidad de trabajo, no solo si se
-   *  llamaron: `create` -> `syncForOrder` -> `setReservedAt` es el pseudocodigo literal del
+   *  llamaron: `create` -> `syncForLine` -> `setReservedAt` es el pseudocodigo literal del
    *  caso de uso. */
   function repositorioConOrden(outcome: 'reserved' | 'not_reserved' = 'reserved') {
     const orden: string[] = [];
@@ -817,22 +827,22 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
       orden.push('orders.create');
       return filaCreada();
     });
-    const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => {
-      void [id, reservedAt];
+    const setReservedAt = vi.fn(async (id: string, lineId: string, reservedAt: Date | null) => {
+      void [id, lineId, reservedAt];
       orden.push('orders.setReservedAt');
     });
-    const syncForOrder = vi.fn(async () => {
-      orden.push('reservations.syncForOrder');
+    const syncForLine = vi.fn(async () => {
+      orden.push('reservations.syncForLine');
       return { kind: outcome } as const;
     });
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { create, setReservedAt },
-      reservations: { syncForOrder },
+      orders: { ...lineWritingOrders(), create, setLineReservedAt: setReservedAt },
+      reservations: { syncForLine },
     });
-    return { unitOfWork, orden, create, setReservedAt, syncForOrder };
+    return { unitOfWork, orden, create, setReservedAt, syncForLine };
   }
 
-  it('el orden real es create -> syncForOrder -> setReservedAt(now) cuando aparta', async () => {
+  it('el orden real es create -> syncForLine -> setReservedAt(now) cuando aparta', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const repo = repositorioConOrden('reserved');
     const createOrder = createCreateOrder({
@@ -848,8 +858,8 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
 
     await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
-    expect(repo.orden).toEqual(['orders.create', 'reservations.syncForOrder', 'orders.setReservedAt']);
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+    expect(repo.orden).toEqual(['orders.create', 'reservations.syncForLine', 'orders.setReservedAt']);
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBe(AHORA);
   });
 
   it('setReservedAt recibe null cuando el reparto no aparta (not_reserved)', async () => {
@@ -868,7 +878,7 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
 
     await createOrder({ recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID }, ACTOR_A);
 
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBeNull();
   });
 
   it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {
@@ -917,10 +927,10 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     );
 
     expect(creado.id).toBe(filaCreada().id);
-    expect(repo.syncForOrder).toHaveBeenCalledTimes(1);
-    const requerido = (repo.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    expect(repo.syncForLine).toHaveBeenCalledTimes(1);
+    const requerido = (repo.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
     expect(requerido.requirement).toEqual([]);
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBeNull();
   });
 
   it('m7: la receta para la reserva se lee con `scope.recipes`, no con el lector global del coste', async () => {
@@ -952,13 +962,13 @@ describe('QC-141 T9 — crear con reserva (R7, R41, R49)', () => {
     }));
     const create = vi.fn(async () => filaCreada());
     const setReservedAt = vi.fn(async () => undefined);
-    const syncForOrder = vi.fn(async (input: { requirement: readonly unknown[] }) => {
+    const syncForLine = vi.fn(async (input: { requirement: readonly unknown[] }) => {
       expect(input.requirement).toEqual([{ productId: PRODUCTO_X, quantity: '10' }]);
       return { kind: 'reserved' as const };
     });
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { create, setReservedAt },
-      reservations: { syncForOrder },
+      orders: { ...lineWritingOrders(), create, setLineReservedAt: setReservedAt },
+      reservations: { syncForLine },
       recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
     });
     const createOrder = createCreateOrder({
@@ -1016,10 +1026,11 @@ describe('alta con version de receta', () => {
   ) {
     const create = vi.fn(async () => filaCreada());
     const setReservedAt = vi.fn(async () => undefined);
-    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const lineas = lineWritingOrders();
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { create, setReservedAt },
-      reservations: { syncForOrder },
+      orders: { ...lineas, create, setLineReservedAt: setReservedAt },
+      reservations: { syncForLine },
       ...(enTransaccion === undefined ? {} : { recipes: { findExecutionContentById: enTransaccion } }),
     });
     const run = vi.spyOn(unitOfWork, 'run');
@@ -1033,7 +1044,7 @@ describe('alta con version de receta', () => {
       packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
-    return { createOrder, create, syncForOrder, run };
+    return { createOrder, create, syncForLine, run, writeLines: lineas.writeLines };
   }
 
   const entrada = (recipeVersionId?: string | null) => ({
@@ -1055,37 +1066,32 @@ describe('alta con version de receta', () => {
       loteCosteable({ stock: '100', unitCost: '3.0000' }),
       loteCosteable({ productId: PRODUCTO_Y, stock: '100', unitCost: '5.0000' }),
     ];
-    const { createOrder, create, syncForOrder } = alta(cat.recipes, cat.enTransaccion, lotes);
+    const { createOrder, writeLines, syncForLine } = alta(cat.recipes, cat.enTransaccion, lotes);
 
     await createOrder(entrada(VERSION_DE_A), ACTOR_A);
 
     expect(cat.findRefsIncludingDeleted).toHaveBeenCalledTimes(1);
     expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A, VERSION_DE_A], EMPRESA_A);
-    const [nuevo, , , , coste] = create.mock.calls[0] as unknown as readonly [
-      { recipeId: string },
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-    ];
+    const nuevo = lineaEscrita(writeLines);
+    const coste = nuevo.cost;
     expect(nuevo.recipeId).toBe(VERSION_DE_A);
     expect(nuevo).not.toHaveProperty('recipeVersionId');
     expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
     expect(cat.findExecutionContentById).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
     expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
-    const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    const sync = (syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
     expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
   });
 
   it('R31: sin version, o con version vacia, pide solo la receta y guarda la original como hoy', async () => {
     for (const recipeVersionId of [undefined, null, '']) {
       const cat = catalogoConVersiones([ref(RECETA_DE_A)]);
-      const { createOrder, create } = alta(cat.recipes);
+      const { createOrder, writeLines } = alta(cat.recipes);
 
       await createOrder(entrada(recipeVersionId), ACTOR_A);
 
       expect(cat.findRefsIncludingDeleted).toHaveBeenCalledWith([RECETA_DE_A], EMPRESA_A);
-      expect((create.mock.calls[0] as unknown as readonly [{ recipeId: string }])[0].recipeId).toBe(RECETA_DE_A);
+      expect(lineaEscrita(writeLines).recipeId).toBe(RECETA_DE_A);
     }
   });
 
@@ -1164,8 +1170,8 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
       orden.push('orders.create');
       return filaCreada();
     });
-    const syncForOrder = vi.fn(async () => {
-      orden.push('reservations.syncForOrder');
+    const syncForLine = vi.fn(async () => {
+      orden.push('reservations.syncForLine');
       return outcome;
     });
     const setStatus = vi.fn(async () => {
@@ -1176,15 +1182,22 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
       orden.push('orders.setIngredientsCost');
       return 'ok' as const;
     });
-    const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => {
-      void [id, reservedAt];
+    const setReservedAt = vi.fn(async (id: string, lineId: string, reservedAt: Date | null) => {
+      void [id, lineId, reservedAt];
       orden.push('orders.setReservedAt');
     });
+    const lineas = lineWritingOrders();
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { create, setStatus, setIngredientsCost, setReservedAt },
-      reservations: { syncForOrder },
+      orders: {
+        ...lineas,
+        create,
+        setLineStatus: setStatus,
+        setLineIngredientsCost: setIngredientsCost,
+        setLineReservedAt: setReservedAt,
+      },
+      reservations: { syncForLine },
     });
-    return { unitOfWork, orden, create, syncForOrder, setStatus, setIngredientsCost, setReservedAt };
+    return { unitOfWork, orden, create, syncForLine, setStatus, setIngredientsCost, setReservedAt, writeLines: lineas.writeLines };
   }
 
   function altaCon(repo: ReturnType<typeof repositorioQueBloquea>, prod = catalogoDeProductos()) {
@@ -1207,7 +1220,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     const createOrder = altaCon(repo);
 
     expect(await codigoDelFallo(() => createOrder(ENTRADA, ACTOR_A))).toBe('order_would_block');
-    expect(repo.orden).toEqual(['orders.create', 'reservations.syncForOrder']);
+    expect(repo.orden).toEqual(['orders.create', 'reservations.syncForLine']);
     expect(repo.setStatus).not.toHaveBeenCalled();
     expect(repo.setReservedAt).not.toHaveBeenCalled();
   });
@@ -1230,14 +1243,15 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     expect(creado.id).toBe(filaCreada().id);
     expect(repo.setStatus).toHaveBeenCalledWith(
       filaCreada().id,
+      'linea-0',
       'PENDIENTE',
       'BLOQUEADO',
       ACTOR_A.id,
       AHORA,
       { companyId: EMPRESA_A },
     );
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
-    // El alta inserta con el estado por defecto: el bloqueado entra solo por `setStatus`.
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBeNull();
+    // La linea nace con el estado por defecto: el bloqueado entra solo por `setLineStatus`.
     expect((repo.create.mock.calls[0] as unknown as readonly [{ status: string }])[0].status).toBe('PENDIENTE');
   });
 
@@ -1247,8 +1261,8 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
 
     await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
 
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '30.0000', packaging: '0.0000' });
-    expect(repo.setIngredientsCost).toHaveBeenCalledWith(filaCreada().id, null, ACTOR_A.id, AHORA, {
+    expect(lineaEscrita(repo.writeLines).cost).toEqual({ total: '30.0000', packaging: '0.0000' });
+    expect(repo.setIngredientsCost).toHaveBeenCalledWith(filaCreada().id, 'linea-0', null, ACTOR_A.id, AHORA, {
       companyId: EMPRESA_A,
     });
   });
@@ -1269,7 +1283,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     await createOrder({ ...ENTRADA, confirmBlocked: true }, ACTOR_A);
 
     expect(repo.setStatus).not.toHaveBeenCalled();
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBe(AHORA);
   });
 
   it('R2: receta sin lineas (not_reserved) -> PENDIENTE sin pedir confirmacion', async () => {
@@ -1279,7 +1293,7 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
     await createOrder(ENTRADA, ACTOR_A);
 
     expect(repo.setStatus).not.toHaveBeenCalled();
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull();
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBeNull();
   });
 
   it('R3: importe nulo por una unidad sin base comun, con la reserva cubierta -> PENDIENTE', async () => {
@@ -1293,9 +1307,9 @@ describe('QC-138 — el alta bloquea con confirmacion (R1, R2, R3, R5, R6, R8)',
 
     await createOrder(ENTRADA, ACTOR_A);
 
-    expect((repo.create.mock.calls[0] as unknown as readonly unknown[])[4]).toBeNull();
+    expect(lineaEscrita(repo.writeLines).cost).toBeNull();
     expect(repo.setStatus).not.toHaveBeenCalled();
-    expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
+    expect(repo.setReservedAt.mock.calls[0]?.[2]).toBe(AHORA);
   });
 
   it('R37: sin pedidos.modificar -> unauthorized antes de leer nada', async () => {
@@ -1320,12 +1334,19 @@ describe('QC-195 — el alta aparta los envases del reparto', () => {
     const setReservedAt = vi.fn(async () => undefined);
     const setStatus = vi.fn(async () => 'ok' as const);
     const setIngredientsCost = vi.fn(async () => 'ok' as const);
-    const syncForOrder = vi.fn(async () =>
+    const syncForLine = vi.fn(async () =>
       resultado === 'reserved' ? ({ kind: 'reserved' } as const) : ({ kind: 'insufficient', productIds: [ENVASE_DE_A] } as const),
     );
+    const lineas = lineWritingOrders();
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { create, setReservedAt, setStatus, setIngredientsCost },
-      reservations: { syncForOrder },
+      orders: {
+        ...lineas,
+        create,
+        setLineReservedAt: setReservedAt,
+        setLineStatus: setStatus,
+        setLineIngredientsCost: setIngredientsCost,
+      },
+      reservations: { syncForLine },
       recipes: cat.recipes,
     });
     const createOrder = createCreateOrder({
@@ -1338,7 +1359,7 @@ describe('QC-195 — el alta aparta los envases del reparto', () => {
       packaging: catalogoDeEnvases('1.0000'),
       now: () => AHORA,
     });
-    return { createOrder, create, setStatus, setReservedAt, syncForOrder };
+    return { createOrder, create, setStatus, setReservedAt, syncForLine, writeLines: lineas.writeLines };
   }
 
   const ALTA = {
@@ -1353,12 +1374,12 @@ describe('QC-195 — el alta aparta los envases del reparto', () => {
 
     await m.createOrder(ALTA, ACTOR_A);
 
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
     expect(entrada.requirement).toEqual([
       { productId: MATERIA, quantity: '40' },
       { productId: ENVASE_DE_A, quantity: '40' },
     ]);
-    expect(m.syncForOrder).toHaveBeenCalledTimes(1);
+    expect(m.syncForLine).toHaveBeenCalledTimes(1);
   });
 
   it('R16, R17: si falta un envase y no se confirma, lanza order_would_block (la transaccion no deja nada)', async () => {
@@ -1373,8 +1394,10 @@ describe('QC-195 — el alta aparta los envases del reparto', () => {
 
     await m.createOrder({ ...ALTA, confirmBlocked: true }, ACTOR_A);
 
-    expect(m.setStatus).toHaveBeenCalledWith(filaCreada().id, 'PENDIENTE', 'BLOQUEADO', ACTOR_A.id, AHORA, { companyId: EMPRESA_A });
-    expect(m.setReservedAt).toHaveBeenCalledWith(filaCreada().id, null, { companyId: EMPRESA_A });
+    expect(m.setStatus).toHaveBeenCalledWith(filaCreada().id, 'linea-0', 'PENDIENTE', 'BLOQUEADO', ACTOR_A.id, AHORA, {
+      companyId: EMPRESA_A,
+    });
+    expect(m.setReservedAt).toHaveBeenCalledWith(filaCreada().id, 'linea-0', null, { companyId: EMPRESA_A });
   });
 });
 
@@ -1393,10 +1416,11 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
     const uni = catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILO.id, KILO], [PIEZA.id, PIEZA]]));
     const create = vi.fn(async () => filaCreada());
     const setReservedAt = vi.fn(async () => undefined);
-    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const lineas = lineWritingOrders();
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { create, setReservedAt },
-      reservations: { syncForOrder },
+      orders: { ...lineas, create, setLineReservedAt: setReservedAt },
+      reservations: { syncForLine },
       recipes: cat.recipes,
       products: fakeScopeProducts([insumo]),
       units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
@@ -1411,7 +1435,7 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
       packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
-    return { createOrder, create, setReservedAt, syncForOrder };
+    return { createOrder, create, setReservedAt, syncForLine, writeLines: lineas.writeLines };
   }
 
   const ALTA_EN_GRAMOS = { recipeId: RECETA_DE_A, quantity: '1000', unitId: GRAMO.id };
@@ -1422,7 +1446,7 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
     await m.createOrder(ALTA_EN_GRAMOS, ACTOR_A);
 
     // 1000 g al 10 % son 100 g = 0.1 kg; a 3.0000 el kg, 0.3000. Sin convertir serian 300.
-    expect((m.create.mock.calls[0] as unknown as readonly unknown[])[4]).toEqual({ total: '0.3000', packaging: '0.0000' });
+    expect(lineaEscrita(m.writeLines).cost).toEqual({ total: '0.3000', packaging: '0.0000' });
   });
 
   it('R10 el alta aparta la necesidad convertida', async () => {
@@ -1430,7 +1454,7 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
 
     await m.createOrder(ALTA_EN_GRAMOS, ACTOR_A);
 
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { productId: string; quantity: string }[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly { productId: string; quantity: string }[] }])[0];
     expect(entrada.requirement).toHaveLength(1);
     expect(entrada.requirement[0]?.productId).toBe(PRODUCTO_X);
     expect(Number(entrada.requirement[0]?.quantity)).toBe(0.1);
@@ -1448,7 +1472,7 @@ describe('QC-204 — el alta convierte la necesidad a la unidad del insumo', () 
     expect((error as PedidosError).code).toBe('order_unit_not_convertible');
     expect((error as PedidosError).diagnostic).toContain(PRODUCTO_X);
     expect(m.create).not.toHaveBeenCalled();
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();
   });
 });
@@ -1476,11 +1500,11 @@ describe('QC-307 — el precio de venta en el alta', () => {
 
   function datosEscritos(repo: ReturnType<typeof repositorioDePedidos>): { salePrice: unknown } {
     expect(repo.create).toHaveBeenCalledTimes(1);
-    return (repo.create.mock.calls[0] as unknown as readonly [{ salePrice: unknown }])[0];
+    return lineaEscrita(repo.writeLines);
   }
 
   function costeEscrito(repo: ReturnType<typeof repositorioDePedidos>): unknown {
-    return (repo.create.mock.calls[0] as unknown as readonly unknown[])[4];
+    return lineaEscrita(repo.writeLines).cost;
   }
 
   it('QC-307 R6: con precio, el puerto recibe la cadena; con 0, "0"; sin precio o en blanco, null', async () => {

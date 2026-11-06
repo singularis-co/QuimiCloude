@@ -46,13 +46,14 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createExpireStaleOrders,
   EXPIRED_ORDER_REASON,
   ORDER_RESERVATION_TTL_DAYS,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder } from '@/lib/modules/pedidos';
+import type { Actor } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
@@ -61,6 +62,11 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { type SingleLineNewOrder } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -195,6 +201,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
@@ -239,7 +247,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, unitId: string, quantity: string): Omit<NewOrder, 'customerId' | 'salePrice'> {
+function nuevoPedido(recipeId: string, unitId: string, quantity: string): Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> {
   return { recipeId, quantity, priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [] };
 }
 
@@ -248,15 +256,12 @@ function nuevoPedido(recipeId: string, unitId: string, quantity: string): Omit<N
 async function crearPedidoCaducado(fixture: Fixture, recipeId: string): Promise<string> {
   const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
   const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
-  await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${vencido}::timestamptz WHERE "id" = ${creado.id}::uuid`;
+  await prisma.$executeRaw`UPDATE "order_lines" SET "reserved_at" = ${vencido}::timestamptz WHERE "order_id" = ${creado.id}::uuid`;
   return creado.id;
 }
 
 async function estadoDe(orderId: string): Promise<{ status: string; cancellationReason: string | null; reservedAt: Date | null }> {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, cancellationReason: true, reservedAt: true },
-  });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, cancellationReason: true, reservedAt: true } });
   return row;
 }
 
@@ -360,7 +365,7 @@ describe('R53 — una edicion intercalada entre el lote y el candado gana', () =
         scope,
       ) => {
         const lote = await findExpirableOrders(companyId, threshold, cursor, limit, scope);
-        await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${new Date()}::timestamptz WHERE "id" = ${orderId}::uuid`;
+        await prisma.$executeRaw`UPDATE "order_lines" SET "reserved_at" = ${new Date()}::timestamptz WHERE "order_id" = ${orderId}::uuid`;
         return lote;
       };
       const expireConEdicionIntercalada = createExpireStaleOrders({
@@ -451,8 +456,8 @@ describe('R17, R21 — aislamiento por empresa: la busqueda de A no devuelve ped
       const candidatosDeB = await findExpirableOrders(fixtureB.companyId, threshold, null, 100, {
         companyId: fixtureB.companyId,
       });
-      const idsDeA = candidatosDeA.map((c) => c.id);
-      const idsDeB = candidatosDeB.map((c) => c.id);
+      const idsDeA = candidatosDeA.map((c) => c.orderId);
+      const idsDeB = candidatosDeB.map((c) => c.orderId);
 
       expect(idsDeA).toContain(orderIdA);
       expect(idsDeA).not.toContain(orderIdB);
@@ -510,7 +515,7 @@ describe('QC-138 R29 — el proceso diario no toca un pedido BLOQUEADO', () => {
         actorDe(fixture),
       );
       const vencido = new Date(Date.now() - (ORDER_RESERVATION_TTL_DAYS + 1) * 24 * 60 * 60 * 1000);
-      await prisma.$executeRaw`UPDATE "orders" SET "reserved_at" = ${vencido}::timestamptz WHERE "id" = ${creado.id}::uuid`;
+      await prisma.$executeRaw`UPDATE "order_lines" SET "reserved_at" = ${vencido}::timestamptz WHERE "order_id" = ${creado.id}::uuid`;
 
       const resultado = await expireStaleOrders();
 

@@ -32,6 +32,7 @@ import type { OrderMutationFormState } from '@/lib/modules/pedidos/adapters/driv
 import type { UnitView } from '@/lib/modules/unidades';
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { updateDistributionMock, quoteAvailabilityMock, routerMock } = vi.hoisted(() => ({
   updateDistributionMock:
@@ -107,6 +108,7 @@ const UNIDADES: readonly UnitView[] = [
 
 function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

@@ -22,6 +22,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizeRecipeName } from '@/lib/modules/recetas'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine, lineOfOrder, createOrderWithLine } from '../../helpers/only-order-line'
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -199,16 +201,14 @@ let nextSequence = 870_000
 
 async function createOrder(tx: Prisma.TransactionClient, companyId: string, recipeId: string): Promise<string> {
   nextSequence += 1
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  })
+    })
+  await ensureOnlyLine(tx, order.id)
   return order.id
 }
 
@@ -243,10 +243,11 @@ function rawInsertEntry(tx: Prisma.TransactionClient, f: Fixture, v: EntryValues
   const responsibles = v.responsibles === undefined ? null : JSON.stringify(v.responsibles)
   return tx.$executeRaw`
     INSERT INTO "order_execution_entries"
-      ("company_id", "order_id", "user_id", "action", "step_position", "responsible_user_ids", "occurred_at")
+      ("company_id", "order_id", "order_line_id", "user_id", "action", "step_position", "responsible_user_ids", "occurred_at")
     VALUES (
       CAST(${f.companyId} AS uuid),
       CAST(${v.orderId ?? f.orderId} AS uuid),
+      ${lineOfOrder(v.orderId ?? f.orderId)},
       CAST(${f.userId} AS uuid),
       CAST(${v.action} AS "OrderExecutionAction"),
       CAST(${v.stepPosition} AS integer),

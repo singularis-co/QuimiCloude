@@ -214,7 +214,7 @@ async function composeConditioningOrderRowsWithNames(
   const names = new Map(personRefs.map((ref) => [ref.id, ref.displayName] as const));
 
   const rows = orders.map((order) => {
-    const rowComposed = composed.get(order.id);
+    const rowComposed = composed.get(order.lineId);
     return {
       id: order.id,
       numberText: formatOrderNumber(order.number),

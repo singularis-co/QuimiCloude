@@ -35,7 +35,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderEdit, OrderScope, OrderStatus } from '@/lib/modules/pedidos'
+import type { OrderScope, OrderStatus } from '@/lib/modules/pedidos'
+import { updateOrderAndLine, createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line'
 
 /** Un ano de prueba propio, distinto de los que ya usan `order-repository.int.test.ts` y
  *  `order-sequence.int.test.ts`, para que ningun archivo pueda heredar su secuencia. */
@@ -136,7 +137,7 @@ function instant(day: number): Date {
 
 let nextSequence = 1
 
-function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId,
@@ -150,12 +151,12 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
   }
 }
 
-async function seedOrder(overrides: Partial<NewOrder> = {}): Promise<string> {
+async function seedOrder(overrides: Partial<SingleLineNewOrder> = {}): Promise<string> {
   const sequence = nextSequence
   nextSequence += 1
   const now = instant(1 + (sequence % 25))
   const result = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(overrides), YEAR, actorId, now, null, scope()),
+    createSingleLineOrder(createOrderWriteRepository(tx), baseOrder(overrides), YEAR, actorId, now, null, scope()),
   )
   return result.id
 }
@@ -171,22 +172,21 @@ function setStatus(
   return createOrderWriteRepository().setStatus(id, from, to, actorId, now, scope())
 }
 
+/** El estado del pedido y la fecha de terminado de su unica linea, que desde QT-313 vive en ella. */
 async function readFinishedAt(id: string): Promise<{ status: string; finishedAt: Date | null }> {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, finishedAt: true },
-  })
-  return row
+  const { status } = await prisma.order.findUniqueOrThrow({ where: { id }, select: { status: true } })
+  const { finishedAt } = await prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { finishedAt: true } })
+  return { status, finishedAt }
 }
 
 beforeAll(async () => {
   const columnas = await prisma.$queryRaw<{ column_name: string }[]>`
     SELECT column_name FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'finished_at'`
+    WHERE table_schema = 'public' AND table_name = 'order_lines' AND column_name = 'finished_at'`
   if (columnas.length !== 1) {
     throw new Error(
-      'la base de pruebas no tiene la columna `orders.finished_at`: falta la migracion ' +
-        '`20260923120000_orders_finished_at` de QC-145. Corre `pnpm run db:migrate`.',
+      'la base de pruebas no tiene la columna `order_lines.finished_at`: falta la migracion ' +
+        '`20261103120000_order_lines`. Corre `pnpm run db:migrate`.',
     )
   }
   await seedFixtures()
@@ -203,23 +203,18 @@ describe('R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun
     try {
       // Los CHECK exigen packed_by, conditioned_by y finished_at en TERMINADO: se siembra a mano.
       const terminadoEn = new Date(Date.UTC(YEAR, 6, 1, 8, 0, 0, 0))
-      await prisma.order.update({
-        where: { id },
-        data: { status: 'TERMINADO', packedBy: actorId, conditionedBy: actorId, finishedAt: terminadoEn },
-      })
+      await updateOrderAndLine(prisma, id, { status: 'TERMINADO', packedBy: actorId, conditionedBy: actorId, finishedAt: terminadoEn })
       const now = new Date(Date.UTC(YEAR, 6, 1, 9, 30, 0, 0))
       const resultado = await setStatus(id, 'TERMINADO', 'ENTREGADO', now)
       expect(resultado).toBe('ok')
 
-      const stored = await prisma.order.findUniqueOrThrow({
-        where: { id },
-        select: { status: true, finishedAt: true, packedBy: true, conditionedBy: true },
-      })
-      expect(stored.status).toBe('ENTREGADO')
+      const stored = await prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { finishedAt: true, packedBy: true, conditionedBy: true } })
+      expect((await prisma.order.findUniqueOrThrow({ where: { id }, select: { status: true } })).status).toBe('ENTREGADO')
       expect(stored.finishedAt?.toISOString()).toBe(terminadoEn.toISOString())
       expect(stored.packedBy).toBe(actorId)
       expect(stored.conditionedBy).toBe(actorId)
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -227,7 +222,7 @@ describe('R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun
   it('R33: de EN_EMPAQUE a POR_ACONDICIONAR NO escribe finished_at', async () => {
     const id = await seedOrder({ status: 'EN_CURSO' })
     try {
-      await prisma.order.update({ where: { id }, data: { status: 'EN_EMPAQUE', packedBy: actorId } })
+      await updateOrderAndLine(prisma, id, { status: 'EN_EMPAQUE', packedBy: actorId })
       const now = new Date(Date.UTC(YEAR, 6, 1, 10, 30, 0, 0))
       const resultado = await setStatus(id, 'EN_EMPAQUE', 'POR_ACONDICIONAR', now)
       expect(resultado).toBe('ok')
@@ -236,6 +231,7 @@ describe('R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun
       expect(stored.status).toBe('POR_ACONDICIONAR')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -251,6 +247,7 @@ describe('R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun
       expect(stored.status).toBe('EN_CURSO')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -266,6 +263,7 @@ describe('R33 (QC-215) — setAliveOrderStatus no escribe finished_at con ningun
       expect(stored.status).toBe('POR_EMPACAR')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -279,6 +277,7 @@ describe('R2 — un pedido entregado sin pasar por Finalizar no tiene fecha de t
       expect(stored.status).toBe('ENTREGADO')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -291,7 +290,7 @@ describe('R4 — la base rechaza una fecha de terminado en un pedido que no es E
       await prisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe('SAVEPOINT sp_finished_at_check')
         await expect(
-          tx.$executeRaw`UPDATE "orders" SET "finished_at" = CURRENT_TIMESTAMP WHERE "id" = CAST(${id} AS uuid)`,
+          tx.$executeRaw`UPDATE "order_lines" SET "finished_at" = CURRENT_TIMESTAMP WHERE "order_id" = CAST(${id} AS uuid)`,
         ).rejects.toMatchObject({
           code: 'P2010',
           meta: expect.objectContaining({ code: '23514' }),
@@ -303,6 +302,7 @@ describe('R4 — la base rechaza una fecha de terminado en un pedido que no es E
       expect(stored.status).toBe('PENDIENTE')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -312,22 +312,14 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
   it('updateAliveOrder no anade ni cambia finished_at', async () => {
     const id = await seedOrder({ status: 'PENDIENTE' })
     try {
-      const edit: OrderEdit = {
-        salePrice: null,
-        recipeId,
-        quantity: '20.0000',
-        priority: 'ALTA',
-        unitId,
-        customerId: null,
-        presentationLines: [],
-      }
-      const resultado = await updateAliveOrder(id, edit, actorId, instant(20), null, scope())
+      const resultado = await updateAliveOrder(id, { priority: 'ALTA', customerId: null }, actorId, instant(20), scope())
       expect(resultado).toBe('ok')
 
       const stored = await readFinishedAt(id)
       expect(stored.status).toBe('PENDIENTE')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })
@@ -342,6 +334,7 @@ describe('R5, R9 — editar y cancelar no tocan finished_at', () => {
       expect(stored.status).toBe('CANCELADO')
       expect(stored.finishedAt).toBeNull()
     } finally {
+      await prisma.orderLine.deleteMany({ where: { orderId: id } })
       await prisma.order.delete({ where: { id } })
     }
   })

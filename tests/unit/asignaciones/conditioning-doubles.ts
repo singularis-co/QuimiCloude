@@ -51,6 +51,7 @@ export const ACONDICIONADOR: Actor = {
 export function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id,
+    lineId: `linea-${id}`,
     number: { year: 2026, sequence: 7 },
     recipeId: RECETA,
     quantity: '10.0000',
@@ -307,7 +308,7 @@ export function montarRegistroDePaso(options?: {
   const status = options?.status ?? 'EN_ACONDICIONAMIENTO';
   const conditionedBy = options?.conditionedBy === undefined ? ANA : options.conditionedBy;
   const findAliveById = vi.fn<OrderCatalog['findAliveById']>(async () =>
-    options?.target === null ? null : { id: PEDIDO_1, status },
+    options?.target === null ? null : { id: PEDIDO_1, status, activeLineStatuses: [status] },
   );
   const listAliveSummariesByIds = vi.fn(
     async (_companyId: string, _ids: readonly string[], _statuses: readonly string[], page: number, pageSize?: number) =>

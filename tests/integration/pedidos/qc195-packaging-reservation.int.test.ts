@@ -25,6 +25,8 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -42,14 +44,15 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   createCancelOrder,
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createQuoteOrderCost,
   createDeleteOrder,
   createReviewBlockedOrders,
   createTransitionOrder,
-  createUpdateOrder,
-  createUpdateOrderPresentationLines,
+  createUpdateOrder as createLinesUpdate,
+  createUpdateOrderPresentationLines as createLinesDistribution,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeDistribution, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -60,7 +63,16 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { onOnlyLine } from '../../helpers/only-order-line';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
+const createUpdateOrderPresentationLines = (deps: Parameters<typeof createLinesDistribution>[0]) =>
+  singleRecipeDistribution(createLinesDistribution(deps), findAliveOrderLines);
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -70,7 +82,7 @@ function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
     withOrderTransaction((tx) => {
@@ -97,9 +109,9 @@ const packaging: PackagingCatalog = { findRefs: findPackagingRefs, findCostingBa
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging, unitOfWork, now: () => new Date() });
-const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
+const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
-const transition = createTransitionOrder({ unitOfWork });
+const transition = onOnlyLine(createTransitionOrder({ unitOfWork }));
 const quoteOrderCost = createQuoteOrderCost({ recipes, products, units, packaging });
 const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging, presentations, units, unitOfWork });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging, unitOfWork });
@@ -189,6 +201,8 @@ async function borrarFixture(f: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: f.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: f.companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: f.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: f.companyId } });
   await prisma.order.deleteMany({ where: { companyId: f.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: f.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: f.companyId } });
@@ -218,7 +232,7 @@ async function apartadoPorProducto(orderId: string): Promise<Readonly<Record<str
 }
 
 async function estadoDe(orderId: string) {
-  return prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true } });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true } });
 }
 
 afterAll(async () => {
@@ -636,10 +650,7 @@ describe('QC-195 — el importe suma los envases', () => {
 describe('QC-195 — Reparto y unidad guarda el importe', () => {
   /** Las dos columnas del importe: el total y su parte de envases. */
   async function costoDe(orderId: string) {
-    const fila = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, ingredientsCost: true, packagingCost: true },
-    });
+    const fila = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, ingredientsCost: true, packagingCost: true } });
     return {
       status: fila.status,
       total: fila.ingredientsCost === null ? null : fila.ingredientsCost.toFixed(4),

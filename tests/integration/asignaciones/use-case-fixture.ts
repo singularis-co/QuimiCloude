@@ -63,6 +63,7 @@ import type { OrderResponsible } from '@/lib/modules/asignaciones/domain/assignm
 import type { OrderResponsiblesEntry } from '@/lib/modules/asignaciones/domain/list-responsibles-for-orders';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { realOrderSummaries } from '../../helpers/order-summaries';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -361,8 +362,7 @@ export async function createOrder(
   options: OrderOptions = {},
 ): Promise<string> {
   nextSequence += 1;
-  const order = await fixture.tx.order.create({
-    data: {
+  const order = await createOrderWithLine(fixture.tx, {
       // QC-60: `orders.company_id` es NOT NULL y la FK de la asignacion ya es compuesta, asi que
       // el pedido nace en la MISMA empresa que sus asignaciones.
       companyId: options.companyId ?? fixture.companyA,
@@ -372,9 +372,8 @@ export async function createOrder(
       quantity: new Prisma.Decimal('10'),
       status: options.status ?? 'PENDIENTE',
       deletedAt: options.deletedAt ?? null,
-    },
-    select: { id: true },
-  });
+    });
+  await ensureOnlyLine(fixture.tx, order.id);
   return order.id;
 }
 
@@ -409,6 +408,7 @@ export async function crearLinea(
   await tx.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: await ensureOnlyLine(tx, orderId),
       companyId,
       presentationId: presentation.id,
       packages,

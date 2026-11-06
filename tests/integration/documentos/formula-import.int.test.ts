@@ -67,7 +67,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapters/driven/persistence/unit-catalog-prisma';
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
-import { createCreateOrder } from '@/lib/modules/pedidos';
+import { createCreateOrder as createLinesOrder } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { Actor as OrderActor } from '@/lib/modules/pedidos';
 
@@ -78,6 +79,10 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 import { noEvidenceLocks } from '../../helpers/evidence-off';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -238,6 +243,8 @@ async function crearEmpresa(): Promise<Empresa> {
 
 async function borrarEmpresa(empresa: Empresa): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: empresa.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: empresa.companyId } });
   await prisma.order.deleteMany({ where: { companyId: empresa.companyId } });
   await prisma.recipe.deleteMany({ where: { companyId: empresa.companyId } });
   await prisma.documentFile.deleteMany({ where: { companyId: empresa.companyId } });
@@ -451,8 +458,8 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
         { recipeId: sembrada.id, quantity: '6.0000', priority: 'MEDIA', unitId: empresa.unitId },
         { id: empresa.userId, companyId: empresa.companyId, permissions: ['pedidos.modificar'] } satisfies OrderActor,
       );
-      const antes = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } });
-      expect(antes.ingredientsCost?.toFixed(4)).toBe('30.0000');
+      const antes = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id }, include: { lines: true } });
+      expect(antes.lines[0]?.ingredientsCost?.toFixed(4)).toBe('30.0000');
       // `JSON.stringify`, no `toEqual`, para no depender de la igualdad estructural de
       // `Prisma.Decimal`: lo que R21 exige es la fila IDENTICA, campo a campo.
       const antesTextual = JSON.stringify(antes);
@@ -468,7 +475,7 @@ describe('createConfirmFormulaImport — integracion contra Postgres real (T6)',
         replaceRecipeId: sembrada.id,
       });
 
-      const despues = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } });
+      const despues = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id }, include: { lines: true } });
       expect(JSON.stringify(despues)).toBe(antesTextual);
     });
   });

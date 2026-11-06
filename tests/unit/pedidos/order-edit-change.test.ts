@@ -4,9 +4,19 @@
 import { describe, expect, it } from 'vitest'
 
 import { sameDecimal } from '@/lib/modules/pedidos/domain/order-distribution'
-import { isCustomerOnlyEdit, type ComparableEdit } from '@/lib/modules/pedidos/domain/order-edit-change'
+import { isUnchangedOrderLine, type ComparableOrderLineEdit } from '@/lib/modules/pedidos/domain/order-edit-change'
 
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { SingleRecipeOrderRow } from '../../helpers/order-unit-of-work-double'
+
+// QT-313: la receta, la cantidad, la unidad, el precio y el reparto son de la linea, y la prioridad
+// del pedido. El atajo de `updateOrder` es «la linea llega igual y la prioridad tambien»: la tabla
+// se sigue midiendo sobre un pedido de una receta, con su unica linea igual a la fila.
+type ComparableEdit = ComparableOrderLineEdit & { readonly priority: OrderRow['priority'] }
+
+function isCustomerOnlyEdit(row: SingleRecipeOrderRow, edit: ComparableEdit): boolean {
+  return edit.priority === row.priority && isUnchangedOrderLine(row, edit)
+}
 
 const RECETA = '22222222-2222-4222-8222-222222222222'
 const VERSION = '55555555-5555-4555-8555-555555555555'
@@ -18,7 +28,7 @@ const PRES_A = '77777777-7777-4777-8777-777777777777'
 const PRES_B = '78787878-7878-4878-8878-787878787878'
 const PRES_ANTIGUA = '79797979-7979-4979-8979-797979797979'
 
-function fila(overrides: Partial<OrderRow> = {}): OrderRow {
+function fila(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',

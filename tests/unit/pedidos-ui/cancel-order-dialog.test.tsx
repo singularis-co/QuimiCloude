@@ -35,6 +35,7 @@ import {
 } from '@/app/(private)/pedidos/components';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderMutationFormState } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { cancelOrderActionMock, routerMock } = vi.hoisted(() => ({
   cancelOrderActionMock:
@@ -72,6 +73,7 @@ const MOTIVO = 'El cliente anuló el encargo';
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

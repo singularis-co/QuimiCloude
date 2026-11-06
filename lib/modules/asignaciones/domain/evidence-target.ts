@@ -11,6 +11,7 @@
  */
 import { requireAnyPermission, requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError } from './errors';
+import { onlyLineOf } from './only-order-line';
 
 import type { EvidencePhase } from './step-evidence';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -31,6 +32,8 @@ export type EvidenceTargetDeps = {
 };
 
 export type EvidenceTarget = {
+  /** La linea del pedido cuyos pasos se documentan. */
+  readonly lineId: string;
   readonly recipeId: string;
   readonly steps: readonly RecipeStepView[];
 };
@@ -49,11 +52,11 @@ async function resolveManufacturing(
   if (order.status !== 'EN_CURSO') throw new OrderNotFoundError();
 
   const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_CURSO'], 1, 1);
-  const summary = page.items[0];
+  const summary = onlyLineOf(page);
   if (summary === undefined) throw new OrderNotFoundError();
 
   const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
-  return { recipeId: summary.recipeId, steps: content?.steps ?? [] };
+  return { lineId: summary.lineId, recipeId: summary.recipeId, steps: content?.steps ?? [] };
 }
 
 async function resolvePacking(
@@ -62,11 +65,11 @@ async function resolvePacking(
   orderId: string,
 ): Promise<EvidenceTarget> {
   const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_EMPAQUE'], 1, 1);
-  const summary = page.items[0];
+  const summary = onlyLineOf(page);
   if (summary?.packedBy !== actor.id) throw new OrderNotFoundError();
 
   const steps = await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId);
-  return { recipeId: summary.recipeId, steps: steps ?? [] };
+  return { lineId: summary.lineId, recipeId: summary.recipeId, steps: steps ?? [] };
 }
 
 async function resolveConditioning(
@@ -75,11 +78,11 @@ async function resolveConditioning(
   orderId: string,
 ): Promise<EvidenceTarget> {
   const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_ACONDICIONAMIENTO'], 1, 1);
-  const summary = page.items[0];
+  const summary = onlyLineOf(page);
   if (summary?.conditionedBy !== actor.id) throw new OrderNotFoundError();
 
   const steps = await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, actor.companyId);
-  return { recipeId: summary.recipeId, steps: steps ?? [] };
+  return { lineId: summary.lineId, recipeId: summary.recipeId, steps: steps ?? [] };
 }
 
 /** Autoriza antes de tocar ningun puerto; la empresa sale siempre del actor. */

@@ -28,6 +28,7 @@ import {
 } from './errors';
 import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
+import { onlyLineOf } from './only-order-line';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -92,7 +93,7 @@ export function createFinishPacking(
       1,
       1,
     );
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
     const numberText = formatOrderNumber(summary.number);
 
@@ -107,11 +108,12 @@ export function createFinishPacking(
     try {
       await deps.transaction.run(async ({ packing, log }) => {
         // El exito de Terminar es un objeto con los lotes dados de alta, no el literal `'ok'`.
-        const result = await packing.finishPackingAliveById(orderId, actor.companyId, actor.id, now, lines);
+        const result = await packing.finishPackingAliveById(orderId, summary.lineId, actor.companyId, actor.id, now, lines);
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await log.append({
           companyId: actor.companyId,
           orderId,
+          orderLineId: summary.lineId,
           userId: actor.id,
           occurredAt: now,
           action: 'pack_finish',

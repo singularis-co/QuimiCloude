@@ -32,6 +32,7 @@ import {
 } from '@/app/(private)/pedidos/components';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderMutationFormState } from '@/lib/modules/pedidos/adapters/driving/order-actions';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { deleteOrderActionMock, routerMock } = vi.hoisted(() => ({
   deleteOrderActionMock:
@@ -69,6 +70,7 @@ const NUMERO = { year: 2026, sequence: 42 } as const;
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: NUMERO,
     numberText: formatOrderNumber(NUMERO),

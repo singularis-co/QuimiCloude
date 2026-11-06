@@ -65,7 +65,7 @@ export {
 export { type NewProductBatch } from './domain/product-batch';
 export { type NewProduct, type ProductView } from './domain/product-view';
 export { type ProductStockByUnit, sumStockByUnit, singleUnitStock } from './domain/product-stock';
-export { type CostingBatch } from './domain/costing-batch';
+export { type CostingBatch, type CostingExclusion } from './domain/costing-batch';
 export { productDisplayName } from './domain/product-display-name';
 export { type PresentationView } from './domain/presentation-view';
 export { aliveBatches, type ProductBatchView } from './domain/product-batch-view';
@@ -277,6 +277,7 @@ export type {
   ConsumptionOutcome,
   OrderCoverage,
   MaterialReservations,
+  ReservationKey,
   ReservationQueries,
   OrderNumberDirectory,
   BatchHistoryEntry,

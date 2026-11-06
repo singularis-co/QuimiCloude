@@ -86,7 +86,7 @@ export function createListAssignedOrders(
 
     // Al actor se le descarta al final, para que el orden del resto no dependa de quien mira.
     const items: AssignedOrderView[] = ordersPage.items.map((row) => {
-      const rowComposed = composed.get(row.id);
+      const rowComposed = composed.get(row.lineId);
       return {
         id: row.id,
         numberText: formatOrderNumber(row.number),

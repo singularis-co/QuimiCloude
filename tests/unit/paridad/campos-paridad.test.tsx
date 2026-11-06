@@ -29,6 +29,7 @@ import {
   setViewportWidth,
 } from '../../helpers/viewport';
 import { arbolAccesibleDe } from './arbol-accesible';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 /**
  * Paridad de los campos de la lista cerrada de T0a (`progress/impl_QC-232-….md > Campos`),
@@ -379,6 +380,7 @@ const DETALLE_RECETA = {
 } as unknown as RecipeDetail;
 
 const PEDIDO: OrderSummary = {
+  ...VISTA_SIN_LINEAS,
   id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
   number: { year: 2026, sequence: 42 },
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

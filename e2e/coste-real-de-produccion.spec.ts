@@ -81,6 +81,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc305_e2e_';
 
@@ -261,7 +262,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.inventoryMovement.deleteMany({ where }),
     () => prisma.orderPresentationLine.deleteMany({ where }),
     () => prisma.orderExecutionEntry.deleteMany({ where }),
-    () => prisma.order.deleteMany({ where }),
+    () => deleteOrdersWithLines({ where }),
     () => prisma.productBatch.deleteMany({ where }),
     () => prisma.product.deleteMany({ where: { ...where, type: PRODUCT_TYPES.FINISHED_PRODUCT } }),
     () => prisma.recipe.deleteMany({ where }),
@@ -283,10 +284,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
 
 /** Los importes del pedido como texto de 4 decimales: `NULL` no se confunde con `'0.0000'`. */
 async function savedCosts(orderId: string) {
-  const order = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, ingredientsCost: true, actualCost: true },
-  });
+  const order = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, ingredientsCost: true, actualCost: true } });
   return {
     status: order.status,
     estimated: order.ingredientsCost?.toFixed(4) ?? null,
@@ -539,7 +537,7 @@ test.describe('coste real de producción', () => {
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     const order = await prisma.order.findFirstOrThrow({
-      where: { companyId, recipeId, deletedAt: null },
+      where: { companyId, lines: { some: { recipeId } }, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true },
     });
     const numberText = formatOrderNumber({ year: order.orderYear, sequence: order.orderSequence });
@@ -576,7 +574,7 @@ test.describe('coste real de producción', () => {
     await submitOrderWithLeftover(page, editForm);
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
-    const edited = await prisma.order.findUniqueOrThrow({ where: { id: order.id }, select: { quantity: true } });
+    const edited = await prisma.orderLine.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { position: 'asc' }, select: { quantity: true } });
     expect(edited.quantity.toFixed(4)).toBe(`${EDITED_QUANTITY}.0000`);
     expect(await savedCosts(order.id)).toEqual({ status: 'EN_CURSO', estimated, actual: null });
 

@@ -54,6 +54,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc223_e2e_';
@@ -323,6 +324,7 @@ async function deleteCompanyRows(companyIds: readonly string[]): Promise<void> {
   await prisma.orderAssignment.deleteMany({ where: inCompanies });
   await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
   await prisma.orderExecutionEntry.deleteMany({ where: inCompanies });
+  await prisma.orderLine.deleteMany({ where: inCompanies });
   await prisma.order.deleteMany({ where: inCompanies });
   await prisma.productBatch.deleteMany({ where: inCompanies });
   // El producto terminado (`products.recipe_id`) restringe el borrado de la receta.
@@ -438,8 +440,7 @@ test.beforeAll(async () => {
 
   // `TERMINADO` exige fecha de terminado, quien empaco y quien acondiciono.
   orderId = (
-    await prisma.order.create({
-      data: {
+    await createOrderWithLine(prisma, {
         companyId,
         orderYear: new Date().getUTCFullYear(),
         orderSequence: ORDER_SEQUENCE,
@@ -452,26 +453,29 @@ test.beforeAll(async () => {
         unitId: unit.id,
         customerId: customerOfOrderId,
         createdBy: adminUserId,
-        presentationLines: {
-          create: [
-            {
-              companyId,
-              presentationId: presentationOne.id,
-              packages: LINE_ONE_PACKAGES,
-              presentationContent: CONTENT_ONE,
-            },
-            {
-              companyId,
-              presentationId: presentationTwo.id,
-              packages: LINE_TWO_PACKAGES,
-              presentationContent: CONTENT_TWO,
-            },
-          ],
-        },
-      },
-      select: { id: true },
-    })
+      })
   ).id;
+  const orderLineId = await ensureOnlyLine(prisma, orderId);
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId,
+      orderLineId,
+      companyId,
+      presentationId: presentationOne.id,
+      packages: LINE_ONE_PACKAGES,
+      presentationContent: CONTENT_ONE,
+    },
+  });
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId,
+      orderLineId,
+      companyId,
+      presentationId: presentationTwo.id,
+      packages: LINE_TWO_PACKAGES,
+      presentationContent: CONTENT_TWO,
+    },
+  });
 });
 
 test.afterAll(async () => {

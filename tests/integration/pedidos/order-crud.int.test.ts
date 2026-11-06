@@ -48,10 +48,17 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-prisma'
 import { createMaterialReservations } from '@/lib/modules/inventario/adapters/driven/persistence/reservation-prisma'
-import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
-import { createOrderWriteRepository, orderOrderBy } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
+import { createCreateOrder as createLinesOrder, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
+import {
+  createOrderWriteRepository,
+  findAliveOrderLines,
+  orderOrderBy,
+} from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
+
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line'
 
 import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -63,6 +70,12 @@ import { findMassVolumeBridge } from '@/lib/modules/unidades/adapters/driven/per
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 // Ningun caso de este archivo asigna cliente: si se llamara, fallaria a la vista.
 const customerCatalog = {
@@ -328,8 +341,6 @@ function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColu
     company_id: asUuid(f.companyId),
     order_year: Prisma.sql`${currentUtcYear()}`,
     order_sequence: Prisma.sql`${sequence}`,
-    recipe_id: asUuid(f.recipeId),
-    quantity: asDecimal('10'),
   }
 }
 
@@ -351,8 +362,7 @@ async function createOrder(
   f: Fixtures,
   seed: OrderSeed = {},
 ): Promise<string> {
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: f.companyId,
       orderYear: currentUtcYear(),
       orderSequence: seed.sequence ?? freshSequence(),
@@ -364,13 +374,18 @@ async function createOrder(
       createdAt: seed.createdAt,
       createdBy: f.userId,
       updatedBy: f.userId,
-      presentationLines:
-        seed.presentationId === undefined || seed.presentationId === null
-          ? undefined
-          : { create: [{ companyId: f.companyId, presentationId: seed.presentationId, packages: 1 }] },
-    },
-    select: { id: true },
-  })
+    })
+  if (seed.presentationId !== undefined && seed.presentationId !== null) {
+    await tx.orderPresentationLine.create({
+      data: {
+        orderId: order.id,
+        orderLineId: await ensureOnlyLine(tx, order.id),
+        companyId: f.companyId,
+        presentationId: seed.presentationId,
+        packages: 1,
+      },
+    })
+  }
   return order.id
 }
 
@@ -447,7 +462,7 @@ describe('el alta contra la base (R8, R10)', () => {
         { id: string; order_year: number; order_sequence: number }[]
       >`
         INSERT INTO "orders" (
-          "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
+          "company_id", "order_year", "order_sequence",
           "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
         ) VALUES (
           ${f.companyId}::uuid,
@@ -456,8 +471,6 @@ describe('el alta contra la base (R8, R10)', () => {
              FROM "orders"
             WHERE "company_id" = ${f.companyId}::uuid
               AND "order_year" = ${year}::integer),
-          ${f.recipeId}::uuid,
-          ${'12.5000'}::numeric,
           ${'ALTA'}::"OrderPriority",
           ${'PENDIENTE'}::"OrderStatus",
           ${f.userId}::uuid,
@@ -480,8 +493,6 @@ describe('el alta contra la base (R8, R10)', () => {
       expect(stored.companyId).toBe(f.companyId)
       expect(stored.orderYear).toBe(Number(devuelta.order_year))
       expect(stored.orderSequence).toBe(Number(devuelta.order_sequence))
-      expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.quantity.toFixed(4)).toBe('12.5000')
       expect(stored.priority).toBe('ALTA')
       expect(stored.status).toBe('PENDIENTE')
       expect(stored.cancellationReason).toBeNull()
@@ -997,6 +1008,7 @@ function casosDeUsoSobre(tx: Prisma.TransactionClient) {
   const orders = {
     findAliveById: (id: string, scope: { companyId: string }) =>
       createOrderWriteRepository(tx).lockAliveById(id, scope),
+    findAliveLines: (id: string, scope: { companyId: string }) => findAliveOrderLines(id, scope, tx),
   } as unknown as OrderRepository
   const recipes = {
     findRefsIncludingDeleted: async (ids: readonly string[], companyId: string) =>
@@ -1094,10 +1106,7 @@ async function codigoDe(promesa: Promise<unknown>): Promise<string | null> {
 }
 
 async function estadoDe(tx: Prisma.TransactionClient, id: string) {
-  const row = await tx.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true },
-  })
+  const row = await tx.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true } })
   const movimientos = await tx.reservationMovement.findMany({
     where: { orderId: id },
     select: { kind: true, quantity: true, createdBy: true },
@@ -1237,6 +1246,8 @@ describe('QC-138 — el alta y la edicion bloquean con confirmacion, contra la b
       const c = casosDeUsoSobre(tx)
       const creado = await c.createOrder(entrada(f, '10'), actorDelFixture(f))
       await tx.order.update({ where: { id: creado.id }, data: { status: 'EN_CURSO' } })
+      // QT-313: el estado que se edita es el de la linea.
+      await tx.orderLine.updateMany({ where: { orderId: creado.id }, data: { status: 'EN_CURSO' } })
       const antes = await estadoDe(tx, creado.id)
 
       expect(await codigoDe(c.updateOrder(creado.id, entrada(f, '30', true), actorDelFixture(f)))).toBe(

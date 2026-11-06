@@ -109,29 +109,64 @@ async function insertarPedido(
   customerId: string | null,
   status: OrderStatus,
   createdAt: Date,
-  options: { deleted?: boolean; id?: string } = {},
+  options: { deleted?: boolean; id?: string; sinLinea?: boolean } = {},
 ): Promise<Pedido> {
   sequence += 1
   const id = options.id ?? randomUUID()
   await tx.$executeRawUnsafe(
-    `INSERT INTO "orders" ("id","company_id","customer_id","order_year","order_sequence","recipe_id",
-       "quantity","status","cancellation_reason","packed_by","conditioned_by","finished_at",
-       "deleted_at","created_at","updated_at")
-     VALUES ($1::uuid, $2::uuid, $3::uuid, 2026, $4, $5::uuid, 10, $6::"OrderStatus", $7, $8::uuid,
-       $8::uuid, $9::timestamptz, $10::timestamptz, $11::timestamptz, CURRENT_TIMESTAMP)`,
+    `INSERT INTO "orders" ("id","company_id","customer_id","order_year","order_sequence",
+       "status","cancellation_reason","deleted_at","created_at","updated_at")
+     VALUES ($1::uuid, $2::uuid, $3::uuid, 2026, $4, $5::"OrderStatus", $6,
+       $7::timestamptz, $8::timestamptz, CURRENT_TIMESTAMP)`,
     id,
     empresa.companyId,
     customerId,
     sequence,
-    empresa.recipeId,
     status,
     status === 'CANCELADO' ? 'Cancelado en la prueba' : null,
-    status === 'TERMINADO' ? empresa.userId : null,
-    status === 'TERMINADO' ? new Date() : null,
     options.deleted === true ? new Date() : null,
     createdAt,
   )
+  if (options.sinLinea !== true) await insertarLinea(tx, id, empresa.recipeId, 0, undefined, empresa.userId)
   return { id, sequence, createdAt }
+}
+
+/** Una linea de su pedido: sin estado propio, la del estado del pedido, y en `TERMINADO` con fecha
+ *  de terminado y `stageUserId` como quien empaco y acondiciono. */
+async function insertarLinea(
+  tx: Prisma.TransactionClient,
+  orderId: string,
+  recipeId: string,
+  position: number,
+  status?: OrderStatus,
+  stageUserId: string | null = null,
+): Promise<void> {
+  await tx.$executeRawUnsafe(
+    `INSERT INTO "order_lines" ("order_id","company_id","position","recipe_id","original_recipe_id","quantity",
+       "status","cancellation_reason","finished_at","packed_by","conditioned_by","deleted_at","created_at","updated_at")
+     SELECT o."id", o."company_id", $3, $2::uuid, $2::uuid, 10,
+       COALESCE($4::"OrderStatus", o."status"),
+       CASE WHEN COALESCE($4::"OrderStatus", o."status") = 'CANCELADO' THEN 'Cancelado en la prueba' END,
+       CASE WHEN $4 IS NULL AND o."status" = 'TERMINADO' THEN now() END,
+       CASE WHEN $4 IS NULL AND o."status" = 'TERMINADO' THEN $5::uuid END,
+       CASE WHEN $4 IS NULL AND o."status" = 'TERMINADO' THEN $5::uuid END,
+       o."deleted_at", o."created_at", o."updated_at"
+       FROM "orders" o WHERE o."id" = $1::uuid`,
+    orderId,
+    recipeId,
+    position,
+    status ?? null,
+    stageUserId,
+  )
+}
+
+async function crearReceta(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
+  const marca = token()
+  const recipe = await tx.recipe.create({
+    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
+    select: { id: true },
+  })
+  return recipe.id
 }
 
 function dia(n: number): Date {
@@ -162,7 +197,7 @@ describe('pedidos de un cliente contra Postgres', () => {
           id: propio.id,
           number: { year: 2026, sequence: propio.sequence },
           status: 'EN_CURSO',
-          recipeId: empresa.recipeId,
+          recipeIds: [empresa.recipeId],
           createdAt: dia(2),
         },
       ])
@@ -281,6 +316,43 @@ describe('pedidos de un cliente contra Postgres', () => {
       expect(
         await directory.listAliveOfCustomer(otra.companyId, clienteAjeno, ORDER_STATUSES_NOT_IN_PROGRESS, 20),
       ).toHaveLength(1)
+    })
+  })
+  it('QT-313 R45: con una linea devuelve la receta de la linea', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const empresa = await crearEmpresa(tx)
+      const cliente = await crearCliente(tx, empresa.companyId)
+      const pedido = await insertarPedido(tx, empresa, cliente, 'EN_CURSO', dia(2))
+      const cancelado = await insertarPedido(tx, empresa, cliente, 'CANCELADO', dia(1))
+
+      const rows = await createCustomerOrderDirectory(tx).listAliveOfCustomer(empresa.companyId, cliente, [], 20)
+
+      expect(rows.map((row) => [row.id, row.recipeIds])).toEqual([
+        [pedido.id, [empresa.recipeId]],
+        [cancelado.id, [empresa.recipeId]],
+      ])
+    })
+  })
+
+  it('QT-313 R45: con varias lineas devuelve sus recetas por position, sin las quitadas ni las canceladas', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const empresa = await crearEmpresa(tx)
+      const cliente = await crearCliente(tx, empresa.companyId)
+      const [segunda, cancelada, quitada] = [
+        await crearReceta(tx, empresa.companyId),
+        await crearReceta(tx, empresa.companyId),
+        await crearReceta(tx, empresa.companyId),
+      ]
+      const pedido = await insertarPedido(tx, empresa, cliente, 'PENDIENTE', dia(2), { sinLinea: true })
+      await insertarLinea(tx, pedido.id, segunda, 3)
+      await insertarLinea(tx, pedido.id, cancelada, 1, 'CANCELADO')
+      await insertarLinea(tx, pedido.id, empresa.recipeId, 0)
+      await insertarLinea(tx, pedido.id, quitada, 2)
+      await tx.orderLine.updateMany({ where: { orderId: pedido.id, recipeId: quitada }, data: { deletedAt: new Date() } })
+
+      const [row] = await createCustomerOrderDirectory(tx).listAliveOfCustomer(empresa.companyId, cliente, [], 20)
+
+      expect(row?.recipeIds).toEqual([empresa.recipeId, segunda])
     })
   })
 })

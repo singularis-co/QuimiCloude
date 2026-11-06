@@ -25,6 +25,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -95,6 +96,7 @@ async function limpiar(empresa: Empresa): Promise<void> {
   await prisma.productBatch.deleteMany({ where: { companyId } });
   await prisma.product.deleteMany({ where: { companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { order: { companyId } } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipe.deleteMany({ where: { companyId } });
   await prisma.presentation.deleteMany({ where: { companyId } });
@@ -186,26 +188,24 @@ async function recibirPorProduccion(
   presentationId: string,
   packages: number,
 ): Promise<{ productId: string; batchId: string }> {
-  const { id: orderId } = await prisma.order.create({
-    data: {
+  const { id: orderId } = await createOrderWithLine(prisma, {
       orderYear: new Date().getUTCFullYear(),
       orderSequence: secuencia++,
       recipeId,
       quantity: '10',
       companyId: empresa.companyId,
       createdAt: new Date(),
-    },
-    select: { id: true },
-  });
+    });
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: empresa.companyId, presentationId, packages, presentationContent: null },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: empresa.companyId, presentationId, packages, presentationContent: null },
     select: { id: true },
   });
-  const outcome = await prisma.$transaction((tx) =>
+  const outcome = await prisma.$transaction(async (tx) =>
     receiveFinishedGoods(
       tx,
       {
         orderId,
+        orderLineId: await ensureOnlyLine(prisma, orderId),
         recipeId,
         recipeName: 'Limpiador',
         presentationId,
@@ -237,7 +237,7 @@ async function recibirPorImportacion(
   lot: string,
   purchaseDate: string,
 ): Promise<string> {
-  const { batchId } = await prisma.$transaction((tx) =>
+  const { batchId } = await prisma.$transaction(async (tx) =>
     addImportedFinishedGoodsBatch(
       tx,
       productId,

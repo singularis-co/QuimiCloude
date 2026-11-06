@@ -124,28 +124,42 @@ export async function crearPresentacion(empresa: EmpresaDeEntrega, content: stri
 let secuencia = 800_000;
 
 /** Pedido con las columnas que exigen sus CHECK en `status`; `TERMINADO` lleva quien empaco, quien
- *  acondiciono y `finished_at`. */
+ *  acondiciono y `finished_at`. Lleva una linea con su receta, su estado y esas columnas, y el
+ *  reparto cuelga de ella, como un pedido creado desde la pantalla. */
 export async function crearPedido(
   empresa: EmpresaDeEntrega,
   status: OrderStatus,
   customerId: string | null,
   lineas: readonly { readonly presentationId: string; readonly packages: number }[],
-): Promise<{ orderId: string; lineIds: readonly string[] }> {
+): Promise<{ orderId: string; lineIds: readonly string[]; orderLineId: string }> {
   const empacado = ['EN_EMPAQUE', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].includes(status);
   const acondicionado = ['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].includes(status);
+  const columnas = {
+    recipeId: empresa.recipeId,
+    quantity: new Prisma.Decimal('10'),
+    status,
+    packedBy: empacado ? empresa.packerId : null,
+    conditionedBy: acondicionado ? empresa.conditionerId : null,
+    finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? new Date('2026-10-01T10:00:00Z') : null,
+  };
   secuencia += 1;
   const { id: orderId } = await prisma.order.create({
     data: {
       companyId: empresa.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: secuencia,
-      recipeId: empresa.recipeId,
-      quantity: new Prisma.Decimal('10'),
-      status,
       customerId,
-      packedBy: empacado ? empresa.packerId : null,
-      conditionedBy: acondicionado ? empresa.conditionerId : null,
-      finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? new Date('2026-10-01T10:00:00Z') : null,
+      status,
+    },
+    select: { id: true },
+  });
+  const { id: orderLineId } = await prisma.orderLine.create({
+    data: {
+      orderId,
+      companyId: empresa.companyId,
+      position: 0,
+      originalRecipeId: empresa.recipeId,
+      ...columnas,
     },
     select: { id: true },
   });
@@ -158,6 +172,7 @@ export async function crearPedido(
     const { id } = await prisma.orderPresentationLine.create({
       data: {
         orderId,
+        orderLineId,
         companyId: empresa.companyId,
         presentationId: linea.presentationId,
         packages: linea.packages,
@@ -168,7 +183,7 @@ export async function crearPedido(
     });
     lineIds.push(id);
   }
-  return { orderId, lineIds };
+  return { orderId, lineIds, orderLineId };
 }
 
 /** Producto terminado vivo de la receta de la empresa en esa presentacion. */
@@ -260,6 +275,7 @@ export async function borrarEmpresaDeEntrega(empresa: EmpresaDeEntrega): Promise
   await prisma.productBatch.deleteMany({ where: { companyId } });
   await prisma.product.deleteMany({ where: { companyId } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.customer.deleteMany({ where: { companyId } });
   await prisma.recipe.deleteMany({ where: { companyId } });

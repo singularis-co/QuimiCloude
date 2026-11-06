@@ -29,6 +29,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/presentation-catalog-prisma';
 import {
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   listAliveOrders,
   createOrderWriteRepository,
   findBlockedOrderIds,
@@ -47,13 +49,14 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   createCancelOrder,
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createDeleteOrder,
   createTransitionOrder,
-  createUpdateOrder,
+  createUpdateOrder as createLinesUpdate,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder, OrderCatalog } from '@/lib/modules/pedidos';
+import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -63,6 +66,13 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { onOnlyLine, updateOrderAndLine, type SingleLineNewOrder } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -87,7 +97,7 @@ function normalizeForTest(name: string): string {
 // El cableado REAL: los mismos adaptadores que `lib/composition`.
 // ---------------------------------------------------------------------------
 
-const orders: OrderRepository = { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
+const orders: OrderRepository = { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds };
 
 const unitOfWork: OrderUnitOfWork = {
   run: (work) =>
@@ -124,7 +134,7 @@ const units: UnitCatalog = {
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
 const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
-const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
+const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const deleteOrder = createDeleteOrder({ orders, unitOfWork, now: () => new Date() });
 
 /** El camino del Finalizar de la planta: `OrderCatalog['transitionAliveById']` cableado igual
@@ -211,6 +221,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   // El producto terminado que un Finalizar da de alta referencia la receta con
@@ -260,7 +272,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): Omit<NewOrder, 'customerId' | 'salePrice'> {
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: SingleLineNewOrder['status'] = 'PENDIENTE'): Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> {
   return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
@@ -276,12 +288,12 @@ async function movimientosDe(orderId: string): Promise<readonly ReservaResumen[]
 }
 
 async function reservedAtDe(orderId: string): Promise<Date | null> {
-  const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { reservedAt: true } });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { reservedAt: true } });
   return row.reservedAt;
 }
 
 async function finishedAtDe(orderId: string): Promise<Date | null> {
-  const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { finishedAt: true } });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { finishedAt: true } });
   return row.finishedAt;
 }
 
@@ -465,7 +477,7 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
       expect(movimientos.map((m) => m.kind)).toEqual(['reserve', 'reserve']);
       expect(movimientos.at(-1)).toMatchObject({ kind: 'reserve', quantity: '4.0000' });
       expect(await reservedAtDe(creado.id)).not.toBeNull();
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { status: true, quantity: true } });
       expect(row.status).toBe('PENDIENTE');
       expect(row.quantity.toFixed(4)).toBe('8.0000');
     } finally {
@@ -492,7 +504,7 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
       );
 
       expect(await stockDe(batchId)).toBe('5.0000');
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { status: true, quantity: true } });
       // QC-138 R11: el PENDIENTE que deja de alcanzar queda BLOQUEADO.
       expect(row.status).toBe('BLOQUEADO');
       expect(row.quantity.toFixed(4)).toBe('500.0000');
@@ -557,7 +569,7 @@ describe('R52 — un pedido sin apartado y receta vacia no rechaza la edicion au
       await updateOrder(creado.id, nuevoPedido(recipeId, fixture.unitId, '20.0000', 'ENTREGADO'), actorDe(fixture));
 
       expect(await movimientosDe(creado.id)).toEqual([]);
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { status: true, quantity: true } });
       expect(row.status).toBe('PENDIENTE');
       expect(row.quantity.toFixed(4)).toBe('20.0000');
       expect(await finishedAtDe(creado.id)).toBeNull();
@@ -577,9 +589,9 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await stockDe(batchId)).toBe('100.0000');
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',
@@ -614,12 +626,12 @@ describe('QC-141 T10 — el Finalizar consume (R27, R28, R32)', () => {
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
 
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
-      await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date());
       // POR_EMPACAR solo admite EN_EMPAQUE: un segundo intento, con POR_EMPACAR como `from` y
       // `to`, es ilegal por construccion y no vuelve a tocar el inventario.
       await expect(
-        transitionAliveById(creado.id, fixture.companyId, 'POR_EMPACAR', 'POR_EMPACAR', fixture.actorId, new Date()),
+        onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'POR_EMPACAR', 'POR_EMPACAR', fixture.actorId, new Date()),
       ).rejects.toThrow();
 
       expect(await stockDe(batchId)).toBe('90.0000');
@@ -645,9 +657,9 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       // La existencia merma por fuera de la reserva (una merma de otro camino), y al Finalizar
       // ya no alcanza lo apartado ni el resto de lotes con disponible.
       await prisma.productBatch.update({ where: { id: batchId }, data: { stock: '0' } });
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',
@@ -680,10 +692,11 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       // caso de uso: el pedido llega al Finalizar sin nada apartado.
       const creado = await createOrder(nuevoPedido(recipeVacia, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
-      await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await updateOrderAndLine(prisma, creado.id, { recipeId });
+      await prisma.orderLine.updateMany({ where: { orderId: creado.id }, data: { recipeId, originalRecipeId: recipeId } });
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',
@@ -712,9 +725,9 @@ describe('QC-141 T10 — Finalizar de un pedido sin apartado y receta sin lineas
     try {
       const creado = await createOrder(nuevoPedido(recipeId, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await transitionAliveById(
+      const resultado = await onOnlyLine(transitionAliveById)(
         creado.id,
         fixture.companyId,
         'EN_CURSO',

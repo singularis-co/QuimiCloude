@@ -367,9 +367,9 @@ async function line(
 
 async function deliveryMovement(client: Client, companyId: string, deliveryId: string, batchId: string, quantity: string): Promise<void> {
   await client.query(
-    `INSERT INTO "inventory_movements" ("id", "batch_id", "kind", "quantity", "company_id", "order_id", "order_delivery_id")
-     VALUES ($1::uuid, $2::uuid, 'delivery', $3::numeric, $4::uuid, $5::uuid, $6::uuid)`,
-    [randomUUID(), batchId, quantity, companyId, randomUUID(), deliveryId],
+    `INSERT INTO "inventory_movements" ("id", "batch_id", "kind", "quantity", "company_id", "order_id", "order_delivery_id", "order_line_id")
+     VALUES ($1::uuid, $2::uuid, 'delivery', $3::numeric, $4::uuid, $5::uuid, $6::uuid, $7::uuid)`,
+    [randomUUID(), batchId, quantity, companyId, randomUUID(), deliveryId, randomUUID()],
   );
 }
 
@@ -392,9 +392,9 @@ async function voidLines(
     );
   }
   await client.query(
-    `INSERT INTO "inventory_movements" ("id", "batch_id", "kind", "quantity", "company_id", "order_id", "order_delivery_void_id")
-     VALUES ($1::uuid, $2::uuid, 'delivery_void', $3::numeric, $4::uuid, $5::uuid, $6::uuid)`,
-    [randomUUID(), row.batchId, row.quantity, row.companyId, randomUUID(), voidId],
+    `INSERT INTO "inventory_movements" ("id", "batch_id", "kind", "quantity", "company_id", "order_id", "order_delivery_void_id", "order_line_id")
+     VALUES ($1::uuid, $2::uuid, 'delivery_void', $3::numeric, $4::uuid, $5::uuid, $6::uuid, $7::uuid)`,
+    [randomUUID(), row.batchId, row.quantity, row.companyId, randomUUID(), voidId, randomUUID()],
   );
 }
 

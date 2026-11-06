@@ -1,13 +1,13 @@
 // lib/modules/pedidos/domain/expire-stale-orders.ts
 /**
- * El proceso diario que cancela los pedidos `PENDIENTE` cuya reserva caduco. Recorre las
+ * El proceso diario que cancela las lineas `PENDIENTE` cuya reserva caduco. Recorre las
  * EMPRESAS una por una y, dentro de cada una, sus candidatos por lotes con un cursor
- * `(reservedAt, id)`: ninguna consulta lee pedidos de mas de una empresa a la vez, y un
+ * `(reservedAt, lineId)`: ninguna consulta lee pedidos de mas de una empresa a la vez, y un
  * candidato que falla queda DETRAS del cursor, asi que no se vuelve a pedir en esta ejecucion.
  *
- * Cada pedido se cancela en su PROPIA transaccion: un fallo no arrastra a los demas, la misma
- * transaccion que abre `pedidos` bloquea la fila y sirve para recomprobar el plazo bajo el
- * candado antes de tocar nada. Un fallo al listar empresas o los candidatos de una tampoco
+ * Cada linea se cancela en su PROPIA transaccion: un fallo no arrastra a las demas, la misma
+ * transaccion bloquea el pedido y la linea y sirve para recomprobar el plazo bajo el candado
+ * antes de tocar nada. Las demas lineas del pedido no cambian, aunque tambien esten `PENDIENTE`. Un fallo al listar empresas o los candidatos de una tampoco
  * detiene a las demas: queda anotado en `failed` con el `stage` que le corresponde, y la
  * ejecucion sigue con la siguiente empresa.
  *
@@ -16,6 +16,7 @@
  */
 import { UNEXPECTED_ERROR_CODE } from '@/lib/modules/errores';
 
+import { cancelLockedLine } from './order-cancellation';
 import { EXPIRED_ORDER_REASON, ORDER_RESERVATION_TTL_DAYS } from './order-expiry';
 
 import type { OrderScope } from './order-scope';
@@ -23,23 +24,32 @@ import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Un candidato a caducar, con lo que hace falta para avanzar el cursor del lote siguiente. */
+/** Una linea candidata a caducar, con lo que hace falta para avanzar el cursor del lote
+ *  siguiente. */
 export type ExpirableOrderCandidate = {
-  readonly id: string;
+  readonly orderId: string;
+  readonly lineId: string;
   readonly reservedAt: Date;
 };
 
-/** El ultimo `(reservedAt, id)` visto de una empresa, o `null` para el primer lote. */
-export type ExpirableOrdersCursor = { readonly reservedAt: Date; readonly id: string } | null;
+/** El ultimo `(reservedAt, lineId)` visto de una empresa, o `null` para el primer lote. */
+export type ExpirableOrdersCursor = { readonly reservedAt: Date; readonly lineId: string } | null;
 
 /** Un fallo del proceso diario: sin mensaje ni datos del pedido, solo lo que hace falta para
  *  diagnosticarlo -donde ocurrio y su codigo del catalogo-. */
 export type ExpiredOrderFailure =
   | { readonly stage: 'companies'; readonly code: string }
   | { readonly stage: 'candidates'; readonly companyId: string; readonly code: string }
-  | { readonly stage: 'order'; readonly id: string; readonly companyId: string; readonly code: string };
+  | {
+      readonly stage: 'order';
+      readonly id: string;
+      readonly lineId: string;
+      readonly companyId: string;
+      readonly code: string;
+    };
 
 export type ExpireStaleOrdersResult = {
+  /** Lineas canceladas. */
   readonly expired: number;
   readonly failed: readonly ExpiredOrderFailure[];
 };
@@ -47,8 +57,8 @@ export type ExpireStaleOrdersResult = {
 export type ExpireStaleOrdersDeps = {
   /** Las empresas a recorrer, una vuelta por cada una. */
   readonly listCompanyIds: () => Promise<readonly string[]>;
-  /** Un lote de candidatos de UNA empresa, `PENDIENTE`, vivos y con la reserva vencida, en el
-   *  orden `(reservedAt, id)` y a partir del cursor del lote anterior. */
+  /** Un lote de lineas candidatas de UNA empresa, `PENDIENTE`, vivas, de pedidos vivos y con la
+   *  reserva vencida, en el orden `(reservedAt, lineId)` y a partir del cursor del lote anterior. */
   readonly findExpirable: (
     companyId: string,
     threshold: Date,
@@ -120,15 +130,15 @@ export function createExpireStaleOrders(
 
         for (const candidate of batch) {
           try {
-            const cancelled = await expireOne(deps.unitOfWork, candidate.id, companyId, instant, threshold);
+            const cancelled = await expireOne(deps.unitOfWork, candidate, companyId, instant, threshold);
             if (cancelled) expired += 1;
           } catch (e) {
-            failed.push({ stage: 'order', id: candidate.id, companyId, code: codeOf(e) });
+            failed.push({ stage: 'order', id: candidate.orderId, lineId: candidate.lineId, companyId, code: codeOf(e) });
           }
         }
 
         const last = batch[batch.length - 1];
-        cursor = { reservedAt: last.reservedAt, id: last.id };
+        cursor = { reservedAt: last.reservedAt, lineId: last.lineId };
 
         if (batch.length < BATCH_LIMIT) break;
       }
@@ -138,47 +148,41 @@ export function createExpireStaleOrders(
   };
 }
 
-/** Una transaccion por pedido: bloquea, recomprueba plazo y estado, y si sigue vencido cancela y
- *  libera. */
+/** Una transaccion por linea: bloquea pedido y linea, recomprueba plazo y estado, y si sigue
+ *  vencida la cancela, libera lo suyo y deriva el estado del pedido. */
 async function expireOne(
   unitOfWork: OrderUnitOfWork,
-  id: string,
+  candidate: ExpirableOrderCandidate,
   companyId: string,
   instant: Date,
   threshold: Date,
 ): Promise<boolean> {
   const scope = { companyId };
+  const { orderId, lineId } = candidate;
 
   return unitOfWork.run(async (transaction) => {
-    const locked = await transaction.orders.lockAliveById(id, scope);
-    // Idempotencia: otra ejecucion ya lo canceló, dejó de estar vivo, o una edicion intercalada
-    // reinicio el plazo o dejo el pedido sin material apartado entre el lote y el candado.
+    const locked = await transaction.orders.lockAliveLine(orderId, lineId, scope);
+    // Idempotencia: otra ejecucion ya la cancelo, dejo de estar viva, o una edicion intercalada
+    // reinicio el plazo o la dejo sin material apartado entre el lote y el candado.
     if (
       locked === null ||
-      locked.status !== 'PENDIENTE' ||
-      locked.reservedAt === null ||
-      locked.reservedAt > threshold
+      locked.line.status !== 'PENDIENTE' ||
+      locked.line.reservedAt === null ||
+      locked.line.reservedAt > threshold
     ) {
       return false;
     }
 
-    const cancelled = await transaction.orders.cancelAlive(
-      id,
-      EXPIRED_ORDER_REASON,
-      null,
-      instant,
-      scope,
-    );
-    if (cancelled === 'not_found') return false;
-
-    await transaction.reservations.releaseForOrder({
-      orderId: id,
-      companyId,
-      reason: 'expire',
+    await cancelLockedLine(transaction, {
+      orderId,
+      lineId,
+      reason: EXPIRED_ORDER_REASON,
+      releaseReason: 'expire',
       actorId: null,
       now: instant,
+      companyId,
     });
-    await transaction.orders.setReservedAt(id, null, scope);
+    await transaction.orders.refreshStatus(orderId, null, instant, scope);
     return true;
   });
 }

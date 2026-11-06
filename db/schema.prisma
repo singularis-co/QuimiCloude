@@ -499,6 +499,11 @@ model InventoryMovement {
   /// `OrderDeliveryVoid` es de `pedidos`; FK compuesta con `companyId` escrita a mano, drift.
   orderDeliveryVoidId String? @map("order_delivery_void_id") @db.Uuid
 
+  /// La linea del pedido: la llevan los cuatro asientos con pedido y solo ellos (CHECK
+  /// `inventory_movements_order_line_id_matches_kind`). Su FK compuesta con `orderId` contra
+  /// `order_lines_id_order_id_key` y el CHECK estan escritos a mano, drift.
+  orderLineId String? @map("order_line_id") @db.Uuid
+
   /// Solo en un ajuste: la existencia leida con el lote bloqueado y el total contado. Van los
   /// dos o ninguno, y `countedStock = stockBefore + quantity`; los `CHECK` son drift.
   stockBefore   Decimal? @map("stock_before") @db.Decimal(14, 4)
@@ -513,6 +518,7 @@ model InventoryMovement {
   @@index([orderPresentationLineId], map: "inventory_movements_order_presentation_line_id_idx")
   @@index([orderDeliveryId], map: "inventory_movements_order_delivery_id_idx")
   @@index([orderDeliveryVoidId], map: "inventory_movements_order_delivery_void_id_idx")
+  @@index([orderLineId], map: "inventory_movements_order_line_id_idx")
   @@map("inventory_movements")
 }
 
@@ -541,11 +547,14 @@ model ReservationMovement {
   quantity  Decimal                 @db.Decimal(14, 4)
   createdBy String?                 @map("created_by") @db.Uuid
   createdAt DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId String                @map("order_line_id") @db.Uuid
 
   @@index([batchId], map: "reservation_movements_batch_id_idx")
   @@index([orderId], map: "reservation_movements_order_id_idx")
   @@index([companyId], map: "reservation_movements_company_id_idx")
   @@index([createdBy], map: "reservation_movements_created_by_idx")
+  @@index([orderLineId], map: "reservation_movements_order_line_id_idx")
   @@map("reservation_movements")
 }
 
@@ -759,15 +768,17 @@ model Unit {
 }
 
 /// Enum y no tabla: el conjunto es cerrado a proposito y anadir un valor es una migracion.
+/// Postgres ordena un enum por declaracion, y el listado ordena por estado con ese orden.
 enum OrderStatus {
+  /// Solo del pedido: sus lineas activas estan en estados distintos. Ninguna linea lo lleva.
+  PARCIAL
   PENDIENTE
   EN_CURSO
   ENTREGADO
   CANCELADO
   POR_EMPACAR
   EN_EMPAQUE
-  /// Un pedido cuyo material no alcanza queda en BLOQUEADO. Va el ultimo, como los dos de
-  /// empaque: reordenar obligaria a recrear el tipo en vez de anadir un valor.
+  /// Un pedido cuyo material no alcanza queda en BLOQUEADO.
   BLOQUEADO
   POR_ACONDICIONAR
   EN_ACONDICIONAMIENTO
@@ -786,19 +797,19 @@ enum OrderPriority {
 /// Sin fecha de solicitud: es `createdAt`. El correlativo es un indice unico total, no parcial: un
 /// pedido dado de baja conserva su numero, y se mide DENTRO de la empresa: `(empresa, ano,
 /// secuencia)`. `orderYear` es el ano de `createdAt` en UTC, y lo exige el CHECK
-/// `orders_order_year_matches_created_at`. `recipeId`, `createdBy`, `updatedBy`, `companyId` y
+/// `orders_order_year_matches_created_at`. `createdBy`, `updatedBy`, `companyId` y
 /// `customerId` van sin `@relation` porque apuntan a otros modulos; sus FK y CHECK estan escritos a
 /// mano y son drift: hay que borrar a mano su `DROP CONSTRAINT` de toda migracion generada.
 /// `orders_id_company_id_key` es la clave candidata a la que apunta la FK COMPUESTA de
 /// `order_assignments`: quitarla la rompe.
+/// Lo de cada receta -receta, cantidad, unidad, costes, precio, reserva y etapas- vive en
+/// `OrderLine`.
 /// Los indices de listado son parciales y viven en la migracion `list_query_indexes`.
 /// @module pedidos
 model Order {
   id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderYear           Int           @map("order_year")
   orderSequence       Int           @map("order_sequence")
-  recipeId            String        @map("recipe_id") @db.Uuid
-  quantity            Decimal       @db.Decimal(14, 4)
   priority            OrderPriority @default(BAJA)
   status              OrderStatus   @default(PENDIENTE)
   /// Sin longitud en la columna: el tope vive en la validacion de entrada. Que exista solo en un
@@ -810,59 +821,74 @@ model Order {
   createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt           DateTime?     @map("deleted_at") @db.Timestamptz(6)
-  /// Coste de los ingredientes de la receta del pedido, con los lotes del momento en que se
-  /// escribio. NULL = no se pudo calcular; nunca 0.
-  ingredientsCost     Decimal?      @map("ingredients_cost") @db.Decimal(14, 4)
-  /// Parte de envases incluida en `ingredientsCost`, que sigue siendo el total. NULL si y solo si
-  /// `ingredientsCost` lo es: CHECK `orders_packaging_cost_matches_ingredients_cost`.
-  packagingCost       Decimal?      @map("packaging_cost") @db.Decimal(14, 4)
-  /// Coste real: suma de (cantidad consumida x coste unitario del lote) de los asientos
-  /// `consumption` del pedido, calculada una sola vez al Terminar el empaque. NULL = sin terminar,
-  /// terminado antes de existir la columna o sin calculo posible; nunca 0. Los CHECK
-  /// `orders_actual_cost_non_negative` y `orders_actual_cost_requires_packed` son drift.
-  actualCost          Decimal?      @map("actual_cost") @db.Decimal(14, 4)
-  /// Precio de venta del pedido ENTERO, escrito a mano. NULL = sin precio; 0 = se regala, y no es
-  /// lo mismo. No es el coste ni se deriva de el. El CHECK `orders_sale_price_non_negative` es
-  /// drift, escrito a mano en la migracion.
-  salePrice           Decimal?      @map("sale_price") @db.Decimal(14, 4)
-  /// Instante desde el que cuentan los 15 dias de caducidad de la reserva: NULL cuando el
-  /// pedido no tiene nada apartado. Crear o editar lo reinician; cancelar, caducar, borrar y
-  /// entregar lo vacian.
-  reservedAt          DateTime?     @map("reserved_at") @db.Timestamptz(6)
-  /// Instante en que el pedido paso a ENTREGADO al finalizarlo en planta. NULL en los entregados
-  /// antes de existir la columna. Solo puede tener valor si el estado es ENTREGADO, lo exige el
-  /// CHECK `orders_finished_at_requires_delivered`.
-  finishedAt          DateTime?     @map("finished_at") @db.Timestamptz(6)
-  /// Quien tiene el pedido en empaque. Obligatorio en EN_EMPAQUE, NULL en PENDIENTE, EN_CURSO,
-  /// POR_EMPACAR y CANCELADO, y opcional en ENTREGADO (los entregados antiguos no lo tienen, los
-  /// nuevos lo conservan), lo exige el CHECK `orders_packed_by_matches_status`. Sin `@relation`:
-  /// es drift, con FK COMPUESTA `(packed_by, company_id)` escrita a mano en la migracion.
-  packedBy            String?       @map("packed_by") @db.Uuid
-  /// Quien tiene o tuvo el pedido en acondicionamiento. Obligatorio en EN_ACONDICIONAMIENTO y
-  /// TERMINADO, NULL antes de comenzar y opcional en ENTREGADO; lo exige el CHECK
-  /// `orders_conditioned_by_matches_status`. Sin `@relation`: FK compuesta escrita a mano.
-  conditionedBy       String?       @map("conditioned_by") @db.Uuid
-  /// La unidad en que se expresa `quantity`. Sin
-  /// `@relation`: `Unit` es de `unidades`, es drift. NULL solo en pedidos anteriores sin
-  /// presentacion; la aplicacion la exige en el alta y en la edicion.
-  unitId              String?       @map("unit_id") @db.Uuid
   /// Cliente del pedido, opcional. Sin `@relation`: `Customer` es de `clientes`, es drift. FK
   /// COMPUESTA `(company_id, customer_id)` a `customers_company_id_id_key`, escrita a mano.
   customerId          String?       @map("customer_id") @db.Uuid
 
   presentationLines OrderPresentationLine[]
   deliveries        OrderDelivery[]
+  lines             OrderLine[]
 
   @@unique([companyId, orderYear, orderSequence], map: "orders_company_year_sequence_key")
   @@unique([id, companyId], map: "orders_id_company_id_key")
-  @@index([recipeId], map: "orders_recipe_id_idx")
   @@index([createdBy], map: "orders_created_by_idx")
   @@index([updatedBy], map: "orders_updated_by_idx")
-  @@index([packedBy], map: "orders_packed_by_idx")
-  @@index([conditionedBy], map: "orders_conditioned_by_idx")
-  @@index([unitId], map: "orders_unit_id_idx")
   @@index([companyId, customerId], map: "orders_company_id_customer_id_idx")
   @@map("orders")
+}
+
+/// Una receta del pedido, con su cantidad, su estado, sus costes, su precio y su plazo de reserva.
+/// `companyId` es copia de la del pedido y la FK `(order_id, company_id)` impide que difieran.
+/// `originalRecipeId` es la receta original de `recipeId` (ella misma si no es version): el unico
+/// parcial `order_lines_order_original_recipe_active_key` la usa para que un pedido no lleve dos
+/// veces la misma receta activa. Ese unico, los indices parciales, los CHECK y las FK hacia
+/// `recipes`, `units`, `users` y `companies` estan escritos a mano y son drift: hay que borrar a
+/// mano su `DROP` de toda migracion generada.
+/// @module pedidos
+model OrderLine {
+  id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId            String      @map("order_id") @db.Uuid
+  companyId          String      @map("company_id") @db.Uuid
+  /// Orden de alta dentro del pedido, desde 0. No se reutiliza al quitar una linea.
+  position           Int
+  /// La receta que se fabrica: la version, si se eligio una.
+  recipeId           String      @map("recipe_id") @db.Uuid
+  originalRecipeId   String      @map("original_recipe_id") @db.Uuid
+  quantity           Decimal     @db.Decimal(14, 4)
+  /// NULL solo en lineas migradas de pedidos antiguos sin unidad.
+  unitId             String?     @map("unit_id") @db.Uuid
+  /// Nunca PARCIAL: lo impide el CHECK `order_lines_status_not_partial`.
+  status             OrderStatus @default(PENDIENTE)
+  cancellationReason String?     @map("cancellation_reason")
+  ingredientsCost    Decimal?    @map("ingredients_cost") @db.Decimal(14, 4)
+  packagingCost      Decimal?    @map("packaging_cost") @db.Decimal(14, 4)
+  actualCost         Decimal?    @map("actual_cost") @db.Decimal(14, 4)
+  salePrice          Decimal?    @map("sale_price") @db.Decimal(14, 4)
+  /// Instante desde el que cuentan los dias de caducidad de lo apartado para esta linea.
+  reservedAt         DateTime?   @map("reserved_at") @db.Timestamptz(6)
+  finishedAt         DateTime?   @map("finished_at") @db.Timestamptz(6)
+  packedBy           String?     @map("packed_by") @db.Uuid
+  conditionedBy      String?     @map("conditioned_by") @db.Uuid
+  createdBy          String?     @map("created_by") @db.Uuid
+  updatedBy          String?     @map("updated_by") @db.Uuid
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt          DateTime?   @map("deleted_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Cascade, map: "order_lines_order_id_company_id_fkey")
+
+  @@unique([orderId, position], map: "order_lines_order_id_position_key")
+  @@unique([id, companyId], map: "order_lines_id_company_id_key")
+  @@unique([id, orderId], map: "order_lines_id_order_id_key")
+  @@index([companyId], map: "order_lines_company_id_idx")
+  @@index([recipeId], map: "order_lines_recipe_id_idx")
+  @@index([originalRecipeId], map: "order_lines_original_recipe_id_idx")
+  @@index([unitId], map: "order_lines_unit_id_idx")
+  @@index([packedBy], map: "order_lines_packed_by_idx")
+  @@index([conditionedBy], map: "order_lines_conditioned_by_idx")
+  @@index([createdBy], map: "order_lines_created_by_idx")
+  @@index([updatedBy], map: "order_lines_updated_by_idx")
+  @@map("order_lines")
 }
 
 /// El reparto de un pedido: en que presentaciones se entrega lo fabricado y cuantos envases de
@@ -896,17 +922,20 @@ model OrderPresentationLine {
   packedReasonOther String? @map("packed_reason_other")
   /// Envases del conteo real que el pedido no espera: quedan libres en el lote. 0 sin excedente.
   packedSurplusPackages Int @default(0) @map("packed_surplus_packages")
+  /// La linea del pedido que se reparte. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId   String   @map("order_line_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   deliveryLines OrderDeliveryLine[]
 
-  @@unique([orderId, presentationId], map: "order_presentation_lines_order_id_presentation_id_key")
+  @@unique([orderLineId, presentationId], map: "order_presentation_lines_order_line_id_presentation_id_key")
   @@unique([id, companyId], map: "order_presentation_lines_id_company_id_key")
   @@index([companyId], map: "order_presentation_lines_company_id_idx")
   @@index([presentationId], map: "order_presentation_lines_presentation_id_idx")
   @@index([packagingProductId], map: "order_presentation_lines_packaging_product_id_idx")
+  @@index([orderLineId], map: "order_presentation_lines_order_line_id_idx")
   @@map("order_presentation_lines")
 }
 
@@ -1201,9 +1230,12 @@ model OrderExecutionEntry {
   occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
   batchLines   Json?                @map("batch_lines")
   responsibleUserIds Json?                @map("responsible_user_ids")
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId  String               @map("order_line_id") @db.Uuid
 
   @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
   @@index([userId], map: "order_execution_entries_user_id_idx")
+  @@index([orderLineId], map: "order_execution_entries_order_line_id_idx")
   @@map("order_execution_entries")
 }
 
@@ -1223,11 +1255,14 @@ model OrderConditioningTeamMember {
   /// `created_at`, y el orden de composicion es el que se muestra.
   position      Int
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId   String   @map("order_line_id") @db.Uuid
 
-  @@id([orderId, userId], map: "order_conditioning_team_members_pkey")
-  @@unique([orderId, position], map: "order_conditioning_team_members_order_id_position_key")
+  @@id([orderLineId, userId], map: "order_conditioning_team_members_pkey")
+  @@unique([orderLineId, position], map: "order_conditioning_team_members_order_line_id_position_key")
   @@index([userId], map: "order_conditioning_team_members_user_id_idx")
   @@index([workGroupId], map: "order_conditioning_team_members_work_group_id_idx")
+  @@index([orderLineId], map: "order_conditioning_team_members_order_line_id_idx")
   @@map("order_conditioning_team_members")
 }
 
@@ -1525,11 +1560,14 @@ model OrderStepEvidence {
   sizeBytes    Int           @map("size_bytes")
   uploadedBy   String        @map("uploaded_by") @db.Uuid
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId  String        @map("order_line_id") @db.Uuid
 
-  @@unique([orderId, phase, stepPosition, slot], map: "order_step_evidence_slot_key")
+  @@unique([orderLineId, phase, stepPosition, slot], map: "order_step_evidence_slot_key")
   @@unique([companyId, path], map: "order_step_evidence_company_path_key")
   @@index([companyId, orderId], map: "order_step_evidence_company_id_order_id_idx")
   @@index([uploadedBy], map: "order_step_evidence_uploaded_by_idx")
+  @@index([orderLineId], map: "order_step_evidence_order_line_id_idx")
   @@map("order_step_evidence")
 }
 

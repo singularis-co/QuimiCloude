@@ -3,6 +3,7 @@ import type { StatusTone } from './status-tone';
 // Claves propias: lib/shared no importa dominio. El test del mapa comprueba que coinciden con
 // los tipos de pedidos e inventario en los dos sentidos.
 export type OrderStatusKey =
+  | 'PARCIAL'
   | 'PENDIENTE'
   | 'EN_CURSO'
   | 'POR_EMPACAR'
@@ -21,6 +22,7 @@ export type OrderCoverageKey = 'full' | 'none' | 'partial';
 type PriorityLevel = 1 | 2 | 3 | 4;
 
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatusKey, string>> = {
+  PARCIAL: 'Parcial',
   PENDIENTE: 'Pendiente',
   EN_CURSO: 'En fabricación',
   POR_EMPACAR: 'Por empacar',
@@ -34,6 +36,7 @@ export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatusKey, string>> = {
 };
 
 export const ORDER_STATUS_TONES: Readonly<Record<OrderStatusKey, StatusTone>> = {
+  PARCIAL: 'progress',
   PENDIENTE: 'neutral',
   EN_CURSO: 'progress',
   POR_EMPACAR: 'waiting',

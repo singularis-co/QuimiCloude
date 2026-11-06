@@ -65,6 +65,7 @@ import {
   searchPackagingOption,
 } from './helpers/order-distribution';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc195_e2e_';
 
@@ -268,7 +269,7 @@ async function expectDistributionReady(form: Locator): Promise<void> {
 
 async function latestOrder() {
   return prisma.order.findFirstOrThrow({
-    where: { companyId: companyId!, recipeId: recipeId!, deletedAt: null },
+    where: { companyId: companyId!, lines: { some: { recipeId: recipeId! } }, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     select: { id: true, orderYear: true, orderSequence: true, status: true },
   });
@@ -277,7 +278,7 @@ async function latestOrder() {
 /** El importe guardado, como texto: `NULL` no se confunde con `'0.0000'`. */
 async function savedAmountText(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`;
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`;
   const row = rows[0];
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
   return row.ingredients_cost;
@@ -312,7 +313,7 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: inOrphans });
     await prisma.orderPresentationLine.deleteMany({ where: inOrphans });
     await prisma.orderExecutionEntry.deleteMany({ where: inOrphans });
-    await prisma.order.deleteMany({ where: inOrphans });
+    await deleteOrdersWithLines({ where: inOrphans });
     await prisma.productBatch.deleteMany({ where: inOrphans });
     // El producto terminado restringe el borrado de la receta; el ingrediente, al reves.
     await prisma.product.deleteMany({ where: { ...inOrphans, type: 'FINISHED_PRODUCT' } });
@@ -461,7 +462,7 @@ test.afterAll(async () => {
     () =>
       byCompany ? prisma.orderPresentationLine.deleteMany({ where: byCompany }) : Promise.resolve(),
     () => (byCompany ? prisma.orderExecutionEntry.deleteMany({ where: byCompany }) : Promise.resolve()),
-    () => (byCompany ? prisma.order.deleteMany({ where: byCompany }) : Promise.resolve()),
+    () => (byCompany ? deleteOrdersWithLines({ where: byCompany }) : Promise.resolve()),
     () => (byCompany ? prisma.productBatch.deleteMany({ where: byCompany }) : Promise.resolve()),
     () =>
       byCompany
@@ -591,7 +592,7 @@ test.describe('envases del pedido como productos', () => {
     const blockedDialog = page.getByTestId(BLOCKED_ORDER_DIALOG_TESTID);
     await expect(blockedDialog).toBeVisible({ timeout: 60_000 });
     expect(
-      await prisma.order.count({ where: { companyId, recipeId } }),
+      await prisma.order.count({ where: { companyId, lines: { some: { recipeId } } }}),
       'sin confirmar no se escribe el pedido',
     ).toBe(1);
 

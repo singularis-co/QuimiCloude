@@ -11,16 +11,21 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  createUpdateOrderPresentationLines,
+  createUpdateOrderPresentationLines as createLineDistributionUpdate,
   REPARTO_EDITABLE_STATUSES,
   type UpdateOrderPresentationLinesDeps,
+  type UpdateOrderPresentationLinesInput,
 } from '@/lib/modules/pedidos/domain/update-order-presentation-lines';
 import { OrderPresentationLineNotEditableError } from '@/lib/modules/pedidos/domain/errors';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import { STARTED_ORDER_STATUSES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
-import type { LockedOrderRow, OrderWriteRepository } from '@/lib/modules/pedidos/ports/order-write-repository';
+import type {
+  LockedOrderRow,
+  OrderLineChanges,
+  OrderWriteRepository,
+} from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type {
   CostingBatch,
   MaterialReservations,
@@ -30,18 +35,18 @@ import type {
   ReservationOutcome,
 } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
-import {
-  fakeFinishedGoodsIntake,
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeMaterialReservations,
-  fakeOrderConsumptionLedger,
-  fakeOrderUnitOfWork,
-  fakeRecipeExecutionReader,
-} from '../../helpers/order-unit-of-work-double';
+import { fakeFinishedGoodsIntake, fakeScopeProducts, fakeScopeUnits, fakeMaterialReservations, fakeOrderConsumptionLedger, fakeOrderUnitOfWork, fakeRecipeExecutionReader, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '../../helpers/order-unit-of-work-double';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
+
+// Estos casos son de un pedido de una receta: el reparto que se edita es el de su unica linea, como
+// lo nombra el formulario de hoy.
+type LineDistributionUpdate = ReturnType<typeof createLineDistributionUpdate>;
+const createUpdateOrderPresentationLines =
+  (deps: UpdateOrderPresentationLinesDeps) =>
+  (orderId: string, actor: Actor, input: Omit<UpdateOrderPresentationLinesInput, 'lineId'>): ReturnType<LineDistributionUpdate> =>
+    createLineDistributionUpdate(deps)(orderId, actor, { lineId: ONLY_LINE_ID, ...input });
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333';
 const PEDIDO = '11111111-1111-4111-8111-111111111111';
@@ -55,8 +60,8 @@ const PRESENTACION_B = '99999999-9999-4999-8999-999999999999';
 
 const AHORA = new Date('2026-09-27T10:00:00.000Z');
 
-function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
-  const base: OrderRow = {
+function filaBloqueada(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
+  const base: SingleRecipeOrderRow = {
     salePrice: null,
     id: PEDIDO,
     number: { year: 2026, sequence: 7 },
@@ -79,8 +84,10 @@ function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow 
   return { ...base, reservedAt: null, packagingCost: null, ...overrides };
 }
 
-/** Doble de `OrderWriteRepository`: los metodos que este caso de uso llama -bloquear, escribir el
- *  reparto, mover el estado, vaciar el importe y fijar `reserved_at`-; el resto explota. */
+/** Doble de `OrderWriteRepository`: bloquear el pedido y su unica linea, escribir el reparto,
+ *  mover el estado, vaciar el importe y fijar `reserved_at` de la linea; el resto explota. Los
+ *  espias conservan los nombres del pedido de una receta: `updatePresentationLinesAlive` recibe la
+ *  unidad y el reparto que se escriben en la linea, y los otros tres lo que se escribe en ella. */
 function ordersDoble(
   fila: LockedOrderRow | null,
   updateResult: 'ok' | 'not_found' = 'ok',
@@ -91,17 +98,32 @@ function ordersDoble(
   readonly setIngredientsCost: ReturnType<typeof vi.fn>;
   readonly setReservedAt: ReturnType<typeof vi.fn>;
 } {
-  const lockAliveById = vi.fn(async () => fila);
-  const updatePresentationLinesAlive = vi.fn(async () => updateResult);
-  const setStatus = vi.fn(async () => 'ok' as const);
-  const setIngredientsCost = vi.fn(async () => 'ok' as const);
-  const setReservedAt = vi.fn(async () => undefined);
+  type Espia<R> = (...args: unknown[]) => Promise<R>;
+  const updatePresentationLinesAlive = vi.fn<Espia<'ok' | 'not_found'>>(async () => updateResult);
+  const setStatus = vi.fn<Espia<'ok'>>(async () => 'ok');
+  const setIngredientsCost = vi.fn<Espia<'ok'>>(async () => 'ok');
+  const setReservedAt = vi.fn<Espia<undefined>>(async () => undefined);
   const orders = {
-    lockAliveById,
-    updatePresentationLinesAlive,
-    setStatus,
-    setIngredientsCost,
-    setReservedAt,
+    lockAliveLine: vi.fn(async (orderId: string, lineId: string) =>
+      fila === null || orderId !== fila.id || lineId !== ONLY_LINE_ID ? null : { order: fila, line: orderLineOf(fila) },
+    ),
+    writeLines: vi.fn(async (orderId: string, changes: OrderLineChanges, actorId: string, now: Date, scope: OrderScope) => {
+      for (const edit of changes.edited) {
+        const result = await updatePresentationLinesAlive(orderId, edit.line.unitId, edit.line.presentationLines, actorId, now, scope);
+        if (result !== 'ok') return null;
+      }
+      return [];
+    }),
+    setLineStatus: vi.fn(async (orderId: string, _lineId: string, from: string, to: string, actorId: string, now: Date, scope: OrderScope) =>
+      setStatus(orderId, from, to, actorId, now, scope),
+    ),
+    setLineIngredientsCost: vi.fn(async (orderId: string, _lineId: string, cost: unknown, actorId: string, now: Date, scope: OrderScope) =>
+      setIngredientsCost(orderId, cost, actorId, now, scope),
+    ),
+    setLineReservedAt: vi.fn(async (orderId: string, _lineId: string, reservedAt: Date | null, scope: OrderScope) =>
+      setReservedAt(orderId, reservedAt, scope),
+    ),
+    refreshStatus: vi.fn(async () => fila?.status ?? null),
     // El resto del puerto no lo llama este caso de uso: si lo hiciera, el test que lo comprueba
     // (mas abajo, "no toca...") fallaria por una llamada inesperada al doble.
     create: vi.fn(async () => {
@@ -275,8 +297,8 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       const { orders, updatePresentationLinesAlive, setStatus, setIngredientsCost, setReservedAt } = ordersDoble(
         filaBloqueada({ status }),
       );
-      const syncForOrder = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
-      const update = montar({ orders, reservations: fakeMaterialReservations({ syncForOrder }) });
+      const syncForLine = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
+      const update = montar({ orders, reservations: fakeMaterialReservations({ syncForLine }) });
 
       await expect(
         update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 1 }] }),
@@ -286,7 +308,7 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
       expect(setStatus).not.toHaveBeenCalled();
       expect(setIngredientsCost).not.toHaveBeenCalled();
       expect(setReservedAt).not.toHaveBeenCalled();
-      expect(syncForOrder).not.toHaveBeenCalled();
+      expect(syncForLine).not.toHaveBeenCalled();
     },
   );
 
@@ -302,14 +324,14 @@ describe("updateOrderPresentationLines — R11-R14, [D3']: ventana de estados ed
 });
 
 describe('updateOrderPresentationLines — bloquea antes de validar (R37, R48)', () => {
-  it('llama lockAliveById con el pedido y el ambito de empresa antes de tocar ningun catalogo', async () => {
+  it('bloquea el pedido y la linea con el ambito de empresa antes de tocar ningun catalogo (QT-313 R26)', async () => {
     const { orders } = ordersDoble(filaBloqueada());
     const cat = catalogoDePresentaciones();
     const update = montar({ orders, catalogos: cat });
 
     await update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [] });
 
-    expect(orders.lockAliveById).toHaveBeenCalledWith(PEDIDO, { companyId: EMPRESA });
+    expect(orders.lockAliveLine).toHaveBeenCalledWith(PEDIDO, ONLY_LINE_ID, { companyId: EMPRESA });
   });
 });
 
@@ -561,8 +583,9 @@ describe('updateOrderPresentationLines — R46: no toca quantity ni receta; QC-1
       update(PEDIDO, ACTOR, { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] }),
     ).resolves.toBe('ok');
 
-    expect(reservations.syncForOrder).toHaveBeenCalledWith({
+    expect(reservations.syncForLine).toHaveBeenCalledWith({
       orderId: PEDIDO,
+      orderLineId: ONLY_LINE_ID,
       companyId: EMPRESA,
       requirement: [
         { productId: 'materia', quantity: '10' },
@@ -579,7 +602,7 @@ describe('QC-195 updateOrderPresentationLines — falta de envases y bloqueo', (
   const FALTA: ReservationOutcome = { kind: 'insufficient', productIds: [ENVASE_A] };
 
   function conFalta() {
-    return fakeMaterialReservations({ syncForOrder: vi.fn(async () => FALTA) });
+    return fakeMaterialReservations({ syncForLine: vi.fn(async () => FALTA) });
   }
 
   const LINEAS = { unitId: UNIT_ID, lines: [{ packagingProductId: ENVASE_A, packages: 2 }] };
@@ -643,7 +666,7 @@ describe('QC-195 updateOrderPresentationLines — falta de envases y bloqueo', (
     const update = montar({ orders, reservations, recipeLines });
 
     await expect(update(PEDIDO, ACTOR, LINEAS)).resolves.toBe('ok');
-    expect(reservations.syncForOrder).toHaveBeenCalledWith(
+    expect(reservations.syncForLine).toHaveBeenCalledWith(
       expect.objectContaining({ requirement: [{ productId: ENVASE_A, quantity: '2' }] }),
     );
   });
@@ -700,8 +723,9 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
         AHORA,
         ESCOPO,
       );
-      expect(costo.findCostingBatches).toHaveBeenCalledWith(['materia'], EMPRESA, { excludeOrderId: PEDIDO });
-      expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderId: PEDIDO });
+      // Lo apartado por la linea cuenta como suyo (QT-313 R25).
+      expect(costo.findCostingBatches).toHaveBeenCalledWith(['materia'], EMPRESA, { excludeOrderLineId: ONLY_LINE_ID });
+      expect(packaging.findCostingBatches).toHaveBeenCalledWith([ENVASE_A], EMPRESA, { excludeOrderLineId: ONLY_LINE_ID });
     },
   );
 
@@ -735,7 +759,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
     const update = montar({
       orders: doble.orders,
       reservations: fakeMaterialReservations({
-        syncForOrder: vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'insufficient', productIds: [ENVASE_A] })),
+        syncForLine: vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'insufficient', productIds: [ENVASE_A] })),
       }),
       recipeLines: RECETA,
       costo,
@@ -781,7 +805,7 @@ describe('QC-195 updateOrderPresentationLines — R45, R46, R47: el importe que 
         const doble = ordersDoble(filaBloqueada({ status, ingredientsCost: '25.0000', packagingCost: '5.0000' }));
         const update = montar({
           orders: doble.orders,
-          reservations: fakeMaterialReservations({ syncForOrder: vi.fn(async () => resultado) }),
+          reservations: fakeMaterialReservations({ syncForLine: vi.fn(async () => resultado) }),
           recipeLines: RECETA,
           costo: catalogosDeCosto(RECETA, [LOTE_MATERIA]),
         });
@@ -820,17 +844,17 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
     costo.products.findRefs = vi.fn(async (ids: readonly string[]) =>
       ids.map((id) => ({ id, name: id, unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' as const })),
     );
-    const syncForOrder = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
+    const syncForLine = vi.fn(async (): Promise<ReservationOutcome> => ({ kind: 'reserved' }));
     const update = montar({
       orders: doble.orders,
-      reservations: fakeMaterialReservations({ syncForOrder }),
+      reservations: fakeMaterialReservations({ syncForLine }),
       units: catalogoDeUnidades(new Map([[GRAMO.id, GRAMO], [KILO.id, KILO], [PIEZA.id, PIEZA]])).units,
       recipeLines: RECETA,
       costo,
       scopeProducts: fakeScopeProducts([{ id: MATERIA, name: MATERIA, unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' }]),
       scopeUnits: fakeScopeUnits([GRAMO, KILO, PIEZA]),
     });
-    return { ...doble, update, syncForOrder };
+    return { ...doble, update, syncForLine };
   }
 
   const EN_GRAMOS = { unitId: GRAMO.id, lines: [] };
@@ -848,7 +872,7 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
       AHORA,
       ESCOPO,
     );
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly { quantity: string }[] }])[0];
     expect(Number(entrada.requirement[0]?.quantity)).toBe(0.1);
   });
 
@@ -857,7 +881,7 @@ describe('QC-204 updateOrderPresentationLines — la necesidad y el importe con 
 
     await expect(m.update(PEDIDO, ACTOR, EN_GRAMOS)).resolves.toBe('unit_not_convertible');
     expect(m.updatePresentationLinesAlive).not.toHaveBeenCalled();
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
     expect(m.setIngredientsCost).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();
   });

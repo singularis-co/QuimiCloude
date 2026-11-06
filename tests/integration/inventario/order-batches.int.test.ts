@@ -21,6 +21,7 @@ import { adjustByDelta } from '../../helpers/adjust-by-delta';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -122,17 +123,14 @@ let sequenceCounter = 1;
 
 async function sembrarPedido(fixture: Fixture): Promise<string> {
   const now = new Date();
-  const { id } = await prisma.order.create({
-    data: {
+  const { id } = await createOrderWithLine(prisma, {
       orderYear: now.getUTCFullYear(),
       orderSequence: sequenceCounter++,
       recipeId: fixture.recipeId,
       quantity: '10',
       companyId: fixture.empresa.companyId,
       createdAt: now,
-    },
-    select: { id: true },
-  });
+    });
   fixture.orderIds.push(id);
   return id;
 }
@@ -145,14 +143,15 @@ async function recibir(
   packages: number,
 ): Promise<{ readonly productId: string; readonly batchId: string }> {
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: fixture.empresa.companyId, presentationId, packages, presentationContent: null },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: fixture.empresa.companyId, presentationId, packages, presentationContent: null },
     select: { id: true },
   });
-  const outcome = await prisma.$transaction((tx) =>
+  const outcome = await prisma.$transaction(async (tx) =>
     receiveFinishedGoods(
       tx,
       {
         orderId,
+        orderLineId: await ensureOnlyLine(prisma, orderId),
         recipeId: fixture.recipeId,
         recipeName: 'Limpiador',
         presentationId,
@@ -182,6 +181,7 @@ async function limpiar(fixture: Fixture): Promise<void> {
   await prisma.productBatch.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.product.deleteMany({ where: { id: { in: productIds } } });
   await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: fixture.orderIds } } });
+  await prisma.orderLine.deleteMany({ where: { order: { id: { in: fixture.orderIds } } } });
   await prisma.order.deleteMany({ where: { id: { in: fixture.orderIds } } });
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
   await prisma.presentation.deleteMany({ where: { id: { in: fixture.presentationIds } } });

@@ -5,11 +5,11 @@
  *  modulo: `module-contract.test.ts` lee el esquema y compara las dos listas, valor a valor y
  *  en orden.
  *
- *  En este conjunto el orden no significa nada de negocio -a diferencia del de la prioridad-,
- *  pero tiene que coincidir con el del `enum`, y anadir al final es lo unico que Postgres sabe
- *  hacer con un `ALTER TYPE ... ADD VALUE` sin recrear el tipo. Para pintar en el orden del
+ *  El orden es el que usa Postgres al ordenar por estado: `PARCIAL` va el primero con
+ *  `ALTER TYPE ... ADD VALUE ... BEFORE`, que no recrea el tipo. Para pintar en el orden del
  *  flujo de trabajo existe `ORDER_STATUS_FLOW`, mas abajo. */
 export const ORDER_STATUS_VALUES = [
+  'PARCIAL',
   'PENDIENTE',
   'EN_CURSO',
   'ENTREGADO',
@@ -22,6 +22,9 @@ export const ORDER_STATUS_VALUES = [
   'TERMINADO',
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
+
+/** El estado de una linea del pedido: `PARCIAL` solo describe al pedido entero. */
+export type OrderLineStatus = Exclude<OrderStatus, 'PARCIAL'>;
 
 // Un pedido sin borrar en cualquier otro estado sigue en curso: `TERMINADO` y `BLOQUEADO` cuentan
 // porque todavia no se entregaron.
@@ -51,6 +54,7 @@ export function isStartedOrderStatus(status: OrderStatus): boolean {
  *  o columnas de estado; ninguna lectura de la base ni ninguna regla de transicion depende de este
  *  orden. */
 export const ORDER_STATUS_FLOW: readonly OrderStatus[] = [
+  'PARCIAL',
   'PENDIENTE',
   'EN_CURSO',
   'POR_EMPACAR',

@@ -25,6 +25,13 @@ import { planReservation, type ReservationCandidateBatch, type ReservationPlan }
 import { subtractQuantities } from '@/lib/modules/inventario/domain/decimal-quantity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import {
+  runDowns,
+  insertLegacyOrder,
+  readLegacyOrders,
+  ensureLegacyOrderLine,
+} from '../../helpers/migration-script';
+
 import type { ProductId } from '@/lib/modules/inventario/domain/product-catalog';
 import type { UnitId } from '@/lib/modules/unidades';
 
@@ -35,10 +42,15 @@ class RollbackSignal extends Error {
   }
 }
 
+// El SQL de esta migracion escribe reservas sin linea del pedido: se bajan antes las posteriores
+// que la hacen obligatoria, como en una reversion real.
+const LATER_DOWNS = ['_orders_drop_line_columns', '_order_lines_references_required'] as const;
+
 async function inRolledBackTransaction(body: (tx: Prisma.TransactionClient) => Promise<void>): Promise<void> {
   try {
     await prisma.$transaction(
       async (tx) => {
+        await runDowns(tx, LATER_DOWNS);
         await body(tx);
         throw new RollbackSignal();
       },
@@ -313,28 +325,25 @@ async function createOrder(
   } = {},
 ): Promise<string> {
   orderSequence += 1;
-  const order = await tx.order.create({
-    data: {
-      orderYear: 2026,
-      orderSequence,
-      recipeId,
-      quantity: new Prisma.Decimal(quantity),
-      status: options.status ?? 'PENDIENTE',
-      cancellationReason: options.status === 'CANCELADO' ? 'pedido de prueba' : null,
-      companyId: fixture.companyId,
-      createdBy: fixture.actorId,
-      updatedBy: fixture.actorId,
-      createdAt: options.createdAt,
-      deletedAt: options.deletedAt,
-    },
-    select: { id: true },
+  return insertLegacyOrder(tx, {
+    orderYear: 2026,
+    orderSequence,
+    recipeId,
+    quantity,
+    status: options.status ?? 'PENDIENTE',
+    cancellationReason: options.status === 'CANCELADO' ? 'pedido de prueba' : null,
+    companyId: fixture.companyId,
+    createdBy: fixture.actorId,
+    updatedBy: fixture.actorId,
+    createdAt: options.createdAt,
+    deletedAt: options.deletedAt,
   });
-  return order.id;
 }
 
 async function reservedAtOf(tx: Prisma.TransactionClient, orderId: string): Promise<Date | null> {
-  const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { reservedAt: true } });
-  return order.reservedAt;
+  const [order] = await readLegacyOrders(tx, [orderId]);
+  if (order === undefined) throw new Error(`no existe el pedido ${orderId}`);
+  return order.reserved_at;
 }
 
 type ReservationRow = { readonly batchId: string; readonly quantity: string; readonly createdBy: string | null };
@@ -686,6 +695,7 @@ describe('migracion reserve_existing_orders contra Postgres real', () => {
         data: {
           companyId: company.companyId,
           orderId: order,
+          orderLineId: await ensureLegacyOrderLine(tx, order),
           batchId: batch.id,
           kind: 'release',
           quantity: new Prisma.Decimal('3.0000'),

@@ -20,19 +20,94 @@ import {
   UnauthorizedError,
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors';
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order';
-import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double';
+import { createUpdateOrder as createLinesUpdate, type UpdateOrderDeps } from '@/lib/modules/pedidos/domain/update-order';
+import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, lineWritingOrders, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
+import { singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import { STARTED_ORDER_STATUSES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
+import type {
+  LockedOrderRow,
+  OrderLineChanges,
+  OrderWriteRepository,
+} from '@/lib/modules/pedidos/ports/order-write-repository';
+import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { CostingBatch, PackagingCatalog, PresentationCatalog, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
+
+// Estos casos describen un pedido de una receta: entran como una linea, como desde el formulario,
+// y el repositorio de lectura da la unica linea de la fila que lee.
+const createUpdateOrder = (deps: UpdateOrderDeps) => {
+  // Lee la fila con la implementacion del doble sin contar una llamada mas a `findAliveById`.
+  const read = (deps.orders.findAliveById as unknown as Espia).getMockImplementation() as
+    | ((id: string, scope: OrderScope) => Promise<OrderRow | null>)
+    | undefined;
+  const findAliveLines = vi.fn(async (id: string, scope: OrderScope) => {
+    const row = await read?.(id, scope);
+    return row === null || row === undefined ? [] : [orderLineOf(row)];
+  });
+  const orders = { ...deps.orders, findAliveLines } as OrderRepository;
+  return singleRecipeUpdate(createLinesUpdate({ ...deps, orders }), findAliveLines);
+};
+
+/** Un espia de los dobles de abajo, llamado con los argumentos de los metodos del pedido. */
+type Espia = { getMockImplementation(): unknown };
+const llamar = (espia: Espia, ...args: unknown[]): Promise<unknown> =>
+  (espia as unknown as (...params: unknown[]) => Promise<unknown>)(...args);
+
+/**
+ * La edicion escribe cada receta en su linea (`writeLines`) y la prioridad y el cliente en el pedido
+ * (`updateAlive`). Estos casos son de un pedido de una receta y se siguen leyendo con los espias de
+ * antes: el espia `updateAlive` recibe una llamada con los datos de la linea editada, su coste y la
+ * prioridad y el cliente del pedido -o solo estos, con `'keep'`, si la linea no cambio-, y los tres
+ * escritores de la linea se ven como los del pedido. Las lineas bloqueadas son la unica de la fila
+ * que bloquea `lockAliveById`.
+ */
+function unaReceta(espias: {
+  readonly lockAliveById: Espia;
+  readonly updateAlive: Espia;
+  readonly setReservedAt?: Espia;
+  readonly setStatus?: Espia;
+  readonly setIngredientsCost?: Espia;
+}): Partial<OrderWriteRepository> {
+  const lineas = lineWritingOrders();
+  let escrita: Record<string, unknown> | undefined;
+  return {
+    ...lineas,
+    lockAliveById: espias.lockAliveById as unknown as OrderWriteRepository['lockAliveById'],
+    lockAliveLines: vi.fn(async (id: string, scope: OrderScope) => {
+      const order = (await llamar(espias.lockAliveById, id, scope)) as LockedOrderRow | null;
+      return order === null ? null : { order, lines: [orderLineOf(order)] };
+    }),
+    writeLines: vi.fn(async (id: string, changes: OrderLineChanges, actorId: string, now: Date, scope: OrderScope) => {
+      for (const edit of changes.edited) {
+        escrita = { ...edit.line };
+        await llamar(espias.updateAlive, id, escrita, actorId, now, edit.cost, scope);
+      }
+      return lineas.writeLines(id, changes, actorId, now, scope);
+    }),
+    updateAlive: vi.fn(async (id: string, header: object, actorId: string, now: Date, scope: OrderScope) => {
+      if (escrita !== undefined) Object.assign(escrita, header);
+      else await llamar(espias.updateAlive, id, { ...header }, actorId, now, 'keep', scope);
+      return 'ok' as const;
+    }),
+    setLineReservedAt: vi.fn(async (id: string, _lineId: string, reservedAt: Date | null, scope: OrderScope) => {
+      if (espias.setReservedAt !== undefined) await llamar(espias.setReservedAt, id, reservedAt, scope);
+    }),
+    setLineStatus: vi.fn(async (id: string, _lineId: string, from: string, to: string, actorId: string | null, now: Date, scope: OrderScope) =>
+      espias.setStatus === undefined ? ('ok' as const) : llamar(espias.setStatus, id, from, to, actorId, now, scope),
+    ),
+    setLineIngredientsCost: vi.fn(async (id: string, _lineId: string, cost: unknown, actorId: string | null, now: Date, scope: OrderScope) =>
+      espias.setIngredientsCost === undefined ? ('ok' as const) : llamar(espias.setIngredientsCost, id, cost, actorId, now, scope),
+    ),
+  } as Partial<OrderWriteRepository>;
+}
 
 const EMPRESA_A = '33333333-3333-4333-8333-333333333333';
 const EMPRESA_B = '44444444-4444-4444-8444-444444444444';
@@ -54,7 +129,7 @@ const OTRA_UNIDAD_INCOMPATIBLE = '10101010-1010-4101-8101-101010101010';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
-function filaExistente(): OrderRow {
+function filaExistente(): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -178,13 +253,13 @@ function repositorioDePedidos() {
   const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
   const updateAlive = vi.fn(async () => 'ok' as const);
   const setReservedAt = vi.fn(async () => undefined);
-  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
-  const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+  const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
+  const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
   const { unitOfWork } = fakeUnitOfWork({
-    orders: { lockAliveById, updateAlive, setReservedAt },
-    reservations: { syncForOrder, consumeForOrder },
+    orders: unaReceta({ lockAliveById, updateAlive, setReservedAt }),
+    reservations: { syncForLine, consumeForLine },
   });
-  return { orders, unitOfWork, findAliveById, lockAliveById, updateAlive, setReservedAt, syncForOrder, consumeForOrder };
+  return { orders, unitOfWork, findAliveById, lockAliveById, updateAlive, setReservedAt, syncForLine, consumeForLine };
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -223,13 +298,13 @@ function repositorioConEstado(status: OrderStatus) {
   const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
   const updateAlive = vi.fn(async () => 'ok' as const);
   const setReservedAt = vi.fn(async () => undefined);
-  const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
-  const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+  const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
+  const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
   const { unitOfWork } = fakeUnitOfWork({
-    orders: { lockAliveById, updateAlive, setReservedAt },
-    reservations: { syncForOrder, consumeForOrder },
+    orders: unaReceta({ lockAliveById, updateAlive, setReservedAt }),
+    reservations: { syncForLine, consumeForLine },
   });
-  return { orders, unitOfWork, findAliveById, lockAliveById, updateAlive, setReservedAt, syncForOrder, consumeForOrder };
+  return { orders, unitOfWork, findAliveById, lockAliveById, updateAlive, setReservedAt, syncForLine, consumeForLine };
 }
 
 describe('QC-50 R26 — editar un pedido CAMBIANDO su receta a una de OTRA empresa se rechaza como inexistente', () => {
@@ -772,8 +847,8 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
     const repo = repositorioConEstado('EN_CURSO');
     const receiveFromOrder = vi.fn();
     const { unitOfWork, finishedGoods } = fakeUnitOfWork({
-      orders: { lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt },
-      reservations: { syncForOrder: repo.syncForOrder, consumeForOrder: repo.consumeForOrder },
+      orders: unaReceta({ lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt }),
+      reservations: { syncForLine: repo.syncForLine, consumeForLine: repo.consumeForLine },
       finishedGoods: { receiveFromOrder },
     });
     const updateOrder = createUpdateOrder({
@@ -827,8 +902,8 @@ describe('QC-150 — la edicion no da de alta producto terminado', () => {
     const repo = repositorioConEstado('ENTREGADO');
     const receiveFromOrder = vi.fn();
     const { unitOfWork, finishedGoods } = fakeUnitOfWork({
-      orders: { lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt },
-      reservations: { syncForOrder: repo.syncForOrder, consumeForOrder: repo.consumeForOrder },
+      orders: unaReceta({ lockAliveById: repo.lockAliveById, updateAlive: repo.updateAlive, setReservedAt: repo.setReservedAt }),
+      reservations: { syncForLine: repo.syncForLine, consumeForLine: repo.consumeForLine },
       finishedGoods: { receiveFromOrder },
     });
     const updateOrder = createUpdateOrder({
@@ -923,7 +998,7 @@ describe('QC-215 R38 — la edicion de solo cliente en un estado sin edicion gen
   const CLIENTE = 'c0000000-0000-4000-8000-00000000000a';
 
   /** Fila con unidad y sin reparto: la edicion `soloCliente` es igual salvo el cliente. */
-  function filaConUnidad(status: OrderStatus): OrderRow {
+  function filaConUnidad(status: OrderStatus): SingleRecipeOrderRow {
     return {
       ...filaExistente(),
       status,
@@ -984,7 +1059,9 @@ describe('QC-215 R38 — la edicion de solo cliente en un estado sin edicion gen
     expect(e.setCustomerAlive).not.toHaveBeenCalled();
   });
 
-  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'])(
+  // En BLOQUEADO ya no hay atajo: la edicion reintenta la reserva de la linea (QT-313 R56, design
+  // § 4.2.1 punto 2). Lo prueba `update-order-lines.test.ts`.
+  it.each<OrderStatus>(['PENDIENTE', 'EN_CURSO'])(
     'R38 (control): en %s la misma entrada es de solo cliente y va por el atajo: solo setCustomerAlive',
     async (status) => {
       const e = escenario(status, true);
@@ -1141,7 +1218,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
     }
   });
 
-  it('pasa el `id` del pedido como `excludeOrderId`: lo que EL mismo tiene apartado cuenta como disponible para si mismo (R65)', async () => {
+  it('pasa la linea editada como `excludeOrderLineId`: lo que ELLA misma tiene apartado cuenta como disponible para si misma (R65, QT-313 R25)', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const uni = catalogoDeUnidades(new Map([[LITRO.id, LITRO]]));
@@ -1160,7 +1237,7 @@ describe('T5 — la edicion recalcula el importe de los ingredientes', () => {
 
     await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, quantity: '20.0000' }, ACTOR_A);
 
-    expect(prod.findCostingBatches).toHaveBeenCalledWith([PRODUCTO_X], EMPRESA_A, { excludeOrderId: ORDER_ID });
+    expect(prod.findCostingBatches).toHaveBeenCalledWith([PRODUCTO_X], EMPRESA_A, { excludeOrderLineId: ONLY_LINE_ID });
   });
 
   it('sin pedidos.modificar no se lee ni un lote ni una unidad (R23)', async () => {
@@ -1208,22 +1285,22 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
       void [id, reservedAt];
       orden.push('orders.setReservedAt');
     });
-    const syncForOrder = vi.fn(async () => {
-      orden.push('reservations.syncForOrder');
+    const syncForLine = vi.fn(async () => {
+      orden.push('reservations.syncForLine');
       return { kind: opciones.sync ?? 'reserved' } as const;
     });
-    const consumeForOrder = vi.fn(async () => {
-      orden.push('reservations.consumeForOrder');
+    const consumeForLine = vi.fn(async () => {
+      orden.push('reservations.consumeForLine');
       return { kind: opciones.consume ?? 'consumed', productIds: [] } as const;
     });
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { lockAliveById, updateAlive, setReservedAt },
-      reservations: { syncForOrder, consumeForOrder },
+      orders: unaReceta({ lockAliveById, updateAlive, setReservedAt }),
+      reservations: { syncForLine, consumeForLine },
     });
-    return { orders, unitOfWork, orden, updateAlive, setReservedAt, syncForOrder, consumeForOrder };
+    return { orders, unitOfWork, orden, updateAlive, setReservedAt, syncForLine, consumeForLine };
   }
 
-  it('destino distinto de ENTREGADO: updateAlive -> syncForOrder -> setReservedAt(now)', async () => {
+  it('destino distinto de ENTREGADO: updateAlive -> syncForLine -> setReservedAt(now)', async () => {
     const cat = catalogoDeRecetas(new Map([[RECETA_DE_A, [lineaDeReceta()]]]));
     const repo = repositorioConOrden({ sync: 'reserved' });
     const updateOrder = createUpdateOrder({
@@ -1240,8 +1317,8 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
 
     await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'EN_CURSO' }, ACTOR_A);
 
-    expect(repo.orden).toEqual(['orders.updateAlive', 'reservations.syncForOrder', 'orders.setReservedAt']);
-    expect(repo.consumeForOrder).not.toHaveBeenCalled();
+    expect(repo.orden).toEqual(['orders.updateAlive', 'reservations.syncForLine', 'orders.setReservedAt']);
+    expect(repo.consumeForLine).not.toHaveBeenCalled();
     expect(repo.setReservedAt.mock.calls[0]?.[1]).toBe(AHORA);
   });
 
@@ -1262,8 +1339,8 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
 
     await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'ENTREGADO' }, ACTOR_A);
 
-    expect(repo.orden).toEqual(['orders.updateAlive', 'reservations.syncForOrder', 'orders.setReservedAt']);
-    expect(repo.consumeForOrder).not.toHaveBeenCalled();
+    expect(repo.orden).toEqual(['orders.updateAlive', 'reservations.syncForLine', 'orders.setReservedAt']);
+    expect(repo.consumeForLine).not.toHaveBeenCalled();
   });
 
   it('R49: editar con una receta sin lineas guarda sin error y deja reserved_at nulo', async () => {
@@ -1283,8 +1360,8 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
 
     await updateOrder(ORDER_ID, { ...EDICION_HACIA_B, recipeId: RECETA_DE_A, status: 'EN_CURSO' }, ACTOR_A)
 
-    expect(repo.syncForOrder).toHaveBeenCalledTimes(1)
-    const requerido = (repo.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0]
+    expect(repo.syncForLine).toHaveBeenCalledTimes(1)
+    const requerido = (repo.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0]
     expect(requerido.requirement).toEqual([])
     expect(repo.setReservedAt.mock.calls[0]?.[1]).toBeNull()
   });
@@ -1352,13 +1429,13 @@ describe('QC-141 T9 — editar con reserva (R12, R20, R41, R49, R52)', () => {
     const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
     const updateAlive = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn(async () => undefined);
-    const syncForOrder = vi.fn(async (input: { requirement: readonly unknown[] }) => {
+    const syncForLine = vi.fn(async (input: { requirement: readonly unknown[] }) => {
       expect(input.requirement).toEqual([{ productId: PRODUCTO_X, quantity: '10' }]);
       return { kind: 'reserved' as const };
     });
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { lockAliveById, updateAlive, setReservedAt },
-      reservations: { syncForOrder },
+      orders: unaReceta({ lockAliveById, updateAlive, setReservedAt }),
+      reservations: { syncForLine },
       recipes: { findExecutionContentById: findExecutionContentByIdDeLaTransaccion },
     });
     const updateOrder = createUpdateOrder({
@@ -1427,14 +1504,14 @@ describe('edicion con version de receta', () => {
       listAlive: vi.fn(),
     } as unknown as OrderRepository;
     const updateAlive = vi.fn(async () => 'ok' as const);
-    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
     const { unitOfWork } = fakeUnitOfWork({
-      orders: {
+      orders: unaReceta({
         lockAliveById: vi.fn(async () => ({ ...fila, reservedAt: null, packagingCost: null })),
         updateAlive,
         setReservedAt: vi.fn(async () => undefined),
-      },
-      reservations: { syncForOrder },
+      }),
+      reservations: { syncForLine },
       recipes: { findExecutionContentById: cat.enTransaccion },
     });
     const run = vi.spyOn(unitOfWork, 'run');
@@ -1449,7 +1526,7 @@ describe('edicion con version de receta', () => {
       packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
-    return { updateOrder, updateAlive, syncForOrder, run };
+    return { updateOrder, updateAlive, syncForLine, run };
   }
 
   const entrada = (recipeVersionId: string | null, recipeId = RECETA_DE_A) => ({
@@ -1474,7 +1551,7 @@ describe('edicion con version de receta', () => {
 
   it('R34: pasar de la original a una version viva la guarda y recalcula coste y necesidad con sus lineas', async () => {
     const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A })], lineas);
-    const { updateOrder, updateAlive, syncForOrder } = edicion(RECETA_DE_A, cat, lotes);
+    const { updateOrder, updateAlive, syncForLine } = edicion(RECETA_DE_A, cat, lotes);
 
     await updateOrder(ORDER_ID, entrada(VERSION_DE_A), ACTOR_A);
 
@@ -1485,7 +1562,7 @@ describe('edicion con version de receta', () => {
     expect(datos).not.toHaveProperty('recipeVersionId');
     expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
     expect(cat.enTransaccion).toHaveBeenCalledWith(VERSION_DE_A, EMPRESA_A);
-    const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+    const sync = (syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
     expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
   });
 
@@ -1568,7 +1645,7 @@ describe('edicion con version de receta', () => {
     'R35, R25: conservar una version %s se acepta sin preguntar al catalogo y recalcula con sus lineas',
     async (_caso, estado) => {
       const cat = catalogoConVersiones([ref(RECETA_DE_A), ref(VERSION_DE_A, { original: ORIGINAL_A, ...estado })], lineas);
-      const { updateOrder, updateAlive, syncForOrder } = edicion(VERSION_DE_A, cat, lotes);
+      const { updateOrder, updateAlive, syncForLine } = edicion(VERSION_DE_A, cat, lotes);
 
       await updateOrder(ORDER_ID, entrada(VERSION_DE_A), ACTOR_A);
 
@@ -1576,7 +1653,7 @@ describe('edicion con version de receta', () => {
       const [, datos, , , coste] = guardado(updateAlive);
       expect(datos.recipeId).toBe(VERSION_DE_A);
       expect(coste).toEqual({ total: '50.0000', packaging: '0.0000' });
-      const sync = (syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
+      const sync = (syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly unknown[] }])[0];
       expect(sync.requirement).toEqual([{ productId: PRODUCTO_Y, quantity: '10' }]);
     },
   );
@@ -1622,13 +1699,13 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
     } as unknown as OrderRepository;
     const lockAliveById = vi.fn(async () => ({ ...fila, reservedAt: null, packagingCost: null }));
     const updateAlive = vi.fn(async () => 'ok' as const);
-    const syncForOrder = vi.fn(async () => outcome);
+    const syncForLine = vi.fn(async () => outcome);
     const setStatus = vi.fn(async () => 'ok' as const);
     const setIngredientsCost = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn(async () => undefined);
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { lockAliveById, updateAlive, setStatus, setIngredientsCost, setReservedAt },
-      reservations: { syncForOrder },
+      orders: unaReceta({ lockAliveById, updateAlive, setStatus, setIngredientsCost, setReservedAt }),
+      reservations: { syncForLine },
     });
     const updateOrder = createUpdateOrder({
       customerCatalog: fakeCustomerCatalog(),
@@ -1641,7 +1718,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
       packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
-    return { updateOrder, updateAlive, syncForOrder, setStatus, setIngredientsCost, setReservedAt };
+    return { updateOrder, updateAlive, syncForLine, setStatus, setIngredientsCost, setReservedAt };
   }
 
   const ENTRADA = { recipeId: RECETA_DE_A, quantity: '10.0000', unitId: UNIT_ID };
@@ -1666,7 +1743,7 @@ describe('QC-138 — la edicion bloquea y desbloquea (R1, R2, R6, R8, R10, R11, 
 
     await caso.updateOrder(ORDER_ID, { ...ENTRADA, confirmBlocked: true }, ACTOR_A);
 
-    expect(caso.syncForOrder).toHaveBeenCalledWith(
+    expect(caso.syncForLine).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: ORDER_ID, actorId: ACTOR_A.id, now: AHORA }),
     );
     expect(caso.setStatus).toHaveBeenCalledWith(ORDER_ID, 'PENDIENTE', 'BLOQUEADO', ACTOR_A.id, AHORA, SCOPE);
@@ -1787,10 +1864,10 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
     const lockAliveById = vi.fn(async () => ({ ...filaVista, reservedAt: null, packagingCost: null }));
     const updateAlive = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn(async () => undefined);
-    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { lockAliveById, updateAlive, setReservedAt },
-      reservations: { syncForOrder },
+      orders: unaReceta({ lockAliveById, updateAlive, setReservedAt }),
+      reservations: { syncForLine },
       recipes: cat.recipes,
       products: fakeScopeProducts([insumo]),
       units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
@@ -1806,7 +1883,7 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
       packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
-    return { updateOrder, updateAlive, syncForOrder, setReservedAt };
+    return { updateOrder, updateAlive, syncForLine, setReservedAt };
   }
 
   const EDICION_EN_GRAMOS = { recipeId: RECETA_DE_A, quantity: '1000', unitId: GRAMO.id };
@@ -1825,7 +1902,7 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
 
     await m.updateOrder(ORDER_ID, EDICION_EN_GRAMOS, ACTOR_A);
 
-    const entrada = (m.syncForOrder.mock.calls[0] as unknown as readonly [{ requirement: readonly { productId: string; quantity: string }[] }])[0];
+    const entrada = (m.syncForLine.mock.calls[0] as unknown as readonly [{ requirement: readonly { productId: string; quantity: string }[] }])[0];
     expect(entrada.requirement).toHaveLength(1);
     expect(entrada.requirement[0]?.productId).toBe(PRODUCTO_X);
     expect(Number(entrada.requirement[0]?.quantity)).toBe(0.1);
@@ -1842,7 +1919,7 @@ describe('QC-204 — la edicion convierte la necesidad con la unidad editada', (
     expect(error).toBeInstanceOf(OrderUnitNotConvertibleError);
     expect((error as PedidosError).code).toBe('order_unit_not_convertible');
     expect(m.updateAlive).not.toHaveBeenCalled();
-    expect(m.syncForOrder).not.toHaveBeenCalled();
+    expect(m.syncForLine).not.toHaveBeenCalled();
     expect(m.setReservedAt).not.toHaveBeenCalled();
   });
 });
@@ -1875,7 +1952,7 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
   }
 
   function edicionEn(filaStatus: OrderStatus, lockedStatus: OrderStatus = filaStatus) {
-    const fila: OrderRow = { ...filaExistente(), status: filaStatus, ingredientsCost: '99.0000', packagingCost: '9.0000' };
+    const fila: SingleRecipeOrderRow = { ...filaExistente(), status: filaStatus, ingredientsCost: '99.0000', packagingCost: '9.0000' };
     const orders = {
       findAliveById: vi.fn(async () => fila),
       listAlive: vi.fn(),
@@ -1886,10 +1963,10 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
     const setIngredientsCost = vi.fn(async () => 'ok' as const);
     const create = vi.fn();
     const setReservedAt = vi.fn(async () => undefined);
-    const syncForOrder = vi.fn(async () => ({ kind: 'reserved' as const }));
+    const syncForLine = vi.fn(async () => ({ kind: 'reserved' as const }));
     const { unitOfWork } = fakeUnitOfWork({
-      orders: { lockAliveById, updateAlive, setStatus, setIngredientsCost, create, setReservedAt },
-      reservations: { syncForOrder },
+      orders: { ...unaReceta({ lockAliveById, updateAlive, setStatus, setIngredientsCost, setReservedAt }), create },
+      reservations: { syncForLine },
     });
     const prod = catalogoDeProductos([loteCosteable({ stock: '100', unitCost: '3.0000' })]);
     const envases = fakePackagingCatalog(
@@ -1913,7 +1990,7 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
       setIngredientsCost,
       create,
       setReservedAt,
-      syncForOrder,
+      syncForLine,
       findCostingBatches: prod.findCostingBatches,
       packagingCostingBatches: envases.findCostingBatches,
     };
@@ -1969,7 +2046,7 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
     expect(caso.findCostingBatches).not.toHaveBeenCalled();
     expect(caso.packagingCostingBatches).not.toHaveBeenCalled();
     // Lo apartado se sigue sincronizando con los datos nuevos.
-    expect(caso.syncForOrder).toHaveBeenCalledTimes(1);
+    expect(caso.syncForLine).toHaveBeenCalledTimes(1);
     expect(caso.setReservedAt).toHaveBeenCalledWith(ORDER_ID, AHORA, SCOPE);
   });
 
@@ -2006,7 +2083,7 @@ describe('QC-307 — el precio de venta en la edicion', () => {
   const CLIENTE = 'c0000000-0000-4000-8000-00000000000b';
 
   /** Fila con unidad y sin reparto, para que una edicion que repite todo sea «igual». */
-  function filaConPrecio(salePrice: string | null, status: OrderStatus = 'PENDIENTE'): OrderRow {
+  function filaConPrecio(salePrice: string | null, status: OrderStatus = 'PENDIENTE'): SingleRecipeOrderRow {
     return {
       ...filaExistente(),
       status,
@@ -2033,14 +2110,14 @@ describe('QC-307 — el precio de venta en la edicion', () => {
   function escenario(fila: OrderRow) {
     const findAliveById = vi.fn(async () => fila);
     const findAliveRefById = vi.fn(async (id: string) => ({ id, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false }));
+    const updateAlive = vi.fn(async () => 'ok' as const);
+    const lockAliveById = vi.fn(async () => ({ ...fila, reservedAt: null }));
     const uow = fakeUnitOfWork({
       orders: {
-        lockAliveById: vi.fn(async () => ({ ...fila, reservedAt: null })),
-        updateAlive: vi.fn(async () => 'ok' as const),
+        ...unaReceta({ lockAliveById, updateAlive, setReservedAt: vi.fn(async () => undefined) }),
         setCustomerAlive: vi.fn(async () => 'ok' as const),
-        setReservedAt: vi.fn(async () => undefined),
       },
-      reservations: { syncForOrder: vi.fn(async () => ({ kind: 'reserved' as const })) },
+      reservations: { syncForLine: vi.fn(async () => ({ kind: 'reserved' as const })) },
     });
     const updateOrder = createUpdateOrder({
       customerCatalog: { ...fakeCustomerCatalog(), findAliveRefById },
@@ -2053,7 +2130,7 @@ describe('QC-307 — el precio de venta en la edicion', () => {
       packaging: fakePackagingCatalog(),
       now: () => AHORA,
     });
-    return { updateOrder, orders: uow.orders };
+    return { updateOrder, orders: { ...uow.orders, updateAlive, lockAliveById } };
   }
 
   function editado(orders: ReturnType<typeof escenario>['orders']): { salePrice: unknown; customerId: unknown } {

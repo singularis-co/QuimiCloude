@@ -44,6 +44,7 @@ import type {
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { RecipeDetail, RecipeSummary, RecipeVersionSummary } from '@/lib/modules/recetas';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const {
   createOrderActionMock,
@@ -233,6 +234,7 @@ function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: crypto.randomUUID(),
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

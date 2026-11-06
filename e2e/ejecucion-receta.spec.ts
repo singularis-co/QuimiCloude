@@ -50,6 +50,7 @@ import {
   enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc63_e2e_';
@@ -318,27 +319,24 @@ async function seedOrder(params: {
     select: { unitId: true },
   });
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: params.sequence,
       recipeId: orderRecipeId,
       quantity: ORDER_QUANTITY,
       unitId,
-      presentationLines: {
-        create: [
-          {
-            companyId,
-            presentationId,
-            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
-            presentationContent: PRESENTATION_CONTENT,
-          },
-        ],
-      },
       status: params.status,
+    });
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: order.id,
+      orderLineId: await ensureOnlyLine(prisma, order.id),
+      companyId,
+      presentationId,
+      packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+      presentationContent: PRESENTATION_CONTENT,
     },
-    select: { id: true },
   });
 
   return { id: order.id, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
@@ -392,6 +390,7 @@ test.beforeAll(async () => {
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Las fotos de evidencia RESTRINGEN el borrado del pedido y de quien las subio.
     await prisma.orderStepEvidence.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
@@ -399,16 +398,20 @@ test.beforeAll(async () => {
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
     const orphanOrders = await prisma.order.findMany({
-      where: { recipeId: { in: orphanRecipeIds } },
+      where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }},
       select: { id: true },
     });
     await prisma.orderStepEvidence.deleteMany({
       where: { orderId: { in: orphanOrders.map((order) => order.id) } },
     });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (
+      await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } } }, select: { id: true } })
+    ).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
     // se borra DESPUES, cuando la receta ya cayo y se llevo sus lineas por cascada.
@@ -571,6 +574,7 @@ test.beforeAll(async () => {
   });
   // Ya paso el paso 1 sin fotos: la pantalla lo retoma en el paso 2, el ultimo.
   const startedAt = Date.now() - 120_000;
+  const evidenceLineId = await ensureOnlyLine(prisma, orderEvidenceId);
   await prisma.orderExecutionEntry.createMany({
     data: [
       { action: 'START' as const, stepPosition: 1, occurredAt: new Date(startedAt) },
@@ -578,6 +582,7 @@ test.beforeAll(async () => {
     ].map((entry) => ({
       ...entry,
       orderId: orderEvidenceId!,
+      orderLineId: evidenceLineId,
       userId: operatorUserId!,
       companyId: companyId!,
     })),
@@ -617,6 +622,10 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.orderStepEvidence.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.orderLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId

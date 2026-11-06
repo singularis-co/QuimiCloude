@@ -20,7 +20,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import type { Prisma } from '@prisma/client';
 
 import { normalizeCustomerText } from '@/lib/modules/clientes';
 import { DOCUMENT_TYPE_CC, normalizeCompanyName, ROLE_ADMINISTRADOR } from '@/lib/modules/identity';
@@ -34,6 +33,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
 import { submitOrderWithLeftover } from './helpers/order-distribution';
+import { ensureOnlyLine, createOrderWithLine, type SingleLineOrderData } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc262_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -192,6 +192,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.inventoryMovement.deleteMany({ where: inCompanies }),
     () => prisma.orderAssignment.deleteMany({ where: inCompanies }),
     () => prisma.orderPresentationLine.deleteMany({ where: inCompanies }),
+    () => prisma.orderLine.deleteMany({ where: inCompanies }),
     () => prisma.order.deleteMany({ where: inCompanies }),
     () => prisma.recipeLine.deleteMany({ where: { recipe: inCompanies } }),
     () => prisma.recipe.deleteMany({ where: inCompanies }),
@@ -328,12 +329,14 @@ test.beforeAll(async () => {
   const year = new Date().getUTCFullYear();
   const seed = async (
     offset: number,
-    data: Omit<Prisma.OrderUncheckedCreateInput, 'companyId' | 'orderYear' | 'orderSequence'>,
+    data: Omit<SingleLineOrderData, 'companyId' | 'orderYear' | 'orderSequence'>,
   ): Promise<SeededOrder> => {
     const sequence = BASE_SEQUENCE + offset;
-    const created = await prisma.order.create({
-      data: { companyId: company, orderYear: year, orderSequence: sequence, ...data },
-      select: { id: true },
+    const created = await createOrderWithLine(prisma, {
+      companyId: company,
+      orderYear: year,
+      orderSequence: sequence,
+      ...data,
     });
     return { id: created.id, numberText: formatOrderNumber({ year, sequence }) };
   };
@@ -366,18 +369,18 @@ test.beforeAll(async () => {
       unitId: unit.id,
       customerId,
       createdBy: adminId,
-      presentationLines: {
-        create: [
-          {
-            companyId: company,
-            presentationId,
-            packages: Number(ORDER_QUANTITY),
-            presentationContent: PRESENTATION_CONTENT,
-          },
-        ],
-      },
     }),
   };
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: orders.finished.id,
+      orderLineId: await ensureOnlyLine(prisma, orders.finished.id),
+      companyId: company,
+      presentationId,
+      packages: Number(ORDER_QUANTITY),
+      presentationContent: PRESENTATION_CONTENT,
+    },
+  });
 });
 
 test.afterAll(async () => {
@@ -734,7 +737,7 @@ test.describe('Pedidos rediseñado', () => {
     const recipe = recipeId;
     const unit = unitId;
     if (recipe === null || unit === null) throw new Error('el fixture no existe: falló el beforeAll');
-    const before = await prisma.order.count({ where: { recipeId: recipe } });
+    const before = await prisma.order.count({ where: { lines: { some: { recipeId: recipe } }}});
 
     const form = page.getByTestId(TESTIDS.orderForm);
     await clickUntilVisible(page.getByTestId(TESTIDS.createOpen).filter({ visible: true }), form);
@@ -757,7 +760,7 @@ test.describe('Pedidos rediseñado', () => {
     await expectTarget(dialog.getByTestId(TESTIDS.blockedConfirm), 'Material insuficiente: Guardar bloqueado');
     await dialog.getByTestId(TESTIDS.blockedDismiss).click();
     await expect(dialog).toBeHidden({ timeout: 60_000 });
-    expect(await prisma.order.count({ where: { recipeId: recipe } }), 'sin confirmar no se escribe el pedido').toBe(
+    expect(await prisma.order.count({ where: { lines: { some: { recipeId: recipe } }}}), 'sin confirmar no se escribe el pedido').toBe(
       before,
     );
   });

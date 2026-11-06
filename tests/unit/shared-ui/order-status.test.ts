@@ -49,6 +49,7 @@ const MAPA_PROPIO =
 describe('mapa de pedido', () => {
   it('R10 — reparte los tonos de estado según el tablero', () => {
     expect(ORDER_STATUS_TONES).toEqual({
+      PARCIAL: 'progress',
       PENDIENTE: 'neutral',
       EN_CURSO: 'progress',
       EN_EMPAQUE: 'progress',
@@ -68,6 +69,7 @@ describe('mapa de pedido', () => {
 
   it('R10 — conserva los textos de hoy', () => {
     expect(ORDER_STATUS_LABELS).toEqual({
+      PARCIAL: 'Parcial',
       PENDIENTE: 'Pendiente',
       EN_CURSO: 'En fabricación',
       POR_EMPACAR: 'Por empacar',
@@ -137,5 +139,12 @@ describe('mapa de pedido', () => {
     expect(MAPA_PROPIO.test('const X: Readonly<Record<OrderStatus, boolean>> = { PENDIENTE: true };')).toBe(
       false,
     );
+  });
+});
+
+describe('el pedido PARCIAL en pantalla', () => {
+  it('R53 — se nombra «Parcial» con el tono progress', () => {
+    expect(ORDER_STATUS_LABELS.PARCIAL).toBe('Parcial');
+    expect(ORDER_STATUS_TONES.PARCIAL).toBe('progress');
   });
 });

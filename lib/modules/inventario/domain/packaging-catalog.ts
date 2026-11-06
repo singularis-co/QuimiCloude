@@ -1,3 +1,4 @@
+import type { CostingExclusion } from './costing-batch';
 import type { ProductId } from './product-catalog';
 
 /** Lo que otro modulo puede saber de un envase con presentacion fija. */
@@ -27,7 +28,8 @@ export type PackagingCostingBatch = {
 /**
  * Lo implementa un adaptador driven de `inventario` y lo cablea `lib/composition`. Solo devuelve
  * envases vivos, de la empresa y con presentacion fija: cualquier otro id simplemente no viene.
- * Con `excludeOrderId`, lo que ese pedido tiene apartado cuenta como disponible.
+ * Con `excludeOrderId`, lo que ese pedido tiene apartado cuenta como disponible; con
+ * `excludeOrderLineId`, solo lo de esa linea.
  */
 export interface PackagingCatalog {
   findRefs(
@@ -40,6 +42,6 @@ export interface PackagingCatalog {
   findCostingBatches(
     ids: readonly ProductId[],
     companyId: string,
-    options?: { readonly excludeOrderId?: string },
+    options?: CostingExclusion,
   ): Promise<readonly PackagingCostingBatch[]>;
 }

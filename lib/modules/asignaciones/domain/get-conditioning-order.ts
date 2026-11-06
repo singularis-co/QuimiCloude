@@ -21,6 +21,7 @@ import {
 import { conditioningProgress } from './conditioning-steps';
 import { OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
+import { onlyLineOf } from './only-order-line';
 
 import type { ComposeOrderRowsDeps } from './compose-order-rows';
 import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
@@ -81,7 +82,7 @@ export function createGetConditioningOrder(
     const { orderId } = parsed.data;
 
     const summaryPage = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], DETAIL_STATUSES, 1, 1);
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
     const isConditioner = summary.conditionedBy === actor.id;
     if (CLOSED_STATUSES.has(summary.status) && !isConditioner) throw new OrderNotFoundError();

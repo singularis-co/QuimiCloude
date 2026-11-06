@@ -100,6 +100,7 @@ describe('quien escribe products.last_batch_at', () => {
       tx,
       {
         orderId: 'order-1',
+        orderLineId: 'order-line-1',
         recipeId: 'recipe-1',
         recipeName: 'Desengrasante',
         presentationId: 'presentation-1',
@@ -127,7 +128,7 @@ describe('quien escribe products.last_batch_at', () => {
 
     const outcome = await consumeBatchStock(
       tx,
-      { batchId: 'batch-1', quantity: '2', orderId: 'order-1', actorId: 'actor-1' },
+      { orderLineId: 'order-line-1', batchId: 'batch-1', quantity: '2', orderId: 'order-1', actorId: 'actor-1' },
       NOW,
       SCOPE,
     );

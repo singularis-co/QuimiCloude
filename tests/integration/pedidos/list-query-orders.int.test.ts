@@ -34,13 +34,15 @@ import { findRecipeIdsMatchingName } from '@/lib/modules/recetas/adapters/driven
 import { normalizeRecipeName } from '@/lib/modules/recetas'
 import {
   createOrderWriteRepository,
+  findAliveOrderLinesByOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/persistence/order-unit-of-work-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
 
-import type { ListQuery, NewOrder, OrderRow, OrderScope, Page } from '@/lib/modules/pedidos'
+import type { ListQuery, OrderRow, OrderScope, Page } from '@/lib/modules/pedidos'
+import { createOrderWithLine, createSingleLineOrder, type SingleLineNewOrder, firstLineQuantities } from '../../helpers/only-order-line'
 
 /** Un ano por archivo, distinto de los 288x de `order-repository.int.test.ts` y de los 287x de
  *  `order-sequence.int.test.ts`, para que ninguno pueda pisarle la secuencia a otro. */
@@ -76,7 +78,7 @@ let actorId: string
 let roleId: string
 let documentTypeCode: string
 let companyId: string
-/** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+/** QC-146: presentacion de la MISMA empresa, obligatoria en `SingleLineNewOrder`. */
 let presentationId: string
 
 const creados: string[] = []
@@ -92,7 +94,7 @@ function instantIn(day: number, ms = 0): Date {
   return new Date(Date.UTC(YEAR, 0, day, 12, 0, 0, ms))
 }
 
-function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId,
@@ -107,9 +109,9 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 }
 
 /** Alta por el adaptador REAL. Registra el id para que el `afterAll` la borre. */
-async function alta(now: Date, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
+async function alta(now: Date, overrides: Partial<SingleLineNewOrder> = {}): Promise<OrderRow> {
   const fila = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(overrides), YEAR, actorId, now, null, scope()),
+    createSingleLineOrder(createOrderWriteRepository(tx), baseOrder(overrides), YEAR, actorId, now, null, scope()),
   )
   creados.push(fila.id)
   return fila
@@ -180,7 +182,7 @@ beforeAll(async () => {
       select: { id: true },
     })
   ).id
-  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`NewOrder`).
+  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`SingleLineNewOrder`).
   presentationId = (
     await prisma.presentation.create({
       data: {
@@ -222,6 +224,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (creados.length > 0) {
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: creados } } })
     await prisma.order.deleteMany({ where: { id: { in: creados } } })
   }
   await prisma.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS "orders_sequence_${String(YEAR)}"`)
@@ -375,7 +378,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
     const recetas = [recipeAlfaId, recipeBetaId, recipeBajaId, ...recetasComunes]
     // Los pedidos de estas recetas ANTES que las recetas: `recipes.company_id`/`orders.recipe_id`
     // son FK RESTRICT y el `afterAll` del archivo, que borra `creados`, corre DESPUES de este.
-    await prisma.order.deleteMany({ where: { recipeId: { in: recetas } } })
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: recetas } } }}, select: { id: true } })).map((pedido) => pedido.id)
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } })
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } })
     for (const id of recetas) {
       await prisma.recipe.delete({ where: { id } })
     }
@@ -477,7 +482,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
       expect(pagina.total).toBe(0)
     } finally {
       // El pedido ANTES que su receta: `orders.recipe_id` es FK RESTRICT.
-      await prisma.order.deleteMany({ where: { recipeId: recipeBorradaR6Id } })
+      const pedidosABorrar2 = (await prisma.order.findMany({ where: { lines: { some: { recipeId: recipeBorradaR6Id } }}, select: { id: true } })).map((pedido) => pedido.id)
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar2 } } })
+      await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar2 } } })
       await prisma.recipe.delete({ where: { id: recipeBorradaR6Id } })
     }
   })
@@ -510,8 +517,7 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
         // fixture (`scope()`), y este pedido tiene que ser de la OTRA empresa. `createdBy` y
         // `updatedBy` quedan sin autor: son columnas opcionales y el actor del fixture es de
         // la empresa contraria.
-        const otherOrder = await prisma.order.create({
-          data: {
+        const otherOrder = await createOrderWithLine(prisma, {
             companyId: otherCompanyId,
             orderYear: YEAR,
             orderSequence: 1,
@@ -521,9 +527,7 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
             status: 'PENDIENTE',
             createdAt: instantIn(DIA, 40),
             updatedAt: instantIn(DIA, 40),
-          },
-          select: { id: true },
-        })
+          })
 
         // El pedido ajeno EXISTE de verdad en la base: si esto fallara, el cero de abajo no
         // demostraria ningun ambito, solo una fila que nunca llego a crearse.
@@ -535,7 +539,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
         expect(pagina.items).toEqual([])
         expect(pagina.total).toBe(0)
       } finally {
-        await prisma.order.deleteMany({ where: { recipeId: otherRecipeId } })
+        const pedidosABorrar3 = (await prisma.order.findMany({ where: { lines: { some: { recipeId: otherRecipeId } }}, select: { id: true } })).map((pedido) => pedido.id)
+        await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar3 } } })
+        await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar3 } } })
         await prisma.recipe.delete({ where: { id: otherRecipeId } })
       }
     } finally {
@@ -764,7 +770,7 @@ describe('los decimales se comparan como Decimal, no como coma flotante', () => 
     )
 
     expect(pagina.items.map((o) => o.id).sort()).toEqual([justo.id, menos.id].sort())
-    expect(pagina.items.map((o) => o.quantity)).toContain('19.9900')
+    expect(await firstLineQuantities(prisma, pagina.items.map((o) => o.id))).toContain('19.9900')
   })
 })
 
@@ -835,5 +841,211 @@ describe('desempate estable por identificador (R10)', () => {
     expect(vistos).toHaveLength(4)
     expect(new Set(vistos).size).toBe(4)
     expect([...vistos].sort()).toEqual(vistos)
+  })
+})
+
+/**
+ * QT-313 T13 — Filtro y orden por estado con pedidos `PARCIAL` (R49, R52). Las lineas se escriben a
+ * mano porque `create` no da de alta ninguna; cada pedido toma el estado que tendria derivado.
+ */
+describe('QT-313: filtro y orden por estado con pedidos PARCIAL (R49, R52)', () => {
+  // El 26 lo usa el caso del rango de fechas.
+  const DIA = 27
+
+  const recetasExtra: string[] = []
+  const lineas: string[] = []
+  let otraEmpresaId: string
+  let pedidoOtraEmpresa: string
+  let pendiente: OrderRow
+  let enCurso: OrderRow
+  let parcialEnCurso: OrderRow
+  let parcialSinCursoActiva: OrderRow
+  let cancelado: OrderRow
+
+  const soloElDia: ListQuery['filters'] = {
+    createdAt: {
+      kind: 'dateRange',
+      from: `${String(YEAR)}-01-${String(DIA)}`,
+      to: `${String(YEAR)}-01-${String(DIA)}`,
+    },
+  }
+
+  function porEstado(estados: readonly string[], destino: OrderScope = scope()): Promise<Page<OrderRow>> {
+    return listAliveOrders(
+      consulta({ pageSize: 25, filters: { ...soloElDia, status: { kind: 'select', values: [...estados] } } }),
+      null,
+      destino,
+    )
+  }
+
+  async function linea(
+    orderId: string,
+    empresa: string,
+    position: number,
+    receta: string,
+    status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' | 'CANCELADO',
+    quitada = false,
+  ): Promise<void> {
+    // La linea 0 de un pedido dado de alta por el puerto ya existe: se reescribe con estos datos.
+    const existente = await prisma.orderLine.findFirst({ where: { orderId, position }, select: { id: true } })
+    const datos = {
+      recipeId: receta,
+      originalRecipeId: receta,
+      quantity: '1.0000',
+      unitId,
+      status,
+      cancellationReason: status === 'CANCELADO' ? 'ya no se fabrica' : null,
+      deletedAt: quitada ? instantIn(DIA) : null,
+    }
+    const { id } =
+      existente === null
+        ? await prisma.orderLine.create({ data: { orderId, companyId: empresa, position, ...datos }, select: { id: true } })
+        : await prisma.orderLine.update({ where: { id: existente.id }, data: datos, select: { id: true } })
+    lineas.push(id)
+  }
+
+  async function conEstado(
+    fila: OrderRow,
+    status: 'PENDIENTE' | 'EN_CURSO' | 'PARCIAL' | 'CANCELADO',
+  ): Promise<OrderRow> {
+    await prisma.order.update({
+      where: { id: fila.id },
+      data: { status, cancellationReason: status === 'CANCELADO' ? 'ya no se fabrica' : null },
+    })
+    return { ...fila, status }
+  }
+
+  beforeAll(async () => {
+    const marca = token()
+    for (const nombre of ['b', 'c', 'd']) {
+      const { id } = await prisma.recipe.create({
+        data: { name: `Receta ${nombre} ${marca}`, nameNormalized: `receta${nombre}${marca}`, companyId },
+        select: { id: true },
+      })
+      recetasExtra.push(id)
+    }
+    const [recetaB = '', recetaC = '', recetaD = ''] = recetasExtra
+
+    pendiente = await conEstado(await alta(instantIn(DIA, 0)), 'PENDIENTE')
+    await linea(pendiente.id, companyId, 0, recipeId, 'PENDIENTE')
+
+    enCurso = await conEstado(await alta(instantIn(DIA, 1)), 'EN_CURSO')
+    await linea(enCurso.id, companyId, 0, recipeId, 'EN_CURSO')
+
+    parcialEnCurso = await conEstado(await alta(instantIn(DIA, 2)), 'PARCIAL')
+    await linea(parcialEnCurso.id, companyId, 0, recipeId, 'EN_CURSO')
+    await linea(parcialEnCurso.id, companyId, 1, recetaB, 'PENDIENTE')
+
+    // La unica linea EN_CURSO esta cancelada y la otra que lo estuvo, quitada: no esta en curso.
+    parcialSinCursoActiva = await conEstado(await alta(instantIn(DIA, 3)), 'PARCIAL')
+    await linea(parcialSinCursoActiva.id, companyId, 0, recipeId, 'PENDIENTE')
+    await linea(parcialSinCursoActiva.id, companyId, 1, recetaB, 'BLOQUEADO')
+    await linea(parcialSinCursoActiva.id, companyId, 2, recetaC, 'CANCELADO')
+    await linea(parcialSinCursoActiva.id, companyId, 3, recetaD, 'EN_CURSO', true)
+
+    cancelado = await conEstado(await alta(instantIn(DIA, 4)), 'CANCELADO')
+    await linea(cancelado.id, companyId, 0, recipeId, 'CANCELADO')
+
+    otraEmpresaId = (
+      await prisma.company.create({
+        data: { name: `Otra ${marca}`, nameNormalized: normalizeCompanyName(`Otra ${marca}`) },
+        select: { id: true },
+      })
+    ).id
+    pedidoOtraEmpresa = (
+      await prisma.order.create({
+        data: { companyId: otraEmpresaId, orderYear: YEAR, orderSequence: 1, status: 'PARCIAL', createdAt: instantIn(DIA, 5) },
+        select: { id: true },
+      })
+    ).id
+    await linea(pedidoOtraEmpresa, otraEmpresaId, 0, recipeId, 'EN_CURSO')
+    await linea(pedidoOtraEmpresa, otraEmpresaId, 1, recetaB, 'PENDIENTE')
+  })
+
+  afterAll(async () => {
+    await prisma.orderLine.deleteMany({ where: { id: { in: lineas } } })
+    await prisma.order.delete({ where: { id: pedidoOtraEmpresa } })
+    await prisma.company.delete({ where: { id: otraEmpresaId } })
+    const nuestros = [pendiente, enCurso, parcialEnCurso, parcialSinCursoActiva, cancelado].map((fila) => fila.id)
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: nuestros } } })
+    await prisma.order.deleteMany({ where: { id: { in: nuestros } } })
+    creados.splice(0, creados.length, ...creados.filter((id) => !nuestros.includes(id)))
+    await prisma.recipe.deleteMany({ where: { id: { in: recetasExtra } } })
+  })
+
+  it('QT-313 R49: EN_CURSO trae los EN_CURSO y los PARCIAL con una linea activa en curso, no el PARCIAL cuya linea en curso esta cancelada o quitada', async () => {
+    const pagina = await porEstado(['EN_CURSO'])
+
+    expect(pagina.items.map((fila) => fila.id).sort()).toEqual([enCurso.id, parcialEnCurso.id].sort())
+    expect(pagina.total).toBe(2)
+  })
+
+  it('QT-313 R49: PARCIAL trae solo los pedidos PARCIAL', async () => {
+    const pagina = await porEstado(['PARCIAL'])
+
+    expect(pagina.items.map((fila) => fila.id).sort()).toEqual([parcialEnCurso.id, parcialSinCursoActiva.id].sort())
+    expect(pagina.items.every((fila) => fila.status === 'PARCIAL')).toBe(true)
+  })
+
+  it('QT-313 R49: EN_CURSO y PENDIENTE a la vez dan la union sin repetir ningun pedido, y el total coincide', async () => {
+    const pagina = await porEstado(['EN_CURSO', 'PENDIENTE'])
+
+    const ids = pagina.items.map((fila) => fila.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect([...ids].sort()).toEqual(
+      [pendiente.id, enCurso.id, parcialEnCurso.id, parcialSinCursoActiva.id].sort(),
+    )
+    expect(pagina.total).toBe(ids.length)
+  })
+
+  it('QT-313 R49: CANCELADO no trae un PARCIAL con una linea cancelada, solo los pedidos CANCELADO', async () => {
+    const pagina = await porEstado(['CANCELADO'])
+
+    expect(pagina.items.map((fila) => fila.id)).toEqual([cancelado.id])
+  })
+
+
+  it('QT-313 R49: el filtro nunca trae pedidos de otra empresa, y en la otra empresa ve solo los suyos', async () => {
+    const nuestra = await porEstado(['EN_CURSO', 'PENDIENTE', 'PARCIAL'])
+    expect(nuestra.items.map((fila) => fila.id)).not.toContain(pedidoOtraEmpresa)
+
+    const otra = await porEstado(['EN_CURSO'], { companyId: otraEmpresaId })
+    expect(otra.items.map((fila) => fila.id)).toEqual([pedidoOtraEmpresa])
+  })
+
+  it('QT-313 R52: ordenar por estado ascendente pone los PARCIAL antes que los PENDIENTE, y descendente los deja al final', async () => {
+    function ordenadoPorEstado(direction: 'asc' | 'desc'): Promise<Page<OrderRow>> {
+      return listAliveOrders(
+        consulta({
+          pageSize: 25,
+          filters: { ...soloElDia, status: { kind: 'select', values: ['PARCIAL', 'PENDIENTE'] } },
+          sort: { columnId: 'status', direction },
+        }),
+        null,
+        scope(),
+      )
+    }
+
+    const asc = (await ordenadoPorEstado('asc')).items.map((fila) => fila.status)
+    const desc = (await ordenadoPorEstado('desc')).items.map((fila) => fila.status)
+
+    expect(asc.slice(0, 2)).toEqual(['PARCIAL', 'PARCIAL'])
+    expect(asc.slice(2).length).toBeGreaterThan(0)
+    expect(asc.slice(2).every((status) => status === 'PENDIENTE')).toBe(true)
+    expect(desc.slice(-2)).toEqual(['PARCIAL', 'PARCIAL'])
+  })
+
+  it('QT-313 R6, R43: las lineas de varios pedidos salen por position y nunca las de otra empresa', async () => {
+    const leidas = await findAliveOrderLinesByOrderIds(
+      [parcialSinCursoActiva.id, parcialEnCurso.id, pedidoOtraEmpresa],
+      scope(),
+    )
+
+    const posiciones = (orderId: string) =>
+      leidas.filter((fila) => fila.orderId === orderId).map((fila) => fila.position)
+    expect(posiciones(parcialSinCursoActiva.id)).toEqual([0, 1, 2])
+    expect(posiciones(parcialEnCurso.id)).toEqual([0, 1])
+    expect(posiciones(pedidoOtraEmpresa)).toEqual([])
+    expect(await findAliveOrderLinesByOrderIds([pedidoOtraEmpresa], { companyId: otraEmpresaId })).toHaveLength(2)
   })
 })

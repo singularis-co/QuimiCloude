@@ -95,19 +95,14 @@ async function insertarPedido(
 ): Promise<void> {
   sequence += 1
   await tx.$executeRawUnsafe(
-    `INSERT INTO "orders" ("id","company_id","order_year","order_sequence","recipe_id","quantity",
-       "status","cancellation_reason","packed_by","conditioned_by","finished_at","deleted_at",
-       "updated_at")
-     VALUES ($1::uuid, $2::uuid, 2026, $3, $4::uuid, 10, $5::"OrderStatus", $6, $7::uuid, $7::uuid,
-       $8::timestamptz, $9::timestamptz, CURRENT_TIMESTAMP)`,
+    `INSERT INTO "orders" ("id","company_id","order_year","order_sequence",
+       "status","cancellation_reason","deleted_at","updated_at")
+     VALUES ($1::uuid, $2::uuid, 2026, $3, $4::"OrderStatus", $5, $6::timestamptz, CURRENT_TIMESTAMP)`,
     randomUUID(),
     empresa.companyId,
     sequence,
-    empresa.recipeId,
     status,
     status === 'CANCELADO' ? 'Cancelado en la prueba' : null,
-    status === 'TERMINADO' ? empresa.userId : null,
-    status === 'TERMINADO' ? new Date() : null,
     options.deleted === true ? new Date() : null,
   )
 }

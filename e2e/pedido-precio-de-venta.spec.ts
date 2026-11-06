@@ -19,11 +19,13 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import {
   openOrderRowMenu,
   orderMenuTrigger,
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
+import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc307_e2e_';
 
@@ -109,7 +111,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: inCompanies });
     await prisma.orderAssignment.deleteMany({ where: inCompanies });
     await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
-    await prisma.order.deleteMany({ where: inCompanies });
+    await deleteOrdersWithLines({ where: inCompanies });
     await prisma.recipe.deleteMany({ where: inCompanies });
     await prisma.unit.deleteMany({ where: inCompanies });
   }
@@ -176,7 +178,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: inCompany }),
     () => prisma.orderAssignment.deleteMany({ where: inCompany }),
     () => prisma.orderPresentationLine.deleteMany({ where: inCompany }),
-    () => prisma.order.deleteMany({ where: inCompany }),
+    () => deleteOrdersWithLines({ where: inCompany }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () => prisma.unit.deleteMany({ where: { name: UNIT_NAME } }),
     () => prisma.user.deleteMany({ where: { username: adminUser.username } }),
@@ -229,10 +231,12 @@ test.describe('precio de venta del pedido', () => {
     await submitOrderWithLeftover(page, form);
     await expect(form).toHaveCount(0, { timeout: 60_000 });
 
-    const created = await prisma.order.findMany({
-      where: { companyId: required(companyId, 'la empresa') },
-      select: { id: true, salePrice: true },
-    });
+    const created = (
+      await prisma.order.findMany({
+        where: { companyId: required(companyId, 'la empresa') },
+        select: { id: true, lines: firstLineSelect({ salePrice: true }) },
+      })
+    ).map(withFirstLine);
     expect(created, 'el alta deja exactamente un pedido nuevo').toHaveLength(1);
     const createdOrder = created[0]!;
     expect(createdOrder.salePrice?.toString(), 'el alta guarda el precio escrito').toBe(

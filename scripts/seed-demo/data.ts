@@ -160,9 +160,10 @@ export type DemoDataset = {
 
 /**
  * `ENTREGADO` existe en el enum pero ningun caso de uso lleva hoy un pedido ahi: el empaque
- * termina en `POR_ACONDICIONAR` y el acondicionamiento en `TERMINADO`. No se fuerza por SQL.
+ * termina en `POR_ACONDICIONAR` y el acondicionamiento en `TERMINADO`. `PARCIAL` necesita un
+ * pedido con varias recetas, y el dataset crea pedidos de una. No se fuerzan por SQL.
  */
-export const UNREACHABLE_ORDER_STATUSES: readonly OrderStatus[] = ['ENTREGADO']
+export const UNREACHABLE_ORDER_STATUSES: readonly OrderStatus[] = ['PARCIAL', 'ENTREGADO']
 
 const users: readonly DemoUser[] = [
   { key: 'operador1', username: 'demo.operador1', role: 'operador', firstNames: 'DEMO Oscar', lastNames: 'Perez', documentNumber: 'DEMO-1002', phone: '+57 300 000 1002' },

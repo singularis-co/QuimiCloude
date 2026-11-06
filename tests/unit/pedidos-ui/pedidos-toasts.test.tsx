@@ -52,6 +52,7 @@ import {
   deliveryView,
 } from '../../fixtures/order-delivery';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const acciones = vi.hoisted(() => ({
   toastSuccess: vi.fn<(message: unknown) => void>(),
@@ -187,6 +188,7 @@ const RESPONSABLES: readonly OrderResponsible[] = [
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

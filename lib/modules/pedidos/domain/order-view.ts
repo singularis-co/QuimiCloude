@@ -1,8 +1,9 @@
-import type { OrderPriority, OrderStatus } from './order-classification';
+import type { OrderLineStatus, OrderPriority, OrderStatus } from './order-classification';
 import type { EditableOrderStatus } from './order-input';
 import type { OrderCustomer } from './order-customer';
 import type { OrderNumber } from './order-number';
 import type { OrderDeliveryState } from './order-pending-delivery';
+import type { OrderProgress } from './order-totals';
 
 /**
  * Contratos de entrada y salida del pedido (`design.md > 7.3`). Viven en `domain/` -no en
@@ -18,9 +19,8 @@ import type { OrderDeliveryState } from './order-pending-delivery';
  * con o sin reparto, y el reparto en si mismo -`presentationLines`- sustituye a la presentacion
  * unica.
  *
- * `OrderRow` y `OrderView` SI llevan `ingredientsCost`: el pedido guarda el coste de sus propios
- * ingredientes, opcional, calculado al escribirlo. Es el COSTE; el precio de venta es
- * `salePrice`, va aparte, lo escribe el usuario y no se deriva del coste.
+ * El coste de los ingredientes y el precio de venta son de cada linea; el precio lo escribe el
+ * usuario y no se deriva del coste.
  */
 
 /**
@@ -79,18 +79,10 @@ export type OrderPresentationLineView = {
  * ninguno de los tres esta aqui.
  */
 export type NewOrder = {
-  readonly recipeId: string;
-  readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: EditableOrderStatus;
-  /** Obligatoria: toda escritura de `NewOrder` la lleva. */
-  readonly unitId: string;
-  /** El reparto, ya resuelto y validado contra el total (puede ser `[]`). */
-  readonly presentationLines: readonly OrderPresentationLineWrite[];
   /** `null` = pedido sin cliente. */
   readonly customerId: string | null;
-  /** Precio de venta del pedido entero. `null` = sin precio. Cadena decimal(14,4). */
-  readonly salePrice: string | null;
 };
 
 /**
@@ -101,46 +93,57 @@ export type NewOrder = {
  */
 export type OrderEdit = Omit<NewOrder, 'status'>;
 
+/** Lo que una edicion escribe en el pedido mismo: lo de cada receta va en su linea. */
+export type OrderHeaderEdit = OrderEdit;
+
 /**
- * La fila tal como la devuelve el puerto: lo que vive en `orders` y nada mas. NO trae el
- * nombre de la receta -eso lo resuelve el caso de uso con el contrato publico de `recetas`, con
- * UNA consulta por pagina (R43, R45)-, y por eso este tipo no es `OrderView`.
+ * La fila tal como la devuelve el puerto: lo que vive en `orders` y nada mas. Lo de cada receta
+ * viene en sus lineas (`OrderLineRow`).
  *
  * `deletedAt` NO sale: ninguna consulta devuelve borrados (R40), asi que seria siempre `null`
  * y solo invitaria a filtrar en memoria lo que ya filtro el puerto.
- *
- * `ingredientsCost` es el coste de los ingredientes de la receta con los lotes del momento en
- * que se escribio el pedido, o `null` si no se pudo calcular. Es el COSTE; el precio de venta
- * es `salePrice`, aparte, y no se deriva de el.
  */
 export type OrderRow = {
   readonly id: string;
   readonly number: OrderNumber;
-  readonly recipeId: string;
-  readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
-  readonly ingredientsCost: string | null;
-  /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
-   *  solo si `ingredientsCost` lo es. */
-  readonly packagingCost: string | null;
-  /** Coste real de lo consumido, fijado al Terminar el empaque; `null` sin terminar o sin
-   *  calculo posible, nunca `0`. Va aparte del estimado y no lo sustituye. */
-  readonly actualCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** El reparto en orden de alta (`created_at`, desempate `id`); `[]` = sin reparto. */
-  readonly presentationLines: readonly OrderPresentationLineRow[];
-  /** La unidad en que se expresa `quantity`.
-   *  `null` solo en los pedidos anteriores sin presentacion. */
-  readonly unitId: string | null;
   /** Solo el id: el nombre lo resuelve el caso de uso con el catalogo de clientes. */
   readonly customerId: string | null;
-  /** Precio de venta del pedido entero; `null` = sin precio. Cadena con 4 decimales. */
+};
+
+/** Una receta del pedido tal como la devuelve el puerto. `recipeId` es la receta que se fabrica (la
+ *  version, si se eligio una) y `originalRecipeId`, su original. */
+export type OrderLineRow = {
+  readonly id: string;
+  readonly orderId: string;
+  readonly position: number;
+  readonly recipeId: string;
+  readonly originalRecipeId: string;
+  readonly quantity: string;
+  /** `null` solo en lineas migradas de pedidos antiguos sin unidad. */
+  readonly unitId: string | null;
+  readonly status: OrderLineStatus;
+  readonly cancellationReason: string | null;
+  readonly ingredientsCost: string | null;
+  readonly packagingCost: string | null;
+  readonly actualCost: string | null;
   readonly salePrice: string | null;
+  readonly reservedAt: Date | null;
+  readonly finishedAt: Date | null;
+  readonly packedBy: string | null;
+  readonly conditionedBy: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  readonly createdBy: string | null;
+  readonly updatedBy: string | null;
+  /** El reparto de esta linea, en orden de alta. */
+  readonly presentationLines: readonly OrderPresentationLineRow[];
 };
 
 /**
@@ -156,11 +159,9 @@ export type OrderRow = {
  * `createdBy`/`updatedBy` son IDENTIFICADORES, no nombres (R46): este modulo no consulta el
  * modelo `User`. Resolverlos es de QC-35.
  *
- * `ingredientsCost` es el COSTE de los ingredientes de la receta, calculado con los lotes que
- * habia en el momento de ESCRIBIR el pedido (alta o edicion), nunca al leerlo. Puede ser `null`
- * cuando no se pudo calcular; `null` y `0` no significan lo mismo. El precio de venta es
- * `salePrice`, aparte: lo escribe el usuario, no se deriva del coste y de el no sale ni margen ni
- * total. Esta salida no tiene moneda.
+ * Los campos planos de receta, cantidad, unidad, reparto, precio y coste estimado son los de la
+ * primera linea (`lines[0]`), los que la pantalla de una receta ya pinta. `actualCost` es la suma
+ * de las lineas activas, igual que `actualCostTotal`. Esta salida no tiene moneda.
  */
 export type OrderView = {
   readonly id: string;
@@ -208,6 +209,37 @@ export type OrderView = {
   readonly customer: OrderCustomer | null;
   /** Precio de venta del pedido entero; `null` = sin precio, distinto de `'0.0000'`. */
   readonly salePrice: string | null;
+  /** Las recetas vivas del pedido, canceladas incluidas, por `position`. */
+  readonly lines: readonly OrderLineView[];
+  /** Lineas activas y cuantas de ellas estan en `TERMINADO` o `ENTREGADO`. */
+  readonly progress: OrderProgress;
+  /** Suma de los precios de las lineas activas que lo tienen; `null` si ninguna lo tiene. */
+  readonly salePriceTotal: string | null;
+  readonly linesWithoutPrice: number;
+  /** `null` si alguna linea activa no tiene coste: una suma con huecos no es el coste. */
+  readonly ingredientsCostTotal: string | null;
+  readonly actualCostTotal: string | null;
+};
+
+/** Una receta del pedido en la ficha y el listado. Las sumas del pedido salen de estas lineas y no
+ *  se guardan. */
+export type OrderLineView = {
+  readonly id: string;
+  readonly position: number;
+  readonly recipeId: string;
+  /** El nombre mostrado; `null` si la receta no vuelve del catalogo. */
+  readonly recipeName: string | null;
+  readonly quantity: string;
+  readonly unitId: string | null;
+  readonly status: OrderLineStatus;
+  readonly cancellationReason: string | null;
+  readonly presentationLines: readonly OrderPresentationLineView[];
+  readonly salePrice: string | null;
+  readonly ingredientsCost: string | null;
+  readonly packagingCost: string | null;
+  readonly actualCost: string | null;
+  readonly finishedAt: Date | null;
+  readonly reservedAt: Date | null;
 };
 
 /**

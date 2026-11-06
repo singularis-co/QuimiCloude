@@ -1,11 +1,13 @@
 // lib/modules/pedidos/domain/review-blocked-orders.ts
 /**
- * Revisa los pedidos `BLOQUEADO` de una empresa despues de que entre material y desbloquea los
- * que ya alcanzan: aparta, pasa a `PENDIENTE`, fija `reserved_at` y sustituye el importe.
+ * Revisa las lineas `BLOQUEADO` de una empresa despues de que entre material y desbloquea las
+ * que ya alcanzan: aparta, pasa la linea a `PENDIENTE`, fija su `reserved_at`, sustituye su importe
+ * y deriva el estado del pedido.
  *
- * Del mas antiguo al mas nuevo, para que el material que entra se aparte antes para el que lleva
- * mas tiempo esperando. Cada pedido va en su propia transaccion: un fallo deja ese pedido como
- * estaba, queda en `failed` y la revision sigue con el siguiente.
+ * Por orden de alta de los pedidos y, dentro de cada pedido, por el de sus lineas, para que el
+ * material que entra se aparte antes para la que lleva mas tiempo esperando. Cada linea va en su
+ * propia transaccion: un fallo deja esa linea como estaba, queda en `failed` y la revision sigue
+ * con la siguiente.
  *
  * Sin actor ni permiso, como la caducidad: lo dispara el sistema despues de una operacion de
  * inventario que ya exigio el suyo, y lo escrito queda sin autor.
@@ -25,7 +27,7 @@ import type { OrderRepository } from '../ports/order-repository';
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
 export type ReviewBlockedOrdersDeps = {
-  readonly orders: Pick<OrderRepository, 'findBlockedIds' | 'findAliveById'>;
+  readonly orders: Pick<OrderRepository, 'findBlockedIds' | 'findAliveLines'>;
   readonly recipes: RecipeCatalog;
   readonly products: ProductCatalog;
   readonly units: UnitCatalog;
@@ -38,13 +40,15 @@ export type ReviewBlockedOrdersInput = {
   readonly now: Date;
 };
 
-/** Sin mensaje ni datos del pedido: solo su identificador y el codigo del catalogo. */
+/** Sin mensaje ni datos del pedido: solo los identificadores y el codigo del catalogo. */
 export type BlockedOrderReviewFailure = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly code: string;
 };
 
 export type ReviewBlockedOrdersResult = {
+  /** Lineas que pasaron a `PENDIENTE`. */
   readonly unblocked: number;
   readonly failed: readonly BlockedOrderReviewFailure[];
 };
@@ -70,16 +74,16 @@ export function createReviewBlockedOrders(
     const { companyId, now } = input;
     const scope: OrderScope = { companyId };
 
-    const ids = await deps.orders.findBlockedIds(scope);
+    const blocked = await deps.orders.findBlockedIds(scope);
 
     let unblocked = 0;
     const failed: BlockedOrderReviewFailure[] = [];
 
-    for (const id of ids) {
+    for (const { orderId, lineId } of blocked) {
       try {
-        if (await reviewOne(deps, id, scope, now)) unblocked += 1;
+        if (await reviewOne(deps, orderId, lineId, scope, now)) unblocked += 1;
       } catch (e) {
-        failed.push({ orderId: id, code: codeOf(e) });
+        failed.push({ orderId, lineId, code: codeOf(e) });
       }
     }
 
@@ -89,61 +93,63 @@ export function createReviewBlockedOrders(
 
 async function reviewOne(
   deps: ReviewBlockedOrdersDeps,
-  id: string,
+  orderId: string,
+  lineId: string,
   scope: OrderScope,
   now: Date,
 ): Promise<boolean> {
-  const row = await deps.orders.findAliveById(id, scope);
-  if (row === null || row.status !== 'BLOQUEADO') return false;
+  const line = (await deps.orders.findAliveLines(orderId, scope)).find((candidate) => candidate.id === lineId);
+  if (line === undefined || line.status !== 'BLOQUEADO') return false;
 
-  // Fuera de la transaccion, igual que en la edicion: el pedido no tiene nada apartado, asi que
-  // es el coste con el disponible general de este instante.
+  // Fuera de la transaccion, igual que en la edicion: la linea no tiene nada apartado, asi que es
+  // el coste con el disponible general de este instante.
   const cost = await resolveStoredOrderCost(
     deps,
-    row.recipeId,
-    row.quantity,
-    row.unitId,
-    packagingLinesOf(row.presentationLines),
+    line.recipeId,
+    line.quantity,
+    line.unitId,
+    packagingLinesOf(line.presentationLines),
     scope.companyId,
-    { orderId: id },
+    { orderLineId: lineId },
   );
 
   return deps.unitOfWork.run(async (transaction) => {
-    const locked = await transaction.orders.lockAliveById(id, scope);
-    // Otra operacion lo cancelo, lo desbloqueo o lo borro entre la lista y el candado. Si lo
-    // editaron sin desbloquearlo, el importe calculado ya no es el suyo: se deja para la
+    const locked = await transaction.orders.lockAliveLine(orderId, lineId, scope);
+    // Otra operacion la cancelo, la desbloqueo o la quito entre la lista y el candado. Si la
+    // editaron sin desbloquearla, el importe calculado ya no es el suyo: se deja para la
     // siguiente revision.
     if (
       locked === null ||
-      locked.status !== 'BLOQUEADO' ||
-      locked.recipeId !== row.recipeId ||
-      locked.quantity !== row.quantity ||
-      locked.unitId !== row.unitId ||
-      !samePackaging(locked.presentationLines, row.presentationLines)
+      locked.line.status !== 'BLOQUEADO' ||
+      locked.line.recipeId !== line.recipeId ||
+      locked.line.quantity !== line.quantity ||
+      locked.line.unitId !== line.unitId ||
+      !samePackaging(locked.line.presentationLines, line.presentationLines)
     ) {
       return false;
     }
 
-    const content = await transaction.recipes.findExecutionContentById(locked.recipeId, scope.companyId);
+    const content = await transaction.recipes.findExecutionContentById(line.recipeId, scope.companyId);
     const recipeLines = content?.lines ?? [];
     const units = await loadRequirementUnits(
       transaction,
-      recipeLines.map((line) => line.productId),
-      locked.unitId,
+      recipeLines.map((recipeLine) => recipeLine.productId),
+      line.unitId,
       scope.companyId,
     );
     const requirement = buildOrderRequirement({
       recipeLines,
-      quantity: locked.quantity,
-      packagingLines: packagingLinesOf(locked.presentationLines),
+      quantity: line.quantity,
+      packagingLines: packagingLinesOf(line.presentationLines),
       phase: 'before_consumption',
       units,
     });
-    // Entrar material no lo arregla: solo editar la unidad. Se queda bloqueado y sin tocar.
+    // Entrar material no lo arregla: solo editar la unidad. Se queda bloqueada y sin tocar.
     if (requirement.kind === 'not_convertible') return false;
 
-    const outcome = await transaction.reservations.syncForOrder({
-      orderId: id,
+    const outcome = await transaction.reservations.syncForLine({
+      orderId,
+      orderLineId: lineId,
       companyId: scope.companyId,
       requirement: requirement.lines,
       actorId: null,
@@ -151,14 +157,15 @@ async function reviewOne(
     });
     if (outcome.kind === 'insufficient') return false;
 
-    const moved = await transaction.orders.setStatus(id, 'BLOQUEADO', 'PENDIENTE', null, now, scope);
-    // Con la fila bloqueada no deberia pasar; si pasa, lanzar deshace lo apartado.
+    const moved = await transaction.orders.setLineStatus(orderId, lineId, 'BLOQUEADO', 'PENDIENTE', null, now, scope);
+    // Con la linea bloqueada no deberia pasar; si pasa, lanzar deshace lo apartado.
     if (moved !== 'ok') throw new OrderNotFoundError();
 
-    const costed = await transaction.orders.setIngredientsCost(id, cost, null, now, scope);
+    const costed = await transaction.orders.setLineIngredientsCost(orderId, lineId, cost, null, now, scope);
     if (costed !== 'ok') throw new OrderNotFoundError();
 
-    await transaction.orders.setReservedAt(id, outcome.kind === 'reserved' ? now : null, scope);
+    await transaction.orders.setLineReservedAt(orderId, lineId, outcome.kind === 'reserved' ? now : null, scope);
+    await transaction.orders.refreshStatus(orderId, null, now, scope);
     return true;
   });
 }

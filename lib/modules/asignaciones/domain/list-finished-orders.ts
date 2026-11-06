@@ -66,7 +66,7 @@ export function createListFinishedOrders(
     const composed = await composeOrderRows(deps, actor.companyId, ordersPage.items);
 
     const items: FinishedOrderView[] = ordersPage.items.map((row) => {
-      const rowComposed = composed.get(row.id);
+      const rowComposed = composed.get(row.lineId);
       return {
         id: row.id,
         numberText: formatOrderNumber(row.number),

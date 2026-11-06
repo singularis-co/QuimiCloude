@@ -1,14 +1,23 @@
+/** Una por linea de entrega anulada; `quantity` es la de esa linea, decimal(14,4), positiva. Puede
+ *  repetir `batchId`: cada lote recibe la suma en un solo incremento y un solo asiento. */
+type ReturnedLine<OrderLineId> = {
+  readonly batchId: string;
+  readonly quantity: string;
+  /** La linea del pedido del asiento `delivery` que se anula. Las lineas de un mismo lote llevan
+   *  la misma. */
+  readonly orderLineId: OrderLineId;
+};
+
+/** Con pedido, cada linea lleva la suya; al anular una entrega sin pedido, ninguna. */
 export type FinishedGoodsReturnInput = {
   readonly companyId: string;
-  /** `null` al anular una entrega sin pedido. */
-  readonly orderId: string | null;
   readonly orderDeliveryVoidId: string;
-  /** Una por linea de entrega anulada; `quantity` es la de esa linea, decimal(14,4), positiva. Puede
-   *  repetir `batchId`: cada lote recibe la suma en un solo incremento y un solo asiento. */
-  readonly lines: readonly { readonly batchId: string; readonly quantity: string }[];
   readonly actorId: string;
   readonly now: Date;
-};
+} & (
+  | { readonly orderId: string; readonly lines: readonly ReturnedLine<string>[] }
+  | { readonly orderId: null; readonly lines: readonly ReturnedLine<null>[] }
+);
 
 export type FinishedGoodsReturnOutcome =
   | { readonly kind: 'returned' }

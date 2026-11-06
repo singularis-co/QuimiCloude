@@ -26,6 +26,8 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -42,11 +44,12 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 
 import {
-  createCreateOrder,
+  createCreateOrder as createLinesOrder,
   createReviewBlockedOrders,
   createTransitionOrder,
-  createUpdateOrder,
+  createUpdateOrder as createLinesUpdate,
 } from '@/lib/modules/pedidos';
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
@@ -56,6 +59,13 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { onOnlyLine } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -71,6 +81,7 @@ function token(): string {
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 };
@@ -189,6 +200,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { product: { companyId: fixture.companyId, type: 'FINISHED_PRODUCT' } } });
   await prisma.product.deleteMany({ where: { companyId: fixture.companyId, type: 'FINISHED_PRODUCT' } });
@@ -267,10 +280,7 @@ async function asientosSobre(batchIds: readonly string[]): Promise<{ reservas: n
 }
 
 async function filaDe(orderId: string): Promise<{ status: string; ingredientsCost: string | null }> {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, ingredientsCost: true },
-  });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, ingredientsCost: true } });
   return { status: row.status, ingredientsCost: row.ingredientsCost === null ? null : row.ingredientsCost.toFixed(4) };
 }
 
@@ -325,9 +335,9 @@ describe('herramientas frente a reserva y consumo', () => {
       });
       expect((await filaDe(bloqueado.id)).status).toBe('PENDIENTE');
 
-      await transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
+      await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
       expect(
-        await transitionAliveById(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date()),
+        await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'EN_CURSO', 'POR_EMPACAR', fixture.actorId, new Date()),
       ).toBe('ok');
 
       expect(await asientosSobre(herramientas)).toEqual(antes);

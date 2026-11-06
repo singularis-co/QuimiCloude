@@ -45,10 +45,10 @@ const ENTREGA: DeliveryForVoid = {
 
 /** El primer cliente en dos lotes; el segundo en uno; el tercero ya anulado. */
 const LINEAS: readonly DeliveryLineForVoid[] = [
-  { id: 'l-1', customerId: DIRECT_FIRST_CUSTOMER_ID, presentationLineId: null, batchId: DIRECT_OLDER_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
-  { id: 'l-2', customerId: DIRECT_FIRST_CUSTOMER_ID, presentationLineId: null, batchId: DIRECT_NEWER_BATCH_ID, packages: 1, quantity: '1.0000', voided: false },
-  { id: 'l-3', customerId: DIRECT_SECOND_CUSTOMER_ID, presentationLineId: null, batchId: DIRECT_OLDER_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
-  { id: 'l-4', customerId: TERCER_CLIENTE, presentationLineId: null, batchId: DIRECT_OLDER_BATCH_ID, packages: 3, quantity: '3.0000', voided: true },
+  { id: 'l-1', customerId: DIRECT_FIRST_CUSTOMER_ID, presentationLineId: null, orderLineId: null, batchId: DIRECT_OLDER_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'l-2', customerId: DIRECT_FIRST_CUSTOMER_ID, presentationLineId: null, orderLineId: null, batchId: DIRECT_NEWER_BATCH_ID, packages: 1, quantity: '1.0000', voided: false },
+  { id: 'l-3', customerId: DIRECT_SECOND_CUSTOMER_ID, presentationLineId: null, orderLineId: null, batchId: DIRECT_OLDER_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'l-4', customerId: TERCER_CLIENTE, presentationLineId: null, orderLineId: null, batchId: DIRECT_OLDER_BATCH_ID, packages: 3, quantity: '3.0000', voided: true },
 ]
 
 function entrada(overrides: Partial<VoidDirectDeliveryInput> = {}): VoidDirectDeliveryInput {
@@ -275,8 +275,8 @@ describe('voidDirectDelivery — registro (R50)', () => {
       orderId: null,
       orderDeliveryVoidId: VOID_ID,
       lines: [
-        { batchId: DIRECT_OLDER_BATCH_ID, quantity: '4.0000' },
-        { batchId: DIRECT_NEWER_BATCH_ID, quantity: '1.0000' },
+        { batchId: DIRECT_OLDER_BATCH_ID, quantity: '4.0000', orderLineId: null },
+        { batchId: DIRECT_NEWER_BATCH_ID, quantity: '1.0000', orderLineId: null },
       ],
       actorId: ANULADOR.id,
       now: AHORA,

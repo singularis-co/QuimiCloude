@@ -118,6 +118,18 @@ describe('R33: el excedente, calculado con el producto bloqueado', () => {
       expect(await codigoDe(pedidos.deliverDirect(deN(e, 13), e.actor))).toBe('delivery_exceeds_surplus');
     });
   });
+
+  it('QT-313 R45: con pedidos de una linea el excedente es el de hoy', async () => {
+    await conEscenario('excedente-linea', async (e) => {
+      const hoy = await pedidos.getDirectDelivery(e.productId, e.actor);
+
+      expect(await pedidos.getDirectDelivery(e.productId, e.actor)).toEqual(hoy);
+      expect(hoy).toMatchObject({ stockPackages: 20, waitingPackages: 8, surplusPackages: 12 });
+      expect(await pedidos.listDirectDeliverySurplus([e.productId], e.actor)).toEqual(new Map([[e.productId, 12]]));
+      expect(await codigoDe(pedidos.deliverDirect(deN(e, 13), e.actor))).toBe('delivery_exceeds_surplus');
+      await expect(pedidos.deliverDirect(deN(e, 12), e.actor)).resolves.toEqual({ status: 'delivered' });
+    });
+  });
 });
 
 describe('R36, R37: lo que escribe una entrega sin pedido', () => {

@@ -28,6 +28,7 @@ import {
   stockDeProducto,
   type EmpresaDeEntrega,
 } from '../../helpers/order-delivery-seed';
+import { firstLineSelect, withFirstLine } from '../../helpers/only-order-line';
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -92,8 +93,8 @@ async function borrarEscenario(e: Escenario): Promise<void> {
 async function pedido(orderId: string) {
   return prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: { status: true, customerId: true, finishedAt: true, packedBy: true, conditionedBy: true },
-  });
+    select: { status: true, customerId: true, lines: firstLineSelect({ finishedAt: true, packedBy: true, conditionedBy: true }) },
+  }).then(withFirstLine);
 }
 
 async function codigoDe(promesa: Promise<unknown>): Promise<string> {
@@ -712,6 +713,22 @@ describe('QC-282 deliverOrder con varios clientes contra Postgres', () => {
 });
 
 describe('getOrderDelivery contra Postgres', () => {
+  it('QT-313 R45: con una linea ofrece los lotes de la receta de la linea', async () => {
+    const e = await crearEscenario();
+    try {
+      const hoy = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+
+      expect(vista).toEqual(hoy);
+      expect(vista.lines.map((linea) => linea.batches.map((lote) => lote.batchId))).toEqual([
+        [e.batchId, e.secondBatchId],
+        [e.smallBatchId],
+      ]);
+    } finally {
+      await borrarEscenario(e);
+    }
+  });
+
   it('R5, R6, R7, R9: devuelve pedidos, entregados y faltan por linea, los lotes entregables y el cliente vivo del pedido', async () => {
     const e = await crearEscenario();
     try {

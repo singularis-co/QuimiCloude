@@ -19,6 +19,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
+import { onlyLineOf } from './only-order-line';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -53,16 +54,27 @@ export function createStartPacking(
     if (!parsed.success) throw new ValidationError();
     const { orderId } = parsed.data;
 
+    const line = onlyLineOf(
+      await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['POR_EMPACAR', 'EN_EMPAQUE'], 1, 1),
+    );
+    // Sin linea que empacar, el pedido no existe o esta en otro estado: cada caso con su error.
+    if (line === undefined) {
+      throw (await deps.orders.findAliveById(orderId, actor.companyId)) === null
+        ? new OrderNotFoundError()
+        : new OrderNotPackableError();
+    }
+
     const now = deps.now?.() ?? new Date();
     try {
       await deps.transaction.run(async ({ packing, log }) => {
-        const result = await packing.startPackingAliveById(orderId, actor.companyId, actor.id, now);
+        const result = await packing.startPackingAliveById(orderId, line.lineId, actor.companyId, actor.id, now);
         // Repetir Comenzar sobre el propio `EN_EMPAQUE` es exito: no escribio nada, asi que no se anota.
         if (result === 'already_mine') return;
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await log.append({
           companyId: actor.companyId,
           orderId,
+          orderLineId: line.lineId,
           userId: actor.id,
           occurredAt: now,
           action: 'pack_start',

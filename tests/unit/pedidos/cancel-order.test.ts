@@ -22,12 +22,11 @@ import {
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
 
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
-import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -40,7 +39,7 @@ const ADMIN: Actor = {
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
-function fila(status: OrderStatus, cancellationReason: string | null = null): OrderRow {
+function fila(status: OrderStatus, cancellationReason: string | null = null): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -63,40 +62,46 @@ function fila(status: OrderStatus, cancellationReason: string | null = null): Or
   }
 }
 
+const LINEA_ID = ONLY_LINE_ID
+
 function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_found' } = {}) {
   const filaVista = opciones.fila === undefined ? null : opciones.fila
+  // QT-313: cancelar ya no lee el pedido antes de la transaccion; el doble explota si lo hace.
   const findAliveById = vi.fn(async () => filaVista)
 
-  const explota = (nombre: string) =>
-    vi.fn(() => {
-      throw new Error(`${nombre} no deberia llamarse al cancelar`)
-    })
-
-  const orders = {
-    findAliveById,
-    listAlive: explota('orders.listAlive'),
-  } as unknown as OrderRepository
-
-  // `lockAliveById` bloquea la MISMA fila que `findAliveById` -en estos tests no hay carrera
-  // que las separe-. Los parametros van TIPADOS -y no `vi.fn(async () => ...)`- para poder
-  // afirmar sobre `mock.calls[0]`: sin ellos, TypeScript infiere una tupla vacia.
-  const lockAliveById = vi.fn(async () => (filaVista === null ? null : { ...filaVista, reservedAt: null, packagingCost: null }))
-  const cancelAlive = vi.fn(
-    async (id: string, reason: string, actorId: string | null, when: Date) => {
-      // El doble no usa los argumentos; los DECLARA para que `mock.calls` tenga tipo.
-      void [id, reason, actorId, when]
+  // El pedido de una receta y su unica linea, con el estado de la fila. Los parametros van TIPADOS
+  // para poder afirmar sobre `mock.calls[0]`.
+  const lockAliveLines = vi.fn(async () =>
+    filaVista === null ? null : { order: { ...filaVista, reservedAt: null }, lines: [orderLineOf(filaVista)] },
+  )
+  const cancelLine = vi.fn(
+    async (id: string, lineId: string, reason: string, actorId: string | null, when: Date) => {
+      void [id, lineId, reason, actorId, when]
       return opciones.cancelacion ?? 'ok'
     },
   )
-  const setReservedAt = vi.fn(async (id: string, reservedAt: Date | null) => { void [id, reservedAt] })
-  const releaseForOrder = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
+  const setLineReservedAt = vi.fn(async (id: string, lineId: string, reservedAt: Date | null) => {
+    void [id, lineId, reservedAt]
+  })
+  const refreshStatus = vi.fn(async () => 'CANCELADO' as const)
+  const releaseForLine = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
 
-  const { unitOfWork } = fakeUnitOfWork({
-    orders: { lockAliveById, cancelAlive, setReservedAt },
-    reservations: { releaseForOrder },
+  const { unitOfWork, orders } = fakeUnitOfWork({
+    orders: { lockAliveLines, cancelLine, setLineReservedAt, refreshStatus },
+    reservations: { releaseForLine },
   })
 
-  return { orders, unitOfWork, now: () => AHORA, findAliveById, lockAliveById, cancelAlive, setReservedAt, releaseForOrder }
+  return {
+    unitOfWork,
+    orders,
+    now: () => AHORA,
+    findAliveById,
+    lockAliveLines,
+    cancelLine,
+    setLineReservedAt,
+    refreshStatus,
+    releaseForLine,
+  }
 }
 
 async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string> {
@@ -114,9 +119,10 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'El cliente anulo el pedido' }, ADMIN)
 
-    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
-    expect(d.cancelAlive.mock.calls[0]).toEqual([
+    expect(d.cancelLine).toHaveBeenCalledTimes(1)
+    expect(d.cancelLine.mock.calls[0]).toEqual([
       ORDER_ID,
+      LINEA_ID,
       'El cliente anulo el pedido',
       ADMIN.id,
       AHORA,
@@ -130,7 +136,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'Falta materia prima' }, ADMIN)
 
-    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+    expect(d.cancelLine).toHaveBeenCalledTimes(1)
   })
 
   it('R25: cancela un pedido BLOQUEADO con su motivo, igual que un PENDIENTE', async () => {
@@ -140,9 +146,10 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'El cliente ya no lo quiere' }, ADMIN)
 
-    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
-    expect(d.cancelAlive.mock.calls[0]).toEqual([
+    expect(d.cancelLine).toHaveBeenCalledTimes(1)
+    expect(d.cancelLine.mock.calls[0]).toEqual([
       ORDER_ID,
+      LINEA_ID,
       'El cliente ya no lo quiere',
       ADMIN.id,
       AHORA,
@@ -160,7 +167,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     const conEspacios = dobles({ fila: fila('BLOQUEADO') })
     await createCancelOrder(conEspacios)(ORDER_ID, { reason: '  ya no  ' }, ADMIN)
-    expect(conEspacios.cancelAlive.mock.calls[0]?.[1]).toBe('ya no')
+    expect(conEspacios.cancelLine.mock.calls[0]?.[2]).toBe('ya no')
   })
 
   it('R5, R25: cancelar un BLOQUEADO no encuentra material que liberar, y eso no lo rompe', async () => {
@@ -171,8 +178,8 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
 
-    expect(d.releaseForOrder).toHaveBeenCalledTimes(1)
-    expect(d.setReservedAt).toHaveBeenCalledWith(ORDER_ID, null, { companyId: ADMIN.companyId })
+    expect(d.releaseForLine).toHaveBeenCalledTimes(1)
+    expect(d.setLineReservedAt).toHaveBeenCalledWith(ORDER_ID, LINEA_ID, null, { companyId: ADMIN.companyId })
   })
 
   it('recorta el motivo antes de escribirlo (R27)', async () => {
@@ -180,13 +187,13 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: '   sin stock   ' }, ADMIN)
 
-    expect(d.cancelAlive.mock.calls[0]?.[1]).toBe('sin stock')
+    expect(d.cancelLine.mock.calls[0]?.[2]).toBe('sin stock')
   })
 
   it('acepta un motivo de exactamente 500 caracteres y rechaza el de 501 (R27)', async () => {
     const d = dobles({ fila: fila('PENDIENTE') })
     await createCancelOrder(d)(ORDER_ID, { reason: 'x'.repeat(500) }, ADMIN)
-    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+    expect(d.cancelLine).toHaveBeenCalledTimes(1)
 
     const e = dobles({ fila: fila('PENDIENTE') })
     expect(
@@ -195,7 +202,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
       ),
     ).toBe('invalid_input')
     expect(e.findAliveById).not.toHaveBeenCalled()
-    expect(e.cancelAlive).not.toHaveBeenCalled()
+    expect(e.cancelLine).not.toHaveBeenCalled()
   })
 
   it('rechaza cancelar sin motivo, con motivo vacio o de solo espacios (R27)', async () => {
@@ -207,7 +214,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
       )
       // R27: no modifica ninguna fila, y ni siquiera la lee.
       expect(d.findAliveById).not.toHaveBeenCalled()
-      expect(d.cancelAlive).not.toHaveBeenCalled()
+      expect(d.cancelLine).not.toHaveBeenCalled()
     }
 
     const d = dobles({ fila: fila('PENDIENTE') })
@@ -220,7 +227,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     expect(
       await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'me equivoque' }, ADMIN)),
     ).toBe('not_cancellable')
-    expect(d.cancelAlive).not.toHaveBeenCalled()
+    expect(d.cancelLine).not.toHaveBeenCalled()
     await expect(
       createCancelOrder(d)(ORDER_ID, { reason: 'me equivoque' }, ADMIN),
     ).rejects.toBeInstanceOf(NotCancellableError)
@@ -234,8 +241,8 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
         await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
         status,
       ).toBe('not_cancellable')
-      expect(d.cancelAlive, status).not.toHaveBeenCalled()
-      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.cancelLine, status).not.toHaveBeenCalled()
+      expect(d.releaseForLine, status).not.toHaveBeenCalled()
     }
   })
 
@@ -247,8 +254,8 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
         await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
         status,
       ).toBe('not_cancellable')
-      expect(d.cancelAlive, status).not.toHaveBeenCalled()
-      expect(d.releaseForOrder, status).not.toHaveBeenCalled()
+      expect(d.cancelLine, status).not.toHaveBeenCalled()
+      expect(d.releaseForLine, status).not.toHaveBeenCalled()
     }
   })
 
@@ -259,7 +266,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
       await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'otro motivo' }, ADMIN)),
     ).toBe('not_cancellable')
     // R29: no hay ningun camino capaz de sustituir el motivo de una cancelacion.
-    expect(d.cancelAlive).not.toHaveBeenCalled()
+    expect(d.cancelLine).not.toHaveBeenCalled()
   })
 
   it('cancelar un pedido inexistente o ya borrado responde order_not_found (R33)', async () => {
@@ -268,7 +275,7 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
     expect(
       await codigoDelFallo(() => createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)),
     ).toBe('order_not_found')
-    expect(d.cancelAlive).not.toHaveBeenCalled()
+    expect(d.cancelLine).not.toHaveBeenCalled()
     await expect(
       createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN),
     ).rejects.toBeInstanceOf(OrderNotFoundError)
@@ -287,52 +294,56 @@ describe('cancelOrder — el unico camino hacia CANCELADO (R26, R28, R29, R6)', 
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
 
-    expect(d.cancelAlive).toHaveBeenCalledTimes(1)
+    expect(d.cancelLine).toHaveBeenCalledTimes(1)
   })
 })
 
 describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
-  it('el orden real es lockAliveById -> cancelAlive -> releaseForOrder(release) -> setReservedAt(null)', async () => {
+  it('QT-313 R27: el orden real es lockAliveLines -> cancelLine -> releaseForLine(release) -> setLineReservedAt(null) -> refreshStatus', async () => {
     const d = dobles({ fila: fila('PENDIENTE') })
     const orden: string[] = []
-    d.lockAliveById.mockImplementation(async () => {
-      orden.push('orders.lockAliveById')
-      return { ...fila('PENDIENTE'), reservedAt: null, packagingCost: null }
+    d.lockAliveLines.mockImplementation(async () => {
+      orden.push('orders.lockAliveLines')
+      const filaPendiente = fila('PENDIENTE')
+      return { order: { ...filaPendiente, reservedAt: null }, lines: [orderLineOf(filaPendiente)] }
     })
-    d.cancelAlive.mockImplementation(async () => {
-      orden.push('orders.cancelAlive')
+    d.cancelLine.mockImplementation(async () => {
+      orden.push('orders.cancelLine')
       return 'ok' as const
     })
-    d.releaseForOrder.mockImplementation(async () => {
-      orden.push('reservations.releaseForOrder')
+    d.releaseForLine.mockImplementation(async () => {
+      orden.push('reservations.releaseForLine')
     })
-    d.setReservedAt.mockImplementation(async () => {
-      orden.push('orders.setReservedAt')
+    d.setLineReservedAt.mockImplementation(async () => {
+      orden.push('orders.setLineReservedAt')
+    })
+    d.refreshStatus.mockImplementation(async () => {
+      orden.push('orders.refreshStatus')
+      return 'CANCELADO' as const
     })
 
     await createCancelOrder(d)(ORDER_ID, { reason: 'sin stock' }, ADMIN)
 
     expect(orden).toEqual([
-      'orders.lockAliveById',
-      'orders.cancelAlive',
-      'reservations.releaseForOrder',
-      'orders.setReservedAt',
+      'orders.lockAliveLines',
+      'orders.cancelLine',
+      'reservations.releaseForLine',
+      'orders.setLineReservedAt',
+      'orders.refreshStatus',
     ])
-    expect(d.releaseForOrder.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
-    expect(d.setReservedAt.mock.calls[0]?.[1]).toBeNull()
+    expect(d.releaseForLine.mock.calls[0]?.[0]).toMatchObject({ reason: 'release', actorId: ADMIN.id })
+    expect(d.setLineReservedAt.mock.calls[0]?.[2]).toBeNull()
+    expect(d.orders.cancelAlive).not.toHaveBeenCalled()
+    expect(d.orders.setReservedAt).not.toHaveBeenCalled()
   })
 
   it('R41: el permiso se exige ANTES de abrir la unidad de trabajo', async () => {
-    const findAliveById = vi.fn(() => {
-      throw new Error('orders.findAliveById no deberia llamarse sin permiso')
-    })
     const unitOfWork = {
       run: vi.fn(() => {
         throw new Error('unitOfWork.run no deberia llamarse sin permiso')
       }),
     }
     const cancelOrder = createCancelOrder({
-      orders: { findAliveById, listAlive: vi.fn() } as unknown as OrderRepository,
       unitOfWork: unitOfWork as unknown as ReturnType<typeof dobles>['unitOfWork'],
       now: () => AHORA,
     })
@@ -341,7 +352,6 @@ describe('QC-141 T9 — cancelar libera (R18, R41)', () => {
     await expect(
       cancelOrder(ORDER_ID, { reason: 'sin stock' }, SIN_PERMISO),
     ).rejects.toBeInstanceOf(UnauthorizedError)
-    expect(findAliveById).not.toHaveBeenCalled()
     expect(unitOfWork.run).not.toHaveBeenCalled()
   })
 })

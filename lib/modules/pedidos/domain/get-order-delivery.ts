@@ -68,24 +68,36 @@ export function createGetOrderDelivery(
     if (order === null) throw new OrderNotFoundError();
     if (order.status !== 'TERMINADO') throw new ActionNotAllowedError();
 
-    const [lines, delivered] = await Promise.all([
+    const [lines, delivered, orderLines] = await Promise.all([
       deps.lines.findPresentationLinesForFinish(orderId, scope),
       deps.deliveries.sumDeliveredPackages(orderId, scope),
+      deps.orders.findAliveLines(orderId, scope),
     ]);
+    const recipeByOrderLine = new Map(orderLines.map((line) => [line.id, line.recipeId]));
+    const recipeOf = (line: (typeof lines)[number]): string | undefined => recipeByOrderLine.get(line.orderLineId);
     const states = lines.map((line) => {
       const state = { presentationLineId: line.id, orderedPackages: orderedPackages(line), deliveredPackages: delivered.get(line.id) ?? 0 };
       return { line, state, remaining: remainingPackages(state) };
     });
 
     const presentationIds = [...new Set(lines.map((line) => line.presentationId))];
-    const pendingPresentationIds = [
-      ...new Set(states.filter((s) => s.remaining > 0).map((s) => s.line.presentationId)),
-    ];
-    const [refs, batches, customer] = await Promise.all([
+    // Una lectura de lotes por receta del pedido con algo pendiente, con sus presentaciones.
+    const pendingByRecipe = new Map<string, Set<string>>();
+    for (const { line, remaining } of states) {
+      const recipeId = recipeOf(line);
+      if (remaining === 0 || recipeId === undefined) continue;
+      const pending = pendingByRecipe.get(recipeId) ?? new Set<string>();
+      pending.add(line.presentationId);
+      pendingByRecipe.set(recipeId, pending);
+    }
+    const [refs, batchesByRecipe, customer] = await Promise.all([
       deps.presentations.findRefs(presentationIds, actor.companyId),
-      pendingPresentationIds.length === 0
-        ? Promise.resolve([])
-        : deps.finishedBatches.findDeliverableBatches(order.recipeId, pendingPresentationIds, actor.companyId),
+      Promise.all(
+        [...pendingByRecipe].map(async ([recipeId, pending]) => {
+          const found = await deps.finishedBatches.findDeliverableBatches(recipeId, [...pending], actor.companyId);
+          return [recipeId, found] as const;
+        }),
+      ).then((entries) => new Map<string, readonly DeliverableBatch[]>(entries)),
       aliveCustomer(deps.customerCatalog, order.customerId, actor.companyId),
     ]);
     const nameById = new Map(refs.map((ref) => [ref.id, ref.name]));
@@ -106,7 +118,12 @@ export function createGetOrderDelivery(
           orderedPackages: state.orderedPackages,
           deliveredPackages: state.deliveredPackages,
           remainingPackages: remaining,
-          batches: remaining === 0 ? [] : batches.filter((batch) => batch.presentationId === line.presentationId),
+          batches:
+            remaining === 0
+              ? []
+              : (batchesByRecipe.get(recipeOf(line) ?? '') ?? []).filter(
+                  (batch) => batch.presentationId === line.presentationId,
+                ),
         };
       }),
     };

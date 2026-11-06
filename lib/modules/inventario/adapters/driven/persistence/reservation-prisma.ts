@@ -10,16 +10,18 @@ import type {
   ConsumptionOutcome,
   MaterialReservations,
   OrderCoverage,
+  ReservationKey,
   ReservationOutcome,
   ReservationQueries,
   ReservationRequirementLine,
 } from '../../../domain/reservation';
+import type { CostingExclusion } from '../../../domain/costing-batch';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 
 import { consumeBatchStock, recalculateProductStock } from './product-prisma';
 
 /**
- * `syncForOrder`, `releaseForOrder`, `consumeForOrder` y `settlePackagingForOrder`. Reciben el
+ * `syncForLine`, `releaseForLine`, `consumeForLine` y `settlePackagingForLine`. Reciben el
  * cliente que abre quien llama -global o transaccional- y no abren transaccion propia: el
  * pedido y su reserva tienen que comitear o deshacerse juntos, y esa transaccion la abre
  * `pedidos`, nunca este archivo.
@@ -48,6 +50,16 @@ function toCivilDate(date: Date): string {
 }
 
 type ReservationMovementRow = { readonly batchId: string; readonly kind: string; readonly quantity: Prisma.Decimal };
+
+/** Las filas de una clave. */
+function keyWhere(key: ReservationKey): { readonly orderId: string; readonly orderLineId: string } {
+  return { orderId: key.orderId, orderLineId: key.orderLineId };
+}
+
+/** Lo mismo en memoria, para separar lo propio de lo ajeno sobre filas ya leidas. */
+function isKeyRow(row: { readonly orderId: string; readonly orderLineId: string }, key: ReservationKey): boolean {
+  return row.orderId === key.orderId && row.orderLineId === key.orderLineId;
+}
 
 function toLedgerRow(row: ReservationMovementRow): { readonly batchId: string; readonly kind: ReservationMovementKind; readonly quantity: string } {
   return { batchId: row.batchId, kind: row.kind as ReservationMovementKind, quantity: row.quantity.toFixed(4) };
@@ -106,16 +118,16 @@ function toCandidateBatches(
 
 export function createMaterialReservations(db: PrismaLike = prisma): MaterialReservations {
   return {
-    async syncForOrder(input): Promise<ReservationOutcome> {
-      const { orderId, companyId, requirement, actorId, now } = input;
+    async syncForLine(input): Promise<ReservationOutcome> {
+      const { orderId, orderLineId, companyId, requirement, actorId, now } = input;
 
       const requirementProductIds = requirement.map((line) => line.productId);
 
-      // Un pedido puede llegar a esta llamada ya con algo apartado de un producto que la RECETA
-      // NUEVA ya no pide (linea quitada): sin incluir tambien esos productos, esa reserva nunca
-      // se liberaria.
+      // Una linea puede llegar a esta llamada ya con algo apartado de un producto que la RECETA
+      // NUEVA ya no pide (ingrediente quitado): sin incluir tambien esos productos, esa reserva
+      // nunca se liberaria.
       const ownBatchIds = await db.reservationMovement.findMany({
-        where: { companyId, orderId },
+        where: { companyId, ...keyWhere(input) },
         select: { batchId: true },
         distinct: ['batchId'],
       });
@@ -143,11 +155,11 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
           ? []
           : await db.reservationMovement.findMany({
               where: { companyId, batchId: { in: batchIds } },
-              select: { batchId: true, orderId: true, kind: true, quantity: true },
+              select: { batchId: true, orderId: true, orderLineId: true, kind: true, quantity: true },
             });
 
-      const ownByBatch = netReservedByBatch(movementRows.filter((row) => row.orderId === orderId).map(toLedgerRow));
-      const othersByBatch = netReservedByBatch(movementRows.filter((row) => row.orderId !== orderId).map(toLedgerRow));
+      const ownByBatch = netReservedByBatch(movementRows.filter((row) => isKeyRow(row, input)).map(toLedgerRow));
+      const othersByBatch = netReservedByBatch(movementRows.filter((row) => !isKeyRow(row, input)).map(toLedgerRow));
 
       const candidateBatches = toCandidateBatches(batches, othersByBatch);
 
@@ -165,7 +177,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         const kind: ReservationMovementKind = comparison > 0 ? 'reserve' : 'release';
         const quantity = comparison > 0 ? subtractQuantities(target, current) : subtractQuantities(current, target);
         await db.reservationMovement.create({
-          data: { companyId, orderId, batchId, kind, quantity: new Prisma.Decimal(quantity), createdBy: actorId, createdAt: now },
+          data: { companyId, orderId, orderLineId, batchId, kind, quantity: new Prisma.Decimal(quantity), createdBy: actorId, createdAt: now },
         });
       }
 
@@ -173,11 +185,11 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
       return { kind: plan.allocations.length > 0 ? 'reserved' : 'not_reserved' };
     },
 
-    async releaseForOrder(input): Promise<void> {
-      const { orderId, companyId, reason, actorId, now } = input;
+    async releaseForLine(input): Promise<void> {
+      const { orderId, orderLineId, companyId, reason, actorId, now } = input;
 
       const rows = await db.reservationMovement.findMany({
-        where: { companyId, orderId },
+        where: { companyId, ...keyWhere(input) },
         select: { batchId: true, kind: true, quantity: true },
       });
       const ownByBatch = netReservedByBatch(rows.map(toLedgerRow));
@@ -185,13 +197,14 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
       for (const [batchId, quantity] of ownByBatch) {
         if (!isPositive(quantity)) continue;
         await db.reservationMovement.create({
-          data: { companyId, orderId, batchId, kind: reason, quantity: new Prisma.Decimal(quantity), createdBy: actorId, createdAt: now },
+          data: { companyId, orderId, orderLineId, batchId, kind: reason, quantity: new Prisma.Decimal(quantity), createdBy: actorId, createdAt: now },
         });
       }
     },
 
-    async consumeForOrder(input): Promise<ConsumptionOutcome> {
-      const { orderId, companyId, actorId, now } = input;
+    async consumeForLine(input): Promise<ConsumptionOutcome> {
+      const { orderId, orderLineId, companyId, actorId, now } = input;
+      const key: ReservationKey = { orderId, orderLineId };
       const scope: InventoryScope = { companyId };
       const subset = input.productIds === undefined ? null : new Set<string>(input.productIds);
       const fallbackRequirement =
@@ -200,7 +213,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
           : input.fallbackRequirement.filter((line) => subset.has(line.productId));
 
       const ownRows = await db.reservationMovement.findMany({
-        where: { companyId, orderId },
+        where: { companyId, ...keyWhere(key) },
         select: { batchId: true, kind: true, quantity: true },
       });
       let ownByBatch = new Map(
@@ -220,11 +233,11 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         ownByBatch = new Map([...ownByBatch].filter(([batchId]) => kept.has(batchId)));
       }
 
-      // El pedido no tiene nada apartado -no alcanzo al crearlo, o su reserva se libero por
+      // La linea no tiene nada apartado -no alcanzo al crearla, o su reserva se libero por
       // una edicion que luego no volvio a apartar-. Se calcula y consume todo-o-nada de lo que
       // haya, sin pasar por `reservation_movements`: no hubo apartado que resolver.
       if (ownByBatch.size === 0) {
-        return consumeWithoutReservation(db, scope, orderId, actorId, now, fallbackRequirement);
+        return consumeWithoutReservation(db, scope, key, actorId, now, fallbackRequirement);
       }
       const batchProduct = new Map(ownBatchRows.map((row) => [row.id, row.productId]));
 
@@ -235,7 +248,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
       const deficitByProduct = new Map<string, string>();
 
       for (const [batchId, quantity] of ownByBatch) {
-        const result = await consumeBatchStock(db, { batchId, quantity, orderId, actorId }, now, scope);
+        const result = await consumeBatchStock(db, { batchId, quantity, orderId, orderLineId, actorId }, now, scope);
         let consumedHere = quantity;
 
         if (result.kind === 'insufficient') {
@@ -243,7 +256,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
           // completa de otros lotes con disponible, mas abajo.
           consumedHere = isPositive(result.available) ? result.available : '0.0000';
           if (isPositive(consumedHere)) {
-            const partial = await consumeBatchStock(db, { batchId, quantity: consumedHere, orderId, actorId }, now, scope);
+            const partial = await consumeBatchStock(db, { batchId, quantity: consumedHere, orderId, orderLineId, actorId }, now, scope);
             if (partial.kind !== 'consumed') {
               throw new Error('reservation-prisma: consumo parcial inesperado bajo el bloqueo del producto');
             }
@@ -257,12 +270,12 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
 
         if (isPositive(consumedHere)) consumedByBatch.set(batchId, consumedHere);
 
-        // El apartado de ESTE pedido en ESTE lote queda resuelto por el importe COMPLETO que
+        // El apartado de ESTA linea en ESTE lote queda resuelto por el importe COMPLETO que
         // tenia reservado, sin importar cuanto pudo dar el lote de verdad: lo que falte se cubre
         // de otro lote o la operacion entera se deshace. `reservation_movements` no es el
         // libro fisico -ese es `inventory_movements`, ya asentado por `consumeBatchStock`-.
         await db.reservationMovement.create({
-          data: { companyId, orderId, batchId, kind: 'consume', quantity: new Prisma.Decimal(quantity), createdBy: actorId, createdAt: now },
+          data: { companyId, orderId, orderLineId, batchId, kind: 'consume', quantity: new Prisma.Decimal(quantity), createdBy: actorId, createdAt: now },
         });
       }
 
@@ -280,14 +293,14 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         for (const row of candidateRows) batchProduct.set(row.id, row.productId);
 
         const candidateIds = candidateRows.map((row) => row.id);
-        const othersRows =
+        const candidateReservationRows =
           candidateIds.length === 0
             ? []
             : await db.reservationMovement.findMany({
-                where: { companyId, batchId: { in: candidateIds }, NOT: { orderId } },
-                select: { batchId: true, kind: true, quantity: true },
+                where: { companyId, batchId: { in: candidateIds } },
+                select: { batchId: true, orderId: true, orderLineId: true, kind: true, quantity: true },
               });
-        const othersByBatch = netReservedByBatch(othersRows.map(toLedgerRow));
+        const othersByBatch = netReservedByBatch(candidateReservationRows.filter((row) => !isKeyRow(row, key)).map(toLedgerRow));
 
         // Los lotes ya vaciados en este mismo consumo no se ofrecen de nuevo: su disponible real
         // ya quedo reflejado en `consumeBatchStock`, y aqui solo interesan los que NO se tocaron.
@@ -304,7 +317,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         }
 
         for (const allocation of plan.allocations) {
-          const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, actorId }, now, scope);
+          const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, orderLineId, actorId }, now, scope);
           if (result.kind !== 'consumed') {
             throw new Error('reservation-prisma: reparto del faltante inesperado bajo el bloqueo del producto');
           }
@@ -322,8 +335,8 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
       return { kind: 'consumed' };
     },
 
-    async settlePackagingForOrder(input): Promise<ConsumptionOutcome> {
-      const { orderId, companyId, actorId, now } = input;
+    async settlePackagingForLine(input): Promise<ConsumptionOutcome> {
+      const { orderId, orderLineId, companyId, actorId, now } = input;
       const scope: InventoryScope = { companyId };
 
       const needByProduct = new Map<string, string>();
@@ -344,7 +357,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         batches.length === 0
           ? []
           : await db.reservationMovement.findMany({
-              where: { companyId, orderId, batchId: { in: batches.map((batch) => batch.id) } },
+              where: { companyId, ...keyWhere(input), batchId: { in: batches.map((batch) => batch.id) } },
               select: { batchId: true, kind: true, quantity: true },
             });
       const ownByBatch = new Map(
@@ -366,7 +379,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
       }
 
       // Lo apartado se reparte con la misma regla que lo aparto (mas antiguo primero), usando
-      // como disponible de cada lote solo lo que ESTE pedido tiene apartado en el.
+      // como disponible de cada lote solo lo que ESTA linea tiene apartado en el.
       const ownCandidates: ReservationCandidateBatch[] = batches
         .filter((batch) => ownByBatch.has(batch.id))
         .map((batch) => ({
@@ -388,12 +401,12 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         const taken = takenByBatch.get(batchId) ?? ZERO;
 
         if (isPositive(taken)) {
-          const result = await consumeBatchStock(db, { batchId, quantity: taken, orderId, actorId }, now, scope);
+          const result = await consumeBatchStock(db, { batchId, quantity: taken, orderId, orderLineId, actorId }, now, scope);
           if (result.kind === 'insufficient') {
             // Merma sobre el lote apartado: se toma lo que quede y el resto sale del disponible libre.
             const available = isPositive(result.available) ? result.available : ZERO;
             if (isPositive(available)) {
-              const partial = await consumeBatchStock(db, { batchId, quantity: available, orderId, actorId }, now, scope);
+              const partial = await consumeBatchStock(db, { batchId, quantity: available, orderId, orderLineId, actorId }, now, scope);
               if (partial.kind !== 'consumed') {
                 throw new Error('reservation-prisma: consumo parcial inesperado bajo el bloqueo del producto');
               }
@@ -402,14 +415,14 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
           }
           touchedProductIds.add(productId);
           await db.reservationMovement.create({
-            data: { companyId, orderId, batchId, kind: 'consume', quantity: new Prisma.Decimal(taken), createdBy: actorId, createdAt: now },
+            data: { companyId, orderId, orderLineId, batchId, kind: 'consume', quantity: new Prisma.Decimal(taken), createdBy: actorId, createdAt: now },
           });
         }
 
         const released = subtractQuantities(reserved, taken);
         if (isPositive(released)) {
           await db.reservationMovement.create({
-            data: { companyId, orderId, batchId, kind: 'release', quantity: new Prisma.Decimal(released), createdBy: actorId, createdAt: now },
+            data: { companyId, orderId, orderLineId, batchId, kind: 'release', quantity: new Prisma.Decimal(released), createdBy: actorId, createdAt: now },
           });
         }
       }
@@ -440,7 +453,7 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
         if (plan.kind === 'insufficient') return { kind: 'insufficient', productIds: plan.productIds };
 
         for (const allocation of plan.allocations) {
-          const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, actorId }, now, scope);
+          const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, orderLineId, actorId }, now, scope);
           if (result.kind !== 'consumed') {
             throw new Error('reservation-prisma: consumo del exceso inesperado bajo el bloqueo del producto');
           }
@@ -456,12 +469,12 @@ export function createMaterialReservations(db: PrismaLike = prisma): MaterialRes
 }
 
 /** Consume la necesidad de respaldo todo-o-nada, sin tocar `reservation_movements` -no hubo
- *  apartado que resolver-. Misma regla de reparto que `syncForOrder`, pero consumiendo en vez de
+ *  apartado que resolver-. Misma regla de reparto que `syncForLine`, pero consumiendo en vez de
  *  reservar. Una necesidad vacia (receta sin lineas) no escribe nada. */
 async function consumeWithoutReservation(
   db: PrismaLike,
   scope: InventoryScope,
-  orderId: string,
+  key: ReservationKey,
   actorId: string,
   now: Date,
   fallbackRequirement: readonly ReservationRequirementLine[],
@@ -469,6 +482,7 @@ async function consumeWithoutReservation(
   if (fallbackRequirement.length === 0) return { kind: 'nothing_to_consume' };
 
   const { companyId } = scope;
+  const { orderId, orderLineId } = key;
   const productIds = [...new Set(fallbackRequirement.map((line) => line.productId))];
   const productUnits = await lockProductsAscending(db, companyId, productIds);
 
@@ -493,7 +507,7 @@ async function consumeWithoutReservation(
   const batchProduct = new Map(batches.map((batch) => [batch.id, batch.productId]));
   const touchedProductIds = new Set<string>();
   for (const allocation of plan.allocations) {
-    const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, actorId }, now, scope);
+    const result = await consumeBatchStock(db, { batchId: allocation.batchId, quantity: allocation.quantity, orderId, orderLineId, actorId }, now, scope);
     if (result.kind !== 'consumed') {
       throw new Error('reservation-prisma: consumo sin apartado previo inesperado bajo el bloqueo del producto');
     }
@@ -567,12 +581,12 @@ export function createReservationQueries(db: PrismaLike = prisma): ReservationQu
  *  Con `excludeOrderId`, lo apartado por ESE pedido no cuenta en `reserved` -y por tanto
  *  suma a `available`-: es lo que necesita el coste de un pedido que ya existe para contar su
  *  propia reserva como disponible para si mismo, sin abrir una segunda definicion del
- *  apartado. */
+ *  apartado. `excludeOrderLineId` hace lo mismo con una sola linea. */
 export async function findReservedAndAvailableByBatch(
   db: PrismaLike,
   companyId: string,
   batchIds: readonly string[],
-  options?: { readonly excludeOrderId?: string },
+  options?: CostingExclusion,
 ): Promise<ReadonlyMap<string, { readonly reserved: string; readonly available: string; readonly overReserved: boolean }>> {
   const result = new Map<string, { reserved: string; available: string; overReserved: boolean }>();
   if (batchIds.length === 0) return result;
@@ -586,6 +600,7 @@ export async function findReservedAndAvailableByBatch(
       companyId,
       batchId: { in: [...batchIds] },
       ...(options?.excludeOrderId !== undefined ? { NOT: { orderId: options.excludeOrderId } } : {}),
+      ...(options?.excludeOrderLineId !== undefined ? { orderLineId: { not: options.excludeOrderLineId } } : {}),
     },
     select: { batchId: true, kind: true, quantity: true },
   });

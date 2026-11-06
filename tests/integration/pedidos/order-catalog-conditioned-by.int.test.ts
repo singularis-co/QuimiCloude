@@ -16,8 +16,9 @@ import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/pers
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderStatus } from '@/lib/modules/pedidos'
+import type { OrderStatus } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
+import { syncOnlyLine, updateOrderAndLine, createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const { listAliveSummariesInCompany } = realOrderSummaries()
 
@@ -112,7 +113,7 @@ let A: Empresa
 let B: Empresa
 let nextSequence = 1
 
-function baseOrder(e: Empresa): NewOrder {
+function baseOrder(e: Empresa): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: e.recipeId,
@@ -135,17 +136,14 @@ async function seedOrder(e: Empresa, status: OrderStatus, conditionedBy: string 
   nextSequence += 1
   const now = new Date(Date.UTC(YEAR, 6, 1 + (sequence % 25), 12, 0, 0, 0))
   const { id } = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(e), YEAR, e.userId, now, null, { companyId: e.companyId }),
+    createSingleLineOrder(createOrderWriteRepository(tx), baseOrder(e), YEAR, e.userId, now, null, { companyId: e.companyId }),
   )
-  await prisma.order.update({
-    where: { id },
-    data: {
+  await updateOrderAndLine(prisma, id, {
       status,
       packedBy: e.userId,
       conditionedBy,
       finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? now : null,
-    },
-  })
+    }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 
@@ -187,7 +185,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(vistos.map((item) => item.id).sort()).toEqual([...mios].sort())
       expect(vistos.every((item) => item.conditionedBy === yo)).toBe(true)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: todos } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: todos } } }).then(() => prisma.order.deleteMany({ where: { id: { in: todos } } }))
       await prisma.user.deleteMany({ where: { id: { in: [yo, otro] } } })
     }
   })
@@ -204,7 +202,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(filtrada.items.map((item) => item.id)).toEqual([mio])
       expect(filtrada.total).toBe(1)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [mio, sinAcondicionador] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [mio, sinAcondicionador] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [mio, sinAcondicionador] } } }))
       await prisma.user.delete({ where: { id: yo } })
     }
   })
@@ -223,7 +221,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(ids).toContain(mio)
       expect(ids).toContain(enCola)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [mio, enCola] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [mio, enCola] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [mio, enCola] } } }))
       await prisma.user.delete({ where: { id: yo } })
     }
   })
@@ -239,7 +237,7 @@ describe('R11 — `conditionedBy` filtra en la base, con total y paginacion del 
       expect(pagina.items).toEqual([])
       expect(pagina.total).toBe(0)
     } finally {
-      await prisma.order.delete({ where: { id: pedidoB } })
+      await prisma.orderLine.deleteMany({ where: { orderId: pedidoB } }).then(() => prisma.order.delete({ where: { id: pedidoB } }))
       await prisma.user.delete({ where: { id: deB } })
     }
   })
@@ -263,7 +261,7 @@ describe('R7 — el resumen publica quien acondiciona', () => {
       expect(porId.get(enCola)?.conditionedBy).toBeNull()
       expect(porId.get(enCurso)?.conditionedBy).toBe(yo)
     } finally {
-      await prisma.order.deleteMany({ where: { id: { in: [enCola, enCurso] } } })
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: [enCola, enCurso] } } }).then(() => prisma.order.deleteMany({ where: { id: { in: [enCola, enCurso] } } }))
       await prisma.user.delete({ where: { id: yo } })
     }
   })

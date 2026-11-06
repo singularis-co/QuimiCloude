@@ -85,6 +85,7 @@ import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc219_e2e_';
@@ -248,6 +249,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.product.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } }),
+    () => prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.presentation.deleteMany({ where: { companyId: { in: ids } } }),
@@ -546,8 +548,7 @@ test.beforeAll(async () => {
 
   // Cumple los CHECK de `orders`: `EN_ACONDICIONAMIENTO` lleva `packed_by` y `conditioned_by`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: ORDER_SEQUENCE,
@@ -558,9 +559,7 @@ test.beforeAll(async () => {
       packedBy: empacadorId,
       conditionedBy: conditioner1Id,
       finishedAt: null,
-    },
-    select: { id: true },
-  });
+    });
 
   /**
    * Una línea del reparto y lo que deja Terminar el empaque por ella: el producto terminado
@@ -568,6 +567,7 @@ test.beforeAll(async () => {
    * y el asiento `production` que enlaza la línea con el lote.
    */
   const lineCreatedAt = Date.now();
+  const orderLineId = await ensureOnlyLine(prisma, order.id);
   async function seedLine(
     offset: number,
     presentationId: string,
@@ -578,6 +578,7 @@ test.beforeAll(async () => {
     const line = await prisma.orderPresentationLine.create({
       data: {
         orderId: order.id,
+        orderLineId,
         companyId: companyId!,
         presentationId,
         packages,
@@ -625,6 +626,7 @@ test.beforeAll(async () => {
         quantity: stock,
         reason: null,
         orderId: order.id,
+        orderLineId,
         orderPresentationLineId: line.id,
         companyId: companyId!,
         createdBy: empacadorId,
@@ -818,10 +820,7 @@ test.describe('datos de lote en el acondicionamiento: un formulario por pedido',
       { timeout: 60_000 },
     );
 
-    const stored = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, finishedAt: true },
-    });
+    const stored = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, finishedAt: true } });
     expect(stored.status).toBe('TERMINADO');
     expect(stored.finishedAt).not.toBeNull();
 

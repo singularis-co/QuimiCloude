@@ -24,6 +24,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import { createOrder, createPerson, inRolledBackTransaction, type Fixture } from './use-case-fixture';
 
 import type { ExecutionLogRepository } from '@/lib/modules/asignaciones/ports/execution-log-repository';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 const DAY = 24 * 60 * 60 * 1000;
 const D1 = new Date('2026-09-01T00:00:00.000Z');
@@ -54,19 +55,21 @@ async function montarEscena(fixture: Fixture): Promise<Escena> {
   const pedidoB = await createOrder(fixture, { companyId: fixture.companyB, status: 'EN_CURSO' });
 
   const a = fixture.companyA;
-  await log.append({ companyId: a, orderId: pedidoA1, userId: ana, action: 'start', stepPosition: 1, occurredAt: D1 });
+  await log.append({ companyId: a, orderId: pedidoA1, orderLineId: await ensureOnlyLine(fixture.tx, pedidoA1), userId: ana, action: 'start', stepPosition: 1, occurredAt: D1 });
   await log.append({
     companyId: a,
     orderId: pedidoA1,
+    orderLineId: await ensureOnlyLine(fixture.tx, pedidoA1),
     userId: luis,
     action: 'advance',
     stepPosition: 2,
     occurredAt: new Date(D2.getTime() + 60_000),
   });
-  await log.append({ companyId: a, orderId: pedidoA2, userId: luis, action: 'start', stepPosition: 1, occurredAt: D3 });
+  await log.append({ companyId: a, orderId: pedidoA2, orderLineId: await ensureOnlyLine(fixture.tx, pedidoA2), userId: luis, action: 'start', stepPosition: 1, occurredAt: D3 });
   await log.append({
     companyId: fixture.companyB,
     orderId: pedidoB,
+    orderLineId: await ensureOnlyLine(fixture.tx, pedidoB),
     userId: ajena,
     action: 'start',
     stepPosition: 1,
@@ -157,6 +160,7 @@ describe('listEntriesForOrders', () => {
       await e.log.append({
         companyId: fixture.companyA,
         orderId: e.pedidoA2,
+        orderLineId: await ensureOnlyLine(fixture.tx, e.pedidoA2),
         userId: e.luis,
         action: 'cancel',
         stepPosition: 1,
@@ -245,14 +249,15 @@ describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
     const pedidoB2 = await createOrder(fixture, { companyId: b, status: 'EN_CURSO' });
 
     const comenzar = new Date(D2.getTime() + 60 * 60_000);
-    await e.log.append({ companyId: a, orderId: pedidoC, userId: e.ana, action: 'conditioning_start', stepPosition: null, occurredAt: comenzar });
-    await e.log.append({ companyId: b, orderId: pedidoB2, userId: e.ajena, action: 'conditioning_start', stepPosition: null, occurredAt: comenzar });
+    await e.log.append({ companyId: a, orderId: pedidoC, orderLineId: await ensureOnlyLine(fixture.tx, pedidoC), userId: e.ana, action: 'conditioning_start', stepPosition: null, occurredAt: comenzar });
+    await e.log.append({ companyId: b, orderId: pedidoB2, orderLineId: await ensureOnlyLine(fixture.tx, pedidoB2), userId: e.ajena, action: 'conditioning_start', stepPosition: null, occurredAt: comenzar });
     for (const [orderId, userId, companyId] of [
       [pedidoC, marta, a],
       [pedidoSinComenzar, marta, a],
       [pedidoB2, miembroB, b],
     ] as const) {
-      await fixture.tx.orderConditioningTeamMember.create({ data: { orderId, userId, companyId, position: 0 } });
+      const orderLineId = await ensureOnlyLine(fixture.tx, orderId);
+      await fixture.tx.orderConditioningTeamMember.create({ data: { orderId, orderLineId, userId, companyId, position: 0 } });
     }
     return { ...e, marta, miembroB, pedidoC, pedidoSinComenzar, pedidoB2 };
   }
@@ -281,7 +286,13 @@ describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
     await inRolledBackTransaction(async (fixture) => {
       const e = await montarEquipo(fixture);
       await fixture.tx.orderConditioningTeamMember.create({
-        data: { orderId: e.pedidoC, userId: e.ana, companyId: fixture.companyA, position: 1 },
+        data: {
+          orderId: e.pedidoC,
+          orderLineId: await ensureOnlyLine(fixture.tx, e.pedidoC),
+          userId: e.ana,
+          companyId: fixture.companyA,
+          position: 1,
+        },
       });
       expect(ordenados(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.ana }))).toEqual(
         ordenados([e.pedidoA1, e.pedidoC]),

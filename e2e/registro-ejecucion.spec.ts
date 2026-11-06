@@ -27,6 +27,7 @@ import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, assignedOrderRoute } from
 import { enterAndStartAssignedOrder } from './helpers/confirm-dialog';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc82_e2e_';
 
@@ -139,27 +140,24 @@ async function seedOrder(sequence: number): Promise<{ id: string; numberText: st
   });
   // El CHECK `orders_order_year_matches_created_at` ata el ano a `created_at`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: sequence,
       recipeId,
       quantity: ORDER_QUANTITY,
       unitId: presentation.unitId,
-      presentationLines: {
-        create: [
-          {
-            companyId,
-            presentationId: presentation.id,
-            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
-            presentationContent: PRESENTATION_CONTENT,
-          },
-        ],
-      },
       status: 'PENDIENTE',
+    });
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: order.id,
+      orderLineId: await ensureOnlyLine(prisma, order.id),
+      companyId,
+      presentationId: presentation.id,
+      packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+      presentationContent: PRESENTATION_CONTENT,
     },
-    select: { id: true },
   });
 
   return { id: order.id, numberText: formatOrderNumber({ year, sequence }) };
@@ -192,6 +190,7 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: inOrphans });
     await prisma.orderPresentationLine.deleteMany({ where: inOrphans });
     await prisma.orderExecutionEntry.deleteMany({ where: inOrphans });
+    await prisma.orderLine.deleteMany({ where: inOrphans });
     await prisma.order.deleteMany({ where: inOrphans });
     await prisma.productBatch.deleteMany({ where: inOrphans });
     await prisma.recipe.deleteMany({ where: inOrphans });
@@ -316,6 +315,7 @@ test.afterAll(async () => {
     byCompany((id) => prisma.orderAssignment.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderPresentationLine.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderExecutionEntry.deleteMany({ where: { companyId: id } })),
+    byCompany((id) => prisma.orderLine.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.order.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.productBatch.deleteMany({ where: { companyId: id } })),
     // La receta antes que el producto: `recipe_lines.product_id` lo restringe hasta su cascada.

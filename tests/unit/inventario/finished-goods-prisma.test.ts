@@ -72,6 +72,7 @@ const SCOPE = { companyId: 'company-1' };
 function baseInput(overrides: Partial<Parameters<typeof receiveFinishedGoods>[1]> = {}) {
   return {
     orderId: 'order-1',
+    orderLineId: 'order-line-1',
     recipeId: 'recipe-1',
     recipeName: 'Desengrasante industrial',
     presentationId: 'presentation-1',

@@ -19,6 +19,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test');
@@ -184,17 +186,14 @@ let nextSequence = 950_000;
 
 async function insertOrder(tx: Prisma.TransactionClient, f: Fixtures): Promise<string> {
   nextSequence += 1;
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: f.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: f.recipeId,
       quantity: new Prisma.Decimal('20'),
       unitId: f.unitId,
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 
@@ -255,19 +254,21 @@ describe('QC-195 — restricciones de envases en la base', () => {
       const foreign = await insertProduct(tx, f.otherCompanyId, 'PACKAGING', {});
       const own = await insertProduct(tx, f.companyId, 'PACKAGING', { presentationId: f.presentationId });
       const orderId = await insertOrder(tx, f);
+      const orderLineId = await ensureOnlyLine(tx, orderId);
       const message = await expectRejected(
         tx,
         () => tx.$executeRaw`
           INSERT INTO "order_presentation_lines"
-            ("order_id", "company_id", "presentation_id", "packages", "presentation_content",
+            ("order_id", "order_line_id", "company_id", "presentation_id", "packages", "presentation_content",
              "packaging_product_id", "updated_at")
-          VALUES (CAST(${orderId} AS uuid), CAST(${f.companyId} AS uuid), CAST(${f.presentationId} AS uuid),
-                  4, 500, CAST(${foreign} AS uuid), now())`,
+          VALUES (CAST(${orderId} AS uuid), CAST(${orderLineId} AS uuid), CAST(${f.companyId} AS uuid),
+                  CAST(${f.presentationId} AS uuid), 4, 500, CAST(${foreign} AS uuid), now())`,
       );
       expect(message).toContain('order_presentation_lines_company_id_packaging_product_id_fkey');
       const line = await tx.orderPresentationLine.create({
         data: {
           orderId,
+          orderLineId,
           companyId: f.companyId,
           presentationId: f.presentationId,
           packages: 4,
@@ -313,11 +314,12 @@ describe('QC-195 — restricciones de envases en la base', () => {
       }
       await runScript(tx, downSource);
       const orderId = await insertOrder(tx, f);
+      const orderLineId = await ensureOnlyLine(tx, orderId);
       await tx.$executeRaw`
         INSERT INTO "order_presentation_lines"
-          ("order_id", "company_id", "presentation_id", "packages", "presentation_content", "updated_at")
-        VALUES (CAST(${orderId} AS uuid), CAST(${f.companyId} AS uuid), CAST(${f.presentationId} AS uuid),
-                40, 500, now())`;
+          ("order_id", "order_line_id", "company_id", "presentation_id", "packages", "presentation_content", "updated_at")
+        VALUES (CAST(${orderId} AS uuid), CAST(${orderLineId} AS uuid), CAST(${f.companyId} AS uuid),
+                CAST(${f.presentationId} AS uuid), 40, 500, now())`;
       const before = await tx.$queryRaw<ReadonlyArray<Record<string, unknown>>>`
         SELECT "id", "presentation_id", "packages", "presentation_content"::text AS content, "updated_at"
           FROM "order_presentation_lines" WHERE "order_id" = CAST(${orderId} AS uuid)`;

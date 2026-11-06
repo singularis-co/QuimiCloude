@@ -7,7 +7,7 @@
  */
 import type { EvidencePhase } from './step-evidence';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
-import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type { OrderCatalog, OrderLineStatus, OrderStatus } from '@/lib/modules/pedidos';
 
 /** El tope que acepta el catalogo de pedidos: pedir mas no trae mas por pagina. */
 const PAGE_SIZE = 25;
@@ -16,7 +16,7 @@ const PHASE_BY_STATUS = {
   EN_CURSO: 'manufacturing',
   EN_EMPAQUE: 'packing',
   EN_ACONDICIONAMIENTO: 'conditioning',
-} as const satisfies Partial<Record<OrderStatus, EvidencePhase>>;
+} as const satisfies Partial<Record<OrderLineStatus, EvidencePhase>>;
 
 const IN_PROGRESS_STATUSES = Object.keys(PHASE_BY_STATUS) as (keyof typeof PHASE_BY_STATUS)[];
 

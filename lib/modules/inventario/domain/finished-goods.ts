@@ -76,6 +76,8 @@ export type FinishedGoodsOutcome =
 export interface FinishedGoodsIntake {
   receiveFromOrder(input: {
     readonly orderId: string;
+    /** La linea del pedido de la fila del reparto. */
+    readonly orderLineId: string;
     readonly companyId: string;
     readonly recipeId: string;
     readonly recipeName: string;

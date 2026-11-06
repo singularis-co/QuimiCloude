@@ -30,6 +30,7 @@ import { formatOrderNumber, type OrderStatus, type OrderSummary } from '@/lib/mo
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
@@ -152,6 +153,7 @@ const UNIDADES = [
 
 function pedido(status: OrderStatus): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: 'o1',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

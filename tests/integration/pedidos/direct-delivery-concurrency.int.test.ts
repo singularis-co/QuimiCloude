@@ -25,6 +25,7 @@ import {
   type EscenarioSinPedido,
 } from '../../helpers/direct-delivery-seed';
 import { crearPedido, stockDeLote, stockDeProducto } from '../../helpers/order-delivery-seed';
+import { onOnlyLine } from '../../helpers/only-order-line';
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -112,7 +113,7 @@ describe('R35: entregas simultaneas del mismo producto', () => {
       });
       const acondicionamiento = prisma.$transaction(
         async (tx) => {
-          const movido = await finishConditioningAliveOrder(orderId, e.empresa.conditionerId, new Date(), { companyId: e.empresa.companyId }, tx);
+          const movido = await onOnlyLine(finishConditioningAliveOrder)(orderId, e.empresa.conditionerId, new Date(), { companyId: e.empresa.companyId }, tx);
           terminado();
           await suelta;
           return movido;

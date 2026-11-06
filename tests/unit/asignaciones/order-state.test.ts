@@ -28,7 +28,12 @@ import { createUnassignResponsible } from '@/lib/modules/asignaciones/domain/una
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PeopleDirectory, WorkGroupDirectory } from '@/lib/modules/identity';
-import type { OrderAssignmentTarget, OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import type {
+  OrderAssignmentTarget,
+  OrderCatalog,
+  OrderLineStatus,
+  OrderStatus,
+} from '@/lib/modules/pedidos';
 
 /** Un uuid valido y legible a partir de un solo digito hexadecimal. */
 function uuid(seed: string): string {
@@ -41,6 +46,17 @@ const PERSONA = uuid('1');
 const AHORA = new Date('2026-09-13T10:00:00.000Z');
 
 const ACTOR: Actor = { id: uuid('9'), companyId: EMPRESA, permissions: ['asignaciones.modificar'] };
+
+/** Un pedido de UNA linea: su linea activa esta en su mismo estado. Un `CANCELADO` no tiene
+ *  ninguna activa (QT-313: activa = viva y no cancelada). */
+function pedido(status: Exclude<OrderStatus, 'PARCIAL'>): OrderAssignmentTarget {
+  return { id: PEDIDO, status, activeLineStatuses: status === 'CANCELADO' ? [] : [status] };
+}
+
+/** Un `PARCIAL` con los estados de sus lineas activas (QT-313 R55). */
+function parcial(activeLineStatuses: readonly OrderLineStatus[]): OrderAssignmentTarget {
+  return { id: PEDIDO, status: 'PARCIAL', activeLineStatuses };
+}
 
 /**
  * Los dobles de los CUATRO puertos. `order` es lo que devuelve `findAliveById`: `null` es «no
@@ -103,7 +119,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
    * para que anadir un estado nuevo sea anadir una fila, y para que la tabla del test se lea igual
    * que la del `design.md`.
    */
-  const TABLA: readonly (readonly [OrderStatus | 'no existe', string])[] = [
+  const TABLA: readonly (readonly [Exclude<OrderStatus, 'PARCIAL'> | 'no existe', string])[] = [
     ['PENDIENTE', 'sin error'],
     ['EN_CURSO', 'sin error'],
     ['BLOQUEADO', 'sin error'],
@@ -120,14 +136,14 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
   for (const [estado, esperado] of TABLA) {
     it(`pedido ${estado} -> ${esperado} (R8, R9, R10, R11, R33)`, async () => {
       const order =
-        estado === 'no existe' ? null : ({ id: PEDIDO, status: estado } as OrderAssignmentTarget);
+        estado === 'no existe' ? null : pedido(estado);
       expect(await codigoDe(order)).toBe(esperado);
     });
   }
 
   it('los TRES estados que admiten escritura SI llegan al puerto de escritura (R9, R33)', async () => {
     for (const status of ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const) {
-      const { deps, assignments } = montar({ id: PEDIDO, status });
+      const { deps, assignments } = montar(pedido(status));
       await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).resolves.toEqual({
         added: 1,
       });
@@ -139,7 +155,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     // Se le puede poner responsable a un pedido que todavia no tiene material: quien lo asigne no
     // lo va a poder iniciar hasta que entren lotes, y eso lo rechazan otros casos de uso, con otro
     // error. Aqui lo que se afirma es que la escritura de responsables SI pasa y llega al puerto.
-    const { deps, assignments } = montar({ id: PEDIDO, status: 'BLOQUEADO' });
+    const { deps, assignments } = montar(pedido('BLOQUEADO'));
 
     await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).resolves.toEqual({
       added: 1,
@@ -150,13 +166,13 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
 
   it('los estados que NO admiten escritura no tocan el puerto de escritura (R10, R11, R8, R33)', async () => {
     const casos: readonly (OrderAssignmentTarget | null)[] = [
-      { id: PEDIDO, status: 'POR_EMPACAR' },
-      { id: PEDIDO, status: 'EN_EMPAQUE' },
-      { id: PEDIDO, status: 'ENTREGADO' },
-      { id: PEDIDO, status: 'CANCELADO' },
-      { id: PEDIDO, status: 'POR_ACONDICIONAR' },
-      { id: PEDIDO, status: 'EN_ACONDICIONAMIENTO' },
-      { id: PEDIDO, status: 'TERMINADO' },
+      pedido('POR_EMPACAR'),
+      pedido('EN_EMPAQUE'),
+      pedido('ENTREGADO'),
+      pedido('CANCELADO'),
+      pedido('POR_ACONDICIONAR'),
+      pedido('EN_ACONDICIONAMIENTO'),
+      pedido('TERMINADO'),
       null,
     ];
 
@@ -180,7 +196,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
    */
   it('R12: inexistente y ENTREGADO-que-existe dan codigos DISTINTOS', async () => {
     const inexistente = await codigoDe(null);
-    const entregado = await codigoDe({ id: PEDIDO, status: 'ENTREGADO' });
+    const entregado = await codigoDe(pedido('ENTREGADO'));
 
     expect(inexistente).toBe('order_not_found');
     expect(entregado).toBe('order_delivered_frozen');
@@ -188,7 +204,7 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
   });
 
   it('R12: la decision se toma sobre la LECTURA del pedido, que ocurre de verdad', async () => {
-    const { deps, orders, assignments } = montar({ id: PEDIDO, status: 'ENTREGADO' });
+    const { deps, orders, assignments } = montar(pedido('ENTREGADO'));
 
     await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).rejects.toMatchObject({
       code: 'order_delivered_frozen',
@@ -215,8 +231,8 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
     });
 
     it('R9: los dos estados abiertos pasan sin lanzar', () => {
-      expect(() => assertOrderAcceptsWrites({ id: PEDIDO, status: 'PENDIENTE' })).not.toThrow();
-      expect(() => assertOrderAcceptsWrites({ id: PEDIDO, status: 'EN_CURSO' })).not.toThrow();
+      expect(() => assertOrderAcceptsWrites(pedido('PENDIENTE'))).not.toThrow();
+      expect(() => assertOrderAcceptsWrites(pedido('EN_CURSO'))).not.toThrow();
     });
 
     /**
@@ -226,9 +242,9 @@ describe('QC-87 — la tabla de estados del pedido, celda a celda (design.md > 4
      * estados que hoy existen estan clasificados, ninguno de ellos por defecto.
      */
     it('R35: los diez estados de hoy estan clasificados, ninguno por descuido (R33, QC-215 R20, R30)', () => {
-      const clasificado = (status: OrderStatus): 'admite' | string => {
+      const clasificado = (status: Exclude<OrderStatus, 'PARCIAL'>): 'admite' | string => {
         try {
-          assertOrderAcceptsWrites({ id: PEDIDO, status });
+          assertOrderAcceptsWrites(pedido(status));
           return 'admite';
         } catch (error) {
           return (error as AsignacionesError).code;
@@ -267,7 +283,7 @@ describe('QC-215 — los estados de acondicionamiento y TERMINADO congelan los r
 
   for (const status of ESTADOS_CERRADOS) {
     it(`R20, R30: asignar, quitar un grupo y desasignar sobre un ${status} rechazan con order_produced_frozen sin escribir`, async () => {
-      const { deps, assignments } = montar({ id: PEDIDO, status });
+      const { deps, assignments } = montar(pedido(status));
 
       await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).rejects.toMatchObject({
         code: 'order_produced_frozen',
@@ -284,4 +300,102 @@ describe('QC-215 — los estados de acondicionamiento y TERMINADO congelan los r
       expect(assignments.deleteByWorkGroup).not.toHaveBeenCalled();
     });
   }
+});
+
+describe('QT-313 — responsables en un pedido PARCIAL, linea a linea (R55, design.md > 12)', () => {
+  /** Las tres escrituras de responsables sobre el mismo pedido: el codigo de cada una, o
+   *  `'sin error'`, y si llego a escribir. */
+  async function lasTresSobre(order: OrderAssignmentTarget): Promise<{
+    readonly codigos: readonly string[];
+    readonly escribio: boolean;
+  }> {
+    const { deps, assignments } = montar(order);
+    const codigos: string[] = [];
+    const escrituras = [
+      () => createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA),
+      () => createRemoveWorkGroupFromOrder(deps)(ACTOR, { orderId: PEDIDO, workGroupId: uuid('b') }),
+      () => createUnassignResponsible(deps)(ACTOR, { orderId: PEDIDO, userId: PERSONA }),
+    ];
+    for (const escritura of escrituras) {
+      try {
+        await escritura();
+        codigos.push('sin error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(AsignacionesError);
+        codigos.push((error as AsignacionesError).code);
+      }
+    }
+    const escribio =
+      assignments.insertMissing.mock.calls.length +
+        assignments.deleteOne.mock.calls.length +
+        assignments.deleteByWorkGroup.mock.calls.length >
+      0;
+    return { codigos, escribio };
+  }
+
+  for (const abierta of ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const) {
+    it(`R55: un PARCIAL con una linea ${abierta} y otra TERMINADO admite asignar, quitar grupo y desasignar`, async () => {
+      const { deps, assignments } = montar(parcial([abierta, 'TERMINADO']));
+
+      await expect(createAssignResponsibles(deps)(ACTOR, ENTRADA, AHORA)).resolves.toEqual({
+        added: 1,
+      });
+      await expect(
+        createRemoveWorkGroupFromOrder(deps)(ACTOR, { orderId: PEDIDO, workGroupId: uuid('b') }),
+      ).resolves.toEqual({ removed: 0 });
+      await expect(
+        createUnassignResponsible(deps)(ACTOR, { orderId: PEDIDO, userId: PERSONA }),
+      ).resolves.toBeUndefined();
+
+      expect(assignments.insertMissing).toHaveBeenCalledTimes(1);
+      expect(assignments.deleteByWorkGroup).toHaveBeenCalledTimes(1);
+      expect(assignments.deleteOne).toHaveBeenCalledTimes(1);
+    });
+  }
+
+  const PRODUCIDAS = [
+    ['POR_EMPACAR', 'EN_EMPAQUE'],
+    ['POR_ACONDICIONAR', 'TERMINADO'],
+    ['EN_ACONDICIONAMIENTO', 'POR_EMPACAR', 'TERMINADO'],
+  ] as const satisfies readonly (readonly OrderLineStatus[])[];
+
+  for (const lineas of PRODUCIDAS) {
+    it(`R55: un PARCIAL con todas sus lineas activas en ${lineas.join(' + ')} rechaza las tres con order_produced_frozen sin escribir`, async () => {
+      const { codigos, escribio } = await lasTresSobre(parcial(lineas));
+
+      expect(codigos).toEqual([
+        'order_produced_frozen',
+        'order_produced_frozen',
+        'order_produced_frozen',
+      ]);
+      expect(escribio).toBe(false);
+    });
+  }
+
+  it('R55: una linea cancelada no cuenta — no llega como activa y no abre el pedido', async () => {
+    // El catalogo solo devuelve las lineas activas: la cancelada (que estaba PENDIENTE al
+    // cancelarse) no aparece, y lo que queda es un PARCIAL ya fabricado.
+    const { codigos, escribio } = await lasTresSobre(parcial(['POR_EMPACAR', 'TERMINADO']));
+
+    expect(codigos).toEqual([
+      'order_produced_frozen',
+      'order_produced_frozen',
+      'order_produced_frozen',
+    ]);
+    expect(escribio).toBe(false);
+  });
+
+  it('R55: assertOrderAcceptsWrites aplica el mapa linea a linea y basta con una que admita', () => {
+    expect(() => assertOrderAcceptsWrites(parcial(['TERMINADO', 'BLOQUEADO']))).not.toThrow();
+    expect(() => assertOrderAcceptsWrites(parcial(['ENTREGADO', 'EN_CURSO']))).not.toThrow();
+    // Ninguna admite: aunque una ya este entregada, el error es el de un pedido fabricado.
+    for (const lineas of [['ENTREGADO', 'TERMINADO'], ['POR_EMPACAR', 'ENTREGADO']] as const) {
+      try {
+        assertOrderAcceptsWrites(parcial(lineas));
+        expect.unreachable('tenia que haber lanzado');
+      } catch (error) {
+        expect((error as AsignacionesError).code, lineas.join(' + ')).toBe('order_produced_frozen');
+      }
+    }
+  });
 });

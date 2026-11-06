@@ -38,6 +38,7 @@ function pedidoId(i: number): string {
 function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id,
+    lineId: `linea-${id}`,
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,
     quantity: '10.0000',
@@ -195,6 +196,7 @@ describe('QC-145 — listCompanyOrders: R22 sin filtro trae todos los estados', 
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
       [
+        'PARCIAL',
         'PENDIENTE',
         'EN_CURSO',
         'POR_EMPACAR',
@@ -392,6 +394,7 @@ describe('QC-145 — listCompanyOrders: R27 paginacion delegada al catalogo', ()
     expect(listAliveSummariesInCompany).toHaveBeenCalledWith(
       EMPRESA,
       [
+        'PARCIAL',
         'PENDIENTE',
         'EN_CURSO',
         'POR_EMPACAR',

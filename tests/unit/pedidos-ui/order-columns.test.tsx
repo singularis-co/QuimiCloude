@@ -56,6 +56,7 @@ import {
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import { finishedProductDetailRoute } from '@/lib/shared/routes';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
   const noDebeInvocarse = (nombre: string) => () => {
@@ -87,6 +88,7 @@ const ESTADOS_DE_ACONDICIONAMIENTO = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO'
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

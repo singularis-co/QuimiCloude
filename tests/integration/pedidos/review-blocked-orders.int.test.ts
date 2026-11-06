@@ -29,6 +29,8 @@ import {
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -44,7 +46,8 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { createCancelOrder, createCreateOrder, createReviewBlockedOrders } from '@/lib/modules/pedidos';
+import { createCancelOrder, createCreateOrder as createLinesOrder, createReviewBlockedOrders } from '@/lib/modules/pedidos';
+import { singleRecipeCreate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor as InventarioActor, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { Actor } from '@/lib/modules/pedidos';
@@ -57,6 +60,10 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { countFromDelta } from '../../helpers/adjust-by-delta';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -95,6 +102,7 @@ function normalizeForTest(name: string): string {
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 };
@@ -133,7 +141,7 @@ const units: UnitCatalog = {
 };
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging: packagingCatalog, unitOfWork, now: () => new Date() });
-const cancelOrder = createCancelOrder({ orders, unitOfWork, now: () => new Date() });
+const cancelOrder = createCancelOrder({ unitOfWork, now: () => new Date() });
 const reviewBlockedOrders = createReviewBlockedOrders({ orders, recipes, products, units, packaging: packagingCatalog, unitOfWork });
 
 // ---------------------------------------------------------------------------
@@ -210,6 +218,8 @@ async function crearFixture(): Promise<Fixture> {
 async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.recipeLine.deleteMany({ where: { recipe: { companyId: fixture.companyId } } });
   await prisma.recipe.deleteMany({ where: { companyId: fixture.companyId } });
@@ -288,16 +298,13 @@ async function crearBloqueado(fixture: Fixture, recipeId: string, quantity: stri
 }
 
 async function filaDe(orderId: string) {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: {
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: {
       status: true,
       reservedAt: true,
       ingredientsCost: true,
       updatedAt: true,
       updatedBy: true,
-    },
-  });
+    } });
   return { ...row, ingredientsCost: row.ingredientsCost === null ? null : row.ingredientsCost.toFixed(4) };
 }
 
@@ -541,6 +548,11 @@ describe('reviewBlockedOrders contra la base — concurrencia', () => {
             where: { id: orderId },
             data: { status: 'CANCELADO', cancellationReason: 'Cliente anulo' },
           });
+          // QT-313: cancelar escribe la linea bajo el mismo candado del pedido.
+          await tx.orderLine.updateMany({
+            where: { orderId },
+            data: { status: 'CANCELADO', cancellationReason: 'Cliente anulo' },
+          });
           avisarCandado();
           await suelta;
         },
@@ -735,7 +747,7 @@ describe('la fachada de inventario dispara la revision', () => {
       expect(avisos).toHaveLength(1);
       const campos = avisos[0]?.[1];
       expect(campos).toMatchObject({ companyId: fixture.companyId, failedCount: 1 });
-      expect(JSON.parse(String(campos?.failed))).toEqual([{ orderId, code: expect.any(String) }]);
+      expect(JSON.parse(String(campos?.failed))).toEqual([{ orderId, lineId: expect.any(String), code: expect.any(String) }]);
     } finally {
       await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS "${disparador}" ON "orders"`);
       await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS "${funcion}"()`);

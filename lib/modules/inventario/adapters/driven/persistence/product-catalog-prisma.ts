@@ -4,7 +4,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ProductId, ProductRef } from '../../../domain/product-catalog';
-import type { CostingBatch } from '../../../domain/costing-batch';
+import type { CostingBatch, CostingExclusion } from '../../../domain/costing-batch';
 import type { ProductNameMatch } from '../../../domain/product-name-lookup';
 import type { ProductStockByUnit } from '../../../domain/product-stock';
 import { PRODUCT_TYPES, type ProductType } from '../../../domain/product-type';
@@ -171,12 +171,13 @@ async function findAliveBatchesWithStock(
  *
  * El disponible sale de `findReservedAndAvailableByBatch`, EL MISMO agregado que usan el
  * listado de lotes y la cobertura: no hay una segunda definicion de lo apartado. Con
- * `excludeOrderId`, lo que ese pedido tiene apartado no se resta.
+ * `excludeOrderId`, lo que ese pedido tiene apartado no se resta; con `excludeOrderLineId`, lo de
+ * esa linea.
  */
 export async function findCostingBatches(
   ids: readonly ProductId[],
   companyId: string,
-  options?: { readonly excludeOrderId?: string },
+  options?: CostingExclusion,
 ): Promise<readonly CostingBatch[]> {
   if (ids.length === 0) return [];
 
@@ -187,7 +188,7 @@ export async function findCostingBatches(
     prisma,
     companyId,
     rows.map((row) => row.id),
-    { excludeOrderId: options?.excludeOrderId },
+    { excludeOrderId: options?.excludeOrderId, excludeOrderLineId: options?.excludeOrderLineId },
   );
 
   return rows

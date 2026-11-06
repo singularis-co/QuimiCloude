@@ -21,6 +21,17 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { runDowns } from '../../helpers/migration-script'
+import { createOrderWithLine } from '../../helpers/only-order-line'
+
+// Las migraciones de las lineas del pedido dependen del tipo `OrderStatus`: bajan antes.
+const ORDER_LINES_DOWNS = [
+  '_orders_drop_line_columns',
+  '_order_lines_references',
+  '_order_lines',
+  '_order_status_partial',
+] as const
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -164,17 +175,14 @@ async function seedPendingConditioningOrder(tx: Prisma.TransactionClient): Promi
     },
     select: { id: true },
   })
-  const order = await tx.order.create({
-    data: {
-      companyId: company.id,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: 950_001,
-      recipeId: recipe.id,
-      quantity: new Prisma.Decimal('10'),
-      status: 'POR_ACONDICIONAR',
-      packedBy: packer.id,
-    },
-    select: { id: true },
+  const order = await createOrderWithLine(tx, {
+    companyId: company.id,
+    orderYear: new Date().getUTCFullYear(),
+    orderSequence: 950_001,
+    recipeId: recipe.id,
+    quantity: new Prisma.Decimal('10'),
+    status: 'POR_ACONDICIONAR',
+    packedBy: packer.id,
   })
   return order.id
 }
@@ -227,6 +235,7 @@ describe('down.sql de order_conditioning_states', () => {
   it('R27: un pedido POR_ACONDICIONAR aborta el DOWN entero y deja el esquema intacto', async () => {
     await inRolledBackTransaction(async (tx) => {
       await seedPendingConditioningOrder(tx)
+      const columnaAntes = await columnExists(tx, 'conditioned_by')
       const enumAntes = await enumValues(tx)
       const checksAntes = await statusChecks(tx)
       const indicesAntes = await indexNames(tx)
@@ -241,7 +250,7 @@ describe('down.sql de order_conditioning_states', () => {
       expect(await enumValues(tx)).toEqual(enumAntes)
       expect(await statusChecks(tx)).toEqual(checksAntes)
       expect(await indexNames(tx)).toEqual(indicesAntes)
-      expect(await columnExists(tx, 'conditioned_by')).toBe(true)
+      expect(await columnExists(tx, 'conditioned_by')).toBe(columnaAntes)
       expect(await tx.order.count({ where: { status: 'POR_ACONDICIONAR' } })).toBeGreaterThan(0)
     })
   })
@@ -253,8 +262,8 @@ describe('down.sql de order_conditioning_states', () => {
           where: { status: { in: ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] } },
         }),
       ).toBe(0)
+      await runDowns(tx, ORDER_LINES_DOWNS)
       expect(await indexNames(tx)).toContain('orders_company_terminated_idx')
-
       await applyStatements(tx, ACTUAL_COST_DOWN_STATEMENTS)
       await applyStatements(tx, INDEX_DOWN_STATEMENTS)
       expect(await indexNames(tx)).not.toContain('orders_company_terminated_idx')

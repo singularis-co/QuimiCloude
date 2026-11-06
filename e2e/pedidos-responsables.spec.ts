@@ -105,6 +105,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc102_e2e_';
@@ -370,7 +371,9 @@ test.beforeAll(async () => {
   if (orphanRecipeIds.length > 0) {
     // Los pedidos huerfanos se identifican por SU receta de fixture: `orders` no tiene ningun
     // campo de texto donde llevar el prefijo ni columna de empresa.
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
   await prisma.user.deleteMany({
@@ -433,8 +436,7 @@ test.beforeAll(async () => {
   // El pedido del recorrido, en `PENDIENTE`: es uno de los dos estados que QC-87 admite para
   // asignar. El ano sale del reloj porque el CHECK `orders_order_year_matches_created_at` lo ata
   // a `created_at`.
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       orderYear: new Date().getUTCFullYear(),
       orderSequence: ORDER_SEQUENCE,
       recipeId,
@@ -444,9 +446,7 @@ test.beforeAll(async () => {
       // QC-60: `orders.company_id` es obligatoria. La empresa de la sesion del recorrido, o el
       // listado de ese administrador no traeria el pedido.
       companyId,
-    },
-    select: { id: true, orderYear: true, orderSequence: true },
-  });
+    });
   orderId = order.id;
   // El correlativo se compone SIEMPRE con `formatOrderNumber` (QC-35 R10), nunca a mano.
   orderNumberText = formatOrderNumber({ year: order.orderYear, sequence: order.orderSequence });
@@ -470,7 +470,9 @@ test.afterAll(async () => {
   } finally {
     try {
       if (recipeId !== null) {
-        await prisma.order.deleteMany({ where: { recipeId } });
+        const pedidosABorrar2 = (await prisma.order.findMany({ where: { lines: { some: { recipeId } } }, select: { id: true } })).map((pedido) => pedido.id);
+        await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar2 } } });
+        await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar2 } } });
       }
     } finally {
       try {

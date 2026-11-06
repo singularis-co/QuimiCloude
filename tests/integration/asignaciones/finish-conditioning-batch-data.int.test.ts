@@ -17,6 +17,7 @@ import { asignaciones } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { syncOnlyLine, ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../../helpers/only-order-line';
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 
@@ -139,6 +140,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
   await prisma.productBatch.deleteMany({ where: { productId: { in: productIds } } });
   await prisma.product.deleteMany({ where: { id: { in: productIds } } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.recipe.deleteMany({ where: { companyId } });
   await prisma.presentation.deleteMany({ where: { id: { in: fixture.presentationIds } } });
@@ -168,8 +170,9 @@ async function crearPresentacion(fixture: Fixture, nombre: string, content: stri
 /** Una linea del reparto; con `conLote`, ademas su entrada por Terminar el empaque. */
 async function crearLinea(fixture: Fixture, orderId: string, nombre: string, conLote: boolean): Promise<string | null> {
   const presentationId = await crearPresentacion(fixture, nombre, '1');
+  const orderLineId = await ensureOnlyLine(prisma, orderId);
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
+    data: { orderId, orderLineId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
     select: { id: true },
   });
   if (!conLote) return null;
@@ -178,6 +181,7 @@ async function crearLinea(fixture: Fixture, orderId: string, nombre: string, con
       tx,
       {
         orderId,
+        orderLineId,
         recipeId: fixture.recipeId,
         recipeName: 'Limpiador',
         presentationId,
@@ -201,26 +205,22 @@ async function crearLinea(fixture: Fixture, orderId: string, nombre: string, con
 
 /** Un pedido `EN_ACONDICIONAMIENTO` de `acondicionador1`, con el operario en su equipo. */
 async function pedidoEnAcondicionamiento(fixture: Fixture): Promise<string> {
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: fixture.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
       recipeId: fixture.recipeId,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
+    });
+  await ensureOnlyLine(prisma, order.id);
   return order.id;
 }
 
 async function comenzar(fixture: Fixture, orderId: string): Promise<void> {
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: 'EN_ACONDICIONAMIENTO', packedBy: fixture.packerId, conditionedBy: fixture.acondicionador1 },
-  });
+  await updateOrderAndLine(prisma, orderId, { status: 'EN_ACONDICIONAMIENTO', packedBy: fixture.packerId, conditionedBy: fixture.acondicionador1 });
+  const orderLineId = await syncOnlyLine(prisma, orderId);
   await prisma.orderConditioningTeamMember.create({
-    data: { orderId, userId: fixture.operario, companyId: fixture.companyId, position: 0 },
+    data: { orderId, orderLineId, userId: fixture.operario, companyId: fixture.companyId, position: 0 },
   });
 }
 
@@ -229,10 +229,7 @@ function actor(fixture: Fixture, id: string): Actor {
 }
 
 async function leerPedido(id: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, conditionedBy: true, finishedAt: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, conditionedBy: true, finishedAt: true } });
 }
 
 async function leerEquipo(orderId: string) {
@@ -417,7 +414,10 @@ describe('QC-219 / QC-284 — Terminar exige los datos de lote', () => {
           data: { lot: viejo2, expiryDate: dia(diaUtc(200)), productionDate: dia(diaUtc(-1)) },
         });
         await asignaciones.finishConditioning(uno, { orderId: pedido });
-        if (estado === 'ENTREGADO') await prisma.order.update({ where: { id: pedido }, data: { status: 'ENTREGADO' } });
+        if (estado === 'ENTREGADO') {
+          await prisma.order.update({ where: { id: pedido }, data: { status: 'ENTREGADO' } });
+          await syncOnlyLine(prisma, pedido);
+        }
         const pedidoAntes = await leerPedido(pedido);
         const equipoAntes = await leerEquipo(pedido);
         const lotesAntes = await leerLotes([lote1, lote2]);

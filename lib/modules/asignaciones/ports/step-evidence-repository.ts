@@ -13,6 +13,8 @@ export type StepEvidenceRow = {
 export type NewStepEvidence = {
   readonly companyId: string;
   readonly orderId: string;
+  /** La linea del pedido cuyo paso documenta. */
+  readonly orderLineId: string;
   readonly phase: EvidencePhase;
   readonly stepPosition: number;
   readonly path: string;

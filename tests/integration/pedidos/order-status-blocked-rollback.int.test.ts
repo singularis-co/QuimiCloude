@@ -33,6 +33,17 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { runDowns } from '../../helpers/migration-script';
+import { createOrderWithLine } from '../../helpers/only-order-line';
+
+// Las migraciones de las lineas del pedido dependen del tipo `OrderStatus`: bajan antes.
+const ORDER_LINES_DOWNS = [
+  '_orders_drop_line_columns',
+  '_order_lines_references',
+  '_order_lines',
+  '_order_status_partial',
+] as const;
+
 // ---------------------------------------------------------------------------
 // Aislamiento (mismo patron que order-packing-states-rollback.int.test.ts)
 // ---------------------------------------------------------------------------
@@ -219,16 +230,13 @@ function freshSequence(): number {
 }
 
 async function seedBlockedOrder(tx: Prisma.TransactionClient, f: Fixtures): Promise<string> {
-  const order = await tx.order.create({
-    data: {
-      companyId: f.companyId,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: freshSequence(),
-      recipeId: f.recipeId,
-      quantity: new Prisma.Decimal('10'),
-      status: 'BLOQUEADO',
-    },
-    select: { id: true },
+  const order = await createOrderWithLine(tx, {
+    companyId: f.companyId,
+    orderYear: new Date().getUTCFullYear(),
+    orderSequence: freshSequence(),
+    recipeId: f.recipeId,
+    quantity: new Prisma.Decimal('10'),
+    status: 'BLOQUEADO',
   });
   return order.id;
 }
@@ -291,6 +299,7 @@ describe('down.sql de order_status_blocked, con y sin pedidos BLOQUEADO', () => 
 
       // Orden de una reversion real: primero los DOWN de las migraciones posteriores, despues
       // el de order_status_blocked.
+      await runDowns(tx, ORDER_LINES_DOWNS);
       await applyStatements(tx, LATER_DOWNS);
       await applyStatements(tx, ORDERS_BLOCKED_INDEX_DOWN_STATEMENTS);
       expect(await indexExists(tx, 'orders_blocked_company_created_idx')).toBe(false);

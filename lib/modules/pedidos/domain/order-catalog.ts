@@ -14,7 +14,7 @@
  * dos lineas de barril. Los seis casos de uso de QC-34 y `order-transitions.ts` quedan
  * intactos.
  */
-import type { OrderPriority, OrderStatus } from './order-classification';
+import type { OrderLineStatus, OrderPriority, OrderStatus } from './order-classification';
 import type { FinishConditioningAliveById, StartConditioningAliveById } from './order-conditioning';
 import type { OrderNumber } from './order-number';
 import type { Page } from './page';
@@ -25,10 +25,14 @@ import type { PackedLineCount } from './packing-count';
  *  lo que no esta en el tipo no se puede filtrar por descuido.
  *
  *  `status` es el `OrderStatus` de QC-34, IMPORTADO y no copiado: una segunda lista de
- *  estados se desincronizaria en silencio de la tabla de transiciones. */
+ *  estados se desincronizaria en silencio de la tabla de transiciones.
+ *
+ *  `activeLineStatuses` son los estados de sus lineas activas (vivas y no canceladas), sin orden
+ *  garantizado. Con ellos `asignaciones` decide si un `PARCIAL` admite responsables. */
 export type OrderAssignmentTarget = {
   readonly id: string;
   readonly status: OrderStatus;
+  readonly activeLineStatuses: readonly OrderLineStatus[];
 };
 
 /** El orden de un resumen paginado. `work_queue` es el de la lista de trabajo (prioridad,
@@ -74,9 +78,10 @@ export interface OrderCatalog {
   findAliveById(id: string, companyId: string): Promise<OrderAssignmentTarget | null>;
 
   /**
-   * Devuelve la `Page` ya armada porque `lib/shared/pagination` no puede importarse desde
-   * `domain/`: quien pagina es el adaptador. Con `ids` vacio no se llama, el caso de uso corta
-   * antes.
+   * Una fila por LINEA viva de esos pedidos cuyo estado esta en `statuses`; el estado es el de la
+   * linea, nunca `PARCIAL`. `total` y la paginacion cuentan lineas. Devuelve la `Page` ya armada
+   * porque `lib/shared/pagination` no puede importarse desde `domain/`: quien pagina es el
+   * adaptador. Con `ids` vacio no se llama, el caso de uso corta antes.
    */
   listAliveSummariesByIds(
     companyId: string,
@@ -95,8 +100,8 @@ export interface OrderCatalog {
    * `unfinished_then_recent` pone los nulos PRIMERO y luego la fecha descendente, con el mismo
    * desempate (numero descendente, `id`).
    *
-   * `filter.packedBy` deja solo los pedidos de ese empacador; un `packedBy` nulo no entra.
-   * `filter.conditionedBy` hace lo mismo con quien acondiciona.
+   * `filter.packedBy` deja solo las lineas de ese empacador; un `packedBy` nulo no entra.
+   * `filter.conditionedBy` hace lo mismo con quien acondiciona. Una fila por linea, como arriba.
    */
   listAliveSummariesInCompany(
     companyId: string,
@@ -132,19 +137,19 @@ export interface OrderCatalog {
   ): Promise<readonly OrderDeliveryProgress[]>;
 
   /**
-   * Mueve el estado de un pedido vivo de esa empresa, SOLO si `assertTransition(from, to)` lo
-   * permite: la comprobacion la hace `pedidos` con su propia matriz, dentro del metodo.
+   * Mueve el estado de UNA linea viva de un pedido vivo de esa empresa, SOLO si
+   * `assertTransition(from, to)` lo permite, y vuelve a derivar el estado del pedido en la misma
+   * transaccion. Las demas lineas no cambian.
    *
-   * `from` viaja para que el `UPDATE` filtre tambien por el, ademas de por `id`, `companyId`
-   * y `deletedAt: null`: dos lecturas simultaneas no pueden escribir dos veces sobre la misma
-   * transicion. `'not_found'` es el mismo caso que en `findAliveById` -no existe, esta de
-   * baja o es de otra empresa-; `'stale'` es un caso nuevo: el pedido sigue vivo y es de esa
-   * empresa, pero su estado ya no es `from` porque alguien lo movio entre la lectura y esta
-   * llamada.
+   * `from` viaja para que el `UPDATE` filtre tambien por el: dos lecturas simultaneas no pueden
+   * escribir dos veces sobre la misma transicion. `'not_found'` es el mismo caso que en
+   * `findAliveById` -no existe, esta de baja o es de otra empresa- y tambien una linea que no es
+   * de ese pedido o esta quitada; `'stale'`: la linea sigue viva, pero su estado ya no es `from`
+   * porque alguien la movio entre la lectura y esta llamada.
    *
-   * Si `to` es `'POR_EMPACAR'`, la misma llamada consume el material apartado:
+   * Si `to` es `'POR_EMPACAR'`, la misma llamada consume el material apartado para esa linea:
    * `'insufficient_material'` si no alcanza y `'recipe_without_lines'` si la receta no
-   * tiene lineas y el pedido no tiene nada apartado. Los dos deshacen la operacion entera.
+   * tiene lineas y la linea no tiene nada apartado. Los dos deshacen la operacion entera.
    *
    * Yendo a `'POR_EMPACAR'` esta llamada YA NO da de alta ningun lote de
    * producto terminado -eso se traslada a Terminar el empaque, una vez por linea del reparto-,
@@ -155,41 +160,44 @@ export interface OrderCatalog {
    * `'EN_EMPAQUE'`, `'POR_ACONDICIONAR'`, `'EN_ACONDICIONAMIENTO'`, `'TERMINADO'` y `'ENTREGADO'`
    * no son destino valido de este metodo: se rechazan con `InvalidTransitionError`, aunque la
    * matriz de transiciones los admita, porque solo los alcanzan acciones propias que conocen a
-   * quien empaca o acondiciona.
+   * quien empaca o acondiciona. `'CANCELADO'` tampoco: lleva motivo y es de cancelar.
    */
   transitionAliveById(
     id: string,
+    lineId: string,
     companyId: string,
-    from: OrderStatus,
-    to: OrderStatus,
+    from: OrderLineStatus,
+    to: OrderLineStatus,
     actorId: string,
     now: Date,
   ): Promise<'ok' | 'not_found' | 'stale' | 'insufficient_material' | 'recipe_without_lines'>;
 
   /**
-   * Comenzar el empaque: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien empaca, en una
-   * transaccion corta con ambito de empresa. `'ok'` mueve la fila; `'already_mine'` es el mismo
-   * empacador repitiendo Comenzar sobre su propio `EN_EMPAQUE`, sin escribir nada;
-   * `'taken'` es `EN_EMPAQUE` a nombre de otro; `'without_distribution'` es un `POR_EMPACAR` sin
-   * ninguna linea de reparto; `'not_packable'` es cualquier otro estado; `'not_found'` es
-   * el mismo caso que en `findAliveById` -no existe, esta de baja o es de otra empresa-.
+   * Comenzar el empaque de una linea: `POR_EMPACAR -> EN_EMPAQUE` con `packerId` como quien
+   * empaca, en una transaccion corta con ambito de empresa que vuelve a derivar el pedido. `'ok'`
+   * mueve la linea; `'already_mine'` es el mismo empacador repitiendo Comenzar sobre su propio
+   * `EN_EMPAQUE`, sin escribir nada; `'taken'` es `EN_EMPAQUE` a nombre de otro;
+   * `'without_distribution'` es un `POR_EMPACAR` sin reparto en esa linea; `'not_packable'` es
+   * cualquier otro estado; `'not_found'` es el mismo caso que en `transitionAliveById`.
    */
   startPackingAliveById(
     id: string,
+    lineId: string,
     companyId: string,
     packerId: string,
     now: Date,
   ): Promise<'ok' | 'already_mine' | 'taken' | 'not_packable' | 'not_found' | 'without_distribution'>;
 
   /**
-   * Terminar el empaque: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finishedAt` -el pedido aun no esta
-   * terminado-, solo si `packerId` es quien tiene el pedido en empaque. `'not_packer'`
-   * es un pedido `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado;
-   * `'not_found'` es el mismo caso que en `findAliveById`.
+   * Terminar el empaque de una linea: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finishedAt` -aun no
+   * esta terminada-, solo si `packerId` es quien la tiene en empaque. `'not_packer'` es una linea
+   * `EN_EMPAQUE` de otro empacador; `'not_packable'` es cualquier otro estado; `'not_found'` es el
+   * mismo caso que en `transitionAliveById`. El coste real es el de lo que consumio esa linea, y
+   * el pedido se vuelve a derivar en la misma transaccion.
    *
-   * Da de alta, por cada linea del reparto, un lote de producto terminado -mismo
+   * Da de alta, por cada fila del reparto de esa linea, un lote de producto terminado -mismo
    * coste unitario para todas-, en la MISMA transaccion que el cambio de estado: si
-   * cualquier linea falla, se deshace TODO. `'recipe_not_found'` es la receta del pedido,
+   * cualquier fila falla, se deshace TODO. `'recipe_not_found'` es la receta de la linea,
    * ausente o de otra empresa (mismo caso que antes emitia Finalizar); `'presentation_without_content'`
    * identifica -por `diagnostic`, nunca en el resultado- la primera linea sin contenido ni
    * copiado ni vigente (defensa en profundidad).
@@ -210,6 +218,7 @@ export interface OrderCatalog {
    */
   finishPackingAliveById(
     id: string,
+    lineId: string,
     companyId: string,
     packerId: string,
     now: Date,
@@ -229,27 +238,29 @@ export interface OrderCatalog {
   >;
 
   /**
-   * Comenzar el acondicionamiento: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO` con `conditionerId`
-   * como quien acondiciona, en un solo `UPDATE` condicional. `'already_mine'` es el mismo
-   * acondicionador sobre su propio `EN_ACONDICIONAMIENTO`, sin escribir; `'taken'`, ese estado a
-   * nombre de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, el mismo caso que
-   * en `findAliveById`.
+   * Comenzar el acondicionamiento de una linea: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO` con
+   * `conditionerId` como quien acondiciona; el pedido se vuelve a derivar en la misma transaccion.
+   * `'already_mine'` es el mismo acondicionador sobre su propio `EN_ACONDICIONAMIENTO`, sin
+   * escribir; `'taken'`, ese estado a nombre de otro; `'not_conditionable'`, cualquier otro estado;
+   * `'not_found'`, el mismo caso que en `transitionAliveById`.
    */
   startConditioningAliveById(
     id: string,
+    lineId: string,
     companyId: string,
     conditionerId: string,
     now: Date,
   ): ReturnType<StartConditioningAliveById>;
 
   /**
-   * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO` con `finishedAt = now` en la
-   * misma escritura, solo si `conditionerId` es quien lo acondiciona. `'not_conditioner'` es ese
-   * estado a nombre de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, igual que
-   * arriba.
+   * Terminar el acondicionamiento de una linea: `EN_ACONDICIONAMIENTO -> TERMINADO` con
+   * `finishedAt = now` en la misma escritura, solo si `conditionerId` es quien la acondiciona; el
+   * pedido se vuelve a derivar en la misma transaccion. `'not_conditioner'` es ese estado a nombre
+   * de otro; `'not_conditionable'`, cualquier otro estado; `'not_found'`, igual que arriba.
    */
   finishConditioningAliveById(
     id: string,
+    lineId: string,
     companyId: string,
     conditionerId: string,
     now: Date,
@@ -282,18 +293,23 @@ export type AssignedOrderPresentationLine = {
 };
 
 /**
- * Sin autoria, sin motivo de cancelacion y sin marcas de tiempo: lo que no esta en el tipo no se
- * filtra por descuido. `quantity` es cadena decimal, nunca `number`
- * (`docs/architecture.md > Anti-patrones`). Tampoco el precio de venta (`salePrice`), a proposito:
- * `asignaciones` no lo recibe.
+ * Una LINEA de un pedido con lo que su fila necesita del pedido: numero, prioridad y fecha de
+ * solicitud. Receta, cantidad, unidad, estado, reparto, quien empaca, quien acondiciona y la fecha
+ * de terminado son los de la linea. Sin autoria, sin motivo de cancelacion y sin marcas de tiempo:
+ * lo que no esta en el tipo no se filtra por descuido. `quantity` es cadena decimal, nunca
+ * `number` (`docs/architecture.md > Anti-patrones`). Tampoco el precio de venta (`salePrice`), a
+ * proposito: `asignaciones` no lo recibe.
  */
 export type AssignedOrderSummary = {
+  /** El pedido. */
   readonly id: string;
+  readonly lineId: string;
   readonly number: OrderNumber;
   readonly recipeId: string;
   readonly quantity: string;
   readonly priority: OrderPriority;
-  readonly status: OrderStatus;
+  /** El de la linea: nunca `PARCIAL`. */
+  readonly status: OrderLineStatus;
   /** La fecha de solicitud del pedido. */
   readonly createdAt: Date;
   /** `[]` = sin reparto todavia: el contrato que `asignaciones` usa para pintarlo. */

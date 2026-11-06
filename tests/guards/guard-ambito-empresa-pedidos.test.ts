@@ -1032,7 +1032,7 @@ function hallazgosDeLaCancelacion(source: string): readonly string[] {
 
   const funcion = funcionesDe(codigo, sinComentarios(source)).find((f) => f.nombre === 'cancelInsideTransaction')
   if (funcion === undefined) return [...hallazgos, 'no se encontro cancelInsideTransaction']
-  for (const metodo of ['lockAliveById', 'cancelAlive']) {
+  for (const metodo of ['lockAliveLines', 'refreshStatus']) {
     const llamadas = argumentosDeCadaLlamada(funcion.cuerpo, `\\.${metodo}\\b`)
     if (llamadas.length === 0 || !llamadas.every((args) => args.endsWith(',{companyId}'))) {
       hallazgos.push(`cancelInsideTransaction no lleva \`{ companyId }\` a ${metodo}`)
@@ -1107,10 +1107,10 @@ describe('QC-82 — cancelar por encargo y la transaccion de ejecucion no pierde
   it('R29 ANTI-PLACEBO (a): quitar `companyId` del ambito en cancelInsideTransaction sale en rojo', () => {
     const mutado = mutar(
       readFileSync(ORDER_CANCELLATION, 'utf8'),
-      'lockAliveById(id, { companyId })',
-      'lockAliveById(id, {} as never)',
+      'lockAliveLines(id, { companyId })',
+      'lockAliveLines(id, {} as never)',
     )
-    expect(hallazgosDeLaCancelacion(mutado)).toEqual(['cancelInsideTransaction no lleva `{ companyId }` a lockAliveById'])
+    expect(hallazgosDeLaCancelacion(mutado)).toEqual(['cancelInsideTransaction no lleva `{ companyId }` a lockAliveLines'])
   })
 
   it('R29 ANTI-PLACEBO (b): cablear la cancelacion de la ejecucion con otra unidad de trabajo sale en rojo', () => {

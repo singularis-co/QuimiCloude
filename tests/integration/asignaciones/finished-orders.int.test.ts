@@ -52,12 +52,13 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
-import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
+import type { OrderLineStatus } from '@/lib/modules/pedidos/domain/order-classification';
 
 import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransaction } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, packingStepsWithoutEvidence, recipesWithoutEvidence } from '../../helpers/evidence-off';
+import { syncOnlyLine, updateOrderAndLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -82,16 +83,21 @@ const PERMISOS_CON_EJECUCION: readonly string[] = [...PERMISOS_DEL_EMPACADOR, 'a
  */
 async function transitionAliveByIdReal(
   id: string,
+  lineId: string,
   companyId: string,
-  from: OrderStatus,
-  to: OrderStatus,
+  from: OrderLineStatus,
+  to: OrderLineStatus,
   actorId: string,
   now: Date,
 ): ReturnType<OrderCatalog['transitionAliveById']> {
   assertTransition(from, to);
+  if (to === 'CANCELADO') throw new Error('cancelar no es una transicion de la ejecucion');
   // R15, R16: yendo a `POR_EMPACAR` el exito real vuelve a ser el literal `'ok'` -ya
   // no da de alta ningun lote-, asi que este doble no necesita distinguir el destino.
-  return createOrderWriteRepository().setStatus(id, from, to, actorId, now, { companyId });
+  const orders = createOrderWriteRepository();
+  const result = await orders.setLineStatus(id, lineId, from, to, actorId, now, { companyId });
+  if (result === 'ok') await orders.refreshStatus(id, actorId, now, { companyId });
+  return result;
 }
 
 /** Cablea el caso de uso REAL sobre la `tx` del fixture, con los mismos adaptadores que
@@ -108,19 +114,28 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
-    startPackingAliveById: (id, companyId, packerId, now) =>
-      startPackingAliveOrder(id, packerId, now, { companyId }),
+    startPackingAliveById: (id, lineId, companyId, packerId, now) =>
+      startPackingAliveOrder(id, lineId, packerId, now, { companyId }),
     // T14: `finishPackingAlive` ya vive en `OrderWriteRepository`, dentro de la unidad de
     // trabajo. Este archivo no ejercita el alta de producto terminado (T14 la prueba entera en
     // `finish-with-finished-goods.int.test.ts`), asi que el `'ok'` vuelve sin lineas.
-    finishPackingAliveById: async (id, companyId, packerId, now) => {
-      const outcome = await createOrderWriteRepository().finishPackingAlive(id, packerId, now, { companyId });
-      return outcome.kind === 'ok' ? { kind: 'ok', finishedGoods: [] } : outcome.kind;
+    finishPackingAliveById: async (id, lineId, companyId, packerId, now) => {
+      const line = await prisma.orderLine.findFirst({
+        where: { id: lineId, orderId: id, companyId, deletedAt: null },
+        select: { status: true, packedBy: true },
+      });
+      if (line === null) return 'not_found';
+      if (line.status !== 'EN_EMPAQUE') return 'not_packable';
+      if (line.packedBy !== packerId) return 'not_packer';
+      const writes = createOrderWriteRepository();
+      await writes.setLineStatus(id, lineId, 'EN_EMPAQUE', 'POR_ACONDICIONAR', packerId, now, { companyId });
+      await writes.refreshStatus(id, packerId, now, { companyId });
+      return { kind: 'ok', finishedGoods: [] };
     },
-    startConditioningAliveById: (id, companyId, conditionerId, now) =>
-      startConditioningAliveOrder(id, conditionerId, now, { companyId }),
-    finishConditioningAliveById: (id, companyId, conditionerId, now) =>
-      finishConditioningAliveOrder(id, conditionerId, now, { companyId }),
+    startConditioningAliveById: (id, lineId, companyId, conditionerId, now) =>
+      startConditioningAliveOrder(id, lineId, conditionerId, now, { companyId }),
+    finishConditioningAliveById: (id, lineId, companyId, conditionerId, now) =>
+      finishConditioningAliveOrder(id, lineId, conditionerId, now, { companyId }),
   };
   const assignments = createOrderAssignmentRepository(tx);
   const execution = executionOnClient(tx, orders);
@@ -228,15 +243,12 @@ async function terminado(
   },
 ): Promise<string> {
   const id = await createOrder(fixture, { status: 'PENDIENTE', companyId: options.companyId });
-  await fixture.tx.order.update({
-    where: { id },
-    data: {
+  await updateOrderAndLine(fixture.tx, id, {
       status: 'TERMINADO',
       packedBy: options.packedBy,
       conditionedBy: options.conditionedBy,
       finishedAt: options.finishedAt,
-    },
-  });
+    }).then(() => syncOnlyLine(fixture.tx, id));
   return id;
 }
 
@@ -264,22 +276,13 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
 
       // Un ENTREGADO antiguo, aunque tenga `finished_at`, ya no es «Terminados».
       const entregadoAntiguo = await createOrder(fixture, { status: 'ENTREGADO' });
-      await fixture.tx.order.update({
-        where: { id: entregadoAntiguo },
-        data: { finishedAt: NOW, packedBy: otraPersona },
-      });
+      await updateOrderAndLine(fixture.tx, entregadoAntiguo, { finishedAt: NOW, packedBy: otraPersona }).then(() => syncOnlyLine(fixture.tx, entregadoAntiguo));
 
       // Los dos estados de acondicionamiento tampoco.
       const porAcondicionar = await createOrder(fixture, { status: 'PENDIENTE' });
-      await fixture.tx.order.update({
-        where: { id: porAcondicionar },
-        data: { status: 'POR_ACONDICIONAR', packedBy: otraPersona },
-      });
+      await updateOrderAndLine(fixture.tx, porAcondicionar, { status: 'POR_ACONDICIONAR', packedBy: otraPersona }).then(() => syncOnlyLine(fixture.tx, porAcondicionar));
       const enAcondicionamiento = await createOrder(fixture, { status: 'PENDIENTE' });
-      await fixture.tx.order.update({
-        where: { id: enAcondicionamiento },
-        data: { status: 'EN_ACONDICIONAMIENTO', packedBy: otraPersona, conditionedBy: otraPersona },
-      });
+      await updateOrderAndLine(fixture.tx, enAcondicionamiento, { status: 'EN_ACONDICIONAMIENTO', packedBy: otraPersona, conditionedBy: otraPersona }).then(() => syncOnlyLine(fixture.tx, enAcondicionamiento));
 
       const actorEmpacador: Actor = {
         id: empacador,
@@ -466,10 +469,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const empacador = await createPerson(fixture, fixture.companyA);
       const entregadoSinFecha = await createOrder(fixture, { status: 'ENTREGADO' });
       const entregadoConFecha = await createOrder(fixture, { status: 'ENTREGADO' });
-      await fixture.tx.order.update({
-        where: { id: entregadoConFecha },
-        data: { finishedAt: NOW, packedBy: empacador },
-      });
+      await updateOrderAndLine(fixture.tx, entregadoConFecha, { finishedAt: NOW, packedBy: empacador }).then(() => syncOnlyLine(fixture.tx, entregadoConFecha));
 
       const conEjecucion = await listFinishedOrders(
         { id: empacador, companyId: fixture.companyA, permissions: PERMISOS_CON_EJECUCION },
@@ -555,14 +555,11 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
         packedBy: string | null,
       ): Promise<string> {
         const id = await createOrder(fixture, { status: 'PENDIENTE' });
-        await fixture.tx.order.update({
-          where: { id },
-          data: {
+        await updateOrderAndLine(fixture.tx, id, {
             status,
             packedBy,
             ...(status === 'EN_ACONDICIONAMIENTO' ? { conditionedBy: acondicionador } : {}),
-          },
-        });
+          }).then(() => syncOnlyLine(fixture.tx, id));
         return id;
       }
 

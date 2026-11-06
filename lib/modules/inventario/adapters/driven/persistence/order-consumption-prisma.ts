@@ -5,15 +5,17 @@ import { batchCompanyScope, movementCompanyScope } from './company-scope';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ConsumedLot, OrderConsumptionLedger } from '../../../domain/order-consumption';
 
-/** Lo que el pedido consumio de cada lote de la empresa, neto, con el `unit_cost` actual del lote. */
+/** Lo que una linea del pedido consumio de cada lote de la empresa, neto, con el `unit_cost` actual
+ *  del lote. */
 async function findConsumedLots(
   tx: Prisma.TransactionClient,
   orderId: string,
+  orderLineId: string,
   scope: InventoryScope,
 ): Promise<readonly ConsumedLot[]> {
   const sums = await tx.inventoryMovement.groupBy({
     by: ['batchId'],
-    where: { AND: [movementCompanyScope(scope), { orderId, kind: 'consumption' }] },
+    where: { AND: [movementCompanyScope(scope), { orderId, orderLineId, kind: 'consumption' }] },
     _sum: { quantity: true },
     orderBy: { batchId: 'asc' },
   });
@@ -52,7 +54,7 @@ export function createOrderConsumptionLedger(tx: Prisma.TransactionClient): Orde
   return {
     findConsumedLots(input) {
       const scope: InventoryScope = { companyId: input.companyId };
-      return findConsumedLots(tx, input.orderId, scope);
+      return findConsumedLots(tx, input.orderId, input.orderLineId, scope);
     },
   };
 }

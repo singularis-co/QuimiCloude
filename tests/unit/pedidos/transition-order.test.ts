@@ -1,7 +1,7 @@
 // `createTransitionOrder`: implementa `OrderCatalog['transitionAliveById']` sobre la unidad de
 // trabajo compartida con `inventario`. Doble de `OrderUnitOfWork`, sin base de datos: lo que se
 // prueba es el ORDEN de llamadas (permiso implicito en `assertTransition` antes de abrir la
-// unidad, `lockAliveById` antes de `consumeForOrder`, `consumeForOrder` antes de `setStatus`: si
+// unidad, `lockAliveById` antes de `consumeForLine`, `consumeForLine` antes de `setStatus`: si
 // falta material o la receta no tiene lineas, ni el estado ni `finishedAt` quedan escritos) y
 // los resultados posibles.
 //
@@ -14,22 +14,24 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { InvalidTransitionError } from '@/lib/modules/pedidos/domain/errors';
 import { createTransitionOrder } from '@/lib/modules/pedidos/domain/transition-order';
-import {
-  fakeOrderConsumptionLedger,
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeUnitOfWork,
-} from '@/tests/helpers/order-unit-of-work-double';
+import { fakeOrderConsumptionLedger, fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, ONLY_LINE_ID, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
+import { singleRecipeWrites } from '@/tests/helpers/single-recipe-order';
 
-import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeExecutionLine } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 const EMPRESA = 'c-1';
+const LINEA = ONLY_LINE_ID;
 const AHORA = new Date('2026-09-23T12:00:00Z');
 
-function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
+/** Las escrituras de la linea vistas con los metodos del pedido que usan estos dobles: un pedido de
+ *  una receta. */
+function porLinea(unitOfWork: OrderUnitOfWork): OrderUnitOfWork {
+  return { run: (work) => unitOfWork.run((scope) => work({ ...scope, orders: singleRecipeWrites(scope.orders) })) };
+}
+
+function filaBloqueada(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: 'o-1',
@@ -72,10 +74,10 @@ describe('createTransitionOrder', () => {
   it('R21/R22: una transicion ilegal lanza InvalidTransitionError SIN abrir la unidad de trabajo', async () => {
     const lockAliveById = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'ENTREGADO', 'EN_CURSO', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'ENTREGADO', 'EN_CURSO', 'actor-1', AHORA),
     ).rejects.toBeInstanceOf(InvalidTransitionError);
 
     expect(lockAliveById).not.toHaveBeenCalled();
@@ -84,10 +86,10 @@ describe('createTransitionOrder', () => {
   it('R2: rechaza EN_EMPAQUE como destino, aunque la matriz lo admita, SIN abrir la unidad de trabajo', async () => {
     const lockAliveById = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'POR_EMPACAR', 'EN_EMPAQUE', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'POR_EMPACAR', 'EN_EMPAQUE', 'actor-1', AHORA),
     ).rejects.toBeInstanceOf(InvalidTransitionError);
 
     expect(lockAliveById).not.toHaveBeenCalled();
@@ -107,9 +109,9 @@ describe('createTransitionOrder', () => {
       const lockAliveById = vi.fn();
       const { unitOfWork, orders } = fakeUnitOfWork({ orders: { lockAliveById } });
       const run = vi.spyOn(unitOfWork, 'run');
-      const transitionAliveById = createTransitionOrder({ unitOfWork });
+      const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
-      const error = await transitionAliveById('o-1', EMPRESA, desde, hacia, 'actor-1', AHORA).catch(
+      const error = await transitionAliveById('o-1', LINEA, EMPRESA, desde, hacia, 'actor-1', AHORA).catch(
         (e: unknown) => e,
       );
 
@@ -124,10 +126,10 @@ describe('createTransitionOrder', () => {
   it('R2: rechaza ENTREGADO como destino, aunque la matriz lo admita, SIN abrir la unidad de trabajo', async () => {
     const lockAliveById = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_EMPAQUE', 'ENTREGADO', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_EMPAQUE', 'ENTREGADO', 'actor-1', AHORA),
     ).rejects.toBeInstanceOf(InvalidTransitionError);
 
     expect(lockAliveById).not.toHaveBeenCalled();
@@ -136,10 +138,10 @@ describe('createTransitionOrder', () => {
   it('not_found: el pedido no existe, esta borrado o es de otra empresa', async () => {
     const lockAliveById = vi.fn(async () => null);
     const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById } });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
     ).resolves.toBe('not_found');
   });
 
@@ -147,10 +149,10 @@ describe('createTransitionOrder', () => {
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const setStatus = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({ orders: { lockAliveById, setStatus } });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
     ).resolves.toBe('stale');
 
     expect(setStatus).not.toHaveBeenCalled();
@@ -167,22 +169,22 @@ describe('createTransitionOrder', () => {
       orden.push('setStatus');
       return 'ok' as const;
     });
-    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
     const setReservedAt = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes: scopeRecipes,
     });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'PENDIENTE', 'EN_CURSO', 'actor-1', AHORA),
     ).resolves.toBe('ok');
 
     expect(orden).toEqual(['lockAliveById', 'setStatus']);
     expect(findExecutionContentById).not.toHaveBeenCalled();
-    expect(consumeForOrder).not.toHaveBeenCalled();
+    expect(consumeForLine).not.toHaveBeenCalled();
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
@@ -192,8 +194,8 @@ describe('createTransitionOrder', () => {
     // Sin presentacion ni contenido: antes esto rechazaba con
     // `presentation_without_content`; ahora Finalizar ni lo mira (R15, R16).
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO', presentationLines: [] }));
-    const consumeForOrder = vi.fn(async () => {
-      orden.push('consumeForOrder');
+    const consumeForLine = vi.fn(async () => {
+      orden.push('consumeForLine');
       return { kind: 'consumed' as const };
     });
     const setStatus = vi.fn(async () => {
@@ -205,16 +207,16 @@ describe('createTransitionOrder', () => {
     });
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes: scopeRecipes,
     });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('ok');
 
-    expect(orden).toEqual(['consumeForOrder', 'setStatus', 'setReservedAt']);
+    expect(orden).toEqual(['consumeForLine', 'setStatus', 'setReservedAt']);
   });
 
   it('R44 retirado: un pedido con `unit_id NULL` y sin reparto SI finaliza y queda POR_EMPACAR', async () => {
@@ -225,18 +227,18 @@ describe('createTransitionOrder', () => {
     // sin mirarlo -nadie reintroduce la condicion retirada-.
     const { recipes: scopeRecipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
-    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
     const setStatus = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes: scopeRecipes,
     });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('ok');
     expect(setReservedAt).toHaveBeenCalledTimes(1);
   });
@@ -245,8 +247,8 @@ describe('createTransitionOrder', () => {
     const { recipes: scopeRecipes } = catalogoDeRecetas();
     const orden: string[] = [];
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO', ingredientsCost: '0.0000' }));
-    const consumeForOrder = vi.fn(async () => {
-      orden.push('consumeForOrder');
+    const consumeForLine = vi.fn(async () => {
+      orden.push('consumeForLine');
       return { kind: 'consumed' as const };
     });
     const setStatus = vi.fn(async () => {
@@ -259,32 +261,32 @@ describe('createTransitionOrder', () => {
     });
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes: scopeRecipes,
     });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('ok');
-    expect(orden).toEqual(['consumeForOrder', 'setStatus', 'setReservedAt']);
+    expect(orden).toEqual(['consumeForLine', 'setStatus', 'setReservedAt']);
   });
 
   it('R30, R31, R51: material insuficiente deshace la transaccion entera', async () => {
     const { recipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const setStatus = vi.fn(async () => 'ok' as const);
-    const consumeForOrder = vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['p-1'] }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'insufficient' as const, productIds: ['p-1'] }));
     const setReservedAt = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes,
     });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('insufficient_material');
 
     // Si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
@@ -296,11 +298,11 @@ describe('createTransitionOrder', () => {
     const { recipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const setStatus = vi.fn(async () => 'stale' as const);
-    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
     const setReservedAt = vi.fn();
     const { orders, reservations, recipes: scopeRecipes, finishedGoods, products, units } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes,
     });
     let vioLaExcepcion = false;
@@ -314,14 +316,14 @@ describe('createTransitionOrder', () => {
         }
       },
     };
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('stale');
 
     expect(vioLaExcepcion).toBe(true);
-    expect(consumeForOrder).toHaveBeenCalledTimes(1);
+    expect(consumeForLine).toHaveBeenCalledTimes(1);
     expect(setReservedAt).not.toHaveBeenCalled();
   });
 
@@ -329,17 +331,17 @@ describe('createTransitionOrder', () => {
     const { recipes } = catalogoDeRecetas();
     const lockAliveById = vi.fn(async () => filaBloqueada({ status: 'EN_CURSO' }));
     const setStatus = vi.fn(async () => 'ok' as const);
-    const consumeForOrder = vi.fn(async () => ({ kind: 'nothing_to_consume' as const }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'nothing_to_consume' as const }));
     const setReservedAt = vi.fn();
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes,
     });
-    const transitionAliveById = createTransitionOrder({ unitOfWork });
+    const transitionAliveById = createTransitionOrder({ unitOfWork: porLinea(unitOfWork) });
 
     await expect(
-      transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('recipe_without_lines');
 
     // Si el consumo falla, ni el estado ni `finishedAt` quedan escritos.
@@ -349,7 +351,7 @@ describe('createTransitionOrder', () => {
 });
 
 describe('QC-195 — pasar a POR_EMPACAR consume solo la receta', () => {
-  it('R26: consumeForOrder recibe como productIds los productos de la receta, no los envases del reparto', async () => {
+  it('R26: consumeForLine recibe como productIds los productos de la receta, no los envases del reparto', async () => {
     const { recipes } = catalogoDeRecetas([
       { productId: 'p-1', productName: null, percentage: '60.00' },
       { productId: 'p-2', productName: null, percentage: '40.00' },
@@ -360,20 +362,20 @@ describe('QC-195 — pasar a POR_EMPACAR consume solo la receta', () => {
         presentationLines: [{ presentationId: 'pres-1', packages: 40, packagingProductId: 'envase-1', presentationContent: null }],
       }),
     );
-    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus: vi.fn(async () => 'ok' as const), setReservedAt: vi.fn() },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes,
     });
 
     await expect(
-      createTransitionOrder({ unitOfWork })('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      createTransitionOrder({ unitOfWork: porLinea(unitOfWork) })('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('ok');
 
-    expect(consumeForOrder).toHaveBeenCalledTimes(1);
-    expect(consumeForOrder).toHaveBeenCalledWith(expect.objectContaining({ productIds: ['p-1', 'p-2'] }));
-    const entrada = (consumeForOrder.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string }[] }])[0];
+    expect(consumeForLine).toHaveBeenCalledTimes(1);
+    expect(consumeForLine).toHaveBeenCalledWith(expect.objectContaining({ productIds: ['p-1', 'p-2'] }));
+    const entrada = (consumeForLine.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string }[] }])[0];
     expect(entrada.fallbackRequirement.map((line) => line.productId)).toEqual(['p-1', 'p-2']);
   });
 });
@@ -389,25 +391,25 @@ describe('QC-204 createTransitionOrder — la necesidad de respaldo al finalizar
     const lockAliveById = vi.fn(async () => filaBloqueada({ quantity: '1000.0000', unitId: GRAMO.id }));
     const setStatus = vi.fn(async () => 'ok' as const);
     const setReservedAt = vi.fn(async () => undefined);
-    const consumeForOrder = vi.fn(async () => ({ kind: 'consumed' as const }));
+    const consumeForLine = vi.fn(async () => ({ kind: 'consumed' as const }));
     const { unitOfWork } = fakeUnitOfWork({
       orders: { lockAliveById, setStatus, setReservedAt },
-      reservations: { consumeForOrder },
+      reservations: { consumeForLine },
       recipes,
       products: fakeScopeProducts([{ id: 'p-1', name: 'p-1', unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' }]),
       units: fakeScopeUnits([GRAMO, KILO, PIEZA]),
     });
-    return { transitionAliveById: createTransitionOrder({ unitOfWork }), consumeForOrder, setStatus };
+    return { transitionAliveById: createTransitionOrder({ unitOfWork: porLinea(unitOfWork) }), consumeForLine, setStatus };
   }
 
   it('R11 finalizar sin nada apartado consume la necesidad convertida', async () => {
     const m = montar(KILO.id);
 
     await expect(
-      m.transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      m.transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('ok');
 
-    const entrada = (m.consumeForOrder.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string; quantity: string }[] }])[0];
+    const entrada = (m.consumeForLine.mock.calls[0] as unknown as readonly [{ fallbackRequirement: readonly { productId: string; quantity: string }[] }])[0];
     expect(entrada.fallbackRequirement).toHaveLength(1);
     expect(entrada.fallbackRequirement[0]?.productId).toBe('p-1');
     // 1000 g al 10 % son 100 g = 0.1 kg; sin convertir serian 100.
@@ -418,10 +420,10 @@ describe('QC-204 createTransitionOrder — la necesidad de respaldo al finalizar
     const m = montar(PIEZA.id);
 
     await expect(
-      m.transitionAliveById('o-1', EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
+      m.transitionAliveById('o-1', LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', 'actor-1', AHORA),
     ).resolves.toBe('insufficient_material');
 
-    expect(m.consumeForOrder).not.toHaveBeenCalled();
+    expect(m.consumeForLine).not.toHaveBeenCalled();
     expect(m.setStatus).not.toHaveBeenCalled();
   });
 });

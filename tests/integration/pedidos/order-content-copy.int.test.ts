@@ -34,6 +34,8 @@ import { createFinishedGoodsIntake } from '@/lib/modules/inventario/adapters/dri
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   listAliveOrders,
   findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
@@ -50,7 +52,8 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { createCreateOrder, createUpdateOrder } from '@/lib/modules/pedidos'
+import { createCreateOrder as createLinesOrder, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -65,6 +68,12 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -91,6 +100,7 @@ function normalizeForTest(name: string): string {
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 }
@@ -274,6 +284,8 @@ async function borrarEnvase(envase: { readonly presentationId: string; readonly 
 async function borrarPedido(orderId: string): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { orderId } })
   await prisma.orderPresentationLine.deleteMany({ where: { orderId } })
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { orderId } })
   await prisma.order.deleteMany({ where: { id: orderId } })
 }
 
@@ -331,7 +343,7 @@ describe('R3 — el alta copia el contenido de cada presentacion del reparto', (
           actorDe(A),
         ),
       ).rejects.toMatchObject({ code: 'presentation_without_content' })
-      expect(await prisma.order.count({ where: { companyId: A.companyId, recipeId } })).toBe(0)
+      expect(await prisma.order.count({ where: { companyId: A.companyId, lines: { some: { recipeId } } }})).toBe(0)
     } finally {
       await borrarEnvase(envase)
       await borrarReceta(recipeId)

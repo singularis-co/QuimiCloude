@@ -7,13 +7,13 @@ import { OrderNotFoundError, UnauthorizedError } from '@/lib/modules/pedidos/dom
 import { createGetOrder, toOrderView } from '@/lib/modules/pedidos/domain/get-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PresentationCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double'
+import { orderLineOf, type SingleRecipeOrderRow } from '../../helpers/order-unit-of-work-double'
 
 const COMPANY = '33333333-3333-4333-8333-333333333333'
 const ADMIN: Actor = { id: 'admin-1', companyId: COMPANY, permissions: ['pedidos.consultar'] }
@@ -41,7 +41,7 @@ const REF_VERSION: RecipeRef = {
   imageUrl: null,
 }
 
-function fila(recipeId: string): OrderRow {
+function fila(recipeId: string): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -65,7 +65,7 @@ function fila(recipeId: string): OrderRow {
 }
 
 function dobles(
-  row: OrderRow | null,
+  row: SingleRecipeOrderRow | null,
   refs: readonly RecipeRef[] = [REF_ORIGINAL, REF_VERSION],
   customerRefs: readonly CustomerRef[] = [],
 ) {
@@ -81,7 +81,10 @@ function dobles(
   return {
     customerCatalog: { findRefsIncludingDeleted: findCustomerRefs },
     findCustomerRefs,
-    orders: { findAliveById: vi.fn(async () => row) } as unknown as OrderRepository,
+    orders: {
+      findAliveById: vi.fn(async () => row),
+      findAliveLines: vi.fn(async () => (row === null ? [] : [orderLineOf(row)])),
+    } as unknown as OrderRepository,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     presentations: { findRefs } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),
@@ -183,7 +186,7 @@ describe('getOrder — el cliente del pedido (QC-156)', () => {
 
 describe('toOrderView — recibe el Map de RecipeRef', () => {
   it('R11: compone recipeVersion desde la referencia y no desde la fila', () => {
-    const vista = toOrderView(fila(VERSION), new Map([[VERSION, REF_VERSION]]))
+    const vista = toOrderView(fila(VERSION), [orderLineOf(fila(VERSION))], new Map([[VERSION, REF_VERSION]]))
 
     expect(vista.recipeName).toBe('Crema base · Sin perfume')
     expect(vista.recipeVersion).toEqual({
@@ -200,7 +203,7 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
   const ENVASE = 'e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1'
   const ENVASE_DE_BAJA = 'e2e2e2e2-e2e2-4e2e-8e2e-e2e2e2e2e2e2'
 
-  function filaConReparto(): OrderRow {
+  function filaConReparto(): SingleRecipeOrderRow {
     return {
       ...fila(ORIGINAL),
       presentationLines: [
@@ -245,7 +248,7 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
   })
 
   it('R33: toOrderView sin nombres de envase deja packagingName en null y conserva el id', () => {
-    const vista = toOrderView(filaConReparto(), new Map([[ORIGINAL, REF_ORIGINAL]]))
+    const vista = toOrderView(filaConReparto(), [orderLineOf(filaConReparto())], new Map([[ORIGINAL, REF_ORIGINAL]]))
 
     expect(vista.presentationLines[1]).toMatchObject({ packagingProductId: ENVASE, packagingName: null })
   })
@@ -259,7 +262,7 @@ describe('la ficha lleva el contenido y la unidad de la presentacion de cada lin
   const PERDIDA = '88888888-8888-4888-8888-888888888888'
 
   it('la copia de la linea manda; sin copia vale la vigente; la etiqueta es la de la unidad de la presentacion', async () => {
-    const row: OrderRow = {
+    const row: SingleRecipeOrderRow = {
       ...fila(ORIGINAL),
       unitId: LITRO,
       presentationLines: [
@@ -298,8 +301,13 @@ describe('la ficha lleva el contenido y la unidad de la presentacion de cada lin
   })
 
   it('toOrderView sin presentaciones resueltas deja contenido de la copia y unidad en null', () => {
+    const conReparto: SingleRecipeOrderRow = {
+      ...fila(ORIGINAL),
+      presentationLines: [{ presentationId: BOTELLA, packages: 1, packagingProductId: null, presentationContent: null }],
+    }
     const vista = toOrderView(
-      { ...fila(ORIGINAL), presentationLines: [{ presentationId: BOTELLA, packages: 1, packagingProductId: null, presentationContent: null }] },
+      conReparto,
+      [orderLineOf(conReparto)],
       new Map([[ORIGINAL, REF_ORIGINAL]]),
     )
 

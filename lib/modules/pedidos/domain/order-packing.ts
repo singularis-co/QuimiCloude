@@ -1,16 +1,16 @@
 // lib/modules/pedidos/domain/order-packing.ts
 //
 // `createStartPacking` implementa `OrderCatalog['startPackingAliveById']` sobre
-// `OrderPackingRepository`: un `UPDATE` condicional fuera de la unidad de trabajo compartida con
+// `OrderPackingRepository`: mueve una linea fuera de la unidad de trabajo compartida con
 // `inventario`, sin tocar material ni producto terminado.
 //
-// `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar):
-// abre `OrderUnitOfWork`, mueve el estado con `OrderWriteRepository.finishPackingAlive`, guarda
-// el conteo real y los envases libres de cada linea, liquida los envases con ese conteo, guarda el
-// coste real de lo consumido y da de alta, por cada linea con envases, un lote de producto
-// terminado con ese coste repartido en un unico coste por unidad del pedido, expresado en la
-// unidad de cada lote; todo en la MISMA transaccion. `asignaciones`
-// solo conoce la firma de `OrderCatalog`, nunca este archivo.
+// `createFinishPacking` implementa `OrderCatalog['finishPackingAliveById']` (Terminar) para UNA
+// linea del pedido: abre `OrderUnitOfWork`, mueve la linea, guarda el conteo real y los envases
+// libres de cada fila de su reparto, liquida los envases con ese conteo, guarda el coste real de lo
+// que consumio esa linea, da de alta, por cada fila con envases, un lote de producto terminado con
+// ese coste repartido en un unico coste por unidad de la linea, expresado en la unidad de cada
+// lote, y vuelve a derivar el pedido; todo en la MISMA transaccion. `asignaciones` solo conoce la
+// firma de `OrderCatalog`, nunca este archivo.
 
 import { planFinishedGoodsLine } from '@/lib/modules/inventario';
 import { convertQuantity, type UnitConversion } from '@/lib/modules/unidades';
@@ -58,10 +58,10 @@ export type FinishPackingDeps = {
 /** Firma exacta de `OrderCatalog['startPackingAliveById']`. `'without_distribution'` sale
  *  tal cual del puerto: este dominio no distingue ese caso de los demas, solo delega. */
 export function createStartPacking(deps: StartPackingDeps): OrderCatalog['startPackingAliveById'] {
-  return async function startPackingAliveById(id, companyId, packerId, now) {
+  return async function startPackingAliveById(id, lineId, companyId, packerId, now) {
     // La unica transicion que alcanza este metodo: falla rapido si algun dia dejara de ser legal.
     assertTransition('POR_EMPACAR', 'EN_EMPAQUE');
-    return deps.packing.startPackingAlive(id, packerId, now, { companyId });
+    return deps.packing.startPackingAlive(id, lineId, packerId, now, { companyId });
   };
 }
 
@@ -243,6 +243,7 @@ async function settlePackaging(
   scope: OrderTransactionScope,
   input: {
     readonly orderId: string;
+    readonly orderLineId: string;
     readonly companyId: string;
     readonly recipeId: string;
     readonly quantity: string;
@@ -263,8 +264,9 @@ async function settlePackaging(
 
   const settled = real.filter((line) => !ingredientIds.has(line.productId));
   if (settled.length > 0) {
-    const outcome = await scope.reservations.settlePackagingForOrder({
+    const outcome = await scope.reservations.settlePackagingForLine({
       orderId: input.orderId,
+      orderLineId: input.orderLineId,
       companyId: input.companyId,
       requirement: settled,
       actorId: input.actorId,
@@ -275,8 +277,9 @@ async function settlePackaging(
 
   const ingredientPackaging = real.filter((line) => ingredientIds.has(line.productId)).map((line) => line.productId);
   if (ingredientPackaging.length > 0) {
-    const consumption = await scope.reservations.consumeForOrder({
+    const consumption = await scope.reservations.consumeForLine({
       orderId: input.orderId,
+      orderLineId: input.orderLineId,
       companyId: input.companyId,
       fallbackRequirement: [],
       productIds: ingredientPackaging,
@@ -287,11 +290,20 @@ async function settlePackaging(
   }
 }
 
-/** Calcula el coste real con lo que el pedido consumio hasta este instante y lo guarda. */
-async function saveActualCost(scope: OrderTransactionScope, orderId: string, companyId: string): Promise<string | null> {
-  const lots = await scope.consumption.findConsumedLots({ orderId, companyId });
+/** Calcula el coste real con lo que la linea consumio hasta este instante, lo guarda en ella y
+ *  vuelve a derivar el pedido, que suma el de sus lineas. */
+async function saveActualCost(
+  scope: OrderTransactionScope,
+  orderId: string,
+  orderLineId: string,
+  companyId: string,
+  actorId: string,
+  now: Date,
+): Promise<string | null> {
+  const lots = await scope.consumption.findConsumedLots({ orderId, orderLineId, companyId });
   const actualCost = calculateActualOrderCost(lots);
-  await scope.orders.setActualCost(orderId, actualCost, { companyId });
+  await scope.orders.setLineActualCost(orderId, orderLineId, actualCost, { companyId });
+  await scope.orders.refreshStatus(orderId, actorId, now, { companyId });
   return actualCost;
 }
 
@@ -301,47 +313,59 @@ function packedByLineId(counts: readonly PackedLineCount[]): ReadonlyMap<string,
 
 /** Firma exacta de `OrderCatalog['finishPackingAliveById']`. */
 export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['finishPackingAliveById'] {
-  return async function finishPackingAliveById(id, companyId, packerId, now, counts) {
+  return async function finishPackingAliveById(id, lineId, companyId, packerId, now, counts) {
     assertTransition('EN_EMPAQUE', 'POR_ACONDICIONAR');
 
     try {
       return await deps.unitOfWork.run(async (scope) => {
-        const updated = await scope.orders.finishPackingAlive(id, packerId, now, { companyId });
-        if (updated.kind !== 'ok') return updated.kind;
+        const locked = await scope.orders.lockAliveLine(id, lineId, { companyId });
+        if (locked === null) return 'not_found';
+        const orderLine = locked.line;
+        if (orderLine.status !== 'EN_EMPAQUE') return 'not_packable';
+        if (orderLine.packedBy !== packerId) return 'not_packer';
 
-        const lines = await scope.orders.findPresentationLinesForFinish(id, { companyId });
+        const moved = await scope.orders.setLineStatus(id, lineId, 'EN_EMPAQUE', 'POR_ACONDICIONAR', packerId, now, {
+          companyId,
+        });
+        // La linea esta bloqueada desde `lockAliveLine` en esta misma transaccion: nadie pudo moverla.
+        if (moved !== 'ok') throw new Error(`finishPacking: la linea ${lineId} devolvio '${moved}' bloqueada`);
+
+        const lines = (await scope.orders.findPresentationLinesForFinish(id, { companyId })).filter(
+          (line) => line.orderLineId === lineId,
+        );
         if (checkPackingCounts(lines, counts).kind !== 'ok') {
           throw new FinishPackingRejectedSignal('invalid_packing_count');
         }
         // Sin reparto no hay envases que liquidar: el real sale solo de los ingredientes.
         if (lines.length === 0) {
-          await saveActualCost(scope, id, companyId);
+          await saveActualCost(scope, id, lineId, companyId, packerId, now);
           return { kind: 'ok' as const, finishedGoods: [] };
         }
 
-        if (updated.unitId === null) throw new OrderWithoutUnitError(id);
+        if (orderLine.unitId === null) throw new OrderWithoutUnitError(id);
         const resolvedLines = await resolveLines(deps.presentations, companyId, lines, packedByLineId(counts));
-        const unitIds = [...new Set([updated.unitId, ...resolvedLines.map((line) => line.unitId)])];
+        const unitIds = [...new Set([orderLine.unitId, ...resolvedLines.map((line) => line.unitId)])];
         const unitById = new Map((await deps.units.findRefs(unitIds, companyId)).map((ref) => [ref.id, ref] as const));
-        const orderUnit = requireUnit(unitById, updated.unitId);
-        const surplusById = resolveSurplus(updated.quantity, orderUnit, unitById, resolvedLines);
+        const orderUnit = requireUnit(unitById, orderLine.unitId);
+        const surplusById = resolveSurplus(orderLine.quantity, orderUnit, unitById, resolvedLines);
 
         await scope.orders.recordPackedCounts(id, withSurplus(counts, surplusById), { companyId });
 
         await settlePackaging(scope, {
           orderId: id,
+          orderLineId: lineId,
           companyId,
-          recipeId: updated.recipeId,
-          quantity: updated.quantity,
+          recipeId: orderLine.recipeId,
+          quantity: orderLine.quantity,
           lines: resolvedLines,
           actorId: packerId,
           now,
         });
 
         // Despues de liquidar los envases: sus asientos ya estan escritos en esta transaccion.
-        const actualCost = await saveActualCost(scope, id, companyId);
+        const actualCost = await saveActualCost(scope, id, lineId, companyId, packerId, now);
 
-        const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([updated.recipeId], companyId);
+        const [recipeRef] = await deps.recipes.findRefsIncludingDeleted([orderLine.recipeId], companyId);
         if (recipeRef === undefined) throw new RecipeNotFoundError();
 
         const packedLines = resolvedLines.filter((line) => line.packedPackages > 0);
@@ -355,8 +379,9 @@ export function createFinishPacking(deps: FinishPackingDeps): OrderCatalog['fini
         for (const { line, content, unitId, packedPackages } of packedLines) {
           const outcome = await scope.finishedGoods.receiveFromOrder({
             orderId: id,
+            orderLineId: line.orderLineId,
             companyId,
-            recipeId: updated.recipeId,
+            recipeId: orderLine.recipeId,
             recipeName: recipeRef.name,
             presentationId: line.presentationId,
             orderPresentationLineId: line.id,

@@ -50,6 +50,7 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { WIDE_VIEWPORT, clearSidebarStateCookie, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 type CookieStoreStub = { get: (name: string) => { name: string; value: string } | undefined };
 
@@ -252,6 +253,7 @@ const PRESENTACION = {
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: crypto.randomUUID(),
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

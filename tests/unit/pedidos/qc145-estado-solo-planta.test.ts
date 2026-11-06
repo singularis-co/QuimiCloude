@@ -256,14 +256,19 @@ describe('R10 — EN_CURSO/ENTREGADO solo los escribe setAliveOrderStatus o Term
     // acondicionamiento suman las dos ultimas.
     const fuente = readFileSync(join(repoRoot, ORDER_PRISMA), 'utf8');
 
+    // QT-313: las escrituras de la linea -nacer, cancelarse, moverse, moverse con el sello de su
+    // etapa y terminar el acondicionamiento- escriben el estado de la LINEA, no el del pedido, que
+    // se deriva de ellas (T14a). Comenzar el empaque y el acondicionamiento escriben con el sello;
+    // Terminar el empaque mueve la linea con `setLineStatus`.
     expect(funcionesConStatusEnData(fuente)).toEqual(
       [
+        'addOrderLines',
         'cancelAliveOrder',
+        'cancelAliveOrderLine',
         'finishConditioningAliveOrder',
-        'finishPackingAliveOrder',
-        'lockAndStartPackingAlive',
+        'setAliveOrderLineStatus',
         'setAliveOrderStatus',
-        'startConditioningAliveOrder',
+        'stampAliveOrderLineStatus',
       ].sort(),
     );
   });

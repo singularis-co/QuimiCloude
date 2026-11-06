@@ -42,6 +42,7 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const LINEA = uuid('e');
 const RECETA = uuid('a');
 const PRODUCTO = uuid('c');
 const LITRO = uuid('d');
@@ -55,6 +56,7 @@ const ACTOR: Actor = {
 function resumen(overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id: PEDIDO,
+    lineId: LINEA,
     number: { year: 2026, sequence: 1 },
     recipeId: RECETA,
     quantity: '250.0000',
@@ -231,6 +233,7 @@ describe('startAssignedOrder — R8: PENDIENTE abre el pedido', () => {
 
     expect(transitionAliveById).toHaveBeenCalledWith(
       PEDIDO,
+      LINEA,
       EMPRESA,
       'PENDIENTE',
       'EN_CURSO',
@@ -457,13 +460,14 @@ describe('QC-82 — startAssignedOrder: arrancar anota `start` en la misma trans
     const view = await createStartAssignedOrder(deps)(ACTOR, { orderId: PEDIDO });
 
     expect(run).toHaveBeenCalledTimes(1);
-    expect(transitionAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, 'PENDIENTE', 'EN_CURSO', ANA, AHORA);
+    expect(transitionAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, 'PENDIENTE', 'EN_CURSO', ANA, AHORA);
     expect(anotaciones).toEqual([
       {
         entry: {
           action: 'start',
           companyId: EMPRESA,
           orderId: PEDIDO,
+          orderLineId: LINEA,
           userId: ANA,
           stepPosition: 1,
           occurredAt: AHORA,
@@ -562,6 +566,7 @@ describe('QC-82 — startAssignedOrder: retomar anota `resume` en la ultima posi
           action: 'resume',
           companyId: EMPRESA,
           orderId: PEDIDO,
+          orderLineId: LINEA,
           userId: ANA,
           stepPosition: 3,
           occurredAt: AHORA,
@@ -678,7 +683,7 @@ describe('QC-82 — startAssignedOrder: carrera de arrancar al leer la vista', (
     expect(dobles.run).not.toHaveBeenCalled();
     expect(dobles.anotaciones.map(({ entry }) => entry.action)).toEqual(['resume']);
     expect(dobles.anotaciones[0]?.entry.stepPosition).toBe(2);
-    expect(listAliveSummariesByIds).toHaveBeenLastCalledWith(EMPRESA, [PEDIDO], ['EN_CURSO'], 1, 1);
+    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['EN_CURSO'], 1, 1);
     expect(view.status).toBe('EN_CURSO');
     expect(view.resumeStepPosition).toBe(2);
   });

@@ -42,6 +42,7 @@ import {
   findSeedRoleId,
 } from './use-case-fixture';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
 
 /**
@@ -50,13 +51,14 @@ import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/
  * hay `finishedGoods` que devolver. Un objeto aqui no es `'ok'` para el caso de uso y lo
  * trataria como `'stale'`, reintentando sin fin.
  */
-function ordersDoblados(orderId: string): OrderCatalog {
+function ordersDoblados(orderId: string, lineId: string): OrderCatalog {
   return {
     findAliveById: async () => ({ id: orderId, status: 'EN_CURSO' as const }),
     listAliveSummariesByIds: async () => ({
       items: [
         {
           id: orderId,
+          lineId,
           number: { year: 2026, sequence: 910001 },
           recipeId: 'receta',
           quantity: '10.0000',
@@ -97,10 +99,10 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
 
       const finish = createFinishAssignedOrder({
         assignments: createOrderAssignmentRepository(fixture.tx),
-        orders: ordersDoblados(pedido),
+        orders: ordersDoblados(pedido, await ensureOnlyLine(fixture.tx, pedido)),
         people: assignmentDirectoryPrisma,
         groups: assignmentDirectoryPrisma,
-        ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
+        ...executionOnClient(fixture.tx, ordersDoblados(pedido, await ensureOnlyLine(fixture.tx, pedido))),
         now: () => NOW,
         recipes: recipesWithoutEvidence,
         evidence: evidenceRepositoryUnused,
@@ -135,10 +137,10 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
 
       const finish = createFinishAssignedOrder({
         assignments: createOrderAssignmentRepository(fixture.tx),
-        orders: ordersDoblados(pedido),
+        orders: ordersDoblados(pedido, await ensureOnlyLine(fixture.tx, pedido)),
         people: assignmentDirectoryPrisma,
         groups: assignmentDirectoryPrisma,
-        ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
+        ...executionOnClient(fixture.tx, ordersDoblados(pedido, await ensureOnlyLine(fixture.tx, pedido))),
         now: () => NOW,
         recipes: recipesWithoutEvidence,
         evidence: evidenceRepositoryUnused,
@@ -173,10 +175,10 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
 
       const finish = createFinishAssignedOrder({
         assignments: createOrderAssignmentRepository(fixture.tx),
-        orders: ordersDoblados(pedido),
+        orders: ordersDoblados(pedido, await ensureOnlyLine(fixture.tx, pedido)),
         people: assignmentDirectoryPrisma,
         groups: assignmentDirectoryPrisma,
-        ...executionOnClient(fixture.tx, ordersDoblados(pedido)),
+        ...executionOnClient(fixture.tx, ordersDoblados(pedido, await ensureOnlyLine(fixture.tx, pedido))),
         now: () => NOW,
         recipes: recipesWithoutEvidence,
         evidence: evidenceRepositoryUnused,

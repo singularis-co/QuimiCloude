@@ -47,6 +47,7 @@ import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/vi
 // LA SEGUNDA MITAD DE R28, invocada y no reescrita: los casos de QC-87 corren tal cual estan en
 // disco. Si alguien relajara `requirePermission` en `asignaciones`, esta suite se pone roja.
 import '../asignaciones/authorization.test';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { routerMock, accionesDeEscritura } = vi.hoisted(() => ({
   routerMock: {
@@ -180,6 +181,7 @@ const PARAMS: DataTableParams = {
 };
 
 const PEDIDO: OrderSummary = {
+  ...VISTA_SIN_LINEAS,
   id: PEDIDO_ID,
   number: { year: 2026, sequence: 42 },
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

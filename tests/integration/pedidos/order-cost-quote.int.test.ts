@@ -20,6 +20,8 @@ import { createWithFirstBatch, findFinishedGoodsReceipts } from '@/lib/modules/i
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   listAliveOrders,
   findBlockedOrderIds,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
@@ -42,9 +44,10 @@ import { findMassVolumeBridge, findUnitRefs } from '@/lib/modules/unidades/adapt
 import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapters/driven/persistence/unit-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { createCreateOrder, createQuoteOrderCost, createUpdateOrder } from '@/lib/modules/pedidos'
+import { createCreateOrder as createLinesOrder, createQuoteOrderCost, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
+import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder } from '@/lib/modules/pedidos'
+import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch'
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
@@ -57,6 +60,13 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+import { type SingleLineNewOrder } from '../../helpers/only-order-line';
+
+
+// Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
+const createCreateOrder = (deps: Parameters<typeof createLinesOrder>[0]) => singleRecipeCreate(createLinesOrder(deps));
+const createUpdateOrder = (deps: Parameters<typeof createLinesUpdate>[0]) =>
+  singleRecipeUpdate(createLinesUpdate(deps), (id, scope) => deps.orders.findAliveLines(id, scope));
 
 const customerCatalog = {
   findAliveRefById: (id: string, companyId: string) => findAliveCustomerRefById(id, { companyId }),
@@ -79,6 +89,7 @@ function normalizeForTest(name: string): string {
 
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
+  findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
   listAlive: listAliveOrders,
   findBlockedIds: findBlockedOrderIds,
 }
@@ -278,12 +289,14 @@ function borrarReceta(recipeId: string): Promise<unknown> {
  *  pedido. */
 async function borrarPedido(orderId: string): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { orderId } })
+  // Las lineas del pedido lo referencian sin borrado en cascada.
+  await prisma.orderLine.deleteMany({ where: { orderId } })
   await prisma.order.deleteMany({ where: { id: orderId } })
 }
 
 async function ingredientsCostCrudo(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`
   const row = rows[0]
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`)
   return row.ingredients_cost
@@ -442,16 +455,18 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      const sinCambios: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const sinCambios: Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, sinCambios, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      // La cotizacion de EDICION, con el `orderId` del propio pedido, coincide con lo guardado.
+      // La cotizacion de EDICION, con la linea del propio pedido (QT-313 R25), coincide con lo
+      // guardado.
+      const [linea] = await orders.findAliveLines(orderId, { companyId: A.companyId })
       const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
-      const cotizacion = await cotizar({ recipeId, quantity: '6.0000', unitId, orderId }, actorDe(A))
+      const cotizacion = await cotizar({ recipeId, quantity: '6.0000', unitId, orderLineId: linea?.id }, actorDe(A))
       expect(cotizacion.ingredientsCost).toBe('30.0000')
 
-      // Sin el `orderId`, la cotizacion es la de un pedido NUEVO: como el unico lote ya esta
+      // Sin la linea, la cotizacion es la de un pedido NUEVO: como el unico lote ya esta
       // apartado por este pedido, no queda nada disponible para nadie mas.
       const cotizacionSinOrderId = await cotizar({ recipeId, quantity: '6.0000', unitId }, actorDe(A))
       expect(cotizacionSinOrderId.ingredientsCost).toBeNull()
@@ -485,9 +500,10 @@ describe('aislamiento: `orderId` de OTRA empresa no cambia nada (R65, ambito)', 
 
       const cotizar = createQuoteOrderCost({ recipes, products, units, packaging: packagingCatalog })
       const sinOrderId = await cotizar({ recipeId, quantity: '6.0000', unitId }, actorDe(A))
-      // El `orderId` es de Q, de OTRA empresa: la consulta de A sigue acotada a `companyId` de A,
-      // asi que excluirlo no puede devolver nada distinto de no excluir nada.
-      const conOrderIdAjeno = await cotizar({ recipeId, quantity: '6.0000', unitId, orderId: orderIdDeQ }, actorDe(A))
+      // La linea es de un pedido de Q, de OTRA empresa: la consulta de A sigue acotada a
+      // `companyId` de A, asi que excluirla no puede devolver nada distinto de no excluir nada.
+      const [lineaDeQ] = await orders.findAliveLines(orderIdDeQ, { companyId: Q.companyId })
+      const conOrderIdAjeno = await cotizar({ recipeId, quantity: '6.0000', unitId, orderLineId: lineaDeQ?.id }, actorDe(A))
 
       expect(sinOrderId.ingredientsCost).toBe('30.0000')
       expect(conOrderIdAjeno.ingredientsCost).toBe('30.0000')

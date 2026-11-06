@@ -451,13 +451,12 @@ async function insertarPedido(
 ): Promise<string> {
   const id = randomUUID()
   await tx.$executeRawUnsafe(
-    `INSERT INTO "orders" ("id","company_id","order_year","order_sequence","recipe_id","quantity","created_at","updated_at")
-     VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, 10, COALESCE($6::timestamptz, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP)`,
+    `INSERT INTO "orders" ("id","company_id","order_year","order_sequence","created_at","updated_at")
+     VALUES ($1::uuid, $2::uuid, $3, $4, COALESCE($5::timestamptz, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP)`,
     id,
     seed.companyId,
     seed.year,
     seed.sequence,
-    seed.recipeId,
     seed.createdAt ?? null,
   )
   return id
@@ -476,8 +475,8 @@ async function insertarPedidoPrevio(
   const id = randomUUID()
   const cancelado = seed.status === 'CANCELADO'
   await tx.$executeRawUnsafe(
-    `INSERT INTO "orders" ("id","order_year","order_sequence","recipe_id","quantity","status","cancellation_reason","created_at","deleted_at","updated_at")
-     VALUES ($1::uuid, 2026, $2, $3::uuid, 10,
+    `INSERT INTO "orders" ("id","order_year","order_sequence","status","cancellation_reason","created_at","deleted_at","updated_at")
+     VALUES ($1::uuid, 2026, $2,
              ${cancelado ? `'CANCELADO'` : `'PENDIENTE'`},
              ${cancelado ? `'Cancelado antes de migrar'` : 'NULL'},
              TIMESTAMPTZ '2026-05-10T12:00:00Z',
@@ -485,7 +484,6 @@ async function insertarPedidoPrevio(
              CURRENT_TIMESTAMP)`,
     id,
     seed.sequence,
-    seed.recipeId,
   )
   return id
 }
@@ -534,6 +532,9 @@ async function vaciarPedidos(tx: Prisma.TransactionClient) {
  *
  * QC-214 2026-10-13: `20261013120000_order_step_evidence` anadio una sexta,
  * `order_step_evidence_order_id_company_id_fkey`, con la misma forma; se retira y restaura igual.
+ *
+ * 2026-11-03: `20261103120000_order_lines` anadio una septima,
+ * `order_lines_order_id_company_id_fkey`, con la misma forma; se retira y restaura igual.
  */
 const RESERVATION_ORDER_FK =
   'ALTER TABLE "reservation_movements" ADD CONSTRAINT "reservation_movements_order_id_fkey" ' +
@@ -560,6 +561,11 @@ const STEP_EVIDENCE_ORDER_FK =
   'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
   'ON DELETE RESTRICT ON UPDATE CASCADE'
 
+const ORDER_LINE_ORDER_FK =
+  'ALTER TABLE "order_lines" ADD CONSTRAINT "order_lines_order_id_company_id_fkey" ' +
+  'FOREIGN KEY ("order_id", "company_id") REFERENCES "orders"("id", "company_id") ' +
+  'ON DELETE RESTRICT ON UPDATE CASCADE'
+
 async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
   await tx.$executeRawUnsafe(
     'ALTER TABLE "reservation_movements" DROP CONSTRAINT "reservation_movements_order_id_fkey"',
@@ -577,6 +583,7 @@ async function dropForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transaction
   await tx.$executeRawUnsafe(
     'ALTER TABLE "order_step_evidence" DROP CONSTRAINT "order_step_evidence_order_id_company_id_fkey"',
   )
+  await tx.$executeRawUnsafe('ALTER TABLE "order_lines" DROP CONSTRAINT "order_lines_order_id_company_id_fkey"')
 }
 
 async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.TransactionClient) {
@@ -586,6 +593,7 @@ async function restoreForeignKeysDependingOnOrdersCompanyKey(tx: Prisma.Transact
   await tx.$executeRawUnsafe(CONDITIONING_TEAM_ORDER_FK)
   await tx.$executeRawUnsafe(DELIVERY_ORDER_FK)
   await tx.$executeRawUnsafe(STEP_EVIDENCE_ORDER_FK)
+  await tx.$executeRawUnsafe(ORDER_LINE_ORDER_FK)
 }
 
 afterAll(async () => {
@@ -599,23 +607,20 @@ afterAll(async () => {
 describe('R1 — todo pedido lleva una empresa que existe', () => {
   it('rechaza con 23502 un pedido SIN empresa y no escribe la fila', async () => {
     await inRolledBackTransaction(async (tx) => {
-      const quimicloud = await quimicloudId(tx)
-      const recipeId = await crearReceta(tx, quimicloud)
       const sequence = freshSequence()
       const rechazo = await expectRejectedByDatabase(
         tx,
         () => tx.$executeRawUnsafe(
-          `INSERT INTO "orders" ("order_year","order_sequence","recipe_id","quantity","updated_at")
-           VALUES ($1, $2, $3::uuid, 10, CURRENT_TIMESTAMP)`,
+          `INSERT INTO "orders" ("order_year","order_sequence","updated_at")
+           VALUES ($1, $2, CURRENT_TIMESTAMP)`,
           currentUtcYear(),
           sequence,
-          recipeId,
         ),
         'pedido sin empresa',
       )
       expect(rechazo.sqlState).toBe(NOT_NULL_VIOLATION)
       // En el INSERT solo falta `company_id`: el resto de NOT NULL van con valor o tienen DEFAULT.
-      expect(await tx.order.count({ where: { recipeId } })).toBe(0)
+      expect(await tx.order.count({ where: { orderSequence: sequence } })).toBe(0)
     })
   })
 
@@ -637,7 +642,6 @@ describe('R1 — todo pedido lleva una empresa que existe', () => {
       expect(rechazo.sqlState).toBe(FOREIGN_KEY_VIOLATION)
       expect(rechazo.texto).toContain('orders_company_id_fkey')
       expect(await tx.order.count({ where: { companyId: inventada } })).toBe(0)
-      expect(await tx.order.count({ where: { recipeId } })).toBe(0)
     })
   })
 })
@@ -1033,17 +1037,15 @@ describe('R5, R7 — el DOWN limpio restaura el esquema global y deja el contado
       // Y ese numero cabe bajo el unico global recien restaurado, mientras que uno ya usado no.
       await expect(
         tx.$executeRawUnsafe(
-          `INSERT INTO "orders" ("order_year","order_sequence","recipe_id","quantity","created_at","updated_at")
-           VALUES (2961, 13, $1::uuid, 10, TIMESTAMPTZ '2961-04-01T12:00:00Z', CURRENT_TIMESTAMP)`,
-          recipeId,
+          `INSERT INTO "orders" ("order_year","order_sequence","created_at","updated_at")
+           VALUES (2961, 13, TIMESTAMPTZ '2961-04-01T12:00:00Z', CURRENT_TIMESTAMP)`,
         ),
       ).resolves.toBe(1)
       const repetido = await expectRejectedByDatabase(
         tx,
         () => tx.$executeRawUnsafe(
-          `INSERT INTO "orders" ("order_year","order_sequence","recipe_id","quantity","created_at","updated_at")
-           VALUES (2961, 12, $1::uuid, 10, TIMESTAMPTZ '2961-04-01T12:00:00Z', CURRENT_TIMESTAMP)`,
-          recipeId,
+          `INSERT INTO "orders" ("order_year","order_sequence","created_at","updated_at")
+           VALUES (2961, 12, TIMESTAMPTZ '2961-04-01T12:00:00Z', CURRENT_TIMESTAMP)`,
         ),
         'pareja ya escrita tras revertir',
       )

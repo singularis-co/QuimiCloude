@@ -1,8 +1,8 @@
 import type { OrderScope } from '../domain/order-scope';
 
 /**
- * Puerto de Comenzar el empaque: UN `UPDATE` condicional con ambito de empresa, fuera de la
- * unidad de trabajo compartida con `inventario` -no toca material ni producto terminado-.
+ * Puerto de Comenzar el empaque de una linea, fuera de la unidad de trabajo compartida con
+ * `inventario` -no toca material ni producto terminado-.
  *
  * Terminar el empaque YA NO vive aqui: da de alta un lote por linea del
  * reparto, y por eso corre DENTRO de `OrderUnitOfWork` -`OrderWriteRepository.finishPackingAlive`
@@ -13,13 +13,14 @@ import type { OrderScope } from '../domain/order-scope';
  * parametro (`tests/guards/guard-ambito-empresa-pedidos.test.ts`).
  */
 export interface OrderPackingRepository {
-  /** Transaccion corta con `SELECT ... FOR UPDATE` de la fila, conteo del reparto en una
-   *  sentencia aparte y solo entonces el `UPDATE`: `'ok'` si el
-   *  `UPDATE` mueve la fila; `'without_distribution'` si esta `POR_EMPACAR` sin ninguna linea de
-   *  reparto; si no, `'not_found'`, `'already_mine'`, `'taken'` o `'not_packable'` segun la fila
-   *  bloqueada. */
+  /** Transaccion corta con `SELECT ... FOR UPDATE` del pedido y de la linea, conteo del reparto de
+   *  la linea en una sentencia aparte y solo entonces el `UPDATE` de la linea, que vuelve a derivar
+   *  el pedido: `'ok'` si mueve la linea; `'without_distribution'` si esta `POR_EMPACAR` sin reparto;
+   *  si no, `'not_found'` -tambien una linea de otro pedido o quitada-, `'already_mine'`, `'taken'`
+   *  o `'not_packable'` segun la linea bloqueada. */
   startPackingAlive(
     id: string,
+    lineId: string,
     packerId: string,
     now: Date,
     scope: OrderScope,

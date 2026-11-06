@@ -60,6 +60,7 @@ import {
 } from '../../fixtures/order-delivery';
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 const { getDeliveryMock, deliverMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   getDeliveryMock: vi.fn<(orderId: string) => Promise<OrderDeliveryResult>>(),
@@ -789,6 +790,7 @@ describe('montaje desde la fila', () => {
 
   function pedidoTerminado(): OrderSummary {
     return {
+      ...VISTA_SIN_LINEAS,
       id: DELIVERY_ORDER_ID,
       number: { year: 2026, sequence: 7 },
       numberText: formatOrderNumber({ year: 2026, sequence: 7 }),

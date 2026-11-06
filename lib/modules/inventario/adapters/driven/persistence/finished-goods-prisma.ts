@@ -18,6 +18,7 @@ export function createFinishedGoodsIntake(tx: Prisma.TransactionClient): Finishe
         tx,
         {
           orderId: input.orderId,
+          orderLineId: input.orderLineId,
           recipeId: input.recipeId,
           recipeName: input.recipeName,
           presentationId: input.presentationId,

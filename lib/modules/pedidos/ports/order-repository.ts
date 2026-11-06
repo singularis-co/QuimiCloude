@@ -1,7 +1,7 @@
 import type { ListQuery } from '../domain/list-query';
 import type { Page } from '../domain/page';
 import type { OrderScope } from '../domain/order-scope';
-import type { OrderRow } from '../domain/order-view';
+import type { OrderLineRow, OrderRow } from '../domain/order-view';
 
 /**
  * Puerto de LECTURA del pedido. La escritura vive en `OrderWriteRepository`
@@ -22,10 +22,24 @@ import type { OrderRow } from '../domain/order-view';
  * «De otra empresa» vuelve como `null`, igual que «no existe»: distinguirlos seria un oraculo de
  * existencia sobre datos ajenos.
  */
+/** Una linea bloqueada y su pedido. */
+export type BlockedOrderLineRef = {
+  readonly orderId: string;
+  readonly lineId: string;
+};
+
 export interface OrderRepository {
   /** `null` = no existe, ya esta borrado, o es de OTRA empresa: para el dominio son el mismo
    *  caso. */
   findAliveById(id: string, scope: OrderScope): Promise<OrderRow | null>;
+
+  /** Las lineas vivas del pedido, canceladas incluidas y quitadas no, por `position`. `[]` si el
+   *  pedido no existe, esta borrado o es de otra empresa. */
+  findAliveLines(orderId: string, scope: OrderScope): Promise<readonly OrderLineRow[]>;
+
+  /** Lo mismo que `findAliveLines` para varios pedidos en una sola consulta: el listado lee las
+   *  lineas de toda la pagina de una vez. Un pedido sin lineas o de otra empresa no sale. */
+  findAliveLinesByOrderIds(orderIds: readonly string[], scope: OrderScope): Promise<readonly OrderLineRow[]>;
 
   /**
    * Listado paginado (R34, R38, R41) con el CONTRATO GENERICO de consulta (QC-57 R13, R25).
@@ -59,7 +73,7 @@ export interface OrderRepository {
     scope: OrderScope,
   ): Promise<Page<OrderRow>>;
 
-  /** Identificadores de los pedidos vivos en `BLOQUEADO` de la empresa, del mas antiguo al mas
-   *  nuevo por `(created_at, id)`: en ese orden se les ofrece el material que entra. */
-  findBlockedIds(scope: OrderScope): Promise<readonly string[]>;
+  /** Las lineas vivas en `BLOQUEADO` de pedidos vivos de la empresa, por `(created_at, id)` del
+   *  pedido y despues por `position`: en ese orden se les ofrece el material que entra. */
+  findBlockedIds(scope: OrderScope): Promise<readonly BlockedOrderLineRef[]>;
 }

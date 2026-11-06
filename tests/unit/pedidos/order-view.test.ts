@@ -14,22 +14,28 @@ import { describe, expect, it } from 'vitest'
 import type { AssignedOrderSummary } from '@/lib/modules/pedidos/domain/order-catalog'
 import type {
   NewOrder,
+  OrderLineRow,
   OrderRow,
   OrderSummary,
   OrderView,
 } from '@/lib/modules/pedidos/domain/order-view'
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
+import type { OrderLineWrite } from '@/lib/modules/pedidos/ports/order-write-repository'
 
 const NEW_ORDER: NewOrder = {
-  recipeId: '11111111-1111-4111-8111-111111111111',
-  quantity: '12.5000',
   priority: 'ALTA',
   status: 'EN_CURSO',
-  unitId: '33333333-3333-4333-8333-333333333333',
   customerId: null,
-  presentationLines: [],
+}
+
+const LINE_WRITE: OrderLineWrite = {
+  recipeId: '11111111-1111-4111-8111-111111111111',
+  originalRecipeId: '11111111-1111-4111-8111-111111111111',
+  quantity: '12.5000',
+  unitId: '33333333-3333-4333-8333-333333333333',
   salePrice: null,
+  presentationLines: [],
 }
 
 /** `true` si el tipo declara esa clave. Se evalua en COMPILACION; el `expect` de abajo solo
@@ -153,17 +159,19 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
     expect([precio, precioUnitario, total]).toEqual([false, false, false])
   })
 
-  it('OrderRow y OrderView llevan ingredientsCost', () => {
-    const enLaFila: Declara<OrderRow, 'ingredientsCost'> = true
+  it('QT-313 R1: el coste va en la linea y en la vista, no en la fila del pedido', () => {
+    const enLaFila: Declara<OrderRow, 'ingredientsCost'> = false
+    const enLaLinea: Declara<OrderLineRow, 'ingredientsCost'> = true
     const enLaVista: Declara<OrderView, 'ingredientsCost'> = true
-    expect([enLaFila, enLaVista]).toEqual([true, true])
+    expect([enLaFila, enLaLinea, enLaVista]).toEqual([false, true, true])
   })
 
-  it('OrderRow y OrderView llevan packagingCost, la parte de envases del importe', () => {
-    const enLaFila: Declara<OrderRow, 'packagingCost'> = true
+  it('QT-313 R1: la parte de envases del importe va en la linea y en la vista, no en la fila del pedido', () => {
+    const enLaFila: Declara<OrderRow, 'packagingCost'> = false
+    const enLaLinea: Declara<OrderLineRow, 'packagingCost'> = true
     const enLaVista: Declara<OrderView, 'packagingCost'> = true
     const sinCoste: OrderView['packagingCost'] = null
-    expect([enLaFila, enLaVista, sinCoste]).toEqual([true, true, null])
+    expect([enLaFila, enLaLinea, enLaVista, sinCoste]).toEqual([false, true, true, null])
   })
 
   it('ingredientsCost en null no se vuelve "0.0000"', () => {
@@ -180,33 +188,40 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
 })
 
 describe('QC-307 — el precio de venta del pedido entero en el contrato', () => {
-  it('R1, R2: NewOrder, OrderRow y OrderView declaran salePrice como cadena o null', () => {
-    const enLaEscritura: Declara<NewOrder, 'salePrice'> = true
-    const enLaFila: Declara<OrderRow, 'salePrice'> = true
+  it('R1, R2, QT-313 R1: la escritura y la fila de la linea y la vista declaran salePrice como cadena o null; el pedido no', () => {
+    const enLaEscritura: Declara<OrderLineWrite, 'salePrice'> = true
+    const enLaLinea: Declara<OrderLineRow, 'salePrice'> = true
+    const enElAlta: Declara<NewOrder, 'salePrice'> = false
+    const enLaFila: Declara<OrderRow, 'salePrice'> = false
     const enLaVista: Declara<OrderView, 'salePrice'> = true
     const enElListado: Declara<OrderSummary, 'salePrice'> = true
-    expect([enLaEscritura, enLaFila, enLaVista, enElListado]).toEqual([true, true, true, true])
+    expect([enLaEscritura, enLaLinea, enElAlta, enLaFila, enLaVista, enElListado]).toEqual([
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+    ])
 
     // Cadena decimal, nunca `number`.
-    const conPrecio: NewOrder = { ...NEW_ORDER, salePrice: '1250.5000' }
+    const conPrecio: OrderLineWrite = { ...LINE_WRITE, salePrice: '1250.5000' }
     const sinPrecio: OrderView['salePrice'] = null
     // @ts-expect-error salePrice no admite number
-    const comoNumero: NewOrder = { ...NEW_ORDER, salePrice: 1250.5 }
+    const comoNumero: OrderLineWrite = { ...LINE_WRITE, salePrice: 1250.5 }
     expect([conPrecio.salePrice, sinPrecio, comoNumero.salePrice]).toEqual(['1250.5000', null, 1250.5])
   })
 
-  it('R1, R2: salePrice es obligatorio en el tipo, no opcional', () => {
-    const sinLaClave: Omit<NewOrder, 'salePrice'> = {
-      recipeId: NEW_ORDER.recipeId,
-      quantity: NEW_ORDER.quantity,
-      priority: NEW_ORDER.priority,
-      status: NEW_ORDER.status,
-      unitId: NEW_ORDER.unitId,
-      customerId: NEW_ORDER.customerId,
-      presentationLines: NEW_ORDER.presentationLines,
+  it('R1, R2: salePrice es obligatorio en la escritura de la linea, no opcional', () => {
+    const sinLaClave: Omit<OrderLineWrite, 'salePrice'> = {
+      recipeId: LINE_WRITE.recipeId,
+      originalRecipeId: LINE_WRITE.originalRecipeId,
+      quantity: LINE_WRITE.quantity,
+      unitId: LINE_WRITE.unitId,
+      presentationLines: LINE_WRITE.presentationLines,
     }
-    // @ts-expect-error NewOrder exige salePrice: la ausencia se escribe `null`, no se omite
-    const incompleto: NewOrder = sinLaClave
+    // @ts-expect-error OrderLineWrite exige salePrice: la ausencia se escribe `null`, no se omite
+    const incompleto: OrderLineWrite = sinLaClave
     expect(incompleto).not.toHaveProperty('salePrice')
   })
 
@@ -230,6 +245,9 @@ describe('pedidos — el puerto declara sus metodos de LECTURA: los dos de desig
     // compartida con `inventario`; este puerto ya solo lee.
     const doble: OrderRepository = {
       findAliveById: async () => null,
+      // QT-313: las lineas del pedido, por `position`.
+      findAliveLines: async () => [],
+      findAliveLinesByOrderIds: async () => [],
       // `listAlive` devuelve una `Page` ya armada, no `{ rows, total }`: la firma se corrigio
       // el 2026-09-04 (nota al final de `design.md > 7.4`, aprobada por el leader) para que el
       // caso de uso no tenga que calcular el `offset`, que es la reimplementacion que R37
@@ -238,7 +256,7 @@ describe('pedidos — el puerto declara sus metodos de LECTURA: los dos de desig
       // QC-138: los bloqueados de la empresa, para la revision que los desbloquea.
       findBlockedIds: async () => [],
     }
-    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'findBlockedIds', 'listAlive'])
+    expect(Object.keys(doble).sort()).toEqual(['findAliveById', 'findAliveLines', 'findAliveLinesByOrderIds', 'findBlockedIds', 'listAlive'])
   })
 
   it('no existe ningun metodo de restaurar ni de listar borrados', () => {

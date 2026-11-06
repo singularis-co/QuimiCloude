@@ -75,7 +75,7 @@ export function createListCompanyOrders(
     const composed = await composeOrderRows(deps, actor.companyId, ordersPage.items);
 
     const items: CompanyOrderView[] = ordersPage.items.map((row) => {
-      const rowComposed = composed.get(row.id);
+      const rowComposed = composed.get(row.lineId);
       return {
         id: row.id,
         numberText: formatOrderNumber(row.number),

@@ -29,13 +29,14 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
-import { createCreateOrder } from '@/lib/modules/pedidos/domain/create-order'
+// Pedido de una receta, como desde el formulario: el helper traduce entrada y escrituras.
+import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-recipe-order'
 import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import { PedidosError, UnauthorizedError } from '@/lib/modules/pedidos/domain/errors'
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { createQuoteOrderCost } from '@/lib/modules/pedidos/domain/quote-order-cost'
-import { createUpdateOrder } from '@/lib/modules/pedidos/domain/update-order'
+import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
@@ -184,7 +185,7 @@ const SIETE: readonly (readonly [string, string, Invocacion])[] = [
     'cancelOrder',
     MODIFICAR,
     (actor, entrada = { reason: 'sin stock' }) =>
-      createCancelOrder({ orders: depsDeTurno().orders, unitOfWork: depsDeTurno().unitOfWork })(
+      createCancelOrder({ unitOfWork: depsDeTurno().unitOfWork })(
         ORDER_ID,
         entrada,
         actor,
@@ -463,7 +464,7 @@ describe('QC-74 — requirePermission es la primera linea de los siete, con su c
       const validacion = cuerpo.indexOf('safeParse')
       if (validacion > -1) expect(autorizacion).toBeLessThan(validacion)
 
-      const primerPuerto = cuerpo.search(/\bdeps\s*\.\s*(orders|recipes)\b/)
+      const primerPuerto = cuerpo.search(/\bdeps\s*\.\s*(orders|recipes|unitOfWork)\b/)
       expect(primerPuerto, 'algun puerto tiene que usarse').toBeGreaterThan(-1)
       expect(autorizacion).toBeLessThan(primerPuerto)
     })

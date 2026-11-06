@@ -21,6 +21,8 @@ import { createOrderDeliveryVoidRepository } from '@/lib/modules/pedidos/adapter
 import {
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma';
@@ -40,6 +42,7 @@ import {
   stockDeProducto,
   type EmpresaDeEntrega,
 } from '../../helpers/order-delivery-seed';
+import { updateOrderAndLine, firstLineSelect, withFirstLine } from '../../helpers/only-order-line';
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -146,8 +149,8 @@ async function entregarTodo(e: Escenario): Promise<string> {
 async function pedido(orderId: string) {
   return prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: { status: true, customerId: true, finishedAt: true, packedBy: true, conditionedBy: true },
-  });
+    select: { status: true, customerId: true, lines: firstLineSelect({ finishedAt: true, packedBy: true, conditionedBy: true }) },
+  }).then(withFirstLine);
 }
 
 async function codigoDe(promesa: Promise<unknown>): Promise<string> {
@@ -251,7 +254,9 @@ describe('voidDelivery contra Postgres', () => {
     const e = await crearEscenario();
     try {
       const deliveryId = await entregarTodo(e);
-      await prisma.order.update({ where: { id: e.orderId }, data: { status: 'EN_ACONDICIONAMIENTO', finishedAt: null } });
+      await updateOrderAndLine(prisma, e.orderId, { status: 'EN_ACONDICIONAMIENTO', finishedAt: null });
+      // QT-313: el estado que decide es el de la linea.
+      await prisma.orderLine.updateMany({ where: { orderId: e.orderId }, data: { status: 'EN_ACONDICIONAMIENTO', finishedAt: null } });
 
       expect(await codigoDe(anular(e, deliveryId, [e.lineId]))).toBe('action_not_allowed');
 
@@ -458,8 +463,12 @@ describe('voidDelivery contra Postgres', () => {
               orders:
                 donde === 'set-status'
                   ? {
-                      lockAliveById: (id, scope) => orders.lockAliveById(id, scope),
+                      lockAliveLines: (id, scope) => orders.lockAliveLines(id, scope),
+                      refreshStatus: (id, actorId, now, scope) => orders.refreshStatus(id, actorId, now, scope),
                       setStatus: async () => {
+                        throw new Error('fallo forzado al cambiar el estado');
+                      },
+                      setLineStatus: async () => {
                         throw new Error('fallo forzado al cambiar el estado');
                       },
                     }
@@ -479,7 +488,7 @@ describe('voidDelivery contra Postgres', () => {
           }),
       },
       voids: createOrderDeliveryVoidRepository(),
-      orders: { findAliveById: findAliveOrderById, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds },
+      orders: { findAliveById: findAliveOrderById, findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds, listAlive: listAliveOrders, findBlockedIds: findBlockedOrderIds },
     });
   }
 

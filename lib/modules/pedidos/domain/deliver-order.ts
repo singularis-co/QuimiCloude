@@ -17,6 +17,13 @@ import {
   flattenBlocks,
   type DeliveryAllocation,
 } from './order-delivery';
+import {
+  deliveryTargetsOf,
+  isDeliveryOrderStatus,
+  statusAfterDelivery,
+  type DeliveryOrderStatus,
+  type DeliveryTarget,
+} from './order-delivery-target';
 import type { OrderScope } from './order-scope';
 import { orderedPackages } from './packing-count';
 import { assertTransition } from './order-transitions';
@@ -30,7 +37,7 @@ import type { CustomerCatalog } from '@/lib/modules/clientes';
 
 export type DeliverOrderResult = {
   readonly status: 'delivered' | 'already_registered';
-  readonly orderStatus: 'TERMINADO' | 'ENTREGADO';
+  readonly orderStatus: DeliveryOrderStatus;
 };
 
 export type DeliverOrderDeps = {
@@ -105,18 +112,27 @@ async function deliverInTransaction(
   now: Date,
   scope: OrderScope,
 ): Promise<DeliverOrderResult> {
-  const order = await tx.orders.lockAliveById(input.orderId, scope);
-  if (order === null) throw new OrderNotFoundError();
+  const locked = await tx.orders.lockAliveLines(input.orderId, scope);
+  if (locked === null) throw new OrderNotFoundError();
   // La clave antes que el estado, ya con el pedido bloqueado: si otra peticion con la misma clave
   // confirmo mientras esta esperaba el bloqueo y dejo el pedido ENTREGADO, esta tiene que responder
   // que ya estaba registrada, no que el pedido ya no admite entregas.
   if ((await tx.deliveries.findByKey(input.deliveryKey, scope)) !== null) throw new DeliveryAlreadyRegisteredSignal();
-  if (order.status !== 'TERMINADO') throw new ActionNotAllowedError();
+  const targets = deliveryTargetsOf(locked);
+  if (![...targets.values()].some((target) => target.status === 'TERMINADO')) throw new ActionNotAllowedError();
 
   const lines = await tx.orders.findPresentationLinesForFinish(input.orderId, scope);
   const lineById = new Map<string, FinishPackingLine>(lines.map((line) => [line.id, line]));
   const allocations = flattenBlocks(input.customers);
   if (allocations.some((a) => !lineById.has(a.presentationLineId))) throw new ValidationError();
+  // Solo se entrega el reparto de una receta TERMINADO.
+  const targetOf = (presentationLineId: string): DeliveryTarget => {
+    const orderLineId = lineById.get(presentationLineId)?.orderLineId;
+    const target = orderLineId === undefined ? undefined : targets.get(orderLineId);
+    if (target === undefined || target.status !== 'TERMINADO') throw new ActionNotAllowedError();
+    return target;
+  };
+  for (const allocation of allocations) targetOf(allocation.presentationLineId);
 
   // Antes de comprobar el tope. La lectura de arriba no basta: la clave es unica por empresa, asi
   // que otra peticion puede estar insertandola para OTRO pedido sin pasar por este bloqueo.
@@ -132,26 +148,25 @@ async function deliverInTransaction(
   if (created.kind === 'duplicate_key') throw new DeliveryAlreadyRegisteredSignal();
 
   const delivered = await tx.deliveries.sumDeliveredPackages(input.orderId, scope);
-  const check = checkDelivery(
-    lines.map((line) => ({
-      presentationLineId: line.id,
-      orderedPackages: orderedPackages(line),
-      deliveredPackages: delivered.get(line.id) ?? 0,
-    })),
-    null,
-    allocations,
-  );
+  const stateOf = (line: FinishPackingLine) => ({
+    presentationLineId: line.id,
+    orderedPackages: orderedPackages(line),
+    deliveredPackages: delivered.get(line.id) ?? 0,
+  });
+  const check = checkDelivery(lines.map(stateOf), null, allocations);
   if (check.kind !== 'ok') throw new DeliveryExceedsRemainingError(`entrega de ${input.orderId}: ${check.kind}`);
 
   const deliveryLines: NewOrderDeliveryLine[] = [];
   for (const [presentationLineId, lineAllocations] of groupByLine(input)) {
     const line = lineById.get(presentationLineId);
     if (line === undefined) throw new ValidationError();
+    const target = targetOf(presentationLineId);
     const outcome = await tx.finishedGoods.dispatchForDelivery({
       companyId: scope.companyId,
       orderId: input.orderId,
+      orderLineId: target.lineId,
       orderDeliveryId: created.id,
-      recipeId: order.recipeId,
+      recipeId: target.recipeId,
       presentationId: line.presentationId,
       allocations: lineAllocations.map((a) => ({ batchId: a.batchId, packages: a.packages })),
       actorId,
@@ -168,16 +183,23 @@ async function deliverInTransaction(
   }
   await tx.deliveries.addLines(created.id, deliveryLines, scope);
 
-  if (!check.completesOrder) return { status: 'delivered', orderStatus: 'TERMINADO' };
+  // Pasa a ENTREGADO cada receta cuyo reparto queda completo con esta entrega; las demas no cambian.
+  for (const target of new Set(allocations.map((a) => targetOf(a.presentationLineId)))) {
+    const own = lines.filter((line) => line.orderLineId === target.lineId);
+    const ownAllocations = allocations.filter((a) => lineById.get(a.presentationLineId)?.orderLineId === target.lineId);
+    const ownCheck = checkDelivery(own.map(stateOf), null, ownAllocations);
+    if (ownCheck.kind !== 'ok' || !ownCheck.completesOrder) continue;
 
-  const moved = await tx.orders.setStatus(input.orderId, 'TERMINADO', 'ENTREGADO', actorId, now, scope);
-  if (moved !== 'ok') throw new Error(`deliverOrder: setStatus devolvio '${moved}' con el pedido bloqueado`);
-  return { status: 'delivered', orderStatus: 'ENTREGADO' };
+    const moved = await tx.orders.setLineStatus(input.orderId, target.lineId, 'TERMINADO', 'ENTREGADO', actorId, now, scope);
+    if (moved !== 'ok') throw new Error(`deliverOrder: el cambio de estado devolvio '${moved}' con el pedido bloqueado`);
+  }
+
+  return { status: 'delivered', orderStatus: await statusAfterDelivery(tx.orders, locked, actorId, now, scope) };
 }
 
 /** Responde con el estado del pedido DE LA ENTREGA registrada, no del pedido pedido: la clave es
- *  unica por empresa, no por pedido. Ese pedido solo puede estar `TERMINADO` o `ENTREGADO`, porque
- *  la entrega exige `TERMINADO` y `TERMINADO` no se cancela. */
+ *  unica por empresa, no por pedido. Ese pedido solo puede estar `TERMINADO`, `ENTREGADO` o
+ *  `PARCIAL`, porque la entrega exige una receta `TERMINADO` y `TERMINADO` no se cancela. */
 async function alreadyRegistered(
   orders: OrderRepository,
   orderId: string | null,
@@ -187,7 +209,7 @@ async function alreadyRegistered(
   if (orderId === null) throw new ValidationError();
   const order = await orders.findAliveById(orderId, scope);
   if (order === null) throw new OrderNotFoundError();
-  if (order.status !== 'TERMINADO' && order.status !== 'ENTREGADO') throw new ActionNotAllowedError();
+  if (!isDeliveryOrderStatus(order.status)) throw new ActionNotAllowedError();
   return { status: 'already_registered', orderStatus: order.status };
 }
 

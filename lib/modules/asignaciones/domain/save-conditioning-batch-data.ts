@@ -23,6 +23,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError } from './execution-entry';
+import { onlyLineOf } from './only-order-line';
 
 import type { ConditioningBatchSnapshotLine } from './conditioning-trace';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -117,7 +118,7 @@ export function createSaveConditioningBatchData(
     if (!(SUMMARY_STATUSES as readonly string[]).includes(target.status)) throw new OrderNotConditionableError();
 
     const summaryPage = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], [target.status], 1, 1);
-    const summary = summaryPage.items[0];
+    const summary = onlyLineOf(summaryPage);
     if (summary === undefined) throw new OrderNotFoundError();
     if (summary.conditionedBy !== actor.id) {
       if (CLOSED_STATUSES.has(summary.status)) throw new OrderNotFoundError();
@@ -142,6 +143,7 @@ export function createSaveConditioningBatchData(
           action: 'conditioning_batch_save',
           companyId,
           orderId,
+          orderLineId: summary.lineId,
           userId: actor.id,
           stepPosition: null,
           batchLines,

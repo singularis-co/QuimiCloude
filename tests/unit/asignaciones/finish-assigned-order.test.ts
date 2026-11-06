@@ -49,6 +49,7 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
+const LINEA = 'linea-unica';
 const OPERARIO = uuid('2');
 const EMPACADOR = uuid('4');
 const OTRO_EMPACADOR = uuid('5');
@@ -126,7 +127,7 @@ function montar(options?: {
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: estados.shift() ?? 'ENTREGADO' }));
   const listAliveSummariesByIds = vi.fn(async () => ({
-    items: [{ id: PEDIDO, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status: 'EN_CURSO' }],
+    items: [{ id: PEDIDO, lineId: LINEA, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status: 'EN_CURSO' }],
     total: 1,
     page: 1,
     pageSize: 1,
@@ -255,6 +256,7 @@ describe('finishAssignedOrder — R5: EN_CURSO transiciona a POR_EMPACAR', () =>
 
     expect(transitionAliveById).toHaveBeenCalledWith(
       PEDIDO,
+      LINEA,
       EMPRESA,
       'EN_CURSO',
       'POR_EMPACAR',
@@ -718,13 +720,14 @@ describe('QC-82 — finishAssignedOrder: anota `finish` en la misma transaccion'
     await createFinishAssignedOrder(deps)(ACTOR, { orderId: PEDIDO, stepPosition: 5 });
 
     expect(run).toHaveBeenCalledTimes(1);
-    expect(transitionAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', ANA, AHORA);
+    expect(transitionAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, 'EN_CURSO', 'POR_EMPACAR', ANA, AHORA);
     expect(anotaciones).toEqual([
       {
         entry: {
           action: 'finish',
           companyId: EMPRESA,
           orderId: PEDIDO,
+          orderLineId: LINEA,
           userId: ANA,
           stepPosition: 5,
           occurredAt: AHORA,
@@ -739,7 +742,7 @@ describe('QC-82 — finishAssignedOrder: anota `finish` en la misma transaccion'
 
     await createFinishAssignedOrder(deps)(ACTOR, ENTRADA);
 
-    const destinos = transitionAliveById.mock.calls.map((call: unknown[]) => call[3]);
+    const destinos = transitionAliveById.mock.calls.map((call: unknown[]) => call[4]);
     expect(destinos).toEqual(['POR_EMPACAR']);
     expect(destinos).not.toContain('ENTREGADO');
   });

@@ -21,6 +21,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { ensureOnlyLine, lineOfOrder, createOrderWithLine } from '../../helpers/only-order-line';
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test');
@@ -134,16 +136,14 @@ async function createOrder(tx: Prisma.TransactionClient, companyId: string): Pro
     select: { id: true },
   });
   nextSequence += 1;
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: recipe.id,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
+    });
+  await ensureOnlyLine(tx, order.id);
   return order.id;
 }
 
@@ -196,10 +196,11 @@ interface MemberValues {
 function rawInsertMember(tx: Prisma.TransactionClient, v: MemberValues): Promise<number> {
   return tx.$executeRaw`
     INSERT INTO "order_conditioning_team_members"
-      ("company_id", "order_id", "user_id", "work_group_id", "work_group_name", "position")
+      ("company_id", "order_id", "order_line_id", "user_id", "work_group_id", "work_group_name", "position")
     VALUES (
       CAST(${v.companyId} AS uuid),
       CAST(${v.orderId} AS uuid),
+      ${lineOfOrder(v.orderId)},
       CAST(${v.userId} AS uuid),
       CAST(${v.workGroupId} AS uuid),
       CAST(${v.workGroupName} AS text),

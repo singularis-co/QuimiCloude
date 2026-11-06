@@ -358,14 +358,19 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
     },
 
     async createOrder(as, input) {
+      // Cada pedido de la demo es de una receta: una sola linea.
       const created = await pedidos.createOrder(
         {
-          recipeId: input.recipeId,
-          recipeVersionId: input.recipeVersionId,
-          quantity: input.quantity,
-          unitId: input.unitId,
+          lines: [
+            {
+              recipeId: input.recipeId,
+              recipeVersionId: input.recipeVersionId,
+              quantity: input.quantity,
+              unitId: input.unitId,
+              presentationLines: input.packaging,
+            },
+          ],
           priority: input.priority,
-          presentationLines: input.packaging,
           customerId: input.customerId ?? undefined,
           confirmBlocked: input.confirmBlocked,
         },

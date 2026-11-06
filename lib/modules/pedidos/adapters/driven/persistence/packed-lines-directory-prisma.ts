@@ -27,18 +27,22 @@ export async function listPackedLinesByCombination(
   paging: { readonly page: number; readonly pageSize?: number },
 ): Promise<Page<FinishedDistributionLine>> {
   const { offset, limit } = toOffsetLimit(paging.page, paging.pageSize);
+  const packedLines = await prisma.orderLine.findMany({
+    where: {
+      AND: [
+        companyScopeColumns({ companyId }),
+        { deletedAt: null, recipeId: combination.recipeId, status: { in: [...PACKED_STATUSES] } },
+        { order: { AND: [orderCompanyScope({ companyId }), { deletedAt: null }] } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (packedLines.length === 0) return buildPage([], 0, paging.page, limit);
   const where = {
     AND: [
       companyScopeColumns({ companyId }),
-      { presentationId: combination.presentationId },
-      {
-        order: {
-          AND: [
-            orderCompanyScope({ companyId }),
-            { deletedAt: null, recipeId: combination.recipeId, status: { in: [...PACKED_STATUSES] } },
-          ],
-        },
-      },
+      { presentationId: combination.presentationId, orderLineId: { in: packedLines.map((line) => line.id) } },
+      { order: { AND: [orderCompanyScope({ companyId }), { deletedAt: null }] } },
     ],
   };
 

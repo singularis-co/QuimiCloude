@@ -17,6 +17,7 @@ import {
   setViewportWidth,
 } from '../../helpers/viewport';
 import { arbolAccesible, nuncaResuelve, resolverServerComponents } from './arbol-accesible';
+import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 /**
  * Paridad de la lista de pedidos. Sus vacio, error y esqueleto locales se conservan y pasan a
@@ -158,6 +159,7 @@ const UNIDAD: UnitView = {
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
+    ...VISTA_SIN_LINEAS,
     id: '33333333-3333-4333-8333-333333333333',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

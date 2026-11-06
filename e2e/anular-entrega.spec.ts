@@ -61,6 +61,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc224_e2e_';
@@ -340,6 +341,7 @@ async function deleteCompanyRows(companyIds: readonly string[]): Promise<void> {
   await prisma.orderAssignment.deleteMany({ where: inCompanies });
   await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
   await prisma.orderExecutionEntry.deleteMany({ where: inCompanies });
+  await prisma.orderLine.deleteMany({ where: inCompanies });
   await prisma.order.deleteMany({ where: inCompanies });
   await prisma.productBatch.deleteMany({ where: inCompanies });
   // El producto terminado (`products.recipe_id`) restringe el borrado de la receta.
@@ -480,8 +482,7 @@ test.beforeAll(async () => {
 
   // `ENTREGADO` con fecha de terminado: al anular vuelve a `TERMINADO`, que la exige.
   orderId = (
-    await prisma.order.create({
-      data: {
+    await createOrderWithLine(prisma, {
         companyId,
         orderYear: new Date().getUTCFullYear(),
         orderSequence: ORDER_SEQUENCE,
@@ -494,15 +495,15 @@ test.beforeAll(async () => {
         unitId: unit.id,
         customerId,
         createdBy: adminUserId,
-      },
-      select: { id: true },
-    })
+      })
   ).id;
+  const orderLineId = await ensureOnlyLine(prisma, orderId);
 
   lineOneId = (
     await prisma.orderPresentationLine.create({
       data: {
         orderId,
+        orderLineId,
         companyId,
         presentationId: presentationOne.id,
         packages: LINE_ONE_PACKAGES,
@@ -515,6 +516,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.create({
       data: {
         orderId,
+        orderLineId,
         companyId,
         presentationId: presentationTwo.id,
         packages: LINE_TWO_PACKAGES,
@@ -569,6 +571,7 @@ test.beforeAll(async () => {
       kind: 'delivery' as const,
       quantity: movement.quantity,
       orderId: required(orderId, 'el pedido'),
+      orderLineId,
       orderDeliveryId: required(deliveryId, 'la entrega'),
       companyId: required(companyId, 'la empresa'),
       createdBy: adminUserId,

@@ -33,6 +33,7 @@ export async function writeMovement(
       reason: movement.reason,
       orderId: movement.orderId,
       orderPresentationLineId: movement.orderPresentationLineId,
+      orderLineId: movement.orderLineId ?? null,
       // Solo una entrega (con o sin pedido) o su anulacion los llevan; los demas asientos los dejan
       // NULL por omision.
       ...(movement.orderDeliveryId != null ? { orderDeliveryId: movement.orderDeliveryId } : {}),

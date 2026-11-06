@@ -70,6 +70,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc151_e2e_';
@@ -192,7 +193,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
  *  confundir `NULL` con `'0.0000'` (mismo criterio que `order-ingredients-cost.int.test.ts`). */
 async function ingredientsCostText(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`;
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`;
   const row = rows[0];
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
   return row.ingredients_cost;
@@ -234,7 +235,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -388,7 +389,7 @@ test.afterAll(async () => {
     () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
-    () => prisma.order.deleteMany({ where: { companyId } }),
+    () => deleteOrdersWithLines({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
     () => prisma.product.deleteMany({ where: { companyId } }),
@@ -486,7 +487,7 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findFirstOrThrow({
-      where: { recipeId, companyId, deletedAt: null },
+      where: { lines: { some: { recipeId } }, companyId, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true },
     });
     expect(await ingredientsCostText(created.id)).toBe(SAVED_AMOUNT_WITH_PACKAGING);
