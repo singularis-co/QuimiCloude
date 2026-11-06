@@ -663,3 +663,6 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Dueño:** Christian Quevedo.
 
 - 2026-10-31: `wt.sh done QT-303-agente-ia-whatsapp-base` falló al borrar el directorio (archivo en uso en Windows); se borró a mano con `rm -rf` el mismo día. Sin acción pendiente.
+
+- 2026-11-06: `./init.sh` local sale en rojo en `validate-features.mjs`, con «id duplicado: 290…308». El board tiene fichas QC-290…308 y QT-290…308 con el mismo número, y el validador exige que `id` sea único sin tener en cuenta el prefijo. No lo causa QT-314: aparece con cualquier F0 desde que existe el prefijo QT. CI no lo ve porque `feature_list.json` no se versiona. Hay que arreglarlo con `/afinar-regla`, para que el `id` único sea por clave (`QC-290` ≠ `QT-290`).
+- 2026-11-06: `wt.sh done QT-313-pedido-con-varias-recetas-backend` desregistró el worktree, pero no pudo borrar el directorio (archivo en uso en Windows). Se borró a mano con `rm -rf` el mismo día. Sin acción pendiente.
