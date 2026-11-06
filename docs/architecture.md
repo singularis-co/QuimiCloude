@@ -89,8 +89,12 @@ Cerrada: 4.** La historia de cada una esta en el `### Por qué` de esta seccion.
    - `lot` es **obligatorio**, con correlativo generado por el backend, **unico por empresa**.
      La **fecha de compra** es obligatoria, con hoy por defecto y **nunca futura**.
      `expiry_date` sigue siendo opcional.
-   - La reserva de material de un pedido elige **de que lote sale**: los mas antiguos por fecha
-     de compra, desempatando por numero de lote.
+   - La reserva de material elige **de que lote sale** **por receta del pedido** (cada linea de
+     `order_lines`, QT-313): los mas antiguos por fecha de compra, desempatando por numero de
+     lote. Lo disponible para una receta es la existencia menos lo apartado por cualquier otra.
+   - Cada receta del pedido tiene **su propio plazo de caducidad de la reserva** (15 dias desde
+     `order_lines.reserved_at`): al vencer, el proceso diario cancela esa receta y libera su
+     material sin tocar las demas del mismo pedido (QT-313).
    - Finalizar un pedido da de alta un **lote de producto terminado** (`FINISHED_PRODUCT`)
      en la misma transaccion que el consumo, y deja el pedido `POR_EMPACAR` (QC-150, QC-168).
    - **Sigue ABIERTO**: el vencimiento no tiene consumidor, y esta sin decidir que cuenta como
@@ -99,16 +103,21 @@ Cerrada: 4.** La historia de cada una esta en el `### Por qué` de esta seccion.
    FDS/SDS, clasificacion GHS, o restricciones de almacenamiento/transporte por
    incompatibilidad? Eso decide si hay gestion de archivos (Supabase Storage) y reglas de
    validacion.
-4. **Contabilidad e impuestos — CERRADA (QC-33, corregida en QC-123 y en QC-307).** Estado vigente:
+4. **Contabilidad e impuestos — CERRADA (QC-33, corregida en QC-123, en QC-307 y en QT-313).**
+   Estado vigente:
    - El ERP **no factura ni liquida impuestos**.
    - El dinero va en `decimal(14,4)` y **nunca `float`**.
-   - Existe un **precio de venta** del **pedido entero**, opcional, escrito a mano al registrarlo
-     o editarlo (`orders.sale_price`, `decimal(14,4)`, nunca negativo; 0 vale y no es lo mismo
-     que vacio). **No sustituye al coste** ni se deriva de el: el margen es QC-308. La receta
-     sigue sin precio. La moneda sigue implicita (punto 5).
-   - Lo que si existe es el **coste de los ingredientes** que la receta del pedido consume,
-     leido de los **lotes de inventario con existencia** y promediado por lote usado. **Se
-     guarda**, y se recalcula **en cada edicion del pedido** y en ningun otro momento.
+   - Existe un **precio de venta** **de cada receta del pedido**, opcional, escrito a mano al
+     registrarla o editarla (`order_lines.sale_price`, `decimal(14,4)`, nunca negativo; 0 vale y
+     no es lo mismo que vacio). El pedido muestra el **precio total**: la suma de sus recetas no
+     canceladas con precio, que **no se guarda**. **No sustituye al coste** ni se deriva de el:
+     el margen es QC-308. La receta del catalogo sigue sin precio. La moneda sigue implicita
+     (punto 5).
+   - Lo que si existe es el **coste de los ingredientes** de **cada receta del pedido**, leido de
+     los **lotes de inventario con existencia** y promediado por lote usado. **Se guarda** por
+     receta (`order_lines.ingredients_cost`), y se recalcula **solo al crear o editar esa
+     receta**, sin tocar el de las demas. El pedido muestra el coste estimado y el real como
+     **suma** de sus recetas activas, y «sin coste» si alguna no lo tiene.
    - **Fleco abierto**: exportar esos datos a un contable externo no se evaluo
      (`specs/QC-33-modelo-pedidos/requirements.md`).
 5. **Moneda por empresa — ABIERTA.** La moneda del costo es hoy **implicita y no se guarda**.
@@ -221,6 +230,15 @@ acondicionamiento escribira, por cada lote de producto terminado del pedido, el 
 los insumos: nada consume el vencimiento todavia (QC-196). Detalle en
 `specs/QC-215-estados-de-acondicionamiento/requirements.md` y
 `specs/QC-219-datos-de-lote-en-acondicionamiento/requirements.md`.
+**Enmendado el 2026-11-06 (QT-313): la reserva elige lote por receta del pedido.** Un pedido
+puede llevar varias recetas (`order_lines`), y el libro de reservas pasa a llevar la receta
+(`order_line_id`): cada una aparta, consume y libera solo lo suyo, y lo disponible para una es la
+existencia menos lo apartado por cualquier otra, del mismo pedido o de otro. El plazo de
+caducidad de la reserva (15 dias) tambien es **de cada receta** (`order_lines.reserved_at`): al
+vencer, el proceso diario cancela esa receta y deja las demas como estan. El vencimiento de los
+insumos **sigue sin consumidor**. Detalle en
+`specs/QT-313-pedido-con-varias-recetas-backend/requirements.md` (R41, R51) y su `design.md` § 3
+y § 6.
 
 **4. Contabilidad e impuestos.** **CERRADA el 2026-09-03 (QC-33).** El ERP **no factura ni
 liquida impuestos**. Texto original: «El dinero **si** entra al modelo —el precio de venta del
@@ -239,9 +257,16 @@ original: sus factores —que lotes habia y a que costo— cambian cada dia, asi
 leer haria que el importe de un pedido de marzo cambiara solo. Detalle en
 `specs/QC-123-el-total-del-pedido-decidir-donde-vive-el-precio/requirements.md`.
 **CORREGIDA el 2026-10-22 (QC-307): vuelve a existir un precio de venta**, por decision humana
-de QC-307, que **deroga QC-123 `[D1]`** («no hay precio de venta en ninguna parte»). Es del
-**pedido entero**, opcional y escrito a mano; no sustituye al coste de QC-123 ni se deriva de el
-(el margen es QC-308). Detalle en `specs/QC-307-precio-de-venta-del-pedido/requirements.md`.
+de QC-307, que **deroga QC-123 `[D1]`** («no hay precio de venta en ninguna parte»). Nacio como
+un unico precio **por pedido** (`orders.sale_price`), opcional y escrito a mano; no sustituye al
+coste de QC-123 ni se deriva de el (el margen es QC-308). Detalle en
+`specs/QC-307-precio-de-venta-del-pedido/requirements.md`.
+**ENMENDADA el 2026-11-06 (QT-313): el precio de venta y el coste pasan a ser de cada receta del
+pedido**, que enmienda la decision de QC-307 «¿Donde va el precio de venta?». Un pedido puede
+llevar varias recetas (`order_lines`), y cada una guarda su precio, su coste estimado y su coste
+real; `orders.sale_price` y los costes de `orders` se quitan. El pedido **muestra la suma**: el
+precio total no se guarda, y el coste total es «sin coste» si a alguna receta activa le falta.
+Detalle en `specs/QT-313-pedido-con-varias-recetas-backend/requirements.md` (R15–R18).
 
 **5. Moneda por empresa.** QC-14 y QC-42 cerraron que la moneda del costo es **implicita y no se
 guarda**, y la razon escrita fue «el ERP es de un solo tenant». Esa premisa ya no vale.

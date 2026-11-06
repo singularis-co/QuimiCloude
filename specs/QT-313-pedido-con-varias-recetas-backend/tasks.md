@@ -262,7 +262,7 @@
   con insumo compartido: alta, cancelar una, finalizar la otra, lote a lote). El E2E de dos recetas
   por pantalla es de QT-315.
   *Hecho:* los dos en verde (R46). Depende de T15.
-- [ ] **T17 [P] — Documentación del perfil.** `docs/architecture.md`, «Preguntas abiertas del
+- [x] **T17 [P] — Documentación del perfil.** `docs/architecture.md`, «Preguntas abiertas del
   dominio», punto 4: el precio de venta y el coste pasan a ser **de cada receta del pedido** y el
   pedido muestra la suma (enmienda de QC-307, decisión «¿Dónde va el precio de venta?»); y punto 2:
   la reserva elige lote **por receta del pedido**, con su propio plazo de caducidad.

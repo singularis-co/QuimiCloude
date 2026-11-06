@@ -532,3 +532,12 @@ Desviaciones para el reviewer. El backend_dev listo nueve en su informe al leade
 - **(4) Indices de terminados:** `orders_company_finished_idx` y `orders_company_terminated_idx` caen con `finished_at` y no se rehicieron en `order_lines`. **El reviewer decide** si hacen falta por el rendimiento de los listados de terminados.
 - `orders_expirable_idx` cae con `reserved_at`. El indice de caducidad de `order_lines` ya existe desde T1.
 - `orders_quantity_idx` pasa a ser `order_lines_quantity_idx`, parcial con `deleted_at IS NULL`.
+
+## Fase 6 — T17 Documentacion del perfil (2026-11-06)
+
+`docs/architecture.md`, «Preguntas abiertas del dominio»:
+- **Punto 2:** la reserva elige lote por receta del pedido (`order_lines`), y cada receta tiene su propio plazo de caducidad (15 dias desde `order_lines.reserved_at`).
+- **Punto 4:** el precio de venta y el coste pasan a ser de cada receta del pedido, y el pedido muestra la suma.
+- En «Por que» se añaden dos entradas fechadas (QT-313, 2026-11-06), una por punto. La historia anterior no se borra: solo cambia la redaccion de la entrada de QC-307, de «del pedido entero» a «por pedido».
+- La cabecera del perfil queda intacta.
+- `grep -n "pedido entero" docs/architecture.md` ya no devuelve nada.
