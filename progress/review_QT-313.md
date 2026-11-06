@@ -175,3 +175,47 @@ revisados en verde, aislamiento por empresa correcto y R56 dentro del spec.
 La vuelta 2 puede acotarse al rango de la corrección. Hay que comprobar que esas ocho líneas quedan sin referencias y
 que no aparecen otras, y de paso cerrar m6 (la salida del E2E en la bitácora). Los menores m1–m5 y m7 no bloquean: se
 anotan como deuda o en las fichas QT-314 y QT-315.
+
+## Vuelta 2 (acotada a d426eee16..e331ea62d)
+
+Esta vuelta revisa el commit `e331ea62d`, «fix(QT-313): review vuelta 1 (B1)», que coincide con lo publicado en
+`origin`. Cubre B1, m2, m5 y m6.
+
+### Verificación
+- `git diff d426eee16..e331ea62d -- lib`: solo cambian comentarios en los cinco archivos de B1, sin tocar código.
+- Repetí el barrido de referencias sobre todo lo que la rama añade a `lib`, `app` y `components` respecto de
+  `origin/dev` (`git diff -U0 origin/dev...HEAD`), buscando `R<n>`, `QC-`/`QT-`, `design.md` y «decisión cerrada»
+  (sin contar `@module`). No queda ninguna.
+- `pnpm run typecheck`: exit 0.
+- No corrí ninguna suite. El leader lo pidió así, y el cambio es solo de comentarios.
+
+### Hallazgos de la vuelta 1
+- [x] **B1, cerrado.** Las ocho líneas quedan sin referencias y siguen explicando el porqué. En `order-prisma.ts`,
+  «de QC-55» pasa a «del contrato».
+- [x] **m2, cerrado.** La desviación 2 de T16b ya dice que `BLOQUEADO` se sacó de la lista del control.
+- [x] **m5, cerrado: mi hallazgo era un falso positivo.** Lo saqué de la desviación 1 de T14e de la bitácora, que se
+  quedó vieja, sin comprobarlo en el código. En el árbol actual:
+  - `NewOrder` (`pedidos/domain/order-view.ts:81`) solo tiene `priority`, `status` y `customerId`;
+  - `insertAliveOrder` solo hace el `INSERT INTO "orders"` de la cabecera.
+
+  No hay camino muerto: lo había quitado T15 (`1a518b874`).
+- [x] **m6, cerrado.** La bitácora (sección «Review vuelta 1») recoge la salida de Playwright, sacada de los informes de
+  las corridas de T16 y T16b, no relanzada:
+  - `reserva-de-material`, en chromium: `1 passed (1.2m)`;
+  - `pedido-con-varias-recetas`, en webkit: `1 passed (3.8 min)`.
+
+  Además corrige la sección de T16: el spec nuevo sí se corrió en WebKit. Siguen pendientes de WebKit los demás specs
+  editados, y quedan para CI.
+
+### Regresiones y hallazgos nuevos
+- `menor` **n1:** al juntar dos líneas del JSDoc de `planEdit`, `lib/modules/pedidos/domain/update-order.ts:95` mide
+  ahora 165 columnas. El resto del bloque está cortado a unas 100. El lint no lo marca y es solo estilo; se puede volver
+  a partir cuando alguien toque el archivo.
+
+Siguen abiertos como deuda o para las fichas QT-314 y QT-315, sin bloquear: m1, m3, m4, m7 y los índices de terminados
+(punto 1 de la vuelta 1). Se anotan en el cierre.
+
+### Veredicto vuelta 2
+
+**OK (APROBADO).** No quedan bloqueantes.
+
