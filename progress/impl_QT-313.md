@@ -610,7 +610,7 @@ Verificacion (salida real):
 
 Desviaciones aceptadas por el humano (2026-11-06), para el reviewer:
 1. **Coste de una linea `retry` que logra reservar:** como no va en `edited`, tras pasar de `BLOQUEADO` a `PENDIENTE` se escribe con `setLineIngredientsCost(line.cost)`. En el `.int` queda 475.0000.
-2. **Control antiguo de QC-215.** En `update-order.test.ts`, el control «R38 (control): en %s … va por el atajo» ya no lista `BLOQUEADO`: contradecia el punto 2 de § 4.2.1. El caso queda comentado y lo cubre R56 (d).
+2. **Control antiguo de QC-215.** En `update-order.test.ts`, el control «R38 (control): en %s … va por el atajo» ya no lista `BLOQUEADO`: contradecia el punto 2 de § 4.2.1. `BLOQUEADO` se saco de la lista del control (no se dejo comentado); un comentario junto a la lista remite a R56, y ese caso lo cubre R56 (d). (Corregido en la review vuelta 1, m2.)
    - La frase historica de § 4.2.1, «antes cualquier edicion de un pedido bloqueado iba por el camino completo», no es exacta: el atajo de solo-cliente tambien se tomaba en `BLOQUEADO`.
    - **Cambio de comportamiento:** cambiar solo el cliente de un pedido con una linea `BLOQUEADO` ahora reintenta la reserva y puede pedir confirmacion.
 3. El «nada escrito» del unitario (b) solo se comprueba de verdad en el `.int`, por el rollback.
@@ -685,3 +685,16 @@ Rutas relativas a la raíz del repo. Cada test existe en el árbol de `1feb49af1
 | R54 | `tests/unit/pedidos-ui/order-row-actions.test.tsx` › «un pedido PARCIAL en la pantalla actual (QT-313)» › «R54: editar, cancelar y eliminar deshabilitados, sin reparto, entrega ni entregas, con «Responsables» y «Cliente» disponibles», «R54: PARCIAL es final y no acepta la edicion acotada de reparto» |
 | R55 | `tests/integration/asignaciones/order-lines-execution.int.test.ts` › «QT-313 R55: un PARCIAL con una linea PENDIENTE admite asignar, quitar grupo y desasignar», «QT-313 R55: un PARCIAL con todas sus lineas activas fabricadas rechaza las tres con order_produced_frozen sin escribir» |
 | R56 | `tests/integration/pedidos/order-lines-blocked-retry.int.test.ts` › «QT-313 R56, R34, R25: con material repuesto, guardar sin cambios deja la bloqueada PENDIENTE con su apartado lote a lote y no toca la otra», «QT-313 R56: sin reponer, sin confirmacion rechaza con order_would_block sin escribir; con confirmacion sigue BLOQUEADO sin apartado ni plazo» |
+
+## Review vuelta 1 — arreglos (2026-11-06)
+
+- **B1:** en los comentarios de produccion añadidos ya no queda ninguna referencia `R<n>`/`QT-`/`QC-`. Solo cambian comentarios, en `asignaciones/domain/order-state.ts`, `pedidos/adapters/driven/persistence/order-catalog-prisma.ts`, `order-prisma.ts`, `pedidos/domain/order-catalog.ts` y `update-order.ts`. No cambia codigo.
+  - backend_dev: typecheck exit 0, lint 0 errores, guardias 87/87.
+  - No se corrio `related`, por falta de memoria: con cambios solo de comentarios basta el typecheck.
+- **m2:** corregida la desviacion 2 de T16b. `BLOQUEADO` se saco de la lista del control; no se comento.
+- **m5:** ya estaba resuelto en T15 (`1a518b874`). `insertAliveOrder` solo inserta la cabecera y `NewOrder` ya no tiene `presentationLines`. No hay camino muerto.
+- **m6:** salida real de Playwright, de corridas anteriores. No se relanzo.
+  - `e2e/reserva-de-material.spec.ts`, chromium: `1 passed (1.2m)`. Corrida de T16b (backend_dev a031e2c6393505727), sobre `QuimiCloude_QT313`.
+  - `e2e/pedido-con-varias-recetas.spec.ts`, chromium y webkit: en verde. En webkit, `1 passed (3.8 min)`. Corrida de T16 (backend_dev ab3cdf7512b3a4a7a), sobre `QuimiCloude_QT313`.
+  - Esto corrige lo que dice la seccion T16: el spec nuevo si se corrio en WebKit. Siguen pendientes de WebKit los demas specs editados.
+- Quedan como deuda para el cierre, sin tocar: m1, m3, m4, m7 y los indices de terminados.

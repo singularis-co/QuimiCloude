@@ -62,7 +62,7 @@ export type UpdateOrderDeps = {
 
 /** Una linea de la entrada contrastada con las guardadas. `saved` falta en una linea nueva;
  *  `changed` es siempre verdadero en ella. `retry` marca una linea guardada en `BLOQUEADO` que llega
- *  sin cambios: vuelve a intentar apartar su material sin cambiar sus datos (R56). */
+ *  sin cambios: vuelve a intentar apartar su material sin cambiar sus datos. */
 type PlannedLine = {
   readonly position: number;
   readonly input: OrderLineInput;
@@ -92,8 +92,7 @@ const EDITABLE_ACTIVE = (status: OrderLineStatus): boolean =>
  * cancelar que falte se quita. Una linea con cambios tiene que estar en un estado editable y una que
  * se quita en `PENDIENTE` o `BLOQUEADO`; una que llega igual no se mira. Solo las lineas nuevas o
  * cambiadas recalculan coste, apartado y plazo, y tambien las `BLOQUEADO` que llegan igual, que
- * reintentan su reserva (R56): las demas no se tocan. Una edicion que no anade
- * ninguna linea necesita alguna linea activa editable, como hasta ahora necesitaba el pedido.
+ * reintentan su reserva: las demas no se tocan. Una edicion que no anade ninguna linea necesita alguna linea activa editable, como hasta ahora necesitaba el pedido.
  *
  * Todo se comprueba dos veces: antes de abrir la transaccion, para fallar sin escribir, y otra vez
  * sobre las lineas que se acaban de bloquear, porque otra operacion pudo moverlas entre medias.
@@ -131,7 +130,7 @@ export function createUpdateOrder(
 
     // Solo cambia el cliente: se escribe solo el cliente, sin catalogos, sin coste y sin tocar lo
     // apartado. Sin bloquear: esta escritura no pisa ningun dato que otra edicion cambie. Una linea
-    // bloqueada obliga al camino completo, que reintenta su reserva (R56).
+    // bloqueada obliga al camino completo, que reintenta su reserva.
     const linesUnchanged = plan.removed.length === 0 && plan.lines.every((line) => !line.changed && !line.retry);
     if (linesUnchanged && priority === row.priority && customerId !== row.customerId) {
       if (customerId !== null) {

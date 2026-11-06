@@ -56,7 +56,7 @@ export function toOrderAssignmentTarget(row: OrderCatalogRow): OrderAssignmentTa
   };
 }
 
-/** QT-313 R55: solo las lineas ACTIVAS (vivas y no canceladas) deciden si un `PARCIAL` admite
+/** Solo las lineas ACTIVAS (vivas y no canceladas) deciden si un `PARCIAL` admite
  *  responsables. El filtro va en la consulta para que una linea cancelada o de baja no llegue. */
 const ACTIVE_LINE_STATUSES_SELECT = {
   where: { deletedAt: null, status: { not: 'CANCELADO' as const } },

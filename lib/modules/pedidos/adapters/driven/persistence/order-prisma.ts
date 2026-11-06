@@ -298,7 +298,7 @@ function enumIn<T extends string>(
 /**
  * Rango numerico del contrato -> rango en `Prisma.Decimal` (`design.md > 5`).
  *
- * `quantity` es `DECIMAL(14,4)` y el `numberRange` de QC-55 emite `number`. La
+ * `quantity` es `DECIMAL(14,4)` y el `numberRange` del contrato emite `number`. La
  * conversion vive AQUI, en el adaptador: `docs/architecture.md > Anti-patrones` prohibe
  * comparar importes en coma flotante binaria, y el dominio ademas no puede importar
  * `@prisma/client`.

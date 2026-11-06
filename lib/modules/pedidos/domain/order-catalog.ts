@@ -28,7 +28,7 @@ import type { PackedLineCount } from './packing-count';
  *  estados se desincronizaria en silencio de la tabla de transiciones.
  *
  *  `activeLineStatuses` son los estados de sus lineas activas (vivas y no canceladas), sin orden
- *  garantizado. Con ellos `asignaciones` decide si un `PARCIAL` admite responsables (R55). */
+ *  garantizado. Con ellos `asignaciones` decide si un `PARCIAL` admite responsables. */
 export type OrderAssignmentTarget = {
   readonly id: string;
   readonly status: OrderStatus;
