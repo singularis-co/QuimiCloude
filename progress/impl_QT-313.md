@@ -561,3 +561,27 @@ Desviaciones del backend_dev de T15, para el reviewer (texto que paso el leader 
 - En «Por que» se añaden dos entradas fechadas (QT-313, 2026-11-06), una por punto. La historia anterior no se borra: solo cambia la redaccion de la entrada de QC-307, de «del pedido entero» a «por pedido».
 - La cabecera del perfil queda intacta.
 - `grep -n "pedido entero" docs/architecture.md` ya no devuelve nada.
+
+## Fase 6 — T16 Recorridos (2026-11-06)
+
+Archivos:
+- Nuevos:
+  - `e2e/pedido-con-varias-recetas.spec.ts`
+  - `tests/integration/pedidos/order-lines-flow.int.test.ts`, registrado en `aislamiento.json`
+  - `e2e/helpers/delete-orders.ts`, helper de limpieza que borra las lineas antes que los pedidos (FK `RESTRICT`)
+- 17 specs E2E con la limpieza corregida.
+- Guardia `guard-identificador-de-request` con `E2E_ESPERADOS` actualizado.
+
+Base del E2E: la propia de la feature, `QuimiCloude_QT313`, copiada de la plantilla de esta rama. La base de desarrollo compartida no se migro ni se toco. El entorno se carga con `scratchpad/withenv313.sh`, sin copiar el `.env`.
+
+Mapa R → test:
+| R | Test |
+|---|---|
+| R46 | `e2e/pedido-con-varias-recetas.spec.ts` › «QT-313 R46 - alta, abrir y finalizar como operador y empacar: apartado, consumo y lote de producto terminado iguales a hoy, lote a lote»; `tests/integration/pedidos/order-lines-flow.int.test.ts` › «QT-313 R46: alta, cancelar una linea y finalizar la otra; lote a lote, lo apartado, lo liberado y lo consumido» |
+
+Verificacion (salida real, segun el informe del backend_dev al leader):
+- E2E nuevo y `order-lines-flow.int`: en verde.
+- Specs E2E editados en T14e/T15/T16, en Chromium y de uno en uno: **37/39 en verde**. Los dos rojos:
+  - `e2e/pedidos-rediseno.spec.ts`: **ajeno**. A `COLUMN_IDS` le falta `salePrice` de QC-307. No se toca: va en otra rama.
+  - `e2e/reserva-de-material.spec.ts`: **de esta feature**. Lo resuelve T16b (R56, reintento de reserva en lineas `BLOQUEADO`, enmienda 0ce3ec846).
+- **WebKit pendiente:** no corrio por falta de memoria. Si no hay memoria al cerrar, queda para CI.

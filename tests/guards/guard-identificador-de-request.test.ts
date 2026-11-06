@@ -249,6 +249,12 @@ export const E2E_ESPERADOS = [
   // peticion: el spec no lee ni afirma nada sobre el identificador ni sobre `reference`, asi que
   // el diferimiento de QC-71 R21 sigue INTACTO.
   'pedido-con-cliente.spec.ts',
+  // Alta el 2026-11-06 (QT-313 T16) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: un pedido de una receta por la pantalla actual, ya guardado en lineas, se crea, el
+  // Operador lo abre y lo finaliza y el Empacador lo empaca; afirma lote a lote lo apartado, lo
+  // consumido y el lote de producto terminado. NO lee ni afirma nada sobre el identificador de
+  // peticion ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
+  'pedido-con-varias-recetas.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja

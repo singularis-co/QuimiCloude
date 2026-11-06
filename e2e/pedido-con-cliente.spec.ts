@@ -29,6 +29,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc156_e2e_';
@@ -264,7 +265,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: inCompanies });
     await prisma.orderAssignment.deleteMany({ where: inCompanies });
     await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
-    await prisma.order.deleteMany({ where: inCompanies });
+    await deleteOrdersWithLines({ where: inCompanies });
     await prisma.recipe.deleteMany({ where: inCompanies });
     await prisma.productBatch.deleteMany({ where: inCompanies });
     await prisma.product.deleteMany({ where: inCompanies });
@@ -363,7 +364,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: inCompany }),
     () => prisma.orderAssignment.deleteMany({ where: inCompany }),
     () => prisma.orderPresentationLine.deleteMany({ where: inCompany }),
-    () => prisma.order.deleteMany({ where: inCompany }),
+    () => deleteOrdersWithLines({ where: inCompany }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     // El envase, antes que su presentacion fija; la presentacion, antes que su unidad.
     () => prisma.productBatch.deleteMany({ where: inCompany }),

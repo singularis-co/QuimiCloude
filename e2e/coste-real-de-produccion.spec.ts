@@ -81,6 +81,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc305_e2e_';
 
@@ -261,7 +262,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.inventoryMovement.deleteMany({ where }),
     () => prisma.orderPresentationLine.deleteMany({ where }),
     () => prisma.orderExecutionEntry.deleteMany({ where }),
-    () => prisma.order.deleteMany({ where }),
+    () => deleteOrdersWithLines({ where }),
     () => prisma.productBatch.deleteMany({ where }),
     () => prisma.product.deleteMany({ where: { ...where, type: PRODUCT_TYPES.FINISHED_PRODUCT } }),
     () => prisma.recipe.deleteMany({ where }),

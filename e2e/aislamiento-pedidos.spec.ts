@@ -39,6 +39,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc60_e2e_';
@@ -237,7 +238,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     // El envase, ANTES que su presentacion fija.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -346,7 +347,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.orderAssignment.deleteMany({ where: { companyId: { in: companyIds } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: companyIds } } }),
-    () => prisma.order.deleteMany({ where: { companyId: { in: companyIds } } }),
+    () => deleteOrdersWithLines({ where: { companyId: { in: companyIds } } }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     // El envase, ANTES que su presentacion fija.
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: companyIds } } }),

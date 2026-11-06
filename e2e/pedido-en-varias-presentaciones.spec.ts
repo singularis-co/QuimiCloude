@@ -62,6 +62,7 @@ import {
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine, firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
@@ -399,7 +400,7 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: inOrphans });
     await prisma.orderPresentationLine.deleteMany({ where: inOrphans });
     await prisma.orderExecutionEntry.deleteMany({ where: inOrphans });
-    await prisma.order.deleteMany({ where: inOrphans });
+    await deleteOrdersWithLines({ where: inOrphans });
     await prisma.productBatch.deleteMany({ where: inOrphans });
     // El producto terminado restringe el borrado de la receta; el ingrediente, al reves.
     await prisma.product.deleteMany({ where: { ...inOrphans, type: 'FINISHED_PRODUCT' } });
@@ -545,7 +546,7 @@ test.afterAll(async () => {
     () =>
       byCompany ? prisma.orderPresentationLine.deleteMany({ where: byCompany }) : Promise.resolve(),
     () => (byCompany ? prisma.orderExecutionEntry.deleteMany({ where: byCompany }) : Promise.resolve()),
-    () => (byCompany ? prisma.order.deleteMany({ where: byCompany }) : Promise.resolve()),
+    () => (byCompany ? deleteOrdersWithLines({ where: byCompany }) : Promise.resolve()),
     () => (byCompany ? prisma.productBatch.deleteMany({ where: byCompany }) : Promise.resolve()),
     () =>
       byCompany

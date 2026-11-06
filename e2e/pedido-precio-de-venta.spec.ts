@@ -19,6 +19,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import {
   openOrderRowMenu,
   orderMenuTrigger,
@@ -110,7 +111,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: inCompanies });
     await prisma.orderAssignment.deleteMany({ where: inCompanies });
     await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
-    await prisma.order.deleteMany({ where: inCompanies });
+    await deleteOrdersWithLines({ where: inCompanies });
     await prisma.recipe.deleteMany({ where: inCompanies });
     await prisma.unit.deleteMany({ where: inCompanies });
   }
@@ -177,7 +178,7 @@ test.afterAll(async () => {
     () => prisma.inventoryMovement.deleteMany({ where: inCompany }),
     () => prisma.orderAssignment.deleteMany({ where: inCompany }),
     () => prisma.orderPresentationLine.deleteMany({ where: inCompany }),
-    () => prisma.order.deleteMany({ where: inCompany }),
+    () => deleteOrdersWithLines({ where: inCompany }),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () => prisma.unit.deleteMany({ where: { name: UNIT_NAME } }),
     () => prisma.user.deleteMany({ where: { username: adminUser.username } }),

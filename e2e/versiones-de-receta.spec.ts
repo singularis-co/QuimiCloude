@@ -31,6 +31,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { addPackagingLine } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc172_e2e_';
@@ -99,7 +100,7 @@ test.beforeAll(async () => {
     await prisma.inventoryMovement.deleteMany({ where: scope });
     await prisma.orderAssignment.deleteMany({ where: scope });
     await prisma.orderPresentationLine.deleteMany({ where: scope });
-    await prisma.order.deleteMany({ where: scope });
+    await deleteOrdersWithLines({ where: scope });
     await prisma.productBatch.deleteMany({ where: scope });
     await prisma.product.deleteMany({ where: { ...scope, recipeId: { not: null } } });
     await prisma.recipe.deleteMany({ where: { ...scope, parentRecipeId: { not: null } } });
@@ -283,7 +284,7 @@ test.afterAll(async () => {
     byCompany((id) => prisma.inventoryMovement.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderAssignment.deleteMany({ where: { companyId: id } })),
     byCompany((id) => prisma.orderPresentationLine.deleteMany({ where: { companyId: id } })),
-    byCompany((id) => prisma.order.deleteMany({ where: { companyId: id } })),
+    byCompany((id) => deleteOrdersWithLines({ where: { companyId: id } })),
     byCompany((id) => prisma.productBatch.deleteMany({ where: { companyId: id } })),
     byCompany((id) =>
       prisma.product.deleteMany({ where: { companyId: id, recipeId: { not: null } } }),

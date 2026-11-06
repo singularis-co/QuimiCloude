@@ -30,6 +30,7 @@ import { ASSIGNED_ORDERS_ROUTE, INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shar
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { submitOrderWithLeftover } from './helpers/order-distribution';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc138_e2e_';
 
@@ -233,7 +234,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // La receta cae antes que el producto: `recipe_lines.product_id` lo restringe.
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -368,7 +369,7 @@ test.afterAll(async () => {
         ? prisma.orderPresentationLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
-      scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
+      scopedCompanyId ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     () =>
       scopedCompanyId
         ? prisma.productBatch.deleteMany({ where: { companyId: scopedCompanyId } })

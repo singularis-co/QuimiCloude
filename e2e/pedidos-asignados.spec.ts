@@ -37,6 +37,7 @@ import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import {
   enterAndStartAssignedOrder,
 } from './helpers/confirm-dialog';
@@ -207,7 +208,7 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
     const orphanCompanyIds = orphanCompanies.map((company) => company.id);
     if (orphanCompanyIds.length > 0) {
       await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-      await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+      await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     }
     const orphanRecipes = await prisma.recipe.findMany({
       where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -299,7 +300,7 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
           : Promise.resolve(),
       () =>
         scopedCompanyId
-          ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
+          ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } })
           : Promise.resolve(),
       () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
       () =>
@@ -562,7 +563,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     if (orphanCompanyIds.length > 0) {
       await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
       await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-      await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+      await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
       await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     }
     await prisma.user.deleteMany({
@@ -654,7 +655,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
           : Promise.resolve(),
       () =>
         scopedCompanyId
-          ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
+          ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } })
           : Promise.resolve(),
       () => prisma.recipe.deleteMany({ where: { name: PACKER_RECIPE_NAME } }),
       () =>

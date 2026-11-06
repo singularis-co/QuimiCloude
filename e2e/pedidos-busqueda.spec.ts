@@ -25,6 +25,7 @@ import { DASHBOARD_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc122_e2e_';
@@ -218,7 +219,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
-    () => prisma.order.deleteMany({ where: { companyId: companyId ?? '' } }),
+    () => deleteOrdersWithLines({ where: { companyId: companyId ?? '' } }),
     () =>
       prisma.recipe.deleteMany({
         where: { name: { in: [recipeAName, recipeBName, recipeCName] } },

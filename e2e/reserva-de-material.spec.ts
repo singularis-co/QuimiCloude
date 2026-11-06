@@ -68,6 +68,7 @@ import {
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc141_e2e_';
 
@@ -355,7 +356,7 @@ test.beforeAll(async () => {
       where: { companyId: { in: orphanCompanyIds } },
     });
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -542,7 +543,7 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     () =>
-      scopedCompanyId ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
+      scopedCompanyId ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } }) : Promise.resolve(),
     // Todos los lotes primero, del producto de la receta y del terminado que Finalizar da de
     // alta: `product_batches.product_id` -> `products` RESTRINGE, y a esta altura ya no queda
     // ningun movimiento que restrinja el borrado del lote.

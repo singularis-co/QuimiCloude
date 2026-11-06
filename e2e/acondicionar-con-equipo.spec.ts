@@ -44,6 +44,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
@@ -204,7 +205,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     // Comenzar anota en el registro de ejecucion, que apunta al pedido.
     () => prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderConditioningTeamMember.deleteMany({ where: { companyId: { in: ids } } }),
-    () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
+    () => deleteOrdersWithLines({ where: { companyId: { in: ids } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.workGroupMember.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.workGroup.deleteMany({ where: { companyId: { in: ids } } }),

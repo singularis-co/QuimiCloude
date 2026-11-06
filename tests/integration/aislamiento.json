@@ -886,6 +886,11 @@
       "archivo": "asignaciones/order-lines-execution.int.test.ts",
       "motivo": "QT-313 T14a: abrir, finalizar, empaque y acondicionamiento por linea con las operaciones de OrderCatalog cableadas a mano y con la fachada real de lib/composition; 'withOrderTransaction' y las escrituras de empaque y acondicionamiento abren SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuarios, rol, tipo de documento, unidad, presentacion, insumo y envase con lote, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-11-05"
+    },
+    {
+      "archivo": "pedidos/order-lines-flow.int.test.ts",
+      "motivo": "QT-313 T16: el recorrido de un pedido de dos lineas con un insumo compartido (alta, cancelar una linea, finalizar la otra) por los casos de uso cableados a mano con los adaptadores driven reales; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. El caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con dos lotes, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-06"
     }
   ]
 }

@@ -257,7 +257,7 @@
   valores como antes; con un pedido de dos líneas, la bajada falla, nombra cuántos y no cambia
   nada (R9); grep sin lecturas de `recipeId`/`quantity`/`salePrice`/`reservedAt` de `orders`
   fuera de la línea (R1). Depende de T14e (su relleno lee las columnas que esta task borra).
-- [ ] **T16 — Recorridos.** `e2e/pedido-con-varias-recetas.spec.ts` (pedido de una línea por la
+- [x] **T16 — Recorridos.** `e2e/pedido-con-varias-recetas.spec.ts` (pedido de una línea por la
   pantalla actual: alta, abrir y finalizar como operador; apartado, consumo y lote de producto
   terminado iguales a hoy) y `tests/integration/pedidos/order-lines-flow.int.test.ts` (dos líneas
   con insumo compartido: alta, cancelar una, finalizar la otra, lote a lote). El E2E de dos recetas

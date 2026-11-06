@@ -70,6 +70,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc151_e2e_';
@@ -234,7 +235,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { companyId: { in: orphanCompanyIds } },
     });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.recipe.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.product.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
@@ -388,7 +389,7 @@ test.afterAll(async () => {
     () => prisma.reservationMovement.deleteMany({ where: { companyId } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId } }),
-    () => prisma.order.deleteMany({ where: { companyId } }),
+    () => deleteOrdersWithLines({ where: { companyId } }),
     () => prisma.recipe.deleteMany({ where: { companyId } }), // cascada sobre `recipe_lines`.
     () => prisma.productBatch.deleteMany({ where: { companyId } }),
     () => prisma.product.deleteMany({ where: { companyId } }),

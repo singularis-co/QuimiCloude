@@ -79,6 +79,7 @@ import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/s
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -328,7 +329,7 @@ test.beforeAll(async () => {
   const orphanCompanyIds = orphanCompanies.map((company) => company.id);
   if (orphanCompanyIds.length > 0) {
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
-    await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await deleteOrdersWithLines({ where: { companyId: { in: orphanCompanyIds } } });
   }
   const orphanRecipes = await prisma.recipe.findMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -428,7 +429,7 @@ test.afterAll(async () => {
         : Promise.resolve(),
     () =>
       scopedCompanyId
-        ? prisma.order.deleteMany({ where: { companyId: scopedCompanyId } })
+        ? deleteOrdersWithLines({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () => prisma.recipe.deleteMany({ where: { name: RECIPE_NAME } }),
     () =>
