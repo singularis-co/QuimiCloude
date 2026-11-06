@@ -499,9 +499,9 @@ model InventoryMovement {
   /// `OrderDeliveryVoid` es de `pedidos`; FK compuesta con `companyId` escrita a mano, drift.
   orderDeliveryVoidId String? @map("order_delivery_void_id") @db.Uuid
 
-  /// La linea del pedido. Solo pueden llevarla los asientos con pedido: CHECK
-  /// `inventory_movements_order_line_id_matches_kind`, escrito a mano, drift. NULL = escrito sin
-  /// linea.
+  /// La linea del pedido: la llevan los cuatro asientos con pedido y solo ellos (CHECK
+  /// `inventory_movements_order_line_id_matches_kind`). Su FK compuesta con `orderId` contra
+  /// `order_lines_id_order_id_key` y el CHECK estan escritos a mano, drift.
   orderLineId String? @map("order_line_id") @db.Uuid
 
   /// Solo en un ajuste: la existencia leida con el lote bloqueado y el total contado. Van los
@@ -547,8 +547,8 @@ model ReservationMovement {
   quantity  Decimal                 @db.Decimal(14, 4)
   createdBy String?                 @map("created_by") @db.Uuid
   createdAt DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  /// La linea del pedido. NULL = escrito sin linea.
-  orderLineId String?               @map("order_line_id") @db.Uuid
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId String                @map("order_line_id") @db.Uuid
 
   @@index([batchId], map: "reservation_movements_batch_id_idx")
   @@index([orderId], map: "reservation_movements_order_id_idx")
@@ -962,15 +962,15 @@ model OrderPresentationLine {
   packedReasonOther String? @map("packed_reason_other")
   /// Envases del conteo real que el pedido no espera: quedan libres en el lote. 0 sin excedente.
   packedSurplusPackages Int @default(0) @map("packed_surplus_packages")
-  /// La linea del pedido que se reparte. NULL = escrita sin linea.
-  orderLineId   String?  @map("order_line_id") @db.Uuid
+  /// La linea del pedido que se reparte. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId   String   @map("order_line_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   deliveryLines OrderDeliveryLine[]
 
-  @@unique([orderId, presentationId], map: "order_presentation_lines_order_id_presentation_id_key")
+  @@unique([orderLineId, presentationId], map: "order_presentation_lines_order_line_id_presentation_id_key")
   @@unique([id, companyId], map: "order_presentation_lines_id_company_id_key")
   @@index([companyId], map: "order_presentation_lines_company_id_idx")
   @@index([presentationId], map: "order_presentation_lines_presentation_id_idx")
@@ -1270,8 +1270,8 @@ model OrderExecutionEntry {
   occurredAt   DateTime             @map("occurred_at") @db.Timestamptz(6)
   batchLines   Json?                @map("batch_lines")
   responsibleUserIds Json?                @map("responsible_user_ids")
-  /// La linea del pedido. NULL = escrito sin linea.
-  orderLineId  String?              @map("order_line_id") @db.Uuid
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId  String               @map("order_line_id") @db.Uuid
 
   @@index([orderId, occurredAt(sort: Desc)], map: "order_execution_entries_order_id_occurred_at_idx")
   @@index([userId], map: "order_execution_entries_user_id_idx")
@@ -1295,11 +1295,11 @@ model OrderConditioningTeamMember {
   /// `created_at`, y el orden de composicion es el que se muestra.
   position      Int
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  /// La linea del pedido. NULL = escrito sin linea.
-  orderLineId   String?  @map("order_line_id") @db.Uuid
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId   String   @map("order_line_id") @db.Uuid
 
-  @@id([orderId, userId], map: "order_conditioning_team_members_pkey")
-  @@unique([orderId, position], map: "order_conditioning_team_members_order_id_position_key")
+  @@id([orderLineId, userId], map: "order_conditioning_team_members_pkey")
+  @@unique([orderLineId, position], map: "order_conditioning_team_members_order_line_id_position_key")
   @@index([userId], map: "order_conditioning_team_members_user_id_idx")
   @@index([workGroupId], map: "order_conditioning_team_members_work_group_id_idx")
   @@index([orderLineId], map: "order_conditioning_team_members_order_line_id_idx")
@@ -1600,10 +1600,10 @@ model OrderStepEvidence {
   sizeBytes    Int           @map("size_bytes")
   uploadedBy   String        @map("uploaded_by") @db.Uuid
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  /// La linea del pedido. NULL = escrita sin linea.
-  orderLineId  String?       @map("order_line_id") @db.Uuid
+  /// La linea del pedido. FK compuesta con `orderId` escrita a mano, drift.
+  orderLineId  String        @map("order_line_id") @db.Uuid
 
-  @@unique([orderId, phase, stepPosition, slot], map: "order_step_evidence_slot_key")
+  @@unique([orderLineId, phase, stepPosition, slot], map: "order_step_evidence_slot_key")
   @@unique([companyId, path], map: "order_step_evidence_company_path_key")
   @@index([companyId, orderId], map: "order_step_evidence_company_id_order_id_idx")
   @@index([uploadedBy], map: "order_step_evidence_uploaded_by_idx")

@@ -92,6 +92,7 @@
     "pedidos/order-delivery-void-repository.int.test.ts",
     "pedidos/order-lines-migration.int.test.ts",
     "pedidos/order-lines-references-migration.int.test.ts",
+    "pedidos/order-lines-references-required-migration.int.test.ts",
     "pedidos/order-packed-counts.int.test.ts",
     "pedidos/order-packing-constraints.int.test.ts",
     "pedidos/order-packing-states-rollback.int.test.ts",

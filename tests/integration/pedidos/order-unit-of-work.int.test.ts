@@ -203,9 +203,33 @@ describe('R15 — un fallo forzado despues de apartar no deja escrito ni el pedi
           companyId: fixture.companyId,
         });
         createdOrderId = order.id;
+        const lines = await scope.orders.writeLines(
+          order.id,
+          {
+            removedIds: [],
+            edited: [],
+            added: [
+              {
+                recipeId: fixture.recipeId,
+                originalRecipeId: fixture.recipeId,
+                quantity: '1.0000',
+                unitId: fixture.unitId,
+                salePrice: null,
+                presentationLines: [],
+                status: 'PENDIENTE',
+                cost: null,
+              },
+            ],
+          },
+          fixture.actorId,
+          now,
+          { companyId: fixture.companyId },
+        );
+        const orderLineId = lines?.[0]?.id;
+        if (orderLineId === undefined) throw new Error('el alta no escribio la linea');
 
         const outcome = await scope.reservations.syncForLine({
-          orderLineId: null,
+          orderLineId,
           orderId: order.id,
           companyId: fixture.companyId,
           requirement: [{ productId, quantity: '5.0000' }],

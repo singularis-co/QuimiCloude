@@ -22,6 +22,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { ensureOnlyLine, lineOfOrder } from '../../helpers/only-order-line';
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test');
@@ -146,6 +148,7 @@ async function createOrder(tx: Prisma.TransactionClient, companyId: string): Pro
     },
     select: { id: true },
   });
+  await ensureOnlyLine(tx, order.id);
   return order.id;
 }
 
@@ -190,10 +193,11 @@ interface EvidenceValues {
 function rawInsertEvidence(tx: Prisma.TransactionClient, v: EvidenceValues): Promise<number> {
   return tx.$executeRaw`
     INSERT INTO "order_step_evidence"
-      ("company_id", "order_id", "phase", "step_position", "slot", "path", "content_type", "size_bytes", "uploaded_by")
+      ("company_id", "order_id", "order_line_id", "phase", "step_position", "slot", "path", "content_type", "size_bytes", "uploaded_by")
     VALUES (
       CAST(${v.companyId} AS uuid),
       CAST(${v.orderId} AS uuid),
+      ${lineOfOrder(v.orderId)},
       CAST(${v.phase} AS "evidence_phase"),
       CAST(${v.stepPosition} AS integer),
       CAST(${v.slot} AS smallint),

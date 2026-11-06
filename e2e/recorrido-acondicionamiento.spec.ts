@@ -93,6 +93,7 @@ import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc283_e2e_';
@@ -263,6 +264,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.product.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } }),
+    () => prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.presentation.deleteMany({ where: { companyId: { in: ids } } }),
@@ -492,6 +494,7 @@ test.beforeAll(async () => {
   // Producción y empaque, firmados por el productor, terminados hace un rato.
   const productionStart = Date.now() - 60 * MINUTE_MS;
   const packingStart = productionStart + PRODUCTION_MS + 5 * MINUTE_MS;
+  const orderLineId = await ensureOnlyLine(prisma, order.id);
   await prisma.orderExecutionEntry.createMany({
     data: [
       { action: 'START' as const, stepPosition: 1, at: productionStart },
@@ -501,6 +504,7 @@ test.beforeAll(async () => {
     ].map((entry) => ({
       companyId: companyId!,
       orderId: order.id,
+      orderLineId,
       userId: producerId,
       action: entry.action,
       stepPosition: entry.stepPosition,
@@ -511,6 +515,7 @@ test.beforeAll(async () => {
     data: {
       companyId,
       orderId: decoy.id,
+      orderLineId: await ensureOnlyLine(prisma, decoy.id),
       userId: adminId,
       action: 'START',
       stepPosition: 1,
@@ -533,6 +538,7 @@ test.beforeAll(async () => {
     const line = await prisma.orderPresentationLine.create({
       data: {
         orderId: order.id,
+        orderLineId,
         companyId: companyId!,
         presentationId,
         packages,
@@ -580,6 +586,7 @@ test.beforeAll(async () => {
         quantity: stock,
         reason: null,
         orderId: order.id,
+        orderLineId,
         orderPresentationLineId: line.id,
         companyId: companyId!,
         createdBy: producerId,

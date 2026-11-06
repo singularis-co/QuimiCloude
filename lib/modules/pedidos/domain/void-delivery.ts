@@ -119,10 +119,12 @@ async function voidInTransaction(
 
   const lines = linesToVoid(await tx.voids.findDeliveryLines(delivery.id, scope), input.items);
   const touched = new Set<DeliveryTarget>();
+  const returned: { batchId: string; quantity: string; orderLineId: string }[] = [];
   for (const line of lines) {
-    const target = targets.get(line.orderLineId);
+    const target = line.orderLineId === null ? undefined : targets.get(line.orderLineId);
     if (!acceptsVoid(target)) throw new ActionNotAllowedError();
     touched.add(target);
+    returned.push({ batchId: line.batchId, quantity: line.quantity, orderLineId: target.lineId });
   }
 
   const created = await tx.voids.create(
@@ -139,29 +141,26 @@ async function voidInTransaction(
   );
   if (added === 'already_voided') throw new DeliveryAlreadyVoidedError();
 
-  const returned = await tx.finishedGoods.returnForDeliveryVoid({
+  const outcome = await tx.finishedGoods.returnForDeliveryVoid({
     companyId: scope.companyId,
     orderId: delivery.orderId,
     orderDeliveryVoidId: created.id,
-    lines: lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: line.orderLineId })),
+    lines: returned,
     actorId,
     now,
   });
-  if (returned.kind === 'batch_not_found') {
-    throw new Error(`voidDelivery: el lote ${returned.batchId} de una linea de entrega no aparece`);
+  if (outcome.kind === 'batch_not_found') {
+    throw new Error(`voidDelivery: el lote ${outcome.batchId} de una linea de entrega no aparece`);
   }
 
   // Lo anulado sale de lo entregado, asi que una receta ENTREGADO tocada deja de tener el reparto
   // completo y vuelve a TERMINADO; las demas no cambian.
   for (const target of touched) {
     if (target.status !== 'ENTREGADO') continue;
-    const moved =
-      target.lineId === null
-        ? await tx.orders.setStatus(delivery.orderId, 'ENTREGADO', 'TERMINADO', actorId, now, scope)
-        : await tx.orders.setLineStatus(delivery.orderId, target.lineId, 'ENTREGADO', 'TERMINADO', actorId, now, scope);
+    const moved = await tx.orders.setLineStatus(delivery.orderId, target.lineId, 'ENTREGADO', 'TERMINADO', actorId, now, scope);
     if (moved !== 'ok') throw new Error(`voidDelivery: el cambio de estado devolvio '${moved}' con el pedido bloqueado`);
   }
-  return { status: 'voided', orderStatus: await statusAfterDelivery(tx.orders, locked, 'TERMINADO', actorId, now, scope) };
+  return { status: 'voided', orderStatus: await statusAfterDelivery(tx.orders, locked, actorId, now, scope) };
 }
 
 /** Responde con el estado actual del pedido de la anulacion registrada: la clave es unica por

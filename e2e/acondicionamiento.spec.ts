@@ -40,6 +40,7 @@ import { ASSIGNED_ORDERS_ROUTE, conditioningOrderRoute } from '@/lib/shared/rout
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc217_e2e_';
@@ -215,6 +216,7 @@ async function createUser(user: Credentials, roleId: string): Promise<string> {
 async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown> {
   const pasos: ReadonlyArray<() => Promise<unknown>> = [
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: [...companyIds] } } }),
+    () => prisma.orderLine.deleteMany({ where: { companyId: { in: [...companyIds] } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: [...companyIds] } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: [...companyIds] } } }),
     () => prisma.inventoryMovement.deleteMany({ where: { companyId: { in: [...companyIds] } } }),
@@ -352,9 +354,11 @@ test.beforeAll(async () => {
   const orderA = await seedOrder(0, { status: 'POR_ACONDICIONAR', conditionedBy: null, finishedAt: null });
   // Dos inserciones con `createdAt` explícito: el reparto se pinta en orden de alta.
   const lineCreatedAt = Date.now();
+  const orderALineId = await ensureOnlyLine(prisma, orderA.id);
   await prisma.orderPresentationLine.create({
     data: {
       orderId: orderA.id,
+      orderLineId: orderALineId,
       companyId,
       presentationId: supplies1.presentationId,
       packages: LINE_1_PACKAGES,
@@ -366,6 +370,7 @@ test.beforeAll(async () => {
   await prisma.orderPresentationLine.create({
     data: {
       orderId: orderA.id,
+      orderLineId: orderALineId,
       companyId,
       presentationId: supplies2.presentationId,
       packages: LINE_2_PACKAGES,

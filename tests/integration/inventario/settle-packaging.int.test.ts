@@ -21,6 +21,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 import type { ConsumptionOutcome, ReservationRequirementLine } from '@/lib/modules/inventario/domain/reservation';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -104,6 +105,7 @@ async function dropFixture(fixture: Fixture): Promise<void> {
   const { companyId } = fixture;
   await prisma.reservationMovement.deleteMany({ where: { companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId } });
+  await prisma.orderLine.deleteMany({ where: { order: { companyId } } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.productBatch.deleteMany({ where: { companyId } });
   await prisma.product.deleteMany({ where: { companyId } });
@@ -168,7 +170,7 @@ function req(productId: string, quantity: string): ReservationRequirementLine {
 
 async function reserve(fixture: Fixture, orderId: string, requirement: readonly ReservationRequirementLine[]): Promise<void> {
   const outcome = await createMaterialReservations(prisma).syncForLine({
-    orderLineId: null,
+    orderLineId: await ensureOnlyLine(prisma, orderId),
     orderId,
     companyId: fixture.companyId,
     requirement,
@@ -180,7 +182,7 @@ async function reserve(fixture: Fixture, orderId: string, requirement: readonly 
 
 async function settle(fixture: Fixture, orderId: string, requirement: readonly ReservationRequirementLine[]): Promise<ConsumptionOutcome> {
   return createMaterialReservations(prisma).settlePackagingForLine({
-    orderLineId: null,
+    orderLineId: await ensureOnlyLine(prisma, orderId),
     orderId,
     companyId: fixture.companyId,
     requirement,
@@ -332,7 +334,7 @@ describe('settlePackagingForLine', () => {
       await expect(
         prisma.$transaction(async (tx) => {
           outcome = await createMaterialReservations(tx).settlePackagingForLine({
-            orderLineId: null,
+            orderLineId: await ensureOnlyLine(prisma, orderId),
             orderId,
             companyId: fixture.companyId,
             requirement: [req(envase.productId, '6')],
@@ -368,7 +370,7 @@ describe('settlePackagingForLine', () => {
       await expect(
         prisma.$transaction(async (tx) => {
           outcome = await createMaterialReservations(tx).settlePackagingForLine({
-            orderLineId: null,
+            orderLineId: await ensureOnlyLine(prisma, orderId),
             orderId,
             companyId: fixture.companyId,
             requirement: [req(ajeno.productId, '2')],
@@ -399,7 +401,7 @@ describe('settlePackagingForLine', () => {
       const ledgerBefore = await ledgerOf(orderId);
 
       const outcome = await createMaterialReservations(prisma).settlePackagingForLine({
-        orderLineId: null,
+        orderLineId: await ensureOnlyLine(prisma, orderId),
         orderId,
         companyId: otherFixture.companyId,
         requirement: [req(envase.productId, '0')],

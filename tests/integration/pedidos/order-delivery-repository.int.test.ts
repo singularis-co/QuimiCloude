@@ -16,6 +16,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { createOrderDeliveryRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine } from '../../helpers/only-order-line'
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -155,7 +157,7 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
   const lineIds: string[] = []
   for (const presentationId of presentationIds) {
     const { id } = await tx.orderPresentationLine.create({
-      data: { orderId, companyId, presentationId, packages: 10 },
+      data: { orderId, orderLineId: await ensureOnlyLine(tx, orderId), companyId, presentationId, packages: 10 },
       select: { id: true },
     })
     lineIds.push(id)

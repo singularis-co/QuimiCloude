@@ -16,6 +16,8 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine, movementLineOf } from '../../helpers/only-order-line'
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -175,7 +177,7 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
     select: { id: true },
   })
   const { id: presentationLineId } = await tx.orderPresentationLine.create({
-    data: { orderId, companyId, presentationId, packages: 10 },
+    data: { orderId, orderLineId: await ensureOnlyLine(tx, orderId), companyId, presentationId, packages: 10 },
     select: { id: true },
   })
 
@@ -296,10 +298,11 @@ type MovementRow = {
 
 async function rawInsertMovement(tx: Prisma.TransactionClient, row: MovementRow): Promise<void> {
   await tx.$executeRaw`
-    INSERT INTO "inventory_movements" ("batch_id", "kind", "quantity", "reason", "order_id", "order_delivery_id", "order_delivery_void_id", "company_id")
+    INSERT INTO "inventory_movements" ("batch_id", "kind", "quantity", "reason", "order_id", "order_line_id", "order_delivery_id", "order_delivery_void_id", "company_id")
     VALUES (
       ${asUuid(row.batchId)}, CAST(${row.kind} AS "InventoryMovementKind"), CAST(${row.quantity} AS decimal(14,4)),
-      ${row.reason ?? null}, ${asNullableUuid(row.orderId)}, ${asNullableUuid(row.orderDeliveryId)},
+      ${row.reason ?? null}, ${asNullableUuid(row.orderId)}, ${movementLineOf(row.kind, row.orderId)},
+      ${asNullableUuid(row.orderDeliveryId)},
       ${asNullableUuid(row.orderDeliveryVoidId)}, ${asUuid(row.companyId)}
     )`
 }

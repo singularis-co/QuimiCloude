@@ -27,6 +27,7 @@ import { findPackageUnitId } from '@/lib/modules/unidades/adapters/driven/persis
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -89,6 +90,7 @@ async function createCompany(): Promise<Company> {
 async function dropCompany(c: Company): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: c.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: c.companyId } });
+  await prisma.orderLine.deleteMany({ where: { order: { companyId: c.companyId } } });
   await prisma.order.deleteMany({ where: { companyId: c.companyId } });
   await prisma.productBatch.deleteMany({ where: { companyId: c.companyId } });
   await prisma.product.deleteMany({ where: { companyId: c.companyId } });
@@ -131,7 +133,7 @@ async function orderReserving(c: Company, productId: string, quantity: string): 
     select: { id: true },
   });
   const outcome = await createMaterialReservations(prisma).syncForLine({
-    orderLineId: null,
+    orderLineId: await ensureOnlyLine(prisma, order.id),
     orderId: order.id,
     companyId: c.companyId,
     requirement: [{ productId, quantity }],

@@ -879,19 +879,6 @@ async function setAliveOrderIngredientsCost(
   return count === 1 ? 'ok' : 'not_found';
 }
 
-/** `findOnlyLineId` de `OrderWriteRepository`. Con dos lineas leidas basta para saber que hay mas
- *  de una. */
-async function findOnlyAliveLineId(orderId: string, scope: OrderScope, tx: PrismaLike): Promise<string | null> {
-  const { companyId } = companyScopeColumns(scope);
-  const lines = await tx.orderLine.findMany({
-    where: { orderId, companyId, deletedAt: null },
-    select: { id: true },
-    take: 2,
-  });
-  if (lines.length > 1) throw new Error(`findOnlyLineId: el pedido ${orderId} tiene mas de una linea`);
-  return lines[0]?.id ?? null;
-}
-
 const ORDER_LINE_SELECT = {
   id: true,
   orderId: true,
@@ -978,7 +965,6 @@ async function readOrderLines(
   });
   const byLine = new Map<string, OrderPresentationLineRow[]>();
   for (const item of distribution) {
-    if (item.orderLineId === null) continue;
     const list = byLine.get(item.orderLineId) ?? [];
     list.push({
       presentationId: item.presentationId,
@@ -1526,7 +1512,6 @@ export async function findExpirableOrders(
 export function createOrderWriteRepository(tx: PrismaLike = prisma): OrderWriteRepository {
   return {
     lockAliveById: (id, scope) => lockAliveOrderById(id, scope, tx),
-    findOnlyLineId: (orderId, scope) => findOnlyAliveLineId(orderId, scope, tx),
     lockAliveLines: (orderId, scope) => lockAliveOrderLines(orderId, scope, tx),
     lockAliveLine: (orderId, lineId, scope) => lockAliveOrderLine(orderId, lineId, scope, tx),
     writeLines: (orderId, changes, actorId, now, scope) => writeOrderLines(orderId, changes, actorId, now, scope, tx),
@@ -1801,7 +1786,7 @@ type FinishPackingLineRow = {
   readonly packaging_product_id: string | null;
   readonly packed_packages: number | null;
   readonly packed_surplus_packages: number;
-  readonly order_line_id: string | null;
+  readonly order_line_id: string;
 };
 
 async function findPresentationLinesForFinishOrder(

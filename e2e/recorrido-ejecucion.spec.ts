@@ -50,6 +50,7 @@ import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc167_e2e_';
@@ -264,10 +265,12 @@ async function seedEntries(params: {
   readonly userIds: Readonly<Record<EntrySpec['who'], string>>;
 }): Promise<void> {
   const start = Date.now() - (params.entries.length + 1) * ENTRY_SPACING_MS;
+  const orderLineId = await ensureOnlyLine(prisma, params.orderId);
   await prisma.orderExecutionEntry.createMany({
     data: params.entries.map((entry, index) => ({
       companyId: params.companyId,
       orderId: params.orderId,
+      orderLineId,
       userId: params.userIds[entry.who],
       action: entry.action,
       stepPosition: entry.step,
@@ -283,6 +286,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<void> {
   await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.orderAssignment.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } });
+  await prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.order.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.recipe.deleteMany({ where: { companyId: { in: ids } } });
   await prisma.user.deleteMany({ where: { companyId: { in: ids } } });

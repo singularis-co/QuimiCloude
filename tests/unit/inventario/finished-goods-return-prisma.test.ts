@@ -51,9 +51,27 @@ function makeTx(batchRows: readonly BatchRow[]) {
   return { tx: tx as unknown as Prisma.TransactionClient, txDouble: tx, order };
 }
 
-function baseInput(overrides: Partial<Parameters<typeof returnFinishedGoods>[1]> = {}) {
+type OrderLineReturn = { readonly batchId: string; readonly quantity: string; readonly orderLineId: string };
+
+function baseInput(overrides: { readonly lines?: readonly OrderLineReturn[] } = {}) {
   return {
     orderId: 'order-1',
+    orderDeliveryVoidId: 'void-1',
+    lines: [
+      { batchId: 'batch-1', quantity: '15.0000', orderLineId: 'line-1' },
+      { batchId: 'batch-2', quantity: '1.5000', orderLineId: 'line-1' },
+      { batchId: 'batch-3', quantity: '2.0000', orderLineId: 'line-1' },
+    ],
+    actorId: 'actor-1',
+    now: NOW,
+    ...overrides,
+  };
+}
+
+/** La misma anulacion sobre una entrega sin pedido: sin pedido ni linea. */
+function directInput() {
+  return {
+    orderId: null,
     orderDeliveryVoidId: 'void-1',
     lines: [
       { batchId: 'batch-1', quantity: '15.0000', orderLineId: null },
@@ -62,7 +80,6 @@ function baseInput(overrides: Partial<Parameters<typeof returnFinishedGoods>[1]>
     ],
     actorId: 'actor-1',
     now: NOW,
-    ...overrides,
   };
 }
 
@@ -149,7 +166,7 @@ describe('returnFinishedGoods — orden de pasos con un tx doblado', () => {
     ]);
   });
 
-  it('R24: writeMovement recibe delivery_void, cantidad positiva, pedido, anulacion y reason null', async () => {
+  it('R24, QT-313 R37: writeMovement recibe delivery_void, cantidad positiva, pedido, su linea, anulacion y reason null', async () => {
     const { tx, txDouble } = makeTx(THREE_BATCHES);
 
     await returnFinishedGoods(tx, baseInput(), SCOPE);
@@ -167,7 +184,7 @@ describe('returnFinishedGoods — orden de pasos con un tx doblado', () => {
         reason: null,
         orderId: 'order-1',
         orderPresentationLineId: null,
-        orderLineId: null,
+        orderLineId: 'line-1',
         orderDeliveryVoidId: 'void-1',
         createdBy: 'actor-1',
         companyId: COMPANY,
@@ -201,9 +218,9 @@ describe('returnFinishedGoods — lote repetido entre lineas', () => {
       tx,
       baseInput({
         lines: [
-          { batchId: 'batch-1', quantity: '15.0000', orderLineId: null },
-          { batchId: 'batch-2', quantity: '1.5000', orderLineId: null },
-          { batchId: 'batch-1', quantity: '20.0000', orderLineId: null },
+          { batchId: 'batch-1', quantity: '15.0000', orderLineId: 'line-1' },
+          { batchId: 'batch-2', quantity: '1.5000', orderLineId: 'line-1' },
+          { batchId: 'batch-1', quantity: '20.0000', orderLineId: 'line-1' },
         ],
       }),
       SCOPE,
@@ -270,10 +287,7 @@ describe('returnFinishedGoods — anulacion de una entrega sin pedido', () => {
   it('R50: un asiento direct_delivery_void por lote, positivo, con la anulacion, sin pedido ni motivo, y el bloqueo sin mirar deleted_at', async () => {
     const { tx, txDouble } = makeTx(THREE_BATCHES);
 
-    const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
-      companyId: COMPANY,
-      ...baseInput({ orderId: null }),
-    });
+    const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({ companyId: COMPANY, ...directInput() });
 
     expect(outcome).toEqual({ kind: 'returned' });
     const datos = txDouble.inventoryMovement.create.mock.calls.map((call) => call[0].data);

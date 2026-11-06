@@ -23,7 +23,7 @@ import {
   SECOND_PENDING_LINE_ID,
   deliverInput,
 } from '@/tests/fixtures/order-delivery'
-import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { FinishedGoodsDispatchInput, FinishedGoodsDispatchOutcome } from '@/lib/modules/inventario'
@@ -71,8 +71,8 @@ function entradaDeUnCliente(): DeliverOrderInput {
 }
 
 const LINEAS: readonly FinishPackingLine[] = [
-  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
-  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: COMPLETE_LINE_ID, presentationId: COMPLETE_PRESENTATION, packages: 4, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: ONLY_LINE_ID },
+  { id: PENDING_LINE_ID, presentationId: PENDING_PRESENTATION, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: ONLY_LINE_ID },
 ]
 
 /** Pedidos 4 + 10; entregados 4 + 3: a la segunda linea le faltan 7. */
@@ -99,7 +99,6 @@ type Montaje = {
       readonly lockAliveById: ReturnType<typeof vi.fn>
       readonly lockAliveLines: ReturnType<typeof vi.fn>
       readonly findPresentationLinesForFinish: ReturnType<typeof vi.fn>
-      readonly setStatus: ReturnType<typeof vi.fn>
       readonly setLineStatus: ReturnType<typeof vi.fn>
       readonly refreshStatus: ReturnType<typeof vi.fn>
     }
@@ -139,8 +138,9 @@ function montar(
     registradaDentro?: RegisteredOrderDelivery | null
   } = {},
 ): Montaje {
-  // Un pedido sin lineas, anterior a ellas: su reparto no nombra linea y el estado se escribe en el
-  // pedido. Los pedidos con lineas los cubre `delivery-by-line.test.ts`.
+  // Un pedido de una linea, con el estado del pedido: el estado se escribe en la linea y el del
+  // pedido se deriva de ella. Los pedidos de varias lineas los cubre `delivery-by-line.test.ts`.
+  let movidaA: OrderStatus | null = null
   const lockAliveById = vi.fn(async (id: string, scope: { companyId: string }) => {
     void [id, scope]
     return opciones.pedido === undefined ? pedidoTerminado() : opciones.pedido
@@ -150,16 +150,20 @@ function montar(
       lockAliveById,
       lockAliveLines: vi.fn(async (id: string, scope: { companyId: string }) => {
         const order = await lockAliveById(id, scope)
-        return order === null ? null : { order, lines: [] }
+        movidaA = null
+        if (order === null) return null
+        // Con una linea un pedido no puede estar PARCIAL: ese caso no tiene linea que entregar.
+        return { order, lines: order.status === 'PARCIAL' ? [] : [orderLineOf(order)] }
       }),
       findPresentationLinesForFinish: vi.fn(async () => opciones.lineas ?? LINEAS),
-      setStatus: vi.fn(async () => opciones.setStatus ?? 'ok'),
-      setLineStatus: vi.fn(() => {
-        throw new Error('setLineStatus no deberia llamarse en un pedido sin lineas')
+      setLineStatus: vi.fn(async (_id: string, _lineId: string, _de: OrderStatus, a: OrderStatus) => {
+        movidaA = a
+        return opciones.setStatus ?? 'ok'
       }),
-      refreshStatus: vi.fn(() => {
-        throw new Error('refreshStatus no deberia llamarse en un pedido sin lineas')
-      }),
+      // Con una linea, el pedido queda en el estado de su linea.
+      refreshStatus: vi.fn(async (id: string, _actorId: string, _now: Date, scope: { companyId: string }) =>
+        movidaA ?? (await lockAliveById(id, scope))?.status ?? null,
+      ),
     },
     deliveries: {
       findByKey: vi.fn(async (deliveryKey: string, scope: { companyId: string }) =>
@@ -232,7 +236,7 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 function nadaEscrito(m: Montaje): void {
   expect(m.tx.finishedGoods.dispatchForDelivery).not.toHaveBeenCalled()
   expect(m.tx.deliveries.addLines).not.toHaveBeenCalled()
-  expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+  expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
 }
 
 function ningunPuerto(m: Montaje): void {
@@ -449,7 +453,7 @@ describe('deliverOrder — salida fisica de inventario (R19, R20, R24)', () => {
     expect(m.tx.finishedGoods.dispatchForDelivery).toHaveBeenCalledWith({
       companyId: EMPRESA,
       orderId: DELIVERY_ORDER_ID,
-      orderLineId: null,
+      orderLineId: ONLY_LINE_ID,
       orderDeliveryId: DELIVERY_ID,
       recipeId: RECETA,
       presentationId: PENDING_PRESENTATION,
@@ -488,7 +492,7 @@ describe('deliverOrder — salida fisica de inventario (R19, R20, R24)', () => {
     const m = montar({ despacho: () => ({ kind: 'batch_not_found', batchId: OLDER_BATCH_ID }) })
     expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(entradaDeUnCliente(), ENTREGADOR))).toBe('batch_not_found')
     expect(m.tx.deliveries.addLines).not.toHaveBeenCalled()
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
     expect(m.lanzoDentro()).not.toBeNull()
   })
 
@@ -498,19 +502,19 @@ describe('deliverOrder — salida fisica de inventario (R19, R20, R24)', () => {
       'delivery_batch_insufficient',
     )
     expect(m.tx.deliveries.addLines).not.toHaveBeenCalled()
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
     expect(m.lanzoDentro()).not.toBeNull()
   })
 })
 
 describe('deliverOrder — estado del pedido tras la entrega (R26, R27)', () => {
-  it('R26: si a alguna linea le siguen faltando envases el pedido sigue TERMINADO y setStatus no se llama', async () => {
+  it('R26: si a alguna linea le siguen faltando envases el pedido sigue TERMINADO y setLineStatus no se llama', async () => {
     const m = montar()
     await expect(createDeliverOrder(m.deps)(entradaDeUnCliente(), ENTREGADOR)).resolves.toEqual({
       status: 'delivered',
       orderStatus: 'TERMINADO',
     })
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 
   it('R27: si no le falta nada a ninguna linea pasa a ENTREGADO en la misma transaccion', async () => {
@@ -524,12 +528,12 @@ describe('deliverOrder — estado del pedido tras la entrega (R26, R27)', () => 
       status: 'delivered',
       orderStatus: 'ENTREGADO',
     })
-    expect(m.tx.orders.setStatus).toHaveBeenCalledTimes(1)
-    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledTimes(1)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, ONLY_LINE_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
     expect(m.run).toHaveBeenCalledTimes(1)
   })
 
-  it('R27: si setStatus no mueve el pedido la entrega entera falla', async () => {
+  it('R27: si setLineStatus no mueve la linea la entrega entera falla', async () => {
     const m = montar({ setStatus: 'stale' })
     const entrada = deliverInput({ ...unCliente([{ presentationLineId: PENDING_LINE_ID, batchId: OLDER_BATCH_ID, packages: 7 }]) })
 
@@ -645,7 +649,7 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
         for (const l of lineas) entregados.set(l.presentationLineId, (entregados.get(l.presentationLineId) ?? 0) + l.packages)
       },
     )
-    m.tx.orders.setStatus.mockImplementation(async (_id: string, _de: OrderStatus, a: OrderStatus) => {
+    m.tx.orders.setLineStatus.mockImplementation(async (_id: string, _lineId: string, _de: OrderStatus, a: OrderStatus) => {
       estado = a
       return 'ok'
     })
@@ -664,7 +668,7 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
       create: m.tx.deliveries.create.mock.calls.length,
       despacho: m.tx.finishedGoods.dispatchForDelivery.mock.calls.length,
       lineas: m.tx.deliveries.addLines.mock.calls.length,
-      estado: m.tx.orders.setStatus.mock.calls.length,
+      estado: m.tx.orders.setLineStatus.mock.calls.length,
     }
 
     await expect(entregar(entradaDeUnCliente(), ENTREGADOR)).resolves.toEqual({
@@ -676,7 +680,7 @@ describe('deliverOrder — clave de entrega ya registrada (R29)', () => {
       create: m.tx.deliveries.create.mock.calls.length,
       despacho: m.tx.finishedGoods.dispatchForDelivery.mock.calls.length,
       lineas: m.tx.deliveries.addLines.mock.calls.length,
-      estado: m.tx.orders.setStatus.mock.calls.length,
+      estado: m.tx.orders.setLineStatus.mock.calls.length,
     }).toEqual(llamadas)
     expect(claves.size).toBe(2)
     expect(entregados.get(PENDING_LINE_ID)).toBe(10)
@@ -723,7 +727,7 @@ const GALLON_PRESENTATION = 'f0000000-0000-4000-8000-000000000003'
 /** Las de QC-223 mas el galon: pedidos 5, ninguno entregado. */
 const LINEAS_VARIOS: readonly FinishPackingLine[] = [
   ...LINEAS,
-  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: null },
+  { id: SECOND_PENDING_LINE_ID, presentationId: GALLON_PRESENTATION, packages: 5, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: ONLY_LINE_ID },
 ]
 
 type Bloque = DeliverOrderInput['customers'][number]
@@ -970,7 +974,7 @@ describe('QC-282 deliverOrder — escritura de una entrega con varios clientes',
 
     expect(await codigoDelFallo(() => createDeliverOrder(m.deps)(deliverInput(), ENTREGADOR))).toBe('delivery_batch_insufficient')
     expect(m.tx.deliveries.addLines).not.toHaveBeenCalled()
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
     expect(m.lanzoDentro()).not.toBeNull()
   })
 
@@ -1004,8 +1008,8 @@ describe('QC-282 deliverOrder — estado del pedido con varios clientes', () => 
     })
 
     await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'ENTREGADO' })
-    expect(m.tx.orders.setStatus).toHaveBeenCalledTimes(1)
-    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledTimes(1)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, ONLY_LINE_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
     expect(m.run).toHaveBeenCalledTimes(1)
   })
 
@@ -1024,7 +1028,7 @@ describe('QC-282 deliverOrder — estado del pedido con varios clientes', () => 
     })
 
     await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'TERMINADO' })
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -1074,7 +1078,7 @@ describe('QC-281 — deliverOrder con los envases reales del empaque', () => {
       status: 'delivered',
       orderStatus: 'ENTREGADO',
     })
-    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, ONLY_LINE_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
   })
 
   it('R24: entregar mas de lo que falta segun el real es delivery_exceeds_remaining aunque el plan lo admitiria', async () => {
@@ -1128,7 +1132,7 @@ describe('QC-281 — deliverOrder con los envases reales del empaque', () => {
       status: 'delivered',
       orderStatus: 'TERMINADO',
     })
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -1162,7 +1166,7 @@ describe('QC-282 R23 + QC-281 — tope por envases reales sobre la suma de los c
 
     // Al galon le siguen faltando 5: el pedido sigue TERMINADO.
     await expect(createDeliverOrder(m.deps)(entrada, ENTREGADOR)).resolves.toEqual({ status: 'delivered', orderStatus: 'TERMINADO' })
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -1240,6 +1244,6 @@ describe('QC-290 — deliverOrder espera solo lo pedido', () => {
       status: 'delivered',
       orderStatus: 'ENTREGADO',
     })
-    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledWith(DELIVERY_ORDER_ID, ONLY_LINE_ID, 'TERMINADO', 'ENTREGADO', ENTREGADOR.id, AHORA, SCOPE)
   })
 })

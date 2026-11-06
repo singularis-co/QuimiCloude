@@ -17,6 +17,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -122,7 +123,7 @@ async function sembrarPedido(recipeId: string): Promise<string> {
 /** La linea del reparto que `receiveFinishedGoods` exige por `orderPresentationLineId`. */
 async function sembrarLinea(orderId: string, presentationId: string, packages: number): Promise<string> {
   const { id } = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: empresaDelArchivo, presentationId, packages, presentationContent: '1' },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: empresaDelArchivo, presentationId, packages, presentationContent: '1' },
     select: { id: true },
   });
   return id;
@@ -251,12 +252,12 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
     let productId: string | null = null;
 
     try {
-      const primero = await prisma.$transaction((tx) =>
+      const primero = await prisma.$transaction(async (tx) =>
         receiveFinishedGoods(
           tx,
           {
             orderId: orderId1,
-            orderLineId: null,
+            orderLineId: await ensureOnlyLine(prisma, orderId1),
             recipeId,
             recipeName: 'Receta renombrable',
             presentationId,
@@ -282,12 +283,12 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
       );
       expect(resultado).toBe(true);
 
-      const segundo = await prisma.$transaction((tx) =>
+      const segundo = await prisma.$transaction(async (tx) =>
         receiveFinishedGoods(
           tx,
           {
             orderId: orderId2,
-            orderLineId: null,
+            orderLineId: await ensureOnlyLine(prisma, orderId2),
             recipeId,
             recipeName: 'Receta renombrable',
             presentationId,
@@ -319,6 +320,7 @@ describe('R4 — la edicion no cambia el tipo de o hacia FINISHED_PRODUCT', () =
         await prisma.product.deleteMany({ where: { id: productId } });
       }
       await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [orderId1, orderId2] } } });
+      await prisma.orderLine.deleteMany({ where: { order: { id: { in: [orderId1, orderId2] } } } });
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });

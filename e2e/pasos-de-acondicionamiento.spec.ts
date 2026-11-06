@@ -94,6 +94,7 @@ import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc299_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -258,6 +259,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.orderExecutionEntry.deleteMany({ where: scope }),
     () => prisma.orderConditioningTeamMember.deleteMany({ where: scope }),
     () => prisma.orderPresentationLine.deleteMany({ where: scope }),
+    () => prisma.orderLine.deleteMany({ where: scope }),
     () => prisma.order.deleteMany({ where: scope }),
     () => prisma.productBatch.deleteMany({ where: scope }),
     async () => {
@@ -562,23 +564,23 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
         recipeId: saved.id,
         quantity: ORDER_QUANTITY,
         unitId: unit.id,
-        presentationLines: {
-          create: [
-            {
-              companyId,
-              presentationId,
-              packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
-              presentationContent: PRESENTATION_CONTENT,
-              packagingProductId,
-            },
-          ],
-        },
         // PENDIENTE: solo asi Entrar pide la confirmacion de comenzar.
         status: 'PENDIENTE',
       },
       select: { id: true },
     });
     const orderId = order.id;
+    await prisma.orderPresentationLine.create({
+      data: {
+        orderId,
+        orderLineId: await ensureOnlyLine(prisma, orderId),
+        companyId,
+        presentationId,
+        packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+        presentationContent: PRESENTATION_CONTENT,
+        packagingProductId,
+      },
+    });
     const orderNumber = formatOrderNumber({ year, sequence: BASE_SEQUENCE });
     await prisma.orderAssignment.create({
       data: {

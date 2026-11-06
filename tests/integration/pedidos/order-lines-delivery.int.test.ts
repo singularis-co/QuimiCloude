@@ -39,19 +39,17 @@ type Escenario = {
   readonly empresa: EmpresaDeEntrega;
   readonly customerId: string;
   readonly orderId: string;
-  readonly orderLineId: string | null;
+  readonly orderLineId: string;
   readonly presentationLineId: string;
   readonly batchId: string;
 };
 
-/** Un pedido TERMINADO de 5 envases de 1 L con un lote de 10: con su linea, o sin ella. */
-async function crearEscenario(sinLinea: boolean): Promise<Escenario> {
+/** Un pedido TERMINADO de 5 envases de 1 L, con su linea, y un lote de 10. */
+async function crearEscenario(): Promise<Escenario> {
   const empresa = await crearEmpresaDeEntrega('L');
   const customerId = await crearCliente(empresa, 'Garcia');
   const presentationId = await crearPresentacion(empresa, '1.0000');
-  const { orderId, lineIds, orderLineId } = await crearPedido(empresa, 'TERMINADO', customerId, [{ presentationId, packages: 5 }], {
-    sinLinea,
-  });
+  const { orderId, lineIds, orderLineId } = await crearPedido(empresa, 'TERMINADO', customerId, [{ presentationId, packages: 5 }]);
   const productId = await crearTerminado(empresa, presentationId);
   const batchId = await crearLote(empresa, productId, presentationId, '10.0000', '1.0000');
   return { empresa, customerId, orderId, orderLineId, presentationLineId: lineIds[0] as string, batchId };
@@ -105,15 +103,14 @@ async function asientos(companyId: string, kind: 'delivery' | 'delivery_void') {
 
 describe('QT-313 T12 — entrega y anulacion por linea contra la base', () => {
   it('QT-313 R37, R39: el asiento delivery lleva la linea del reparto, la entrega completa deja la linea ENTREGADO, y el delivery_void lleva la misma linea y la devuelve a TERMINADO', async () => {
-    const e = await crearEscenario(false);
+    const e = await crearEscenario();
     try {
-      expect(e.orderLineId).not.toBeNull();
 
       const deliveryId = await entregarTodo(e);
 
       const entregas = await asientos(e.empresa.companyId, 'delivery');
       expect(entregas).toEqual([{ orderId: e.orderId, orderLineId: e.orderLineId, orderDeliveryId: deliveryId, orderDeliveryVoidId: null }]);
-      const linea = await prisma.orderLine.findUniqueOrThrow({ where: { id: e.orderLineId as string }, select: { status: true } });
+      const linea = await prisma.orderLine.findUniqueOrThrow({ where: { id: e.orderLineId }, select: { status: true } });
       expect(linea.status).toBe('ENTREGADO');
       expect((await prisma.order.findUniqueOrThrow({ where: { id: e.orderId } })).status).toBe('ENTREGADO');
 
@@ -121,25 +118,8 @@ describe('QT-313 T12 — entrega y anulacion por linea contra la base', () => {
 
       const anulaciones = await asientos(e.empresa.companyId, 'delivery_void');
       expect(anulaciones.map((a) => [a.orderId, a.orderLineId])).toEqual([[e.orderId, entregas[0]?.orderLineId]]);
-      const lineaDespues = await prisma.orderLine.findUniqueOrThrow({ where: { id: e.orderLineId as string }, select: { status: true } });
+      const lineaDespues = await prisma.orderLine.findUniqueOrThrow({ where: { id: e.orderLineId }, select: { status: true } });
       expect(lineaDespues.status).toBe('TERMINADO');
-      expect((await prisma.order.findUniqueOrThrow({ where: { id: e.orderId } })).status).toBe('TERMINADO');
-    } finally {
-      await borrarEscenario(e);
-    }
-  });
-
-  it('QT-313 R37: un pedido sin linea escribe null en la linea del delivery y del delivery_void, y su estado sigue en el pedido', async () => {
-    const e = await crearEscenario(true);
-    try {
-      const deliveryId = await entregarTodo(e);
-
-      expect((await asientos(e.empresa.companyId, 'delivery')).map((a) => a.orderLineId)).toEqual([null]);
-      expect((await prisma.order.findUniqueOrThrow({ where: { id: e.orderId } })).status).toBe('ENTREGADO');
-
-      await anularTodo(e, deliveryId);
-
-      expect((await asientos(e.empresa.companyId, 'delivery_void')).map((a) => a.orderLineId)).toEqual([null]);
       expect((await prisma.order.findUniqueOrThrow({ where: { id: e.orderId } })).status).toBe('TERMINADO');
     } finally {
       await borrarEscenario(e);

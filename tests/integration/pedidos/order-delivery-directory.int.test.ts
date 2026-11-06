@@ -19,6 +19,8 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine } from '../../helpers/only-order-line'
+
 function token(): string {
   return randomUUID().replace(/-/gu, '')
 }
@@ -122,7 +124,7 @@ async function createOrder(t: Tenant): Promise<string> {
 
 async function createLine(t: Tenant, orderId: string, presentationId: string): Promise<string> {
   const { id } = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: t.companyId, presentationId, packages: 10 },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: t.companyId, presentationId, packages: 10 },
     select: { id: true },
   })
   return id
@@ -293,6 +295,7 @@ async function dropTenant(t: Tenant): Promise<void> {
   await prisma.productBatch.deleteMany({ where })
   await prisma.product.deleteMany({ where })
   await prisma.orderPresentationLine.deleteMany({ where })
+  await prisma.orderLine.deleteMany({ where })
   await prisma.order.deleteMany({ where })
   await prisma.customer.deleteMany({ where })
   await prisma.recipe.deleteMany({ where })

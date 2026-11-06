@@ -43,6 +43,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -366,10 +367,11 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
         ),
       );
       const deliveryOrderId = orderId;
+      const deliveryOrderLineId = await ensureOnlyLine(prisma, deliveryOrderId);
       const finishedRecipeId = recipeId;
       const outcome = await prisma.$transaction((tx) =>
         createFinishedGoodsDispatch(tx).dispatchForDelivery({
-          orderLineId: null,
+          orderLineId: deliveryOrderLineId,
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryId: delivery.id,
@@ -390,6 +392,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       await prisma.orderDelivery.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
       if (productId !== null) await prisma.product.deleteMany({ where: { id: productId } });
+      if (orderId !== null) await prisma.orderLine.deleteMany({ where: { orderId } });
       if (orderId !== null) await prisma.order.deleteMany({ where: { id: orderId } });
       if (customerId !== null) await prisma.customer.deleteMany({ where: { id: customerId } });
       if (recipeId !== null) await prisma.recipe.deleteMany({ where: { id: recipeId } });
@@ -472,10 +475,11 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
         ),
       );
       const deliveryOrderId = orderId;
+      const deliveryOrderLineId = await ensureOnlyLine(prisma, deliveryOrderId);
       const finishedRecipeId = recipeId;
       const dispatched = await prisma.$transaction((tx) =>
         createFinishedGoodsDispatch(tx).dispatchForDelivery({
-          orderLineId: null,
+          orderLineId: deliveryOrderLineId,
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryId: delivery.id,
@@ -504,7 +508,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryVoidId: deliveryVoid.id,
-          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: null })),
+          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: deliveryOrderLineId })),
           actorId: fixture.actorId,
           now: new Date(),
         }),
@@ -520,6 +524,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       await prisma.orderDelivery.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
       if (productId !== null) await prisma.product.deleteMany({ where: { id: productId } });
+      if (orderId !== null) await prisma.orderLine.deleteMany({ where: { orderId } });
       if (orderId !== null) await prisma.order.deleteMany({ where: { id: orderId } });
       if (customerId !== null) await prisma.customer.deleteMany({ where: { id: customerId } });
       if (recipeId !== null) await prisma.recipe.deleteMany({ where: { id: recipeId } });
@@ -568,7 +573,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       });
       orderId = order.id;
       const presentationLine = await prisma.orderPresentationLine.create({
-        data: { orderId, companyId: fixture.companyId, presentationId: fixture.presentationId, packages: 10 },
+        data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: fixture.companyId, presentationId: fixture.presentationId, packages: 10 },
         select: { id: true },
       });
       for (const firstNames of ['Luis', 'Marta']) {
@@ -603,11 +608,12 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
         ),
       );
       const deliveryOrderId = orderId;
+      const deliveryOrderLineId = await ensureOnlyLine(prisma, deliveryOrderId);
       const finishedRecipeId = recipeId;
       const packagesByCustomer = [3, 2];
       const dispatched = await prisma.$transaction(async (tx) => {
         const outcome = await createFinishedGoodsDispatch(tx).dispatchForDelivery({
-          orderLineId: null,
+          orderLineId: deliveryOrderLineId,
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryId: delivery.id,
@@ -662,7 +668,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
           companyId: fixture.companyId,
           orderId: deliveryOrderId,
           orderDeliveryVoidId: deliveryVoid.id,
-          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: null })),
+          lines: dispatched.lines.map((line) => ({ batchId: line.batchId, quantity: line.quantity, orderLineId: deliveryOrderLineId })),
           actorId: fixture.actorId,
           now: new Date(),
         }),
@@ -685,6 +691,7 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
       await prisma.orderPresentationLine.deleteMany({ where: { companyId: fixture.companyId } });
       await prisma.productBatch.deleteMany({ where: { companyId: fixture.companyId } });
       if (productId !== null) await prisma.product.deleteMany({ where: { id: productId } });
+      if (orderId !== null) await prisma.orderLine.deleteMany({ where: { orderId } });
       if (orderId !== null) await prisma.order.deleteMany({ where: { id: orderId } });
       if (customerIds.length > 0) await prisma.customer.deleteMany({ where: { id: { in: customerIds } } });
       if (recipeId !== null) await prisma.recipe.deleteMany({ where: { id: recipeId } });

@@ -38,7 +38,7 @@ import {
 import type { FinishedGoodsOutcome } from '../../../domain/finished-goods';
 import type { FinishedBatchLabel, FinishedBatchLabelsOutcome } from '../../../domain/finished-batch-labels';
 import type { FinishedGoodsDispatchOutcome } from '../../../domain/finished-goods-dispatch';
-import type { FinishedGoodsReturnOutcome } from '../../../domain/finished-goods-return';
+import type { FinishedGoodsReturnInput, FinishedGoodsReturnOutcome } from '../../../domain/finished-goods-return';
 import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ListFilterValue, ListQuery, ListSort } from '../../../domain/list-query';
 import type { Page } from '../../../domain/page';
@@ -1280,7 +1280,7 @@ export async function consumeBatchStock(
     readonly batchId: string;
     readonly quantity: string;
     readonly orderId: string;
-    readonly orderLineId: string | null;
+    readonly orderLineId: string;
     readonly actorId: string;
   },
   now: Date,
@@ -1340,7 +1340,7 @@ export async function receiveFinishedGoods(
   tx: Prisma.TransactionClient,
   input: {
     readonly orderId: string;
-    readonly orderLineId: string | null;
+    readonly orderLineId: string;
     readonly recipeId: string;
     readonly recipeName: string;
     readonly presentationId: string;
@@ -1447,8 +1447,7 @@ export type FinishedGoodsDispatchOrigin =
   | {
       readonly origin: 'order';
       readonly orderId: string;
-      /** `null` en un pedido sin lineas. */
-      readonly orderLineId: string | null;
+      readonly orderLineId: string;
       readonly recipeId: string;
       readonly presentationId: string;
     }
@@ -1629,17 +1628,7 @@ export async function dispatchFinishedGoods(
  */
 export async function returnFinishedGoods(
   tx: Prisma.TransactionClient,
-  input: {
-    readonly orderId: string | null;
-    readonly orderDeliveryVoidId: string;
-    readonly lines: readonly {
-      readonly batchId: string;
-      readonly quantity: string;
-      readonly orderLineId: string | null;
-    }[];
-    readonly actorId: string;
-    readonly now: Date;
-  },
+  input: Omit<FinishedGoodsReturnInput, 'companyId'>,
   scope: InventoryScope,
 ): Promise<FinishedGoodsReturnOutcome> {
   const { companyId } = companyScopeColumns(scope);
@@ -1664,14 +1653,13 @@ export async function returnFinishedGoods(
   `);
 
   // Un incremento y un asiento por lote: el indice unico del libro por (anulacion, lote) no admite dos.
-  const quantityByBatch = new Map<string, string>();
-  const orderLineByBatch = new Map<string, string | null>();
+  const byBatch = new Map<string, { quantity: string; orderLineId: string | null }>();
   for (const line of input.lines) {
-    quantityByBatch.set(line.batchId, addQuantities(quantityByBatch.get(line.batchId) ?? ZERO_QUANTITY, line.quantity));
-    orderLineByBatch.set(line.batchId, line.orderLineId);
+    const quantity = addQuantities(byBatch.get(line.batchId)?.quantity ?? ZERO_QUANTITY, line.quantity);
+    byBatch.set(line.batchId, { quantity, orderLineId: line.orderLineId });
   }
 
-  for (const [batchId, quantity] of quantityByBatch) {
+  for (const [batchId, { quantity, orderLineId }] of byBatch) {
     await tx.productBatch.update({
       where: { id: batchId, companyId },
       data: { stock: { increment: new Prisma.Decimal(quantity) }, updatedBy: input.actorId, updatedAt: input.now },
@@ -1687,7 +1675,7 @@ export async function returnFinishedGoods(
         reason: null,
         orderId: input.orderId,
         orderPresentationLineId: null,
-        orderLineId: input.orderId === null ? null : (orderLineByBatch.get(batchId) ?? null),
+        orderLineId,
         orderDeliveryVoidId: input.orderDeliveryVoidId,
         createdBy: input.actorId,
       },

@@ -13,7 +13,7 @@ export type DeliveryLineForVoid = {
   readonly customerId: string;
   /** `null` en una entrega sin pedido. */
   readonly presentationLineId: string | null;
-  /** La linea del pedido de su reparto; `null` en una entrega sin pedido o de un pedido sin lineas. */
+  /** La linea del pedido de su reparto; `null` en una entrega sin pedido. */
   readonly orderLineId: string | null;
   readonly batchId: string;
   readonly packages: number;

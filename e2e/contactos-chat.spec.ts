@@ -90,6 +90,7 @@ import {
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 const USERNAME_PREFIX = 'qc246_e2e_';
 const COMPANY_NAME_PREFIX = 'qc246_e2e_empresa_';
@@ -178,6 +179,7 @@ async function deleteWhatsappData(companyIds: readonly string[]): Promise<void> 
 async function deleteOrderData(companyIds: readonly string[]): Promise<void> {
   const where = { companyId: { in: [...companyIds] } };
   await prisma.orderPresentationLine.deleteMany({ where });
+  await prisma.orderLine.deleteMany({ where });
   await prisma.order.deleteMany({ where });
   await prisma.recipe.deleteMany({ where });
   await prisma.presentation.deleteMany({ where });
@@ -584,7 +586,14 @@ async function seedOpenOrder(
     select: { id: true },
   });
   await prisma.orderPresentationLine.create({
-    data: { orderId: order.id, companyId: company, presentationId: presentation.id, packages: 12, presentationContent: 1 },
+    data: {
+      orderId: order.id,
+      orderLineId: await ensureOnlyLine(prisma, order.id),
+      companyId: company,
+      presentationId: presentation.id,
+      packages: 12,
+      presentationContent: 1,
+    },
   });
 }
 

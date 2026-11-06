@@ -79,7 +79,7 @@ export async function findAliveOrderTargetById(
  *  `createdAt asc, id asc`, asi que este adaptador no reordena nada en memoria. */
 type AssignedOrderPresentationLineRow = {
   readonly id: string;
-  readonly orderLineId: string | null;
+  readonly orderLineId: string;
   readonly presentationId: string;
   readonly packages: number;
   readonly packedPackages: number | null;
@@ -213,7 +213,6 @@ async function toSummaryRecords(
   });
   const byLine = new Map<string, AssignedOrderPresentationLineRow[]>();
   for (const item of distribution) {
-    if (item.orderLineId === null) continue;
     const list = byLine.get(item.orderLineId) ?? [];
     list.push(item);
     byLine.set(item.orderLineId, list);

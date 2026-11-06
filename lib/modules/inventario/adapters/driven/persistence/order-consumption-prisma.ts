@@ -6,11 +6,11 @@ import type { InventoryScope } from '../../../domain/inventory-scope';
 import type { ConsumedLot, OrderConsumptionLedger } from '../../../domain/order-consumption';
 
 /** Lo que una linea del pedido consumio de cada lote de la empresa, neto, con el `unit_cost` actual
- *  del lote. `orderLineId` `null` lee solo los asientos del pedido escritos sin linea. */
+ *  del lote. */
 async function findConsumedLots(
   tx: Prisma.TransactionClient,
   orderId: string,
-  orderLineId: string | null,
+  orderLineId: string,
   scope: InventoryScope,
 ): Promise<readonly ConsumedLot[]> {
   const sums = await tx.inventoryMovement.groupBy({

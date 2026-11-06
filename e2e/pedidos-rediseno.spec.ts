@@ -34,6 +34,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
 import { submitOrderWithLeftover } from './helpers/order-distribution';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc262_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -192,6 +193,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.inventoryMovement.deleteMany({ where: inCompanies }),
     () => prisma.orderAssignment.deleteMany({ where: inCompanies }),
     () => prisma.orderPresentationLine.deleteMany({ where: inCompanies }),
+    () => prisma.orderLine.deleteMany({ where: inCompanies }),
     () => prisma.order.deleteMany({ where: inCompanies }),
     () => prisma.recipeLine.deleteMany({ where: { recipe: inCompanies } }),
     () => prisma.recipe.deleteMany({ where: inCompanies }),
@@ -366,18 +368,18 @@ test.beforeAll(async () => {
       unitId: unit.id,
       customerId,
       createdBy: adminId,
-      presentationLines: {
-        create: [
-          {
-            companyId: company,
-            presentationId,
-            packages: Number(ORDER_QUANTITY),
-            presentationContent: PRESENTATION_CONTENT,
-          },
-        ],
-      },
     }),
   };
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: orders.finished.id,
+      orderLineId: await ensureOnlyLine(prisma, orders.finished.id),
+      companyId: company,
+      presentationId,
+      packages: Number(ORDER_QUANTITY),
+      presentationContent: PRESENTATION_CONTENT,
+    },
+  });
 });
 
 test.afterAll(async () => {

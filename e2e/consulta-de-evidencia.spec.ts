@@ -43,6 +43,7 @@ import { executionTraceRoute, finishedProductDetailRoute } from '@/lib/shared/ro
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc271_e2e_';
@@ -265,6 +266,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<void> {
   await prisma.orderExecutionEntry.deleteMany({ where: inCompanies });
   await prisma.orderAssignment.deleteMany({ where: inCompanies });
   await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
+  await prisma.orderLine.deleteMany({ where: inCompanies });
   await prisma.order.deleteMany({ where: inCompanies });
   await prisma.productBatch.deleteMany({ where: inCompanies });
   // El producto terminado (`products.recipe_id`) restringe el borrado de la receta.
@@ -387,22 +389,22 @@ test.beforeAll(async () => {
       conditionedBy: admin,
       unitId: unit.id,
       createdBy: admin,
-      presentationLines: {
-        create: [
-          {
-            companyId: company,
-            presentationId: presentation.id,
-            packages: LINE_PACKAGES,
-            presentationContent: CONTENT,
-          },
-        ],
-      },
     },
-    select: { id: true, presentationLines: { select: { id: true } } },
+    select: { id: true },
   });
   orderId = order.id;
-  const [line] = order.presentationLines;
-  if (line === undefined) throw new Error('el pedido nacio sin su linea de reparto');
+  const orderLineId = await ensureOnlyLine(prisma, order.id);
+  const line = await prisma.orderPresentationLine.create({
+    data: {
+      orderId: order.id,
+      orderLineId,
+      companyId: company,
+      presentationId: presentation.id,
+      packages: LINE_PACKAGES,
+      presentationContent: CONTENT,
+    },
+    select: { id: true },
+  });
 
   // El asiento con el que Terminar ata el lote a la linea del pedido: de el sale el pedido del lote.
   await prisma.inventoryMovement.create({
@@ -412,6 +414,7 @@ test.beforeAll(async () => {
       quantity: BATCH_STOCK,
       reason: null,
       orderId: order.id,
+      orderLineId,
       orderPresentationLineId: line.id,
       companyId: company,
       createdBy: admin,
@@ -423,6 +426,7 @@ test.beforeAll(async () => {
     data: ENTRIES.map((entry, index) => ({
       companyId: company,
       orderId: order.id,
+      orderLineId,
       userId: index % 2 === 0 ? operator : admin,
       action: entry.action,
       stepPosition: entry.step,
@@ -434,6 +438,7 @@ test.beforeAll(async () => {
   const evidenceRow = (phase: 'MANUFACTURING' | 'PACKING', stepPosition: number, slot: number) => ({
     companyId: company,
     orderId: order.id,
+    orderLineId,
     phase,
     stepPosition,
     slot,

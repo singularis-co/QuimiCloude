@@ -21,6 +21,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -153,7 +154,7 @@ async function sembrarLinea(
   packages: number,
 ): Promise<string> {
   const { id } = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId, presentationId, packages, presentationContent: null },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId, presentationId, packages, presentationContent: null },
     select: { id: true },
   });
   return id;
@@ -181,12 +182,12 @@ async function recibir(
   },
 ): Promise<{ readonly productId: string }> {
   const lineId = await sembrarLinea(input.orderId, companyId, input.presentationId, input.packages);
-  const outcome = await prisma.$transaction((tx) =>
+  const outcome = await prisma.$transaction(async (tx) =>
     receiveFinishedGoods(
       tx,
       {
         orderId: input.orderId,
-        orderLineId: null,
+        orderLineId: await ensureOnlyLine(prisma, input.orderId),
         recipeId: input.recipeId,
         recipeName: `Receta ${input.orderId}`,
         presentationId: input.presentationId,
@@ -221,6 +222,7 @@ async function sembrarFixture(content = '1'): Promise<Fixture> {
 
 async function limpiarFixture(fixture: Fixture, orderIds: readonly string[]): Promise<void> {
   await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: [...orderIds] } } });
+  await prisma.orderLine.deleteMany({ where: { order: { id: { in: [...orderIds] } } } });
   await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
   await prisma.recipe.deleteMany({ where: { id: fixture.recipeId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });

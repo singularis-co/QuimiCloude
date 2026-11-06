@@ -42,7 +42,6 @@ export function fakeOrderWriteRepository(
   return {
     lockAliveById: vi.fn(explota('lockAliveById')),
     // Todos los pedidos de los tests unitarios son, por ahora, pedidos sin linea.
-    findOnlyLineId: vi.fn(async () => null),
     lockAliveLines: vi.fn(explota('lockAliveLines')),
     lockAliveLine: vi.fn(explota('lockAliveLine')),
     writeLines: vi.fn(explota('writeLines')),

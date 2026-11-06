@@ -344,10 +344,10 @@ describe('relleno de order_line_id', () => {
 
   it('R8: bajar y volver a subir no crea otra linea ni cambia la de cada fila', async () => {
     await inRolledBackTransaction(async (tx) => {
+      await runDowns(tx, LATER_DOWNS);
       const base = await seedBase(tx);
       const orderId = await seedOrder(tx, base);
       await seedChildren(tx, base, orderId);
-      await runDowns(tx, LATER_DOWNS);
       await runScript(tx, DOWN_SQL);
       await runScript(tx, UP_SQL);
       const lineasAntes = await tx.orderLine.count();
@@ -365,6 +365,8 @@ describe('relleno de order_line_id', () => {
 describe('CHECK de linea en inventory_movements', () => {
   it('R37: la base rechaza linea en un asiento opening o adjustment y la admite en los cuatro tipos con pedido', async () => {
     await inRolledBackTransaction(async (tx) => {
+      // El CHECK de este paso; el definitivo lo prueba la migracion que hace la linea obligatoria.
+      await runDowns(tx, LATER_DOWNS);
       const base = await seedBase(tx);
       const orderId = await seedOrder(tx, base);
       const lineId = await insertLine(tx, base, orderId, 0, base.recipeId);

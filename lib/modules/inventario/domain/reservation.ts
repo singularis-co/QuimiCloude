@@ -30,11 +30,10 @@ export type ConsumptionOutcome =
 
 export type OrderCoverage = 'full' | 'partial' | 'none';
 
-/** La clave de lo apartado: una linea del pedido. `orderLineId` `null` = las filas del pedido
- *  escritas sin linea, una clave mas, que nunca lee ni toca las filas con linea del mismo pedido. */
+/** La clave de lo apartado: una linea del pedido. */
 export type ReservationKey = {
   readonly orderId: string;
-  readonly orderLineId: string | null;
+  readonly orderLineId: string;
 };
 
 /** Escritura. Siempre dentro de la transaccion que abre quien llama. */

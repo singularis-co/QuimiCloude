@@ -81,8 +81,8 @@ export type FinishPackingLine = {
   readonly packedPackages: number | null;
   /** Envases del conteo real que el pedido no espera; 0 sin contar o sin excedente. */
   readonly packedSurplusPackages: number;
-  /** La linea del pedido de la que es este reparto; `null` en un pedido sin lineas. */
-  readonly orderLineId: string | null;
+  /** La linea del pedido de la que es este reparto. */
+  readonly orderLineId: string;
 };
 
 /** El conteo de una linea con los envases que, de ese conteo, quedan libres en el lote. */
@@ -103,11 +103,6 @@ export interface OrderWriteRepository {
    *  empresa. El dominio repite su comprobacion de transicion sobre la fila que esto devuelve,
    *  nunca sobre la que leyo antes de abrir la transaccion. */
   lockAliveById(id: string, scope: OrderScope): Promise<LockedOrderRow | null>;
-
-  /** El id de la unica linea viva del pedido, o `null` si no tiene ninguna -pedido creado sin
-   *  lineas- o es de otra empresa. Lanza si tiene mas de una: quien opera un pedido de varias
-   *  lineas ya conoce la suya y no debe preguntar por «la unica». */
-  findOnlyLineId(orderId: string, scope: OrderScope): Promise<string | null>;
 
   /** `FOR UPDATE` del pedido vivo y despues de sus lineas vivas por `position`, siempre en ese
    *  orden para no cruzar candados. `null` si el pedido no existe, esta borrado o es de otra

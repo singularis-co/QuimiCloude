@@ -18,6 +18,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-dispatch-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine } from '../../helpers/only-order-line'
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -57,6 +59,7 @@ type Tenant = {
   readonly companyId: string
   readonly userId: string
   readonly orderId: string
+  readonly orderLineId: string
   readonly deliveryId: string
   readonly recipeId: string
   readonly presentationId: string
@@ -106,6 +109,7 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
       ${asUuid(orderId)}, ${asUuid(companyId)}, ${new Date().getUTCFullYear()}, ${freshSequence()},
       ${asUuid(recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP
     )`
+  const orderLineId = await ensureOnlyLine(tx, orderId)
   const { id: unitId } = await tx.unit.create({
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca.slice(0, 8)}` },
     select: { id: true },
@@ -131,7 +135,7 @@ async function createTenant(tx: Prisma.TransactionClient, label: string): Promis
     data: { companyId, orderId, deliveryKey: randomUUID(), createdBy: userId },
     select: { id: true },
   })
-  return { companyId, userId, orderId, deliveryId, recipeId, presentationId, productId }
+  return { companyId, userId, orderId, orderLineId, deliveryId, recipeId, presentationId, productId }
 }
 
 async function createBatch(
@@ -160,7 +164,7 @@ function dispatchInput(t: Tenant, allocations: readonly { batchId: string; packa
   return {
     companyId: t.companyId,
     orderId: t.orderId,
-    orderLineId: null,
+    orderLineId: t.orderLineId,
     orderDeliveryId: t.deliveryId,
     recipeId: t.recipeId,
     presentationId: t.presentationId,

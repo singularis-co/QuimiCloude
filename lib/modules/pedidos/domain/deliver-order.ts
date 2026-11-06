@@ -17,7 +17,6 @@ import {
   flattenBlocks,
   type DeliveryAllocation,
 } from './order-delivery';
-import type { OrderStatus } from './order-classification';
 import {
   deliveryTargetsOf,
   isDeliveryOrderStatus,
@@ -128,7 +127,8 @@ async function deliverInTransaction(
   if (allocations.some((a) => !lineById.has(a.presentationLineId))) throw new ValidationError();
   // Solo se entrega el reparto de una receta TERMINADO.
   const targetOf = (presentationLineId: string): DeliveryTarget => {
-    const target = targets.get(lineById.get(presentationLineId)?.orderLineId ?? null);
+    const orderLineId = lineById.get(presentationLineId)?.orderLineId;
+    const target = orderLineId === undefined ? undefined : targets.get(orderLineId);
     if (target === undefined || target.status !== 'TERMINADO') throw new ActionNotAllowedError();
     return target;
   };
@@ -184,22 +184,17 @@ async function deliverInTransaction(
   await tx.deliveries.addLines(created.id, deliveryLines, scope);
 
   // Pasa a ENTREGADO cada receta cuyo reparto queda completo con esta entrega; las demas no cambian.
-  let withoutLines: OrderStatus = locked.order.status;
   for (const target of new Set(allocations.map((a) => targetOf(a.presentationLineId)))) {
     const own = lines.filter((line) => line.orderLineId === target.lineId);
     const ownAllocations = allocations.filter((a) => lineById.get(a.presentationLineId)?.orderLineId === target.lineId);
     const ownCheck = checkDelivery(own.map(stateOf), null, ownAllocations);
     if (ownCheck.kind !== 'ok' || !ownCheck.completesOrder) continue;
 
-    const moved =
-      target.lineId === null
-        ? await tx.orders.setStatus(input.orderId, 'TERMINADO', 'ENTREGADO', actorId, now, scope)
-        : await tx.orders.setLineStatus(input.orderId, target.lineId, 'TERMINADO', 'ENTREGADO', actorId, now, scope);
+    const moved = await tx.orders.setLineStatus(input.orderId, target.lineId, 'TERMINADO', 'ENTREGADO', actorId, now, scope);
     if (moved !== 'ok') throw new Error(`deliverOrder: el cambio de estado devolvio '${moved}' con el pedido bloqueado`);
-    withoutLines = 'ENTREGADO';
   }
 
-  return { status: 'delivered', orderStatus: await statusAfterDelivery(tx.orders, locked, withoutLines, actorId, now, scope) };
+  return { status: 'delivered', orderStatus: await statusAfterDelivery(tx.orders, locked, actorId, now, scope) };
 }
 
 /** Responde con el estado del pedido DE LA ENTREGA registrada, no del pedido pedido: la clave es

@@ -24,7 +24,7 @@ import {
   VOIDED_LINE_ID,
   voidInput,
 } from '@/tests/fixtures/order-delivery-void'
-import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { FinishedGoodsReturnOutcome } from '@/lib/modules/inventario'
 import type { VoidDeliveryInput } from '@/lib/modules/pedidos/adapters/driving/order-actions'
@@ -68,10 +68,10 @@ const ENTREGA: DeliveryForVoid = {
 
 /** La presentacion abierta sale en dos lotes; la anulada, en uno; la otra, en uno. */
 const LINEAS: readonly DeliveryLineForVoid[] = [
-  { id: 'l-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
-  { id: 'l-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
-  { id: 'l-3', customerId: FIRST_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, orderLineId: null, batchId: THIRD_BATCH_ID, packages: 3, quantity: '12.0000', voided: true },
-  { id: 'l-4', customerId: FIRST_CUSTOMER_ID, presentationLineId: OTHER_LINE_ID, orderLineId: null, batchId: OTHER_BATCH_ID, packages: 5, quantity: '2.5000', voided: false },
+  { id: 'l-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'l-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'l-3', customerId: FIRST_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: THIRD_BATCH_ID, packages: 3, quantity: '12.0000', voided: true },
+  { id: 'l-4', customerId: FIRST_CUSTOMER_ID, presentationLineId: OTHER_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: OTHER_BATCH_ID, packages: 5, quantity: '2.5000', voided: false },
 ]
 
 function pedido(status: OrderStatus = 'ENTREGADO'): LockedOrderRow {
@@ -86,7 +86,6 @@ type Montaje = {
     readonly orders: {
       readonly lockAliveById: Fn
       readonly lockAliveLines: Fn
-      readonly setStatus: Fn
       readonly setLineStatus: Fn
       readonly refreshStatus: Fn
     }
@@ -123,8 +122,9 @@ function montar(
     leido?: OrderRow | null
   } = {},
 ): Montaje {
-  // Un pedido sin lineas, anterior a ellas: el estado se escribe en el pedido. Los pedidos con
-  // lineas los cubre `delivery-by-line.test.ts`.
+  // Un pedido de una linea, con el estado del pedido: el estado se escribe en la linea y el del
+  // pedido se deriva de ella. Los pedidos de varias lineas los cubre `delivery-by-line.test.ts`.
+  let movidaA: OrderStatus | null = null
   const lockAliveById = vi.fn(async (id: string, scope: { companyId: string }) => {
     void [id, scope]
     return opciones.pedido === undefined ? pedido() : opciones.pedido
@@ -134,15 +134,19 @@ function montar(
       lockAliveById,
       lockAliveLines: vi.fn(async (id: string, scope: { companyId: string }) => {
         const order = await lockAliveById(id, scope)
-        return order === null ? null : { order, lines: [] }
+        movidaA = null
+        if (order === null) return null
+        // Con una linea un pedido no puede estar PARCIAL: ese caso no tiene linea que entregar.
+        return { order, lines: order.status === 'PARCIAL' ? [] : [orderLineOf(order)] }
       }),
-      setStatus: vi.fn(async () => opciones.setStatus ?? 'ok'),
-      setLineStatus: vi.fn(() => {
-        throw new Error('setLineStatus no deberia llamarse en un pedido sin lineas')
+      setLineStatus: vi.fn(async (_id: string, _lineId: string, _de: OrderStatus, a: OrderStatus) => {
+        movidaA = a
+        return opciones.setStatus ?? 'ok'
       }),
-      refreshStatus: vi.fn(() => {
-        throw new Error('refreshStatus no deberia llamarse en un pedido sin lineas')
-      }),
+      // Con una linea, el pedido queda en el estado de su linea.
+      refreshStatus: vi.fn(async (id: string, _actorId: string, _now: Date, scope: { companyId: string }) =>
+        movidaA ?? (await lockAliveById(id, scope))?.status ?? null,
+      ),
     },
     voids: {
       findByKey: vi.fn(async () => opciones.registradaDentro ?? null),
@@ -212,7 +216,7 @@ function nadaEscrito(m: Montaje): void {
   expect(m.tx.voids.create).not.toHaveBeenCalled()
   expect(m.tx.voids.addLines).not.toHaveBeenCalled()
   expect(m.tx.finishedGoods.returnForDeliveryVoid).not.toHaveBeenCalled()
-  expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+  expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
 }
 
 function ningunPuerto(m: Montaje): void {
@@ -376,7 +380,7 @@ describe('voidDelivery — presentaciones pedidas (R20, R21)', () => {
     expect(await codigoDelFallo(() => createVoidDelivery(m.deps)(voidInput(), ANULADOR))).toBe('delivery_already_voided')
     expect(m.lanzoDentro()).not.toBeNull()
     expect(m.tx.finishedGoods.returnForDeliveryVoid).not.toHaveBeenCalled()
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -412,8 +416,8 @@ describe('voidDelivery — registro (R22, R23, R24)', () => {
       orderId: VOID_ORDER_ID,
       orderDeliveryVoidId: VOID_ID,
       lines: [
-        { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: null },
-        { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: null },
+        { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: ONLY_LINE_ID },
+        { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: ONLY_LINE_ID },
       ],
       actorId: ANULADOR.id,
       now: AHORA,
@@ -424,7 +428,7 @@ describe('voidDelivery — registro (R22, R23, R24)', () => {
     const m = montar({ devolucion: { kind: 'batch_not_found', batchId: SECOND_BATCH_ID } })
     await expect(createVoidDelivery(m.deps)(voidInput(), ANULADOR)).rejects.toThrow(SECOND_BATCH_ID)
     expect(m.lanzoDentro()).not.toBeNull()
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -435,21 +439,21 @@ describe('voidDelivery — estado del pedido (R27)', () => {
       status: 'voided',
       orderStatus: 'TERMINADO',
     })
-    expect(m.tx.orders.setStatus).toHaveBeenCalledTimes(1)
-    expect(m.tx.orders.setStatus).toHaveBeenCalledWith(VOID_ORDER_ID, 'ENTREGADO', 'TERMINADO', ANULADOR.id, AHORA, SCOPE)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledTimes(1)
+    expect(m.tx.orders.setLineStatus).toHaveBeenCalledWith(VOID_ORDER_ID, ONLY_LINE_ID, 'ENTREGADO', 'TERMINADO', ANULADOR.id, AHORA, SCOPE)
     expect(m.run).toHaveBeenCalledTimes(1)
   })
 
-  it('R27: un pedido TERMINADO sigue TERMINADO y no se llama a setStatus', async () => {
+  it('R27: un pedido TERMINADO sigue TERMINADO y no se llama a setLineStatus', async () => {
     const m = montar({ pedido: pedido('TERMINADO') })
     await expect(createVoidDelivery(m.deps)(voidInput(), ANULADOR)).resolves.toEqual({
       status: 'voided',
       orderStatus: 'TERMINADO',
     })
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 
-  it('R27, R29: setStatus distinto de ok con el pedido bloqueado lanza dentro de la transaccion', async () => {
+  it('R27, R29: setLineStatus distinto de ok con el pedido bloqueado lanza dentro de la transaccion', async () => {
     const m = montar({ pedido: pedido('ENTREGADO'), setStatus: 'stale' })
     await expect(createVoidDelivery(m.deps)(voidInput(), ANULADOR)).rejects.toThrow(/stale/)
     expect(m.lanzoDentro()).not.toBeNull()
@@ -515,7 +519,7 @@ describe('voidDelivery — idempotencia (R28)', () => {
     expect(m.findByKey).toHaveBeenCalledTimes(2)
     expect(m.tx.voids.addLines).not.toHaveBeenCalled()
     expect(m.tx.finishedGoods.returnForDeliveryVoid).not.toHaveBeenCalled()
-    expect(m.tx.orders.setStatus).not.toHaveBeenCalled()
+    expect(m.tx.orders.setLineStatus).not.toHaveBeenCalled()
   })
 
   it('R28: si el pedido de la anulacion registrada ya no se lee, responde order_not_found', async () => {
@@ -528,10 +532,10 @@ describe('voidDelivery — idempotencia (R28)', () => {
 // clientes que comparten presentacion y lote: el primero lleva la presentacion abierta en dos lotes
 // y comparte con el segundo el primer lote; el segundo tiene ademas la presentacion ya anulada.
 const DOS_CLIENTES: readonly DeliveryLineForVoid[] = [
-  { id: 'a-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
-  { id: 'a-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
-  { id: 'b-1', customerId: SECOND_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: null, batchId: FIRST_BATCH_ID, packages: 3, quantity: '3.0000', voided: false },
-  { id: 'b-2', customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, orderLineId: null, batchId: THIRD_BATCH_ID, packages: 1, quantity: '4.0000', voided: true },
+  { id: 'a-1', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: FIRST_BATCH_ID, packages: 4, quantity: '4.0000', voided: false },
+  { id: 'a-2', customerId: FIRST_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: SECOND_BATCH_ID, packages: 2, quantity: '2.0000', voided: false },
+  { id: 'b-1', customerId: SECOND_CUSTOMER_ID, presentationLineId: OPEN_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: FIRST_BATCH_ID, packages: 3, quantity: '3.0000', voided: false },
+  { id: 'b-2', customerId: SECOND_CUSTOMER_ID, presentationLineId: VOIDED_LINE_ID, orderLineId: ONLY_LINE_ID, batchId: THIRD_BATCH_ID, packages: 1, quantity: '4.0000', voided: true },
 ]
 
 const par = (customerId: string, presentationLineId: string) => ({ customerId, presentationLineId })
@@ -623,8 +627,8 @@ describe('voidDelivery — pares cliente-presentacion (R3, R39, R40, R41)', () =
     expect(m.tx.finishedGoods.returnForDeliveryVoid).toHaveBeenCalledWith(
       expect.objectContaining({
         lines: [
-          { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: null },
-          { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: null },
+          { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: ONLY_LINE_ID },
+          { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: ONLY_LINE_ID },
         ],
       }),
     )
@@ -642,9 +646,9 @@ describe('voidDelivery — pares cliente-presentacion (R3, R39, R40, R41)', () =
       orderId: VOID_ORDER_ID,
       orderDeliveryVoidId: VOID_ID,
       lines: [
-        { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: null },
-        { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: null },
-        { batchId: FIRST_BATCH_ID, quantity: '3.0000', orderLineId: null },
+        { batchId: FIRST_BATCH_ID, quantity: '4.0000', orderLineId: ONLY_LINE_ID },
+        { batchId: SECOND_BATCH_ID, quantity: '2.0000', orderLineId: ONLY_LINE_ID },
+        { batchId: FIRST_BATCH_ID, quantity: '3.0000', orderLineId: ONLY_LINE_ID },
       ],
       actorId: ANULADOR.id,
       now: AHORA,

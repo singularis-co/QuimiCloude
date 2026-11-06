@@ -268,7 +268,9 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /**
  * Alta por el adaptador REAL, con el `now` del ano de prueba. Registra el id en `creados` para
- * que el `finally` del caso lo borre aunque una asercion posterior falle.
+ * que el `finally` del caso lo borre aunque una asercion posterior falle. Con reparto, como el
+ * alta de hoy: el pedido sin reparto y la linea con el suyo, en la misma transaccion; devuelve el
+ * reparto que escribio la linea.
  */
 async function altaReal(
   creados: string[],
@@ -276,9 +278,35 @@ async function altaReal(
   now: Date,
   overrides: Partial<NewOrder> = {},
 ): Promise<OrderRow> {
-  const fila = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(overrides), year, actorId, now, null, scope()),
-  )
+  const pedido = baseOrder(overrides)
+  const fila = await withOrderTransaction(async (tx) => {
+    const orders = createOrderWriteRepository(tx)
+    const creado = await orders.create({ ...pedido, presentationLines: [] }, year, actorId, now, null, scope())
+    if (pedido.presentationLines.length === 0) return creado
+    const lineas = await orders.writeLines(
+      creado.id,
+      {
+        removedIds: [],
+        edited: [],
+        added: [
+          {
+            recipeId: pedido.recipeId,
+            originalRecipeId: pedido.recipeId,
+            quantity: pedido.quantity,
+            unitId: pedido.unitId,
+            salePrice: pedido.salePrice,
+            presentationLines: pedido.presentationLines,
+            status: 'PENDIENTE',
+            cost: null,
+          },
+        ],
+      },
+      actorId,
+      now,
+      scope(),
+    )
+    return { ...creado, presentationLines: lineas?.[0]?.presentationLines ?? [] }
+  })
   creados.push(fila.id)
   return fila
 }
@@ -822,13 +850,12 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
   })
 })
 
-/** Pasa un pedido recien creado de `PENDIENTE` a `BLOQUEADO` por `setStatus`, sin autor. */
+/** Pasa un pedido recien creado de `PENDIENTE` a `BLOQUEADO` por su linea, sin autor. */
 async function bloquear(id: string, now: Date): Promise<void> {
-  // Con linea, lo bloqueado es la linea y el pedido se deriva de ella; sin linea, el pedido.
+  // Lo bloqueado es la linea y el pedido se deriva de ella.
   const resultado = await withOrderTransaction(async (tx) => {
     const writes = createOrderWriteRepository(tx)
-    const lineId = await writes.findOnlyLineId(id, scope())
-    if (lineId === null) return writes.setStatus(id, 'PENDIENTE', 'BLOQUEADO', null, now, scope())
+    const lineId = await ensureOnlyLine(tx, id)
     const movida = await writes.setLineStatus(id, lineId, 'PENDIENTE', 'BLOQUEADO', null, now, scope())
     await writes.refreshStatus(id, null, now, scope())
     return movida

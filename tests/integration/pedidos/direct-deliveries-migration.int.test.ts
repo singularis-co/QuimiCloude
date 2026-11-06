@@ -482,8 +482,8 @@ async function movement(
   },
 ): Promise<void> {
   await client.query(
-    `INSERT INTO "inventory_movements" ("id", "batch_id", "kind", "quantity", "company_id", "order_id", "order_delivery_id", "order_delivery_void_id")
-     VALUES ($1::uuid, $2::uuid, $3::text::"InventoryMovementKind", $4::numeric, $5::uuid, $6::uuid, $7::uuid, $8::uuid)`,
+    `INSERT INTO "inventory_movements" ("id", "batch_id", "kind", "quantity", "company_id", "order_id", "order_delivery_id", "order_delivery_void_id", "order_line_id")
+     VALUES ($1::uuid, $2::uuid, $3::text::"InventoryMovementKind", $4::numeric, $5::uuid, $6::uuid, $7::uuid, $8::uuid, $9::uuid)`,
     [
       randomUUID(),
       row.batchId,
@@ -493,6 +493,8 @@ async function movement(
       row.orderId,
       row.orderDeliveryId ?? null,
       row.orderDeliveryVoidId ?? null,
+      // La copia no tiene `order_lines`: como el pedido, la linea es un uuid suelto; solo el CHECK la exige.
+      ['consumption', 'production', 'delivery', 'delivery_void'].includes(row.kind) ? randomUUID() : null,
     ],
   );
 }

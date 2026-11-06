@@ -157,7 +157,7 @@ async function listWaitingOrderLines(
   const deliveredByLine = new Map(delivered.map((row) => [row.orderPresentationLineId, row._sum.packages ?? 0]));
 
   return lines.flatMap((line) => {
-    const recipeId = line.orderLineId === null ? undefined : recipeByLine.get(line.orderLineId);
+    const recipeId = recipeByLine.get(line.orderLineId);
     if (recipeId === undefined) return [];
     return [
       {

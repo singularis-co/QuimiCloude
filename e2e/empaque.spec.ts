@@ -56,6 +56,7 @@ import {
 } from './helpers/confirm-dialog';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc168_e2e_';
@@ -321,6 +322,7 @@ test.beforeAll(async () => {
     await prisma.orderAssignment.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.productBatch.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
   }
@@ -328,6 +330,7 @@ test.beforeAll(async () => {
     await prisma.orderPresentationLine.deleteMany({
       where: { order: { recipeId: { in: orphanRecipeIds } } },
     });
+    await prisma.orderLine.deleteMany({ where: { order: { recipeId: { in: orphanRecipeIds } } } });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     const orphanFinishedProducts = await prisma.product.findMany({
       where: { recipeId: { in: orphanRecipeIds } },
@@ -451,20 +454,20 @@ test.beforeAll(async () => {
       recipeId,
       quantity: ORDER_QUANTITY,
       unitId: unit.id,
-      presentationLines: {
-        create: [
-          {
-            companyId,
-            presentationId,
-            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
-            presentationContent: PRESENTATION_CONTENT,
-            packagingProductId: packaging.productId,
-          },
-        ],
-      },
       status: 'EN_CURSO',
     },
     select: { id: true },
+  });
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: order.id,
+      orderLineId: await ensureOnlyLine(prisma, order.id),
+      companyId,
+      presentationId,
+      packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+      presentationContent: PRESENTATION_CONTENT,
+      packagingProductId: packaging.productId,
+    },
   });
   orderId = order.id;
   orderNumber = formatOrderNumber({ year, sequence: BASE_SEQUENCE });
@@ -519,6 +522,10 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.orderExecutionEntry.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.orderLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId

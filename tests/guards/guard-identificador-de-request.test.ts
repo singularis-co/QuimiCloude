@@ -868,6 +868,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261103120000_order_lines',
   // 2026-11-03: la linea del pedido en las tablas hijas; no toca el identificador.
   '20261103120100_order_lines_references',
+  // 2026-11-05: la linea del pedido pasa a obligatoria; no toca el identificador.
+  '20261103120150_order_lines_references_required',
 ] as const
 
 export function hallazgosDeMigraciones(

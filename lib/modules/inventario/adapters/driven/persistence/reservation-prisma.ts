@@ -51,14 +51,13 @@ function toCivilDate(date: Date): string {
 
 type ReservationMovementRow = { readonly batchId: string; readonly kind: string; readonly quantity: Prisma.Decimal };
 
-/** Las filas de una clave. Con `orderLineId` `null`, Prisma lo traduce a `IS NULL`. */
-function keyWhere(key: ReservationKey): { readonly orderId: string; readonly orderLineId: string | null } {
+/** Las filas de una clave. */
+function keyWhere(key: ReservationKey): { readonly orderId: string; readonly orderLineId: string } {
   return { orderId: key.orderId, orderLineId: key.orderLineId };
 }
 
-/** Lo mismo en memoria, para separar lo propio de lo ajeno sin un `NOT` en SQL: con `NULL` de por
- *  medio, `NOT (order_id = x AND order_line_id = y)` descartaria las filas sin linea del pedido. */
-function isKeyRow(row: { readonly orderId: string; readonly orderLineId: string | null }, key: ReservationKey): boolean {
+/** Lo mismo en memoria, para separar lo propio de lo ajeno sobre filas ya leidas. */
+function isKeyRow(row: { readonly orderId: string; readonly orderLineId: string }, key: ReservationKey): boolean {
   return row.orderId === key.orderId && row.orderLineId === key.orderLineId;
 }
 
@@ -601,10 +600,7 @@ export async function findReservedAndAvailableByBatch(
       companyId,
       batchId: { in: [...batchIds] },
       ...(options?.excludeOrderId !== undefined ? { NOT: { orderId: options.excludeOrderId } } : {}),
-      // Con `NOT` a secas, las filas sin linea tambien caerian: `NULL <> x` no es verdadero.
-      ...(options?.excludeOrderLineId !== undefined
-        ? { OR: [{ orderLineId: null }, { orderLineId: { not: options.excludeOrderLineId } }] }
-        : {}),
+      ...(options?.excludeOrderLineId !== undefined ? { orderLineId: { not: options.excludeOrderLineId } } : {}),
     },
     select: { batchId: true, kind: true, quantity: true },
   });

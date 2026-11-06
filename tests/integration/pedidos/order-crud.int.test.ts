@@ -58,6 +58,8 @@ import {
 import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine } from '../../helpers/only-order-line'
+
 import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
@@ -375,13 +377,20 @@ async function createOrder(
       createdAt: seed.createdAt,
       createdBy: f.userId,
       updatedBy: f.userId,
-      presentationLines:
-        seed.presentationId === undefined || seed.presentationId === null
-          ? undefined
-          : { create: [{ companyId: f.companyId, presentationId: seed.presentationId, packages: 1 }] },
     },
     select: { id: true },
   })
+  if (seed.presentationId !== undefined && seed.presentationId !== null) {
+    await tx.orderPresentationLine.create({
+      data: {
+        orderId: order.id,
+        orderLineId: await ensureOnlyLine(tx, order.id),
+        companyId: f.companyId,
+        presentationId: seed.presentationId,
+        packages: 1,
+      },
+    })
+  }
   return order.id
 }
 

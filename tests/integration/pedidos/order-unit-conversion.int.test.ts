@@ -270,16 +270,42 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
 
       // Lo que la formula anterior guardaba: 1000 g al 10 % leidos como 100 kg, a 3.0000.
       const orderId = await withOrderTransaction(async (tx) => {
-        const order = await createOrderWriteRepository(tx).create(
+        const orders = createOrderWriteRepository(tx);
+        const cost = { total: '300.0000', packaging: '0.0000' };
+        const order = await orders.create(
           { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [], salePrice: null, customerId: null },
           instante.getUTCFullYear(),
           fixture.actorId,
           instante,
-          { total: '300.0000', packaging: '0.0000' },
+          cost,
           scope,
         );
+        const lines = await orders.writeLines(
+          order.id,
+          {
+            removedIds: [],
+            edited: [],
+            added: [
+              {
+                recipeId,
+                originalRecipeId: recipeId,
+                quantity: '1000',
+                unitId: fixture.gramoId,
+                salePrice: null,
+                presentationLines: [],
+                status: 'PENDIENTE',
+                cost,
+              },
+            ],
+          },
+          fixture.actorId,
+          instante,
+          scope,
+        );
+        const orderLineId = lines?.[0]?.id;
+        if (orderLineId === undefined) throw new Error('el alta no escribio la linea');
         await createMaterialReservations(tx).syncForLine({
-          orderLineId: null,
+          orderLineId,
           orderId: order.id,
           companyId: fixture.companyId,
           requirement: [{ productId, quantity: '100' }],

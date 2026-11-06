@@ -13,6 +13,8 @@ import { inventario } from '@/lib/composition';
 import type { Actor } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { ensureOnlyLine } from '../../helpers/only-order-line';
+
 function token(): string {
   return randomUUID().replace(/-/gu, '');
 }
@@ -127,13 +129,20 @@ async function sembrarPedido(presentationId: string, presentationContent: string
       recipeId,
       quantity: '10.0000',
       companyId: empresaDelArchivo,
-      presentationLines: {
-        create: [{ companyId: empresaDelArchivo, presentationId, packages: 10, presentationContent }],
-      },
     },
     select: { id: true },
   });
   pedidosSembrados.push(id);
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: id,
+      orderLineId: await ensureOnlyLine(prisma, id),
+      companyId: empresaDelArchivo,
+      presentationId,
+      packages: 10,
+      presentationContent,
+    },
+  });
   return id;
 }
 
@@ -144,6 +153,7 @@ function anotarParaBorrar(id: string): string {
 
 afterAll(async () => {
   await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: pedidosSembrados } } });
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosSembrados } } });
   await prisma.order.deleteMany({ where: { id: { in: pedidosSembrados } } });
   await prisma.recipe.deleteMany({ where: { id: { in: recetasSembradas } } });
   await prisma.inventoryMovement.deleteMany({ where: { batchId: { in: lotesSembrados } } });

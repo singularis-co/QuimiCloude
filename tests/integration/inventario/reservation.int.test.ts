@@ -149,9 +149,37 @@ async function createFixture(): Promise<Fixture> {
 
 let orderSequence = 0;
 
-/** Un pedido REAL y minimo: la reserva exige la FK compuesta `(order_id, company_id)` contra
- *  `orders_id_company_id_key`, asi que no vale un uuid escrito a mano. */
+/** La unica linea de cada pedido de `createOrderRow`: lo apartado se asienta por linea. */
+const LINE_OF_ORDER = new Map<string, string>();
+
+function lineOf(orderId: string): string {
+  const lineId = LINE_OF_ORDER.get(orderId);
+  if (lineId === undefined) throw new Error(`el pedido ${orderId} no tiene linea sembrada`);
+  return lineId;
+}
+
+/** Un pedido REAL y minimo, con su unica linea: la reserva exige la FK compuesta
+ *  `(order_id, company_id)` contra `orders_id_company_id_key` y la `(order_line_id, order_id)`
+ *  contra `order_lines`, asi que no vale un uuid escrito a mano. */
 async function createOrderRow(fixture: Fixture): Promise<string> {
+  const orderId = await createBareOrderRow(fixture);
+  const line = await prisma.orderLine.create({
+    data: {
+      orderId,
+      companyId: fixture.companyId,
+      position: 0,
+      recipeId: fixture.recipeId,
+      originalRecipeId: fixture.recipeId,
+      quantity: new Prisma.Decimal('1'),
+    },
+    select: { id: true },
+  });
+  LINE_OF_ORDER.set(orderId, line.id);
+  return orderId;
+}
+
+/** El pedido sin lineas: quien lo usa le crea las suyas. */
+async function createBareOrderRow(fixture: Fixture): Promise<string> {
   orderSequence += 1;
   const order = await prisma.order.create({
     data: {
@@ -241,6 +269,7 @@ async function inventoryMovementsOf(batchId: string): Promise<
 async function dropFixture(fixture: Fixture, productIds: readonly string[], orderIds: readonly string[]): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.orderLine.deleteMany({ where: { orderId: { in: [...orderIds] } } });
   await prisma.order.deleteMany({ where: { id: { in: [...orderIds] } } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
@@ -359,7 +388,7 @@ describe('R12 — editar recalcula desde cero, pero solo asienta la DIFERENCIA p
 
     try {
       const primero = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '10'),
@@ -369,7 +398,7 @@ describe('R12 — editar recalcula desde cero, pero solo asienta la DIFERENCIA p
       expect(primero).toEqual({ kind: 'reserved' });
 
       const segundo = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '6'),
@@ -398,7 +427,7 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
 
     try {
       const primero = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '5'),
@@ -409,7 +438,7 @@ describe('R13 — si tras editar ya no cubre, libera TODO lo que tenia apartado'
 
       // La edicion pide MAS de lo que el unico lote tiene en total: ya no cabe -> insufficient.
       const segundo = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '999'),
@@ -450,7 +479,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
 
     try {
       const outcome = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: [
@@ -478,7 +507,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
     try {
       expect(
         await reservations.syncForLine({
-          orderLineId: null,
+          orderLineId: lineOf(otro),
           orderId: otro,
           companyId: fixture.companyId,
           requirement: requirementOf(productId, '8'),
@@ -488,7 +517,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
       ).toEqual({ kind: 'reserved' });
 
       const outcome = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '3'),
@@ -513,7 +542,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
     try {
       expect(
         await reservations.syncForLine({
-          orderLineId: null,
+          orderLineId: lineOf(orderId),
           orderId,
           companyId: fixture.companyId,
           requirement: requirementOf(productId, '6'),
@@ -523,7 +552,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
       ).toEqual({ kind: 'reserved' });
       expect(
         await reservations.syncForLine({
-          orderLineId: null,
+          orderLineId: lineOf(otro),
           orderId: otro,
           companyId: fixture.companyId,
           requirement: requirementOf(productId, '4'),
@@ -534,7 +563,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
 
       // El lote ya no tiene disponible para nadie mas, pero los 6 del pedido siguen siendo suyos.
       const edicion = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '6'),
@@ -556,7 +585,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
 
     try {
       const outcome = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: [],
@@ -579,7 +608,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
 
     try {
       const outcome = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(sinLotes, '1'),
@@ -603,7 +632,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '5'),
@@ -613,7 +642,7 @@ describe('QC-138 — la reserva distingue insufficient de not_reserved', () => {
 
       // La edicion sigue pidiendo lo mismo del producto con lote, pero suma uno sin lotes.
       const outcome = await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: [
@@ -648,6 +677,7 @@ describe('R17 — ningun asiento de reserva puede apuntar a un pedido de otra em
           data: {
             companyId: fixtureA.companyId,
             orderId: orderDeB,
+            orderLineId: lineOf(orderDeB),
             batchId,
             kind: 'reserve',
             quantity: new Prisma.Decimal('1'),
@@ -673,7 +703,7 @@ describe('R27, R28 — entregar consume: baja el lote, asienta la salida y recal
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '4'),
@@ -682,7 +712,7 @@ describe('R27, R28 — entregar consume: baja el lote, asienta la salida y recal
       });
 
       const resultado = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [],
@@ -718,7 +748,7 @@ describe('QC-195 R25, R26 — consumeForLine por subconjunto de productos', () =
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: [
@@ -730,7 +760,7 @@ describe('QC-195 R25, R26 — consumeForLine por subconjunto de productos', () =
       });
 
       const resultado = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [{ productId: a.productId, quantity: '4' }],
@@ -768,7 +798,7 @@ describe('QC-195 R25, R26 — consumeForLine por subconjunto de productos', () =
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(a.productId, '4'),
@@ -777,7 +807,7 @@ describe('QC-195 R25, R26 — consumeForLine por subconjunto de productos', () =
       });
 
       const resultado = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [
@@ -809,7 +839,7 @@ describe('QC-195 R25, R26 — consumeForLine por subconjunto de productos', () =
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(a.productId, '4'),
@@ -818,7 +848,7 @@ describe('QC-195 R25, R26 — consumeForLine por subconjunto de productos', () =
       });
 
       const resultado = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [{ productId: b.productId, quantity: '3' }],
@@ -844,7 +874,7 @@ describe('R32 — el sistema no consume dos veces el material de un mismo pedido
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '4'),
@@ -852,7 +882,7 @@ describe('R32 — el sistema no consume dos veces el material de un mismo pedido
         now: new Date(),
       });
       await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [],
@@ -866,7 +896,7 @@ describe('R32 — el sistema no consume dos veces el material de un mismo pedido
       // Segunda entrega del MISMO pedido: ya no tiene nada apartado, y sin necesidad de
       // respaldo no hay nada que consumir.
       const segunda = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [],
@@ -892,7 +922,7 @@ describe('R50 — entregar sin apartado y sin necesidad de respaldo no consume n
 
     try {
       const resultado = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [],
@@ -935,7 +965,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
     try {
       // Reparte 8 en el lote mas antiguo: el unico con disponible en ese momento.
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '8'),
@@ -949,7 +979,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       expect(await batchStockOf(batchIdViejo)).toBe('5.0000');
 
       const resultado = await reservations.consumeForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         fallbackRequirement: [],
@@ -989,7 +1019,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '10'),
@@ -1010,7 +1040,7 @@ describe('R30 — una merma sobre el lote apartado completa desde otros lotes co
       try {
         await prisma.$transaction(async (tx) => {
           resultado = await createMaterialReservations(tx).consumeForLine({
-            orderLineId: null,
+            orderLineId: lineOf(orderId),
             orderId,
             companyId: fixture.companyId,
             fallbackRequirement: [],
@@ -1042,7 +1072,7 @@ describe('R33 — un ajuste que deja el apartado por encima de la existencia se 
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '8'),
@@ -1067,7 +1097,7 @@ describe('R34, R37 — el lote sobre-reservado se marca, con su apartado y su di
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '8'),
@@ -1102,7 +1132,7 @@ describe('R36 — por producto: total, reservado y disponible, incluido el caso 
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '6'),
@@ -1126,7 +1156,7 @@ describe('R36 — por producto: total, reservado y disponible, incluido el caso 
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '8'),
@@ -1187,7 +1217,7 @@ describe('R38 — el historial de un lote une los dos libros, del mas reciente a
 
     try {
       await reservations.syncForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '4'),
@@ -1196,7 +1226,7 @@ describe('R38 — el historial de un lote une los dos libros, del mas reciente a
       });
       await adjustByDelta(batchId, '-1', 'merma', fixture.actorId, new Date(), ambito(fixture));
       await reservations.releaseForLine({
-        orderLineId: null,
+        orderLineId: lineOf(orderId),
         orderId,
         companyId: fixture.companyId,
         reason: 'release',
@@ -1303,7 +1333,7 @@ describe('directo — consumeBatchStock (R27) sin pasar por la reserva', () => {
 
     try {
       const resultado = await prisma.$transaction((tx) =>
-        consumeBatchStock(tx, { orderLineId: null, batchId, quantity: '4', orderId, actorId: fixture.actorId }, new Date(), ambito(fixture)),
+        consumeBatchStock(tx, { orderLineId: lineOf(orderId), batchId, quantity: '4', orderId, actorId: fixture.actorId }, new Date(), ambito(fixture)),
       );
       expect(resultado).toEqual({ kind: 'consumed', stock: '6.0000' });
       expect(await inventoryMovementsOf(batchId)).toEqual([
@@ -1312,7 +1342,7 @@ describe('directo — consumeBatchStock (R27) sin pasar por la reserva', () => {
       ]);
 
       const insuficiente = await prisma.$transaction((tx) =>
-        consumeBatchStock(tx, { orderLineId: null, batchId, quantity: '100', orderId, actorId: fixture.actorId }, new Date(), ambito(fixture)),
+        consumeBatchStock(tx, { orderLineId: lineOf(orderId), batchId, quantity: '100', orderId, actorId: fixture.actorId }, new Date(), ambito(fixture)),
       );
       expect(insuficiente).toEqual({ kind: 'insufficient', available: '6.0000' });
     } finally {
@@ -1405,7 +1435,7 @@ describe('QT-313 — MaterialReservations por linea', () => {
   it('QT-313 R12, R37: dos lineas que comparten insumo apartan en orden; la segunda ve lo que aparto la primera', async () => {
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
-    const orderId = await createOrderRow(fixture);
+    const orderId = await createBareOrderRow(fixture);
     const reservations = createMaterialReservations(prisma);
 
     try {
@@ -1450,7 +1480,7 @@ describe('QT-313 — MaterialReservations por linea', () => {
   it('QT-313 R27, R37: liberar una linea asienta solo su release y deja intacto lo de la otra', async () => {
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
-    const orderId = await createOrderRow(fixture);
+    const orderId = await createBareOrderRow(fixture);
     const otroPedido = await createOrderRow(fixture);
     const reservations = createMaterialReservations(prisma);
 
@@ -1472,7 +1502,7 @@ describe('QT-313 — MaterialReservations por linea', () => {
       // Lo de la linea B sigue apartado: otro pedido alcanza los 6 restantes, no 7.
       const ajeno = await reservations.syncForLine({
         orderId: otroPedido,
-        orderLineId: null,
+        orderLineId: lineOf(otroPedido),
         companyId: fixture.companyId,
         requirement: requirementOf(productId, '7'),
         actorId: fixture.actorId,
@@ -1487,7 +1517,7 @@ describe('QT-313 — MaterialReservations por linea', () => {
   it('QT-313 R36, R37: consumir una linea consume solo lo suyo y el asiento consumption lleva su linea', async () => {
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
-    const orderId = await createOrderRow(fixture);
+    const orderId = await createBareOrderRow(fixture);
     const reservations = createMaterialReservations(prisma);
 
     try {
@@ -1522,7 +1552,7 @@ describe('QT-313 — MaterialReservations por linea', () => {
   it('QT-313 R37: liquidar los envases de una linea asienta su consume, su release y su consumption con la linea', async () => {
     const fixture = await createFixture();
     const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
-    const orderId = await createOrderRow(fixture);
+    const orderId = await createBareOrderRow(fixture);
     const reservations = createMaterialReservations(prisma);
 
     try {
@@ -1550,51 +1580,6 @@ describe('QT-313 — MaterialReservations por linea', () => {
         { batchId, kind: 'consume', quantity: '2.0000', orderLineId: lineaB },
         { batchId, kind: 'release', quantity: '2.0000', orderLineId: lineaB },
       ]);
-    } finally {
-      await dropFixtureWithLines(fixture, [productId], [orderId]);
-    }
-  });
-
-  it('QT-313 R37: con orderLineId null el pedido aparta, libera y consume como hoy sin leer ni tocar sus filas con linea', async () => {
-    const fixture = await createFixture();
-    const { productId, batchId } = await createProductWithBatch(fixture, { stock: '10' });
-    const orderId = await createOrderRow(fixture);
-    const reservations = createMaterialReservations(prisma);
-
-    try {
-      const linea = await createOrderLineRow(fixture, orderId, 0);
-      const base = { orderId, companyId: fixture.companyId, actorId: fixture.actorId };
-      await reservations.syncForLine({ ...base, orderLineId: linea, requirement: requirementOf(productId, '4'), now: new Date() });
-
-      // Lo de la linea cuenta como apartado por otra clave: sin linea solo quedan 6.
-      const demasiado = await reservations.syncForLine({
-        ...base,
-        orderLineId: null,
-        requirement: requirementOf(productId, '7'),
-        now: new Date(),
-      });
-      expect(demasiado).toEqual({ kind: 'insufficient', productIds: [productId] });
-
-      await reservations.syncForLine({ ...base, orderLineId: null, requirement: requirementOf(productId, '3'), now: new Date() });
-      await reservations.releaseForLine({ ...base, orderLineId: null, reason: 'release', now: new Date() });
-      await reservations.syncForLine({ ...base, orderLineId: null, requirement: requirementOf(productId, '2'), now: new Date() });
-      const consumo = await prisma.$transaction((tx) =>
-        createMaterialReservations(tx).consumeForLine({ ...base, orderLineId: null, fallbackRequirement: [], now: new Date() }),
-      );
-      expect(consumo).toEqual({ kind: 'consumed' });
-
-      // Resincronizar la linea con lo mismo no asienta nada: ninguna fila sin linea entro en su cuenta.
-      await reservations.syncForLine({ ...base, orderLineId: linea, requirement: requirementOf(productId, '4'), now: new Date() });
-
-      expectSameRows(await reservationMovementsWithLineOf(orderId), [
-        { batchId, kind: 'reserve', quantity: '4.0000', orderLineId: linea },
-        { batchId, kind: 'reserve', quantity: '3.0000', orderLineId: null },
-        { batchId, kind: 'release', quantity: '3.0000', orderLineId: null },
-        { batchId, kind: 'reserve', quantity: '2.0000', orderLineId: null },
-        { batchId, kind: 'consume', quantity: '2.0000', orderLineId: null },
-      ]);
-      expect(await consumptionsOf(batchId)).toEqual([{ quantity: '-2.0000', orderId, orderLineId: null }]);
-      expect(await batchStockOf(batchId)).toBe('8.0000');
     } finally {
       await dropFixtureWithLines(fixture, [productId], [orderId]);
     }

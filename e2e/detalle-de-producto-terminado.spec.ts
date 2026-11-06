@@ -53,6 +53,7 @@ import { INVENTORY_ROUTE, ORDERS_ROUTE, finishedProductDetailRoute } from '@/lib
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc225_e2e_';
@@ -267,6 +268,7 @@ async function deleteCompanyRows(companyIds: readonly string[]): Promise<void> {
   await prisma.orderAssignment.deleteMany({ where: inCompanies });
   await prisma.orderPresentationLine.deleteMany({ where: inCompanies });
   await prisma.orderExecutionEntry.deleteMany({ where: inCompanies });
+  await prisma.orderLine.deleteMany({ where: inCompanies });
   await prisma.order.deleteMany({ where: inCompanies });
   await prisma.productBatch.deleteMany({ where: inCompanies });
   // El producto terminado (`products.recipe_id`) restringe el borrado de la receta.
@@ -415,22 +417,22 @@ test.beforeAll(async () => {
       unitId: unit.id,
       customerId: customer.id,
       createdBy: adminUserId,
-      presentationLines: {
-        create: [
-          {
-            companyId,
-            presentationId: presentation.id,
-            packages: LINE_PACKAGES,
-            presentationContent: CONTENT,
-          },
-        ],
-      },
     },
-    select: { id: true, presentationLines: { select: { id: true } } },
+    select: { id: true },
   });
   orderId = order.id;
-  const [line] = order.presentationLines;
-  if (line === undefined) throw new Error('el pedido nacio sin su linea de reparto');
+  const orderLineId = await ensureOnlyLine(prisma, order.id);
+  const line = await prisma.orderPresentationLine.create({
+    data: {
+      orderId: order.id,
+      orderLineId,
+      companyId,
+      presentationId: presentation.id,
+      packages: LINE_PACKAGES,
+      presentationContent: CONTENT,
+    },
+    select: { id: true },
+  });
 
   // El asiento con el que Terminar ata el lote a la linea del pedido: de el salen el pedido de
   // origen del lote, la entrada de produccion y el enlace de /pedidos.
@@ -441,6 +443,7 @@ test.beforeAll(async () => {
       quantity: BATCH_STOCK,
       reason: null,
       orderId,
+      orderLineId,
       orderPresentationLineId: line.id,
       companyId,
       createdBy: adminUserId,

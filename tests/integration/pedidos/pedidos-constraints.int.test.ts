@@ -71,6 +71,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine, lineOfOrder } from '../../helpers/only-order-line'
+
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
 // ---------------------------------------------------------------------------
@@ -353,13 +355,20 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
       createdBy: seed.createdBy ?? null,
       updatedBy: seed.updatedBy ?? null,
       unitId: seed.unitId ?? null,
-      presentationLines:
-        seed.presentationId === undefined || seed.presentationId === null
-          ? undefined
-          : { create: [{ companyId: seed.companyId, presentationId: seed.presentationId, packages: 1 }] },
     },
     select: { id: true },
   })
+  if (seed.presentationId !== undefined && seed.presentationId !== null) {
+    await tx.orderPresentationLine.create({
+      data: {
+        orderId: order.id,
+        orderLineId: await ensureOnlyLine(tx, order.id),
+        companyId: seed.companyId,
+        presentationId: seed.presentationId,
+        packages: 1,
+      },
+    })
+  }
   return order.id
 }
 
@@ -1372,11 +1381,12 @@ describe('la presentacion del pedido (hoy, su linea de reparto)', () => {
       const otra = await seedFixtures(tx)
 
       const orderId = await createOrder(tx, { companyId: f.companyId, recipeId: f.recipeId })
+      await ensureOnlyLine(tx, orderId)
       const rawInsertLine = (presentationId: string): Promise<number> =>
         tx.$executeRaw`
           INSERT INTO "order_presentation_lines"
-            ("order_id", "company_id", "presentation_id", "packages", "updated_at")
-          VALUES (${asUuid(orderId)}, ${asUuid(f.companyId)}, ${asUuid(presentationId)}, 1, CURRENT_TIMESTAMP)`
+            ("order_id", "order_line_id", "company_id", "presentation_id", "packages", "updated_at")
+          VALUES (${asUuid(orderId)}, ${lineOfOrder(orderId)}, ${asUuid(f.companyId)}, ${asUuid(presentationId)}, 1, CURRENT_TIMESTAMP)`
 
       const deOtraEmpresa = await expectRejectedByDatabase(
         tx,

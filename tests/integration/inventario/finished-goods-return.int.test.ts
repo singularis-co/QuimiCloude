@@ -20,6 +20,8 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine } from '../../helpers/only-order-line'
+
 type Db = Prisma.TransactionClient | typeof prisma
 
 class RollbackSignal extends Error {
@@ -64,6 +66,7 @@ type Tenant = {
   readonly documentTypeCode: string
   readonly unitId: string
   readonly orderId: string
+  readonly orderLineId: string
   readonly deliveryId: string
   readonly presentationId: string
   readonly productId: string
@@ -112,6 +115,7 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
       ${asUuid(orderId)}, ${asUuid(companyId)}, ${new Date().getUTCFullYear()}, ${freshSequence()},
       ${asUuid(recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP
     )`
+  const orderLineId = await ensureOnlyLine(db, orderId)
   const { id: unitId } = await db.unit.create({
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca.slice(0, 8)}` },
     select: { id: true },
@@ -137,7 +141,7 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
     data: { companyId, orderId, deliveryKey: randomUUID(), createdBy: userId },
     select: { id: true },
   })
-  return { companyId, userId, roleId, documentTypeCode, unitId, orderId, deliveryId, presentationId, productId }
+  return { companyId, userId, roleId, documentTypeCode, unitId, orderId, orderLineId, deliveryId, presentationId, productId }
 }
 
 /** Borra todo lo de una empresa efimera confirmada, en el orden que exigen las FK. */
@@ -150,6 +154,7 @@ async function dropTenant(t: Tenant): Promise<void> {
   await prisma.product.deleteMany({ where })
   await prisma.presentation.deleteMany({ where })
   await prisma.unit.deleteMany({ where: { id: t.unitId } })
+  await prisma.orderLine.deleteMany({ where })
   await prisma.order.deleteMany({ where })
   await prisma.recipe.deleteMany({ where })
   await prisma.customer.deleteMany({ where })
@@ -198,6 +203,18 @@ function returnInput(t: Tenant, voidId: string, lines: readonly { batchId: strin
   return {
     companyId: t.companyId,
     orderId: t.orderId,
+    orderDeliveryVoidId: voidId,
+    lines: lines.map((line) => ({ ...line, orderLineId: t.orderLineId })),
+    actorId: t.userId,
+    now: new Date(),
+  }
+}
+
+/** La anulacion de una entrega sin pedido: sin pedido ni linea. */
+function directReturnInput(t: Tenant, voidId: string, lines: readonly { batchId: string; quantity: string }[]) {
+  return {
+    companyId: t.companyId,
+    orderId: null,
     orderDeliveryVoidId: voidId,
     lines: lines.map((line) => ({ ...line, orderLineId: null })),
     actorId: t.userId,
@@ -505,12 +522,11 @@ describe('returnFinishedGoods con orderId nulo contra Postgres real', () => {
       const now = new Date('2026-10-16T15:30:00.000Z')
 
       const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
-        ...returnInput(a, voidId, [
+        ...directReturnInput(a, voidId, [
           { batchId: lote1.id, quantity: '15.0000' },
           { batchId: lote2.id, quantity: '2.5000' },
           { batchId: lote1.id, quantity: '5.0000' },
         ]),
-        orderId: null,
         now,
       })
 
@@ -540,8 +556,7 @@ describe('returnFinishedGoods con orderId nulo contra Postgres real', () => {
       await tx.product.update({ where: { id: a.productId }, data: { deletedAt: new Date() } })
 
       const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
-        ...returnInput(a, voidId, [{ batchId: lote.id, quantity: '4.0000' }]),
-        orderId: null,
+        ...directReturnInput(a, voidId, [{ batchId: lote.id, quantity: '4.0000' }]),
       })
 
       expect(outcome).toEqual({ kind: 'returned' })
@@ -561,8 +576,7 @@ describe('returnFinishedGoods con orderId nulo contra Postgres real', () => {
       const voidId = await createDirectVoid(tx, a)
 
       const outcome = await createFinishedGoodsReturn(tx).returnForDeliveryVoid({
-        ...returnInput(a, voidId, [{ batchId: loteB.id, quantity: '5.0000' }]),
-        orderId: null,
+        ...directReturnInput(a, voidId, [{ batchId: loteB.id, quantity: '5.0000' }]),
       })
 
       expect(outcome).toEqual({ kind: 'batch_not_found', batchId: loteB.id })

@@ -226,7 +226,7 @@
 
 ## Fase 6 — Contrato y cierre
 
-- [ ] **T14e — `order_line_id` obligatorio (paso 2 de 2).** Migración
+- [x] **T14e — `order_line_id` obligatorio (paso 2 de 2).** Migración
   `20261103120150_order_lines_references_required` (design § 1.4, punto 3): repite el relleno,
   bloque `DO` que aborta si queda una fila sin línea donde debe tenerla, `NOT NULL` en cinco
   tablas, CHECK definitivo de `inventory_movements` (los cuatro tipos con pedido llevan línea,
@@ -667,3 +667,43 @@ Tocados en la fase 5 (T14a) por el flujo de planta por linea (los demas archivos
 - `tests/unit/asignaciones/assign-responsibles.test.ts`
 - `tests/unit/asignaciones/remove-work-group-from-order.test.ts`
 - `tests/unit/asignaciones/unassign-responsible.test.ts`
+- `e2e/acondicionamiento.spec.ts`
+- `e2e/anular-entrega.spec.ts`
+- `e2e/consulta-de-evidencia.spec.ts`
+- `e2e/contactos-chat.spec.ts`
+- `e2e/dashboard-rediseno.spec.ts`
+- `e2e/datos-de-lote-en-acondicionamiento.spec.ts`
+- `e2e/detalle-de-producto-terminado.spec.ts`
+- `e2e/ejecucion-receta.spec.ts`
+- `e2e/empaque.spec.ts`
+- `e2e/entrega-a-varios-clientes.spec.ts`
+- `e2e/entrega-sin-pedido.spec.ts`
+- `e2e/entregar-producto-terminado.spec.ts`
+- `e2e/envases-reales-empaque.spec.ts`
+- `e2e/operario-rediseno.spec.ts`
+- `e2e/pasos-de-acondicionamiento.spec.ts`
+- `e2e/pasos-de-envasado.spec.ts`
+- `e2e/pedidos-rediseno.spec.ts`
+- `e2e/recorrido-acondicionamiento.spec.ts`
+- `e2e/recorrido-ejecucion.spec.ts`
+- `e2e/registro-ejecucion.spec.ts`
+- `tests/integration/asignaciones/conditioning-team-constraints.int.test.ts`
+- `tests/integration/asignaciones/order-execution-entries-constraints.int.test.ts`
+- `tests/integration/asignaciones/step-evidence-constraints.int.test.ts`
+- `tests/integration/inventario/finished-product-detail.int.test.ts`
+- `tests/integration/inventario/presentation-content.int.test.ts`
+- `tests/integration/inventario/product-unit-without-presentation.int.test.ts`
+- `tests/integration/inventario/qc195-packaging-constraints.int.test.ts`
+- `tests/integration/inventario/reserve-existing-orders-migration.int.test.ts`
+- `tests/integration/pedidos/direct-deliveries-migration.int.test.ts`
+- `tests/integration/pedidos/direct-delivery-constraints.int.test.ts`
+- `tests/integration/pedidos/order-delivery-constraints.int.test.ts`
+- `tests/integration/pedidos/order-delivery-directory.int.test.ts`
+- `tests/integration/pedidos/order-delivery-lines-customer-migration.int.test.ts`
+- `tests/integration/pedidos/order-delivery-repository.int.test.ts`
+- `tests/integration/pedidos/order-delivery-void-constraints.int.test.ts`
+- `tests/integration/pedidos/order-delivery-void-repository.int.test.ts`
+- `tests/integration/pedidos/order-packed-counts.int.test.ts`
+- `tests/integration/pedidos/pedidos-constraints.int.test.ts`
+- `tests/integration/pedidos/qc170-backfill.int.test.ts`
+- `tests/integration/recetas/recipe-conditioning-steps-migration.int.test.ts`

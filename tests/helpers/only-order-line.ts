@@ -10,6 +10,27 @@ import { prisma } from '@/lib/shared/db/prisma';
 type Db = PrismaClient | Prisma.TransactionClient;
 
 /**
+ * Para un INSERT crudo en una tabla hija: la linea de menor `position` del pedido. Si el pedido no
+ * tiene linea (no existe), un uuid suelto, para que la base rechace por la FK y no por el NOT NULL
+ * de `order_line_id`, que se comprueba antes.
+ */
+export function lineOfOrder(orderId: string): Prisma.Sql {
+  return Prisma.sql`COALESCE(
+    (SELECT "id" FROM "order_lines" WHERE "order_id" = CAST(${orderId} AS uuid) ORDER BY "position" LIMIT 1),
+    gen_random_uuid()
+  )`;
+}
+
+const KINDS_WITH_LINE = ['consumption', 'production', 'delivery', 'delivery_void'];
+
+/** Para un INSERT crudo en `inventory_movements`: la linea del pedido en los cuatro tipos que la
+ *  llevan, NULL en los demas, como exige su CHECK. */
+export function movementLineOf(kind: string, orderId: string | null): Prisma.Sql {
+  if (!KINDS_WITH_LINE.includes(kind)) return Prisma.sql`CAST(NULL AS uuid)`;
+  return orderId === null ? Prisma.sql`gen_random_uuid()` : lineOfOrder(orderId);
+}
+
+/**
  * La linea viva del pedido; si no tiene ninguna, la crea con los datos y el estado del pedido y le
  * cuelga el reparto que aun no tenga linea. Devuelve su id.
  */

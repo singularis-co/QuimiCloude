@@ -76,6 +76,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc281_e2e_';
 
@@ -194,6 +195,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.inventoryMovement.deleteMany({ where }),
     () => prisma.orderPresentationLine.deleteMany({ where }),
     () => prisma.orderExecutionEntry.deleteMany({ where }),
+    () => prisma.orderLine.deleteMany({ where }),
     () => prisma.order.deleteMany({ where }),
     () => prisma.productBatch.deleteMany({ where }),
     () => prisma.product.deleteMany({ where: { ...where, type: PRODUCT_TYPES.FINISHED_PRODUCT } }),
@@ -268,7 +270,16 @@ async function seedIngredientConsumption(offset: number, orderId: string, ingred
   await prisma.inventoryMovement.createMany({
     data: [
       { batchId: batch.id, kind: 'opening', quantity: ORDER_QUANTITY, reason: null, companyId, createdBy: packerId, createdAt: purchaseDate },
-      { batchId: batch.id, kind: 'consumption', quantity: `-${ORDER_QUANTITY}`, reason: null, orderId, companyId, createdBy: packerId },
+      {
+        batchId: batch.id,
+        kind: 'consumption',
+        quantity: `-${ORDER_QUANTITY}`,
+        reason: null,
+        orderId,
+        orderLineId: await ensureOnlyLine(prisma, orderId),
+        companyId,
+        createdBy: packerId,
+      },
     ],
   });
 }
@@ -309,6 +320,7 @@ async function seedPackingOrder(
     select: { id: true },
   });
   await seedIngredientConsumption(offset, order.id, ingredientsCost);
+  const orderLineId = await ensureOnlyLine(prisma, order.id);
 
   const createdAt = Date.now();
   const lines: SeededLine[] = [];
@@ -337,6 +349,7 @@ async function seedPackingOrder(
     const line = await prisma.orderPresentationLine.create({
       data: {
         orderId: order.id,
+        orderLineId,
         companyId,
         presentationId: presentation.id,
         packages: spec.plan,
@@ -350,6 +363,7 @@ async function seedPackingOrder(
       data: {
         companyId,
         orderId: order.id,
+        orderLineId,
         batchId: packaging.batchId,
         kind: 'reserve',
         quantity: String(spec.plan),

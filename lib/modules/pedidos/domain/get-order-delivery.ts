@@ -74,9 +74,7 @@ export function createGetOrderDelivery(
       deps.orders.findAliveLines(orderId, scope),
     ]);
     const recipeByOrderLine = new Map(orderLines.map((line) => [line.id, line.recipeId]));
-    // Un reparto sin linea no tiene receta que ofrecer: no se le buscan lotes.
-    const recipeOf = (line: (typeof lines)[number]): string | undefined =>
-      line.orderLineId === null ? undefined : recipeByOrderLine.get(line.orderLineId);
+    const recipeOf = (line: (typeof lines)[number]): string | undefined => recipeByOrderLine.get(line.orderLineId);
     const states = lines.map((line) => {
       const state = { presentationLineId: line.id, orderedPackages: orderedPackages(line), deliveredPackages: delivered.get(line.id) ?? 0 };
       return { line, state, remaining: remainingPackages(state) };

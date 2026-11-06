@@ -27,7 +27,7 @@ import {
 
 const UP_SQL = readMigration('_order_lines', 'migration.sql');
 const DOWN_SQL = readMigration('_order_lines', 'down.sql');
-const LATER_DOWNS = ['_orders_drop_line_columns', '_order_lines_references'] as const;
+const LATER_DOWNS = ['_orders_drop_line_columns', '_order_lines_references_required', '_order_lines_references'] as const;
 
 type OrderSeed = {
   readonly status: 'PENDIENTE' | 'EN_CURSO' | 'CANCELADO' | 'ENTREGADO' | 'BLOQUEADO';

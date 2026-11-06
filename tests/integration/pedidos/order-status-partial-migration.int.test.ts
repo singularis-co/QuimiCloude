@@ -28,7 +28,12 @@ import {
 const DOWN_SQL = readMigration('_order_status_partial', 'down.sql');
 const [ABORT_BLOCK] = statementsOf(DOWN_SQL);
 
-const LATER_DOWNS = ['_orders_drop_line_columns', '_order_lines_references', '_order_lines'] as const;
+const LATER_DOWNS = [
+  '_orders_drop_line_columns',
+  '_order_lines_references_required',
+  '_order_lines_references',
+  '_order_lines',
+] as const;
 
 const TEN_VALUES = [
   'PENDIENTE',

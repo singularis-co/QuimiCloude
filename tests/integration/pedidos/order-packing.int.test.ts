@@ -50,7 +50,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
-import { onOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, onOnlyLine } from '../../helpers/only-order-line';
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
@@ -194,6 +194,7 @@ async function crearLinea(fixture: Fixture, orderId: string, packages = 1): Prom
   await prisma.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: await ensureOnlyLine(prisma, orderId),
       companyId: fixture.companyId,
       presentationId: fixture.presentationId,
       packages,

@@ -256,7 +256,8 @@ describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
       [pedidoSinComenzar, marta, a],
       [pedidoB2, miembroB, b],
     ] as const) {
-      await fixture.tx.orderConditioningTeamMember.create({ data: { orderId, userId, companyId, position: 0 } });
+      const orderLineId = await ensureOnlyLine(fixture.tx, orderId);
+      await fixture.tx.orderConditioningTeamMember.create({ data: { orderId, orderLineId, userId, companyId, position: 0 } });
     }
     return { ...e, marta, miembroB, pedidoC, pedidoSinComenzar, pedidoB2 };
   }
@@ -285,7 +286,13 @@ describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
     await inRolledBackTransaction(async (fixture) => {
       const e = await montarEquipo(fixture);
       await fixture.tx.orderConditioningTeamMember.create({
-        data: { orderId: e.pedidoC, userId: e.ana, companyId: fixture.companyA, position: 1 },
+        data: {
+          orderId: e.pedidoC,
+          orderLineId: await ensureOnlyLine(fixture.tx, e.pedidoC),
+          userId: e.ana,
+          companyId: fixture.companyA,
+          position: 1,
+        },
       });
       expect(ordenados(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.ana }))).toEqual(
         ordenados([e.pedidoA1, e.pedidoC]),

@@ -170,10 +170,11 @@ async function recibir(
   packages: number,
   orderLineId: string | undefined = fixture.lineOf.get(orderId),
 ): Promise<{ readonly productId: string; readonly batchId: string }> {
+  if (orderLineId === undefined) throw new Error(`el pedido ${orderId} no tiene linea sembrada`);
   const line = await prisma.orderPresentationLine.create({
     data: {
       orderId,
-      orderLineId: orderLineId ?? null,
+      orderLineId,
       companyId: fixture.empresa.companyId,
       presentationId,
       packages,
@@ -186,7 +187,7 @@ async function recibir(
       tx,
       {
         orderId,
-        orderLineId: null,
+        orderLineId,
         recipeId: receta.id,
         recipeName: receta.name,
         presentationId,

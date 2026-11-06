@@ -20,6 +20,8 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { lineOfOrder, ensureOnlyLine } from '../../helpers/only-order-line'
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test')
@@ -152,6 +154,7 @@ async function createOrder(tx: Prisma.TransactionClient, companyId: string): Pro
     },
     select: { id: true },
   })
+  await ensureOnlyLine(tx, order.id)
   return order.id
 }
 
@@ -190,10 +193,11 @@ interface EntryValues {
 function rawInsertEntry(tx: Prisma.TransactionClient, v: EntryValues): Promise<number> {
   return tx.$executeRaw`
     INSERT INTO "order_execution_entries"
-      ("company_id", "order_id", "user_id", "action", "step_position", "reason", "occurred_at")
+      ("company_id", "order_id", "order_line_id", "user_id", "action", "step_position", "reason", "occurred_at")
     VALUES (
       CAST(${v.companyId} AS uuid),
       CAST(${v.orderId} AS uuid),
+      ${lineOfOrder(v.orderId)},
       CAST(${v.userId} AS uuid),
       CAST(${v.action} AS "OrderExecutionAction"),
       CAST(${v.stepPosition} AS integer),
@@ -412,10 +416,11 @@ function rawInsertWithBatchLines(
   const json = batchLines === null ? null : JSON.stringify(batchLines)
   return tx.$executeRaw`
     INSERT INTO "order_execution_entries"
-      ("company_id", "order_id", "user_id", "action", "step_position", "reason", "batch_lines", "occurred_at")
+      ("company_id", "order_id", "order_line_id", "user_id", "action", "step_position", "reason", "batch_lines", "occurred_at")
     VALUES (
       CAST(${v.companyId} AS uuid),
       CAST(${v.orderId} AS uuid),
+      ${lineOfOrder(v.orderId)},
       CAST(${v.userId} AS uuid),
       CAST(${v.action} AS "OrderExecutionAction"),
       CAST(${v.stepPosition} AS integer),

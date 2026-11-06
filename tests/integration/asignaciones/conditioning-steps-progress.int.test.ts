@@ -181,9 +181,9 @@ async function pedidoEnAcondicionamiento(empresa: Empresa, recipeId = empresa.re
     where: { id },
     data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: empresa.acondicionador },
   });
-  await syncOnlyLine(prisma, id);
+  const orderLineId = await syncOnlyLine(prisma, id);
   await prisma.orderConditioningTeamMember.create({
-    data: { orderId: id, userId: empresa.operario, companyId: empresa.companyId, position: 0 },
+    data: { orderId: id, orderLineId, userId: empresa.operario, companyId: empresa.companyId, position: 0 },
   });
   return id;
 }

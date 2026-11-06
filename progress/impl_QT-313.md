@@ -459,3 +459,51 @@ Desviaciones aceptadas por el humano (2026-11-05), para el reviewer:
 1. El campo nuevo se llama `activeLineStatuses`.
 2. Algunos fixtures de test necesitaron rodeos para fabricar un `PARCIAL` con lineas en estados concretos.
 3. Tres rutas nuevas en «Archivos esperados».
+
+## Fase 6 — T14e `order_line_id` obligatorio (paso 2 de 2, 2026-11-05)
+
+Produccion:
+- Migracion `db/migrations/20261103120150_order_lines_references_required/{migration.sql,down.sql}`: relleno, bloque `DO`, `NOT NULL` en cinco tablas, CHECK definitivo de `inventory_movements`, FK compuestas `(order_line_id, order_id)`, y unicos y PK por linea.
+- `db/schema.prisma`.
+- `inventario`: reserva, consumo y `product-prisma.ts` sin `| null` ni rama `IS NULL`; `finished-goods*`.
+- `pedidos`: `order-prisma.ts`, `order-catalog-prisma.ts`, `direct-delivery-prisma.ts`, entrega y anulacion, y sus puertos.
+- `findOnlyLineId` ya no existe.
+- El contrato de devolucion `inventario/domain/finished-goods-return.ts` pasa a ser una union: con pedido, cada linea es `string`; sin pedido (entrega directa), `null`.
+
+Tests:
+- Nuevo: `tests/integration/pedidos/order-lines-references-required-migration.int.test.ts`.
+- Helpers `lineOfOrder` y `movementLineOf` en `tests/helpers/only-order-line.ts`.
+- Unos 60 tests y 20 specs E2E ajustados: sus siembras creaban pedidos sin linea. La lista esta en `tasks.md > Archivos esperados`.
+
+Mapa R → test (`order-lines-references-required-migration.int`):
+| R | Test |
+|---|---|
+| R8 | «R8: un pedido creado sin linea antes de aplicarla la recibe y todas sus filas apuntan a ella», «R8, R37: un pedido con linea y filas sin ella las une a su linea, delivery_void con la misma que su delivery», «R8: una fila sin linea de un pedido de dos lineas hace abortar la migracion nombrando la tabla y cuantas», «R8: subir y bajar deja las seis tablas como estaban», «R8: la bajada se niega si los unicos por pedido chocarian, dice cuantos y no cambia nada», «R8: la bajada pasa con pedidos de una sola linea y la columna vuelve a admitir NULL» |
+| R37 (base) | «R37: la base rechaza una fila sin linea en cada una de las cinco tablas», «R37: la base rechaza un delivery sin linea y una linea en un asiento sin pedido», «R37: la base rechaza la linea de otro pedido en cada una de las seis tablas», «R37: dos lineas del mismo pedido pueden repetir presentacion, slot de evidencia y persona del equipo»; `tests/unit/inventario/finished-goods-return-prisma.test.ts` › «R24, QT-313 R37: writeMovement recibe delivery_void, … su linea…» |
+
+Verificacion (salida real, backend_dev):
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores.
+- Guardias: 87 archivos (1336 tests en verde, 22 skipped).
+- `related --project node --maxWorkers=1` (18 archivos de `lib/`): 294 archivos, 6386 tests en verde y 1 rojo. Era una expectativa vieja: `delivery_void` ahora lleva su linea. Corregida y repetida junto a los tests de anulacion (4 archivos): 114/114.
+- `related --project ui`: 340 archivos, 5653 tests en verde, 1 skipped.
+- `.int` de migraciones (T0, T1, T2 y la nueva): 4 archivos, 31/31.
+- `.int` de constraints y migraciones viejas: 15 archivos, 161/161.
+- Tres tandas de `.int` de `pedidos`, `inventario` y `asignaciones` (incluye `order-lines-execution`), con cada rojo corregido y repetido en verde: 14 archivos/132 tests, 14/156, 3/56 y 2/23.
+- `direct-delivery-void.int` y `finished-goods-dispatch.int`: 22/22.
+- Sin correr: los 20 specs E2E editados. Solo se comprobaron con typecheck; Playwright no se lanzo.
+
+Los `null` que quedan son legitimos: todos son de la entrega directa, que no tiene pedido. Sus asientos son `direct_delivery` y `direct_delivery_void`, y el CHECK definitivo exige que en ellos `order_line_id` sea NULL (design § 1.3). Estan en:
+- `void-direct-delivery.ts`
+- `order-delivery-void-repository.ts`
+- `order-delivery-void-prisma.ts`
+- `product-prisma.ts`, en la rama sin pedido
+- `finished-goods-return.ts`, con `ReturnedLine<null>` solo cuando `orderId` es null
+
+Desviaciones y riesgos (para el reviewer):
+1. **Camino muerto:** `order-prisma.ts > insertAliveOrder` todavia escribe un reparto sin linea si `create` recibe `presentationLines` no vacio. La app no lo hace (el alta pasa `[]`), y la base ahora lo rechaza. Se deja para T15/QT-314. `order-repository.int` pasa a usar el camino real (`create` + `writeLines`).
+2. Los specs E2E editados importan `ensureOnlyLine` de `tests/helpers`. Es la primera vez que un E2E usa este helper.
+3. **Riesgo E2E:** otros specs que crean pedidos por la pantalla podrian fallar en su limpieza por la FK `RESTRICT` de `order_lines` (viene de T9). No se ha comprobado; T16 corre su spec.
+4. El test «fila sin linea» comprueba el SQLSTATE 23502, porque el mensaje de Prisma no nombra la columna.
+5. En `order-lines-references-migration.int`, «R8: bajar y volver a subir…» ahora ejecuta `LATER_DOWNS` antes de sembrar.
+6. `reserve-existing-orders-migration.int` y `qc170-backfill.int` deshacen las migraciones nuevas al empezar cada transaccion.

@@ -14,10 +14,9 @@ export type ConsumedLot = {
 
 /** Lectura dentro de la transaccion de quien llama. */
 export interface OrderConsumptionLedger {
-  /** `orderLineId` `null` = solo los asientos del pedido escritos sin linea. */
   findConsumedLots(input: {
     readonly orderId: string;
-    readonly orderLineId: string | null;
+    readonly orderLineId: string;
     readonly companyId: string;
   }): Promise<readonly ConsumedLot[]>;
 }

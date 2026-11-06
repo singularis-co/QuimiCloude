@@ -16,6 +16,8 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { createOrderWriteRepository } from '@/lib/modules/pedidos/adapters/driven/persistence/order-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
+import { ensureOnlyLine } from '../../helpers/only-order-line'
+
 import type { PackedLineCount } from '@/lib/modules/pedidos'
 import type { RecordedPackedLine } from '@/lib/modules/pedidos/ports/order-write-repository'
 
@@ -141,6 +143,7 @@ async function seedLine(
   const line = await tx.orderPresentationLine.create({
     data: {
       orderId,
+      orderLineId: await ensureOnlyLine(tx, orderId),
       companyId: company.companyId,
       presentationId: presentation.id,
       packages,

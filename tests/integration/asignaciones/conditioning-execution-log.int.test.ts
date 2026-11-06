@@ -239,8 +239,9 @@ async function crearLote(fixture: Fixture, orderId: string, nombre: string): Pro
 
 /** Como `crearLote`, sobre una presentacion que ya existe (otra produccion de la misma). */
 async function crearLoteEn(fixture: Fixture, orderId: string, presentationId: string): Promise<Lote> {
+  const orderLineId = await ensureOnlyLine(prisma, orderId);
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
+    data: { orderId, orderLineId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
     select: { id: true },
   });
   const outcome = await prisma.$transaction((tx) =>
@@ -248,7 +249,7 @@ async function crearLoteEn(fixture: Fixture, orderId: string, presentationId: st
       tx,
       {
         orderId,
-        orderLineId: null,
+        orderLineId,
         recipeId: fixture.recipeId,
         recipeName: 'Limpiador',
         presentationId,

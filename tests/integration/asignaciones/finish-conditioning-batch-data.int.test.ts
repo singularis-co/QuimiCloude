@@ -170,8 +170,9 @@ async function crearPresentacion(fixture: Fixture, nombre: string, content: stri
 /** Una linea del reparto; con `conLote`, ademas su entrada por Terminar el empaque. */
 async function crearLinea(fixture: Fixture, orderId: string, nombre: string, conLote: boolean): Promise<string | null> {
   const presentationId = await crearPresentacion(fixture, nombre, '1');
+  const orderLineId = await ensureOnlyLine(prisma, orderId);
   const line = await prisma.orderPresentationLine.create({
-    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
+    data: { orderId, orderLineId, companyId: fixture.companyId, presentationId, packages: 2, presentationContent: null },
     select: { id: true },
   });
   if (!conLote) return null;
@@ -180,7 +181,7 @@ async function crearLinea(fixture: Fixture, orderId: string, nombre: string, con
       tx,
       {
         orderId,
-        orderLineId: null,
+        orderLineId,
         recipeId: fixture.recipeId,
         recipeName: 'Limpiador',
         presentationId,
@@ -222,9 +223,10 @@ async function comenzar(fixture: Fixture, orderId: string): Promise<void> {
   await prisma.order.update({
     where: { id: orderId },
     data: { status: 'EN_ACONDICIONAMIENTO', packedBy: fixture.packerId, conditionedBy: fixture.acondicionador1 },
-  }).then(() => syncOnlyLine(prisma, orderId));
+  });
+  const orderLineId = await syncOnlyLine(prisma, orderId);
   await prisma.orderConditioningTeamMember.create({
-    data: { orderId, userId: fixture.operario, companyId: fixture.companyId, position: 0 },
+    data: { orderId, orderLineId, userId: fixture.operario, companyId: fixture.companyId, position: 0 },
   });
 }
 

@@ -50,6 +50,7 @@ import {
   enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc63_e2e_';
@@ -326,19 +327,19 @@ async function seedOrder(params: {
       recipeId: orderRecipeId,
       quantity: ORDER_QUANTITY,
       unitId,
-      presentationLines: {
-        create: [
-          {
-            companyId,
-            presentationId,
-            packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
-            presentationContent: PRESENTATION_CONTENT,
-          },
-        ],
-      },
       status: params.status,
     },
     select: { id: true },
+  });
+  await prisma.orderPresentationLine.create({
+    data: {
+      orderId: order.id,
+      orderLineId: await ensureOnlyLine(prisma, order.id),
+      companyId,
+      presentationId,
+      packages: Math.floor(Number(ORDER_QUANTITY) / Number(PRESENTATION_CONTENT)),
+      presentationContent: PRESENTATION_CONTENT,
+    },
   });
 
   return { id: order.id, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
@@ -392,6 +393,7 @@ test.beforeAll(async () => {
     await prisma.orderExecutionEntry.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Las fotos de evidencia RESTRINGEN el borrado del pedido y de quien las subio.
     await prisma.orderStepEvidence.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
+    await prisma.orderLine.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     await prisma.order.deleteMany({ where: { companyId: { in: orphanCompanyIds } } });
     // Todos los lotes de la empresa huerfana, del producto de formula y del terminado: sus
     // movimientos ya cayeron arriba, y sin lotes ningun producto queda restringido por ellos.
@@ -408,6 +410,7 @@ test.beforeAll(async () => {
     await prisma.orderStepEvidence.deleteMany({
       where: { orderId: { in: orphanOrders.map((order) => order.id) } },
     });
+    await prisma.orderLine.deleteMany({ where: { order: { recipeId: { in: orphanRecipeIds } } } });
     await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
@@ -571,6 +574,7 @@ test.beforeAll(async () => {
   });
   // Ya paso el paso 1 sin fotos: la pantalla lo retoma en el paso 2, el ultimo.
   const startedAt = Date.now() - 120_000;
+  const evidenceLineId = await ensureOnlyLine(prisma, orderEvidenceId);
   await prisma.orderExecutionEntry.createMany({
     data: [
       { action: 'START' as const, stepPosition: 1, occurredAt: new Date(startedAt) },
@@ -578,6 +582,7 @@ test.beforeAll(async () => {
     ].map((entry) => ({
       ...entry,
       orderId: orderEvidenceId!,
+      orderLineId: evidenceLineId,
       userId: operatorUserId!,
       companyId: companyId!,
     })),
@@ -617,6 +622,10 @@ test.afterAll(async () => {
     () =>
       scopedCompanyId
         ? prisma.orderStepEvidence.deleteMany({ where: { companyId: scopedCompanyId } })
+        : Promise.resolve(),
+    () =>
+      scopedCompanyId
+        ? prisma.orderLine.deleteMany({ where: { companyId: scopedCompanyId } })
         : Promise.resolve(),
     () =>
       scopedCompanyId

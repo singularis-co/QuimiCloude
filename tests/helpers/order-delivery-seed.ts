@@ -125,15 +125,13 @@ let secuencia = 800_000;
 
 /** Pedido con las columnas que exigen sus CHECK en `status`; `TERMINADO` lleva quien empaco, quien
  *  acondiciono y `finished_at`. Lleva una linea con su receta, su estado y esas columnas, y el
- *  reparto cuelga de ella, como un pedido creado desde la pantalla; con `sinLinea`, el pedido
- *  anterior a las lineas, con el reparto sin linea. */
+ *  reparto cuelga de ella, como un pedido creado desde la pantalla. */
 export async function crearPedido(
   empresa: EmpresaDeEntrega,
   status: OrderStatus,
   customerId: string | null,
   lineas: readonly { readonly presentationId: string; readonly packages: number }[],
-  opciones: { readonly sinLinea?: boolean } = {},
-): Promise<{ orderId: string; lineIds: readonly string[]; orderLineId: string | null }> {
+): Promise<{ orderId: string; lineIds: readonly string[]; orderLineId: string }> {
   const empacado = ['EN_EMPAQUE', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].includes(status);
   const acondicionado = ['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'].includes(status);
   const columnas = {
@@ -155,21 +153,16 @@ export async function crearPedido(
     },
     select: { id: true },
   });
-  const orderLineId =
-    opciones.sinLinea === true
-      ? null
-      : (
-          await prisma.orderLine.create({
-            data: {
-              orderId,
-              companyId: empresa.companyId,
-              position: 0,
-              originalRecipeId: empresa.recipeId,
-              ...columnas,
-            },
-            select: { id: true },
-          })
-        ).id;
+  const { id: orderLineId } = await prisma.orderLine.create({
+    data: {
+      orderId,
+      companyId: empresa.companyId,
+      position: 0,
+      originalRecipeId: empresa.recipeId,
+      ...columnas,
+    },
+    select: { id: true },
+  });
   // 2026-10-09: cada linea lleva su `createdAt` explicito y creciente. Las lineas se leen por
   // `created_at, id`, y dos `create` seguidos pueden caer en el mismo milisegundo: entonces el
   // desempate es el `id` aleatorio y el orden de las lineas del escenario dejaba de ser el pedido.

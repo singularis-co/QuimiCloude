@@ -29,6 +29,9 @@ import { normalizePresentationName } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 
+import { runDowns } from '../../helpers/migration-script';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
+
 class RollbackSignal extends Error {
   constructor() {
     super('rollback de aislamiento del test');
@@ -36,10 +39,15 @@ class RollbackSignal extends Error {
   }
 }
 
+// El SQL de esta migracion escribe el reparto sin linea del pedido: se bajan antes las posteriores
+// que la hacen obligatoria, como en una reversion real.
+const LATER_DOWNS = ['_orders_drop_line_columns', '_order_lines_references_required'] as const;
+
 async function inRolledBackTransaction(body: (tx: Prisma.TransactionClient) => Promise<void>): Promise<void> {
   try {
     await prisma.$transaction(
       async (tx) => {
+        await runDowns(tx, LATER_DOWNS);
         await body(tx);
         throw new RollbackSignal();
       },
@@ -643,14 +651,15 @@ describe('down.sql', () => {
           recipeId: f.recipeId,
           quantity: new Prisma.Decimal('10'),
           unitId: f.unitA,
-          presentationLines: {
-            create: [
-              { companyId: f.companyId, presentationId: f.withContent, packages: 2, presentationContent: '2.5' },
-              { companyId: f.companyId, presentationId: f.withoutContent, packages: 1 },
-            ],
-          },
         },
         select: { id: true },
+      });
+      const repartidoLinea = await ensureOnlyLine(tx, repartido.id);
+      await tx.orderPresentationLine.createMany({
+        data: [
+          { orderId: repartido.id, orderLineId: repartidoLinea, companyId: f.companyId, presentationId: f.withContent, packages: 2, presentationContent: '2.5' },
+          { orderId: repartido.id, orderLineId: repartidoLinea, companyId: f.companyId, presentationId: f.withoutContent, packages: 1 },
+        ],
       });
 
       const message = await expectScriptToFail(tx, () => runScript(tx, downSource), 'DOWN con un pedido de dos lineas');
@@ -674,11 +683,18 @@ describe('down.sql', () => {
           recipeId: f.recipeId,
           quantity: new Prisma.Decimal('10'),
           unitId: f.unitA,
-          presentationLines: {
-            create: [{ companyId: f.companyId, presentationId: f.withContent, packages: 4, presentationContent: '2.5' }],
-          },
         },
         select: { id: true },
+      });
+      await tx.orderPresentationLine.create({
+        data: {
+          orderId: unaLinea.id,
+          orderLineId: await ensureOnlyLine(tx, unaLinea.id),
+          companyId: f.companyId,
+          presentationId: f.withContent,
+          packages: 4,
+          presentationContent: '2.5',
+        },
       });
 
       await runScript(tx, downSource);

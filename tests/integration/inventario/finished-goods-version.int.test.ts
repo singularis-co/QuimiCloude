@@ -19,6 +19,7 @@ import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/p
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -129,7 +130,7 @@ async function sembrarPedido(
   // QC-170: el pedido ya no tiene presentacion unica; se reparte en lineas. Una sola linea de
   // 10 envases de contenido 1 equivale a la presentacion unica de antes.
   const { id: lineId } = await prisma.orderPresentationLine.create({
-    data: { orderId: id, companyId, presentationId, packages: 10, presentationContent: '1' },
+    data: { orderId: id, orderLineId: await ensureOnlyLine(prisma, id), companyId, presentationId, packages: 10, presentationContent: '1' },
     select: { id: true },
   });
   return { id, lineId };
@@ -145,12 +146,12 @@ async function finalizar(
 ) {
   const [ref] = await findRecipeRefsIncludingDeleted([recipeId], empresa.companyId);
   if (ref === undefined) throw new Error('la receta no volvio del catalogo');
-  return prisma.$transaction((tx) =>
+  return prisma.$transaction(async (tx) =>
     receiveFinishedGoods(
       tx,
       {
         orderId: pedido.id,
-        orderLineId: null,
+        orderLineId: await ensureOnlyLine(prisma, pedido.id),
         recipeId,
         recipeName: ref.name,
         presentationId,
@@ -218,6 +219,7 @@ describe('producto terminado de un pedido con version de receta', () => {
       await prisma.product.deleteMany({ where: { id: { in: productIds } } });
       const pedidos = [pedidoOriginal.id, pedidoVersion.id, pedidoVersionBis.id];
       await prisma.orderPresentationLine.deleteMany({ where: { orderId: { in: pedidos } } });
+      await prisma.orderLine.deleteMany({ where: { order: { id: { in: pedidos } } } });
       await prisma.order.deleteMany({ where: { id: { in: pedidos } } });
       await prisma.recipe.deleteMany({ where: { id: versionId } });
       await prisma.recipe.deleteMany({ where: { id: originalId } });

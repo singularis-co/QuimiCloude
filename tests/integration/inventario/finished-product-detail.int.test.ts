@@ -23,6 +23,7 @@ import { inventario } from '@/lib/composition'
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
+import { ensureOnlyLine } from '../../helpers/only-order-line'
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -139,7 +140,7 @@ async function createOrder(t: Tenant, deletedAt: Date | null = null): Promise<st
 
 async function createLine(t: Tenant, orderId: string, presentationId: string): Promise<string> {
   const { id } = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId: t.companyId, presentationId, packages: 10 },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: t.companyId, presentationId, packages: 10 },
     select: { id: true },
   })
   return id
@@ -202,8 +203,13 @@ async function movement(
   t: Tenant,
   data: Omit<Prisma.InventoryMovementUncheckedCreateInput, 'companyId'>,
 ): Promise<string> {
+  // Los asientos con pedido llevan su linea (CHECK de la tabla).
+  const orderLineId =
+    typeof data.orderId === 'string' && data.orderLineId === undefined
+      ? await ensureOnlyLine(prisma, data.orderId)
+      : data.orderLineId
   const { id } = await prisma.inventoryMovement.create({
-    data: { ...data, companyId: t.companyId },
+    data: { ...data, orderLineId, companyId: t.companyId },
     select: { id: true },
   })
   return id
@@ -219,6 +225,7 @@ async function dropTenant(t: Tenant): Promise<void> {
   await prisma.productBatch.deleteMany({ where })
   await prisma.product.deleteMany({ where })
   await prisma.orderPresentationLine.deleteMany({ where })
+  await prisma.orderLine.deleteMany({ where })
   await prisma.order.deleteMany({ where })
   await prisma.customer.deleteMany({ where })
   await prisma.recipe.deleteMany({ where })

@@ -25,6 +25,7 @@ import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/p
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
+import { ensureOnlyLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -158,7 +159,7 @@ async function sembrarLinea(
   presentationContent: string | null,
 ): Promise<string> {
   const { id } = await prisma.orderPresentationLine.create({
-    data: { orderId, companyId, presentationId, packages, presentationContent },
+    data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId, presentationId, packages, presentationContent },
     select: { id: true },
   });
   return id;
@@ -174,7 +175,7 @@ async function limpiarProducto(productId: string): Promise<void> {
   await prisma.product.deleteMany({ where: { id: productId } });
 }
 
-function recibir(
+async function recibir(
   companyId: string,
   input: {
     readonly orderId: string;
@@ -189,7 +190,8 @@ function recibir(
     readonly now: Date;
   },
 ) {
-  return prisma.$transaction((tx) => receiveFinishedGoods(tx, { ...input, orderLineId: null }, ambito(companyId)));
+  const orderLineId = await ensureOnlyLine(prisma, input.orderId);
+  return prisma.$transaction((tx) => receiveFinishedGoods(tx, { ...input, orderLineId }, ambito(companyId)));
 }
 
 describe('receiveFinishedGoods — R11, R13, R17, R41, R43: primera entrada', () => {
@@ -249,6 +251,7 @@ describe('receiveFinishedGoods — R11, R13, R17, R41, R43: primera entrada', ()
       await limpiarProducto(outcome.productId);
     } finally {
       await borrarLineas(orderId);
+      await prisma.orderLine.deleteMany({ where: { order: { id: orderId } } });
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -307,6 +310,7 @@ describe('receiveFinishedGoods — R11, R13, R17, R41, R43: primera entrada', ()
       if (productId !== null) await limpiarProducto(productId);
       await borrarLineas(orderId1);
       await borrarLineas(orderId2);
+      await prisma.orderLine.deleteMany({ where: { order: { id: { in: [orderId1, orderId2] } } } });
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -352,6 +356,7 @@ describe('receiveFinishedGoods — R21: idempotencia por linea del reparto', () 
     } finally {
       if (productId !== null) await limpiarProducto(productId);
       await borrarLineas(orderId);
+      await prisma.orderLine.deleteMany({ where: { order: { id: orderId } } });
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -415,6 +420,7 @@ describe('receiveFinishedGoods — R22: dos lineas de la misma combinacion, a la
       if (productId !== null) await limpiarProducto(productId);
       await borrarLineas(orderId1);
       await borrarLineas(orderId2);
+      await prisma.orderLine.deleteMany({ where: { order: { id: { in: [orderId1, orderId2] } } } });
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -483,6 +489,7 @@ describe('receiveFinishedGoods — R23: acotado por empresa', () => {
       if (productIdB !== null) await limpiarProducto(productIdB);
       await borrarLineas(orderA);
       await borrarLineas(orderB);
+      await prisma.orderLine.deleteMany({ where: { order: { id: { in: [orderA, orderB] } } } });
       await prisma.order.deleteMany({ where: { id: { in: [orderA, orderB] } } });
       await prisma.recipe.deleteMany({ where: { id: { in: [recipeA, recipeB] } } });
       await prisma.presentation.deleteMany({ where: { id: { in: [presentationA, presentationB] } } });
@@ -535,6 +542,7 @@ describe('receiveFinishedGoods — R23 — acceso cruzado: presentacion de otra 
       expect(despues).toEqual(antes);
     } finally {
       await borrarLineas(orderB);
+      await prisma.orderLine.deleteMany({ where: { order: { id: orderB } } });
       await prisma.order.deleteMany({ where: { id: orderB } });
       await prisma.recipe.deleteMany({ where: { id: recipeB } });
       await prisma.presentation.deleteMany({ where: { id: { in: [presentationA, presentationB] } } });
@@ -599,6 +607,7 @@ describe('receiveFinishedGoods — R35: producto dado de baja', () => {
       if (productId2 !== null) await limpiarProducto(productId2);
       await borrarLineas(orderId1);
       await borrarLineas(orderId2);
+      await prisma.orderLine.deleteMany({ where: { order: { id: { in: [orderId1, orderId2] } } } });
       await prisma.order.deleteMany({ where: { id: { in: [orderId1, orderId2] } } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -636,6 +645,7 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
     } finally {
       if (productId !== null) await limpiarProducto(productId);
       await borrarLineas(orderId);
+      await prisma.orderLine.deleteMany({ where: { order: { id: orderId } } });
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -672,6 +682,7 @@ describe('receiveFinishedGoods — R44: contenido del pedido', () => {
       expect(movements).toHaveLength(0);
     } finally {
       await borrarLineas(orderId);
+      await prisma.orderLine.deleteMany({ where: { order: { id: orderId } } });
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });
@@ -718,6 +729,7 @@ describe('receiveFinishedGoods — D22: el nombre completo, sin recortar', () =>
     } finally {
       if (productId !== null) await limpiarProducto(productId);
       await borrarLineas(orderId);
+      await prisma.orderLine.deleteMany({ where: { order: { id: orderId } } });
       await prisma.order.deleteMany({ where: { id: orderId } });
       await prisma.recipe.deleteMany({ where: { id: recipeId } });
       await prisma.presentation.deleteMany({ where: { id: presentationId } });

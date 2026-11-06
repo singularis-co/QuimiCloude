@@ -266,15 +266,6 @@ describe('QT-313 — getOrderDelivery lee la receta de la linea del pedido', () 
     expect(vista).toEqual(hoy)
   })
 
-  it('QT-313 R45: un reparto sin linea del pedido no pide lotes ni lee la receta del pedido', async () => {
-    const m = montar({ lineas: LINEAS.map((linea) => ({ ...linea, orderLineId: null })), lineasDelPedido: [] })
-    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, ENTREGADOR)
-
-    expect(m.findDeliverableBatches).not.toHaveBeenCalled()
-    expect(vista.lines.map((linea) => linea.batches)).toEqual([[], [], []])
-    expect(vista.lines.map((linea) => linea.remainingPackages)).toEqual([0, 7, 2])
-  })
-
   it('QT-313 R45: con dos lineas cada reparto pendiente lleva solo los lotes de la receta de su linea', async () => {
     const m = montar({
       lineas: [

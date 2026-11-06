@@ -85,6 +85,7 @@ import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
+import { ensureOnlyLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc219_e2e_';
@@ -248,6 +249,7 @@ async function deleteCompanyData(companyIds: readonly string[]): Promise<unknown
     () => prisma.productBatch.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.product.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.orderPresentationLine.deleteMany({ where: { companyId: { in: ids } } }),
+    () => prisma.orderLine.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.order.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.recipe.deleteMany({ where: { companyId: { in: ids } } }),
     () => prisma.presentation.deleteMany({ where: { companyId: { in: ids } } }),
@@ -568,6 +570,7 @@ test.beforeAll(async () => {
    * y el asiento `production` que enlaza la línea con el lote.
    */
   const lineCreatedAt = Date.now();
+  const orderLineId = await ensureOnlyLine(prisma, order.id);
   async function seedLine(
     offset: number,
     presentationId: string,
@@ -578,6 +581,7 @@ test.beforeAll(async () => {
     const line = await prisma.orderPresentationLine.create({
       data: {
         orderId: order.id,
+        orderLineId,
         companyId: companyId!,
         presentationId,
         packages,
@@ -625,6 +629,7 @@ test.beforeAll(async () => {
         quantity: stock,
         reason: null,
         orderId: order.id,
+        orderLineId,
         orderPresentationLineId: line.id,
         companyId: companyId!,
         createdBy: empacadorId,
