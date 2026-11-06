@@ -546,17 +546,11 @@ describe('Contexto del chat', () => {
     expect(elegido.values['pedido.detalle']).not.toMatch(/[\n\t]/u)
   })
 
-  it('QT-313 R45: con pedidos de una linea el contexto es el mismo aunque orders.recipe_id diga otra receta', async () => {
+  it('QT-313 R45: con pedidos de una linea el contexto es el mismo', async () => {
     const e = await escenarioDePedidos()
     const pedirContexto = () =>
       integraciones.getWhatsappChatContext({ target: { customerId: e.cliente.id }, orderId: e.terminado }, e.A.lector)
     const hoy = await pedirContexto()
-    const marca = randomUUID().replace(/-/gu, '')
-    const ajena = await prisma.recipe.create({
-      data: { name: `Ajena ${marca}`, nameNormalized: `ajena${marca}`, companyId: e.A.companyId },
-      select: { id: true },
-    })
-    await prisma.order.updateMany({ where: { id: { in: [e.terminado, e.pendiente] } }, data: { recipeId: ajena.id } })
 
     const contexto = await pedirContexto()
 

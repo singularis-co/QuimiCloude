@@ -17,7 +17,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -106,17 +106,14 @@ let sequenceDelArchivo = 1;
 
 async function sembrarPedido(recipeId: string): Promise<string> {
   const now = new Date();
-  const { id } = await prisma.order.create({
-    data: {
+  const { id } = await createOrderWithLine(prisma, {
       orderYear: now.getUTCFullYear(),
       orderSequence: sequenceDelArchivo++,
       recipeId,
       quantity: '10',
       companyId: empresaDelArchivo,
       createdAt: now,
-    },
-    select: { id: true },
-  });
+    });
   return id;
 }
 

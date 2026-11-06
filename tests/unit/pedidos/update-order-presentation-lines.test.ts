@@ -20,7 +20,6 @@ import { OrderPresentationLineNotEditableError } from '@/lib/modules/pedidos/dom
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
 import { STARTED_ORDER_STATUSES, type OrderStatus } from '@/lib/modules/pedidos/domain/order-classification';
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type {
   LockedOrderRow,
   OrderLineChanges,
@@ -36,17 +35,7 @@ import type {
   ReservationOutcome,
 } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
-import {
-  fakeFinishedGoodsIntake,
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeMaterialReservations,
-  fakeOrderConsumptionLedger,
-  fakeOrderUnitOfWork,
-  fakeRecipeExecutionReader,
-  ONLY_LINE_ID,
-  orderLineOf,
-} from '../../helpers/order-unit-of-work-double';
+import { fakeFinishedGoodsIntake, fakeScopeProducts, fakeScopeUnits, fakeMaterialReservations, fakeOrderConsumptionLedger, fakeOrderUnitOfWork, fakeRecipeExecutionReader, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '../../helpers/order-unit-of-work-double';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
 import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import { fakePackagingCatalog, packagingRef } from '../../helpers/packaging-catalog-double';
@@ -71,8 +60,8 @@ const PRESENTACION_B = '99999999-9999-4999-8999-999999999999';
 
 const AHORA = new Date('2026-09-27T10:00:00.000Z');
 
-function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
-  const base: OrderRow = {
+function filaBloqueada(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
+  const base: SingleRecipeOrderRow = {
     salePrice: null,
     id: PEDIDO,
     number: { year: 2026, sequence: 7 },
@@ -135,7 +124,6 @@ function ordersDoble(
       setReservedAt(orderId, reservedAt, scope),
     ),
     refreshStatus: vi.fn(async () => fila?.status ?? null),
-    mirrorFirstLine: vi.fn(async () => undefined),
     // El resto del puerto no lo llama este caso de uso: si lo hiciera, el test que lo comprueba
     // (mas abajo, "no toca...") fallaria por una llamada inesperada al doble.
     create: vi.fn(async () => {

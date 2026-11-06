@@ -21,7 +21,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 import type { ConsumptionOutcome, ReservationRequirementLine } from '@/lib/modules/inventario/domain/reservation';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -121,8 +121,7 @@ let orderSequence = 0;
 
 async function createOrderRow(fixture: Fixture): Promise<string> {
   orderSequence += 1;
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       orderYear: new Date().getUTCFullYear(),
       orderSequence,
       recipeId: fixture.recipeId,
@@ -130,9 +129,7 @@ async function createOrderRow(fixture: Fixture): Promise<string> {
       companyId: fixture.companyId,
       createdBy: fixture.actorId,
       updatedBy: fixture.actorId,
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 

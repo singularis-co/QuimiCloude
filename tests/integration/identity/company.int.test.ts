@@ -276,19 +276,13 @@ function listQuery(overrides: Partial<ListQuery> = {}): ListQuery {
 }
 
 async function seedOrder(tx: Tx, companyId: string): Promise<string> {
-  const marca = tag()
-  const recipe = await tx.recipe.create({
-    data: { name: `Receta ${marca}`, nameNormalized: `receta${marca}`, companyId },
-    select: { id: true },
-  })
   const id = randomUUID()
   await tx.$executeRawUnsafe(
-    `INSERT INTO "orders" ("id","company_id","order_year","order_sequence","recipe_id","quantity","updated_at")
-     VALUES ($1::uuid, $2::uuid, 2026, $3, $4::uuid, 10, CURRENT_TIMESTAMP)`,
+    `INSERT INTO "orders" ("id","company_id","order_year","order_sequence","updated_at")
+     VALUES ($1::uuid, $2::uuid, 2026, $3, CURRENT_TIMESTAMP)`,
     id,
     companyId,
     900_000 + Math.floor(Math.random() * 90_000),
-    recipe.id,
   )
   return id
 }

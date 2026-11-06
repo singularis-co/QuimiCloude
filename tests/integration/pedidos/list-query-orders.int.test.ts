@@ -41,7 +41,8 @@ import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/pers
 import { prisma } from '@/lib/shared/db/prisma'
 import { MAX_PAGE_SIZE } from '@/lib/shared/pagination'
 
-import type { ListQuery, NewOrder, OrderRow, OrderScope, Page } from '@/lib/modules/pedidos'
+import type { ListQuery, OrderRow, OrderScope, Page } from '@/lib/modules/pedidos'
+import { createOrderWithLine, createSingleLineOrder, type SingleLineNewOrder, firstLineQuantities } from '../../helpers/only-order-line'
 
 /** Un ano por archivo, distinto de los 288x de `order-repository.int.test.ts` y de los 287x de
  *  `order-sequence.int.test.ts`, para que ninguno pueda pisarle la secuencia a otro. */
@@ -77,7 +78,7 @@ let actorId: string
 let roleId: string
 let documentTypeCode: string
 let companyId: string
-/** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+/** QC-146: presentacion de la MISMA empresa, obligatoria en `SingleLineNewOrder`. */
 let presentationId: string
 
 const creados: string[] = []
@@ -93,7 +94,7 @@ function instantIn(day: number, ms = 0): Date {
   return new Date(Date.UTC(YEAR, 0, day, 12, 0, 0, ms))
 }
 
-function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId,
@@ -108,9 +109,9 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 }
 
 /** Alta por el adaptador REAL. Registra el id para que el `afterAll` la borre. */
-async function alta(now: Date, overrides: Partial<NewOrder> = {}): Promise<OrderRow> {
+async function alta(now: Date, overrides: Partial<SingleLineNewOrder> = {}): Promise<OrderRow> {
   const fila = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(overrides), YEAR, actorId, now, null, scope()),
+    createSingleLineOrder(createOrderWriteRepository(tx), baseOrder(overrides), YEAR, actorId, now, null, scope()),
   )
   creados.push(fila.id)
   return fila
@@ -181,7 +182,7 @@ beforeAll(async () => {
       select: { id: true },
     })
   ).id
-  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`NewOrder`).
+  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`SingleLineNewOrder`).
   presentationId = (
     await prisma.presentation.create({
       data: {
@@ -223,6 +224,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (creados.length > 0) {
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: creados } } })
     await prisma.order.deleteMany({ where: { id: { in: creados } } })
   }
   await prisma.$executeRawUnsafe(`DROP SEQUENCE IF EXISTS "orders_sequence_${String(YEAR)}"`)
@@ -376,7 +378,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
     const recetas = [recipeAlfaId, recipeBetaId, recipeBajaId, ...recetasComunes]
     // Los pedidos de estas recetas ANTES que las recetas: `recipes.company_id`/`orders.recipe_id`
     // son FK RESTRICT y el `afterAll` del archivo, que borra `creados`, corre DESPUES de este.
-    await prisma.order.deleteMany({ where: { recipeId: { in: recetas } } })
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: recetas } } }}, select: { id: true } })).map((pedido) => pedido.id)
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } })
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } })
     for (const id of recetas) {
       await prisma.recipe.delete({ where: { id } })
     }
@@ -478,7 +482,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
       expect(pagina.total).toBe(0)
     } finally {
       // El pedido ANTES que su receta: `orders.recipe_id` es FK RESTRICT.
-      await prisma.order.deleteMany({ where: { recipeId: recipeBorradaR6Id } })
+      const pedidosABorrar2 = (await prisma.order.findMany({ where: { lines: { some: { recipeId: recipeBorradaR6Id } }}, select: { id: true } })).map((pedido) => pedido.id)
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar2 } } })
+      await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar2 } } })
       await prisma.recipe.delete({ where: { id: recipeBorradaR6Id } })
     }
   })
@@ -511,8 +517,7 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
         // fixture (`scope()`), y este pedido tiene que ser de la OTRA empresa. `createdBy` y
         // `updatedBy` quedan sin autor: son columnas opcionales y el actor del fixture es de
         // la empresa contraria.
-        const otherOrder = await prisma.order.create({
-          data: {
+        const otherOrder = await createOrderWithLine(prisma, {
             companyId: otherCompanyId,
             orderYear: YEAR,
             orderSequence: 1,
@@ -522,9 +527,7 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
             status: 'PENDIENTE',
             createdAt: instantIn(DIA, 40),
             updatedAt: instantIn(DIA, 40),
-          },
-          select: { id: true },
-        })
+          })
 
         // El pedido ajeno EXISTE de verdad en la base: si esto fallara, el cero de abajo no
         // demostraria ningun ambito, solo una fila que nunca llego a crearse.
@@ -536,7 +539,9 @@ describe('la busqueda por nombre de receta (R1, R2, R3, R4, R5, R6, R10, R15)', 
         expect(pagina.items).toEqual([])
         expect(pagina.total).toBe(0)
       } finally {
-        await prisma.order.deleteMany({ where: { recipeId: otherRecipeId } })
+        const pedidosABorrar3 = (await prisma.order.findMany({ where: { lines: { some: { recipeId: otherRecipeId } }}, select: { id: true } })).map((pedido) => pedido.id)
+        await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar3 } } })
+        await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar3 } } })
         await prisma.recipe.delete({ where: { id: otherRecipeId } })
       }
     } finally {
@@ -765,7 +770,7 @@ describe('los decimales se comparan como Decimal, no como coma flotante', () => 
     )
 
     expect(pagina.items.map((o) => o.id).sort()).toEqual([justo.id, menos.id].sort())
-    expect(pagina.items.map((o) => o.quantity)).toContain('19.9900')
+    expect(await firstLineQuantities(prisma, pagina.items.map((o) => o.id))).toContain('19.9900')
   })
 })
 
@@ -881,21 +886,21 @@ describe('QT-313: filtro y orden por estado con pedidos PARCIAL (R49, R52)', () 
     status: 'PENDIENTE' | 'EN_CURSO' | 'BLOQUEADO' | 'CANCELADO',
     quitada = false,
   ): Promise<void> {
-    const { id } = await prisma.orderLine.create({
-      data: {
-        orderId,
-        companyId: empresa,
-        position,
-        recipeId: receta,
-        originalRecipeId: receta,
-        quantity: '1.0000',
-        unitId,
-        status,
-        cancellationReason: status === 'CANCELADO' ? 'ya no se fabrica' : null,
-        deletedAt: quitada ? instantIn(DIA) : null,
-      },
-      select: { id: true },
-    })
+    // La linea 0 de un pedido dado de alta por el puerto ya existe: se reescribe con estos datos.
+    const existente = await prisma.orderLine.findFirst({ where: { orderId, position }, select: { id: true } })
+    const datos = {
+      recipeId: receta,
+      originalRecipeId: receta,
+      quantity: '1.0000',
+      unitId,
+      status,
+      cancellationReason: status === 'CANCELADO' ? 'ya no se fabrica' : null,
+      deletedAt: quitada ? instantIn(DIA) : null,
+    }
+    const { id } =
+      existente === null
+        ? await prisma.orderLine.create({ data: { orderId, companyId: empresa, position, ...datos }, select: { id: true } })
+        : await prisma.orderLine.update({ where: { id: existente.id }, data: datos, select: { id: true } })
     lineas.push(id)
   }
 
@@ -949,16 +954,7 @@ describe('QT-313: filtro y orden por estado con pedidos PARCIAL (R49, R52)', () 
     ).id
     pedidoOtraEmpresa = (
       await prisma.order.create({
-        data: {
-          companyId: otraEmpresaId,
-          orderYear: YEAR,
-          orderSequence: 1,
-          recipeId,
-          quantity: '1.0000',
-          unitId,
-          status: 'PARCIAL',
-          createdAt: instantIn(DIA, 5),
-        },
+        data: { companyId: otraEmpresaId, orderYear: YEAR, orderSequence: 1, status: 'PARCIAL', createdAt: instantIn(DIA, 5) },
         select: { id: true },
       })
     ).id
@@ -971,6 +967,7 @@ describe('QT-313: filtro y orden por estado con pedidos PARCIAL (R49, R52)', () 
     await prisma.order.delete({ where: { id: pedidoOtraEmpresa } })
     await prisma.company.delete({ where: { id: otraEmpresaId } })
     const nuestros = [pendiente, enCurso, parcialEnCurso, parcialSinCursoActiva, cancelado].map((fila) => fila.id)
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: nuestros } } })
     await prisma.order.deleteMany({ where: { id: { in: nuestros } } })
     creados.splice(0, creados.length, ...creados.filter((id) => !nuestros.includes(id)))
     await prisma.recipe.deleteMany({ where: { id: { in: recetasExtra } } })

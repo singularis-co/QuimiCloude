@@ -6,10 +6,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { legacyCreateOrder as createCreateOrder, legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 import { UnauthorizedError, ValidationError } from '@/lib/modules/pedidos/domain/errors'
 import { createQuoteOrderCost, type QuoteOrderCostDeps } from '@/lib/modules/pedidos/domain/quote-order-cost'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog } from '@/lib/modules/recetas'
@@ -76,7 +75,7 @@ const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 /** La unidad del pedido: deriva de 'u-1' con factor 1 en `dobles()`. */
 const ORDER_UNIT_ID = '99999999-9999-4999-8999-999999999999'
 
-function filaExistente(): OrderRow {
+function filaExistente(): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,

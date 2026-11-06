@@ -56,7 +56,7 @@ import {
 } from './helpers/confirm-dialog';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc168_e2e_';
@@ -328,10 +328,13 @@ test.beforeAll(async () => {
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
-    await prisma.orderLine.deleteMany({ where: { order: { recipeId: { in: orphanRecipeIds } } } });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (
+      await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } } }, select: { id: true } })
+    ).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     const orphanFinishedProducts = await prisma.product.findMany({
       where: { recipeId: { in: orphanRecipeIds } },
       select: { id: true },
@@ -446,8 +449,7 @@ test.beforeAll(async () => {
   ).id;
 
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: BASE_SEQUENCE,
@@ -455,9 +457,7 @@ test.beforeAll(async () => {
       quantity: ORDER_QUANTITY,
       unitId: unit.id,
       status: 'EN_CURSO',
-    },
-    select: { id: true },
-  });
+    });
   await prisma.orderPresentationLine.create({
     data: {
       orderId: order.id,
@@ -677,10 +677,7 @@ test.describe('el recorrido de empaque (R48)', () => {
       timeout: 60_000,
     });
 
-    const startedOrder = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, packedBy: true },
-    });
+    const startedOrder = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true } });
     expect(startedOrder.status).toBe('EN_EMPAQUE');
     expect(startedOrder.packedBy).toBe(empacadorUserId);
 

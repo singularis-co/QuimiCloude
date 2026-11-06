@@ -56,7 +56,7 @@ import {
 } from '@/lib/modules/pedidos';
 import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder, OrderCatalog } from '@/lib/modules/pedidos';
+import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
@@ -66,7 +66,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
-import { onOnlyLine } from '../../helpers/only-order-line';
+import { onOnlyLine, updateOrderAndLine, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -272,7 +272,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): Omit<NewOrder, 'customerId' | 'salePrice'> {
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: SingleLineNewOrder['status'] = 'PENDIENTE'): Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> {
   return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
@@ -288,12 +288,12 @@ async function movimientosDe(orderId: string): Promise<readonly ReservaResumen[]
 }
 
 async function reservedAtDe(orderId: string): Promise<Date | null> {
-  const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { reservedAt: true } });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { reservedAt: true } });
   return row.reservedAt;
 }
 
 async function finishedAtDe(orderId: string): Promise<Date | null> {
-  const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { finishedAt: true } });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { finishedAt: true } });
   return row.finishedAt;
 }
 
@@ -477,7 +477,7 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
       expect(movimientos.map((m) => m.kind)).toEqual(['reserve', 'reserve']);
       expect(movimientos.at(-1)).toMatchObject({ kind: 'reserve', quantity: '4.0000' });
       expect(await reservedAtDe(creado.id)).not.toBeNull();
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { status: true, quantity: true } });
       expect(row.status).toBe('PENDIENTE');
       expect(row.quantity.toFixed(4)).toBe('8.0000');
     } finally {
@@ -504,7 +504,7 @@ describe('R52 — un `status` de entrada no dispara consumo, ni siquiera "ENTREG
       );
 
       expect(await stockDe(batchId)).toBe('5.0000');
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { status: true, quantity: true } });
       // QC-138 R11: el PENDIENTE que deja de alcanzar queda BLOQUEADO.
       expect(row.status).toBe('BLOQUEADO');
       expect(row.quantity.toFixed(4)).toBe('500.0000');
@@ -569,7 +569,7 @@ describe('R52 — un pedido sin apartado y receta vacia no rechaza la edicion au
       await updateOrder(creado.id, nuevoPedido(recipeId, fixture.unitId, '20.0000', 'ENTREGADO'), actorDe(fixture));
 
       expect(await movimientosDe(creado.id)).toEqual([]);
-      const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true, quantity: true } });
+      const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { status: true, quantity: true } });
       expect(row.status).toBe('PENDIENTE');
       expect(row.quantity.toFixed(4)).toBe('20.0000');
       expect(await finishedAtDe(creado.id)).toBeNull();
@@ -692,7 +692,7 @@ describe('QC-141 T10 — Finalizar sin material suficiente (R30, R31)', () => {
       // caso de uso: el pedido llega al Finalizar sin nada apartado.
       const creado = await createOrder(nuevoPedido(recipeVacia, fixture.unitId, '10.0000'), actorDe(fixture));
       expect(await movimientosDe(creado.id)).toEqual([]);
-      await prisma.order.update({ where: { id: creado.id }, data: { recipeId } });
+      await updateOrderAndLine(prisma, creado.id, { recipeId });
       await prisma.orderLine.updateMany({ where: { orderId: creado.id }, data: { recipeId, originalRecipeId: recipeId } });
       await onOnlyLine(transitionAliveById)(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 

@@ -318,12 +318,9 @@ async function aTerminado(fixture: Fixture, orderId: string, lineId: string, at:
   expect(await finishConditioning(orderId, lineId, fixture.companyId, fixture.actorId, at)).toBe('ok');
 }
 
+/** El estado derivado del pedido: lo de cada etapa vive en sus lineas. */
 async function pedidoDe(orderId: string) {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, packedBy: true, conditionedBy: true, finishedAt: true, actualCost: true },
-  });
-  return { ...row, actualCost: row.actualCost === null ? null : row.actualCost.toFixed(4) };
+  return prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } });
 }
 
 async function lineaDe(lineId: string) {
@@ -332,14 +329,6 @@ async function lineaDe(lineId: string) {
     select: { status: true, packedBy: true, conditionedBy: true, finishedAt: true, actualCost: true, reservedAt: true },
   });
   return { ...row, actualCost: row.actualCost === null ? null : row.actualCost.toFixed(4) };
-}
-
-/** Que el CHECK siga en la base: si desapareciera, el caso dejaria de probar lo que nombra. */
-async function expectCheck(name: string): Promise<void> {
-  const rows = await prisma.$queryRaw<ReadonlyArray<{ readonly conname: string }>>(Prisma.sql`
-    SELECT conname FROM pg_constraint WHERE conname = ${name} AND conrelid = '"orders"'::regclass
-  `);
-  expect(rows).toHaveLength(1);
 }
 
 describe('QT-313 T14a — el flujo de planta escribe la linea y deriva el pedido', () => {
@@ -418,100 +407,8 @@ describe('QT-313 T14a — el flujo de planta escribe la linea y deriva el pedido
   });
 });
 
-describe('QT-313 T14a — espejo de etapa en `orders` (CHECK por CHECK)', () => {
-  it('QT-313 orders_packed_by_matches_status: EN_EMPAQUE lleva quien empaca; PARCIAL con una linea en empaque lo deja NULL', async () => {
-    await conFixture(async (fixture) => {
-      await expectCheck('orders_packed_by_matches_status');
-      const uno = await crearPedido(fixture, ['2']);
-      await aEmpaque(fixture, uno.orderId, uno.lines[0] as string);
-      expect(await pedidoDe(uno.orderId)).toMatchObject({ status: 'EN_EMPAQUE', packedBy: fixture.actorId });
-
-      const dos = await crearPedido(fixture, ['2', '3']);
-      await aEmpaque(fixture, dos.orderId, dos.lines[1] as string, fixture.otherActorId);
-      expect(await pedidoDe(dos.orderId)).toMatchObject({ status: 'PARCIAL', packedBy: null });
-      expect((await lineaDe(dos.lines[1] as string)).packedBy).toBe(fixture.otherActorId);
-
-      await aEmpaque(fixture, dos.orderId, dos.lines[0] as string);
-      // Las dos en empaque: quien empaca la de menor position.
-      expect(await pedidoDe(dos.orderId)).toMatchObject({ status: 'EN_EMPAQUE', packedBy: fixture.actorId });
-    });
-  });
-
-  it('QT-313 orders_actual_cost_requires_packed: POR_ACONDICIONAR lleva la suma de R18; PARCIAL lo deja NULL', async () => {
-    await conFixture(async (fixture) => {
-      await expectCheck('orders_actual_cost_requires_packed');
-      const { orderId, lines } = await crearPedido(fixture, ['6', '3']);
-      const [a, b] = lines as [string, string];
-
-      await aPorAcondicionar(fixture, orderId, a);
-      expect(await pedidoDe(orderId)).toMatchObject({ status: 'PARCIAL', actualCost: null });
-
-      await aPorAcondicionar(fixture, orderId, b);
-      // 18.0000 de la primera y 9.0000 de la segunda (3 del insumo a 2.5000 y 3 envases a 0.5000).
-      expect(await pedidoDe(orderId)).toMatchObject({ status: 'POR_ACONDICIONAR', actualCost: '27.0000', packedBy: fixture.actorId });
-    });
-  });
-
-  it('QT-313 orders_conditioned_by_matches_status: EN_ACONDICIONAMIENTO lleva quien acondiciona la de menor position', async () => {
-    await conFixture(async (fixture) => {
-      await expectCheck('orders_conditioned_by_matches_status');
-      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
-      const [a, b] = lines as [string, string];
-
-      await aAcondicionamiento(fixture, orderId, b, fixture.otherActorId);
-      expect(await pedidoDe(orderId)).toMatchObject({ status: 'PARCIAL', conditionedBy: null });
-      await aAcondicionamiento(fixture, orderId, a);
-      expect(await pedidoDe(orderId)).toMatchObject({
-        status: 'EN_ACONDICIONAMIENTO',
-        conditionedBy: fixture.actorId,
-        packedBy: fixture.actorId,
-        // 6.0000 de la primera y 9.0000 de la segunda.
-        actualCost: '15.0000',
-      });
-    });
-  });
-
-  it('QT-313 orders_finished_requires_finished_at: TERMINADO con dos lineas lleva el mayor finished_at', async () => {
-    await conFixture(async (fixture) => {
-      await expectCheck('orders_finished_requires_finished_at');
-      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
-      const [a, b] = lines as [string, string];
-      const antes = new Date('2026-10-01T10:00:00.000Z');
-      const despues = new Date('2026-10-02T10:00:00.000Z');
-
-      await aTerminado(fixture, orderId, b, despues);
-      await aTerminado(fixture, orderId, a, antes);
-
-      const pedido = await pedidoDe(orderId);
-      expect(pedido.status).toBe('TERMINADO');
-      expect(pedido.finishedAt?.toISOString()).toBe(despues.toISOString());
-      expect(pedido.conditionedBy).toBe(fixture.actorId);
-    });
-  });
-
-  it('QT-313 orders_finished_at_requires_delivered: PARCIAL con una linea TERMINADO deja finished_at, quien empaca y el coste en NULL', async () => {
-    await conFixture(async (fixture) => {
-      await expectCheck('orders_finished_at_requires_delivered');
-      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
-      const [a, b] = lines as [string, string];
-
-      await aTerminado(fixture, orderId, a, new Date());
-
-      expect((await lineaDe(a)).finishedAt).not.toBeNull();
-      expect((await lineaDe(b)).status).toBe('PENDIENTE');
-      expect(await pedidoDe(orderId)).toEqual({
-        status: 'PARCIAL',
-        packedBy: null,
-        conditionedBy: null,
-        finishedAt: null,
-        actualCost: null,
-      });
-    });
-  });
-});
-
 describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
-  it('QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real de la linea, y orders su fecha de terminado', async () => {
+  it('QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
     await conFixture(async (fixture) => {
       const { orderId, lines } = await crearPedido(fixture, ['4']);
       const [linea] = lines as [string];
@@ -525,9 +422,9 @@ describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
       expect(vista.actualCost).toBe('12.0000');
       expect(vista.actualCostTotal).toBe('12.0000');
       expect(vista.lines[0]?.finishedAt?.toISOString()).toBe(terminado.toISOString());
-      const pedido = await pedidoDe(orderId);
-      expect(pedido).toMatchObject({ packedBy: fixture.actorId, conditionedBy: fixture.actorId, actualCost: '12.0000' });
-      expect(pedido.finishedAt?.toISOString()).toBe(terminado.toISOString());
+      const etapa = await lineaDe(linea);
+      expect(etapa).toMatchObject({ packedBy: fixture.actorId, conditionedBy: fixture.actorId, actualCost: '12.0000' });
+      expect(etapa.finishedAt?.toISOString()).toBe(terminado.toISOString());
     });
   });
 
@@ -540,7 +437,7 @@ describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
       const pagina = await summaries.listAliveSummariesByIds(fixture.companyId, [orderId], ['EN_EMPAQUE'], 1, 10);
       expect(pagina.total).toBe(1);
       const [fila] = pagina.items;
-      const pedido = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { recipeId: true, quantity: true, unitId: true } });
+      const pedido = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { recipeId: true, quantity: true, unitId: true } });
       expect(fila).toMatchObject({
         id: orderId,
         lineId: linea,

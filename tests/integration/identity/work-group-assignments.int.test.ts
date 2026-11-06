@@ -41,6 +41,7 @@ import { DOCUMENT_TYPE_CC, normalizeCompanyName, ROLE_OPERADOR } from '@/lib/mod
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { Actor } from '@/lib/modules/identity/domain/actor';
+import { createOrderWithLine } from '../../helpers/only-order-line';
 
 // ---------------------------------------------------------------------------
 // Escenario propio, limpieza propia
@@ -84,8 +85,7 @@ async function createRecipe(companyId: string): Promise<string> {
 
 async function createOrder(recipeId: string, companyId: string): Promise<string> {
   nextSequence += 1;
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       // QC-60: `orders.company_id` es NOT NULL y la FK de la asignacion ya es compuesta, asi que
       // el pedido nace en la MISMA empresa que sus asignaciones.
       companyId,
@@ -93,9 +93,7 @@ async function createOrder(recipeId: string, companyId: string): Promise<string>
       orderSequence: nextSequence,
       recipeId,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 
@@ -133,6 +131,7 @@ async function dropCompanyExceptCompanyRow(companyId: string): Promise<void> {
   await prisma.orderAssignment.deleteMany({ where: { companyId } });
   // QC-60: `orders.company_id` tiene FK `ON DELETE RESTRICT`, asi que los pedidos de la empresa
   // caen ANTES que ella.
+  await prisma.orderLine.deleteMany({ where: { companyId } });
   await prisma.order.deleteMany({ where: { companyId } });
   await prisma.workGroupMember.deleteMany({ where: { companyId } });
   await prisma.workGroup.deleteMany({ where: { companyId } });

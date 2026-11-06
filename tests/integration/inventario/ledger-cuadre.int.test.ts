@@ -43,7 +43,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -320,16 +320,13 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
         select: { id: true },
       });
       productId = product.id;
-      const order = await prisma.order.create({
-        data: {
+      const order = await createOrderWithLine(prisma, {
           orderYear: new Date().getUTCFullYear(),
           orderSequence: 1,
           recipeId,
           quantity: '10',
           companyId: fixture.companyId,
-        },
-        select: { id: true },
-      });
+        });
       orderId = order.id;
       const customer = await prisma.customer.create({
         data: {
@@ -428,16 +425,13 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
         select: { id: true },
       });
       productId = product.id;
-      const order = await prisma.order.create({
-        data: {
+      const order = await createOrderWithLine(prisma, {
           orderYear: new Date().getUTCFullYear(),
           orderSequence: 1,
           recipeId,
           quantity: '10',
           companyId: fixture.companyId,
-        },
-        select: { id: true },
-      });
+        });
       orderId = order.id;
       const customer = await prisma.customer.create({
         data: {
@@ -561,16 +555,13 @@ describe('cuadre del libro: stock = suma de asientos, para lotes posteriores a L
         select: { id: true },
       });
       productId = product.id;
-      const order = await prisma.order.create({
-        data: {
+      const order = await createOrderWithLine(prisma, {
           orderYear: new Date().getUTCFullYear(),
           orderSequence: 1,
           recipeId,
           quantity: '10',
           companyId: fixture.companyId,
-        },
-        select: { id: true },
-      });
+        });
       orderId = order.id;
       const presentationLine = await prisma.orderPresentationLine.create({
         data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: fixture.companyId, presentationId: fixture.presentationId, packages: 10 },

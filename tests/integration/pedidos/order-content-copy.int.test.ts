@@ -343,7 +343,7 @@ describe('R3 — el alta copia el contenido de cada presentacion del reparto', (
           actorDe(A),
         ),
       ).rejects.toMatchObject({ code: 'presentation_without_content' })
-      expect(await prisma.order.count({ where: { companyId: A.companyId, recipeId } })).toBe(0)
+      expect(await prisma.order.count({ where: { companyId: A.companyId, lines: { some: { recipeId } } }})).toBe(0)
     } finally {
       await borrarEnvase(envase)
       await borrarReceta(recipeId)

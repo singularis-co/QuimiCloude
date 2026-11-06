@@ -21,7 +21,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
@@ -264,16 +264,13 @@ describe('QC-199 — la vista de lotes cuenta en la unidad del producto', () => 
         new Date(),
         scopeOf(fixture),
       );
-      const order = await prisma.order.create({
-        data: {
+      const order = await createOrderWithLine(prisma, {
           companyId: fixture.companyId,
           orderYear: new Date().getUTCFullYear(),
           orderSequence: 1,
           recipeId: fixture.recipeId,
           quantity: new Prisma.Decimal('10'),
-        },
-        select: { id: true },
-      });
+        });
       await prisma.reservationMovement.create({
         data: {
           companyId: fixture.companyId,

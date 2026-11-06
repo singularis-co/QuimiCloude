@@ -21,6 +21,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
+import { createOrderWithLine } from '../../helpers/only-order-line'
 
 class RollbackSignal extends Error {
   constructor() {
@@ -163,8 +164,7 @@ async function createOrder(
     packedBy: string | null
   }> = {},
 ): Promise<string> {
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: f.companyId,
       orderYear: currentUtcYear(),
       orderSequence: freshSequence(),
@@ -173,9 +173,7 @@ async function createOrder(
       status: overrides.status,
       packedBy: overrides.packedBy,
       ...(overrides.status === 'CANCELADO' ? { cancellationReason: 'motivo de prueba' } : {}),
-    },
-    select: { id: true },
-  })
+    })
   return order.id
 }
 
@@ -184,7 +182,11 @@ function asUuid(id: string): Prisma.Sql {
   return Prisma.sql`CAST(${id} AS uuid)`
 }
 
-/** `INSERT` crudo en `orders`, con lo minimo obligatorio mas lo que cada caso quiere forzar. */
+/**
+ * `INSERT` crudo de un pedido y su unica linea en la misma sentencia, con lo minimo obligatorio mas
+ * lo que cada caso quiere forzar. Desde QT-313 quien empaca y la fecha de terminado son de la
+ * linea: sus CHECK y su FK son los de `order_lines`.
+ */
 function rawInsertOrder(
   tx: Prisma.TransactionClient,
   f: Fixtures,
@@ -194,40 +196,27 @@ function rawInsertOrder(
     readonly finishedAt?: Prisma.Sql
   },
 ): Promise<number> {
-  const columns = [
-    Prisma.raw('"company_id"'),
-    Prisma.raw('"order_year"'),
-    Prisma.raw('"order_sequence"'),
-    Prisma.raw('"recipe_id"'),
-    Prisma.raw('"quantity"'),
-    Prisma.raw('"status"'),
-    Prisma.raw('"updated_at"'),
-  ]
-  const values = [
-    asUuid(f.companyId),
-    Prisma.sql`${currentUtcYear()}`,
-    Prisma.sql`${freshSequence()}`,
-    asUuid(f.recipeId),
-    Prisma.sql`CAST('10' AS decimal(14,4))`,
-    overrides.status,
-    Prisma.sql`CURRENT_TIMESTAMP`,
-  ]
-  if (overrides.packedBy !== undefined) {
-    columns.push(Prisma.raw('"packed_by"'))
-    values.push(overrides.packedBy)
-  }
-  if (overrides.finishedAt !== undefined) {
-    columns.push(Prisma.raw('"finished_at"'))
-    values.push(overrides.finishedAt)
-  }
-  return tx.$executeRaw`INSERT INTO "orders" (${Prisma.join(columns)}) VALUES (${Prisma.join(values)})`
+  return tx.$executeRaw`
+    WITH o AS (
+      INSERT INTO "orders" ("company_id", "order_year", "order_sequence", "status", "updated_at")
+      VALUES (${asUuid(f.companyId)}, ${currentUtcYear()}, ${freshSequence()}, ${overrides.status}, CURRENT_TIMESTAMP)
+      RETURNING "id", "company_id", "status"
+    )
+    INSERT INTO "order_lines" (
+      "order_id", "company_id", "position", "recipe_id", "original_recipe_id", "quantity", "status",
+      "packed_by", "finished_at", "updated_at"
+    )
+    SELECT o."id", o."company_id", 0, ${asUuid(f.recipeId)}, ${asUuid(f.recipeId)}, CAST('10' AS decimal(14,4)),
+           o."status", ${overrides.packedBy ?? Prisma.sql`NULL`}, ${overrides.finishedAt ?? Prisma.sql`NULL`},
+           CURRENT_TIMESTAMP
+      FROM o`
 }
 
 afterAll(async () => {
   await prisma.$disconnect()
 })
 
-describe('orders_packed_by_matches_status', () => {
+describe('order_lines_packed_by_matches_status', () => {
   it('rechaza EN_EMPAQUE sin quien empaca, con SQLSTATE 23514 (R28)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
@@ -262,10 +251,7 @@ describe('orders_packed_by_matches_status', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
       const enEmpaque = await createOrder(tx, f, { status: 'EN_EMPAQUE', packedBy: f.packerId })
-      const stored = await tx.order.findUniqueOrThrow({
-        where: { id: enEmpaque },
-        select: { status: true, packedBy: true },
-      })
+      const stored = await tx.orderLine.findFirstOrThrow({ where: { orderId: enEmpaque }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true } })
       expect(stored.status).toBe('EN_EMPAQUE')
       expect(stored.packedBy).toBe(f.packerId)
 
@@ -274,12 +260,12 @@ describe('orders_packed_by_matches_status', () => {
         packedBy: f.packerId,
       })
       expect(
-        (await tx.order.findUniqueOrThrow({ where: { id: entregadoConEmpacador } })).packedBy,
+        (await tx.orderLine.findFirstOrThrow({ where: { orderId: entregadoConEmpacador } })).packedBy,
       ).toBe(f.packerId)
 
       const entregadoSinEmpacador = await createOrder(tx, f, { status: 'ENTREGADO' })
       expect(
-        (await tx.order.findUniqueOrThrow({ where: { id: entregadoSinEmpacador } })).packedBy,
+        (await tx.orderLine.findFirstOrThrow({ where: { orderId: entregadoSinEmpacador } })).packedBy,
       ).toBeNull()
     })
   })
@@ -334,7 +320,7 @@ describe('orders_delivered_not_deleted amplia POR_EMPACAR y EN_EMPAQUE', () => {
   })
 })
 
-describe('orders_finished_at_requires_delivered sigue aplicando en POR_EMPACAR', () => {
+describe('order_lines_finished_at_requires_delivered sigue aplicando en POR_EMPACAR', () => {
   it('rechaza finished_at en un pedido POR_EMPACAR, con SQLSTATE 23514 (R8)', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)

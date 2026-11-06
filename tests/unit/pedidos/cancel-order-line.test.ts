@@ -66,9 +66,6 @@ function dobles(lineas: readonly OrderLineRow[], opciones: { pedido?: OrderRow |
         orden.push('refreshStatus')
         return 'PARCIAL' as const
       }),
-      mirrorFirstLine: vi.fn(async () => {
-        orden.push('mirrorFirstLine')
-      }),
       softDeleteAlive: vi.fn(async () => {
         orden.push('softDeleteAlive')
         return 'ok' as const
@@ -131,7 +128,6 @@ describe('QT-313 T11 — cancelOrderLine', () => {
       `releaseForLine:${LINEA_B}`,
       `setLineReservedAt:${LINEA_B}`,
       'refreshStatus',
-      'mirrorFirstLine',
     ])
     // Ninguna escritura del estado del pedido: se deriva de las lineas.
     expect(d.orders.cancelAlive).not.toHaveBeenCalled()
@@ -199,7 +195,7 @@ describe('QT-313 T11 — cancelOrder con varias lineas', () => {
       [LINEA_C, 'El cliente anulo'],
     ])
     expect(d.reservations.releaseForLine.mock.calls.map((call) => call[0].orderLineId)).toEqual([LINEA_A, LINEA_C])
-    expect(d.orden.slice(-2)).toEqual(['refreshStatus', 'mirrorFirstLine'])
+    expect(d.orden.slice(-1)).toEqual(['refreshStatus'])
     expect(d.orders.refreshStatus).toHaveBeenCalledWith(PEDIDO.id, ADMIN.id, AHORA, SCOPE)
     expect(d.orders.cancelAlive).not.toHaveBeenCalled()
   })
@@ -253,7 +249,6 @@ describe('QT-313 T11 — deleteOrder con varias lineas', () => {
       `setLineReservedAt:${LINEA_A}`,
       `releaseForLine:${LINEA_B}`,
       `setLineReservedAt:${LINEA_B}`,
-      'mirrorFirstLine',
       'softDeleteAlive',
     ])
     expect(d.orders.softDeleteAlive).toHaveBeenCalledWith(PEDIDO.id, ADMIN.id, AHORA, SCOPE)

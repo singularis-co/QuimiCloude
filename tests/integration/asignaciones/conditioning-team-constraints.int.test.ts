@@ -21,7 +21,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { ensureOnlyLine, lineOfOrder } from '../../helpers/only-order-line';
+import { ensureOnlyLine, lineOfOrder, createOrderWithLine } from '../../helpers/only-order-line';
 
 class RollbackSignal extends Error {
   constructor() {
@@ -136,16 +136,13 @@ async function createOrder(tx: Prisma.TransactionClient, companyId: string): Pro
     select: { id: true },
   });
   nextSequence += 1;
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: recipe.id,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
+    });
   await ensureOnlyLine(tx, order.id);
   return order.id;
 }

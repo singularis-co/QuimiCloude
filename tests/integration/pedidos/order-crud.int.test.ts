@@ -58,7 +58,7 @@ import {
 import { createRecipeExecutionReader } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { ensureOnlyLine } from '../../helpers/only-order-line'
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line'
 
 import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -341,8 +341,6 @@ function baseColumns(f: Fixtures, sequence: number): Partial<Record<WritableColu
     company_id: asUuid(f.companyId),
     order_year: Prisma.sql`${currentUtcYear()}`,
     order_sequence: Prisma.sql`${sequence}`,
-    recipe_id: asUuid(f.recipeId),
-    quantity: asDecimal('10'),
   }
 }
 
@@ -364,8 +362,7 @@ async function createOrder(
   f: Fixtures,
   seed: OrderSeed = {},
 ): Promise<string> {
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: f.companyId,
       orderYear: currentUtcYear(),
       orderSequence: seed.sequence ?? freshSequence(),
@@ -377,9 +374,7 @@ async function createOrder(
       createdAt: seed.createdAt,
       createdBy: f.userId,
       updatedBy: f.userId,
-    },
-    select: { id: true },
-  })
+    })
   if (seed.presentationId !== undefined && seed.presentationId !== null) {
     await tx.orderPresentationLine.create({
       data: {
@@ -467,7 +462,7 @@ describe('el alta contra la base (R8, R10)', () => {
         { id: string; order_year: number; order_sequence: number }[]
       >`
         INSERT INTO "orders" (
-          "company_id", "order_year", "order_sequence", "recipe_id", "quantity",
+          "company_id", "order_year", "order_sequence",
           "priority", "status", "created_by", "updated_by", "created_at", "updated_at"
         ) VALUES (
           ${f.companyId}::uuid,
@@ -476,8 +471,6 @@ describe('el alta contra la base (R8, R10)', () => {
              FROM "orders"
             WHERE "company_id" = ${f.companyId}::uuid
               AND "order_year" = ${year}::integer),
-          ${f.recipeId}::uuid,
-          ${'12.5000'}::numeric,
           ${'ALTA'}::"OrderPriority",
           ${'PENDIENTE'}::"OrderStatus",
           ${f.userId}::uuid,
@@ -500,8 +493,6 @@ describe('el alta contra la base (R8, R10)', () => {
       expect(stored.companyId).toBe(f.companyId)
       expect(stored.orderYear).toBe(Number(devuelta.order_year))
       expect(stored.orderSequence).toBe(Number(devuelta.order_sequence))
-      expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.quantity.toFixed(4)).toBe('12.5000')
       expect(stored.priority).toBe('ALTA')
       expect(stored.status).toBe('PENDIENTE')
       expect(stored.cancellationReason).toBeNull()
@@ -1115,10 +1106,7 @@ async function codigoDe(promesa: Promise<unknown>): Promise<string | null> {
 }
 
 async function estadoDe(tx: Prisma.TransactionClient, id: string) {
-  const row = await tx.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true },
-  })
+  const row = await tx.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true } })
   const movimientos = await tx.reservationMovement.findMany({
     where: { orderId: id },
     select: { kind: true, quantity: true, createdBy: true },

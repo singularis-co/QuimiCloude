@@ -23,7 +23,7 @@ import { inventario } from '@/lib/composition'
 import { prisma } from '@/lib/shared/db/prisma'
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
-import { ensureOnlyLine } from '../../helpers/only-order-line'
+import { ensureOnlyLine, insertOnlyLine } from '../../helpers/only-order-line'
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -130,11 +130,12 @@ async function createOrder(t: Tenant, deletedAt: Date | null = null): Promise<st
   const orderId = randomUUID()
   nextSequence += 1
   await prisma.$executeRaw`
-    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "updated_at", "deleted_at")
+    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "updated_at", "deleted_at")
     VALUES (
       ${asUuid(orderId)}, ${asUuid(t.companyId)}, ${new Date().getUTCFullYear()}, ${nextSequence},
-      ${asUuid(t.recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP, ${deletedAt}
+      CURRENT_TIMESTAMP, ${deletedAt}
     )`
+  await insertOnlyLine(prisma, orderId, { recipeId: t.recipeId })
   return orderId
 }
 

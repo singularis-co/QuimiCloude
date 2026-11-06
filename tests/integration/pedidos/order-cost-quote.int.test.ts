@@ -47,7 +47,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 import { createCreateOrder as createLinesOrder, createQuoteOrderCost, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
 import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder } from '@/lib/modules/pedidos'
+import type { Actor } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch'
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
@@ -60,6 +60,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+import { type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -295,7 +296,7 @@ async function borrarPedido(orderId: string): Promise<void> {
 
 async function ingredientsCostCrudo(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`
   const row = rows[0]
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`)
   return row.ingredients_cost
@@ -454,7 +455,7 @@ describe('R65: un pedido que ya existe cuenta lo que EL MISMO tiene apartado com
       orderId = creado.id
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
-      const sinCambios: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const sinCambios: Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '6.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, sinCambios, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 

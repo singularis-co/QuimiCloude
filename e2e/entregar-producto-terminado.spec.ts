@@ -54,7 +54,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc223_e2e_';
@@ -440,8 +440,7 @@ test.beforeAll(async () => {
 
   // `TERMINADO` exige fecha de terminado, quien empaco y quien acondiciono.
   orderId = (
-    await prisma.order.create({
-      data: {
+    await createOrderWithLine(prisma, {
         companyId,
         orderYear: new Date().getUTCFullYear(),
         orderSequence: ORDER_SEQUENCE,
@@ -454,9 +453,7 @@ test.beforeAll(async () => {
         unitId: unit.id,
         customerId: customerOfOrderId,
         createdBy: adminUserId,
-      },
-      select: { id: true },
-    })
+      })
   ).id;
   const orderLineId = await ensureOnlyLine(prisma, orderId);
   await prisma.orderPresentationLine.create({

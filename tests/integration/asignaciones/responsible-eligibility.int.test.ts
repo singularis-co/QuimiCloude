@@ -341,10 +341,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       };
       const ejecucion = wireExecutionUseCases(fixture);
 
-      const antes = await fixture.tx.order.findUniqueOrThrow({
-        where: { id: pedido },
-        select: { status: true, finishedAt: true, updatedAt: true },
-      });
+      const antes = await fixture.tx.orderLine.findFirstOrThrow({ where: { orderId: pedido }, orderBy: { position: 'asc' }, select: { status: true, finishedAt: true, updatedAt: true } });
 
       const errorGet = await withSavepoint(fixture.tx, () => ejecucion.get(actor, { orderId: pedido }));
       expect(codeOf(errorGet)).toBe('order_not_found');
@@ -355,10 +352,7 @@ describe('asignaciones · quien puede ser responsable, contra la base (integraci
       const errorFinish = await withSavepoint(fixture.tx, () => ejecucion.finish(actor, { orderId: pedido, stepPosition: null }));
       expect(codeOf(errorFinish)).toBe('order_not_found');
 
-      const fila = await fixture.tx.order.findUniqueOrThrow({
-        where: { id: pedido },
-        select: { status: true, finishedAt: true, updatedAt: true },
-      });
+      const fila = await fixture.tx.orderLine.findFirstOrThrow({ where: { orderId: pedido }, orderBy: { position: 'asc' }, select: { status: true, finishedAt: true, updatedAt: true } });
       expect(fila.status).toBe('PENDIENTE');
       expect(fila.finishedAt).toEqual(antes.finishedAt);
       expect(fila.updatedAt).toEqual(antes.updatedAt);

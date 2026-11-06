@@ -64,15 +64,28 @@ export function singleRecipeUpdate(
  * escritos antes de las lineas: bloquear las lineas es bloquear el pedido y su unica linea; editar
  * la linea llama a `updateAlive` con sus datos y su coste, y la prioridad y el cliente se le suman
  * despues; y estado, coste y plazo de la linea van a `setStatus`, `setIngredientsCost` y
- * `setReservedAt`. Derivar el estado y copiar la linea al pedido no hacen nada: el doble ya es el
- * pedido.
+ * `setReservedAt` (`LegacyOrderWrites`). Derivar el estado no hace nada: el doble ya es el pedido.
+ *
+ * El alta llama a `create` con la forma de antes: `(datos, ano, autor, instante, coste, ambito)`.
+ * Como la receta y el coste llegan despues, con la unica linea, se anaden a los argumentos que el
+ * doble ya registro, para que el test los lea donde los leia.
  */
 export function singleRecipeWrites(orders: OrderWriteRepository): OrderWriteRepository {
   type Legacy = Record<string, (...args: unknown[]) => Promise<unknown>>;
   const legacy = orders as unknown as Legacy;
   let written: Record<string, unknown> | undefined;
+  let pendingCreate: { readonly data: Record<string, unknown>; readonly args: unknown[] | undefined } | undefined;
   return {
     ...orders,
+    create: async (data, year, actorId, now, scope) => {
+      const legacyData: Record<string, unknown> = { ...data };
+      const row = (await legacy.create?.(legacyData, year, actorId, now, null, scope)) as Awaited<
+        ReturnType<OrderWriteRepository['create']>
+      >;
+      const calls = (orders.create as unknown as { readonly mock?: { readonly calls: unknown[][] } }).mock?.calls;
+      pendingCreate = { data: legacyData, args: calls?.[calls.length - 1] };
+      return row;
+    },
     lockAliveLines: async (id, scope) => {
       const order = await orders.lockAliveById(id, scope);
       return order === null ? null : { order, lines: [orderLineOf(order)] };
@@ -82,6 +95,18 @@ export function singleRecipeWrites(orders: OrderWriteRepository): OrderWriteRepo
       return order === null || lineId !== ONLY_LINE_ID ? null : { order, line: orderLineOf(order) };
     },
     writeLines: async (id, changes, actorId, now, scope) => {
+      const [first] = changes.added;
+      if (pendingCreate !== undefined && first !== undefined) {
+        Object.assign(pendingCreate.data, {
+          recipeId: first.recipeId,
+          quantity: first.quantity,
+          unitId: first.unitId,
+          presentationLines: [],
+          salePrice: first.salePrice,
+        });
+        if (pendingCreate.args !== undefined) pendingCreate.args[4] = first.cost;
+        pendingCreate = undefined;
+      }
       for (const edit of changes.edited) {
         written = { ...edit.line };
         delete written.originalRecipeId;
@@ -105,10 +130,11 @@ export function singleRecipeWrites(orders: OrderWriteRepository): OrderWriteRepo
     },
     setLineStatus: async (id, _lineId, from, to, actorId, now, scope) => orders.setStatus(id, from, to, actorId, now, scope),
     setLineIngredientsCost: async (id, _lineId, cost, actorId, now, scope) =>
-      orders.setIngredientsCost(id, cost, actorId, now, scope),
-    setLineReservedAt: async (id, _lineId, reservedAt, scope) => orders.setReservedAt(id, reservedAt, scope),
+      (await legacy.setIngredientsCost?.(id, cost, actorId, now, scope)) as 'ok' | 'not_found',
+    setLineReservedAt: async (id, _lineId, reservedAt, scope) => {
+      await legacy.setReservedAt?.(id, reservedAt, scope);
+    },
     refreshStatus: async () => null,
-    mirrorFirstLine: async () => undefined,
   };
 }
 

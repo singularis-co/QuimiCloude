@@ -13,7 +13,7 @@ import { normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/iden
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewConditioningTeamMember } from '@/lib/modules/asignaciones/ports/conditioning-team-repository';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 class RollbackSignal extends Error {
   constructor() {
@@ -108,16 +108,13 @@ async function createOrder(tx: Prisma.TransactionClient, companyId: string): Pro
     select: { id: true },
   });
   nextSequence += 1;
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: recipe.id,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 
@@ -293,7 +290,7 @@ describe('createConditioningTeamRepository — listByOrdersInCompany', () => {
       const otroPedidoA = await createOrder(tx, a.companyId);
       const repo = createConditioningTeamRepository(tx);
       const equipoA = teamOf(a);
-      const equipoOtro = teamOf({ ...a, orderId: otroPedidoA }).slice(0, 2);
+      const equipoOtro = teamOf({ ...a, orderId: otroPedidoA, orderLineId: await ensureOnlyLine(tx, otroPedidoA) }).slice(0, 2);
       // Se insertan desordenadas y mezcladas entre pedidos.
       await repo.insertAll([equipoA[2]!, equipoOtro[1]!, equipoA[0]!]);
       await repo.insertAll([equipoOtro[0]!, equipoA[1]!]);

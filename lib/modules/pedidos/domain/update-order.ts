@@ -258,7 +258,6 @@ export function createUpdateOrder(
       if (header === 'not_found') throw new OrderNotFoundError();
 
       await transaction.orders.refreshStatus(id, actor.id, instant, scope);
-      await transaction.orders.mirrorFirstLine(id, scope);
     });
   };
 }

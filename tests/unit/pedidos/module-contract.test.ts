@@ -619,7 +619,7 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     // devolviera siempre lo mismo, todo lo de arriba seria decorativo.
     expect(enumValues('OrderStatus')).not.toEqual(enumValues('OrderPriority'))
     expect(() => enumValues('OrderInexistente')).toThrow(/no existe/)
-    expect(() => defaultOf('quantity')).toThrow(/no declara @default/)
+    expect(() => defaultOf('orderYear')).toThrow(/no declara @default/)
     expect(() => defaultOf('campoInexistente')).toThrow(/no declara el campo/)
   })
 

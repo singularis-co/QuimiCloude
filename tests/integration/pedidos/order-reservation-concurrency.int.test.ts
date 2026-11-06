@@ -56,7 +56,7 @@ import {
 } from '@/lib/modules/pedidos';
 import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder, OrderCatalog } from '@/lib/modules/pedidos';
+import type { Actor, OrderCatalog } from '@/lib/modules/pedidos';
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
@@ -67,7 +67,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
-import { onOnlyLine } from '../../helpers/only-order-line';
+import { onOnlyLine, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -261,7 +261,7 @@ async function crearProductoConLote(fixture: Fixture, stock: string): Promise<{ 
   return { productId: created.id, batchId: created.batchId };
 }
 
-function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: NewOrder['status'] = 'PENDIENTE'): Omit<NewOrder, 'customerId' | 'salePrice'> {
+function nuevoPedido(recipeId: string, unitId: string, quantity: string, status: SingleLineNewOrder['status'] = 'PENDIENTE'): Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> {
   return { recipeId, quantity, priority: 'BAJA', status, unitId, presentationLines: [] };
 }
 
@@ -277,7 +277,7 @@ async function movimientosDe(orderId: string): Promise<readonly ReservaResumen[]
 }
 
 async function reservedAtDe(orderId: string): Promise<Date | null> {
-  const row = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { reservedAt: true } });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { reservedAt: true } });
   return row.reservedAt;
 }
 

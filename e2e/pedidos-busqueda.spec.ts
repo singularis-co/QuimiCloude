@@ -25,6 +25,7 @@ import { DASHBOARD_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc122_e2e_';
 
@@ -97,8 +98,7 @@ async function searchFor(page: Page, searchBox: Locator, term: string): Promise<
 
 async function seedOrder(sequence: number, recipeId: string) {
   if (!companyId) throw new Error('la empresa del fixture no existe: fallo el beforeAll');
-  return prisma.order.create({
-    data: {
+  return createOrderWithLine(prisma, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: sequence,
@@ -106,9 +106,7 @@ async function seedOrder(sequence: number, recipeId: string) {
       quantity: ORDER_QUANTITY,
       status: 'PENDIENTE',
       createdBy: adminUserId,
-    },
-    select: { id: true },
-  });
+    });
 }
 
 test.beforeAll(async () => {
@@ -131,7 +129,9 @@ test.beforeAll(async () => {
     })
   ).map((recipe) => recipe.id);
   if (orphanRecipeIds.length > 0) {
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
   }
   await prisma.recipe.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },

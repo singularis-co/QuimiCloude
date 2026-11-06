@@ -298,16 +298,13 @@ async function crearBloqueado(fixture: Fixture, recipeId: string, quantity: stri
 }
 
 async function filaDe(orderId: string) {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: {
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: {
       status: true,
       reservedAt: true,
       ingredientsCost: true,
       updatedAt: true,
       updatedBy: true,
-    },
-  });
+    } });
   return { ...row, ingredientsCost: row.ingredientsCost === null ? null : row.ingredientsCost.toFixed(4) };
 }
 

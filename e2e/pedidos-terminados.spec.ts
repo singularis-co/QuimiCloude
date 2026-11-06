@@ -79,6 +79,7 @@ import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/s
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc145_e2e_';
@@ -283,8 +284,7 @@ async function seedOrder(params: {
   if (!recipeId) throw new Error('la receta del fixture no existe: fallo el beforeAll');
 
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: params.sequence,
@@ -295,9 +295,7 @@ async function seedOrder(params: {
       packedBy: params.packedBy ?? null,
       conditionedBy: params.conditionedBy ?? null,
       cancellationReason: params.cancellationReason ?? null,
-    },
-    select: { id: true },
-  });
+    });
 
   return { id: order.id, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
 }
@@ -338,7 +336,9 @@ test.beforeAll(async () => {
   });
   const orphanRecipeIds = orphanRecipes.map((recipe) => recipe.id);
   if (orphanRecipeIds.length > 0) {
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     await prisma.recipe.deleteMany({ where: { id: { in: orphanRecipeIds } } });
   }
   await prisma.user.deleteMany({

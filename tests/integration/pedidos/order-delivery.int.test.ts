@@ -28,6 +28,7 @@ import {
   stockDeProducto,
   type EmpresaDeEntrega,
 } from '../../helpers/order-delivery-seed';
+import { firstLineSelect, withFirstLine } from '../../helpers/only-order-line';
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -92,8 +93,8 @@ async function borrarEscenario(e: Escenario): Promise<void> {
 async function pedido(orderId: string) {
   return prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: { status: true, customerId: true, finishedAt: true, packedBy: true, conditionedBy: true },
-  });
+    select: { status: true, customerId: true, lines: firstLineSelect({ finishedAt: true, packedBy: true, conditionedBy: true }) },
+  }).then(withFirstLine);
 }
 
 async function codigoDe(promesa: Promise<unknown>): Promise<string> {
@@ -712,17 +713,10 @@ describe('QC-282 deliverOrder con varios clientes contra Postgres', () => {
 });
 
 describe('getOrderDelivery contra Postgres', () => {
-  it('QT-313 R45: con una linea ofrece los lotes de la receta de la linea aunque orders.recipe_id diga otra', async () => {
+  it('QT-313 R45: con una linea ofrece los lotes de la receta de la linea', async () => {
     const e = await crearEscenario();
     try {
       const hoy = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
-      const marca = randomUUID().replace(/-/gu, '');
-      const ajena = await prisma.recipe.create({
-        data: { name: `Ajena ${marca}`, nameNormalized: `ajena${marca}`, companyId: e.a.companyId },
-        select: { id: true },
-      });
-      await prisma.order.update({ where: { id: e.orderId }, data: { recipeId: ajena.id } });
-
       const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
 
       expect(vista).toEqual(hoy);

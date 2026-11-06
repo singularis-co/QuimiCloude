@@ -61,6 +61,8 @@ import {
   cancelAliveOrder,
   createOrderWriteRepository,
   findAliveOrderById,
+  findAliveOrderLines,
+  findAliveOrderLinesByOrderIds,
   findBlockedOrderIds,
   listAliveOrders,
   softDeleteAliveOrder,
@@ -74,7 +76,6 @@ import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, toOffsetLimit } from '@/lib/shared/pa
 
 import type {
   ListQuery,
-  NewOrder,
   OrderPriority,
   OrderRow,
   OrderScope,
@@ -83,7 +84,13 @@ import type {
 import { realOrderSummaries } from '../../helpers/order-summaries'
 
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed'
-import { ensureOnlyLine } from '../../helpers/only-order-line'
+import {
+  ensureOnlyLine,
+  createOrderWithLine,
+  createSingleLineOrder,
+  type SingleLineNewOrder,
+  type SingleLineOrderRow,
+} from '../../helpers/only-order-line'
 
 const { listAliveSummariesByIds: listAliveOrderSummariesByIds } = realOrderSummaries()
 
@@ -136,7 +143,7 @@ let roleId: string
 let documentTypeCode: string
 /** Empresa efimera del fixture. QC-47 R9 hizo `users.company_id` obligatoria. */
 let companyId: string
-/** QC-146: presentacion de la MISMA empresa, para que `NewOrder.presentationId` (obligatorio)
+/** QC-146: presentacion de la MISMA empresa, para que `SingleLineNewOrder.presentationId` (obligatorio)
  *  tenga una referencia valida en toda alta y edicion de este archivo. */
 let presentationId: string
 
@@ -178,7 +185,7 @@ async function seedFixtures(): Promise<void> {
       select: { id: true },
     })
   ).id
-  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`NewOrder`).
+  // QC-146: presentacion de la MISMA empresa, obligatoria en toda alta y edicion (`SingleLineNewOrder`).
   presentationId = (
     await prisma.presentation.create({
       data: {
@@ -252,7 +259,7 @@ function instantIn(year: number, month: number, day: number, ms = 0): Date {
   return new Date(Date.UTC(year, month, day, 12, 0, 0, ms))
 }
 
-function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId,
@@ -268,45 +275,19 @@ function baseOrder(overrides: Partial<NewOrder> = {}): NewOrder {
 
 /**
  * Alta por el adaptador REAL, con el `now` del ano de prueba. Registra el id en `creados` para
- * que el `finally` del caso lo borre aunque una asercion posterior falle. Con reparto, como el
- * alta de hoy: el pedido sin reparto y la linea con el suyo, en la misma transaccion; devuelve el
- * reparto que escribio la linea.
+ * que el `finally` del caso lo borre aunque una asercion posterior falle. La cabecera y su unica
+ * linea, con su reparto, en la misma transaccion.
  */
 async function altaReal(
   creados: string[],
   year: number,
   now: Date,
-  overrides: Partial<NewOrder> = {},
-): Promise<OrderRow> {
+  overrides: Partial<SingleLineNewOrder> = {},
+): Promise<SingleLineOrderRow> {
   const pedido = baseOrder(overrides)
-  const fila = await withOrderTransaction(async (tx) => {
-    const orders = createOrderWriteRepository(tx)
-    const creado = await orders.create({ ...pedido, presentationLines: [] }, year, actorId, now, null, scope())
-    if (pedido.presentationLines.length === 0) return creado
-    const lineas = await orders.writeLines(
-      creado.id,
-      {
-        removedIds: [],
-        edited: [],
-        added: [
-          {
-            recipeId: pedido.recipeId,
-            originalRecipeId: pedido.recipeId,
-            quantity: pedido.quantity,
-            unitId: pedido.unitId,
-            salePrice: pedido.salePrice,
-            presentationLines: pedido.presentationLines,
-            status: 'PENDIENTE',
-            cost: null,
-          },
-        ],
-      },
-      actorId,
-      now,
-      scope(),
-    )
-    return { ...creado, presentationLines: lineas?.[0]?.presentationLines ?? [] }
-  })
+  const fila = await withOrderTransaction((tx) =>
+    createSingleLineOrder(createOrderWriteRepository(tx), pedido, year, actorId, now, null, scope()),
+  )
   creados.push(fila.id)
   return fila
 }
@@ -427,9 +408,10 @@ describe('R8 — alta por el adaptador y relectura sin perdida', () => {
       expect(ficha).not.toBeNull()
       expect(ficha?.id).toBe(alta.id)
       expect(ficha?.number).toEqual({ year: YEAR_ALTA, sequence: 1 })
-      expect(ficha?.recipeId).toBe(recipeId)
+      const [linea] = await findAliveOrderLines(alta.id, scope())
+      expect(linea?.recipeId).toBe(recipeId)
       // `.toFixed(4)`: la escala de la columna, en la ida y en la vuelta.
-      expect(ficha?.quantity).toBe('10.5000')
+      expect(linea?.quantity).toBe('10.5000')
       expect(ficha?.priority).toBe('ALTA')
       expect(ficha?.status).toBe('PENDIENTE')
       expect(ficha?.cancellationReason).toBeNull()
@@ -440,8 +422,12 @@ describe('R8 — alta por el adaptador y relectura sin perdida', () => {
       expect(ficha?.updatedAt.toISOString()).toBe(now.toISOString())
 
       // Lo que devuelve el alta y lo que devuelve la relectura son EL MISMO pedido, campo a
-      // campo: si el `RETURNING` y el `select` divergieran, el alta mentiria.
-      expect(ficha).toEqual(alta)
+      // campo: si el `RETURNING` y el `select` divergieran, el alta mentiria. La receta va aparte,
+      // en su linea.
+      expect(alta).toMatchObject(ficha ?? {})
+      expect(Object.keys(ficha ?? {}).sort()).toEqual(
+        ['cancellationReason', 'createdAt', 'createdBy', 'customerId', 'id', 'number', 'priority', 'status', 'updatedAt', 'updatedBy'],
+      )
 
       // La segunda alta del mismo ano se lleva la posicion siguiente (R11).
       const segunda = await altaReal(creados, YEAR_ALTA, instantIn(YEAR_ALTA, 4, 21))
@@ -693,7 +679,7 @@ describe('R33/R40 — los discriminantes de las tres escrituras', () => {
 
       // VIVO -> 'ok', y la edicion escribe de verdad.
       //
-      // ENMIENDA: `editado` sigue llevando `status` porque `baseOrder` devuelve un `NewOrder`
+      // ENMIENDA: `editado` sigue llevando `status` porque `baseOrder` devuelve un `SingleLineNewOrder`
       // completo -el mismo helper del alta-, pero `updateAliveOrder` ya no lo lee (`OrderEdit` no
       // tiene el campo): la fila se queda en el estado con el que nacio, `PENDIENTE`, aunque
       // `editado.status` pida `EN_CURSO`.
@@ -741,17 +727,14 @@ describe('T10 — listAliveOrderSummariesByIds devuelve el reparto y la unidad',
       // Un pedido «viejo» sin reparto ni unidad: se inserta con Prisma directo, sin pasar por
       // el adaptador -que ya los exige siempre-, para simular una fila anterior a esta ficha
       // (R2, R43).
-      const filaSinReparto = await prisma.order.create({
-        data: {
+      const filaSinReparto = await createOrderWithLine(prisma, {
           companyId,
           orderYear: YEAR_CATALOGO,
           orderSequence: 999,
           recipeId,
           quantity: new Prisma.Decimal('10'),
           createdAt: instantIn(YEAR_CATALOGO, 1, 11),
-        },
-        select: { id: true },
-      })
+        })
       creados.push(filaSinReparto.id)
       // Los resumenes son por linea: cada pedido sembrado recibe la suya, como en la migracion.
       for (const id of creados) await ensureOnlyLine(prisma, id)
@@ -814,19 +797,25 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
 
       expect(conReparto.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
 
+      const [linea] = await findAliveOrderLines(conReparto.id, scope())
+      expect(linea?.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
+      // Lo que devuelve el alta y la relectura no pueden divergir tampoco en la cabecera.
       const ficha = await findAliveOrderById(conReparto.id, scope())
-      expect(ficha?.presentationLines).toEqual([{ presentationId, packages: 4, presentationContent: null, packagingProductId: null }])
-      // Lo que devuelve el alta y la relectura no pueden divergir tampoco en el reparto.
-      expect(ficha).toEqual(conReparto)
+      expect(ficha).not.toBeNull()
+      expect(conReparto).toMatchObject(ficha ?? {})
 
-      const fichaSin = await findAliveOrderById(sinReparto.id, scope())
-      expect(fichaSin?.presentationLines).toEqual([])
+      const [lineaSin] = await findAliveOrderLines(sinReparto.id, scope())
+      expect(lineaSin?.presentationLines).toEqual([])
 
       const todos = await recorrerTodo()
-      expect(todos.find((fila) => fila.id === conReparto.id)?.presentationLines).toEqual([
+      const lineas = await findAliveOrderLinesByOrderIds(
+        todos.map((fila) => fila.id),
+        scope(),
+      )
+      expect(lineas.find((fila) => fila.orderId === conReparto.id)?.presentationLines).toEqual([
         { presentationId, packages: 4, presentationContent: null, packagingProductId: null },
       ])
-      expect(todos.find((fila) => fila.id === sinReparto.id)?.presentationLines).toEqual([])
+      expect(lineas.find((fila) => fila.orderId === sinReparto.id)?.presentationLines).toEqual([])
     } finally {
       await limpiar(creados)
     }
@@ -842,8 +831,8 @@ describe('R26/R27 — la ficha y el listado leen el reparto de `order_presentati
       expect(conCopia.presentationLines).toEqual([
         { presentationId, packages: 9, presentationContent: '300.0000', packagingProductId: null },
       ])
-      const ficha = await findAliveOrderById(conCopia.id, scope())
-      expect(ficha?.presentationLines).toEqual(conCopia.presentationLines)
+      const [linea] = await findAliveOrderLines(conCopia.id, scope())
+      expect(linea?.presentationLines).toEqual(conCopia.presentationLines)
     } finally {
       await limpiar(creados)
     }
@@ -861,27 +850,6 @@ async function bloquear(id: string, now: Date): Promise<void> {
     return movida
   })
   expect(resultado).toBe('ok')
-}
-
-/** La unica linea de un pedido sembrado sin ella, con su receta y su cantidad. */
-async function conLinea(
-  pedido: Pick<OrderRow, 'id' | 'recipeId' | 'quantity'>,
-  companyId: string,
-  status: 'PENDIENTE' | 'BLOQUEADO',
-): Promise<string> {
-  const { id } = await prisma.orderLine.create({
-    data: {
-      orderId: pedido.id,
-      companyId,
-      position: 0,
-      recipeId: pedido.recipeId,
-      originalRecipeId: pedido.recipeId,
-      quantity: new Prisma.Decimal(pedido.quantity),
-      status,
-    },
-    select: { id: true },
-  })
-  return id
 }
 
 describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', () => {
@@ -903,11 +871,10 @@ describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', (
       const empatadoB = await altaReal(creados, YEAR_BLOQUEADOS, empate)
       const pendiente = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
       const borrado = await altaReal(creados, YEAR_BLOQUEADOS, temprano)
-      // QT-313: lo bloqueado es la linea; cada pedido lleva la suya y el bloqueo se le copia.
-      const lineas = new Map<string, string>()
-      for (const pedido of [ultimo, empatadoA, primero, empatadoB, pendiente, borrado]) {
-        lineas.set(pedido.id, await conLinea(pedido, scope().companyId, 'PENDIENTE'))
-      }
+      // QT-313: lo bloqueado es la linea; cada pedido lleva la suya desde el alta.
+      const lineas = new Map<string, string>(
+        [ultimo, empatadoA, primero, empatadoB, pendiente, borrado].map((pedido) => [pedido.id, pedido.lineId]),
+      )
       for (const pedido of [ultimo, empatadoA, primero, empatadoB, borrado]) {
         await bloquear(pedido.id, tarde)
       }
@@ -926,8 +893,7 @@ describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', (
           select: { id: true },
         })
       ).id
-      const ajeno = await prisma.order.create({
-        data: {
+      const ajeno = await createOrderWithLine(prisma, {
           companyId: otraEmpresa,
           orderYear: YEAR_BLOQUEADOS,
           orderSequence: 1,
@@ -935,15 +901,9 @@ describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', (
           quantity: new Prisma.Decimal('1'),
           status: 'BLOQUEADO',
           createdAt: instantIn(YEAR_BLOQUEADOS, 0, 1),
-        },
-        select: { id: true },
-      })
+        })
       ajenos.push(ajeno.id)
-      const lineaAjena = await conLinea(
-        { id: ajeno.id, recipeId: otraReceta, quantity: '1.0000' },
-        otraEmpresa,
-        'BLOQUEADO',
-      )
+      const lineaAjena = ajeno.lineId
 
       const empatados = [empatadoA.id, empatadoB.id].sort()
       const bloqueadas = await findBlockedOrderIds(scope())
@@ -963,7 +923,7 @@ describe('QC-138 — findBlockedIds lista los bloqueados vivos de la empresa', (
   })
 })
 
-describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
+describe('QC-138 — setStatus sin autor y setLineIngredientsCost', () => {
   it('R22 — setStatus admite actorId null y deja updated_by vacio', async () => {
     const creados: string[] = []
     try {
@@ -986,7 +946,7 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
     }
   })
 
-  it('R15, QC-195 R47 — setIngredientsCost sustituye el importe y su parte de envases, tambien por null, sin tocar estado ni datos', async () => {
+  it('R15, QC-195 R47, QT-313 R1 — setLineIngredientsCost sustituye el importe y su parte de envases de la linea, tambien por null, sin tocar estado ni datos', async () => {
     const creados: string[] = []
     try {
       const now = instantIn(YEAR_BLOQUEADOS, 3, 1)
@@ -995,10 +955,17 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
       await bloquear(pedido.id, now)
 
       const conImporte = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '123.4500', packaging: '3.4500' }, null, despues, scope()),
+        createOrderWriteRepository(tx).setLineIngredientsCost(
+          pedido.id,
+          pedido.lineId,
+          { total: '123.4500', packaging: '3.4500' },
+          null,
+          despues,
+          scope(),
+        ),
       )
       expect(conImporte).toBe('ok')
-      const tras = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      const tras = await prisma.orderLine.findUniqueOrThrow({ where: { id: pedido.lineId } })
       expect(tras.ingredientsCost?.toFixed(4)).toBe('123.4500')
       expect(tras.packagingCost?.toFixed(4)).toBe('3.4500')
       expect(tras.status).toBe('BLOQUEADO')
@@ -1007,17 +974,17 @@ describe('QC-138 — setStatus sin autor y setIngredientsCost', () => {
       expect(tras.updatedAt.toISOString()).toBe(despues.toISOString())
 
       const sinImporte = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, null, actorId, despues, scope()),
+        createOrderWriteRepository(tx).setLineIngredientsCost(pedido.id, pedido.lineId, null, actorId, despues, scope()),
       )
       expect(sinImporte).toBe('ok')
-      const final = await prisma.order.findUniqueOrThrow({ where: { id: pedido.id } })
+      const final = await prisma.orderLine.findUniqueOrThrow({ where: { id: pedido.lineId } })
       expect(final.ingredientsCost).toBeNull()
       expect(final.packagingCost).toBeNull()
       expect(final.updatedBy).toBe(actorId)
 
       expect(await softDeleteAliveOrder(pedido.id, actorId, despues, scope())).toBe('ok')
       const borrado = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).setIngredientsCost(pedido.id, { total: '1', packaging: '0' }, null, despues, scope()),
+        createOrderWriteRepository(tx).setLineIngredientsCost(pedido.id, pedido.lineId, { total: '1', packaging: '0' }, null, despues, scope()),
       )
       expect(borrado).toBe('not_found')
     } finally {
@@ -1034,16 +1001,17 @@ describe('QC-305 — la edicion de una linea con keep conserva su estimado guard
       const despues = instantIn(YEAR_DISCRIMINANTES, 5, 2)
       const pedido = await altaReal(creados, YEAR_DISCRIMINANTES, now)
       const linea = { recipeId, originalRecipeId: recipeId, quantity: '10.0000', unitId, salePrice: null, presentationLines: [] }
-      const escrita = await withOrderTransaction((tx) =>
-        createOrderWriteRepository(tx).writeLines(
+      const lineId = pedido.lineId
+      await withOrderTransaction((tx) =>
+        createOrderWriteRepository(tx).setLineIngredientsCost(
           pedido.id,
-          { removedIds: [], edited: [], added: [{ ...linea, status: 'PENDIENTE', cost: { total: '45.6700', packaging: '5.6700' } }] },
+          lineId,
+          { total: '45.6700', packaging: '5.6700' },
           actorId,
           now,
           scope(),
         ),
       )
-      const lineId = escrita?.[0]?.id ?? ''
 
       const editar = (cost: 'keep' | null) =>
         withOrderTransaction((tx) =>

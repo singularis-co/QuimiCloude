@@ -23,7 +23,7 @@ import { MAX_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import type { ListQuery } from '@/lib/modules/inventario/domain/list-query';
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -133,16 +133,13 @@ describe('QC-195 — el listado de productos sirve al selector de envases', () =
         select: { id: true },
       });
       const reserve = async (productId: string, quantity: string) => {
-        const order = await prisma.order.create({
-          data: {
+        const order = await createOrderWithLine(prisma, {
             companyId,
             orderYear: new Date().getUTCFullYear(),
             orderSequence: 980_000 + Math.floor(Math.random() * 10_000),
             recipeId: recipe.id,
             quantity: new Prisma.Decimal('1'),
-          },
-          select: { id: true },
-        });
+          });
         await createMaterialReservations(prisma).syncForLine({
           orderLineId: await ensureOnlyLine(prisma, order.id),
           orderId: order.id,

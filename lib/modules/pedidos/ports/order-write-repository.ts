@@ -10,9 +10,8 @@ import type {
   OrderRow,
 } from '../domain/order-view';
 
-/** La fila que bloquea `lockAliveById`, con `reservedAt`: quien vuelve a comprobar el plazo bajo
- *  el candado -el proceso diario- lo necesita sin pedir una segunda lectura. */
-export type LockedOrderRow = OrderRow & { readonly reservedAt: Date | null };
+/** La fila que bloquea `lockAliveById`. El plazo de reserva es de cada linea. */
+export type LockedOrderRow = OrderRow;
 
 /** El pedido bloqueado y sus lineas vivas -canceladas incluidas-, bloqueadas despues por
  *  `position`. */
@@ -171,17 +170,11 @@ export interface OrderWriteRepository {
    */
   refreshStatus(orderId: string, actorId: string | null, now: Date, scope: OrderScope): Promise<OrderStatus | null>;
 
-  /** Alta dentro de la transaccion ya abierta. El choque del correlativo (indice unico
-   *  `orders_company_year_sequence_key`) se deja SUBIR: la transaccion entera ya quedo
-   *  abortada, y quien reintenta con una transaccion nueva es `OrderUnitOfWork`. */
-  create(
-    data: NewOrder,
-    year: number,
-    actorId: string,
-    now: Date,
-    cost: StoredOrderCost | null,
-    scope: OrderScope,
-  ): Promise<OrderRow>;
+  /** Alta de la cabecera dentro de la transaccion ya abierta; las recetas las escribe
+   *  `writeLines`. El choque del correlativo (indice unico `orders_company_year_sequence_key`) se
+   *  deja SUBIR: la transaccion entera ya quedo abortada, y quien reintenta con una transaccion
+   *  nueva es `OrderUnitOfWork`. */
+  create(data: NewOrder, year: number, actorId: string, now: Date, scope: OrderScope): Promise<OrderRow>;
 
   /** La prioridad y el cliente del pedido; lo de cada receta lo escribe `writeLines`. No puede
    *  escribir estado ni motivo. */
@@ -192,11 +185,6 @@ export interface OrderWriteRepository {
     now: Date,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found'>;
-
-  /** Copia en `orders` la receta, cantidad, unidad, precio, coste y `reserved_at` de su linea viva
-   *  de menor `position`, sin mover `updated_at`: los lectores que aun leen esas columnas del
-   *  pedido ven los datos de su linea hasta que dejen de leerlas. */
-  mirrorFirstLine(orderId: string, scope: OrderScope): Promise<void>;
 
   /** Escribe `CANCELADO` y el motivo en el pedido, no en sus lineas: cancelar, caducar y cancelar
    *  por encargo cancelan cada linea con `cancelLine` y derivan el pedido con `refreshStatus`. */
@@ -223,22 +211,6 @@ export interface OrderWriteRepository {
     now: Date,
     scope: OrderScope,
   ): Promise<'ok' | 'not_found' | 'stale'>;
-
-  /** Sustituye el importe y su parte de envases, tambien por `null`, y sella
-   *  `updated_at`/`updated_by` sin tocar los datos de negocio ni el estado. */
-  setIngredientsCost(
-    id: string,
-    cost: StoredOrderCost | null,
-    actorId: string | null,
-    now: Date,
-    scope: OrderScope,
-  ): Promise<'ok' | 'not_found'>;
-
-
-
-  /** Escribe `reserved_at` SIN mover `updated_at`: apartar o liberar material no es una edicion
-   *  que el usuario deba ver en esa columna. */
-  setReservedAt(id: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
 
   /** Escribe SOLO `customer_id`, `updated_by` y `updated_at` del pedido vivo: ni el estado, ni el
    *  coste, ni la cantidad, ni lo apartado. `customerId` `null` quita el cliente. */

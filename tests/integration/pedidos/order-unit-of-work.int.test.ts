@@ -31,8 +31,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
 import type { NewProduct } from '@/lib/modules/inventario/domain/product-view';
 import type { OrderTransactionScope } from '@/lib/modules/pedidos/ports/order-unit-of-work';
-import type { NewOrder } from '@/lib/modules/pedidos/domain/order-view';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
+import { createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
@@ -139,6 +139,7 @@ async function createFixture(): Promise<Fixture> {
 async function dropFixture(fixture: Fixture, productIds: readonly string[]): Promise<void> {
   await prisma.reservationMovement.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.inventoryMovement.deleteMany({ where: { companyId: fixture.companyId } });
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.productBatch.deleteMany({ where: { productId: { in: [...productIds] } } });
   await prisma.product.deleteMany({ where: { id: { in: [...productIds] } } });
@@ -171,7 +172,7 @@ async function createProductWithBatch(fixture: Fixture, stock: string): Promise<
   return { productId: created.id, batchId: created.batchId };
 }
 
-function newOrder(fixture: Fixture, quantity = '1.0000'): NewOrder {
+function newOrder(fixture: Fixture, quantity = '1.0000'): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: fixture.recipeId,
@@ -199,32 +200,11 @@ describe('R15 — un fallo forzado despues de apartar no deja escrito ni el pedi
 
     await expect(
       runInOrderTransaction(async (scope) => {
-        const order = await scope.orders.create(newOrder(fixture), now.getUTCFullYear(), fixture.actorId, now, null, {
+        const order = await createSingleLineOrder(scope.orders, newOrder(fixture), now.getUTCFullYear(), fixture.actorId, now, null, {
           companyId: fixture.companyId,
         });
         createdOrderId = order.id;
-        const lines = await scope.orders.writeLines(
-          order.id,
-          {
-            removedIds: [],
-            edited: [],
-            added: [
-              {
-                recipeId: fixture.recipeId,
-                originalRecipeId: fixture.recipeId,
-                quantity: '1.0000',
-                unitId: fixture.unitId,
-                salePrice: null,
-                presentationLines: [],
-                status: 'PENDIENTE',
-                cost: null,
-              },
-            ],
-          },
-          fixture.actorId,
-          now,
-          { companyId: fixture.companyId },
-        );
+        const lines = [{ id: order.lineId }];
         const orderLineId = lines?.[0]?.id;
         if (orderLineId === undefined) throw new Error('el alta no escribio la linea');
 
@@ -268,7 +248,7 @@ describe('el reintento del correlativo (sin carrera artificial, con el trigger d
 
     // El numero 1 queda ocupado por un alta normal, DENTRO de la unidad de trabajo.
     const primera = await runInOrderTransaction((scope) =>
-      scope.orders.create(newOrder(fixture), now.getUTCFullYear(), fixture.actorId, now, null, {
+      createSingleLineOrder(scope.orders, newOrder(fixture), now.getUTCFullYear(), fixture.actorId, now, null, {
         companyId: fixture.companyId,
       }),
     );
@@ -296,10 +276,10 @@ describe('el reintento del correlativo (sin carrera artificial, con el trigger d
       // Control: el trigger produce de verdad el 23505 del indice del correlativo.
       const control = await admin
         .query(
-          `INSERT INTO orders (company_id, order_year, order_sequence, recipe_id, quantity, priority,
+          `INSERT INTO orders (company_id, order_year, order_sequence, priority,
                                status, created_by, updated_by, created_at, updated_at)
-           VALUES ($1::uuid, $2::int, 999, $3::uuid, 1, 'BAJA', 'PENDIENTE', $4::uuid, $4::uuid, $5, $5)`,
-          [fixture.companyId, primera.number.year, fixture.recipeId, fixture.actorId, now],
+           VALUES ($1::uuid, $2::int, 999, 'BAJA', 'PENDIENTE', $3::uuid, $3::uuid, $4, $4)`,
+          [fixture.companyId, primera.number.year, fixture.actorId, now],
         )
         .then(
           () => null,
@@ -312,7 +292,7 @@ describe('el reintento del correlativo (sin carrera artificial, con el trigger d
       spy = vi.spyOn(prisma, '$transaction');
 
       const rechazo = await runInOrderTransaction((scope) =>
-        scope.orders.create(newOrder(fixture), now.getUTCFullYear(), fixture.actorId, now, null, {
+        createSingleLineOrder(scope.orders, newOrder(fixture), now.getUTCFullYear(), fixture.actorId, now, null, {
           companyId: fixture.companyId,
         }),
       ).then(

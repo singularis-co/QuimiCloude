@@ -29,8 +29,7 @@ import { normalizePresentationName } from '@/lib/modules/inventario';
 import { normalizeUnitName } from '@/lib/modules/unidades';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { runDowns } from '../../helpers/migration-script';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureLegacyOrderLine, insertLegacyOrder, readLegacyOrders, runDowns } from '../../helpers/migration-script';
 
 class RollbackSignal extends Error {
   constructor() {
@@ -306,20 +305,19 @@ async function seedLegacyOrder(
 ): Promise<string> {
   nextSequence += 1;
   const status = seed.status ?? 'PENDIENTE';
-  const order = await tx.order.create({
-    data: {
+  const order = {
+    id: await insertLegacyOrder(tx, {
       companyId: f.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: f.recipeId,
-      quantity: new Prisma.Decimal(seed.quantity),
+      quantity: seed.quantity,
       status,
-      packedBy: status === 'EN_EMPAQUE' ? f.packerId : undefined,
-      cancellationReason: status === 'CANCELADO' ? 'motivo de prueba' : undefined,
-      deletedAt: seed.deleted === true ? new Date() : undefined,
-    },
-    select: { id: true },
-  });
+      packedBy: status === 'EN_EMPAQUE' ? f.packerId : null,
+      cancellationReason: status === 'CANCELADO' ? 'motivo de prueba' : null,
+      deletedAt: seed.deleted === true ? new Date() : null,
+    }),
+  };
   if (seed.presentationId !== undefined) {
     await tx.$executeRaw`
       UPDATE "orders"
@@ -346,8 +344,9 @@ async function linesOf(tx: Prisma.TransactionClient, orderId: string): Promise<r
 }
 
 async function unitOf(tx: Prisma.TransactionClient, orderId: string): Promise<string | null> {
-  const row = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { unitId: true } });
-  return row.unitId;
+  const [row] = await readLegacyOrders(tx, [orderId]);
+  if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
+  return row.unit_id;
 }
 
 /** Ningun pedido ajeno a la transaccion puede disparar los guardias: si los hubiera, el fallo
@@ -643,18 +642,17 @@ describe('down.sql', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx);
       nextSequence += 1;
-      const repartido = await tx.order.create({
-        data: {
+      const repartido = {
+        id: await insertLegacyOrder(tx, {
           companyId: f.companyId,
           orderYear: new Date().getUTCFullYear(),
           orderSequence: nextSequence,
           recipeId: f.recipeId,
-          quantity: new Prisma.Decimal('10'),
+          quantity: '10',
           unitId: f.unitA,
-        },
-        select: { id: true },
-      });
-      const repartidoLinea = await ensureOnlyLine(tx, repartido.id);
+        }),
+      };
+      const repartidoLinea = await ensureLegacyOrderLine(tx, repartido.id);
       await tx.orderPresentationLine.createMany({
         data: [
           { orderId: repartido.id, orderLineId: repartidoLinea, companyId: f.companyId, presentationId: f.withContent, packages: 2, presentationContent: '2.5' },
@@ -675,21 +673,20 @@ describe('down.sql', () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx);
       nextSequence += 1;
-      const unaLinea = await tx.order.create({
-        data: {
+      const unaLinea = {
+        id: await insertLegacyOrder(tx, {
           companyId: f.companyId,
           orderYear: new Date().getUTCFullYear(),
           orderSequence: nextSequence,
           recipeId: f.recipeId,
-          quantity: new Prisma.Decimal('10'),
+          quantity: '10',
           unitId: f.unitA,
-        },
-        select: { id: true },
-      });
+        }),
+      };
       await tx.orderPresentationLine.create({
         data: {
           orderId: unaLinea.id,
-          orderLineId: await ensureOnlyLine(tx, unaLinea.id),
+          orderLineId: await ensureLegacyOrderLine(tx, unaLinea.id),
           companyId: f.companyId,
           presentationId: f.withContent,
           packages: 4,

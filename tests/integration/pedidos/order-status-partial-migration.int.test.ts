@@ -54,15 +54,9 @@ async function seedOrder(
   recipeId: string,
   status: 'PARCIAL' | 'PENDIENTE',
 ): Promise<string> {
+  void recipeId;
   const order = await tx.order.create({
-    data: {
-      companyId,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: freshSequence(),
-      recipeId,
-      quantity: new Prisma.Decimal('10'),
-      status,
-    },
+    data: { companyId, orderYear: new Date().getUTCFullYear(), orderSequence: freshSequence(), status },
     select: { id: true },
   });
   return order.id;

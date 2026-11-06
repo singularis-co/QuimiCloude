@@ -114,48 +114,49 @@ async function insertarPedido(
   sequence += 1
   const id = options.id ?? randomUUID()
   await tx.$executeRawUnsafe(
-    `INSERT INTO "orders" ("id","company_id","customer_id","order_year","order_sequence","recipe_id",
-       "quantity","status","cancellation_reason","packed_by","conditioned_by","finished_at",
-       "deleted_at","created_at","updated_at")
-     VALUES ($1::uuid, $2::uuid, $3::uuid, 2026, $4, $5::uuid, 10, $6::"OrderStatus", $7, $8::uuid,
-       $8::uuid, $9::timestamptz, $10::timestamptz, $11::timestamptz, CURRENT_TIMESTAMP)`,
+    `INSERT INTO "orders" ("id","company_id","customer_id","order_year","order_sequence",
+       "status","cancellation_reason","deleted_at","created_at","updated_at")
+     VALUES ($1::uuid, $2::uuid, $3::uuid, 2026, $4, $5::"OrderStatus", $6,
+       $7::timestamptz, $8::timestamptz, CURRENT_TIMESTAMP)`,
     id,
     empresa.companyId,
     customerId,
     sequence,
-    empresa.recipeId,
     status,
     status === 'CANCELADO' ? 'Cancelado en la prueba' : null,
-    status === 'TERMINADO' ? empresa.userId : null,
-    status === 'TERMINADO' ? new Date() : null,
     options.deleted === true ? new Date() : null,
     createdAt,
   )
-  if (options.sinLinea !== true) await insertarLinea(tx, id, empresa.recipeId, 0)
+  if (options.sinLinea !== true) await insertarLinea(tx, id, empresa.recipeId, 0, undefined, empresa.userId)
   return { id, sequence, createdAt }
 }
 
-/** Una linea con los datos de su pedido, como la que el relleno de la migracion le da. */
+/** Una linea de su pedido: sin estado propio, la del estado del pedido, y en `TERMINADO` con fecha
+ *  de terminado y `stageUserId` como quien empaco y acondiciono. */
 async function insertarLinea(
   tx: Prisma.TransactionClient,
   orderId: string,
   recipeId: string,
   position: number,
   status?: OrderStatus,
+  stageUserId: string | null = null,
 ): Promise<void> {
   await tx.$executeRawUnsafe(
     `INSERT INTO "order_lines" ("order_id","company_id","position","recipe_id","original_recipe_id","quantity",
        "status","cancellation_reason","finished_at","packed_by","conditioned_by","deleted_at","created_at","updated_at")
-     SELECT o."id", o."company_id", $3, $2::uuid, $2::uuid, o."quantity",
+     SELECT o."id", o."company_id", $3, $2::uuid, $2::uuid, 10,
        COALESCE($4::"OrderStatus", o."status"),
        CASE WHEN COALESCE($4::"OrderStatus", o."status") = 'CANCELADO' THEN 'Cancelado en la prueba' END,
-       CASE WHEN $4 IS NULL THEN o."finished_at" END, CASE WHEN $4 IS NULL THEN o."packed_by" END,
-       CASE WHEN $4 IS NULL THEN o."conditioned_by" END, o."deleted_at", o."created_at", o."updated_at"
+       CASE WHEN $4 IS NULL AND o."status" = 'TERMINADO' THEN now() END,
+       CASE WHEN $4 IS NULL AND o."status" = 'TERMINADO' THEN $5::uuid END,
+       CASE WHEN $4 IS NULL AND o."status" = 'TERMINADO' THEN $5::uuid END,
+       o."deleted_at", o."created_at", o."updated_at"
        FROM "orders" o WHERE o."id" = $1::uuid`,
     orderId,
     recipeId,
     position,
     status ?? null,
+    stageUserId,
   )
 }
 
@@ -317,14 +318,12 @@ describe('pedidos de un cliente contra Postgres', () => {
       ).toHaveLength(1)
     })
   })
-  it('QT-313 R45: con una linea devuelve la receta de la linea aunque orders.recipe_id diga otra', async () => {
+  it('QT-313 R45: con una linea devuelve la receta de la linea', async () => {
     await inRolledBackTransaction(async (tx) => {
       const empresa = await crearEmpresa(tx)
       const cliente = await crearCliente(tx, empresa.companyId)
-      const otraReceta = await crearReceta(tx, empresa.companyId)
       const pedido = await insertarPedido(tx, empresa, cliente, 'EN_CURSO', dia(2))
       const cancelado = await insertarPedido(tx, empresa, cliente, 'CANCELADO', dia(1))
-      await tx.order.updateMany({ where: { id: { in: [pedido.id, cancelado.id] } }, data: { recipeId: otraReceta } })
 
       const rows = await createCustomerOrderDirectory(tx).listAliveOfCustomer(empresa.companyId, cliente, [], 20)
 

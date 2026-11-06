@@ -41,7 +41,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc265_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -379,8 +379,7 @@ test.beforeAll(async () => {
     },
   ): Promise<SeededOrder> {
     const sequence = BASE_SEQUENCE + offset;
-    const order = await prisma.order.create({
-      data: {
+    const order = await createOrderWithLine(prisma, {
         companyId: companyId!,
         orderYear: year,
         orderSequence: sequence,
@@ -391,9 +390,7 @@ test.beforeAll(async () => {
         packedBy: data.packedBy ?? null,
         conditionedBy: data.conditionedBy ?? null,
         finishedAt: data.finishedAt ?? null,
-      },
-      select: { id: true },
-    });
+      });
     return { id: order.id, numberText: formatOrderNumber({ year, sequence }) };
   }
 

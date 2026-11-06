@@ -11,17 +11,11 @@ import {
   UnauthorizedError,
 } from '@/lib/modules/pedidos/domain/errors';
 import { createErrorStateTranslator } from '@/lib/modules/errores';
-import {
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeUnitOfWork,
-  lineWritingOrders,
-} from '@/tests/helpers/order-unit-of-work-double';
+import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, lineWritingOrders, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
 import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '@/tests/helpers/customer-catalog-double';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type { OrderLineChanges } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { CostingBatch, PresentationCatalog, ProductCatalog, ReservationOutcome } from '@/lib/modules/inventario';
@@ -103,7 +97,7 @@ function catalogos() {
   return { products, units, presentations, findCostingBatches };
 }
 
-function filaCreada(): OrderRow {
+function filaCreada(): SingleRecipeOrderRow {
   return {
     id: ORDER_ID,
     number: { year: 2026, sequence: 1 },
@@ -209,15 +203,14 @@ describe('QT-313 T9 — alta con lineas', () => {
     ]);
   });
 
-  it('R34: deriva el estado del pedido de sus lineas y copia en el pedido la linea de menor posicion', async () => {
+  it('R34, R1: deriva el estado del pedido de sus lineas y el pedido solo lleva su cabecera', async () => {
     const e = escenario();
 
     await alta(e.unitOfWork)({ lines: [linea(RECETA_A), linea(RECETA_B)] }, ACTOR);
 
     expect(e.lineas.refreshStatus).toHaveBeenCalledWith(ORDER_ID, ACTOR.id, AHORA, { companyId: EMPRESA });
-    expect(e.lineas.mirrorFirstLine).toHaveBeenCalledWith(ORDER_ID, { companyId: EMPRESA });
-    // El reparto va solo en las lineas.
-    expect((e.create.mock.calls[0] as unknown as readonly [{ presentationLines: unknown }])[0].presentationLines).toEqual([]);
+    // Receta, cantidad, reparto, precio y coste van solo en las lineas.
+    expect((e.create.mock.calls[0] as unknown as readonly [unknown])[0]).toEqual({ priority: 'BAJA', status: 'PENDIENTE', customerId: null });
   });
 
   it('R13: si una linea no alcanza y no se confirma, rechaza con order_would_block, sin campos nuevos y con la posicion en el diagnostico', async () => {

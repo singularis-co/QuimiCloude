@@ -50,7 +50,7 @@ import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { packedCountsOfPlan } from '../../helpers/packed-counts';
-import { ensureOnlyLine, onOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, onOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 const orderPackingRepository: OrderPackingRepository = {
   startPackingAlive: startPackingAliveOrder,
@@ -259,8 +259,7 @@ async function createOrder(
     readonly companyId?: string;
   },
 ): Promise<string> {
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: overrides.companyId ?? fixture.companyId,
       orderYear: currentUtcYear(),
       orderSequence: freshSequence(),
@@ -272,9 +271,7 @@ async function createOrder(
       finishedAt: overrides.finishedAt ?? null,
       deletedAt: overrides.deletedAt ?? null,
       ...(overrides.status === 'CANCELADO' ? { cancellationReason: 'motivo de prueba' } : {}),
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 
@@ -301,10 +298,7 @@ async function crearPedidosDeAcondicionamiento(fixture: Fixture): Promise<Record
 async function readOrder(
   id: string,
 ): Promise<{ status: string; packedBy: string | null; updatedAt: Date; finishedAt: Date | null }> {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, packedBy: true, updatedAt: true, finishedAt: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true, updatedAt: true, finishedAt: true } });
 }
 
 async function movementCountDe(companyId: string): Promise<number> {
@@ -480,7 +474,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       expect(fila.finishedAt).toBeNull();
       expect(fila.packedBy).toBe(fixture.packerId);
       expect(fila.updatedAt).toEqual(ahora);
-      const conditionedBy = await prisma.order.findUniqueOrThrow({ where: { id: pedido }, select: { conditionedBy: true } });
+      const conditionedBy = await prisma.orderLine.findFirstOrThrow({ where: { orderId: pedido }, orderBy: { position: 'asc' }, select: { conditionedBy: true } });
       expect(conditionedBy.conditionedBy).toBeNull();
       expect(await movementCountDe(fixture.companyId)).toBe(antes);
     } finally {
@@ -569,10 +563,7 @@ describe('finishPackingAliveById — R21, R22, R23, R24, R25, R27, R28', () => {
       const ahora = new Date();
       await onOnlyLine(finishPackingAliveById)(pedido, fixture.companyId, fixture.packerId, ahora, await packedCountsOfPlan(pedido));
 
-      const fila = await prisma.order.findUniqueOrThrow({
-        where: { id: pedido },
-        select: { status: true, finishedAt: true },
-      });
+      const fila = await prisma.orderLine.findFirstOrThrow({ where: { orderId: pedido }, orderBy: { position: 'asc' }, select: { status: true, finishedAt: true } });
       expect(fila.status).toBe('POR_ACONDICIONAR');
       expect(fila.finishedAt).toBeNull();
     } finally {
@@ -598,10 +589,7 @@ describe('createOrderPackingRepository — Comenzar dentro de una transaccion aj
             new Date(),
             { companyId: fixture.companyId },
           );
-          const fila = await tx.order.findUniqueOrThrow({
-            where: { id: pedido },
-            select: { status: true, packedBy: true },
-          });
+          const fila = await tx.orderLine.findFirstOrThrow({ where: { orderId: pedido }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true } });
           dentro = { resultado, status: fila.status, packedBy: fila.packedBy };
           throw deshacer;
         })

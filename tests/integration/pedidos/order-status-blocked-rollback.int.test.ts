@@ -34,6 +34,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import { runDowns } from '../../helpers/migration-script';
+import { createOrderWithLine } from '../../helpers/only-order-line';
 
 // Las migraciones de las lineas del pedido dependen del tipo `OrderStatus`: bajan antes.
 const ORDER_LINES_DOWNS = [
@@ -229,16 +230,13 @@ function freshSequence(): number {
 }
 
 async function seedBlockedOrder(tx: Prisma.TransactionClient, f: Fixtures): Promise<string> {
-  const order = await tx.order.create({
-    data: {
-      companyId: f.companyId,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: freshSequence(),
-      recipeId: f.recipeId,
-      quantity: new Prisma.Decimal('10'),
-      status: 'BLOQUEADO',
-    },
-    select: { id: true },
+  const order = await createOrderWithLine(tx, {
+    companyId: f.companyId,
+    orderYear: new Date().getUTCFullYear(),
+    orderSequence: freshSequence(),
+    recipeId: f.recipeId,
+    quantity: new Prisma.Decimal('10'),
+    status: 'BLOQUEADO',
   });
   return order.id;
 }

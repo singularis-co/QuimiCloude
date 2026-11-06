@@ -31,6 +31,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { addPackagingLine } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc172_e2e_';
 
@@ -386,8 +387,8 @@ test.describe('version de receta en el pedido', () => {
     // --- 3. En la base: el pedido guarda la version y lo apartado sale de sus lineas.
     const orders = await prisma.order.findMany({
       where: { companyId: companyId!, deletedAt: null },
-      select: { id: true, recipeId: true },
-    });
+      select: { id: true, lines: firstLineSelect({ recipeId: true }) },
+    }).then((rows) => rows.map(withFirstLine));
     expect(orders).toHaveLength(1);
     const [order] = orders;
     expect(order.recipeId).toBe(versionId);

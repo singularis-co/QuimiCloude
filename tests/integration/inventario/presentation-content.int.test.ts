@@ -13,7 +13,7 @@ import { inventario } from '@/lib/composition';
 import type { Actor } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -122,16 +122,13 @@ async function sembrarPedido(presentationId: string, presentationContent: string
   recetasSembradas.push(recipeId);
 
   secuenciaPedido += 1;
-  const { id } = await prisma.order.create({
-    data: {
+  const { id } = await createOrderWithLine(prisma, {
       orderYear: 2026,
       orderSequence: secuenciaPedido,
       recipeId,
       quantity: '10.0000',
       companyId: empresaDelArchivo,
-    },
-    select: { id: true },
-  });
+    });
   pedidosSembrados.push(id);
   await prisma.orderPresentationLine.create({
     data: {

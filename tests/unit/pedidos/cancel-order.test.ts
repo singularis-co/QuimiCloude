@@ -22,7 +22,7 @@ import {
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
 
-import { fakeUnitOfWork, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -39,7 +39,7 @@ const ADMIN: Actor = {
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
-function fila(status: OrderStatus, cancellationReason: string | null = null): OrderRow {
+function fila(status: OrderStatus, cancellationReason: string | null = null): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -84,11 +84,10 @@ function dobles(opciones: { fila?: OrderRow | null; cancelacion?: 'ok' | 'not_fo
     void [id, lineId, reservedAt]
   })
   const refreshStatus = vi.fn(async () => 'CANCELADO' as const)
-  const mirrorFirstLine = vi.fn(async () => undefined)
   const releaseForLine = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
 
   const { unitOfWork, orders } = fakeUnitOfWork({
-    orders: { lockAliveLines, cancelLine, setLineReservedAt, refreshStatus, mirrorFirstLine },
+    orders: { lockAliveLines, cancelLine, setLineReservedAt, refreshStatus },
     reservations: { releaseForLine },
   })
 

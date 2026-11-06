@@ -20,7 +20,7 @@ import {
 } from '@/lib/modules/inventario/adapters/driven/persistence/finished-goods-return-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { ensureOnlyLine } from '../../helpers/only-order-line'
+import { ensureOnlyLine, insertOnlyLine } from '../../helpers/only-order-line'
 
 type Db = Prisma.TransactionClient | typeof prisma
 
@@ -110,11 +110,12 @@ async function createTenant(db: Db, label: string): Promise<Tenant> {
   })
   const orderId = randomUUID()
   await db.$executeRaw`
-    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "updated_at")
+    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "updated_at")
     VALUES (
       ${asUuid(orderId)}, ${asUuid(companyId)}, ${new Date().getUTCFullYear()}, ${freshSequence()},
-      ${asUuid(recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP
+      CURRENT_TIMESTAMP
     )`
+  await insertOnlyLine(db, orderId, { recipeId: recipeId })
   const orderLineId = await ensureOnlyLine(db, orderId)
   const { id: unitId } = await db.unit.create({
     data: { name: `Unidad ${marca}`, nameNormalized: `unidad${marca}`, symbol: `u${marca.slice(0, 8)}` },

@@ -192,7 +192,7 @@ async function createUserWithRole(user: Credentials, roleName: string): Promise<
  *  confundir `NULL` con `'0.0000'` (mismo criterio que `order-ingredients-cost.int.test.ts`). */
 async function ingredientsCostText(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`;
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`;
   const row = rows[0];
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`);
   return row.ingredients_cost;
@@ -486,7 +486,7 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     const created = await prisma.order.findFirstOrThrow({
-      where: { recipeId, companyId, deletedAt: null },
+      where: { lines: { some: { recipeId } }, companyId, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true },
     });
     expect(await ingredientsCostText(created.id)).toBe(SAVED_AMOUNT_WITH_PACKAGING);

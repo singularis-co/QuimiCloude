@@ -20,9 +20,9 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderScope, OrderStatus } from '@/lib/modules/pedidos'
+import type { OrderScope, OrderStatus } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
-import { syncOnlyLine } from '../../helpers/only-order-line';
+import { syncOnlyLine, createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const { listSummariesByIdsIncludingDeleted, listAliveSummariesByIds } = realOrderSummaries()
 
@@ -119,7 +119,7 @@ function scopeOf(e: Empresa): OrderScope {
   return { companyId: e.companyId }
 }
 
-function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(e: Empresa, overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: e.recipeId,
@@ -148,7 +148,7 @@ async function sembrar(e: Empresa, semilla: Semilla): Promise<string> {
   const year = semilla.year ?? YEAR
   const now = new Date(Date.UTC(year, 6, 1, 12, 0, 0, 0))
   const { id } = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(
+    createSingleLineOrder(createOrderWriteRepository(tx), 
       baseOrder(e, { status: status === 'CANCELADO' ? 'PENDIENTE' : status }),
       year,
       e.userId,

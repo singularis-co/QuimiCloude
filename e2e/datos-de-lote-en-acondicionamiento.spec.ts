@@ -85,7 +85,7 @@ import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc219_e2e_';
@@ -548,8 +548,7 @@ test.beforeAll(async () => {
 
   // Cumple los CHECK de `orders`: `EN_ACONDICIONAMIENTO` lleva `packed_by` y `conditioned_by`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: ORDER_SEQUENCE,
@@ -560,9 +559,7 @@ test.beforeAll(async () => {
       packedBy: empacadorId,
       conditionedBy: conditioner1Id,
       finishedAt: null,
-    },
-    select: { id: true },
-  });
+    });
 
   /**
    * Una línea del reparto y lo que deja Terminar el empaque por ella: el producto terminado
@@ -823,10 +820,7 @@ test.describe('datos de lote en el acondicionamiento: un formulario por pedido',
       { timeout: 60_000 },
     );
 
-    const stored = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, finishedAt: true },
-    });
+    const stored = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, finishedAt: true } });
     expect(stored.status).toBe('TERMINADO');
     expect(stored.finishedAt).not.toBeNull();
 

@@ -280,10 +280,7 @@ async function asientosSobre(batchIds: readonly string[]): Promise<{ reservas: n
 }
 
 async function filaDe(orderId: string): Promise<{ status: string; ingredientsCost: string | null }> {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, ingredientsCost: true },
-  });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, ingredientsCost: true } });
   return { status: row.status, ingredientsCost: row.ingredientsCost === null ? null : row.ingredientsCost.toFixed(4) };
 }
 

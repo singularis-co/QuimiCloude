@@ -90,7 +90,7 @@ import {
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const USERNAME_PREFIX = 'qc246_e2e_';
 const COMPANY_NAME_PREFIX = 'qc246_e2e_empresa_';
@@ -573,8 +573,7 @@ async function seedOpenOrder(
     select: { id: true },
   });
   // El CHECK `orders_order_year_matches_created_at` ata el año a `created_at`.
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: company,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: 1,
@@ -582,9 +581,7 @@ async function seedOpenOrder(
       quantity: 12,
       unitId: unit.id,
       customerId: customer.id,
-    },
-    select: { id: true },
-  });
+    });
   await prisma.orderPresentationLine.create({
     data: {
       orderId: order.id,

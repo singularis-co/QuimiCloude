@@ -57,6 +57,7 @@ import {
   normalizeWorkGroupName,
 } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
+import { createOrderWithLine } from '../../helpers/only-order-line'
 
 // ---------------------------------------------------------------------------
 // Aislamiento
@@ -278,8 +279,7 @@ let nextSequence = 700_000 + Math.floor(Math.random() * 100_000)
  */
 async function createOrder(fixture: Fixture): Promise<string> {
   nextSequence += 1
-  const order = await fixture.tx.order.create({
-    data: {
+  const order = await createOrderWithLine(fixture.tx, {
       // QC-60: `orders.company_id` es NOT NULL y la FK de la asignacion ya es compuesta, asi que
       // el pedido nace en la MISMA empresa que sus asignaciones.
       companyId: fixture.companyA,
@@ -287,9 +287,7 @@ async function createOrder(fixture: Fixture): Promise<string> {
       orderSequence: nextSequence,
       recipeId: fixture.recipeId,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  })
+    })
   return order.id
 }
 

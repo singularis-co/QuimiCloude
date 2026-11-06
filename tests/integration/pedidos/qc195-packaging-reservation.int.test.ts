@@ -232,7 +232,7 @@ async function apartadoPorProducto(orderId: string): Promise<Readonly<Record<str
 }
 
 async function estadoDe(orderId: string) {
-  return prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true } });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, reservedAt: true, ingredientsCost: true, quantity: true } });
 }
 
 afterAll(async () => {
@@ -650,10 +650,7 @@ describe('QC-195 — el importe suma los envases', () => {
 describe('QC-195 — Reparto y unidad guarda el importe', () => {
   /** Las dos columnas del importe: el total y su parte de envases. */
   async function costoDe(orderId: string) {
-    const fila = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, ingredientsCost: true, packagingCost: true },
-    });
+    const fila = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, ingredientsCost: true, packagingCost: true } });
     return {
       status: fila.status,
       total: fila.ingredientsCost === null ? null : fila.ingredientsCost.toFixed(4),

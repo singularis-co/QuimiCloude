@@ -42,7 +42,6 @@ function dobles(overrides: { readonly orders?: Partial<OrderWriteRepository> } =
       cancelLine: vi.fn(async () => 'ok' as const),
       setLineReservedAt: vi.fn(async () => undefined),
       refreshStatus: vi.fn(async () => 'CANCELADO' as const),
-      mirrorFirstLine: vi.fn(async () => undefined),
       ...overrides.orders,
     },
   })

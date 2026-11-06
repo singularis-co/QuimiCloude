@@ -68,15 +68,14 @@ function dobles(opciones: { estado?: OrderLineStatus | null; cancelacion?: 'ok' 
     void [id, lineId, reservedAt, scope]
   })
   const refreshStatus = vi.fn(async () => 'CANCELADO' as const)
-  const mirrorFirstLine = vi.fn(async () => undefined)
   const releaseForLine = vi.fn(async (input: unknown) => {
     void input
   })
   const { unitOfWork, orders } = fakeUnitOfWork({
-    orders: { lockAliveLines, cancelLine, setLineReservedAt, refreshStatus, mirrorFirstLine },
+    orders: { lockAliveLines, cancelLine, setLineReservedAt, refreshStatus },
     reservations: { releaseForLine },
   })
-  return { unitOfWork, orders, lockAliveLines, cancelLine, setLineReservedAt, refreshStatus, mirrorFirstLine, releaseForLine }
+  return { unitOfWork, orders, lockAliveLines, cancelLine, setLineReservedAt, refreshStatus, releaseForLine }
 }
 
 describe('isCancellableStatus — una sola definicion de «cancelable» (R29, R43)', () => {
@@ -132,7 +131,6 @@ describe('createCancelAliveOrder — cancelar por encargo, por el camino unico (
       d.releaseForLine.mock.invocationCallOrder[0],
       d.setLineReservedAt.mock.invocationCallOrder[0],
       d.refreshStatus.mock.invocationCallOrder[0],
-      d.mirrorFirstLine.mock.invocationCallOrder[0],
     ]
     expect(orden).toEqual([...orden].sort((a, b) => (a ?? 0) - (b ?? 0)))
     // QT-313 R29: el estado del pedido no se escribe, se deriva.

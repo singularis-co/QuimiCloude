@@ -22,7 +22,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizeRecipeName } from '@/lib/modules/recetas'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { ensureOnlyLine, lineOfOrder } from '../../helpers/only-order-line'
+import { ensureOnlyLine, lineOfOrder, createOrderWithLine } from '../../helpers/only-order-line'
 
 class RollbackSignal extends Error {
   constructor() {
@@ -201,16 +201,13 @@ let nextSequence = 870_000
 
 async function createOrder(tx: Prisma.TransactionClient, companyId: string, recipeId: string): Promise<string> {
   nextSequence += 1
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  })
+    })
   await ensureOnlyLine(tx, order.id)
   return order.id
 }

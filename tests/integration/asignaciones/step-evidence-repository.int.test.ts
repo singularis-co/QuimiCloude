@@ -15,7 +15,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { EvidencePhase } from '@/lib/modules/asignaciones';
 import type { NewStepEvidence, StepEvidenceRow } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
-import { ensureOnlyLine, syncOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, syncOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 const repo = createStepEvidenceRepository();
 
@@ -76,17 +76,14 @@ async function createOrder(companyId: string): Promise<string> {
     select: { id: true },
   });
   nextSequence += 1;
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: recipe.id,
       quantity: new Prisma.Decimal('10'),
       status: 'EN_CURSO',
-    },
-    select: { id: true },
-  });
+    });
   lineOf.set(order.id, await ensureOnlyLine(prisma, order.id));
   return order.id;
 }

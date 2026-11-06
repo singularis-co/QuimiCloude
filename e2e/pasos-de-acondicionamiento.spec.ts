@@ -94,7 +94,7 @@ import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc299_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -556,8 +556,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
       where: { nameNormalized: 'litro', companyId: null },
       select: { id: true },
     });
-    const order = await prisma.order.create({
-      data: {
+    const order = await createOrderWithLine(prisma, {
         companyId,
         orderYear: year,
         orderSequence: BASE_SEQUENCE,
@@ -566,9 +565,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
         unitId: unit.id,
         // PENDIENTE: solo asi Entrar pide la confirmacion de comenzar.
         status: 'PENDIENTE',
-      },
-      select: { id: true },
-    });
+      });
     const orderId = order.id;
     await prisma.orderPresentationLine.create({
       data: {

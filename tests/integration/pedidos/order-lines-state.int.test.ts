@@ -268,11 +268,14 @@ async function lineaDe(lineId: string): Promise<LineaLeida> {
   };
 }
 
+/** El estado derivado del pedido y, de su primera linea, el plazo de reserva. */
 async function pedidoDe(orderId: string) {
-  return prisma.order.findUniqueOrThrow({
+  const pedido = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: { status: true, cancellationReason: true, deletedAt: true, reservedAt: true },
+    select: { status: true, cancellationReason: true, deletedAt: true },
   });
+  const primera = await prisma.orderLine.findFirstOrThrow({ where: { orderId }, orderBy: { position: 'asc' }, select: { reservedAt: true } });
+  return { ...pedido, reservedAt: primera.reservedAt };
 }
 
 /** Lo apartado neto de una linea. */

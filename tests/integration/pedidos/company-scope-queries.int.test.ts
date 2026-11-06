@@ -36,7 +36,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 import type { ListQuery } from '@/lib/modules/pedidos/domain/list-query';
 import type { OrderPriority } from '@/lib/modules/pedidos/domain/order-classification';
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
-import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import { createOrderWithLine, createSingleLineOrder, type SingleLineNewOrder, firstLineQuantities } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -143,8 +144,7 @@ type SiembraDePedido = {
 /** Con `prisma.order.create` y no con el adaptador: la siembra tiene que poder ELEGIR el
  *  correlativo —37, 44, 77— para montar el escenario del backfill. */
 async function sembrarPedido(empresa: Empresa, datos: SiembraDePedido): Promise<string> {
-  const { id } = await prisma.order.create({
-    data: {
+  const { id } = await createOrderWithLine(prisma, {
       companyId: empresa.companyId,
       orderYear: ANO,
       orderSequence: datos.sequence,
@@ -157,14 +157,12 @@ async function sembrarPedido(empresa: Empresa, datos: SiembraDePedido): Promise<
       updatedBy: empresa.userId,
       createdAt: AHORA,
       deletedAt: datos.deleted === true ? AHORA : null,
-    },
-    select: { id: true },
-  });
+    });
   empresa.pedidos.push(id);
   return id;
 }
 
-function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
+function pedidoNuevo(overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: recetaId,
@@ -181,7 +179,7 @@ function pedidoNuevo(overrides: Partial<NewOrder> = {}): NewOrder {
 /** Alta por el adaptador REAL: la transaccion, el lock y el `max()+1` son los de produccion. */
 async function alta(empresa: Empresa): Promise<OrderRow> {
   const resultado = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(
+    createSingleLineOrder(createOrderWriteRepository(tx), 
       pedidoNuevo(),
       ANO,
       empresa.userId,
@@ -257,6 +255,7 @@ afterAll(async () => {
   // borra ANTES que las empresas, no despues-.
   for (const empresa of empresas) {
     await prisma.orderAssignment.deleteMany({ where: { companyId: empresa.companyId } });
+    await prisma.orderLine.deleteMany({ where: { companyId: empresa.companyId } });
     await prisma.order.deleteMany({ where: { companyId: empresa.companyId } });
   }
   if (recetaId !== undefined) await prisma.recipe.deleteMany({ where: { id: recetaId } });
@@ -404,7 +403,7 @@ describe('R19 — los filtros, el orden y la paginacion NO ensanchan lo visible'
 
     expect(pagina.total).toBe(4);
     expect(pagina.totalPages).toBe(2);
-    expect(pagina.items.map((o) => o.quantity)).toEqual(['50.0000', '30.0000']);
+    expect(await firstLineQuantities(prisma, pagina.items.map((o) => o.id))).toEqual(['50.0000', '30.0000']);
     for (const ajeno of B.pedidos) {
       expect(pagina.items.map((o) => o.id)).not.toContain(ajeno);
     }

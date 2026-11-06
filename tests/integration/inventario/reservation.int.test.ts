@@ -185,8 +185,6 @@ async function createBareOrderRow(fixture: Fixture): Promise<string> {
     data: {
       orderYear: new Date().getUTCFullYear(),
       orderSequence,
-      recipeId: fixture.recipeId,
-      quantity: new Prisma.Decimal('1'),
       companyId: fixture.companyId,
       createdBy: fixture.actorId,
       updatedBy: fixture.actorId,

@@ -183,7 +183,6 @@ async function expireOne(
       companyId,
     });
     await transaction.orders.refreshStatus(orderId, null, instant, scope);
-    await transaction.orders.mirrorFirstLine(orderId, scope);
     return true;
   });
 }

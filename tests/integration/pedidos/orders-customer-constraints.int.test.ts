@@ -184,10 +184,10 @@ async function rawInsertOrder(
         ? Prisma.sql`, NULL`
         : Prisma.sql`, ${asUuid(customerId)}`
   await tx.$executeRaw`
-    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "updated_at"${customerColumn})
+    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "updated_at"${customerColumn})
     VALUES (
       ${asUuid(id)}, ${asUuid(companyId)}, ${new Date().getUTCFullYear()}, ${freshSequence()},
-      ${asUuid(recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP${customerValue}
+      CURRENT_TIMESTAMP${customerValue}
     )`
   return id
 }

@@ -56,15 +56,7 @@ import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/li
 import type { RecipeCatalog } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
 
-import {
-  fakeFinishedGoodsIntake,
-  fakeOrderConsumptionLedger,
-  fakeOrderUnitOfWork,
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeUnitOfWork,
-  orderLineOf,
-} from '@/tests/helpers/order-unit-of-work-double'
+import { fakeFinishedGoodsIntake, fakeOrderConsumptionLedger, fakeOrderUnitOfWork, fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double';
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double';
 import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double';
@@ -102,7 +94,7 @@ const ENTRADA_ALTA_CON_REPARTO = {
 }
 const ENTRADA_EDICION_CON_REPARTO = { ...ENTRADA_ALTA_CON_REPARTO, status: 'EN_CURSO' }
 
-function fila(id: string): OrderRow {
+function fila(id: string): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id,
@@ -225,9 +217,6 @@ function almacen() {
     void scope
   })
   const refreshStatus = vi.fn(async (id: string, _actorId: string | null, _now: Date, scope: OrderScope) => visible(id, scope)?.status ?? null)
-  const mirrorFirstLine = vi.fn(async (_id: string, scope: OrderScope) => {
-    void scope
-  })
   const writeOrders = {
     lockAliveById,
     create,
@@ -239,7 +228,6 @@ function almacen() {
     cancelLine,
     setLineReservedAt,
     refreshStatus,
-    mirrorFirstLine,
   }
 
   // Reservas de `inventario`: no forman parte de lo que este archivo mide -el ambito de ESE
@@ -390,7 +378,6 @@ describe('QC-60 R16 — los seis casos de uso pasan al puerto el ambito DEL ACTO
         'cancelLine',
         'setLineReservedAt',
         'refreshStatus',
-        'mirrorFirstLine',
         'softDeleteAlive',
         'setReservedAt',
       ]),

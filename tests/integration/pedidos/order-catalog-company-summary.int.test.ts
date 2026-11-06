@@ -18,9 +18,9 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderScope } from '@/lib/modules/pedidos'
+import type { OrderScope } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
-import { ensureOnlyLine, syncOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, syncOnlyLine, updateOrderAndLine, createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const { listAliveSummariesInCompany } = realOrderSummaries()
 
@@ -120,7 +120,7 @@ function scopeOf(e: Empresa): OrderScope {
   return { companyId: e.companyId }
 }
 
-function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
+function baseOrder(e: Empresa, overrides: Partial<SingleLineNewOrder> = {}): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: e.recipeId,
@@ -134,12 +134,12 @@ function baseOrder(e: Empresa, overrides: Partial<NewOrder> = {}): NewOrder {
   }
 }
 
-async function seedOrder(e: Empresa, overrides: Partial<NewOrder> = {}): Promise<string> {
+async function seedOrder(e: Empresa, overrides: Partial<SingleLineNewOrder> = {}): Promise<string> {
   const sequence = nextSequence
   nextSequence += 1
   const now = instant(1 + (sequence % 25))
   const result = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(e, overrides), YEAR, e.userId, now, null, scopeOf(e)),
+    createSingleLineOrder(createOrderWriteRepository(tx), baseOrder(e, overrides), YEAR, e.userId, now, null, scopeOf(e)),
   )
   await ensureOnlyLine(prisma, result.id)
   return result.id
@@ -302,14 +302,8 @@ describe('R20 — el orden de terminados contra la base real', () => {
     const sinFechaMenor = await seedOrder(A, { status: 'ENTREGADO' })
     const sinFechaMayor = await seedOrder(A, { status: 'ENTREGADO' })
     try {
-      await prisma.order.update({
-        where: { id: antiguo },
-        data: { status: 'ENTREGADO', finishedAt: new Date('2026-01-01T00:00:00.000Z') },
-      }).then(() => syncOnlyLine(prisma, antiguo))
-      await prisma.order.update({
-        where: { id: reciente },
-        data: { status: 'ENTREGADO', finishedAt: new Date('2026-06-01T00:00:00.000Z') },
-      }).then(() => syncOnlyLine(prisma, reciente))
+      await updateOrderAndLine(prisma, antiguo, { status: 'ENTREGADO', finishedAt: new Date('2026-01-01T00:00:00.000Z') }).then(() => syncOnlyLine(prisma, antiguo))
+      await updateOrderAndLine(prisma, reciente, { status: 'ENTREGADO', finishedAt: new Date('2026-06-01T00:00:00.000Z') }).then(() => syncOnlyLine(prisma, reciente))
 
       const pagina = await listAliveSummariesInCompany(A.companyId, ['ENTREGADO'], 'finished_recent_first', 1, 25)
 
@@ -351,7 +345,7 @@ async function crearEmpacador(e: Empresa): Promise<string> {
 
 async function seedEntregado(e: Empresa, packedBy: string | null): Promise<string> {
   const id = await seedOrder(e, { status: 'ENTREGADO' })
-  if (packedBy !== null) await prisma.order.update({ where: { id }, data: { packedBy } }).then(() => syncOnlyLine(prisma, id))
+  if (packedBy !== null) await updateOrderAndLine(prisma, id, { packedBy }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 

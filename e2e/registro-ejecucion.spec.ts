@@ -27,7 +27,7 @@ import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, assignedOrderRoute } from
 import { enterAndStartAssignedOrder } from './helpers/confirm-dialog';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc82_e2e_';
 
@@ -140,8 +140,7 @@ async function seedOrder(sequence: number): Promise<{ id: string; numberText: st
   });
   // El CHECK `orders_order_year_matches_created_at` ata el ano a `created_at`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: sequence,
@@ -149,9 +148,7 @@ async function seedOrder(sequence: number): Promise<{ id: string; numberText: st
       quantity: ORDER_QUANTITY,
       unitId: presentation.unitId,
       status: 'PENDIENTE',
-    },
-    select: { id: true },
-  });
+    });
   await prisma.orderPresentationLine.create({
     data: {
       orderId: order.id,

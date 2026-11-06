@@ -160,8 +160,7 @@ export function createCreateOrder(
     }
 
     const instant = now();
-    const [first] = prepared;
-    if (first === undefined) throw new ValidationError('alta sin lineas');
+    if (prepared.length === 0) throw new ValidationError('alta sin lineas');
 
     const created = await deps.unitOfWork.run(async (transaction) => {
       // Las necesidades se arman antes del primer INSERT: una linea no convertible rechaza el
@@ -171,23 +170,11 @@ export function createCreateOrder(
         requirements.push(await atLinePosition(position, () => lineRequirement(transaction, line, actor.companyId)));
       }
 
-      // Las columnas de receta del pedido nacen con las de su primera linea; el reparto va solo
-      // en las lineas.
       const order = await transaction.orders.create(
-        {
-          recipeId: first.effectiveRecipeId,
-          quantity: first.input.quantity,
-          priority,
-          unitId: first.input.unitId,
-          status: STATUS_DE_ALTA,
-          presentationLines: [],
-          customerId,
-          salePrice: first.input.salePrice,
-        },
+        { priority, status: STATUS_DE_ALTA, customerId },
         instant.getUTCFullYear(),
         actor.id,
         instant,
-        first.cost,
         scope,
       );
 
@@ -246,7 +233,6 @@ export function createCreateOrder(
       }
 
       await transaction.orders.refreshStatus(order.id, actor.id, instant, scope);
-      await transaction.orders.mirrorFirstLine(order.id, scope);
       return order;
     });
 

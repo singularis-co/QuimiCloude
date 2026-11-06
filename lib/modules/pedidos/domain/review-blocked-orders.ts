@@ -166,7 +166,6 @@ async function reviewOne(
 
     await transaction.orders.setLineReservedAt(orderId, lineId, outcome.kind === 'reserved' ? now : null, scope);
     await transaction.orders.refreshStatus(orderId, null, now, scope);
-    await transaction.orders.mirrorFirstLine(orderId, scope);
     return true;
   });
 }

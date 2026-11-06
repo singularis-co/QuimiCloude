@@ -139,9 +139,6 @@ async function insertBareOrder(tx: Prisma.TransactionClient, c: Company): Promis
       companyId: c.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
-      recipeId: c.recipeId,
-      quantity: new Prisma.Decimal('20'),
-      unitId: c.unitId,
     },
     select: { id: true },
   });

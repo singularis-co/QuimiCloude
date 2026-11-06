@@ -17,7 +17,7 @@ import { asignaciones } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
-import { syncOnlyLine, ensureOnlyLine } from '../../helpers/only-order-line';
+import { syncOnlyLine, ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../../helpers/only-order-line';
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 
@@ -205,25 +205,19 @@ async function crearLinea(fixture: Fixture, orderId: string, nombre: string, con
 
 /** Un pedido `EN_ACONDICIONAMIENTO` de `acondicionador1`, con el operario en su equipo. */
 async function pedidoEnAcondicionamiento(fixture: Fixture): Promise<string> {
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: fixture.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
       recipeId: fixture.recipeId,
       quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
+    });
   await ensureOnlyLine(prisma, order.id);
   return order.id;
 }
 
 async function comenzar(fixture: Fixture, orderId: string): Promise<void> {
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { status: 'EN_ACONDICIONAMIENTO', packedBy: fixture.packerId, conditionedBy: fixture.acondicionador1 },
-  });
+  await updateOrderAndLine(prisma, orderId, { status: 'EN_ACONDICIONAMIENTO', packedBy: fixture.packerId, conditionedBy: fixture.acondicionador1 });
   const orderLineId = await syncOnlyLine(prisma, orderId);
   await prisma.orderConditioningTeamMember.create({
     data: { orderId, orderLineId, userId: fixture.operario, companyId: fixture.companyId, position: 0 },
@@ -235,10 +229,7 @@ function actor(fixture: Fixture, id: string): Actor {
 }
 
 async function leerPedido(id: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, conditionedBy: true, finishedAt: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, conditionedBy: true, finishedAt: true } });
 }
 
 async function leerEquipo(orderId: string) {

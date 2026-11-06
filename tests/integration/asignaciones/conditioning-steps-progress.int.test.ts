@@ -42,7 +42,7 @@ import { ConditioningStepOutOfOrderError, OrderNotFoundError } from '@/lib/modul
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
-import { ensureOnlyLine, syncOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, syncOnlyLine, createOrderWithLine, updateOrderAndLine } from '../../helpers/only-order-line';
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 
@@ -165,8 +165,7 @@ async function borrarEmpresas(empresas: readonly Empresa[]): Promise<void> {
 
 /** Un pedido `EN_ACONDICIONAMIENTO` a nombre del acondicionador, con el operario en su equipo. */
 async function pedidoEnAcondicionamiento(empresa: Empresa, recipeId = empresa.recipeId): Promise<string> {
-  const { id } = await prisma.order.create({
-    data: {
+  const { id } = await createOrderWithLine(prisma, {
       companyId: empresa.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
@@ -174,13 +173,8 @@ async function pedidoEnAcondicionamiento(empresa: Empresa, recipeId = empresa.re
       quantity: new Prisma.Decimal('10'),
       status: 'POR_ACONDICIONAR',
       packedBy: empresa.packerId,
-    },
-    select: { id: true },
-  });
-  await prisma.order.update({
-    where: { id },
-    data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: empresa.acondicionador },
-  });
+    });
+  await updateOrderAndLine(prisma, id, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: empresa.acondicionador });
   const orderLineId = await syncOnlyLine(prisma, id);
   await prisma.orderConditioningTeamMember.create({
     data: { orderId: id, orderLineId, userId: empresa.operario, companyId: empresa.companyId, position: 0 },

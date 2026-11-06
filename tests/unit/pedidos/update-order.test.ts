@@ -21,14 +21,7 @@ import {
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors';
 import { createUpdateOrder as createLinesUpdate, type UpdateOrderDeps } from '@/lib/modules/pedidos/domain/update-order';
-import {
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeUnitOfWork,
-  lineWritingOrders,
-  ONLY_LINE_ID,
-  orderLineOf,
-} from '@/tests/helpers/order-unit-of-work-double';
+import { fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, lineWritingOrders, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
 import { singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor';
@@ -136,7 +129,7 @@ const OTRA_UNIDAD_INCOMPATIBLE = '10101010-1010-4101-8101-101010101010';
 
 const AHORA = new Date('2026-09-16T10:00:00.000Z');
 
-function filaExistente(): OrderRow {
+function filaExistente(): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -1005,7 +998,7 @@ describe('QC-215 R38 — la edicion de solo cliente en un estado sin edicion gen
   const CLIENTE = 'c0000000-0000-4000-8000-00000000000a';
 
   /** Fila con unidad y sin reparto: la edicion `soloCliente` es igual salvo el cliente. */
-  function filaConUnidad(status: OrderStatus): OrderRow {
+  function filaConUnidad(status: OrderStatus): SingleRecipeOrderRow {
     return {
       ...filaExistente(),
       status,
@@ -1957,7 +1950,7 @@ describe('QC-305 — el estimado queda congelado desde Comenzar (R11, R12, R14)'
   }
 
   function edicionEn(filaStatus: OrderStatus, lockedStatus: OrderStatus = filaStatus) {
-    const fila: OrderRow = { ...filaExistente(), status: filaStatus, ingredientsCost: '99.0000', packagingCost: '9.0000' };
+    const fila: SingleRecipeOrderRow = { ...filaExistente(), status: filaStatus, ingredientsCost: '99.0000', packagingCost: '9.0000' };
     const orders = {
       findAliveById: vi.fn(async () => fila),
       listAlive: vi.fn(),
@@ -2088,7 +2081,7 @@ describe('QC-307 — el precio de venta en la edicion', () => {
   const CLIENTE = 'c0000000-0000-4000-8000-00000000000b';
 
   /** Fila con unidad y sin reparto, para que una edicion que repite todo sea «igual». */
-  function filaConPrecio(salePrice: string | null, status: OrderStatus = 'PENDIENTE'): OrderRow {
+  function filaConPrecio(salePrice: string | null, status: OrderStatus = 'PENDIENTE'): SingleRecipeOrderRow {
     return {
       ...filaExistente(),
       status,

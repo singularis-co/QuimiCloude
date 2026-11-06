@@ -48,7 +48,6 @@ export function createCancelOrderLine(
         companyId: actor.companyId,
       });
       await transaction.orders.refreshStatus(orderId, actor.id, instant, scope);
-      await transaction.orders.mirrorFirstLine(orderId, scope);
       return 'ok' as const;
     });
 

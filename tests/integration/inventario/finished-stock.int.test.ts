@@ -134,8 +134,6 @@ async function sembrarPedido(fixture: Fixture, receta: Receta, year: number, seq
     data: {
       orderYear: year,
       orderSequence: sequence,
-      recipeId: receta.id,
-      quantity: '10',
       companyId: fixture.empresa.companyId,
       // El ano del correlativo tiene que ser el de `created_at` (CHECK de la tabla).
       createdAt: new Date(Date.UTC(year, 5, 15)),
@@ -457,7 +455,7 @@ describe('listStockGroups: la pestana de producto terminado por pedido', () => {
       await limpiar(ajena);
     }
   });
-  it('QT-313 R45: con una linea, la fila sale y se busca por la receta de la linea aunque orders.recipe_id diga otra', async () => {
+  it('QT-313 R45: con una linea, la fila sale y se busca por la receta de la linea', async () => {
     const fixture = await sembrarFixture();
     try {
       const receta = await sembrarReceta(fixture, `Limpiador ${token()}`);
@@ -465,8 +463,6 @@ describe('listStockGroups: la pestana de producto terminado por pedido', () => {
       const pedido = await sembrarPedido(fixture, receta, 2026, 1);
       await recibir(fixture, receta, pedido, await sembrarPresentacion(fixture, 'Botella 500 ml', '0.5'), 2);
       const hoy = await listStockGroups(consulta(), fixture.scope);
-      await prisma.order.update({ where: { id: pedido }, data: { recipeId: ajena.id } });
-
       const page = await listStockGroups(consulta(), fixture.scope);
 
       expect(page).toEqual(hoy);

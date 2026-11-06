@@ -67,6 +67,7 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { firstLineSelect, withFirstLine } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -304,17 +305,8 @@ async function lineaDe(orderId: string) {
 async function foto(orderId: string) {
   const fila = await prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: {
-      companyId: true,
-      unitId: true,
-      quantity: true,
-      recipeId: true,
-      priority: true,
-      status: true,
-      updatedAt: true,
-      updatedBy: true,
-    },
-  });
+    select: { companyId: true, priority: true, status: true, updatedAt: true, updatedBy: true, lines: firstLineSelect({ unitId: true, quantity: true, recipeId: true }) },
+  }).then(withFirstLine);
   const lineas = await prisma.orderPresentationLine.findMany({
     where: { orderId },
     select: { id: true, companyId: true, presentationId: true, packages: true, presentationContent: true, updatedAt: true },
@@ -450,7 +442,6 @@ describe('R29 — aislamiento: la edicion acotada del reparto y la unidad no cru
           new Date(),
           { companyId: a.companyId },
         );
-        await repo.mirrorFirstLine(pedidoA, { companyId: a.companyId });
         return escrito;
       });
 

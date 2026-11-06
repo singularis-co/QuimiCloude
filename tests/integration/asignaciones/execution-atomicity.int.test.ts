@@ -307,10 +307,7 @@ async function anotaciones(orderId: string) {
 }
 
 async function pedidoEnBase(orderId: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { status: true, packedBy: true, finishedAt: true, cancellationReason: true, updatedAt: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true, finishedAt: true, cancellationReason: true, updatedAt: true } });
 }
 
 async function movimientosDeReserva(orderId: string) {

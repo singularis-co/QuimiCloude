@@ -11,6 +11,8 @@ import type {
   OrderTransactionScope,
   OrderUnitOfWork,
 } from '@/lib/modules/pedidos/ports/order-unit-of-work';
+import type { StoredOrderCost } from '@/lib/modules/pedidos/domain/order-cost';
+import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type { OrderLineRow, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
 import type {
   LockedOrderRow,
@@ -29,12 +31,32 @@ import type {
 } from '@/lib/modules/inventario';
 import type { MassVolumeBridge, UnitRef } from '@/lib/modules/unidades';
 
+/**
+ * Escrituras del pedido que el puerto ya no tiene: el coste y el plazo de reserva son de la linea.
+ * Los dobles escritos para pedidos de una receta las siguen ofreciendo, y `singleRecipeWrites` les
+ * manda las de su unica linea.
+ */
+export type LegacyOrderWrites = {
+  setIngredientsCost(
+    id: string,
+    cost: StoredOrderCost | null,
+    actorId: string | null,
+    now: Date,
+    scope: OrderScope,
+  ): Promise<'ok' | 'not_found'>;
+  setReservedAt(id: string, reservedAt: Date | null, scope: OrderScope): Promise<void>;
+};
+
+type FakeOrderWrites = OrderWriteRepository &
+  LegacyOrderWrites &
+  Record<keyof OrderWriteRepository | keyof LegacyOrderWrites, ReturnType<typeof vi.fn>>;
+
 /** Un `OrderWriteRepository` que explota si se le llama un metodo que el test no espera: el
  *  patron de `explota()` que ya usan `create-order.test.ts` y compania, aplicado al puerto de
  *  escritura de la unidad de trabajo. */
 export function fakeOrderWriteRepository(
-  overrides: Partial<OrderWriteRepository> = {},
-): OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>> {
+  overrides: Partial<OrderWriteRepository & LegacyOrderWrites> = {},
+): FakeOrderWrites {
   const explota = (nombre: string) =>
     vi.fn(() => {
       throw new Error(`OrderWriteRepository.${nombre} no deberia llamarse en este caso`);
@@ -52,7 +74,6 @@ export function fakeOrderWriteRepository(
     refreshStatus: vi.fn(explota('refreshStatus')),
     create: vi.fn(explota('create')),
     updateAlive: vi.fn(explota('updateAlive')),
-    mirrorFirstLine: vi.fn(explota('mirrorFirstLine')),
     cancelAlive: vi.fn(explota('cancelAlive')),
     softDeleteAlive: vi.fn(explota('softDeleteAlive')),
     setStatus: vi.fn(explota('setStatus')),
@@ -63,7 +84,7 @@ export function fakeOrderWriteRepository(
     findPresentationLinesForFinish: vi.fn(explota('findPresentationLinesForFinish')),
     recordPackedCounts: vi.fn(explota('recordPackedCounts')),
     ...overrides,
-  } as unknown as OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
+  } as unknown as FakeOrderWrites;
 }
 
 /** Un `MaterialReservations` que por defecto aparta todo lo que se le pida y no falla nunca:
@@ -165,7 +186,7 @@ export function fakeOrderConsumptionLedger(
 /** Combina los puertos del `scope` y la unidad de trabajo que los expone, lista para
  *  inyectar en `CreateOrderDeps.unitOfWork`, etc. */
 export function fakeUnitOfWork(overrides: {
-  readonly orders?: Partial<OrderWriteRepository>;
+  readonly orders?: Partial<OrderWriteRepository & LegacyOrderWrites>;
   readonly reservations?: Partial<MaterialReservations>;
   readonly recipes?: Partial<OrderTransactionScope['recipes']>;
   readonly finishedGoods?: Partial<FinishedGoodsIntake>;
@@ -174,7 +195,7 @@ export function fakeUnitOfWork(overrides: {
   readonly consumption?: OrderConsumptionLedger;
 } = {}): {
   readonly unitOfWork: OrderUnitOfWork;
-  readonly orders: OrderWriteRepository & Record<keyof OrderWriteRepository, ReturnType<typeof vi.fn>>;
+  readonly orders: FakeOrderWrites;
   readonly reservations: MaterialReservations &
     Record<keyof MaterialReservations, ReturnType<typeof vi.fn>>;
   readonly recipes: OrderTransactionScope['recipes'] & Record<'findExecutionContentById', ReturnType<typeof vi.fn>>;
@@ -202,11 +223,24 @@ export function fakeUnitOfWork(overrides: {
   };
 }
 
+/** La cabecera del pedido con los datos de su unica receta: `orderLineOf` construye la linea con
+ *  ellos. Es una `LockedOrderRow` valida; los campos de receta solo los lee `orderLineOf`. */
+export type SingleRecipeOrderRow = LockedOrderRow & {
+  readonly recipeId: string;
+  readonly quantity: string;
+  readonly unitId: string | null;
+  readonly ingredientsCost: string | null;
+  readonly packagingCost: string | null;
+  readonly actualCost: string | null;
+  readonly salePrice: string | null;
+  readonly presentationLines: OrderLineRow['presentationLines'];
+  readonly reservedAt?: Date | null;
+};
+
 /** Fila minima de `OrderWriteRepository.lockAliveById`: los tests que no la personalizan usan
- *  esta, para no repetir los campos de `LockedOrderRow` en cada archivo. `reservedAt` por
- *  defecto queda DENTRO del plazo (anterior a `AHORA` de los tests), como un pedido con material
- *  apartado hace rato. */
-export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
+ *  esta, para no repetir los campos en cada archivo. `reservedAt` por defecto queda DENTRO del
+ *  plazo (anterior a `AHORA` de los tests), como un pedido con material apartado hace rato. */
+export function fakeOrderRow(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: '11111111-1111-4111-8111-111111111111',
@@ -235,23 +269,29 @@ export function fakeOrderRow(overrides: Partial<LockedOrderRow> = {}): LockedOrd
  *  cada pedido existente. `id` fijo para que los tests la nombren. */
 export const ONLY_LINE_ID = '0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e';
 
-export function orderLineOf(row: OrderRow & { readonly reservedAt?: Date | null }, overrides: Partial<OrderLineRow> = {}): OrderLineRow {
+export function orderLineOf(
+  row: OrderRow & Partial<Omit<SingleRecipeOrderRow, keyof OrderRow>>,
+  overrides: Partial<OrderLineRow> = {},
+): OrderLineRow {
   if (row.status === 'PARCIAL') throw new Error('una linea no puede estar en PARCIAL');
+  // Lo que la fila no trae de su receta sale de la fila por defecto.
+  const full = fakeOrderRow({ reservedAt: null, ...row });
+  const reservedAt = full.reservedAt ?? null;
   return {
     id: ONLY_LINE_ID,
     orderId: row.id,
     position: 0,
-    recipeId: row.recipeId,
-    originalRecipeId: row.recipeId,
-    quantity: row.quantity,
-    unitId: row.unitId,
+    recipeId: full.recipeId,
+    originalRecipeId: full.recipeId,
+    quantity: full.quantity,
+    unitId: full.unitId,
     status: row.status,
     cancellationReason: row.cancellationReason,
-    ingredientsCost: row.ingredientsCost,
-    packagingCost: row.packagingCost,
-    actualCost: row.actualCost,
-    salePrice: row.salePrice,
-    reservedAt: row.reservedAt ?? null,
+    ingredientsCost: full.ingredientsCost,
+    packagingCost: full.packagingCost,
+    actualCost: full.actualCost,
+    salePrice: full.salePrice,
+    reservedAt,
     finishedAt: null,
     packedBy: null,
     conditionedBy: null,
@@ -259,7 +299,7 @@ export function orderLineOf(row: OrderRow & { readonly reservedAt?: Date | null 
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationLines: row.presentationLines,
+    presentationLines: full.presentationLines,
     ...overrides,
   };
 }
@@ -269,8 +309,8 @@ export function orderLineOf(row: OrderRow & { readonly reservedAt?: Date | null 
  *  necesite otra cosa la pisa con su propio doble. */
 export function lineWritingOrders(): Pick<
   OrderWriteRepository,
-  'writeLines' | 'setLineStatus' | 'setLineIngredientsCost' | 'setLineReservedAt' | 'refreshStatus' | 'mirrorFirstLine' | 'updateAlive'
-> & Record<'writeLines' | 'setLineStatus' | 'setLineIngredientsCost' | 'setLineReservedAt' | 'refreshStatus' | 'mirrorFirstLine' | 'updateAlive', ReturnType<typeof vi.fn>> {
+  'writeLines' | 'setLineStatus' | 'setLineIngredientsCost' | 'setLineReservedAt' | 'refreshStatus' | 'updateAlive'
+> & Record<'writeLines' | 'setLineStatus' | 'setLineIngredientsCost' | 'setLineReservedAt' | 'refreshStatus' | 'updateAlive', ReturnType<typeof vi.fn>> {
   const writeLines = vi.fn(async (orderId: string, changes: OrderLineChanges): Promise<readonly OrderLineRow[]> =>
     changes.added.map((line, index) => ({
       id: `linea-${String(index)}`,
@@ -308,7 +348,6 @@ export function lineWritingOrders(): Pick<
     setLineIngredientsCost: vi.fn(async () => 'ok' as const),
     setLineReservedAt: vi.fn(async () => undefined),
     refreshStatus: vi.fn(async () => 'PENDIENTE' as const),
-    mirrorFirstLine: vi.fn(async () => undefined),
     updateAlive: vi.fn(async () => 'ok' as const),
   };
 }

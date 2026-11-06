@@ -106,7 +106,6 @@ export function createTransitionOrder(deps: TransitionOrderDeps): OrderCatalog['
         if (to === 'POR_EMPACAR') await scope.orders.setLineReservedAt(id, lineId, null, { companyId });
 
         await scope.orders.refreshStatus(id, actorId, now, { companyId });
-        await scope.orders.mirrorFirstLine(id, { companyId });
         return 'ok' as const;
       });
     } catch (err) {

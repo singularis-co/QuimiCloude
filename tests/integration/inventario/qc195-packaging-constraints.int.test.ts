@@ -19,7 +19,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity';
 import { normalizePresentationName } from '@/lib/modules/inventario';
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 class RollbackSignal extends Error {
   constructor() {
@@ -186,17 +186,14 @@ let nextSequence = 950_000;
 
 async function insertOrder(tx: Prisma.TransactionClient, f: Fixtures): Promise<string> {
   nextSequence += 1;
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: f.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: nextSequence,
       recipeId: f.recipeId,
       quantity: new Prisma.Decimal('20'),
       unitId: f.unitId,
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 

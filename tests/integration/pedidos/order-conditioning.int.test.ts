@@ -23,7 +23,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import type { OrderStatus } from '@/lib/modules/pedidos';
 import type { OrderConditioningRepository } from '@/lib/modules/pedidos/ports/order-conditioning-repository';
-import { onOnlyLine } from '../../helpers/only-order-line';
+import { onOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 const conditioningRepository: OrderConditioningRepository = {
   startConditioningAlive: startConditioningAliveOrder,
@@ -133,8 +133,7 @@ async function createOrder(
 ): Promise<string> {
   const empacado = ['EN_EMPAQUE', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'].includes(status);
   const acondicionado = status === 'EN_ACONDICIONAMIENTO' || status === 'TERMINADO';
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: fixture.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
@@ -146,9 +145,7 @@ async function createOrder(
       finishedAt: status === 'TERMINADO' ? new Date('2026-10-01T10:00:00Z') : null,
       deletedAt: overrides.deletedAt ?? null,
       ...(status === 'CANCELADO' ? { cancellationReason: 'motivo de prueba' } : {}),
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 
@@ -162,10 +159,7 @@ type OrderSnapshot = {
 };
 
 async function readOrder(id: string): Promise<OrderSnapshot> {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, packedBy: true, conditionedBy: true, finishedAt: true, updatedAt: true, updatedBy: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true, conditionedBy: true, finishedAt: true, updatedAt: true, updatedBy: true } });
 }
 
 /** Lo que el acondicionamiento NO debe tocar: asientos de inventario y lotes de la empresa. */

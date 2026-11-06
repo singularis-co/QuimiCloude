@@ -8,7 +8,7 @@ import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderLineStatus, OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
-import type { OrderLineRow, OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { OrderLineRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { PresentationCatalog } from '@/lib/modules/inventario'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
@@ -16,6 +16,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades'
 import { fakeCustomerCatalog } from '../../helpers/customer-catalog-double'
 import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double'
+import type { SingleRecipeOrderRow } from '../../helpers/order-unit-of-work-double'
 
 const COMPANY = '33333333-3333-4333-8333-333333333333'
 const ADMIN: Actor = { id: 'admin-1', companyId: COMPANY, permissions: ['pedidos.consultar'] }
@@ -32,7 +33,7 @@ function receta(id: string, name: string): RecipeRef {
 
 const RECETAS: readonly RecipeRef[] = [receta(CREMA, 'Crema base'), receta(JABON, 'Jabon neutro'), receta(GEL, 'Gel frio')]
 
-function fila(id: string, status: OrderStatus, recipeId = CREMA): OrderRow {
+function fila(id: string, status: OrderStatus, recipeId = CREMA): SingleRecipeOrderRow {
   return {
     id,
     number: { year: 2026, sequence: 7 },
@@ -86,7 +87,7 @@ function linea(orderId: string, datos: LineaParcial): OrderLineRow {
   }
 }
 
-function dobles(filas: readonly OrderRow[], lineas: readonly OrderLineRow[]) {
+function dobles(filas: readonly SingleRecipeOrderRow[], lineas: readonly OrderLineRow[]) {
   const findAliveById = vi.fn(async (id: string) => filas.find((row) => row.id === id) ?? null)
   const findAliveLines = vi.fn(async (orderId: string) => lineas.filter((line) => line.orderId === orderId))
   const findAliveLinesByOrderIds = vi.fn(async (orderIds: readonly string[]) =>

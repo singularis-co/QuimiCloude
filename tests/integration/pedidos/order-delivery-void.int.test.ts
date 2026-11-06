@@ -42,6 +42,7 @@ import {
   stockDeProducto,
   type EmpresaDeEntrega,
 } from '../../helpers/order-delivery-seed';
+import { updateOrderAndLine, firstLineSelect, withFirstLine } from '../../helpers/only-order-line';
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -148,8 +149,8 @@ async function entregarTodo(e: Escenario): Promise<string> {
 async function pedido(orderId: string) {
   return prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    select: { status: true, customerId: true, finishedAt: true, packedBy: true, conditionedBy: true },
-  });
+    select: { status: true, customerId: true, lines: firstLineSelect({ finishedAt: true, packedBy: true, conditionedBy: true }) },
+  }).then(withFirstLine);
 }
 
 async function codigoDe(promesa: Promise<unknown>): Promise<string> {
@@ -253,7 +254,7 @@ describe('voidDelivery contra Postgres', () => {
     const e = await crearEscenario();
     try {
       const deliveryId = await entregarTodo(e);
-      await prisma.order.update({ where: { id: e.orderId }, data: { status: 'EN_ACONDICIONAMIENTO', finishedAt: null } });
+      await updateOrderAndLine(prisma, e.orderId, { status: 'EN_ACONDICIONAMIENTO', finishedAt: null });
       // QT-313: el estado que decide es el de la linea.
       await prisma.orderLine.updateMany({ where: { orderId: e.orderId }, data: { status: 'EN_ACONDICIONAMIENTO', finishedAt: null } });
 

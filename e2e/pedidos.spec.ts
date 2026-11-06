@@ -81,6 +81,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc35_e2e_';
@@ -278,9 +279,11 @@ test.beforeAll(async () => {
   // E2E viejo de esta ficha.
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
   }
   await prisma.recipe.deleteMany({
     where: { name: { startsWith: FIXTURE_PREFIX }, createdAt: { lt: orphanCutoff } },
@@ -400,8 +403,10 @@ test.afterAll(async () => {
       await prisma.inventoryMovement.deleteMany({ where: { companyId } });
     }
     if (recipeId !== null) {
-      await prisma.orderPresentationLine.deleteMany({ where: { order: { recipeId } } });
-      await prisma.order.deleteMany({ where: { recipeId } });
+      await prisma.orderPresentationLine.deleteMany({ where: { order: { lines: { some: { recipeId } } } } });
+      const pedidosABorrar2 = (await prisma.order.findMany({ where: { lines: { some: { recipeId } } }, select: { id: true } })).map((pedido) => pedido.id);
+      await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar2 } } });
+      await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar2 } } });
     }
   } finally {
     try {
@@ -508,16 +513,16 @@ test.describe('pantalla de pedidos', () => {
     // --- 9. El correlativo lo pone el BACKEND (secuencia por ano de QC-33), asi que se lee de
     // donde el alta lo dejo y se compone SIEMPRE con `formatOrderNumber` (R10), nunca a mano.
     const created = await prisma.order.findFirstOrThrow({
-      where: { recipeId: recipeId ?? '', deletedAt: null },
+      where: { lines: { some: { recipeId: recipeId ?? '' } }, deletedAt: null },
       select: {
         id: true,
         orderYear: true,
         orderSequence: true,
         priority: true,
-        quantity: true,
         presentationLines: { select: { presentationId: true, packagingProductId: true } },
+        lines: firstLineSelect({ quantity: true }),
       },
-    });
+    }).then(withFirstLine);
     const numberText = formatOrderNumber({
       year: created.orderYear,
       sequence: created.orderSequence,

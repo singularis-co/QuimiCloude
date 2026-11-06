@@ -52,15 +52,10 @@ async function seedFixture(tx: Db): Promise<Fixture> {
   return { ...base, actorId, unitId: unit.id };
 }
 
+/** El pedido sin lineas: cada caso le crea las suyas. */
 async function insertOrder(tx: Db, base: Base): Promise<string> {
   const { id } = await tx.order.create({
-    data: {
-      companyId: base.companyId,
-      orderYear: 2026,
-      orderSequence: freshSequence(),
-      recipeId: base.recipeId,
-      quantity: new Prisma.Decimal('10'),
-    },
+    data: { companyId: base.companyId, orderYear: 2026, orderSequence: freshSequence() },
     select: { id: true },
   });
   return id;

@@ -27,7 +27,7 @@ import { findPackageUnitId } from '@/lib/modules/unidades/adapters/driven/persis
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -122,16 +122,13 @@ let sequence = 970_000;
 
 async function orderReserving(c: Company, productId: string, quantity: string): Promise<string> {
   sequence += 1;
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: c.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: sequence,
       recipeId: c.recipeId,
       quantity: new Prisma.Decimal('1'),
-    },
-    select: { id: true },
-  });
+    });
   const outcome = await createMaterialReservations(prisma).syncForLine({
     orderLineId: await ensureOnlyLine(prisma, order.id),
     orderId: order.id,

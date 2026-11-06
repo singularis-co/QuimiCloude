@@ -29,6 +29,7 @@ import {
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
 import { seedPackaging } from './helpers/packaging';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc156_e2e_';
 
@@ -187,8 +188,7 @@ async function createCustomer(customer: CustomerFixture, company: string): Promi
 
 /** El ano sale del reloj: el CHECK `orders_order_year_matches_created_at` lo ata a `created_at`. */
 async function seedOrder(sequence: number, customerId: string | null): Promise<string> {
-  const created = await prisma.order.create({
-    data: {
+  const created = await createOrderWithLine(prisma, {
       companyId: required(companyId, 'la empresa'),
       orderYear: new Date().getUTCFullYear(),
       orderSequence: sequence,
@@ -197,9 +197,7 @@ async function seedOrder(sequence: number, customerId: string | null): Promise<s
       status: 'PENDIENTE',
       createdBy: adminId,
       customerId,
-    },
-    select: { id: true },
-  });
+    });
   return created.id;
 }
 
@@ -517,7 +515,7 @@ test.describe('pedido con cliente', () => {
         customerId: true,
         status: true,
         cancellationReason: true,
-        quantity: true,
+        lines: { select: { quantity: true } },
         deletedAt: true,
       },
     });
@@ -540,7 +538,7 @@ test.describe('pedido con cliente', () => {
         customerId: true,
         status: true,
         cancellationReason: true,
-        quantity: true,
+        lines: { select: { quantity: true } },
         deletedAt: true,
       },
     });

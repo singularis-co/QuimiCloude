@@ -101,7 +101,6 @@ export async function cancelInsideTransaction(
     });
   }
   await scope.orders.refreshStatus(id, actorId, now, { companyId });
-  await scope.orders.mirrorFirstLine(id, { companyId });
   return 'ok';
 }
 

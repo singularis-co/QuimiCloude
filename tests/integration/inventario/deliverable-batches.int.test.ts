@@ -25,7 +25,7 @@ import {
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -188,17 +188,14 @@ async function recibirPorProduccion(
   presentationId: string,
   packages: number,
 ): Promise<{ productId: string; batchId: string }> {
-  const { id: orderId } = await prisma.order.create({
-    data: {
+  const { id: orderId } = await createOrderWithLine(prisma, {
       orderYear: new Date().getUTCFullYear(),
       orderSequence: secuencia++,
       recipeId,
       quantity: '10',
       companyId: empresa.companyId,
       createdAt: new Date(),
-    },
-    select: { id: true },
-  });
+    });
   const line = await prisma.orderPresentationLine.create({
     data: { orderId, orderLineId: await ensureOnlyLine(prisma, orderId), companyId: empresa.companyId, presentationId, packages, presentationContent: null },
     select: { id: true },

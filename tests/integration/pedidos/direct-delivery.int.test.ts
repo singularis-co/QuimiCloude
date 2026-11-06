@@ -119,18 +119,9 @@ describe('R33: el excedente, calculado con el producto bloqueado', () => {
     });
   });
 
-  it('QT-313 R45: con pedidos de una linea el excedente es el de hoy aunque orders.recipe_id diga otra receta', async () => {
+  it('QT-313 R45: con pedidos de una linea el excedente es el de hoy', async () => {
     await conEscenario('excedente-linea', async (e) => {
       const hoy = await pedidos.getDirectDelivery(e.productId, e.actor);
-      const marca = randomUUID().replace(/-/gu, '');
-      const ajena = await prisma.recipe.create({
-        data: { name: `Ajena ${marca}`, nameNormalized: `ajena${marca}`, companyId: e.empresa.companyId },
-        select: { id: true },
-      });
-      await prisma.order.updateMany({
-        where: { id: { in: [e.firstOrder.orderId, e.secondOrder.orderId] } },
-        data: { recipeId: ajena.id },
-      });
 
       expect(await pedidos.getDirectDelivery(e.productId, e.actor)).toEqual(hoy);
       expect(hoy).toMatchObject({ stockPackages: 20, waitingPackages: 8, surplusPackages: 12 });

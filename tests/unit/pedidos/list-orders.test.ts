@@ -44,6 +44,7 @@ import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades'
 import { fakeDeliveryProgress } from '../../helpers/delivery-progress-double'
 import { fakePackagingCatalog } from '../../helpers/packaging-catalog-double'
+import { orderLineOf, type SingleRecipeOrderRow } from '../../helpers/order-unit-of-work-double'
 
 // QC-74: el actor lleva PERMISOS, no el nombre del rol (R18). Los dos codigos de `pedidos`,
 // porque este archivo ejercita lecturas y escrituras con el mismo fixture.
@@ -69,7 +70,7 @@ const REFS_RECETA: readonly RecipeRef[] = [
   // tiene que seguir diciendo que se pidio.
   { id: RECETA_B, name: 'Formula retirada', ownName: 'Formula retirada', isUnderReview: false, original: null, isDeleted: true, imageUrl: null },
 ]
-function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow {
+function fila(overrides: Partial<SingleRecipeOrderRow> & { readonly id: string }): SingleRecipeOrderRow {
   return {
     salePrice: null,
     number: { year: 2026, sequence: 1 },
@@ -88,6 +89,7 @@ function fila(overrides: Partial<OrderRow> & { readonly id: string }): OrderRow 
     presentationLines: [],
     unitId: null,
     customerId: null,
+    reservedAt: null,
     ...overrides,
   }
 }
@@ -139,7 +141,10 @@ function dobles(opciones: {
     create: explota('orders.create'),
     findAliveById: explota('orders.findAliveById'),
     listAlive,
-    findAliveLinesByOrderIds: vi.fn(async () => []),
+    // La unica linea de cada pedido de la pagina, con los datos de su receta.
+    findAliveLinesByOrderIds: vi.fn(async (ids: readonly string[]) =>
+      (opciones.pagina ?? pagina([])).items.filter((row) => ids.includes(row.id)).map((row) => orderLineOf(row)),
+    ),
     updateAlive: explota('orders.updateAlive'),
     cancelAlive: explota('orders.cancelAlive'),
     softDeleteAlive: explota('orders.softDeleteAlive'),

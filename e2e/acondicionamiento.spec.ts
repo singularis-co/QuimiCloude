@@ -40,7 +40,7 @@ import { ASSIGNED_ORDERS_ROUTE, conditioningOrderRoute } from '@/lib/shared/rout
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc217_e2e_';
@@ -333,8 +333,7 @@ test.beforeAll(async () => {
     },
   ): Promise<SeededOrder> {
     const sequence = BASE_SEQUENCE + offset;
-    const order = await prisma.order.create({
-      data: {
+    const order = await createOrderWithLine(prisma, {
         companyId: companyId!,
         orderYear: year,
         orderSequence: sequence,
@@ -345,9 +344,7 @@ test.beforeAll(async () => {
         packedBy: empacadorId,
         conditionedBy: data.conditionedBy,
         finishedAt: data.finishedAt,
-      },
-      select: { id: true },
-    });
+      });
     return { id: order.id, numberText: formatOrderNumber({ year, sequence }) };
   }
 

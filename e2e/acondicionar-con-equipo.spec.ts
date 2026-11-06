@@ -44,6 +44,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc218_e2e_';
@@ -363,8 +364,7 @@ test.beforeAll(async () => {
 
   // Cumple los CHECK de `orders`: «Por acondicionar» lleva `packed_by` y aún no `conditioned_by`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: ORDER_SEQUENCE,
@@ -375,9 +375,7 @@ test.beforeAll(async () => {
       packedBy: operatorId,
       conditionedBy: null,
       finishedAt: null,
-    },
-    select: { id: true },
-  });
+    });
 
   fixture = {
     orderId: order.id,
@@ -530,10 +528,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
     await expect(rowByNumber(finished, numberText)).toHaveCount(1, { timeout: 60_000 });
 
     // --- 9. Lo que quedó en la base: TERMINADO con fecha, y el equipo conservado.
-    const stored = await prisma.order.findUniqueOrThrow({
-      where: { id: orderId },
-      select: { status: true, finishedAt: true },
-    });
+    const stored = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { status: true, finishedAt: true } });
     expect(stored.status).toBe('TERMINADO');
     expect(stored.finishedAt).not.toBeNull();
     const storedTeam = await prisma.orderConditioningTeamMember.findMany({

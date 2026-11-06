@@ -17,7 +17,6 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   expectRejectedByDatabase,
-  freshSequence,
   inRolledBackTransaction,
   readMigration,
   runDowns,
@@ -26,6 +25,8 @@ import {
   seedCompany,
   seedRecipe,
   seedUser,
+  insertOrderAnySchema,
+  readLegacyOrders,
 } from '../../helpers/migration-script';
 
 const UP_SQL = readMigration('_order_lines_references', 'migration.sql');
@@ -82,18 +83,10 @@ async function seedBase(tx: Prisma.TransactionClient): Promise<Base> {
   return { companyId, userId, recipeId, presentationId, batchId };
 }
 
+/** Un pedido del esquema en que este la base: los casos que bajan `orders_drop_line_columns` lo
+ *  siembran con su receta en `orders`; los demas, solo con la cabecera. */
 async function seedOrder(tx: Prisma.TransactionClient, base: Base): Promise<string> {
-  const order = await tx.order.create({
-    data: {
-      companyId: base.companyId,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: freshSequence(),
-      recipeId: base.recipeId,
-      quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
-  return order.id;
+  return insertOrderAnySchema(tx, { companyId: base.companyId, recipeId: base.recipeId });
 }
 
 async function insertLine(
@@ -306,7 +299,8 @@ describe('relleno de order_line_id', () => {
       await insertLine(tx, base, varias, 1, await seedRecipe(tx, base.companyId));
       await seedChildren(tx, base, varias);
 
-      const pedido = await tx.order.findUniqueOrThrow({ where: { id: sinLinea } });
+      const [pedido] = await readLegacyOrders(tx, [sinLinea]);
+      if (pedido === undefined) throw new Error('el pedido sin linea no se sembro');
       expect(await tx.orderLine.count({ where: { orderId: sinLinea } })).toBe(0);
 
       await runScript(tx, UP_SQL);
@@ -323,11 +317,11 @@ describe('relleno de order_line_id', () => {
         status: linea.status,
         deletedAt: linea.deletedAt,
       }).toEqual({
-        companyId: pedido.companyId,
+        companyId: pedido.company_id,
         position: 0,
-        recipeId: pedido.recipeId,
-        originalRecipeId: pedido.recipeId,
-        quantity: pedido.quantity.toFixed(4),
+        recipeId: pedido.recipe_id,
+        originalRecipeId: pedido.recipe_id,
+        quantity: pedido.quantity,
         status: pedido.status,
         deletedAt: null,
       });

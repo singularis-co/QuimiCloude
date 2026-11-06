@@ -222,3 +222,171 @@ export async function seedUser(tx: Prisma.TransactionClient, companyId: string):
   });
   return user.id;
 }
+
+/** Un pedido como lo guardaba `orders` antes de `orders_drop_line_columns`: la cabecera y su receta
+ *  en la misma fila. Lo que no se nombra va con el valor por defecto de la columna o NULL. */
+export type LegacyOrderSeed = {
+  readonly id?: string;
+  readonly companyId: string;
+  readonly orderYear?: number;
+  readonly orderSequence?: number;
+  readonly recipeId: string;
+  readonly quantity?: LegacyDecimal;
+  readonly status?: string;
+  readonly priority?: string;
+  readonly unitId?: string | null;
+  readonly customerId?: string | null;
+  readonly cancellationReason?: string | null;
+  readonly ingredientsCost?: LegacyDecimal | null;
+  readonly packagingCost?: LegacyDecimal | null;
+  readonly actualCost?: LegacyDecimal | null;
+  readonly salePrice?: LegacyDecimal | null;
+  readonly reservedAt?: Date | null;
+  readonly finishedAt?: Date | null;
+  readonly packedBy?: string | null;
+  readonly conditionedBy?: string | null;
+  readonly createdBy?: string | null;
+  readonly updatedBy?: string | null;
+  readonly createdAt?: Date;
+  readonly deletedAt?: Date | null;
+};
+
+/** Un decimal como cadena, numero o `Prisma.Decimal`: se escribe por su texto. */
+type LegacyDecimal = string | number | Prisma.Decimal;
+
+function decimalText(value: LegacyDecimal | null | undefined): string | null {
+  return value === null || value === undefined ? null : value.toString();
+}
+
+/** INSERT crudo en el esquema de `orders` anterior a `orders_drop_line_columns`, que el cliente de
+ *  Prisma ya no conoce: lo usan los tests que bajan esa migracion dentro de su transaccion. */
+export async function insertLegacyOrder(tx: Prisma.TransactionClient, seed: LegacyOrderSeed): Promise<string> {
+  const id = seed.id ?? randomUUID();
+  const createdAt = seed.createdAt ?? new Date();
+  await tx.$executeRaw(Prisma.sql`
+    INSERT INTO "orders" (
+      "id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "status", "priority",
+      "unit_id", "customer_id", "cancellation_reason", "ingredients_cost", "packaging_cost", "actual_cost",
+      "sale_price", "reserved_at", "finished_at", "packed_by", "conditioned_by", "created_by", "updated_by",
+      "created_at", "updated_at", "deleted_at"
+    ) VALUES (
+      ${id}::uuid, ${seed.companyId}::uuid, ${seed.orderYear ?? createdAt.getUTCFullYear()}::integer,
+      ${seed.orderSequence ?? freshSequence()}::integer, ${seed.recipeId}::uuid, ${decimalText(seed.quantity) ?? '10'}::numeric,
+      ${seed.status ?? 'PENDIENTE'}::"OrderStatus", ${seed.priority ?? 'BAJA'}::"OrderPriority",
+      ${seed.unitId ?? null}::uuid, ${seed.customerId ?? null}::uuid, ${seed.cancellationReason ?? null}::text,
+      ${decimalText(seed.ingredientsCost)}::numeric, ${decimalText(seed.packagingCost)}::numeric,
+      ${decimalText(seed.actualCost)}::numeric, ${decimalText(seed.salePrice)}::numeric,
+      ${seed.reservedAt ?? null}::timestamptz, ${seed.finishedAt ?? null}::timestamptz,
+      ${seed.packedBy ?? null}::uuid, ${seed.conditionedBy ?? null}::uuid,
+      ${seed.createdBy ?? null}::uuid, ${seed.updatedBy ?? seed.createdBy ?? null}::uuid,
+      ${createdAt}::timestamptz, ${createdAt}::timestamptz, ${seed.deletedAt ?? null}::timestamptz
+    )
+  `);
+  return id;
+}
+
+/** Las columnas de receta de un pedido en el esquema anterior a `orders_drop_line_columns`, como
+ *  cadenas: los decimales con sus 4 decimales y los instantes en ISO. */
+export type LegacyOrderColumns = {
+  readonly id: string;
+  readonly status: string;
+  readonly recipe_id: string;
+  readonly quantity: string;
+  readonly unit_id: string | null;
+  readonly cancellation_reason: string | null;
+  readonly ingredients_cost: string | null;
+  readonly packaging_cost: string | null;
+  readonly actual_cost: string | null;
+  readonly sale_price: string | null;
+  readonly reserved_at: Date | null;
+  readonly finished_at: Date | null;
+  readonly packed_by: string | null;
+  readonly conditioned_by: string | null;
+  readonly company_id: string;
+  readonly deleted_at: Date | null;
+  readonly updated_at: Date;
+};
+
+/** Los pedidos `ids` leidos con SQL crudo en el esquema anterior a `orders_drop_line_columns`, por id. */
+export async function readLegacyOrders(
+  tx: Prisma.TransactionClient,
+  ids: readonly string[],
+): Promise<readonly LegacyOrderColumns[]> {
+  return tx.$queryRaw<LegacyOrderColumns[]>(Prisma.sql`
+    SELECT "id"::text AS "id", "status"::text AS "status", "recipe_id"::text AS "recipe_id",
+           "quantity"::text AS "quantity", "unit_id"::text AS "unit_id", "cancellation_reason",
+           "ingredients_cost"::text AS "ingredients_cost", "packaging_cost"::text AS "packaging_cost",
+           "actual_cost"::text AS "actual_cost", "sale_price"::text AS "sale_price", "reserved_at",
+           "finished_at", "packed_by"::text AS "packed_by", "conditioned_by"::text AS "conditioned_by",
+           "company_id"::text AS "company_id", "deleted_at", "updated_at"
+      FROM "orders"
+     WHERE "id" = ANY(${[...ids]}::uuid[])
+     ORDER BY "id"
+  `);
+}
+
+/**
+ * La unica linea de un pedido en el esquema anterior a `orders_drop_line_columns`: si no la tiene,
+ * la crea copiando sus columnas, como el relleno de `order_lines`, y le cuelga el reparto que aun
+ * no tenga linea. Devuelve su id.
+ */
+export async function ensureLegacyOrderLine(tx: Prisma.TransactionClient, orderId: string): Promise<string> {
+  const existing = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
+    SELECT "id"::text AS "id" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid AND "deleted_at" IS NULL
+  `);
+  if (existing.length > 1) throw new Error(`el pedido ${orderId} tiene mas de una linea`);
+  const found = existing[0];
+  if (found !== undefined) return found.id;
+  const rows = await tx.$queryRaw<ReadonlyArray<{ id: string }>>(Prisma.sql`
+    INSERT INTO "order_lines" (
+      "order_id", "company_id", "position", "recipe_id", "original_recipe_id", "quantity", "unit_id",
+      "status", "cancellation_reason", "ingredients_cost", "packaging_cost", "actual_cost",
+      "sale_price", "reserved_at", "finished_at", "packed_by", "conditioned_by",
+      "created_by", "updated_by", "created_at", "updated_at"
+    )
+    SELECT o."id", o."company_id", 0, o."recipe_id", COALESCE(r."parent_recipe_id", r."id"), o."quantity",
+           o."unit_id", o."status", o."cancellation_reason", o."ingredients_cost", o."packaging_cost",
+           o."actual_cost", o."sale_price", o."reserved_at", o."finished_at", o."packed_by",
+           o."conditioned_by", o."created_by", o."updated_by", o."created_at", o."updated_at"
+      FROM "orders" o
+      JOIN "recipes" r ON r."id" = o."recipe_id"
+     WHERE o."id" = ${orderId}::uuid
+    RETURNING "id"::text AS "id"
+  `);
+  const line = rows[0];
+  if (line === undefined) throw new Error(`el pedido ${orderId} no existe`);
+  await tx.$executeRaw(Prisma.sql`
+    UPDATE "order_presentation_lines"
+       SET "order_line_id" = ${line.id}::uuid
+     WHERE "order_id" = ${orderId}::uuid
+       AND "order_line_id" IS NULL
+  `);
+  return line.id;
+}
+
+/** Si `orders` todavia tiene las columnas de la linea: la base esta por debajo de `orders_drop_line_columns`. */
+export async function ordersHaveLineColumns(tx: Prisma.TransactionClient): Promise<boolean> {
+  const rows = await tx.$queryRaw<ReadonlyArray<{ exists: boolean }>>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'recipe_id'
+    ) AS "exists"
+  `);
+  return rows[0]?.exists === true;
+}
+
+/**
+ * Un pedido en `PENDIENTE` del esquema en que este la base: con su receta en la fila si `orders`
+ * aun la guarda, o solo la cabecera si no. Su linea, si hace falta, la escribe quien llama.
+ */
+export async function insertOrderAnySchema(
+  tx: Prisma.TransactionClient,
+  seed: Pick<LegacyOrderSeed, 'companyId' | 'recipeId'>,
+): Promise<string> {
+  if (await ordersHaveLineColumns(tx)) return insertLegacyOrder(tx, seed);
+  const order = await tx.order.create({
+    data: { companyId: seed.companyId, orderYear: new Date().getUTCFullYear(), orderSequence: freshSequence() },
+    select: { id: true },
+  });
+  return order.id;
+}

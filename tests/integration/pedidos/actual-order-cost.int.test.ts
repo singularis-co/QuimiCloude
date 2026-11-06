@@ -32,7 +32,6 @@ import {
 import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/inventario/adapters/driven/persistence/packaging-catalog-prisma';
 import {
   createOrderWriteRepository,
-  findAliveOrderById,
   finishConditioningAliveOrder,
   startConditioningAliveOrder,
   startPackingAliveOrder,
@@ -293,10 +292,7 @@ async function producir(
 }
 
 async function costesDelPedido(orderId: string) {
-  const row = await prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { actualCost: true, ingredientsCost: true, packagingCost: true },
-  });
+  const row = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { actualCost: true, ingredientsCost: true, packagingCost: true } });
   return {
     actualCost: row.actualCost?.toFixed(4) ?? null,
     ingredientsCost: row.ingredientsCost?.toFixed(4) ?? null,
@@ -344,8 +340,8 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       const lote = await loteTerminadoDe(orderId);
       expect(lote.unitCost).toBe('14.5000');
 
-      const fila = await findAliveOrderById(orderId, { companyId: fixture.companyId });
-      expect(fila?.actualCost).toBe('145.0000');
+      const vista = await pedidos.getOrder(orderId, actorDe(fixture));
+      expect(vista.actualCost).toBe('145.0000');
 
       const tab = await inventario.listFinishedProductCosts(lote.productId, {}, actorDeInventario(fixture));
       expect(tab.items).toHaveLength(1);
@@ -444,7 +440,7 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       const lotePrimero = await loteTerminadoDe(primero);
       // Asi quedaba un lote de antes: el estimado repartido y el pedido sin real.
       await prisma.productBatch.update({ where: { id: lotePrimero.batchId }, data: { unitCost: '15.5000' } });
-      await prisma.$executeRaw`UPDATE "orders" SET "actual_cost" = NULL WHERE "id" = ${primero}::uuid`;
+      await prisma.$executeRaw`UPDATE "order_lines" SET "actual_cost" = NULL WHERE "order_id" = ${primero}::uuid`;
 
       await producir(fixture, recipeId, '5.0000', 5);
 

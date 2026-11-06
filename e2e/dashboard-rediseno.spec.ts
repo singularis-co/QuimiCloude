@@ -31,7 +31,7 @@ import { DASHBOARD_ROUTE, executionTraceRoute } from '@/lib/shared/routes';
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc261_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -94,8 +94,7 @@ async function seedOrder(params: {
 }): Promise<SeededOrder> {
   // El CHECK `orders_order_year_matches_created_at` ata el año a `created_at`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: params.companyId,
       orderYear: year,
       orderSequence: params.sequence,
@@ -103,9 +102,7 @@ async function seedOrder(params: {
       quantity: ORDER_QUANTITY,
       unitId: params.unitId,
       status: params.status,
-    },
-    select: { id: true },
-  });
+    });
   return { id: order.id, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
 }
 

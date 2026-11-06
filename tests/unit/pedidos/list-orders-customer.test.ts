@@ -21,6 +21,7 @@ import type { ListQueryLog } from '@/lib/modules/pedidos/ports/list-query-log'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas'
 import type { UnitCatalog } from '@/lib/modules/unidades'
+import { type SingleRecipeOrderRow, orderLineOf } from '../../helpers/order-unit-of-work-double'
 
 const EMPRESA = '33333333-3333-4333-8333-333333333333'
 const ACTOR: Actor = { id: 'u-1', companyId: EMPRESA, permissions: ['pedidos.consultar'] }
@@ -50,7 +51,7 @@ const REF_RECETA: RecipeRef = {
 }
 
 let secuencia = 0
-function fila(customerId: string | null): OrderRow {
+function fila(customerId: string | null): SingleRecipeOrderRow {
   secuencia += 1
   return {
     salePrice: null,
@@ -92,7 +93,11 @@ function dobles(filas: readonly OrderRow[] = [], idsQueCasan: readonly string[] 
   })
   const ignoredFields = vi.fn<ListQueryLog['ignoredFields']>()
   const deps: ListOrdersDeps = {
-    orders: { listAlive, findAliveById: vi.fn(), findAliveLinesByOrderIds: vi.fn(async () => []) } as unknown as OrderRepository,
+    orders: {
+      listAlive,
+      findAliveById: vi.fn(),
+      findAliveLinesByOrderIds: vi.fn(async () => filas.map((row) => orderLineOf(row))),
+    } as unknown as OrderRepository,
     recipes: { findRefsIncludingDeleted, findIdsMatchingName } as unknown as RecipeCatalog,
     presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
     packaging: fakePackagingCatalog(),

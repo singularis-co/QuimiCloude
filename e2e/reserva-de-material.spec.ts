@@ -362,9 +362,11 @@ test.beforeAll(async () => {
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }}, select: { id: true } })).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
     // se borra DESPUES, cuando la receta ya cayo y se llevo sus lineas por cascada.
@@ -600,7 +602,7 @@ test.describe('reserva de material del pedido', () => {
     // --- 1. Pedido A, de 1.500: el lote tiene 2.000 y le sobra para cubrirlo entero.
     await createOrder(page, ORDER_QUANTITY);
     const orderA = await prisma.order.findFirstOrThrow({
-      where: { recipeId, deletedAt: null },
+      where: { lines: { some: { recipeId } }, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: { id: true, orderYear: true, orderSequence: true },
     });
@@ -628,7 +630,7 @@ test.describe('reserva de material del pedido', () => {
     // no se guarda sin mas: pide confirmacion y queda BLOQUEADO.
     await createBlockedOrder(page, ORDER_QUANTITY);
     const orderB = await prisma.order.findFirstOrThrow({
-      where: { recipeId, deletedAt: null, id: { not: orderA.id } },
+      where: { lines: { some: { recipeId } }, deletedAt: null, id: { not: orderA.id } },
       select: { id: true, orderYear: true, orderSequence: true, status: true },
     });
     expect(orderB.status).toBe('BLOQUEADO');

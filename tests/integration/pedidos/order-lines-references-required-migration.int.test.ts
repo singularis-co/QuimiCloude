@@ -17,7 +17,6 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   expectRejectedByDatabase,
-  freshSequence,
   inRolledBackTransaction,
   readMigration,
   runDowns,
@@ -26,6 +25,7 @@ import {
   seedCompany,
   seedRecipe,
   seedUser,
+  insertOrderAnySchema,
 } from '../../helpers/migration-script';
 
 const UP_SQL = readMigration('_order_lines_references_required', 'migration.sql');
@@ -82,18 +82,10 @@ async function seedBase(tx: Prisma.TransactionClient): Promise<Base> {
   return { companyId, userId, recipeId, presentationId, batchId };
 }
 
+/** Un pedido del esquema en que este la base: los casos que bajan `orders_drop_line_columns` lo
+ *  siembran con su receta en `orders`; los demas, solo con la cabecera. */
 async function seedOrder(tx: Prisma.TransactionClient, base: Base): Promise<string> {
-  const order = await tx.order.create({
-    data: {
-      companyId: base.companyId,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: freshSequence(),
-      recipeId: base.recipeId,
-      quantity: new Prisma.Decimal('10'),
-    },
-    select: { id: true },
-  });
-  return order.id;
+  return insertOrderAnySchema(tx, { companyId: base.companyId, recipeId: base.recipeId });
 }
 
 async function insertLine(

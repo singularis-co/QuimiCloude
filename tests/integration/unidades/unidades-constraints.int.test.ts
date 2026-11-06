@@ -632,13 +632,7 @@ describe('frontera con unidades: FK reales sin relacion de Prisma', () => {
           confdeltype: 'r',
           confupdtype: 'c',
         },
-        // La unidad del pedido: con RESTRICT, una unidad usada por un pedido no se borra.
-        {
-          conname: 'orders_unit_id_fkey',
-          referencia: 'units',
-          confdeltype: 'r',
-          confupdtype: 'c',
-        },
+        // Desde QT-313 la unidad es de cada receta del pedido: `orders` ya no la guarda.
         {
           conname: 'presentations_unit_id_fkey',
           referencia: 'units',

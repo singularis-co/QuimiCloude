@@ -33,7 +33,8 @@ import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/pers
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
-import type { NewOrder, OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view';
+import { createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -57,7 +58,7 @@ type Fixture = {
   readonly actorId: string;
   readonly roleId: string;
   readonly documentTypeCode: string;
-  /** QC-146: presentacion de la MISMA empresa, obligatoria en `NewOrder`. */
+  /** QC-146: presentacion de la MISMA empresa, obligatoria en `SingleLineNewOrder`. */
   readonly presentationId: string;
 };
 
@@ -113,6 +114,7 @@ async function createFixture(): Promise<Fixture> {
 
 /** En orden de FK. Borrar por `companyId` no alcanza filas ajenas: la empresa nacio en el caso. */
 async function dropFixture(fixture: Fixture): Promise<void> {
+  await prisma.orderLine.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.order.deleteMany({ where: { companyId: fixture.companyId } });
   await prisma.presentation.deleteMany({ where: { id: fixture.presentationId } });
   await prisma.user.deleteMany({ where: { id: fixture.actorId } });
@@ -125,7 +127,7 @@ function ambito(fixture: Fixture): OrderScope {
   return { companyId: fixture.companyId };
 }
 
-function pedidoNuevo(): NewOrder {
+function pedidoNuevo(): SingleLineNewOrder {
   return { recipeId: recetaId, quantity: '3.0000', priority: 'BAJA', status: 'PENDIENTE', unitId, presentationLines: [], salePrice: null, customerId: null };
 }
 
@@ -134,7 +136,7 @@ function pedidoNuevo(): NewOrder {
 function altaDe(fixture: Fixture): Promise<OrderRow> {
   const now = new Date();
   return withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(
+    createSingleLineOrder(createOrderWriteRepository(tx), 
       pedidoNuevo(),
       now.getUTCFullYear(),
       fixture.actorId,

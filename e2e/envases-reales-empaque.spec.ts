@@ -76,7 +76,7 @@ import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc281_e2e_';
 
@@ -286,7 +286,7 @@ async function seedIngredientConsumption(offset: number, orderId: string, ingred
 
 /** El coste real que Terminar guardó en el pedido (QC-305 R1). */
 async function actualCostOf(orderId: string): Promise<string | null> {
-  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { actualCost: true } });
+  const order = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { actualCost: true } });
   return order.actualCost?.toFixed(4) ?? null;
 }
 
@@ -304,8 +304,7 @@ async function seedPackingOrder(
   const { companyId, recipeId, unitId, packerId } = seeded();
   const year = new Date().getUTCFullYear();
   const sequence = BASE_SEQUENCE + offset;
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: sequence,
@@ -316,9 +315,7 @@ async function seedPackingOrder(
       packedBy: packerId,
       ingredientsCost,
       packagingCost: (specs.reduce((total, spec) => total + spec.plan, 0) * PACKAGING_UNIT_COST).toFixed(4),
-    },
-    select: { id: true },
-  });
+    });
   await seedIngredientConsumption(offset, order.id, ingredientsCost);
   const orderLineId = await ensureOnlyLine(prisma, order.id);
 
@@ -667,10 +664,7 @@ test.describe('envases reales al terminar el empaque', () => {
     expect(sameBatch!.unitCost?.toFixed(4)).toBe(deriveUnitCost(actualCost!, '3'));
     expect(deriveUnitCost(actualCost!, '3')).not.toBe(deriveUnitCost(actualCost!, '5'));
 
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId },
-    });
+    await updateOrderAndLine(prisma, order.id, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId });
     await switchUser(page, conditionerUser);
     await page.goto(conditioningOrderRoute(order.id));
     const screen = page.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID);
@@ -809,10 +803,7 @@ test.describe('envases reales al terminar el empaque', () => {
     expect(Math.abs(lotsValue.toNumber() - Number(actualCost))).toBeLessThan(0.01);
 
     // El acondicionamiento no es lo que se prueba: el pedido pasa a `TERMINADO` por la base.
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: 'TERMINADO', conditionedBy: conditionerId, finishedAt: new Date() },
-    });
+    await updateOrderAndLine(prisma, order.id, { status: 'TERMINADO', conditionedBy: conditionerId, finishedAt: new Date() });
 
     // R12: el sheet de entrega del pedido pide 5 de 1 l (lo pedido), no los 7 reales.
     await switchUser(page, adminUser);

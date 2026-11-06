@@ -24,7 +24,7 @@ import {
 import { createGetOrder } from '@/lib/modules/pedidos/domain/get-order'
 import { createListOrders } from '@/lib/modules/pedidos/domain/list-orders'
 import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, type SingleRecipeOrderRow, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
@@ -67,7 +67,7 @@ const ENTRADA_ALTA = {
   unitId: UNIT_ID,
 }
 
-function fila(overrides: Partial<OrderRow> = {}): OrderRow {
+function fila(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -145,7 +145,7 @@ function dobles(opciones: {
 
   const orders = {
     findAliveById,
-    findAliveLines: vi.fn(async () => []),
+    findAliveLines: vi.fn(async () => (filaVista === null ? [] : [orderLineOf(filaVista)])),
     listAlive: explota('orders.listAlive'),
   } as unknown as OrderRepository
 
@@ -354,13 +354,13 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       unitId: UNIT_ID,
       unitLabel: 'L',
       customer: null,
-      // QT-313: este doble no tiene lineas; sin lineas activas las sumas de coste son 0.
-      lines: [],
-      progress: { total: 0, finished: 0 },
+      // QT-313: los campos planos son los de su unica linea, la que sigue.
+      lines: [expect.objectContaining({ recipeId: RECIPE_ID, quantity: '10.0000', unitId: UNIT_ID, status: 'PENDIENTE' })],
+      progress: { total: 1, finished: 0 },
       salePriceTotal: null,
-      linesWithoutPrice: 0,
-      ingredientsCostTotal: '0.0000',
-      actualCostTotal: '0.0000',
+      linesWithoutPrice: 1,
+      ingredientsCostTotal: null,
+      actualCostTotal: null,
     })
   })
 
@@ -458,7 +458,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
     }))
     const orders = {
       findAliveById: vi.fn(),
-      findAliveLinesByOrderIds: vi.fn(async () => []),
+      findAliveLinesByOrderIds: vi.fn(async () => [orderLineOf(CON_IMPORTE)]),
       listAlive,
     } as unknown as OrderRepository
     const findRefsIncludingDeleted = vi.fn(async () => [RECETA_VIVA])

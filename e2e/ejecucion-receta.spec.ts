@@ -50,7 +50,7 @@ import {
   enterAndStartAssignedOrder,
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc63_e2e_';
@@ -319,8 +319,7 @@ async function seedOrder(params: {
     select: { unitId: true },
   });
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: params.sequence,
@@ -328,9 +327,7 @@ async function seedOrder(params: {
       quantity: ORDER_QUANTITY,
       unitId,
       status: params.status,
-    },
-    select: { id: true },
-  });
+    });
   await prisma.orderPresentationLine.create({
     data: {
       orderId: order.id,
@@ -401,17 +398,20 @@ test.beforeAll(async () => {
   }
   if (orphanRecipeIds.length > 0) {
     await prisma.orderPresentationLine.deleteMany({
-      where: { order: { recipeId: { in: orphanRecipeIds } } },
+      where: { order: { lines: { some: { recipeId: { in: orphanRecipeIds } } }} },
     });
     const orphanOrders = await prisma.order.findMany({
-      where: { recipeId: { in: orphanRecipeIds } },
+      where: { lines: { some: { recipeId: { in: orphanRecipeIds } } }},
       select: { id: true },
     });
     await prisma.orderStepEvidence.deleteMany({
       where: { orderId: { in: orphanOrders.map((order) => order.id) } },
     });
-    await prisma.orderLine.deleteMany({ where: { order: { recipeId: { in: orphanRecipeIds } } } });
-    await prisma.order.deleteMany({ where: { recipeId: { in: orphanRecipeIds } } });
+    const pedidosABorrar = (
+      await prisma.order.findMany({ where: { lines: { some: { recipeId: { in: orphanRecipeIds } } } }, select: { id: true } })
+    ).map((pedido) => pedido.id);
+    await prisma.orderLine.deleteMany({ where: { orderId: { in: pedidosABorrar } } });
+    await prisma.order.deleteMany({ where: { id: { in: pedidosABorrar } } });
     // El producto terminado (`products.recipe_id`) RESTRINGE el borrado de la receta: se borra
     // antes que la receta. El producto de la formula (`recipe_lines.product_id`) es al reves y
     // se borra DESPUES, cuando la receta ya cayo y se llevo sus lineas por cascada.

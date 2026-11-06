@@ -16,9 +16,9 @@ import { withOrderTransaction } from '@/lib/modules/pedidos/adapters/driven/pers
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import type { NewOrder, OrderStatus } from '@/lib/modules/pedidos'
+import type { OrderStatus } from '@/lib/modules/pedidos'
 import { realOrderSummaries } from '../../helpers/order-summaries'
-import { syncOnlyLine } from '../../helpers/only-order-line';
+import { syncOnlyLine, updateOrderAndLine, createSingleLineOrder, type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 const { listAliveSummariesInCompany } = realOrderSummaries()
 
@@ -113,7 +113,7 @@ let A: Empresa
 let B: Empresa
 let nextSequence = 1
 
-function baseOrder(e: Empresa): NewOrder {
+function baseOrder(e: Empresa): SingleLineNewOrder {
   return {
     salePrice: null,
     recipeId: e.recipeId,
@@ -136,17 +136,14 @@ async function seedOrder(e: Empresa, status: OrderStatus, conditionedBy: string 
   nextSequence += 1
   const now = new Date(Date.UTC(YEAR, 6, 1 + (sequence % 25), 12, 0, 0, 0))
   const { id } = await withOrderTransaction((tx) =>
-    createOrderWriteRepository(tx).create(baseOrder(e), YEAR, e.userId, now, null, { companyId: e.companyId }),
+    createSingleLineOrder(createOrderWriteRepository(tx), baseOrder(e), YEAR, e.userId, now, null, { companyId: e.companyId }),
   )
-  await prisma.order.update({
-    where: { id },
-    data: {
+  await updateOrderAndLine(prisma, id, {
       status,
       packedBy: e.userId,
       conditionedBy,
       finishedAt: status === 'TERMINADO' || status === 'ENTREGADO' ? now : null,
-    },
-  }).then(() => syncOnlyLine(prisma, id))
+    }).then(() => syncOnlyLine(prisma, id))
   return id
 }
 

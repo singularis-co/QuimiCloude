@@ -7,7 +7,7 @@ import { createGetOrderDelivery, type GetOrderDeliveryDeps } from '@/lib/modules
 import { ORDER_STATUS_VALUES } from '@/lib/modules/pedidos/domain/order-classification'
 import { formatOrderNumber } from '@/lib/modules/pedidos/domain/order-number'
 import { COMPLETE_LINE_ID, DELIVERY_CUSTOMER_ID, DELIVERY_ORDER_ID, PENDING_LINE_ID } from '@/tests/fixtures/order-delivery'
-import { fakeOrderRow, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { DeliverableBatch, PresentationRef } from '@/lib/modules/inventario'
@@ -60,7 +60,7 @@ const LOTES: readonly DeliverableBatch[] = [
 
 const CLIENTE: CustomerRef = { id: DELIVERY_CUSTOMER_ID, firstNames: 'Ana', lastNames: 'Perez', isDeleted: false }
 
-function pedido(overrides: Partial<OrderRow> = {}): OrderRow {
+function pedido(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return fakeOrderRow({
     id: DELIVERY_ORDER_ID,
     number: { year: 2026, sequence: 7 },

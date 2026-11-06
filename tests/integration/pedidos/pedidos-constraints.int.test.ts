@@ -71,7 +71,7 @@ import { normalizeCompanyName } from '@/lib/modules/identity'
 import { normalizePresentationName } from '@/lib/modules/inventario'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { ensureOnlyLine, lineOfOrder } from '../../helpers/only-order-line'
+import { ensureOnlyLine, lineOfOrder, createOrderWithLine } from '../../helpers/only-order-line'
 
 // ---------------------------------------------------------------------------
 // Utilidades de aislamiento
@@ -342,8 +342,7 @@ interface OrderSeed {
  */
 async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promise<string> {
   nextSequence += 1
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: seed.companyId,
       orderYear: seed.year ?? currentUtcYear(),
       orderSequence: seed.sequence ?? nextSequence,
@@ -355,9 +354,7 @@ async function createOrder(tx: Prisma.TransactionClient, seed: OrderSeed): Promi
       createdBy: seed.createdBy ?? null,
       updatedBy: seed.updatedBy ?? null,
       unitId: seed.unitId ?? null,
-    },
-    select: { id: true },
-  })
+    })
   if (seed.presentationId !== undefined && seed.presentationId !== null) {
     await tx.orderPresentationLine.create({
       data: {
@@ -390,24 +387,50 @@ type WritableColumn =
   | 'ingredients_cost'
   | 'packaging_cost'
 
+/** Las columnas que desde QT-313 son de la linea del pedido, no de `orders`. */
+const LINE_COLUMNS: readonly WritableColumn[] = ['recipe_id', 'quantity', 'unit_id', 'ingredients_cost', 'packaging_cost']
+
 /**
- * `INSERT` crudo en `orders`. `columns` decide que se escribe: omitir una entrada es
- * exactamente el caso «falta un dato obligatorio», que la API tipada no deja ni compilar.
- * `updated_at` se da siempre porque es NOT NULL SIN DEFAULT (lo rellena el cliente Prisma via
- * `@updatedAt`, no la base).
+ * `INSERT` crudo de un pedido de una receta. `columns` decide que se escribe: omitir una entrada
+ * es exactamente el caso «falta un dato obligatorio», que la API tipada no deja ni compilar. La
+ * cabecera va a `orders` y la receta a su unica linea, en la MISMA sentencia: un rechazo de
+ * cualquiera de las dos tablas deja la base sin ninguna fila. `updated_at` se da siempre porque
+ * es NOT NULL SIN DEFAULT (lo rellena el cliente Prisma via `@updatedAt`, no la base).
  */
 function rawInsertOrder(
   tx: Prisma.TransactionClient,
   columns: Partial<Record<WritableColumn, Prisma.Sql>>,
 ): Promise<number> {
   const entries = Object.entries(columns) as [WritableColumn, Prisma.Sql][]
-  const names = entries.map(([name]) => Prisma.raw(`"${name}"`))
-  const values = entries.map(([, value]) => value)
+  const header = entries.filter(([name]) => !LINE_COLUMNS.includes(name))
+  const line = entries.filter(([name]) => LINE_COLUMNS.includes(name))
+  const names = header.map(([name]) => Prisma.raw(`"${name}"`))
+  const values = header.map(([, value]) => value)
 
   names.push(Prisma.raw('"updated_at"'))
   values.push(Prisma.sql`CURRENT_TIMESTAMP`)
 
-  return tx.$executeRaw`INSERT INTO "orders" (${Prisma.join(names)}) VALUES (${Prisma.join(values)})`
+  if (line.length === 0) {
+    return tx.$executeRaw`INSERT INTO "orders" (${Prisma.join(names)}) VALUES (${Prisma.join(values)})`
+  }
+  const recipe = columns.recipe_id
+  const lineNames = [
+    ...line.map(([name]) => Prisma.raw(`"${name}"`)),
+    ...(recipe === undefined ? [] : [Prisma.raw('"original_recipe_id"')]),
+  ]
+  const lineValues = [...line.map(([, value]) => value), ...(recipe === undefined ? [] : [recipe])]
+  return tx.$executeRaw`
+    WITH o AS (
+      INSERT INTO "orders" (${Prisma.join(names)}) VALUES (${Prisma.join(values)})
+      RETURNING "id", "company_id", "status", "cancellation_reason", "deleted_at"
+    )
+    INSERT INTO "order_lines" (
+      "order_id", "company_id", "position", "status", "cancellation_reason", "deleted_at", "updated_at",
+      ${Prisma.join(lineNames)}
+    )
+    SELECT o."id", o."company_id", 0, o."status", o."cancellation_reason", o."deleted_at", CURRENT_TIMESTAMP,
+           ${Prisma.join(lineValues)}
+      FROM o`
 }
 
 /** Valor SQL de un uuid: el parametro llega como texto y hay que castearlo. */
@@ -481,9 +504,10 @@ describe('el pedido como fila completa', () => {
       })
 
       const stored = await tx.order.findUniqueOrThrow({ where: { id } })
+      const storedLine = await tx.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' } })
       expect(stored.id).toMatch(UUID_SHAPE)
-      expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.quantity.toString()).toBe('12.5')
+      expect(storedLine.recipeId).toBe(f.recipeId)
+      expect(storedLine.quantity.toString()).toBe('12.5')
       expect(stored.status).toBe('EN_CURSO')
       expect(stored.priority).toBe('ALTA')
       expect(stored.createdBy).toBe(f.userId)
@@ -503,60 +527,24 @@ describe('el pedido como fila completa', () => {
       SELECT column_name FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'orders'`
     const names = columns.map((c) => c.column_name).sort()
+    // QT-313: la receta, la cantidad, la unidad, los costes, el precio, el plazo de reserva y las
+    // etapas son de cada linea (`order_lines`); `orders` guarda solo la cabecera.
     expect(names).toEqual([
-      // `actual_cost` es el coste real de produccion, aparte del estimado. No es
-      // un precio de venta, un total, un impuesto ni un cliente. La primera por el `sort()`
-      // lexicografico ('a' < 'c').
-      'actual_cost',
-      // `cancellation_reason` la anade QC-34 (su R48, decision cerrada 4): es la UNICA columna
-      // que esa ficha puede anadir a `orders`. Aparece la PRIMERA porque el `sort()` es
-      // lexicografico y 'ca' < 'cr'. Sigue sin haber total, subtotal ni impuesto.
+      // `cancellation_reason` la anade QC-34 (su R48, decision cerrada 4). Aparece la PRIMERA
+      // porque el `sort()` es lexicografico. Sigue sin haber total, subtotal ni impuesto.
       'cancellation_reason',
-      // `company_id` la anade QC-60 (R1): la empresa del pedido. No es un total, un impuesto ni un
-      // cliente. Va entre las dos por el mismo `sort()` lexicografico ('ca' < 'co' < 'cr').
+      // `company_id` la anade QC-60 (R1): la empresa del pedido.
       'company_id',
-      // `conditioned_by` es quien acondiciona el pedido: no es un total, un impuesto ni un
-      // cliente. Entre `company_id` y `created_at` por el mismo `sort()` ('com' < 'con' < 'cr').
-      'conditioned_by',
       'created_at',
       'created_by',
       // `customer_id` la anade QC-156 (R5): la UNICA referencia a cliente del pedido, opcional.
-      // Entre `created_by` y `deleted_at` por el mismo `sort()` lexicografico ('cr' < 'cu' < 'd').
       'customer_id',
       'deleted_at',
-      // `finished_at` es el instante en que el pedido paso a ENTREGADO al finalizarlo en
-      // planta: no es un total, un subtotal, un impuesto ni un cliente. Entre `deleted_at` e
-      // `id` por el mismo `sort()` lexicografico ('d' < 'f' < 'i').
-      'finished_at',
       'id',
-      // `ingredients_cost` es el COSTE DE LOS INGREDIENTES, leido de los lotes vigentes al
-      // guardar: no es un precio de venta, ni un total, ni un subtotal, ni un impuesto. Entre
-      // `id` y `order_sequence` por el mismo `sort()` lexicografico ('id' < 'in' < 'or').
-      'ingredients_cost',
       'order_sequence',
       'order_year',
-      // `packaging_cost` es la parte de envases incluida en `ingredients_cost` (QC-195 R47): un
-      // desglose del costo, no un precio, un total, un impuesto ni un cliente. Entre `order_year`
-      // y `packed_by` por el mismo `sort()` lexicografico ('packag' < 'packed').
-      'packaging_cost',
-      // `packed_by` es quien tiene el pedido en empaque: no es un total, un impuesto ni un
-      // cliente. Entre `order_year` y `priority` por el mismo `sort()` lexicografico.
-      'packed_by',
       'priority',
-      'quantity',
-      'recipe_id',
-      // `reserved_at`: el instante desde el que cuenta la caducidad de la reserva, o `null` si
-      // el pedido no tiene material apartado.
-      'reserved_at',
-      // `sale_price` la anade QC-307: el precio de venta del pedido ENTERO, opcional, que escribe
-      // el usuario. No es un precio por linea ni un total, un subtotal o un impuesto: esos siguen
-      // sin existir. Entre `reserved_at` y `status` por el mismo `sort()` lexicografico ('r' < 'sa' < 'st').
-      'sale_price',
       'status',
-      // `unit_id` es la unidad en que se expresa `quantity`: no es un total, un impuesto ni un
-      // cliente. Entre `status` y `updated_at` por el mismo `sort()` lexicografico ('status' <
-      // 'unit_id' < 'updated_at').
-      'unit_id',
       'updated_at',
       'updated_by',
     ])
@@ -574,12 +562,12 @@ describe('la cantidad', () => {
         quantity: '1234567890.1234',
       })
 
-      const stored = await tx.order.findUniqueOrThrow({ where: { id }, select: { quantity: true } })
+      const stored = await tx.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { quantity: true } })
       expect(stored.quantity.toString()).toBe('1234567890.1234')
 
       // Y tal como la ve la propia base, sin pasar por ningun `number` de JavaScript.
       const [row] = await tx.$queryRaw<{ quantity: string }[]>`
-        SELECT "quantity"::text AS quantity FROM "orders" WHERE "id" = CAST(${id} AS uuid)`
+        SELECT "quantity"::text AS quantity FROM "order_lines" WHERE "order_id" = CAST(${id} AS uuid)`
       expect(row.quantity).toBe('1234567890.1234')
     })
   })
@@ -696,8 +684,8 @@ describe('la unidad y la receta', () => {
       )
       expect(fisico).toBe(FOREIGN_KEY_VIOLATION)
 
-      const stored = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
-      expect(stored.unitId).toBe(f.unitId)
+      const storedLine = await tx.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' } })
+      expect(storedLine.unitId).toBe(f.unitId)
     })
   })
 
@@ -743,9 +731,10 @@ describe('la unidad y la receta', () => {
       await tx.recipe.update({ where: { id: f.recipeId }, data: { deletedAt: new Date() } })
 
       const stored = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
-      expect(stored.recipeId).toBe(f.recipeId)
+      const storedLine = await tx.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' } })
+      expect(storedLine.recipeId).toBe(f.recipeId)
       expect(stored.deletedAt).toBeNull()
-      expect(stored.quantity.toString()).toBe('7.5')
+      expect(storedLine.quantity.toString()).toBe('7.5')
 
       const fisico = await expectRejectedByDatabase(
         tx,
@@ -1142,11 +1131,12 @@ describe('la autoria, el borrado logico y las marcas de tiempo', () => {
       await tx.order.update({ where: { id }, data: { deletedAt: new Date() } })
 
       const stored = await tx.order.findUniqueOrThrow({ where: { id } })
+      const storedLine = await tx.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' } })
       expect(stored.deletedAt).not.toBeNull()
       expect(stored.orderYear).toBe(currentUtcYear())
       expect(stored.orderSequence).toBe(sequence)
-      expect(stored.recipeId).toBe(f.recipeId)
-      expect(stored.quantity.toString()).toBe('3.25')
+      expect(storedLine.recipeId).toBe(f.recipeId)
+      expect(storedLine.quantity.toString()).toBe('3.25')
       expect(stored.priority).toBe('CRITICA')
       expect(stored.createdBy).toBe(f.userId)
     })
@@ -1294,10 +1284,7 @@ describe('el CHECK del pedido entregado', () => {
         recipeId: f.recipeId,
         status: 'BLOQUEADO',
       })
-      const nacido = await tx.order.findUniqueOrThrow({
-        where: { id: bloqueado },
-        select: { status: true, cancellationReason: true, packedBy: true, finishedAt: true, deletedAt: true },
-      })
+      const nacido = await tx.orderLine.findFirstOrThrow({ where: { orderId: bloqueado }, orderBy: { position: 'asc' }, select: { status: true, cancellationReason: true, packedBy: true, finishedAt: true, deletedAt: true } })
       expect(nacido.status).toBe('BLOQUEADO')
       expect(nacido.cancellationReason).toBeNull()
       expect(nacido.packedBy).toBeNull()

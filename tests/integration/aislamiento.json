@@ -99,6 +99,7 @@
     "pedidos/order-status-blocked-rollback.int.test.ts",
     "pedidos/order-status-partial-migration.int.test.ts",
     "pedidos/orders-customer-constraints.int.test.ts",
+    "pedidos/orders-drop-line-columns-migration.int.test.ts",
     "pedidos/pedidos-constraints.int.test.ts",
     "pedidos/qc170-backfill.int.test.ts",
     "proveedores/catalog-line.int.test.ts",

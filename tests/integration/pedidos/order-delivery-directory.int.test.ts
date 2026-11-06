@@ -19,7 +19,7 @@ import {
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-delivery-directory-prisma'
 import { prisma } from '@/lib/shared/db/prisma'
 
-import { ensureOnlyLine } from '../../helpers/only-order-line'
+import { ensureOnlyLine, insertOnlyLine } from '../../helpers/only-order-line'
 
 function token(): string {
   return randomUUID().replace(/-/gu, '')
@@ -114,11 +114,12 @@ async function createOrder(t: Tenant): Promise<string> {
   const orderId = randomUUID()
   nextSequence += 1
   await prisma.$executeRaw`
-    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "updated_at")
+    INSERT INTO "orders" ("id", "company_id", "order_year", "order_sequence", "updated_at")
     VALUES (
       ${asUuid(orderId)}, ${asUuid(t.companyId)}, ${new Date().getUTCFullYear()}, ${nextSequence},
-      ${asUuid(t.recipeId)}, CAST('10' AS decimal(14,4)), CURRENT_TIMESTAMP
+      CURRENT_TIMESTAMP
     )`
+  await insertOnlyLine(prisma, orderId, { recipeId: t.recipeId })
   return orderId
 }
 

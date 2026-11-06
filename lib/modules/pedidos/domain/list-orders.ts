@@ -208,7 +208,7 @@ export function createListOrders(
 
     // R45: los ids se DEDUPLICAN antes de preguntar. Diez pedidos de la misma receta son UNA
     // sola entrada, y el numero de consultas no crece con el numero de filas.
-    const recipeIds = orderRecipeIds(page.items, lines);
+    const recipeIds = orderRecipeIds(lines);
 
     // R44: `findRefsIncludingDeleted` -y no una consulta de solo vivas- porque un pedido
     // conserva su receta aunque la den de baja y la fila tiene que seguir diciendo que se
@@ -218,13 +218,13 @@ export function createListOrders(
     const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]));
 
     // Las presentaciones de TODAS las lineas de la pagina, deduplicadas: una sola llamada.
-    const presentationIds = orderPresentationIds([...page.items, ...lines]);
+    const presentationIds = orderPresentationIds(lines);
     const presentations =
       presentationIds.length === 0 ? [] : await deps.presentations.findRefs(presentationIds, actor.companyId);
 
-    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS: los de los pedidos
-    // y los de sus presentaciones (la etiqueta del contenido de cada linea).
-    const unitIds = orderAndPresentationUnitIds([...page.items, ...lines], presentations);
+    // Una sola llamada al catalogo de unidades por pagina, con los ids UNICOS: los de las lineas
+    // y los de sus presentaciones (la etiqueta del contenido de cada reparto).
+    const unitIds = orderAndPresentationUnitIds(lines, presentations);
     const units = unitIds.length === 0 ? [] : await deps.units.findRefs(unitIds, actor.companyId);
     const unitLabels = new Map(units.map((unit) => [unit.id, unitLabelOf(unit)]));
     const presentationDisplays = toPresentationDisplays(presentations, unitLabels);
@@ -232,7 +232,7 @@ export function createListOrders(
     // Los envases de la pagina, deduplicados: una sola llamada.
     const packagingNames = await findPackagingNames(
       deps.packaging,
-      orderPackagingIds([...page.items, ...lines]),
+      orderPackagingIds(lines),
       actor.companyId,
     );
 

@@ -1,5 +1,7 @@
 /**
- * Las restricciones de `orders` que trae `order_conditioning_states`, contra Postgres REAL.
+ * Las restricciones que trajo `order_conditioning_states`, contra Postgres REAL. Desde QT-313 quien
+ * empaca, quien acondiciona y la fecha de terminado son de la linea del pedido, y sus CHECK son los
+ * de `order_lines`; el borrado logico sigue protegido tambien en `orders`.
  *
  * Aislamiento: cada `it` corre dentro de una transaccion que termina en `ROLLBACK`, y cada
  * escritura que se espera rechazada va en un SAVEPOINT para poder seguir afirmando despues. Las
@@ -13,6 +15,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 
 import { normalizeCompanyName } from '@/lib/modules/identity'
 import { prisma } from '@/lib/shared/db/prisma'
+import { createOrderWithLine } from '../../helpers/only-order-line'
 
 class RollbackSignal extends Error {
   constructor() {
@@ -179,21 +182,30 @@ function uuidOrNull(id: string | null | undefined): Prisma.Sql {
   return id === null || id === undefined ? Prisma.sql`NULL` : Prisma.sql`CAST(${id} AS uuid)`
 }
 
+/** El pedido y su unica linea en una sola sentencia; devuelve las lineas escritas. */
 function rawInsertOrder(tx: Prisma.TransactionClient, f: Fixtures, row: Row): Promise<number> {
   const cancellationReason = row.status === 'CANCELADO' ? Prisma.sql`'motivo de prueba'` : Prisma.sql`NULL`
+  const deletedAt = row.deleted === true ? Prisma.sql`CURRENT_TIMESTAMP` : Prisma.sql`NULL`
   return tx.$executeRaw`
-    INSERT INTO "orders" (
-      "company_id", "order_year", "order_sequence", "recipe_id", "quantity", "status",
+    WITH o AS (
+      INSERT INTO "orders" (
+        "company_id", "order_year", "order_sequence", "status", "cancellation_reason", "deleted_at", "updated_at"
+      ) VALUES (
+        CAST(${f.companyId} AS uuid), ${new Date().getUTCFullYear()}, ${freshSequence()},
+        CAST(${row.status} AS "OrderStatus"), ${cancellationReason}, ${deletedAt}, CURRENT_TIMESTAMP
+      )
+      RETURNING "id", "company_id", "status", "cancellation_reason", "deleted_at"
+    )
+    INSERT INTO "order_lines" (
+      "order_id", "company_id", "position", "recipe_id", "original_recipe_id", "quantity", "status",
       "cancellation_reason", "packed_by", "conditioned_by", "finished_at", "deleted_at", "updated_at"
-    ) VALUES (
-      CAST(${f.companyId} AS uuid), ${new Date().getUTCFullYear()}, ${freshSequence()},
-      CAST(${f.recipeId} AS uuid), CAST('10' AS decimal(14,4)),
-      CAST(${row.status} AS "OrderStatus"), ${cancellationReason},
-      ${uuidOrNull(row.packedBy)}, ${uuidOrNull(row.conditionedBy)},
-      ${row.finishedAt === true ? Prisma.sql`CURRENT_TIMESTAMP` : Prisma.sql`NULL`},
-      ${row.deleted === true ? Prisma.sql`CURRENT_TIMESTAMP` : Prisma.sql`NULL`},
-      CURRENT_TIMESTAMP
-    )`
+    )
+    SELECT o."id", o."company_id", 0, CAST(${f.recipeId} AS uuid), CAST(${f.recipeId} AS uuid),
+           CAST('10' AS decimal(14,4)), o."status", o."cancellation_reason",
+           ${uuidOrNull(row.packedBy)}, ${uuidOrNull(row.conditionedBy)},
+           ${row.finishedAt === true ? Prisma.sql`CURRENT_TIMESTAMP` : Prisma.sql`NULL`},
+           o."deleted_at", CURRENT_TIMESTAMP
+      FROM o`
 }
 
 async function expectAccepted(tx: Prisma.TransactionClient, f: Fixtures, row: Row): Promise<void> {
@@ -237,8 +249,7 @@ describe('estados de acondicionamiento: borrado, quien empaca y finished_at', ()
       for (const status of CONDITIONING) {
         const id = randomUUID()
         const row = validRow(f, status)
-        await tx.order.create({
-          data: {
+        await createOrderWithLine(tx, {
             id,
             companyId: f.companyId,
             orderYear: new Date().getUTCFullYear(),
@@ -248,8 +259,7 @@ describe('estados de acondicionamiento: borrado, quien empaca y finished_at', ()
             status,
             packedBy: row.packedBy ?? null,
             conditionedBy: row.conditionedBy ?? null,
-          },
-        })
+          })
         const estado = await expectRejectedByDatabase(
           tx,
           () => tx.$executeRaw`UPDATE "orders" SET "deleted_at" = CURRENT_TIMESTAMP WHERE "id" = CAST(${id} AS uuid)`,
@@ -262,7 +272,7 @@ describe('estados de acondicionamiento: borrado, quien empaca y finished_at', ()
   })
 })
 
-describe('orders_conditioned_by_matches_status', () => {
+describe('order_lines_conditioned_by_matches_status', () => {
   it('R25: exige quien acondiciona en EN_ACONDICIONAMIENTO y en TERMINADO', async () => {
     await inRolledBackTransaction(async (tx) => {
       const f = await seedFixtures(tx)
@@ -366,36 +376,38 @@ describe('TERMINADO cerrado en la base', () => {
 })
 
 describe('las filas existentes cumplen las restricciones nuevas', () => {
-  it('R26: las restricciones de la migracion estan validadas contra las filas que ya habia', async () => {
+  it('R26: las restricciones estan validadas contra las filas que ya habia', async () => {
     const rows = await prisma.$queryRaw<ReadonlyArray<{ conname: string; convalidated: boolean }>>`
       SELECT conname::text AS conname, convalidated
         FROM pg_constraint
-       WHERE conrelid = 'orders'::regclass
-         AND conname IN (
-           'orders_conditioned_by_matches_status',
-           'orders_conditioned_by_company_id_fkey',
-           'orders_packed_by_matches_status',
-           'orders_delivered_not_deleted',
-           'orders_finished_at_requires_delivered',
-           'orders_finished_requires_finished_at'
-         )
+       WHERE (conrelid = 'order_lines'::regclass
+              AND conname IN (
+                'order_lines_conditioned_by_matches_status',
+                'order_lines_conditioned_by_company_id_fkey',
+                'order_lines_packed_by_matches_status',
+                'order_lines_delivered_not_deleted',
+                'order_lines_finished_at_requires_delivered',
+                'order_lines_finished_requires_finished_at'
+              ))
+          OR (conrelid = 'orders'::regclass AND conname = 'orders_delivered_not_deleted')
        ORDER BY conname`
     expect(rows.map((row) => row.conname)).toEqual([
-      'orders_conditioned_by_company_id_fkey',
-      'orders_conditioned_by_matches_status',
+      'order_lines_conditioned_by_company_id_fkey',
+      'order_lines_conditioned_by_matches_status',
+      'order_lines_delivered_not_deleted',
+      'order_lines_finished_at_requires_delivered',
+      'order_lines_finished_requires_finished_at',
+      'order_lines_packed_by_matches_status',
       'orders_delivered_not_deleted',
-      'orders_finished_at_requires_delivered',
-      'orders_finished_requires_finished_at',
-      'orders_packed_by_matches_status',
     ])
     // `NOT VALID` dejaria filas antiguas sin comprobar: todas tienen que estar validadas.
     expect(rows.every((row) => row.convalidated)).toBe(true)
   })
 
-  it('R26: ninguna fila de orders incumple las reglas nuevas', async () => {
+  it('R26: ninguna linea de pedido incumple las reglas nuevas', async () => {
     const [fila] = await prisma.$queryRaw<ReadonlyArray<{ incumplen: bigint }>>`
       SELECT count(*) AS incumplen
-        FROM "orders"
+        FROM "order_lines"
        WHERE ("status"::text IN ('POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO')
               AND ("deleted_at" IS NOT NULL OR "packed_by" IS NULL))
           OR ("finished_at" IS NOT NULL AND "status"::text NOT IN ('TERMINADO', 'ENTREGADO'))

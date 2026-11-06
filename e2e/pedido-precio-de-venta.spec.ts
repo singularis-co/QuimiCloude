@@ -24,6 +24,7 @@ import {
   orderMenuTrigger,
   submitOrderWithLeftover,
 } from './helpers/order-distribution';
+import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc307_e2e_';
 
@@ -229,10 +230,12 @@ test.describe('precio de venta del pedido', () => {
     await submitOrderWithLeftover(page, form);
     await expect(form).toHaveCount(0, { timeout: 60_000 });
 
-    const created = await prisma.order.findMany({
-      where: { companyId: required(companyId, 'la empresa') },
-      select: { id: true, salePrice: true },
-    });
+    const created = (
+      await prisma.order.findMany({
+        where: { companyId: required(companyId, 'la empresa') },
+        select: { id: true, lines: firstLineSelect({ salePrice: true }) },
+      })
+    ).map(withFirstLine);
     expect(created, 'el alta deja exactamente un pedido nuevo').toHaveLength(1);
     const createdOrder = created[0]!;
     expect(createdOrder.salePrice?.toString(), 'el alta guarda el precio escrito').toBe(

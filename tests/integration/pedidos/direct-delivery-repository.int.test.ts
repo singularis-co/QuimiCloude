@@ -185,7 +185,7 @@ async function createOrder(
     deletedAt: seed.deletedAt ?? null,
   }
   const { id: orderId } = await tx.order.create({
-    data: { companyId: t.companyId, orderYear: ANIO, orderSequence: sequence, ...columnas },
+    data: { companyId: t.companyId, orderYear: ANIO, orderSequence: sequence, status, deletedAt: columnas.deletedAt },
     select: { id: true },
   })
   const { id: orderLineId } = await tx.orderLine.create({
@@ -598,18 +598,15 @@ describe('WaitingOrdersReader contra Postgres real', () => {
     })
   })
 
-  it('QT-313 R45: con pedidos de una linea cuentan la receta y el estado de la linea, no los de orders', async () => {
+  it('QT-313 R45: con pedidos de una linea cuentan la receta y el estado de la linea', async () => {
     await inRolledBackTransaction(async (tx) => {
       const a = await createTenant(tx, 'A')
       const otraReceta = await createRecipe(tx, a.companyId)
       const vale = await createOrder(tx, a, { lines: [{ presentationId: a.presentationId, packages: 4 }] })
-      const ajeno = await createOrder(tx, a, { recipeId: otraReceta, lines: [{ presentationId: a.presentationId, packages: 5 }] })
+      await createOrder(tx, a, { recipeId: otraReceta, lines: [{ presentationId: a.presentationId, packages: 5 }] })
       const reader = createWaitingOrdersReader(tx)
       const par = [{ recipeId: a.recipeId, presentationId: a.presentationId }]
       const hoy = await reader.listWaitingLines(par, { companyId: a.companyId })
-
-      await tx.order.update({ where: { id: vale.orderId }, data: { recipeId: otraReceta } })
-      await tx.order.update({ where: { id: ajeno.orderId }, data: { recipeId: a.recipeId } })
 
       const filas = await reader.listWaitingLines(par, { companyId: a.companyId })
       expect(filas).toEqual(hoy)
@@ -630,10 +627,7 @@ describe('WaitingOrdersReader contra Postgres real', () => {
       await tx.orderPresentationLine.create({
         data: { orderId: pedido.orderId, orderLineId: enCurso.id, companyId: a.companyId, presentationId: otraPresentacion, packages: 6 },
       })
-      await tx.order.update({
-        where: { id: pedido.orderId },
-        data: { status: 'PARCIAL', packedBy: null, conditionedBy: null, finishedAt: null },
-      })
+      await tx.order.update({ where: { id: pedido.orderId }, data: { status: 'PARCIAL' } })
 
       const filas = await createWaitingOrdersReader(tx).listWaitingLines(
         [

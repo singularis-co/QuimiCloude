@@ -47,6 +47,7 @@ import { findUnitRefsSharingBaseInCompany } from '@/lib/modules/unidades/adapter
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   createCreateOrder,
+  createGetOrder,
   createUpdateOrder,
   createUpdateOrderPresentationLines,
   OrderWouldBlockError,
@@ -105,6 +106,14 @@ const customerCatalog = {
 };
 
 const createOrder = createCreateOrder({ customerCatalog, recipes, products, units, presentations, packaging, unitOfWork });
+const getOrder = createGetOrder({
+  orders,
+  recipes,
+  presentations,
+  packaging,
+  units,
+  customerCatalog: { findRefsIncludingDeleted: async () => [] },
+});
 const updateOrder = createUpdateOrder({ customerCatalog, orders, recipes, products, units, presentations, packaging, unitOfWork });
 const updateDistribution = createUpdateOrderPresentationLines({ recipes, products, packaging, presentations, units, unitOfWork });
 
@@ -297,7 +306,7 @@ describe('QT-313 T9 — alta con lineas contra la base', () => {
     }
   });
 
-  it('QT-313 R44: el pedido copia receta, cantidad, unidad, precio, costes y reserved_at de su linea de menor posicion', async () => {
+  it('QT-313 R44, R1: la ficha toma receta, cantidad, unidad, precio y coste de su linea de menor posicion, y el pedido no los guarda', async () => {
     const fixture = await crearFixture();
     try {
       const recetaA = await crearReceta(fixture);
@@ -309,24 +318,25 @@ describe('QT-313 T9 — alta con lineas contra la base', () => {
       );
 
       const primera = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id, position: 0 } });
-      const pedido = await prisma.order.findUniqueOrThrow({ where: { id: creado.id } });
+      const vista = await getOrder(creado.id, actorDe(fixture));
       expect({
-        recipeId: pedido.recipeId,
-        quantity: pedido.quantity.toFixed(4),
-        unitId: pedido.unitId,
-        salePrice: pedido.salePrice?.toFixed(4),
-        ingredientsCost: pedido.ingredientsCost?.toFixed(4),
-        packagingCost: pedido.packagingCost?.toFixed(4),
-        reservedAt: pedido.reservedAt?.toISOString(),
+        recipeId: vista.recipeId,
+        quantity: vista.quantity,
+        unitId: vista.unitId,
+        salePrice: vista.salePrice,
+        ingredientsCost: vista.ingredientsCost,
+        packagingCost: vista.packagingCost,
       }).toEqual({
         recipeId: primera.recipeId,
         quantity: primera.quantity.toFixed(4),
         unitId: primera.unitId,
-        salePrice: primera.salePrice?.toFixed(4),
-        ingredientsCost: primera.ingredientsCost?.toFixed(4),
-        packagingCost: primera.packagingCost?.toFixed(4),
-        reservedAt: primera.reservedAt?.toISOString(),
+        salePrice: primera.salePrice?.toFixed(4) ?? null,
+        ingredientsCost: primera.ingredientsCost?.toFixed(4) ?? null,
+        packagingCost: primera.packagingCost?.toFixed(4) ?? null,
       });
+      const columnas = await prisma.$queryRaw<ReadonlyArray<{ column_name: string }>>`
+        SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'orders'`;
+      expect(columnas.map((c) => c.column_name)).not.toContain('recipe_id');
     } finally {
       await borrarFixture(fixture);
     }

@@ -19,7 +19,7 @@ import {
   type PedidosError,
 } from '@/lib/modules/pedidos/domain/errors'
 
-import { fakeUnitOfWork, ONLY_LINE_ID, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, ONLY_LINE_ID, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { OrderStatus } from '@/lib/modules/pedidos/domain/order-classification'
@@ -37,7 +37,7 @@ const ADMIN: Actor = {
 const ORDER_ID = '11111111-1111-4111-8111-111111111111'
 const AHORA = new Date('2026-09-04T12:00:00.000Z')
 
-function fila(status: OrderStatus): OrderRow {
+function fila(status: OrderStatus): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -82,11 +82,10 @@ function dobles(opciones: { fila?: OrderRow | null; borrado?: 'ok' | 'not_found'
   )
   const softDeleteAlive = vi.fn(async () => opciones.borrado ?? 'ok')
   const setLineReservedAt = vi.fn(async (id: string, lineId: string, reservedAt: Date | null) => { void [id, lineId, reservedAt] })
-  const mirrorFirstLine = vi.fn(async () => undefined)
   const releaseForLine = vi.fn(async (input: { reason: 'release' | 'expire'; actorId: string | null }) => { void input })
 
   const { unitOfWork, orders: escritura } = fakeUnitOfWork({
-    orders: { lockAliveLines, softDeleteAlive, setLineReservedAt, mirrorFirstLine },
+    orders: { lockAliveLines, softDeleteAlive, setLineReservedAt },
     reservations: { releaseForLine },
   })
 

@@ -19,7 +19,7 @@ import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/p
 import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { findRecipeRefsIncludingDeleted } from '@/lib/modules/recetas/adapters/driven/persistence/recipe-catalog-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 function token(): string {
   return randomUUID().replace(/-/gu, '');
@@ -115,8 +115,7 @@ async function sembrarPedido(
   presentationId: string,
 ): Promise<{ readonly id: string; readonly lineId: string }> {
   const now = new Date();
-  const { id } = await prisma.order.create({
-    data: {
+  const { id } = await createOrderWithLine(prisma, {
       orderYear: now.getUTCFullYear(),
       orderSequence: sequenceCounter++,
       recipeId,
@@ -124,9 +123,7 @@ async function sembrarPedido(
       companyId,
       unitId,
       createdAt: now,
-    },
-    select: { id: true },
-  });
+    });
   // QC-170: el pedido ya no tiene presentacion unica; se reparte en lineas. Una sola linea de
   // 10 envases de contenido 1 equivale a la presentacion unica de antes.
   const { id: lineId } = await prisma.orderPresentationLine.create({

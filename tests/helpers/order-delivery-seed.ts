@@ -149,7 +149,7 @@ export async function crearPedido(
       orderYear: new Date().getUTCFullYear(),
       orderSequence: secuencia,
       customerId,
-      ...columnas,
+      status,
     },
     select: { id: true },
   });

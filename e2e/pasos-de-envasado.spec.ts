@@ -45,7 +45,7 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc211_e2e_';
 const RUN_ID = randomUUID().replace(/-/g, '');
@@ -497,8 +497,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
     // --- 2. El pedido de esa formula, asignado al Operario por el equipo que tambien trae al
     // Empacador: Finalizar asigna al Empacador.
     const year = new Date().getUTCFullYear();
-    const order = await prisma.order.create({
-      data: {
+    const order = await createOrderWithLine(prisma, {
         companyId,
         orderYear: year,
         orderSequence: BASE_SEQUENCE,
@@ -512,9 +511,7 @@ test.describe('pasos de envasado de punta a punta (R32)', () => {
         ).id,
         // PENDIENTE: solo asi Entrar pide la confirmacion de comenzar.
         status: 'PENDIENTE',
-      },
-      select: { id: true },
-    });
+      });
     const orderId = order.id;
     await prisma.orderPresentationLine.create({
       data: {

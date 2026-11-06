@@ -93,7 +93,7 @@ import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de él se toca. */
 const FIXTURE_PREFIX = 'qc283_e2e_';
@@ -460,8 +460,7 @@ test.beforeAll(async () => {
 
   // Cumple los CHECK de `orders`: «Por acondicionar» lleva `packed_by` y aún no `conditioned_by`.
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: ORDER_SEQUENCE,
@@ -472,14 +471,11 @@ test.beforeAll(async () => {
       packedBy: producerId,
       conditionedBy: null,
       finishedAt: null,
-    },
-    select: { id: true },
-  });
+    });
 
   // El señuelo: otro pedido de la empresa que firma solo el Administrador. Filtrar por el miembro
   // del equipo no debe encontrarlo.
-  const decoy = await prisma.order.create({
-    data: {
+  const decoy = await createOrderWithLine(prisma, {
       companyId,
       orderYear: year,
       orderSequence: DECOY_SEQUENCE,
@@ -487,9 +483,7 @@ test.beforeAll(async () => {
       quantity: ORDER_QUANTITY,
       unitId: unit.id,
       status: 'EN_CURSO',
-    },
-    select: { id: true },
-  });
+    });
 
   // Producción y empaque, firmados por el productor, terminados hace un rato.
   const productionStart = Date.now() - 60 * MINUTE_MS;

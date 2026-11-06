@@ -36,7 +36,7 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 
 import { NOW, createOrder, createPerson, inRolledBackTransaction } from './use-case-fixture';
 import { realOrderSummaries } from '../../helpers/order-summaries';
-import { syncOnlyLine } from '../../helpers/only-order-line';
+import { syncOnlyLine, updateOrderAndLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -144,14 +144,8 @@ describe('asignaciones · listCompanyOrders con los permisos del Administrador (
 
       const entregadoAntiguo = await createOrder(fixture, { status: 'ENTREGADO' });
       const entregadoReciente = await createOrder(fixture, { status: 'ENTREGADO' });
-      await fixture.tx.order.update({
-        where: { id: entregadoAntiguo },
-        data: { finishedAt: new Date('2026-01-01T00:00:00.000Z') },
-      }).then(() => syncOnlyLine(fixture.tx, entregadoAntiguo));
-      await fixture.tx.order.update({
-        where: { id: entregadoReciente },
-        data: { finishedAt: new Date('2026-02-01T00:00:00.000Z') },
-      }).then(() => syncOnlyLine(fixture.tx, entregadoReciente));
+      await updateOrderAndLine(fixture.tx, entregadoAntiguo, { finishedAt: new Date('2026-01-01T00:00:00.000Z') }).then(() => syncOnlyLine(fixture.tx, entregadoAntiguo));
+      await updateOrderAndLine(fixture.tx, entregadoReciente, { finishedAt: new Date('2026-02-01T00:00:00.000Z') }).then(() => syncOnlyLine(fixture.tx, entregadoReciente));
       const pendiente = await createOrder(fixture, { status: 'PENDIENTE' });
 
       const administrador = await createPerson(fixture, fixture.companyA);

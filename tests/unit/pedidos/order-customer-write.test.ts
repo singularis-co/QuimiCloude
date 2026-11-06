@@ -16,7 +16,7 @@ import { legacyCreateOrder as createCreateOrder } from '@/tests/helpers/single-r
 import type { UpdateOrderDeps } from '@/lib/modules/pedidos/domain/update-order'
 import { legacyUpdateOrder as createUpdateOrder } from '@/tests/helpers/single-recipe-order'
 import { fakePackagingCatalog, packagingRef } from '@/tests/helpers/packaging-catalog-double'
-import { fakeUnitOfWork } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeUnitOfWork, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PackagingCatalog, PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
@@ -136,7 +136,7 @@ function catalogosQueExplotan() {
   }
 }
 
-function filaGuardada(overrides: Partial<OrderRow> = {}): OrderRow {
+function filaGuardada(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: ORDER_ID,
@@ -193,7 +193,7 @@ function unidadDeTrabajo(fila: OrderRow, setCustomerAliveResult: 'ok' | 'not_fou
 }
 
 function escenarioDeEdicion(opciones: {
-  fila?: Partial<OrderRow>
+  fila?: Partial<SingleRecipeOrderRow>
   catalogos?: 'vivos' | 'explotan'
   setCustomerAlive?: 'ok' | 'not_found'
 } = {}) {

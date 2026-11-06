@@ -63,7 +63,7 @@ import { prisma } from '@/lib/shared/db/prisma'
 import { createCreateOrder as createLinesOrder, createUpdateOrder as createLinesUpdate } from '@/lib/modules/pedidos'
 import { singleRecipeCreate, singleRecipeUpdate } from '@/tests/helpers/single-recipe-order';
 
-import type { Actor, NewOrder, OrderScope } from '@/lib/modules/pedidos'
+import type { Actor, OrderScope } from '@/lib/modules/pedidos'
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario'
 import type { NewProductBatch } from '@/lib/modules/inventario/domain/product-batch'
 import type { InventoryScope } from '@/lib/modules/inventario/domain/inventory-scope'
@@ -76,6 +76,7 @@ import { findPackagingCostingBatches, findPackagingRefs } from '@/lib/modules/in
 import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma'
+import { type SingleLineNewOrder } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -340,7 +341,7 @@ async function borrarPedido(orderId: string): Promise<void> {
  *  con `'0.0000'`. */
 async function ingredientsCostCrudo(orderId: string): Promise<string | null> {
   const rows = await prisma.$queryRaw<{ ingredients_cost: string | null }[]>`
-    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "orders" WHERE "id" = ${orderId}::uuid`
+    SELECT "ingredients_cost"::text AS "ingredients_cost" FROM "order_lines" WHERE "order_id" = ${orderId}::uuid ORDER BY "position" LIMIT 1`
   const row = rows[0]
   if (row === undefined) throw new Error(`no existe el pedido ${orderId}`)
   return row.ingredients_cost
@@ -401,14 +402,14 @@ describe('la edicion lo reescribe, incluso a nulo (R11)', () => {
       expect(await ingredientsCostCrudo(orderId)).toBe('20.0000')
 
       // Edicion #1: sube la cantidad sin desbordar la existencia. Recalcula a OTRO numero.
-      const editadoInput: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const editadoInput: Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '8.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editadoInput, actorDe(A))
       // necesaria = 8 * 100 % = 8, cubierta (stock 10) -> 8 * 5 = 40.0000.
       expect(await ingredientsCostCrudo(orderId)).toBe('40.0000')
 
       // Edicion #2: sube la cantidad hasta que la existencia YA NO cubre -> sustituye por NULL.
       // QC-138 R6/R11: sin confirmar no se escribe nada; confirmada, el pedido queda BLOQUEADO.
-      const editadoSinCubrir: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const editadoSinCubrir: Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '200.0000', priority: 'MEDIA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, { ...editadoSinCubrir, confirmBlocked: true }, actorDe(A))
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
       const pedido = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true } })
@@ -442,7 +443,7 @@ describe('comprar un lote despues no cambia el importe de un pedido ya creado (R
         { companyId: A.companyId },
       )
 
-      const releido = await orders.findAliveById(orderId, ambitoDe(A))
+      const [releido] = await orders.findAliveLines(orderId, ambitoDe(A))
       expect(releido?.ingredientsCost).toBe('30.0000')
       // Sin reparto no hay envases: la parte de envases es cero, no null.
       expect(releido?.packagingCost).toBe('0.0000')
@@ -467,12 +468,12 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
       expect(await ingredientsCostCrudo(orderId)).toBe('30.0000')
 
       // Simula un pedido anterior a la columna: se pone en NULL por fuera de la aplicacion.
-      await prisma.$executeRaw`UPDATE "orders" SET "ingredients_cost" = NULL, "packaging_cost" = NULL WHERE "id" = ${orderId}::uuid`
+      await prisma.$executeRaw`UPDATE "order_lines" SET "ingredients_cost" = NULL, "packaging_cost" = NULL WHERE "order_id" = ${orderId}::uuid`
       expect(await ingredientsCostCrudo(orderId)).toBeNull()
 
       // La LECTURA -ficha y listado- no recibe `products` ni `units`: no puede recalcular
       // aunque el lote siga con existencia de sobra.
-      const ficha = await orders.findAliveById(orderId, ambitoDe(A))
+      const [ficha] = await orders.findAliveLines(orderId, ambitoDe(A))
       expect(ficha?.ingredientsCost).toBeNull()
       expect(ficha?.packagingCost).toBeNull()
 
@@ -481,7 +482,8 @@ describe('un pedido anterior a la columna sigue sin importe (R8, R13)', () => {
         null,
         ambitoDe(A),
       )
-      const enListado = listado.items.find((row) => row.id === orderId)
+      expect(listado.items.map((row) => row.id)).toContain(orderId)
+      const [enListado] = await orders.findAliveLinesByOrderIds([orderId], ambitoDe(A))
       expect(enListado?.ingredientsCost).toBeNull()
       expect(enListado?.packagingCost).toBeNull()
 
@@ -529,7 +531,8 @@ describe('un pedido de otra empresa no se alcanza ni por identificador (R14, R21
 
       const propio = await orders.findAliveById(orderId, ambitoDe(A))
       expect(propio?.id).toBe(orderId)
-      expect(propio?.ingredientsCost).toBe('30.0000')
+      const [linea] = await orders.findAliveLines(orderId, ambitoDe(A))
+      expect(linea?.ingredientsCost).toBe('30.0000')
     } finally {
       if (orderId !== null) await borrarPedido(orderId)
       await borrarReceta(recipeId)
@@ -558,7 +561,7 @@ describe('tras el alta y la edicion, los lotes y los asientos quedan intactos (R
       expect(despuesDeAlta.batches).toBe(antesDeAlta.batches)
       expect(despuesDeAlta.movements).toBe(antesDeAlta.movements)
 
-      const editado: Omit<NewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [] }
+      const editado: Omit<SingleLineNewOrder, 'customerId' | 'salePrice'> = { recipeId, quantity: '8.0000', priority: 'ALTA', status: 'PENDIENTE', unitId, presentationLines: [] }
       await edicion(orderId, editado, actorDe(A))
 
       const despuesDeEdicion = await fotoDeInventario(A)

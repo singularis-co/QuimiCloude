@@ -882,7 +882,7 @@ describe('listOrderDeliveryProgressByIdsIncludingDeleted — receta, reparto y l
     findMany.mockResolvedValue([
       {
         id: 'o-1',
-        recipeId: 'r-1',
+        lines: [{ recipeId: 'r-1' }],
         presentationLines: [
           { presentationId: 'p-1', packages: 10, packedPackages: 8, deliveryLines: [{ packages: 2 }, { packages: 1 }] },
           { presentationId: 'p-2', packages: 5, packedPackages: null, deliveryLines: [] },
@@ -901,6 +901,12 @@ describe('listOrderDeliveryProgressByIdsIncludingDeleted — receta, reparto y l
     expect(args.where.AND.some((termino) => 'deletedAt' in termino)).toBe(false)
     // Lo anulado no cuenta como entregado.
     expect(args.select.presentationLines.select.deliveryLines.where).toEqual({ voidLine: { is: null } })
+    // QT-313: la receta es la de la primera linea, la viva de menor posicion o, dado de baja, la ultima quitada.
+    expect((args.select as unknown as { lines: unknown }).lines).toEqual({
+      select: { recipeId: true },
+      orderBy: [{ deletedAt: { sort: 'desc', nulls: 'first' } }, { position: 'asc' }],
+      take: 1,
+    })
     expect(progreso).toEqual([
       {
         id: 'o-1',
@@ -924,7 +930,7 @@ describe('listOrderDeliveryProgressByIdsIncludingDeleted — receta, reparto y l
     findMany.mockResolvedValue([
       {
         id: 'o-1',
-        recipeId: 'r-1',
+        lines: [{ recipeId: 'r-1' }],
         presentationLines: [
           { presentationId: 'p-1', packages: 10, packedPackages: 8, deliveryLines: [{ packages: 2 }, { packages: 1 }] },
           { presentationId: 'p-2', packages: 5, packedPackages: null, deliveryLines: [] },
@@ -943,6 +949,12 @@ describe('listOrderDeliveryProgressByIdsIncludingDeleted — receta, reparto y l
     expect(args.where.AND.some((termino) => 'deletedAt' in termino)).toBe(false)
     // Lo anulado no cuenta como entregado.
     expect(args.select.presentationLines.select.deliveryLines.where).toEqual({ voidLine: { is: null } })
+    // QT-313: la receta es la de la primera linea, la viva de menor posicion o, dado de baja, la ultima quitada.
+    expect((args.select as unknown as { lines: unknown }).lines).toEqual({
+      select: { recipeId: true },
+      orderBy: [{ deletedAt: { sort: 'desc', nulls: 'first' } }, { position: 'asc' }],
+      take: 1,
+    })
     expect(progreso).toEqual([
       {
         id: 'o-1',

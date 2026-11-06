@@ -48,7 +48,6 @@ describe('QT-313 T12 — expireStaleOrders por linea', () => {
         cancelLine: vi.fn(async () => 'ok' as const),
         setLineReservedAt: vi.fn(async () => undefined),
         refreshStatus: vi.fn(async () => 'PENDIENTE' as const),
-        mirrorFirstLine: vi.fn(async () => undefined),
       },
     })
     // El lector ya filtra por plazo: solo la linea vencida es candidata.
@@ -106,7 +105,6 @@ describe('QT-313 T12 — reviewBlockedOrders por linea', () => {
         setLineIngredientsCost: vi.fn(async () => 'ok' as const),
         setLineReservedAt: vi.fn(async () => undefined),
         refreshStatus: vi.fn(async () => 'PARCIAL' as const),
-        mirrorFirstLine: vi.fn(async () => undefined),
       },
       reservations: {
         syncForLine: vi.fn(async (): Promise<ReservationOutcome> => {

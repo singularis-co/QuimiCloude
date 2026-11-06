@@ -89,7 +89,7 @@ import type { PackagingCatalog } from '@/lib/modules/inventario';
 import { dropPackaging, seedPackaging } from '../../helpers/packaging-seed';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
-import { onOnlyLine } from '../../helpers/only-order-line';
+import { onOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -328,10 +328,7 @@ function nuevoPedido(fixture: Fixture, quantity: string, lines: PedidoInput['pre
 }
 
 async function leerOrden(orderId: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id: orderId },
-    select: { quantity: true, unitId: true, status: true, packedBy: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { quantity: true, unitId: true, status: true, packedBy: true } });
 }
 
 async function leerLineas(orderId: string) {
@@ -517,8 +514,7 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
     try {
       // Simula un pedido migrado (R43): `unit_id NULL`, sin presentacion, sin reparto.
       const year = new Date().getUTCFullYear();
-      const legado = await prisma.order.create({
-        data: {
+      const legado = await createOrderWithLine(prisma, {
           orderYear: year,
           orderSequence: 1,
           recipeId: fixture.recipeId,
@@ -529,22 +525,7 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
           createdBy: fixture.actorId,
           updatedBy: fixture.actorId,
           unitId: null,
-        },
-        select: { id: true },
-      });
-      // La migracion de las lineas le dio su unica linea, con los mismos datos.
-      await prisma.orderLine.create({
-        data: {
-          orderId: legado.id,
-          companyId: fixture.companyId,
-          position: 0,
-          recipeId: fixture.recipeId,
-          originalRecipeId: fixture.recipeId,
-          quantity: new Prisma.Decimal('30.0000'),
-          status: 'PENDIENTE',
-          unitId: null,
-        },
-      });
+        });
 
       await updateOrder(
         legado.id,
@@ -565,8 +546,7 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
     const fixture = await crearFixture();
     try {
       const year = new Date().getUTCFullYear();
-      const legado = await prisma.order.create({
-        data: {
+      const legado = await createOrderWithLine(prisma, {
           orderYear: year,
           orderSequence: 1,
           recipeId: fixture.recipeId,
@@ -577,22 +557,7 @@ describe('R42, R46 — un pedido sin unidad acepta el reparto en cuanto la edici
           createdBy: fixture.actorId,
           updatedBy: fixture.actorId,
           unitId: null,
-        },
-        select: { id: true },
-      });
-      // La migracion de las lineas le dio su unica linea, con los mismos datos.
-      await prisma.orderLine.create({
-        data: {
-          orderId: legado.id,
-          companyId: fixture.companyId,
-          position: 0,
-          recipeId: fixture.recipeId,
-          originalRecipeId: fixture.recipeId,
-          quantity: new Prisma.Decimal('30.0000'),
-          status: 'POR_EMPACAR',
-          unitId: null,
-        },
-      });
+        });
 
       const resultado = await updateOrderPresentationLines(legado.id, actorDe(fixture), {
         unitId: fixture.unitId,
@@ -733,7 +698,7 @@ describe('R48 — Comenzar y el guardado del reparto se serializan sobre la fila
       // Comenzar GANA: la escritura exacta de `startPackingAliveOrder` (la cuenta de lineas ya
       // paso, este pedido nace con una).
       await holder.query(
-        `UPDATE "orders" SET "status" = 'EN_EMPAQUE', "packed_by" = $2, "updated_at" = now(), "updated_by" = $2 WHERE "id" = $1`,
+        `UPDATE "orders" SET "status" = 'EN_EMPAQUE', "updated_at" = now(), "updated_by" = $2 WHERE "id" = $1`,
         [creado.id, fixture.actorId],
       );
       // QT-313: Comenzar copia el estado a la unica linea viva del pedido en la misma transaccion.

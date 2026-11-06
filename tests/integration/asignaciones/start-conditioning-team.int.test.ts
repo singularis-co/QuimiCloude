@@ -45,7 +45,7 @@ vi.mock(
 import { asignaciones } from '@/lib/composition';
 import { normalizeCompanyName, normalizeWorkGroupName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
-import { ensureOnlyLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../../helpers/only-order-line';
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 
@@ -185,8 +185,7 @@ async function borrarFixture(fixture: Fixture): Promise<void> {
 }
 
 async function pedidoPorAcondicionar(fixture: Fixture): Promise<string> {
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: fixture.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
@@ -194,9 +193,7 @@ async function pedidoPorAcondicionar(fixture: Fixture): Promise<string> {
       quantity: new Prisma.Decimal('10'),
       status: 'POR_ACONDICIONAR',
       packedBy: fixture.packerId,
-    },
-    select: { id: true },
-  });
+    });
   await ensureOnlyLine(prisma, order.id);
   return order.id;
 }
@@ -206,10 +203,7 @@ function actor(fixture: Fixture, id: string, permissions: readonly string[]): Ac
 }
 
 async function leerPedido(id: string) {
-  return prisma.order.findUniqueOrThrow({
-    where: { id },
-    select: { status: true, packedBy: true, conditionedBy: true, finishedAt: true },
-  });
+  return prisma.orderLine.findFirstOrThrow({ where: { orderId: id }, orderBy: { position: 'asc' }, select: { status: true, packedBy: true, conditionedBy: true, finishedAt: true } });
 }
 
 async function leerEquipo(orderId: string) {

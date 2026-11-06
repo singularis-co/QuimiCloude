@@ -58,7 +58,7 @@ import { NOW, actorOf, createOrder, createPerson, crearLinea, inRolledBackTransa
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, packingStepsWithoutEvidence, recipesWithoutEvidence } from '../../helpers/evidence-off';
-import { syncOnlyLine } from '../../helpers/only-order-line';
+import { syncOnlyLine, updateOrderAndLine } from '../../helpers/only-order-line';
 
 const summaryReaders = realOrderSummaries();
 
@@ -243,15 +243,12 @@ async function terminado(
   },
 ): Promise<string> {
   const id = await createOrder(fixture, { status: 'PENDIENTE', companyId: options.companyId });
-  await fixture.tx.order.update({
-    where: { id },
-    data: {
+  await updateOrderAndLine(fixture.tx, id, {
       status: 'TERMINADO',
       packedBy: options.packedBy,
       conditionedBy: options.conditionedBy,
       finishedAt: options.finishedAt,
-    },
-  }).then(() => syncOnlyLine(fixture.tx, id));
+    }).then(() => syncOnlyLine(fixture.tx, id));
   return id;
 }
 
@@ -279,22 +276,13 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
 
       // Un ENTREGADO antiguo, aunque tenga `finished_at`, ya no es «Terminados».
       const entregadoAntiguo = await createOrder(fixture, { status: 'ENTREGADO' });
-      await fixture.tx.order.update({
-        where: { id: entregadoAntiguo },
-        data: { finishedAt: NOW, packedBy: otraPersona },
-      }).then(() => syncOnlyLine(fixture.tx, entregadoAntiguo));
+      await updateOrderAndLine(fixture.tx, entregadoAntiguo, { finishedAt: NOW, packedBy: otraPersona }).then(() => syncOnlyLine(fixture.tx, entregadoAntiguo));
 
       // Los dos estados de acondicionamiento tampoco.
       const porAcondicionar = await createOrder(fixture, { status: 'PENDIENTE' });
-      await fixture.tx.order.update({
-        where: { id: porAcondicionar },
-        data: { status: 'POR_ACONDICIONAR', packedBy: otraPersona },
-      }).then(() => syncOnlyLine(fixture.tx, porAcondicionar));
+      await updateOrderAndLine(fixture.tx, porAcondicionar, { status: 'POR_ACONDICIONAR', packedBy: otraPersona }).then(() => syncOnlyLine(fixture.tx, porAcondicionar));
       const enAcondicionamiento = await createOrder(fixture, { status: 'PENDIENTE' });
-      await fixture.tx.order.update({
-        where: { id: enAcondicionamiento },
-        data: { status: 'EN_ACONDICIONAMIENTO', packedBy: otraPersona, conditionedBy: otraPersona },
-      }).then(() => syncOnlyLine(fixture.tx, enAcondicionamiento));
+      await updateOrderAndLine(fixture.tx, enAcondicionamiento, { status: 'EN_ACONDICIONAMIENTO', packedBy: otraPersona, conditionedBy: otraPersona }).then(() => syncOnlyLine(fixture.tx, enAcondicionamiento));
 
       const actorEmpacador: Actor = {
         id: empacador,
@@ -481,10 +469,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const empacador = await createPerson(fixture, fixture.companyA);
       const entregadoSinFecha = await createOrder(fixture, { status: 'ENTREGADO' });
       const entregadoConFecha = await createOrder(fixture, { status: 'ENTREGADO' });
-      await fixture.tx.order.update({
-        where: { id: entregadoConFecha },
-        data: { finishedAt: NOW, packedBy: empacador },
-      }).then(() => syncOnlyLine(fixture.tx, entregadoConFecha));
+      await updateOrderAndLine(fixture.tx, entregadoConFecha, { finishedAt: NOW, packedBy: empacador }).then(() => syncOnlyLine(fixture.tx, entregadoConFecha));
 
       const conEjecucion = await listFinishedOrders(
         { id: empacador, companyId: fixture.companyA, permissions: PERMISOS_CON_EJECUCION },
@@ -570,14 +555,11 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
         packedBy: string | null,
       ): Promise<string> {
         const id = await createOrder(fixture, { status: 'PENDIENTE' });
-        await fixture.tx.order.update({
-          where: { id },
-          data: {
+        await updateOrderAndLine(fixture.tx, id, {
             status,
             packedBy,
             ...(status === 'EN_ACONDICIONAMIENTO' ? { conditionedBy: acondicionador } : {}),
-          },
-        }).then(() => syncOnlyLine(fixture.tx, id));
+          }).then(() => syncOnlyLine(fixture.tx, id));
         return id;
       }
 

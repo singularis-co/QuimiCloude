@@ -243,7 +243,6 @@ export function createUpdateOrderPresentationLines(
           scope,
         );
         await transaction.orders.refreshStatus(orderId, actorId, instant, scope);
-        await transaction.orders.mirrorFirstLine(orderId, scope);
         return 'ok';
       });
     } catch (error) {

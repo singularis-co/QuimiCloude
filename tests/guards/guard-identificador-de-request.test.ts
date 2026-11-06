@@ -870,6 +870,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261103120100_order_lines_references',
   // 2026-11-05: la linea del pedido pasa a obligatoria; no toca el identificador.
   '20261103120150_order_lines_references_required',
+  // 2026-11-05: orders deja de guardar lo de cada receta; no toca el identificador.
+  '20261103120200_orders_drop_line_columns',
 ] as const
 
 export function hallazgosDeMigraciones(

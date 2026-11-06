@@ -14,16 +14,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { InvalidTransitionError } from '@/lib/modules/pedidos/domain/errors';
 import { createTransitionOrder } from '@/lib/modules/pedidos/domain/transition-order';
-import {
-  fakeOrderConsumptionLedger,
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeUnitOfWork,
-  ONLY_LINE_ID,
-} from '@/tests/helpers/order-unit-of-work-double';
+import { fakeOrderConsumptionLedger, fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, ONLY_LINE_ID, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
 import { singleRecipeWrites } from '@/tests/helpers/single-recipe-order';
 
-import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedidos/ports/order-unit-of-work';
 import type { RecipeExecutionLine } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
@@ -38,7 +31,7 @@ function porLinea(unitOfWork: OrderUnitOfWork): OrderUnitOfWork {
   return { run: (work) => unitOfWork.run((scope) => work({ ...scope, orders: singleRecipeWrites(scope.orders) })) };
 }
 
-function filaBloqueada(overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
+function filaBloqueada(overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return {
     salePrice: null,
     id: 'o-1',

@@ -88,7 +88,6 @@ export function createDeleteOrder(
         });
         await transaction.orders.setLineReservedAt(id, line.id, null, scope);
       }
-      await transaction.orders.mirrorFirstLine(id, scope);
 
       const deleted = await transaction.orders.softDeleteAlive(id, actor.id, instant, scope);
       if (deleted === 'not_found') return 'not_found' as const;

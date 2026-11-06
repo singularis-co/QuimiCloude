@@ -5,20 +5,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createReviewBlockedOrders } from '@/lib/modules/pedidos/domain/review-blocked-orders';
-import {
-  fakeOrderRow,
-  fakeScopeProducts,
-  fakeScopeUnits,
-  fakeUnitOfWork,
-  orderLineOf,
-} from '@/tests/helpers/order-unit-of-work-double';
+import { fakeOrderRow, fakeScopeProducts, fakeScopeUnits, fakeUnitOfWork, orderLineOf, type SingleRecipeOrderRow } from '@/tests/helpers/order-unit-of-work-double';
 import { fakePackagingCatalog } from '@/tests/helpers/packaging-catalog-double';
 
 import type { OrderLineStatus } from '@/lib/modules/pedidos/domain/order-classification';
 import type { StoredOrderCost } from '@/lib/modules/pedidos/domain/order-cost';
 import type { OrderScope } from '@/lib/modules/pedidos/domain/order-scope';
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository';
-import type { LockedOrderRow } from '@/lib/modules/pedidos/ports/order-write-repository';
 import type { CostingBatch, ProductCatalog, ReservationOutcome } from '@/lib/modules/inventario';
 import type { RecipeCatalog, RecipeExecutionLine } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitConversion, UnitRef } from '@/lib/modules/unidades';
@@ -55,15 +48,15 @@ function lineaDe(orderId: string): string {
   return `linea-${orderId}`;
 }
 
-function bloqueado(id: string, overrides: Partial<LockedOrderRow> = {}): LockedOrderRow {
+function bloqueado(id: string, overrides: Partial<SingleRecipeOrderRow> = {}): SingleRecipeOrderRow {
   return fakeOrderRow({ id, status: 'BLOQUEADO', reservedAt: null, quantity: '10.0000', ...overrides });
 }
 
 type Escenario = {
   readonly ids?: readonly string[];
-  readonly filas?: ReadonlyMap<string, LockedOrderRow>;
+  readonly filas?: ReadonlyMap<string, SingleRecipeOrderRow>;
   /** Lo que devuelve `lockAliveById` si no es la misma fila que la lectura previa. */
-  readonly bloqueadas?: ReadonlyMap<string, LockedOrderRow | null>;
+  readonly bloqueadas?: ReadonlyMap<string, SingleRecipeOrderRow | null>;
   readonly resultado?: (orderId: string) => ReservationOutcome;
   readonly lineas?: readonly RecipeExecutionLine[];
   readonly lotes?: readonly CostingBatch[];
@@ -128,7 +121,6 @@ function montar(escenario: Escenario = {}) {
     void [id, lineId, reservedAt, scope];
   });
   const refreshStatus = vi.fn(async () => 'PENDIENTE' as const);
-  const mirrorFirstLine = vi.fn(async () => undefined);
   const findExecutionContentById = vi.fn(async (id: string) => ({
     id,
     name: 'Receta',
@@ -142,7 +134,7 @@ function montar(escenario: Escenario = {}) {
   const unidades: readonly UnitConversion[] = escenario.unidades ?? [LITRO];
   const insumo = { id: PRODUCTO_X, name: 'x', unitId: insumoUnitId, stockByUnit: [], type: 'PRODUCT' as const };
   const uow = fakeUnitOfWork({
-    orders: { lockAliveLine, setLineStatus, setLineIngredientsCost, setLineReservedAt, refreshStatus, mirrorFirstLine },
+    orders: { lockAliveLine, setLineStatus, setLineIngredientsCost, setLineReservedAt, refreshStatus },
     reservations: { syncForLine },
     recipes: { findExecutionContentById },
     products: fakeScopeProducts(escenario.insumoUnitId === undefined ? [] : [insumo]),
@@ -419,7 +411,7 @@ describe('QC-195 reviewBlockedOrders — los envases del reparto', () => {
   const ENVASE = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
   const PRESENTACION = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 
-  function conReparto(): LockedOrderRow {
+  function conReparto(): SingleRecipeOrderRow {
     return bloqueado(PEDIDO_1, {
       presentationLines: [
         { presentationId: PRESENTACION, packages: 10, packagingProductId: ENVASE, presentationContent: null },

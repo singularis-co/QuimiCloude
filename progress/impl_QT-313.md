@@ -507,3 +507,28 @@ Desviaciones y riesgos (para el reviewer):
 4. El test «fila sin linea» comprueba el SQLSTATE 23502, porque el mensaje de Prisma no nombra la columna.
 5. En `order-lines-references-migration.int`, «R8: bajar y volver a subir…» ahora ejecuta `LATER_DOWNS` antes de sembrar.
 6. `reserve-existing-orders-migration.int` y `qc170-backfill.int` deshacen las migraciones nuevas al empezar cada transaccion.
+
+## Fase 6 — T15 Quitar las columnas de `orders` (2026-11-06)
+
+Produccion:
+- Migracion `db/migrations/20261103120200_orders_drop_line_columns/{migration.sql,down.sql}`. Quita de `orders` las columnas de receta, cantidad, unidad, costes, precio, `reserved_at`, `finished_at`, `packed_by` y `conditioned_by`, junto con sus CHECK, FK e indices, y crea `order_lines_quantity_idx`. El `down.sql` las restaura y aborta si hay pedidos con mas de una linea viva.
+- `db/schema.prisma`.
+- El espejo sale del alta, de la edicion, de `refreshStatus`, de `mirrorFirstLine` y del adaptador.
+- Archivos de `pedidos`: `order-prisma.ts`, `order-catalog-prisma.ts`, `order-write-repository.ts`, `order-view.ts`, `get-order.ts`, `list-orders.ts`, `create-order.ts`, `update-order.ts`, `update-order-presentation-lines.ts`, `cancel-order-line.ts`, `order-cancellation.ts`, `delete-order.ts`, `expire-stale-orders.ts`, `review-blocked-orders.ts` y `transition-order.ts`.
+
+Tests: unos 190 ajustados (lista en `tasks.md > Archivos esperados`), mas el `.int` de la migracion (R9) y el grep de R1. Los nombres exactos y el mapa de R1 y R9 estan en el informe del backend_dev de T15; se consolidan en la seccion final de trazabilidad (T18).
+
+Verificacion (salida real):
+- backend_dev: typecheck, lint, `related --project node` y 10 tandas de `.int` con `--maxWorkers=1`, todo en verde.
+- implementer, guardias corridas solas (`pnpm exec vitest run guard`): `Test Files 1 failed | 86 passed (87)`, `Tests 2 failed | 1331 passed | 22 skipped`. Los dos rojos son de `tests/guards/guard-asignacion-componentizada.test.ts` y fallan por plazo (20 s).
+  - Repetida con `--testTimeout=120000`: `Tests 22 passed (22)`. Los dos casos tardan 17,4 s y 18,1 s; otros dos tardan 14,9 s y 5,0 s.
+  - **No es de esta feature.** La guardia recorre `app/`, `components/`, `hooks/` y `lib/` leyendo archivos, y T15 no toca `app/` ni `components/` (solo 15 archivos de `lib/modules/pedidos`). Ya va cerca del limite de 20 s por su propio coste. Conviene apuntarla como deuda: subir su plazo u optimizar el recorrido.
+- implementer, ui por lotes con `--maxWorkers=1`: 130 archivos de test de UI que importan `pedidos` o la composicion, en 9 lotes de 15.
+  - 8 lotes en verde.
+  - En el lote 01 fallo `tests/unit/clientes-ui/clientes-viewport.test.tsx` («…cumplen 44x44 px y 16 px de fuente (R39)»). Corrido solo da `Tests 8 passed (8)`; es inestable bajo carga y T15 no toca `clientes`.
+  - Total: 129/130 archivos y 2687/2688 tests en la pasada por lotes.
+
+Desviaciones para el reviewer. El backend_dev listo nueve en su informe al leader; aqui se anota la que el leader pidio resaltar y lo que se puede comprobar en la migracion. **El leader debe completar las desviaciones 1–9 con su texto exacto.**
+- **(4) Indices de terminados:** `orders_company_finished_idx` y `orders_company_terminated_idx` caen con `finished_at` y no se rehicieron en `order_lines`. **El reviewer decide** si hacen falta por el rendimiento de los listados de terminados.
+- `orders_expirable_idx` cae con `reserved_at`. El indice de caducidad de `order_lines` ya existe desde T1.
+- `orders_quantity_idx` pasa a ser `order_lines_quantity_idx`, parcial con `deleted_at IS NULL`.

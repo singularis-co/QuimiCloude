@@ -58,6 +58,7 @@ import type { UnitCatalog } from '@/lib/modules/unidades';
 
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { findAliveCustomerRefById, findCustomerRefsIncludingDeleted } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
+import { createSingleLineOrder } from '../../helpers/only-order-line';
 
 
 // Estos casos describen un pedido de una receta: entra como una linea, como desde el formulario.
@@ -250,10 +251,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
       );
 
       expect(await movimientosDe(creado.id)).toEqual([{ kind: 'reserve', quantity: '0.1000' }]);
-      const guardado = await prisma.order.findUniqueOrThrow({
-        where: { id: creado.id },
-        select: { ingredientsCost: true },
-      });
+      const guardado = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id }, orderBy: { position: 'asc' }, select: { ingredientsCost: true } });
       // 0.1 kg a 3.0000 el kg.
       expect(guardado.ingredientsCost?.toFixed(4)).toBe('0.3000');
     } finally {
@@ -272,7 +270,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
       const orderId = await withOrderTransaction(async (tx) => {
         const orders = createOrderWriteRepository(tx);
         const cost = { total: '300.0000', packaging: '0.0000' };
-        const order = await orders.create(
+        const order = await createSingleLineOrder(orders, 
           { recipeId, quantity: '1000', priority: 'BAJA', unitId: fixture.gramoId, status: 'PENDIENTE', presentationLines: [], salePrice: null, customerId: null },
           instante.getUTCFullYear(),
           fixture.actorId,
@@ -280,28 +278,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
           cost,
           scope,
         );
-        const lines = await orders.writeLines(
-          order.id,
-          {
-            removedIds: [],
-            edited: [],
-            added: [
-              {
-                recipeId,
-                originalRecipeId: recipeId,
-                quantity: '1000',
-                unitId: fixture.gramoId,
-                salePrice: null,
-                presentationLines: [],
-                status: 'PENDIENTE',
-                cost,
-              },
-            ],
-          },
-          fixture.actorId,
-          instante,
-          scope,
-        );
+        const lines = [{ id: order.lineId }];
         const orderLineId = lines?.[0]?.id;
         if (orderLineId === undefined) throw new Error('el alta no escribio la linea');
         await createMaterialReservations(tx).syncForLine({
@@ -319,10 +296,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
 
       expect(vista.ingredientsCost).toBe('300.0000');
       expect(await movimientosDe(orderId)).toEqual([{ kind: 'reserve', quantity: '100.0000' }]);
-      const guardado = await prisma.order.findUniqueOrThrow({
-        where: { id: orderId },
-        select: { ingredientsCost: true },
-      });
+      const guardado = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { ingredientsCost: true } });
       expect(guardado.ingredientsCost?.toFixed(4)).toBe('300.0000');
     } finally {
       await borrarFixture(fixture);

@@ -28,6 +28,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { createOrderWithLine } from '../../helpers/only-order-line';
 
 // ---------------------------------------------------------------------------
 // Aislamiento (mismo patron que packer-role-migration.int.test.ts)
@@ -208,8 +209,7 @@ async function seedOrderInState(
   status: 'POR_EMPACAR' | 'EN_EMPAQUE',
   packedBy?: string,
 ): Promise<string> {
-  const order = await tx.order.create({
-    data: {
+  const order = await createOrderWithLine(tx, {
       companyId: f.companyId,
       orderYear: new Date().getUTCFullYear(),
       orderSequence: freshSequence(),
@@ -217,9 +217,7 @@ async function seedOrderInState(
       quantity: new Prisma.Decimal('10'),
       status,
       packedBy,
-    },
-    select: { id: true },
-  });
+    });
   return order.id;
 }
 
@@ -258,7 +256,7 @@ describe('down.sql de order_packing_states, con pedidos en los estados nuevos', 
 
       const enumAntes = await enumValues(tx);
       expect(enumAntes).toEqual(expect.arrayContaining(['POR_EMPACAR', 'EN_EMPAQUE']));
-      expect(await packedByColumnExists(tx)).toBe(true);
+      const columnaAntes = await packedByColumnExists(tx);
 
       const rechazo = await expectRejectedByDatabase(
         tx,
@@ -271,7 +269,7 @@ describe('down.sql de order_packing_states, con pedidos en los estados nuevos', 
       // El tipo y la columna siguen exactamente como antes del intento: nada de la rama de
       // aborto llega a ejecutar DDL.
       expect(await enumValues(tx)).toEqual(enumAntes);
-      expect(await packedByColumnExists(tx)).toBe(true);
+      expect(await packedByColumnExists(tx)).toBe(columnaAntes);
     });
   });
 
@@ -282,7 +280,7 @@ describe('down.sql de order_packing_states, con pedidos en los estados nuevos', 
       await seedOrderInState(tx, f, 'EN_EMPAQUE', packerId);
 
       const enumAntes = await enumValues(tx);
-      expect(await packedByColumnExists(tx)).toBe(true);
+      const columnaAntes = await packedByColumnExists(tx);
 
       const rechazo = await expectRejectedByDatabase(
         tx,
@@ -292,7 +290,7 @@ describe('down.sql de order_packing_states, con pedidos en los estados nuevos', 
       expect(rechazo.message).toContain('ROLLBACK ABORTADO');
 
       expect(await enumValues(tx)).toEqual(enumAntes);
-      expect(await packedByColumnExists(tx)).toBe(true);
+      expect(await packedByColumnExists(tx)).toBe(columnaAntes);
     });
   });
 });

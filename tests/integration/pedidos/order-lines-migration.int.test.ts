@@ -14,6 +14,8 @@ import { prisma } from '@/lib/shared/db/prisma';
 import {
   expectRejectedByDatabase,
   freshSequence,
+  insertLegacyOrder,
+  readLegacyOrders,
   inRolledBackTransaction,
   readMigration,
   runDowns,
@@ -46,28 +48,15 @@ type OrderSeed = {
   readonly deletedAt?: Date | null;
 };
 
+/** Un pedido en el esquema de `orders` anterior a la migracion, con su receta en la misma fila. */
 async function seedOrder(tx: Prisma.TransactionClient, companyId: string, seed: OrderSeed): Promise<string> {
-  const decimal = (value: string | null | undefined) => (value == null ? null : new Prisma.Decimal(value));
+  return insertLegacyOrder(tx, { companyId, ...seed });
+}
+
+/** Un pedido con el esquema de hoy: solo la cabecera. */
+async function seedHeader(tx: Prisma.TransactionClient, companyId: string): Promise<string> {
   const order = await tx.order.create({
-    data: {
-      companyId,
-      orderYear: new Date().getUTCFullYear(),
-      orderSequence: freshSequence(),
-      recipeId: seed.recipeId,
-      quantity: new Prisma.Decimal(seed.quantity ?? '10'),
-      status: seed.status,
-      unitId: seed.unitId ?? null,
-      cancellationReason: seed.cancellationReason ?? null,
-      ingredientsCost: decimal(seed.ingredientsCost),
-      packagingCost: decimal(seed.packagingCost),
-      actualCost: decimal(seed.actualCost),
-      salePrice: decimal(seed.salePrice),
-      reservedAt: seed.reservedAt ?? null,
-      finishedAt: seed.finishedAt ?? null,
-      packedBy: seed.packedBy ?? null,
-      conditionedBy: seed.conditionedBy ?? null,
-      deletedAt: seed.deletedAt ?? null,
-    },
+    data: { companyId, orderYear: new Date().getUTCFullYear(), orderSequence: freshSequence() },
     select: { id: true },
   });
   return order.id;
@@ -166,13 +155,12 @@ describe('relleno de order_lines', () => {
           deletedAt: new Date('2026-10-05T00:00:00.000Z'),
         }),
       ];
-      const pedidosAntes = await tx.order.findMany({ where: { id: { in: ids } }, orderBy: { id: 'asc' } });
+      const pedidosAntes = await readLegacyOrders(tx, ids);
 
       await runScript(tx, UP_SQL);
 
       expect(await tx.orderLine.count()).toBe(await tx.order.count());
-      const pedidosDespues = await tx.order.findMany({ where: { id: { in: ids } }, orderBy: { id: 'asc' } });
-      expect(pedidosDespues).toEqual(pedidosAntes);
+      expect(await readLegacyOrders(tx, ids)).toEqual(pedidosAntes);
 
       for (const order of pedidosAntes) {
         const lines = await tx.orderLine.findMany({ where: { orderId: order.id } });
@@ -196,22 +184,22 @@ describe('relleno de order_lines', () => {
           conditionedBy: line.conditionedBy,
           deletedAt: line.deletedAt,
         }).toEqual({
-          companyId: order.companyId,
+          companyId: order.company_id,
           position: 0,
-          recipeId: order.recipeId,
-          quantity: order.quantity.toFixed(4),
-          unitId: order.unitId,
+          recipeId: order.recipe_id,
+          quantity: order.quantity,
+          unitId: order.unit_id,
           status: order.status,
-          cancellationReason: order.cancellationReason,
-          ingredientsCost: order.ingredientsCost?.toFixed(4) ?? null,
-          packagingCost: order.packagingCost?.toFixed(4) ?? null,
-          actualCost: order.actualCost?.toFixed(4) ?? null,
-          salePrice: order.salePrice?.toFixed(4) ?? null,
-          reservedAt: order.reservedAt,
-          finishedAt: order.finishedAt,
-          packedBy: order.packedBy,
-          conditionedBy: order.conditionedBy,
-          deletedAt: order.deletedAt,
+          cancellationReason: order.cancellation_reason,
+          ingredientsCost: order.ingredients_cost,
+          packagingCost: order.packaging_cost,
+          actualCost: order.actual_cost,
+          salePrice: order.sale_price,
+          reservedAt: order.reserved_at,
+          finishedAt: order.finished_at,
+          packedBy: order.packed_by,
+          conditionedBy: order.conditioned_by,
+          deletedAt: order.deleted_at,
         });
         expect(line.originalRecipeId).toBe(original);
       }
@@ -224,7 +212,7 @@ describe('restricciones de order_lines', () => {
     const companyId = await seedCompany(tx);
     const original = await seedRecipe(tx, companyId);
     const version = await seedRecipe(tx, companyId, original);
-    const orderId = await seedOrder(tx, companyId, { status: 'PENDIENTE', recipeId: original });
+    const orderId = await seedHeader(tx, companyId);
     return { companyId, original, version, orderId };
   }
 

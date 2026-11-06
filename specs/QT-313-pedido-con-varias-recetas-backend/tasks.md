@@ -242,7 +242,7 @@
   únicos por pedido chocarían; `typecheck` verde con `orderLineId: string` y ningún `IS NULL` /
   `orderLineId: null` en los adaptadores de reserva, consumo y `product-prisma.ts`. Depende de T14a, T14b,
   T14c (todo el código escribe la línea).
-- [ ] **T15 — Quitar las columnas de `orders`.** Migración `20261103120200_orders_drop_line_columns`
+- [x] **T15 — Quitar las columnas de `orders`.** Migración `20261103120200_orders_drop_line_columns`
   y `db/schema.prisma` (design § 1.2), `reserved_at` incluido. `down.sql` aborta si hay pedidos con
   más de una línea viva. En el mismo commit borra el **espejo** de `orders` (design § 4.1.1, puntos
   3 y 3b) de los casos de uso de alta y edición, de `refreshStatus`, de `mirrorFirstLine` y del
@@ -707,3 +707,39 @@ Tocados en la fase 5 (T14a) por el flujo de planta por linea (los demas archivos
 - `tests/integration/pedidos/pedidos-constraints.int.test.ts`
 - `tests/integration/pedidos/qc170-backfill.int.test.ts`
 - `tests/integration/recetas/recipe-conditioning-steps-migration.int.test.ts`
+
+Tocados en la fase 6 (T15) por quitar las columnas de linea de `orders` (las siembras escriben la receta en la linea y las lecturas la leen de ella):
+- `e2e/acondicionar-con-equipo.spec.ts`
+- `e2e/aislamiento-pedidos.spec.ts`
+- `e2e/coste-real-de-produccion.spec.ts`
+- `e2e/envases-del-pedido.spec.ts`
+- `e2e/pedido-bloqueado.spec.ts`
+- `e2e/pedido-con-cliente.spec.ts`
+- `e2e/pedido-conversion-de-unidad.spec.ts`
+- `e2e/pedido-en-varias-presentaciones.spec.ts`
+- `e2e/pedido-precio-de-venta.spec.ts`
+- `e2e/pedidos-asignados.spec.ts`
+- `e2e/pedidos-busqueda.spec.ts`
+- `e2e/pedidos-cotizacion.spec.ts`
+- `e2e/pedidos-responsables.spec.ts`
+- `e2e/pedidos-terminados.spec.ts`
+- `e2e/pedidos.spec.ts`
+- `e2e/producto-terminado.spec.ts`
+- `e2e/recetas-porcentaje.spec.ts`
+- `e2e/reserva-de-material.spec.ts`
+- `e2e/versiones-de-receta.spec.ts`
+- `tests/integration/asignaciones/order-assignment-prisma.int.test.ts`
+- `tests/integration/asignaciones/order-assignments-constraints.int.test.ts`
+- `tests/integration/identity/company.int.test.ts`
+- `tests/integration/identity/work-group-assignments.int.test.ts`
+- `tests/integration/pedidos/order-company-stats.int.test.ts`
+- `tests/integration/pedidos/order-conditioning-constraints.int.test.ts`
+- `tests/integration/pedidos/order-duplicate-number.int.test.ts`
+- `tests/integration/pedidos/order-packing-constraints.int.test.ts`
+- `tests/integration/pedidos/order-packing-states-rollback.int.test.ts`
+- `tests/integration/pedidos/order-sequence-race.int.test.ts`
+- `tests/integration/pedidos/order-sequence.int.test.ts`
+- `tests/integration/pedidos/orders-customer-constraints.int.test.ts`
+- `tests/unit/pedidos/orders-header-only.test.ts`
+- `tests/integration/asignaciones/finish-auto-assign-packers.int.test.ts`
+- `tests/integration/inventario/list-query-indexes.int.test.ts`

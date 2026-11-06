@@ -50,7 +50,7 @@ import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openRowActionsMenuItem } from './helpers/row-actions-menu';
-import { ensureOnlyLine } from '../tests/helpers/only-order-line';
+import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
 const FIXTURE_PREFIX = 'qc167_e2e_';
@@ -238,8 +238,7 @@ async function seedOrder(params: {
   readonly deleted?: boolean;
 }): Promise<SeededOrder> {
   const year = new Date().getUTCFullYear();
-  const order = await prisma.order.create({
-    data: {
+  const order = await createOrderWithLine(prisma, {
       companyId: params.companyId,
       orderYear: year,
       orderSequence: params.sequence,
@@ -248,9 +247,7 @@ async function seedOrder(params: {
       unitId: params.unitId,
       status: params.status,
       deletedAt: params.deleted ? new Date() : null,
-    },
-    select: { id: true },
-  });
+    });
   return {
     id: order.id,
     numberText: formatOrderNumber({ year, sequence: params.sequence }),

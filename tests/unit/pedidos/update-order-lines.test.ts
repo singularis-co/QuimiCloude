@@ -271,7 +271,6 @@ describe('QT-313 T10 — edicion con lineas', () => {
 
     expect(e.escrituras.updateAlive).toHaveBeenCalledWith(ORDER_ID, { priority: 'ALTA', customerId: null }, ACTOR.id, AHORA, SCOPE);
     expect(e.escrituras.refreshStatus).toHaveBeenCalledWith(ORDER_ID, ACTOR.id, AHORA, SCOPE);
-    expect(e.escrituras.mirrorFirstLine).toHaveBeenCalledWith(ORDER_ID, SCOPE);
   });
 });
 

@@ -324,7 +324,8 @@ export async function listOrderHistoryByIdsIncludingDeleted(
 
 type OrderDeliveryProgressRow = {
   readonly id: string;
-  readonly recipeId: string;
+  /** La primera linea: la viva de menor `position` o, en un pedido dado de baja, la ultima quitada. */
+  readonly lines: readonly { readonly recipeId: string }[];
   readonly presentationLines: readonly {
     readonly presentationId: string;
     readonly packages: number;
@@ -336,9 +337,11 @@ type OrderDeliveryProgressRow = {
 
 /** Suma lo entregado de cada linea; la consulta ya deja fuera las lineas de entrega anuladas. */
 export function toOrderDeliveryProgress(row: OrderDeliveryProgressRow): OrderDeliveryProgress {
+  const first = row.lines[0];
+  if (first === undefined) throw new Error(`el pedido ${row.id} no tiene ninguna linea`);
   return {
     id: row.id,
-    recipeId: row.recipeId,
+    recipeId: first.recipeId,
     lines: row.presentationLines.map((line) => ({
       presentationId: line.presentationId,
       packages: line.packages,
@@ -364,7 +367,11 @@ export async function listOrderDeliveryProgressByIdsIncludingDeleted(
     where: { AND: [orderCompanyScope({ companyId }), { id: { in: [...ids] } }] },
     select: {
       id: true,
-      recipeId: true,
+      lines: {
+        select: { recipeId: true },
+        orderBy: [{ deletedAt: { sort: 'desc' as const, nulls: 'first' as const } }, { position: 'asc' as const }],
+        take: 1,
+      },
       presentationLines: {
         select: {
           presentationId: true,
