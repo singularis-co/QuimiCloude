@@ -59,9 +59,9 @@ Tres frontend_dev en paralelo (T6+T7; T8+T11; T9+T10+T12), sin commit propio; lo
 |---|---|---|
 | T6, T7 | 36efea69e | `components/shared/row-actions-menu.tsx` (`groupLabel`), `components/shared/notice.tsx` (`actions`), `components/shared/CATALOGO.md` (filas de `RowActionsMenu` y `Notice`, tableros en «Diseño»), `tests/unit/shared-ui/row-actions-menu-group.test.tsx`, `tests/unit/shared-ui/notice-actions.test.tsx` |
 | T8 | 38bb0ea0b | `app/(private)/pedidos/components/order-progress.tsx`, `tests/unit/pedidos-ui/order-progress.test.tsx` |
-| T9, T10 | ver `git log` (feat T9+T10) | `order-line-draft.ts`, `order-line-actions.ts`, sus tests |
-| T11 | ver `git log` (feat T11) | `order-detail-sheet.tsx`, su test |
-| T12 | ver `git log` (feat T12) | `order-line-picker-dialog.tsx`, `cancel-order-line-dialog.tsx`, sus tests, `components/index.ts` (solo reexportaciones) |
+| T9, T10 | 0a339b628 | `order-line-draft.ts`, `order-line-actions.ts`, sus tests |
+| T11 | 300c10add | `order-detail-sheet.tsx`, su test |
+| T12 | 673598d1c | `order-line-picker-dialog.tsx`, `cancel-order-line-dialog.tsx`, sus tests, `components/index.ts` (solo reexportaciones) |
 
 ### T6 y T7
 
