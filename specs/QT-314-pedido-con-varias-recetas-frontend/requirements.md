@@ -109,6 +109,11 @@
   (receta 4).», y DEBE marcar su fila. CUANDO el código es `order_would_block`, el aviso DEBE ofrecer
   «Guardar bloqueada», que reenvía el mismo pedido confirmando que se guarde bloqueado, y «Revisar
   receta», que cierra el aviso sin enviar. *[Errores por receta]*
+- **R50** — SI el alta o la edición se rechazan sin posiciones de receta (por ejemplo
+  `invalid_transition` al guardar un pedido sin receta editable ni receta nueva), ENTONCES el panel
+  DEBE mostrar el mensaje del catálogo sin cerrarse y sin perder el borrador. La pantalla NO DEBE
+  añadir ninguna regla propia de «sin cambios» que bloquee «Guardar pedido».
+  *[Guardar sin receta editable ni receta nueva]*
 
 ### Consulta: panel de detalle
 
@@ -123,9 +128,10 @@
 
 ### Listado
 
-- **R20** — El listado DEBE tener una fila por pedido. En la columna de la fórmula DEBE mostrar la
+- **R20** — El listado DEBE tener una fila por pedido. En la columna «Fórmula» DEBE mostrar la
   primera receta del pedido y, si tiene más, «+N más», donde N es el número de recetas del pedido
-  menos una. *[Listado con varias recetas]*
+  menos una. La columna «Motivo de cancelación» DEBE seguir en el listado.
+  *[Listado con varias recetas · Tablero frente a decisión en el listado]*
 - **R21** — El listado DEBE tener una columna de avance con «F de T» y su barra, donde T es el
   número de recetas activas y F el de las terminadas. *[Listado con varias recetas]*
 - **R22** — Las columnas de precio de venta, coste estimado y coste real DEBEN mostrar los totales
@@ -136,8 +142,9 @@
   de cada receta se ve en el detalle (R18). *[Listado con varias recetas]*
 - **R24** — La pantalla de Pedidos NO DEBE pintar ningún dato de una receta (nombre, imagen,
   versión, cantidad, unidad, reparto, precio o coste) a partir de los campos del pedido que copian
-  la primera receta: los saca de las recetas del pedido o de sus totales.
-  *[Listado con varias recetas · Esquemas de entrada]*
+  la primera receta: los saca de las recetas del pedido o de sus totales. (lib) La lectura del
+  pedido (`OrderView`) NO DEBE tener esos campos.
+  *[Listado con varias recetas · Esquemas de entrada · Campos planos de `OrderView`]*
 
 ### Acciones de una receta, desde el menú de la fila
 
@@ -275,27 +282,13 @@ se retiran o se reescriben a los requisitos nuevos (`tasks.md`).
 | ¿Hace falta E2E? | R48, R49 |
 | ¿Librería nueva? | R47 |
 | Pase `/design` | R1, R25, R44, R45, R46 |
+| Campos planos de `OrderView` (P1) | R24 |
+| Guardar sin receta editable ni receta nueva (P2) | R50 |
+| Tablero frente a decisión en el listado (P3) | R20 |
 
 ## Preguntas abiertas
 
-- **P1** — ¿Se borran de `OrderView` los campos planos que copian la primera receta (`recipeId`,
-  `recipeName`, `recipeVersion`, `recipeImageUrl`, `quantity`, `unitId`, `unitLabel`,
-  `presentationLines`, `salePrice`, `ingredientsCost`, `packagingCost`, `actualCost`)? QT-313 § 7 los
-  dejó para la pantalla de una receta. La fila «Esquemas de entrada» manda quitar el puente de
-  `order-actions.ts`, pero no dice nada de esta lectura. **Recomendación: sí, en esta ficha**
-  (`tasks.md` T17). Hoy solo los leen la pantalla de Pedidos y sus tests. Si se quedan, sirven para
-  volver a pintar la primera receta como si fuera el pedido, que es justo lo que R24 prohíbe. Si la
-  respuesta es no, T17 sale del plan y R24 se verifica solo con tests.
-- **P2** — En un pedido sin ninguna receta editable (todas terminadas, por ejemplo), «Guardar
-  pedido» sin añadir receta lo rechaza el servidor con `invalid_transition` (QT-313, `planEdit`).
-  También lo rechaza si solo cambia la prioridad. ¿El panel avisa antes de enviar? **Recomendación:
-  no.** El panel muestra el mensaje del catálogo, como hoy con cualquier rechazo, y no se añade
-  ninguna regla de «sin cambios» en la pantalla.
-- **P3** — El tablero no coincide con la decisión en dos detalles del listado. Rotula la columna
-  «Recetas» y escribe «+N»; la decisión dice «En Fórmula, la primera receta y "+N más"». Además, no
-  pinta la columna «Motivo de cancelación», y la decisión solo quita Presentación. **Recomendación:
-  seguir la decisión escrita**: la columna se llama «Fórmula», el texto es «+N más» y «Motivo de
-  cancelación» se queda. Así está escrito R20.
+Ninguna. P1–P3 cerradas en la tabla de abajo.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -314,3 +307,6 @@ se retiran o se reescriben a los requisitos nuevos (`tasks.md`).
 | 2026-11-06 | ¿Hace falta E2E? | **Sí:** hay importes y movimientos de inventario (`CHECKPOINTS.md`). Un recorrido por Pedidos: alta de un pedido de dos recetas con precio; reabrirlo y ver avance y totales; cancelar una receta; añadir otra. Los E2E de pedidos que existen se adaptan a la pantalla nueva. |
 | 2026-11-06 | ¿Librería nueva? | **No.** Se reutilizan los patrones de la pantalla (`FormSheet`, `order-distribution-field.tsx`, filas de `recipe-lines-field.tsx`). |
 | 2026-11-06 | Pase `/design` | **Aprobado por el humano el 2026-11-06.** Tableros `docs/diseno/canvas/PedidosVariasRecetas.dc.html` (escritorio, interactivo: listado, detalle, editar y nuevo con sub-panel, selector de receta, cancelar receta, cancelar pedido y error por receta), `PedidosVariasRecetasTablet.dc.html` y `PedidosVariasRecetasMovil.dc.html` (teléfono y ficha). Están en el canvas del proyecto, página «3 · Pedidos». `design.md` los cita. |
+| 2026-11-06 | Campos planos de `OrderView` que copian la primera receta (P1, F1.4) | **Se borran en esta ficha** (`recipeId`, `recipeName`, `recipeVersion`, `recipeImageUrl`, `quantity`, `unitId`, `unitLabel`, `presentationLines`, `salePrice`, `ingredientsCost`, `packagingCost`, `actualCost`). T17 entra en el plan. |
+| 2026-11-06 | Guardar sin receta editable ni receta nueva (P2, F1.4) | **No hay regla «sin cambios» en la pantalla.** El servidor rechaza con `invalid_transition` y el panel muestra el mensaje del catálogo, como hoy. |
+| 2026-11-06 | Tablero frente a decisión en el listado (P3, F1.4) | **Manda la decisión escrita:** la columna se llama «Fórmula», el texto es «+N más» y se conserva la columna «Motivo de cancelación». |

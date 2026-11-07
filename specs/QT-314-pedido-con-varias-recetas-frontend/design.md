@@ -192,6 +192,12 @@ type OrderLineView = {
 primera receta: el `RecipeRef`, ya leído para todas, y las etiquetas de unidad, ya leídas en una sola
 llamada. No hay consulta nueva por receta. `OrderLineRow.originalRecipeId` ya existe.
 
+**Campos planos de `OrderView` (decisión P1).** Se borran `recipeId`, `recipeName`,
+`recipeVersion`, `recipeImageUrl`, `quantity`, `unitId`, `unitLabel`, `presentationLines`,
+`salePrice`, `ingredientsCost`, `packagingCost` y `actualCost`, y su relleno en `toOrderView` (T17,
+cuando la pantalla ya no los lee). `cancellationReason` del pedido se queda. Así R24 lo garantiza
+también el tipo, no solo los tests.
+
 ### 3.5 Entregas por receta (R33, R35)
 
 - `getOrderDelivery(orderId, lineId, actor)`. Bloquea por la receta, no por el pedido: busca la línea
@@ -266,7 +272,9 @@ Funciones, cada una con su test unitario:
   - **`order_would_block`**: el aviso ofrece «Guardar bloqueada», que reenvía el mismo candidato con
     `confirmBlocked: true` (R17). Sustituye en este panel a `BlockedOrderDialog`, que sigue en
     «Reparto y unidad».
-- `canSave` es falso mientras no haya ninguna receta no cancelada (R12).
+- `canSave` es falso mientras no haya ninguna receta no cancelada (R12). No hay otra regla de «sin
+  cambios» (decisión P2). Un rechazo sin posiciones, como `invalid_transition`, muestra el mensaje
+  del catálogo en el panel y conserva el borrador (R50).
 - Título y descripción, del tablero: «Nuevo pedido» / «Editar pedido 2026-…».
 
 ### 4.3 Sub-panel y aviso de error
@@ -307,7 +315,7 @@ detalle».
 
 | Columna | Hoy | Después |
 |---|---|---|
-| Fórmula | `order.recipeName` | `lines[0].recipeName` + «+N más», N = `lines.length - 1` (R20; P3 para el rótulo) |
+| Fórmula | `order.recipeName` | Rótulo «Fórmula»: `lines[0].recipeName` + «+N más», N = `lines.length - 1` (R20; decisión P3: manda la decisión escrita sobre el tablero) |
 | Avance | — | **Nueva**: `OrderProgress` corto «F de T» (R21) |
 | Presentación | reparto de la línea 0 | **Sale** (R23) |
 | Precio de venta | `salePrice` | `salePriceTotal` + «N sin precio» (R22) |
@@ -317,7 +325,8 @@ detalle».
 
 La tarjeta de teléfono se ajusta igual: título con la primera receta y «+N más», barra de avance, y
 pie con «Ver detalle» y «Acciones» (R44). El resto de columnas (Estado, Prioridad, Cliente, Por
-entregar, Fecha, Motivo de cancelación, Cobertura, Responsables) no cambia.
+entregar, Fecha, Motivo de cancelación, Cobertura, Responsables) no cambia. «Motivo de
+cancelación» se conserva aunque el tablero no la pinte (decisión P3).
 
 ### 4.6 Menú de la fila y selector
 

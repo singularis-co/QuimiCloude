@@ -138,9 +138,11 @@
     - precio y total (R13);
     - cotización con `orderLineId` (R14);
     - aviso con «receta N», fila marcada y «Guardar bloqueada» reenviando con `confirmBlocked`
-      (R17).
+      (R17);
+    - `invalid_transition` sin posiciones: mensaje del catálogo, panel abierto, borrador intacto,
+      «Guardar pedido» sin regla de «sin cambios» (R50).
     - Se reescriben `order-form*.test.tsx`.
-  - **Cubre:** R1–R8, R10–R14, R17, R44, R46.
+  - **Cubre:** R1–R8, R10–R14, R17, R44, R46, R50.
 - [ ] **T15** · frontend_dev · depende de T6, T8, T10, T11, T12, T13 — Listado, menú y cableado
   (design § 4.5, § 4.6):
   - `order-columns.tsx`, `order-table.tsx` (tarjeta), `order-row-actions.tsx` (tres grupos y
@@ -149,7 +151,7 @@
   - `isFinalOrderStatus` y los cuatro mapas por estado del pedido desaparecen;
   - reescribir a los requisitos nuevos los tests de QT-313 R54.
   - **Hecho:** tests de UI:
-    - «+N más» (R20);
+    - columna «Fórmula» con «+N más», y «Motivo de cancelación» presente (R20);
     - avance (R21);
     - totales y «N sin precio» (R22);
     - sin columna Presentación (R23);
@@ -174,8 +176,9 @@
 
 ## Tanda 4 — limpieza, E2E y cierre
 
-- [ ] **T17** · backend_dev · depende de T15, T16 · **solo si P1 = sí** — Se borran de `OrderView`
-  los campos planos de la primera receta y su relleno en `toOrderView`, y se ajustan sus tests.
+- [ ] **T17** · backend_dev · depende de T15, T16 — Se borran de `OrderView` los campos planos de
+  la primera receta y su relleno en `toOrderView`, y se ajustan sus tests (decisión P1, design
+  § 3.4).
   - **Hecho:** typecheck en verde sin que ningún archivo de `app/` lea esos campos, y Grep de
     `order.recipeName`, `order.quantity` y `order.presentationLines` sin resultados en
     `app/(private)/pedidos/`.
@@ -198,7 +201,7 @@
   - comprobación de que `package.json` no cambió;
   - el mapa `R<n> -> test` completo en `progress/impl_QT-314.md`, con la nota de qué tests de
     QT-313 R44 y R54 se retiraron.
-  - **Hecho:** `pnpm exec vitest run guard` en verde y las 49 filas del mapa.
+  - **Hecho:** `pnpm exec vitest run guard` en verde y las 50 filas del mapa.
   - **Cubre:** R43, R47, y la trazabilidad de todos.
 
 ## Archivos esperados
