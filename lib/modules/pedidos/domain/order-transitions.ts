@@ -57,6 +57,11 @@ export function isAllowedTransition(from: OrderStatus, to: OrderStatus): boolean
   return ALLOWED[from].includes(to);
 }
 
+/** Una linea admite cambios si puede quedarse en su estado. */
+export function isEditableOrderLineStatus(status: OrderLineStatus): boolean {
+  return status !== 'CANCELADO' && isAllowedTransition(status, status);
+}
+
 /**
  * Guardia de la edicion (R21, R22). Lanza `InvalidTransitionError` -`code`
  * `invalid_transition`- si el cambio pedido no esta permitido: un retroceso, un salto que la

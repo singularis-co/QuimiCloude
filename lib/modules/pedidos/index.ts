@@ -125,7 +125,14 @@ export type {
 
 /** La guardia de transiciones (R22). Se publica para que QC-35 pueda saber que estados ofrecer
  *  sin escribir una segunda tabla; la tabla sigue viviendo en un solo archivo. */
-export { assertTransition, isAllowedTransition } from './domain/order-transitions';
+export { assertTransition, isAllowedTransition, isEditableOrderLineStatus } from './domain/order-transitions';
+
+/** Las reglas que la pantalla anticipa, las mismas funciones que aplican los casos de uso. */
+export { isCancellableStatus } from './domain/order-cancellation';
+export { isRemovableOrderLineStatus } from './domain/order-line-removal';
+export { isDeletableOrder } from './domain/delete-order';
+export { sumDecimal4 } from './domain/order-totals';
+export { orderLineInputSchema } from './domain/order-input';
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.

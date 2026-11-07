@@ -11,13 +11,13 @@
 
 ## Tanda 1 — `lib/` sin romper la pantalla de hoy (backend_dev)
 
-- [ ] **T1** `[P]` · backend_dev — `OrderLineView` gana `originalRecipeId`, `recipeVersion`,
+- [x] **T1** `[P]` · backend_dev — `OrderLineView` gana `originalRecipeId`, `recipeVersion`,
   `recipeImageUrl` y `unitLabel`, que rellena `toOrderLineView` sin consultas nuevas (design § 3.4).
   - **Hecho:** test de `getOrder` y `listOrders` con un pedido de dos recetas (una original y una
     versión, con unidades distintas) que comprueba los cuatro campos de cada receta, y que el
     número de llamadas a los catálogos no cambia.
   - **Cubre:** R18, R30, R32, R39 (dato).
-- [ ] **T2** `[P]` · backend_dev — El contrato publica `isEditableOrderLineStatus`,
+- [x] **T2** `[P]` · backend_dev — El contrato publica `isEditableOrderLineStatus`,
   `isCancellableStatus`, `isRemovableOrderLineStatus`, `isDeletableOrder`, `sumDecimal4` y
   `orderLineInputSchema` (design § 3.6). `update-order.ts` y `delete-order.ts` usan los mismos
   predicados que publican, sin copias.

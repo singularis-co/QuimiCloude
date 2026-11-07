@@ -23,7 +23,7 @@ import { buildOrderRequirement } from './order-requirement';
 import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import { packagingLinesOfInput, resolveDistribution, type ResolvedDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
-import { isAllowedTransition } from './order-transitions';
+import { isEditableOrderLineStatus } from './order-transitions';
 import type { OrderLineRow } from './order-view';
 import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
@@ -81,9 +81,6 @@ type EditPlan = {
 /** Las referencias de receta que ya se pidieron al catalogo, para no repetir la lectura al volver
  *  a planear bajo el candado. */
 type RecipeRefs = Map<string, RecipeRef>;
-
-const EDITABLE_ACTIVE = (status: OrderLineStatus): boolean =>
-  status !== 'CANCELADO' && isAllowedTransition(status, status);
 
 /**
  * Edicion de pedido: reemplazo completo de sus lineas, su prioridad y su cliente.
@@ -330,7 +327,7 @@ async function planEdit(
     saved,
   );
 
-  if (diff.added.length === 0 && !saved.some((line) => EDITABLE_ACTIVE(line.status))) {
+  if (diff.added.length === 0 && !saved.some((line) => isEditableOrderLineStatus(line.status))) {
     throw new InvalidTransitionError('ninguna linea activa admite edicion');
   }
 
