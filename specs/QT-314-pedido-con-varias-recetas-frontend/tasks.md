@@ -54,39 +54,39 @@
 
 ## Tanda 2 — piezas nuevas de la pantalla, sin cablear todavía (frontend_dev)
 
-- [ ] **T6** `[P]` · frontend_dev — `RowActionsMenu` gana `groupLabel` por ítem, en `dropdown` y
+- [x] **T6** `[P]` · frontend_dev — `RowActionsMenu` gana `groupLabel` por ítem, en `dropdown` y
   `centered`. Se actualiza su fila de `CATALOGO.md`: punto de extensión, y el tablero en `Diseño`.
   - **Hecho:** test nuevo `tests/unit/shared-ui/row-actions-menu-group.test.tsx` (el rótulo sale
     antes del ítem, no es enfocable y combina con `separatorBefore`); los tests de
     `row-actions-menu-*` de hoy, sin cambios y en verde.
   - **Cubre:** R25.
-- [ ] **T7** `[P]` · frontend_dev — `Notice` gana `actions`. Se actualiza su fila de `CATALOGO.md`.
+- [x] **T7** `[P]` · frontend_dev — `Notice` gana `actions`. Se actualiza su fila de `CATALOGO.md`.
   - **Hecho:** test nuevo `tests/unit/shared-ui/notice-actions.test.tsx`; `notice.test.tsx` y
     `notice-dismiss.test.tsx`, sin cambios y en verde.
   - **Cubre:** R17, R46.
-- [ ] **T8** `[P]` · frontend_dev — `order-progress.tsx`: «F de T», con barra y forma larga «N de M
+- [x] **T8** `[P]` · frontend_dev — `order-progress.tsx`: «F de T», con barra y forma larga «N de M
   terminadas», y transición de ancho.
   - **Hecho:** test de las dos formas, del 0 de 0 y de un `aria-label` con el texto (la barra va
     `aria-hidden`).
   - **Cubre:** R18, R21, R46.
-- [ ] **T9** `[P]` · frontend_dev · depende de T1, T2 — `order-line-draft.ts` (design § 4.1):
+- [x] **T9** `[P]` · frontend_dev · depende de T1, T2 — `order-line-draft.ts` (design § 4.1):
   `draftFromOrder`, `candidateOf` (con `rowOfPosition`), `isSameRecipe`, `draftTotals`,
   `canRemove`, `isReadOnly`.
   - **Hecho:** test unitario de cada función, con canceladas, no editables, nuevas, una versión de
     la misma original y precios con 0 y vacíos.
   - **Cubre:** R7, R8, R10, R11, R12, R13.
-- [ ] **T10** `[P]` · frontend_dev · depende de T2 — `order-line-actions.ts`: `lineAcceptsAction`,
+- [x] **T10** `[P]` · frontend_dev · depende de T2 — `order-line-actions.ts`: `lineAcceptsAction`,
   `orderOffersLineAction` y sus motivos; `canEditOrder`, `canCancelOrder`, `canDeleteOrder` y
   `responsiblesFrozen` (design § 4.6).
   - **Hecho:** test con todos los estados de receta, y con pedidos `PARCIAL` que admiten y que no
     admiten cada acción.
   - **Cubre:** R9, R26, R27, R36, R37, R38.
-- [ ] **T11** `[P]` · frontend_dev · depende de T1, T8 — `order-detail-sheet.tsx` (design § 4.4).
+- [x] **T11** `[P]` · frontend_dev · depende de T1, T8 — `order-detail-sheet.tsx` (design § 4.4).
   - **Hecho:** test con un pedido `PARCIAL` de tres recetas (una cancelada con motivo, una
     terminada y una sin precio): todos los campos de R18, ningún control salvo «Editar», y
     «Editar» deshabilitado en `ENTREGADO`.
   - **Cubre:** R18, R19, R9.
-- [ ] **T12** `[P]` · frontend_dev · depende de T5, T10 — `order-line-picker-dialog.tsx` y
+- [x] **T12** `[P]` · frontend_dev · depende de T5, T10 — `order-line-picker-dialog.tsx` y
   `cancel-order-line-dialog.tsx`.
   - **Hecho:**
     - selector: todas las recetas, las deshabilitadas con su motivo, opciones de 52 px, y elegir
