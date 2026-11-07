@@ -45,7 +45,7 @@
     - `.int` `tests/integration/pedidos/order-delivery-by-line.int.test.ts` con un pedido de dos
       recetas contra la base.
   - **Cubre:** R33, R35.
-- [ ] **T5** · backend_dev · depende de T4 (mismo archivo) — `cancelOrderLineAction` en
+- [x] **T5** · backend_dev · depende de T4 (mismo archivo) — `cancelOrderLineAction` en
   `order-actions.ts` (design § 3.2).
   - **Hecho:** test contra dobles: éxito; `not_cancellable`; `invalid_input` por motivo vacío o de
     501 caracteres; `invalid_input` sin `id` o sin `lineId`, sin llamar al caso de uso;

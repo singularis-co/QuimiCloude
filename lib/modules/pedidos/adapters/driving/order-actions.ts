@@ -329,6 +329,42 @@ export async function cancelOrderAction(
   }
 }
 
+/** Copy provisional, en una constante para que ningun test dependa del literal. */
+const MISSING_LINE_ID_ERROR = 'Falta el identificador de la receta.';
+
+/**
+ * Cancelacion de UNA receta del pedido (QT-314 R29). `id`, `lineId` y el motivo viajan como
+ * campos ocultos del dialogo, el mismo patron que `cancelOrderAction`.
+ *
+ * El motivo se entrega TAL CUAL: lo valida `cancelOrderLineSchema` dentro de `cancelOrderLine`,
+ * despues de su comprobacion de `pedidos.modificar` (R42). Aqui solo se comprueba que el pedido y la
+ * receta vengan, porque sin ellos no hay a quien llamar.
+ */
+export async function cancelOrderLineAction(
+  prevState: OrderMutationFormState,
+  formData: FormData,
+): Promise<OrderMutationFormState> {
+  void prevState;
+
+  const id = readFormString(formData, 'id');
+  if (id === '') {
+    return { status: 'error', code: INVALID_INPUT_CODE, message: MISSING_ID_ERROR };
+  }
+  const lineId = readFormString(formData, 'lineId');
+  if (lineId === '') {
+    return { status: 'error', code: INVALID_INPUT_CODE, message: MISSING_LINE_ID_ERROR };
+  }
+
+  const actor = await currentActor();
+
+  try {
+    await pedidos.cancelOrderLine(id, lineId, { reason: readFormString(formData, 'reason') }, actor);
+    return { status: 'success' };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
 /** Borrado LOGICO del pedido (R31, R32, R33). El `id` viaja como campo oculto del formulario. */
 export async function deleteOrderAction(
   prevState: OrderMutationFormState,

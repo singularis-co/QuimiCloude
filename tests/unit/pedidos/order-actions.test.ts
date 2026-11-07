@@ -601,7 +601,8 @@ describe('Server Actions de pedidos — actor, forma de entrada y errores', () =
     // QC-223 2026-10-08: 15 y no 13, entran `getOrderDeliveryAction` y `deliverOrderAction`.
     // 2026-10-09: 17 y no 15, entran `listOrderDeliveriesAction` y `voidDeliveryAction`.
     // QC-288 2026-10-16: 22 y no 17, entran las cinco de la entrega sin pedido.
-    expect(catches.length).toBe(22)
+    // QT-314 T5: 23 y no 22, entra `cancelOrderLineAction`.
+    expect(catches.length).toBe(23)
     expect(source, 'hay un catch vacio').not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
   })
 })
@@ -905,6 +906,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
 
     expect(exportadas).toEqual([
       ['cancelOrderAction', 2],
+      // QT-314 T5: cancelar una receta, `FormData` con `id`, `lineId` y motivo.
+      ['cancelOrderLineAction', 2],
       ['createOrderAction', 2],
       ['deleteOrderAction', 2],
       // QC-288 2026-10-16: registrar una entrega sin pedido, argumento ya tipado.
@@ -949,6 +952,8 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       createOrderAction: 'prevState: CreateOrderFormState, formData: FormData',
       updateOrderAction: 'id: string, prevState: OrderMutationFormState, formData: FormData',
       cancelOrderAction: 'prevState: OrderMutationFormState, formData: FormData',
+      // QT-314 T5
+      cancelOrderLineAction: 'prevState: OrderMutationFormState, formData: FormData',
       deleteOrderAction: 'prevState: OrderMutationFormState, formData: FormData',
       getOrderAction: 'id: string',
       listOrdersAction: 'query: unknown',
