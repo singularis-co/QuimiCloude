@@ -228,7 +228,9 @@ export function createUpdateOrder(
         });
         // Una linea en curso tiene que seguir teniendo con que producirse.
         if (outcome.kind === 'insufficient' && status === 'EN_CURSO') {
-          throw new InsufficientMaterialError(`linea en la posicion ${String(line.planned.position)}`);
+          throw new InsufficientMaterialError(`linea en la posicion ${String(line.planned.position)}`).withLinePositions([
+            line.planned.position,
+          ]);
         }
         outcomes.push(outcome);
       }
@@ -238,7 +240,7 @@ export function createUpdateOrder(
       );
       // Lanzar deshace todo lo escrito: sin confirmacion no queda nada.
       if (blocked.length > 0 && !confirmBlocked) {
-        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`);
+        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`).withLinePositions(blocked);
       }
 
       for (const [index, { line, lineId, status }] of toSync.entries()) {

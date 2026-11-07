@@ -217,7 +217,7 @@ export function createCreateOrder(
       const blocked = outcomes.flatMap((outcome, position) => (outcome.kind === 'insufficient' ? [position] : []));
       // Lanzar deshace el pedido, sus lineas y lo apartado: sin confirmacion no queda nada.
       if (blocked.length > 0 && !confirmBlocked) {
-        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`);
+        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`).withLinePositions(blocked);
       }
 
       for (const [position, line] of written.entries()) {

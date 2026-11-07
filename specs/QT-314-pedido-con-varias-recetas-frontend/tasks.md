@@ -24,7 +24,7 @@
   - **Hecho:** test unitario por predicado, con todos los estados de `OrderLineStatus`, y test de
     que `updateOrder` y `deleteOrder` siguen rechazando lo mismo.
   - **Cubre:** R10, R11, R13, R36, R37.
-- [ ] **T3** · backend_dev · depende de T2 — Posiciones de las recetas que fallan como dato
+- [x] **T3** · backend_dev · depende de T2 — Posiciones de las recetas que fallan como dato
   (design § 3.3): `PedidosError.linePositions`, `atLinePosition`, `OrderWouldBlockError` del alta y
   de la edición, `InsufficientMaterialError` en una receta en curso, `assertNoDuplicateOrderRecipe`,
   y `linePositionsOf` publicado.
