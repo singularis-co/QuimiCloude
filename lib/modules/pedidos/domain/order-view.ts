@@ -229,8 +229,20 @@ export type OrderLineView = {
   readonly recipeId: string;
   /** El nombre mostrado; `null` si la receta no vuelve del catalogo. */
   readonly recipeName: string | null;
+  /** La original de `recipeId`; la misma si `recipeId` ya es una original. */
+  readonly originalRecipeId: string;
+  /** `null` si la receta es una original o no vuelve del catalogo. */
+  readonly recipeVersion: {
+    readonly originalId: string;
+    readonly originalName: string;
+    readonly versionName: string;
+  } | null;
+  /** La de la original si `recipeId` es una version; `null` = sin imagen o receta que no vuelve. */
+  readonly recipeImageUrl: string | null;
   readonly quantity: string;
   readonly unitId: string | null;
+  /** El simbolo de la unidad, o su nombre si no tiene simbolo; `null` cuando `unitId` es `null`. */
+  readonly unitLabel: string | null;
   readonly status: OrderLineStatus;
   readonly cancellationReason: string | null;
   readonly presentationLines: readonly OrderPresentationLineView[];
