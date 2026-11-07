@@ -18,6 +18,11 @@ export type NoticeProps = {
   readonly id?: string;
   /** Pinta un botón que oculta el aviso; `label` es su nombre accesible. */
   readonly dismissible?: { readonly label: string; readonly testId?: string };
+  /**
+   * Botones del aviso (p. ej. «Revisar receta», «Guardar bloqueada»): van en fila debajo del texto,
+   * dentro del cuerpo. Los pone quien lo usa, con sus textos y callbacks. Sin ella, el árbol no cambia.
+   */
+  readonly actions?: ReactNode;
 };
 
 const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly classes: string }>> = {
@@ -29,7 +34,16 @@ const TONES: Readonly<Record<NoticeTone, { readonly icon: LucideIcon; readonly c
 
 // Compone el Alert de shadcn: el layout del tablero (flex, gap 12, padding 12/14, radio 10)
 // sustituye al grid base vía tailwind-merge, y el role de Alert se sobrescribe por props.
-export function Notice({ tone, title, children, className, testId, id, dismissible }: NoticeProps) {
+export function Notice({
+  tone,
+  title,
+  children,
+  className,
+  testId,
+  id,
+  dismissible,
+  actions,
+}: NoticeProps) {
   const { icon: Icon, classes } = TONES[tone];
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
@@ -52,6 +66,11 @@ export function Notice({ tone, title, children, className, testId, id, dismissib
         {title !== undefined && <AlertTitle className="mb-0.5 font-semibold">{title}</AlertTitle>}
         {children !== undefined && (
           <AlertDescription className="text-current">{children}</AlertDescription>
+        )}
+        {actions !== undefined && (
+          <div className="mt-2 flex flex-wrap gap-2" data-slot="notice-actions">
+            {actions}
+          </div>
         )}
       </div>
       {dismissible !== undefined && (

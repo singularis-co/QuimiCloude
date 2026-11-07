@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, type ComponentType, type ReactNode } from 'react';
+import { Fragment, useId, useState, type ComponentType, type ReactNode } from 'react';
 
 import { EllipsisIcon, MoreVerticalIcon, XIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -10,7 +10,9 @@ import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from '
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -52,6 +54,11 @@ export type RowActionMenuItem = {
   readonly testId?: string;
   /** Línea divisoria delante de este ítem. En el primer ítem no se pinta. */
   readonly separatorBefore?: boolean;
+  /**
+   * Rótulo no interactivo delante de este ítem: abre un grupo (`role="group"` con nombre) que llega
+   * hasta el siguiente rótulo o la siguiente línea. Combina con `separatorBefore`: línea, rótulo, ítem.
+   */
+  readonly groupLabel?: string;
 } & (
   | { readonly onSelect: () => void; readonly href?: undefined }
   /** Item enlace: se pinta como `<a href>` y navega a esa ruta. */
@@ -83,6 +90,35 @@ const CLOSE_FALLBACK = 'Cerrar';
 function hasSeparatorBefore(item: RowActionMenuItem, index: number): boolean {
   return index > 0 && item.separatorBefore === true;
 }
+
+/** Tramo de ítems seguidos; con `label`, se pinta como grupo con su rótulo. */
+type ItemSegment = {
+  readonly key: string;
+  readonly label?: string;
+  readonly separator: boolean;
+  readonly items: readonly RowActionMenuItem[];
+};
+
+/**
+ * Parte la lista en tramos: empieza uno nuevo en cada rótulo y en cada línea. Sin `groupLabel` en
+ * ningún ítem, los tramos se pintan sin envoltorio y el árbol es el de siempre.
+ */
+function segmentItems(items: readonly RowActionMenuItem[]): ItemSegment[] {
+  const segments: { key: string; label?: string; separator: boolean; items: RowActionMenuItem[] }[] = [];
+  items.forEach((item, index) => {
+    const separator = hasSeparatorBefore(item, index);
+    const current = segments.at(-1);
+    if (current === undefined || separator || item.groupLabel !== undefined) {
+      segments.push({ key: item.key, label: item.groupLabel, separator, items: [item] });
+    } else {
+      current.items.push(item);
+    }
+  });
+  return segments;
+}
+
+/** Rótulo del tablero (`.cap`): 12 px, color apagado, padding 4/10. */
+const GROUP_LABEL_CLASS = 'px-2.5 py-1 text-xs leading-normal font-normal text-muted-foreground';
 
 const CENTERED_ITEM_CLASS = 'min-h-12 w-full justify-start gap-3 px-3 text-base font-normal';
 
@@ -130,29 +166,43 @@ export function RowActionsMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent side="bottom" align="end" className={`min-w-[200px] ${CONTENT_PADDING}`}>
-        {items.map((item, index) => {
-          const Icon = item.icon;
+        {segmentItems(items).map((segment) => {
+          const rendered = segment.items.map((item) => <DropdownRowItem key={item.key} item={item} />);
           return (
-            <Fragment key={item.key}>
-              {hasSeparatorBefore(item, index) ? <DropdownMenuSeparator /> : null}
-              <DropdownMenuItem
-                variant={item.destructive ? 'destructive' : 'default'}
-                disabled={item.disabled}
-                data-testid={item.testId}
-                className={ITEM_TOUCH_TARGET}
-                render={item.href === undefined ? undefined : <Link href={item.href} />}
-                // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
-                // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
-                onClick={item.onSelect}
-              >
-                <Icon aria-hidden="true" />
-                {item.label}
-              </DropdownMenuItem>
+            <Fragment key={segment.key}>
+              {segment.separator ? <DropdownMenuSeparator /> : null}
+              {segment.label === undefined ? (
+                rendered
+              ) : (
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className={GROUP_LABEL_CLASS}>{segment.label}</DropdownMenuLabel>
+                  {rendered}
+                </DropdownMenuGroup>
+              )}
             </Fragment>
           );
         })}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+function DropdownRowItem({ item }: { readonly item: RowActionMenuItem }) {
+  const Icon = item.icon;
+  return (
+    <DropdownMenuItem
+      variant={item.destructive ? 'destructive' : 'default'}
+      disabled={item.disabled}
+      data-testid={item.testId}
+      className={ITEM_TOUCH_TARGET}
+      render={item.href === undefined ? undefined : <Link href={item.href} />}
+      // El primitivo de Base UI (`components/ui/dropdown-menu.tsx`) expone `onClick`, no
+      // `onSelect`: aqui se traduce el callback semantico del item a ese evento.
+      onClick={item.onSelect}
+    >
+      <Icon aria-hidden="true" />
+      {item.label}
+    </DropdownMenuItem>
   );
 }
 
@@ -165,6 +215,7 @@ function CenteredRowActions({
   texts,
 }: Omit<RowActionsMenuProps, 'presentation'>) {
   const [open, setOpen] = useState(false);
+  const labelIdPrefix = useId();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -206,56 +257,72 @@ function CenteredRowActions({
         </div>
 
         <div className="flex flex-col">
-          {items.map((item, index) => {
-            const Icon = item.icon;
-            const separator = hasSeparatorBefore(item, index) ? (
-              <Separator className="my-1" />
-            ) : null;
-            const select = () => {
-              item.onSelect?.();
-              setOpen(false);
-            };
-            const className = cn(
-              CENTERED_ITEM_CLASS,
-              item.destructive && 'text-destructive hover:text-destructive',
-            );
-
-            if (item.href !== undefined && item.disabled !== true) {
-              return (
-                <Fragment key={item.key}>
-                  {separator}
-                  <Link
-                    href={item.href}
-                    data-testid={item.testId}
-                    className={cn(buttonVariants({ variant: 'ghost' }), className)}
-                    onClick={select}
-                  >
-                    <Icon aria-hidden="true" />
-                    {item.label}
-                  </Link>
-                </Fragment>
-              );
-            }
-
+          {segmentItems(items).map((segment) => {
+            const rendered = segment.items.map((item) => (
+              <CenteredRowItem key={item.key} item={item} onDone={() => setOpen(false)} />
+            ));
+            const labelId = `${labelIdPrefix}-${segment.key}`;
             return (
-              <Fragment key={item.key}>
-                {separator}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={item.disabled}
-                  data-testid={item.testId}
-                  className={className}
-                  onClick={select}
-                >
-                  <Icon aria-hidden="true" />
-                  {item.label}
-                </Button>
+              <Fragment key={segment.key}>
+                {segment.separator ? <Separator className="my-1" /> : null}
+                {segment.label === undefined ? (
+                  rendered
+                ) : (
+                  <div role="group" aria-labelledby={labelId} className="flex flex-col">
+                    <div id={labelId} className={GROUP_LABEL_CLASS}>
+                      {segment.label}
+                    </div>
+                    {rendered}
+                  </div>
+                )}
               </Fragment>
             );
           })}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CenteredRowItem({
+  item,
+  onDone,
+}: {
+  readonly item: RowActionMenuItem;
+  readonly onDone: () => void;
+}) {
+  const Icon = item.icon;
+  const select = () => {
+    item.onSelect?.();
+    onDone();
+  };
+  const className = cn(CENTERED_ITEM_CLASS, item.destructive && 'text-destructive hover:text-destructive');
+
+  if (item.href !== undefined && item.disabled !== true) {
+    return (
+      <Link
+        href={item.href}
+        data-testid={item.testId}
+        className={cn(buttonVariants({ variant: 'ghost' }), className)}
+        onClick={select}
+      >
+        <Icon aria-hidden="true" />
+        {item.label}
+      </Link>
+    );
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      disabled={item.disabled}
+      data-testid={item.testId}
+      className={className}
+      onClick={select}
+    >
+      <Icon aria-hidden="true" />
+      {item.label}
+    </Button>
   );
 }
