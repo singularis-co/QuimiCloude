@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedidos con varias recetas</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="pedidos" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+          <button class="tb-btn" type="button" aria-label="Cerrar sesión"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path></svg><span class="tip">Cerrar sesión</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <div class="ph">
+          <div class="ph-t"><h1 class="h1">Pedidos</h1></div>
+          <div class="ph-act" style="display: flex; gap: 8px"><button class="b b-pri b-touch-m" type="button" onClick="{{ openNew }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo pedido</button></div>
+        </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Filtros de pedidos">
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Buscar por receta" aria-label="Buscar por receta"></label>
+          <label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input class="in" type="search" placeholder="Filtrar por cliente" aria-label="Filtrar por cliente"></label>
+          <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Estado</button>
+          <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Prioridad</button>
+          <button class="chip" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4"></path></svg>Fecha de solicitud</button>
+        </div>
+
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Nº de pedido</th><th scope="col">Estado</th><th scope="col">Prioridad</th><th scope="col">Recetas</th><th scope="col">Avance</th><th scope="col">Cliente</th><th scope="col">Por entregar</th><th scope="col" class="num">Fecha de solicitud</th><th scope="col">Cobertura</th><th scope="col">Responsables</th><th scope="col" class="num">Precio de venta</th><th scope="col" class="num">Costo estimado</th><th scope="col" class="num">Costo real</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody>
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+                  <tr>
+                    <td class="mono"><button class="b b-lnk" type="button" onClick="{{ r.openDetail }}" aria-label="{{ r.detailLabel }}">{{ r.no }}</button></td>
+                    <td><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></td>
+                    <td><span class="{{ r.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ r.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ r.o3 }}"></rect></svg>{{ r.pr }}</span></td>
+                    <td><span class="strong">{{ r.first }}</span><sc-if value="{{ r.hasMore }}" hint-placeholder-val="{{ true }}"> <span class="count">{{ r.more }}</span></sc-if></td>
+                    <td><span style="display: flex; flex-direction: column; gap: 4px; min-width: 84px"><span class="mono" style="font-size: 13px">{{ r.prog }}</span><span class="progress" aria-hidden="true"><i style="{{ r.progW }}"></i></span></span></td>
+                    <td>{{ r.cli }}</td>
+                    <td>{{ r.pend }}</td>
+                    <td class="num mono">{{ r.date }}</td>
+                    <td><span class="{{ r.covCls }}"><i></i>{{ r.cov }}</span></td>
+                    <td><span class="avs"><span class="av sm">LG</span><span class="av sm c2">MS</span></span></td>
+                    <td class="num"><span class="mono">{{ r.price }}</span><sc-if value="{{ r.hasNoPrice }}" hint-placeholder-val="{{ false }}"><span class="cap" style="display: block">{{ r.noPrice }}</span></sc-if></td>
+                    <td class="num mono">{{ r.cost }}</td>
+                    <td class="num mono">{{ r.real }}</td>
+                    <td class="rowact anchor">
+                      <button class="b b-gho b-ico" type="button" aria-label="{{ r.menuLabel }}" aria-haspopup="menu" aria-expanded="{{ r.open }}" onClick="{{ r.toggle }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M12 5h.01M12 12h.01M12 19h.01"></path></svg></button>
+                      <div class="{{ r.menuCls }}" role="menu">
+                        <button class="mi" type="button" role="menuitem" onClick="{{ r.openDetail }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path></svg>Ver detalle</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ openEdit }}" disabled="{{ r.editOff }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>Editar</button>
+                        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path></svg>Responsables</button>
+                        <button class="mi" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 18c1-2 3-3 5-3s4 1 5 3"></path></svg>Cliente</button>
+                        <div class="sep"></div>
+                        <span class="cap" style="padding: 4px 10px">Por receta</span>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ pickRep }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8v8H3zM13 13h8v8h-8zM8 3h8v8H8z"></path></svg>Reparto y unidad…</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ pickDeliver }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7"></path></svg>Entregar…</button>
+                        <button class="mi" type="button" role="menuitem" onClick="{{ pickDeliveries }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>Entregas…</button>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ pickCancel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Cancelar receta…</button>
+                        <div class="sep"></div>
+                        <span class="cap" style="padding: 4px 10px">Pedido entero</span>
+                        <button class="mi danger" type="button" role="menuitem" onClick="{{ openCancelOrder }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg>Cancelar pedido</button>
+                        <button class="mi danger" type="button" role="menuitem"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"></path></svg>Eliminar</button>
+                      </div>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ rows }}" as="r" hint-placeholder-count="5">
+                <div class="rm">
+                  <div class="rm-top"><span class="mono strong">{{ r.no }}</span><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></div>
+                  <span><span class="strong">{{ r.first }}</span><sc-if value="{{ r.hasMore }}" hint-placeholder-val="{{ true }}"> <span class="count">{{ r.more }}</span></sc-if></span>
+                  <div style="display: flex; align-items: center; gap: 10px"><span class="progress" aria-hidden="true" style="flex: 1"><i style="{{ r.progW }}"></i></span><span class="mono" style="font-size: 13px">{{ r.prog }}</span></div>
+                  <div class="rm-meta"><span>{{ r.cli }}</span><span class="mono">{{ r.price }}</span><span class="mono">{{ r.date }}</span></div>
+                  <div class="rm-top"><button class="b b-out b-sm" type="button" onClick="{{ r.openDetail }}">Ver detalle</button><button class="b b-out b-sm" type="button" onClick="{{ r.mobileActs }}" aria-label="{{ r.menuLabel }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width: 3"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg>Acciones</button></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="pg"><span>6 de 6 pedidos</span><span class="pgb"><button class="b b-out b-ico b-sm" type="button" aria-label="Página anterior" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><button class="b b-out b-ico b-sm" type="button" aria-label="Página siguiente" disabled><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="pedidos" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <aside class="{{ detailCls }}" role="dialog" aria-modal="true" aria-labelledby="pv-dt">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pv-dt" class="h2">Pedido <span class="mono">{{ cur.no }}</span></h2><p class="sub">{{ cur.cli }} · solicitado el <span class="mono">{{ cur.date }}</span></p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <section class="card" aria-label="Resumen del pedido" style="padding: 16px; gap: 12px">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px"><span class="{{ cur.stCls }}"><i></i>{{ cur.st }}</span><span class="{{ cur.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ cur.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ cur.o3 }}"></rect></svg>{{ cur.pr }}</span></div>
+        <div style="display: flex; flex-direction: column; gap: 6px"><div style="display: flex; justify-content: space-between"><span class="h3">Avance</span><span class="mono">{{ cur.progLong }}</span></div><span class="progress" aria-hidden="true"><i style="{{ cur.progW }}"></i></span></div>
+        <dl class="spec" style="font-size: 13px">
+          <dt>Precio de venta</dt><dd><span class="mono">{{ cur.price }}</span> <span class="cap">{{ cur.noPrice }}</span></dd>
+          <dt>Costo estimado</dt><dd class="mono">{{ cur.cost }}</dd>
+          <dt>Costo real</dt><dd class="mono">{{ cur.real }}</dd>
+          <dt>Responsables</dt><dd><span class="avs"><span class="av sm">LG</span><span class="av sm c2">MS</span></span></dd>
+        </dl>
+      </section>
+      <span class="h3">Recetas</span>
+      <sc-for list="{{ cur.lines }}" as="l" hint-placeholder-count="4">
+        <section class="card" style="padding: 14px 16px; gap: 8px">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px"><span class="strong">{{ l.name }}</span><span class="{{ l.stCls }}"><i></i>{{ l.st }}</span></div>
+          <dl class="spec" style="font-size: 13px">
+            <dt>Cantidad</dt><dd class="mono">{{ l.qty }}</dd>
+            <dt>Reparto</dt><dd>{{ l.split }}</dd>
+            <dt>Precio</dt><dd class="mono">{{ l.price }}</dd>
+            <dt>Costo</dt><dd class="mono">{{ l.cost }}</dd>
+          </dl>
+          <sc-if value="{{ l.hasReason }}" hint-placeholder-val="{{ false }}"><span class="cap">Motivo de cancelación: {{ l.reason }}</span></sc-if>
+        </section>
+      </sc-for>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cerrar</button><button class="b b-pri" type="button" onClick="{{ openEdit }}" disabled="{{ cur.editOff }}">Editar</button></div>
+  </aside>
+
+  <aside class="{{ sheetCls }}" role="dialog" aria-modal="true" aria-labelledby="pv-sh">
+    <div class="sheet-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pv-sh" class="h2">{{ sheetTitle }}</h2><p class="sub">{{ sheetDesc }}</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="sheet-bd">
+      <sc-if value="{{ showErr }}" hint-placeholder-val="{{ false }}">
+        <div class="nt n-d enter" role="alert"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><div><b>No alcanza el material para Suavizante (receta 4).</b>Falta fragancia lavanda. Puedes guardarla bloqueada: el resto de recetas apartan su material igual.<div style="display: flex; gap: 8px; margin-top: 8px"><button class="b b-out b-sm" type="button" onClick="{{ hideErr }}">Revisar receta</button><button class="b b-des b-sm" type="button" onClick="{{ saveBlocked }}">Guardar bloqueada</button></div></div></div>
+      </sc-if>
+      <div class="g2">
+        <div class="f"><label for="pv-c">Cliente</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pv-c" class="in" type="text" value="{{ formCli }}" placeholder="Busca un cliente por su nombre"></label></div>
+        <div class="f"><label for="pv-p">Prioridad</label><button id="pv-p" class="in trig" type="button"><span>Alta</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between"><span class="h3">Recetas <span class="count">{{ formCount }}</span></span><button class="b b-out b-sm" type="button" onClick="{{ addLine }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Añadir receta</button></div>
+      <sc-if value="{{ formEmpty }}" hint-placeholder-val="{{ false }}">
+        <div class="drop row"><span class="thumb lg"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span><span class="sub">El pedido aún no tiene recetas. Añade al menos una.</span></div>
+      </sc-if>
+      <sc-if value="{{ formHasLines }}" hint-placeholder-val="{{ true }}">
+        <div class="tw">
+          <div class="scroll">
+            <table class="collapse">
+              <thead><tr><th scope="col">Receta</th><th scope="col" class="num">Cantidad</th><th scope="col" class="num">Precio</th><th scope="col">Estado</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+              <tbody>
+                <sc-for list="{{ formLines }}" as="l" hint-placeholder-count="5">
+                  <tr style="{{ l.rowStyle }}">
+                    <td><span style="display: flex; flex-direction: column; gap: 2px"><span class="strong">{{ l.name }}</span><span class="cap">{{ l.split }}</span></span></td>
+                    <td class="num mono">{{ l.qty }}</td>
+                    <td class="num mono">{{ l.price }}</td>
+                    <td><span class="{{ l.stCls }}"><i></i>{{ l.st }}</span></td>
+                    <td class="rowact"><sc-if value="{{ l.editable }}" hint-placeholder-val="{{ true }}"><button class="b b-gho b-ico" type="button" aria-label="{{ l.editLabel }}" onClick="{{ l.edit }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button></sc-if><sc-if value="{{ l.locked }}" hint-placeholder-val="{{ false }}"><span class="cap" title="Solo lectura">Solo lectura</span></sc-if></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <div class="rows-m">
+              <sc-for list="{{ formLines }}" as="l" hint-placeholder-count="4">
+                <div class="rm" style="{{ l.rowStyle }}">
+                  <div class="rm-top"><span class="strong">{{ l.name }}</span><span class="{{ l.stCls }}"><i></i>{{ l.st }}</span></div>
+                  <div class="rm-meta"><span class="mono">{{ l.qty }}</span><span class="mono">{{ l.price }}</span><span>{{ l.split }}</span></div>
+                  <sc-if value="{{ l.editable }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-sm" type="button" onClick="{{ l.edit }}">Editar receta</button></sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div class="lbox"><div class="lrow"><span>Total <span class="cap">{{ formNoPrice }}</span></span><span class="mono strong">{{ formTotal }}</span></div><div class="lrow"><span>Costo estimado</span><span class="mono">{{ formCost }}</span></div></div>
+      </sc-if>
+    </div>
+    <div class="sheet-ft"><button class="b b-out" type="button" onClick="{{ closeAll }}">Cancelar</button><button class="b b-pri" type="button" onClick="{{ save }}" disabled="{{ formEmpty }}">Guardar pedido</button></div>
+  </aside>
+
+  <aside class="{{ subCls }}" role="dialog" aria-modal="true" aria-labelledby="pv-sub">
+    <div class="sheet-hd"><div style="display: flex; align-items: flex-start; gap: 8px"><button class="xbtn" type="button" aria-label="Volver al pedido" onClick="{{ closeSub }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pv-sub" class="h2">{{ subTitle }}</h2><p class="sub">Los cambios se guardan con «Guardar pedido».</p></div></div></div>
+    <div class="sheet-bd">
+      <div class="drop row"><span class="thumb lg photo" role="img" aria-label="Imagen de la receta"></span><span class="sub">{{ subName }}</span></div>
+      <div class="f"><label for="pv-r">Receta</label><label class="wrap-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5"></path></svg><input id="pv-r" class="in" type="text" value="{{ subName }}" placeholder="Busca una receta por su nombre"></label><span class="help">Una receta, o una de sus versiones, solo puede estar una vez en el pedido.</span></div>
+      <div class="f"><label for="pv-v">Versión</label><button id="pv-v" class="in trig" type="button"><span>Original</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 10px"><div class="f"><label for="pv-q">Cantidad</label><input id="pv-q" class="in mono num" type="text" value="{{ subQty }}"></div><div class="f"><label for="pv-u">Unidad</label><button id="pv-u" class="in trig" type="button"><span>L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div></div>
+      <div class="card" style="padding: 16px; gap: 10px"><span class="h3">Reparto en envases</span><div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px; align-items: end"><div class="f"><label>Envase</label><button class="in trig" type="button"><span>Garrafa 5 L</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></div><div class="f"><label>Cantidad</label><input class="in mono num" type="text" value="10"></div><button class="b b-out" type="button" style="height: 40px">Añadir</button></div><span class="cap">Disponible <span class="mono">24</span> · Cubre <span class="mono">50,00 L</span></span></div>
+      <div class="f"><label for="pv-pr">Precio de venta</label><input id="pv-pr" class="in mono num" type="text" value="{{ subPrice }}" placeholder="Sin precio"><span class="help">Vacío es «sin precio»; 0 es un regalo.</span></div>
+      <div class="card" style="padding: 16px; gap: 8px"><div style="display: flex; justify-content: space-between"><span class="h3">Cotización</span><span class="sb t-success"><i></i>Material disponible</span></div><span class="cap">Costo estimado <span class="mono">36,20</span> · ingredientes <span class="mono">31,40</span> · envases <span class="mono">4,80</span></span><button class="b b-lnk" type="button" style="align-self: flex-start">Ver insumos (6)</button></div>
+    </div>
+    <div class="sheet-ft"><sc-if value="{{ subRemovable }}" hint-placeholder-val="{{ true }}"><button class="b b-gho" type="button" style="margin-right: auto; color: var(--d-fg)" onClick="{{ removeLine }}">Quitar receta</button></sc-if><button class="b b-out" type="button" onClick="{{ closeSub }}">Descartar</button><button class="b b-pri" type="button" onClick="{{ applySub }}">Aplicar</button></div>
+  </aside>
+
+  <div class="{{ pickCls }}" role="dialog" aria-modal="true" aria-labelledby="pv-pk">
+    <div class="dlg-hd"><div style="display: flex; flex-direction: column; gap: 4px"><h2 id="pv-pk" class="h2">{{ pickTitle }}</h2><p class="sub">Pedido <span class="mono">{{ cur.no }}</span>. Elige la receta.</p></div><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <div class="lbox" role="listbox" aria-label="Recetas del pedido">
+      <sc-for list="{{ pickLines }}" as="l" hint-placeholder-count="4">
+        <button class="opt" type="button" role="option" aria-disabled="{{ l.offStr }}" disabled="{{ l.off }}" onClick="{{ l.go }}" style="min-height: 52px; justify-content: space-between"><span style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px"><span class="strong">{{ l.name }}</span><span class="cap">{{ l.why }}</span></span><span class="{{ l.stCls }}"><i></i>{{ l.st }}</span></button>
+      </sc-for>
+    </div>
+    <span class="cap">{{ pickHelp }}</span>
+  </div>
+
+  <div class="{{ cancelLineCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pv-cl">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+    <h2 id="pv-cl" class="h2">Cancelar la receta</h2>
+    <p class="sub">Se va a cancelar <span class="strong">{{ pickedName }}</span> del pedido <span class="mono">{{ cur.no }}</span> y se libera su material. Las demás recetas siguen igual.</p>
+    <div class="f"><label for="pv-m">Motivo de la cancelación</label><textarea id="pv-m" class="in" rows="3"></textarea><span class="help">Entre 1 y 500 caracteres.</span></div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ doCancelLine }}">Cancelar la receta</button></div>
+  </div>
+
+  <div class="{{ cancelOrderCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pv-co">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+    <h2 id="pv-co" class="h2">Cancelar el pedido</h2>
+    <p class="sub">Se cancelan las recetas que aún no se fabricaron: <span class="strong">Desengrasante, Jabón líquido y Suavizante</span>. <span class="strong">Hipoclorito 5 %</span> ya está terminada y se queda como está.</p>
+    <div class="f"><label for="pv-mo">Motivo de la cancelación</label><textarea id="pv-mo" class="in" rows="3"></textarea></div>
+    <div class="actions"><button class="b b-out" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des" type="button" onClick="{{ doCancelOrder }}">Cancelar el pedido</button></div>
+  </div>
+
+  <div class="{{ actsCls }}" role="menu" aria-label="Acciones del pedido">
+    <div class="dlg-hd" style="padding: 0 4px 8px"><span class="h3">Pedido <span class="mono">{{ cur.no }}</span></span><button class="xbtn" type="button" aria-label="Cerrar" onClick="{{ closeAll }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openDetailCur }}">Ver detalle</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ openEdit }}">Editar</button>
+    <button class="mi" type="button" role="menuitem">Responsables</button>
+    <button class="mi" type="button" role="menuitem">Cliente</button>
+    <div class="sep"></div>
+    <button class="mi" type="button" role="menuitem" onClick="{{ pickRep }}">Reparto y unidad…</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ pickDeliver }}">Entregar…</button>
+    <button class="mi" type="button" role="menuitem" onClick="{{ pickDeliveries }}">Entregas…</button>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ pickCancel }}">Cancelar receta…</button>
+    <div class="sep"></div>
+    <button class="mi danger" type="button" role="menuitem" onClick="{{ openCancelOrder }}">Cancelar pedido</button>
+    <button class="mi danger" type="button" role="menuitem">Eliminar</button>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const ST = { PENDIENTE: ['Pendiente', 'neutral'], EN_CURSO: ['En fabricación', 'progress'], POR_EMPACAR: ['Por empacar', 'waiting'], TERMINADO: ['Terminado', 'success'], ENTREGADO: ['Entregado', 'success'], BLOQUEADO: ['Bloqueado', 'danger'], CANCELADO: ['Cancelado', 'muted'], PARCIAL: ['Parcial', 'progress'] };
+const L = (name, st, qty, split, price, cost, reason) => ({ name, st, qty, split, price, cost, reason: reason || '' });
+const orders = [
+{ no: '2026-0001042', st: 'PARCIAL', pr: 'Alta', lvl: 3, cli: 'Lavandería Sol', date: '02/11/2026', cov: 'Sin cobertura completa', covT: 'waiting', pend: '10 bidón 20 L', price: '435,00', noPrice: '1 sin precio', cost: 'Sin calcular', real: '—', lines: [
+L('Hipoclorito 5 %', 'TERMINADO', '200,00 L', '10 × bidón 20 L', '180,00', '92,10'),
+L('Desengrasante alcalino', 'PENDIENTE', '50,00 L', '10 × garrafa 5 L', '65,00', '~36,20'),
+L('Jabón líquido', 'EN_CURSO', '120,00 L', '24 × garrafa 5 L', '140,00', '~71,40'),
+L('Suavizante lavanda', 'BLOQUEADO', '80,00 L', 'Sin reparto', 'Sin precio', '—'),
+L('Cloro gel', 'CANCELADO', '40,00 L', '—', '50,00', 'No suma', 'El cliente lo pidió por otro canal.')
+] },
+{ no: '2026-0001043', st: 'PENDIENTE', pr: 'Media', lvl: 2, cli: 'Hotel Andino', date: '03/11/2026', cov: 'Apartado', covT: 'success', pend: '—', price: '—', noPrice: '', cost: '~48,00', real: '—', lines: [
+L('Desengrasante alcalino', 'PENDIENTE', '60,00 kg', '3 × garrafa 20 L', 'Sin precio', '~48,00')
+] },
+{ no: '2026-0001044', st: 'TERMINADO', pr: 'Baja', lvl: 1, cli: 'Clínica Norte', date: '28/10/2026', cov: 'Apartado', covT: 'success', pend: '8 garrafa 5 L', price: '410,00', noPrice: '', cost: '212,40', real: '219,80', lines: [
+L('Jabón líquido', 'TERMINADO', '40,00 L', '8 × garrafa 5 L', '120,00', '71,40'),
+L('Limpiador multiusos limón', 'TERMINADO', '80,50 kg', '21 × galón 3,78 L', '170,00', '88,20'),
+L('Blanqueador 5 %', 'ENTREGADO', '60,00 L', '3 × bidón 20 L', '120,00', '52,80')
+] },
+{ no: '2026-0001045', st: 'EN_CURSO', pr: 'Crítica', lvl: 4, cli: 'Mateo Sánchez', date: '04/11/2026', cov: 'Apartado', covT: 'success', pend: '—', price: '260,00', noPrice: '', cost: '~150,30', real: '—', lines: [
+L('Desengrasante alcalino', 'EN_CURSO', '120,00 kg', '6 × garrafa 20 L', '160,00', '~98,10'),
+L('Limpiador cítrico', 'EN_CURSO', '25,00 kg', '7 × galón 3,78 L', '100,00', '~52,20')
+] },
+{ no: '2026-0001046', st: 'POR_EMPACAR', pr: 'Alta', lvl: 3, cli: 'Valentina Herrera', date: '05/11/2026', cov: 'Apartado', covT: 'success', pend: '—', price: '90,00', noPrice: '', cost: '~44,00', real: '—', lines: [
+L('Limpiador multiusos limón', 'POR_EMPACAR', '45,00 kg', '12 × galón 3,78 L', '90,00', '~44,00')
+] },
+{ no: '2026-0001039', st: 'CANCELADO', pr: 'Media', lvl: 2, cli: 'Santiago Vargas', date: '29/10/2026', cov: 'Sin apartar', covT: 'neutral', pend: '—', price: '—', noPrice: '', cost: '—', real: '—', lines: [
+L('Blanqueador 5 %', 'CANCELADO', '150,00 L', '—', '200,00', 'No suma', 'El cliente retiró el pedido.'),
+L('Cloro gel', 'CANCELADO', '30,00 L', '—', '45,00', 'No suma', 'El cliente retiró el pedido.')
+] }
+];
+const active = (o) => o.lines.filter((l) => l.st !== 'CANCELADO');
+const done = (o) => active(o).filter((l) => l.st === 'TERMINADO' || l.st === 'ENTREGADO').length;
+const pct = (o) => active(o).length ? Math.round(100 * done(o) / active(o).length) : 0;
+const pm = (lvl) => ({ pmCls: lvl === 4 ? 'pm crit' : 'pm', o2: lvl >= 2 ? '1' : '0.2', o3: lvl >= 3 ? '1' : '0.2' });
+const editOff = (o) => o.st === 'ENTREGADO' || o.st === 'CANCELADO';
+const curOrder = orders.find((o) => o.no === s.cur) || orders[0];
+const view = (o) => Object.assign({ no: o.no, st: ST[o.st][0], stCls: 'sb t-' + ST[o.st][1], pr: o.pr, cli: o.cli, date: o.date, price: o.price, noPrice: o.noPrice, cost: o.cost, real: o.real, editOff: editOff(o), progLong: done(o) + ' de ' + active(o).length + ' terminadas', progW: 'width: ' + pct(o) + '%', lines: o.lines.map((l) => ({ name: l.name, st: ST[l.st][0], stCls: 'sb t-' + ST[l.st][1], qty: l.qty, split: l.split, price: l.price, cost: l.cost, reason: l.reason, hasReason: !!l.reason })) }, pm(o.lvl));
+const toast = (text, extra) => { this.setState(Object.assign({ sheet: null, sub: null, dlg: null, acts: null, open: null, err: false, toast: text }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
+const open = s.open;
+const ACTION = {
+rep: { title: 'Reparto y unidad', help: 'Solo las recetas Por empacar admiten cambiar el reparto y la unidad.', ok: (l) => l.st === 'POR_EMPACAR', why: 'Solo Por empacar' },
+deliver: { title: 'Entregar', help: 'Se entrega lo de las recetas terminadas, aunque el pedido siga Parcial.', ok: (l) => l.st === 'TERMINADO', why: 'Aún no está terminada' },
+deliveries: { title: 'Entregas', help: 'Ver o anular las entregas de una receta.', ok: (l) => l.st === 'TERMINADO' || l.st === 'ENTREGADO', why: 'Sin entregas' },
+cancel: { title: 'Cancelar receta', help: 'Se puede cancelar una receta Pendiente, En fabricación o Bloqueada.', ok: (l) => ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'].includes(l.st), why: 'No se puede cancelar en este estado' }
+};
+const act = ACTION[s.pick] || ACTION.cancel;
+const pickFor = (kind) => () => this.setState({ dlg: 'pick', pick: kind, cur: open || s.cur || orders[0].no, open: null, acts: null });
+const isNew = s.sheet === 'new';
+const baseLines = isNew ? (s.added ? [L('Desengrasante alcalino', 'PENDIENTE', '50,00 L', '10 × garrafa 5 L', '65,00', '~36,20')] : []) : curOrder.lines.concat(s.added ? [L('Desinfectante amonio', 'PENDIENTE', '30,00 L', '6 × garrafa 5 L', '75,00', '~29,10')] : []);
+const editableSt = ['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'];
+const formLines = baseLines.map((l, i) => {
+const editable = editableSt.includes(l.st);
+const bad = s.err && l.st === 'BLOQUEADO';
+return { name: l.name, st: ST[l.st][0], stCls: 'sb t-' + ST[l.st][1], qty: l.qty, price: l.price, split: l.split, editable, locked: !editable, editLabel: 'Editar ' + l.name, rowStyle: bad ? 'box-shadow: inset 3px 0 0 var(--d-fg); background: var(--d-bg)' : '', edit: () => this.setState({ sub: { name: l.name, qty: l.qty.split(' ')[0], price: l.price === 'Sin precio' ? '' : l.price, removable: l.st === 'PENDIENTE' || l.st === 'BLOQUEADO', isNew: false } }) };
+});
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+menuStr: s.menu ? 'true' : 'false',
+openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+rows: orders.map((o, i) => Object.assign({
+no: o.no, st: ST[o.st][0], stCls: 'sb t-' + ST[o.st][1], pr: o.pr,
+first: o.lines[0].name, hasMore: o.lines.length > 1, more: '+' + (o.lines.length - 1),
+prog: done(o) + ' de ' + active(o).length, progW: 'width: ' + pct(o) + '%',
+cli: o.cli, pend: o.pend, date: o.date, cov: o.cov, covCls: 'sb t-' + o.covT,
+price: o.price, hasNoPrice: !!o.noPrice, noPrice: o.noPrice, cost: o.cost, real: o.real,
+editOff: editOff(o),
+open: open === o.no ? 'true' : 'false',
+menuCls: 'pop right at-row' + (i >= orders.length - 3 ? ' up' : '') + (open === o.no ? ' open' : ''),
+menuLabel: 'Acciones del pedido ' + o.no, detailLabel: 'Ver detalle del pedido ' + o.no,
+toggle: () => this.setState({ open: open === o.no ? null : o.no, cur: o.no }),
+openDetail: () => this.setState({ dlg: 'detail', cur: o.no, open: null, acts: null }),
+mobileActs: () => this.setState({ acts: o.no, cur: o.no })
+}, pm(o.lvl))),
+cur: view(curOrder),
+detailCls: s.dlg === 'detail' ? 'sheet wide open' : 'sheet wide',
+openDetailCur: () => this.setState({ dlg: 'detail', acts: null }),
+openNew: () => this.setState({ sheet: 'new', added: false, err: false, open: null }),
+openEdit: () => this.setState({ sheet: 'edit', added: false, err: false, dlg: null, open: null, acts: null }),
+sheetCls: s.sheet ? 'sheet wide open' : 'sheet wide',
+sheetTitle: isNew ? 'Nuevo pedido' : 'Editar pedido ' + curOrder.no,
+sheetDesc: isNew ? 'Añade una o más recetas. La fecha y el número los pone el sistema.' : 'Las recetas que ya no se pueden editar salen en solo lectura. Siempre puedes añadir otra.',
+formCli: isNew ? '' : curOrder.cli,
+formLines, formCount: String(formLines.length), formEmpty: formLines.length === 0, formHasLines: formLines.length > 0,
+formTotal: isNew ? (s.added ? '65,00' : '—') : (s.added ? '510,00' : curOrder.price),
+formNoPrice: isNew ? '' : curOrder.noPrice,
+formCost: isNew ? (s.added ? '~36,20' : '—') : curOrder.cost,
+addLine: () => this.setState({ sub: { name: '', qty: '', price: '', removable: true, isNew: true } }),
+subCls: s.sub ? 'sheet open' : 'sheet',
+subTitle: s.sub && s.sub.isNew ? 'Añadir receta' : 'Editar receta',
+subName: (s.sub && s.sub.name) || 'Sin receta elegida',
+subQty: (s.sub && s.sub.qty) || '',
+subPrice: (s.sub && s.sub.price) || '',
+subRemovable: !!(s.sub && s.sub.removable),
+closeSub: () => this.setState({ sub: null }),
+applySub: () => this.setState({ sub: null, added: s.sub && s.sub.isNew ? true : s.added }),
+removeLine: () => this.setState({ sub: null }),
+showErr: !!s.err,
+hideErr: () => this.setState({ err: false }),
+save: () => (!isNew && !s.err ? this.setState({ err: true }) : toast(isNew ? 'Pedido creado.' : 'Pedido actualizado.')),
+saveBlocked: () => toast('Pedido actualizado. Suavizante lavanda queda bloqueada.'),
+pickRep: pickFor('rep'), pickDeliver: pickFor('deliver'), pickDeliveries: pickFor('deliveries'), pickCancel: pickFor('cancel'),
+pickCls: s.dlg === 'pick' ? 'dlg open' : 'dlg',
+pickTitle: act.title, pickHelp: act.help,
+pickLines: curOrder.lines.map((l) => { const ok = act.ok(l); return { name: l.name, st: ST[l.st][0], stCls: 'sb t-' + ST[l.st][1], off: !ok, offStr: ok ? 'false' : 'true', why: ok ? l.qty + ' · ' + l.split : act.why, go: () => (s.pick === 'cancel' ? this.setState({ dlg: 'cancelLine', picked: l.name }) : toast(act.title + ': ' + l.name + '.')) }; }),
+pickedName: s.picked || '',
+cancelLineCls: s.dlg === 'cancelLine' ? 'dlg open' : 'dlg',
+doCancelLine: () => toast('Receta cancelada. Su material quedó libre.'),
+openCancelOrder: () => this.setState({ dlg: 'cancelOrder', open: null, acts: null }),
+cancelOrderCls: s.dlg === 'cancelOrder' ? 'dlg open' : 'dlg',
+doCancelOrder: () => toast('Pedido cancelado. 3 recetas canceladas.'),
+actsCls: s.acts ? 'dlg menu open' : 'dlg menu',
+ovCls: (s.sheet || s.sub || s.dlg || s.menu || s.acts) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ sheet: null, sub: null, dlg: null, menu: false, acts: null, err: false }),
+toastCls: s.toast ? 'toast show' : 'toast',
+toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>
