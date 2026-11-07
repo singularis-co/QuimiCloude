@@ -21,6 +21,7 @@ import {
 import {
   deliverOrderAction,
   getOrderDeliveryAction,
+  listOrderDeliveriesAction,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions'
 import { ActionNotAllowedError } from '@/lib/modules/pedidos/domain/errors'
 
@@ -31,16 +32,19 @@ import {
   deliverInput,
   deliveryView,
 } from '../../fixtures/order-delivery'
+import { deliveryHistoryView } from '../../fixtures/order-delivery-void'
 
 const {
   getOrderDeliveryMock,
   deliverOrderMock,
+  listOrderDeliveriesMock,
   getSessionUserMock,
   getSessionContextMock,
   REQUEST_ID,
 } = vi.hoisted(() => ({
   getOrderDeliveryMock: vi.fn(),
   deliverOrderMock: vi.fn(),
+  listOrderDeliveriesMock: vi.fn(),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   REQUEST_ID: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
@@ -52,6 +56,7 @@ vi.mock('@/lib/composition', () => ({
   pedidos: {
     getOrderDelivery: getOrderDeliveryMock,
     deliverOrder: deliverOrderMock,
+    listOrderDeliveries: listOrderDeliveriesMock,
   },
 }))
 
@@ -114,7 +119,7 @@ describe('Server Actions de la entrega: entrada, actor y resultado', () => {
 
     expect(result).toEqual({ status: 'success', data: view })
     expect(getOrderDeliveryMock).toHaveBeenCalledTimes(1)
-    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, EXPECTED_ACTOR)
+    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, undefined, EXPECTED_ACTOR)
   })
 
   it('R22: deliverOrderAction pasa la entrada tal cual al caso de uso, sin quitar ni anadir campos', async () => {
@@ -197,4 +202,44 @@ describe('Server Actions de la entrega: traduccion de errores', () => {
       consoleError.mockRestore()
     })
   }
+})
+
+describe('QT-314 T4 — las actions de entregas pasan la receta', () => {
+  const LINE_ID = 'c0000000-0000-4000-8000-00000000000a'
+
+  it('R33: getOrderDeliveryAction pasa el pedido, la receta y el actor de la sesion, y devuelve la vista tal cual', async () => {
+    const view = deliveryView()
+    getOrderDeliveryMock.mockResolvedValue(view)
+
+    expect(await getOrderDeliveryAction(DELIVERY_ORDER_ID, LINE_ID)).toEqual({ status: 'success', data: view })
+    expect(getOrderDeliveryMock).toHaveBeenCalledTimes(1)
+    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINE_ID, EXPECTED_ACTOR)
+  })
+
+  it('R35: listOrderDeliveriesAction pasa el pedido, la receta y el actor de la sesion, y devuelve la vista tal cual', async () => {
+    const view = { ...deliveryHistoryView(), orderStatus: 'PARCIAL' as const, lineStatus: 'TERMINADO' as const }
+    listOrderDeliveriesMock.mockResolvedValue(view)
+
+    expect(await listOrderDeliveriesAction(DELIVERY_ORDER_ID, LINE_ID)).toEqual({ status: 'success', data: view })
+    expect(listOrderDeliveriesMock).toHaveBeenCalledTimes(1)
+    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINE_ID, EXPECTED_ACTOR)
+  })
+
+  it('R33, R35: sin receta las dos pasan lineId undefined, como hoy', async () => {
+    listOrderDeliveriesMock.mockResolvedValue(deliveryHistoryView())
+
+    await getOrderDeliveryAction(DELIVERY_ORDER_ID)
+    await listOrderDeliveriesAction(DELIVERY_ORDER_ID)
+
+    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, undefined, EXPECTED_ACTOR)
+    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, undefined, EXPECTED_ACTOR)
+  })
+
+  it('R33: el rechazo por la receta vuelve como el ErrorState del catalogo', async () => {
+    getOrderDeliveryMock.mockRejectedValueOnce(new ActionNotAllowedError())
+    expect(await getOrderDeliveryAction(DELIVERY_ORDER_ID, LINE_ID)).toEqual(DELIVERY_ERROR_STATES.actionNotAllowed)
+
+    listOrderDeliveriesMock.mockRejectedValueOnce(new OrderNotFoundError())
+    expect(await listOrderDeliveriesAction(DELIVERY_ORDER_ID, LINE_ID)).toEqual(DELIVERY_ERROR_STATES.orderNotFound)
+  })
 })

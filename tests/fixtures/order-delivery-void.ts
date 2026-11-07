@@ -31,6 +31,7 @@ export function deliveryHistoryView(overrides: Partial<OrderDeliveryHistoryView>
     orderId: VOID_ORDER_ID,
     numberText: '2026-0000024',
     orderStatus: 'ENTREGADO',
+    lineStatus: null,
     deliveries: [
       {
         id: NEWER_DELIVERY_ID,

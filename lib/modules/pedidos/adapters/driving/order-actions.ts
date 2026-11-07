@@ -589,11 +589,11 @@ export async function getOrderCustomerFilterOptionAction(id: string): Promise<Or
 export type OrderDeliveryResult = { status: 'success'; data: OrderDeliveryView } | ErrorState;
 
 /** Lo que el sheet de entrega pinta de un pedido `TERMINADO`. */
-export async function getOrderDeliveryAction(orderId: string): Promise<OrderDeliveryResult> {
+export async function getOrderDeliveryAction(orderId: string, lineId?: string): Promise<OrderDeliveryResult> {
   const actor = await currentActor();
 
   try {
-    const data = await pedidos.getOrderDelivery(orderId, actor);
+    const data = await pedidos.getOrderDelivery(orderId, lineId, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
@@ -627,11 +627,11 @@ export async function deliverOrderAction(input: unknown): Promise<DeliverOrderAc
 export type OrderDeliveriesResult = { status: 'success'; data: OrderDeliveryHistoryView } | ErrorState;
 
 /** Las entregas de un pedido, con lo anulado de cada una. */
-export async function listOrderDeliveriesAction(orderId: string): Promise<OrderDeliveriesResult> {
+export async function listOrderDeliveriesAction(orderId: string, lineId?: string): Promise<OrderDeliveriesResult> {
   const actor = await currentActor();
 
   try {
-    const data = await pedidos.listOrderDeliveries(orderId, actor);
+    const data = await pedidos.listOrderDeliveries(orderId, lineId, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

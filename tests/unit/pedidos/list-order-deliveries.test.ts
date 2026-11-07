@@ -21,14 +21,14 @@ import {
   VOIDED_LINE_ID,
   deliveryHistoryView,
 } from '@/tests/fixtures/order-delivery-void'
-import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PersonRef } from '@/lib/modules/identity'
 import type { PresentationRef } from '@/lib/modules/inventario'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { OrderLineRow, OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { DeliveryHistoryRow } from '@/lib/modules/pedidos/ports/order-delivery-void-repository'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { FinishPackingLine } from '@/lib/modules/pedidos/ports/order-write-repository'
@@ -110,6 +110,7 @@ type Fn = ReturnType<typeof vi.fn>
 type Montaje = {
   readonly deps: ListOrderDeliveriesDeps
   readonly findAliveById: Fn
+  readonly findAliveLines: Fn
   readonly listByOrder: Fn
   readonly findPresentationLinesForFinish: Fn
   readonly findRefs: Fn
@@ -125,11 +126,14 @@ function montar(
     personas?: readonly PersonRef[]
     clientes?: readonly CustomerRef[]
     lotes?: ReadonlyMap<string, string>
+    reparto?: readonly FinishPackingLine[]
+    lineasDelPedido?: readonly OrderLineRow[]
   } = {},
 ): Montaje {
   const findAliveById = vi.fn(async () => (opciones.pedido === undefined ? PEDIDO : opciones.pedido))
   const listByOrder = vi.fn(async () => opciones.filas ?? FILAS)
-  const findPresentationLinesForFinish = vi.fn(async () => REPARTO)
+  const findPresentationLinesForFinish = vi.fn(async () => opciones.reparto ?? REPARTO)
+  const findAliveLines = vi.fn(async () => opciones.lineasDelPedido ?? [])
   const findRefs = vi.fn(async () => PRESENTACIONES)
   const findRefsIncludingDeleted = vi.fn(async () => opciones.clientes ?? [CLIENTE, SEGUNDO_CLIENTE])
   const findRefsIncludingDeletedInCompany = vi.fn(async () => opciones.personas ?? PERSONAS)
@@ -138,7 +142,7 @@ function montar(
     vi.fn(() => {
       throw new Error(`OrderRepository.${nombre} no deberia llamarse`)
     })
-  const orders = { findAliveById, listAlive: explota('listAlive'), findBlockedIds: explota('findBlockedIds') }
+  const orders = { findAliveById, findAliveLines, listAlive: explota('listAlive'), findBlockedIds: explota('findBlockedIds') }
 
   return {
     deps: {
@@ -152,6 +156,7 @@ function montar(
       now: () => AHORA,
     },
     findAliveById,
+    findAliveLines,
     listByOrder,
     findPresentationLinesForFinish,
     findRefs,
@@ -173,6 +178,7 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 function ningunPuerto(m: Montaje): void {
   for (const puerto of [
     m.findAliveById,
+    m.findAliveLines,
     m.listByOrder,
     m.findPresentationLinesForFinish,
     m.findRefs,
@@ -397,5 +403,118 @@ describe('listOrderDeliveries — por cliente (R33, R34)', () => {
       createdAt: '2026-10-09T09:00:00.000Z',
     })
     expect(anuladaDe(SECOND_CUSTOMER_ID)).toBeNull()
+  })
+})
+
+describe('QT-314 T4 — listOrderDeliveries por receta', () => {
+  const LINEA_A = 'c0000000-0000-4000-8000-00000000000a'
+  const LINEA_B = 'c0000000-0000-4000-8000-00000000000b'
+  const PEDIDO_PARCIAL: OrderRow = { ...PEDIDO, status: 'PARCIAL' }
+  const PEDIDO_TERMINADO: OrderRow = { ...PEDIDO, status: 'TERMINADO' }
+  // OPEN_LINE_ID es de la receta A; VOIDED_LINE_ID, de la B.
+  const REPARTO_DOS: readonly FinishPackingLine[] = [
+    { ...REPARTO[0]!, orderLineId: LINEA_A },
+    { ...REPARTO[1]!, orderLineId: LINEA_B },
+  ]
+  const LINEAS_DEL_PEDIDO: readonly OrderLineRow[] = [
+    orderLineOf(PEDIDO_TERMINADO, { id: LINEA_A, status: 'ENTREGADO' }),
+    orderLineOf(PEDIDO_TERMINADO, { id: LINEA_B, position: 1, status: 'TERMINADO' }),
+  ]
+
+  function dosRecetas() {
+    return montar({ pedido: PEDIDO_PARCIAL, reparto: REPARTO_DOS, lineasDelPedido: LINEAS_DEL_PEDIDO })
+  }
+
+  function presentacionesDe(vista: Awaited<ReturnType<ReturnType<typeof createListOrderDeliveries>>>) {
+    return vista.deliveries.map((entrega) => ({
+      id: entrega.id,
+      packages: entrega.packages,
+      customers: entrega.customers.map((cliente) => ({
+        customerId: cliente.customerId,
+        lineas: cliente.presentations.map((p) => p.presentationLineId),
+      })),
+    }))
+  }
+
+  it('R35: con la receta A solo salen sus lineas de entrega, con el total de envases de esas lineas', async () => {
+    const m = dosRecetas()
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA_A, CONSULTOR)
+
+    expect(presentacionesDe(vista)).toEqual([
+      { id: NEWER_DELIVERY_ID, packages: 6, customers: [{ customerId: CLIENTE_ID, lineas: [OPEN_LINE_ID] }] },
+      { id: OLDER_DELIVERY_ID, packages: 4, customers: [{ customerId: CLIENTE_ID, lineas: [OPEN_LINE_ID] }] },
+    ])
+    expect(m.findAliveLines).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
+    expect(m.findPresentationLinesForFinish).toHaveBeenCalledTimes(1)
+    expect(m.findLots).toHaveBeenCalledWith([FIRST_BATCH_ID, SECOND_BATCH_ID], EMPRESA)
+  })
+
+  it('R35: con la receta B quita la entrega que se queda sin lineas de esa receta y conserva sus anulaciones', async () => {
+    const m = dosRecetas()
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA_B, CONSULTOR)
+
+    expect(presentacionesDe(vista)).toEqual([
+      {
+        id: NEWER_DELIVERY_ID,
+        packages: 5,
+        customers: [
+          { customerId: CLIENTE_ID, lineas: [VOIDED_LINE_ID] },
+          { customerId: SECOND_CUSTOMER_ID, lineas: [VOIDED_LINE_ID] },
+        ],
+      },
+    ])
+    expect(vista.deliveries[0]?.customers[0]?.presentations[0]?.void?.reason).toBe(VOID_REASON)
+  })
+
+  it('R35: la vista lleva el estado de la receta y conserva el del pedido', async () => {
+    const listar = createListOrderDeliveries(dosRecetas().deps)
+    expect(await listar(VOID_ORDER_ID, LINEA_A, CONSULTOR)).toMatchObject({ orderStatus: 'PARCIAL', lineStatus: 'ENTREGADO' })
+    expect(await listar(VOID_ORDER_ID, LINEA_B, CONSULTOR)).toMatchObject({ orderStatus: 'PARCIAL', lineStatus: 'TERMINADO' })
+  })
+
+  it('R35: una receta sin entregas devuelve la lista vacia, con su estado, sin consultar catalogos', async () => {
+    const m = montar({
+      pedido: PEDIDO_PARCIAL,
+      reparto: [...REPARTO_DOS, { ...REPARTO[0]!, id: 'd0000000-0000-4000-8000-0000000000cc', orderLineId: 'c0000000-0000-4000-8000-00000000000c' }],
+      lineasDelPedido: [
+        ...LINEAS_DEL_PEDIDO,
+        orderLineOf(PEDIDO_TERMINADO, { id: 'c0000000-0000-4000-8000-00000000000c', position: 2, status: 'TERMINADO' }),
+      ],
+    })
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, 'c0000000-0000-4000-8000-00000000000c', CONSULTOR)
+
+    expect(vista).toMatchObject({ lineStatus: 'TERMINADO', deliveries: [] })
+    expect(m.findRefs).not.toHaveBeenCalled()
+    expect(m.findLots).not.toHaveBeenCalled()
+  })
+
+  it('R35: una receta de otro pedido, quitada o de otra empresa (el puerto no la devuelve) es order_not_found sin leer el historial', async () => {
+    const m = dosRecetas()
+    expect(
+      await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, 'c0000000-0000-4000-8000-0000000000ff', CONSULTOR)),
+    ).toBe('order_not_found')
+    expect(m.listByOrder).not.toHaveBeenCalled()
+
+    const sinPedido = montar({ pedido: null, lineasDelPedido: LINEAS_DEL_PEDIDO })
+    expect(await codigoDelFallo(() => createListOrderDeliveries(sinPedido.deps)(VOID_ORDER_ID, LINEA_A, CONSULTOR))).toBe(
+      'order_not_found',
+    )
+    expect(sinPedido.findAliveLines).not.toHaveBeenCalled()
+  })
+
+  it('R35: un lineId sin forma de uuid es order_not_found sin consultar', async () => {
+    const m = dosRecetas()
+    expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, 'linea-a', CONSULTOR))).toBe(
+      'order_not_found',
+    )
+    ningunPuerto(m)
+  })
+
+  it('R35: sin lineId devuelve todas las entregas como hoy, con lineStatus null y sin leer las recetas', async () => {
+    const m = dosRecetas()
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, undefined, CONSULTOR)
+
+    expect(vista).toEqual({ ...deliveryHistoryView(), orderStatus: 'PARCIAL', lineStatus: null })
+    expect(m.findAliveLines).not.toHaveBeenCalled()
   })
 })

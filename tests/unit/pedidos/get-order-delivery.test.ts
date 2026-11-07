@@ -389,3 +389,109 @@ describe('QC-290 — getOrderDelivery espera solo lo pedido', () => {
     expect(m.findDeliverableBatches).toHaveBeenCalledWith(RECETA, [PENDING_PRESENTATION, OTHER_PRESENTATION], EMPRESA)
   })
 })
+
+describe('QT-314 T4 — getOrderDelivery por receta', () => {
+  const LINEA_A = 'c0000000-0000-4000-8000-00000000000a'
+  const LINEA_B = 'c0000000-0000-4000-8000-00000000000b'
+  const OTRA_RECETA = '22222222-2222-4222-8222-2222222222bb'
+
+  function dosRecetas(estadoA: OrderLineRow['status'], estadoB: OrderLineRow['status']) {
+    return montar({
+      pedido: pedido({ status: 'PARCIAL' }),
+      lineas: [
+        { ...LINEAS[0]!, orderLineId: LINEA_A },
+        { ...LINEAS[1]!, orderLineId: LINEA_A },
+        { ...LINEAS[2]!, orderLineId: LINEA_B },
+      ],
+      lineasDelPedido: [
+        orderLineOf(pedido(), { id: LINEA_A, recipeId: RECETA, status: estadoA }),
+        orderLineOf(pedido(), { id: LINEA_B, position: 1, recipeId: OTRA_RECETA, status: estadoB }),
+      ],
+    })
+  }
+
+  it('R33: una receta TERMINADO con el pedido PARCIAL devuelve solo su reparto y sus lotes', async () => {
+    const m = dosRecetas('TERMINADO', 'EN_CURSO')
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, LINEA_A, ENTREGADOR)
+
+    expect(vista.lines.map((linea) => linea.presentationLineId)).toEqual([COMPLETE_LINE_ID, PENDING_LINE_ID])
+    expect(vista.lines[1]?.remainingPackages).toBe(7)
+    expect(m.findDeliverableBatches).toHaveBeenCalledTimes(1)
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(RECETA, [PENDING_PRESENTATION], EMPRESA)
+    expect(m.findRefs).toHaveBeenCalledWith([COMPLETE_PRESENTATION, PENDING_PRESENTATION], EMPRESA)
+    expect(vista.customer).toEqual({ id: DELIVERY_CUSTOMER_ID, name: 'Ana Perez', isDeleted: false })
+  })
+
+  it('R33: la otra receta TERMINADO del mismo pedido devuelve solo el suyo', async () => {
+    const m = dosRecetas('ENTREGADO', 'TERMINADO')
+    const vista = await createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, LINEA_B, ENTREGADOR)
+
+    expect(vista.lines.map((linea) => linea.presentationLineId)).toEqual([OTHER_PENDING_LINE_ID])
+    expect(m.findDeliverableBatches).toHaveBeenCalledWith(OTRA_RECETA, [OTHER_PRESENTATION], EMPRESA)
+  })
+
+  for (const status of ORDER_STATUS_VALUES.filter(
+    (s): s is Exclude<OrderLineRow['status'], 'TERMINADO'> => s !== 'TERMINADO' && s !== 'PARCIAL',
+  )) {
+    it(`R33: una receta ${status} es action_not_allowed y no lee el reparto`, async () => {
+      const m = dosRecetas(status, 'TERMINADO')
+      expect(await codigoDelFallo(() => createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, LINEA_A, ENTREGADOR))).toBe(
+        'action_not_allowed',
+      )
+      expect(m.findPresentationLinesForFinish).not.toHaveBeenCalled()
+      expect(m.sumDeliveredPackages).not.toHaveBeenCalled()
+    })
+  }
+
+  it('R33: una receta de otro pedido (o quitada: el puerto no la devuelve) es order_not_found', async () => {
+    const m = dosRecetas('TERMINADO', 'TERMINADO')
+    const deOtroPedido = 'c0000000-0000-4000-8000-0000000000ff'
+    expect(await codigoDelFallo(() => createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, deOtroPedido, ENTREGADOR))).toBe(
+      'order_not_found',
+    )
+    expect(m.findPresentationLinesForFinish).not.toHaveBeenCalled()
+  })
+
+  it('R33: con el pedido de otra empresa (el puerto devuelve null) es order_not_found sin leer la receta', async () => {
+    const m = montar({ pedido: null })
+    expect(await codigoDelFallo(() => createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, LINEA_A, ENTREGADOR))).toBe(
+      'order_not_found',
+    )
+    for (const puerto of m.puertos.slice(1)) expect(puerto).not.toHaveBeenCalled()
+  })
+
+  it('R33: una receta de otra empresa en un pedido visible (el puerto no la devuelve) es order_not_found', async () => {
+    const m = montar({ pedido: pedido({ status: 'PARCIAL' }), lineasDelPedido: [] })
+    expect(await codigoDelFallo(() => createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, LINEA_A, ENTREGADOR))).toBe(
+      'order_not_found',
+    )
+  })
+
+  it('R33: un lineId sin forma de uuid es order_not_found sin consultar', async () => {
+    const m = montar()
+    expect(await codigoDelFallo(() => createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, 'linea-1', ENTREGADOR))).toBe(
+      'order_not_found',
+    )
+    for (const puerto of m.puertos) expect(puerto).not.toHaveBeenCalled()
+  })
+
+  it('R33: sin lineId, o con lineId undefined, se comporta como hoy: exige el pedido TERMINADO', async () => {
+    const hoy = await createGetOrderDelivery(montar().deps)(DELIVERY_ORDER_ID, ENTREGADOR)
+    expect(await createGetOrderDelivery(montar().deps)(DELIVERY_ORDER_ID, undefined, ENTREGADOR)).toEqual(hoy)
+
+    const m = dosRecetas('TERMINADO', 'EN_CURSO')
+    expect(await codigoDelFallo(() => createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, undefined, ENTREGADOR))).toBe(
+      'action_not_allowed',
+    )
+  })
+
+  it('R33: con lineId sin entregas.modificar responde unauthorized sin consultar', async () => {
+    const m = montar()
+    expect(
+      await codigoDelFallo(() =>
+        createGetOrderDelivery(m.deps)(DELIVERY_ORDER_ID, LINEA_A, { ...ENTREGADOR, permissions: ['pedidos.consultar'] }),
+      ),
+    ).toBe('unauthorized')
+    for (const puerto of m.puertos) expect(puerto).not.toHaveBeenCalled()
+  })
+})

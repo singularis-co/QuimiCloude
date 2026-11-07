@@ -917,14 +917,14 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       ['getOrderAction', 1],
       // QC-156: el cliente que trae la direccion del filtro.
       ['getOrderCustomerFilterOptionAction', 1],
-      // QC-223 2026-10-08: lo que pinta el sheet de entrega.
-      ['getOrderDeliveryAction', 1],
+      // QC-223 2026-10-08: lo que pinta el sheet de entrega. QT-314: mas la receta.
+      ['getOrderDeliveryAction', 2],
       // QC-288 2026-10-16: el excedente de una pagina del listado.
       ['listDirectDeliverySurplusAction', 1],
       // La cobertura de la pagina, argumento ya tipado, ningun `FormData`.
       ['listOrderCoverageAction', 1],
-      // 2026-10-09: la lista de entregas del pedido.
-      ['listOrderDeliveriesAction', 1],
+      // 2026-10-09: la lista de entregas del pedido. QT-314: mas la receta.
+      ['listOrderDeliveriesAction', 2],
       ['listOrdersAction', 1],
       ['quoteOrderCostAction', 1],
       // T11: el disponible de solo lectura, argumento ya tipado.
@@ -960,10 +960,11 @@ describe('QC-60 R34 — las firmas publicas de las Server Actions no cambian, ma
       searchOrderCustomersAction: 'query: unknown, purpose: OrderCustomerSearchPurpose',
       getOrderCustomerFilterOptionAction: 'id: string',
       // QC-223 2026-10-08
-      getOrderDeliveryAction: 'orderId: string',
+      // QT-314: la receta, opcional hasta la tanda 3.
+      getOrderDeliveryAction: 'orderId: string, lineId?: string',
       deliverOrderAction: 'input: unknown',
       // 2026-10-09
-      listOrderDeliveriesAction: 'orderId: string',
+      listOrderDeliveriesAction: 'orderId: string, lineId?: string',
       voidDeliveryAction: 'input: unknown',
       // QC-288 2026-10-16
       getDirectDeliveryAction: 'productId: string',

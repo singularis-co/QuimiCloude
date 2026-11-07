@@ -6,6 +6,7 @@ import { toOrderCustomer, type OrderCustomer } from './order-customer';
 import { remainingPackages } from './order-delivery';
 import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
+import type { OrderLineRow } from './order-view';
 import { orderedPackages } from './packing-count';
 
 import type { OrderDeliveryRepository } from '../ports/order-delivery-repository';
@@ -54,25 +55,43 @@ async function aliveCustomer(
   return ref === null ? null : toOrderCustomer(ref);
 }
 
-/** Lo que el sheet de entrega necesita de un pedido `TERMINADO`. */
-export function createGetOrderDelivery(
-  deps: GetOrderDeliveryDeps,
-): (orderId: string, actor: Actor | null | undefined) => Promise<OrderDeliveryView> {
-  return async function getOrderDelivery(orderId, actor) {
+/** Sin `lineId` lee el pedido entero, que tiene que estar `TERMINADO`; con `lineId`, solo esa receta. */
+export type GetOrderDelivery = {
+  (orderId: string, actor: Actor | null | undefined): Promise<OrderDeliveryView>;
+  (orderId: string, lineId: string | undefined, actor: Actor | null | undefined): Promise<OrderDeliveryView>;
+};
+
+/** `findAliveLines` ya deja fuera las quitadas y las de otro pedido o empresa. */
+function assertDeliverableLine(orderLines: readonly OrderLineRow[], lineId: string): void {
+  const line = orderLines.find((candidate) => candidate.id === lineId);
+  if (line === undefined) throw new OrderNotFoundError();
+  if (line.status !== 'TERMINADO') throw new ActionNotAllowedError();
+}
+
+type ActorArgs =readonly [actor: Actor | null | undefined] | readonly [lineId: string | undefined, actor: Actor | null | undefined];
+
+/** Lo que el sheet de entrega necesita de un pedido `TERMINADO` o de una receta `TERMINADO`. */
+export function createGetOrderDelivery(deps: GetOrderDeliveryDeps): GetOrderDelivery {
+  return async function getOrderDelivery(orderId: string, ...args: ActorArgs): Promise<OrderDeliveryView> {
+    const [lineId, actor] = args.length === 2 ? args : [undefined, args[0]];
     requirePermission(actor, 'entregas.modificar');
 
     if (!orderIdSchema.safeParse(orderId).success) throw new OrderNotFoundError();
+    if (lineId !== undefined && !orderIdSchema.safeParse(lineId).success) throw new OrderNotFoundError();
     const scope: OrderScope = { companyId: actor.companyId };
 
     const order = await deps.orders.findAliveById(orderId, scope);
     if (order === null) throw new OrderNotFoundError();
-    if (order.status !== 'TERMINADO') throw new ActionNotAllowedError();
 
-    const [lines, delivered, orderLines] = await Promise.all([
+    if (lineId === undefined && order.status !== 'TERMINADO') throw new ActionNotAllowedError();
+    const orderLines = await deps.orders.findAliveLines(orderId, scope);
+    if (lineId !== undefined) assertDeliverableLine(orderLines, lineId);
+
+    const [allLines, delivered] = await Promise.all([
       deps.lines.findPresentationLinesForFinish(orderId, scope),
       deps.deliveries.sumDeliveredPackages(orderId, scope),
-      deps.orders.findAliveLines(orderId, scope),
     ]);
+    const lines = lineId === undefined ? allLines : allLines.filter((line) => line.orderLineId === lineId);
     const recipeByOrderLine = new Map(orderLines.map((line) => [line.id, line.recipeId]));
     const recipeOf = (line: (typeof lines)[number]): string | undefined => recipeByOrderLine.get(line.orderLineId);
     const states = lines.map((line) => {

@@ -34,7 +34,7 @@
     - un test de que `linePositionsOf` de un error ajeno es `[]`;
     - `guard-catalogo-de-errores` en verde **sin tocarla**.
   - **Cubre:** R15, R16.
-- [ ] **T4** · backend_dev · depende de T1 — Entregas por receta (design § 3.5):
+- [x] **T4** · backend_dev · depende de T1 — Entregas por receta (design § 3.5):
   - `getOrderDelivery` y `listOrderDeliveries` aceptan `lineId`, de momento opcional;
   - `getOrderDeliveryAction` y `listOrderDeliveriesAction` lo pasan;
   - la vista de entregas gana `lineStatus`.

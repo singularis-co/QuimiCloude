@@ -111,7 +111,7 @@ describe('Server Actions de la anulacion: entrada, actor y resultado', () => {
     expect(result).toEqual({ status: 'success', data: view })
     expect(listOrderDeliveriesMock.mock.calls[0]?.[0]).toBe(VOID_ORDER_ID)
     expect(listOrderDeliveriesMock).toHaveBeenCalledTimes(1)
-    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(VOID_ORDER_ID, EXPECTED_ACTOR)
+    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(VOID_ORDER_ID, undefined, EXPECTED_ACTOR)
   })
 
   it('R17: voidDeliveryAction pasa la entrada tal cual al caso de uso, sin quitar ni anadir campos', async () => {
