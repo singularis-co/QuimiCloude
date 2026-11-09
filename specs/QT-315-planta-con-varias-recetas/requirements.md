@@ -14,6 +14,8 @@
 > - El alta, la edición y la consulta del pedido: QT-314.
 > - El rediseño visual de las pantallas del operario: QC-291. Se adapta a varias recetas al integrar `dev`, después de esta ficha.
 > - Los avisos QC-293 y QC-294.
+> - Las evidencias del lote en Inventario › Producto terminado: van a **QT-316**
+>   `evidencias-del-lote-por-receta`, que depende de esta ficha (decisión P4).
 >
 > Sembrado por `/afinar-feature` el 2026-11-09. El bloque de Alcance y la tabla de «Decisiones cerradas» los fijó el humano ANTES del spec. `spec_author` los respeta, no los reabre y no los reescribe: su trabajo aquí es `## Requisitos (EARS)`.
 
@@ -45,9 +47,9 @@
   *[¿Cómo trabaja el operario…?]*
 - **R3** — DONDE el pedido tiene más de una receta viva, la fila DEBE mostrar «Receta N de M» bajo
   el nombre de la receta, con N la posición de esa receta entre las vivas del pedido en su orden
-  de alta y M el número de recetas vivas, canceladas incluidas (pendiente de **P1**). Un pedido de
-  una sola receta viva NO DEBE mostrarlo. *[¿Cómo trabaja el operario…? · Pase `/design`
-  aprobado]*
+  de alta y M el número de recetas vivas, **canceladas incluidas**, aunque el avance «F de T»
+  (R21, R25) no las cuente. Un pedido de una sola receta viva NO DEBE mostrarlo.
+  *[¿Cómo trabaja el operario…? · Pase `/design` aprobado · P1]*
 - **R4** — CUANDO se pulsa «Entrar» en una fila, el sistema DEBE abrir la pantalla que esa vista
   abre hoy (ejecución, empaque o acondicionamiento), **de esa receta**, con la receta identificada
   en la dirección. *[¿Cómo trabaja el operario…?]*
@@ -65,9 +67,12 @@
   nombre de la receta, su cantidad, su reparto y su estado, y DONDE el pedido tiene más de una
   receta viva, también «Receta N de M» con la regla de R3. *[Pase `/design` aprobado]*
 - **R8** — DONDE el pedido tiene más de una receta viva, la pantalla DEBE listar las **otras**
-  recetas vivas del pedido con su nombre y su estado, en su orden de alta, y DEBE ofrecer «Ir a
-  esta receta» con la regla de **P2**; una receta cancelada o terminada NO DEBE ofrecerlo.
-  *[Pase `/design` aprobado]*
+  recetas vivas del pedido con su nombre y su estado, en su orden de alta. Para cada una DEBE
+  ofrecer «Ir a esta receta», que lleva a la pantalla que corresponde a su estado (ejecución con
+  `PENDIENTE` o `EN_CURSO`; empaque con `POR_EMPACAR` o `EN_EMPAQUE`; acondicionamiento con
+  `POR_ACONDICIONAR` o `EN_ACONDICIONAMIENTO`), solo SI quien mira tiene el permiso que esa
+  pantalla exige (R15). En cualquier otro estado (cancelada, terminada, `BLOQUEADO` o `ENTREGADO`)
+  NO DEBE ofrecerlo. *[Pase `/design` aprobado · P2]*
 - **R9** — SI la dirección de una pantalla de receta no nombra ninguna receta, o nombra una de
   otro pedido, de otra empresa, quitada o inexistente, ENTONCES el sistema DEBE responder como
   hoy ante un pedido inexistente (página no encontrada), sin mostrar datos de ningún pedido.
@@ -144,8 +149,8 @@
   terminadas» y duración total) y, debajo, **una sección por receta** en su orden de alta, con su
   nombre, su estado, su cantidad, su reparto, su duración, sus vueltas atrás y su línea de tiempo
   (fabricación, empaque y acondicionamiento) con sus anotaciones, su equipo, sus responsables por
-  paso, sus datos de lote y sus fotos. Qué recetas tienen sección lo fija **P3**.
-  *[Dashboard y Recorrido]*
+  paso, sus datos de lote y sus fotos. Una receta sin ninguna anotación NO DEBE tener sección,
+  pero DEBE contar en el avance del resumen. *[Dashboard y Recorrido · P3]*
 - **R26** — Ninguna sección del Recorrido DEBE mostrar anotaciones, fotos, equipo ni presentaciones
   de otra receta. *[Dashboard y Recorrido]*
 - **R27** — El sistema DEBE medir las duraciones de fase **por receta**: una fase cuenta como
@@ -174,6 +179,9 @@
   paso que la otra receta no cambia de estado, y comprobar el Dashboard («+1 más», «1 de 2» y
   «2 de 2») y el Recorrido con sus dos secciones. Los E2E de planta que ya existen DEBEN seguir
   pasando, adaptados a la receta en la dirección. *[¿Hace falta E2E?]*
+- **R34** — Esta ficha NO DEBE cambiar la consulta de evidencias del lote en Inventario ›
+  Producto terminado: DEBE seguir devolviendo las fotos del pedido como en la rama base. Su
+  separación por receta es de QT-316. *[P4]*
 
 ### Cobertura de la tabla de decisiones
 
@@ -193,33 +201,14 @@
 | Restos de nombres viejos | R19, R20 (el comentario de `finishPackingAction` se corrige en T6; lo verifica el reviewer) |
 | ¿Librería nueva? | R32 |
 | Pase `/design` (aprobado) | R3, R7, R8, R18, R29, R30 |
+| P1 — «Receta N de M» cuenta las canceladas | R3, R7 |
+| P2 — destino y visibilidad de «Ir a esta receta» | R8 |
+| P3 — receta sin anotaciones en el Recorrido | R25 |
+| P4 — evidencias del lote en Inventario fuera (QT-316) | R34 |
 
 ## Preguntas abiertas
 
-- **P1 — «Receta N de M»: ¿cuentan las recetas canceladas?** El tablero no tiene ninguna
-  cancelada en la lista. **Recomendación:** contarlas. M son las recetas vivas, canceladas
-  incluidas, y N es la posición en el orden de alta. Así el número de una receta no cambia
-  cuando se cancela otra. Es la misma regla que «+N más» del listado de Pedidos y que el detalle
-  de QT-314, que enseñan las canceladas. El avance «F de T» sí las excluye (QT-313 R33). R3 y R7
-  están escritos con esta recomendación.
-- **P2 — «Ir a esta receta»: ¿a qué pantalla lleva y quién lo ve?** El tablero solo dice que una
-  receta cancelada o terminada no lo tiene. **Recomendación:**
-  - Lleva a la pantalla del estado de esa receta: ejecución si está en `PENDIENTE` o `EN_CURSO`;
-    empaque si está en `POR_EMPACAR` o `EN_EMPAQUE`; acondicionamiento si está en
-    `POR_ACONDICIONAR` o `EN_ACONDICIONAMIENTO`.
-  - Solo sale si quien mira tiene el permiso de esa pantalla.
-  - Tampoco sale en `BLOQUEADO` ni en `ENTREGADO`, que no tienen pantalla de planta que los
-    atienda.
-  - Una vez dentro, la pantalla de destino aplica sus reglas de hoy, por ejemplo con un empaque
-    tomado por otra persona.
-- **P3 — Recorrido: ¿tiene sección una receta sin ninguna anotación?** Es una receta que nadie
-  ha empezado, o una cancelada antes de arrancar. El tablero solo enseña recetas con
-  anotaciones. **Recomendación:** no tiene sección propia, pero cuenta en el avance del resumen
-  («1 de 2 terminadas»). Pintarla pediría un estado vacío que no está en el tablero.
-- **P4 — Fotos del lote en Inventario (fuera del Alcance).** El diálogo de evidencias del
-  producto terminado (`batch-evidence-dialog.tsx` → `getOrderEvidence`) lee las fotos **por
-  pedido**. En un pedido de dos recetas mezcla las fotos de las dos. **Recomendación:** una
-  ficha aparte, de Inventario, que filtre por la receta del lote. Esta ficha no lo toca.
+Ninguna. P1–P4 cerradas en la tabla de abajo.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -239,3 +228,7 @@
 | 2026-11-09 | Restos de nombres viejos | **Entran:** el comentario de `finishPackingAction` («Deja el pedido ENTREGADO») y el aviso «delivered» de `finishAssignedOrderAction` (`DELIVERED_ORDER_PARAM`) se corrigen para que digan lo que pasa de verdad. |
 | 2026-11-09 | ¿Librería nueva? | **No.** |
 | 2026-11-09 | Pase `/design` | **Aprobado por el humano el 2026-11-09.** Tableros: `docs/diseno/canvas/PlantaVariasRecetas.dc.html`, `PlantaVariasRecetasTablet.dc.html` y `PlantaVariasRecetasMovil.dc.html`. El de escritorio es interactivo y cubre Asignación por receta, la pantalla de una receta (con cancelar receta), Recorridos y el Recorrido del pedido por secciones; el de teléfono lleva además la ficha. Están en el canvas del proyecto, página «6 · Operario», y `design.md` los cita. |
+| 2026-11-09 | P1 — «Receta N de M»: ¿cuentan las recetas canceladas? | **Sí, cuentan**, como «+N más» y el detalle de QT-314: M son las recetas vivas, canceladas incluidas, y N la posición en el orden de alta. El avance «F de T» sigue sin contarlas. |
+| 2026-11-09 | P2 — «Ir a esta receta»: ¿a qué pantalla lleva y quién lo ve? | **A la pantalla que corresponde al estado de esa receta** (ejecución, empaque o acondicionamiento), **solo si quien mira tiene permiso para esa pantalla**. No aparece si la receta está `BLOQUEADO` o `ENTREGADO` (ni cancelada o terminada). La pantalla de destino aplica sus reglas de hoy. |
+| 2026-11-09 | P3 — Recorrido: ¿tiene sección una receta sin anotaciones? | **No tiene sección; solo cuenta en el avance** del resumen. |
+| 2026-11-09 | P4 — Evidencias del lote en Inventario › Producto terminado | **Fuera de QT-315.** Van a la ficha **QT-316** `evidencias-del-lote-por-receta`, ya creada en el board, que depende de QT-315. |

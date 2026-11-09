@@ -156,7 +156,7 @@ Tres cambios, los tres aditivos. Ningún consumidor actual cambia de comportamie
    type OrderRecipesOutline = {
      readonly id: string;
      readonly deleted: boolean;
-     readonly recipes: readonly OrderRecipeOutline[]; // canceladas incluidas (P1)
+     readonly recipes: readonly OrderRecipeOutline[]; // canceladas incluidas (decisión P1)
      readonly progress: OrderProgress;                // orderProgress(recipes): sin canceladas
    };
    ```
@@ -245,9 +245,22 @@ readonly otherRecipes: readonly {
 ```
 
 Salen de `listRecipeOutlinesByIdsIncludingDeleted(companyId, [orderId])` y de
-`recipes.findRefsIncludingDeleted`. La pantalla decide «Ir a esta receta» con el estado y los
-permisos de la sesión (P2). El caso de uso no lo decide: es navegación, no autorización. La
-pantalla de destino vuelve a autorizar.
+`recipes.findRefsIncludingDeleted`. `recipe.position` y `recipe.count` cuentan las canceladas
+(decisión P1, R3, R7).
+
+**«Ir a esta receta» (decisión P2, R8).** Lo decide la pantalla con el estado de la otra receta
+y los permisos de la sesión. El caso de uso no lo decide: es navegación, no autorización. La
+pantalla de destino vuelve a autorizar con sus reglas de hoy.
+
+| Estado de la otra receta | Destino | Permiso que exige |
+|---|---|---|
+| `PENDIENTE`, `EN_CURSO` | `assignedOrderRoute(orderId, lineId)` | el de la ejecución (R15) |
+| `POR_EMPACAR`, `EN_EMPAQUE` | `packingOrderRoute(orderId, lineId)` | `empaque.modificar` |
+| `POR_ACONDICIONAR`, `EN_ACONDICIONAMIENTO` | `conditioningOrderRoute(orderId, lineId)` | `acondicionamiento.modificar` |
+| cualquier otro (`CANCELADO`, terminada, `BLOQUEADO`, `ENTREGADO`) | sin enlace | — |
+
+Sin el permiso de la fila, la receta sale con su nombre y su estado, sin enlace. La función
+pura que elige el destino vive junto a `RecipeHeader` y recibe el estado y los permisos.
 
 **Vistas de lista.** `AssignedOrderView`, `CompanyOrderView`, `FinishedOrderView`,
 `PackingOrderRow` y `ConditioningOrderRow` ganan `lineId` y
@@ -286,7 +299,7 @@ pantalla de destino vuelve a autorizar.
   progress: OrderProgress,
   totalDuration: TraceDuration,
   firstAt, lastAt,
-  recipes: readonly ExecutionTraceRecipe[],   // orden de alta; cuáles salen: P3
+  recipes: readonly ExecutionTraceRecipe[],   // orden de alta; solo las que tienen anotaciones (P3)
 }
 type ExecutionTraceRecipe = {
   lineId, recipeName: string | null, status: OrderLineStatus,
@@ -297,13 +310,17 @@ type ExecutionTraceRecipe = {
 }
 ```
 
+- **Qué recetas tienen sección (decisión P3, R25).** Solo las que tienen al menos una
+  anotación. `progress` sale del outline y cuenta todas las vivas, también las que no tienen
+  sección.
 - **Lo que sale de nivel pedido.** `steps`, `durations` y `goBackCount` salen del nivel pedido.
 - **Responsables por paso.** El mapa de responsables vigentes de
   `conditioning_responsibles_change` se reconstruye **por receta**.
 - **Equipo.** El equipo de `conditioning_start` es el de esa línea.
 - **Fotos.** `getExecutionEvidence` devuelve
   `{ recipes: readonly { lineId: string; evidence: OrderEvidence }[] }`. `readOrderEvidence` gana
-  una variante por línea, y la de `getOrderEvidence` (Inventario, P4) no cambia.
+  una variante por línea, y la de `getOrderEvidence` (Inventario) no cambia: su separación por
+  receta es de **QT-316** (decisión P4, R34).
 
 ### 3.7 Adaptadores driving (backend_dev)
 
@@ -349,7 +366,8 @@ type ExecutionTraceRecipe = {
   - el `h1` con la receta;
   - cantidad · reparto;
   - el `StatusBadge`;
-  - la caja «Otras recetas del pedido» con `StatusBadge` e «Ir a esta receta» (P2).
+  - la caja «Otras recetas del pedido» con `StatusBadge` e «Ir a esta receta» según la tabla de
+    § 3.4 (decisión P2).
 - **Cuerpo.** El de cada pantalla es el de hoy y recibe la vista de **esa** receta.
 - **Ejecución.** `OrderCancelDialog` pasa a «Cancelar esta receta». El título, el texto, el
   motivo y los botones son los del tablero. El `FormData` lleva `orderId`, `lineId`, `reason` y
@@ -424,7 +442,10 @@ Ningún contrato pierde un método: `listAliveSummariesByIds`, `cancelAliveById`
   - los avisos (R19, R20);
   - la página 404 sin receta (R9);
   - las columnas del Dashboard (R21–R23);
-  - las secciones del Recorrido (R25–R28).
+  - las secciones del Recorrido (R25–R28), incluida la receta sin anotaciones que no tiene
+    sección y cuenta en el avance.
+- **Inventario sin cambios (R34).** Los tests que ya cubren `getOrderEvidence` siguen verdes
+  sin tocarlos, y el diff no toca `batch-evidence-dialog.tsx`.
 - **E2E.** El nuevo es `e2e/planta-con-varias-recetas.spec.ts` (R33). Los E2E de planta de
   hoy se adaptan (T13).
 - **Guardias y `R32`.** `pnpm exec vitest run guard`. El reviewer comprueba que el diff no toca

@@ -9,8 +9,8 @@
 > - Los E2E corren en CI (`gate-completo`). En local se corre solo el spec tocado:
 >   `pnpm exec playwright test <spec>`.
 >
-> **Antes de T6:** el humano tiene que haber respondido **P1 y P2**. P3 se necesita antes de
-> T10. P4 no bloquea.
+> P1–P4 están cerradas (`requirements.md > Decisiones cerradas`, 2026-11-09). Ninguna task espera
+> una respuesta del humano.
 >
 > `[P]` = puede ir en paralelo con las otras `[P]` de su tanda. Cada test lleva `R<n>` en el
 > nombre del caso.
@@ -58,15 +58,16 @@
   - `StepEvidenceRepository`: `listByLine`, `findById` y `delete` con línea, y `slot` libre por
     línea.
   - `ConditioningTeamRepository.listByLineInCompany`; `listByOrdersInCompany` con `orderLineId`.
-  - Se actualizan `evidence-photos`, `read-order-evidence` (sigue por pedido para
-    `getOrderEvidence`, P4), `record-step-move`, `register-evidence`, `request-evidence-upload`,
+  - Se actualizan `evidence-photos`, `read-order-evidence` (la variante de `getOrderEvidence`
+    sigue por pedido: es de QT-316, R34), `record-step-move`, `register-evidence`, `request-evidence-upload`,
     `remove-evidence`, `finish-packing` y `record-conditioning-step`.
   - **Hecho cuando:**
     - `step-evidence-repository.int.test.ts` prueba el tope de fotos por paso **por receta**;
     - `conditioning-team-repository.int.test.ts` prueba que el equipo de una línea no sale en la
-      otra (R13).
+      otra (R13);
+    - los tests de `getOrderEvidence` siguen verdes sin tocarlos (R34).
 
-## Tanda 3 — la receta viaja de punta a punta (depende de T1–T5, P1 y P2)
+## Tanda 3 — la receta viaja de punta a punta (depende de T1–T5)
 
 - [ ] **T6 · backend_dev — casos de uso y acciones con `lineId`** (design § 2, § 3.4 y § 3.7)
   - **`only-order-line.ts`.** Se borra; entra `order-line-target.ts` (`findLine`) con
@@ -113,13 +114,14 @@
   - **Aviso.** `finishAssignedOrder` y `cancelAssignedOrder` devuelven `recipeName` y
     `recipeCount`. Lo mismo `finishPacking` y `finishConditioning` para su aviso.
   - **Hecho cuando:**
-    - hay un unit de N y M con una receta cancelada, según P1 (R3, R7);
+    - hay un unit de N y M con una receta cancelada, que cuenta en M y conserva la posición de
+      las demás (R3, R7);
     - hay un unit de `otherRecipes` en orden de alta (R8);
     - el número de llamadas por página no crece con las filas.
 - [ ] **T9 · frontend_dev — piezas del tablero «Pantalla de una receta»** (design § 4.1–§ 4.3;
   depende de T8)
   - **Piezas nuevas.** `RecipeOfOrderLabel` (paso 4) y `RecipeHeader` (paso 3), con «Ir a esta
-    receta» según P2.
+    receta» según la tabla de estado, destino y permiso de design § 3.4.
   - **Diálogo.** `OrderCancelDialog` pasa a «Cancelar esta receta».
   - **Avisos.** `OrderOutcomeNotice` pasa de `delivered` a `manufactured`, con la receta.
     `asignacion/page.tsx` lee `OUTCOME_RECIPE_PARAM`.
@@ -127,24 +129,29 @@
   - **Hecho cuando:**
     - hay tests de UI de «Receta N de M» y de su ausencia con una receta (R3, R29);
     - hay tests de la cabecera y de «Otras recetas» (R7, R8);
+    - hay tests de «Ir a esta receta»: un destino por cada par de estados, sin enlace sin el
+      permiso de la pantalla, y sin enlace en `CANCELADO`, terminada, `BLOQUEADO` y `ENTREGADO`
+      (R8);
     - hay tests del diálogo (R18);
     - hay tests de los cuatro avisos con y sin receta, y ninguno dice «entregado» (R19, R20);
     - hay un test de que ninguna pantalla de planta ofrece entregar (R31);
     - el diff cumple multiplataforma.
 
-## Tanda 5 — Dashboard y Recorrido (depende de P3)
+## Tanda 5 — Dashboard y Recorrido
 
 - [ ] **T10 · backend_dev — recorrido por receta** (design § 3.5 y § 3.6)
   - **`listExecutionTraces`.** Agrupa por `orderLineId`. Añade `moreRecipes`, `progress` y
     `recipes[].presentations`. La duración es la suma, con «abierta gana» (R21–R23).
-  - **`getExecutionTrace`.** Devuelve `recipes[]`, con responsables y equipo por receta (R25,
-    R26).
+  - **`getExecutionTrace`.** Devuelve `recipes[]` solo con las recetas que tienen anotaciones,
+    con responsables y equipo por receta; `progress` cuenta todas (R25, R26).
   - **`getExecutionEvidence`.** Agrupa las fotos por línea.
   - **Fases.** Se miden con el estado de la línea (R27).
   - **Hecho cuando:**
     - hay un unit con un `PARCIAL` de dos recetas: fase abierta en una y cerrada en la otra (R27),
       y la duración suma (R23);
     - hay un unit de la cancelada con su sección (R28);
+    - hay un unit de una receta sin anotaciones: no sale en `recipes[]` y sí cuenta en
+      `progress` (R25);
     - hay un unit del pedido dado de baja (R24);
     - hay un unit de un pedido de una receta, igual que hoy en una sección (R29).
 - [ ] **T11 · frontend_dev — Dashboard y Recorrido** (design § 4.4, § 4.5 y § 7; misma tanda
@@ -181,7 +188,7 @@
 ## Cierre
 
 - [ ] **T14 · implementer — cierre**
-  - El mapa `R<n> → test` (R1–R33) va en `progress/impl_QT-315.md`.
+  - El mapa `R<n> → test` (R1–R34) va en `progress/impl_QT-315.md`.
   - `./init.sh` en verde.
   - Se comprueba R32: el diff no toca `db/` ni las dependencias de `package.json`.
   - Se corre `node scripts/archivos-en-vuelo.mjs --candidata QT-315` y el resultado se anota.
