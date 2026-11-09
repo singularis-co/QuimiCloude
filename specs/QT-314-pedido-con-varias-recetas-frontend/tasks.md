@@ -218,7 +218,7 @@
   - **Hecho:** cada spec de `## Archivos esperados > e2e`, corrido uno a uno con `pnpm exec
     playwright test <spec>` en verde, con la salida en `progress/impl_QT-314.md`.
   - **Cubre:** R49.
-- [ ] **T20** · frontend_dev · depende de T13–T19 y T16b — Guardias y convenciones:
+- [x] **T20** · frontend_dev · depende de T13–T19 y T16b — Guardias y convenciones:
   - `pedidos-convenciones.test.ts` sin los esquemas planos;
   - `guard-pedidos-rediseno` en verde con los archivos nuevos;
   - comprobación de que `package.json` no cambió;

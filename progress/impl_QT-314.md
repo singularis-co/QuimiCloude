@@ -1013,3 +1013,121 @@ Verificación (salida real):
 Bloqueos de la app: ninguno.
 
 Veredicto: lote B de T19 hecho. Los 13 specs del lote están en verde en chromium (12 adaptados y 1 sin tocar), y no se quitó ninguna comprobación.
+
+### T20 (frontend_dev) — guardias y convenciones
+
+Sin commit propio.
+
+Archivos modificados (solo `tests/`):
+- `tests/unit/pedidos-ui/pedidos-convenciones.test.ts`:
+  - Esquemas planos: el archivo no nombra ninguno. Grep de `createOrderWithLinesSchema|updateOrderWithLinesSchema|updateOrderLineDistributionSchema|requireSingleLineIdOf`: 0. Su único esquema, `createOrderSchema` en el caso negativo de R41, es hoy el nombre final del de `lines` y sigue publicado; no se toca.
+  - Bloque nuevo «QT-314 — el precio y el total solo se pintan en Pedidos (R43)»: barrido de `app/(private)/asignacion` (carpeta derivada de `ASSIGNED_ORDERS_ROUTE`) contra `salePrice|salePriceTotal|linesWithoutPrice` y contra el barrel de componentes de Pedidos, con su caso negativo.
+  - Bloque nuevo «QT-314 — la ficha no anade dependencias (R47)»: los commits `QT-314` de `origin/dev..HEAD` y el árbol no tocan `package.json` ni `pnpm-lock.yaml`. Las dependencias son las de la base de la rama (`git merge-base origin/dev HEAD`), con su caso negativo. Se salta, como los tres de QC-35, si el rango no tiene commits de la ficha.
+  - `archivosTocadosPorLaFeature` recibe la marca como parámetro, con `QC-35` por defecto. Los tres casos de QC-35 no cambian.
+- `tests/unit/pedidos/scope.test.ts`: la lista cerrada de specs E2E de pedidos pasa de SIETE a OCHO. Entra `e2e/pedidos-varias-recetas.spec.ts` (T18, R48), con su párrafo «AMPLIADA el 2026-11-09 (QT-314…)», como las ampliaciones anteriores. Es el rojo que dejó anotado T19 lote A.
+
+`guard-pedidos-rediseno`: en verde sin tocarlo. Barre 53 archivos de `app/(private)/pedidos/`, incluidas las piezas nuevas (`order-progress`, `order-detail-sheet`, `order-lines-table`, `order-line-sheet`, `order-line-picker-dialog`, `cancel-order-line-dialog`, `order-line-draft`, `order-line-actions`). Ninguna importa `Badge` ni declara un mapa propio.
+
+Comprobación de `package.json` (R47):
+- Base de la rama: `git merge-base origin/dev HEAD` = `1a830ee4e` (= `origin/dev`, merge de QT-313).
+- `git diff --stat origin/dev -- package.json pnpm-lock.yaml`: sin salida, exit 0.
+- `git diff --stat 1a830ee4e -- package.json pnpm-lock.yaml`: sin salida, exit 0.
+
+`e2e/helpers/order-distribution.ts > submitOrderWithLeftover`:
+- Ningún spec la importa: grep en `*.ts` da solo su definición, en la línea 99.
+- Ninguna guardia exige retirarla y el lint no lo marca (`0 errors`). El repo no tiene herramienta de código muerto (ni knip ni ts-prune).
+- **Se deja en su sitio. Queda para el reviewer.**
+
+#### T20 — Mapa de trazabilidad R1–R52 (frontend_dev)
+
+Cada fila se comprobó con `grep -F` sobre el nombre del caso en su archivo: 108 nombres de `tests/unit/pedidos-ui/` y los de `lib/`, `shared-ui` y `e2e` citados abajo. No falta ninguno. Rutas cortas: `ui/` = `tests/unit/pedidos-ui/`, `ped/` = `tests/unit/pedidos/`, `int/` = `tests/integration/pedidos/`.
+
+| R | Test (archivo › caso) |
+|---|---|
+| R1 | `ui/order-form.test.tsx` › «R1: cliente, prioridad, tabla vacía con su aviso, «Añadir receta» y «Guardar pedido» deshabilitado» |
+| R2 | `ui/order-form.test.tsx` › «R2: una fila por receta, en el orden del pedido…», «R2: debajo, el total del precio…»; `ui/order-lines-table.test.tsx` › «R2: cabeceras y, por receta…» |
+| R3 | `ui/order-form.test.tsx` › «R3: «Añadir receta» abre el sub-panel vacío…», «R3: el «Editar» de una receta abre el sub-panel con los valores de esa receta»; `ui/order-line-sheet.test.tsx` › «R3: al editar, cada campo viene con el valor de esa receta…» |
+| R4 | `ui/order-form.test.tsx` › «R4: una receta nueva aplicada queda al final…», «R4: una receta editada se queda en su sitio…», «R4: si un campo no pasa el esquema…» |
+| R5 | `ui/order-form.test.tsx` › «R5: «Descartar» cierra el sub-panel y deja la tabla como estaba», «R5: «Volver al pedido» tampoco añade la receta nueva» |
+| R6 | `ui/order-form.test.tsx` › «R6: añadir, editar y quitar recetas no llama a ninguna acción de guardado», «R6: cerrar el panel sin guardar pierde el borrador…» |
+| R7 | `ui/order-form.test.tsx` › «R7: el alta envía en una sola operación…», «R7: la edición envía las guardadas con su id, las nuevas sin él, y no envía las canceladas», «R7: dentro de `OrderSheet`, guardar cierra el panel, avisa con un toast y refresca el listado»; `ui/order-line-draft.test.ts` › «R7: envía las no canceladas en su orden…»; `e2e/pedidos-varias-recetas.spec.ts` › «R48 R7 R18 R21 R22 R28 R10 - …» |
+| R8 | `ui/order-line-sheet.test.tsx` › «R8: no deja aplicar la misma original…», «R8: sí deja aplicarla si su única otra aparición está cancelada» |
+| R9 | `ui/order-row-actions.test.tsx` › «R9: «Editar» habilitado en todo estado salvo ENTREGADO y CANCELADO, PARCIAL incluido»; `ui/order-detail-sheet.test.tsx` › «R9, R19: en PARCIAL «Editar» está habilitado…», «R9: en ENTREGADO «Editar» está deshabilitado», «R9: en CANCELADO «Editar» está deshabilitado»; `ui/order-line-actions.test.ts` › «R9: habilitado en todo estado salvo ENTREGADO y CANCELADO, PARCIAL incluido» |
+| R10 | `ui/order-form.test.tsx` › «R10: una receta guardada en un estado no editable sale con «Solo lectura»…», «R10: «Añadir receta» está disponible en PARCIAL y la de solo lectura viaja sin cambios»; `ui/order-lines-table.test.tsx` › «R10: las no editables y las canceladas salen con «Solo lectura»…»; `ped/order-line-predicates.test.ts` › «R10: editables solo PENDIENTE, EN_CURSO y BLOQUEADO; el resto, solo lectura» |
+| R11 | `ui/order-line-sheet.test.tsx` › «R11: una guardada en PENDIENTE o BLOQUEADO ofrece «Quitar receta»…», «R11: una guardada EN_CURSO no lo ofrece…»; `ped/order-line-predicates.test.ts` › «R11: se quitan solo PENDIENTE y BLOQUEADO; EN_CURSO no» |
+| R12 | `ui/order-form.test.tsx` › «R12: una cancelada sale en solo lectura y no suma…», «R12: con solo canceladas sale el aviso de R1…»; `ui/order-line-draft.test.ts` › «R12: una cancelada no suma…» |
+| R13 | `ui/order-line-sheet.test.tsx` › «R13: vacío es «sin precio»…», «R13: 0 es un precio válido…», «R13: un negativo se marca sin aplicar…»; `ui/order-line-draft.test.ts` › «R13: suma exacta…»; `ped/order-line-predicates.test.ts` › «R13: la suma es exacta, a cuatro decimales…» |
+| R14 | `ui/order-form-quote.test.tsx` › «R14: una receta guardada se cotiza con su propio identificador de receta», «R14: una receta nueva se cotiza sin identificador»; `ped/order-actions.test.ts` › «R14: la cotizacion entrega la entrada tal cual, con el orderLineId que manda el sub-panel» |
+| R15 | `ped/order-line-positions.test.ts` › «R15: alta de tres recetas con la segunda invalida responde recipe_not_found con la posicion [1]» (y los otros 7 por regla); `ped/order-actions.test.ts` › «R15: un fallo de receta trae su codigo, el mensaje del catalogo y su posicion, sin el diagnostico», «R15: las posiciones salen de menor a mayor y sin repetir» |
+| R16 | `ped/order-line-positions.test.ts` › «R16: linePositionsOf de un error ajeno al modulo, o de algo que no es un error, es []», «R16: un error del modulo que no es de receta no trae posiciones y su estado traducido no cambia» |
+| R17 | `ui/order-form-lines-error.test.tsx` › «R17: en el alta, el aviso nombra la receta con su número y marca su fila», «R17: la receta N es la fila de la tabla, aunque haya canceladas que no se envían», «R17: «Guardar bloqueada» reenvía el mismo pedido confirmando que se guarde bloqueado»; `tests/unit/shared-ui/notice-actions.test.tsx` › «R17: pinta las acciones dentro del aviso, debajo del texto y en su orden» |
+| R18 | `ui/order-detail-sheet.test.tsx` › «R18: la cabecera nombra el pedido, el cliente y la fecha de solicitud», «R18: el resumen lleva estado, prioridad, avance, totales con «N sin precio» y responsables», «R18: hay una tarjeta por receta, canceladas incluidas, en su orden», «R18: la receta cancelada enseña su estado y su motivo»; `ui/order-row-wiring.test.tsx` › «R18: «Ver detalle» abre el detalle de solo lectura del pedido elegido», «R18: el número de pedido de la fila abre el mismo detalle» |
+| R19 | `ui/order-detail-sheet.test.tsx` › «R19: no ofrece ningún control que cambie el pedido salvo «Editar»» |
+| R20 | `ui/order-columns.test.tsx` › «R20: con dos recetas pinta la primera y «+1 más»», «R20: N es el número de recetas del pedido menos una, canceladas incluidas», «R20: la columna «Motivo de cancelación» sigue en el listado» |
+| R21 | `ui/order-columns.test.tsx` › «R21: pinta «F de T» con su barra…»; `ui/order-progress.test.tsx` › «R21: la forma corta pinta «F de T»…»; `ui/order-cards.test.tsx` › «R44, R21: lleva la barra de avance…» |
+| R22 | `ui/order-columns.test.tsx` › «R22: el precio es el total del pedido y avisa de «N sin precio»», «R22: un total «sin coste» pinta el marcador de ausencia», «R22: con el total «sin precio» pinta el marcador de ausencia y el aviso» |
+| R23 | `ui/order-columns.test.tsx` › «R23: ningún id ni rótulo de presentación, y ninguna celda pinta el reparto»; `ui/order-cards.test.tsx` › «R15, R23: la tarjeta no repite columnas que no nombra…» |
+| R24 | `ped/order-view.test.ts` › «R24: OrderView y OrderSummary no declaran ninguno de los campos planos de la primera receta»; `ui/order-columns.test.tsx` › «R24: con la primera receta distinta del pedido plano, ninguna celda pinta el dato plano»; `ui/order-form.test.tsx` › «R2: ningún dato de receta sale de los campos planos del pedido»; `ui/order-sheet-responsibles.test.tsx` › «R51, R24: ningun dato de los campos planos del pedido sale en la ficha» |
+| R25 | `ui/order-row-actions.test.tsx` › «R25: en un PARCIAL que lo admite todo, las del pedido, «Por receta» y «Pedido entero», en ese orden», «R25: los rótulos van en la primera acción de una receta y en «Cancelar pedido», con su línea delante»; `tests/unit/shared-ui/row-actions-menu-group.test.tsx` › «R25: el rótulo sale justo antes de su ítem y nombra el grupo» |
+| R26 | `ui/order-row-actions.test.tsx` › «R26: un PARCIAL con una receta TERMINADO y otra PENDIENTE…», «R26: «Entregas…» no pide permiso propio»; `ui/order-line-actions.test.ts` › «R26: «Reparto y unidad» solo en POR_EMPACAR», «R26: «Entregar» solo en TERMINADO»; `ui/order-row-wiring.test.tsx` › «R26: sin el permiso, la fila no ofrece «Cancelar receta…»» |
+| R27 | `ui/order-line-picker-dialog.test.tsx` › «R27: una opción por receta…», «R27: pulsar una deshabilitada no emite nada», «R27: elegir una habilitada emite su lineId»; `ui/order-row-wiring.test.tsx` › «R27: una receta que no admite la acción no se puede elegir y el selector sigue abierto» |
+| R28 | `ui/cancel-order-line-dialog.test.tsx` › «R28: título, receta, pedido…», «R28: llama a `cancelOrderLineAction` con `id`, `lineId` y `reason`», «R28: con éxito cierra…», «R28: muestra el mensaje del catálogo, no se cierra y conserva el motivo»; `ui/order-row-wiring.test.tsx` › «R26, R27, R28: «Cancelar receta…» abre el selector y, elegida la receta, su diálogo con el pedido y la receta» |
+| R29 | `ped/order-actions-cancel-line.test.ts` › «R29: cancela la receta con el pedido, la receta y el motivo tal cual, y responde exito», «R29: una receta que ya no se puede cancelar responde not_cancellable con el mensaje del catalogo», «R29: una receta de otro pedido o quitada responde order_not_found», «R29: un motivo de 500 caracteres se acepta» |
+| R30 | `ui/order-distribution-dialog.test.tsx` › «R30: el diálogo viene con el reparto, la unidad y la cantidad de la receta, no con los del pedido», «R30: elegida la segunda receta en el selector, trae su reparto y guarda con su lineId» |
+| R31 | `ped/order-actions-distribution.test.ts` › «R31: en un pedido de dos recetas entrega la receta de la entrada, sin leer las del pedido ni rechazarlo», «R31: sin lineId, o con uno sin forma de uuid, responde invalid_input sin llamar a la fachada» |
+| R32 | `ui/order-delivery-sheet.test.tsx` › «R32: el panel lleva el nombre y la imagen de la receta elegida, no los del pedido», «R32: registra la entrega de esa receta con el pedido PARCIAL» |
+| R33 | `ped/get-order-delivery.test.ts` › «R33: una receta TERMINADO con el pedido PARCIAL devuelve solo su reparto y sus lotes», «R33: la receta es obligatoria: sin ella responde order_not_found sin consultar»; `int/order-delivery-by-line.int.test.ts` › «QT-314 R33, R35: con el pedido PARCIAL, cada receta lee solo su reparto y solo lo entregado de ella» |
+| R34 | `ui/order-deliveries-sheet.test.tsx` › «R34: pide solo las entregas de la receta elegida, también al releer tras anular», «R34: con la receta TERMINADO y sin el permiso de anular no ofrece «Anular»»; `ui/order-delivery-list.test.tsx` › «R34: …» por estado de receta |
+| R35 | `ped/list-order-deliveries.test.ts` › «R35: con la receta A solo salen sus lineas de entrega, con el total de envases de esas lineas», «R35: la vista lleva el estado de la receta y conserva el del pedido», «R35: la receta es obligatoria: sin ella responde order_not_found sin leer nada» |
+| R36 | `ui/cancel-order-dialog.test.tsx` › «R36: lista las cancelables y, aparte, las que se quedan como están»; `ui/order-row-actions.test.tsx` › «R36: «Cancelar pedido» se pinta siempre y se habilita solo si alguna receta es cancelable»; `ui/order-whole-actions.test.tsx` › «R36: desde la fila de un PARCIAL, el diálogo nombra las que se cancelan y las que se quedan» |
+| R37 | `ui/order-row-actions.test.tsx` › «R37: «Eliminar» se pinta siempre y se habilita si el pedido y todas sus recetas se pueden borrar»; `ui/order-whole-actions.test.tsx` › «R37: los casos cubren las dos ramas de la regla»; `ped/order-line-predicates.test.ts` › «R37: un pedido PARCIAL se borra si…» |
+| R38 | `ui/order-sheet-responsibles.test.tsx` › «R38: con una receta activa %s, «Responsables» abre y ofrece los controles de escritura», «R38: sin ninguna receta activa que lo admita…»; `ui/order-row-actions.test.tsx` › «R38: «Responsables» está habilitado en todos los estados, PARCIAL incluido», «R38: en PARCIAL «Cliente» está habilitado y emite el cambio de cliente» |
+| R39 | `ui/order-columns.test.tsx` › «R39: un pedido PARCIAL se pinta «Parcial» con el tono `progress`»; `tests/unit/shared-ui/order-status.test.ts` › «R53 — se nombra «Parcial» con el tono progress» (QT-313, mapa único). El estado de cada receta con el mismo `OrderStatusBadge`: `ui/order-detail-sheet.test.tsx` › «R18: cada tarjeta lleva nombre, estado, …» y `ui/order-sheet-responsibles.test.tsx` › «R51: la receta cancelada sale con su estado» (ver nota 2) |
+| R40 | `ped/order-input-lines.test.ts` › «R40: createOrderSchema y updateOrderSchema son un pedido con lines; updateOrderDistributionSchema lleva lineId», «R40: una receta suelta, sin lines, ya no es un pedido valido» |
+| R41 | `ped/order-actions.test.ts` › «R41: el alta de tres recetas llega intacta al caso de uso, sin rechazarla por su numero de recetas», «R41: la edicion de tres recetas (dos guardadas y una nueva) llega intacta al caso de uso», «R41: ninguna de las dos lee las recetas del pedido para completar la entrada» |
+| R42 | `ped/order-actions-cancel-line.test.ts` › «R42: sin pedidos.modificar responde unauthorized», «R42: sin sesion el actor llega null y responde unauthorized»; `ui/order-list-section.test.tsx` › «R26, R42: con pedidos.modificar, un pedido con una receta cancelable la ofrece», «R26, R42: sin pedidos.modificar no la ofrece» |
+| R43 | `ui/pedidos-convenciones.test.ts` › «R43: ninguna pantalla de asignaciones lee el precio o el total del pedido ni monta piezas de Pedidos», «R43: y la guardia FALLA ante el precio o el barrel de pedidos, sin morder a lo legitimo» |
+| R44 (enmendado F2.1) | `ui/order-cards.test.tsx` › «R44: el pie lleva la prioridad y «Acciones», sin un botón «Ver detalle» aparte», «R44: tocar el número de pedido abre el detalle», «R44: «Ver detalle» dentro de «Acciones» abre el detalle», «R44: el título es la primera receta con «+N más»»; `ui/order-lines-table.test.tsx` › «R44: la tabla pasa a tarjetas por debajo de 768 px…»; `ui/order-line-sheet.test.tsx` › «R44: en el teléfono el sub-panel ocupa todo el ancho; en tablet y escritorio se apila a la derecha»; `ui/order-line-picker-dialog.test.tsx` › «R44: cada opción mide al menos 52 px…», «R44: es un diálogo centrado…»; `e2e/pedidos-rediseno.spec.ts` › «a 390 px: los paneles de alta, edición y entrega ocupan toda la pantalla con el pie visible (R19)» (ver nota 1) |
+| R45 | `ui/order-line-sheet.test.tsx` › «R44: en el teléfono el sub-panel ocupa todo el ancho; en tablet y escritorio se apila a la derecha»; `ui/pedidos-viewport.test.tsx` › «el desbordamiento se resuelve DENTRO de la tabla, no en el documento (R22)» (heredado de QC, sin cambios; ver nota 3) |
+| R46 | `ui/order-line-sheet.test.tsx` › «R46: el sub-panel entra con la misma curva y duración que el panel»; `ui/order-form-lines-error.test.tsx` › «R46: el aviso de error por receta entra con la animación de los avisos»; `ui/order-progress.test.tsx` › «R46: la barra anima el cambio de ancho…» |
+| R47 | `ui/pedidos-convenciones.test.ts` › «R47: la ficha no toca package.json ni pnpm-lock.yaml, y las dependencias son las de su base», «R47: y la guardia FALLA ante cualquiera de los dos manifiestos» |
+| R48 | `e2e/pedidos-varias-recetas.spec.ts` › «R48 R7 R18 R21 R22 R28 R10 - dos recetas con precio, detalle con avance y totales, cancelar una libera su material y deja de sumar, y Editar anade otra» |
+| R49 | Los 26 specs de T19 (lotes A y B), en verde en chromium. Por ejemplo, `e2e/pedidos.spec.ts` › «el Administrador entra, da de alta un pedido, lo ve por su correlativo y lo cancela con motivo (R48, R29)»; `e2e/pedido-bloqueado.spec.ts` › «R40, R7, R13, R14, R31 - un pedido sin material se guarda bloqueado…»; `e2e/entregar-producto-terminado.spec.ts` › «entrega parcial a otro cliente con el borrador tras recargar…». Hay una fila por spec en las tablas de «T19 lote A» y «T19 lote B» |
+| R50 | `ui/order-form.test.tsx` › «R50: muestra el mensaje del catálogo, el panel sigue abierto y el borrador intacto», «R50: no hay regla propia de «sin cambios»…» |
+| R51 (F2.1) | `ui/order-sheet-responsibles.test.tsx` › «R51: una fila por receta en el orden del pedido, canceladas incluidas», «R51: cada fila lleva el nombre, la cantidad con su unidad, el reparto y el estado de su receta», «R51: la receta cancelada sale con su estado», «R51, R24: ningun dato de los campos planos del pedido sale en la ficha» (T16b) |
+| R52 (F2.1) | `ui/order-delivery-draft.test.ts` › «R52: dos recetas del mismo pedido guardan cada una su borrador y se leen cada una con lo suyo», «R52: abrir la segunda receta no borra ni cambia el borrador de la primera», «R52: el borrador de una receta no se carga en otra: la otra empieza uno nuevo»; `ui/order-delivery-sheet.test.tsx` › «R52: abre «Entregar» en dos recetas y, al volver a la primera, trae su borrador; la segunda no lo hereda» (T16b) |
+
+Tests de QT-313 R44 y R54, retirados o reorientados:
+- **QT-313 R44** (la pantalla manda una sola receta):
+  - `ped/order-actions.test.ts`: «R44: el alta envia una linea…» y «R44: editar desde el formulario un pedido de dos lineas responde invalid_input…» se reescribieron a los tres R41 (T13).
+  - `int/order-lines-use-cases.int.test.ts` y `ped/order-view-lines.test.ts` («el pedido conserva los planos») se reorientaron a R24 (T17). Hoy son «QT-314 R24, QT-313 R1: la receta, cantidad, unidad, precio y coste de la ficha salen solo de sus lineas…» y «QT-314 R24: un pedido de una linea lleva sus datos solo en la linea, sin campos planos en el pedido».
+  - Queda **un** caso que conserva la etiqueta: `tests/integration/asignaciones/order-lines-execution.int.test.ts:411`, «QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real de la linea…».
+    - T17 ya lo ajustó: lee `vista.lines[0]?.actualCost` y `vista.actualCostTotal`, no campos planos.
+    - Lo que comprueba sigue siendo válido (QT-313 R45). Solo la etiqueta «R44» quedó vieja. No se renombra aquí: es un `.int` de `asignaciones`, fuera del alcance de T20.
+- **QT-313 R54** (`PARCIAL` como estado final en la pantalla), todos en `ui/order-row-actions.test.tsx`:
+  - El caso «R54: editar, cancelar y eliminar deshabilitados…» se reescribió a R9, R26, R36 y R38.
+  - «R54: PARCIAL es final y no acepta la edicion acotada de reparto» se retiró; lo sustituye R26.
+  - Se retiraron también los bloques de los mapas por estado del pedido (T15).
+  - Grep de `QT-313 R54|'R54` en `tests/` y `e2e/`: ningún caso de pedidos. Los «R54» que salen son de otras fichas (QC-137, whatsapp, inventario…).
+
+Notas para el reviewer (coberturas parciales; ningún R se queda sin test):
+1. **R44.** Ningún test mide que el **detalle** ocupe la pantalla entera en el teléfono.
+   - El E2E de 390 px mide el panel de alta y edición y el de entrega.
+   - El código lo cumple: `order-detail-sheet.tsx` lleva `w-full … data-[side=right]:w-full sm:max-w-lg`, como el sub-panel.
+2. **R39.** El tono de cada receta (tarjeta del detalle, ficha de responsables, selector) se comprueba por su `data-status` sobre el mismo `OrderStatusBadge`, y no con un caso propio «R39» por superficie. `guard-pedidos-rediseno` impide que haya un mapa propio.
+3. **R45.** El desplazamiento horizontal de la tabla en tablet lo da `DataTable`, y lo cubre el caso heredado de `pedidos-viewport` (con la etiqueta R22 de QC). No hay caso nuevo con la etiqueta QT-314 R45: T15 lo dejó anotado.
+
+Verificación (salida real):
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87) · Tests 1333 passed | 22 skipped (1355)`.
+- `pnpm exec vitest run tests/guards/guard-pedidos-rediseno.test.ts`: `Test Files 1 passed (1) · Tests 2 passed (2)`.
+- `pnpm exec vitest run tests/unit/pedidos/scope.test.ts`:
+  - antes del cambio: `Tests 1 failed | 9 passed (10)`. Faltaba `e2e/pedidos-varias-recetas.spec.ts`.
+  - después, junto con `pedidos-convenciones`: `Test Files 2 passed (2) · Tests 34 passed | 3 skipped (37)`.
+  - Los 3 saltados son los casos de diff de QC-35, que no tiene commits en el rango. Los 4 casos nuevos de QT-314 corren y pasan; el de R47 no se salta.
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos preexistentes. `eslint` sobre los 2 archivos tocados: `No issues found`, exit 0.
+- No se corrió `vitest related` ni la suite completa.
+
+Bloqueos: ninguno. Ningún R1–R52 se queda sin test. Las tres coberturas parciales están arriba, en las notas para el reviewer.
+
+Veredicto: T20 hecha. Guardias en verde, R43 y R47 con guardia propia, la lista E2E de pedidos cerrada en ocho, y el mapa con las 52 filas comprobadas contra el código.
