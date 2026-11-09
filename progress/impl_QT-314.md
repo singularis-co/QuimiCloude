@@ -604,6 +604,9 @@ Verificación (salida real, `pnpm exec vitest run <archivo>` uno a uno):
 | `guard-formularios-y-acciones` | 20 passed, 3 skipped |
 | `guard-pantalla-pedidos-se-amplia` | 8 passed, 2 skipped |
 | `guard-piezas-base` | 25 passed, 1 skipped |
+| `guard-pedidos-rediseno` | 2 passed |
+| `pedidos-convenciones` | 20 passed, 3 skipped |
+| `delivery-void-dialog` | 20 passed |
 
 - `pnpm run typecheck`: solo `app/layout.tsx(45,56) LayoutProps` (ajeno). Ya no fallan `order-deliveries-sheet.tsx(39)` ni `order-delivery-sheet.tsx(128)`.
 - `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos en archivos ajenos.
@@ -626,3 +629,29 @@ Bloqueos de T16 (no improvisados):
 - R44 (pie de la tarjeta) sigue abierto desde T15. T16 no lo toca.
 
 Veredicto: T16 hecha salvo la ficha de `order-responsibles-sheet.tsx`, que espera decisión. Los diálogos trabajan por receta, sus tests están en verde y en el typecheck solo queda `LayoutProps`.
+
+### Cierre de la Tanda 3 (implementer, salida real, 2026-11-09)
+
+Commits: `91750769b` (T13), `0e4c22523` (T14), `a48f82d17` (T15), `c460b0302` (T16) y el de este cierre.
+
+- `pnpm exec tsc --noEmit -p .`: solo `app/layout.tsx(45,56) TS2304 LayoutProps` (conocido, faltan `.next/types`).
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos en archivos ajenos.
+- `tests/unit/pedidos-ui/` (66 archivos) en 11 lotes de 6, `pnpm exec vitest run <6 archivos>`: 11/11 lotes en verde,
+  1067 tests pasados y 3 saltados (44, 160, 98, 124, 84, 101, 94, 115, 85, 79+3 skip, 83).
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1333 passed | 22 skipped (1355)`.
+- `.int` tocados en la tanda, uno a uno, con `.env` copiado del worktree principal (verification.md: cada corrida
+  crea y borra su base efímera `qct_*`; no toca la de desarrollo):
+  - `order-delivery-by-line.int.test.ts`: 2 passed
+  - `order-delivery-void.int.test.ts`: 16 passed
+  - `order-delivery.int.test.ts`: 25 passed
+- **Rojo encontrado y arreglado:** `tests/unit/shared-ui/catalogo-qc256.test.ts` (6 fallos, no está en
+  `tests/baseline-rojos.json`). Lo causó la Tanda 2: T6 y T7 añadieron los tres tableros de
+  `PedidosVariasRecetas*` a la columna Diseño de `RowActionsMenu` y `Notice` en `CATALOGO.md`, y el test
+  compara esa celda exacta. Se actualizó lo que espera, igual que hizo QC-265 (`b2f85353a`) con el segundo
+  tablero de `Notice`. Tras el cambio: 6 passed.
+- **Incidente de verificación:** el último lote del bucle salió con argumentos vacíos y `vitest run` corrió
+  la suite unitaria entera una vez (1694 archivos en verde, 1 rojo: el `catalogo-qc256` de arriba). No fue
+  intencionado. No sustituye al gate de CI.
+
+Bloqueos abiertos al cerrar la tanda (detalle en «Bloqueos»): R44 pie de la tarjeta (T15), ficha de solo
+lectura de `order-responsibles-sheet.tsx` (T16, condiciona T17) y borrador de entrega por pedido (T16).
