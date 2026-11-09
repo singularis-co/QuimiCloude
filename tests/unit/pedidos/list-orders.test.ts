@@ -279,7 +279,7 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items[0]?.recipeName).toBe('Acido citrico 50%')
+    expect(salida.items[0]?.lines[0]?.recipeName).toBe('Acido citrico 50%')
     expect(salida.items[0]?.numberText).toBe('2026-0000001')
   })
 
@@ -288,8 +288,8 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items[0]?.recipeId).toBe(RECETA_B)
-    expect(salida.items[0]?.recipeName).toBe('Formula retirada')
+    expect(salida.items[0]?.lines[0]?.recipeId).toBe(RECETA_B)
+    expect(salida.items[0]?.lines[0]?.recipeName).toBe('Formula retirada')
   })
 
   it('si el id no vuelve del catalogo, el nombre es null y la fila SIGUE apareciendo', async () => {
@@ -300,8 +300,8 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(salida.items).toHaveLength(1)
-    expect(salida.items[0]?.recipeName).toBeNull()
-    expect(salida.items[0]?.recipeVersion).toBeNull()
+    expect(salida.items[0]?.lines[0]?.recipeName).toBeNull()
+    expect(salida.items[0]?.lines[0]?.recipeVersion).toBeNull()
   })
 
   it('R11: un pedido con version sale con el nombre compuesto y su recipeVersion; uno con original, con null', async () => {
@@ -327,15 +327,15 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items[0]?.recipeId).toBe(VERSION)
-    expect(salida.items[0]?.recipeName).toBe('Acido citrico 50% · Sin perfume')
-    expect(salida.items[0]?.recipeVersion).toEqual({
+    expect(salida.items[0]?.lines[0]?.recipeId).toBe(VERSION)
+    expect(salida.items[0]?.lines[0]?.recipeName).toBe('Acido citrico 50% · Sin perfume')
+    expect(salida.items[0]?.lines[0]?.recipeVersion).toEqual({
       originalId: RECETA_A,
       originalName: 'Acido citrico 50%',
       versionName: 'Sin perfume',
     })
-    expect(salida.items[1]?.recipeName).toBe('Acido citrico 50%')
-    expect(salida.items[1]?.recipeVersion).toBeNull()
+    expect(salida.items[1]?.lines[0]?.recipeName).toBe('Acido citrico 50%')
+    expect(salida.items[1]?.lines[0]?.recipeVersion).toBeNull()
     // Sigue siendo UNA llamada al catalogo para versiones y originales.
     expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
   })
@@ -366,7 +366,7 @@ describe('listOrders — lo que devuelve cada fila (R43, R44, R46, R29)', () => 
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items.map((item) => item.recipeImageUrl)).toEqual([URL_A, URL_A, null])
+    expect(salida.items.map((item) => item.lines[0]?.recipeImageUrl)).toEqual([URL_A, URL_A, null])
     expect(d.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
   })
 
@@ -750,7 +750,7 @@ describe('listOrders (y getOrder) — las lecturas no recalculan el coste (R12)'
 
     const salida = await createListOrders(vigilado)({ page: 1 }, ADMIN)
 
-    expect(salida.items[0]?.ingredientsCost).toBe('150.0000')
+    expect(salida.items[0]?.lines[0]?.ingredientsCost).toBe('150.0000')
   })
 })
 
@@ -814,15 +814,15 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
 
     expect(d.findRefs).toHaveBeenCalledTimes(1)
     expect(d.findRefs.mock.calls[0]?.[0]).toEqual([PRESENTACION_A, PRESENTACION_B])
-    expect(salida.items[0]?.presentationLines).toEqual([
+    expect(salida.items[0]?.lines[0]?.presentationLines).toEqual([
       { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
       { presentationId: PRESENTACION_B, presentationName: 'Botella 1L', packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
-    expect(salida.items[1]?.presentationLines).toEqual([
+    expect(salida.items[1]?.lines[0]?.presentationLines).toEqual([
       { presentationId: PRESENTACION_A, presentationName: 'Bidon 20L', packages: 3, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
     // R27: sin reparto, lista vacia; no es un error de carga.
-    expect(salida.items[2]?.presentationLines).toEqual([])
+    expect(salida.items[2]?.lines[0]?.presentationLines).toEqual([])
   })
 
   it('R27: ninguna llamada al catalogo de presentaciones si ningun pedido de la pagina tiene reparto', async () => {
@@ -831,7 +831,7 @@ describe('listOrders — el reparto del pedido (R21, R22, R26, R27)', () => {
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(d.findRefs).not.toHaveBeenCalled()
-    expect(salida.items.every((item) => item.presentationLines.length === 0)).toBe(true)
+    expect(salida.items.every((item) => item.lines[0]?.presentationLines.length === 0)).toBe(true)
   })
 
   it('R21: ordenar o filtrar por presentacion se OMITE y se anota, como cualquier campo no declarado', async () => {
@@ -875,9 +875,9 @@ describe("listOrders — la unidad del pedido (R42, [Q4] deroga QC-35bis)", () =
 
     expect(d.findUnitRefs).toHaveBeenCalledTimes(1)
     expect(d.findUnitRefs.mock.calls[0]?.[0]).toEqual([UNIDAD_A])
-    expect(salida.items[0]?.unitLabel).toBe('L')
-    expect(salida.items[1]?.unitLabel).toBe('L')
-    expect(salida.items[2]?.unitLabel).toBeNull()
+    expect(salida.items[0]?.lines[0]?.unitLabel).toBe('L')
+    expect(salida.items[1]?.lines[0]?.unitLabel).toBe('L')
+    expect(salida.items[2]?.lines[0]?.unitLabel).toBeNull()
   })
 
   it('R42: ninguna llamada al catalogo de unidades si ningun pedido de la pagina tiene unidad', async () => {
@@ -886,7 +886,7 @@ describe("listOrders — la unidad del pedido (R42, [Q4] deroga QC-35bis)", () =
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
     expect(d.findUnitRefs).not.toHaveBeenCalled()
-    expect(salida.items.every((item) => item.unitLabel === null)).toBe(true)
+    expect(salida.items.every((item) => item.lines[0]?.unitLabel === null)).toBe(true)
   })
 
   it('sin simbolo, la etiqueta cae al nombre de la unidad', async () => {
@@ -897,7 +897,7 @@ describe("listOrders — la unidad del pedido (R42, [Q4] deroga QC-35bis)", () =
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items[0]?.unitLabel).toBe('Litro')
+    expect(salida.items[0]?.lines[0]?.unitLabel).toBe('Litro')
   })
 })
 
@@ -1104,14 +1104,14 @@ describe('QC-305 — listOrders: el coste real y quien lo ve (R24)', () => {
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items.map((item) => [item.id, item.actualCost])).toEqual([
+    expect(salida.items.map((item) => [item.id, item.actualCostTotal])).toEqual([
       ['o-1', '142.5000'],
       ['o-2', null],
     ])
-    expect(salida.items[0]?.actualCost).toMatch(/^\d+\.\d{4}$/)
-    for (const item of salida.items) expect(item).toHaveProperty('actualCost')
+    expect(salida.items[0]?.actualCostTotal).toMatch(/^\d+\.\d{4}$/)
+    for (const item of salida.items) expect(item).toHaveProperty('actualCostTotal')
     // El real no pisa el estimado.
-    expect(salida.items[0]?.ingredientsCost).toBe('150.0000')
+    expect(salida.items[0]?.lines[0]?.ingredientsCost).toBe('150.0000')
   })
 
   for (const [etiqueta, actor] of [
@@ -1143,7 +1143,7 @@ describe('QC-307 — listOrders: el precio de venta', () => {
 
     const salida = await createListOrders(d)({ page: 1 }, ADMIN)
 
-    expect(salida.items.map((item) => item.salePrice)).toEqual(['1250.5000', null])
+    expect(salida.items.map((item) => item.lines[0]?.salePrice)).toEqual(['1250.5000', null])
   })
 
   for (const [etiqueta, actor] of [

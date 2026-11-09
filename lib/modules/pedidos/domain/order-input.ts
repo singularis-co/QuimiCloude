@@ -120,41 +120,6 @@ export const ORDER_DISTRIBUTION_PACKAGES_FIELD = 'presentationLines.packages';
 export const ORDER_DISTRIBUTION_PACKAGING_FIELD = 'presentationLines.packagingProductId';
 
 /**
- * Alta (R8, R9). Lo que este esquema NO declara, no puede llegar: no hay `status`, ni
- * `cancellationReason`, ni `orderYear`/`orderSequence`, ni `createdAt`, ni `createdBy` /
- * `updatedBy`. `z.object` DESCARTA las claves desconocidas, asi que un cliente que las envie
- * no consigue nada (R6, R9). El estado de alta es siempre `PENDIENTE` y lo pone el caso de
- * uso; el correlativo lo entrega la secuencia de la base (R11); los dos autores salen de la
- * sesion (R6).
- *
- * La prioridad es OPCIONAL en la entrada y su ausencia significa `BAJA` (R9). El defecto se
- * aplica AQUI y no en el caso de uso para que la salida del `parse` no tenga un campo
- * opcional que cada llamante tenga que volver a resolver; la constante es la del dominio
- * (`DEFAULT_ORDER_PRIORITY`), no un literal repetido.
- */
-export const createOrderSchema = z.object({
-  recipeId: recipeIdSchema,
-  quantity: quantitySchema,
-  priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
-  unitId: unitIdSchema,
-  presentationLines: presentationLinesSchema,
-  /** Permiso explicito para guardar el pedido bloqueado si el material no alcanza. No elige el
-   *  estado: si al escribir alcanza, el pedido queda pendiente igual. */
-  confirmBlocked: z.boolean().default(false),
-  // El formulario envia '' cuando se elige «Original».
-  recipeVersionId: z
-    .preprocess((value) => (value === '' ? null : value), z.string().uuid().nullable())
-    .default(null),
-  // Sin `.uuid()`: un id sin forma tiene que acabar en `customer_not_found`, no en
-  // `invalid_input`. Ausente o vacio es un pedido sin cliente.
-  customerId: z
-    .string()
-    .optional()
-    .transform((value) => (value === undefined || value.trim() === '' ? null : value)),
-  salePrice: salePriceSchema,
-});
-
-/**
  * Los estados que una EDICION puede escribir (R24). Se DERIVA de `ORDER_STATUS_VALUES`
  * quitando `'CANCELADO'`, y no se escribe a mano: asi, el dia que aparezca un quinto estado,
  * quien lo anada tiene que decidir explicitamente si es editable en vez de heredarlo por
@@ -165,17 +130,6 @@ export type EditableOrderStatus = Exclude<OrderStatus, 'CANCELADO'>;
 export const EDITABLE_STATUS_VALUES: readonly EditableOrderStatus[] = ORDER_STATUS_VALUES.filter(
   (status): status is EditableOrderStatus => status !== 'CANCELADO',
 );
-
-/**
- * Edicion: REEMPLAZO COMPLETO del conjunto de datos de negocio. Un
- * parche parcial obligaria a distinguir «campo ausente» de «campo puesto a nulo». El coste:
- * subir la prioridad obliga a reenviar todo el pedido.
- *
- * La edicion ya no mueve el estado: un `status` que llegue en la entrada muere aqui, como
- * cualquier otra clave que el esquema no declare -`z.object` la descarta-, el mismo criterio
- * que el alta. Tampoco hay campo `reason`: cancelar es `cancelOrder` y solo el.
- */
-export const updateOrderSchema = createOrderSchema;
 
 /**
  * Cancelacion (R27). El tope de 500 vive AQUI, en la validacion de aplicacion, y no en el tipo
@@ -189,10 +143,12 @@ export const cancelOrderSchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 
+// '' es «Original»: la receta sin version.
 const recipeVersionIdSchema = z
   .preprocess((value) => (value === '' ? null : value), z.string().uuid().nullable())
   .default(null);
 
+// Sin `.uuid()`: un id sin forma tiene que acabar en `customer_not_found`, no en `invalid_input`.
 const customerIdSchema = z
   .string()
   .optional()
@@ -215,6 +171,11 @@ function hasNoRepeatedLineId(lines: readonly { readonly id?: string | undefined 
   return new Set(ids).size === ids.length;
 }
 
+/**
+ * Lo que el esquema no declara no llega: `z.object` descarta `status`, motivo, correlativo y
+ * autores. El estado de alta lo pone el caso de uso y los autores salen de la sesion. La prioridad
+ * ausente es la de defecto del dominio, aplicada aqui para que nadie tenga que volver a resolverla.
+ */
 const orderWithLinesSchema = z.object({
   lines: z
     .array(orderLineInputSchema)
@@ -222,34 +183,22 @@ const orderWithLinesSchema = z.object({
     .refine(hasNoRepeatedLineId, { message: 'Cada línea aparece una sola vez.' }),
   priority: prioritySchema.default(DEFAULT_ORDER_PRIORITY),
   customerId: customerIdSchema,
+  /** Permiso para guardar el pedido bloqueado si el material no alcanza; no elige el estado. */
   confirmBlocked: z.boolean().default(false),
 });
 
-// Conviven con `createOrderSchema` y `updateOrderSchema` mientras los casos de uso sigan con una
-// sola receta; al pasarlos a lineas, estos toman esos nombres.
-export const createOrderWithLinesSchema = orderWithLinesSchema.refine(
+export const createOrderSchema = orderWithLinesSchema.refine(
   (order) => order.lines.every((line) => line.id === undefined),
   { message: 'Una línea nueva no trae identificador.', path: ['lines'] },
 );
 
-export const updateOrderWithLinesSchema = orderWithLinesSchema;
+/** Reemplazo completo: una receta guardada que no llega se quita, y una sin `id` es nueva. */
+export const updateOrderSchema = orderWithLinesSchema;
 
 export const cancelOrderLineSchema = cancelOrderSchema;
 
-export const updateOrderLineDistributionSchema = z
-  .object({
-    lineId: z.string().uuid(),
-    unitId: unitIdSchema,
-    presentationLines: presentationLinesSchema,
-    confirmBlocked: z.boolean().default(false),
-  })
-  .strict();
-
 export type OrderLineInput = z.infer<typeof orderLineInputSchema>;
-export type CreateOrderWithLinesInput = z.infer<typeof createOrderWithLinesSchema>;
-export type UpdateOrderWithLinesInput = z.infer<typeof updateOrderWithLinesSchema>;
 export type CancelOrderLineInput = z.infer<typeof cancelOrderLineSchema>;
-export type UpdateOrderLineDistributionInput = z.infer<typeof updateOrderLineDistributionSchema>;
 
 /**
  * QC-57 (R25): **`listOrdersSchema` DESAPARECIO.** El listado de pedidos ya no tiene forma
@@ -274,9 +223,9 @@ export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
 
 /**
- * Receta, cantidad y unidad, con la MISMA regla que el alta -`pick` hereda la
+ * Receta, cantidad y unidad, con la MISMA regla que una receta del pedido -`pick` hereda la
  * forma UUID y el patron decimal sin copiarlos-. Sin unidad no hay cotizacion: la necesidad se
- * expresa en la unidad del pedido. Un `companyId` en la entrada no llega a
+ * expresa en la unidad de la receta. Un `companyId` en la entrada no llega a
  * ninguna parte: `z.object` descarta las claves de mas.
  *
  * `orderLineId` es OPCIONAL y solo llega al editar una linea que ya existe: lo que esa linea tiene
@@ -284,7 +233,7 @@ export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
  * no abre ninguna lectura de la linea: el identificador viaja como cadena opaca hasta
  * `findCostingBatches`.
  */
-export const quoteOrderCostSchema = createOrderSchema
+export const quoteOrderCostSchema = orderLineInputSchema
   .pick({ recipeId: true, quantity: true, unitId: true })
   .extend({ orderLineId: z.string().uuid().optional(), presentationLines: distributionLinesSchema.optional() });
 
@@ -294,11 +243,10 @@ export type QuoteOrderCostInput = Omit<z.infer<typeof quoteOrderCostSchema>, 'pr
 };
 
 /**
- * «Cuanto queda disponible», de solo lectura. Comparte forma con el
- * alta -misma cantidad, misma unidad, mismo reparto- porque el calculo se hace ANTES de
- * guardar, con los mismos tres datos que `createOrderSchema` ya valida.
+ * «Cuanto queda disponible», de solo lectura. Comparte forma con una receta del pedido -misma
+ * cantidad, misma unidad, mismo reparto- porque el calculo se hace ANTES de guardar.
  */
-export const orderPresentationAvailabilitySchema = createOrderSchema.pick({
+export const orderPresentationAvailabilitySchema = orderLineInputSchema.pick({
   quantity: true,
   unitId: true,
   presentationLines: true,
@@ -307,7 +255,7 @@ export const orderPresentationAvailabilitySchema = createOrderSchema.pick({
 export type OrderPresentationAvailabilityInput = z.infer<typeof orderPresentationAvailabilitySchema>;
 
 /**
- * La edicion ACOTADA «Reparto y unidad» en `POR_EMPACAR`. A
+ * La edicion ACOTADA «Reparto y unidad» de una receta, nombrada por `lineId`. A
  * diferencia de `createOrderSchema`/`updateOrderSchema` -que cubren el pedido ENTERO y
  * descartan las claves de mas en silencio-, este esquema es `.strict()`: la cantidad, la
  * receta o los responsables no se ignoran, RECHAZAN la entrada entera, porque este formulario
@@ -315,6 +263,7 @@ export type OrderPresentationAvailabilityInput = z.infer<typeof orderPresentatio
  */
 export const updateOrderDistributionSchema = z
   .object({
+    lineId: z.string().uuid(),
     unitId: unitIdSchema,
     presentationLines: presentationLinesSchema,
     confirmBlocked: z.boolean().default(false),

@@ -216,7 +216,8 @@ const ANCLAS_DE_LA_PANTALLA: Readonly<Record<string, readonly string[]>> = {
     'OrderRowAction',
     'OrderRowActions',
     'OrderRowActionsProps',
-    'isFinalOrderStatus',
+    // `isFinalOrderStatus` salió con QT-314 (tasks T15): la habilitación del menú pasa a mirar las
+    // recetas del pedido (R9, R26, R36, R37) y el predicado por estado del pedido deja de existir.
     'orderRowActionsSpec',
   ],
   'order-sheet.tsx': [

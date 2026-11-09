@@ -78,8 +78,14 @@ import {
   DISTRIBUTION_AVAILABLE_TESTID,
   openOrderRowMenu,
   orderMenuTrigger,
-  submitOrderWithLeftover,
 } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  openEditOrderLine,
+  saveOrder,
+} from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 
@@ -118,7 +124,6 @@ const RECIPE_STEPS: readonly RecipeStepDocument[] = [
 ];
 
 const ORDERS_TITLE_TESTID = 'pedidos-title';
-const ORDER_CREATE_OPEN_TESTID = 'order-create-open';
 const ORDER_ACTION_EDIT_TESTID = 'order-action-edit';
 const ORDER_FORM_TESTID = 'order-form';
 const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
@@ -511,28 +516,30 @@ test.describe('coste real de producción', () => {
     // --- 1. Alta por la pantalla: 6 l en 6 envases de 1 l.
     await loginAndLand(page, adminUser);
     await openOrders(page);
-    await page.getByTestId(ORDER_CREATE_OPEN_TESTID).first().click();
-    const form = page.getByTestId(ORDER_FORM_TESTID);
-    await expect(form).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta, el reparto y la cotizacion viven en el sub-panel de la receta.
+    const form = await openCreateOrderPanel(page);
+    const sheet = await openAddOrderLine(page, form);
 
-    const recipePicker = form.getByTestId(RECIPE_PICKER_TESTID);
+    const recipePicker = sheet.getByTestId(RECIPE_PICKER_TESTID);
     await recipePicker.click();
     await recipePicker.fill(RECIPE_NAME);
     const recipeOption = page.getByTestId(RECIPE_PICKER_OPTION_TESTID).filter({ hasText: RECIPE_NAME });
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
-    await expect(form.getByTestId(RECIPE_PICKER_VALUE_TESTID)).toHaveValue(recipeId);
+    await expect(sheet.getByTestId(RECIPE_PICKER_VALUE_TESTID)).toHaveValue(recipeId);
 
-    await form.getByTestId(ORDER_QUANTITY_FIELD_TESTID).fill(ORDER_QUANTITY);
-    await form.getByTestId(UNIT_SELECT_TESTID).click();
+    await sheet.getByTestId(ORDER_QUANTITY_FIELD_TESTID).fill(ORDER_QUANTITY);
+    await sheet.getByTestId(UNIT_SELECT_TESTID).click();
     await page.locator(`[data-testid="${UNIT_OPTION_TESTID}"][data-value="${litroUnitId}"]`).click();
-    await expect(form.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toBeVisible({ timeout: 60_000 });
-    await addPackagingLine(page, form, packaging, String(PLANNED_PACKAGES));
-    await expect(form.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute('data-state', 'ready', {
+    await expect(sheet.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toBeVisible({ timeout: 60_000 });
+    await addPackagingLine(page, sheet, packaging, String(PLANNED_PACKAGES));
+    await expect(sheet.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute('data-state', 'ready', {
       timeout: 60_000,
     });
-    await expect(page.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).toHaveText(/\d/, { timeout: 60_000 });
+    await expect(sheet.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).toHaveText(/\d/, { timeout: 60_000 });
 
+    // QT-314: «Aplicar» devuelve la receta al panel; «Guardar pedido» da el alta.
+    await applyOrderLine(page, sheet);
     await form.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
@@ -563,15 +570,18 @@ test.describe('coste real de producción', () => {
     await (await openOrderRowMenu(page, orderMenuTrigger(page, order.id), ORDER_ACTION_EDIT_TESTID)).click();
     const editForm = page.getByTestId(ORDER_FORM_TESTID);
     await expect(editForm).toBeVisible({ timeout: 60_000 });
-    const quote = page.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID);
+    // QT-314: la cantidad y la cotizacion se ven en el sub-panel de la receta, abierto con su «Editar».
+    const editSheet = await openEditOrderLine(page, editForm, RECIPE_NAME);
+    const quote = editSheet.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID);
     await expect(quote).toHaveText(exactText(formatOrderAmount(estimated)), { timeout: 60_000 });
 
-    await editForm.getByTestId(ORDER_QUANTITY_FIELD_TESTID).fill(EDITED_QUANTITY);
+    await editSheet.getByTestId(ORDER_QUANTITY_FIELD_TESTID).fill(EDITED_QUANTITY);
     await expect(page.getByTestId(ORDER_COST_QUOTE_QUOTING_TESTID)).toHaveCount(0);
     await expect(quote).toHaveText(exactText(formatOrderAmount(estimated)));
 
-    // 8 l repartidos en 6 envases de 1 l dejan 2 l sin envasar: Guardar pregunta antes.
-    await submitOrderWithLeftover(page, editForm);
+    // 8 l repartidos en 6 envases de 1 l dejan 2 l sin envasar: «Aplicar» pregunta antes.
+    await applyOrderLine(page, editSheet, { leftover: true });
+    await saveOrder(page, editForm);
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     const edited = await prisma.orderLine.findFirstOrThrow({ where: { orderId: order.id }, orderBy: { position: 'asc' }, select: { quantity: true } });

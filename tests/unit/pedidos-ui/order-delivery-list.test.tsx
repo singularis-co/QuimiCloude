@@ -12,7 +12,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { OrderDeliveryList, type OrderDeliveryHistoryEntry } from '@/app/(private)/pedidos/components';
-import { ORDER_STATUS_VALUES, type OrderStatus } from '@/lib/modules/pedidos';
+import { ORDER_STATUS_VALUES, type OrderLineStatus } from '@/lib/modules/pedidos';
 import {
   FIRST_BATCH_ID,
   FIRST_CUSTOMER_ID,
@@ -41,7 +41,7 @@ function pintar(
     <OrderDeliveryList
       deliveries={VISTA.deliveries}
       canVoid
-      orderStatus={VISTA.orderStatus}
+      lineStatus={VISTA.lineStatus}
       onVoid={vi.fn()}
       {...props}
     />,
@@ -219,10 +219,10 @@ describe('OrderDeliveryList', () => {
   });
 
   it.each(['TERMINADO', 'ENTREGADO'] as const)(
-    'R35: con canVoid y el pedido %s, cada entrega con algun par sin anular ofrece «Anular» y emite la entrega',
+    'R34: con canVoid y la receta %s, cada entrega con algun par sin anular ofrece «Anular» y emite la entrega',
     (status) => {
       const onVoid = vi.fn();
-      pintar({ orderStatus: status, onVoid });
+      pintar({ lineStatus: status, onVoid });
 
       expect(screen.getAllByTestId('order-delivery-void')).toHaveLength(2);
       fireEvent.click(within(entrega(OLDER_DELIVERY_ID)).getByTestId('order-delivery-void'));
@@ -253,9 +253,12 @@ describe('OrderDeliveryList', () => {
   });
 
   it.each(
-    ORDER_STATUS_VALUES.filter((status): status is OrderStatus => status !== 'TERMINADO' && status !== 'ENTREGADO'),
-  )('R35: con el pedido %s no ofrece «Anular» aunque haya permiso', (status) => {
-    pintar({ orderStatus: status });
+    ORDER_STATUS_VALUES.filter(
+      (status): status is OrderLineStatus =>
+        status !== 'PARCIAL' && status !== 'TERMINADO' && status !== 'ENTREGADO',
+    ),
+  )('R34: con la receta %s no ofrece «Anular» aunque haya permiso', (status) => {
+    pintar({ lineStatus: status });
 
     expect(screen.getAllByTestId('order-delivery-entry')).toHaveLength(2);
     expect(screen.queryByTestId('order-delivery-void')).toBeNull();

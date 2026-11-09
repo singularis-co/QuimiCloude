@@ -40,13 +40,16 @@ describe('QC-195 contrato de pedidos — 11.3 lineas del reparto', () => {
 })
 
 describe('QC-195 contrato de pedidos — 11.4 Reparto y unidad', () => {
+  // QT-314 R31: la entrada nombra la receta con `lineId`.
   it('R17, R37: la entrada lleva lineas de envase y la confirmacion de bloqueo opcional', () => {
+    expectTypeOf<UpdateOrderDistributionInput['lineId']>().toEqualTypeOf<string>()
     expectTypeOf<UpdateOrderDistributionInput['unitId']>().toEqualTypeOf<string>()
     expectTypeOf<UpdateOrderDistributionInput['presentationLines']>().toEqualTypeOf<
       readonly DistributionLineInput[]
     >()
     expectTypeOf<UpdateOrderDistributionInput['confirmBlocked']>().toEqualTypeOf<boolean | undefined>()
     expectTypeOf<{
+      lineId: string
       unitId: string
       presentationLines: readonly DistributionLineInput[]
     }>().toExtend<UpdateOrderDistributionInput>()

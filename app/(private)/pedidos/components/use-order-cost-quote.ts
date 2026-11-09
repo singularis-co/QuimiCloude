@@ -78,11 +78,9 @@ function canQuote(
 }
 
 /**
- * Cotizacion del coste de ingredientes del formulario de pedido. Arranca con `initialAmount` -el
- * importe guardado en la edicion, `null` en el alta- y no pide nada al montar: solo los
- * manejadores disparan una peticion, siempre desde el evento que los llama y nunca desde un
- * efecto. `orderId` solo lo pasa la edicion, para que el pedido cuente como disponible lo que el
- * mismo tiene apartado; el alta no lo envia.
+ * Cotizacion del coste de una receta del pedido. No pide nada al montar: solo los manejadores
+ * disparan una peticion. `orderLineId` solo llega con una receta ya guardada, para que lo que ella
+ * tiene apartado cuente como disponible y lo de las demas recetas del pedido no.
  */
 export type OrderCostQuoteOptions = {
   /** El estimado de un pedido comenzado ya no cambia: se pinta el guardado y no se cotiza. */
@@ -93,7 +91,7 @@ function ignoreChange(): void {}
 
 export function useOrderCostQuote(
   initialAmount: string | null,
-  orderId?: string,
+  orderLineId?: string,
   initialLines: readonly OrderDistributionLine[] = [],
   { frozen = false }: OrderCostQuoteOptions = {},
 ): OrderCostQuoteHandlers {
@@ -124,7 +122,7 @@ export function useOrderCostQuote(
       recipeId,
       quantity,
       unitId,
-      ...(orderId === undefined ? {} : { orderId }),
+      ...(orderLineId === undefined ? {} : { orderLineId }),
       ...(presentationLines.length === 0 ? {} : { presentationLines }),
     })
       .then((result: OrderCostQuoteResult) => {
@@ -146,7 +144,7 @@ export function useOrderCostQuote(
         setAmount(null);
         setError(unexpectedFromRejection());
       });
-  }, [orderId]);
+  }, [orderLineId]);
 
   const goToDash = useCallback(() => {
     clearPendingTimer();

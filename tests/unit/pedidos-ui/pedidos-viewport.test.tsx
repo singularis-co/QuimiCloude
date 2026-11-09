@@ -65,7 +65,9 @@ import {
   ORDER_CREATE_OPEN_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
+  ORDER_FORM_ADD_LINE_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_LINE_SHEET_TESTID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_SELECT_TESTID,
   RECIPE_NAME_COLUMN_ID,
@@ -306,39 +308,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-
-      {
-        presentationId: PRESENTACION.id,
-        presentationName: PRESENTACION.name,
-        packages: 1,
-        packagingProductId: null,
-        packagingName: null,
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-
-    ],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -667,6 +645,13 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
 
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
+    const prioridad = screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID);
+    for (const token of AREA_TACTIL) {
+      expect(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID).className).toContain(token);
+    }
+    // Desde QT-314 los campos de una receta viven en su sub-panel, que se abre con «Añadir receta».
+    await user.click(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID));
+    await screen.findByTestId(ORDER_LINE_SHEET_TESTID);
 
     // El selector de presentacion del reparto solo aparece con unidad elegida; aqui se mide el de
     // la unidad, que esta siempre.
@@ -674,7 +659,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
       screen.getByTestId('order-field-quantity'),
       screen.getByTestId(RECIPE_PICKER_TESTID),
       screen.getByTestId('presentation-unit-select'),
-      screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
+      prioridad,
     ];
 
     for (const campo of campos) {
@@ -695,6 +680,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
 
     // El panel no se pega al borde inferior del movil: respeta el area segura.
     expect(screen.getByTestId('order-sheet').className).toContain('env(safe-area-inset-bottom)');
+    expect(screen.getByTestId(ORDER_LINE_SHEET_TESTID).className).toContain('env(safe-area-inset-bottom)');
   });
 
   it('la pantalla no usa 100vh como alto (R45)', async () => {

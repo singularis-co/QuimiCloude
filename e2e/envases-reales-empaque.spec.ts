@@ -75,6 +75,7 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { pickOrderLine } from './helpers/order-form';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
 import { ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../tests/helpers/only-order-line';
 
@@ -234,6 +235,8 @@ type SeededLine = {
 
 type SeededOrder = {
   readonly id: string;
+  /** La unica receta del pedido: «Entregar» es una accion por receta (QT-314). */
+  readonly orderLineId: string;
   readonly numberText: string;
   readonly lines: readonly SeededLine[];
 };
@@ -377,7 +380,7 @@ async function seedPackingOrder(
     });
   }
 
-  return { id: order.id, numberText: formatOrderNumber({ year, sequence }), lines };
+  return { id: order.id, orderLineId, numberText: formatOrderNumber({ year, sequence }), lines };
 }
 
 async function switchUser(page: Page, user: Credentials): Promise<void> {
@@ -813,6 +816,8 @@ test.describe('envases reales al terminar el empaque', () => {
     await expect(page.getByTestId(ORDERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(`${TABLE_ROW_TESTID_PREFIX}${order.id}`)).toHaveCount(1, { timeout: 60_000 });
     await (await openOrderRowMenu(page, orderMenuTrigger(page, order.id), ORDER_ACTION_DELIVER_TESTID)).click();
+    // QT-314: la accion va en «Por receta» y pide la receta en el selector.
+    await pickOrderLine(page, order.orderLineId);
     const deliverySheet = page.getByTestId(DELIVERY_SHEET_TESTID);
     await expect(deliverySheet).toBeVisible({ timeout: 60_000 });
     await expect(deliverySheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });

@@ -44,7 +44,7 @@ import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { ORDERS_ROUTE } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE } from '@/lib/shared/routes';
 
 const RAIZ = join(__dirname, '..', '..', '..');
 
@@ -354,10 +354,10 @@ function git(comando: string): string {
  * fusiones de `dev` con trabajo ajeno, y atribuirselo a QC-35 pondria la guardia roja por algo
  * que QC-35 no hizo. Devuelve `null` cuando el rango no esta disponible.
  */
-function archivosTocadosPorLaFeature(): string[] | null {
+function archivosTocadosPorLaFeature(marca: string = MARCA_DE_LA_FEATURE): string[] | null {
   let commits: string[];
   try {
-    commits = git(`git log --no-merges --format=%H "--grep=${MARCA_DE_LA_FEATURE}" origin/dev..HEAD`)
+    commits = git(`git log --no-merges --format=%H "--grep=${marca}" origin/dev..HEAD`)
       .split('\n')
       .map((linea) => linea.trim())
       .filter((linea) => linea.length > 0);
@@ -711,5 +711,102 @@ describe('lo heredado se hereda montado y no se re-crea (R47)', () => {
       (archivo) => /\/viewport\.tsx?$/.test(archivo) && archivo !== 'tests/helpers/viewport.ts',
     );
     expect(copias, `copias del helper de viewport: ${copias.join(', ')}`).toEqual([]);
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// QT-314 (pedido-con-varias-recetas-frontend), T20: el precio no sale de Pedidos y la ficha no
+// trae dependencias. Mismo patron: detector puro, barrido real y caso negativo.
+// --------------------------------------------------------------------------------------------
+
+/** La carpeta de las pantallas de `asignaciones`, derivada de su constante de ruta. */
+const CARPETA_DE_ASIGNACION = `app/(private)${ASSIGNED_ORDERS_ROUTE}`;
+
+/** Los campos del precio de una receta y del total del pedido en `OrderView`. */
+const CAMPOS_DE_PRECIO = /\b(?:salePrice|salePriceTotal|linesWithoutPrice)\b/;
+
+/** Los componentes de la ruta de pedidos (precio, totales, detalle) entran por este barrel. */
+const BARREL_DE_PEDIDOS_DESDE_FUERA = new RegExp(
+  `from\\s*['"]${BARREL_DE_LA_RUTA.replace(/[[\]()/]/g, (c) => `\\${c}`)}(?:/[^'"]*)?['"]`,
+);
+
+function precioFueraDePedidos(fuente: string): string[] {
+  const codigo = sinComentarios(fuente);
+  const hallazgos: string[] = [];
+  if (CAMPOS_DE_PRECIO.test(codigo)) hallazgos.push('lee el precio del pedido');
+  if (BARREL_DE_PEDIDOS_DESDE_FUERA.test(codigo)) hallazgos.push('importa componentes de pedidos');
+  return hallazgos;
+}
+
+/** La marca de los commits de esta ficha, para separarlos de lo que llega de `dev`. */
+const MARCA_QT_314 = 'QT-314';
+
+/** Manifiestos de dependencias: R47 no deja que la ficha toque ninguno. */
+const MANIFIESTOS = ['package.json', 'pnpm-lock.yaml'] as const;
+
+const TOCADOS_POR_QT_314 = archivosTocadosPorLaFeature(MARCA_QT_314);
+
+function manifiestosTocados(rutas: readonly string[]): string[] {
+  return rutas.filter((ruta) => (MANIFIESTOS as readonly string[]).includes(ruta));
+}
+
+describe('QT-314 — el precio y el total solo se pintan en Pedidos (R43)', () => {
+  it('R43: ninguna pantalla de asignaciones lee el precio o el total del pedido ni monta piezas de Pedidos', () => {
+    const fuentes = fuentesBajo(CARPETA_DE_ASIGNACION);
+    expect(fuentes.length, 'el barrido no encontro las fuentes de asignaciones').toBeGreaterThan(10);
+
+    const culpables = fuentes.flatMap((archivo) =>
+      precioFueraDePedidos(leer(archivo)).map((detalle) => `${archivo} ${detalle}`),
+    );
+
+    expect(culpables, culpables.join(', ')).toEqual([]);
+  });
+
+  it('R43: y la guardia FALLA ante el precio o el barrel de pedidos, sin morder a lo legitimo', () => {
+    expect(precioFueraDePedidos('const p = line.salePrice;')).not.toEqual([]);
+    expect(precioFueraDePedidos('<span>{order.salePriceTotal}</span>')).not.toEqual([]);
+    expect(precioFueraDePedidos('const n = order.linesWithoutPrice;')).not.toEqual([]);
+    expect(
+      precioFueraDePedidos(`import { OrderDetailSheet } from '${BARREL_DE_LA_RUTA}';`),
+    ).not.toEqual([]);
+
+    // El contrato del modulo (tipos y esquemas) no es la pantalla de Pedidos.
+    expect(precioFueraDePedidos(`import type { OrderStatus } from '@/lib/modules/pedidos';`)).toEqual(
+      [],
+    );
+    // Un comentario que nombra el campo no pinta nada.
+    expect(precioFueraDePedidos('// sin salePrice: el operador no ve precios')).toEqual([]);
+  });
+});
+
+describe('QT-314 — la ficha no anade dependencias (R47)', () => {
+  it('R47: la ficha no toca package.json ni pnpm-lock.yaml, y las dependencias son las de su base', (ctx) => {
+    if (TOCADOS_POR_QT_314 === null) {
+      ctx.skip('el rango git origin/dev..HEAD no tiene commits de QT-314');
+      return;
+    }
+
+    const tocados = manifiestosTocados(TOCADOS_POR_QT_314);
+    expect(tocados, `la ficha toca ${tocados.join(', ')}`).toEqual([]);
+
+    // Contra la base de la rama y no contra `origin/dev`: si `dev` gana una dependencia
+    // aprobada de otra ficha, esto no debe ponerse rojo hasta que la rama la fusione.
+    const base = git('git merge-base origin/dev HEAD').trim();
+    const enLaBase = JSON.parse(git(`git show ${base}:package.json`)) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const aqui = JSON.parse(leer('package.json')) as typeof enLaBase;
+
+    expect(aqui.dependencies ?? {}).toEqual(enLaBase.dependencies ?? {});
+    expect(aqui.devDependencies ?? {}).toEqual(enLaBase.devDependencies ?? {});
+  });
+
+  it('R47: y la guardia FALLA ante cualquiera de los dos manifiestos', () => {
+    expect(manifiestosTocados(['package.json'])).toEqual(['package.json']);
+    expect(manifiestosTocados(['pnpm-lock.yaml'])).toEqual(['pnpm-lock.yaml']);
+    expect(
+      manifiestosTocados(['app/(private)/pedidos/components/order-form.tsx', 'docs/package.json']),
+    ).toEqual([]);
   });
 });

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Pedidos con varias recetas en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="PedidosVariasRecetas" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Pedidos con varias recetas · ficha (QT-314)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd><span class="mono">shared/data-table · status-badge · priority-mark · responsible-avatars · row-actions-menu · form-sheet · async-autocomplete · presentation-unit-select · confirm-dialog · ui/sonner</span>. También el reparto de <span class="mono">order-distribution-field</span> y la cotización de <span class="mono">order-cost-quote</span>, sin cambios, dentro del sub-panel de la receta.</dd>
+      <dt>Nuevo</dt><dd>Panel de detalle de solo lectura · tabla de recetas en el panel del pedido · sub-panel de una receta · selector de receta para las acciones por receta · barra de avance «N de M».</dd>
+      <dt>Librerías</dt><dd><span class="mono">@tanstack/react-table · @base-ui/react</span> (Menu, Dialog, Sheet, Select) · <span class="mono">sonner · lucide-react</span>. Ninguna nueva.</dd>
+      <dt>Escritorio</dt><dd>Listado: «Recetas» muestra la primera y «+N» · «Avance» con barra · precio y costos son los totales, con «N sin precio» · el nº de pedido abre el detalle. Menú ⋯ en tres grupos: pedido · por receta (abre el selector) · pedido entero. El sub-panel de la receta se abre encima del panel del pedido, con «Volver al pedido». Nada se guarda hasta «Guardar pedido».</dd>
+      <dt>Estados</dt><dd>Formulario vacío: aviso «Añade al menos una» y Guardar deshabilitado · receta no editable: «Solo lectura», sin editar ni quitar · «Quitar receta» solo en Pendiente o Bloqueado · error por receta: aviso que nombra la receta y fila marcada, con «Guardar bloqueada» · selector: las recetas que no admiten la acción salen deshabilitadas con el motivo · cancelada: no suma y muestra su motivo en el detalle.</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · la tabla del listado se desplaza en horizontal dentro de su caja · el panel y el sub-panel se apilan a la derecha.</dd>
+      <dt>Teléfono</dt><dd>El listado pasa a tarjetas con la barra de avance y dos botones: «Ver detalle» y «Acciones» · el panel, el sub-panel y el detalle ocupan la pantalla entera; el sub-panel vuelve con la flecha · la tabla de recetas del panel pasa a tarjetas · el selector es un diálogo centrado con objetivos de 52 px.</dd>
+      <dt>Animación</dt><dd>Como Pedidos: entrada escalonada · menú ⋯ 200/150 ms · Sheet 300/150 ms (el sub-panel entra encima con la misma curva) · aviso de error con <span class="mono">qc-rise</span> · barra de avance con transición de ancho · toast.</dd>
+      <dt>Por confirmar</dt><dd>Nada: las decisiones de producto están en <span class="mono">specs/QT-314-pedido-con-varias-recetas-frontend/requirements.md</span>.</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

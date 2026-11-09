@@ -92,6 +92,7 @@ export {
   OrderPresentationLineNotEditableError,
   CustomerNotFoundError,
 } from './domain/errors';
+export { linePositionsOf } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
  *  aplica `lib/shared/pagination` en el adaptador driven (R35, R37). */
@@ -104,6 +105,7 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
+  cancelOrderLineSchema,
   quoteOrderCostSchema,
   presentationLinesSchema,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
@@ -125,7 +127,14 @@ export type {
 
 /** La guardia de transiciones (R22). Se publica para que QC-35 pueda saber que estados ofrecer
  *  sin escribir una segunda tabla; la tabla sigue viviendo en un solo archivo. */
-export { assertTransition, isAllowedTransition } from './domain/order-transitions';
+export { assertTransition, isAllowedTransition, isEditableOrderLineStatus } from './domain/order-transitions';
+
+/** Las reglas que la pantalla anticipa, las mismas funciones que aplican los casos de uso. */
+export { isCancellableStatus } from './domain/order-cancellation';
+export { isRemovableOrderLineStatus } from './domain/order-line-removal';
+export { isDeletableOrder } from './domain/delete-order';
+export { sumDecimal4 } from './domain/order-totals';
+export { orderLineInputSchema } from './domain/order-input';
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
@@ -168,8 +177,6 @@ export type { GetOrderDeps } from './domain/get-order';
 export { createListOrders } from './domain/list-orders';
 export type { ListOrdersDeps } from './domain/list-orders';
 export { createUpdateOrder } from './domain/update-order';
-/** Las lineas vivas de un pedido, para que el formulario de una receta nombre la que edita. */
-export { createListOrderLineIds } from './domain/list-order-line-ids';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';

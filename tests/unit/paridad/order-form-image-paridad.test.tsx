@@ -1,6 +1,8 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 
 import {
+  ORDER_FORM_ADD_LINE_TESTID,
+  ORDER_LINE_SHEET_TESTID,
   ORDER_RECIPE_IMAGE_TESTID,
   OrderForm,
   RECIPE_PICKER_TESTID,
@@ -17,6 +19,7 @@ import { arbolAccesible } from './arbol-accesible';
  * Paridad del hueco de la imagen de la receta en el formulario de pedido, sin receta, con una
  * receta con imagen y con una sin ella. `OrderRecipeImage` pasa a delegar en `EntityImage`, y el
  * hueco tiene que seguir pintando lo mismo. Mocks de `tests/unit/pedidos-ui/order-form.test.tsx`.
+ * Desde QT-314 el hueco vive en el sub-panel de la receta, que se abre con «Añadir receta».
  */
 
 const { getRecipeActionMock } = vi.hoisted(() => ({
@@ -122,12 +125,14 @@ function detalle(receta: { id: string; name: string; imageUrl: string | null }):
   };
 }
 
-function renderFormulario(recipes: RecipePickerPage) {
-  return render(
+async function renderFormulario(user: ReturnType<typeof setupUser>, recipes: RecipePickerPage) {
+  render(
     <Sheet open>
       <OrderForm recipes={recipes} units={UNIDADES} bridge={null} onSaved={vi.fn()} />
     </Sheet>,
   );
+  await user.click(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID));
+  await screen.findByTestId(ORDER_LINE_SHEET_TESTID);
 }
 
 /** El hueco de la imagen es la columna del formulario que la contiene, que no cambia. */
@@ -151,15 +156,15 @@ afterEach(() => {
 });
 
 describe('paridad de la imagen del formulario de pedido', () => {
-  it('R1 — sin receta elegida, con el marcador', () => {
-    renderFormulario({ items: [RECETA_SIN_IMAGEN], totalPages: 1 });
+  it('R1 — sin receta elegida, con el marcador', async () => {
+    await renderFormulario(setupUser(), { items: [RECETA_SIN_IMAGEN], totalPages: 1 });
     expect(arbolDelHueco()).toMatchSnapshot();
   });
 
   it('R1 — con una receta con imagen', async () => {
     getRecipeActionMock.mockResolvedValue({ status: 'success', data: detalle(RECETA_CON_IMAGEN) });
     const user = setupUser();
-    renderFormulario({ items: [RECETA_CON_IMAGEN], totalPages: 1 });
+    await renderFormulario(user, { items: [RECETA_CON_IMAGEN], totalPages: 1 });
 
     await elegirReceta(user);
     await waitFor(() =>
@@ -175,7 +180,7 @@ describe('paridad de la imagen del formulario de pedido', () => {
   it('R1 — con una receta sin imagen, el marcador se queda', async () => {
     getRecipeActionMock.mockResolvedValue({ status: 'success', data: detalle(RECETA_SIN_IMAGEN) });
     const user = setupUser();
-    renderFormulario({ items: [RECETA_SIN_IMAGEN], totalPages: 1 });
+    await renderFormulario(user, { items: [RECETA_SIN_IMAGEN], totalPages: 1 });
 
     await elegirReceta(user);
     await waitFor(() =>

@@ -284,6 +284,7 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     invocar: async () =>
       (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).getOrderDeliveryAction(
         '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        'cf7c6a95-8bac-4dbe-af6d-5c9abe7d3b86',
       ),
   },
   {
@@ -310,6 +311,7 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     invocar: async () =>
       (await import('@/lib/modules/pedidos/adapters/driving/order-actions')).listOrderDeliveriesAction(
         '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        'cf7c6a95-8bac-4dbe-af6d-5c9abe7d3b86',
       ),
   },
   {

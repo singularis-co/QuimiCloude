@@ -30,6 +30,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { addPackagingLine } from './helpers/order-distribution';
+import { applyOrderLine, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
@@ -329,12 +330,13 @@ test.describe('version de receta en el pedido', () => {
 
     await page.goto(ordersUrl());
     await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId('order-create-open').first().click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta y su version se eligen en el sub-panel, abierto con «Añadir receta».
+    const form = await openCreateOrderPanel(page);
+    const sheet = await openAddOrderLine(page, form);
 
-    const recipePicker = page.getByTestId('recipe-picker');
-    const versionTrigger = page.getByTestId('recipe-version-select');
-    const versionValue = page.getByTestId('recipe-version-select-value');
+    const recipePicker = sheet.getByTestId('recipe-picker');
+    const versionTrigger = sheet.getByTestId('recipe-version-select');
+    const versionValue = sheet.getByTestId('recipe-version-select-value');
 
     // --- 1. Receta sin versiones: el selector se queda en «Original» y deshabilitado.
     await recipePicker.click();
@@ -344,7 +346,7 @@ test.describe('version de receta en el pedido', () => {
       .filter({ hasText: PLAIN_RECIPE_NAME });
     await expect(plainOption).toHaveCount(1, { timeout: 60_000 });
     await plainOption.click();
-    await expect(page.getByTestId('recipe-picker-value')).toHaveValue(plainRecipeId);
+    await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(plainRecipeId);
     await expect(versionTrigger).toBeDisabled();
     await expect(versionValue).toHaveValue('');
 
@@ -356,7 +358,7 @@ test.describe('version de receta en el pedido', () => {
       .filter({ hasText: ORIGINAL_NAME });
     await expect(originalOption).toHaveCount(1, { timeout: 60_000 });
     await originalOption.click();
-    await expect(page.getByTestId('recipe-picker-value')).toHaveValue(originalId);
+    await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(originalId);
     await expect(versionTrigger).toBeEnabled({ timeout: 60_000 });
 
     await versionTrigger.click();
@@ -365,14 +367,14 @@ test.describe('version de receta en el pedido', () => {
 
     // QC-170: unidad del pedido y reparto en lugar de la presentacion unica. Toda la cantidad en
     // una sola linea: con contenido 1, un envase por unidad del pedido.
-    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
-    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+    await sheet.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await sheet.getByTestId('presentation-unit-select').click();
     await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
-    const distribution = page.getByTestId('order-distribution-field');
+    const distribution = sheet.getByTestId('order-distribution-field');
     await addPackagingLine(
       page,
-      page.getByTestId('order-form'),
+      sheet,
       { productId: packagingId ?? '', name: PACKAGING_NAME },
       ORDER_QUANTITY,
     );
@@ -382,7 +384,9 @@ test.describe('version de receta en el pedido', () => {
       { timeout: 60_000 },
     );
 
-    await page.getByTestId('order-form-submit').click();
+    // QT-314: «Aplicar» devuelve la receta al panel y «Guardar pedido» da el alta.
+    await applyOrderLine(page, sheet);
+    await saveOrder(page, form);
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     // --- 3. En la base: el pedido guarda la version y lo apartado sale de sus lineas.

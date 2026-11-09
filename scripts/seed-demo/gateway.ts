@@ -351,7 +351,11 @@ export function createPrismaDemoSeedGateway(options: PrismaDemoSeedGatewayOption
       const as = await reader()
       for (let page = 1; ; page += 1) {
         const result = await pedidos.listOrders({ page, sort: { columnId: 'createdAt', direction: 'asc' } }, as)
-        const found = result.items.find((order) => order.recipeId === recipeId && wanted.equals(order.quantity))
+        // Los pedidos de la demo son de una sola receta: basta con mirar la primera.
+        const found = result.items.find((order) => {
+          const line = order.lines[0]
+          return line !== undefined && line.recipeId === recipeId && wanted.equals(line.quantity)
+        })
         if (found !== undefined) return { id: found.id, status: found.status }
         if (page >= result.totalPages) return null
       }
