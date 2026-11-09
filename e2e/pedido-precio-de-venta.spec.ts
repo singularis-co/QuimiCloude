@@ -20,11 +20,15 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import {
-  openOrderRowMenu,
-  orderMenuTrigger,
-  submitOrderWithLeftover,
-} from './helpers/order-distribution';
+  applyOrderLine,
+  chooseLineUnit,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  openEditOrderLine,
+  saveOrder,
+} from './helpers/order-form';
 import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc307_e2e_';
@@ -54,13 +58,10 @@ const LIST_PAGE_SIZE = '25';
 const LIST_SORT = 'createdAt:desc';
 
 const ORDERS_TITLE = 'pedidos-title';
-const CREATE_OPEN = 'order-create-open';
 const ORDER_FORM = 'order-form';
 const RECIPE_PICKER = 'recipe-picker';
 const RECIPE_PICKER_OPTION = 'recipe-picker-option';
 const RECIPE_PICKER_VALUE = 'recipe-picker-value';
-const UNIT_SELECT = 'presentation-unit-select';
-const UNIT_OPTION = 'presentation-unit-option';
 const QUANTITY_FIELD = 'order-field-quantity';
 const SALE_PRICE_FIELD = 'order-field-salePrice';
 const SALE_PRICE_CELL = 'order-sale-price';
@@ -210,26 +211,25 @@ test.describe('precio de venta del pedido', () => {
     await page.goto(ordersUrl());
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId(CREATE_OPEN).first().click();
-    const form = page.getByTestId(ORDER_FORM);
-    await expect(form).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta, con su precio, se escribe en su sub-panel.
+    const form = await openCreateOrderPanel(page);
+    const lineSheet = await openAddOrderLine(page, form);
 
-    const recipePicker = page.getByTestId(RECIPE_PICKER);
+    const recipePicker = lineSheet.getByTestId(RECIPE_PICKER);
     await recipePicker.click();
     await recipePicker.fill(RECIPE_NAME);
     const recipeOption = page.getByTestId(RECIPE_PICKER_OPTION).filter({ hasText: RECIPE_NAME });
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
-    await expect(page.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(required(recipeId, 'la receta'));
+    await expect(lineSheet.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(required(recipeId, 'la receta'));
 
-    await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
-    await form.getByTestId(UNIT_SELECT).click();
-    await page.locator(`[data-testid="${UNIT_OPTION}"][data-value="${unitId}"]`).click();
+    await lineSheet.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
+    await chooseLineUnit(page, lineSheet, required(unitId, 'la unidad'));
 
-    await form.getByTestId(SALE_PRICE_FIELD).fill(SALE_PRICE_TYPED);
-    // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes.
-    await submitOrderWithLeftover(page, form);
-    await expect(form).toHaveCount(0, { timeout: 60_000 });
+    await lineSheet.getByTestId(SALE_PRICE_FIELD).fill(SALE_PRICE_TYPED);
+    // Sin reparto toda la cantidad queda sin envasar: con QT-314, «Aplicar» pregunta antes.
+    await applyOrderLine(page, lineSheet, { leftover: true });
+    await saveOrder(page, form);
 
     const created = (
       await prisma.order.findMany({
@@ -251,6 +251,8 @@ test.describe('precio de venta del pedido', () => {
     await (await openOrderRowMenu(page, orderMenuTrigger(page, createdOrder.id), EDIT_ACTION)).click();
     const editForm = page.getByTestId(ORDER_FORM);
     await expect(editForm).toBeVisible({ timeout: 60_000 });
-    await expect(editForm.getByTestId(SALE_PRICE_FIELD)).toHaveValue(SALE_PRICE_TYPED);
+    // QT-314: el precio precargado se ve en el sub-panel de la receta.
+    const editSheet = await openEditOrderLine(page, editForm, RECIPE_NAME);
+    await expect(editSheet.getByTestId(SALE_PRICE_FIELD)).toHaveValue(SALE_PRICE_TYPED);
   });
 });

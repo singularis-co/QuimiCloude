@@ -7,7 +7,8 @@
  * la barra, la columna fijada y el centrado de los diálogos solo existen aquí.
  *
  * Ningún caso confirma nada: los diálogos y paneles se abren, se miden y se cierran con su botón de
- * volver o cancelar, y «Material insuficiente» se cierra con «Volver» antes de escribir el pedido.
+ * volver o cancelar, y «Material insuficiente» (el aviso por receta del panel, QT-314) se cierra con
+ * «Revisar receta» antes de escribir el pedido.
  * Los pedidos sembrados no cambian, así que los casos corren en cualquier orden y en paralelo.
  *
  * FIXTURE (sembrado por Prisma): una empresa efímera por worker con un Administrador, un insumo con
@@ -32,7 +33,14 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand, type Credentials } from './helpers/landing';
-import { submitOrderWithLeftover } from './helpers/order-distribution';
+import {
+  addOrderLine,
+  ORDER_FORM_LINES_ERROR_TESTID,
+  ORDER_FORM_REVIEW_LINE_TESTID,
+  ORDER_FORM_SAVE_BLOCKED_TESTID,
+  ORDER_LINE_PICKER_DIALOG_TESTID,
+  pickOrderLine,
+} from './helpers/order-form';
 import { ensureOnlyLine, createOrderWithLine, type SingleLineOrderData } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc262_e2e_';
@@ -87,6 +95,7 @@ const TESTIDS = {
   customer: 'order-action-customer',
   distribution: 'order-action-distribution',
   deliver: 'order-action-deliver',
+  deliveries: 'order-action-deliveries',
   cancelDialog: 'cancel-order-dialog',
   cancelDismiss: 'cancel-order-dismiss',
   cancelConfirm: 'cancel-order-confirm',
@@ -119,22 +128,25 @@ const TESTIDS = {
 } as const;
 
 /**
- * Las catorce columnas de la lista, en su orden (el de `tests/unit/pedidos-ui/order-columns.test.tsx`).
+ * Las quince columnas de la lista, en su orden (el de `order-columns.tsx`).
  * R16 nacio con doce; despues sale «Cantidad» (2026-10-16), entra «Por entregar» delante de
  * «Presentación» y entran «Costo estimado» y «Costo real», contiguas y en ese orden (QC-305 R19).
+ * QC-307 añade «Precio de venta» delante de los costes. QT-314 quita «Presentación» (el reparto es
+ * de cada receta) y añade «Avance» tras «Fórmula» (R21, R24).
  */
 const COLUMN_IDS = [
   'orderNumber',
   'status',
   'priority',
   'recipeName',
+  'progress',
   'customer',
   'pendingDelivery',
-  'presentationName',
   'createdAt',
   'cancellationReason',
   'coverage',
   'responsibles',
+  'salePrice',
   'productionCost',
   'actualCost',
   'actions',
@@ -526,8 +538,46 @@ async function menuSequence(menu: Locator): Promise<string[]> {
   );
 }
 
+/** QT-314 R25: los ítems de cada bloque con rótulo van dentro de su grupo, nombrado por el rótulo. */
+async function expectMenuGroups(
+  menu: Locator,
+  lineItems: readonly string[],
+  wholeOrderItems: readonly string[],
+): Promise<void> {
+  for (const [name, items] of [
+    ['Por receta', lineItems],
+    ['Pedido entero', wholeOrderItems],
+  ] as const) {
+    const group = menu.getByRole('group', { name, exact: true });
+    await expect(group, `grupo «${name}»`).toHaveCount(1);
+    for (const testId of items) await expect(group.getByTestId(testId), `${testId} en «${name}»`).toHaveCount(1);
+  }
+}
+
+/** El id de la única receta de un pedido sembrado. */
+async function onlyLineId(order: SeededOrder): Promise<string> {
+  return (await prisma.orderLine.findFirstOrThrow({ where: { orderId: order.id }, select: { id: true } })).id;
+}
+
+/**
+ * QT-314: una acción «Por receta» desde «Acciones» de la tarjeta abre antes el selector de receta,
+ * centrado y entero; se elige la receta y se espera a lo que abre.
+ */
+async function openLineActionFromCard(
+  page: Page,
+  order: SeededOrder,
+  itemTestId: string,
+  target: Locator,
+): Promise<void> {
+  const picker = page.getByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+  await openFromCard(page, order, itemTestId, picker);
+  await expectCenteredAndWhole(page, picker, `Selector de receta de ${itemTestId}`);
+  await pickOrderLine(page, await onlyLineId(order));
+  await expect(target).toBeVisible({ timeout: 60_000 });
+}
+
 test.describe('Pedidos rediseñado', () => {
-  test('a 1440 px: una sola barra en orden, menú con separador y destructivos, y catorce columnas con el número fijado (R2, R11, R14, R16, QC-305 R19)', async ({
+  test('a 1440 px: una sola barra en orden, menú por grupos con separador y destructivos, y quince columnas con el número fijado (R2, R11, R14, R16, QC-305 R19)', async ({
     page,
   }) => {
     await openOrders(page, DESKTOP);
@@ -552,7 +602,7 @@ test.describe('Pedidos rediseñado', () => {
     expect(chipLabels[1]).toContain('Prioridad');
     expect(chipLabels[2]).toContain('Fecha de solicitud');
 
-    // R16: tabla visible, tarjetas ocultas, las columnas de hoy (catorce) en su orden y el número fijado a la izquierda.
+    // R16: tabla visible, tarjetas ocultas, las columnas de hoy (quince) en su orden y el número fijado a la izquierda.
     await expect(row(page, toPack)).toBeVisible();
     await expect(card(page, toPack)).toBeHidden();
     const headIds = await page
@@ -585,17 +635,22 @@ test.describe('Pedidos rediseñado', () => {
     }
 
     // R11, R14: el menú del pedido por empacar y el del terminado, con su orden, separador y destructivos.
+    // QT-314 R25: tres bloques; los de una receta bajo «Por receta» y los del pedido entero bajo
+    // «Pedido entero», cada uno tras su separador.
     const dropdown = page.getByRole('menu');
     await clickUntilVisible(row(page, toPack).getByTestId(TESTIDS.rowActions), dropdown);
     expect(await menuSequence(dropdown)).toEqual([
+      'Ver detalle',
       'Editar',
       'Responsables',
       'Cliente',
-      'Reparto y unidad',
       '---',
-      'Cancelar',
+      'Reparto y unidad…',
+      '---',
+      'Cancelar pedido',
       'Eliminar',
     ]);
+    await expectMenuGroups(dropdown, [TESTIDS.distribution], [TESTIDS.cancel, TESTIDS.delete]);
     for (const testId of [TESTIDS.cancel, TESTIDS.delete]) {
       await expect(dropdown.getByTestId(testId)).toHaveAttribute('data-variant', 'destructive');
     }
@@ -607,15 +662,18 @@ test.describe('Pedidos rediseñado', () => {
 
     await clickUntilVisible(row(page, finished).getByTestId(TESTIDS.rowActions), dropdown);
     expect(await menuSequence(dropdown)).toEqual([
+      'Ver detalle',
       'Editar',
       'Responsables',
       'Cliente',
-      'Entregas',
-      'Entregar',
       '---',
-      'Cancelar',
+      'Entregar…',
+      'Entregas…',
+      '---',
+      'Cancelar pedido',
       'Eliminar',
     ]);
+    await expectMenuGroups(dropdown, [TESTIDS.deliver, TESTIDS.deliveries], [TESTIDS.cancel, TESTIDS.delete]);
     await expect(dropdown.getByTestId(TESTIDS.deliver)).not.toHaveAttribute('data-variant', 'destructive');
     await page.keyboard.press('Escape');
     await expect(dropdown).toHaveCount(0);
@@ -672,7 +730,9 @@ test.describe('Pedidos rediseñado', () => {
     for (const testId of [TESTIDS.edit, TESTIDS.customer, TESTIDS.distribution, TESTIDS.cancel, TESTIDS.delete]) {
       await expectTarget(menu.getByTestId(testId), `ítem ${testId}`, MIN_MENU_ITEM_PX);
     }
-    await expect(menu.getByRole('separator')).toHaveCount(1);
+    // QT-314 R25: un separador delante de «Por receta» y otro delante de «Pedido entero».
+    await expect(menu.getByRole('separator')).toHaveCount(2);
+    await expectMenuGroups(menu, [TESTIDS.distribution], [TESTIDS.cancel, TESTIDS.delete]);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
   });
@@ -720,7 +780,8 @@ test.describe('Pedidos rediseñado', () => {
 
     for (const check of checks) {
       const dialog = page.getByTestId(check.dialog);
-      await openFromCard(page, check.order, check.item, dialog);
+      if (check.item === TESTIDS.distribution) await openLineActionFromCard(page, check.order, check.item, dialog);
+      else await openFromCard(page, check.order, check.item, dialog);
       await expectCenteredAndWhole(page, dialog, check.label);
       for (const button of check.buttons) {
         await expectTarget(dialog.getByTestId(button), `${check.label}: ${button}`);
@@ -730,7 +791,7 @@ test.describe('Pedidos rediseñado', () => {
     }
   });
 
-  test('a 390 px: «Material insuficiente» queda entero y centrado con botones de 44 px y «Volver» no escribe nada (R18)', async ({
+  test('a 390 px: «Material insuficiente» queda entero con botones de 44 px y «Revisar receta» no escribe nada (R18, QT-314 R17)', async ({
     page,
   }) => {
     await openOrders(page, PHONE);
@@ -741,25 +802,33 @@ test.describe('Pedidos rediseñado', () => {
 
     const form = page.getByTestId(TESTIDS.orderForm);
     await clickUntilVisible(page.getByTestId(TESTIDS.createOpen).filter({ visible: true }), form);
-    const recipePicker = form.getByTestId(TESTIDS.recipePicker);
-    await recipePicker.click();
-    await recipePicker.fill(RECIPE_NAME);
-    const recipeOption = page.getByTestId(TESTIDS.recipePickerOption).filter({ hasText: RECIPE_NAME });
-    await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
-    await recipeOption.click();
-    await expect(form.getByTestId(TESTIDS.recipePickerValue)).toHaveValue(recipe);
-    await form.getByTestId(TESTIDS.quantity).fill(BLOCKING_QUANTITY);
-    await form.getByTestId(TESTIDS.unitSelect).click();
-    await page.locator(`[data-testid="${TESTIDS.unitOption}"][data-value="${unit}"]`).click();
-    // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes del bloqueo.
-    await submitOrderWithLeftover(page, form);
+    // QT-314: la receta se escribe en su sub-panel (selector con búsqueda, cantidad y unidad). Sin
+    // reparto toda la cantidad queda sin envasar: «Aplicar» pregunta antes de volver al panel.
+    await addOrderLine(
+      page,
+      form,
+      { recipe: { id: recipe, name: RECIPE_NAME }, quantity: BLOCKING_QUANTITY, unitId: unit },
+      { leftover: true },
+    );
+    await form.getByTestId(TESTIDS.orderSubmit).click();
 
-    const dialog = page.getByTestId(TESTIDS.blockedDialog);
-    await expectCenteredAndWhole(page, dialog, 'Material insuficiente');
-    await expectTarget(dialog.getByTestId(TESTIDS.blockedDismiss), 'Material insuficiente: Volver');
-    await expectTarget(dialog.getByTestId(TESTIDS.blockedConfirm), 'Material insuficiente: Guardar bloqueado');
-    await dialog.getByTestId(TESTIDS.blockedDismiss).click();
-    await expect(dialog).toBeHidden({ timeout: 60_000 });
+    // QT-314 R17: «Material insuficiente» ya no es un diálogo aparte sino el aviso por receta del
+    // panel, con «Revisar receta» (antes «Volver») y «Guardar bloqueada». Se mide que queda entero
+    // dentro de la pantalla de 390 px y que sus dos botones miden 44 px.
+    const notice = form.getByTestId(ORDER_FORM_LINES_ERROR_TESTID);
+    await expect(notice, 'Material insuficiente').toBeVisible({ timeout: 60_000 });
+    await notice.scrollIntoViewIfNeeded();
+    await waitForAnimationsToSettle(notice);
+    const noticeBox = await box(notice);
+    expect(noticeBox.x, 'Material insuficiente: borde izquierdo').toBeGreaterThanOrEqual(-EDGE_TOLERANCE_PX);
+    expect(noticeBox.x + noticeBox.width, 'Material insuficiente: borde derecho').toBeLessThanOrEqual(
+      PHONE.width + EDGE_TOLERANCE_PX,
+    );
+    const review = notice.getByTestId(ORDER_FORM_REVIEW_LINE_TESTID);
+    await expectTarget(review, 'Material insuficiente: Revisar receta');
+    await expectTarget(notice.getByTestId(ORDER_FORM_SAVE_BLOCKED_TESTID), 'Material insuficiente: Guardar bloqueada');
+    await review.click();
+    await expect(notice).toBeHidden({ timeout: 60_000 });
     expect(await prisma.order.count({ where: { lines: { some: { recipeId: recipe } }}}), 'sin confirmar no se escribe el pedido').toBe(
       before,
     );
@@ -784,7 +853,7 @@ test.describe('Pedidos rediseñado', () => {
     await expect(sheet).toBeHidden({ timeout: 60_000 });
 
     const delivery = page.getByTestId(TESTIDS.deliverySheet);
-    await openFromCard(page, finished, TESTIDS.deliver, delivery);
+    await openLineActionFromCard(page, finished, TESTIDS.deliver, delivery);
     await expect(delivery.getByTestId(TESTIDS.deliverySubmit)).toBeVisible({ timeout: 60_000 });
     await expectFullScreenPanel(
       page,

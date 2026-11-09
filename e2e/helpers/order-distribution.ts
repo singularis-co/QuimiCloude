@@ -91,6 +91,10 @@ export function orderMenuTrigger(page: Page, orderId: string): Locator {
 /**
  * Guarda un pedido cuyo reparto deja cantidad sin envasar: espera el disponible cotizado -antes,
  * Guardar no pregunta-, pulsa Guardar y confirma «Guardar con sobrante».
+ *
+ * Es del panel de antes de QT-314, con el reparto en el propio panel. Con la tabla de recetas la
+ * pregunta del sobrante la hace «Aplicar» del sub-panel: usa `applyOrderLine(page, sheet, {
+ * leftover: true })` y `saveOrder` de `./order-form`. Se conserva mientras queden specs sin adaptar.
  */
 export async function submitOrderWithLeftover(page: Page, form: Locator): Promise<void> {
   await expect(form.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute(

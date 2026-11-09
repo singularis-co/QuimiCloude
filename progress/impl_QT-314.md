@@ -905,3 +905,62 @@ sigue usando `QuimiCloude_QT313` (es de otra feature). Se creó la base propia `
 130 migraciones; `prisma migrate status`: «Database schema is up to date!»). El entorno se carga con
 `scratchpad/withenv314.sh` (sobrescribe `DATABASE_URL` y `DIRECT_URL` solo en ese proceso; el `.env` no cambia).
 Recorrida sobre ella: `e2e/pedidos-varias-recetas.spec.ts`, chromium: `1 passed (33.9s)`. WebKit: CI.
+
+### T19 lote A (frontend_dev)
+
+Primera mitad de T19: los E2E de pedidos del lote A, adaptados al panel con tabla de recetas y
+sub-panel, al menú por grupos y al selector de receta, con los helpers de T18. Sin commit propio.
+Base: `QuimiCloude_QT314` con `withenv314.sh`; chromium, un spec cada vez. WebKit: CI.
+
+| Spec | ¿Tocado? | Qué se cambió | chromium |
+|---|---|---|---|
+| `e2e/helpers/order-distribution.ts` | sí (comentario) | `submitOrderWithLeftover` se conserva para los specs aún sin adaptar; el comentario remite a `applyOrderLine`/`saveOrder` | — |
+| `e2e/helpers/order-form.ts` | sí (aditivo) | Nuevas constantes `ORDER_FORM_LINES_ERROR(_ITEM)_TESTID`, `ORDER_FORM_REVIEW_LINE_TESTID`, `ORDER_FORM_SAVE_BLOCKED_TESTID`, `ORDER_LINE_SHEET_DISCARD_TESTID`. Sin cambios en las funciones; `pedidos-varias-recetas.spec.ts` sigue en verde: `1 passed (31.3s)` | — |
+| `e2e/pedidos.spec.ts` | sí | Alta por sub-panel (selector con búsqueda y valor oculto, cantidad, unidad, reparto con su presentación, «Aplicar con sobrante»). La prioridad se sigue comprobando en el panel. El reparto de la fila (la columna ya no existe) se comprueba con el mismo texto en la tarjeta de la receta del detalle | `2 passed (37.7s)` |
+| `e2e/pedido-con-varias-recetas.spec.ts` | sí | Alta por sub-panel; `chooseRecipe` comprueba el id; la tabla del panel tiene 1 receta antes de guardar | `1 passed (1.2m)` |
+| `e2e/pedidos-rediseno.spec.ts` | sí | Columnas: fuera `presentationName`, entran `progress` (QT-314) y `salePrice` (QC-307, ya estaba en rojo por eso). Menús: «Ver detalle», «Por receta» y «Pedido entero», con 2 separadores, y cada ítem dentro de su grupo nombrado (`expectMenuGroups`). «Reparto y unidad» y «Entregar» desde la tarjeta pasan por el selector de receta, que también se mide centrado y entero. «Material insuficiente» pasa del diálogo al aviso del panel (R17): se mide entero a 390 px, con sus dos botones de 44 px, y «Revisar receta» no escribe nada | `6 passed (53.8s)` |
+| `e2e/pedidos-cotizacion.spec.ts` | sí | La cotización se hace en el sub-panel; al reabrir la edición, el mismo importe en el sub-panel de la receta | `2 passed (28.4s)` |
+| `e2e/pedidos-busqueda.spec.ts` | no | Verde sin cambios; no usa el panel ni el menú de recetas | `5 passed (44.8s)` |
+| `e2e/pedidos-terminados.spec.ts` | no | Verde sin cambios | `4 passed (26.5s)` |
+| `e2e/pedidos-responsables.spec.ts` | no | Verde sin cambios | `1 passed (23.2s)` |
+| `e2e/pedidos-asignados.spec.ts` | no | Verde sin cambios | `4 passed (25.2s)` |
+| `e2e/pedido-bloqueado.spec.ts` | sí | Alta por `addOrderLine`. El modal pasa a ser el aviso del panel (R17): `role="alert"`, «No alcanza el material para … (receta 1).», 2 botones, «Guardar bloqueada» y «Revisar receta». El resto, igual | `1 passed (27.3s)` |
+| `e2e/pedido-con-cliente.spec.ts` | sí | Alta por sub-panel; el cliente sigue en el panel. Quitadas 3 constantes que ya no se usaban | `4 passed (33.9s)` |
+| `e2e/pedido-conversion-de-unidad.spec.ts` | sí | `fillNewOrder` usa `fillOrderLine`; los ingredientes y el coste aproximado se miran en el sub-panel | `2 passed (20.0s)` |
+| `e2e/pedido-en-varias-presentaciones.spec.ts` | sí | R39: «Aplicar» deshabilitado con el reparto que pasa del total. R36: el envío forzado se hace con el manejador de «Aplicar» y luego «Guardar pedido»; antes era `requestSubmit()`. El rechazo `order_distribution_exceeds_quantity` sale en el aviso por receta, el panel no se cierra, lo escrito sigue en el sub-panel y la base no cambia. Test 2: «Reparto y unidad…» pasa por el selector de receta | `2 passed (52.6s)` |
+| `e2e/pedido-precio-de-venta.spec.ts` | sí | Precio en el sub-panel y, al editar, precargado en el sub-panel de la receta | `1 passed (17.9s)` |
+
+No se quitó ninguna comprobación (R49). Las que miraban algo que ya no existe se movieron a donde
+vive ahora:
+- el reparto de la fila pasa a la tarjeta del detalle;
+- el modal de bloqueo pasa al aviso del panel;
+- «Guardar» deshabilitado pasa a «Aplicar» deshabilitado;
+- el error del campo de reparto pasa al aviso por receta;
+- el «Volver» del bloqueo pasa a «Revisar receta».
+
+El «centrado» del diálogo «Material insuficiente» se cambió por «entero dentro de los 390 px». El
+aviso va dentro del panel, así que ya no hay centrado que medir.
+
+Se añadieron estas comprobaciones:
+- los grupos del menú;
+- el selector de receta centrado y entero;
+- el texto del aviso con su número de receta.
+
+Fuera del lote (no arreglado):
+- `pnpm exec vitest run tests/unit/pedidos/scope.test.ts`: 1 failed. «los specs E2E de pedidos son estos
+  SIETE…» recibe `e2e/pedidos-varias-recetas.spec.ts`, el spec nuevo de T18, que no entró en esa
+  lista cerrada.
+  - No lo causa este lote: no se crea ni se renombra ningún spec.
+  - Lo cierra quien lleve T18/T20, añadiéndolo a la lista con su párrafo de ampliación.
+- Las otras listas de `tests/` que nombran e2e (`guard-e2e-landing`, `clientes/scope`,
+  `recetas/scope`, `data-table-alcance`, `guard-identificador-de-request`) están en verde: `5 passed`
+  de los 6 archivos corridos.
+
+Verificación (salida real):
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todas preexistentes en `tests/`.
+  `eslint` de los 11 archivos tocados: exit 0, sin salida.
+
+Bloqueos de la app: ninguno.
+
+Veredicto: lote A de T19 hecho. Los 13 specs del lote están en verde en chromium (9 adaptados y 4 sin tocar), con los 2 helpers, y no se quitó ninguna comprobación.

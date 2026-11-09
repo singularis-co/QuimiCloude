@@ -26,7 +26,15 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { submitOrderWithLeftover } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  fillOrderLine,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  orderForm,
+  orderLineSheet,
+  saveOrder,
+} from './helpers/order-form';
 import { netReservedInBatch } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
@@ -142,26 +150,17 @@ async function fillNewOrder(
   await page.goto(ORDERS_ROUTE);
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId('order-create-open').first().click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
-
-  const picker = page.getByTestId('recipe-picker');
-  await picker.click();
-  await picker.fill(recipe.name);
-  const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: recipe.name });
-  await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
-  await recipeOption.click();
-  await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipe.id);
-
-  await page.getByTestId('order-field-quantity').fill(quantity);
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
-  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+  // QT-314: la receta se escribe en su sub-panel. `fillOrderLine` la elige en el selector con
+  // busqueda y comprueba el id elegido, escribe la cantidad y elige la unidad.
+  const form = await openCreateOrderPanel(page);
+  const sheet = await openAddOrderLine(page, form);
+  await fillOrderLine(page, sheet, { recipe, quantity, unitId });
 }
 
 async function submitAndFindOrder(page: Page, recipeId: string) {
-  // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes.
-  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
-  await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+  // Sin reparto toda la cantidad queda sin envasar: con QT-314, «Aplicar» pregunta antes.
+  await applyOrderLine(page, orderLineSheet(page), { leftover: true });
+  await saveOrder(page, orderForm(page));
 
   return withFirstLine(
     await prisma.order.findFirstOrThrow({
@@ -315,7 +314,8 @@ test.describe('conversion de la unidad del pedido a la del insumo (QC-204)', () 
   test('R24 pedido en g sobre insumo en kg: costo y cantidad apartada exactos', async ({ page }) => {
     await fillNewOrder(page, { id: gramRecipeId, name: gramRecipeName }, GRAM_QUANTITY, gramUnitId);
 
-    const form = page.getByTestId('order-form');
+    // QT-314: los ingredientes y el coste se ven en el sub-panel de la receta.
+    const form = orderLineSheet(page);
     const line = form.getByTestId('order-ingredient-0');
     await expect(line.getByTestId('order-ingredient-required')).toHaveText(GRAM_REQUIRED_TEXT, {
       timeout: 60_000,
@@ -344,7 +344,8 @@ test.describe('conversion de la unidad del pedido a la del insumo (QC-204)', () 
       milliliterUnitId,
     );
 
-    const form = page.getByTestId('order-form');
+    // QT-314: los ingredientes y el coste se ven en el sub-panel de la receta.
+    const form = orderLineSheet(page);
     const line = form.getByTestId('order-ingredient-0');
     await expect(line.getByTestId('order-ingredient-required')).toContainText(
       MILLILITER_REQUIRED_TEXT,

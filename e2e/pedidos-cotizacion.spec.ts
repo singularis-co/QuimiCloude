@@ -63,12 +63,17 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { addPackagingLine } from './helpers/order-distribution';
 import {
-  addPackagingLine,
-  openOrderRowMenu,
-  orderMenuTrigger,
-  submitOrderWithLeftover,
-} from './helpers/order-distribution';
+  applyOrderLine,
+  chooseLineUnit,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  openEditOrderLine,
+  openEditOrderPanel,
+  orderLineSheet,
+  saveOrder,
+} from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 
@@ -415,10 +420,16 @@ test.afterAll(async () => {
 // El primer `goto` hace que `next dev` compile la ruta bajo demanda y bcrypt tarda a proposito.
 test.setTimeout(180_000);
 
-/** Elige en el formulario del pedido la unidad del fixture (litro). */
+/** Elige en el sub-panel de la receta (QT-314) la unidad del fixture (litro). */
 async function chooseOrderUnit(page: Page): Promise<void> {
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
-  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+  await chooseLineUnit(page, orderLineSheet(page), unitId);
+}
+
+/** «Nuevo pedido» y «Añadir receta»: el coste se cotiza en el sub-panel de la receta (QT-314). */
+async function openNewOrderLine(page: Page): Promise<Locator> {
+  const form = await openCreateOrderPanel(page);
+  await openAddOrderLine(page, form);
+  return form;
 }
 
 test.describe('cotizacion del coste en el pedido (QC-151)', () => {
@@ -430,8 +441,7 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await page.goto(ORDERS_ROUTE);
     await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId('order-create-open').first().click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+    const orderForm = await openNewOrderLine(page);
 
     // Receta TOMADA DEL SELECTOR CON BUSQUEDA, igual que `e2e/pedidos.spec.ts`.
     const picker = page.getByTestId('recipe-picker');
@@ -470,7 +480,7 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     const distribution = page.getByTestId('order-distribution-field');
     await addPackagingLine(
       page,
-      page.getByTestId('order-form'),
+      orderLineSheet(page),
       { productId: packagingId, name: packagingName },
       ORDER_PACKAGES,
     );
@@ -482,9 +492,9 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     // El reparto cambia la cotizacion: el envase se suma a los ingredientes.
     await expect(quoteValue).toHaveText(AMOUNT_B_WITH_PACKAGING, { timeout: 60_000 });
 
-    // 5001 en un envase de 1: queda sobrante y Guardar pregunta antes.
-    await submitOrderWithLeftover(page, page.getByTestId('order-form'));
-    await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+    // 5001 en un envase de 1: queda sobrante y, con QT-314, «Aplicar» pregunta antes.
+    await applyOrderLine(page, orderLineSheet(page), { leftover: true });
+    await saveOrder(page, orderForm);
 
     const created = await prisma.order.findFirstOrThrow({
       where: { lines: { some: { recipeId } }, companyId, deletedAt: null },
@@ -500,14 +510,10 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
       timeout: 60_000,
     });
 
-    const editAction = await openOrderRowMenu(
-      page,
-      orderMenuTrigger(page, created.id),
-      'order-action-edit',
-    );
-    await editAction.click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('order-cost-quote-value')).toHaveText(AMOUNT_B_WITH_PACKAGING, {
+    // QT-314: la cotización vive en el sub-panel de la receta, abierto con su «Editar».
+    const editForm = await openEditOrderPanel(page, created.id);
+    await openEditOrderLine(page, editForm, recipeName);
+    await expect(orderLineSheet(page).getByTestId('order-cost-quote-value')).toHaveText(AMOUNT_B_WITH_PACKAGING, {
       timeout: 60_000,
     });
   });
@@ -520,8 +526,7 @@ test.describe('cotizacion del coste en el pedido (QC-151)', () => {
     await page.goto(ORDERS_ROUTE);
     await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId('order-create-open').first().click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+    await openNewOrderLine(page);
 
     const picker = page.getByTestId('recipe-picker');
     await picker.click();

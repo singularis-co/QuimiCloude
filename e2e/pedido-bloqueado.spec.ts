@@ -7,7 +7,8 @@
  *
  * El estado final se lee de la base; la pantalla se comprueba por `data-testid` y `data-status`,
  * nunca por posicion. Los textos que se afirman salen de las constantes que pinta la propia UI, o
- * son los fijados por el spec («Guardar bloqueado», «Volver»).
+ * son los fijados por el spec. Con QT-314 (R17) el modal pasa a ser el aviso por receta del panel,
+ * con «Guardar bloqueada» y «Revisar receta» (antes «Guardar bloqueado» y «Volver»).
  *
  * DATOS: tablas compartidas entre proyectos y worktrees. Todo lleva el prefijo `qc138_e2e_` y el
  * `RUN_ID` del worker; la limpieza de huerfanos filtra por prefijo Y por edad, y `afterAll` borra
@@ -29,7 +30,15 @@ import { ASSIGNED_ORDERS_ROUTE, INVENTORY_ROUTE, ORDERS_ROUTE } from '@/lib/shar
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { submitOrderWithLeftover } from './helpers/order-distribution';
+import {
+  addOrderLine,
+  openCreateOrderPanel,
+  ORDER_FORM_LINES_ERROR_ITEM_TESTID,
+  ORDER_FORM_LINES_ERROR_TESTID,
+  ORDER_FORM_REVIEW_LINE_TESTID,
+  ORDER_FORM_SAVE_BLOCKED_TESTID,
+  orderForm,
+} from './helpers/order-form';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc138_e2e_';
@@ -131,23 +140,17 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.goto(ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId('order-create-open').first().click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
-
-  const recipePicker = page.getByTestId('recipe-picker');
-  await recipePicker.click();
-  await recipePicker.fill(RECIPE_NAME);
-  const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: RECIPE_NAME });
-  await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
-  await recipeOption.click();
-  await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
-
-  await page.getByTestId('order-field-quantity').fill(quantity);
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
-  await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
-
-  // Sin reparto toda la cantidad queda sin envasar: Guardar pregunta antes.
-  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
+  // QT-314: la receta se escribe en su sub-panel (selector con busqueda, que comprueba el id
+  // elegido, cantidad y unidad). Sin reparto toda la cantidad queda sin envasar: «Aplicar» pregunta
+  // antes de volver al panel.
+  const form = await openCreateOrderPanel(page);
+  await addOrderLine(
+    page,
+    form,
+    { recipe: { id: recipeId ?? '', name: RECIPE_NAME }, quantity, unitId: unitId ?? '' },
+    { leftover: true },
+  );
+  await form.getByTestId('order-form-submit').click();
 }
 
 /** Da de alta por Inventario un lote nuevo del insumo del fixture, con su unidad preseleccionada. */
@@ -415,16 +418,24 @@ test.describe('pedido bloqueado por inventario insuficiente', () => {
 
     await loginAndLand(page, adminUser);
 
-    // --- 1. El pedido pide 1.500 y el unico lote tiene 500: aparece el modal y todavia no se
-    // ha escrito nada.
+    // --- 1. El pedido pide 1.500 y el unico lote tiene 500: aparece el aviso con sus dos
+    // opciones (QT-314 R17, antes un modal) y todavia no se ha escrito nada.
     await submitNewOrder(page, ORDER_QUANTITY);
 
-    const dialog = page.getByRole('alertdialog');
+    const dialog = orderForm(page).getByTestId(ORDER_FORM_LINES_ERROR_TESTID);
     await expect(dialog).toBeVisible({ timeout: 60_000 });
+    await expect(dialog).toHaveAttribute('role', 'alert');
+    await expect(dialog.getByTestId(ORDER_FORM_LINES_ERROR_ITEM_TESTID)).toHaveText(
+      `No alcanza el material para ${RECIPE_NAME} (receta 1).`,
+    );
     await expect(dialog.getByRole('button')).toHaveCount(2);
-    const saveBlocked = dialog.getByRole('button', { name: 'Guardar bloqueado', exact: true });
+    const saveBlocked = dialog.getByRole('button', { name: 'Guardar bloqueada', exact: true });
     await expect(saveBlocked).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Volver', exact: true })).toBeVisible();
+    await expect(saveBlocked).toHaveAttribute('data-testid', ORDER_FORM_SAVE_BLOCKED_TESTID);
+    await expect(dialog.getByRole('button', { name: 'Revisar receta', exact: true })).toHaveAttribute(
+      'data-testid',
+      ORDER_FORM_REVIEW_LINE_TESTID,
+    );
 
     expect(
       await prisma.order.count({ where: { lines: { some: { recipeId } } }}),

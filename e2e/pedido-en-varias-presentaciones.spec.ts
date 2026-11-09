@@ -60,7 +60,20 @@ import {
   PACKING_ORDER_START_CONFIRM_TESTID,
   startOpenedAssignedOrder,
 } from './helpers/confirm-dialog';
-import { addPackagingLine, openOrderRowMenu, submitOrderWithLeftover } from './helpers/order-distribution';
+import { addPackagingLine, openOrderRowMenu } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  ORDER_FORM_LINES_ERROR_ITEM_TESTID,
+  ORDER_FORM_LINES_ERROR_TESTID,
+  ORDER_LINE_SHEET_APPLY_TESTID,
+  ORDER_LINE_SHEET_DISCARD_TESTID,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  openEditOrderLine,
+  orderLineSheet,
+  pickOrderLine,
+  saveOrder,
+} from './helpers/order-form';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine, firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
@@ -128,7 +141,6 @@ const RECIPE_STEPS: readonly RecipeStepDocument[] = [
 
 /** Pedidos. */
 const ORDERS_TITLE_TESTID = 'pedidos-title';
-const ORDER_CREATE_OPEN_TESTID = 'order-create-open';
 const ORDER_FORM_TESTID = 'order-form';
 const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
 const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
@@ -148,7 +160,6 @@ const DISTRIBUTION_LINE_TESTID = 'order-distribution-line';
 const DISTRIBUTION_LINE_PACKAGES_TESTID = 'order-distribution-line-packages';
 const DISTRIBUTION_AVAILABLE_TESTID = 'order-distribution-available';
 const DISTRIBUTION_WARNING_TESTID = 'order-distribution-warning';
-const DISTRIBUTION_ERROR_TESTID = 'order-distribution-error';
 
 const DISTRIBUTION_DIALOG_TESTID = 'order-distribution-dialog';
 const DISTRIBUTION_DIALOG_SUBMIT_TESTID = 'order-distribution-dialog-submit';
@@ -603,9 +614,9 @@ test.describe('pedido en varias presentaciones', () => {
     // --- 1. Alta por la pantalla: receta, cantidad, unidad y dos lineas de reparto.
     await loginAndLand(page, adminUser);
     await openOrders(page);
-    await page.getByTestId(ORDER_CREATE_OPEN_TESTID).first().click();
-    const createForm = page.getByTestId(ORDER_FORM_TESTID);
-    await expect(createForm).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta (con su unidad y su reparto) se escribe en su sub-panel.
+    const orderPanel = await openCreateOrderPanel(page);
+    const createForm = await openAddOrderLine(page, orderPanel);
 
     const recipePicker = createForm.getByTestId(RECIPE_PICKER_TESTID);
     await recipePicker.click();
@@ -621,21 +632,23 @@ test.describe('pedido en varias presentaciones', () => {
     await addDistributionLine(page, createForm, presentationB, PACKAGES_B);
     await expectAvailability(createForm, false);
 
-    // --- 2. R39: un reparto que pasa del total avisa y no ofrece Guardar; al volver, si.
+    // --- 2. R39: un reparto que pasa del total avisa y no ofrece aplicar la receta (QT-314: el
+    // control es «Aplicar» del sub-panel); al volver, si.
     const createLineB = distributionLine(createForm, presentationB.id).getByTestId(
       DISTRIBUTION_LINE_PACKAGES_TESTID,
     );
     await createLineB.fill(PACKAGES_B_EXCEEDING);
     await expectAvailability(createForm, true);
-    await expect(createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
+    await expect(createForm.getByTestId(ORDER_LINE_SHEET_APPLY_TESTID)).toBeDisabled();
 
     await createLineB.fill(PACKAGES_B);
     await expectAvailability(createForm, false);
-    await expect(createForm.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+    await expect(createForm.getByTestId(ORDER_LINE_SHEET_APPLY_TESTID)).toBeEnabled();
 
-    // 4 x 1 + 6 x 0.5 = 7 de 10: queda sobrante y Guardar pregunta antes.
-    await submitOrderWithLeftover(page, createForm);
-    await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
+    // 4 x 1 + 6 x 0.5 = 7 de 10: queda sobrante y, con QT-314, «Aplicar» pregunta antes.
+    await applyOrderLine(page, createForm, { leftover: true });
+    await expect(orderPanel.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
+    await saveOrder(page, orderPanel);
 
     const created = withFirstLine(
       await prisma.order.findFirstOrThrow({
@@ -666,8 +679,10 @@ test.describe('pedido en varias presentaciones', () => {
     const actions = rowActions(page, orderId);
     await expect(actions).toBeVisible({ timeout: 60_000 });
     await (await openOrderRowMenu(page, actions, ORDER_ACTION_EDIT_TESTID)).click();
-    const editForm = page.getByTestId(ORDER_FORM_TESTID);
-    await expect(editForm).toBeVisible({ timeout: 60_000 });
+    const editPanel = page.getByTestId(ORDER_FORM_TESTID);
+    await expect(editPanel).toBeVisible({ timeout: 60_000 });
+    // QT-314: el reparto se edita en el sub-panel de la receta.
+    const editForm = await openEditOrderLine(page, editPanel, RECIPE_NAME);
 
     const editLineA = distributionLine(editForm, presentationA.id).getByTestId(
       DISTRIBUTION_LINE_PACKAGES_TESTID,
@@ -675,24 +690,50 @@ test.describe('pedido en varias presentaciones', () => {
     await expect(editLineA).toHaveValue(PACKAGES_A, { timeout: 60_000 });
     await editLineA.fill(PACKAGES_A_EXCEEDING);
     await expectAvailability(editForm, true);
-    await expect(editForm.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
+    await expect(editForm.getByTestId(ORDER_LINE_SHEET_APPLY_TESTID)).toBeDisabled();
 
-    // El boton deshabilitado no es la defensa: se envia el formulario igual.
-    await editForm.evaluate((form) => (form as HTMLFormElement).requestSubmit());
-    await expect(editForm.getByTestId(DISTRIBUTION_ERROR_TESTID)).toHaveText(
-      errorMessage('order_distribution_exceeds_quantity'),
-      { timeout: 60_000 },
-    );
-    await expect(editLineA, 'lo escrito no se pierde con el rechazo').toHaveValue(
-      PACKAGES_A_EXCEEDING,
-    );
+    // El boton deshabilitado no es la defensa: se aplica la receta igual y se guarda el pedido.
+    // QT-314: el sub-panel no es un formulario, asi que se invoca el manejador de «Aplicar» que la
+    // pantalla le pasa al boton (el componente mas alto del arbol de React con su `data-testid`),
+    // como antes `requestSubmit()` saltaba el boton deshabilitado.
+    await editForm.getByTestId(ORDER_LINE_SHEET_APPLY_TESTID).evaluate((button, testId) => {
+      type Fiber = {
+        readonly memoizedProps?: { readonly 'data-testid'?: string; readonly onClick?: () => void };
+        readonly return: Fiber | null;
+      };
+      const fiberKey = Object.keys(button).find((key) => key.startsWith('__reactFiber'));
+      let fiber = (button as unknown as Record<string, Fiber | undefined>)[fiberKey ?? ''] ?? null;
+      let handler: (() => void) | undefined;
+      while (fiber !== null) {
+        if (fiber.memoizedProps?.['data-testid'] === testId) handler = fiber.memoizedProps.onClick;
+        fiber = fiber.return;
+      }
+      if (handler === undefined) throw new Error('el boton «Aplicar» no tiene manejador');
+      handler();
+    }, ORDER_LINE_SHEET_APPLY_TESTID);
+    await expect(orderLineSheet(page)).toHaveCount(0, { timeout: 60_000 });
+    await editPanel.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
+    // El rechazo llega como aviso por receta del panel (QT-314 R17), con el mensaje del catalogo.
+    await expect(
+      editPanel.getByTestId(ORDER_FORM_LINES_ERROR_TESTID).getByTestId(ORDER_FORM_LINES_ERROR_ITEM_TESTID),
+    ).toHaveText(`${errorMessage('order_distribution_exceeds_quantity')} ${RECIPE_NAME} (receta 1).`, {
+      timeout: 60_000,
+    });
+    await expect(editPanel, 'el panel no se cierra con el rechazo').toBeVisible();
+    const reopened = await openEditOrderLine(page, editPanel, RECIPE_NAME);
+    await expect(
+      distributionLine(reopened, presentationA.id).getByTestId(DISTRIBUTION_LINE_PACKAGES_TESTID),
+      'lo escrito no se pierde con el rechazo',
+    ).toHaveValue(PACKAGES_A_EXCEEDING);
 
     const afterRejection = await linesByPresentation(orderId);
     expect(afterRejection.get(presentationA.id)).toBe(Number(PACKAGES_A));
     expect(afterRejection.get(presentationB.id)).toBe(Number(PACKAGES_B));
     expect(afterRejection.size).toBe(2);
 
-    await editForm.getByTestId(ORDER_FORM_CANCEL_TESTID).click();
+    await reopened.getByTestId(ORDER_LINE_SHEET_DISCARD_TESTID).click();
+    await expect(orderLineSheet(page)).toHaveCount(0, { timeout: 60_000 });
+    await editPanel.getByTestId(ORDER_FORM_CANCEL_TESTID).click();
     await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
 
     // --- 4. Produccion: el Operador finaliza y todavia no nace ningun lote.
@@ -875,7 +916,12 @@ test.describe('pedido en varias presentaciones', () => {
 
       const actions = rowActions(adminPage, orderId);
       await expect(actions).toBeVisible({ timeout: 60_000 });
+      // QT-314: «Reparto y unidad…» es una accion «Por receta»: antes se elige la receta.
+      const lineId = (
+        await prisma.orderLine.findFirstOrThrow({ where: { orderId }, select: { id: true } })
+      ).id;
       await (await openOrderRowMenu(adminPage, actions, ORDER_ACTION_DISTRIBUTION_TESTID)).click();
+      await pickOrderLine(adminPage, lineId);
       let dialog = adminPage.getByTestId(DISTRIBUTION_DIALOG_TESTID);
       await expect(dialog).toBeVisible({ timeout: 60_000 });
 
@@ -900,6 +946,7 @@ test.describe('pedido en varias presentaciones', () => {
       await openOrders(adminPage);
       await expect(actions).toBeVisible({ timeout: 60_000 });
       await (await openOrderRowMenu(adminPage, actions, ORDER_ACTION_DISTRIBUTION_TESTID)).click();
+      await pickOrderLine(adminPage, lineId);
       dialog = adminPage.getByTestId(DISTRIBUTION_DIALOG_TESTID);
       await expect(dialog).toBeVisible({ timeout: 60_000 });
       const staleLine = distributionLine(dialog, presentationA.id).getByTestId(
