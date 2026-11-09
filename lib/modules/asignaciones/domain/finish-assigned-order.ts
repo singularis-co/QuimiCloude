@@ -213,7 +213,14 @@ export function createFinishAssignedOrder(
     // Fuera de la transaccion: quitar la ultima foto justo al finalizar lo provoca la misma
     // persona desde su pantalla, que ya bloquea el boton.
     const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
-    await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, 'manufacturing', content?.steps ?? []);
+    await assertEvidenceComplete(
+      deps.evidence,
+      actor.companyId,
+      orderId,
+      summary.lineId,
+      'manufacturing',
+      content?.steps ?? [],
+    );
 
     const now = deps.now?.() ?? new Date();
     // El auto-asignado del empacador, ANTES de transicionar y UNA sola vez: el reintento

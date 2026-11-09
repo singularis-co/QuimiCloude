@@ -128,12 +128,12 @@ describe('execution-log-prisma: append', () => {
 })
 
 describe('execution-log-prisma: findLastStepPosition (R14)', () => {
-  it('R14: la ultima fila con posicion de ese pedido en esa empresa, ordenada por instante e id', async () => {
+  it('R14, R13: la ultima fila con posicion de esa linea del pedido en esa empresa, ordenada por instante e id', async () => {
     const { db, findFirst } = clienteDoble()
     findFirst.mockResolvedValue({ stepPosition: 5 })
-    await expect(createExecutionLogRepository(db).findLastStepPosition(COMPANY, ORDER)).resolves.toBe(5)
+    await expect(createExecutionLogRepository(db).findLastStepPosition(COMPANY, ORDER, ORDER_LINE)).resolves.toBe(5)
     expect(findFirst).toHaveBeenCalledWith({
-      where: { companyId: COMPANY, orderId: ORDER, stepPosition: { not: null } },
+      where: { companyId: COMPANY, orderId: ORDER, orderLineId: ORDER_LINE, stepPosition: { not: null } },
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       select: { stepPosition: true },
     })
@@ -141,7 +141,7 @@ describe('execution-log-prisma: findLastStepPosition (R14)', () => {
 
   it('R14: sin anotaciones con posicion devuelve null', async () => {
     const { db } = clienteDoble()
-    await expect(createExecutionLogRepository(db).findLastStepPosition(COMPANY, ORDER)).resolves.toBeNull()
+    await expect(createExecutionLogRepository(db).findLastStepPosition(COMPANY, ORDER, ORDER_LINE)).resolves.toBeNull()
   })
 })
 

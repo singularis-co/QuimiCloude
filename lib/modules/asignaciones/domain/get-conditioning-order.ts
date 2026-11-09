@@ -18,7 +18,7 @@ import {
   type ConditioningOrderDetail,
   type ConditioningStepsView,
 } from './conditioning-order-view';
-import { conditioningProgress } from './conditioning-steps';
+import { lineConditioningProgress } from './conditioning-steps';
 import { OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
 import { onlyLineOf } from './only-order-line';
@@ -62,9 +62,9 @@ async function readConditioningSteps(
   if (steps.length === 0) return null;
   const [entries, evidence] = await Promise.all([
     deps.log.listEntriesForOrders(actor.companyId, [summary.id]),
-    readStepEvidence(deps.evidence, deps.storage, actor.companyId, summary.id, 'conditioning', steps),
+    readStepEvidence(deps.evidence, deps.storage, actor.companyId, summary.id, summary.lineId, 'conditioning', steps),
   ]);
-  return composeConditioningStepsView(detail, actor.id, steps, conditioningProgress(entries, steps.length), evidence);
+  return composeConditioningStepsView(detail, actor.id, steps, lineConditioningProgress(entries, summary.lineId, steps.length), evidence);
 }
 
 export function createGetConditioningOrder(
@@ -88,7 +88,7 @@ export function createGetConditioningOrder(
     if (CLOSED_STATUSES.has(summary.status) && !isConditioner) throw new OrderNotFoundError();
 
     const team = TEAM_STATUSES.has(summary.status)
-      ? await deps.team.listByOrderInCompany(actor.companyId, orderId)
+      ? await deps.team.listByLineInCompany(actor.companyId, orderId, summary.lineId)
       : [];
     const batches =
       summary.status !== 'POR_ACONDICIONAR' && isConditioner

@@ -82,7 +82,7 @@ function montar(options?: {
     recipes: {
       findExecutionContentById: vi.fn(async () => ({ steps: [{ blocks: [] }, { blocks: [] }, { blocks: [] }] })),
     } as unknown as RecipeCatalog,
-    evidence: { listByOrder: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
+    evidence: { listByLine: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
   };
   return { deps, listOrderIdsByUserInCompany, findAliveById, append, findLastStepPosition };
 }

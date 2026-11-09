@@ -15,7 +15,7 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { missingBatchDataLines } from './conditioning-batch-data';
-import { conditioningProgress } from './conditioning-steps';
+import { lineConditioningProgress } from './conditioning-steps';
 import {
   ConditioningBatchDataMissingError,
   ConditioningStepsPendingError,
@@ -32,7 +32,12 @@ import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
 
 import type { FinishedBatchLabels } from '@/lib/modules/inventario';
-import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
+import {
+  formatOrderNumber,
+  type AssignedOrderSummary,
+  type OrderAssignmentTarget,
+  type OrderCatalog,
+} from '@/lib/modules/pedidos';
 import type { RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
 const finishConditioningSchema = z.strictObject({
@@ -51,13 +56,12 @@ export type FinishConditioningDeps = {
 async function assertConditioningStepsCompleted(
   deps: FinishConditioningDeps,
   companyId: string,
-  orderId: string,
-  recipeId: string,
+  summary: Pick<AssignedOrderSummary, 'id' | 'lineId' | 'recipeId'>,
 ): Promise<void> {
-  const steps = (await deps.conditioningSteps.findConditioningStepsById(recipeId, companyId)) ?? [];
+  const steps = (await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, companyId)) ?? [];
   if (steps.length === 0) return;
-  const entries = await deps.log.listEntriesForOrders(companyId, [orderId]);
-  const { completedCount } = conditioningProgress(entries, steps.length);
+  const entries = await deps.log.listEntriesForOrders(companyId, [summary.id]);
+  const { completedCount } = lineConditioningProgress(entries, summary.lineId, steps.length);
   if (completedCount < steps.length) {
     throw new ConditioningStepsPendingError(`${String(completedCount)} de ${String(steps.length)} pasos`);
   }
@@ -105,7 +109,7 @@ export function createFinishConditioning(
     if (target.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) throw new OrderConditioningTakenError();
 
-    await assertConditioningStepsCompleted(deps, actor.companyId, orderId, summary.recipeId);
+    await assertConditioningStepsCompleted(deps, actor.companyId, summary);
 
     const batches = await deps.batches.listOfOrder(actor.companyId, orderId, summary.lineId);
     if (missingBatchDataLines(summary.presentationLines, batches) > 0) throw new ConditioningBatchDataMissingError();

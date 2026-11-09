@@ -70,7 +70,7 @@ export function createRegisterEvidence(
     const replaced =
       replacesEvidenceId === undefined
         ? null
-        : await deps.evidence.findById(actor.companyId, orderId, phase, replacesEvidenceId);
+        : await deps.evidence.findById(actor.companyId, orderId, target.lineId, phase, replacesEvidenceId);
     if (replacesEvidenceId !== undefined && replaced?.stepPosition !== stepPosition) {
       return rejectUpload(path, (diagnostic) => new EvidenceNotFoundError(diagnostic));
     }
@@ -118,7 +118,7 @@ export function createRegisterEvidence(
       if (warning !== null) warnings.push(warning);
     }
 
-    const rows = await deps.evidence.listByOrder(actor.companyId, orderId, phase);
+    const rows = await deps.evidence.listByLine(actor.companyId, orderId, target.lineId, phase);
     return { photos: await signStepPhotos(deps.storage, rows, stepPosition), warnings };
   };
 }

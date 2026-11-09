@@ -179,7 +179,7 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('createConditioningTeamRepository — insertAll y listByOrderInCompany', () => {
+describe('createConditioningTeamRepository — insertAll y listByLineInCompany', () => {
   it('R13: insertAll escribe una fila por persona y la lectura las devuelve por `position`', async () => {
     await inRolledBackTransaction(async (tx) => {
       const s = await seedScenario(tx);
@@ -189,7 +189,7 @@ describe('createConditioningTeamRepository — insertAll y listByOrderInCompany'
       // Se insertan desordenadas: el orden de lectura sale de `position`, no del de insercion.
       expect(await repo.insertAll([team[2]!, team[0]!, team[1]!])).toBe(3);
 
-      expect(await repo.listByOrderInCompany(s.companyId, s.orderId)).toEqual([
+      expect(await repo.listByLineInCompany(s.companyId, s.orderId, s.orderLineId)).toEqual([
         { userId: s.users[0], workGroupId: null, workGroupName: null },
         { userId: s.users[1], workGroupId: s.groupId, workGroupName: s.groupName },
         { userId: s.users[2], workGroupId: s.groupId, workGroupName: s.groupName },
@@ -205,17 +205,17 @@ describe('createConditioningTeamRepository — insertAll y listByOrderInCompany'
       await repo.insertAll(teamOf(a));
       await repo.insertAll(teamOf(b).slice(0, 1));
 
-      expect(await repo.listByOrderInCompany(b.companyId, a.orderId)).toEqual([]);
-      expect(await repo.listByOrderInCompany(a.companyId, b.orderId)).toEqual([]);
-      expect(await repo.listByOrderInCompany(b.companyId, b.orderId)).toHaveLength(1);
-      expect(await repo.listByOrderInCompany(a.companyId, a.orderId)).toHaveLength(3);
+      expect(await repo.listByLineInCompany(b.companyId, a.orderId, a.orderLineId)).toEqual([]);
+      expect(await repo.listByLineInCompany(a.companyId, b.orderId, b.orderLineId)).toEqual([]);
+      expect(await repo.listByLineInCompany(b.companyId, b.orderId, b.orderLineId)).toHaveLength(1);
+      expect(await repo.listByLineInCompany(a.companyId, a.orderId, a.orderLineId)).toHaveLength(3);
     });
   });
 
   it('R13: un pedido sin equipo devuelve la lista vacia', async () => {
     await inRolledBackTransaction(async (tx) => {
       const s = await seedScenario(tx);
-      expect(await createConditioningTeamRepository(tx).listByOrderInCompany(s.companyId, s.orderId)).toEqual([]);
+      expect(await createConditioningTeamRepository(tx).listByLineInCompany(s.companyId, s.orderId, s.orderLineId)).toEqual([]);
     });
   });
 
@@ -258,7 +258,7 @@ describe('el equipo guardado no cambia cuando cambian los grupos o las personas 
       }
       await repo.insertAll(teamOf(s));
       const antes = await rawTeam(tx, s.orderId);
-      const leidoAntes = await repo.listByOrderInCompany(s.companyId, s.orderId);
+      const leidoAntes = await repo.listByLineInCompany(s.companyId, s.orderId, s.orderLineId);
 
       const nuevoNombre = `Renombrado ${token()}`;
       await tx.workGroup.update({
@@ -276,8 +276,85 @@ describe('el equipo guardado no cambia cuando cambian los grupos o las personas 
       await tx.workGroup.update({ where: { id: s.groupId }, data: { deletedAt: new Date() } });
 
       expect(await rawTeam(tx, s.orderId)).toEqual(antes);
-      expect(await repo.listByOrderInCompany(s.companyId, s.orderId)).toEqual(leidoAntes);
+      expect(await repo.listByLineInCompany(s.companyId, s.orderId, s.orderLineId)).toEqual(leidoAntes);
       expect(antes.map((row) => row.work_group_name)).toEqual([null, s.groupName, s.groupName]);
+    });
+  });
+});
+
+/** Una segunda receta en el pedido del escenario, con su propia linea. */
+async function addSecondLine(tx: Prisma.TransactionClient, s: Scenario): Promise<string> {
+  const marca = token();
+  const recipe = await tx.recipe.create({
+    data: { name: `Receta B ${marca}`, nameNormalized: `recetab${marca}`, companyId: s.companyId },
+    select: { id: true },
+  });
+  const line = await tx.orderLine.create({
+    data: {
+      orderId: s.orderId,
+      companyId: s.companyId,
+      position: 1,
+      recipeId: recipe.id,
+      originalRecipeId: recipe.id,
+      quantity: '5',
+    },
+    select: { id: true },
+  });
+  return line.id;
+}
+
+describe('el equipo es el de la receta nombrada (QT-315)', () => {
+  it('R13: con dos lineas del mismo pedido, el equipo de una no sale en la otra', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const s = await seedScenario(tx);
+      const lineB = await addSecondLine(tx, s);
+      const repo = createConditioningTeamRepository(tx);
+      const team = teamOf(s);
+      await repo.insertAll(team.slice(0, 2));
+      // La misma persona puede estar en el equipo de las dos recetas.
+      await repo.insertAll([
+        { ...team[1]!, orderLineId: lineB, position: 0 },
+        { ...team[2]!, orderLineId: lineB, position: 1 },
+      ]);
+
+      expect(await repo.listByLineInCompany(s.companyId, s.orderId, s.orderLineId)).toEqual([
+        { userId: s.users[0], workGroupId: null, workGroupName: null },
+        { userId: s.users[1], workGroupId: s.groupId, workGroupName: s.groupName },
+      ]);
+      expect(await repo.listByLineInCompany(s.companyId, s.orderId, lineB)).toEqual([
+        { userId: s.users[1], workGroupId: s.groupId, workGroupName: s.groupName },
+        { userId: s.users[2], workGroupId: s.groupId, workGroupName: s.groupName },
+      ]);
+    });
+  });
+
+  it('R13: una linea de otro pedido o de otra empresa no trae equipo', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const s = await seedScenario(tx);
+      const otro = await seedScenario(tx);
+      const otroPedido = await createOrder(tx, s.companyId);
+      const repo = createConditioningTeamRepository(tx);
+      await repo.insertAll(teamOf(s));
+
+      expect(await repo.listByLineInCompany(s.companyId, otroPedido, s.orderLineId)).toEqual([]);
+      expect(await repo.listByLineInCompany(otro.companyId, s.orderId, s.orderLineId)).toEqual([]);
+    });
+  });
+
+  it('R13: listByOrdersInCompany dice de que linea es cada miembro', async () => {
+    await inRolledBackTransaction(async (tx) => {
+      const s = await seedScenario(tx);
+      const lineB = await addSecondLine(tx, s);
+      const repo = createConditioningTeamRepository(tx);
+      const team = teamOf(s);
+      await repo.insertAll([team[0]!, { ...team[1]!, orderLineId: lineB, position: 1 }]);
+
+      const filas = await repo.listByOrdersInCompany(s.companyId, [s.orderId]);
+
+      expect(filas.map((row) => [row.userId, row.orderLineId])).toEqual([
+        [s.users[0], s.orderLineId],
+        [s.users[1], lineB],
+      ]);
     });
   });
 });
@@ -300,6 +377,7 @@ describe('createConditioningTeamRepository — listByOrdersInCompany', () => {
 
       const fila = (orderId: string, member: NewConditioningTeamMember) => ({
         orderId,
+        orderLineId: member.orderLineId,
         userId: member.userId,
         workGroupId: member.workGroupId,
         workGroupName: member.workGroupName,

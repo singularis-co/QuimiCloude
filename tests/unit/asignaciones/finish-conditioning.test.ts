@@ -522,12 +522,28 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
     expect(append).not.toHaveBeenCalled();
   });
 
+  it('R13: los pasos completados de otra receta del pedido no cuentan para terminar esta', async () => {
+    const { deps, finishConditioningAliveById } = montar('ok', {
+      pasos: PASOS,
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, null, 1, LINEA),
+        anotacionDePaso('conditioning_step_advance', 1, null, 2, 'linea-otra-receta'),
+        anotacionDePaso('conditioning_steps_complete', 2, null, 3, 'linea-otra-receta'),
+      ],
+    });
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+      ConditioningStepsPendingError,
+    );
+    expect(finishConditioningAliveById).not.toHaveBeenCalled();
+  });
+
   it('R25: con todos los pasos completados termina como hoy', async () => {
     const { deps, finishConditioningAliveById } = montar('ok', {
       pasos: PASOS,
       anotaciones: [
-        anotacionDePaso('conditioning_step_advance', 1, null),
-        anotacionDePaso('conditioning_steps_complete', 2, null),
+        anotacionDePaso('conditioning_step_advance', 1, null, 1, LINEA),
+        anotacionDePaso('conditioning_steps_complete', 2, null, 2, LINEA),
       ],
     });
 

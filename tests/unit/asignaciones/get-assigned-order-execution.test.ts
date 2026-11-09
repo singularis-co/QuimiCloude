@@ -101,7 +101,7 @@ type Dobles = {
   readonly findMassVolumeBridge: ReturnType<typeof vi.fn>;
   readonly productFindRefs: ReturnType<typeof vi.fn>;
   readonly findRefsPresentations: ReturnType<typeof vi.fn>;
-  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByLine: ReturnType<typeof vi.fn>;
   readonly createSignedReadUrl: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
@@ -159,7 +159,7 @@ function montar(options?: {
 
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
 
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const createSignedReadUrl = vi.fn(async (path: string, ttl: number) => `https://bucket.test/${path}?ttl=${String(ttl)}`);
 
   const deps: GetAssignedOrderExecutionDeps = {
@@ -182,7 +182,7 @@ function montar(options?: {
       findFinishedGoodsReceipts: vi.fn(async () => []),
     } as ProductCatalog,
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
-    evidence: { listByOrder: listEvidenceByOrder } as unknown as StepEvidenceRepository,
+    evidence: { listByLine: listEvidenceByLine } as unknown as StepEvidenceRepository,
     storage: { createSignedReadUrl } as unknown as EvidenceStorage,
   };
 
@@ -197,7 +197,7 @@ function montar(options?: {
     findMassVolumeBridge,
     productFindRefs,
     findRefsPresentations,
-    listEvidenceByOrder,
+    listEvidenceByLine,
     createSignedReadUrl,
     todos: [
       listOrderIdsByUserInCompany,
@@ -216,7 +216,7 @@ function montar(options?: {
       findMassVolumeBridge,
       productFindRefs,
       findRefsPresentations,
-      listEvidenceByOrder,
+      listEvidenceByLine,
       createSignedReadUrl,
     ],
   };
@@ -930,7 +930,7 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
   const EN_CURSO = { order: { id: PEDIDO, status: 'EN_CURSO' as const }, summary: resumen({ status: 'EN_CURSO' }) };
 
   function fila(id: string, stepPosition: number, slot: number): StepEvidenceRow {
-    return { id, orderId: PEDIDO, phase: 'manufacturing', stepPosition, slot, path: `${EMPRESA}/${PEDIDO}/${id}` };
+    return { id, orderId: PEDIDO, orderLineId: LINEA, phase: 'manufacturing', stepPosition, slot, path: `${EMPRESA}/${PEDIDO}/${id}` };
   }
 
   it('R14, R33: un pedido EN_CURSO trae sus fotos por paso, cada una con URL firmada de 15 minutos', async () => {
@@ -950,7 +950,7 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
       },
       { stepPosition: 3, photos: [{ id: 'f3', slot: 1, url: `https://bucket.test/${EMPRESA}/${PEDIDO}/f3?ttl=900` }] },
     ]);
-    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
+    expect(d.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'manufacturing');
     expect(d.createSignedReadUrl).toHaveBeenCalledTimes(3);
     for (const call of d.createSignedReadUrl.mock.calls) expect(call[1]).toBe(15 * 60);
   });
@@ -959,7 +959,7 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
     const d = montar({ content: contenido({ steps: PASOS_CON_EVIDENCIA }) });
     const view = await createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO });
     expect(view.evidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
     expect(d.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
@@ -967,7 +967,7 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
     const d = montar({ ...EN_CURSO, content: contenido({ steps: [{ blocks: [] }] }) });
     const view = await createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO });
     expect(view.evidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
   });
 
   it('R33: quien no es responsable asignado no recibe ninguna URL firmada', async () => {
@@ -975,7 +975,7 @@ describe('getAssignedOrderExecution — evidencia (R14, R33)', () => {
     await expect(createGetAssignedOrderExecution(d.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
       OrderNotFoundError,
     );
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
     expect(d.createSignedReadUrl).not.toHaveBeenCalled();
   });
 });

@@ -46,7 +46,7 @@
 
 ## Tanda 2 — lecturas por línea en los puertos de `asignaciones`
 
-- [ ] **T4 [P] · backend_dev — registro de ejecución por línea** (design § 3.3)
+- [x] **T4 [P] · backend_dev — registro de ejecución por línea** (design § 3.3)
   - `findLastStepPosition(companyId, orderId, orderLineId)`.
   - `ExecutionEntryRecord.orderLineId`.
   - El avance de los pasos de acondicionamiento filtra por línea en `get-conditioning-order`,
@@ -54,7 +54,7 @@
   - Los llamadores pasan el `lineId` que ya tienen.
   - **Hecho cuando:** hay un unit y una integración con dos líneas del mismo pedido que no se
     mezclan (R13).
-- [ ] **T5 [P] · backend_dev — fotos y equipo por línea** (design § 3.3)
+- [x] **T5 [P] · backend_dev — fotos y equipo por línea** (design § 3.3)
   - `StepEvidenceRepository`: `listByLine`, `findById` y `delete` con línea, y `slot` libre por
     línea.
   - `ConditioningTeamRepository.listByLineInCompany`; `listByOrdersInCompany` con `orderLineId`.

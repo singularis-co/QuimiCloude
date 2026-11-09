@@ -25,6 +25,7 @@ const FROM_DB_PHASE: Readonly<Record<DbEvidencePhase, EvidencePhase>> = {
 const ROW_SELECT = {
   id: true,
   orderId: true,
+  orderLineId: true,
   phase: true,
   stepPosition: true,
   slot: true,
@@ -37,6 +38,7 @@ function toRow(row: DbRow): StepEvidenceRow {
   return {
     id: row.id,
     orderId: row.orderId,
+    orderLineId: row.orderLineId,
     phase: FROM_DB_PHASE[row.phase],
     stepPosition: row.stepPosition,
     slot: row.slot,
@@ -87,9 +89,18 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
       return rows.map(toRow);
     },
 
-    async findById(companyId, orderId, phase, id) {
+    async listByLine(companyId, orderId, orderLineId, phase) {
+      const rows = await db.orderStepEvidence.findMany({
+        where: { companyId, orderId, orderLineId, phase: TO_DB_PHASE[phase] },
+        orderBy: [{ stepPosition: 'asc' }, { slot: 'asc' }],
+        select: ROW_SELECT,
+      });
+      return rows.map(toRow);
+    },
+
+    async findById(companyId, orderId, orderLineId, phase, id) {
       const row = await db.orderStepEvidence.findFirst({
-        where: { id, companyId, orderId, phase: TO_DB_PHASE[phase] },
+        where: { id, companyId, orderId, orderLineId, phase: TO_DB_PHASE[phase] },
         select: ROW_SELECT,
       });
       return row === null ? null : toRow(row);
@@ -103,6 +114,7 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
           where: {
             companyId: row.companyId,
             orderId: row.orderId,
+            orderLineId: row.orderLineId,
             phase: TO_DB_PHASE[row.phase],
             stepPosition: row.stepPosition,
           },
@@ -129,6 +141,7 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
               id: replacedId,
               companyId: row.companyId,
               orderId: row.orderId,
+              orderLineId: row.orderLineId,
               phase: TO_DB_PHASE[row.phase],
               stepPosition: row.stepPosition,
             },
@@ -155,9 +168,9 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
       }
     },
 
-    async delete(companyId, orderId, phase, id) {
+    async delete(companyId, orderId, orderLineId, phase, id) {
       const row = await db.orderStepEvidence.findFirst({
-        where: { id, companyId, orderId, phase: TO_DB_PHASE[phase] },
+        where: { id, companyId, orderId, orderLineId, phase: TO_DB_PHASE[phase] },
         select: ROW_SELECT,
       });
       if (row === null) return null;

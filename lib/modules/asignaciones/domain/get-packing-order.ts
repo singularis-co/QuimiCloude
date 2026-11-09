@@ -73,6 +73,7 @@ export function createGetPackingOrder(
       deps.storage,
       actor.companyId,
       orderId,
+      summary.lineId,
       'packing',
       packingSteps,
     );

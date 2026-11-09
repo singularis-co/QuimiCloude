@@ -69,7 +69,7 @@ export function createStartAssignedOrder(
       if (order.status === 'EN_CURSO') {
         view ??= await getAssignedOrderExecution(actor, { orderId });
         const { lineId } = await findOnlyLine(deps.orders, actor.companyId, orderId, STARTABLE);
-        const last = await deps.log.findLastStepPosition(actor.companyId, orderId);
+        const last = await deps.log.findLastStepPosition(actor.companyId, orderId, lineId);
         const position = view.steps.length === 0 ? null : last ?? 1;
         await deps.log.append({
           action: 'resume',

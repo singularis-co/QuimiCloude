@@ -25,6 +25,10 @@ export const ANA = uuid('1');
 export const BETO = uuid('2');
 export const PEDIDO = uuid('7');
 export const RECETA = uuid('9');
+/** La linea del pedido que resuelve el acceso por defecto. */
+export const LINEA = uuid('8');
+/** Otra linea del mismo pedido. */
+export const OTRA_LINEA = uuid('6');
 
 export const OPERADOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
 export const EMPACADOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
@@ -45,6 +49,7 @@ export function filaFoto(
 ): StepEvidenceRow & { readonly companyId: string } {
   return {
     orderId: PEDIDO,
+    orderLineId: LINEA,
     phase: 'manufacturing',
     stepPosition: 2,
     path: `${companyId}/${PEDIDO}/${overrides.id}`,
@@ -63,11 +68,14 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
   const nuevaId = () => uuid('e').replace(/e{12}$/, String(++secuencia).padStart(12, '0'));
   const de = (companyId: string, orderId: string, phase: EvidencePhase) =>
     filas.filter((f) => f.companyId === companyId && f.orderId === orderId && f.phase === phase);
+  const deLinea = (companyId: string, orderId: string, orderLineId: string, phase: EvidencePhase) =>
+    de(companyId, orderId, phase).filter((f) => f.orderLineId === orderLineId);
   const rutaOcupada = (companyId: string, path: string, salvo?: string) =>
     filas.some((f) => f.companyId === companyId && f.path === path && f.id !== salvo);
   const sinEmpresa = (fila: FilaGuardada): StepEvidenceRow => ({
     id: fila.id,
     orderId: fila.orderId,
+    orderLineId: fila.orderLineId,
     phase: fila.phase,
     stepPosition: fila.stepPosition,
     slot: fila.slot,
@@ -80,13 +88,18 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
         .sort((a, b) => a.stepPosition - b.stepPosition || a.slot - b.slot)
         .map(sinEmpresa),
     ),
-    findById: vi.fn<StepEvidenceRepository['findById']>(async (companyId, orderId, phase, id) => {
-      const fila = de(companyId, orderId, phase).find((f) => f.id === id);
+    listByLine: vi.fn<StepEvidenceRepository['listByLine']>(async (companyId, orderId, orderLineId, phase) =>
+      deLinea(companyId, orderId, orderLineId, phase)
+        .sort((a, b) => a.stepPosition - b.stepPosition || a.slot - b.slot)
+        .map(sinEmpresa),
+    ),
+    findById: vi.fn<StepEvidenceRepository['findById']>(async (companyId, orderId, orderLineId, phase, id) => {
+      const fila = deLinea(companyId, orderId, orderLineId, phase).find((f) => f.id === id);
       return fila === undefined ? null : sinEmpresa(fila);
     }),
     insert: vi.fn<StepEvidenceRepository['insert']>(async (row: NewStepEvidence) => {
       const ocupados = new Set(
-        de(row.companyId, row.orderId, row.phase)
+        deLinea(row.companyId, row.orderId, row.orderLineId, row.phase)
           .filter((f) => f.stepPosition === row.stepPosition)
           .map((f) => f.slot),
       );
@@ -97,6 +110,7 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
         id: nuevaId(),
         companyId: row.companyId,
         orderId: row.orderId,
+        orderLineId: row.orderLineId,
         phase: row.phase,
         stepPosition: row.stepPosition,
         slot,
@@ -111,6 +125,7 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
           f.id === replacedId &&
           f.companyId === row.companyId &&
           f.orderId === row.orderId &&
+          f.orderLineId === row.orderLineId &&
           f.phase === row.phase &&
           f.stepPosition === row.stepPosition,
       );
@@ -121,9 +136,14 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
       filas.splice(index, 1, fila);
       return sinEmpresa(fila);
     }),
-    delete: vi.fn<StepEvidenceRepository['delete']>(async (companyId, orderId, phase, id) => {
+    delete: vi.fn<StepEvidenceRepository['delete']>(async (companyId, orderId, orderLineId, phase, id) => {
       const index = filas.findIndex(
-        (f) => f.id === id && f.companyId === companyId && f.orderId === orderId && f.phase === phase,
+        (f) =>
+          f.id === id &&
+          f.companyId === companyId &&
+          f.orderId === orderId &&
+          f.orderLineId === orderLineId &&
+          f.phase === phase,
       );
       if (index < 0) return null;
       const [borrada] = filas.splice(index, 1);
@@ -199,7 +219,9 @@ export function acceso(options?: {
   const listAliveSummariesByIds = vi.fn(
     async (companyId: string, _ids: readonly string[], statuses: readonly OrderStatus[]) => {
       const visible = status !== null && companyId === EMPRESA && statuses.includes(status);
-      const items = visible ? [{ id: PEDIDO, recipeId: RECETA, status, packedBy: options?.packedBy ?? null }] : [];
+      const items = visible
+        ? [{ id: PEDIDO, lineId: LINEA, recipeId: RECETA, status, packedBy: options?.packedBy ?? null }]
+        : [];
       return { items, total: items.length, page: 1, pageSize: 1, totalPages: 1 };
     },
   );

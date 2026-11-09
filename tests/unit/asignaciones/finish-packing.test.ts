@@ -79,7 +79,7 @@ function montar(options?: {
   readonly filas: NewExecutionEntry[];
   readonly estado: Estado;
   readonly findPackingStepsById: ReturnType<typeof vi.fn>;
-  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByLine: ReturnType<typeof vi.fn>;
 } {
   const findAliveById = vi.fn(async () => (options?.target === undefined ? { id: PEDIDO, status: 'EN_EMPAQUE' } : options.target));
   const listAliveSummariesByIds = vi.fn(async () => ({
@@ -122,14 +122,14 @@ function montar(options?: {
   const globalFinishPackingAliveById = vi.fn(async () => options?.resultado ?? { kind: 'ok' as const, finishedGoods: [] });
   const depsAppend = vi.fn(async () => undefined);
   const findPackingStepsById = vi.fn(async () => (options?.pasos === undefined ? [{ blocks: [] }] : options.pasos));
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById: globalFinishPackingAliveById },
     log: { append: depsAppend, findLastStepPosition: vi.fn(async () => null) },
     transaction: { run },
     now: () => AHORA,
     packingSteps: { findPackingStepsById },
-    evidence: { listByOrder: listEvidenceByOrder },
+    evidence: { listByLine: listEvidenceByLine },
   } as unknown as FinishPackingDeps;
 
   return {
@@ -144,7 +144,7 @@ function montar(options?: {
     filas,
     estado,
     findPackingStepsById,
-    listEvidenceByOrder,
+    listEvidenceByLine,
   };
 }
 
@@ -330,10 +330,10 @@ describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de env
   // [2026-10-13] QC-214 R36 le da el lector de pasos de envasado, solo para saber que pasos piden
   // fotos: el recorrido sigue sin comprobarse.
   it('R24: el unico lector de pasos es el de envasado, y sin pasos que pidan evidencia no se consulta ninguna foto', async () => {
-    const { deps, listEvidenceByOrder } = montar();
+    const { deps, listEvidenceByLine } = montar();
     expect(Object.keys(deps).filter((key) => /step/i.test(key))).toEqual(['packingSteps']);
     await createFinishPacking(deps)(ACTOR, ENTRADA);
-    expect(listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(listEvidenceByLine).not.toHaveBeenCalled();
   });
 });
 
@@ -518,7 +518,7 @@ describe('finishPacking — R24: cualquier otro desenlace aborta sin fila y con 
 describe('finishPacking — evidencia (R36, R37)', () => {
   const RECETA = uuid('a');
   const EN_EMPAQUE_DE_ANA = [
-    { id: PEDIDO, number: { year: 2026, sequence: 7 }, recipeId: RECETA, status: 'EN_EMPAQUE', packedBy: ANA },
+    { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, status: 'EN_EMPAQUE', packedBy: ANA },
   ];
   const CON_EVIDENCIA = [{ requiresEvidence: true }, { blocks: [] }, { requiresEvidence: true }];
 
@@ -530,7 +530,7 @@ describe('finishPacking — evidencia (R36, R37)', () => {
     expect(m.run).not.toHaveBeenCalled();
     expect(m.finishPackingAliveById).not.toHaveBeenCalled();
     expect(m.findPackingStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
-    expect(m.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
+    expect(m.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'packing');
   });
 
   it('R36: con al menos una foto en cada paso que la pide, termina', async () => {
@@ -558,7 +558,7 @@ describe('finishPacking — evidencia (R36, R37)', () => {
       const m = montar({ summaryItems: EN_EMPAQUE_DE_ANA, pasos });
       await createFinishPacking(m.deps)(ACTOR, ENTRADA);
       expect(m.finishPackingAliveById).toHaveBeenCalledTimes(1);
-      expect(m.listEvidenceByOrder).not.toHaveBeenCalled();
+      expect(m.listEvidenceByLine).not.toHaveBeenCalled();
     }
   });
 
@@ -572,7 +572,7 @@ describe('finishPacking — evidencia (R36, R37)', () => {
       code: 'order_packing_taken',
     });
     expect(m.findPackingStepsById).not.toHaveBeenCalled();
-    expect(m.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(m.listEvidenceByLine).not.toHaveBeenCalled();
   });
 });
 

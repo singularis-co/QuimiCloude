@@ -21,6 +21,7 @@ import {
   EMPRESA,
   OPERADOR,
   OTRA_EMPRESA,
+  LINEA,
   PEDIDO,
   PNG_VALIDO,
   acceso,
@@ -197,6 +198,7 @@ describe('registerEvidence — contenido (R32)', () => {
     expect(d.repo.insert).toHaveBeenCalledWith({
       companyId: EMPRESA,
       orderId: PEDIDO,
+      orderLineId: LINEA,
       phase: 'manufacturing',
       stepPosition: 2,
       path: RUTA,

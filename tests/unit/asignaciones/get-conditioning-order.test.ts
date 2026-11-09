@@ -250,7 +250,7 @@ describe('R25 — el detalle trae el equipo guardado (D12)', () => {
 
     const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
 
-    expect(dobles.listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(dobles.listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`);
     expect(detalle.team).toEqual([
       { userId: BETO, displayName: 'Beto Ruiz', origin: { kind: 'direct' } },
       {
@@ -290,7 +290,7 @@ describe('R25 — el detalle trae el equipo guardado (D12)', () => {
 
     const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
 
-    expect(dobles.listTeamByOrderInCompany).not.toHaveBeenCalled();
+    expect(dobles.listTeamByLineInCompany).not.toHaveBeenCalled();
     expect(detalle.team).toEqual([]);
   });
 });
@@ -420,14 +420,14 @@ describe('QC-219 — los datos de lote del detalle', () => {
   });
 
   it('D13 (QC-219 R21): un ENTREGADO propio abre con su equipo', async () => {
-    const { deps, listTeamByOrderInCompany } = montarCon(
+    const { deps, listTeamByLineInCompany } = montarCon(
       resumen(PEDIDO_1, { status: 'ENTREGADO', conditionedBy: ANA, finishedAt: new Date() }),
     );
 
     const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
 
     expect(detalle.status).toBe('ENTREGADO');
-    expect(listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`);
   });
 });
 
@@ -519,7 +519,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     expect(detalle.conditioningSteps).toBeNull();
     expect(dobles.findConditioningStepsById).not.toHaveBeenCalled();
     expect(dobles.listEntriesForOrders).not.toHaveBeenCalled();
-    expect(dobles.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(dobles.listEvidenceByLine).not.toHaveBeenCalled();
     expect(dobles.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
@@ -534,7 +534,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     expect(detalle.conditioningSteps).toBeNull();
     expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
     expect(dobles.listEntriesForOrders).not.toHaveBeenCalled();
-    expect(dobles.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(dobles.listEvidenceByLine).not.toHaveBeenCalled();
   });
 
   it('R19: sin pasos, el resto del detalle es el mismo que sin la ficha', async () => {
@@ -595,6 +595,23 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     });
   });
 
+  it('R13: el avance sale solo de las anotaciones de la linea del resumen, no de la otra receta del pedido', async () => {
+    const otra = 'linea-otra-receta';
+    const dobles = montarPasos(MIO, {
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, null),
+        anotacionDePaso('conditioning_step_advance', 2, [BETO], 2, otra),
+        anotacionDePaso('conditioning_steps_complete', 3, null, 3, otra),
+      ],
+    });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+
+    expect(detalle.conditioningSteps?.completedCount).toBe(1);
+    expect(dobles.listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, MIO.lineId);
+    expect(dobles.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, MIO.lineId, 'conditioning');
+  });
+
   it('R31: un acondicionador sin recetas.consultar recibe los pasos', async () => {
     const actor = { ...ACONDICIONADOR, permissions: ['acondicionamiento.modificar'] };
     const dobles = montarPasos(MIO);
@@ -636,7 +653,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
 
     const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
 
-    expect(dobles.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, 'conditioning');
+    expect(dobles.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`, 'conditioning');
     expect(detalle.conditioningSteps?.evidence).toEqual([
       {
         stepPosition: 3,
@@ -670,6 +687,6 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
 
     expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, otra);
     expect(dobles.listEntriesForOrders).toHaveBeenCalledWith(otra, [PEDIDO_1]);
-    expect(dobles.listEvidenceByOrder).toHaveBeenCalledWith(otra, PEDIDO_1, 'conditioning');
+    expect(dobles.listEvidenceByLine).toHaveBeenCalledWith(otra, PEDIDO_1, `linea-${PEDIDO_1}`, 'conditioning');
   });
 });

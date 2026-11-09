@@ -14,6 +14,7 @@ import {
   OPERADOR,
   OTRA_EMPRESA,
   PASOS_FABRICACION,
+  LINEA,
   PEDIDO,
   RECETA,
   filaFoto,
@@ -29,7 +30,7 @@ function montar(options?: {
   const findExecutionContentById = vi.fn(async () => ({ steps: options?.pasos ?? PASOS_FABRICACION }));
   const { repo } = repositorioEnMemoria(options?.filas);
   const listAliveSummariesByIds = vi.fn(async () => ({
-    items: [{ id: PEDIDO, recipeId: RECETA, status: 'EN_CURSO' }],
+    items: [{ id: PEDIDO, lineId: LINEA, recipeId: RECETA, status: 'EN_CURSO' }],
     total: 1,
     page: 1,
     pageSize: 1,
@@ -58,7 +59,7 @@ describe('recordStepMove — evidencia (R34, R37)', () => {
     expect(error).toBeInstanceOf(EvidenceRequiredError);
     expect((error as EvidenceRequiredError).code).toBe('evidence_required');
     expect(d.append).not.toHaveBeenCalled();
-    expect(d.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
+    expect(d.repo.listByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'manufacturing');
     expect(d.findExecutionContentById).toHaveBeenCalledWith(RECETA, EMPRESA);
   });
 
@@ -86,7 +87,7 @@ describe('recordStepMove — evidencia (R34, R37)', () => {
     const d = montar();
     await d.move(OPERADOR, { orderId: PEDIDO, direction: 'advance', stepPosition: 2 });
     expect(d.append).toHaveBeenCalledTimes(1);
-    expect(d.repo.listByOrder).not.toHaveBeenCalled();
+    expect(d.repo.listByLine).not.toHaveBeenCalled();
   });
 
   it('R34: llegar al paso 1 o sin posicion (receta sin pasos) no deja ningun paso atras: anota sin leer la receta', async () => {
@@ -104,7 +105,7 @@ describe('recordStepMove — evidencia (R34, R37)', () => {
       await d.move(OPERADOR, { orderId: PEDIDO, direction: 'go_back', stepPosition });
       expect(d.append).toHaveBeenCalledTimes(1);
       expect(d.findExecutionContentById).not.toHaveBeenCalled();
-      expect(d.repo.listByOrder).not.toHaveBeenCalled();
+      expect(d.repo.listByLine).not.toHaveBeenCalled();
     }
   });
 

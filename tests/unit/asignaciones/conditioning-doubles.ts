@@ -129,11 +129,11 @@ export function montar(options?: Opciones) {
   const findRefsIncludingDeletedInCompany = vi.fn(async () => options?.people ?? []);
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
   const findRefsUnits = vi.fn(async () => options?.units ?? []);
-  const listTeamByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(async () => options?.team ?? []);
+  const listTeamByLineInCompany = vi.fn<ConditioningTeamRepository['listByLineInCompany']>(async () => options?.team ?? []);
   const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => options?.batches ?? []);
   const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
   const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const createSignedReadUrl = vi.fn(async (path: string) => `firmada:${path}`);
 
   const deps = {
@@ -150,11 +150,11 @@ export function montar(options?: Opciones) {
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
-    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany, listByOrdersInCompany: vi.fn() },
+    team: { insertAll: vi.fn(), listByLineInCompany: listTeamByLineInCompany, listByOrdersInCompany: vi.fn() },
     batches: { listOfOrder },
     conditioningSteps: { findConditioningStepsById },
     log: { listEntriesForOrders },
-    evidence: { listByOrder: listEvidenceByOrder },
+    evidence: { listByLine: listEvidenceByLine },
     storage: { createSignedReadUrl },
     now: () => AHORA,
   } as unknown as GetConditioningOrderDeps;
@@ -168,16 +168,16 @@ export function montar(options?: Opciones) {
     findRefsIncludingDeletedInCompany,
     findRefsPresentations,
     findRefsUnits,
-    listTeamByOrderInCompany,
+    listTeamByLineInCompany,
     listOfOrder,
     findConditioningStepsById,
     listEntriesForOrders,
-    listEvidenceByOrder,
+    listEvidenceByLine,
     createSignedReadUrl,
     todos: [
       findConditioningStepsById,
       listEntriesForOrders,
-      listEvidenceByOrder,
+      listEvidenceByLine,
       createSignedReadUrl,
       listAliveSummariesInCompany,
       listAliveSummariesByIds,
@@ -186,7 +186,7 @@ export function montar(options?: Opciones) {
       findRefsIncludingDeletedInCompany,
       findRefsPresentations,
       findRefsUnits,
-      listTeamByOrderInCompany,
+      listTeamByLineInCompany,
       listOfOrder,
     ],
   };
@@ -264,10 +264,12 @@ export function anotacionDePaso(
   stepPosition: number,
   responsibleUserIds: readonly string[] | null,
   seq = stepPosition,
+  orderLineId = `linea-${PEDIDO_1}`,
 ): ExecutionEntryRecord {
   return {
     id: `anotacion-${String(seq)}`,
     orderId: PEDIDO_1,
+    orderLineId,
     userId: ANA,
     action,
     stepPosition,
@@ -283,6 +285,7 @@ export function fotoDeAcondicionamiento(stepPosition: number, slot = 1): StepEvi
   return {
     id: `foto-${String(stepPosition)}-${String(slot)}`,
     orderId: PEDIDO_1,
+    orderLineId: `linea-${PEDIDO_1}`,
     phase: 'conditioning',
     stepPosition,
     slot,
@@ -315,21 +318,21 @@ export function montarRegistroDePaso(options?: {
       pagina([resumen(PEDIDO_1, { status, conditionedBy })], 1, page, pageSize),
   );
   const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
-  const listByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(
+  const listByLineInCompany = vi.fn<ConditioningTeamRepository['listByLineInCompany']>(
     async () => options?.equipo ?? [],
   );
   const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
   const append = vi.fn<(entry: NewExecutionEntry) => Promise<ExecutionAppendOutcome>>(
     async () => options?.desenlace ?? 'ok',
   );
-  const listByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listByLine = vi.fn(async () => options?.fotos ?? []);
 
   const deps = {
     orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
     conditioningSteps: { findConditioningStepsById },
-    team: { listByOrderInCompany },
+    team: { listByLineInCompany },
     log: { append, listEntriesForOrders },
-    evidence: { listByOrder },
+    evidence: { listByLine },
     now: () => AHORA,
   } satisfies RecordConditioningStepDeps;
 
@@ -338,18 +341,18 @@ export function montarRegistroDePaso(options?: {
     findAliveById,
     listAliveSummariesByIds,
     findConditioningStepsById,
-    listByOrderInCompany,
+    listByLineInCompany,
     listEntriesForOrders,
     append,
-    listByOrder,
+    listByLine,
     todos: [
       findAliveById,
       listAliveSummariesByIds,
       findConditioningStepsById,
-      listByOrderInCompany,
+      listByLineInCompany,
       listEntriesForOrders,
       append,
-      listByOrder,
+      listByLine,
     ],
   };
 }

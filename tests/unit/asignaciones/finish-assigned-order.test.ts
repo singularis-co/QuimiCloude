@@ -84,7 +84,7 @@ type Dobles = {
   readonly run: ReturnType<typeof vi.fn>;
   readonly anotaciones: Anotacion[];
   readonly findExecutionContentById: ReturnType<typeof vi.fn>;
-  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByLine: ReturnType<typeof vi.fn>;
 };
 
 type Anotacion = { readonly entry: NewExecutionEntry; readonly dentroDeRun: boolean };
@@ -169,7 +169,7 @@ function montar(options?: {
 
   // Sin pasos que pidan evidencia salvo que el caso los pase: los casos de siempre no cambian.
   const findExecutionContentById = vi.fn(async () => ({ steps: options?.pasos ?? [{ blocks: [] }] }));
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
 
   const deps: FinishAssignedOrderDeps = {
     assignments: {
@@ -191,7 +191,7 @@ function montar(options?: {
     transaction: { run } as unknown as ExecutionTransaction,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
     recipes: { findExecutionContentById } as unknown as RecipeCatalog,
-    evidence: { listByOrder: listEvidenceByOrder } as unknown as StepEvidenceRepository,
+    evidence: { listByLine: listEvidenceByLine } as unknown as StepEvidenceRepository,
   };
 
   return {
@@ -209,7 +209,7 @@ function montar(options?: {
     run,
     anotaciones,
     findExecutionContentById,
-    listEvidenceByOrder,
+    listEvidenceByLine,
   };
 }
 
@@ -879,7 +879,7 @@ describe('finishAssignedOrder — evidencia (R35, R37)', () => {
     expect(d.append).not.toHaveBeenCalled();
     expect(d.listByOrderInCompany).not.toHaveBeenCalled();
     expect(d.insertMissing).not.toHaveBeenCalled();
-    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
+    expect(d.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'manufacturing');
     expect(d.findExecutionContentById).toHaveBeenCalledWith('receta-1', EMPRESA);
   });
 
@@ -899,7 +899,7 @@ describe('finishAssignedOrder — evidencia (R35, R37)', () => {
     const d = montar({ pasos: [{ blocks: [] }, { blocks: [] }] });
     await createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA);
     expect(d.transitionAliveById).toHaveBeenCalledTimes(1);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
   });
 
   it('R35: una receta sin contenido legible no pide evidencia', async () => {

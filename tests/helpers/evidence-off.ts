@@ -12,6 +12,7 @@ function noUsado(operation: string): () => Promise<never> {
 
 export const evidenceRepositoryUnused: StepEvidenceRepository = {
   listByOrder: noUsado('listByOrder'),
+  listByLine: noUsado('listByLine'),
   findById: noUsado('findById'),
   insert: noUsado('insert'),
   replace: noUsado('replace'),

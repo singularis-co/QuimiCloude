@@ -14,11 +14,13 @@ const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const BETO = uuid('2');
 const PEDIDO = uuid('7');
+const LINEA = uuid('e');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
 
 const RESUMEN = {
   id: PEDIDO,
+  lineId: LINEA,
   number: { year: 2026, sequence: 7 },
   recipeId: 'receta-1',
   quantity: '10.0000',
@@ -41,7 +43,7 @@ type Dobles = {
   readonly findPresentationRefs: ReturnType<typeof vi.fn>;
   readonly findUnitRefs: ReturnType<typeof vi.fn>;
   readonly findPackingStepsById: ReturnType<typeof vi.fn>;
-  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByLine: ReturnType<typeof vi.fn>;
   readonly createSignedReadUrl: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
@@ -87,7 +89,7 @@ function montar(options?: {
     async () => options?.unidades ?? [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }],
   );
 
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const createSignedReadUrl = vi.fn(async (path: string, ttl: number) => `https://bucket.test/${path}?ttl=${String(ttl)}`);
 
   const deps = {
@@ -100,7 +102,7 @@ function montar(options?: {
     packaging: { findRefs: findPackagingRefs },
     packingSteps: { findPackingStepsById },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
-    evidence: { listByOrder: listEvidenceByOrder },
+    evidence: { listByLine: listEvidenceByLine },
     storage: { createSignedReadUrl },
   } as unknown as GetPackingOrderDeps;
 
@@ -111,7 +113,7 @@ function montar(options?: {
     findPresentationRefs,
     findUnitRefs,
     findPackingStepsById,
-    listEvidenceByOrder,
+    listEvidenceByLine,
     createSignedReadUrl,
     todos: [
       listAliveSummariesByIds,
@@ -122,7 +124,7 @@ function montar(options?: {
       findUnitRefs,
       findPackagingRefs,
       findPackingStepsById,
-      listEvidenceByOrder,
+      listEvidenceByLine,
       createSignedReadUrl,
     ],
   };
@@ -384,7 +386,7 @@ describe('getPackingOrder — evidencia (R14, R27, R33)', () => {
         ],
       },
     ]);
-    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
+    expect(d.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'packing');
     for (const call of d.createSignedReadUrl.mock.calls) expect(call[1]).toBe(15 * 60);
   });
 
@@ -393,7 +395,7 @@ describe('getPackingOrder — evidencia (R14, R27, R33)', () => {
     const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
     expect(order.packingSteps).toEqual([]);
     expect(order.packingEvidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
     expect(d.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
@@ -401,14 +403,14 @@ describe('getPackingOrder — evidencia (R14, R27, R33)', () => {
     const d = montar({ packingSteps: PASOS_CON_EVIDENCIA });
     const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
     expect(order.packingEvidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
   });
 
   it('R14: sin pasos de envasado que pidan evidencia no consulta fotos', async () => {
     const d = montar({ items: [EN_EMPAQUE_DE_ANA] });
     const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
     expect(order.packingEvidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
   });
 });
 

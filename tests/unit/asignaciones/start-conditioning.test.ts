@@ -102,7 +102,7 @@ function montar(opciones: Opciones = {}) {
     pasos.push('transaccion');
     return work({
       conditioning: { startConditioningAliveById },
-      team: { insertAll, listByOrderInCompany: vi.fn() },
+      team: { insertAll, listByLineInCompany: vi.fn() },
       log: { append },
     } as unknown as ExecutionWriters);
   });

@@ -45,8 +45,8 @@ class RegistroDoble implements ExecutionLogRepository {
     return Promise.resolve('ok')
   }
 
-  findLastStepPosition(companyId: string, orderId: string): Promise<number | null> {
-    return Promise.resolve(companyId === COMPANY && orderId === ORDER ? null : -1)
+  findLastStepPosition(companyId: string, orderId: string, orderLineId: string): Promise<number | null> {
+    return Promise.resolve(companyId === COMPANY && orderId === ORDER && orderLineId === ORDER_LINE ? null : -1)
   }
 
   listExecutedOrderIds(): Promise<readonly string[]> {
@@ -186,7 +186,7 @@ describe('ExecutionLogRepository: solo anexar (R31)', () => {
     const registro = new RegistroDoble()
     await registro.append({ ...base, action: 'start', stepPosition: 1 })
     expect(registro.anotadas).toHaveLength(1)
-    await expect(registro.findLastStepPosition(COMPANY, ORDER)).resolves.toBeNull()
+    await expect(registro.findLastStepPosition(COMPANY, ORDER, ORDER_LINE)).resolves.toBeNull()
   })
 
   it('R31: los dos puertos son dominio puro, sin Prisma ni Next', () => {
@@ -216,7 +216,7 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
       },
       team: {
         insertAll: () => Promise.resolve(0),
-        listByOrderInCompany: () => Promise.resolve([]),
+        listByLineInCompany: () => Promise.resolve([]),
         listByOrdersInCompany: () => Promise.resolve([]),
       },
       batches: { writeForOrder: () => Promise.resolve({ kind: 'written' }) },

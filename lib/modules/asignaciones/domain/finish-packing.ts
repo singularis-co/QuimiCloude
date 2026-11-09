@@ -101,7 +101,7 @@ export function createFinishPacking(
     // transaccion con su error propio.
     if (summary.status === 'EN_EMPAQUE' && summary.packedBy === actor.id) {
       const steps = await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId);
-      await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, 'packing', steps ?? []);
+      await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, summary.lineId, 'packing', steps ?? []);
     }
 
     const now = deps.now?.() ?? new Date();

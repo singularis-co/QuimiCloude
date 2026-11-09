@@ -291,7 +291,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
 
 describe('recordConditioningStep — evidencia (R21)', () => {
   it('R21: completar un paso que pide evidencia sin ninguna foto suya rechaza sin escribir', async () => {
-    const { deps, append, listByOrder } = montarRegistroDePaso({
+    const { deps, append, listByLine } = montarRegistroDePaso({
       pasos: [CON_FOTO, SIMPLE],
       fotos: [fotoDeAcondicionamiento(2)],
     });
@@ -302,7 +302,7 @@ describe('recordConditioningStep — evidencia (R21)', () => {
 
     expect(error).toBeInstanceOf(EvidenceRequiredError);
     expect((error as EvidenceRequiredError).code).toBe('evidence_required');
-    expect(listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, 'conditioning');
+    expect(listByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`, 'conditioning');
     expect(append).not.toHaveBeenCalled();
   });
 
@@ -316,11 +316,11 @@ describe('recordConditioningStep — evidencia (R21)', () => {
   });
 
   it('R21: un paso sin evidencia no consulta las fotos', async () => {
-    const { deps, listByOrder } = montarRegistroDePaso({ pasos: PASOS });
+    const { deps, listByLine } = montarRegistroDePaso({ pasos: PASOS });
 
     await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 });
 
-    expect(listByOrder).not.toHaveBeenCalled();
+    expect(listByLine).not.toHaveBeenCalled();
   });
 });
 
@@ -351,7 +351,7 @@ describe('recordConditioningStep — responsables (R23)', () => {
   });
 
   it('R23: alguien fuera del equipo y que no es el acondicionador rechaza con conditioning_responsible_not_allowed', async () => {
-    const { deps, append, listByOrderInCompany } = montarRegistroDePaso({
+    const { deps, append, listByLineInCompany } = montarRegistroDePaso({
       pasos: PASOS,
       equipo: EQUIPO,
       anotaciones: COMPLETADO_1,
@@ -365,7 +365,7 @@ describe('recordConditioningStep — responsables (R23)', () => {
 
     expect(error).toBeInstanceOf(ConditioningResponsibleNotAllowedError);
     expect((error as ConditioningResponsibleNotAllowedError).code).toBe('conditioning_responsible_not_allowed');
-    expect(listByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(listByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`);
     expect(append).not.toHaveBeenCalled();
   });
 
@@ -378,12 +378,12 @@ describe('recordConditioningStep — responsables (R23)', () => {
   });
 
   it('R23: responsables en un paso sin asignacion rechaza con invalid_input sin escribir', async () => {
-    const { deps, append, listByOrderInCompany } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO });
+    const { deps, append, listByLineInCompany } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO });
 
     await expect(
       createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1, responsibleUserIds: [BETO] }),
     ).rejects.toBeInstanceOf(ValidationError);
-    expect(listByOrderInCompany).not.toHaveBeenCalled();
+    expect(listByLineInCompany).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
   });
 
@@ -472,7 +472,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
   });
 
   it('R28: revisitar un paso con evidencia no vuelve a exigir fotos', async () => {
-    const { deps, append, listByOrder } = montarRegistroDePaso({
+    const { deps, append, listByLine } = montarRegistroDePaso({
       pasos: [CON_FOTO, SIMPLE],
       anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null)],
     });
@@ -480,7 +480,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     await expect(
       createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 1, allCompleted: false });
-    expect(listByOrder).not.toHaveBeenCalled();
+    expect(listByLine).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
   });
 
@@ -494,5 +494,26 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     await expect(
       createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 3, allCompleted: true });
+  });
+});
+
+describe('recordConditioningStep — la receta del resumen', () => {
+  const OTRA_LINEA = 'linea-otra-receta';
+
+  it('R13: el avance de la otra receta del pedido no cuenta: su paso 1 completado no deja saltar al 2 en esta', async () => {
+    const { deps, append } = montarRegistroDePaso({
+      pasos: [SIMPLE, SIMPLE, SIMPLE],
+      anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null, 1, OTRA_LINEA)],
+    });
+
+    await expect(
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2 }),
+    ).rejects.toBeInstanceOf(ConditioningStepOutOfOrderError);
+    expect(append).not.toHaveBeenCalled();
+
+    await expect(
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+    ).resolves.toEqual({ completedCount: 1, allCompleted: false });
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: `linea-${PEDIDO_1}`, stepPosition: 1 }));
   });
 });

@@ -44,13 +44,13 @@ export function createRemoveEvidence(
     if (!parsed.success) throw new ValidationError();
     const { orderId, phase, evidenceId } = parsed.data;
 
-    await resolveEvidenceTarget(deps, actor, orderId, phase);
+    const target = await resolveEvidenceTarget(deps, actor, orderId, phase);
 
-    const removed = await deps.evidence.delete(actor.companyId, orderId, phase, evidenceId);
+    const removed = await deps.evidence.delete(actor.companyId, orderId, target.lineId, phase, evidenceId);
     if (removed === null) throw new EvidenceNotFoundError();
 
     const warning = await removeEvidenceSafely(deps.storage, removed.path);
-    const rows = await deps.evidence.listByOrder(actor.companyId, orderId, phase);
+    const rows = await deps.evidence.listByLine(actor.companyId, orderId, target.lineId, phase);
     return {
       stepPosition: removed.stepPosition,
       photos: await signStepPhotos(deps.storage, rows, removed.stepPosition),

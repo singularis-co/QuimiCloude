@@ -40,6 +40,7 @@ function anotacion(action: ExecutionAction, offsetMin: number, userId = ANA, ste
   return {
     id: `e-${String(seq).padStart(4, '0')}`,
     orderId: PEDIDO,
+    orderLineId: `linea-${PEDIDO}`,
     userId,
     action,
     stepPosition,
@@ -65,7 +66,7 @@ function montar(options?: {
   readonly order?: OrderHistorySummary | null;
   readonly entries?: readonly ExecutionEntryRecord[];
   readonly people?: readonly PersonRef[];
-  readonly team?: readonly (ConditioningTeamMemberRow & { readonly orderId: string })[];
+  readonly team?: readonly (ConditioningTeamMemberRow & { readonly orderId: string; readonly orderLineId: string })[];
 }) {
   const order = options?.order === undefined ? resumen() : options.order;
   const entries = options?.entries ?? RECORRIDO;
@@ -309,9 +310,9 @@ describe('getExecutionTrace — las anotaciones del acondicionamiento', () => {
     anotacion('conditioning_finish', 30, ANA, null),
   ];
   const equipo = [
-    { orderId: PEDIDO, userId: CARLA, workGroupId: GRUPO, workGroupName: 'Turno manana (al comenzar)' },
-    { orderId: PEDIDO, userId: DIEGO, workGroupId: null, workGroupName: null },
-    { orderId: PEDIDO, userId: ELENA, workGroupId: null, workGroupName: null },
+    { orderId: PEDIDO, orderLineId: `linea-${PEDIDO}`, userId: CARLA, workGroupId: GRUPO, workGroupName: 'Turno manana (al comenzar)' },
+    { orderId: PEDIDO, orderLineId: `linea-${PEDIDO}`, userId: DIEGO, workGroupId: null, workGroupName: null },
+    { orderId: PEDIDO, orderLineId: `linea-${PEDIDO}`, userId: ELENA, workGroupId: null, workGroupName: null },
   ];
 
   it('R11: sin dashboard.consultar no lee registro ni equipo', async () => {

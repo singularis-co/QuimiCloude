@@ -156,7 +156,15 @@ export function createGetAssignedOrderExecution(
     // Un pedido PENDIENTE todavia no puede tener fotos.
     const evidence =
       target.status === 'EN_CURSO'
-        ? await readStepEvidence(deps.evidence, deps.storage, actor.companyId, orderId, 'manufacturing', steps)
+        ? await readStepEvidence(
+            deps.evidence,
+            deps.storage,
+            actor.companyId,
+            orderId,
+            summary.lineId,
+            'manufacturing',
+            steps,
+          )
         : [];
 
     return {

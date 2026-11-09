@@ -16,6 +16,8 @@
  * AISLAMIENTO: `transaccion` (cabecera de `./use-case-fixture.ts` y el censo). El adaptador es una
  * fabrica y se construye sobre la `tx` del caso.
  */
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
@@ -314,6 +316,77 @@ describe('listExecutedOrderIds: el equipo de acondicionamiento', () => {
       expect(await e.log.listExecutedOrderIds(fixture.companyB, { userId: e.marta })).toEqual([]);
       expect(await e.log.listExecutedOrderIds(fixture.companyA, { userId: e.miembroB })).toEqual([]);
       expect(await e.log.listExecutedOrderIds(fixture.companyB, { userId: e.miembroB })).toEqual([e.pedidoB2]);
+    });
+  });
+});
+
+/** Una segunda receta en el pedido, con su propia linea. */
+async function addSecondLine(fixture: Fixture, orderId: string): Promise<string> {
+  const marca = randomUUID().replaceAll('-', '');
+  const recipe = await fixture.tx.recipe.create({
+    data: { name: `Receta B ${marca}`, nameNormalized: `recetab${marca}`, companyId: fixture.companyA },
+    select: { id: true },
+  });
+  const line = await fixture.tx.orderLine.create({
+    data: {
+      orderId,
+      companyId: fixture.companyA,
+      position: 1,
+      recipeId: recipe.id,
+      originalRecipeId: recipe.id,
+      quantity: '5',
+    },
+    select: { id: true },
+  });
+  return line.id;
+}
+
+describe('QT-315 — el registro se lee por receta', () => {
+  it('R13: findLastStepPosition con dos lineas del mismo pedido solo mira la nombrada', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEscena(fixture);
+      const lineaA = await ensureOnlyLine(fixture.tx, e.pedidoA1);
+      const lineaB = await addSecondLine(fixture, e.pedidoA1);
+      // La linea B anota despues que la A: si se leyera por pedido, ganaria su posicion.
+      await e.log.append({
+        companyId: fixture.companyA,
+        orderId: e.pedidoA1,
+        orderLineId: lineaB,
+        userId: e.luis,
+        action: 'start',
+        stepPosition: 7,
+        occurredAt: D3,
+      });
+
+      expect(await e.log.findLastStepPosition(fixture.companyA, e.pedidoA1, lineaA)).toBe(2);
+      expect(await e.log.findLastStepPosition(fixture.companyA, e.pedidoA1, lineaB)).toBe(7);
+      expect(await e.log.findLastStepPosition(fixture.companyA, e.pedidoA2, lineaB), 'linea de otro pedido').toBeNull();
+      expect(await e.log.findLastStepPosition(fixture.companyB, e.pedidoA1, lineaA), 'otra empresa').toBeNull();
+    });
+  });
+
+  it('R13: listEntriesForOrders dice de que linea es cada anotacion', async () => {
+    await inRolledBackTransaction(async (fixture) => {
+      const e = await montarEscena(fixture);
+      const lineaA = await ensureOnlyLine(fixture.tx, e.pedidoA1);
+      const lineaB = await addSecondLine(fixture, e.pedidoA1);
+      await e.log.append({
+        companyId: fixture.companyA,
+        orderId: e.pedidoA1,
+        orderLineId: lineaB,
+        userId: e.luis,
+        action: 'start',
+        stepPosition: 1,
+        occurredAt: D3,
+      });
+
+      const entries = await e.log.listEntriesForOrders(fixture.companyA, [e.pedidoA1]);
+
+      expect(entries.map((x) => [x.action, x.orderLineId])).toEqual([
+        ['start', lineaA],
+        ['advance', lineaA],
+        ['start', lineaB],
+      ]);
     });
   });
 });

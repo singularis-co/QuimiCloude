@@ -43,7 +43,7 @@ async function assertLeavingStepHasEvidence(
   const content = await deps.recipes.findExecutionContentById(summary.recipeId, companyId);
   if (!stepRequiresEvidence(content?.steps ?? [], position)) return;
 
-  const rows = await deps.evidence.listByOrder(companyId, orderId, 'manufacturing');
+  const rows = await deps.evidence.listByLine(companyId, orderId, summary.lineId, 'manufacturing');
   if (!rows.some((row) => row.stepPosition === position)) {
     throw new EvidenceRequiredError(`paso ${String(position)} sin evidencia`);
   }

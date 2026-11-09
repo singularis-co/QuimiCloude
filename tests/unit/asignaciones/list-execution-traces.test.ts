@@ -57,6 +57,7 @@ function anotacion(
   return {
     id: `e-${String(seq).padStart(4, '0')}`,
     orderId,
+    orderLineId: `linea-${orderId}`,
     userId,
     action,
     stepPosition: action === 'pack_start' || action === 'pack_finish' || action.startsWith('conditioning_') ? null : 1,
@@ -105,10 +106,10 @@ function persona(id: string, displayName: string): PersonRef {
   return { id, displayName, isActive: true, permissions: [], roleName: 'Operador' };
 }
 
-type TeamRow = ConditioningTeamMemberRow & { readonly orderId: string };
+type TeamRow = ConditioningTeamMemberRow & { readonly orderId: string; readonly orderLineId: string };
 
 function miembro(orderId: string, userId: string, group?: { id: string; name: string }): TeamRow {
-  return { orderId, userId, workGroupId: group?.id ?? null, workGroupName: group?.name ?? null };
+  return { orderId, orderLineId: `linea-${orderId}`, userId, workGroupId: group?.id ?? null, workGroupName: group?.name ?? null };
 }
 
 function pagina(items: readonly OrderHistorySummary[], page = 1, pageSize = 10): Page<OrderHistorySummary> {

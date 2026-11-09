@@ -186,7 +186,7 @@ function montar(options?: {
     now: () => new Date('2026-09-17T10:00:00.000Z'),
     // Ningun paso de estas recetas pide evidencia: las fotos al retomar se prueban en
     // get-assigned-order-execution.test.ts.
-    evidence: { listByOrder: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
+    evidence: { listByLine: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
     storage: { createSignedReadUrl: vi.fn() } as unknown as EvidenceStorage,
   };
 
@@ -558,7 +558,7 @@ describe('QC-82 — startAssignedOrder: retomar anota `resume` en la ultima posi
 
     const view = await createStartAssignedOrder(deps)(ACTOR, { orderId: PEDIDO });
 
-    expect(findLastStepPosition).toHaveBeenCalledWith(EMPRESA, PEDIDO);
+    expect(findLastStepPosition).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(run).not.toHaveBeenCalled();
     expect(anotaciones).toEqual([
       {

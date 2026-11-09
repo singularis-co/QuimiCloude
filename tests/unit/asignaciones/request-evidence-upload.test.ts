@@ -24,6 +24,8 @@ import {
   EMPRESA,
   OPERADOR,
   OTRA_EMPRESA,
+  LINEA,
+  OTRA_LINEA,
   PEDIDO,
   acceso,
   bucket,
@@ -95,7 +97,7 @@ describe('requestEvidenceUpload — autorizacion (R26, R27)', () => {
       const d = montar({ status });
       await expect(d.request(OPERADOR, FABRICACION), String(status)).rejects.toBeInstanceOf(OrderNotFoundError);
       expect(d.storage.createSignedUpload).not.toHaveBeenCalled();
-      expect(d.repo.listByOrder).not.toHaveBeenCalled();
+      expect(d.repo.listByLine).not.toHaveBeenCalled();
     }
   });
 
@@ -201,7 +203,7 @@ describe('requestEvidenceUpload — tope y sustitucion (R29, R19)', () => {
   it('R39: las fotos de otra empresa no cuentan para el tope', async () => {
     const d = montar({ filas: TRES.map((f) => ({ ...f, companyId: OTRA_EMPRESA })) });
     await expect(d.request(OPERADOR, FABRICACION)).resolves.toBeDefined();
-    expect(d.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
+    expect(d.repo.listByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'manufacturing');
   });
 });
 
@@ -228,6 +230,22 @@ describe('requestEvidenceUpload — la ruta (R30)', () => {
     const d = montar(EN_EMPAQUE_DE_ANA);
     const subida = await d.request(EMPACADOR, ENVASADO);
     expect(isEvidencePathOf(subida.path, EMPRESA, PEDIDO)).toBe(true);
-    expect(d.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
+    expect(d.repo.listByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'packing');
+  });
+});
+
+describe('requestEvidenceUpload — el tope es de la receta', () => {
+  it('R13: tres fotos del mismo paso en la otra receta del pedido no llenan el tope de esta', async () => {
+    const deLaOtra = [1, 2, 3].map((slot) => filaFoto({ id: uuid(String(slot)), slot, orderLineId: OTRA_LINEA }));
+    const d = montar({ filas: deLaOtra });
+    await expect(d.request(OPERADOR, FABRICACION)).resolves.toBeDefined();
+  });
+
+  it('R13: sustituir una foto de la otra receta es evidence_not_found', async () => {
+    const d = montar({ filas: [filaFoto({ id: uuid('1'), slot: 1, orderLineId: OTRA_LINEA })] });
+    await expect(d.request(OPERADOR, { ...FABRICACION, replacesEvidenceId: uuid('1') })).rejects.toBeInstanceOf(
+      EvidenceNotFoundError,
+    );
+    expect(d.repo.findById).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'manufacturing', uuid('1'));
   });
 });
