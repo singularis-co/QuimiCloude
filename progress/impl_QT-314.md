@@ -1156,3 +1156,22 @@ Para el reviewer:
 - Coberturas parciales anotadas en el mapa de T20: R44 (panel a pantalla completa en teléfono), R39, R45.
 - `tests/integration/asignaciones/order-lines-execution.int.test.ts:411` conserva la etiqueta «QT-313 R44».
 - Borradores de entrega antiguos (v1, sin `lineId`) ya no se recuperan (design § 4.7); sus tests llevan `lineId` a mano.
+
+## Review vuelta 1: arreglos
+
+Informe: `progress/review_QT-314.md` (HEAD revisado 6a0889d79). Se arreglan B1 y los menores 1, 6 y 7; los menores 2, 3, 4, 5 y 8 los anota el leader.
+
+- **B1.** Comentarios de producción sin citas a fichas, conservando el porqué:
+  - `lib/modules/pedidos/adapters/driving/order-actions.ts`: JSDoc de `cancelOrderLineAction` (quitados «QT-314 R29» y «R42») y de `cancelOrderAction` (quitados «R26, R27, R28» y «R27»; las líneas también son añadidas por el diff).
+  - `lib/modules/pedidos/domain/get-order.ts:206`: «FK `RESTRICT` de QC-33» pasa a «FK `RESTRICT` de las recetas».
+  - Barrido de las líneas añadidas o cambiadas en comentarios de `lib app components` (sin tests) con `\b(R\d+|QT-\d+|QC-\d+)\b` contra `origin/dev`: 0 coincidencias.
+- **Menor 1.** `tests/unit/pedidos-ui/order-detail-sheet.test.tsx`: describe `OrderDetailSheet: plataformas (R44)`, test «R44: en el teléfono el detalle ocupa la pantalla entera; en tablet y escritorio se abre a la derecha». Es gemelo de `order-line-sheet.test.tsx:426` (`data-side="right"`, `w-full`, `data-[side=right]:w-full`). Mapa: R44 (detalle a pantalla entera) -> este test.
+- **Menor 6.** `tests/integration/asignaciones/order-lines-execution.int.test.ts:411`: «QT-313 R44, R45» pasa a «QT-313 R45». QT-313 R44 deja de aplicar con esta ficha (`requirements.md > Lo que deja de aplicar de QT-313`).
+- **Menor 7.** `e2e/helpers/order-distribution.ts`: borrado `submitOrderWithLeftover`, junto con el import de `clickAndConfirm` y las constantes `ORDER_FORM_SUBMIT_TESTID` y `ORDER_LEFTOVER_CONFIRM_TESTID`, que solo usaba esa función. `grep -rn submitOrderWithLeftover e2e tests app lib components`: 0.
+
+Verificación:
+- typecheck (`tsc --noEmit`): verde.
+- eslint sobre los 5 archivos: verde.
+- `vitest run tests/unit/pedidos-ui/order-detail-sheet.test.tsx`: 10/10 en verde.
+- `vitest run tests/integration/asignaciones/order-lines-execution.int.test.ts`: 14/14 en verde.
+- `vitest run guard`: 87 archivos; 1333 en verde y 22 omitidos.

@@ -408,7 +408,7 @@ describe('QT-313 T14a — el flujo de planta escribe la linea y deriva el pedido
 });
 
 describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
-  it('QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
+  it('QT-313 R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
     await conFixture(async (fixture) => {
       const { orderId, lines } = await crearPedido(fixture, ['4']);
       const [linea] = lines as [string];

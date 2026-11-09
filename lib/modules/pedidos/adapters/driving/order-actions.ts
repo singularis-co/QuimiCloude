@@ -221,11 +221,11 @@ export async function updateOrderAction(id: string, input: unknown): Promise<Upd
 }
 
 /**
- * Cancelacion de pedido (R26, R27, R28). El `id` viaja como campo oculto del formulario,
+ * Cancelacion de pedido. El `id` viaja como campo oculto del formulario,
  * igual que en el borrado, porque quien cancela lo hace desde un boton de la fila.
  *
  * El motivo se entrega TAL CUAL: el recorte, el minimo y el tope de 500 son de
- * `cancelOrderSchema`, dentro del caso de uso (R27). Aqui no se recorta ni se mide nada.
+ * `cancelOrderSchema`, dentro del caso de uso. Aqui no se recorta ni se mide nada.
  */
 export async function cancelOrderAction(
   prevState: OrderMutationFormState,
@@ -252,11 +252,11 @@ export async function cancelOrderAction(
 const MISSING_LINE_ID_ERROR = 'Falta el identificador de la receta.';
 
 /**
- * Cancelacion de UNA receta del pedido (QT-314 R29). `id`, `lineId` y el motivo viajan como
+ * Cancelacion de UNA receta del pedido. `id`, `lineId` y el motivo viajan como
  * campos ocultos del dialogo, el mismo patron que `cancelOrderAction`.
  *
  * El motivo se entrega TAL CUAL: lo valida `cancelOrderLineSchema` dentro de `cancelOrderLine`,
- * despues de su comprobacion de `pedidos.modificar` (R42). Aqui solo se comprueba que el pedido y la
+ * despues de su comprobacion de `pedidos.modificar`. Aqui solo se comprueba que el pedido y la
  * receta vengan, porque sin ellos no hay a quien llamar.
  */
 export async function cancelOrderLineAction(

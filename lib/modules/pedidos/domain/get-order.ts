@@ -203,7 +203,7 @@ function toOrderLineView(
  * seria el sitio exacto por donde empezarian a diferir.
  *
  * El `recipeName` de una linea es `null` solo si el id NO vuelve del catalogo -una receta
- * borrada FISICAMENTE por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila SIGUE saliendo
+ * borrada FISICAMENTE por consola, que las FK `RESTRICT` de las recetas hacen casi imposible-: la fila SIGUE saliendo
  * (mismo criterio que QC-25 R18 y QC-43 R37). Una receta dada de BAJA si vuelve, con su nombre
  * (R44).
  *

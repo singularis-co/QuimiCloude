@@ -265,3 +265,11 @@ describe('OrderDetailSheet', () => {
     expect(screen.getByRole('button', { name: 'Editar' })).toBeDisabled();
   });
 });
+
+describe('OrderDetailSheet: plataformas (R44)', () => {
+  it('R44: en el teléfono el detalle ocupa la pantalla entera; en tablet y escritorio se abre a la derecha', () => {
+    const { panel } = pintar(pedido());
+    expect(panel).toHaveAttribute('data-side', 'right');
+    expect(panel).toHaveClass('w-full', 'data-[side=right]:w-full');
+  });
+});
