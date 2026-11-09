@@ -209,6 +209,18 @@
   estar habilitado. En los demás estados, los dos DEBEN seguir como hoy. La prioridad se cambia con
   «Editar» (R9). *[Alcance: responsables, cliente y prioridad · Reglas de negocio de las recetas ·
   ¿Cuándo se puede pulsar Editar?]*
+- **R51** — CUANDO se abre «Responsables», la ficha de solo lectura del pedido DEBE mostrar una fila
+  por receta del pedido, en el orden del pedido, con el nombre de la receta, su cantidad con su
+  unidad, su reparto y su estado. Las recetas canceladas DEBEN salir también, con su estado. La
+  ficha NO DEBE pintar ningún dato de una receta a partir de los campos del pedido que copian la
+  primera receta (R24). *[Ficha de solo lectura del panel «Responsables» · Campos planos de
+  `OrderView`]*
+- **R52** — El borrador de «Entregar» (lo escrito sin confirmar) DEBE guardarse por receta. CUANDO
+  se abre «Entregar» en una receta mientras otra receta del mismo pedido tiene un borrador, el
+  sistema NO DEBE borrar ni cambiar ese borrador, y CUANDO se vuelve a abrir «Entregar» en la
+  primera receta, el panel DEBE venir con su borrador. El borrador de una receta NO DEBE
+  precargarse en el «Entregar» de otra. *[Borrador de «Entregar» por receta · Entregas desde
+  Pedidos con varias recetas]*
 - **R39** — El sistema DEBE pintar el estado de un pedido `PARCIAL` como «Parcial» con el tono
   `progress`, y el estado de cada receta con la misma etiqueta y el mismo tono que ese estado tiene
   en un pedido, en el listado, la tarjeta, el panel, el detalle y el selector.
@@ -239,10 +251,13 @@
 ### Plataformas y animación (tablero aprobado)
 
 - **R44** — En teléfono, el sistema DEBE mostrar el listado en tarjetas con la primera receta, el
-  «+N más», la barra de avance y los botones «Ver detalle» y «Acciones»; el panel, el sub-panel y
-  el detalle DEBEN ocupar la pantalla entera y el sub-panel DEBE volver al panel con la flecha; la
+  «+N más», la barra de avance y un pie con la prioridad y «Acciones». CUANDO se toca el número de
+  pedido de la tarjeta o se elige «Ver detalle» dentro de «Acciones», el sistema DEBE abrir el
+  detalle; la tarjeta NO DEBE tener un botón «Ver detalle» aparte. El panel, el sub-panel y el
+  detalle DEBEN ocupar la pantalla entera y el sub-panel DEBE volver al panel con la flecha; la
   tabla de recetas del panel DEBE pasar a tarjetas; y el selector de receta DEBE ser un diálogo
-  centrado con opciones de al menos 52 px de alto. *[Pase `/design`]*
+  centrado con opciones de al menos 52 px de alto. *[Pase `/design` · R44, entrada al detalle en
+  el teléfono]*
 - **R45** — En tablet, la tabla del listado DEBE desplazarse en horizontal dentro de su caja y el
   panel y el sub-panel DEBEN apilarse a la derecha. *[Pase `/design`]*
 - **R46** — El sub-panel DEBE entrar encima del panel con la misma curva y duración que el panel,
@@ -274,7 +289,7 @@ se retiran o se reescriben a los requisitos nuevos (`tasks.md`).
 | Listado con varias recetas | R18, R20, R21, R22, R23, R24 |
 | Acciones de una sola receta | R25, R26, R27, R28, R29, R30, R36 |
 | ¿Cuándo se puede pulsar Editar? | R9, R10, R38 |
-| Entregas desde Pedidos con varias recetas | R26, R32, R33, R34, R35 |
+| Entregas desde Pedidos con varias recetas | R26, R32, R33, R34, R35, R52 |
 | Errores por receta | R15, R16, R17 |
 | Esquemas de entrada | R7, R24, R31, R40, R41 |
 | Reglas de negocio de las recetas | R8, R11, R12, R13, R28, R36, R37, R38, R39 |
@@ -282,9 +297,12 @@ se retiran o se reescriben a los requisitos nuevos (`tasks.md`).
 | ¿Hace falta E2E? | R48, R49 |
 | ¿Librería nueva? | R47 |
 | Pase `/design` | R1, R25, R44, R45, R46 |
-| Campos planos de `OrderView` (P1) | R24 |
+| Campos planos de `OrderView` (P1) | R24, R51 |
 | Guardar sin receta editable ni receta nueva (P2) | R50 |
 | Tablero frente a decisión en el listado (P3) | R20 |
+| R44, entrada al detalle en el teléfono (F2.1) | R44 |
+| Ficha de solo lectura del panel «Responsables» (F2.1) | R51 |
+| Borrador de «Entregar» por receta (F2.1) | R52 |
 
 ## Preguntas abiertas
 
@@ -310,3 +328,6 @@ Ninguna. P1–P3 cerradas en la tabla de abajo.
 | 2026-11-06 | Campos planos de `OrderView` que copian la primera receta (P1, F1.4) | **Se borran en esta ficha** (`recipeId`, `recipeName`, `recipeVersion`, `recipeImageUrl`, `quantity`, `unitId`, `unitLabel`, `presentationLines`, `salePrice`, `ingredientsCost`, `packagingCost`, `actualCost`). T17 entra en el plan. |
 | 2026-11-06 | Guardar sin receta editable ni receta nueva (P2, F1.4) | **No hay regla «sin cambios» en la pantalla.** El servidor rechaza con `invalid_transition` y el panel muestra el mensaje del catálogo, como hoy. |
 | 2026-11-06 | Tablero frente a decisión en el listado (P3, F1.4) | **Manda la decisión escrita:** la columna se llama «Fórmula», el texto es «+N más» y se conserva la columna «Motivo de cancelación». |
+| 2026-11-09 | R44, entrada al detalle en el teléfono (F2.1, bloqueo de T15) | **En la tarjeta del teléfono, el detalle se abre tocando el número de pedido o con «Ver detalle» dentro de «Acciones». El pie de la tarjeta conserva la prioridad y «Acciones», sin un botón «Ver detalle» aparte**, porque el pie de `DataTable` solo admite una columna y no se amplía. Enmienda R44 y design § 4.5. **Se aparta del tablero `PedidosVariasRecetasMovil`**, que pinta «Ver detalle» y «Acciones» en el pie. |
+| 2026-11-09 | Ficha de solo lectura del panel «Responsables» (`order-responsibles-sheet.tsx`, F2.1, bloqueo de T16) | **Con varias recetas muestra una fila por receta, con su cantidad, su reparto y su estado**, en vez de los datos sueltos de la primera receta. Deja de leer los campos planos de `OrderView`, lo que permite cerrar T17 (R24). **Las canceladas se muestran con su estado.** |
+| 2026-11-09 | Borrador de «Entregar» por receta (F2.1, bloqueo de T16) | **Lo escrito sin confirmar se guarda por receta, no por pedido**: abrir «Entregar» en otra receta no borra el borrador de la primera. Toca `order-delivery-draft.ts`, `use-order-delivery-draft.ts` y su test. |

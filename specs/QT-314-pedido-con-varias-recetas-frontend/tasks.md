@@ -176,7 +176,30 @@
 
 ## Tanda 4 — limpieza, E2E y cierre
 
-- [ ] **T17** · backend_dev · depende de T15, T16 — Se borran de `OrderView` los campos planos de
+- [ ] **T16b** · frontend_dev · depende de T16 · va antes de T17 — Enmienda F2.1 (design § 4.5 y
+  § 4.7):
+  - `order-responsibles-sheet.tsx`: la ficha de solo lectura pinta una fila por receta (nombre,
+    cantidad con unidad, reparto y estado), canceladas incluidas, y deja de leer los campos planos
+    de `OrderView`;
+  - `order-delivery-draft.ts` y `use-order-delivery-draft.ts`: el borrador de «Entregar» por
+    receta (clave, contenido y lectura con `lineId`), y `order-delivery-sheet.tsx` pasa `line.id`;
+  - R44: el código de la tarjeta ya cumple la enmienda (pie con prioridad y «Acciones»); solo se
+    añaden sus tests.
+  - **Hecho:**
+    - tests de UI de la ficha con un pedido de tres recetas cuya primera receta difiere de los
+      campos planos, una de ellas cancelada: una fila por receta en orden, con cantidad, unidad,
+      reparto y estado, la cancelada con su estado, y ningún dato plano pintado (R51);
+    - test unitario del borrador: dos recetas del mismo pedido con borradores distintos se guardan
+      y se leen cada una con lo suyo; abrir la segunda no borra la primera; el borrador de una no se
+      carga en otra (R52); y un test de UI de `order-delivery-sheet` que abre «Entregar» en dos
+      recetas y vuelve a la primera con su borrador (R52);
+    - test de la tarjeta de teléfono: el pie tiene prioridad y «Acciones» y ningún botón «Ver
+      detalle» aparte; tocar el número de pedido abre el detalle; «Ver detalle» dentro de
+      «Acciones» abre el detalle (R44);
+    - Grep de `order.recipeName`, `order.recipeImageUrl`, `order.quantity`, `order.unitLabel` y
+      `order.presentationLines` sin resultados en `order-responsibles-sheet.tsx`.
+  - **Cubre:** R44, R51, R52 (y R24 en la ficha).
+- [ ] **T17** · backend_dev · depende de T15, T16, T16b — Se borran de `OrderView` los campos planos de
   la primera receta y su relleno en `toOrderView`, y se ajustan sus tests (decisión P1, design
   § 3.4).
   - **Hecho:** typecheck en verde sin que ningún archivo de `app/` lea esos campos, y Grep de
@@ -195,13 +218,14 @@
   - **Hecho:** cada spec de `## Archivos esperados > e2e`, corrido uno a uno con `pnpm exec
     playwright test <spec>` en verde, con la salida en `progress/impl_QT-314.md`.
   - **Cubre:** R49.
-- [ ] **T20** · frontend_dev · depende de T13–T19 — Guardias y convenciones:
+- [ ] **T20** · frontend_dev · depende de T13–T19 y T16b — Guardias y convenciones:
   - `pedidos-convenciones.test.ts` sin los esquemas planos;
   - `guard-pedidos-rediseno` en verde con los archivos nuevos;
   - comprobación de que `package.json` no cambió;
   - el mapa `R<n> -> test` completo en `progress/impl_QT-314.md`, con la nota de qué tests de
-    QT-313 R44 y R54 se retiraron.
-  - **Hecho:** `pnpm exec vitest run guard` en verde y las 50 filas del mapa.
+    QT-313 R44 y R54 se retiraron, y con las filas de la enmienda F2.1: R44 (enmendado), R51 y R52
+    a los tests de T16b.
+  - **Hecho:** `pnpm exec vitest run guard` en verde y las 52 filas del mapa (R1–R52).
   - **Cubre:** R43, R47, y la trazabilidad de todos.
 
 ## Archivos esperados
@@ -257,6 +281,8 @@
 - `app/(private)/pedidos/components/cancel-order-line-dialog.tsx`
 - `app/(private)/pedidos/components/order-line-draft.ts`
 - `app/(private)/pedidos/components/order-line-actions.ts`
+- `app/(private)/pedidos/components/order-delivery-draft.ts`
+- `app/(private)/pedidos/components/use-order-delivery-draft.ts`
 
 ### tests de lib
 - `tests/unit/pedidos/order-input.test.ts`
@@ -318,6 +344,7 @@
 - `tests/unit/pedidos-ui/order-detail-sheet.test.tsx`
 - `tests/unit/pedidos-ui/order-line-picker-dialog.test.tsx`
 - `tests/unit/pedidos-ui/cancel-order-line-dialog.test.tsx`
+- `tests/unit/pedidos-ui/order-delivery-draft.test.ts`
 - `tests/guards/guard-pedidos-rediseno.test.ts`
 
 ### e2e (frontend_dev)

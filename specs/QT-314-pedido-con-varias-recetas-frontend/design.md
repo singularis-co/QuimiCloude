@@ -41,7 +41,7 @@ fila:
 
 | Fila | Uso en esta ficha |
 |---|---|
-| `DataTable` | Listado y tarjetas de teléfono (`card.footer` para «Ver detalle» y «Acciones») |
+| `DataTable` | Listado y tarjetas de teléfono. `card.footer` pinta una sola columna: la prioridad y «Acciones», como hoy. No se amplía (enmienda F2.1 de R44, § 4.5) |
 | `RowActionsMenu` | Menú de la fila, **extendido** con rótulos de grupo (§ 4.6) |
 | `FormSheet`, `SaveButton` | El panel del pedido. Su pie fijo «Cancelar / Guardar pedido» encaja |
 | `Sheet`, `SheetContent`, `SheetHeader`, `SheetFooter` | El sub-panel y el detalle. Ninguno de los dos es un `<form>` con Server Action, así que `FormSheet` no sirve: su pie no admite «Quitar receta» |
@@ -323,8 +323,13 @@ detalle».
 | Costo real | `actualCost` | `actualCostTotal` |
 | Nº de pedido | texto | botón que abre el detalle |
 
-La tarjeta de teléfono se ajusta igual: título con la primera receta y «+N más», barra de avance, y
-pie con «Ver detalle» y «Acciones» (R44). El resto de columnas (Estado, Prioridad, Cliente, Por
+La tarjeta de teléfono se ajusta igual: título con la primera receta y «+N más» y barra de avance.
+El pie se queda como hoy, con la prioridad y «Acciones» (R44, enmienda F2.1). En el teléfono, el
+detalle se abre tocando el número de pedido (el mismo botón de la celda) o con «Ver detalle» dentro
+de «Acciones». No hay un botón «Ver detalle» aparte en el pie: `DataTableCardLayout.footer`
+(`components/shared/data-table/data-table-cards.tsx`) pinta una sola columna y `DataTable` no admite
+columnas solo de tarjeta, y el humano decidió no ampliarlo (§ 6, alternativa H). Esto se aparta del
+tablero `PedidosVariasRecetasMovil`, que pinta los dos botones en el pie. El resto de columnas (Estado, Prioridad, Cliente, Por
 entregar, Fecha, Motivo de cancelación, Cobertura, Responsables) no cambia. «Motivo de
 cancelación» se conserva aunque el tablero no la pinte (decisión P3).
 
@@ -355,7 +360,8 @@ terminada», «Sin entregas», «No se puede cancelar en este estado».
 
 `isFinalOrderStatus` deja de existir. `order-responsibles-sheet.tsx` pasa a
 `responsiblesFrozen(order)`: igual que hoy fuera de `PARCIAL`, y en `PARCIAL` congelado si ninguna
-receta activa está en `PENDIENTE`, `EN_CURSO` o `BLOQUEADO` (R38, la regla de QT-313 R55).
+receta activa está en `PENDIENTE`, `EN_CURSO` o `BLOQUEADO` (R38, la regla de QT-313 R55). Su ficha
+de solo lectura cambia en § 4.7 (R51).
 
 El selector `OrderLinePickerDialog` es un `Dialog` centrado (también en escritorio, como en el
 tablero) con una opción por receta: nombre, motivo o «cantidad · reparto», y estado, con 52 px de
@@ -373,10 +379,12 @@ se monta en el mismo sitio, uno por tabla.
 | `OrderDeliverySheet` | Recibe `line`. El título y la imagen son los de la receta, y llama a `getOrderDeliveryAction(order.id, line.id)` (R32) |
 | `OrderDeliveriesSheet`, `OrderDeliveryList` | `listOrderDeliveriesAction(order.id, line.id)`. `STATUS_ACCEPTS_VOID` mira `view.lineStatus` (`TERMINADO` o `ENTREGADO`), no el estado del pedido (R34) |
 | `CancelOrderDialog` | Lista las recetas que se cancelan y las que se quedan, con `isCancellableStatus` (R36) |
+| `OrderResponsiblesSheet` (ficha de solo lectura) | Enmienda F2.1 (R51). La cabecera conserva lo del pedido (número, estado y lo demás que no es de una receta). Los datos sueltos de la primera receta (nombre, imagen, cantidad, unidad y reparto, hoy de `order.recipeName`, `order.recipeImageUrl`, `order.quantity`, `order.unitLabel` y `order.presentationLines`) se sustituyen por **una fila por receta** de `order.lines`, por `position` y canceladas incluidas: nombre, cantidad con `unitLabel`, reparto (`OrderDistributionLabel` con `distributionLabelLine`) y estado (`OrderStatusBadge`). Ya no lee ningún campo plano, así que T17 puede borrarlos. `responsiblesFrozen` (R38) no cambia |
+| `order-delivery-draft.ts`, `use-order-delivery-draft.ts` | Enmienda F2.1 (R52). El borrador pasa a ser por receta: `orderDeliveryDraftKey(orderId, lineId)`, el borrador guarda `lineId` junto a `orderId`, `parseOrderDeliveryDraft(raw, orderId, lineId)` descarta el que no coincide en los dos, y `useOrderDeliveryDraft(orderId, lineId)`. `OrderDeliverySheet` pasa `line.id`, que ya recibe (R32). Un borrador guardado antes con la clave por pedido no se recupera: no coincide con ninguna clave nueva |
 
 ### 4.8 Plataformas y animación (R44–R46)
 
-- **Teléfono** (< 768 px): el listado en tarjetas (`DataTable` con `card`). El panel, el sub-panel y
+- **Teléfono** (< 768 px): el listado en tarjetas (`DataTable` con `card`), con el pie de § 4.5. El panel, el sub-panel y
   el detalle a pantalla completa (`side="bottom"` o el ancho completo que ya usa `FormSheet` en
   teléfono). `OrderLinesTable` pinta tarjetas con «Editar receta». Targets de 44 px y 52 px en el
   selector. Inputs de 16 px (los campos reutilizados ya lo cumplen).
@@ -417,6 +425,8 @@ se monta en el mismo sitio, uno por tabla.
 | **E. Mantener `requireSingleLineIdOf` para «Reparto y unidad»** | Rechaza justo los pedidos que esta ficha hace posibles (R31) |
 | **F. Ocultar las acciones de una receta cuando ninguna receta las admite, y además deshabilitarlas en el menú** | Mezcla dos señales. Se sigue el patrón de hoy (se pintan si alguna receta las admite), y el «por qué no» de cada receta lo dice el selector |
 | **G. Saltar el selector cuando el pedido tiene una sola receta** | La decisión dice «eligiendo primero la receta», y el tablero no pinta ese atajo |
+| **H. Ampliar `DataTable` con un pie de tarjeta de varias columnas**, o añadir una columna «Ver detalle» | Lo descartó el humano en F2.1 (fila «R44, entrada al detalle en el teléfono»). Ampliar un componente compartido por un botón que ya está en el número y en «Acciones», y una columna nueva saldría también en escritorio, donde el tablero no la tiene |
+| **I. Ficha de «Responsables» con la primera receta y «+N más», o sin datos de receta** | El humano eligió en F2.1 una fila por receta (fila «Ficha de solo lectura del panel "Responsables"») |
 
 ## 7. Riesgos
 
