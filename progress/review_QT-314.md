@@ -198,3 +198,18 @@ La única excepción son los E2E y los `.int`, que se aceptan por la salida de l
 | R52 | `order-delivery-draft.test.ts` › R52 (×3); `order-delivery-sheet.test.tsx` › R52 | OK |
 
 Para la vuelta 2 basta B1. Se recomienda añadir también el caso del menor 1. Los demás menores pueden ir a `progress/deudas.md`.
+
+## Vuelta 2 (acotada a 18db82313..d613a8e91)
+
+HEAD revisado: `d613a8e91`. Arreglos en `d613a8e91`; `4a7ded330` solo toca `progress/deudas.md` (menores 3, 4 y 5).
+
+- [x] **B1:** cerrado. `order-actions.ts` (JSDoc de `cancelOrderAction` y `cancelOrderLineAction`) y `get-order.ts:206` ya no llevan R/QT/QC. Barrido propio de `git diff origin/dev...HEAD -- lib app components`, solo comentarios añadidos, con el patrón `R<n>|QT-<n>|QC-<n>`: 0 coincidencias. Las referencias `QC-25 R18`, `QC-43 R37` y `(R44)` de `get-order.ts:207-208` ya estaban en `origin/dev` (blame `dee47c178c`), así que no son de este diff.
+- [x] **Menor 1:** cerrado. `order-detail-sheet.test.tsx` › «R44: en el teléfono el detalle ocupa la pantalla entera…» comprueba `data-side="right"` y `w-full data-[side=right]:w-full`, que es lo que pinta `order-detail-sheet.tsx:221-222`. `vitest run` del archivo da 10/10 en verde.
+- [x] **Menor 6:** cerrado. La etiqueta de `order-lines-execution.int.test.ts:411` queda como `QT-313 R45`.
+- [x] **Menor 7:** cerrado. `submitOrderWithLeftover`, su import `clickAndConfirm` y las constantes que solo usaba esa función ya no están en `e2e/helpers/order-distribution.ts`. Ningún spec importa lo borrado: los specs que usan `ORDER_FORM_SUBMIT_TESTID` lo definen ellos mismos o lo toman de `order-form.ts`.
+- [x] eslint de los 5 archivos tocados y `tsc --noEmit` (incluye `e2e/`): verdes.
+- Sin regresiones en el rango.
+
+Hallazgos abiertos: ninguno de esta vuelta. Los menores 3, 4 y 5 quedan en `progress/deudas.md`.
+
+**Veredicto: APROBADO**
