@@ -56,7 +56,12 @@ export {
   ORDER_NUMBER_COLUMN_ID,
   PENDING_DELIVERY_COLUMN_ID,
   PENDING_DELIVERY_TESTID,
-  PRESENTATION_NAME_COLUMN_ID,
+  ORDER_COLUMNS_TEXTS,
+  ORDER_NUMBER_DETAIL_TESTID,
+  ORDER_RECIPES_FIRST_TESTID,
+  ORDER_RECIPES_MORE_TESTID,
+  ORDER_ROW_WITHOUT_PRICE_TESTID,
+  PROGRESS_COLUMN_ID,
   PRODUCTION_COST_COLUMN_ID,
   PRODUCTION_COST_TESTID,
   ACTUAL_COST_COLUMN_ID,
@@ -68,6 +73,7 @@ export {
   SALE_PRICE_TESTID,
   buildOrderColumns,
   type OrderColumnsDeps,
+  type OrderColumnsTexts,
 } from './order-columns';
 export { OrderField, type OrderFieldProps } from './order-field';
 export {
@@ -394,13 +400,15 @@ export {
 export { OrderListSection } from './order-list-section';
 export { ORDER_SKELETON_COLUMN_COUNT, OrderListSkeleton } from './order-list-skeleton';
 export {
+  ORDER_ACTION_CANCEL_LINE_TESTID,
   ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_ACTION_DELIVERIES_TESTID,
   ORDER_ACTION_DELIVER_TESTID,
+  ORDER_ACTION_DETAIL_TESTID,
   ORDER_ACTION_DISTRIBUTION_TESTID,
+  ORDER_ROW_ACTION_GROUPS,
+  ORDER_ROW_ACTION_LABELS,
   OrderRowActions,
-  acceptsDelivery,
-  acceptsDistributionEdit,
-  isFinalOrderStatus,
   orderRowActionsSpec,
   type OrderRowAction,
   type OrderRowActionsProps,

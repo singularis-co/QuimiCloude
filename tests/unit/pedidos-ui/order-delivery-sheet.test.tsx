@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_LINE_PICKER_DIALOG_TESTID,
+  ORDER_LINE_PICKER_OPTION_TESTID,
   ORDER_ACTION_DELIVER_TESTID,
   ORDER_DELIVERY_ADD_CUSTOMER_TESTID,
   ORDER_DELIVERY_BATCH_OVER_TESTID,
@@ -61,6 +63,7 @@ import {
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { LINEA_A_ID, lineaPedido } from '../../helpers/order-form-ui';
 
 const { getDeliveryMock, deliverMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
   getDeliveryMock: vi.fn<(orderId: string) => Promise<OrderDeliveryResult>>(),
@@ -788,9 +791,11 @@ describe('montaje desde la fila', () => {
   beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
   afterEach(() => resetViewport());
 
+  // La fila ofrece «Entregar…» si alguna receta está TERMINADO; se elige en el selector.
   function pedidoTerminado(): OrderSummary {
     return {
       ...VISTA_SIN_LINEAS,
+      lines: [lineaPedido({ status: 'TERMINADO' })],
       id: DELIVERY_ORDER_ID,
       number: { year: 2026, sequence: 7 },
       numberText: formatOrderNumber({ year: 2026, sequence: 7 }),
@@ -818,6 +823,13 @@ describe('montaje desde la fila', () => {
     };
   }
 
+  async function elegirLaReceta(user: ReturnType<typeof setupUser>) {
+    const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+    const [opcion] = within(selector).getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID);
+    expect(opcion).toHaveAttribute('data-line-id', LINEA_A_ID);
+    await user.click(opcion as HTMLElement);
+  }
+
   it('QC-223 R4: solo se monta al pulsar «Entregar» en la fila y pide la entrega de ese pedido', async () => {
     const user = setupUser();
     render(
@@ -837,6 +849,7 @@ describe('montaje desde la fila', () => {
 
     await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeInTheDocument();
     expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID);
@@ -858,6 +871,7 @@ describe('montaje desde la fila', () => {
 
     await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByRole('dialog', { name: 'Esmalte azul' })).toBeInTheDocument();
     const resumen = await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID);

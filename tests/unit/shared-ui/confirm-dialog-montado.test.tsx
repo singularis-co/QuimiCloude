@@ -99,6 +99,7 @@ import { clickRowAction } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 /** Lo que devuelve cualquier Server Action de baja de estas pantallas. */
 type EstadoDeBaja = { status: 'idle' } | { status: 'success' } | ErrorState;
@@ -530,8 +531,10 @@ describe('grupos de trabajo: borrado (R33)', () => {
 describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
   const RECETAS: RecipePickerPage = { items: [], totalPages: 1 };
 
+  // Una receta PENDIENTE: «Cancelar pedido» se habilita si alguna receta es cancelable.
   const PEDIDO: OrderSummary = {
     ...VISTA_SIN_LINEAS,
+    lines: [lineaPedido()],
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),

@@ -1,4 +1,5 @@
-// QC-35 T7 — Las diez columnas de la lista de pedidos: R8, R9, R10, R11, R12, R14, R19, R39.
+// QC-35 T7 — Las columnas de la lista de pedidos. QT-314: la columna «Fórmula» con «+N más», el
+// avance, los totales del pedido y el número que abre el detalle (R18, R20–R24).
 //
 // **Las columnas son DATOS**, asi que el test las recorre en vez de listar literales: anadir una
 // columna es anadir una fila a `ORDER_COLUMNS`, y eso es justo lo que el test en negativo de R8
@@ -12,7 +13,7 @@
 // ruta arrastra el Server Component de la seccion, y una declaracion de columnas no puede pedir
 // datos por su cuenta (R43).
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -26,18 +27,21 @@ import {
   ORDER_COVERAGE_LABELS,
   ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
+  ORDER_NUMBER_DETAIL_TESTID,
   ORDER_PRIORITY_LABELS,
-  ORDER_PRODUCED_PRESENTATIONS_TESTID,
-  ORDER_PRODUCED_PRODUCT_LINK_TESTID,
+  ORDER_PROGRESS_TESTID,
+  ORDER_RECIPES_FIRST_TESTID,
+  ORDER_RECIPES_MORE_TESTID,
+  ORDER_ROW_WITHOUT_PRICE_TESTID,
   ORDER_SKELETON_COLUMN_COUNT,
   ORDER_STATUS_LABELS,
   NOTHING_PENDING_MARK,
   PENDING_DELIVERY_COLUMN_ID,
   PENDING_DELIVERY_TESTID,
-  PRESENTATION_NAME_COLUMN_ID,
   PRIORITY_COLUMN_ID,
   PRODUCTION_COST_COLUMN_ID,
   PRODUCTION_COST_TESTID,
+  PROGRESS_COLUMN_ID,
   RESPONSIBLES_COLUMN_ID,
   SALE_PRICE_COLUMN_ID,
   SALE_PRICE_TESTID,
@@ -55,7 +59,7 @@ import {
   formatOrderNumber,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
-import { finishedProductDetailRoute } from '@/lib/shared/routes';
+import { lineaB, lineaPedido, pedidoDeDosRecetas, RECETA_A } from '../../helpers/order-form-ui';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
@@ -136,15 +140,15 @@ afterEach(() => {
 // costo real. El 2026-10-22 POR ENTREGAR pasa delante de PRESENTACION. Sigue siendo cerrada y en un
 // orden acordado. El 2026-10-28 sube a QUINCE con el PRECIO DE VENTA, delante de los costes.
 describe('las columnas declaradas son exactamente las quince acordadas (R8, R20, R35)', () => {
-  it('QC-307 R19: los quince ids, en el orden acordado', () => {
+  it('QC-307 R19, R20, R21, R23: los quince ids, en el orden acordado: «Avance» tras «Fórmula», sin «Presentación» y con «Motivo de cancelación»', () => {
     expect(ORDER_COLUMNS.map((column) => column.id)).toEqual([
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
+      PROGRESS_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
       PENDING_DELIVERY_COLUMN_ID,
-      PRESENTATION_NAME_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
@@ -200,9 +204,9 @@ describe('solo cuatro columnas ordenan, y son las de la lista blanca menos la no
 
     expect(noOrdenables).toEqual([
       RECIPE_NAME_COLUMN_ID,
+      PROGRESS_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
       PENDING_DELIVERY_COLUMN_ID,
-      PRESENTATION_NAME_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
       COVERAGE_COLUMN_ID,
       RESPONSIBLES_COLUMN_ID,
@@ -282,6 +286,7 @@ describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`
         canEditDistribution: false,
         canEditCustomer: false,
         canDeliver: false,
+        canCancelLine: false,
         onAction: vi.fn(),
       }).items.map((item) => item.key),
     );
@@ -305,6 +310,16 @@ describe('el fijado por defecto y la columna de acciones (R19, `design.md > 6.1`
     expect(onAction).toHaveBeenCalledExactlyOnceWith('customer', elPedido);
   });
 
+  it('R26: con `canCancelLine` el menu ofrece «Cancelar receta…» si alguna receta es cancelable', () => {
+    const columnas = buildOrderColumns({ units: [], bridge: null, canCancelLine: true });
+    const elPedido = pedidoDeDosRecetas();
+    const spec = columnas.find((column) => column.id === ACTIONS_COLUMN_ID)?.menu?.(elPedido);
+
+    expect(spec?.items.map((item) => item.key)).toContain('cancelLine');
+    const sinPermiso = ORDER_COLUMNS.find((column) => column.id === ACTIONS_COLUMN_ID)?.menu?.(elPedido);
+    expect(sinPermiso?.items.map((item) => item.key)).not.toContain('cancelLine');
+  });
+
   it('R10: la celda pinta el disparador del menu con el id del pedido como dato', () => {
     const acciones = ORDER_COLUMNS.find((column) => column.id === ACTIONS_COLUMN_ID);
     const elPedido = pedido();
@@ -324,30 +339,142 @@ describe('el correlativo se compone SIEMPRE con la funcion del contrato (R10)', 
     expect(container.textContent).toBe(formatOrderNumber({ year: 2025, sequence: 7 }));
     expect(container.textContent).not.toContain(order.id);
   });
+
+  it('R18: el número es un botón con nombre accesible que abre el detalle del pedido de la fila', () => {
+    const onAction = vi.fn();
+    const columnas = buildOrderColumns({ units: [], bridge: null, onAction });
+    const order = pedidoDeDosRecetas();
+    const columna = columnas.find((candidate) => candidate.id === ORDER_NUMBER_COLUMN_ID);
+    render(<>{columna?.cell(order)}</>);
+
+    const boton = screen.getByRole('button', { name: `Ver detalle del pedido ${order.numberText}` });
+    expect(boton).toHaveAttribute('data-testid', ORDER_NUMBER_DETAIL_TESTID);
+    expect(boton).toHaveTextContent(order.numberText);
+    fireEvent.click(boton);
+
+    expect(onAction).toHaveBeenCalledExactlyOnceWith('detail', order);
+  });
 });
 
-describe('receta y unidad se presentan por su NOMBRE, tomado de la propia fila (R9)', () => {
-  it('con nombre informado se pinta el nombre y no el identificador', () => {
-    const order = pedido();
-
-    const { container } = pintarCelda(RECIPE_NAME_COLUMN_ID, order);
-
-    expect(container.textContent).toBe('Esmalte azul');
-    expect(container.textContent).not.toContain(RECIPE_ID);
+describe('la columna «Fórmula»: la primera receta y «+N más»', () => {
+  it('R20: se rotula «Fórmula»', () => {
+    expect(ORDER_COLUMNS.find((column) => column.id === RECIPE_NAME_COLUMN_ID)?.label).toBe('Fórmula');
   });
 
-  it('sin nombre de receta se pinta un marcador identificable y NUNCA el uuid', () => {
-    const { container } = pintarCelda(RECIPE_NAME_COLUMN_ID, pedido({ recipeName: null }));
+  it('R20: con dos recetas pinta la primera y «+1 más»', () => {
+    pintarCelda(RECIPE_NAME_COLUMN_ID, pedidoDeDosRecetas());
+
+    expect(screen.getByTestId(ORDER_RECIPES_FIRST_TESTID)).toHaveTextContent(RECETA_A.name);
+    expect(screen.getByTestId(ORDER_RECIPES_MORE_TESTID)).toHaveTextContent('+1 más');
+  });
+
+  it('R20: N es el número de recetas del pedido menos una, canceladas incluidas', () => {
+    const lineas = [
+      lineaPedido(),
+      lineaB(),
+      lineaB({ id: '50000000-0000-4000-8000-00000000000c', position: 2, status: 'CANCELADO' }),
+      lineaB({ id: '50000000-0000-4000-8000-00000000000d', position: 3 }),
+    ];
+    pintarCelda(RECIPE_NAME_COLUMN_ID, pedidoDeDosRecetas(lineas));
+
+    expect(screen.getByTestId(ORDER_RECIPES_MORE_TESTID)).toHaveTextContent('+3 más');
+  });
+
+  it('R20: con una sola receta no hay «+N más»', () => {
+    const { container } = pintarCelda(RECIPE_NAME_COLUMN_ID, pedidoDeDosRecetas([lineaPedido()]));
+
+    expect(container.textContent).toBe(RECETA_A.name);
+    expect(screen.queryByTestId(ORDER_RECIPES_MORE_TESTID)).toBeNull();
+  });
+
+  it('R24: el nombre sale de la primera receta y no del campo plano del pedido', () => {
+    const { container } = pintarCelda(RECIPE_NAME_COLUMN_ID, pedidoDeDosRecetas());
+
+    expect(container.textContent).not.toContain('PLANO NO USAR');
+  });
+
+  it('sin recetas pinta el marcador de ausencia y nunca un identificador', () => {
+    const { container } = pintarCelda(RECIPE_NAME_COLUMN_ID, pedido());
 
     expect(screen.getByTestId(`order-missing-${RECIPE_NAME_COLUMN_ID}`)).toHaveTextContent(
       MISSING_VALUE_MARK,
     );
     expect(container.textContent).not.toContain(RECIPE_ID);
   });
+});
 
+describe('la columna «Avance»', () => {
+  it('R21: va justo detrás de «Fórmula», se rotula «Avance» y no ordena ni filtra', () => {
+    const ids = ORDER_COLUMNS.map((column) => column.id);
+    const avance = ORDER_COLUMNS.find((column) => column.id === PROGRESS_COLUMN_ID);
+
+    expect(ids.indexOf(PROGRESS_COLUMN_ID)).toBe(ids.indexOf(RECIPE_NAME_COLUMN_ID) + 1);
+    expect(avance?.label).toBe('Avance');
+    expect(avance?.sortable).not.toBe(true);
+    expect(avance?.filter).toBeUndefined();
+  });
+
+  it('R21: pinta «F de T» con su barra, con las recetas activas y las terminadas del pedido', () => {
+    const { container } = pintarCelda(
+      PROGRESS_COLUMN_ID,
+      pedidoDeDosRecetas(undefined, { progress: { total: 3, finished: 1 } }),
+    );
+
+    const avance = screen.getByTestId(ORDER_PROGRESS_TESTID);
+    expect(avance).toHaveAttribute('data-variant', 'short');
+    expect(avance).toHaveAttribute('data-finished', '1');
+    expect(avance).toHaveAttribute('data-total', '3');
+    expect(container.textContent).toBe('1 de 3');
+  });
+});
+
+describe('la tabla no tiene columna Presentación', () => {
+  it('R23: ningún id ni rótulo de presentación, y ninguna celda pinta el reparto', () => {
+    expect(ORDER_COLUMNS.map((column) => column.id)).not.toContain('presentationName');
+    expect(ORDER_COLUMNS.map((column) => column.label)).not.toContain('Presentación');
+
+    const order = pedidoDeDosRecetas();
+    for (const column of ORDER_COLUMNS) {
+      if (column.id === RESPONSIBLES_COLUMN_ID || column.id === ACTIONS_COLUMN_ID) continue;
+      const { container, unmount } = render(<>{column.cell(order)}</>);
+      expect(container.textContent, column.id).not.toContain('Envase 5 L');
+      expect(container.textContent, column.id).not.toContain('Galón');
+      unmount();
+    }
+  });
+});
+
+describe('ninguna celda pinta un dato de receta a partir de los campos planos del pedido', () => {
+  it('R24: con la primera receta distinta del pedido plano, ninguna celda pinta el dato plano', () => {
+    const order = pedidoDeDosRecetas(undefined, {
+      recipeName: 'PLANO NO USAR',
+      quantity: '999.0000',
+      salePrice: '999.0000',
+      ingredientsCost: '999.0000',
+      actualCost: '999.0000',
+      unitLabel: 'PLANO-U',
+      salePriceTotal: '120.5000',
+      linesWithoutPrice: 1,
+      ingredientsCostTotal: '65.0000',
+      actualCostTotal: null,
+    });
+    for (const column of ORDER_COLUMNS) {
+      if (column.id === RESPONSIBLES_COLUMN_ID || column.id === ACTIONS_COLUMN_ID) continue;
+      const { container, unmount } = render(<>{column.cell(order)}</>);
+      expect(container.textContent, column.id).not.toContain('PLANO');
+      expect(container.textContent, column.id).not.toContain('999');
+      unmount();
+    }
+  });
 });
 
 describe('el motivo de cancelacion (R11)', () => {
+  it('R20: la columna «Motivo de cancelación» sigue en el listado', () => {
+    expect(ORDER_COLUMNS.find((column) => column.id === CANCELLATION_REASON_COLUMN_ID)?.label).toBe(
+      'Motivo de cancelación',
+    );
+  });
+
   it('con el pedido cancelado se presenta su motivo', () => {
     const order = pedido({ status: 'CANCELADO', cancellationReason: 'Cliente anuló el encargo' });
 
@@ -363,137 +490,6 @@ describe('el motivo de cancelacion (R11)', () => {
     expect(screen.getByTestId(`order-missing-${CANCELLATION_REASON_COLUMN_ID}`)).toHaveTextContent(
       MISSING_VALUE_MARK,
     );
-  });
-});
-
-describe('R20: la columna Presentación pinta el reparto o Sin presentación', () => {
-  it('QC-170 R26: con una linea pinta «envases × nombre» sin «+0»', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({
-        presentationLines: [{ presentationId: 'p-1', presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
-      }),
-    );
-
-    expect(container.textContent).toBe('2 × Bidón 20L');
-  });
-
-  it('QC-170 R26: con varias lineas pinta todas separadas por coma', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({
-        presentationLines: [
-          { presentationId: 'p-1', presentationName: 'Botella 200 ml', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
-          { presentationId: 'p-2', presentationName: 'Bidón 20L', packages: 1, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
-        ],
-      }),
-    );
-
-    expect(container.textContent).toBe('5 × Botella 200 ml, 1 × Bidón 20L');
-  });
-
-  it('QC-170 R27: sin reparto se pinta «Sin presentación»', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({ presentationLines: [] }),
-    );
-
-    expect(container.textContent).toBe('Sin presentación');
-  });
-});
-
-describe('el reparto del listado con lineas de envase y antiguas', () => {
-  it('R33: una linea con envase se pinta con el nombre del envase', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({
-        presentationLines: [
-          {
-            presentationId: 'p-1',
-            presentationName: '20 L',
-            packages: 2,
-            packagingProductId: 'e-1',
-            packagingName: 'Bidón PET 20 L',
-            presentationContent: null,
-            presentationUnitLabel: null,
-          },
-        ],
-      }),
-    );
-
-    expect(container.textContent).toBe('2 × Bidón PET 20 L');
-  });
-
-  it('R33: una linea antigua se sigue pintando con el nombre de su presentacion', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({
-        presentationLines: [
-          {
-            presentationId: 'p-1',
-            presentationName: 'Bidón 20L',
-            packages: 2,
-            packagingProductId: null,
-            packagingName: null,
-            presentationContent: null,
-            presentationUnitLabel: null,
-          },
-        ],
-      }),
-    );
-
-    expect(container.textContent).toBe('2 × Bidón 20L');
-  });
-
-  it('R33: un envase cuyo nombre no vuelve del catalogo se pinta con su presentacion', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({
-        presentationLines: [
-          {
-            presentationId: 'p-1',
-            presentationName: '20 L',
-            packages: 3,
-            packagingProductId: 'e-1',
-            packagingName: null,
-            presentationContent: null,
-            presentationUnitLabel: null,
-          },
-        ],
-      }),
-    );
-
-    expect(container.textContent).toBe('3 × 20 L');
-  });
-
-  it('una linea con envase y volumen conocido pinta «envases × envase · volumen»', () => {
-    const { container } = pintarCelda(
-      PRESENTATION_NAME_COLUMN_ID,
-      pedido({
-        presentationLines: [
-          {
-            presentationId: 'p-1',
-            presentationName: '300 ml',
-            packages: 9,
-            packagingProductId: 'e-1',
-            packagingName: 'Embase pequeño 2',
-            presentationContent: '300.0000',
-            presentationUnitLabel: 'ml',
-          },
-        ],
-      }),
-    );
-
-    expect(container.textContent).toBe('9 × Embase pequeño 2 · 300 ml');
-  });
-});
-
-describe('R21: Presentación no ordena ni filtra', () => {
-  it('la columna no declara `sortable` ni `filter`', () => {
-    const columna = ORDER_COLUMNS.find((c) => c.id === PRESENTATION_NAME_COLUMN_ID);
-
-    expect(columna?.sortable).not.toBe(true);
-    expect(columna?.filter).toBeUndefined();
   });
 });
 
@@ -567,6 +563,15 @@ describe('estado y prioridad se leen como etiqueta, no como valor crudo del enum
     },
   );
 
+  it('R39: un pedido PARCIAL se pinta «Parcial» con el tono `progress`', () => {
+    pintarCelda(STATUS_COLUMN_ID, pedidoDeDosRecetas(undefined, { status: 'PARCIAL' }));
+
+    const badge = screen.getByTestId('order-status');
+    expect(badge).toHaveAttribute('data-status', 'PARCIAL');
+    expect(badge).toHaveTextContent('Parcial');
+    expect(badge).toHaveAttribute('data-tone', 'progress');
+  });
+
   it('cada prioridad del contrato tiene su etiqueta legible', () => {
     pintarCelda(PRIORITY_COLUMN_ID, pedido({ priority: 'CRITICA' }));
 
@@ -597,14 +602,14 @@ describe('la tabla de pedidos no pinta el importe (R18)', () => {
     expect(ids).toHaveLength(15);
 
     const VALOR_DELATOR = '999999.9999';
-    const order = pedido({ ingredientsCost: VALOR_DELATOR, actualCost: VALOR_DELATOR });
+    const order = pedido({ ingredientsCostTotal: VALOR_DELATOR, actualCostTotal: VALOR_DELATOR });
     const idsRenderizablesSinContexto = [
       ORDER_NUMBER_COLUMN_ID,
       STATUS_COLUMN_ID,
       PRIORITY_COLUMN_ID,
       RECIPE_NAME_COLUMN_ID,
+      PROGRESS_COLUMN_ID,
       ORDER_CUSTOMER_NAME_COLUMN_ID,
-      PRESENTATION_NAME_COLUMN_ID,
       PENDING_DELIVERY_COLUMN_ID,
       CREATED_AT_COLUMN_ID,
       CANCELLATION_REASON_COLUMN_ID,
@@ -655,7 +660,7 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
   });
 
   it('R20: sin coste real pinta el guion con el rotulo «Sin dato», nunca 0 ni vacio', () => {
-    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '50.0000', actualCost: null }));
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCostTotal: '50.0000', actualCostTotal: null }));
 
     expect(screen.queryByTestId(ACTUAL_COST_TESTID)).toBeNull();
     const guion = screen.getByTestId(`order-missing-${ACTUAL_COST_COLUMN_ID}`);
@@ -665,7 +670,7 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
   });
 
   it('R20: sin estimado pinta el guion con el rotulo «Sin dato», como hoy', () => {
-    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: null, packagingCost: null }));
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCostTotal: null}));
 
     expect(screen.queryByTestId(PRODUCTION_COST_TESTID)).toBeNull();
     const guion = screen.getByTestId(`order-missing-${PRODUCTION_COST_COLUMN_ID}`);
@@ -674,13 +679,13 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
   });
 
   it('R20: el real no cae al estimado cuando falta', () => {
-    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '50.0000', actualCost: null }));
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCostTotal: '50.0000', actualCostTotal: null }));
 
     expect(document.body).not.toHaveTextContent('50.00');
   });
 
   it('R21: un importe exacto a dos decimales no lleva `title`', () => {
-    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '120.0000' }));
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCostTotal: '120.0000' }));
 
     const celda = screen.getByTestId(ACTUAL_COST_TESTID);
     expect(celda.textContent).toBe('$120.00');
@@ -688,35 +693,42 @@ describe('las columnas «Costo estimado» y «Costo real»', () => {
   });
 
   it('R21: un importe que se redondea expone el exacto en el `title`', () => {
-    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCost: '12752.5512' }));
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ actualCostTotal: '12752.5512' }));
 
     const celda = screen.getByTestId(ACTUAL_COST_TESTID);
     expect(celda.textContent).toBe('$12,752.55');
     expect(celda).toHaveAttribute('title', '12752.5512');
   });
 
-  it('R21: el real se pinta de `actualCost` y no del estimado', () => {
-    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCost: '99.0000', actualCost: '120.0000' }));
+  it('R21: el real se pinta de `actualCostTotal` y no del estimado', () => {
+    pintarCelda(ACTUAL_COST_COLUMN_ID, pedido({ ingredientsCostTotal: '99.0000', actualCostTotal: '120.0000' }));
 
     expect(screen.getByTestId(ACTUAL_COST_TESTID).textContent).toBe('$120.00');
     expect(screen.getByTestId(ACTUAL_COST_TESTID)).not.toHaveTextContent('99.00');
   });
 
   it('el estimado pinta el importe como dinero, con el valor exacto en el `title` si se redondea', () => {
-    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '1234.5670', packagingCost: '0.0000' }));
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCostTotal: '1234.5670'}));
 
     const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
     expect(celda).toHaveTextContent('$1,234.57');
     expect(celda).toHaveAttribute('title', '1234.567');
   });
 
-  it('el estimado NO suma `packagingCost`: los envases ya van dentro de `ingredientsCost`', () => {
-    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedido({ ingredientsCost: '12.5000', packagingCost: '2.0000' }));
+  it('R22: los dos costes son los totales del pedido, no los de la primera receta', () => {
+    const order = pedidoDeDosRecetas(undefined, { ingredientsCostTotal: '65.0000', actualCostTotal: '70.0000' });
 
-    const celda = screen.getByTestId(PRODUCTION_COST_TESTID);
-    expect(celda).toHaveTextContent('$12.50');
-    expect(celda).not.toHaveTextContent('$14.50');
-    expect(celda).not.toHaveAttribute('title');
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, order);
+    expect(screen.getByTestId(PRODUCTION_COST_TESTID).textContent).toBe('$65.00');
+    cleanup();
+    pintarCelda(ACTUAL_COST_COLUMN_ID, order);
+    expect(screen.getByTestId(ACTUAL_COST_TESTID).textContent).toBe('$70.00');
+  });
+
+  it('R22: un total «sin coste» pinta el marcador de ausencia', () => {
+    pintarCelda(PRODUCTION_COST_COLUMN_ID, pedidoDeDosRecetas(undefined, { ingredientsCostTotal: null }));
+
+    expect(screen.getByTestId(`order-missing-${PRODUCTION_COST_COLUMN_ID}`)).toHaveTextContent(MISSING_VALUE_MARK);
   });
 });
 
@@ -731,7 +743,7 @@ describe('la columna «Precio de venta»', () => {
   });
 
   it('QC-307 R19: con precio pinta el importe con dos decimales y separador de miles', () => {
-    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: '1250.5000' }));
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePriceTotal: '1250.5000' }));
 
     const celda = screen.getByTestId(SALE_PRICE_TESTID);
     expect(celda.textContent).toBe('$1,250.50');
@@ -739,7 +751,7 @@ describe('la columna «Precio de venta»', () => {
   });
 
   it('QC-307 R19: el `title` lleva el valor exacto cuando lo pintado se redondea', () => {
-    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: '12752.5512' }));
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePriceTotal: '12752.5512' }));
 
     const celda = screen.getByTestId(SALE_PRICE_TESTID);
     expect(celda.textContent).toBe('$12,752.55');
@@ -747,7 +759,7 @@ describe('la columna «Precio de venta»', () => {
   });
 
   it('QC-307 R19: sin precio pinta el marcador de ausencia, nunca 0 ni vacio', () => {
-    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: null, ingredientsCost: '50.0000' }));
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePriceTotal: null, ingredientsCostTotal: '50.0000' }));
 
     expect(screen.queryByTestId(SALE_PRICE_TESTID)).toBeNull();
     const guion = screen.getByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`);
@@ -757,22 +769,46 @@ describe('la columna «Precio de venta»', () => {
   });
 
   it('QC-307 R19: un precio 0 se pinta como importe cero, no como ausencia', () => {
-    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePrice: '0.0000' }));
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedido({ salePriceTotal: '0.0000' }));
 
     expect(screen.getByTestId(SALE_PRICE_TESTID).textContent).toBe('$0.00');
     expect(screen.queryByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`)).toBeNull();
   });
 
-  it('QC-307 R19: se pinta de `salePrice` y no de ningun coste', () => {
+  it('QC-307 R19: se pinta de `salePriceTotal` y no de ningun coste', () => {
     pintarCelda(
       SALE_PRICE_COLUMN_ID,
-      pedido({ salePrice: '10.0000', ingredientsCost: '99.0000', actualCost: '77.0000' }),
+      pedido({ salePriceTotal: '10.0000', ingredientsCostTotal: '99.0000', actualCostTotal: '77.0000' }),
     );
 
     const celda = screen.getByTestId(SALE_PRICE_TESTID);
     expect(celda.textContent).toBe('$10.00');
     expect(document.body).not.toHaveTextContent('99.00');
     expect(document.body).not.toHaveTextContent('77.00');
+  });
+
+  it('R22: el precio es el total del pedido y avisa de «N sin precio»', () => {
+    pintarCelda(
+      SALE_PRICE_COLUMN_ID,
+      pedidoDeDosRecetas(undefined, { salePriceTotal: '120.5000', linesWithoutPrice: 1 }),
+    );
+
+    expect(screen.getByTestId(SALE_PRICE_TESTID).textContent).toBe('$120.50');
+    expect(screen.getByTestId(ORDER_ROW_WITHOUT_PRICE_TESTID)).toHaveTextContent('1 sin precio');
+  });
+
+  it('R22: sin recetas sin precio no hay aviso', () => {
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedidoDeDosRecetas(undefined, { salePriceTotal: '10.0000', linesWithoutPrice: 0 }));
+
+    expect(screen.queryByTestId(ORDER_ROW_WITHOUT_PRICE_TESTID)).toBeNull();
+  });
+
+  it('R22: con el total «sin precio» pinta el marcador de ausencia y el aviso', () => {
+    pintarCelda(SALE_PRICE_COLUMN_ID, pedidoDeDosRecetas(undefined, { salePriceTotal: null, linesWithoutPrice: 2 }));
+
+    expect(screen.queryByTestId(SALE_PRICE_TESTID)).toBeNull();
+    expect(screen.getByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`)).toHaveTextContent(MISSING_VALUE_MARK);
+    expect(screen.getByTestId(ORDER_ROW_WITHOUT_PRICE_TESTID)).toHaveTextContent('2 sin precio');
   });
 
   it('QC-307 R20: no declara `sortable` ni `filter`', () => {
@@ -930,92 +966,18 @@ describe('la columna «Cliente»', () => {
     expect(columna?.filter).toBeUndefined();
   });
 
-  it('R30: va justo detras de «Receta»', () => {
+  it('R30, R21: va justo detras de «Avance»', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
 
-    expect(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID)).toBe(ids.indexOf(RECIPE_NAME_COLUMN_ID) + 1);
-  });
-});
-
-// 2026-10-13 — la celda de «Presentación» enlaza a la ficha del producto terminado en los pedidos
-// producidos. Los casos de arriba, sin mapa, siguen afirmando el reparto de siempre.
-describe('la columna «Presentación» enlaza al producto terminado del pedido producido', () => {
-  const PEDIDO_ID = '11111111-1111-4111-8111-111111111111';
-  const PRESENTACION_ID = 'p-1';
-  const PRODUCTO_ID = '33333333-3333-4333-8333-333333333333';
-  const LINEAS = [
-    { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
-  ];
-
-  function pintarPresentacionConMapa(order: OrderSummary) {
-    const columnas = buildOrderColumns({
-      units: [],
-      bridge: null,
-      producedProductsByOrder: { [PEDIDO_ID]: { [PRESENTACION_ID]: PRODUCTO_ID } },
-    });
-    const columna = columnas.find((candidate) => candidate.id === PRESENTATION_NAME_COLUMN_ID);
-    if (columna === undefined) throw new Error('No existe la columna de presentación');
-    return render(<>{columna.cell(order)}</>);
-  }
-
-  it.each(['TERMINADO', 'ENTREGADO'] as const)(
-    'R27: un pedido %s con mapa enlaza la presentación a la ficha de su producto',
-    (status) => {
-      pintarPresentacionConMapa(pedido({ id: PEDIDO_ID, status, presentationLines: LINEAS }));
-
-      const enlace = screen.getByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID);
-      expect(enlace).toHaveAttribute('href', finishedProductDetailRoute(PRODUCTO_ID));
-      expect(enlace).toHaveTextContent('2 × Bidón 20L');
-    },
-  );
-
-  it.each(['EN_EMPAQUE', 'CANCELADO'] as const)(
-    'R28: un pedido %s con mapa pinta el reparto de siempre, sin enlace',
-    (status) => {
-      const { container } = pintarPresentacionConMapa(
-        pedido({ id: PEDIDO_ID, status, presentationLines: LINEAS }),
-      );
-
-      expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
-      expect(screen.queryByTestId(ORDER_PRODUCED_PRESENTATIONS_TESTID)).toBeNull();
-      expect(container.textContent).toBe('2 × Bidón 20L');
-    },
-  );
-
-  it.each(['TERMINADO', 'ENTREGADO'] as const)(
-    'R28: un pedido %s sin mapa pinta el reparto de siempre, sin enlace',
-    (status) => {
-      const { container } = pintarCelda(
-        PRESENTATION_NAME_COLUMN_ID,
-        pedido({ id: PEDIDO_ID, status, presentationLines: LINEAS }),
-      );
-
-      expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
-      expect(screen.queryByTestId(ORDER_PRODUCED_PRESENTATIONS_TESTID)).toBeNull();
-      expect(container.textContent).toBe('2 × Bidón 20L');
-    },
-  );
-
-  it('R28: un pedido TERMINADO cuyo id no está en el mapa pinta el reparto de siempre', () => {
-    const { container } = pintarPresentacionConMapa(
-      pedido({
-        id: '44444444-4444-4444-8444-444444444444',
-        status: 'TERMINADO',
-        presentationLines: LINEAS,
-      }),
-    );
-
-    expect(screen.queryByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toBeNull();
-    expect(container.textContent).toBe('2 × Bidón 20L');
+    expect(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID)).toBe(ids.indexOf(PROGRESS_COLUMN_ID) + 1);
   });
 });
 
 describe('la columna «Por entregar», traida del dashboard', () => {
-  // 2026-10-22: pasa delante de «Presentación», justo despues de «Cliente» (decision humana).
-  it('va despues de Cliente, antes de Presentación, y no ordena ni filtra', () => {
+  it('va despues de Cliente, antes de la fecha de solicitud, y no ordena ni filtra', () => {
     const ids = ORDER_COLUMNS.map((column) => column.id);
     expect(ids.indexOf(PENDING_DELIVERY_COLUMN_ID)).toBe(ids.indexOf(ORDER_CUSTOMER_NAME_COLUMN_ID) + 1);
-    expect(ids.indexOf(PRESENTATION_NAME_COLUMN_ID)).toBe(ids.indexOf(PENDING_DELIVERY_COLUMN_ID) + 1);
+    expect(ids.indexOf(CREATED_AT_COLUMN_ID)).toBe(ids.indexOf(PENDING_DELIVERY_COLUMN_ID) + 1);
 
     const columna = ORDER_COLUMNS.find((column) => column.id === PENDING_DELIVERY_COLUMN_ID);
     expect(columna?.sortable).not.toBe(true);

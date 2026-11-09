@@ -47,6 +47,7 @@ import {
 } from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaB, lineaPedido } from '../../helpers/order-form-ui';
 
 const {
   routerMock,
@@ -866,7 +867,7 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
       id: '55555555-5555-4555-8555-555555555555',
       permissions: ['pedidos.consultar', 'pedidos.modificar'],
     });
-    listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
+    listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR', lines: [lineaPedido({ status: 'POR_EMPACAR' })] })]));
 
     render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
@@ -881,12 +882,45 @@ describe('la accion «Reparto y unidad» la decide el permiso de la sesion', () 
       id: '55555555-5555-4555-8555-555555555555',
       permissions: ['pedidos.consultar', 'empaque.modificar'],
     });
-    listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
+    listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR', lines: [lineaPedido({ status: 'POR_EMPACAR' })] })]));
 
     render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 
     expect(screen.getByTestId(testId.lista)).toBeInTheDocument();
     fireEvent.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
+    expect(screen.queryByTestId(ACCION)).toBeNull();
+  });
+});
+
+describe('la accion «Cancelar receta…» la decide el permiso de la sesion', () => {
+  const ACCION = 'order-action-cancel-line';
+  const PARCIAL = () =>
+    pedido({ status: 'PARCIAL', lines: [lineaPedido({ status: 'TERMINADO' }), lineaB({ status: 'PENDIENTE' })] });
+
+  it('R26, R42: con pedidos.modificar, un pedido con una receta cancelable la ofrece', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar', 'pedidos.modificar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([PARCIAL()]));
+
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    fireEvent.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
+    expect(await screen.findByTestId(ACCION)).toBeInTheDocument();
+  });
+
+  it('R26, R42: sin pedidos.modificar no la ofrece', async () => {
+    getSessionUserMock.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+      permissions: ['pedidos.consultar'],
+    });
+    listOrdersActionMock.mockResolvedValue(pagina([PARCIAL()]));
+
+    render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
+
+    fireEvent.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
+    await screen.findByTestId('order-action-edit');
     expect(screen.queryByTestId(ACCION)).toBeNull();
   });
 });
@@ -983,7 +1017,7 @@ describe('el filtro «Cliente» de la barra', () => {
       cleanup();
       vi.clearAllMocks();
       getSessionUserMock.mockResolvedValue({ id: '55555555-5555-4555-8555-555555555555', permissions: [...permisos] });
-      listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR' })]));
+      listOrdersActionMock.mockResolvedValue(pagina([pedido({ status: 'POR_EMPACAR', lines: [lineaPedido({ status: 'POR_EMPACAR' })] })]));
 
       render(await OrderListSection({ params: parametros(), recipes: RECIPES_VACIAS, units: UNITS_VACIAS, bridge: null }));
 

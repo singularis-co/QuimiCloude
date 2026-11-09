@@ -14,6 +14,10 @@ import {
   CANCEL_ORDER_ID_TESTID,
   MISSING_VALUE_MARK,
   ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_PROGRESS_TESTID,
+  ORDER_RECIPES_FIRST_TESTID,
+  ORDER_RECIPES_MORE_TESTID,
+  ORDER_ROW_WITHOUT_PRICE_TESTID,
   ORDER_CUSTOMER_DIALOG_TESTID,
   ORDER_LIST_NO_MATCHES_TESTID,
   ORDER_NO_MATCHES_MESSAGE,
@@ -34,6 +38,7 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaB, lineaPedido, pedidoDeDosRecetas, RECETA_A } from '../../helpers/order-form-ui';
 
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
@@ -91,6 +96,8 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
+    lines: [lineaPedido({ recipeName: `Receta ${sequence}` })],
+    progress: { total: 1, finished: 0 },
     id,
     number: { year: 2026, sequence },
     numberText: formatOrderNumber({ year: 2026, sequence }),
@@ -237,7 +244,7 @@ describe('cada pedido en su tarjeta', () => {
     expect(ORDER_TABLE_TEXTS.closeMenu).toBe('Cerrar');
   });
 
-  it('R15: la tarjeta no repite columnas que no nombra (cobertura, responsables, presentacion, motivo)', () => {
+  it('R15, R23: la tarjeta no repite columnas que no nombra (cobertura, responsables, presentacion, motivo)', () => {
     montar();
     const card = tarjeta(CON_CLIENTE);
 
@@ -345,7 +352,7 @@ describe('los estados de la lista no cambian con las tarjetas', () => {
 // con la MISMA celda que la tabla: rotulo de tarjeta delante, importe con `formatMoneyDisplay` y el
 // exacto en `title` si se redondea, o el guion «Sin dato».
 describe('R19: los costes en la tarjeta de telefono', () => {
-  const CON_COSTES = pedido('o3', 9, { ingredientsCost: '120.0000', actualCost: '12752.5512' });
+  const CON_COSTES = pedido('o3', 9, { ingredientsCostTotal: '120.0000', actualCostTotal: '12752.5512' });
 
   it('R19: con valor, «Costo estimado» y «Costo real» con su importe, en ese orden, tras la fecha', () => {
     montar({ orders: [CON_COSTES] });
@@ -403,7 +410,7 @@ describe('R19: los costes en la tarjeta de telefono', () => {
 });
 
 describe('el precio de venta en la tarjeta de telefono', () => {
-  const CON_PRECIO = pedido('o4', 10, { salePrice: '1250.5000', ingredientsCost: '120.0000' });
+  const CON_PRECIO = pedido('o4', 10, { salePriceTotal: '1250.5000', ingredientsCostTotal: '120.0000' });
 
   it('QC-307 R19: la tarjeta pinta «Precio de venta» con su rotulo y su importe, antes del costo estimado', () => {
     montar({ orders: [CON_PRECIO] });
@@ -425,5 +432,66 @@ describe('el precio de venta en la tarjeta de telefono', () => {
     const guion = within(celda).getByTestId(`order-missing-${SALE_PRICE_COLUMN_ID}`);
     expect(guion).toHaveTextContent(MISSING_VALUE_MARK);
     expect(guion).toHaveAccessibleName('Sin dato');
+  });
+});
+
+describe('la tarjeta de un pedido con varias recetas', () => {
+  const VARIAS = pedidoDeDosRecetas(
+    [
+      lineaPedido(),
+      lineaB(),
+      lineaB({ id: '50000000-0000-4000-8000-00000000000c', position: 2, status: 'TERMINADO' }),
+    ],
+    {
+      id: 'o9',
+      progress: { total: 3, finished: 1 },
+      salePriceTotal: '120.5000',
+      linesWithoutPrice: 2,
+    },
+  );
+
+  it('R44: el título es la primera receta con «+N más»', () => {
+    montar({ orders: [VARIAS] });
+    const titulo = campo(tarjeta(VARIAS), 'recipeName');
+
+    expect(within(titulo).getByTestId(ORDER_RECIPES_FIRST_TESTID)).toHaveTextContent(RECETA_A.name);
+    expect(within(titulo).getByTestId(ORDER_RECIPES_MORE_TESTID)).toHaveTextContent('+2 más');
+    expect(titulo).not.toHaveTextContent('PLANO NO USAR');
+  });
+
+  it('R44, R21: lleva la barra de avance «F de T» antes del cliente', () => {
+    montar({ orders: [VARIAS] });
+    const card = tarjeta(VARIAS);
+
+    const avance = within(campo(card, 'progress')).getByTestId(ORDER_PROGRESS_TESTID);
+    expect(avance).toHaveAttribute('data-finished', '1');
+    expect(avance).toHaveAttribute('data-total', '3');
+    expect(
+      campo(card, 'progress').compareDocumentPosition(campo(card, 'customer')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('R22: el precio de la tarjeta es el total y avisa de «N sin precio»', () => {
+    montar({ orders: [VARIAS] });
+    const precio = campo(tarjeta(VARIAS), SALE_PRICE_COLUMN_ID);
+
+    expect(within(precio).getByTestId(SALE_PRICE_TESTID).textContent).toBe('$120.50');
+    expect(within(precio).getByTestId(ORDER_ROW_WITHOUT_PRICE_TESTID)).toHaveTextContent('2 sin precio');
+  });
+
+  it('R44: el número de la tarjeta abre el detalle del pedido', async () => {
+    const user = setupUser();
+    montar({ orders: [VARIAS] });
+
+    await user.click(
+      within(campo(tarjeta(VARIAS), 'orderNumber')).getByRole('button', {
+        name: `Ver detalle del pedido ${VARIAS.numberText}`,
+      }),
+    );
+
+    expect(await screen.findByRole('dialog', { name: `Pedido ${VARIAS.numberText}` })).toHaveAttribute(
+      'data-order-id',
+      VARIAS.id,
+    );
   });
 });

@@ -49,7 +49,17 @@ Rama `feature/QT-314-pedido-con-varias-recetas-frontend`. Spec aprobado en F1.4 
 
 ## Bloqueos
 
-Ninguno.
+- **Tanda 3 / T15 / R44 — «Ver detalle» en el pie de la tarjeta de teléfono (ABIERTO, decide el leader/humano).**
+  R44 pide en la tarjeta los botones «Ver detalle» y «Acciones», y design § 2 (catálogo) dice
+  «`DataTable` … `card.footer` para "Ver detalle" y "Acciones"». Pero `DataTableCardLayout.footer`
+  (`components/shared/data-table/data-table-cards.tsx`) pinta **una sola columna** de la tabla, y
+  `DataTable` no admite columnas solo de tarjeta. Cumplirlo exige (a) una columna nueva que saldría
+  también en escritorio (el tablero no la tiene), o (b) ampliar `DataTable` (componente compartido,
+  fila del `CATALOGO.md`), que el design no lista entre las piezas a ampliar. No se improvisó:
+  el pie queda como estaba (prioridad + «Acciones»); en teléfono el detalle se abre tocando el
+  número de pedido o con «Ver detalle» dentro de «Acciones». Opciones: ampliar `DataTable`
+  (enmienda del design) o aceptar el número como entrada al detalle (enmienda de R44).
+  El resto de T15 cumple su «Hecho».
 
 ## Tanda 2 — piezas nuevas sin cablear (frontend_dev) — HECHA
 
@@ -391,3 +401,138 @@ Tests de QT-313 retirados o reescritos: ninguno de los de QT-313 R44 o R54 estab
 - no se portaron los de la tabla de ingredientes con stock (restante, faltante, sin unidad), que ya cubre `order-ingredients-table.test.tsx` montando la tabla sola.
 
 Veredicto: T14 hecha. Sus tests y los adaptados, en verde. Quedan en rojo `order-sheet.test.tsx` (T15) y los dos errores de tipos de T16.
+
+### T15 (frontend_dev)
+
+Listado, menú en tres grupos y cableado del detalle, el selector y «Cancelar receta…». Sin commit propio: lo hace el implementer.
+
+Archivos:
+- producción (`app/(private)/pedidos/components/`):
+  - `order-row-actions.tsx`: reescrito. Tres grupos con `groupLabel` («Por receta», «Pedido entero»); «Ver detalle» nuevo; «Editar» con `canEditOrder`; acciones de receta con `orderOffersLineAction` y su permiso (`canCancelLine` nuevo); «Cancelar pedido» con `canCancelOrder`; «Eliminar» con `canDeleteOrder`. Fuera `isFinalOrderStatus`, `acceptsDistributionEdit`, `acceptsDelivery` y los mapas `ORDER_STATUS_IS_FINAL`, `ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT`, `ORDER_STATUS_ACCEPTS_DELIVERY` y `ORDER_STATUS_HAS_DELIVERIES`. Se queda `ORDER_STATUS_ACCEPTS_CUSTOMER_CHANGE`, como pide design § 4.6. `OrderRowActions` pierde los `on<Acción>` sueltos: solo `onAction`, que es lo que ya usaba la tabla.
+  - `order-columns.tsx`: «Fórmula» desde `lines[0]` con «+N más»; columna nueva «Avance» (`OrderProgress` corto) tras «Fórmula»; fuera «Presentación»; precio, coste estimado y coste real desde `salePriceTotal` (con «N sin precio»), `ingredientsCostTotal` y `actualCostTotal`; el número de pedido es un botón que emite `detail`; `canCancelLine` llega al menú. «Motivo de cancelación» se queda (P3).
+  - `order-table.tsx`: la tarjeta añade «Avance» a los datos secundarios; pasa `canCancelLine`, `onAction` (para «Editar» desde el detalle) y `producedProducts` del pedido a `OrderRowSheetActions`.
+  - `order-sheet.tsx` (`OrderRowSheetActions`): `detail` monta `OrderDetailSheet`; las cuatro acciones de receta abren antes `OrderLinePickerDialog`; elegida la receta, su diálogo; `cancelLine` monta `CancelOrderLineDialog` con la receta elegida.
+  - `order-list-section.tsx`: `canCancelLine={canModifyOrders}` (1 línea).
+  - `order-responsibles-sheet.tsx` (de T16, lo mínimo): `isFinal={responsiblesFrozen(order)}` en vez de `isFinalOrderStatus(order.status)`. `distributionLabelLine` se queda donde está.
+  - `index.ts`: solo reexportaciones (fuera las tres funciones retiradas y `PRESENTATION_NAME_COLUMN_ID`).
+- tests reescritos o adaptados:
+  - `tests/unit/pedidos-ui/order-row-actions.test.tsx`: reescrito entero a R9, R18, R25, R26, R36, R37, R38.
+  - `tests/unit/pedidos-ui/order-columns.test.tsx`: fuera los bloques de «Presentación»; nuevos «Fórmula», «Avance», R23, R24, totales y R39.
+  - `tests/unit/pedidos-ui/order-row-wiring.test.tsx`: las acciones de receta pasan por el selector; bloque nuevo de detalle, «Cancelar receta…» y permisos.
+  - `tests/unit/pedidos-ui/order-sheet.test.tsx`: el alta pasa por el sub-panel (`anadirReceta` de `tests/helpers/order-form-ui.ts`); el error lleva `linePositions` (arregla el error de tipos de la línea 557); la edición mira la tabla de recetas y el sub-panel.
+  - `tests/unit/pedidos-ui/order-cards.test.tsx`, `order-table.test.tsx`, `order-list-section.test.tsx`, `order-list-section-produced.test.tsx`: los pedidos traen recetas; totales en vez de campos planos; R23 en la cabecera; los enlaces al producto terminado se miran en el detalle; bloques nuevos de R44 y R26.
+  - `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`: el pedido trae una receta PENDIENTE (si no, «Cancelar pedido» sale deshabilitado).
+  - `tests/unit/paridad/pedidos-paridad.test.tsx` y su `.snap`: el pedido trae una receta; se regenera solo el snapshot «con filas» (columna «Avance», sin «Presentación», número como botón). Los otros seis no cambian.
+  - `tests/guards/guard-pantalla-pedidos-se-amplia.test.ts`: sale el ancla `isFinalOrderStatus` de `order-row-actions.tsx`, con comentario.
+  - De T16, solo lo que rompía el cambio del menú: `order-distribution-dialog.test.tsx` (6 casos de la fila) y `order-delivery-sheet.test.tsx` (2 casos de la fila). El pedido trae una receta en el estado que admite la acción y se elige en el selector. No se toca nada de lo que prueban los diálogos.
+
+Mapa `R<n> -> test`:
+- R9:
+  - `order-row-actions.test.tsx` > «R9: «Editar» habilitado en todo estado salvo ENTREGADO y CANCELADO, PARCIAL incluido», «R9: en PARCIAL, pulsar «Editar» emite la edición», «R9: en %s «Editar» sale deshabilitado y pulsarlo no emite» (ENTREGADO, CANCELADO)
+  - `order-row-wiring.test.tsx` > «R9, R18: «Editar» del detalle cambia al panel de edición del mismo pedido»
+- R18:
+  - `order-row-actions.test.tsx` > «R18: «Ver detalle» es la primera, está siempre habilitada y emite `detail` con el pedido»
+  - `order-columns.test.tsx` > «R18: el número es un botón con nombre accesible que abre el detalle del pedido de la fila»
+  - `order-row-wiring.test.tsx` > «R18: «Ver detalle» abre el detalle de solo lectura del pedido elegido», «R18: el número de pedido de la fila abre el mismo detalle»
+- R20: `order-columns.test.tsx` > «QC-307 R19, R20, R21, R23: los quince ids, en el orden acordado…», «R20: se rotula «Fórmula»», «R20: con dos recetas pinta la primera y «+1 más»», «R20: N es el número de recetas del pedido menos una, canceladas incluidas», «R20: con una sola receta no hay «+N más»», «R20: la columna «Motivo de cancelación» sigue en el listado»
+- R21:
+  - `order-columns.test.tsx` > «R21: va justo detrás de «Fórmula», se rotula «Avance» y no ordena ni filtra», «R21: pinta «F de T» con su barra…»
+  - `order-cards.test.tsx` > «R44, R21: lleva la barra de avance «F de T» antes del cliente»
+- R22:
+  - `order-columns.test.tsx` > «R22: los dos costes son los totales del pedido…», «R22: un total «sin coste» pinta el marcador de ausencia», «R22: el precio es el total del pedido y avisa de «N sin precio»», «R22: sin recetas sin precio no hay aviso», «R22: con el total «sin precio» pinta el marcador de ausencia y el aviso»
+  - `order-cards.test.tsx` > «R22: el precio de la tarjeta es el total y avisa de «N sin precio»»
+- R23:
+  - `order-columns.test.tsx` > «R23: ningún id ni rótulo de presentación, y ninguna celda pinta el reparto»
+  - `order-table.test.tsx` > «R23: ninguna cabecera dice «Cantidad» ni «Presentación», y «Por entregar» sigue»
+  - `order-cards.test.tsx` > «R15, R23: la tarjeta no repite columnas que no nombra…»
+- R24:
+  - `order-columns.test.tsx` > «R24: el nombre sale de la primera receta y no del campo plano del pedido», «R24: con la primera receta distinta del pedido plano, ninguna celda pinta el dato plano»
+  - `order-cards.test.tsx` > «R44: el título es la primera receta con «+N más»» (afirma que no sale el plano)
+- R25: `order-row-actions.test.tsx` > los ocho «R25: …» (orden de los tres grupos, rótulos y líneas, rótulo en la única acción de receta, sin rótulo «Por receta» si no hay ninguna, textos del tablero, grupos con nombre en el desplegable, grupos en el diálogo centrado, orden con cualquier estado y permiso, destructivas y testids)
+- R26:
+  - `order-row-actions.test.tsx` > «R26: «%s» se pinta con su permiso solo si alguna receta del pedido la admite, y nunca deshabilitada» (×4), «R26: «%s» no se pinta sin su permiso, aunque alguna receta la admita» (×3), «R26: «Entregas…» no pide permiso propio», «R26: un PARCIAL con una receta TERMINADO y otra PENDIENTE…», «R26: sin ningún permiso, un PARCIAL solo ofrece «Entregas…»…», «R26: cada acción de receta emite su clase con el pedido de la fila»
+  - `order-columns.test.tsx` > «R26: con `canCancelLine` el menu ofrece «Cancelar receta…» si alguna receta es cancelable»
+  - `order-list-section.test.tsx` > «R26, R42: con pedidos.modificar, un pedido con una receta cancelable la ofrece», «R26, R42: sin pedidos.modificar no la ofrece»
+  - `order-row-wiring.test.tsx` > «R26, R27, R28: «Cancelar receta…» abre el selector y, elegida la receta, su diálogo con el pedido y la receta», «R26: sin el permiso, la fila no ofrece «Cancelar receta…»»
+- R27: `order-row-wiring.test.tsx` > «R13, R27: %s abre el selector y, elegida la receta, %s para su pedido, y solo ese» (reparto, entregar, entregas), «R27: una receta que no admite la acción no se puede elegir y el selector sigue abierto»
+- R36 (habilitación en el menú): `order-row-actions.test.tsx` > «R36: «Cancelar pedido» se pinta siempre y se habilita solo si alguna receta es cancelable», «R36: con todas las recetas sin cancelar posible, pulsar «Cancelar pedido» no emite»
+- R37 (habilitación en el menú): `order-row-actions.test.tsx` > «R37: «Eliminar» se pinta siempre y se habilita si el pedido y todas sus recetas se pueden borrar»
+- R38 (menú): `order-row-actions.test.tsx` > «R38: «Responsables» está habilitado en todos los estados, PARCIAL incluido», «R38: en PARCIAL «Cliente» está habilitado y emite el cambio de cliente». El panel de responsables en PARCIAL es de T16.
+- R39: `order-columns.test.tsx` > «R39: un pedido PARCIAL se pinta «Parcial» con el tono `progress`»
+- R42: `order-list-section.test.tsx` > los dos «R26, R42: …»
+- R44: `order-cards.test.tsx` > «R44: el título es la primera receta con «+N más»», «R44, R21: lleva la barra de avance…», «R44: el número de la tarjeta abre el detalle del pedido»
+- R45: sin test nuevo. El desplazamiento horizontal de la tabla lo da `DataTable` y no cambia: `pedidos-viewport.test.tsx` sigue en verde (20).
+
+Tests de QT-313 R54 (todos en `order-row-actions.test.tsx`):
+- «R54: editar, cancelar y eliminar deshabilitados, sin reparto, entrega ni entregas, con «Responsables» y «Cliente» disponibles» -> reescrito a R9 («Editar» habilitado en PARCIAL y emite), R26 (el PARCIAL con una receta TERMINADO y otra PENDIENTE ofrece entregar, entregas y cancelar receta), R36 («Cancelar pedido» en PARCIAL según sus recetas) y R38 («Responsables» y «Cliente» en PARCIAL).
+- «R54: PARCIAL es final y no acepta la edicion acotada de reparto» -> retirado: los dos predicados ya no existen. Lo sustituye R26 («Reparto y unidad…» si alguna receta está POR_EMPACAR, también en PARCIAL).
+- Retirados también, porque probaban los mapas por estado del pedido que T15 borra:
+  - el bloque «el predicado de estado final es UNO solo»;
+  - «los estados de acondicionamiento son finales…»;
+  - las tablas «orderRowActionsSpec: reglas por estado y permiso (R12)» y «orden, separador y destructivos (R11)».
+  - Los sustituyen los bloques R25 y R26, que miran el estado de las recetas.
+- Se conservan (adaptados): disparador de 44 px, sin `:hover`, id como dato, ningún ítem repite el número, «Cliente» cerrado en ENTREGADO y CANCELADO, título y emisión de la especificación.
+
+Verificación (salida real, `pnpm exec vitest run <archivo>` uno a uno):
+- De T15:
+
+  | Archivo | Pasados |
+  |---|---|
+  | `order-row-actions` | 37 |
+  | `order-columns` | 88 |
+  | `order-row-wiring` | 23 |
+  | `order-sheet` | 12 |
+  | `order-cards` | 24 |
+  | `order-table` | 27 |
+  | `order-list-section` | 43 |
+  | `order-list-section-produced` | 3 |
+
+- Adaptados:
+
+  | Archivo | Resultado |
+  |---|---|
+  | `shared-ui/confirm-dialog-montado` | 29 passed |
+  | `paridad/pedidos-paridad` | 7 passed (1 snapshot actualizado) |
+  | `guard-pantalla-pedidos-se-amplia` | 8 passed, 2 skipped |
+  | `order-distribution-dialog` | 29 passed |
+  | `order-delivery-sheet` | 42 passed |
+
+- Sin tocar, en verde: `read-only` 45, `a11y-tactil` 5, `pedidos-viewport` 20, `order-sheet-coverage` 5, `order-sheet-responsibles` 11, `order-list-skeleton` 4, `pedidos-convenciones` 20 (3 skipped), `order-route-contract` 23, `marca/tablas-marca` 21, `identity/session-once-per-request-render` 13, `recetas/module-contract` 5, `recetas/scope` 5, `navegacion/pantallas-exigen-permiso` 46, `pedidos-page-header` 3, `order-customer-dialog` 9, `identity/qc78-alcance` 12 (4 skipped), `order-detail-sheet` 9, `order-line-picker-dialog` 9, `cancel-order-line-dialog` 6, `order-responsibles` 13, `order-line-actions` 20, `pedidos-toasts` 26, `cancel-order-dialog` 9, `delete-order-dialog` 9, `order-deliveries-sheet` 11, `order-delivery-list` 24, `assign` 11, `delivery-void-dialog` 20, `guard-pedidos-rediseno` 2.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87) · Tests 1333 passed | 22 skipped (1355)`.
+- `pnpm run typecheck`: sin errores en archivos de T15. `order-sheet.test.tsx(557)` ya no falla. Quedan solo:
+  - `order-deliveries-sheet.tsx(39)` y `order-delivery-sheet.tsx(128)`: de T16;
+  - `app/layout.tsx(45) LayoutProps`: ajeno.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos en archivos ajenos.
+- No se corrió `vitest related` ni la suite completa.
+- Grep de `isFinalOrderStatus|ORDER_STATUS_IS_FINAL|ORDER_STATUS_ACCEPTS_DISTRIBUTION_EDIT|ORDER_STATUS_ACCEPTS_DELIVERY|ORDER_STATUS_HAS_DELIVERIES|acceptsDistributionEdit|acceptsDelivery` en `app/ lib/ components/ tests/`:
+  - un comentario viejo en `order-responsibles.tsx:191`, que no es de T15 y no se toca;
+  - el comentario nuevo de la guardia.
+
+Decisiones nuevas (dentro del spec):
+1. **El permiso de «Cancelar receta…» llega como `canCancelLine`**, igual que `canEditDistribution` y `canEditCustomer`. La sección le pasa `canModifyOrders` y no hace ninguna lectura de sesión más.
+2. **«N sin precio» va dentro de la celda del precio**:
+   - en la tabla, debajo del importe; en la tarjeta, al lado;
+   - si el total no existe, salen el marcador de ausencia y el aviso;
+   - testid `order-row-without-price`: `order-lines-without-price` ya lo usa la tabla de recetas del panel.
+3. **El selector va dentro de `OrderRowSheetActions`.**
+   - La receta elegida vale para esa apertura y esa acción.
+   - Al elegirla, el selector se sustituye por el diálogo de la acción, que hereda la apertura.
+   - Cerrar el selector sin elegir cierra la acción.
+4. **«Editar» desde el detalle llama a `onAction('edit')`** de la tabla, que cambia la acción activa sin cerrar. El detalle sale y entra el panel del mismo pedido.
+5. **El reparto con enlaces al producto terminado** vive ahora en el detalle. La tabla le pasa `producedProductsByOrder[order.id]`, y el detalle filtra por el estado de cada receta, como hace T11.
+6. **`OrderRowActions` solo emite `onAction`.** Los `onEdit`/`onCancel`/… sueltos no tenían más consumidor que los tests.
+
+Para T16:
+- `OrderRowSheetActions` ya resuelve la receta elegida (`pickedLine: OrderLineView`), pero a `OrderDistributionDialog`, `OrderDeliverySheet` y `OrderDeliveriesSheet` todavía les pasa solo `order`, porque hoy no aceptan `line`.
+- Cuando T16 les añada la prop `line` (design § 4.7), hay que pasarles `line={pickedLine}` en las tres ramas de `order-sheet.tsx`. Sus ramas ya solo se montan con una receta elegida.
+- `order-responsibles-sheet.tsx` ya usa `responsiblesFrozen(order)`. Su rediseño (R38) y sus campos planos siguen siendo de T16.
+
+Pendiente de decisión (no improvisado):
+- **R44, pie de la tarjeta con «Ver detalle» y «Acciones».** `DataTableCardLayout.footer` pinta la celda de una columna de la tabla. Un botón «Ver detalle» ahí necesitaría:
+  - o una columna nueva, que también saldría en la tabla de escritorio y el tablero no la tiene;
+  - o extender `DataTable` con contenido solo de tarjeta, que design § «Componentes nuevos o con cambio» no lista (solo extiende `RowActionsMenu` y `Notice`).
+- Se deja el pie como hoy (prioridad + «Acciones»).
+- En el teléfono el detalle se abre igual: desde el número de la tarjeta, que es un botón (test R44), y desde «Ver detalle» en «Acciones».
+- Hace falta que el humano elija: extender `DataTable` (paso 2, con su fila de catálogo) o aceptar el número como entrada al detalle.
+
+Veredicto: T15 hecha. Sus tests y los adaptados, en verde. Typecheck limpio en los archivos de T15. Queda abierto el pie de la tarjeta (R44).

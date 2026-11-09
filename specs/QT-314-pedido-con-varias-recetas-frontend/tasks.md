@@ -143,7 +143,7 @@
       «Guardar pedido» sin regla de «sin cambios» (R50).
     - Se reescriben `order-form*.test.tsx`.
   - **Cubre:** R1–R8, R10–R14, R17, R44, R46, R50.
-- [ ] **T15** · frontend_dev · depende de T6, T8, T10, T11, T12, T13 — Listado, menú y cableado
+- [x] **T15** · frontend_dev · depende de T6, T8, T10, T11, T12, T13 — Listado, menú y cableado
   (design § 4.5, § 4.6):
   - `order-columns.tsx`, `order-table.tsx` (tarjeta), `order-row-actions.tsx` (tres grupos y
     habilitaciones), `order-sheet.tsx` (detalle, selector y acciones de receta) y

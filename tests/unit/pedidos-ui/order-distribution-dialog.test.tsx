@@ -17,6 +17,8 @@ import {
   ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
   ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
   ORDER_DISTRIBUTION_WARNING_TESTID,
+  ORDER_LINE_PICKER_DIALOG_TESTID,
+  ORDER_LINE_PICKER_OPTION_TESTID,
   OrderDistributionDialog,
   OrderRowActions,
   OrderTable,
@@ -33,6 +35,7 @@ import type { UnitView } from '@/lib/modules/unidades';
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 const { updateDistributionMock, quoteAvailabilityMock, routerMock } = vi.hoisted(() => ({
   updateDistributionMock:
@@ -106,9 +109,12 @@ const UNIDADES: readonly UnitView[] = [
   { id: UNIDAD_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
 ];
 
+// La fila ofrece «Reparto y unidad…» si alguna receta está POR_EMPACAR: la del pedido va en su
+// mismo estado (en PARCIAL, una TERMINADO).
 function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
+    lines: [lineaPedido({ status: status === 'PARCIAL' ? 'TERMINADO' : status })],
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
@@ -148,6 +154,13 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
 }
 
 const cerrar = vi.fn<(open: boolean) => void>();
+
+/** Desde la fila, «Reparto y unidad…» pasa por el selector de receta. */
+async function elegirLaReceta(user: ReturnType<typeof setupUser>) {
+  const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+  const [opcion] = within(selector).getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID);
+  await user.click(opcion as HTMLElement);
+}
 
 function montarDialogo(order: OrderSummary = pedido()) {
   render(<OrderDistributionDialog order={order} units={UNIDADES} open onOpenChange={cerrar} />);
@@ -227,6 +240,7 @@ describe('accion de fila «Reparto y unidad»', () => {
 
     await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
   });
@@ -389,6 +403,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
   async function guardarEnvases(user: ReturnType<typeof setupUser>, envases: string) {
     await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await elegirLaReceta(user);
     const campo = await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
     await user.clear(campo);
     await user.type(campo, envases);
@@ -406,6 +421,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     await guardarEnvases(user, '5');
     await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(5);
   });
@@ -417,6 +433,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     await guardarEnvases(user, '5');
     await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await elegirLaReceta(user);
     await user.click(await screen.findByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
 
     await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
@@ -450,6 +467,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     );
     await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(7);
   });

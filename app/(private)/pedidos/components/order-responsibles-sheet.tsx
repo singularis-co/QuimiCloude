@@ -26,7 +26,7 @@ import {
   OrderResponsibles,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
-import { isFinalOrderStatus } from './order-row-actions';
+import { responsiblesFrozen } from './order-line-actions';
 import { OrderPriorityBadge, OrderStatusBadge } from './order-status-badge';
 
 export const ORDER_RESPONSIBLES_SHEET_TESTID = 'order-responsibles-sheet';
@@ -166,7 +166,7 @@ export function OrderResponsiblesSheet({
               orderId={order.id}
               responsibles={responsibles}
               canWrite={responsiblesCatalog.canWrite}
-              isFinal={isFinalOrderStatus(order.status)}
+              isFinal={responsiblesFrozen(order)}
               people={responsiblesCatalog.people}
               workGroups={responsiblesCatalog.workGroups}
             />
