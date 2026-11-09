@@ -66,6 +66,13 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  ORDER_FORM_LINES_ERROR_TESTID,
+  ORDER_FORM_SAVE_BLOCKED_TESTID,
+} from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
@@ -212,26 +219,27 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.goto(ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId('order-create-open').first().click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+  // QT-314: la receta se escribe en su sub-panel, abierto con «Añadir receta» desde el panel.
+  const form = await openCreateOrderPanel(page);
+  const sheet = await openAddOrderLine(page, form);
 
-  const recipePicker = page.getByTestId('recipe-picker');
+  const recipePicker = sheet.getByTestId('recipe-picker');
   await recipePicker.click();
   await recipePicker.fill(RECIPE_NAME);
   const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: RECIPE_NAME });
   await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
   await recipeOption.click();
-  await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
+  await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  await page.getByTestId('order-field-quantity').fill(quantity);
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await sheet.getByTestId('order-field-quantity').fill(quantity);
+  await sheet.getByTestId('presentation-unit-select').click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
   // Toda la cantidad en una sola linea: con contenido 1, un envase por unidad del pedido.
-  const distribution = page.getByTestId('order-distribution-field');
+  const distribution = sheet.getByTestId('order-distribution-field');
   await addPackagingLine(
     page,
-    page.getByTestId('order-form'),
+    sheet,
     { productId: packagingId ?? '', name: PACKAGING_NAME },
     quantity,
   );
@@ -241,7 +249,8 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
     { timeout: 60_000 },
   );
 
-  await page.getByTestId('order-form-submit').click();
+  await applyOrderLine(page, sheet);
+  await form.getByTestId('order-form-submit').click();
 }
 
 /** Crea un pedido que alcanza: se guarda sin aviso y el formulario se cierra. */
@@ -253,9 +262,10 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
 /** Crea un pedido que no alcanza: el alta pide confirmacion y se guarda bloqueado. */
 async function createBlockedOrder(page: Page, quantity: string): Promise<void> {
   await submitNewOrder(page, quantity);
-  const dialog = page.getByTestId('blocked-order-dialog');
+  // QT-314 (R17): el modal de bloqueo pasa a ser el aviso por receta del panel.
+  const dialog = page.getByTestId('order-form').getByTestId(ORDER_FORM_LINES_ERROR_TESTID);
   await expect(dialog).toBeVisible({ timeout: 60_000 });
-  await dialog.getByTestId('blocked-order-confirm').click();
+  await dialog.getByTestId(ORDER_FORM_SAVE_BLOCKED_TESTID).click();
   await expect(dialog).toHaveCount(0, { timeout: 60_000 });
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }

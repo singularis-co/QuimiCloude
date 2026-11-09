@@ -59,6 +59,7 @@ import { ORDERS_ROUTE, finishedProductDetailRoute } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { pickOrderLine } from './helpers/order-form';
 import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -191,6 +192,8 @@ let companyId: string | null = null;
 let adminUserId: string | null = null;
 let recipeId: string | null = null;
 let orderId: string | null = null;
+/** La unica receta del pedido: «Entregar» y «Entregas» son acciones por receta (QT-314). */
+let orderLineId: string | null = null;
 let customerAId: string | null = null;
 let customerBId: string | null = null;
 let lineOneId: string | null = null;
@@ -272,6 +275,8 @@ function voidPair(dialog: Locator, id: string, presentationLineId: string): Loca
 /** Abre «Entregar» desde el menu de la fila y espera a que el panel pinte su primer bloque. */
 async function openDeliverySheet(page: Page, id: string): Promise<Locator> {
   await (await openOrderRowMenu(page, orderMenuTrigger(page, id), ORDER_ACTION_DELIVER_TESTID)).click();
+  // QT-314: la accion va en «Por receta» y pide la receta en el selector.
+  await pickOrderLine(page, required(orderLineId, 'la receta del pedido'));
   const sheet = page.getByTestId(DELIVERY_SHEET_TESTID);
   await expect(sheet).toBeVisible({ timeout: 60_000 });
   await expect(sheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -294,6 +299,7 @@ async function chooseCustomer(page: Page, scope: Locator, label: string): Promis
 /** Abre «Entregas» desde el menu de la fila y espera a que la lista pinte la entrega. */
 async function openDeliveriesSheet(page: Page, id: string, entryId: string): Promise<Locator> {
   await (await openOrderRowMenu(page, orderMenuTrigger(page, id), ORDER_ACTION_DELIVERIES_TESTID)).click();
+  await pickOrderLine(page, required(orderLineId, 'la receta del pedido'));
   const sheet = page.getByTestId(DELIVERIES_SHEET_TESTID);
   await expect(sheet).toBeVisible({ timeout: 60_000 });
   await expect(
@@ -536,7 +542,7 @@ test.beforeAll(async () => {
       createdBy: adminUserId,
     });
   orderId = order.id;
-  const orderLineId = await ensureOnlyLine(prisma, order.id);
+  orderLineId = await ensureOnlyLine(prisma, order.id);
   lineOneId = (
     await prisma.orderPresentationLine.create({
       data: {

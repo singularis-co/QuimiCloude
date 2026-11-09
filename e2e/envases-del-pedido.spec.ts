@@ -64,6 +64,18 @@ import {
   packagingLine,
   searchPackagingOption,
 } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  fillOrderLine,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  ORDER_FORM_LINES_ERROR_ITEM_TESTID,
+  ORDER_FORM_LINES_ERROR_TESTID,
+  ORDER_FORM_SAVE_BLOCKED_TESTID,
+  orderForm,
+  panelLines,
+  saveOrder,
+} from './helpers/order-form';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 
@@ -132,18 +144,8 @@ const RECIPE_STEPS: readonly RecipeStepDocument[] = [
 
 /** Pedidos. */
 const ORDERS_TITLE_TESTID = 'pedidos-title';
-const ORDER_CREATE_OPEN_TESTID = 'order-create-open';
-const ORDER_FORM_TESTID = 'order-form';
 const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
-const ORDER_QUANTITY_FIELD_TESTID = 'order-field-quantity';
 const ORDER_COST_QUOTE_VALUE_TESTID = 'order-cost-quote-value';
-const RECIPE_PICKER_TESTID = 'recipe-picker';
-const RECIPE_PICKER_OPTION_TESTID = 'recipe-picker-option';
-const RECIPE_PICKER_VALUE_TESTID = 'recipe-picker-value';
-const UNIT_SELECT_TESTID = 'presentation-unit-select';
-const UNIT_OPTION_TESTID = 'presentation-unit-option';
-const BLOCKED_ORDER_DIALOG_TESTID = 'blocked-order-dialog';
-const BLOCKED_ORDER_CONFIRM_TESTID = 'blocked-order-confirm';
 
 /** Asignacion, ejecucion y empaque. */
 const ASIGNACION_TITLE_TESTID = 'asignacion-title';
@@ -232,31 +234,30 @@ async function switchUser(page: Page, user: Credentials): Promise<void> {
   await loginAndLand(page, user);
 }
 
-/** Abre el alta con la receta, la cantidad y la unidad (l) ya elegidas. */
-async function openNewOrder(page: Page, quantity: string): Promise<Locator> {
+/**
+ * Abre el alta y el sub-panel de una receta (QT-314) con la receta, la cantidad y la unidad (l) ya
+ * elegidas. Devuelve el panel y el sub-panel, donde viven el reparto y la cotizacion.
+ */
+async function openNewOrder(
+  page: Page,
+  quantity: string,
+): Promise<{ readonly form: Locator; readonly sheet: Locator }> {
   // En WebKit el `router.refresh()` de un guardado anterior puede interrumpir la navegacion.
   await expect(async () => {
     await page.goto(ORDERS_ROUTE);
   }).toPass({ timeout: 60_000 });
   await expect(page.getByTestId(ORDERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId(ORDER_CREATE_OPEN_TESTID).first().click();
-  const form = page.getByTestId(ORDER_FORM_TESTID);
-  await expect(form).toBeVisible({ timeout: 60_000 });
-
-  const recipePicker = form.getByTestId(RECIPE_PICKER_TESTID);
-  await recipePicker.click();
-  await recipePicker.fill(RECIPE_NAME);
-  const recipeOption = page.getByTestId(RECIPE_PICKER_OPTION_TESTID).filter({ hasText: RECIPE_NAME });
-  await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
-  await recipeOption.click();
-  await expect(form.getByTestId(RECIPE_PICKER_VALUE_TESTID)).toHaveValue(recipeId ?? '');
-
-  await form.getByTestId(ORDER_QUANTITY_FIELD_TESTID).fill(quantity);
-  await form.getByTestId(UNIT_SELECT_TESTID).click();
-  await page.locator(`[data-testid="${UNIT_OPTION_TESTID}"][data-value="${litroUnitId}"]`).click();
-  await expect(form.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toBeVisible({ timeout: 60_000 });
-  return form;
+  const form = await openCreateOrderPanel(page);
+  const sheet = await openAddOrderLine(page, form);
+  // `chooseRecipe` busca por nombre, elige y comprueba el id en el valor oculto.
+  await fillOrderLine(page, sheet, {
+    recipe: { id: recipeId ?? '', name: RECIPE_NAME },
+    quantity,
+    unitId: litroUnitId ?? '',
+  });
+  await expect(sheet.getByTestId(DISTRIBUTION_AVAILABLE_TESTID)).toBeVisible({ timeout: 60_000 });
+  return { form, sheet };
 }
 
 async function expectDistributionReady(form: Locator): Promise<void> {
@@ -515,27 +516,29 @@ test.describe('envases del pedido como productos', () => {
 
     // --- 1. Alta del pedido de 30 l en 40 botellas de 500 ml y 10 garrafas de 1 l.
     await loginAndLand(page, adminUser);
-    const form = await openNewOrder(page, ORDER_QUANTITY);
-    const quote = page.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID);
+    const { form, sheet } = await openNewOrder(page, ORDER_QUANTITY);
+    const quote = sheet.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID);
     await expect(quote, 'sin reparto solo cuesta la materia prima').toHaveText(AMOUNT_INGREDIENTS, {
       timeout: 60_000,
     });
 
     // R8, R10: el selector del pedido en litros ofrece el envase de 500 ml con su disponible.
-    const field = form.getByTestId(DISTRIBUTION_FIELD_TESTID);
-    await addPackagingLine(page, form, bottle, BOTTLES);
+    const field = sheet.getByTestId(DISTRIBUTION_FIELD_TESTID);
+    await addPackagingLine(page, sheet, bottle, BOTTLES);
     await expect(packagingLine(field, bottle.productId)).toHaveAttribute(
       'data-presentation-id',
       halfLiterPresentationId!,
     );
-    await addPackagingLine(page, form, jug, JUGS);
-    await expectDistributionReady(form);
+    await addPackagingLine(page, sheet, jug, JUGS);
+    await expectDistributionReady(sheet);
 
     // R27, R29: la cotizacion se recalcula con el reparto y suma los envases.
     await expect(quote).toHaveText(AMOUNT_WITH_PACKAGING, { timeout: 60_000 });
 
-    await form.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
-    await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
+    // QT-314: «Aplicar» devuelve la receta a la tabla del panel y «Guardar pedido» da el alta.
+    await applyOrderLine(page, sheet);
+    await expect(panelLines(form)).toHaveCount(1);
+    await saveOrder(page, form);
 
     const first = await latestOrder();
     expect(first.status).toBe('PENDIENTE');
@@ -564,10 +567,10 @@ test.describe('envases del pedido como productos', () => {
     expect(await savedAmountText(first.id)).toBe(SAVED_AMOUNT_WITH_PACKAGING);
 
     // --- 2. Un segundo pedido pide 6 garrafas y solo quedan 5 libres.
-    const shortForm = await openNewOrder(page, SHORT_ORDER_QUANTITY);
+    const { form: shortForm, sheet: shortSheet } = await openNewOrder(page, SHORT_ORDER_QUANTITY);
 
     // R10: el disponible que ofrece el selector descuenta lo apartado por el primer pedido.
-    const shortField = shortForm.getByTestId(DISTRIBUTION_FIELD_TESTID);
+    const shortField = shortSheet.getByTestId(DISTRIBUTION_FIELD_TESTID);
     const jugOption = await searchPackagingOption(page, shortField, jug);
     await expect(jugOption.getByTestId(PACKAGING_OPTION_AVAILABLE_TESTID)).toHaveText(
       JUGS_LEFT_LABEL,
@@ -579,26 +582,31 @@ test.describe('envases del pedido como productos', () => {
     await expect(add).toBeEnabled({ timeout: 60_000 });
     await add.click();
     await expect(packagingLine(shortField, jug.productId)).toHaveCount(1);
-    await expectDistributionReady(shortForm);
+    await expectDistributionReady(shortSheet);
 
     // R28: con menos envases libres que los del reparto no hay importe.
-    await expect(page.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).toHaveText(
+    await expect(shortSheet.getByTestId(ORDER_COST_QUOTE_VALUE_TESTID)).toHaveText(
       MISSING_VALUE_MARK,
       { timeout: 60_000 },
     );
 
-    // R16, R17: el alta avisa con la misma confirmacion que la falta de materia prima.
+    // R16, R17: el alta avisa con la misma confirmacion que la falta de materia prima. Con QT-314
+    // (R17) el modal pasa a ser el aviso por receta del panel, con «Guardar bloqueada».
+    await applyOrderLine(page, shortSheet);
     await shortForm.getByTestId(ORDER_FORM_SUBMIT_TESTID).click();
-    const blockedDialog = page.getByTestId(BLOCKED_ORDER_DIALOG_TESTID);
+    const blockedDialog = shortForm.getByTestId(ORDER_FORM_LINES_ERROR_TESTID);
     await expect(blockedDialog).toBeVisible({ timeout: 60_000 });
+    await expect(blockedDialog.getByTestId(ORDER_FORM_LINES_ERROR_ITEM_TESTID)).toHaveText(
+      `No alcanza el material para ${RECIPE_NAME} (receta 1).`,
+    );
     expect(
       await prisma.order.count({ where: { companyId, lines: { some: { recipeId } } }}),
       'sin confirmar no se escribe el pedido',
     ).toBe(1);
 
-    await blockedDialog.getByTestId(BLOCKED_ORDER_CONFIRM_TESTID).click();
+    await blockedDialog.getByTestId(ORDER_FORM_SAVE_BLOCKED_TESTID).click();
     await expect(blockedDialog).toHaveCount(0, { timeout: 60_000 });
-    await expect(page.getByTestId(ORDER_FORM_TESTID)).toHaveCount(0, { timeout: 60_000 });
+    await expect(orderForm(page)).toHaveCount(0, { timeout: 60_000 });
 
     const second = await latestOrder();
     expect(second.id).not.toBe(first.id);

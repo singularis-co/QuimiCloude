@@ -212,7 +212,7 @@
   - **Hecho:** `pnpm exec playwright test e2e/pedidos-varias-recetas.spec.ts` en verde y su salida
     en `progress/impl_QT-314.md`.
   - **Cubre:** R48 (y de punta a punta R7, R18, R21, R22, R28, R10).
-- [ ] **T19** `[P]` · frontend_dev · depende de la tanda 3 — Adaptar los E2E de pedidos que
+- [x] **T19** `[P]` · frontend_dev · depende de la tanda 3 — Adaptar los E2E de pedidos que
   existen al panel nuevo, al menú por grupos y al selector de receta, con los helpers de T18. No
   se quita ninguna comprobación.
   - **Hecho:** cada spec de `## Archivos esperados > e2e`, corrido uno a uno con `pnpm exec

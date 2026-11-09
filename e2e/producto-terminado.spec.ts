@@ -76,7 +76,8 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine, submitOrderWithLeftover } from './helpers/order-distribution';
+import { addPackagingLine } from './helpers/order-distribution';
+import { applyOrderLine, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -264,26 +265,27 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
   await gotoSettled(page, ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId('order-create-open').first().click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+  // QT-314: la receta se escribe en su sub-panel, abierto con «Añadir receta» desde el panel.
+  const form = await openCreateOrderPanel(page);
+  const sheet = await openAddOrderLine(page, form);
 
-  const recipePicker = page.getByTestId('recipe-picker');
+  const recipePicker = sheet.getByTestId('recipe-picker');
   await recipePicker.click();
   await recipePicker.fill(RECIPE_NAME);
   const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: RECIPE_NAME });
   await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
   await recipeOption.click();
-  await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
+  await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  await page.getByTestId('order-field-quantity').fill(quantity);
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await sheet.getByTestId('order-field-quantity').fill(quantity);
+  await sheet.getByTestId('presentation-unit-select').click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
   // El selector solo ofrece el envase cuando su presentacion ya tiene contenido.
-  const distribution = page.getByTestId('order-distribution-field');
+  const distribution = sheet.getByTestId('order-distribution-field');
   await addPackagingLine(
     page,
-    page.getByTestId('order-form'),
+    sheet,
     { productId: packagingId ?? '', name: PACKAGING_NAME },
     packages,
   );
@@ -293,8 +295,9 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
     { timeout: 60_000 },
   );
 
-  // 50.5 en 50 envases de 1: queda sobrante y Guardar pregunta antes.
-  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
+  // 50.5 en 50 envases de 1: queda sobrante y, con QT-314, «Aplicar» pregunta antes.
+  await applyOrderLine(page, sheet, { leftover: true });
+  await saveOrder(page, form);
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
 

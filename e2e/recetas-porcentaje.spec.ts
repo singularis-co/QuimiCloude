@@ -62,7 +62,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
-import { submitOrderWithLeftover } from './helpers/order-distribution';
+import { applyOrderLine, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
@@ -521,32 +521,34 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
     await page.goto(ORDERS_ROUTE);
     await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId('order-create-open').first().click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta se escribe en su sub-panel, abierto con «Añadir receta» desde el panel.
+    const form = await openCreateOrderPanel(page);
+    const sheet = await openAddOrderLine(page, form);
 
     // Receta TOMADA DEL SELECTOR CON BUSQUEDA, igual que `e2e/pedidos.spec.ts`.
-    const picker = page.getByTestId('recipe-picker');
+    const picker = sheet.getByTestId('recipe-picker');
     await picker.click();
     await picker.fill(recipeConLineaName);
     const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: recipeConLineaName });
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
-    await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeConLineaId);
+    await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(recipeConLineaId);
 
-    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY_TEXT);
+    await sheet.getByTestId('order-field-quantity').fill(ORDER_QUANTITY_TEXT);
     // El alta exige la unidad del pedido; el reparto es opcional y este escenario no lo usa.
-    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+    await sheet.getByTestId('presentation-unit-select').click();
     await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
     // La tabla de ingredientes pinta el porcentaje y la cantidad requerida ANTES de guardar:
     // 200 x 10 % = 20.
-    await expect(page.getByTestId('order-ingredients-table')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('order-ingredient-percentage')).toHaveText('10,00 %');
-    await expect(page.getByTestId('order-ingredient-required')).toHaveText(`20 ${unitSymbol}`);
+    await expect(sheet.getByTestId('order-ingredients-table')).toBeVisible({ timeout: 60_000 });
+    await expect(sheet.getByTestId('order-ingredient-percentage')).toHaveText('10,00 %');
+    await expect(sheet.getByTestId('order-ingredient-required')).toHaveText(`20 ${unitSymbol}`);
 
     // Guardar: la Server Action REAL de `pedidos` contra Postgres. Sin reparto toda la cantidad
-    // queda sin envasar, asi que Guardar pregunta antes.
-    await submitOrderWithLeftover(page, page.getByTestId('order-form'));
+    // queda sin envasar, asi que, con QT-314, «Aplicar» pregunta antes.
+    await applyOrderLine(page, sheet, { leftover: true });
+    await saveOrder(page, form);
     await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 
     // El pedido nuevo, distinguido del ya sembrado y asignado del escenario 4 (misma receta).

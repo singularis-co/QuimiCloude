@@ -964,3 +964,52 @@ Verificación (salida real):
 Bloqueos de la app: ninguno.
 
 Veredicto: lote A de T19 hecho. Los 13 specs del lote están en verde en chromium (9 adaptados y 4 sin tocar), con los 2 helpers, y no se quitó ninguna comprobación.
+
+### T19 lote B (frontend_dev)
+
+Segunda mitad de T19. Mismo criterio que el lote A: helpers de T18, sin commit propio. Base
+`QuimiCloude_QT314` con `withenv314.sh`; chromium, un spec cada vez. WebKit queda para CI. Cada spec
+se corrió primero tal cual; solo se tocó el que falló por la UI nueva.
+
+| Spec | ¿Tocado? | Qué se cambió | chromium |
+|---|---|---|---|
+| `e2e/envases-del-pedido.spec.ts` | sí | `openNewOrder` abre el panel y el sub-panel (`openCreateOrderPanel`, `openAddOrderLine`, `fillOrderLine`, que comprueba el id de la receta) y devuelve los dos. El reparto, el disponible y la cotización (con y sin envases, y «—» sin importe) se miran en el sub-panel. Alta: `applyOrderLine`, 1 receta en la tabla y `saveOrder`. El modal de bloqueo pasa al aviso del panel (R17): visible, con el texto «No alcanza el material para … (receta 1).», «Guardar bloqueada»; la base sigue con 1 pedido antes de confirmar | `2 passed (50.6s)` |
+| `e2e/aislamiento-pedidos.spec.ts` | sí | Alta en A por sub-panel; el sobrante lo confirma «Aplicar» (`applyOrderLine({leftover})`) y luego `saveOrder` | `1 passed (26.8s)` |
+| `e2e/entrega-sin-pedido.spec.ts` | no | Verde sin cambios | `2 passed (41.2s)` |
+| `e2e/reserva-de-material.spec.ts` | sí | `submitNewOrder` por sub-panel + `applyOrderLine` + «Guardar pedido». `createBlockedOrder`: el modal pasa al aviso del panel y su «Guardar bloqueada». La reedición (abrir «Editar» y guardar) queda igual | `1 passed (58.8s)` |
+| `e2e/anular-entrega.spec.ts` | sí | «Entregas» y «Entregar» van ahora en «Por receta»: después del ítem, `pickOrderLine` con el id de la única receta (`ensureOnlyLine` se guarda en `orderLineId`) | `2 passed (21.8s)` |
+| `e2e/entregar-producto-terminado.spec.ts` | sí | «Entregar» pasa por el selector de receta (`pickOrderLine`). El borrador tras recargar sigue comprobándose: ahora va por receta (R52) y se reabre la misma | `2 passed (28.0s)` |
+| `e2e/entrega-a-varios-clientes.spec.ts` | sí | «Entregar» y «Entregas» pasan por el selector de receta | `1 passed (29.5s)` |
+| `e2e/coste-real-de-produccion.spec.ts` | sí | Alta por sub-panel, con la cotización en el sub-panel. Edición en `EN_CURSO`: el estimado se mira en el sub-panel de la receta (`openEditOrderLine`); se cambia la cantidad a 8, no se recotiza y «Aplicar con sobrante» + `saveOrder` | `1 passed (1.3m)` |
+| `e2e/detalle-de-producto-terminado.spec.ts` | sí | «Entregar» pasa por el selector de receta. El enlace a la ficha del producto (`order-produced-product-link`) estaba en la columna de reparto de la fila, que ya no existe: se comprueba igual (1 enlace, su `href`, el clic abre la ficha) en la tarjeta de la receta del detalle (`openOrderDetail`) | `2 passed (28.0s)` |
+| `e2e/envases-reales-empaque.spec.ts` | sí | `seedPackingOrder` devuelve también `orderLineId`; «Entregar» pasa por el selector de receta | `4 passed (55.8s)` |
+| `e2e/producto-terminado.spec.ts` | sí | `createOrder` por sub-panel; sobrante en «Aplicar» y `saveOrder` | `1 passed (49.9s)` |
+| `e2e/recetas-porcentaje.spec.ts` | sí | Escenario 3: alta por sub-panel; la tabla de ingredientes (porcentaje y requerido) se mira en el sub-panel, antes de guardar; sobrante en «Aplicar» y `saveOrder` | `4 passed (35.7s)` |
+| `e2e/versiones-de-receta.spec.ts` | sí | Receta, selector de versión (deshabilitado sin versiones, habilitado con ellas, valor elegido), cantidad, unidad y reparto en el sub-panel; `applyOrderLine` + `saveOrder` | `1 passed (24.7s)` |
+
+No se quitó ninguna comprobación (R49). Las que miraban algo que ya no existe se movieron a donde
+vive ahora:
+- el modal de bloqueo (`blocked-order-dialog`) pasa al aviso del panel, y se le añade el texto de la receta;
+- la cotización, los ingredientes, el reparto y el selector de versión pasan del panel al sub-panel;
+- el enlace al producto terminado pasa de la fila a la tarjeta de la receta del detalle.
+
+Cambiaron dos gestos:
+- «Entregar» y «Entregas» pasan por el selector de receta;
+- el sobrante se confirma al pulsar «Aplicar», ya no al guardar.
+
+Helpers: no se tocaron. `submitOrderWithLeftover` (`e2e/helpers/order-distribution.ts`) ya no lo
+importa ningún spec. Se deja en su sitio porque quitarlo no es un cambio aditivo; lo puede retirar T20 o
+el leader.
+
+Verificación (salida real):
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`. Las 11 son las de antes, todas en `tests/`.
+  `eslint` de los 12 specs tocados: `No issues found`, exit 0.
+- `pnpm exec vitest run` de las listas que nombran estos specs (`guard-formularios-y-acciones`,
+  `guard-identificador-de-request`, `clientes/scope`, `inventario/scope`, `recetas/scope`,
+  `data-table-alcance`): `Test Files 6 passed (6) · Tests 105 passed | 5 skipped (110)`.
+  `tests/unit/pedidos/scope.test.ts` no se corrió: es de T20.
+
+Bloqueos de la app: ninguno.
+
+Veredicto: lote B de T19 hecho. Los 13 specs del lote están en verde en chromium (12 adaptados y 1 sin tocar), y no se quitó ninguna comprobación.
