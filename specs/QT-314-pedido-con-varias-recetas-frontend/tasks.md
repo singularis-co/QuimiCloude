@@ -206,7 +206,7 @@
     `order.recipeName`, `order.quantity` y `order.presentationLines` sin resultados en
     `app/(private)/pedidos/`.
   - **Cubre:** R24.
-- [ ] **T18** `[P]` · frontend_dev · depende de la tanda 3 — `e2e/pedidos-varias-recetas.spec.ts`
+- [x] **T18** `[P]` · frontend_dev · depende de la tanda 3 — `e2e/pedidos-varias-recetas.spec.ts`
   y `e2e/helpers/order-form.ts`. El recorrido de R48 comprueba en la base, por receta, lo apartado
   al crear y lo liberado al cancelar.
   - **Hecho:** `pnpm exec playwright test e2e/pedidos-varias-recetas.spec.ts` en verde y su salida

@@ -805,3 +805,103 @@ Salida real:
 Bloqueos: ninguno. Nota para T20: `pedidos-convenciones.test.ts` no se ha tocado.
 
 Veredicto: T17 hecha; `OrderView` sin campos planos, typecheck verde y grep del «Hecho» vacío.
+
+### T18 (frontend_dev)
+
+Archivos:
+- Creado `e2e/pedidos-varias-recetas.spec.ts`: un único `test()` en serie. Siembra por Prisma, con
+  prefijo `qt314_e2e_`, la empresa, un Administrador, tres insumos de un lote cada uno, una receta por
+  insumo y un envase compartido. Las tres recetas comparten el envase para que se vea si un apartado
+  o una liberación se cuela a otra receta. Limpia los huérfanos por prefijo y edad, y `afterAll`
+  siempre, en el orden de las FK.
+- Creado `e2e/helpers/order-form.ts`: los helpers del panel, el sub-panel, el detalle y las acciones
+  por receta. Lo usará T19.
+- Modificados, solo para dar de alta los archivos nuevos en tres listas cerradas de `tests/`; sin
+  esto el gate se pone rojo:
+  - `tests/unit/recetas/scope.test.ts`: el nombre del spec contiene «recetas» y entra como noveno
+    literal.
+  - `tests/unit/shared/data-table-alcance.test.ts`: el helper usa `data-table-row-`; la lista pasa
+    de 59 a 60.
+  - `tests/guards/guard-identificador-de-request.test.ts`: el `.spec.ts` nuevo entra en
+    `E2E_ESPERADOS`.
+
+API de `e2e/helpers/order-form.ts` (y las constantes `*_TESTID` de cada pieza):
+- `orderForm(page)`: el panel del pedido (`order-form`).
+- `orderLineSheet(page)`: el sub-panel de una receta abierto.
+- `panelLines(form)`: las recetas de la tabla del panel, en su orden; las filas o las tarjetas, la forma que esté visible.
+- `panelLine(form, recipeName)`: una receta de la tabla del panel por su nombre.
+- `openCreateOrderPanel(page)`: «Nuevo pedido», con reintento si el clic llega antes de hidratar. Devuelve el panel.
+- `openEditOrderPanel(page, orderId)`: «Editar» desde el menú de la fila. Devuelve el panel.
+- `openAddOrderLine(page, form)`: «Añadir receta». Devuelve el sub-panel.
+- `openEditOrderLine(page, form, recipeName)`: el «Editar» de una receta de la tabla. Devuelve el sub-panel.
+- `chooseRecipe(page, sheet, {id, name})`: busca y elige la fórmula, y comprueba el valor oculto.
+- `chooseLineUnit(page, sheet, unitId)`: la unidad de la receta.
+- `fillOrderLine(page, sheet, input)`: escribe solo los campos que trae `OrderLineInput` (receta, cantidad, unidad, envase con sus envases, precio).
+- `applyOrderLine(page, sheet, {leftover?})`: espera el disponible `ready`, pulsa «Aplicar», confirma «Aplicar con sobrante» si se pide y espera a que se cierre.
+- `addOrderLine(page, form, input, {leftover?})`: abre, rellena y aplica, y espera una receta más en la tabla.
+- `saveOrder(page, form)`: «Guardar pedido» y espera a que el panel se cierre.
+- `orderRow(page, orderId)`: la fila del pedido en el listado.
+- `openOrderDetail(page, orderId)`: abre el detalle desde el número de la fila, con reintento. Devuelve el detalle.
+- `closeWithEscape(page, opened)`: Escape y espera a que se cierre.
+- `openOrderLineAction(page, orderId, actionTestId, lineId)`: la acción «Por receta» del menú y la receta en el selector.
+- `pickOrderLine(page, lineId)`: elige una receta habilitada en el selector abierto.
+- `cancelOrderLine(page, orderId, lineId, reason)`: «Cancelar receta…», el motivo y la confirmación; espera a que el diálogo se cierre.
+
+R → test. Un único caso: `e2e/pedidos-varias-recetas.spec.ts` › «R48 R7 R18 R21 R22 R28 R10 - dos
+recetas con precio, detalle con avance y totales, cancelar una libera su material y deja de sumar,
+y Editar anade otra»:
+- R48: el recorrido entero.
+  - Por receta y en la base, lo apartado al crear: neto por lote, A = insumo_a 10 + envase 10 y
+    B = insumo_b 20 + envase 20.
+  - Lo liberado al cancelar B: B con neto 0 y movimientos `release`; A sin cambios.
+  - Deja de sumar: avance 0 de 1 y total $100.00.
+  - «Editar» añade C, que aparta insumo_c 5 + envase 5.
+- R7:
+  - El alta envía las dos recetas en su orden, con cantidad, unidad y precio; la base lo comprueba
+    por `position`.
+  - El panel se cierra, sale el toast «Pedido creado.» y la fila aparece.
+  - La edición conserva los id de A y B y sale el toast «Pedido actualizado.».
+- R18: el detalle se abre desde el número de pedido, con «0 de 2 terminadas», el precio total, dos
+  tarjetas con su precio y, tras cancelar, «Motivo de cancelación: …» en B.
+- R21: la columna de avance da `data-total` 2, luego 1 tras cancelar y 2 tras añadir C.
+  `data-finished` es 0.
+- R22: la celda de precio muestra el total del pedido ($350.50, luego $100.00, luego $140.00) y no
+  muestra «N sin precio».
+- R28: cancelar B con motivo solo cambia B (`CANCELADO` con su motivo; A sigue `PENDIENTE`), con el
+  toast «Receta cancelada.».
+- R10: en la edición, B (cancelada) sale con «Solo lectura» y sin «Editar», y «Añadir receta» sigue
+  disponible.
+
+Salida real:
+- `pnpm exec playwright test e2e/pedidos-varias-recetas.spec.ts --project=chromium`:
+  - 1.ª corrida: `1 passed (1.0m)`.
+  - 2.ª corrida: `✓ 1 [chromium] › … (32.1s)` y `1 passed (44.0s)`.
+- Entorno:
+  - Con el `.env` del worktree tal cual, el E2E cae en la siembra con `The column existe does not
+    exist`: la base de desarrollo `QuimiCloude` va 5 migraciones atrás (`pnpm run db:test status`).
+  - Se corrió con `DATABASE_URL` y `DIRECT_URL` apuntando, solo en ese shell, a `QuimiCloude_QT313`,
+    la base de E2E de la feature anterior. Está al día: 130 migraciones (`db:test status`). No se
+    migró ni se tocó ninguna base.
+- WebKit: no se corrió y queda para CI.
+- `pnpm run typecheck`: `tsc --noEmit`, sin errores; no apareció el error conocido de `app/layout.tsx`.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos preexistentes. `eslint` sobre los
+  5 archivos tocados: sin salida, exit 0.
+- `pnpm exec vitest run tests/unit/shared/data-table-alcance.test.ts tests/unit/recetas/scope.test.ts --project node`:
+  - Antes del alta en las listas: 2 failed.
+  - Después: `Test Files 2 passed (2) · Tests 23 passed | 2 skipped (25)`.
+- `pnpm exec vitest run guard`:
+  - Antes del alta en `E2E_ESPERADOS`: 1 failed.
+  - Después: `Test Files 87 passed (87) · Tests 1333 passed | 22 skipped (1355)`.
+
+Bloqueos: ninguno de la app. Del entorno: la base de desarrollo `QuimiCloude` necesita `pnpm run
+db:migrate` para correr los E2E con el `.env` tal cual.
+
+Veredicto: T18 hecha. El E2E de R48 pasa en chromium y comprueba en la base lo apartado y lo liberado receta a receta.
+
+**Base del E2E (implementer, 2026-11-09).** La base de desarrollo `QuimiCloude` va 5 migraciones atrás
+(la primera que falta, `20261103115900_order_status_partial`) y no se migró: es compartida. Tampoco se
+sigue usando `QuimiCloude_QT313` (es de otra feature). Se creó la base propia `QuimiCloude_QT314` con
+`CREATE DATABASE ... TEMPLATE qct_tpl_9925690f8798` (la plantilla de esta rama, `pnpm run db:test template`,
+130 migraciones; `prisma migrate status`: «Database schema is up to date!»). El entorno se carga con
+`scratchpad/withenv314.sh` (sobrescribe `DATABASE_URL` y `DIRECT_URL` solo en ese proceso; el `.env` no cambia).
+Recorrida sobre ella: `e2e/pedidos-varias-recetas.spec.ts`, chromium: `1 passed (33.9s)`. WebKit: CI.

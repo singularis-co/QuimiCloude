@@ -255,6 +255,12 @@ export const E2E_ESPERADOS = [
   // consumido y el lote de producto terminado. NO lee ni afirma nada sobre el identificador de
   // peticion ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'pedido-con-varias-recetas.spec.ts',
+  // Alta el 2026-11-09 (QT-314 T18) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: alta de un pedido de dos recetas con precio, detalle con avance y totales, cancelar
+  // una receta y anadir otra con «Editar»; afirma receta a receta lo apartado y lo liberado. NO lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`, asi que el
+  // diferimiento de QC-71 R21 sigue INTACTO.
+  'pedidos-varias-recetas.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja

@@ -265,10 +265,16 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // alta de pedido (`recipe-picker`) y comprueba la receta de la linea en la base. El orden es
     // el que devuelve `readdirSync`, asi que va TERCERO, entre `ejecucion-receta.spec.ts` y
     // `recetas-pasos.spec.ts`.
+    //
+    // 2026-11-09 (QT-314, T18): entra `e2e/pedidos-varias-recetas.spec.ts`, de NUEVE literales, y la
+    // lista sigue CERRADA. Tampoco toca la pantalla de recetas: navega solo a `ORDERS_ROUTE`,
+    // siembra las recetas por Prisma y las elige en el sub-panel del pedido. Va tras
+    // `pedido-con-varias-recetas.spec.ts`: '-' precede a 's'.
     expect(e2eMatches, `spec E2E de recetas inesperado: ${e2eMatches.join(', ')}`).toEqual([
       'aislamiento-recetas.spec.ts', // QC-50 / R31: E2E de aislamiento por empresa
       'ejecucion-receta.spec.ts', // QC-63 / R29, R30: E2E de la ejecucion desde un pedido asignado
       'pedido-con-varias-recetas.spec.ts', // QT-313 / T16: E2E del pedido en lineas por la pantalla actual
+      'pedidos-varias-recetas.spec.ts', // QT-314 / T18, R48: E2E del pedido de varias recetas en la pantalla nueva
       'recetas-pasos.spec.ts', // QC-64 / R28: E2E del camino completo del editor y el asistente
       'recetas-porcentaje.spec.ts', // QC-147 / R22: E2E del porcentaje en lineas de receta
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
