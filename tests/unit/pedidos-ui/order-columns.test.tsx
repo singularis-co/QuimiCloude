@@ -96,27 +96,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECIPE_ID,
-    recipeName: 'Esmalte azul',
-    recipeVersion: null,
-    quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -446,18 +434,23 @@ describe('la tabla no tiene columna Presentación', () => {
 
 describe('ninguna celda pinta un dato de receta a partir de los campos planos del pedido', () => {
   it('R24: con la primera receta distinta del pedido plano, ninguna celda pinta el dato plano', () => {
-    const order = pedidoDeDosRecetas(undefined, {
-      recipeName: 'PLANO NO USAR',
-      quantity: '999.0000',
-      salePrice: '999.0000',
-      ingredientsCost: '999.0000',
-      actualCost: '999.0000',
-      unitLabel: 'PLANO-U',
-      salePriceTotal: '120.5000',
-      linesWithoutPrice: 1,
-      ingredientsCostTotal: '65.0000',
-      actualCostTotal: null,
-    });
+    // Campos planos que el tipo ya no declara, colados a proposito: ninguna celda debe leerlos.
+    const order = Object.assign(
+      pedidoDeDosRecetas(undefined, {
+        salePriceTotal: '120.5000',
+        linesWithoutPrice: 1,
+        ingredientsCostTotal: '65.0000',
+        actualCostTotal: null,
+      }),
+      {
+        recipeName: 'PLANO NO USAR',
+        quantity: '999.0000',
+        salePrice: '999.0000',
+        ingredientsCost: '999.0000',
+        actualCost: '999.0000',
+        unitLabel: 'PLANO-U',
+      },
+    );
     for (const column of ORDER_COLUMNS) {
       if (column.id === RESPONSIBLES_COLUMN_ID || column.id === ACTIONS_COLUMN_ID) continue;
       const { container, unmount } = render(<>{column.cell(order)}</>);

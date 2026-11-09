@@ -202,8 +202,8 @@ function toOrderLineView(
  * `OrderSummary` es `OrderView` mas lo pendiente de entregar, y una segunda copia de este mapeo
  * seria el sitio exacto por donde empezarian a diferir.
  *
- * `recipeName` es `null` solo si el id NO vuelve del catalogo -una receta borrada FISICAMENTE
- * por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila SIGUE saliendo
+ * El `recipeName` de una linea es `null` solo si el id NO vuelve del catalogo -una receta
+ * borrada FISICAMENTE por consola, que las FK `RESTRICT` de QC-33 hacen casi imposible-: la fila SIGUE saliendo
  * (mismo criterio que QC-25 R18 y QC-43 R37). Una receta dada de BAJA si vuelve, con su nombre
  * (R44).
  *
@@ -221,40 +221,22 @@ export function toOrderView(
   orderCustomers: ReadonlyMap<string, OrderCustomer> = new Map(),
 ): OrderView {
   const sortedLines = [...lines].sort((a, b) => a.position - b.position);
-  const first = sortedLines[0];
   // Todo pedido vivo nace con una linea y la edicion no puede dejarlo sin ninguna.
-  if (first === undefined) throw new Error(`el pedido ${row.id} no tiene ninguna linea viva`);
-  const recipe = recipes.get(first.recipeId);
+  if (sortedLines.length === 0) throw new Error(`el pedido ${row.id} no tiene ninguna linea viva`);
   const totals = orderTotals(sortedLines);
   return {
     id: row.id,
     number: row.number,
     numberText: formatOrderNumber(row.number),
-    recipeId: first.recipeId,
-    recipeName: recipe?.name ?? null,
-    recipeVersion:
-      recipe?.original == null
-        ? null
-        : { originalId: recipe.original.id, originalName: recipe.original.name, versionName: recipe.ownName },
-    // El catalogo ya resuelve la de la original para una version.
-    recipeImageUrl: recipe?.imageUrl ?? null,
-    quantity: first.quantity,
     priority: row.priority,
     status: row.status,
     // R29: el motivo se devuelve en la ficha Y en el listado mientras el pedido este
     // cancelado. Ningun caso de uso lo vacia ni lo sustituye.
     cancellationReason: row.cancellationReason,
-    ingredientsCost: first.ingredientsCost,
-    packagingCost: first.packagingCost,
-    actualCost: totals.actualCostTotal,
-    salePrice: first.salePrice,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
     updatedBy: row.updatedBy,
-    presentationLines: toPresentationLineViews(first.presentationLines, presentations, packagingNames),
-    unitId: first.unitId,
-    unitLabel: first.unitId === null ? null : unitLabels.get(first.unitId) ?? null,
     // Un id que no vuelve del catalogo se pinta sin cliente y la fila sigue saliendo.
     customer: row.customerId === null ? null : orderCustomers.get(row.customerId) ?? null,
     lines: sortedLines.map((line) => toOrderLineView(line, recipes, presentations, packagingNames, unitLabels)),

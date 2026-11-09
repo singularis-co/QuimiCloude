@@ -741,3 +741,67 @@ Notas para el reviewer:
 Bloqueos: ninguno nuevo. Los tres de la tanda 3 quedan resueltos por la enmienda F2.1 y este cambio.
 
 Veredicto: T16b hecha; cumple su «Hecho» y deja `order-responsibles-sheet.tsx` sin campos planos para T17.
+
+### T17 (backend_dev)
+
+Decisión P1 (design § 3.4): `OrderView` (y por tanto `OrderSummary`) ya no lleva `recipeId`,
+`recipeName`, `recipeVersion`, `recipeImageUrl`, `quantity`, `unitId`, `unitLabel`,
+`presentationLines`, `salePrice`, `ingredientsCost`, `packagingCost` ni `actualCost`;
+`cancellationReason` del pedido se queda. `toOrderView` deja de rellenarlos.
+
+Archivos de producción:
+- `lib/modules/pedidos/domain/order-view.ts`: tipo `OrderView` sin los 12 campos y su doc.
+- `lib/modules/pedidos/domain/get-order.ts`: `toOrderView` sin el relleno de la primera línea.
+- `scripts/seed-demo/gateway.ts`: `findOrder` busca por `order.lines[0]` (la demo es de una receta).
+
+Tests ajustados:
+- Lectura `vista.X` -> `vista.lines[0]?.X`: `tests/unit/pedidos/get-order.test.ts`,
+  `list-orders.test.ts`, `order-service.test.ts` (incluido el `toEqual` de la ficha completa),
+  `tests/integration/pedidos/order-unit-conversion.int.test.ts`,
+  `tests/integration/asignaciones/order-lines-execution.int.test.ts`.
+- `actualCost` del pedido (era la suma de activas) -> `actualCostTotal`: `get-order.test.ts`,
+  `list-orders.test.ts`, `tests/integration/pedidos/actual-order-cost.int.test.ts`.
+- Tests de tipos `tests/unit/pedidos/order-view.test.ts`: las aserciones «en la vista» pasan a
+  `OrderLineView` y `OrderView`/`OrderSummary` declaran `false`; test nuevo R24 con los 12 campos.
+- Re-propuestos a R24 (antes QT-313 R44, «el pedido conserva los planos»):
+  `order-lines-use-cases.int.test.ts` y `order-view-lines.test.ts` comprueban que el dato sale de
+  `lines[0]` y que la vista NO tiene la propiedad.
+- Fixtures `OrderSummary` sin los 12 campos (solo borrado de líneas): 25 archivos de
+  `tests/unit/pedidos-ui/`, `tests/unit/paridad/` y `tests/unit/shared-ui/confirm-dialog-montado.test.tsx`
+  y `tests/helpers/order-form-ui.ts`. `order-sheet.test.tsx` conserva CRLF.
+- Señuelos de R24 que siguen en tiempo de ejecución, colados con `Object.assign` (el tipo ya no
+  los admite en el literal): `pedidoDeDosRecetas` en `tests/helpers/order-form-ui.ts`, el test R24
+  de `order-columns.test.tsx` y el R36 de `cancel-order-dialog.test.tsx`. `pedidos-toasts.test.tsx`
+  y `order-sheet.test.tsx` leen el reparto/cantidad de la línea.
+
+Grep del «Hecho»:
+- `grep -rnE "order\.(recipeName|quantity|presentationLines)\b" "app/(private)/pedidos/"` -> sin
+  resultados (exit 1).
+- Ningún archivo de `app/` lee los campos de `OrderView`: typecheck verde. Los `order.recipeName`/
+  `order.quantity` de `app/(private)/asignacion/**` son de `AssignedOrderSummary` (otro tipo), y los
+  de `e2e/` son filas de Prisma, no `OrderView`.
+
+R24 -> test:
+- `tests/unit/pedidos/order-view.test.ts` > «QT-314 — la vista del pedido no copia la primera receta»
+  > «R24: OrderView y OrderSummary no declaran ninguno de los campos planos de la primera receta».
+- `tests/integration/pedidos/order-lines-use-cases.int.test.ts` > «QT-314 R24, QT-313 R1: la receta,
+  cantidad, unidad, precio y coste de la ficha salen solo de sus lineas…».
+- `tests/unit/pedidos/order-view-lines.test.ts` > «QT-314 R24: un pedido de una linea lleva sus datos
+  solo en la linea, sin campos planos en el pedido».
+
+Salida real:
+- `pnpm run typecheck`: 1 error, el conocido `app/layout.tsx(45,56) TS2304 LayoutProps`.
+- `pnpm run lint`: `0 errors, 11 warnings`, todos en archivos/líneas que T17 no toca.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87) · Tests 1333 passed | 22 skipped`.
+- vitest por archivo, los 29 unit tocados: `Test Files 29 passed · Tests 796 passed`
+  (tras corregir el `toEqual` de `order-service.test.ts`, 26/26).
+- vitest por archivo, `order-view-lines` + 11 unit de pedidos que usan la vista +
+  `order-customer.int.test.ts`: `Test Files 13 passed · Tests 372 passed`.
+- vitest por archivo, consumidores de `pedidoDeDosRecetas` (`order-form*`, `order-row-actions`):
+  `Test Files 7 passed · Tests 100 passed`.
+- Integración por archivo (`order-lines-use-cases`, `actual-order-cost`, `order-unit-conversion`,
+  `asignaciones/order-lines-execution`): `Test Files 4 passed · Tests 35 passed`.
+
+Bloqueos: ninguno. Nota para T20: `pedidos-convenciones.test.ts` no se ha tocado.
+
+Veredicto: T17 hecha; `OrderView` sin campos planos, typecheck verde y grep del «Hecho» vacío.

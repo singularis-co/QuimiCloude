@@ -419,7 +419,7 @@ describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
       const vista = await pedidos.getOrder(orderId, actorDe(fixture));
       expect(vista.status).toBe('TERMINADO');
       // 4 del insumo a 2.5000 y 4 envases a 0.5000.
-      expect(vista.actualCost).toBe('12.0000');
+      expect(vista.lines[0]?.actualCost).toBe('12.0000');
       expect(vista.actualCostTotal).toBe('12.0000');
       expect(vista.lines[0]?.finishedAt?.toISOString()).toBe(terminado.toISOString());
       const etapa = await lineaDe(linea);

@@ -65,6 +65,22 @@ import type { OrderTransactionScope, OrderUnitOfWork } from '@/lib/modules/pedid
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
+/** Lo que la vista del pedido copiaba de su primera receta y ya no lleva. */
+const CAMPOS_PLANOS = [
+  'recipeId',
+  'recipeName',
+  'recipeVersion',
+  'recipeImageUrl',
+  'quantity',
+  'unitId',
+  'unitLabel',
+  'presentationLines',
+  'salePrice',
+  'ingredientsCost',
+  'packagingCost',
+  'actualCost',
+] as const;
+
 const orders: OrderRepository = {
   findAliveById: findAliveOrderById,
   findAliveLines: findAliveOrderLines, findAliveLinesByOrderIds: findAliveOrderLinesByOrderIds,
@@ -306,7 +322,7 @@ describe('QT-313 T9 — alta con lineas contra la base', () => {
     }
   });
 
-  it('QT-313 R44, R1: la ficha toma receta, cantidad, unidad, precio y coste de su linea de menor posicion, y el pedido no los guarda', async () => {
+  it('QT-314 R24, QT-313 R1: la receta, cantidad, unidad, precio y coste de la ficha salen solo de sus lineas, el pedido no los copia ni los guarda', async () => {
     const fixture = await crearFixture();
     try {
       const recetaA = await crearReceta(fixture);
@@ -319,13 +335,15 @@ describe('QT-313 T9 — alta con lineas contra la base', () => {
 
       const primera = await prisma.orderLine.findFirstOrThrow({ where: { orderId: creado.id, position: 0 } });
       const vista = await getOrder(creado.id, actorDe(fixture));
+      for (const plano of CAMPOS_PLANOS) expect(vista).not.toHaveProperty(plano);
+      const [linea0] = vista.lines;
       expect({
-        recipeId: vista.recipeId,
-        quantity: vista.quantity,
-        unitId: vista.unitId,
-        salePrice: vista.salePrice,
-        ingredientsCost: vista.ingredientsCost,
-        packagingCost: vista.packagingCost,
+        recipeId: linea0?.recipeId,
+        quantity: linea0?.quantity,
+        unitId: linea0?.unitId,
+        salePrice: linea0?.salePrice,
+        ingredientsCost: linea0?.ingredientsCost,
+        packagingCost: linea0?.packagingCost,
       }).toEqual({
         recipeId: primera.recipeId,
         quantity: primera.quantity.toFixed(4),

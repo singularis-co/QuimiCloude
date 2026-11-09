@@ -404,7 +404,7 @@ describe('getOrder — las recetas del pedido', () => {
     expect(vista.lines.map((line) => line.status)).toEqual(['EN_CURSO', 'PENDIENTE'])
   })
 
-  it('R44: un pedido de una linea conserva los campos planos de hoy junto a la linea', async () => {
+  it('QT-314 R24: un pedido de una linea lleva sus datos solo en la linea, sin campos planos en el pedido', async () => {
     const d = dobles(
       [{ ...fila(PEDIDO, 'PENDIENTE'), salePrice: '12.0000' }],
       [linea(PEDIDO, { position: 0, status: 'PENDIENTE', quantity: '10.0000', salePrice: '12.0000' })],
@@ -412,8 +412,9 @@ describe('getOrder — las recetas del pedido', () => {
 
     const vista = await createGetOrder(d.deps)(PEDIDO, ADMIN)
 
-    expect(vista).toMatchObject({ recipeId: CREMA, recipeName: 'Crema base', quantity: '10.0000', salePrice: '12.0000' })
     expect(vista.lines).toHaveLength(1)
+    expect(vista.lines[0]).toMatchObject({ recipeId: CREMA, recipeName: 'Crema base', quantity: '10.0000', salePrice: '12.0000' })
+    for (const plano of ['recipeId', 'recipeName', 'quantity', 'salePrice']) expect(vista).not.toHaveProperty(plano)
     expect(vista.salePriceTotal).toBe('12.0000')
   })
 })

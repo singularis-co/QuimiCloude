@@ -139,30 +139,17 @@ export function pedidoDeDosRecetas(
   lines: readonly OrderLineView[] = [lineaPedido(), lineaB()],
   overrides: Partial<OrderSummary> = {},
 ): OrderSummary {
-  return {
+  const pedido: OrderSummary = {
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    // Campos planos con datos que no son de ninguna receta: la pantalla no debe pintarlos.
-    recipeId: '10000000-0000-4000-8000-0000000000ff',
-    recipeName: 'PLANO NO USAR',
-    recipeVersion: null,
-    recipeImageUrl: null,
-    quantity: '999.0000',
     priority: 'ALTA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: '999.0000',
-    packagingCost: null,
-    actualCost: null,
-    salePrice: '999.0000',
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [],
-    unitId: UNIDAD.id,
-    unitLabel: 'L',
     customer: null,
     lines,
     progress: { total: lines.length, finished: 0 },
@@ -173,6 +160,16 @@ export function pedidoDeDosRecetas(
     pendingDelivery: { kind: 'not_packed' },
     ...overrides,
   }
+  // Campos planos que el tipo ya no declara, colados con datos que no son de ninguna receta: si la
+  // pantalla los leyera por un camino sin tipo, los pintaria.
+  return Object.assign(pedido, {
+    recipeId: '10000000-0000-4000-8000-0000000000ff',
+    recipeName: 'PLANO NO USAR',
+    quantity: '999.0000',
+    ingredientsCost: '999.0000',
+    salePrice: '999.0000',
+    unitLabel: 'L',
+  })
 }
 
 export function subPanel(): HTMLElement | null {

@@ -199,7 +199,7 @@
     - Grep de `order.recipeName`, `order.recipeImageUrl`, `order.quantity`, `order.unitLabel` y
       `order.presentationLines` sin resultados en `order-responsibles-sheet.tsx`.
   - **Cubre:** R44, R51, R52 (y R24 en la ficha).
-- [ ] **T17** · backend_dev · depende de T15, T16, T16b — Se borran de `OrderView` los campos planos de
+- [x] **T17** · backend_dev · depende de T15, T16, T16b — Se borran de `OrderView` los campos planos de
   la primera receta y su relleno en `toOrderView`, y se ajustan sus tests (decisión P1, design
   § 3.4).
   - **Hecho:** typecheck en verde sin que ningún archivo de `app/` lea esos campos, y Grep de

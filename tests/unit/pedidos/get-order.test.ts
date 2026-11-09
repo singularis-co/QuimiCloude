@@ -99,9 +99,9 @@ describe('getOrder — pedido con version de receta', () => {
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.recipeId).toBe(VERSION)
-    expect(vista.recipeName).toBe('Crema base · Sin perfume')
-    expect(vista.recipeVersion).toEqual({
+    expect(vista.lines[0]?.recipeId).toBe(VERSION)
+    expect(vista.lines[0]?.recipeName).toBe('Crema base · Sin perfume')
+    expect(vista.lines[0]?.recipeVersion).toEqual({
       originalId: ORIGINAL,
       originalName: 'Crema base',
       versionName: 'Sin perfume',
@@ -113,8 +113,8 @@ describe('getOrder — pedido con version de receta', () => {
   it('R11: la ficha de un pedido con original sigue dando su nombre y recipeVersion null', async () => {
     const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
 
-    expect(vista.recipeName).toBe('Crema base')
-    expect(vista.recipeVersion).toBeNull()
+    expect(vista.lines[0]?.recipeName).toBe('Crema base')
+    expect(vista.lines[0]?.recipeVersion).toBeNull()
   })
 
   it('R25: una version dada de baja sigue saliendo con su nombre compuesto', async () => {
@@ -123,15 +123,15 @@ describe('getOrder — pedido con version de receta', () => {
       ADMIN,
     )
 
-    expect(vista.recipeName).toBe('Crema base · Sin perfume')
-    expect(vista.recipeVersion?.versionName).toBe('Sin perfume')
+    expect(vista.lines[0]?.recipeName).toBe('Crema base · Sin perfume')
+    expect(vista.lines[0]?.recipeVersion?.versionName).toBe('Sin perfume')
   })
 
   it('si el id no vuelve del catalogo, nombre y recipeVersion son null', async () => {
     const vista = await createGetOrder(dobles(fila(VERSION), []))(ORDER_ID, ADMIN)
 
-    expect(vista.recipeName).toBeNull()
-    expect(vista.recipeVersion).toBeNull()
+    expect(vista.lines[0]?.recipeName).toBeNull()
+    expect(vista.lines[0]?.recipeVersion).toBeNull()
   })
 
   it('un pedido que no existe sigue respondiendo no encontrado sin preguntar al catalogo', async () => {
@@ -188,8 +188,8 @@ describe('toOrderView — recibe el Map de RecipeRef', () => {
   it('R11: compone recipeVersion desde la referencia y no desde la fila', () => {
     const vista = toOrderView(fila(VERSION), [orderLineOf(fila(VERSION))], new Map([[VERSION, REF_VERSION]]))
 
-    expect(vista.recipeName).toBe('Crema base · Sin perfume')
-    expect(vista.recipeVersion).toEqual({
+    expect(vista.lines[0]?.recipeName).toBe('Crema base · Sin perfume')
+    expect(vista.lines[0]?.recipeVersion).toEqual({
       originalId: ORIGINAL,
       originalName: 'Crema base',
       versionName: 'Sin perfume',
@@ -220,13 +220,13 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.presentationLines.map((line) => [line.packagingProductId, line.packagingName])).toEqual([
+    expect(vista.lines[0]?.presentationLines.map((line) => [line.packagingProductId, line.packagingName])).toEqual([
       [null, null],
       [ENVASE, 'Botella PET 500 ml'],
       // Un envase que ya no vuelve del catalogo conserva su id y se queda sin nombre.
       [ENVASE_DE_BAJA, null],
     ])
-    expect(vista.presentationLines[0]?.presentationId).toBe(PRESENTACION_ANTIGUA)
+    expect(vista.lines[0]?.presentationLines[0]?.presentationId).toBe(PRESENTACION_ANTIGUA)
     expect(packaging.findRefs).toHaveBeenCalledTimes(1)
     expect(packaging.findRefs).toHaveBeenCalledWith([ENVASE, ENVASE_DE_BAJA], COMPANY)
   })
@@ -243,14 +243,14 @@ describe('QC-195 R33 — la ficha y el listado nombran el envase de cada linea',
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.presentationLines).toHaveLength(1)
+    expect(vista.lines[0]?.presentationLines).toHaveLength(1)
     expect(packaging.findRefs).not.toHaveBeenCalled()
   })
 
   it('R33: toOrderView sin nombres de envase deja packagingName en null y conserva el id', () => {
     const vista = toOrderView(filaConReparto(), [orderLineOf(filaConReparto())], new Map([[ORIGINAL, REF_ORIGINAL]]))
 
-    expect(vista.presentationLines[1]).toMatchObject({ packagingProductId: ENVASE, packagingName: null })
+    expect(vista.lines[0]?.presentationLines[1]).toMatchObject({ packagingProductId: ENVASE, packagingName: null })
   })
 })
 
@@ -288,13 +288,13 @@ describe('la ficha lleva el contenido y la unidad de la presentacion de cada lin
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.presentationLines.map((line) => [line.presentationContent, line.presentationUnitLabel])).toEqual([
+    expect(vista.lines[0]?.presentationLines.map((line) => [line.presentationContent, line.presentationUnitLabel])).toEqual([
       ['300.0000', 'ml'],
       ['5.0000', 'L'],
       // La presentacion no vuelve: conserva la copia de la linea, pero sin unidad no hay etiqueta.
       ['5.0000', null],
     ])
-    expect(vista.unitLabel).toBe('L')
+    expect(vista.lines[0]?.unitLabel).toBe('L')
     // La unidad del pedido y las de las presentaciones, en una sola llamada y sin repetir.
     expect(unitsFindRefs).toHaveBeenCalledTimes(1)
     expect(unitsFindRefs).toHaveBeenCalledWith([LITRO, MILILITRO], COMPANY)
@@ -311,7 +311,7 @@ describe('la ficha lleva el contenido y la unidad de la presentacion de cada lin
       new Map([[ORIGINAL, REF_ORIGINAL]]),
     )
 
-    expect(vista.presentationLines[0]).toMatchObject({ presentationContent: null, presentationUnitLabel: null })
+    expect(vista.lines[0]?.presentationLines[0]).toMatchObject({ presentationContent: null, presentationUnitLabel: null })
   })
 })
 
@@ -319,8 +319,8 @@ describe('la ficha lleva la imagen de la receta', () => {
   it('la de la receta del pedido; sin receta en el catalogo, null', async () => {
     const conImagen = dobles(fila(VERSION), [{ ...REF_VERSION, imageUrl: 'https://cdn.test/recetas/crema.png' }])
 
-    expect((await createGetOrder(conImagen)(ORDER_ID, ADMIN)).recipeImageUrl).toBe('https://cdn.test/recetas/crema.png')
-    expect((await createGetOrder(dobles(fila(VERSION), []))(ORDER_ID, ADMIN)).recipeImageUrl).toBeNull()
+    expect((await createGetOrder(conImagen)(ORDER_ID, ADMIN)).lines[0]?.recipeImageUrl).toBe('https://cdn.test/recetas/crema.png')
+    expect((await createGetOrder(dobles(fila(VERSION), []))(ORDER_ID, ADMIN)).lines[0]?.recipeImageUrl).toBeNull()
   })
 })
 
@@ -330,15 +330,15 @@ describe('getOrder — el importe y su parte de envases', () => {
 
     const vista = await createGetOrder(dobles(conImporte))(ORDER_ID, ADMIN)
 
-    expect(vista.ingredientsCost).toBe('30.0000')
-    expect(vista.packagingCost).toBe('4.5000')
+    expect(vista.lines[0]?.ingredientsCost).toBe('30.0000')
+    expect(vista.lines[0]?.packagingCost).toBe('4.5000')
   })
 
   it('sin importe, los dos salen null y no "0.0000"', async () => {
     const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
 
-    expect(vista.ingredientsCost).toBeNull()
-    expect(vista.packagingCost).toBeNull()
+    expect(vista.lines[0]?.ingredientsCost).toBeNull()
+    expect(vista.lines[0]?.packagingCost).toBeNull()
   })
 })
 
@@ -350,17 +350,17 @@ describe('QC-305 — getOrder: el coste real y quien lo ve (R24)', () => {
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.actualCost).toBe('27.1250')
-    expect(vista.actualCost).toMatch(/^\d+\.\d{4}$/)
+    expect(vista.actualCostTotal).toBe('27.1250')
+    expect(vista.actualCostTotal).toMatch(/^\d+\.\d{4}$/)
     // El real no pisa el estimado: los dos viajan juntos y distintos.
-    expect(vista.ingredientsCost).toBe('30.0000')
+    expect(vista.lines[0]?.ingredientsCost).toBe('30.0000')
   })
 
   it('R24: un pedido sin coste real sale con actualCost null, no "0.0000" ni ausente', async () => {
     const vista = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
 
-    expect(vista).toHaveProperty('actualCost')
-    expect(vista.actualCost).toBeNull()
+    expect(vista).toHaveProperty('actualCostTotal')
+    expect(vista.actualCostTotal).toBeNull()
   })
 
   for (const [etiqueta, actor] of [
@@ -386,17 +386,17 @@ describe('QC-307 — getOrder: el precio de venta', () => {
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.salePrice).toBe('1250.5000')
-    expect(vista.ingredientsCost).toBe('30.0000')
+    expect(vista.lines[0]?.salePrice).toBe('1250.5000')
+    expect(vista.lines[0]?.ingredientsCost).toBe('30.0000')
   })
 
   it('QC-307 R6: un pedido sin precio sale con salePrice null, no "0.0000" ni ausente; un 0 sale como 0', async () => {
     const sinPrecio = await createGetOrder(dobles(fila(ORIGINAL)))(ORDER_ID, ADMIN)
     const conCero = await createGetOrder(dobles({ ...fila(ORIGINAL), salePrice: '0.0000' }))(ORDER_ID, ADMIN)
 
-    expect(sinPrecio).toHaveProperty('salePrice')
-    expect(sinPrecio.salePrice).toBeNull()
-    expect(conCero.salePrice).toBe('0.0000')
+    expect(sinPrecio.lines[0]).toHaveProperty('salePrice')
+    expect(sinPrecio.lines[0]?.salePrice).toBeNull()
+    expect(conCero.lines[0]?.salePrice).toBe('0.0000')
   })
 
   for (const [etiqueta, actor] of [

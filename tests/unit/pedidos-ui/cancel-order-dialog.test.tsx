@@ -80,27 +80,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: '22222222-2222-4222-8222-222222222222',
-    recipeName: 'Esmalte azul',
-    recipeVersion: null,
-    quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -293,17 +281,20 @@ describe('el diálogo nombra las recetas que se cancelan y las que se quedan (R3
   }
 
   it('R36: lista las cancelables y, aparte, las que se quedan como están', () => {
+    // Un campo plano que el tipo ya no declara, colado a proposito: el dialogo no debe leerlo.
     montar(
-      pedido({
-        status: 'PARCIAL',
-        recipeName: 'Esmalte azul',
-        lines: [
-          receta(1, 'PENDIENTE', 'Desengrasante'),
-          receta(2, 'TERMINADO', 'Hipoclorito 5 %'),
-          receta(3, 'EN_CURSO', 'Jabón líquido'),
-          receta(4, 'BLOQUEADO', 'Suavizante'),
-        ],
-      }),
+      Object.assign(
+        pedido({
+          status: 'PARCIAL',
+          lines: [
+            receta(1, 'PENDIENTE', 'Desengrasante'),
+            receta(2, 'TERMINADO', 'Hipoclorito 5 %'),
+            receta(3, 'EN_CURSO', 'Jabón líquido'),
+            receta(4, 'BLOQUEADO', 'Suavizante'),
+          ],
+        }),
+        { recipeName: 'Esmalte azul' },
+      ),
     );
 
     expect(screen.getByTestId(CANCEL_ORDER_CANCELLED_LINES_TESTID)).toHaveTextContent(

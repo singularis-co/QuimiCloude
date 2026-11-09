@@ -278,39 +278,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     id: crypto.randomUUID(),
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: CANTIDAD,
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-
-      {
-        presentationId: PRESENTACION.id,
-        presentationName: PRESENTACION.name,
-        packages: 1,
-        packagingProductId: null,
-        packagingName: null,
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-
-    ],
-    unitId: UNIDAD.id,
-    unitLabel: UNIDAD.symbol,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -649,7 +625,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     // `valueAsNumber`, y «12.5000» y «12.5» son el mismo numero pero no la misma cadena: el
     // sub-panel precarga la cantidad sin los ceros de relleno.
     expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('12.5');
-    expect(elPedido.quantity, 'el dato del pedido NO se toca, solo lo que el campo muestra').toBe(
+    expect(elPedido.lines[0]?.quantity, 'el dato del pedido NO se toca, solo lo que el campo muestra').toBe(
       CANTIDAD,
     );
   });

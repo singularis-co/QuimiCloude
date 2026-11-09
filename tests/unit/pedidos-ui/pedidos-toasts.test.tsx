@@ -198,37 +198,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: '100.0000',
     priority: 'MEDIA',
     status: 'POR_EMPACAR',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-      {
-        presentationId: '44444444-4444-4444-8444-444444444444',
-        presentationName: '20 L',
-        packages: 2,
-        packagingProductId: ENVASE_ID,
-        packagingName: 'Bidón PET 20 L',
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-    ],
-    unitId: UNIDAD.id,
-    unitLabel: UNIDAD.symbol,
     pendingDelivery: { kind: 'not_packed' },
     customer: { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601', name: 'Ana Garcia', isDeleted: false },
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -338,7 +316,7 @@ const CASOS: readonly Caso[] = [
     actuar: async (user) => {
       render(
         <OrderSheet
-          order={pedido({ status: 'EN_CURSO', presentationLines: [], lines: [lineaPedido({ status: 'EN_CURSO' })] })}
+          order={pedido({ status: 'EN_CURSO', lines: [lineaPedido({ status: 'EN_CURSO' })] })}
           recipes={RECETAS}
           units={[UNIDAD]}
           bridge={null}
@@ -395,7 +373,17 @@ const CASOS: readonly Caso[] = [
             quantity: '100.0000',
             unitId: UNIDAD.id,
             unitLabel: UNIDAD.symbol,
-            presentationLines: pedido().presentationLines,
+            presentationLines: [
+              {
+                presentationId: '44444444-4444-4444-8444-444444444444',
+                presentationName: '20 L',
+                packages: 2,
+                packagingProductId: ENVASE_ID,
+                packagingName: 'Bidón PET 20 L',
+                presentationContent: null,
+                presentationUnitLabel: null,
+              },
+            ],
           })}
           units={[UNIDAD]}
           open
