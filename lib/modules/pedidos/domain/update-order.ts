@@ -10,7 +10,7 @@ import { isStartedOrderStatus, type OrderLineStatus } from './order-classificati
 import type { StoredOrderCost } from './order-cost';
 import { requireAliveCustomer } from './order-customer';
 import { isUnchangedOrderLine } from './order-edit-change';
-import { updateOrderWithLinesSchema, type OrderLineInput } from './order-input';
+import { updateOrderSchema, type OrderLineInput } from './order-input';
 import {
   assertNoDuplicateOrderRecipe,
   assertOrderLineEditable,
@@ -113,7 +113,7 @@ export function createUpdateOrder(
     const scope: OrderScope = { companyId: actor.companyId };
     const companyId = actor.companyId;
 
-    const parsed = updateOrderWithLinesSchema.safeParse(input);
+    const parsed = updateOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const { confirmBlocked, priority, customerId, lines: entry } = parsed.data;
 

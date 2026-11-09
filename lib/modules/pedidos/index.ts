@@ -105,6 +105,7 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
+  cancelOrderLineSchema,
   quoteOrderCostSchema,
   presentationLinesSchema,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
@@ -176,8 +177,6 @@ export type { GetOrderDeps } from './domain/get-order';
 export { createListOrders } from './domain/list-orders';
 export type { ListOrdersDeps } from './domain/list-orders';
 export { createUpdateOrder } from './domain/update-order';
-/** Las lineas vivas de un pedido, para que el formulario de una receta nombre la que edita. */
-export { createListOrderLineIds } from './domain/list-order-line-ids';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';

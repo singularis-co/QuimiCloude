@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { PERMISSIONS } from '@/lib/modules/identity';
-import { createOrderSchema, updateOrderSchema } from '@/lib/modules/pedidos';
+import { createOrderSchema, orderLineInputSchema, updateOrderSchema } from '@/lib/modules/pedidos';
 
 function findRepoRoot(startDir: string): string {
   let dir = startDir;
@@ -267,12 +267,12 @@ describe('R21 — no hay accion manual de desbloqueo', () => {
     expect(stripComments(fuente)).not.toMatch(/\breviewBlockedOrders\b|\bcreateReviewBlockedOrders\b/);
   });
 
+  // QT-314 R40: el pedido es una lista de recetas; ni el pedido ni sus recetas declaran estado.
   it('R21: el esquema del formulario de pedido no declara estado y descarta uno que llegue', () => {
-    expect(Object.keys(createOrderSchema.shape).sort()).toEqual([
-      'confirmBlocked',
-      'customerId',
+    expect(Object.keys(createOrderSchema.shape).sort()).toEqual(['confirmBlocked', 'customerId', 'lines', 'priority']);
+    expect(Object.keys(orderLineInputSchema.shape).sort()).toEqual([
+      'id',
       'presentationLines',
-      'priority',
       'quantity',
       'recipeId',
       'recipeVersionId',
@@ -281,14 +281,20 @@ describe('R21 — no hay accion manual de desbloqueo', () => {
     ]);
 
     const conEstado = {
-      recipeId: '00000000-0000-4000-8000-000000000001',
-      unitId: '00000000-0000-4000-8000-000000000002',
-      quantity: '10',
+      lines: [
+        {
+          recipeId: '00000000-0000-4000-8000-000000000001',
+          unitId: '00000000-0000-4000-8000-000000000002',
+          quantity: '10',
+          status: 'PENDIENTE',
+        },
+      ],
       status: 'PENDIENTE',
     };
     for (const esquema of [createOrderSchema, updateOrderSchema]) {
       const resultado = esquema.parse(conEstado);
       expect(resultado).not.toHaveProperty('status');
+      expect(resultado.lines[0]).not.toHaveProperty('status');
     }
   });
 

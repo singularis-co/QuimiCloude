@@ -60,6 +60,8 @@ type Escenario = {
   readonly admin: Actor;
   readonly customerId: string;
   readonly orderId: string;
+  /** La receta del pedido: las lecturas de entregas son por receta (QT-314 R33, R35). */
+  readonly orderLineId: string;
   /** Linea de 5 envases de 2 L y linea de 3 envases de 1 L. */
   readonly lineId: string;
   readonly smallLineId: string;
@@ -81,7 +83,7 @@ async function crearEscenario(): Promise<Escenario> {
   const customerId = await crearCliente(a, 'Garcia');
   const presentationId = await crearPresentacion(a, '2.0000');
   const smallPresentationId = await crearPresentacion(a, '1.0000');
-  const { orderId, lineIds } = await crearPedido(a, 'TERMINADO', customerId, [
+  const { orderId, lineIds, orderLineId } = await crearPedido(a, 'TERMINADO', customerId, [
     { presentationId, packages: 5 },
     { presentationId: smallPresentationId, packages: 3 },
   ]);
@@ -96,6 +98,7 @@ async function crearEscenario(): Promise<Escenario> {
     admin: administrador(a),
     customerId,
     orderId,
+    orderLineId,
     lineId: lineIds[0] as string,
     smallLineId: lineIds[1] as string,
     presentationId,
@@ -366,7 +369,7 @@ describe('voidDelivery contra Postgres', () => {
       const deliveryId = await entregarTodo(e);
       await anular(e, deliveryId, [e.lineId]);
 
-      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.orderLineId, e.a.actor);
       const [grande, chica] = vista.lines;
       expect(grande).toMatchObject({
         presentationLineId: e.lineId,
@@ -623,7 +626,7 @@ describe('voidDelivery con varios clientes contra Postgres', () => {
         [`${e.customerId}|${e.lineId}|${e.batchId}`, `${e.customerId}|${e.lineId}|${e.secondBatchId}`].sort(),
       );
 
-      const vista = await pedidos.listOrderDeliveries(e.orderId, e.admin);
+      const vista = await pedidos.listOrderDeliveries(e.orderId, e.orderLineId, e.admin);
       const [entrega] = vista.deliveries;
       expect(entrega?.packages).toBe(8);
       expect(entrega?.customers.map((c) => [c.customerId, c.customerName])).toEqual([
@@ -704,7 +707,7 @@ describe('voidDelivery con varios clientes contra Postgres', () => {
       expect(await stockDeLote(e.smallBatchId)).toBe('5.0000');
       await expectLibroCuadra([e.batchId, e.secondBatchId, e.smallBatchId]);
 
-      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.orderLineId, e.a.actor);
       const [grande, chica] = vista.lines;
       expect(grande).toMatchObject({ presentationLineId: e.lineId, deliveredPackages: 0, remainingPackages: 5 });
       expect(chica).toMatchObject({ presentationLineId: e.smallLineId, deliveredPackages: 1, remainingPackages: 2 });
@@ -755,7 +758,7 @@ describe('listOrderDeliveries contra Postgres', () => {
       await anular(e, segunda, [e.lineId], { reason: '  Lote mal etiquetado ' });
       await prisma.customer.update({ where: { id: e.customerId }, data: { deletedAt: new Date() } });
 
-      const vista = await pedidos.listOrderDeliveries(e.orderId, e.admin);
+      const vista = await pedidos.listOrderDeliveries(e.orderId, e.orderLineId, e.admin);
 
       const nombres = new Map(
         (
@@ -827,7 +830,7 @@ describe('listOrderDeliveries contra Postgres', () => {
   it('R8: un pedido sin entregas devuelve la lista vacia', async () => {
     const e = await crearEscenario();
     try {
-      const vista = await pedidos.listOrderDeliveries(e.orderId, e.admin);
+      const vista = await pedidos.listOrderDeliveries(e.orderId, e.orderLineId, e.admin);
 
       expect(vista).toMatchObject({ orderId: e.orderId, orderStatus: 'TERMINADO', deliveries: [] });
     } finally {
@@ -840,15 +843,15 @@ describe('listOrderDeliveries contra Postgres', () => {
     try {
       await entregarTodo(e);
       const presentationB = await crearPresentacion(e.b, '1.0000');
-      const { orderId: orderB } = await crearPedido(e.b, 'TERMINADO', null, [{ presentationId: presentationB, packages: 1 }]);
-      const { orderId: borrado } = await crearPedido(e.a, 'PENDIENTE', e.customerId, []);
+      const { orderId: orderB, orderLineId: lineB } = await crearPedido(e.b, 'TERMINADO', null, [{ presentationId: presentationB, packages: 1 }]);
+      const { orderId: borrado, orderLineId: lineBorrado } = await crearPedido(e.a, 'PENDIENTE', e.customerId, []);
       await prisma.order.update({ where: { id: borrado }, data: { deletedAt: new Date() } });
       const sinPermiso: Actor = { ...e.admin, permissions: ['entregas.anular', 'entregas.modificar'] };
 
-      expect(await codigoDe(pedidos.listOrderDeliveries(e.orderId, sinPermiso))).toBe('unauthorized');
-      expect(await codigoDe(pedidos.listOrderDeliveries(orderB, e.admin))).toBe('order_not_found');
-      expect(await codigoDe(pedidos.listOrderDeliveries(randomUUID(), e.admin))).toBe('order_not_found');
-      expect(await codigoDe(pedidos.listOrderDeliveries(borrado, e.admin))).toBe('order_not_found');
+      expect(await codigoDe(pedidos.listOrderDeliveries(e.orderId, e.orderLineId, sinPermiso))).toBe('unauthorized');
+      expect(await codigoDe(pedidos.listOrderDeliveries(orderB, lineB, e.admin))).toBe('order_not_found');
+      expect(await codigoDe(pedidos.listOrderDeliveries(randomUUID(), e.orderLineId, e.admin))).toBe('order_not_found');
+      expect(await codigoDe(pedidos.listOrderDeliveries(borrado, lineBorrado, e.admin))).toBe('order_not_found');
       expect(await escritoPorEntregas(e.b.companyId)).toEqual({ entregas: 0, lineas: 0, asientos: 0 });
     } finally {
       await borrarEscenario(e);

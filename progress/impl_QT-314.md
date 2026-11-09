@@ -154,3 +154,48 @@ Notas:
 - Las opciones del selector usan `aria-disabled` y no `disabled`: siguen siendo enfocables y el lector lee el motivo.
 
 Veredicto: T9, T10 y T12 hechas, en verde, sin cablear.
+
+## Tanda 3 — el cambio de la pantalla y del contrato
+
+### T13 (backend_dev)
+
+Una sesión anterior dejó T13 a medias sin commit; esta la revisa contra design § 3.1 y § 3.2 y la termina.
+
+Archivos de `lib/`:
+- modificados: `lib/composition/index.ts` (fuera `listOrderLineIds`), `lib/modules/pedidos/index.ts` (fuera `createListOrderLineIds`; publica `cancelOrderLineSchema`), `domain/order-input.ts` (borrados los esquemas planos y los nombres provisionales: `createOrderSchema`/`updateOrderSchema` son los de `lines`, `updateOrderDistributionSchema` lleva `lineId`; `quoteOrderCostSchema` y `orderPresentationAvailabilitySchema` salen de `orderLineInputSchema.pick`), `domain/create-order.ts`, `domain/update-order.ts`, `domain/get-order-delivery.ts` y `domain/list-order-deliveries.ts` (`lineId` obligatorio; `lineStatus` ya no es `null`), `adapters/driving/order-actions.ts` (`createOrderAction(input)`, `updateOrderAction(id, input)`, `OrderLinesErrorState`, `UpdateOrderFormState`, reparto con `parsed.data.lineId`, cotización sin `withOrderLine`, lecturas de entregas con `lineId: string`; borrados `buildCreateCandidate`, `buildUpdateCandidate`, `readPresentationLines`, `singleLineIdOf`, `requireSingleLineIdOf`, `withOrderLine` y los lectores de `FormData` que solo usaban ellos).
+- borrado: `lib/modules/pedidos/domain/list-order-line-ids.ts` (no tenía test propio).
+
+Archivos de `tests/`:
+- de la sesión anterior: `fixtures/order-delivery-void.ts`, `unit/identity/session-once-per-request-actions.test.ts`, `unit/pedidos/{get-order-delivery,list-order-deliveries,order-actions,order-actions-customer,order-actions-delivery,order-actions-delivery-void,order-actions-distribution,order-input}.test.ts`.
+- de esta sesión: `unit/pedidos/order-input-lines.test.ts` (nombres finales + bloque R40), `unit/pedidos/qc138-transversales.test.ts` (R21 sobre la forma con `lines`), `unit/pedidos/qc195-contrato-tipos.test.ts` (`lineId` en `UpdateOrderDistributionInput`), `integration/pedidos/order-delivery.int.test.ts` y `order-delivery-void.int.test.ts` (pasan la receta del escenario, `crearPedido(...).orderLineId`), `integration/pedidos/order-delivery-by-line.int.test.ts` (fuera los dos casos de la lectura sin receta, que ya no existe).
+
+Mapa `R<n> -> test`:
+- R14 -> `order-actions.test.ts` > «R14: la cotizacion entrega la entrada tal cual, con el orderLineId que manda el sub-panel», «R14: un orderId en la cotizacion ya no se cambia por una receta del pedido»
+- R15 -> `order-actions.test.ts` > «R15: order_would_block del alta y de la edicion trae las posiciones de las recetas que bloquearian», «R15: un fallo de receta trae su codigo, el mensaje del catalogo y su posicion, sin el diagnostico», «R15: las posiciones salen de menor a mayor y sin repetir»
+- R31 -> `order-actions-distribution.test.ts` > «R31: llama a la fachada con la receta, el unitId y las lineas ya validadas…», «R31: en un pedido de dos recetas entrega la receta de la entrada, sin leer las del pedido ni rechazarlo», «R31: sin lineId, o con uno sin forma de uuid, responde invalid_input sin llamar a la fachada»
+- R40 -> `order-input-lines.test.ts` > «R40: createOrderSchema y updateOrderSchema son un pedido con lines; updateOrderDistributionSchema lleva lineId», «R40: una receta suelta, sin lines, ya no es un pedido valido»; `qc138-transversales.test.ts` > «R21: el esquema del formulario de pedido no declara estado…» (forma con `lines`)
+- R41 -> `order-actions.test.ts` > «R41: el alta de tres recetas llega intacta al caso de uso…», «R41: la edicion de tres recetas (dos guardadas y una nueva) llega intacta al caso de uso», «R41: ninguna de las dos lee las recetas del pedido para completar la entrada»
+- R33/R35 con `lineId` obligatorio -> `get-order-delivery.test.ts` > «R33: la receta es obligatoria: sin ella responde order_not_found sin consultar»; `list-order-deliveries.test.ts` > «R35: la receta es obligatoria: sin ella responde order_not_found sin leer nada»; `order-actions-delivery.test.ts` > «R33: getOrderDeliveryAction pasa el pedido, la receta…», «R35: listOrderDeliveriesAction pasa el pedido, la receta…»
+- QT-313 R44 (retirado): los dos tests «R44: el alta envia una linea…» y «R44: editar desde el formulario un pedido de dos lineas responde invalid_input…» de `order-actions.test.ts` se reescribieron a R41 (los tres de arriba).
+
+Grep del «Hecho» (`createOrderWithLinesSchema|updateOrderWithLinesSchema|updateOrderLineDistributionSchema|requireSingleLineIdOf|listOrderLineIds` en `lib/ app/ tests/`): un solo resultado, `tests/unit/pedidos/order-actions.test.ts:1086`, que es la guardia R41 que busca esos nombres por regex en el fuente de `order-actions.ts` para afirmar que NO están. Se deja: sin el literal no hay guardia.
+
+Verificación (salida real, por archivo):
+- `order-input-lines` 18 passed · `order-input` 56 passed · `order-actions` 36 passed · `order-actions-distribution` 26 passed · `order-actions-delivery` 31 passed · `order-actions-delivery-void` 25 passed · `order-actions-customer` 26 passed · `get-order-delivery` 43 passed · `list-order-deliveries` 27 passed · `qc138-transversales` 12 passed · `qc195-contrato-tipos` 6 passed · `session-once-per-request-actions` 118 passed · `pedidos-convenciones` 20 passed | 3 skipped.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87) · Tests 1333 passed | 22 skipped (1355)`.
+- Integración (`order-delivery*.int.test.ts`): NO corridos, el worktree no tiene `.env` (`test-db: falta DATABASE_URL`). Compilan (typecheck).
+- `pnpm run lint`: `0 errors, 11 warnings` (todas en archivos ajenos).
+- `pnpm run typecheck`: `lib/` y los tests que toca T13 en verde. Quedan, para frontend_dev:
+  - `app/(private)/pedidos/components/order-deliveries-sheet.tsx(39)`: `listOrderDeliveriesAction` pide `lineId` (T16)
+  - `app/(private)/pedidos/components/order-delivery-sheet.tsx(128)`: `getOrderDeliveryAction` pide `lineId` (T16)
+  - `app/(private)/pedidos/components/order-form.tsx(334, 339)`: `createOrderAction(input)` / `updateOrderAction(id, input)` (T14)
+  - `app/(private)/pedidos/components/order-ingredients-table.tsx(110)`: `createOrderSchema.shape.quantity` -> `orderLineInputSchema.shape.quantity` (T14)
+  - `tests/unit/pedidos-ui/order-form.test.tsx(1221, 1262)`: `CreateOrderFormState` de error exige `linePositions` (T14 reescribe `order-form*.test.tsx`)
+  - `tests/unit/pedidos-ui/order-sheet.test.tsx(557)`: idem, `CreateOrderFormState` sin `linePositions` (T15)
+  - `app/layout.tsx(45) LayoutProps`: ajeno, conocido.
+
+Decisiones nuevas:
+- `updateOrderAction` devuelve `UpdateOrderFormState` (con `linePositions` en el error), distinto de `OrderMutationFormState`, que se queda para cancelar, borrar y cliente.
+- El test R40 compara por identidad lo publicado en `@/lib/modules/pedidos` con `order-input.ts` en vez de buscar por texto los nombres viejos, para no añadir más literales al Grep del «Hecho».
+
+Veredicto: T13 hecha; `lib/` y sus tests en verde; la pantalla queda rota en los 5 puntos de `app/` listados, que arreglan T14–T16.

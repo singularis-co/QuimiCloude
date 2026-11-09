@@ -169,7 +169,6 @@ describe('QT-314 T4 — entregas por receta contra la base', () => {
       expect(repartoA.customer?.id).toBe(e.customerId);
 
       expect(await codigoDelFallo(() => pedidos.getOrderDelivery(e.orderId, e.lineB, actor))).toBe('action_not_allowed');
-      expect(await codigoDelFallo(() => pedidos.getOrderDelivery(e.orderId, actor))).toBe('action_not_allowed');
 
       const entregasA = await pedidos.listOrderDeliveries(e.orderId, e.lineA, actor);
       expect(entregasA).toMatchObject({ orderStatus: 'PARCIAL', lineStatus: 'TERMINADO' });
@@ -184,13 +183,6 @@ describe('QT-314 T4 — entregas por receta contra la base', () => {
       ).toEqual([
         [soloB, 2, [e.presentationLineB]],
         [mezclada, 1, [e.presentationLineB]],
-      ]);
-
-      const todas = await pedidos.listOrderDeliveries(e.orderId, actor);
-      expect(todas.lineStatus).toBeNull();
-      expect(todas.deliveries.map((d) => [d.id, d.packages])).toEqual([
-        [soloB, 2],
-        [mezclada, 3],
       ]);
     } finally {
       await borrarEscenario(e);

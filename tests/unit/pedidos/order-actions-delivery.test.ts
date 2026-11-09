@@ -70,6 +70,7 @@ const SESSION_USER = {
 
 const COMPANY_ID = '33333333-3333-4333-8333-333333333333'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
+const LINE_ID = 'c0000000-0000-4000-8000-00000000000a'
 
 const EXPECTED_ACTOR = {
   id: SESSION_USER.id,
@@ -81,7 +82,7 @@ const DELIVERY_ACTIONS = [
   {
     nombre: 'getOrderDeliveryAction',
     useCase: getOrderDeliveryMock,
-    invocar: () => getOrderDeliveryAction(DELIVERY_ORDER_ID),
+    invocar: () => getOrderDeliveryAction(DELIVERY_ORDER_ID, LINE_ID),
   },
   {
     nombre: 'deliverOrderAction',
@@ -111,15 +112,15 @@ beforeEach(() => {
 })
 
 describe('Server Actions de la entrega: entrada, actor y resultado', () => {
-  it('R2, R5: getOrderDeliveryAction entrega el id y el actor de la sesion, y devuelve la vista tal cual', async () => {
+  it('R2, R5: getOrderDeliveryAction entrega el id, la receta y el actor de la sesion, y devuelve la vista tal cual', async () => {
     const view = deliveryView()
     getOrderDeliveryMock.mockResolvedValue(view)
 
-    const result = await getOrderDeliveryAction(DELIVERY_ORDER_ID)
+    const result = await getOrderDeliveryAction(DELIVERY_ORDER_ID, LINE_ID)
 
     expect(result).toEqual({ status: 'success', data: view })
     expect(getOrderDeliveryMock).toHaveBeenCalledTimes(1)
-    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, undefined, EXPECTED_ACTOR)
+    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINE_ID, EXPECTED_ACTOR)
   })
 
   it('R22: deliverOrderAction pasa la entrada tal cual al caso de uso, sin quitar ni anadir campos', async () => {
@@ -205,7 +206,6 @@ describe('Server Actions de la entrega: traduccion de errores', () => {
 })
 
 describe('QT-314 T4 — las actions de entregas pasan la receta', () => {
-  const LINE_ID = 'c0000000-0000-4000-8000-00000000000a'
 
   it('R33: getOrderDeliveryAction pasa el pedido, la receta y el actor de la sesion, y devuelve la vista tal cual', async () => {
     const view = deliveryView()
@@ -223,16 +223,6 @@ describe('QT-314 T4 — las actions de entregas pasan la receta', () => {
     expect(await listOrderDeliveriesAction(DELIVERY_ORDER_ID, LINE_ID)).toEqual({ status: 'success', data: view })
     expect(listOrderDeliveriesMock).toHaveBeenCalledTimes(1)
     expect(listOrderDeliveriesMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINE_ID, EXPECTED_ACTOR)
-  })
-
-  it('R33, R35: sin receta las dos pasan lineId undefined, como hoy', async () => {
-    listOrderDeliveriesMock.mockResolvedValue(deliveryHistoryView())
-
-    await getOrderDeliveryAction(DELIVERY_ORDER_ID)
-    await listOrderDeliveriesAction(DELIVERY_ORDER_ID)
-
-    expect(getOrderDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, undefined, EXPECTED_ACTOR)
-    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, undefined, EXPECTED_ACTOR)
   })
 
   it('R33: el rechazo por la receta vuelve como el ErrorState del catalogo', async () => {

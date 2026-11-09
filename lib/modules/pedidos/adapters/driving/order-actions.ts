@@ -7,9 +7,6 @@ import {
   type ErrorState,
 } from '@/lib/modules/errores';
 import {
-  ORDER_DISTRIBUTION_PACKAGES_FIELD,
-  ORDER_DISTRIBUTION_PACKAGING_FIELD,
-  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
   IncompatibleUnitsError,
   InsufficientMaterialError,
   OrderDistributionExceedsQuantityError,
@@ -24,6 +21,7 @@ import {
   ProductNotFoundError,
   UnitNotFoundError,
   ValidationError,
+  linePositionsOf,
   requirePermission,
   updateOrderDistributionSchema,
   type Actor,
@@ -56,10 +54,10 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * `inventario`: la action se prueba contra dobles y nunca contra la sesion real.
  *
  * FORMA DE ENTRADA, decidida por operacion (decision cerrada 19, R54):
- * - `create`/`update`/`cancel`/`delete` son mutaciones que salen de un formulario (QC-35):
- *   reciben `FormData`. Los esquemas (`createOrderSchema`, `updateOrderSchema`,
- *   `cancelOrderSchema`) viven en el CASO DE USO y esta action NO los repite: solo extrae
- *   los campos del formulario y los entrega como candidato `unknown`.
+ * - `create`/`update` reciben el pedido entero como `input: unknown`: varias recetas, cada una
+ *   con su reparto, son una estructura anidada que el panel arma y esta action entrega tal cual.
+ *   `cancel`/`delete` salen de un dialogo y reciben `FormData`. Los esquemas viven en el CASO DE
+ *   USO y esta action NO los repite.
  * - `get`/`list` son consultas que invoca un Server Component con datos que YA tiene tipados
  *   (un `id` de la URL, o una consulta de lista que quien llama ya construyo): no hay
  *   formulario del que leer. `listOrdersAction` recibe `query: unknown` porque quien valida
@@ -98,14 +96,26 @@ import type { OrderCoverage } from '@/lib/modules/inventario';
  * inventarla. QC-35 decide que revalida. Tampoco hay `fetch` a ninguna ruta propia.
  */
 
+/**
+ * El error del alta y de la edicion: el estado del catalogo y, ademas, las posiciones en `lines` de
+ * la entrada de las recetas que fallaron (vacio si el error no es de receta). Se extiende aqui el
+ * estado ya traducido, para que `ErrorState` siga siendo el mismo para todos los modulos.
+ */
+export type OrderLinesErrorState = ErrorState & { readonly linePositions: readonly number[] };
+
 /** Estado del alta: unico caso que devuelve datos ademas de exito/fracaso (el pedido creado
  *  con su correlativo, R8). */
 export type CreateOrderFormState =
   | { status: 'idle' }
   | { status: 'success'; id: string; numberText: string }
-  | ErrorState;
+  | OrderLinesErrorState;
 
-/** Estado compartido por edicion, cancelacion y borrado: ninguna de las tres devuelve datos. */
+export type UpdateOrderFormState =
+  | { status: 'idle' }
+  | { status: 'success' }
+  | OrderLinesErrorState;
+
+/** Estado compartido por las mutaciones que no devuelven datos ni posiciones de receta. */
 export type OrderMutationFormState =
   | { status: 'idle' }
   | { status: 'success' }
@@ -177,127 +187,36 @@ function readFormString(formData: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-/**
- * Un campo AUSENTE del formulario es ausencia (`undefined`), no cadena vacia, para que el
- * esquema aplique su defecto. Que hacer con un blanco lo decide el esquema, no el borde.
- */
-function readOptionalFormString(formData: FormData, name: string): string | undefined {
-  const value = formData.get(name);
-  return typeof value === 'string' ? value : undefined;
-}
-
-function readFormStrings(formData: FormData, name: string): string[] {
-  return formData.getAll(name).map((value) => (typeof value === 'string' ? value : ''));
-}
-
-/** La cadena vacia es la marca del identificador que no lleva esa posicion. */
-function emptyAsAbsent(value: string | undefined): string | undefined {
-  return value === '' ? undefined : value;
+async function toOrderLinesErrorState(error: unknown): Promise<OrderLinesErrorState> {
+  return { ...(await toErrorState(error)), linePositions: linePositionsOf(error) };
 }
 
 /**
- * Las lineas llegan como tres listas de campos repetidos, unidas por posicion: en cada una va el
- * envase o la presentacion de una linea antigua, y el otro vacio. Si las longitudes difieren, la
- * posicion sin pareja queda `undefined` y la rechaza `presentationLinesSchema`: el borde no
- * rellena ni descarta.
+ * Alta de pedido. `input` es el pedido con todas sus recetas, tal como lo arma el panel: se entrega
+ * sin tocar al caso de uso, que lo valida despues de comprobar el permiso. Devuelve el id y el numero
+ * visible ya compuesto.
  */
-function readPresentationLines(formData: FormData): unknown[] {
-  const packagingProductIds = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGING_FIELD);
-  const presentationIds = readFormStrings(formData, ORDER_DISTRIBUTION_PRESENTATION_FIELD);
-  const packages = readFormStrings(formData, ORDER_DISTRIBUTION_PACKAGES_FIELD);
-  const length = Math.max(packagingProductIds.length, presentationIds.length, packages.length);
-  return Array.from({ length }, (_, index) => ({
-    packagingProductId: emptyAsAbsent(packagingProductIds[index]),
-    presentationId: emptyAsAbsent(presentationIds[index]),
-    packages: packages[index],
-  }));
-}
-
-/**
- * El formulario de hoy envia una sola receta: el candidato es un pedido de una linea con esos
- * campos, y la prioridad, el cliente y la confirmacion quedan en el pedido. No lleva `status`, ni
- * motivo, ni correlativo, ni autores: lo que el esquema del caso de uso no declara no puede llegar.
- * La validacion es la del caso de uso, despues de su comprobacion de permiso.
- */
-function buildCreateCandidate(formData: FormData, lineId?: string): unknown {
-  return {
-    lines: [
-      {
-        ...(lineId === undefined ? {} : { id: lineId }),
-        recipeId: readFormString(formData, 'recipeId'),
-        quantity: readFormString(formData, 'quantity'),
-        unitId: readFormString(formData, 'unitId'),
-        presentationLines: readPresentationLines(formData),
-        recipeVersionId: readOptionalFormString(formData, 'recipeVersionId'),
-        // Que hacer con un blanco lo decide el esquema, no el borde.
-        salePrice: readOptionalFormString(formData, 'salePrice'),
-      },
-    ],
-    priority: readOptionalFormString(formData, 'priority'),
-    // Solo la cadena exacta confirma: cualquier otro valor, o la ausencia, es no confirmar.
-    confirmBlocked: formData.get('confirmBlocked') === 'true',
-    customerId: readOptionalFormString(formData, 'customerId'),
-  };
-}
-
-/**
- * La edicion es un reemplazo completo, asi que el candidato nombra la unica linea del pedido para
- * editarla en vez de quitarla y anadir otra. Un `status` que el formulario siga enviando se ignora.
- */
-function buildUpdateCandidate(formData: FormData, lineId: string): unknown {
-  return buildCreateCandidate(formData, lineId);
-}
-
-/**
- * La linea que edita el formulario de una receta: la unica del pedido. Con varias, reenviar una
- * sola receta quitaria las demas, asi que se rechaza sin escribir; sin ninguna no hay que nombrar.
- */
-async function singleLineIdOf(orderId: string, actor: Actor | null): Promise<string | undefined> {
-  const ids = await pedidos.listOrderLineIds(orderId, actor);
-  if (ids.length > 1) throw new ValidationError(`el pedido ${orderId} tiene ${String(ids.length)} lineas`);
-  return ids[0];
-}
-
-async function requireSingleLineIdOf(orderId: string, actor: Actor | null): Promise<string> {
-  const lineId = await singleLineIdOf(orderId, actor);
-  if (lineId === undefined) throw new ValidationError(`el pedido ${orderId} no tiene lineas`);
-  return lineId;
-}
-
-/** Alta de pedido (R8, R9, R15, R16). Devuelve el id y el numero visible ya compuesto. */
-export async function createOrderAction(
-  prevState: CreateOrderFormState,
-  formData: FormData,
-): Promise<CreateOrderFormState> {
-  void prevState;
-
+export async function createOrderAction(input: unknown): Promise<CreateOrderFormState> {
   const actor = await currentActor();
 
   try {
-    const created = await pedidos.createOrder(buildCreateCandidate(formData), actor);
+    const created = await pedidos.createOrder(input, actor);
     return { status: 'success', id: created.id, numberText: created.numberText };
   } catch (error) {
-    return toErrorState(error);
+    return toOrderLinesErrorState(error);
   }
 }
 
-/** Edicion de pedido: reemplazo completo del conjunto de datos de negocio (R20, R21, R22).
- *  El `id` es ARGUMENTO y no campo del formulario, como en `proveedores`. */
-export async function updateOrderAction(
-  id: string,
-  prevState: OrderMutationFormState,
-  formData: FormData,
-): Promise<OrderMutationFormState> {
-  void prevState;
-
+/** Edicion de pedido: reemplazo completo, con todas sus recetas, entregado sin tocar al caso de uso.
+ *  El `id` es ARGUMENTO y no campo de la entrada, como en `proveedores`. */
+export async function updateOrderAction(id: string, input: unknown): Promise<UpdateOrderFormState> {
   const actor = await currentActor();
 
   try {
-    const lineId = await requireSingleLineIdOf(id, actor);
-    await pedidos.updateOrder(id, buildUpdateCandidate(formData, lineId), actor);
+    await pedidos.updateOrder(id, input, actor);
     return { status: 'success' };
   } catch (error) {
-    return toErrorState(error);
+    return toOrderLinesErrorState(error);
   }
 }
 
@@ -460,21 +379,11 @@ export async function quoteOrderCostAction(input: unknown): Promise<OrderCostQuo
   const actor = await currentActor();
 
   try {
-    const data = await pedidos.quoteOrderCost(await withOrderLine(input, actor), actor);
+    const data = await pedidos.quoteOrderCost(input, actor);
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
   }
-}
-
-/** El formulario de edicion cotiza con el `orderId` del pedido; el caso de uso cuenta como propio lo
- *  apartado por su linea, asi que el pedido se cambia por su unica linea. */
-async function withOrderLine(input: unknown, actor: Actor | null): Promise<unknown> {
-  if (typeof input !== 'object' || input === null || !('orderId' in input)) return input;
-  const { orderId, ...rest } = input;
-  if (typeof orderId !== 'string') return input;
-  const orderLineId = await singleLineIdOf(orderId, actor);
-  return orderLineId === undefined ? rest : { ...rest, orderLineId };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -528,7 +437,7 @@ export async function updateOrderDistributionAction(
     if (!parsed.success) throw new ValidationError();
 
     const result = await pedidos.updateOrderPresentationLines(id, actor, {
-      lineId: await requireSingleLineIdOf(id, actor),
+      lineId: parsed.data.lineId,
       unitId: parsed.data.unitId,
       lines: parsed.data.presentationLines,
       confirmBlocked: parsed.data.confirmBlocked,
@@ -624,8 +533,8 @@ export async function getOrderCustomerFilterOptionAction(id: string): Promise<Or
 
 export type OrderDeliveryResult = { status: 'success'; data: OrderDeliveryView } | ErrorState;
 
-/** Lo que el sheet de entrega pinta de un pedido `TERMINADO`. */
-export async function getOrderDeliveryAction(orderId: string, lineId?: string): Promise<OrderDeliveryResult> {
+/** Lo que el sheet de entrega pinta de una receta `TERMINADO` del pedido. */
+export async function getOrderDeliveryAction(orderId: string, lineId: string): Promise<OrderDeliveryResult> {
   const actor = await currentActor();
 
   try {
@@ -662,8 +571,8 @@ export async function deliverOrderAction(input: unknown): Promise<DeliverOrderAc
 
 export type OrderDeliveriesResult = { status: 'success'; data: OrderDeliveryHistoryView } | ErrorState;
 
-/** Las entregas de un pedido, con lo anulado de cada una. */
-export async function listOrderDeliveriesAction(orderId: string, lineId?: string): Promise<OrderDeliveriesResult> {
+/** Las entregas de una receta del pedido, con lo anulado de cada una. */
+export async function listOrderDeliveriesAction(orderId: string, lineId: string): Promise<OrderDeliveriesResult> {
   const actor = await currentActor();
 
   try {

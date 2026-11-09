@@ -97,7 +97,7 @@
 
 ## Tanda 3 — el cambio de la pantalla y del contrato, en una sola tanda (backend_dev + frontend_dev)
 
-- [ ] **T13** · backend_dev · depende de la tanda 1 — Esquemas finales y fin del puente (design
+- [x] **T13** · backend_dev · depende de la tanda 1 — Esquemas finales y fin del puente (design
   § 3.1, § 3.2):
   - renombrar los esquemas y borrar los planos;
   - `createOrderAction(input)`, `updateOrderAction(id, input)` y `OrderLinesErrorState` con

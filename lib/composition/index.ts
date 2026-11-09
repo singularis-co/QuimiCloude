@@ -320,7 +320,6 @@ import {
   createStartPacking,
   createTransitionOrder,
   createUpdateOrder,
-  createListOrderLineIds,
   createUpdateOrderPresentationLines,
   formatOrderNumber,
 } from '@/lib/modules/pedidos';
@@ -1788,7 +1787,6 @@ export const pedidos = {
     unitOfWork: orderUnitOfWork,
     customerCatalog,
   }),
-  listOrderLineIds: createListOrderLineIds({ orders: orderRepository }),
   cancelOrder: createCancelOrder({ unitOfWork: orderUnitOfWork }),
   cancelOrderLine: createCancelOrderLine({ unitOfWork: orderUnitOfWork }),
   deleteOrder: createDeleteOrder({ orders: orderRepository, unitOfWork: orderUnitOfWork }),

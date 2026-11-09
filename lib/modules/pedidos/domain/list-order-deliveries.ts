@@ -19,8 +19,8 @@ export type OrderDeliveryHistoryView = {
   readonly orderId: string;
   readonly numberText: string;
   readonly orderStatus: OrderStatus;
-  /** El de la receta pedida; `null` si se leyo el pedido entero. */
-  readonly lineStatus: OrderLineStatus | null;
+  /** El de la receta pedida. */
+  readonly lineStatus: OrderLineStatus;
   readonly deliveries: readonly {
     readonly id: string;
     /** ISO */
@@ -141,11 +141,10 @@ function toDeliveryView(row: DeliveryHistoryRow, names: Names): DeliveryView {
 
 async function resolveNames(
   deps: ListOrderDeliveriesDeps,
-  orderId: string,
   rows: readonly DeliveryHistoryRow[],
   now: Date,
   scope: OrderScope,
-  presentationLines: readonly FinishPackingLine[] | undefined,
+  presentationLines: readonly FinishPackingLine[],
 ): Promise<Names> {
   const lines = rows.flatMap((row) => row.lines);
   const customerIds = [...new Set(lines.map((line) => line.customerId))];
@@ -158,20 +157,17 @@ async function resolveNames(
   const batchIds = [...new Set(lines.map((line) => line.batchId))];
 
   const [presentationByLine, customerNames, people, lots] = await Promise.all([
-    (presentationLines === undefined
-      ? deps.lines.findPresentationLinesForFinish(orderId, scope)
-      : Promise.resolve(presentationLines)
-    ).then(async (orderLines) => {
-      const presentationIds = [...new Set(orderLines.map((line) => line.presentationId))];
+    (async () => {
+      const presentationIds = [...new Set(presentationLines.map((line) => line.presentationId))];
       const refs = await deps.presentations.findRefs(presentationIds, scope.companyId);
       const nameById = new Map(refs.map((ref) => [ref.id, ref.name]));
       const byLine = new Map<string, string>();
-      for (const line of orderLines) {
+      for (const line of presentationLines) {
         const name = nameById.get(line.presentationId);
         if (name !== undefined) byLine.set(line.id, name);
       }
       return byLine;
-    }),
+    })(),
     deps.customerCatalog
       .findRefsIncludingDeleted(customerIds, scope.companyId)
       .then((refs) => new Map(refs.map((ref) => [ref.id, formatOrderCustomerName(ref)]))),
@@ -183,13 +179,12 @@ async function resolveNames(
   return { presentationByLine, customerNames, people, lots };
 }
 
-type ActorArgs = readonly [actor: Actor | null | undefined] | readonly [lineId: string | undefined, actor: Actor | null | undefined];
-
-/** Sin `lineId`, todas las entregas del pedido; con `lineId`, solo lo entregado de esa receta. */
-export type ListOrderDeliveries = {
-  (orderId: string, actor: Actor | null | undefined): Promise<OrderDeliveryHistoryView>;
-  (orderId: string, lineId: string | undefined, actor: Actor | null | undefined): Promise<OrderDeliveryHistoryView>;
-};
+/** Lo entregado de una receta del pedido. */
+export type ListOrderDeliveries = (
+  orderId: string,
+  lineId: string,
+  actor: Actor | null | undefined,
+) => Promise<OrderDeliveryHistoryView>;
 
 /** Deja en cada entrega solo las lineas de esas presentaciones y quita las que se quedan sin ninguna. */
 function onlyPresentationLines(
@@ -205,39 +200,35 @@ function onlyPresentationLines(
 export function createListOrderDeliveries(deps: ListOrderDeliveriesDeps): ListOrderDeliveries {
   const now = deps.now ?? (() => new Date());
 
-  return async function listOrderDeliveries(orderId: string, ...args: ActorArgs): Promise<OrderDeliveryHistoryView> {
-    const [lineId, actor] = args.length === 2 ? args : [undefined, args[0]];
+  return async function listOrderDeliveries(orderId, lineId, actor) {
     requirePermission(actor, 'pedidos.consultar');
 
     if (!orderIdSchema.safeParse(orderId).success) throw new OrderNotFoundError();
-    if (lineId !== undefined && !orderIdSchema.safeParse(lineId).success) throw new OrderNotFoundError();
+    if (!orderIdSchema.safeParse(lineId).success) throw new OrderNotFoundError();
     const scope: OrderScope = { companyId: actor.companyId };
 
     const order = await deps.orders.findAliveById(orderId, scope);
     if (order === null) throw new OrderNotFoundError();
 
-    let lineStatus: OrderLineStatus | null = null;
-    if (lineId !== undefined) {
-      // `findAliveLines` ya deja fuera las quitadas y las de otro pedido o empresa.
-      const line = (await deps.orders.findAliveLines(orderId, scope)).find((candidate) => candidate.id === lineId);
-      if (line === undefined) throw new OrderNotFoundError();
-      lineStatus = line.status;
-    }
+    // `findAliveLines` ya deja fuera las quitadas y las de otro pedido o empresa.
+    const line = (await deps.orders.findAliveLines(orderId, scope)).find((candidate) => candidate.id === lineId);
+    if (line === undefined) throw new OrderNotFoundError();
 
     const allRows = await deps.history.listByOrder(orderId, scope);
-    const header = { orderId: order.id, numberText: formatOrderNumber(order.number), orderStatus: order.status, lineStatus };
+    const header = {
+      orderId: order.id,
+      numberText: formatOrderNumber(order.number),
+      orderStatus: order.status,
+      lineStatus: line.status,
+    };
     if (allRows.length === 0) return { ...header, deliveries: [] };
 
-    let rows = allRows;
-    let presentationLines: readonly FinishPackingLine[] | undefined;
-    if (lineId !== undefined) {
-      presentationLines = await deps.lines.findPresentationLinesForFinish(orderId, scope);
-      const ofLine = new Set(presentationLines.filter((line) => line.orderLineId === lineId).map((line) => line.id));
-      rows = onlyPresentationLines(allRows, ofLine);
-      if (rows.length === 0) return { ...header, deliveries: [] };
-    }
+    const presentationLines = await deps.lines.findPresentationLinesForFinish(orderId, scope);
+    const ofLine = new Set(presentationLines.filter((row) => row.orderLineId === lineId).map((row) => row.id));
+    const rows = onlyPresentationLines(allRows, ofLine);
+    if (rows.length === 0) return { ...header, deliveries: [] };
 
-    const names = await resolveNames(deps, orderId, rows, now(), scope, presentationLines);
+    const names = await resolveNames(deps, rows, now(), scope, presentationLines);
     return { ...header, deliveries: rows.map((row) => toDeliveryView(row, names)) };
   };
 }
