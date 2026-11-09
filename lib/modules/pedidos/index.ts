@@ -184,7 +184,7 @@ export { createCancelOrderLine } from './domain/cancel-order-line';
 export type { CancelOrderLineDeps } from './domain/cancel-order-line';
 /** Cancelar por encargo de otro modulo, con la unidad de trabajo que le cablee la composicion:
  *  mismas comprobaciones y la misma liberacion que `createCancelOrder`, sin permiso ni motivo. */
-export { createCancelAliveOrder } from './domain/order-cancellation';
+export { createCancelAliveOrder, createCancelAliveOrderLine } from './domain/order-cancellation';
 export type { CancelAliveOrderDeps, OrderCancellation } from './domain/order-cancellation';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
@@ -234,11 +234,22 @@ export type {
 
 /** Implementan los dos listados de resumen de `OrderCatalog`, con el nombre del envase de cada
  *  linea ya resuelto. */
-export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';
+export {
+  createFindAliveLineSummary,
+  createListAliveSummariesByIds,
+  createListAliveSummariesInCompany,
+} from './domain/list-order-summaries';
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
 export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
 export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
-export type { OrderDeliveryProgress, OrderDeliveryProgressLine, OrderHistorySummary } from './domain/order-catalog';
+export type {
+  OrderDeliveryProgress,
+  OrderDeliveryProgressLine,
+  OrderHistorySummary,
+  OrderRecipeOutline,
+  OrderRecipesOutline,
+} from './domain/order-catalog';
+export type { OrderProgress } from './domain/order-totals';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */

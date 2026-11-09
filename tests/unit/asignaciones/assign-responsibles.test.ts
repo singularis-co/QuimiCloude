@@ -812,6 +812,12 @@ function montarSobreBase(
       listDeliveryProgressByIdsIncludingDeleted: async () => {
         throw new Error('no lo usa `assignResponsibles`');
       },
+      findAliveLineSummary: async () => {
+        throw new Error('este archivo no lee una receta suelta');
+      },
+      listRecipeOutlinesByIdsIncludingDeleted: async () => {
+        throw new Error('este archivo no lee las recetas del pedido');
+      },
       transitionAliveById: async () => {
         throw new Error('QC-87: no lo usa `assignResponsibles`');
       },

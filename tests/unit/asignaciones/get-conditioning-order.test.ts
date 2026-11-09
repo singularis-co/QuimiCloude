@@ -333,7 +333,7 @@ describe('QC-219 — los datos de lote del detalle', () => {
 
     const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
 
-    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`);
     expect(detalle.batchData).toEqual({
       lines: [
         {

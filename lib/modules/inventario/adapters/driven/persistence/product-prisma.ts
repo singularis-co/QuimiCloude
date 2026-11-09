@@ -1788,8 +1788,8 @@ export async function findFinishedGoodsReceipts(
 }
 
 /**
- * El mismo lote, vencimiento y dia de produccion en todos los lotes de produccion del pedido: los
- * de las lineas que devuelve `listOfOrder`. Cambia la etiqueta del lote, no su existencia: por eso
+ * El mismo lote, vencimiento y dia de produccion en todos los lotes de produccion de esa linea del
+ * pedido: los que devuelve `listOfOrder`. Cambia la etiqueta del lote, no su existencia: por eso
  * no asienta movimiento, y la trazabilidad queda en `updated_by` y `updated_at`.
  *
  * Los lotes se bloquean antes de comprobar el choque, asi que dos guardados del mismo pedido se
@@ -1800,6 +1800,7 @@ export async function writeFinishedBatchLabels(
   tx: Prisma.TransactionClient,
   input: {
     readonly orderId: string;
+    readonly orderLineId: string;
     readonly label: FinishedBatchLabel;
     readonly actorId: string;
     readonly now: Date;
@@ -1820,6 +1821,7 @@ export async function writeFinishedBatchLabels(
                 AND m."company_id" = ${companyId}::uuid
                 AND m."kind" = 'production'
                 AND m."order_id" = ${input.orderId}::uuid
+                AND m."order_line_id" = ${input.orderLineId}::uuid
                 AND m."order_presentation_line_id" IS NOT NULL
            )
      ORDER BY b."id"

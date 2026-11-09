@@ -160,6 +160,9 @@ const orderCatalog: OrderCatalog = {
     return createListAliveSummariesByIds({
       summaries: {
         listAliveByIds: listAliveOrderSummariesByIds,
+        findAliveLine: async () => {
+          throw new Error('este archivo no lee una receta suelta');
+        },
         listAliveInCompany: async () => {
           throw new Error('este archivo no ejercita listAliveSummariesInCompany');
         },
@@ -181,6 +184,12 @@ const orderCatalog: OrderCatalog = {
   },
   listDeliveryProgressByIdsIncludingDeleted: async () => {
     throw new Error('este archivo no ejercita listDeliveryProgressByIdsIncludingDeleted');
+  },
+  findAliveLineSummary: async () => {
+    throw new Error('este archivo no lee una receta suelta');
+  },
+  listRecipeOutlinesByIdsIncludingDeleted: async () => {
+    throw new Error('este archivo no lee las recetas del pedido');
   },
   // R15, R16: Finalizar ya no da de alta ningun lote -eso se traslada a Terminar (T14)-.
   transitionAliveById: createTransitionOrder({ unitOfWork }),

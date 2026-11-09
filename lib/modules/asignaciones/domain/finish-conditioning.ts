@@ -107,7 +107,7 @@ export function createFinishConditioning(
 
     await assertConditioningStepsCompleted(deps, actor.companyId, orderId, summary.recipeId);
 
-    const batches = await deps.batches.listOfOrder(actor.companyId, orderId);
+    const batches = await deps.batches.listOfOrder(actor.companyId, orderId, summary.lineId);
     if (missingBatchDataLines(summary.presentationLines, batches) > 0) throw new ConditioningBatchDataMissingError();
 
     const now = deps.now?.() ?? new Date();

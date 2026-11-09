@@ -104,11 +104,46 @@ export async function cancelInsideTransaction(
   return 'ok';
 }
 
-/** Cancelar un pedido vivo de una empresa, por encargo de otro modulo: no exige permiso ni
- *  valida el motivo, eso es de quien llama. */
+/**
+ * Cancela una sola linea dentro de una transaccion ya abierta, sin tocar las demas, y deriva el
+ * estado del pedido.
+ */
+export async function cancelLineInsideTransaction(
+  scope: OrderTransactionScope,
+  input: {
+    readonly orderId: string;
+    readonly lineId: string;
+    readonly reason: string;
+    readonly actorId: string;
+    readonly now: Date;
+    readonly companyId: string;
+  },
+): Promise<OrderCancellationOutcome> {
+  const { orderId, lineId, reason, actorId, now, companyId } = input;
+
+  // Pedido y despues linea, el mismo orden que las demas escrituras, para no cruzar candados.
+  const locked = await scope.orders.lockAliveLine(orderId, lineId, { companyId });
+  if (locked === null) return 'not_found';
+  if (!isCancellableStatus(locked.line.status)) return 'not_cancellable';
+
+  await cancelLockedLine(scope, { orderId, lineId, reason, releaseReason: 'release', actorId, now, companyId });
+  await scope.orders.refreshStatus(orderId, actorId, now, { companyId });
+  return 'ok';
+}
+
+/** Cancelar un pedido vivo de una empresa, o una linea suya, por encargo de otro modulo: no exige
+ *  permiso ni valida el motivo, eso es de quien llama. */
 export type OrderCancellation = {
   cancelAliveById(
     id: string,
+    companyId: string,
+    reason: string,
+    actorId: string,
+    now: Date,
+  ): Promise<OrderCancellationOutcome>;
+  cancelLineAliveById(
+    orderId: string,
+    lineId: string,
     companyId: string,
     reason: string,
     actorId: string,
@@ -123,5 +158,13 @@ export type CancelAliveOrderDeps = {
 export function createCancelAliveOrder(deps: CancelAliveOrderDeps): OrderCancellation['cancelAliveById'] {
   return async function cancelAliveById(id, companyId, reason, actorId, now) {
     return deps.unitOfWork.run((scope) => cancelInsideTransaction(scope, { id, reason, actorId, now, companyId }));
+  };
+}
+
+export function createCancelAliveOrderLine(deps: CancelAliveOrderDeps): OrderCancellation['cancelLineAliveById'] {
+  return async function cancelLineAliveById(orderId, lineId, companyId, reason, actorId, now) {
+    return deps.unitOfWork.run((scope) =>
+      cancelLineInsideTransaction(scope, { orderId, lineId, reason, actorId, now, companyId }),
+    );
   };
 }

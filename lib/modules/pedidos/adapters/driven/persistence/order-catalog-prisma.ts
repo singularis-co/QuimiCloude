@@ -10,10 +10,13 @@ import type {
   OrderAssignmentTarget,
   OrderDeliveryProgress,
   OrderHistorySummary,
+  OrderRecipeOutline,
+  OrderRecipesOutline,
   OrderSummaryFilter,
   OrderSummaryOrdering,
 } from '../../../domain/order-catalog';
 import type { OrderNumber } from '../../../domain/order-number';
+import { orderProgress } from '../../../domain/order-totals';
 import type { Page } from '../../../domain/page';
 import type { OrderSummaryLineRecord, OrderSummaryRecord } from '../../../ports/order-summary-reader';
 
@@ -221,13 +224,30 @@ async function toSummaryRecords(
 }
 
 /** Lineas vivas de pedidos vivos de la empresa: el ambito va en la linea y en su pedido. */
-function aliveLinesWhere(companyId: string, statuses: readonly OrderStatus[]) {
+function aliveLineScope(companyId: string) {
   return {
     ...companyScopeColumns({ companyId }),
-    status: { in: [...statuses] },
     deletedAt: null,
     order: { AND: [orderCompanyScope({ companyId }), { deletedAt: null }] },
   };
+}
+
+function aliveLinesWhere(companyId: string, statuses: readonly OrderStatus[]) {
+  return { ...aliveLineScope(companyId), status: { in: [...statuses] } };
+}
+
+export async function findAliveOrderLineSummary(
+  companyId: string,
+  orderId: string,
+  lineId: string,
+): Promise<OrderSummaryRecord | null> {
+  const row = await prisma.orderLine.findFirst({
+    where: { ...aliveLineScope(companyId), id: lineId, orderId },
+    select: SUMMARY_SELECT,
+  });
+  if (row === null) return null;
+  const [record] = await toSummaryRecords(companyId, [row]);
+  return record ?? null;
 }
 
 /**
@@ -385,6 +405,74 @@ export async function listOrderDeliveryProgressByIdsIncludingDeleted(
     },
   });
   return rows.map(toOrderDeliveryProgress);
+}
+
+type OrderRecipesOutlineRow = {
+  readonly id: string;
+  readonly deletedAt: Date | null;
+  /** Todas las lineas del pedido, ya en orden de `position`. */
+  readonly lines: readonly {
+    readonly id: string;
+    readonly recipeId: string;
+    readonly status: string;
+    readonly quantity: { toFixed(digits: number): string };
+    readonly unitId: string | null;
+    readonly deletedAt: Date | null;
+  }[];
+  readonly presentationLines: readonly {
+    readonly orderLineId: string;
+    readonly presentationId: string;
+    readonly packages: number;
+  }[];
+};
+
+/** La baja sella el pedido y sus lineas vivas con el mismo instante: asi se distinguen de las que
+ *  ya estaban quitadas antes. */
+function belongsToOutline(orderDeletedAt: Date | null, lineDeletedAt: Date | null): boolean {
+  if (orderDeletedAt === null) return lineDeletedAt === null;
+  return lineDeletedAt !== null && lineDeletedAt.getTime() === orderDeletedAt.getTime();
+}
+
+export function toOrderRecipesOutline(row: OrderRecipesOutlineRow): OrderRecipesOutline {
+  const recipes = row.lines
+    .filter((line) => belongsToOutline(row.deletedAt, line.deletedAt))
+    .map(
+      (line, index): OrderRecipeOutline => ({
+        lineId: line.id,
+        position: index + 1,
+        recipeId: line.recipeId,
+        status: line.status as OrderLineStatus,
+        quantity: line.quantity.toFixed(4),
+        unitId: line.unitId,
+        presentationLines: row.presentationLines
+          .filter((presentation) => presentation.orderLineId === line.id)
+          .map((presentation) => ({ presentationId: presentation.presentationId, packages: presentation.packages })),
+      }),
+    );
+  return { id: row.id, deleted: row.deletedAt !== null, recipes, progress: orderProgress(recipes) };
+}
+
+export async function listOrderRecipeOutlinesByIdsIncludingDeleted(
+  companyId: string,
+  orderIds: readonly string[],
+): Promise<readonly OrderRecipesOutline[]> {
+  if (orderIds.length === 0) return [];
+  const rows = await prisma.order.findMany({
+    where: { AND: [orderCompanyScope({ companyId }), { id: { in: [...orderIds] } }] },
+    select: {
+      id: true,
+      deletedAt: true,
+      lines: {
+        select: { id: true, recipeId: true, status: true, quantity: true, unitId: true, deletedAt: true },
+        orderBy: [{ position: 'asc' as const }, { id: 'asc' as const }],
+      },
+      presentationLines: {
+        select: { orderLineId: true, presentationId: true, packages: true },
+        orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+      },
+    },
+  });
+  return rows.map(toOrderRecipesOutline);
 }
 
 /**

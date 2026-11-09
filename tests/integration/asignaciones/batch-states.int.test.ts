@@ -138,6 +138,8 @@ function casosDelOperador(fixture: Fixture) {
     listAliveSummariesInCompany: noUsado('listAliveSummariesInCompany'),
     listSummariesByIdsIncludingDeleted: noUsado('listSummariesByIdsIncludingDeleted'),
     listDeliveryProgressByIdsIncludingDeleted: noUsado('listDeliveryProgressByIdsIncludingDeleted'),
+    findAliveLineSummary: noUsado('findAliveLineSummary'),
+    listRecipeOutlinesByIdsIncludingDeleted: noUsado('listRecipeOutlinesByIdsIncludingDeleted'),
     transitionAliveById: noUsado('transitionAliveById'),
     startPackingAliveById: noUsado('startPackingAliveById'),
     finishPackingAliveById: noUsado('finishPackingAliveById'),

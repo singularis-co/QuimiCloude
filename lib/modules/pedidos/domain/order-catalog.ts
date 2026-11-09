@@ -17,6 +17,7 @@
 import type { OrderLineStatus, OrderPriority, OrderStatus } from './order-classification';
 import type { FinishConditioningAliveById, StartConditioningAliveById } from './order-conditioning';
 import type { OrderNumber } from './order-number';
+import type { OrderProgress } from './order-totals';
 import type { Page } from './page';
 import type { PackedLineCount } from './packing-count';
 
@@ -135,6 +136,22 @@ export interface OrderCatalog {
     companyId: string,
     ids: readonly string[],
   ): Promise<readonly OrderDeliveryProgress[]>;
+
+  /**
+   * Esa linea viva de ese pedido vivo, en cualquier estado. `null` si el pedido o la linea no
+   * existen, son de otra empresa, la linea es de otro pedido o esta quitada.
+   */
+  findAliveLineSummary(companyId: string, orderId: string, lineId: string): Promise<AssignedOrderSummary | null>;
+
+  /**
+   * Las recetas de cada pedido, incluidos los dados de baja: de un pedido vivo, sus lineas vivas; de
+   * uno dado de baja, las que se quitaron con el (mismo `deleted_at`). Un id que no existe o de otra
+   * empresa no vuelve. Sin orden entre pedidos. Con `ids` vacio no consulta.
+   */
+  listRecipeOutlinesByIdsIncludingDeleted(
+    companyId: string,
+    orderIds: readonly string[],
+  ): Promise<readonly OrderRecipesOutline[]>;
 
   /**
    * Mueve el estado de UNA linea viva de un pedido vivo de esa empresa, SOLO si
@@ -346,4 +363,23 @@ export type OrderDeliveryProgress = {
   readonly id: string;
   readonly recipeId: string;
   readonly lines: readonly OrderDeliveryProgressLine[];
+};
+
+/** Una receta del pedido. `position` va de 1 al numero de recetas, en el orden de alta. */
+export type OrderRecipeOutline = {
+  readonly lineId: string;
+  readonly position: number;
+  readonly recipeId: string;
+  readonly status: OrderLineStatus;
+  readonly quantity: string;
+  readonly unitId: string | null;
+  readonly presentationLines: readonly { readonly presentationId: string; readonly packages: number }[];
+};
+
+/** `recipes` incluye las canceladas; `progress` no las cuenta. */
+export type OrderRecipesOutline = {
+  readonly id: string;
+  readonly deleted: boolean;
+  readonly recipes: readonly OrderRecipeOutline[];
+  readonly progress: OrderProgress;
 };

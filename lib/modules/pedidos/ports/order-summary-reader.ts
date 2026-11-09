@@ -33,6 +33,8 @@ export interface OrderSummaryReader {
     pageSize?: number,
   ): Promise<Page<OrderSummaryRecord>>;
 
+  findAliveLine(companyId: string, orderId: string, lineId: string): Promise<OrderSummaryRecord | null>;
+
   listAliveInCompany(
     companyId: string,
     statuses: readonly OrderStatus[],

@@ -84,6 +84,8 @@ const orders: OrderCatalog = {
   listDeliveryProgressByIdsIncludingDeleted: async () => {
     throw new Error('los casos de uso de asignacion no leen el progreso de entrega');
   },
+  findAliveLineSummary: summaryReaders.findAliveLineSummary,
+  listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
   transitionAliveById: async () => {
     throw new Error('QC-87: los casos de uso de asignacion no escriben el estado del pedido');
   },

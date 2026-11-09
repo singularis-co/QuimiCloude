@@ -203,6 +203,7 @@ describe('ExecutionTransaction: los escritores que recibe el trabajo (R24)', () 
       orders: {
         transitionAliveById: () => Promise.resolve('ok'),
         cancelAliveById: () => Promise.resolve('ok'),
+        cancelLineAliveById: () => Promise.resolve('ok'),
       },
       packing: {
         startPackingAliveById: () => Promise.resolve('ok'),

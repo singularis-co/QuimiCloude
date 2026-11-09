@@ -54,6 +54,7 @@ const LOTE_C = uuid('9');
 const FRASCO = uuid('c');
 const GARRAFA = uuid('d');
 const SIN_NOMBRE = uuid('e');
+const LINEA_1 = uuid('f');
 
 type Datos = { lot: string; expiryDate: string; productionDate: string };
 
@@ -82,7 +83,7 @@ function montar(options?: {
   const listAliveSummariesByIds = vi.fn(async () => {
     orden.push('resumen');
     return {
-      items: status === null ? [] : [{ id: PEDIDO_1, status, conditionedBy, presentationLines: [] }],
+      items: status === null ? [] : [{ id: PEDIDO_1, lineId: LINEA_1, status, conditionedBy, presentationLines: [] }],
       total: 1,
       page: 1,
       pageSize: 1,
@@ -373,6 +374,7 @@ describe('R18, R27 — guarda en los estados corregibles', () => {
       expect(writeForOrder).toHaveBeenCalledWith({
         companyId: EMPRESA,
         orderId: PEDIDO_1,
+        orderLineId: LINEA_1,
         label: { lot: 'CR-2610', expiryDate: '2027-04-30', productionDate: HOY },
         actorId: ANA,
         now: AHORA,
@@ -387,7 +389,7 @@ describe('QC-283 — cada guardado anota una foto en el registro de ejecucion', 
 
     await createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada({ lot: '  CR-C  ', productionDate: '2026-09-01' }));
 
-    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, LINEA_1);
     expect(findRefs).toHaveBeenCalledWith([SIN_NOMBRE, FRASCO, GARRAFA], EMPRESA);
     expect(orden.slice(-3)).toEqual(['transaccion', 'escribe-lotes', 'anota']);
     expect(append).toHaveBeenCalledTimes(1);
@@ -396,6 +398,7 @@ describe('QC-283 — cada guardado anota una foto en el registro de ejecucion', 
       action: 'conditioning_batch_save',
       companyId: EMPRESA,
       orderId: PEDIDO_1,
+      orderLineId: LINEA_1,
       userId: ANA,
       stepPosition: null,
       occurredAt: AHORA,

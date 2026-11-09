@@ -70,9 +70,10 @@ async function composeSnapshot(
   deps: SaveConditioningBatchDataDeps,
   companyId: string,
   orderId: string,
+  lineId: string,
   label: { readonly lot: string; readonly expiryDate: string; readonly productionDate: string },
 ): Promise<readonly ConditioningBatchSnapshotLine[]> {
-  const ofOrder = await deps.batches.listOfOrder(companyId, orderId);
+  const ofOrder = await deps.batches.listOfOrder(companyId, orderId, lineId);
   if (ofOrder.length === 0) throw new ConditioningBatchNotFoundError();
 
   const presentationIds = [...new Set(ofOrder.map((batch) => batch.presentationId))];
@@ -132,11 +133,18 @@ export function createSaveConditioningBatchData(
 
     const companyId = actor.companyId;
     const label = { lot, expiryDate, productionDate };
-    const batchLines = await composeSnapshot(deps, companyId, orderId, label);
+    const batchLines = await composeSnapshot(deps, companyId, orderId, summary.lineId, label);
 
     try {
       await deps.transaction.run(async ({ batches, log }) => {
-        const outcome = await batches.writeForOrder({ companyId, orderId, label, actorId: actor.id, now });
+        const outcome = await batches.writeForOrder({
+          companyId,
+          orderId,
+          orderLineId: summary.lineId,
+          label,
+          actorId: actor.id,
+          now,
+        });
         // Tras un `duplicate_lot` la transaccion queda abortada en Postgres: hay que lanzar, no seguir.
         if (outcome.kind !== 'written') throw new BatchLabelsAbortedError(outcome);
         await log.append({

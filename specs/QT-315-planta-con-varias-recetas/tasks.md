@@ -17,7 +17,7 @@
 
 ## Tanda 1 — contratos de `pedidos` e `inventario` (aditivos)
 
-- [ ] **T1 [P] · backend_dev — lecturas por receta en `OrderCatalog`** (design § 3.1, puntos 1 y 2)
+- [x] **T1 [P] · backend_dev — lecturas por receta en `OrderCatalog`** (design § 3.1, puntos 1 y 2)
   - `findAliveLineSummary(companyId, orderId, lineId)` y
     `listRecipeOutlinesByIdsIncludingDeleted(companyId, orderIds)`, con su adaptador Prisma, el
     barril y `composition`. Se exporta el tipo `OrderProgress`.
@@ -28,7 +28,7 @@
       un pedido dado de baja;
     - rechazo cruzado por empresa;
     - typecheck y guardias en verde.
-- [ ] **T2 [P] · backend_dev — `OrderCancellation.cancelLineAliveById`** (design § 3.1, punto 3)
+- [x] **T2 [P] · backend_dev — `OrderCancellation.cancelLineAliveById`** (design § 3.1, punto 3)
   - Se extrae `cancelLineInsideTransaction`, que comparten `cancelOrderLine` y el método nuevo.
   - Se ata en `executionTransaction.orders` de `composition`.
   - **Hecho cuando:**
@@ -36,7 +36,7 @@
     - hay un unit de `ok`, `not_found` y `not_cancellable`;
     - hay una integración: libera solo el material de esa línea y deriva el estado del pedido
       (R16, R17).
-- [ ] **T3 [P] · backend_dev — `FinishedBatchLabels` por línea** (design § 3.2)
+- [x] **T3 [P] · backend_dev — `FinishedBatchLabels` por línea** (design § 3.2)
   - `listOfOrder` y `writeForOrder` reciben `orderLineId`.
   - Los tres llamadores de `asignaciones` pasan `summary.lineId`, el de hoy.
   - **Hecho cuando:**

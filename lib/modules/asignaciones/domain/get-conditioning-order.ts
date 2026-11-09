@@ -92,7 +92,7 @@ export function createGetConditioningOrder(
       : [];
     const batches =
       summary.status !== 'POR_ACONDICIONAR' && isConditioner
-        ? await deps.batches.listOfOrder(actor.companyId, orderId)
+        ? await deps.batches.listOfOrder(actor.companyId, orderId, summary.lineId)
         : null;
     const detail = await composeConditioningOrderDetail(deps, actor.companyId, summary, team, batches);
     if (detail === undefined) throw new OrderNotFoundError();

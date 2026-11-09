@@ -298,7 +298,7 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
 
     expect(error).toBeInstanceOf(ConditioningBatchDataMissingError);
     expect((error as ConditioningBatchDataMissingError).code).toBe('conditioning_batch_data_missing');
-    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO);
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
   });
 

@@ -111,6 +111,12 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     listDeliveryProgressByIdsIncludingDeleted: async () => {
       throw new Error('los terminados no leen el progreso de entrega');
     },
+    findAliveLineSummary: async () => {
+      throw new Error('este archivo no lee una receta suelta');
+    },
+    listRecipeOutlinesByIdsIncludingDeleted: async () => {
+      throw new Error('este archivo no lee las recetas del pedido');
+    },
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.

@@ -295,12 +295,14 @@ import type { SupplierRepository } from '@/lib/modules/proveedores/ports/supplie
 import { buildPage, toOffsetLimit } from '@/lib/shared/pagination';
 import {
   createCancelAliveOrder,
+  createCancelAliveOrderLine,
   createCancelOrder,
   createCancelOrderLine,
   createCreateOrder,
   createDeleteOrder,
   createDeliverOrder,
   createExpireStaleOrders,
+  createFindAliveLineSummary,
   createFindCoverage,
   createFinishConditioning,
   createFinishPacking,
@@ -527,12 +529,14 @@ import { evidenceStorageMemoryForE2E } from '@/lib/modules/asignaciones/adapters
 import { evidenceStorageSupabase } from '@/lib/modules/asignaciones/adapters/driven/storage/evidence-storage-supabase';
 import type { EvidenceStorage } from '@/lib/modules/asignaciones/ports/evidence-storage';
 import {
+  findAliveOrderLineSummary,
   findAliveOrderTargetById,
   listAliveOrderSummariesByIds,
   listAliveOrderSummariesInCompany,
   listOrderDeliveryProgressByIdsIncludingDeleted,
   listOrderHistoryByIdsIncludingDeleted,
   listOrderNumbersByIdsIncludingDeleted,
+  listOrderRecipeOutlinesByIdsIncludingDeleted,
 } from '@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import { assignmentDirectoryPrisma } from '@/lib/modules/identity/adapters/driven/persistence/assignment-directory-prisma';
@@ -1939,6 +1943,7 @@ const orderConditioningRepository: OrderConditioningRepository = {
 
 const orderSummaryReader: OrderSummaryReader = {
   listAliveByIds: listAliveOrderSummariesByIds,
+  findAliveLine: findAliveOrderLineSummary,
   listAliveInCompany: listAliveOrderSummariesInCompany,
   listNumbersByIdsIncludingDeleted: listOrderNumbersByIdsIncludingDeleted,
   listHistoryByIdsIncludingDeleted: listOrderHistoryByIdsIncludingDeleted,
@@ -1955,6 +1960,8 @@ const orderCatalog: OrderCatalog = {
   }),
   listSummariesByIdsIncludingDeleted: createListSummariesByIdsIncludingDeleted({ summaries: orderSummaryReader }),
   listDeliveryProgressByIdsIncludingDeleted: listOrderDeliveryProgressByIdsIncludingDeleted,
+  findAliveLineSummary: createFindAliveLineSummary({ summaries: orderSummaryReader, packaging: packagingCatalog }),
+  listRecipeOutlinesByIdsIncludingDeleted: listOrderRecipeOutlinesByIdsIncludingDeleted,
   // Finalizar ya no da de alta ningun lote, asi que `createTransitionOrder`
   // ya no necesita `recipeCatalog`/`productCatalog`/`unitCatalog` -esos catalogos siguen
   // cableados mas abajo para quien todavia los usa-.
@@ -2051,6 +2058,7 @@ const executionTransaction: ExecutionTransaction = {
         orders: {
           transitionAliveById: createTransitionOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
           cancelAliveById: createCancelAliveOrder({ unitOfWork: joinOrderUnitOfWork(tx) }),
+          cancelLineAliveById: createCancelAliveOrderLine({ unitOfWork: joinOrderUnitOfWork(tx) }),
         },
         packing: {
           startPackingAliveById: createStartPacking({ packing: createOrderPackingRepository(tx) }),
