@@ -1131,3 +1131,28 @@ Verificación (salida real):
 Bloqueos: ninguno. Ningún R1–R52 se queda sin test. Las tres coberturas parciales están arriba, en las notas para el reviewer.
 
 Veredicto: T20 hecha. Guardias en verde, R43 y R47 con guardia propia, la lista E2E de pedidos cerrada en ocho, y el mapa con las 52 filas comprobadas contra el código.
+
+### Cierre de la Tanda 4 (implementer, salida real, 2026-11-09)
+
+Commits: `912896510` (T16b), `a5a8d2ba4` (T17), `5e980f7bd` (T18), `4defb83e0` (T19 lote A), `6cce5aef7` (T19 lote B),
+`9f818b0dd` (T20) y el de este cierre. Todas las tasks de `tasks.md` en `[x]`.
+
+- `pnpm run typecheck`: sin errores (esta vez tampoco salió el conocido de `app/layout.tsx`).
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos previos y en archivos ajenos.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1333 passed | 22 skipped (1355)`.
+- `tests/unit/pedidos-ui/` (66 archivos) en 9 lotes de hasta 8, `pnpm exec vitest run <archivos>`: 9/9 en verde,
+  1088 pasados y 3 saltados (73, 193, 172, 112, 158, 124, 117+3 skip, 128, 11).
+- `.int` tocados en la tanda (T17), uno a uno, base efímera: `order-lines-use-cases` 13 passed,
+  `actual-order-cost` 6 passed, `order-unit-conversion` 2 passed, `asignaciones/order-lines-execution` 14 passed.
+- E2E en chromium, uno a uno, sobre `QuimiCloude_QT314` (ver T18): 27 specs, 27 en verde (`pedidos-varias-recetas` 1 passed;
+  lote A 13/13; lote B 13/13; tablas en T19 lote A y B). WebKit no se corrió (memoria): queda para CI.
+
+Para el reviewer:
+- T19 lote A, `pedido-en-varias-presentaciones.spec.ts`: el envío forzado llama al manejador de «Aplicar» que la
+  pantalla pasa al botón (internos de React), porque el sub-panel ya no es un `<form>` y `requestSubmit()` no aplica.
+- T20, `pedidos-convenciones.test.ts` R47: lee el historial git (commits QT-314) y se salta si el rango no los tiene;
+  ojo con clones superficiales en CI.
+- `e2e/helpers/order-distribution.ts > submitOrderWithLeftover` ya no lo usa ningún spec; se dejó.
+- Coberturas parciales anotadas en el mapa de T20: R44 (panel a pantalla completa en teléfono), R39, R45.
+- `tests/integration/asignaciones/order-lines-execution.int.test.ts:411` conserva la etiqueta «QT-313 R44».
+- Borradores de entrega antiguos (v1, sin `lineId`) ya no se recuperan (design § 4.7); sus tests llevan `lineId` a mano.
