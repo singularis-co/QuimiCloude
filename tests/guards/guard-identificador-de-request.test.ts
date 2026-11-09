@@ -1078,7 +1078,7 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
     motivo: 'mismo canal `error: string` de AsyncAutocomplete que product-name-picker.',
   },
   {
-    archivo: 'app/(private)/pedidos/components/order-form.tsx',
+    archivo: 'app/(private)/pedidos/components/order-line-sheet.tsx',
     idioma: 'set-estado-string',
     ocurrencias: 1,
     motivo:
@@ -1510,13 +1510,13 @@ describe('guardia: casos sinteticos -- cada comprobacion, con su rojo y su verde
 
   it('R17: una entrada de la lista que YA NO aplana se caza — la lista no es un vertedero', () => {
     const arreglada = SUPERFICIES_QUE_APLANAN.filter(
-      ({ archivo }) => archivo !== 'app/(private)/pedidos/components/order-form.tsx',
+      ({ archivo }) => archivo !== 'app/(private)/pedidos/components/order-line-sheet.tsx',
     ).map(({ archivo, idioma }) => ({ relPath: archivo, idioma }))
 
     const rojo = hallazgosDeAplanado(arreglada, SUPERFICIES_QUE_APLANAN)
 
     expect(rojo).toHaveLength(1)
-    expect(rojo[0]).toContain('app/(private)/pedidos/components/order-form.tsx')
+    expect(rojo[0]).toContain('app/(private)/pedidos/components/order-line-sheet.tsx')
     expect(rojo[0]).toContain('ya NO lo hace')
   })
 

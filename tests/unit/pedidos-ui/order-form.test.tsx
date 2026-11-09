@@ -1,75 +1,41 @@
-// El formulario de alta y edicion de pedido.
+// QT-314 T14 — El panel del pedido con varias recetas: tabla de recetas, sub-panel y guardado.
 //
-// **El formulario se monta dentro de un `<Sheet>` abierto**, que es su unico entorno real: desde
-// que el panel entero es un `<form>` (`SheetContent isForm`), sacarlo del panel no probaria el
-// formulario que existe.
-//
-// **Lo que se afirma del envio es el `FormData`**, no el estado de React: el formulario es no
-// controlado y lo unico que importa es que cada campo llegue a la operacion con el nombre y el
-// valor que el adaptador driving lee. Al soltar el foco la cantidad se coloca a DOS decimales, y
-// es ESE valor el que llega en el `FormData`; nada de aritmetica de coma flotante en el camino.
-//
-// **Los tests en negativo son el nucleo de esta ficha**: que el alta no ofrezca estado, que la
-// edicion no ofrezca `CANCELADO` y que no haya campo de fecha de solicitud es justo lo que una
-// feature posterior puede reintroducir sin que ningun assert positivo se ponga rojo.
-//
-// **Ningun assert sobre copy**: controles y regiones por `data-testid` o por rol ARIA.
+// El panel se monta dentro de un `<Sheet>` abierto, que es su entorno real. Lo que se afirma del
+// guardado es el candidato que llega a la acción, no el estado de React. El pedido de la edición
+// tiene dos recetas y unos campos planos que no son de ninguna de ellas.
 
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
-import {
-  REFERENCIA_DEL_CASO,
-  errorInesperado,
-  esperarSinIdentificador,
-} from '../../helpers/identificador-de-request';
-import { esperarInteractiva, setupUser } from '../../helpers/user-event';
-import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  BLOCKED_ORDER_CONFIRM_TESTID,
-  BLOCKED_ORDER_DIALOG_TESTID,
-  BLOCKED_ORDER_DISMISS_TESTID,
-  BLOCKED_ORDER_MESSAGE_TESTID,
-  ORDER_BUSINESS_FIELDS,
-  ORDER_DISTRIBUTION_ADD_TESTID,
-  ORDER_DISTRIBUTION_AVAILABLE_TESTID,
-  ORDER_DISTRIBUTION_ERROR_TESTID,
-  ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID,
-  ORDER_DISTRIBUTION_LINE_TESTID,
-  ORDER_DISTRIBUTION_PACKAGES_FIELD,
-  ORDER_DISTRIBUTION_PACKAGING_FIELD,
-  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
-  PACKAGING_OPTION_TESTID,
-  PACKAGING_SELECT_TESTID,
-  ORDER_DISTRIBUTION_TESTID,
-  ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID,
-  ORDER_CONFIRM_BLOCKED_FIELD,
+  ORDER_CREATE_OPEN_TESTID,
+  ORDER_FORM_ADD_LINE_TESTID,
+  ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_ERROR_TESTID,
-  ORDER_FORM_TITLE_TESTID,
-  ORDER_INGREDIENTS_EMPTY_TESTID,
-  ORDER_INGREDIENTS_ERROR_TESTID,
-  ORDER_INGREDIENTS_TABLE_TESTID,
-  ORDER_INGREDIENTS_TESTID,
-  ORDER_RECIPE_IMAGE_TESTID,
+  ORDER_FORM_LINES_COUNT_TESTID,
+  ORDER_FORM_LINES_ERROR_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_FORM_TITLE_TESTID,
+  ORDER_LINE_SHEET_BACK_TESTID,
+  ORDER_LINE_SHEET_DISCARD_TESTID,
+  ORDER_LINE_SHEET_REMOVE_TESTID,
+  ORDER_LINE_SHEET_TITLE_TESTID,
+  ORDER_LINES_COST_TESTID,
+  ORDER_LINES_EDIT_TESTID,
+  ORDER_LINES_EMPTY_TESTID,
+  ORDER_LINES_READ_ONLY_TESTID,
+  ORDER_LINES_ROW_TESTID,
+  ORDER_LINES_TABLE_TESTID,
+  ORDER_LINES_TOTAL_TESTID,
+  ORDER_LINES_WITHOUT_PRICE_TESTID,
   ORDER_PRIORITY_OPTION_TESTID,
   ORDER_PRIORITY_SELECT_TESTID,
-  ORDER_STATUS_FIELD,
-  ORDER_STATUS_SELECT_TESTID,
+  ORDER_RECIPE_IMAGE_TESTID,
   OrderForm,
-  ORIGINAL_VERSION_VALUE,
-  RECIPE_FIELD,
+  OrderSheet,
   RECIPE_PICKER_TESTID,
-  RECIPE_VERSION_FIELD,
-  RECIPE_VERSION_SELECT_TESTID,
-  type RecipePickerPage,
 } from '@/app/(private)/pedidos/components';
-import { MISSING_IMAGE_SRC } from '@/components/shared/entity-image';
-import {
-  UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
-  UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID,
-} from '@/components/shared/unexpected-error-notice';
 import { Sheet } from '@/components/ui/sheet';
 import {
   DEFAULT_ORDER_PRIORITY,
@@ -79,277 +45,150 @@ import {
 } from '@/lib/modules/pedidos';
 import type {
   CreateOrderFormState,
-  OrderMutationFormState,
+  UpdateOrderFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type {
-  RecipeListResult,
   RecipeQueryResult,
   RecipeVersionListResult,
 } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeDetail, RecipeVersionSummary } from '@/lib/modules/recetas';
-import type { UnitView } from '@/lib/modules/unidades';
-import { formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
-import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import {
+  ENVASE,
+  LINEA_A_ID,
+  LINEA_B_ID,
+  PEDIDO_ID,
+  RECETA_A,
+  RECETA_B,
+  RECETA_C,
+  RECETAS,
+  UNIDAD,
+  UNIDADES,
+  VERSION_B,
+  abrirAnadirReceta,
+  anadirReceta,
+  aplicar,
+  elegirReceta,
+  escribirCantidad,
+  lineaB,
+  lineaPedido,
+  pedidoDeDosRecetas,
+  recetaDetalle,
+  subPanel,
+} from '../../helpers/order-form-ui';
+import { setupUser } from '../../helpers/user-event';
 
 const {
   createOrderActionMock,
   updateOrderActionMock,
-  prohibida,
-  listRecipesActionMock,
   getRecipeActionMock,
   listRecipeVersionsActionMock,
-  listPresentationsActionMock,
-  listProductsActionMock,
-  quoteAvailabilityMock,
-} = vi.hoisted(() => {
-  const noDebeInvocarse = (nombre: string) => () => {
-    throw new Error(`${nombre} no debe invocarse desde el formulario`);
-  };
-  return {
-    createOrderActionMock:
-      vi.fn<(prev: CreateOrderFormState, data: FormData) => Promise<CreateOrderFormState>>(),
-    updateOrderActionMock:
-      vi.fn<
-        (
-          id: string,
-          prev: OrderMutationFormState,
-          data: FormData,
-        ) => Promise<OrderMutationFormState>
-      >(),
-    prohibida: noDebeInvocarse,
-    listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
-    getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
-    listRecipeVersionsActionMock: vi.fn<(id: string) => Promise<RecipeVersionListResult>>(),
-    listPresentationsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
-    listProductsActionMock: vi.fn<(query: unknown) => Promise<unknown>>(),
-    quoteAvailabilityMock: vi.fn<(input: unknown) => Promise<unknown>>(),
-  };
-});
+  toastSuccessMock,
+  refreshMock,
+  prohibida,
+} = vi.hoisted(() => ({
+  createOrderActionMock: vi.fn<(input: unknown) => Promise<CreateOrderFormState>>(),
+  updateOrderActionMock: vi.fn<(id: string, input: unknown) => Promise<UpdateOrderFormState>>(),
+  getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
+  listRecipeVersionsActionMock: vi.fn<(id: string) => Promise<RecipeVersionListResult>>(),
+  toastSuccessMock: vi.fn(),
+  refreshMock: vi.fn(),
+  prohibida: (nombre: string) => () => {
+    throw new Error(`${nombre} no debe invocarse desde el panel del pedido`);
+  },
+}));
 
-// El panel monta la SECCION DE RESPONSABLES dentro de si mismo, y esa seccion es un modulo de
-// cliente que usa `useRouter` y las Server Actions de `asignaciones`.
-//
-// **No es un cambio de guion de este archivo**: no toca ni un `it(...)`, ni un selector, ni una
-// asercion. Son los dos dobles que el borde nuevo exige —el router de la App Router, que jsdom no
-// monta, y las actions de `asignaciones`, que este archivo no ejercita— con el mismo criterio con
-// el que ya estan aislados los bordes de `pedidos` y `recetas`.
+vi.mock('sonner', () => ({ toast: { success: toastSuccessMock, error: vi.fn() } }));
+
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
-    refresh: vi.fn(),
+    refresh: refreshMock,
     back: vi.fn(),
     forward: vi.fn(),
     prefetch: vi.fn(),
   }),
 }));
 
-vi.mock('@/lib/modules/asignaciones/adapters/driving/order-assignment-actions', () => {
-  const noDebeInvocarse = (nombre: string) => () => {
-    throw new Error(`${nombre} no debe invocarse desde el formulario de pedido`);
-  };
-  return {
-    assignResponsiblesAction: vi.fn(noDebeInvocarse('assignResponsiblesAction')),
-    unassignResponsibleAction: vi.fn(noDebeInvocarse('unassignResponsibleAction')),
-    removeWorkGroupFromOrderAction: vi.fn(noDebeInvocarse('removeWorkGroupFromOrderAction')),
-    listOrderResponsiblesAction: vi.fn(noDebeInvocarse('listOrderResponsiblesAction')),
-    listResponsiblesForOrdersAction: vi.fn(noDebeInvocarse('listResponsiblesForOrdersAction')),
-  };
-});
-
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
   createOrderAction: createOrderActionMock,
   updateOrderAction: updateOrderActionMock,
-  // Dobles que FALLAN si se les llama: el formulario no cancela, no borra y no lista.
+  searchOrderCustomersAction: vi.fn(async () => ({
+    status: 'success',
+    data: { items: [], total: 0, page: 1, pageSize: 10, totalPages: 1 },
+  })),
   cancelOrderAction: vi.fn(prohibida('cancelOrderAction')),
+  cancelOrderLineAction: vi.fn(prohibida('cancelOrderLineAction')),
   deleteOrderAction: vi.fn(prohibida('deleteOrderAction')),
-  listOrdersAction: vi.fn(prohibida('listOrdersAction')),
-  getOrderAction: vi.fn(prohibida('getOrderAction')),
-  quoteOrderCostAction: vi.fn(() =>
-    Promise.resolve({ status: 'success', data: { ingredientsCost: null } }),
-  ),
-  quoteOrderPresentationAvailabilityAction: quoteAvailabilityMock,
+  quoteOrderCostAction: vi.fn(async () => ({ status: 'success', data: { ingredientsCost: null } })),
+  quoteOrderPresentationAvailabilityAction: vi.fn(async () => ({
+    status: 'success',
+    data: { kind: 'ok', available: '0' },
+  })),
 }));
 
 vi.mock('@/lib/modules/recetas/adapters/driving/recipe-actions', () => ({
   listRecipeVersionsAction: listRecipeVersionsActionMock,
-  listRecipesAction: listRecipesActionMock,
+  listRecipesAction: vi.fn(prohibida('listRecipesAction')),
   getRecipeAction: getRecipeActionMock,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => ({
-  listPresentationsAction: listPresentationsActionMock,
+  listPresentationsAction: vi.fn(async () => ({
+    status: 'success',
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
   createPresentationAction: vi.fn(prohibida('createPresentationAction')),
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
-  listProductsAction: listProductsActionMock,
+  listProductsAction: vi.fn(async () => ({
+    status: 'success',
+    data: { items: [], page: 1, pageSize: 25, total: 0, totalPages: 1 },
+  })),
 }));
-
-const RECETA = { id: crypto.randomUUID(), name: 'Esmalte azul', imageUrl: null };
-/** Segunda receta, esta CON imagen: es la que prueba que el marcador se sustituye (2026-09-08). */
-const RECETA_CON_IMAGEN = {
-  id: crypto.randomUUID(),
-  name: 'Barniz mate',
-  imageUrl: 'https://ejemplo.test/barniz.png',
-};
-const RECETAS: RecipePickerPage = { items: [RECETA], totalPages: 1 };
-
-/** Catalogo de unidades: resuelve la unidad de los ingredientes y es el de la unidad del pedido. */
-const UNIDAD = {
-  id: crypto.randomUUID(),
-  name: 'Litro',
-  symbol: 'L',
-  baseUnitId: null,
-  factor: null,
-  isSystem: true,
-};
-
-/** Presentacion del catalogo, ofrecida por `listPresentationsAction` en el selector del reparto. */
-const PRESENTACION = {
-  id: crypto.randomUUID(),
-  name: 'Bidón 20L',
-  unitId: UNIDAD.id,
-  content: '20.0000',
-};
-
-/** Envase del catalogo, ofrecido por `listProductsAction` en el selector del reparto. */
-const ENVASE = {
-  id: crypto.randomUUID(),
-  name: 'Bidón PET 20 L',
-  imagePath: null,
-  stock: '10.0000',
-  unitId: crypto.randomUUID(),
-  qtyAlert: null,
-  type: 'PACKAGING',
-  createdAt: new Date('2026-01-01T00:00:00.000Z'),
-  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-  available: '10.0000',
-  presentationId: PRESENTACION.id,
-  presentationName: PRESENTACION.name,
-  presentationContent: PRESENTACION.content,
-  presentationUnitId: PRESENTACION.unitId,
-};
-
-/** Linea de reparto con envase, como la devuelve el pedido guardado. */
-const LINEA_ENVASE = {
-  presentationId: PRESENTACION.id,
-  presentationName: PRESENTACION.name,
-  packages: 1,
-  packagingProductId: ENVASE.id,
-  packagingName: ENVASE.name,
-  presentationContent: null,
-  presentationUnitLabel: null,
-};
-
-/** Cuatro decimales a proposito: es una cadena que ninguna coma flotante devuelve intacta. */
-const CANTIDAD = '0.1005';
-
-const UNIDADES: readonly UnitView[] = [UNIDAD];
-
-/** Linea del detalle de la receta elegida, con los datos del producto ya unidos. */
-const LINEA_INGREDIENTE = {
-  id: 'linea-1',
-  productId: crypto.randomUUID(),
-  productName: 'Sosa cáustica',
-  percentage: '10.00',
-  productUnitId: UNIDAD.id,
-  productStock: '40.0000',
-};
-
-/** Detalle de la receta que devuelve `getRecipeAction` (el JOIN con `products` lo hace `recetas`). */
-function recetaDetalle(overrides: Partial<RecipeDetail> = {}): RecipeDetail {
-  return {
-    id: RECETA.id,
-    name: RECETA.name,
-    description: null,
-    imageUrl: null,
-    stepCount: 0,
-    createdAt: new Date('2026-01-01T00:00:00.000Z'),
-    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-    createdBy: null,
-    updatedBy: null,
-    steps: [],
-    packingSteps: [],
-    conditioningSteps: [],
-    lines: [LINEA_INGREDIENTE],
-    tools: [],
-    original: null,
-    isUnderReview: false,
-    displayName: RECETA.name,
-    ...overrides,
-  };
-}
-
-function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
-  return {
-    ...VISTA_SIN_LINEAS,
-    id: crypto.randomUUID(),
-    number: { year: 2026, sequence: 42 },
-    numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: CANTIDAD,
-    priority: 'ALTA',
-    status: 'EN_CURSO',
-    cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
-    createdAt: new Date('2026-01-15T10:00:00.000Z'),
-    updatedAt: new Date('2026-01-15T10:00:00.000Z'),
-    createdBy: null,
-    updatedBy: null,
-    presentationLines: [LINEA_ENVASE],
-    unitId: UNIDAD.id,
-    unitLabel: UNIDAD.symbol,
-    pendingDelivery: { kind: 'not_packed' },
-    customer: null,
-    recipeImageUrl: null,
-    ...overrides,
-  };
-}
 
 const onSaved = vi.fn();
 
-function renderFormulario(order?: OrderSummary, recipes: RecipePickerPage = RECETAS) {
+function renderPanel(order?: OrderSummary) {
   return render(
     <Sheet open>
-      <OrderForm order={order} recipes={recipes} units={UNIDADES} bridge={null} onSaved={onSaved} />
+      <OrderForm order={order} recipes={RECETAS} units={UNIDADES} bridge={null} onSaved={onSaved} />
     </Sheet>,
   );
 }
 
-/** Elige la receta, que es el unico campo que no se escribe a mano (la unidad se fue en 2026-09-07). */
-async function elegirCatalogos(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
-  await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
+function filas(): HTMLElement[] {
+  return screen.queryAllByTestId(ORDER_LINES_ROW_TESTID);
 }
 
-async function elegirUnidad(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId('presentation-unit-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
+function nombresDeLasFilas(): string[] {
+  return filas().map((fila) => within(fila).getAllByText(/./)[0]?.textContent ?? '');
 }
 
-/** Anade al reparto el envase del catalogo que trae `listProductsAction`. */
-async function anadirLinea(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
-  await user.click(await esperarInteractiva(await screen.findByTestId(PACKAGING_OPTION_TESTID)));
-  await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
+function guardar(): HTMLElement {
+  return screen.getByTestId(ORDER_FORM_SUBMIT_TESTID);
 }
 
-/** El control de cantidad, tipado: sus asserts miran la CADENA del DOM, no `valueAsNumber`. */
-function cantidad(): HTMLInputElement {
-  return screen.getByTestId('order-field-quantity') as HTMLInputElement;
+function editarFila(indice: number): HTMLElement {
+  const fila = filas()[indice];
+  if (fila === undefined) throw new Error(`no hay fila ${indice}`);
+  return within(fila).getByTestId(ORDER_LINES_EDIT_TESTID);
 }
 
-async function rellenarAlta(user: ReturnType<typeof setupUser>) {
-  await elegirCatalogos(user);
-  await elegirUnidad(user);
-  await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+type Candidato = {
+  lines: { id?: string; recipeId: string; recipeVersionId: string | null; quantity: string; unitId: string; presentationLines: unknown[]; salePrice: string }[];
+  priority: string;
+  customerId: string;
+  confirmBlocked: boolean;
+};
+
+function candidatoDelAlta(llamada = 0): Candidato {
+  return createOrderActionMock.mock.calls[llamada]?.[0] as Candidato;
+}
+
+function candidatoDeLaEdicion(llamada = 0): Candidato {
+  return updateOrderActionMock.mock.calls[llamada]?.[1] as Candidato;
 }
 
 beforeEach(() => {
@@ -360,1119 +199,504 @@ beforeEach(() => {
     numberText: formatOrderNumber({ year: 2026, sequence: 43 }),
   });
   updateOrderActionMock.mockResolvedValue({ status: 'success' });
-  getRecipeActionMock.mockResolvedValue({ status: 'success', data: recetaDetalle() });
+  getRecipeActionMock.mockImplementation(async (id) => ({ status: 'success', data: recetaDetalle(id) }));
   listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [] });
-  listPresentationsActionMock.mockResolvedValue({
-    status: 'success',
-    data: { items: [PRESENTACION], page: 1, pageSize: 25, total: 1, totalPages: 1 },
-  });
-  listProductsActionMock.mockResolvedValue({
-    status: 'success',
-    data: { items: [ENVASE], page: 1, pageSize: 25, total: 1, totalPages: 1 },
-  });
-  // Sin sobrante por defecto: con sobrante, Guardar pregunta antes de enviar.
-  quoteAvailabilityMock.mockResolvedValue({
-    status: 'success',
-    data: { kind: 'ok', available: '0' },
-  });
 });
 
 afterEach(() => {
   cleanup();
 });
 
-describe('formulario de alta de pedido (R26, R27, R30, R33, R39)', () => {
-  it('R41: captura los campos de negocio, unidad incluida, y los envia a la operacion de alta', async () => {
-    // El `FormData` lleva exactamente los nombres que el adaptador driving lee. La lista se
-    // deriva de `ORDER_BUSINESS_FIELDS`, no de literales sueltos.
-    const user = setupUser();
-    renderFormulario();
+describe('alta vacía (R1)', () => {
+  it('R1: cliente, prioridad, tabla vacía con su aviso, «Añadir receta» y «Guardar pedido» deshabilitado', () => {
+    renderPanel();
 
-    await rellenarAlta(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    for (const campo of ORDER_BUSINESS_FIELDS) {
-      expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
-    }
-    expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
-    // La unidad vuelve al pedido; el precio unitario sigue fuera.
-    expect(enviado.get('unitId')).toBe(UNIDAD.id);
-    expect(enviado.get('unitPrice')).toBeNull();
-    // Sin lineas el reparto viaja vacio, que es valido en el alta.
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([]);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([]);
-    expect(updateOrderActionMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent('Nuevo pedido');
+    expect(screen.getByRole('combobox', { name: 'Cliente (opcional)' })).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_LINES_EMPTY_TESTID)).toHaveTextContent(
+      'El pedido aún no tiene recetas. Añade al menos una.',
+    );
+    expect(screen.queryByTestId(ORDER_LINES_TABLE_TESTID)).toBeNull();
+    expect(screen.getByTestId(ORDER_FORM_LINES_COUNT_TESTID)).toHaveTextContent('0');
+    expect(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID)).toHaveTextContent('Añadir receta');
+    expect(guardar()).toHaveTextContent('Guardar pedido');
+    expect(guardar()).toBeDisabled();
   });
 
-  it('al salir del campo, la cantidad se coloca a DOS decimales y sin ceros finales', async () => {
-    // Al soltar el foco el valor se coloca a dos decimales y se afeitan los ceros finales.
-    // «25.00» y «25.0» se muestran como «25»; «25.3» y «25.08» conservan sus decimales. El valor
-    // colocado es el que queda en el campo y el que viaja al enviar: al pinchar Guardar, el
-    // campo pierde el foco ANTES del submit.
-    const user = setupUser();
-    renderFormulario();
-
-    const control = cantidad();
-    for (const [escrito, colocado] of [
-      ['25.00', '25'],
-      ['25.0', '25'],
-      ['25.3', '25.3'],
-      ['25.08', '25.08'],
-      ['0.1005', '0.1'],
-      // 2026-09-17: estos tres reventaban. El redondeo propio del campo dejaba el punto suelto
-      // -«25.001» salia «25.»- y un `type="number"` sanea esa cadena a VACIA, con lo que el
-      // campo se quedaba EN BLANCO al tabular y el pedido se enviaba sin cantidad.
-      ['25.001', '25'],
-      ['25.995', '26'],
-      ['9.999', '10'],
-    ] as const) {
-      await user.clear(control);
-      await user.type(control, escrito);
-      await user.tab();
-
-      expect(control.value, `«${escrito}» deberia quedar como «${colocado}»`).toBe(colocado);
-    }
+  it('R1: el panel no tiene campos de receta: la receta se elige en el sub-panel', () => {
+    renderPanel();
+    expect(screen.queryByTestId(RECIPE_PICKER_TESTID)).toBeNull();
+    expect(screen.queryByTestId('order-field-quantity')).toBeNull();
   });
 
-  it('el enviar colocado a dos decimales: «0.1005» viaja como «0.1» en el FormData', async () => {
-    // El click en Guardar hace perder el foco al campo de cantidad: el valor se coloca antes del
-    // submit y es ESE el que llega a la operacion.
+  it('R1: la prioridad ofrece las cuatro del contrato y arranca en la de defecto', async () => {
     const user = setupUser();
-    renderFormulario();
-
-    await rellenarAlta(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.get('quantity')).toBe('0.1');
-  });
-
-  it('captura la cantidad con el control NUMERICO del navegador, con paso libre y sin negativos', () => {
-    // El control es numerico. Que `0.1005` llegue intacta al `FormData` lo comprueba el test de
-    // arriba. `step="any"` es imprescindible: con el paso entero por defecto un decimal seria
-    // invalido. `min="0.01"` es la señal al navegador de que no ofrezca negativos ni cero -el
-    // «mayor que cero» real lo sigue cerrando el esquema del contrato al enviar.
-    renderFormulario();
-
-    const control = screen.getByTestId('order-field-quantity');
-    expect(control).toHaveAttribute('type', 'number');
-    expect(control).toHaveAttribute('step', 'any');
-    expect(control).toHaveAttribute('min', '0.01');
-    expect(control).toHaveAttribute('inputmode', 'decimal');
-
-    // Y el campo de precio unitario NO existe: se fue con la columna (2026-09-07).
-    expect(screen.queryByTestId('order-field-unitPrice')).toBeNull();
-  });
-
-  it('presenta la prioridad por defecto del contrato PRESELECCIONADA y visible', async () => {
-    // «No implicita»: el campo emite siempre un valor valido, porque para el adaptador driving
-    // una prioridad VACIA es error y no ausencia.
-    const user = setupUser();
-    renderFormulario();
-
-    await rellenarAlta(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.get('priority')).toBe(DEFAULT_ORDER_PRIORITY);
-  });
-
-  it('ofrece las CUATRO prioridades que publica el contrato', async () => {
-    // El conjunto se deriva de `ORDER_PRIORITY_VALUES`, no se escribe a mano.
-    const user = setupUser();
-    renderFormulario();
+    renderPanel();
 
     await user.click(screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID));
 
     const opciones = await screen.findAllByTestId(ORDER_PRIORITY_OPTION_TESTID);
-    expect(opciones.map((o) => o.getAttribute('data-value'))).toEqual([...ORDER_PRIORITY_VALUES]);
-  });
-
-  it('el alta NO ofrece selector de estado', async () => {
-    // El alta nace `PENDIENTE` y lo pone el caso de uso.
-    const user = setupUser();
-    renderFormulario();
-
-    expect(screen.queryByTestId(ORDER_STATUS_SELECT_TESTID)).toBeNull();
-
-    await rellenarAlta(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.get(ORDER_STATUS_FIELD)).toBeNull();
-  });
-
-  it('ningun formulario ofrece campo de fecha de solicitud, ni motivo, ni correlativo, ni autoria', () => {
-    // La fecha la pone el sistema y solo se muestra y ordena.
-    for (const pedidoDelCaso of [undefined, pedido()]) {
-      cleanup();
-      renderFormulario(pedidoDelCaso);
-
-      const formulario = screen.getByTestId(ORDER_FORM_TESTID) as HTMLFormElement;
-      const nombres = [...new FormData(formulario).keys()];
-      for (const prohibido of [
-        'createdAt',
-        'requestedAt',
-        'cancellationReason',
-        'reason',
-        'orderNumber',
-        'numberText',
-        'createdBy',
-        'updatedBy',
-      ]) {
-        expect(nombres, `«${prohibido}» no debe existir`).not.toContain(prohibido);
-      }
-    }
+    expect(opciones.map((opcion) => opcion.getAttribute('data-value'))).toEqual([...ORDER_PRIORITY_VALUES]);
+    expect(
+      (screen.getByTestId(ORDER_FORM_TESTID) as HTMLFormElement).querySelector('input[name="priority"]'),
+    ).toHaveValue(DEFAULT_ORDER_PRIORITY);
   });
 });
 
-describe('la unidad y el reparto del pedido (R4, R9, R41, R42)', () => {
-  it('R41: el alta exige la unidad: sin ella no se llama a la operacion y el error va junto al selector', async () => {
+describe('tabla de recetas (R2)', () => {
+  it('R2: una fila por receta, en el orden del pedido, con fórmula, reparto, cantidad y unidad, precio y estado', () => {
+    renderPanel(pedidoDeDosRecetas([lineaB({ position: 1 }), lineaPedido({ position: 0 })]));
+
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent('Editar pedido 2026-');
+    const [primera, segunda] = filas();
+    expect(filas()).toHaveLength(2);
+    expect(primera).toHaveTextContent(RECETA_A.name);
+    expect(primera).toHaveTextContent('3 × Envase 5 L');
+    expect(primera).toHaveTextContent('15 L');
+    expect(primera).toHaveTextContent('120.50');
+    expect(primera).toHaveTextContent('Pendiente');
+    expect(segunda).toHaveTextContent(RECETA_B.name);
+    expect(segunda).toHaveTextContent('Sin presentación');
+    expect(segunda).toHaveTextContent('30 L');
+    expect(segunda).toHaveTextContent('Sin precio');
+    expect(segunda).toHaveTextContent('En fabricación');
+    expect(within(primera as HTMLElement).getByTestId(ORDER_LINES_EDIT_TESTID)).toHaveAccessibleName(
+      `Editar ${RECETA_A.name}`,
+    );
+    expect(within(segunda as HTMLElement).getByTestId(ORDER_LINES_EDIT_TESTID)).toBeInTheDocument();
+  });
+
+  it('R2: debajo, el total del precio con cuántas no lo tienen y el coste estimado', () => {
+    renderPanel(pedidoDeDosRecetas());
+
+    expect(screen.getByTestId(ORDER_LINES_TOTAL_TESTID)).toHaveTextContent('120.50');
+    expect(screen.getByTestId(ORDER_LINES_WITHOUT_PRICE_TESTID)).toHaveTextContent('1 sin precio');
+    expect(screen.getByTestId(ORDER_LINES_COST_TESTID)).toHaveTextContent('65.00');
+  });
+
+  it('R2: ningún dato de receta sale de los campos planos del pedido', () => {
+    renderPanel(pedidoDeDosRecetas());
+    const panel = screen.getByTestId(ORDER_FORM_TESTID);
+    expect(panel).not.toHaveTextContent('PLANO NO USAR');
+    expect(panel).not.toHaveTextContent('999');
+  });
+});
+
+describe('sub-panel de una receta (R3)', () => {
+  it('R3: «Añadir receta» abre el sub-panel vacío encima del panel, con «Descartar» y «Aplicar»', async () => {
     const user = setupUser();
-    renderFormulario();
+    renderPanel();
 
-    await elegirCatalogos(user);
-    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await abrirAnadirReceta(user);
 
-    expect(await screen.findByTestId('presentation-error-unit')).toBeInTheDocument();
+    const sub = subPanel() as HTMLElement;
+    expect(within(sub).getByTestId(ORDER_LINE_SHEET_TITLE_TESTID)).toHaveTextContent('Añadir receta');
+    expect(within(sub).getByText('Los cambios se guardan con «Guardar pedido».')).toBeInTheDocument();
+    expect(within(sub).getByTestId(RECIPE_PICKER_TESTID)).toHaveValue('');
+    expect(within(sub).getByTestId('order-field-quantity')).toHaveValue(null);
+    expect(within(sub).getByTestId(ORDER_RECIPE_IMAGE_TESTID)).toBeInTheDocument();
+    expect(within(sub).getByTestId(ORDER_LINE_SHEET_DISCARD_TESTID)).toHaveTextContent('Descartar');
+    expect(within(sub).getByRole('button', { name: 'Aplicar' })).toBeInTheDocument();
+    expect(within(sub).queryByTestId(ORDER_LINE_SHEET_REMOVE_TESTID)).toBeNull();
+  });
+
+  it('R3: el «Editar» de una receta abre el sub-panel con los valores de esa receta', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
+
+    await user.click(editarFila(1));
+
+    const sub = (await screen.findByTestId('order-line-sheet')) as HTMLElement;
+    expect(within(sub).getByTestId(ORDER_LINE_SHEET_TITLE_TESTID)).toHaveTextContent('Editar receta');
+    expect(within(sub).getByTestId(RECIPE_PICKER_TESTID)).toHaveValue(RECETA_B.name);
+    expect(within(sub).getByTestId('recipe-version-select-value')).toHaveValue(VERSION_B);
+    expect(within(sub).getByTestId('order-field-quantity')).toHaveValue(30);
+    expect(within(sub).getByTestId('order-field-salePrice')).toHaveValue(null);
+    expect(within(sub).getByTestId('presentation-unit-select')).toHaveTextContent('L');
+    expect(within(sub).getByTestId(ORDER_RECIPE_IMAGE_TESTID)).toHaveAttribute('src', RECETA_B.imageUrl);
+    await waitFor(() => expect(getRecipeActionMock).toHaveBeenCalledWith(VERSION_B));
+  });
+});
+
+describe('aplicar y descartar (R4, R5)', () => {
+  it('R4: una receta nueva aplicada queda al final de la tabla y el sub-panel se cierra', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
+
+    await anadirReceta(user, { recetaId: RECETA_C.id, cantidad: '7' });
+
+    expect(filas()).toHaveLength(3);
+    expect(filas()[2]).toHaveTextContent(RECETA_C.name);
+    expect(filas()[2]).toHaveTextContent('7 L');
+    expect(screen.getByTestId(ORDER_FORM_LINES_COUNT_TESTID)).toHaveTextContent('3');
+  });
+
+  it('R4: una receta editada se queda en su sitio con los valores nuevos', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
+
+    await user.click(editarFila(0));
+    await screen.findByTestId('order-line-sheet');
+    await escribirCantidad(user, '22');
+    await aplicar(user);
+    await waitFor(() => expect(subPanel()).toBeNull());
+
+    expect(filas()[0]).toHaveTextContent(RECETA_A.name);
+    expect(filas()[0]).toHaveTextContent('22 L');
+    expect(filas()[1]).toHaveTextContent(RECETA_B.name);
+  });
+
+  it('R4: si un campo no pasa el esquema de una receta, se marca y el sub-panel sigue abierto con lo escrito', async () => {
+    const user = setupUser();
+    renderPanel();
+
+    await abrirAnadirReceta(user);
+    await escribirCantidad(user, '5');
+    await aplicar(user);
+
+    expect(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-error-unit')).toBeInTheDocument();
+    expect(subPanel()).not.toBeNull();
+    expect(screen.getByTestId('order-field-quantity')).toHaveValue(5);
+    expect(filas()).toHaveLength(0);
+  });
+
+  it('R5: «Descartar» cierra el sub-panel y deja la tabla como estaba', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
+
+    await user.click(editarFila(0));
+    await screen.findByTestId('order-line-sheet');
+    await escribirCantidad(user, '99');
+    await user.click(screen.getByTestId(ORDER_LINE_SHEET_DISCARD_TESTID));
+    await waitFor(() => expect(subPanel()).toBeNull());
+
+    expect(filas()[0]).toHaveTextContent('15 L');
+    expect(filas()).toHaveLength(2);
+  });
+
+  it('R5: «Volver al pedido» tampoco añade la receta nueva', async () => {
+    const user = setupUser();
+    renderPanel();
+
+    await abrirAnadirReceta(user);
+    await elegirReceta(user, RECETA_A.id);
+    await user.click(screen.getByTestId(ORDER_LINE_SHEET_BACK_TESTID));
+    await waitFor(() => expect(subPanel()).toBeNull());
+
+    expect(screen.getByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
+    expect(filas()).toHaveLength(0);
+    expect(screen.getByTestId(ORDER_LINES_EMPTY_TESTID)).toBeInTheDocument();
+  });
+});
+
+describe('nada se escribe hasta guardar (R6)', () => {
+  it('R6: añadir, editar y quitar recetas no llama a ninguna acción de guardado', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
+
+    await anadirReceta(user, { recetaId: RECETA_C.id });
+    await user.click(editarFila(0));
+    await screen.findByTestId('order-line-sheet');
+    await escribirCantidad(user, '11');
+    await aplicar(user);
+    await waitFor(() => expect(subPanel()).toBeNull());
+    await user.click(editarFila(2));
+    await user.click(await screen.findByTestId(ORDER_LINE_SHEET_REMOVE_TESTID));
+    await waitFor(() => expect(subPanel()).toBeNull());
+
     expect(createOrderActionMock).not.toHaveBeenCalled();
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-
-  it('R42: sin unidad, el control de reparto dice que falta y no ofrece anadir lineas', () => {
-    renderFormulario();
-
-    expect(screen.getByTestId(ORDER_DISTRIBUTION_TESTID)).toBeInTheDocument();
-    expect(screen.getByTestId(ORDER_DISTRIBUTION_WITHOUT_UNIT_TESTID)).toBeInTheDocument();
-    expect(screen.queryByTestId(PACKAGING_SELECT_TESTID)).toBeNull();
-    expect(screen.queryByTestId(ORDER_DISTRIBUTION_ADD_TESTID)).toBeNull();
-  });
-
-  it('R36: el selector del reparto es de envases, no ofrece crear presentaciones ni manda el campo de presentacion unica', async () => {
-    const user = setupUser();
-    renderFormulario();
-
-    await elegirUnidad(user);
-
-    expect(screen.getByTestId(PACKAGING_SELECT_TESTID)).toBeInTheDocument();
-    expect(screen.queryByTestId('presentation-select')).toBeNull();
-    expect(screen.queryByTestId('presentation-create-open')).toBeNull();
-    const formulario = screen.getByTestId(ORDER_FORM_TESTID) as HTMLFormElement;
-    expect([...new FormData(formulario).keys()]).not.toContain('presentationId');
-  });
-
-  it('R36: las lineas anadidas viajan en el alta con el envase, la presentacion vacia y los envases', async () => {
-    const user = setupUser();
-    renderFormulario();
-
-    await rellenarAlta(user);
-    await anadirLinea(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual(['']);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['1']);
-  });
-
-  it('R35: una linea antigua se reenvia sin cambios por su presentacion y sin envase', async () => {
-    const user = setupUser();
-    renderFormulario(
-      pedido({
-        presentationLines: [
-          { presentationId: PRESENTACION.id, presentationName: PRESENTACION.name, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
-        ],
-      }),
-    );
-
-    const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
-    expect(linea).toHaveAttribute('data-legacy', 'true');
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual([PRESENTACION.id]);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual(['']);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['2']);
-  });
-
-  it('R17: dos envases de presentaciones distintas se guardan: la presentacion vacia del envio no los hace repetidos', async () => {
-    const user = setupUser();
-    const otraPresentacion = { id: crypto.randomUUID(), name: 'Bidón 5L', content: '5.0000' };
-    const otroEnvase = {
-      ...ENVASE,
-      id: crypto.randomUUID(),
-      name: 'Bidón PET 5 L',
-      presentationId: otraPresentacion.id,
-      presentationName: otraPresentacion.name,
-      presentationContent: otraPresentacion.content,
-    };
-    listProductsActionMock.mockResolvedValue({
-      status: 'success',
-      data: { items: [ENVASE, otroEnvase], page: 1, pageSize: 25, total: 2, totalPages: 1 },
-    });
-    renderFormulario();
-
-    await rellenarAlta(user);
-    for (const indice of [0, 1]) {
-      await user.click(screen.getByTestId(PACKAGING_SELECT_TESTID));
-      const opciones = await screen.findAllByTestId(PACKAGING_OPTION_TESTID);
-      await user.click(await esperarInteractiva(opciones[indice]!));
-      await user.click(screen.getByTestId(ORDER_DISTRIBUTION_ADD_TESTID));
-    }
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id, otroEnvase.id]);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD)).toEqual(['', '']);
-  });
-
-  it('R11: el rechazo product_not_found del envase se pinta junto al reparto', async () => {
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'product_not_found',
-      message: 'El envase no existe.',
-    });
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() =>
-      expect(screen.getByTestId(ORDER_DISTRIBUTION_ERROR_TESTID)).toHaveTextContent(
-        'El envase no existe.',
-      ),
-    );
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-  });
-
-  it('R36: la edicion precarga unidad y reparto en envases, y permite cambiar los envases', async () => {
-    const user = setupUser();
-    const elPedido = pedido();
-    renderFormulario(elPedido);
-
-    const linea = screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID);
-    expect(linea).toHaveAttribute('data-packaging-product-id', ENVASE.id);
-    expect(linea).toHaveTextContent(ENVASE.name);
-    const envases = within(linea).getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
-    expect(envases).toHaveValue(1);
-
-    await user.clear(envases);
-    await user.type(envases, '3');
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    expect(enviado.get('unitId')).toBe(UNIDAD.id);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
-    expect(enviado.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD)).toEqual(['3']);
-  });
-
-  it('R41: un pedido sin unidad exige elegirla al editar; con ella elegida se guarda', async () => {
-    const user = setupUser();
-    renderFormulario(pedido({ unitId: null, unitLabel: null, presentationLines: [] }));
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-    expect(await screen.findByTestId('presentation-error-unit')).toBeInTheDocument();
     expect(updateOrderActionMock).not.toHaveBeenCalled();
-
-    await elegirUnidad(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    expect(enviado.get('unitId')).toBe(UNIDAD.id);
   });
 
-  it('R6: el disponible se pide con la cantidad, la unidad y el reparto vigentes', async () => {
-    quoteAvailabilityMock.mockResolvedValue({
-      status: 'success',
-      data: { kind: 'ok', available: '0.1005' },
-    });
-    renderFormulario(pedido());
-
-    await waitFor(() =>
-      expect(quoteAvailabilityMock).toHaveBeenCalledWith({
-        quantity: CANTIDAD,
-        unitId: UNIDAD.id,
-        presentationLines: [{ packagingProductId: ENVASE.id, packages: 1 }],
-      }),
-    );
-    expect(await screen.findByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent(
-      '0.1005 L',
-    );
-  });
-
-  it('R39: si el reparto pasa del total, Guardar queda deshabilitado', async () => {
-    quoteAvailabilityMock.mockResolvedValue({
-      status: 'success',
-      data: { kind: 'exceeds_quantity', available: '-19.8995' },
-    });
-    renderFormulario(pedido());
-
-    await waitFor(() => expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled());
-    expect(screen.getByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveAttribute(
-      'data-negative',
-      'true',
-    );
-  });
-
-  it('R36: el rechazo del servidor por el reparto se pinta junto al reparto y conserva lo escrito', async () => {
+  it('R6: cerrar el panel sin guardar pierde el borrador; al volver a abrirlo arranca vacío', async () => {
     const user = setupUser();
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'presentation_not_found',
-      message: 'La presentación no existe.',
-    });
-    renderFormulario(pedido());
+    render(<OrderSheet recipes={RECETAS} units={UNIDADES} bridge={null} />);
 
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(ORDER_FORM_TESTID);
+    await anadirReceta(user);
+    expect(filas()).toHaveLength(1);
 
-    await waitFor(() => {
-      expect(screen.getByTestId(ORDER_DISTRIBUTION_ERROR_TESTID)).toBeInTheDocument();
-      expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-    });
-    expect(cantidad().value).toBe(CANTIDAD);
-    expect(screen.getByTestId(ORDER_DISTRIBUTION_LINE_TESTID)).toBeInTheDocument();
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-});
+    await user.click(screen.getByTestId(ORDER_FORM_CANCEL_TESTID));
+    await waitFor(() => expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull());
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await screen.findByTestId(ORDER_FORM_TESTID);
 
-describe('formulario de edicion de pedido (R7, R28, R34)', () => {
-  it('precarga los valores actuales y envia el REEMPLAZO COMPLETO del conjunto de negocio', async () => {
-    // No hay envio por campos sueltos: se manda todo el conjunto de negocio, y nada de
-    // estado.
-    const user = setupUser();
-    const elPedido = pedido();
-    renderFormulario(elPedido);
-
-    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
-    // El valor del control se lee como CADENA a proposito: `toHaveValue` sobre un control
-    // numerico devuelve `valueAsNumber`, y esa conversion perderia la precision decimal que aqui
-    // se quiere comprobar. Lo que importa es que el DOM siga guardando la cadena tal cual.
-    expect(cantidad().value).toBe(elPedido.quantity);
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
-
-    // `bind(null, id)`: el id es el PRIMER argumento de la action, no un campo del formulario.
-    expect(updateOrderActionMock.mock.calls[0]?.[0]).toBe(elPedido.id);
-    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    for (const campo of ORDER_BUSINESS_FIELDS) {
-      expect(enviado.get(campo), `falta el campo «${campo}»`).not.toBeNull();
-    }
-    expect(enviado.get(RECIPE_FIELD)).toBe(elPedido.recipeId);
-    expect(enviado.get('priority')).toBe(elPedido.priority);
-    expect(createOrderActionMock).not.toHaveBeenCalled();
-  });
-
-  it('R7: la edicion no ofrece ningun control de estado ni lo envia', async () => {
-    const user = setupUser();
-    const elPedido = pedido();
-    renderFormulario(elPedido);
-
-    expect(screen.queryByTestId(ORDER_STATUS_SELECT_TESTID)).toBeNull();
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    expect(enviado.get(ORDER_STATUS_FIELD)).toBeNull();
-  });
-
-  it('«recipe_not_found» se pinta junto al SELECTOR DE RECETA, no en la region del formulario', async () => {
-    // Se decide por el `code` estable, nunca por el texto del mensaje.
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'recipe_not_found',
-      message: 'La receta no existe.',
-    });
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    // Las tres condiciones del DOM en la misma espera: el mensaje, la ausencia de aviso de
-    // formulario y el `aria-invalid` cambian en la misma interaccion pero no tienen por que caer
-    // en el mismo commit.
-    await waitFor(() => {
-      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-error`)).toBeInTheDocument();
-      expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-      expect(screen.getByTestId(RECIPE_PICKER_TESTID)).toHaveAttribute('aria-invalid', 'true');
-    });
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-
-  it('R7: «invalid_transition» va a la region general del formulario, sin campo de estado que senalar', async () => {
-    // Sin selector de estado, `invalid_transition` ya no puede senalar ningun campo: cae
-    // en la region general, junto con `duplicate_number` y compania.
-    const user = setupUser();
-
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'invalid_transition',
-      message: 'Transición no permitida.',
-    });
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
-    expect(region).toHaveAttribute('role', 'alert');
-    expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('invalid_transition');
-    expect(screen.queryByTestId(`order-error-${ORDER_STATUS_FIELD}`)).toBeNull();
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-
-  it('un codigo que no senala campo va a la region de aviso del formulario y no pierde lo escrito', async () => {
-    // `duplicate_number`, `not_found` y `unauthorized` no identifican campo. Y un rechazo NO
-    // cierra el panel ni vacia el formulario.
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'duplicate_number',
-      message: 'Ese correlativo ya existe.',
-    });
-    const elPedido = pedido();
-    renderFormulario(elPedido);
-
-    await user.clear(screen.getByTestId('order-field-quantity'));
-    await user.type(screen.getByTestId('order-field-quantity'), '7.7777');
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
-    expect(region).toHaveAttribute('role', 'alert');
-    expect(screen.getByTestId('order-form-error-code')).toHaveTextContent('duplicate_number');
-    // Lo escrito sigue ahi: React 19 resetea los campos no controlados al completarse la action,
-    // asi que el estado de fallo los devuelve por `defaultValue`. Al pinchar Guardar el campo
-    // perdió el foco antes del submit, asi que el valor devuelto es el COLOCADO a dos decimales.
-    expect(cantidad().value).toBe('7.78');
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-
-  it('una cantidad que el ESQUEMA del contrato rechaza no llega a la operacion', async () => {
-    // La validacion previa usa el mismo esquema que valida el servidor: no hay segunda copia de
-    // la regla «la cantidad es mayor que cero».
-    const user = setupUser();
-    renderFormulario(pedido({ quantity: '0' }));
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(screen.getByTestId('order-error-quantity')).toBeInTheDocument());
-    expect(screen.getByTestId('order-error-quantity')).toHaveTextContent('Ingresa un número mayor a 0.');
-    expect(updateOrderActionMock).not.toHaveBeenCalled();
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-
-  it('valida con los esquemas del contrato y sin ninguna libreria de formularios', () => {
-    // Guardia de FUENTE: los esquemas salen del barrel de `pedidos` (client-safe) y las actions,
-    // de su ruta exacta. (Los paquetes descartados no se nombran aqui a proposito.)
-    const fuente = readFileSync('app/(private)/pedidos/components/order-form.tsx', 'utf8');
-
-    expect(fuente).toContain("createOrderSchema");
-    expect(fuente).toContain("updateOrderSchema");
-    expect(fuente).toContain("from '@/lib/modules/pedidos'");
-    expect(fuente).toContain("@/lib/modules/pedidos/adapters/driving/order-actions");
-    expect(fuente).not.toContain('parseFloat(');
-    expect(fuente).not.toContain('toFixed(');
-    expect(fuente).not.toContain('@/lib/composition');
-  });
-});
-
-describe('la cabecera describe el pedido y el panel ensena la receta (2026-09-08)', () => {
-  // Se afirma sobre DATOS -el nombre de la receta y la cantidad tecleada-, no sobre copy.
-
-  it('el titulo pasa a nombrar la receta elegida y la cantidad tecleada', async () => {
-    const user = setupUser();
-    renderFormulario();
-
-    const titulo = screen.getByTestId(ORDER_FORM_TITLE_TESTID);
-    expect(titulo.textContent).not.toContain(RECETA.name);
-
-    await rellenarAlta(user);
-
-    expect(titulo.textContent).toContain(RECETA.name);
-    expect(titulo.textContent).toContain(CANTIDAD);
-  });
-
-  it('el hueco de la imagen existe desde el principio, con el marcador comun', () => {
-    renderFormulario();
-
-    const imagen = screen.getByTestId(ORDER_RECIPE_IMAGE_TESTID);
-    expect(imagen).toHaveAttribute('data-missing', 'true');
-    expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
-  });
-
-  it('elegir una receta con imagen sustituye el marcador por ella', async () => {
-    const user = setupUser();
-    renderFormulario(undefined, { items: [RECETA_CON_IMAGEN], totalPages: 1 });
-
-    await elegirCatalogos(user);
-
-    const imagen = screen.getByTestId(ORDER_RECIPE_IMAGE_TESTID);
-    expect(imagen).toHaveAttribute('src', RECETA_CON_IMAGEN.imageUrl);
-    expect(imagen).not.toHaveAttribute('data-missing');
-  });
-
-  it('y elegir una receta SIN imagen (ruta nula) deja el marcador donde estaba', async () => {
-    const user = setupUser();
-    renderFormulario();
-
-    await elegirCatalogos(user);
-
-    const imagen = screen.getByTestId(ORDER_RECIPE_IMAGE_TESTID);
-    expect(imagen).toHaveAttribute('data-missing', 'true');
-    expect(imagen).toHaveAttribute('src', MISSING_IMAGE_SRC);
-  });
-});
-
-describe('la eleccion de receta gobierna Guardar (2026-09-09)', () => {
-  // «crema 1» no puede guardarse con el campo diciendo «crema 1a». Guardar solo se habilita con
-  // una receta ELEGIDA de la lista; editar el campo retira la eleccion, deja el id oculto vacio y
-  // vuelve a deshabilitar Guardar. Se afirma sobre el atributo del boton y sobre el `input`
-  // oculto del selector, sin asserts de copy.
-
-  it('en el alta, Guardar esta deshabilitado hasta elegir una receta', async () => {
-    const user = setupUser();
-    renderFormulario();
-
-    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
-
-    await rellenarAlta(user);
-
-    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
-  });
-
-  it('editar el campo tras elegir retira la receta y vuelve a bloquear Guardar', async () => {
-    const user = setupUser();
-    renderFormulario();
-
-    await rellenarAlta(user);
-    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeEnabled();
-
-    // Lo que el selector ya no guarda: el id viaja vacio y el titulo y el boton vuelven al inicio.
-    await user.type(screen.getByTestId(RECIPE_PICKER_TESTID), 'a');
-
-    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue('');
-    expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
-    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
+    expect(filas()).toHaveLength(0);
     expect(createOrderActionMock).not.toHaveBeenCalled();
   });
 });
 
-describe('los ingredientes de la receta elegida (2026-09-09)', () => {
-  // El JOIN con `products` lo hace el detalle de `recetas` (`getRecipeAction`); aqui se
-  // comprueba que al elegir receta se pide y que la tabla pinta los datos del producto.
-
-  it('sin receta elegida la tabla de ingredientes no se monta', () => {
-    renderFormulario();
-
-    expect(screen.queryByTestId(ORDER_INGREDIENTS_TESTID)).toBeNull();
-    expect(getRecipeActionMock).not.toHaveBeenCalled();
-  });
-
-  it('elegir una receta pide su detalle y pinta la tabla con los datos de los productos', async () => {
+describe('el candidato que se envía (R7)', () => {
+  it('R7: el alta envía en una sola operación la prioridad, el cliente y las recetas nuevas en su orden, sin id', async () => {
     const user = setupUser();
-    renderFormulario();
+    renderPanel();
 
-    await elegirCatalogos(user);
+    await anadirReceta(user, { recetaId: RECETA_A.id, cantidad: '10', precio: '50' });
+    await anadirReceta(user, { recetaId: RECETA_C.id, cantidad: '4' });
+    await user.click(guardar());
 
-    await waitFor(() => expect(getRecipeActionMock).toHaveBeenCalledWith(RECETA.id));
-    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-
-    expect(within(tabla).getByTestId('order-ingredient-product')).toHaveTextContent(
-      LINEA_INGREDIENTE.productName,
-    );
-    // La columna «porcentaje» pinta la parte del insumo con coma y dos decimales.
-    expect(within(tabla).getByTestId('order-ingredient-percentage')).toHaveTextContent('10,00 %');
-    // La unidad es la del PRODUCTO (`productUnitId`), se resuelve con el catalogo bajado por
-    // props y va pegada a la cifra del stock.
-    expect(within(tabla).getByTestId('order-ingredient-stock').textContent).toBe(
-      `${formatDecimalDisplay(LINEA_INGREDIENTE.productStock ?? '')} L`,
-    );
-    expect(within(tabla).queryByTestId('order-ingredient-unit')).toBeNull();
-  });
-
-  it('la edicion pide el detalle de la receta YA elegida al montar el panel', async () => {
-    renderFormulario(pedido());
-
-    await waitFor(() => expect(getRecipeActionMock).toHaveBeenCalledWith(RECETA.id));
-    expect(await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID)).toBeInTheDocument();
-  });
-
-  it('una receta sin ingredientes se dice, no se pinta una tabla vacia', async () => {
-    const user = setupUser();
-    getRecipeActionMock.mockResolvedValue({
-      status: 'success',
-      data: recetaDetalle({ lines: [] }),
+    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
+    expect(candidatoDelAlta()).toEqual({
+      lines: [
+        {
+          recipeId: RECETA_A.id,
+          recipeVersionId: null,
+          quantity: '10',
+          unitId: UNIDAD.id,
+          presentationLines: [],
+          salePrice: '50',
+        },
+        {
+          recipeId: RECETA_C.id,
+          recipeVersionId: null,
+          quantity: '4',
+          unitId: UNIDAD.id,
+          presentationLines: [],
+          salePrice: '',
+        },
+      ],
+      priority: DEFAULT_ORDER_PRIORITY,
+      customerId: '',
+      confirmBlocked: false,
     });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-
-    expect(await screen.findByTestId(ORDER_INGREDIENTS_EMPTY_TESTID)).toBeInTheDocument();
-    expect(screen.queryByTestId(ORDER_INGREDIENTS_TABLE_TESTID)).toBeNull();
-  });
-
-  it('la «cantidad requerida» parte de 0 y el «restante» la descuenta del stock', async () => {
-    // La columna calcula `cantidad del pedido × porcentaje / 100` (`consumedQuantity`), y sin
-    // cantidad escrita vale 0; el restante es `stock − requerida` (`subtractDecimal`) y sin
-    // cantidad escrita coincide con el stock.
-    const user = setupUser();
-    renderFormulario();
-
-    await elegirCatalogos(user);
-    await elegirUnidad(user);
-
-    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    const requerida = within(tabla).getByTestId('order-ingredient-required');
-    const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    expect(requerida).toHaveTextContent('0');
-    expect(restante).toHaveTextContent('40');
-
-    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
-
-    // 0.1005 × 10,00 % = 0.01005 y 40 − 0.01005 = 39.98995. Se CALCULAN exactos y se PINTAN a dos
-    // decimales: «0.01 L» y «39.99 L». El valor exacto no se pierde, viaja en el `title`.
-    await waitFor(() => expect(requerida.textContent).toBe('0.01 L'));
-    expect(requerida).toHaveAttribute('title', '0.01005');
-    expect(requerida).toHaveAttribute('aria-label', '0.01005 L');
-    expect(restante.textContent).toBe('39.99 L');
-    expect(restante).toHaveAttribute('title', '39.98995');
-    expect(restante).toHaveAttribute('aria-label', '39.98995 L');
-    expect(restante.firstChild).not.toHaveClass('text-destructive');
-  });
-
-  it('un restante negativo se resalta en rojo', async () => {
-    // El pedido pide mas de lo que hay, el restante baja de cero y la celda se pinta con
-    // `text-destructive` sobre fondo suave.
-    const user = setupUser();
-    getRecipeActionMock.mockResolvedValue({
-      status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: '0.0050' }] }),
-    });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-    await elegirUnidad(user);
-
-    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    // Sin cantidad escrita, el restante coincide con el stock, redondeado a dos decimales.
-    expect(restante).toHaveTextContent('0.01');
-
-    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
-
-    // 0.005 − 0.01005 = −0.00505, resaltado. A dos decimales eso se pinta «-0.01», y el `title`
-    // lleva la cifra exacta. El resalte (`isShort`) mira el exacto, no el pintado.
-    await waitFor(() => expect(restante.textContent).toBe('-0.01 L'));
-    expect(restante).toHaveAttribute('title', '-0.00505');
-    expect(restante).toHaveAttribute('aria-label', '-0.00505 L');
-    expect(restante.firstElementChild).toHaveClass('text-destructive');
-  });
-
-  it('R12 — con existencia en la unidad de la linea, el restante resta normal', async () => {
-    const user = setupUser();
-    getRecipeActionMock.mockResolvedValue({
-      status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: '40.0000' }] }),
-    });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-    await elegirUnidad(user);
-
-    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('40');
-    expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('40');
-  });
-
-  it('R13 — con lotes pero ninguno en la unidad de la linea, existencia y restante muestran el marcador', async () => {
-    const user = setupUser();
-    getRecipeActionMock.mockResolvedValue({
-      status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: null }] }),
-    });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-
-    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('—');
-    expect(within(tabla).getByTestId('order-ingredient-remaining')).toHaveTextContent('—');
-  });
-
-  it('R14 — sin ningun lote, la existencia es 0 y el restante negativo se destaca como faltante', async () => {
-    const user = setupUser();
-    getRecipeActionMock.mockResolvedValue({
-      status: 'success',
-      data: recetaDetalle({ lines: [{ ...LINEA_INGREDIENTE, productStock: '0.0000' }] }),
-    });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-    await elegirUnidad(user);
-
-    const tabla = await screen.findByTestId(ORDER_INGREDIENTS_TABLE_TESTID);
-    expect(within(tabla).getByTestId('order-ingredient-stock')).toHaveTextContent('0');
-
-    await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
-
-    const restante = within(tabla).getByTestId('order-ingredient-remaining');
-    // 0 − 0.01005 = −0.01005: sin ningun lote el pedido siempre pide mas de lo que hay. Se
-    // CALCULA exacto y se PINTA a dos decimales, «-0.01».
-    // El resalte de faltante (`isShort`) se decide con el restante EXACTO, nunca con el pintado.
-    // En telefono o impreso no hay `title`, y alli el color es el unico aviso; se acepta a
-    // sabiendas.
-    await waitFor(() => expect(restante.textContent).toBe('-0.01 L'));
-    expect(restante).toHaveAttribute('title', '-0.01005');
-    expect(restante).toHaveAttribute('aria-label', '-0.01005 L');
-    expect(restante.firstElementChild).toHaveClass('text-destructive');
-  });
-
-  it('si el detalle falla, la tabla se sustituye por el estado de error de los ingredientes', async () => {
-    const user = setupUser();
-    // El codigo es `recipe_not_found`: `getRecipeAction` declara su `code` como `ErrorCode`, la
-    // union CERRADA del catalogo. Es el mismo que compara
-    // `app/(private)/produccion/formulas/[id]/page.tsx`.
-    getRecipeActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'recipe_not_found',
-      message: 'La receta no existe.',
-    });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-
-    const error = await screen.findByTestId(ORDER_INGREDIENTS_ERROR_TESTID);
-    expect(error).toHaveAttribute('role', 'alert');
-    expect(error).toHaveTextContent('La receta no existe.');
-    // El fallo del detalle no convierte el panel en un fallo del formulario.
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-  });
-});
-
-/**
- * El formulario guarda el estado de error de la operacion ENTERO (`serverError`), y esta pareja de
- * casos es la que lo demuestra: la copia campo a campo que habia antes dejaba el identificador por
- * el camino sin que ningun test se enterara.
- */
-describe('formulario de pedido — el identificador del error inesperado (QC-71 R17, R18)', () => {
-  it('el error inesperado ensena el identificador como texto, con su etiqueta', async () => {
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValue(errorInesperado());
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
-    expect(region).toHaveAttribute('role', 'alert');
-    expect(within(region).getByText(REFERENCIA_DEL_CASO)).toBeInTheDocument();
-    expect(within(region).getByTestId(UNEXPECTED_ERROR_NOTICE_REFERENCE_TESTID)).toHaveTextContent(
-      UNEXPECTED_ERROR_NOTICE_REFERENCE_LABEL,
-    );
-  });
-
-  it('un error del catalogo no ensena identificador ninguno', async () => {
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValue({
-      status: 'error',
-      code: 'duplicate_number',
-      message: 'Ese correlativo ya existe.',
-    });
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
-    expect(within(region).getByTestId('order-form-error-code')).toHaveTextContent(
-      'duplicate_number',
-    );
-    esperarSinIdentificador();
-  });
-});
-
-describe('pedido que no alcanza: el aviso de guardarlo bloqueado', () => {
-  const MENSAJE_BLOQUEO = 'No hay material suficiente para este pedido.';
-  const NO_ALCANZA = { status: 'error', code: 'order_would_block', message: MENSAJE_BLOQUEO } as const;
-
-  /** Lo que viajo en cada envio, sin el campo de confirmacion: para comparar los demas campos. */
-  function camposDeNegocio(formData: FormData): Record<string, string> {
-    const campos: Record<string, string> = {};
-    for (const [nombre, valor] of formData) {
-      if (nombre !== ORDER_CONFIRM_BLOCKED_FIELD) campos[nombre] = String(valor);
-    }
-    return campos;
-  }
-
-  it('R7: en el alta, ante order_would_block aparece el aviso y no la region de error', async () => {
-    const user = setupUser();
-    createOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
-    renderFormulario();
-
-    await rellenarAlta(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    const dialogo = await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID);
-    expect(within(dialogo).getAllByRole('button')).toHaveLength(2);
-    expect(screen.getByTestId(BLOCKED_ORDER_MESSAGE_TESTID)).toHaveTextContent(MENSAJE_BLOQUEO);
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-    expect(onSaved).not.toHaveBeenCalled();
-  });
-
-  it('R7: en la edicion, ante order_would_block aparece el mismo aviso', async () => {
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    expect(await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeInTheDocument();
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
-  });
-
-  it('R7, R9: las acciones del aviso tienen objetivo tactil de al menos 44x44', async () => {
-    const user = setupUser();
-    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
-    renderFormulario(pedido());
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-    await screen.findByTestId(BLOCKED_ORDER_DIALOG_TESTID);
-
-    for (const testId of [BLOCKED_ORDER_CONFIRM_TESTID, BLOCKED_ORDER_DISMISS_TESTID]) {
-      const boton = screen.getByTestId(testId);
-      expect(boton.className, testId).toContain('min-h-11');
-      expect(boton.className, testId).toContain('min-w-11');
-    }
-  });
-
-  it('R8: en el alta, «Guardar bloqueado» reenvia el mismo FormData con confirmBlocked=true', async () => {
-    const user = setupUser();
-    createOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
-    renderFormulario();
-
-    await rellenarAlta(user);
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(2));
-    const primero = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    const reenvio = createOrderActionMock.mock.calls[1]?.[1] as FormData;
-    expect(primero.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBeNull();
-    expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
-    expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
     expect(updateOrderActionMock).not.toHaveBeenCalled();
   });
 
-  it('R8: en la edicion, «Guardar bloqueado» reenvia al mismo pedido y, guardado, no vuelve a avisar', async () => {
-    // El servidor decide si queda bloqueado o, si entre tanto alcanza, pendiente: el formulario
-    // solo ve el exito y cierra.
+  it('R7: la edición envía las guardadas con su id, las nuevas sin él, y no envía las canceladas', async () => {
     const user = setupUser();
-    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
-    const elPedido = pedido();
-    renderFormulario(elPedido);
+    const cancelada = lineaPedido({
+      id: '50000000-0000-4000-8000-00000000000c',
+      position: 2,
+      recipeId: RECETA_C.id,
+      originalRecipeId: RECETA_C.id,
+      recipeName: RECETA_C.name,
+      status: 'CANCELADO',
+      cancellationReason: 'No hace falta',
+    });
+    renderPanel(pedidoDeDosRecetas([lineaPedido(), lineaB(), cancelada]));
 
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-    await user.click(await screen.findByTestId(BLOCKED_ORDER_CONFIRM_TESTID));
+    await anadirReceta(user, { recetaId: RECETA_C.id, cantidad: '8' });
+    await user.click(guardar());
 
-    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(2));
-    expect(updateOrderActionMock.mock.calls[1]?.[0]).toBe(elPedido.id);
-    const primero = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-    const reenvio = updateOrderActionMock.mock.calls[1]?.[2] as FormData;
-    expect(reenvio.get(ORDER_CONFIRM_BLOCKED_FIELD)).toBe('true');
-    expect(camposDeNegocio(reenvio)).toEqual(camposDeNegocio(primero));
-    expect(reenvio.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD)).toEqual([ENVASE.id]);
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    expect(updateOrderActionMock.mock.calls[0]?.[0]).toBe(PEDIDO_ID);
+    const candidato = candidatoDeLaEdicion();
+    expect(candidato.lines.map((line) => line.id)).toEqual([LINEA_A_ID, LINEA_B_ID, undefined]);
+    expect(candidato.lines[0]).toEqual({
+      id: LINEA_A_ID,
+      recipeId: RECETA_A.id,
+      recipeVersionId: null,
+      quantity: '15',
+      unitId: UNIDAD.id,
+      presentationLines: [{ packagingProductId: ENVASE, packages: 3 }],
+      salePrice: '120.5',
+    });
+    expect(candidato.lines[1]).toMatchObject({ recipeId: RECETA_B.id, recipeVersionId: VERSION_B });
+    expect(candidato.lines[2]).toMatchObject({ recipeId: RECETA_C.id, quantity: '8' });
+    // La prioridad viaja desde su campo: el pedido la tiene en ALTA y no es la de defecto.
+    expect(candidato.priority).toBe('ALTA');
+    expect(createOrderActionMock).not.toHaveBeenCalled();
+  });
+
+  it('R7: con éxito, el panel avisa a quien lo abrió para cerrar, avisar y refrescar', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
+
+    await user.click(guardar());
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
-    expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull();
   });
 
-  it('R9: «Volver» cierra el aviso sin llamar a la action y los campos conservan su valor', async () => {
+  it('R7: dentro de `OrderSheet`, guardar cierra el panel, avisa con un toast y refresca el listado', async () => {
     const user = setupUser();
-    updateOrderActionMock.mockResolvedValueOnce(NO_ALCANZA);
-    const elPedido = pedido();
-    renderFormulario(elPedido);
+    render(<OrderSheet recipes={RECETAS} units={UNIDADES} bridge={null} />);
 
-    await user.clear(cantidad());
-    await user.type(cantidad(), '7.7777');
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-    await user.click(await screen.findByTestId(BLOCKED_ORDER_DISMISS_TESTID));
+    await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
+    await anadirReceta(user);
+    await user.click(guardar());
 
-    await waitFor(() => expect(screen.queryByTestId(BLOCKED_ORDER_DIALOG_TESTID)).toBeNull());
-    expect(updateOrderActionMock).toHaveBeenCalledTimes(1);
-    expect(createOrderActionMock).not.toHaveBeenCalled();
-    expect(onSaved).not.toHaveBeenCalled();
-    // Al pinchar Guardar el campo perdio el foco antes del envio: lo que conserva es lo colocado.
-    expect(cantidad().value).toBe('7.78');
-    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
-    expect(screen.queryByTestId(ORDER_FORM_ERROR_TESTID)).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId(ORDER_FORM_TESTID)).toBeNull());
+    expect(toastSuccessMock).toHaveBeenCalledWith('Pedido creado.');
+    expect(refreshMock).toHaveBeenCalled();
   });
 });
 
-describe('el selector de version en el formulario', () => {
-  function versionDeLaReceta(name: string, isUnderReview = false): RecipeVersionSummary {
-    return {
-      id: crypto.randomUUID(),
-      name,
-      displayName: `${RECETA.name} · ${name}`,
-      isUnderReview,
-      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-    };
-  }
+describe('solo lectura y añadir en la edición (R10)', () => {
+  const terminada = () =>
+    lineaPedido({ status: 'TERMINADO', salePrice: '10.0000', quantity: '12.5000' });
 
-  function selectorDeVersion(): HTMLElement {
-    return screen.getByTestId(RECIPE_VERSION_SELECT_TESTID);
-  }
+  it('R10: una receta guardada en un estado no editable sale con «Solo lectura» y sin «Editar»', () => {
+    renderPanel(pedidoDeDosRecetas([terminada(), lineaB()], { status: 'PARCIAL' }));
 
-  async function elegirVersion(user: ReturnType<typeof setupUser>, indice: number) {
-    await waitFor(() => expect(selectorDeVersion()).toBeEnabled());
-    await user.click(selectorDeVersion());
-    const opciones = await screen.findAllByTestId(`${RECIPE_VERSION_SELECT_TESTID}-option`);
-    await user.click(await esperarInteractiva(opciones[indice]!));
-  }
-
-  it('R27: en el alta sin receta el selector esta deshabilitado y su campo viaja vacio', () => {
-    renderFormulario();
-
-    expect(selectorDeVersion()).toBeDisabled();
-    expect(screen.getByTestId(`${RECIPE_VERSION_SELECT_TESTID}-value`)).toHaveValue(
-      ORIGINAL_VERSION_VALUE,
+    const [primera, segunda] = filas();
+    expect(within(primera as HTMLElement).getByTestId(ORDER_LINES_READ_ONLY_TESTID)).toHaveTextContent(
+      'Solo lectura',
     );
+    expect(within(primera as HTMLElement).queryByTestId(ORDER_LINES_EDIT_TESTID)).toBeNull();
+    expect(within(segunda as HTMLElement).getByTestId(ORDER_LINES_EDIT_TESTID)).toBeInTheDocument();
   });
 
-  it('R26, R27: elegir la receta pide sus versiones; sin ninguna ofrecible sigue deshabilitado', async () => {
+  it('R10: «Añadir receta» está disponible en PARCIAL y la de solo lectura viaja sin cambios', async () => {
     const user = setupUser();
-    listRecipeVersionsActionMock.mockResolvedValue({
-      status: 'success',
-      data: [versionDeLaReceta('A medias', true)],
+    renderPanel(pedidoDeDosRecetas([terminada(), lineaB()], { status: 'PARCIAL' }));
+
+    await anadirReceta(user, { recetaId: RECETA_C.id });
+    await user.click(guardar());
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
+    expect(candidatoDeLaEdicion().lines[0]).toEqual({
+      id: LINEA_A_ID,
+      recipeId: RECETA_A.id,
+      recipeVersionId: null,
+      quantity: '12.5000',
+      unitId: UNIDAD.id,
+      presentationLines: [{ packagingProductId: ENVASE, packages: 3 }],
+      salePrice: '10.0000',
     });
-    renderFormulario();
-
-    await elegirCatalogos(user);
-
-    await waitFor(() => expect(listRecipeVersionsActionMock).toHaveBeenCalledWith(RECETA.id));
-    expect(selectorDeVersion()).toBeDisabled();
+    expect(candidatoDeLaEdicion().lines).toHaveLength(3);
   });
-
-  it('R28: elegir una version pide sus ingredientes y volver a «Original» los de la original', async () => {
-    const user = setupUser();
-    const viva = versionDeLaReceta('Sin colorante');
-    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [viva] });
-    renderFormulario();
-    await elegirCatalogos(user);
-    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA.id));
-
-    await elegirVersion(user, 1);
-    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(viva.id));
-
-    await elegirVersion(user, 0);
-    await waitFor(() => expect(getRecipeActionMock).toHaveBeenLastCalledWith(RECETA.id));
-  });
-
-  it('R28: el alta con version envia la original como receta y la version en su campo', async () => {
-    const user = setupUser();
-    const viva = versionDeLaReceta('Sin colorante');
-    listRecipeVersionsActionMock.mockResolvedValue({ status: 'success', data: [viva] });
-    renderFormulario();
-    await rellenarAlta(user);
-    await elegirVersion(user, 1);
-
-    await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-    await waitFor(() => expect(createOrderActionMock).toHaveBeenCalledTimes(1));
-    const enviado = createOrderActionMock.mock.calls[0]?.[1] as FormData;
-    expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
-    expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(viva.id);
-  });
-
-  it.each([
-    ['por revisar', true],
-    ['dada de baja', false],
-  ] as const)(
-    'R29: la edicion de un pedido con una version %s la muestra elegida y el FormData la conserva',
-    async (nota, sigueListada) => {
-      const user = setupUser();
-      const actual = versionDeLaReceta('A medias', true);
-      listRecipeVersionsActionMock.mockResolvedValue({
-        status: 'success',
-        data: sigueListada ? [actual] : [],
-      });
-      const elPedido = pedido({
-        recipeId: actual.id,
-        recipeName: actual.displayName,
-        recipeVersion: { originalId: RECETA.id, originalName: RECETA.name, versionName: actual.name },
-      });
-      renderFormulario(elPedido);
-
-      expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(RECETA.id);
-      expect(screen.getByRole('combobox', { name: 'Fórmula' })).toHaveValue(RECETA.name);
-      await waitFor(() => expect(selectorDeVersion()).toHaveTextContent(nota));
-      expect(selectorDeVersion()).toHaveTextContent(actual.name);
-      expect(selectorDeVersion()).toBeEnabled();
-      expect(getRecipeActionMock).toHaveBeenCalledWith(actual.id);
-
-      await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
-
-      await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(1));
-      const enviado = updateOrderActionMock.mock.calls[0]?.[2] as FormData;
-      expect(enviado.get(RECIPE_FIELD)).toBe(RECETA.id);
-      expect(enviado.get(RECIPE_VERSION_FIELD)).toBe(actual.id);
-    },
-  );
 });
 
-describe('el panel en telefono y sus textos (QC-262)', () => {
-  /** Clases que fijan ancho o tope de ancho SIN prefijo de punto de ruptura: las que mandan bajo 640 px. */
-  function clasesDeAnchoSinBreakpoint(panel: HTMLElement): string[] {
-    return [...panel.classList].filter((clase) =>
-      /^(data-\[side=right\]:)?(w-|max-w-|min-w-)/.test(clase),
-    );
-  }
+describe('quitar una receta (R11)', () => {
+  it('R11: «Quitar receta» de una guardada en PENDIENTE la saca de la tabla', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
 
-  it('R19: por debajo de 640 px el panel ocupa todo el ancho con su clase de hoy', () => {
-    renderFormulario();
+    await user.click(editarFila(0));
+    await user.click(await screen.findByTestId(ORDER_LINE_SHEET_REMOVE_TESTID));
+    await waitFor(() => expect(subPanel()).toBeNull());
 
-    const panel = screen.getByTestId('order-sheet');
-    expect(panel).toHaveAttribute('data-side', 'right');
-    expect(clasesDeAnchoSinBreakpoint(panel).sort()).toEqual(['data-[side=right]:w-full', 'w-full']);
-    // El tope de ancho solo entra desde `sm` (640 px).
-    expect(panel).toHaveClass('sm:max-w-md');
-    expect(panel).not.toHaveClass('data-[side=right]:w-3/4');
-    // El minimo del 70 % no recorta el ancho completo.
-    expect(panel.style.minWidth).toBe('70vw');
-    // El pie respeta el margen seguro inferior.
-    expect(panel).toHaveClass('pb-[env(safe-area-inset-bottom)]');
+    expect(filas()).toHaveLength(1);
+    expect(filas()[0]).toHaveTextContent(RECETA_B.name);
   });
 
-  it('R20: el alta se titula «Nuevo pedido» con su descripcion de hoy', () => {
-    renderFormulario();
+  it('R11: una guardada EN_CURSO no ofrece «Quitar receta»', async () => {
+    const user = setupUser();
+    renderPanel(pedidoDeDosRecetas());
 
-    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent(/^Nuevo pedido$/);
-    expect(
-      screen.getByText('Completa los datos del pedido. La fecha y el número los pone el sistema.'),
-    ).toBeInTheDocument();
+    await user.click(editarFila(1));
+    await screen.findByTestId('order-line-sheet');
+
+    expect(screen.queryByTestId(ORDER_LINE_SHEET_REMOVE_TESTID)).toBeNull();
   });
 
-  it('R20: la edicion se titula «<receta> × <cantidad>» con su descripcion de hoy', () => {
-    const elPedido = pedido();
-    renderFormulario(elPedido);
+  it('R11: una receta nueva del borrador también se puede quitar', async () => {
+    const user = setupUser();
+    renderPanel();
 
-    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent(
-      new RegExp(`^${elPedido.recipeName} × ${elPedido.quantity.replace('.', '\.')}$`),
-    );
-    expect(
-      screen.getByText('Cambia los datos del pedido. Se guardan todos los campos.'),
-    ).toBeInTheDocument();
+    await anadirReceta(user);
+    await user.click(editarFila(0));
+    await user.click(await screen.findByTestId(ORDER_LINE_SHEET_REMOVE_TESTID));
+    await waitFor(() => expect(subPanel()).toBeNull());
+
+    expect(filas()).toHaveLength(0);
+    expect(guardar()).toBeDisabled();
+  });
+});
+
+describe('canceladas (R12)', () => {
+  const cancelada = (overrides = {}) =>
+    lineaPedido({ status: 'CANCELADO', cancellationReason: 'Sin stock', ...overrides });
+
+  it('R12: una cancelada sale en solo lectura y no suma al total ni al coste', () => {
+    renderPanel(pedidoDeDosRecetas([cancelada(), lineaB({ salePrice: '30.0000' })], { status: 'PARCIAL' }));
+
+    const [primera] = filas();
+    expect(primera).toHaveTextContent('Cancelado');
+    expect(within(primera as HTMLElement).getByTestId(ORDER_LINES_READ_ONLY_TESTID)).toBeInTheDocument();
+    expect(screen.getByTestId(ORDER_LINES_TOTAL_TESTID)).toHaveTextContent('30.00');
+    expect(screen.queryByTestId(ORDER_LINES_WITHOUT_PRICE_TESTID)).toBeNull();
+    expect(screen.getByTestId(ORDER_LINES_COST_TESTID)).toHaveTextContent('25.00');
+  });
+
+  it('R12: con solo canceladas sale el aviso de R1 y «Guardar pedido» sigue deshabilitado', () => {
+    renderPanel(pedidoDeDosRecetas([cancelada()], { status: 'CANCELADO' }));
+
+    expect(filas()).toHaveLength(1);
+    expect(screen.getByTestId(ORDER_LINES_EMPTY_TESTID)).toBeInTheDocument();
+    expect(guardar()).toBeDisabled();
+  });
+});
+
+describe('precio y total (R13)', () => {
+  it('R13: el total es la suma exacta de los precios, el 0 cuenta como precio y dice cuántas no lo tienen', async () => {
+    const user = setupUser();
+    renderPanel();
+
+    await anadirReceta(user, { recetaId: RECETA_A.id, precio: '0.1' });
+    await anadirReceta(user, { recetaId: RECETA_B.id, precio: '0.2' });
+    await anadirReceta(user, { recetaId: RECETA_C.id, precio: '0' });
+
+    expect(screen.getByTestId(ORDER_LINES_TOTAL_TESTID)).toHaveTextContent('0.30');
+    expect(screen.queryByTestId(ORDER_LINES_WITHOUT_PRICE_TESTID)).toBeNull();
+  });
+
+  it('R13: sin ningún precio el total es el marcador de ausencia y cuenta las que no lo tienen', async () => {
+    const user = setupUser();
+    renderPanel();
+
+    await anadirReceta(user, { recetaId: RECETA_A.id });
+
+    expect(screen.getByTestId(ORDER_LINES_TOTAL_TESTID)).toHaveAccessibleName('Sin dato');
+    expect(screen.getByTestId(ORDER_LINES_WITHOUT_PRICE_TESTID)).toHaveTextContent('1 sin precio');
+  });
+});
+
+describe('rechazo sin posiciones de receta (R50)', () => {
+  const sinCambios = {
+    status: 'error',
+    code: 'invalid_transition',
+    message: 'El pedido no admite ese cambio de estado.',
+    linePositions: [],
+  } as const;
+
+  it('R50: muestra el mensaje del catálogo, el panel sigue abierto y el borrador intacto', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue(sinCambios);
+    renderPanel(pedidoDeDosRecetas());
+
+    await user.click(guardar());
+
+    const region = await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
+    expect(region).toHaveTextContent('El pedido no admite ese cambio de estado.');
+    expect(screen.queryByTestId(ORDER_FORM_LINES_ERROR_TESTID)).toBeNull();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(screen.getByTestId(ORDER_FORM_TESTID)).toBeInTheDocument();
+    expect(nombresDeLasFilas()).toHaveLength(2);
+    expect(filas()[0]).toHaveTextContent('15 L');
+  });
+
+  it('R50: no hay regla propia de «sin cambios»: «Guardar pedido» sigue habilitado y vuelve a enviar', async () => {
+    const user = setupUser();
+    updateOrderActionMock.mockResolvedValue(sinCambios);
+    renderPanel(pedidoDeDosRecetas([lineaB({ status: 'TERMINADO' })], { status: 'PARCIAL' }));
+
+    expect(guardar()).toBeEnabled();
+    await user.click(guardar());
+    await screen.findByTestId(ORDER_FORM_ERROR_TESTID);
+    expect(guardar()).toBeEnabled();
+    await user.click(guardar());
+
+    await waitFor(() => expect(updateOrderActionMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('R50: un fallo inesperado enseña su identificador en la misma región', async () => {
+    const user = setupUser();
+    createOrderActionMock.mockResolvedValue({
+      status: 'error',
+      code: 'unexpected',
+      message: 'Algo falló.',
+      reference: 'ref-123',
+      linePositions: [],
+    });
+    renderPanel();
+
+    await anadirReceta(user);
+    await user.click(guardar());
+
+    expect(await screen.findByTestId(ORDER_FORM_ERROR_TESTID)).toHaveTextContent('ref-123');
   });
 });

@@ -20,6 +20,7 @@ import {
   DELETE_ORDER_ID_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_FORM_TITLE_TESTID,
   ORDER_RESPONSIBLES_SUMMARY_TESTID,
   ORDER_SHEET_RESPONSIBLES_TESTID,
   OrderTable,
@@ -345,7 +346,8 @@ describe('R13: un solo anfitrion por tabla abre lo de cada item para su pedido',
     await elegir(user, PEDIDO_B, 'order-action-edit');
 
     await screen.findByTestId(ORDER_FORM_TESTID);
-    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('30');
+    // Desde QT-314 el panel no tiene campos de receta: el título nombra el pedido elegido.
+    expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID)).toHaveTextContent(PEDIDO_B.numberText);
     expect(screen.queryByTestId(ORDER_SHEET_RESPONSIBLES_TESTID)).toBeNull();
   });
 

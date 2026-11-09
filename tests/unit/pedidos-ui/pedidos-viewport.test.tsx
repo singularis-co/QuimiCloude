@@ -65,7 +65,9 @@ import {
   ORDER_CREATE_OPEN_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
+  ORDER_FORM_ADD_LINE_TESTID,
   ORDER_FORM_TESTID,
+  ORDER_LINE_SHEET_TESTID,
   ORDER_NUMBER_COLUMN_ID,
   ORDER_PRIORITY_SELECT_TESTID,
   RECIPE_NAME_COLUMN_ID,
@@ -667,6 +669,13 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
 
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
+    const prioridad = screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID);
+    for (const token of AREA_TACTIL) {
+      expect(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID).className).toContain(token);
+    }
+    // Desde QT-314 los campos de una receta viven en su sub-panel, que se abre con «Añadir receta».
+    await user.click(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID));
+    await screen.findByTestId(ORDER_LINE_SHEET_TESTID);
 
     // El selector de presentacion del reparto solo aparece con unidad elegida; aqui se mide el de
     // la unidad, que esta siempre.
@@ -674,7 +683,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
       screen.getByTestId('order-field-quantity'),
       screen.getByTestId(RECIPE_PICKER_TESTID),
       screen.getByTestId('presentation-unit-select'),
-      screen.getByTestId(ORDER_PRIORITY_SELECT_TESTID),
+      prioridad,
     ];
 
     for (const campo of campos) {
@@ -695,6 +704,7 @@ describe.each(VIEWPORTS)('pantalla de pedidos en viewport %s (%i px)', (_nombre,
 
     // El panel no se pega al borde inferior del movil: respeta el area segura.
     expect(screen.getByTestId('order-sheet').className).toContain('env(safe-area-inset-bottom)');
+    expect(screen.getByTestId(ORDER_LINE_SHEET_TESTID).className).toContain('env(safe-area-inset-bottom)');
   });
 
   it('la pantalla no usa 100vh como alto (R45)', async () => {

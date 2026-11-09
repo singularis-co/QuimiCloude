@@ -117,7 +117,7 @@
     - test de `linePositions` en `order_would_block` y en un fallo de receta;
     - test de «Reparto y unidad» en un pedido de dos recetas.
   - **Cubre:** R14, R15, R31, R40, R41.
-- [ ] **T14** · frontend_dev · depende de T6–T9, T13 — Panel y sub-panel (design § 4.2, § 4.3):
+- [x] **T14** · frontend_dev · depende de T6–T9, T13 — Panel y sub-panel (design § 4.2, § 4.3):
   - `order-form.tsx` rehecho con forma B;
   - `order-lines-table.tsx` y `order-line-sheet.tsx`;
   - el aviso de error por receta con «Guardar bloqueada»;
