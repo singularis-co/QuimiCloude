@@ -27,6 +27,8 @@ import { createDefaultParams } from '@/components/shared/data-table';
 import {
   ORDER_STATUS_VALUES,
   formatOrderNumber,
+  type OrderLineView,
+  type OrderPresentationLineView,
   type OrderStatus,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
@@ -109,19 +111,52 @@ const UNIDADES: readonly UnitView[] = [
   { id: UNIDAD_ID, name: 'Litro', symbol: 'L', baseUnitId: null, factor: null, isSystem: true },
 ];
 
+const LINEA_ID = '66666666-6666-4666-8666-666666666666';
+const OTRA_LINEA_ID = '77777777-7777-4777-8777-777777777777';
+
+function reparto(packages: number, presentationName = '20 L'): OrderPresentationLineView {
+  return {
+    presentationId: PRESENTACION_ID,
+    presentationName,
+    packages,
+    packagingProductId: ENVASE_ID,
+    packagingName: 'Bidón PET 20 L',
+    presentationContent: null,
+    presentationUnitLabel: null,
+  };
+}
+
+/** El reparto, la unidad y la cantidad que edita el diálogo son los de la receta. */
+function linea(status: OrderLineView['status'], overrides: Partial<OrderLineView> = {}): OrderLineView {
+  return lineaPedido({
+    id: LINEA_ID,
+    status,
+    quantity: '100.0000',
+    unitId: UNIDAD_ID,
+    unitLabel: 'L',
+    presentationLines: [reparto(2)],
+    ...overrides,
+  });
+}
+
 // La fila ofrece «Reparto y unidad…» si alguna receta está POR_EMPACAR: la del pedido va en su
-// mismo estado (en PARCIAL, una TERMINADO).
-function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSummary> = {}): OrderSummary {
+// mismo estado (en PARCIAL, una TERMINADO). Los campos planos del pedido llevan otro reparto y
+// otra unidad: si el diálogo los leyera, los tests lo verían.
+function pedido(
+  status: OrderStatus = 'POR_EMPACAR',
+  overrides: Partial<OrderSummary> = {},
+  lineOverrides: Partial<OrderLineView> = {},
+): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
-    lines: [lineaPedido({ status: status === 'PARCIAL' ? 'TERMINADO' : status })],
+    lines: [linea(status === 'PARCIAL' ? 'TERMINADO' : status, lineOverrides)],
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
     recipeId: '22222222-2222-4222-8222-222222222222',
     recipeName: 'Esmalte azul',
     recipeVersion: null,
-    quantity: '100.0000',
+    quantity: '1.0000',
     priority: 'MEDIA',
     status,
     cancellationReason: status === 'CANCELADO' ? 'Cliente anuló el encargo' : null,
@@ -133,19 +168,9 @@ function pedido(status: OrderStatus = 'POR_EMPACAR', overrides: Partial<OrderSum
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-      {
-        presentationId: PRESENTACION_ID,
-        presentationName: '20 L',
-        packages: 2,
-        packagingProductId: ENVASE_ID,
-        packagingName: 'Bidón PET 20 L',
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-    ],
-    unitId: UNIDAD_ID,
-    unitLabel: 'L',
+    presentationLines: [reparto(9)],
+    unitId: null,
+    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
     recipeImageUrl: null,
@@ -162,8 +187,10 @@ async function elegirLaReceta(user: ReturnType<typeof setupUser>) {
   await user.click(opcion as HTMLElement);
 }
 
-function montarDialogo(order: OrderSummary = pedido()) {
-  render(<OrderDistributionDialog order={order} units={UNIDADES} open onOpenChange={cerrar} />);
+function montarDialogo(order: OrderSummary = pedido(), line: OrderLineView = order.lines[0]!) {
+  render(
+    <OrderDistributionDialog order={order} line={line} units={UNIDADES} open onOpenChange={cerrar} />,
+  );
 }
 
 beforeEach(() => {
@@ -260,10 +287,11 @@ describe('dialogo «Reparto y unidad»', () => {
     const [id, input] = updateDistributionMock.mock.calls[0] ?? [];
     expect(id).toBe(pedido().id);
     expect(input).toEqual({
+      lineId: LINEA_ID,
       unitId: UNIDAD_ID,
       presentationLines: [{ packagingProductId: ENVASE_ID, packages: '2' }],
     });
-    expect(Object.keys(input as object).sort()).toEqual(['presentationLines', 'unitId']);
+    expect(Object.keys(input as object).sort()).toEqual(['lineId', 'presentationLines', 'unitId']);
     await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
     expect(cerrar.mock.calls.some(([abierto]) => abierto === false)).toBe(true);
   });
@@ -327,6 +355,7 @@ describe('dialogo «Reparto y unidad»', () => {
     expect(region).toHaveAttribute('data-code', code);
     expect(within(region).getByText(`mensaje de ${code}`)).toBeInTheDocument();
     expect(updateDistributionMock).toHaveBeenCalledWith(pedido().id, {
+      lineId: LINEA_ID,
       unitId: UNIDAD_ID,
       presentationLines: [{ packagingProductId: ENVASE_ID, packages: '3' }],
     });
@@ -338,7 +367,7 @@ describe('dialogo «Reparto y unidad»', () => {
   it('R35: una linea antigua se reenvia tal cual, por su presentacion', async () => {
     const user = setupUser();
     montarDialogo(
-      pedido('POR_EMPACAR', {
+      pedido('POR_EMPACAR', {}, {
         presentationLines: [
           { presentationId: PRESENTACION_ID, presentationName: 'Bidón 20L', packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
         ],
@@ -352,6 +381,7 @@ describe('dialogo «Reparto y unidad»', () => {
 
     await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(1));
     expect(updateDistributionMock.mock.calls[0]?.[1]).toEqual({
+      lineId: LINEA_ID,
       unitId: UNIDAD_ID,
       presentationLines: [{ presentationId: PRESENTACION_ID, packages: '2' }],
     });
@@ -374,8 +404,8 @@ describe('dialogo «Reparto y unidad»', () => {
     expect(updateDistributionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('R42: sin unidad del pedido no se ofrece guardar', () => {
-    montarDialogo(pedido('POR_EMPACAR', { unitId: null, unitLabel: null, presentationLines: [] }));
+  it('R42: sin unidad de la receta no se ofrece guardar', () => {
+    montarDialogo(pedido('POR_EMPACAR', {}, { unitId: null, unitLabel: null, presentationLines: [] }));
 
     expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeDisabled();
   });
@@ -438,6 +468,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
 
     await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
     expect(updateDistributionMock.mock.calls[1]?.[1]).toEqual({
+      lineId: LINEA_ID,
       unitId: UNIDAD_ID,
       presentationLines: [{ packagingProductId: ENVASE_ID, packages: '5' }],
     });
@@ -448,23 +479,7 @@ describe('reabrir «Reparto y unidad» antes de que llegue el refresco', () => {
     const { rerender } = render(accionesDeFila(pedido()));
 
     await guardarEnvases(user, '5');
-    rerender(
-      accionesDeFila(
-        pedido('POR_EMPACAR', {
-          presentationLines: [
-            {
-              presentationId: PRESENTACION_ID,
-              presentationName: '20 L',
-              packages: 7,
-              packagingProductId: ENVASE_ID,
-              packagingName: 'Bidón PET 20 L',
-              presentationContent: null,
-              presentationUnitLabel: null,
-            },
-          ],
-        }),
-      ),
-    );
+    rerender(accionesDeFila(pedido('POR_EMPACAR', {}, { presentationLines: [reparto(7)] })));
     await user.click(within(screen.getByTestId(`data-table-row-${pedido().id}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
     await elegirLaReceta(user);
@@ -506,10 +521,12 @@ describe('«Reparto y unidad» con falta de envases (R17, R37)', () => {
 
     await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(2));
     expect(updateDistributionMock.mock.calls[0]?.[1]).toEqual({
+      lineId: LINEA_ID,
       unitId: UNIDAD_ID,
       presentationLines: [{ packagingProductId: ENVASE_ID, packages: '2' }],
     });
     expect(updateDistributionMock.mock.calls[1]?.[1]).toEqual({
+      lineId: LINEA_ID,
       unitId: UNIDAD_ID,
       presentationLines: [{ packagingProductId: ENVASE_ID, packages: '2' }],
       confirmBlocked: true,
@@ -529,6 +546,103 @@ describe('«Reparto y unidad» con falta de envases (R17, R37)', () => {
     expect(updateDistributionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeInTheDocument();
     expect(routerMock.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('«Reparto y unidad» de una receta del pedido (R30)', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
+  /** Dos recetas POR_EMPACAR con repartos y cantidades distintos. */
+  function pedidoDeDos(): OrderSummary {
+    const order = pedido('POR_EMPACAR');
+    return {
+      ...order,
+      lines: [
+        order.lines[0]!,
+        linea('POR_EMPACAR', {
+          id: OTRA_LINEA_ID,
+          position: 1,
+          recipeName: 'Jabón líquido',
+          quantity: '40.0000',
+          presentationLines: [reparto(4, '5 L')],
+        }),
+      ],
+    };
+  }
+
+  function tabla(order: OrderSummary) {
+    return (
+      <OrderTable
+        orders={[order]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={{ items: [], totalPages: 1 }}
+        units={UNIDADES}
+        bridge={null}
+        canEditDistribution
+      />
+    );
+  }
+
+  async function abrirConLaReceta(user: ReturnType<typeof setupUser>, order: OrderSummary, posicion: number) {
+    await user.click(within(screen.getByTestId(`data-table-row-${order.id}`)).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DISTRIBUTION_TESTID));
+    const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+    const opciones = within(selector).getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID);
+    await user.click(opciones[posicion] as HTMLElement);
+  }
+
+  it('R30: el diálogo viene con el reparto, la unidad y la cantidad de la receta, no con los del pedido', async () => {
+    montarDialogo();
+
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(2);
+    await waitFor(() =>
+      expect(quoteAvailabilityMock).toHaveBeenCalledWith(
+        expect.objectContaining({ quantity: '100', unitId: UNIDAD_ID }),
+      ),
+    );
+    expect(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeEnabled();
+  });
+
+  it('R30: elegida la segunda receta en el selector, trae su reparto y guarda con su lineId', async () => {
+    const user = setupUser();
+    const order = pedidoDeDos();
+    render(tabla(order));
+
+    await abrirConLaReceta(user, order, 1);
+
+    expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(4);
+    await waitFor(() =>
+      expect(quoteAvailabilityMock).toHaveBeenCalledWith(expect.objectContaining({ quantity: '40' })),
+    );
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+
+    await waitFor(() => expect(updateDistributionMock).toHaveBeenCalledTimes(1));
+    expect(updateDistributionMock).toHaveBeenCalledWith(order.id, {
+      lineId: OTRA_LINEA_ID,
+      unitId: UNIDAD_ID,
+      presentationLines: [{ packagingProductId: ENVASE_ID, packages: '4' }],
+    });
+  });
+
+  it('R30: lo guardado de una receta no se arrastra a otra abierta antes del refresco', async () => {
+    const user = setupUser();
+    const order = pedidoDeDos();
+    render(tabla(order));
+
+    await abrirConLaReceta(user, order, 0);
+    const campo = await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID);
+    await user.clear(campo);
+    await user.type(campo, '5');
+    await user.click(screen.getByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID));
+    await waitFor(() => expect(routerMock.refresh).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId(ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID)).toBeNull());
+
+    await abrirConLaReceta(user, order, 1);
+
+    expect(await screen.findByTestId(ORDER_DISTRIBUTION_LINE_PACKAGES_TESTID)).toHaveValue(4);
   });
 });
 

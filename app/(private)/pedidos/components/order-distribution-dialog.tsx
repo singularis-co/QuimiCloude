@@ -23,7 +23,7 @@ import {
   type ErrorState,
 } from '@/lib/modules/errores';
 import { newRequestId } from '@/lib/modules/observabilidad';
-import type { OrderSummary } from '@/lib/modules/pedidos';
+import type { OrderLineView, OrderSummary } from '@/lib/modules/pedidos';
 import {
   updateOrderDistributionAction,
   type OrderMutationFormState,
@@ -61,18 +61,22 @@ const LABELS = {
 } as const;
 
 export type OrderDistributionDraft = {
+  readonly lineId: string;
   readonly unitId: string;
   readonly lines: readonly OrderDistributionLine[];
 };
 
 export type OrderDistributionDialogProps = {
-  readonly order: OrderSummary;
+  readonly order: Pick<OrderSummary, 'id' | 'numberText'>;
+  /** La receta cuyo reparto se edita: las demás del pedido no viajan. */
+  readonly line: Pick<OrderLineView, 'id' | 'quantity' | 'unitId' | 'unitLabel' | 'presentationLines'>;
   readonly units: readonly UnitView[];
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   /**
    * Lo ultimo guardado desde este dialogo mientras `order` aun no lo refleja: `router.refresh()`
-   * no se espera, y reabrir con los valores viejos y guardar desharia el cambio.
+   * no se espera, y reabrir con los valores viejos y guardar desharia el cambio. Solo vale para su
+   * receta.
    */
   readonly saved?: OrderDistributionDraft;
   readonly onSaved?: (saved: OrderDistributionDraft) => void;
@@ -90,19 +94,20 @@ function unexpectedFromRejection(): ErrorState {
 function resolveUnitLabel(
   units: readonly UnitView[],
   unitId: string,
-  order: OrderSummary,
+  line: OrderDistributionDialogProps['line'],
 ): string | null {
   const unit = units.find((candidate) => candidate.id === unitId);
   if (unit !== undefined) return unit.symbol ?? unit.name;
-  return order.unitId === unitId ? order.unitLabel : null;
+  return line.unitId === unitId ? line.unitLabel : null;
 }
 
 /**
- * Edicion acotada del pedido ya finalizado: solo unidad y reparto. Es un formulario aparte, no el
+ * Edicion acotada de una receta ya finalizada: solo unidad y reparto. Es un formulario aparte, no el
  * general con campos deshabilitados, para que cantidad, receta o responsables no puedan viajar.
  */
 export function OrderDistributionDialog({
   order,
+  line,
   units,
   open,
   onOpenChange,
@@ -110,9 +115,10 @@ export function OrderDistributionDialog({
   onSaved,
 }: OrderDistributionDialogProps) {
   const router = useRouter();
-  const [unitId, setUnitId] = useState(saved?.unitId ?? order.unitId ?? '');
+  const own = saved?.lineId === line.id ? saved : undefined;
+  const [unitId, setUnitId] = useState(own?.unitId ?? line.unitId ?? '');
   const [lines, setLines] = useState<readonly OrderDistributionLine[]>(
-    () => saved?.lines ?? fromOrderPresentationLines(order.presentationLines),
+    () => own?.lines ?? fromOrderPresentationLines(line.presentationLines),
   );
   const [error, setError] = useState<ErrorState | null>(null);
   const [blocked, setBlocked] = useState<{
@@ -122,7 +128,7 @@ export function OrderDistributionDialog({
   const [isPending, startTransition] = useTransition();
 
   const availability = useOrderDistributionAvailability({
-    quantity: trimDecimal(order.quantity),
+    quantity: trimDecimal(line.quantity),
     unitId,
     lines,
   });
@@ -131,12 +137,13 @@ export function OrderDistributionDialog({
 
   function save() {
     if (!canSave) return;
-    send({ unitId, lines }, false);
+    send({ lineId: line.id, unitId, lines }, false);
   }
 
   /** `confirmBlocked` solo viaja tras aceptar el aviso, y con el mismo reparto que lo provoco. */
   function send(draft: OrderDistributionDraft, confirmBlocked: boolean) {
     const input = {
+      lineId: draft.lineId,
       unitId: draft.unitId,
       presentationLines: toPresentationLinesInput(draft.lines),
       ...(confirmBlocked ? { confirmBlocked: true } : {}),
@@ -206,8 +213,8 @@ export function OrderDistributionDialog({
             onLinesChange={setLines}
             unitId={unitId}
             compatibleUnitIds={compatibleIds}
-            unitLabel={resolveUnitLabel(units, unitId, order)}
-            quantity={trimDecimal(order.quantity)}
+            unitLabel={resolveUnitLabel(units, unitId, line)}
+            quantity={trimDecimal(line.quantity)}
             units={units}
             availability={availability}
             submitLines={false}

@@ -284,10 +284,11 @@ export function OrderRowSheetActions({
     case 'delete':
       return <DeleteOrderDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
     case 'distribution':
-      return (
+      return pickedLine === undefined ? null : (
         <OrderDistributionDialog
           key={opening}
           order={order}
+          line={pickedLine}
           units={units}
           open={open}
           onOpenChange={onOpenChange}
@@ -298,19 +299,21 @@ export function OrderRowSheetActions({
     case 'customer':
       return <OrderCustomerDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
     case 'deliver':
-      return (
+      return pickedLine === undefined ? null : (
         <OrderDeliverySheet
           key={opening}
           order={order}
+          line={pickedLine}
           open={open}
           onOpenChange={onOpenChange}
         />
       );
     case 'deliveries':
-      return (
+      return pickedLine === undefined ? null : (
         <OrderDeliveriesSheet
           key={opening}
           order={order}
+          line={pickedLine}
           open={open}
           onOpenChange={onOpenChange}
           canVoid={canVoidDelivery}

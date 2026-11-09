@@ -60,6 +60,15 @@ Rama `feature/QT-314-pedido-con-varias-recetas-frontend`. Spec aprobado en F1.4 
   número de pedido o con «Ver detalle» dentro de «Acciones». Opciones: ampliar `DataTable`
   (enmienda del design) o aceptar el número como entrada al detalle (enmienda de R44).
   El resto de T15 cumple su «Hecho».
+- **Tanda 3 / T16 — ficha de solo lectura de `order-responsibles-sheet.tsx` (ABIERTO, decide el humano).**
+  Sigue pintando nombre, imagen, cantidad, unidad y reparto desde los campos planos de la primera
+  receta: choca con R24 y bloquea el «Hecho» de T17 (Tanda 4). Ni design § 4.7 ni el tablero dicen
+  qué pinta con varias recetas. Opciones en «T16 > Bloqueos de T16». No afecta al «Hecho» de T16
+  (R38 funciona y tiene tests).
+- **Tanda 3 / T16 — borrador de entrega por pedido, no por receta (ABIERTO).** `order-delivery-draft.ts`
+  y `use-order-delivery-draft.ts` (fuera del alcance de T16) usan una clave por pedido: con dos recetas
+  `TERMINADO`, abrir «Entregar» de la segunda descarta el borrador de la primera. La entrega registrada
+  es correcta. El arreglo (añadir `lineId` a la clave) amplía el alcance: decide el leader.
 
 ## Tanda 2 — piezas nuevas sin cablear (frontend_dev) — HECHA
 
@@ -536,3 +545,84 @@ Pendiente de decisión (no improvisado):
 - Hace falta que el humano elija: extender `DataTable` (paso 2, con su fila de catálogo) o aceptar el número como entrada al detalle.
 
 Veredicto: T15 hecha. Sus tests y los adaptados, en verde. Typecheck limpio en los archivos de T15. Queda abierto el pie de la tarjeta (R44).
+
+### T16 (frontend_dev)
+
+Diálogos por receta y del pedido entero. Sin commit propio: lo hace el implementer.
+
+Archivos:
+- producción (`app/(private)/pedidos/components/`):
+  - `order-distribution-dialog.tsx`: prop nueva `line` (`id`, `quantity`, `unitId`, `unitLabel`, `presentationLines`). Unidad, reparto, cantidad y etiqueta salen de la receta; la entrada lleva `lineId`. `OrderDistributionDraft` gana `lineId`: lo guardado antes del refresco solo se reusa para su receta. `order` queda en `id` + `numberText`.
+  - `order-delivery-sheet.tsx`: prop nueva `line` (`id`, `recipeName`, `recipeImageUrl`). Título e imagen de la receta; `getOrderDeliveryAction(order.id, line.id)`. `order` queda en `id` + `numberText`.
+  - `order-deliveries-sheet.tsx`: prop nueva `line` (`id`); `listOrderDeliveriesAction(order.id, line.id)` (también al releer tras anular); pasa `lineStatus` a la lista.
+  - `order-delivery-list.tsx`: `orderStatus` -> `lineStatus: OrderLineStatus`; `STATUS_ACCEPTS_VOID` es un mapa por estado de receta.
+  - `cancel-order-dialog.tsx`: nombra las recetas que se cancelan (`isCancellableStatus`) y las que se quedan; testids `cancel-order-cancelled-lines` y `cancel-order-kept-lines`.
+  - `order-sheet.tsx`: solo `line={pickedLine}` en las ramas `distribution`, `deliver` y `deliveries` (con el mismo `pickedLine === undefined ? null :` que ya usaba `cancelLine`).
+  - `order-responsibles.tsx`: solo el comentario viejo de `isFinal` que nombraba `isFinalOrderStatus`.
+  - `index.ts`: reexporta los dos testids nuevos.
+  - `order-responsibles-sheet.tsx`: sin cambios (ver «Bloqueos de T16»).
+- tests:
+  - `order-distribution-dialog.test.tsx`: el fixture pone reparto, unidad y cantidad en la receta, y otros distintos en los campos planos; las entradas esperadas llevan `lineId`; bloque nuevo R30.
+  - `order-delivery-sheet.test.tsx`: `line` en cada montaje; la lectura se espera con `lineId`; bloque nuevo R32.
+  - `order-deliveries-sheet.test.tsx`: `line` y `lineId`; bloque nuevo R34.
+  - `order-delivery-list.test.tsx`: `lineStatus` en vez de `orderStatus`; los casos de «Anular» por estado pasan a R34 por estado de receta.
+  - `cancel-order-dialog.test.tsx`: bloque nuevo R36.
+  - `order-sheet-responsibles.test.tsx`: el fixture admite recetas; bloque nuevo R38.
+  - nuevo `order-whole-actions.test.tsx`: R36 y R37 desde una fila viva.
+  - `pedidos-toasts.test.tsx`: los dos montajes directos pasan `line` (el typecheck lo pedía).
+
+Mapa `R<n> -> test`:
+- R28: ya cubierto por T12 (`cancel-order-line-dialog.test.tsx`) y su cableado por T15 (`order-row-wiring.test.tsx`). T16 no toca `CancelOrderLineDialog`.
+- R30: `order-distribution-dialog.test.tsx` > «R30: el diálogo viene con el reparto, la unidad y la cantidad de la receta, no con los del pedido», «R30: elegida la segunda receta en el selector, trae su reparto y guarda con su lineId», «R30: lo guardado de una receta no se arrastra a otra abierta antes del refresco»
+- R32: `order-delivery-sheet.test.tsx` > «R32: el panel lleva el nombre y la imagen de la receta elegida, no los del pedido», «R32: pide lo que queda por entregar de esa receta, con el pedido PARCIAL», «R32: registra la entrega de esa receta con el pedido PARCIAL»
+- R34:
+  - `order-deliveries-sheet.test.tsx` > «R34: pide solo las entregas de la receta elegida, también al releer tras anular», «R34: con la receta %s y el pedido PARCIAL ofrece «Anular»» (TERMINADO, ENTREGADO), «R34: manda el estado de la receta, no el del pedido: …», «R34: con la receta TERMINADO y sin el permiso de anular no ofrece «Anular»»
+  - `order-delivery-list.test.tsx` > «R34: con canVoid y la receta %s, cada entrega con algun par sin anular ofrece «Anular» y emite la entrega» (×2), «R34: con la receta %s no ofrece «Anular» aunque haya permiso» (×8)
+- R36:
+  - `cancel-order-dialog.test.tsx` > «R36: lista las cancelables y, aparte, las que se quedan como están», «R36: con todas cancelables no hay lista de las que se quedan», «R36: varias que se quedan van en plural, también una ya cancelada», «R36: una receta sin nombre se nombra con el marcador de ausencia»
+  - `order-whole-actions.test.tsx` > «R36: desde la fila de un PARCIAL, el diálogo nombra las que se cancelan y las que se quedan»
+- R37: `order-whole-actions.test.tsx` > «R37: %s sigue `isDeletableOrder`» (×4: un PENDIENTE borrable abre el diálogo de borrar; tres PARCIAL no borrables salen deshabilitados y no lo abren), «R37: los casos cubren las dos ramas de la regla»
+- R38: `order-sheet-responsibles.test.tsx` > «R38: con una receta activa %s, «Responsables» abre y ofrece los controles de escritura» (PENDIENTE, EN_CURSO, BLOQUEADO), «R38: sin ninguna receta activa que lo admita (la otra %s), «Responsables» abre sin controles de escritura» (POR_EMPACAR, EN_EMPAQUE, TERMINADO, ENTREGADO, CANCELADO)
+
+Verificación (salida real, `pnpm exec vitest run <archivo>` uno a uno):
+
+| Archivo | Resultado |
+|---|---|
+| `order-distribution-dialog` | 32 passed (29 + 3) |
+| `order-delivery-sheet` | 45 passed (42 + 3) |
+| `order-deliveries-sheet` | 16 passed (11 + 5) |
+| `order-delivery-list` | 23 passed (antes 24: el `it.each` por estado ya no incluye `PARCIAL`, que no es estado de receta) |
+| `cancel-order-dialog` | 13 passed (9 + 4) |
+| `order-sheet-responsibles` | 19 passed (11 + 8) |
+| `order-whole-actions` (nuevo) | 6 passed |
+| `pedidos-toasts` | 26 passed |
+| `paridad/confirmaciones-paridad` | 56 passed, sin tocar el snapshot (una pasada con 1 fallo en «estado de usuario», ajeno; dos repeticiones en verde) |
+| `order-row-wiring` | 23 passed |
+| `order-sheet` | 12 passed |
+| `order-responsibles` | 13 passed |
+| `pedidos/order-delivery` | 48 passed |
+| `guard-formularios-y-acciones` | 20 passed, 3 skipped |
+| `guard-pantalla-pedidos-se-amplia` | 8 passed, 2 skipped |
+| `guard-piezas-base` | 25 passed, 1 skipped |
+
+- `pnpm run typecheck`: solo `app/layout.tsx(45,56) LayoutProps` (ajeno). Ya no fallan `order-deliveries-sheet.tsx(39)` ni `order-delivery-sheet.tsx(128)`.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos en archivos ajenos.
+- No se corrió `vitest related` ni la suite completa.
+
+Decisiones nuevas (dentro del spec):
+1. **El texto de «Cancelar pedido» sigue el tablero**: «Se cancelan las recetas que aún no se fabricaron: A, B y C.» y «D se queda como está.» / «D y E se quedan como están.». El tablero dice «ya está terminada»; aquí no, porque la que se queda puede estar en cualquier estado no cancelable, también `CANCELADO` (se lista entre las que se quedan). Los nombres se unen con `Intl.ListFormat('es')`; una receta sin nombre sale con el marcador de ausencia.
+2. **«Un pedido cancelado ya no se puede editar.»** solo sale si el pedido acaba cancelado entero (ninguna receta viva se queda). Sin recetas el texto es el de hoy, y el snapshot de paridad no cambia.
+3. **Lo guardado en «Reparto y unidad» antes del refresco va atado a su receta** (`OrderDistributionDraft.lineId`). Si no, guardar una receta y abrir otra antes del refresco precargaba el reparto de la primera.
+4. **Los títulos de «Reparto y unidad» y «Entregas» no cambian.** El tablero no los fija. Siguen nombrando el pedido y no la receta.
+5. **`OrderDeliveryList` recibe `lineStatus`** y no `orderStatus` (design § 4.7). `OrderDeliveriesSheet` le pasa `view.lineStatus`.
+
+Bloqueos de T16 (no improvisados):
+- **`order-responsibles-sheet.tsx`, la ficha de solo lectura.** Hoy pinta nombre, imagen, cantidad, unidad y reparto desde los campos planos de la primera receta. Eso choca con R24 y deja a T17 sin poder borrarlos (su «Hecho» pide que ningún archivo de `app/` los lea). Ni design § 4.7 ni el tablero (`PedidosVariasRecetas*.dc.html` no dibuja este panel) dicen qué pinta con varias recetas, y requirements dice «con sus pantallas de hoy». Opciones:
+  - (a) cabecera con la primera receta y «+N más», como la fila y la tarjeta (R20/R44), y fuera las filas «Cantidad» y «Reparto», que ya están por receta en el detalle (R18, R23);
+  - (b) una fila por receta con nombre, cantidad y reparto, como las tarjetas del detalle;
+  - (c) solo número, estado, prioridad y cliente.
+  Lo que pide T16 para R38 (escritura en `PARCIAL`) ya funciona con `responsiblesFrozen(order)` y tiene sus tests. `distributionLabelLine` sigue ahí y lo importa `order-detail-sheet`.
+- **El borrador de la entrega va por pedido, no por receta** (`order-delivery-draft.ts` y `use-order-delivery-draft.ts`, fuera del alcance de T16). Con dos recetas `TERMINADO` en el mismo pedido, abrir «Entregar» de la segunda tras dejar a medias la primera descarta los envases de la primera y enseña el aviso «Algunos lotes del borrador ya no están disponibles…». La entrega registrada es correcta; lo que se pierde es el borrador. Arreglarlo es poner `lineId` en la clave y en la validación del borrador. Es poco, pero toca dos archivos que T16 no lista.
+- R44 (pie de la tarjeta) sigue abierto desde T15. T16 no lo toca.
+
+Veredicto: T16 hecha salvo la ficha de `order-responsibles-sheet.tsx`, que espera decisión. Los diálogos trabajan por receta, sus tests están en verde y en el typecheck solo queda `LayoutProps`.

@@ -24,6 +24,7 @@ import {
   type DeliveryCheck,
   type DeliveryCustomerBlock,
   type OrderDeliveryView,
+  type OrderLineView,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import {
@@ -57,7 +58,7 @@ export const ORDER_DELIVERY_CANCEL_TESTID = 'order-delivery-cancel';
 export const ORDER_DELIVERY_NUMBER_TESTID = 'order-delivery-number';
 
 const LABELS = {
-  /** Respaldo del título cuando el pedido no trae el nombre de su receta. */
+  /** Respaldo del título cuando la receta no trae su nombre. */
   fallbackTitle: (numberText: string) => `Entregar pedido ${numberText}`,
   orderNumber: 'Pedido',
   adjusted: 'Algunos lotes del borrador ya no están disponibles y se quitaron sus envases.',
@@ -123,9 +124,9 @@ function unexpectedFromRejection(): ErrorState {
   };
 }
 
-async function readDeliveryView(orderId: string): Promise<OrderDeliveryResult> {
+async function readDeliveryView(orderId: string, lineId: string): Promise<OrderDeliveryResult> {
   try {
-    return await getOrderDeliveryAction(orderId);
+    return await getOrderDeliveryAction(orderId, lineId);
   } catch {
     return unexpectedFromRejection();
   }
@@ -225,12 +226,12 @@ function ErrorNotice({ error, testId }: { readonly error: ErrorState; readonly t
 }
 
 export type OrderDeliverySheetProps = {
+  readonly order: Pick<OrderSummary, 'id' | 'numberText'>;
   /**
-   * `recipeName` da el título; sin él, el título es «Entregar pedido <número>». `recipeImageUrl`
-   * es la imagen del resumen; `null` o ausente pinta el marcador.
+   * La receta que se entrega. `recipeName` da el título; sin él, el título es «Entregar pedido
+   * <número>». `recipeImageUrl` `null` pinta el marcador.
    */
-  readonly order: Pick<OrderSummary, 'id' | 'numberText'> &
-    Partial<Pick<OrderSummary, 'recipeName' | 'recipeImageUrl'>>;
+  readonly line: Pick<OrderLineView, 'id' | 'recipeName' | 'recipeImageUrl'>;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 };
@@ -241,13 +242,13 @@ type LoadState =
   | { readonly kind: 'ready'; readonly view: OrderDeliveryView };
 
 /**
- * Registra una entrega parcial o total de un pedido terminado, repartida entre uno o mas clientes.
+ * Registra una entrega parcial o total de una receta terminada, repartida entre uno o mas clientes.
  * El borrador vive en el navegador hasta que la entrega se aplica o se cancela; cerrar el panel de
  * cualquier otra forma lo conserva.
  */
-export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliverySheetProps) {
+export function OrderDeliverySheet({ order, line, open, onOpenChange }: OrderDeliverySheetProps) {
   const router = useRouter();
-  const recipeName = order.recipeName?.trim() ?? '';
+  const recipeName = line.recipeName?.trim() ?? '';
   const title = recipeName === '' ? LABELS.fallbackTitle(order.numberText) : recipeName;
   const store = useOrderDeliveryDraft(order.id);
   const { sync, hasDraft } = store;
@@ -270,7 +271,10 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
     [hasDraft, sync],
   );
 
-  const readView = useCallback(() => readDeliveryView(order.id).then(applyView), [applyView, order.id]);
+  const readView = useCallback(
+    () => readDeliveryView(order.id, line.id).then(applyView),
+    [applyView, order.id, line.id],
+  );
 
   useEffect(() => {
     void readView();
@@ -404,7 +408,7 @@ export function OrderDeliverySheet({ order, open, onOpenChange }: OrderDeliveryS
               <OrderDeliverySummary
                 lines={summaryLines(view, evaluation)}
                 labels={LABELS.summary}
-                image={<OrderRecipeImage imageUrl={order.recipeImageUrl ?? null} name={recipeName} />}
+                image={<OrderRecipeImage imageUrl={line.recipeImageUrl} name={recipeName} />}
               />
 
               {draft.blocks.map((block, index) => {

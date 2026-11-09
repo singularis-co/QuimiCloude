@@ -283,6 +283,7 @@ async function entregar(user: User) {
   render(
     <OrderDeliverySheet
       order={{ id: DELIVERY_ORDER_ID, numberText: '2026-0000007' }}
+      line={lineaPedido({ status: 'TERMINADO' })}
       open
       onOpenChange={vi.fn()}
     />,
@@ -387,7 +388,19 @@ const CASOS: readonly Caso[] = [
       acciones.updateDistribution.mockResolvedValue(exito ? { status: 'success' } : ERROR),
     actuar: async (user) => {
       render(
-        <OrderDistributionDialog order={pedido()} units={[UNIDAD]} open onOpenChange={vi.fn()} />,
+        <OrderDistributionDialog
+          order={pedido()}
+          line={lineaPedido({
+            status: 'POR_EMPACAR',
+            quantity: '100.0000',
+            unitId: UNIDAD.id,
+            unitLabel: UNIDAD.symbol,
+            presentationLines: pedido().presentationLines,
+          })}
+          units={[UNIDAD]}
+          open
+          onOpenChange={vi.fn()}
+        />,
       );
       await waitFor(() =>
         expect(screen.getByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent('60 L'),

@@ -44,6 +44,7 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { LINEA_B_ID, lineaPedido } from '../../helpers/order-form-ui';
 
 const { routerMock, listaDeResponsables, listaEnLote } = vi.hoisted(() => ({
   routerMock: {
@@ -161,9 +162,10 @@ const PARAMS: DataTableParams = {
   search: '',
 };
 
-function pedido(status: OrderStatus): OrderSummary {
+function pedido(status: OrderStatus, lines: OrderSummary['lines'] = VISTA_SIN_LINEAS.lines): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
+    lines,
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
@@ -195,10 +197,11 @@ function pedido(status: OrderStatus): OrderSummary {
 function montarLista(
   status: OrderStatus = 'PENDIENTE',
   catalogo: OrderResponsiblesCatalog = CATALOGO_CON_ESCRITURA,
+  lines: OrderSummary['lines'] = VISTA_SIN_LINEAS.lines,
 ) {
   render(
     <OrderTable
-      orders={[pedido(status)]}
+      orders={[pedido(status, lines)]}
       params={PARAMS}
       totalPages={1}
       recipes={RECETAS}
@@ -407,6 +410,60 @@ describe('con el pedido ENTREGADO o CANCELADO la seccion CALLA (R29)', () => {
       expect(within(seccion).getByTestId(RESPONSIBLE_CONFIRM_TESTID)).toBeInTheDocument();
       expect(within(seccion).getAllByTestId(RESPONSIBLE_REMOVE_PERSON_TESTID)).toHaveLength(5);
       expect(within(seccion).getAllByTestId(RESPONSIBLE_REMOVE_GROUP_TESTID)).toHaveLength(1);
+    },
+  );
+});
+
+describe('con el pedido PARCIAL, la escritura depende de sus recetas activas (R38)', () => {
+  const CONTROLES_DE_ESCRITURA = [
+    RESPONSIBLE_SEARCH_TESTID,
+    RESPONSIBLE_CANDIDATE_TESTID,
+    RESPONSIBLE_WORK_GROUP_TESTID,
+    RESPONSIBLE_CONFIRM_TESTID,
+    RESPONSIBLE_REMOVE_PERSON_TESTID,
+    RESPONSIBLE_REMOVE_GROUP_TESTID,
+  ] as const;
+
+  type EstadoDeReceta = OrderSummary['lines'][number]['status'];
+
+  function recetas(otra: EstadoDeReceta): OrderSummary['lines'] {
+    return [
+      lineaPedido({ status: 'TERMINADO' }),
+      lineaPedido({ id: LINEA_B_ID, position: 1, status: otra }),
+    ];
+  }
+
+  async function abrirSeccion(user: ReturnType<typeof setupUser>): Promise<HTMLElement> {
+    await abrirResponsablesPorLaFila(user);
+    return screen.findByTestId(ORDER_SHEET_RESPONSIBLES_TESTID);
+  }
+
+  it.each(['PENDIENTE', 'EN_CURSO', 'BLOQUEADO'] as const)(
+    'R38: con una receta activa %s, «Responsables» abre y ofrece los controles de escritura',
+    async (otra) => {
+      const user = setupUser();
+      montarLista('PARCIAL', CATALOGO_CON_ESCRITURA, recetas(otra));
+
+      const seccion = await abrirSeccion(user);
+
+      expect(within(seccion).getByTestId(RESPONSIBLE_SEARCH_TESTID)).toBeInTheDocument();
+      expect(within(seccion).getByTestId(RESPONSIBLE_CONFIRM_TESTID)).toBeInTheDocument();
+      expect(within(seccion).getAllByTestId(RESPONSIBLE_REMOVE_PERSON_TESTID)).toHaveLength(5);
+    },
+  );
+
+  it.each(['POR_EMPACAR', 'EN_EMPAQUE', 'TERMINADO', 'ENTREGADO', 'CANCELADO'] as const)(
+    'R38: sin ninguna receta activa que lo admita (la otra %s), «Responsables» abre sin controles de escritura',
+    async (otra) => {
+      const user = setupUser();
+      montarLista('PARCIAL', CATALOGO_CON_ESCRITURA, recetas(otra));
+
+      const seccion = await abrirSeccion(user);
+
+      for (const testId of CONTROLES_DE_ESCRITURA) {
+        expect(within(seccion).queryAllByTestId(testId)).toHaveLength(0);
+      }
+      expect(within(seccion).getAllByTestId(RESPONSIBLE_PERSON_TESTID)).toHaveLength(5);
     },
   );
 });

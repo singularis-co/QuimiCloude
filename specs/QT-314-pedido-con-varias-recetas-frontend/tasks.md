@@ -161,7 +161,7 @@
     - «Editar» en `PARCIAL` y deshabilitado en `ENTREGADO` (R9);
     - el número de pedido abre el detalle (R18).
   - **Cubre:** R9, R18, R20–R27, R39, R42, R44, R45.
-- [ ] **T16** · frontend_dev · depende de T4, T10, T12, T13 — Diálogos por receta y pedido entero
+- [x] **T16** · frontend_dev · depende de T4, T10, T12, T13 — Diálogos por receta y pedido entero
   (design § 4.7): `order-distribution-dialog.tsx`, `order-delivery-sheet.tsx`,
   `order-deliveries-sheet.tsx`, `order-delivery-list.tsx`, `cancel-order-dialog.tsx` y
   `order-responsibles-sheet.tsx`.

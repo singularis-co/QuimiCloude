@@ -23,12 +23,14 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CANCEL_ORDER_CANCELLED_LINES_TESTID,
   CANCEL_ORDER_CONFIRM_TESTID,
   CANCEL_ORDER_DIALOG_TESTID,
   CANCEL_ORDER_DISMISS_TESTID,
   CANCEL_ORDER_ERROR_TESTID,
   CANCEL_ORDER_ID_FIELD,
   CANCEL_ORDER_ID_TESTID,
+  CANCEL_ORDER_KEPT_LINES_TESTID,
   CANCEL_ORDER_REASON_FIELD,
   CANCEL_ORDER_REASON_TESTID,
   CancelOrderDialog,
@@ -36,6 +38,7 @@ import {
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderMutationFormState } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 const { cancelOrderActionMock, routerMock } = vi.hoisted(() => ({
   cancelOrderActionMock:
@@ -276,5 +279,71 @@ describe('los textos del dialogo son los de hoy (QC-262 R20)', () => {
     );
     expect(screen.getByTestId(CANCEL_ORDER_DISMISS_TESTID)).toHaveTextContent(/^Volver$/);
     expect(screen.getByTestId(CANCEL_ORDER_CONFIRM_TESTID)).toHaveTextContent(/^Cancelar el pedido$/);
+  });
+});
+
+describe('el diálogo nombra las recetas que se cancelan y las que se quedan (R36)', () => {
+  function receta(n: number, status: OrderSummary['lines'][number]['status'], recipeName: string | null) {
+    return lineaPedido({
+      id: `50000000-0000-4000-8000-00000000000${n}`,
+      position: n,
+      status,
+      recipeName,
+    });
+  }
+
+  it('R36: lista las cancelables y, aparte, las que se quedan como están', () => {
+    montar(
+      pedido({
+        status: 'PARCIAL',
+        recipeName: 'Esmalte azul',
+        lines: [
+          receta(1, 'PENDIENTE', 'Desengrasante'),
+          receta(2, 'TERMINADO', 'Hipoclorito 5 %'),
+          receta(3, 'EN_CURSO', 'Jabón líquido'),
+          receta(4, 'BLOQUEADO', 'Suavizante'),
+        ],
+      }),
+    );
+
+    expect(screen.getByTestId(CANCEL_ORDER_CANCELLED_LINES_TESTID)).toHaveTextContent(
+      /^Desengrasante, Jabón líquido y Suavizante$/,
+    );
+    expect(screen.getByTestId(CANCEL_ORDER_KEPT_LINES_TESTID)).toHaveTextContent(/^Hipoclorito 5 %$/);
+    const mensaje = screen.getByTestId('cancel-order-message');
+    expect(mensaje).toHaveTextContent('Hipoclorito 5 % se queda como está.');
+    expect(mensaje).not.toHaveTextContent('Esmalte azul');
+    expect(mensaje).not.toHaveTextContent('Un pedido cancelado ya no se puede editar.');
+  });
+
+  it('R36: con todas cancelables no hay lista de las que se quedan', () => {
+    montar(pedido({ lines: [receta(1, 'PENDIENTE', 'Desengrasante'), receta(2, 'EN_CURSO', 'Suavizante')] }));
+
+    expect(screen.getByTestId(CANCEL_ORDER_CANCELLED_LINES_TESTID)).toHaveTextContent(/^Desengrasante y Suavizante$/);
+    expect(screen.queryByTestId(CANCEL_ORDER_KEPT_LINES_TESTID)).toBeNull();
+    expect(screen.getByTestId('cancel-order-message')).toHaveTextContent('Un pedido cancelado ya no se puede editar.');
+  });
+
+  it('R36: varias que se quedan van en plural, también una ya cancelada', () => {
+    montar(
+      pedido({
+        status: 'PARCIAL',
+        lines: [
+          receta(1, 'PENDIENTE', 'Desengrasante'),
+          receta(2, 'POR_EMPACAR', 'Hipoclorito 5 %'),
+          receta(3, 'CANCELADO', 'Suavizante'),
+        ],
+      }),
+    );
+
+    expect(screen.getByTestId(CANCEL_ORDER_KEPT_LINES_TESTID)).toHaveTextContent(/^Hipoclorito 5 % y Suavizante$/);
+    expect(screen.getByTestId('cancel-order-message')).toHaveTextContent('se quedan como están.');
+  });
+
+  it('R36: una receta sin nombre se nombra con el marcador de ausencia', () => {
+    montar(pedido({ lines: [receta(1, 'PENDIENTE', null), receta(2, 'TERMINADO', 'Hipoclorito 5 %')] }));
+
+    expect(screen.getByTestId(CANCEL_ORDER_CANCELLED_LINES_TESTID).textContent).not.toBe('');
+    expect(screen.getByTestId(CANCEL_ORDER_CANCELLED_LINES_TESTID)).not.toHaveTextContent('null');
   });
 });
