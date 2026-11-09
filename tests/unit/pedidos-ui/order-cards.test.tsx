@@ -14,6 +14,8 @@ import {
   CANCEL_ORDER_ID_TESTID,
   MISSING_VALUE_MARK,
   ORDER_ACTION_CUSTOMER_TESTID,
+  ORDER_ACTION_DETAIL_TESTID,
+  ORDER_DETAIL_SHEET_TESTID,
   ORDER_PROGRESS_TESTID,
   ORDER_RECIPES_FIRST_TESTID,
   ORDER_RECIPES_MORE_TESTID,
@@ -36,7 +38,7 @@ import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
-import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { NARROW_VIEWPORT, WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
 import { lineaB, lineaPedido, pedidoDeDosRecetas, RECETA_A } from '../../helpers/order-form-ui';
 
@@ -493,5 +495,62 @@ describe('la tarjeta de un pedido con varias recetas', () => {
       'data-order-id',
       VARIAS.id,
     );
+  });
+});
+
+describe('entrada al detalle en la tarjeta de teléfono (R44)', () => {
+  const VARIAS = pedidoDeDosRecetas([lineaPedido(), lineaB()], { id: 'o10', progress: { total: 2, finished: 0 } });
+
+  beforeEach(() => setViewportWidth(NARROW_VIEWPORT));
+
+  function pie(card: HTMLElement): HTMLElement {
+    const contenedor = campo(card, 'priority').parentElement;
+    if (contenedor === null) throw new Error('la prioridad no está en el pie');
+    return contenedor;
+  }
+
+  it('R44: el pie lleva la prioridad y «Acciones», sin un botón «Ver detalle» aparte', () => {
+    montar({ orders: [VARIAS] });
+    const card = tarjeta(VARIAS);
+    const footer = pie(card);
+
+    expect(within(footer).getByTestId('order-priority')).toBeInTheDocument();
+    expect(within(footer).getAllByRole('button')).toEqual([within(card).getByTestId('order-row-actions')]);
+    expect(within(footer).queryByRole('button', { name: /ver detalle/i })).toBeNull();
+    expect(within(card).queryByRole('button', { name: /^ver detalle$/i })).toBeNull();
+  });
+
+  it('R44: el único botón «Ver detalle» de la tarjeta es el número del pedido', () => {
+    montar({ orders: [VARIAS] });
+    const card = tarjeta(VARIAS);
+
+    const detalle = within(card).getAllByRole('button', { name: /ver detalle/i });
+    expect(detalle).toHaveLength(1);
+    expect(campo(card, 'orderNumber')).toContainElement(detalle[0] as HTMLElement);
+  });
+
+  it('R44: tocar el número de pedido abre el detalle', async () => {
+    const user = setupUser();
+    montar({ orders: [VARIAS] });
+
+    await user.click(
+      within(campo(tarjeta(VARIAS), 'orderNumber')).getByRole('button', {
+        name: `Ver detalle del pedido ${VARIAS.numberText}`,
+      }),
+    );
+
+    expect(await screen.findByTestId(ORDER_DETAIL_SHEET_TESTID)).toHaveAttribute('data-order-id', VARIAS.id);
+  });
+
+  it('R44: «Ver detalle» dentro de «Acciones» abre el detalle', async () => {
+    const user = setupUser();
+    montar({ orders: [VARIAS] });
+
+    expect(screen.queryByTestId(ORDER_DETAIL_SHEET_TESTID)).toBeNull();
+    await user.click(within(tarjeta(VARIAS)).getByTestId('order-row-actions'));
+    const dialogo = await screen.findByRole('dialog', { name: `Pedido ${VARIAS.numberText}` });
+    await user.click(await esperarInteractiva(within(dialogo).getByTestId(ORDER_ACTION_DETAIL_TESTID)));
+
+    expect(await screen.findByTestId(ORDER_DETAIL_SHEET_TESTID)).toHaveAttribute('data-order-id', VARIAS.id);
   });
 });

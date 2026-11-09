@@ -176,7 +176,7 @@
 
 ## Tanda 4 — limpieza, E2E y cierre
 
-- [ ] **T16b** · frontend_dev · depende de T16 · va antes de T17 — Enmienda F2.1 (design § 4.5 y
+- [x] **T16b** · frontend_dev · depende de T16 · va antes de T17 — Enmienda F2.1 (design § 4.5 y
   § 4.7):
   - `order-responsibles-sheet.tsx`: la ficha de solo lectura pinta una fila por receta (nombre,
     cantidad con unidad, reparto y estado), canceladas incluidas, y deja de leer los campos planos

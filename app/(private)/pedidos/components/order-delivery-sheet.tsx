@@ -250,7 +250,7 @@ export function OrderDeliverySheet({ order, line, open, onOpenChange }: OrderDel
   const router = useRouter();
   const recipeName = line.recipeName?.trim() ?? '';
   const title = recipeName === '' ? LABELS.fallbackTitle(order.numberText) : recipeName;
-  const store = useOrderDeliveryDraft(order.id);
+  const store = useOrderDeliveryDraft(order.id, line.id);
   const { sync, hasDraft } = store;
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [attempted, setAttempted] = useState(false);

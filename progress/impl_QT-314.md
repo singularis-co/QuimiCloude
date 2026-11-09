@@ -49,7 +49,7 @@ Rama `feature/QT-314-pedido-con-varias-recetas-frontend`. Spec aprobado en F1.4 
 
 ## Bloqueos
 
-- **Tanda 3 / T15 / R44 — «Ver detalle» en el pie de la tarjeta de teléfono (ABIERTO, decide el leader/humano).**
+- **Tanda 3 / T15 / R44 — «Ver detalle» en el pie de la tarjeta de teléfono (RESUELTO: enmienda F2.1 de R44, 2026-11-09; tests en T16b).**
   R44 pide en la tarjeta los botones «Ver detalle» y «Acciones», y design § 2 (catálogo) dice
   «`DataTable` … `card.footer` para "Ver detalle" y "Acciones"». Pero `DataTableCardLayout.footer`
   (`components/shared/data-table/data-table-cards.tsx`) pinta **una sola columna** de la tabla, y
@@ -60,12 +60,12 @@ Rama `feature/QT-314-pedido-con-varias-recetas-frontend`. Spec aprobado en F1.4 
   número de pedido o con «Ver detalle» dentro de «Acciones». Opciones: ampliar `DataTable`
   (enmienda del design) o aceptar el número como entrada al detalle (enmienda de R44).
   El resto de T15 cumple su «Hecho».
-- **Tanda 3 / T16 — ficha de solo lectura de `order-responsibles-sheet.tsx` (ABIERTO, decide el humano).**
+- **Tanda 3 / T16 — ficha de solo lectura de `order-responsibles-sheet.tsx` (RESUELTO: R51, enmienda F2.1; hecho en T16b).**
   Sigue pintando nombre, imagen, cantidad, unidad y reparto desde los campos planos de la primera
   receta: choca con R24 y bloquea el «Hecho» de T17 (Tanda 4). Ni design § 4.7 ni el tablero dicen
   qué pinta con varias recetas. Opciones en «T16 > Bloqueos de T16». No afecta al «Hecho» de T16
   (R38 funciona y tiene tests).
-- **Tanda 3 / T16 — borrador de entrega por pedido, no por receta (ABIERTO).** `order-delivery-draft.ts`
+- **Tanda 3 / T16 — borrador de entrega por pedido, no por receta (RESUELTO: R52, enmienda F2.1; hecho en T16b).** `order-delivery-draft.ts`
   y `use-order-delivery-draft.ts` (fuera del alcance de T16) usan una clave por pedido: con dos recetas
   `TERMINADO`, abrir «Entregar» de la segunda descarta el borrador de la primera. La entrega registrada
   es correcta. El arreglo (añadir `lineId` a la clave) amplía el alcance: decide el leader.
@@ -655,3 +655,89 @@ Commits: `91750769b` (T13), `0e4c22523` (T14), `a48f82d17` (T15), `c460b0302` (T
 
 Bloqueos abiertos al cerrar la tanda (detalle en «Bloqueos»): R44 pie de la tarjeta (T15), ficha de solo
 lectura de `order-responsibles-sheet.tsx` (T16, condiciona T17) y borrador de entrega por pedido (T16).
+
+## Tanda 4
+
+### T16b (frontend_dev)
+
+Enmienda F2.1 (design § 4.5 y § 4.7). Resuelve los tres bloqueos de la tanda 3 (R44 pie de la
+tarjeta, ficha de «Responsables», borrador de entrega por pedido). Sin commit propio.
+
+Archivos modificados:
+- `app/(private)/pedidos/components/order-responsibles-sheet.tsx`: la cabecera conserva número, estado
+  del pedido, prioridad y cliente; los datos sueltos de la primera receta (y su imagen) se sustituyen
+  por una lista «Recetas» con una fila por receta de `order.lines`, ordenada por `position` y con las
+  canceladas: nombre, cantidad con `unitLabel`, reparto (`OrderDistributionLabel` +
+  `distributionLabelLine`) y `OrderStatusBadge` de la receta. Nuevo `ORDER_RESPONSIBLES_LINE_TESTID` y
+  rótulo `lines`. `responsiblesFrozen` sin cambios.
+- `app/(private)/pedidos/components/index.ts`: reexporta `ORDER_RESPONSIBLES_LINE_TESTID`.
+- `app/(private)/pedidos/components/order-delivery-draft.ts`: `orderDeliveryDraftKey(orderId, lineId)`;
+  el borrador guarda `lineId`; `parseOrderDeliveryDraft(raw, orderId, lineId)` descarta el que no
+  coincide en los dos; `newOrderDeliveryDraft`, `loadOrderDeliveryDraft` y `clearOrderDeliveryDraft`
+  reciben `lineId`.
+- `app/(private)/pedidos/components/use-order-delivery-draft.ts`: `useOrderDeliveryDraft(orderId, lineId)`.
+- `app/(private)/pedidos/components/order-delivery-sheet.tsx`: pasa `line.id` al hook.
+- tests: `order-sheet-responsibles.test.tsx` (el caso «la ficha muestra los datos del pedido como texto»
+  ya no mira la imagen ni los campos planos: monta una receta; bloque nuevo R51),
+  `order-delivery-draft.test.ts` (llamadas con `lineId`; caso «sin receta» en los descartes; bloque
+  nuevo R52), `order-delivery-sheet.test.tsx` (`DRAFT_KEY` y borradores guardados con `lineId`; bloque
+  nuevo R52), `order-cards.test.tsx` (bloque nuevo R44).
+
+Mapa `R<n> -> test`:
+- R51 (y R24 en la ficha): `order-sheet-responsibles.test.tsx` > «la ficha pinta una fila por receta del
+  pedido, no los campos planos (R51, R24)» > «R51: una fila por receta en el orden del pedido, canceladas
+  incluidas», «R51: cada fila lleva el nombre, la cantidad con su unidad, el reparto y el estado de su
+  receta», «R51: la receta cancelada sale con su estado», «R51: la cabecera conserva el estado del pedido
+  y la prioridad», «R51, R24: ningun dato de los campos planos del pedido sale en la ficha». Pedido de
+  tres recetas desordenadas en el arreglo (la ficha sigue `position`), la primera distinta de los
+  campos planos («Esmalte azul», 12.5) y la segunda `CANCELADO`.
+- R52 (unitario): `order-delivery-draft.test.ts` > «el borrador de entrega va por receta (R52)» >
+  «R52: dos recetas del mismo pedido guardan cada una su borrador y se leen cada una con lo suyo»,
+  «R52: abrir la segunda receta no borra ni cambia el borrador de la primera», «R52: el borrador de una
+  receta no se carga en otra: la otra empieza uno nuevo», «R52: el texto de una receta no vale para otra
+  aunque se lea con su clave», «R52: borrar el borrador de una receta deja el de la otra».
+- R52 (UI): `order-delivery-sheet.test.tsx` > «el borrador de «Entregar» va por receta (R52)» > «R52: abre
+  «Entregar» en dos recetas y, al volver a la primera, trae su borrador; la segunda no lo hereda»
+  (desde la fila viva de `OrderTable`, con el selector de receta; con la clave por pedido de antes, la
+  segunda receta heredaba el «3» de la primera y el caso falla).
+- R44 (enmendado): `order-cards.test.tsx` > «entrada al detalle en la tarjeta de teléfono (R44)» > «R44: el
+  pie lleva la prioridad y «Acciones», sin un botón «Ver detalle» aparte», «R44: el único botón «Ver
+  detalle» de la tarjeta es el número del pedido», «R44: tocar el número de pedido abre el detalle»,
+  «R44: «Ver detalle» dentro de «Acciones» abre el detalle». Código sin cambios.
+
+Grep del «Hecho» (`order\.(recipeName|recipeImageUrl|quantity|unitLabel|presentationLines)` en
+`order-responsibles-sheet.tsx`): sin resultados (exit 1).
+
+Verificación (salida real):
+- `pnpm run typecheck`: solo `app/layout.tsx(45,56): error TS2304: Cannot find name 'LayoutProps'.` (conocido).
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, todos preexistentes en archivos que no toca T16b.
+- `pnpm exec vitest run <10 archivos>`: `Test Files 10 passed (10) · Tests 271 passed | 6 skipped (277)`.
+
+| Archivo | Resultado |
+|---|---|
+| `order-delivery-draft.test.ts` | 31 passed (25 + 6) |
+| `order-delivery-sheet.test.tsx` | 46 passed (45 + 1) |
+| `order-sheet-responsibles.test.tsx` | 24 passed (19 + 5) |
+| `order-cards.test.tsx` | 28 passed (24 + 4) |
+| `order-row-wiring.test.tsx` | 23 passed |
+| `order-sheet-coverage.test.tsx` | 5 passed |
+| `pedidos-toasts.test.tsx` | 26 passed |
+| `pedidos-convenciones.test.ts` | 20 passed, 3 skipped |
+| `guard-formularios-y-acciones.test.ts` | 20 passed, 3 skipped |
+| `tests/unit/pedidos/order-delivery.test.ts` | 48 passed |
+
+Guardias `guard-pedidos-rediseno`, `guard-pantalla-pedidos-se-amplia`, `guard-catalogo-de-componentes`:
+`Test Files 3 passed (3) · Tests 69 passed | 2 skipped (71)`.
+
+Notas para el reviewer:
+- La lectura de borradores v1 (de antes de los bloques) se conserva, pero ahora también exige `lineId`:
+  un v1 real nunca lo tuvo y vive en la clave por pedido, así que en la práctica ya no se recupera, como
+  dice design § 4.7 para cualquier borrador anterior. Los tests de v1 (QC R45) siguen verdes con un v1
+  que lleva `lineId`. Retirar esa rama sería limpieza fuera del alcance de T16b; queda a criterio del
+  leader.
+- La ficha deja de pintar la imagen de la receta: design § 4.7 lista para cada fila nombre, cantidad,
+  reparto y estado, sin imagen.
+
+Bloqueos: ninguno nuevo. Los tres de la tanda 3 quedan resueltos por la enmienda F2.1 y este cambio.
+
+Veredicto: T16b hecha; cumple su «Hecho» y deja `order-responsibles-sheet.tsx` sin campos planos para T17.

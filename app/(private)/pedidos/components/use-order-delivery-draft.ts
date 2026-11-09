@@ -43,8 +43,8 @@ export type OrderDeliveryDraftStore = {
   readonly clear: () => void;
 };
 
-/** El borrador de la entrega de un pedido: cada cambio se guarda en el navegador al momento. */
-export function useOrderDeliveryDraft(orderId: string): OrderDeliveryDraftStore {
+/** El borrador de la entrega de una receta del pedido: cada cambio se guarda en el navegador al momento. */
+export function useOrderDeliveryDraft(orderId: string, lineId: string): OrderDeliveryDraftStore {
   const storage = useMemo(() => browserStorage(), []);
   const [draft, setDraft] = useState<OrderDeliveryDraft | null>(null);
   const [adjusted, setAdjusted] = useState(false);
@@ -73,12 +73,12 @@ export function useOrderDeliveryDraft(orderId: string): OrderDeliveryDraftStore 
     (view: OrderDeliveryView) => {
       const loaded =
         draftRef.current === null
-          ? loadOrderDeliveryDraft(storage, view, () => crypto.randomUUID())
+          ? loadOrderDeliveryDraft(storage, view, lineId, () => crypto.randomUUID())
           : adjustOrderDeliveryDraft(draftRef.current, view);
       commit(loaded.draft);
       setAdjusted(loaded.adjusted);
     },
-    [commit, storage],
+    [commit, lineId, storage],
   );
 
   return useMemo(
@@ -91,8 +91,8 @@ export function useOrderDeliveryDraft(orderId: string): OrderDeliveryDraftStore 
       removeBlock: (blockKey) => update((current) => removeDraftBlock(current, blockKey)),
       setCustomer: (blockKey, customer) => update((current) => setDraftBlockCustomer(current, blockKey, customer)),
       setPackages: (blockKey, key, text) => update((current) => setDraftBlockPackages(current, blockKey, key, text)),
-      clear: () => clearOrderDeliveryDraft(storage, orderId),
+      clear: () => clearOrderDeliveryDraft(storage, orderId, lineId),
     }),
-    [adjusted, draft, hasDraft, orderId, storage, sync, update],
+    [adjusted, draft, hasDraft, lineId, orderId, storage, sync, update],
   );
 }

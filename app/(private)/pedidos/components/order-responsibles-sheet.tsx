@@ -14,13 +14,12 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
-import type { OrderPresentationLineView, OrderSummary } from '@/lib/modules/pedidos';
+import type { OrderLineView, OrderPresentationLineView, OrderSummary } from '@/lib/modules/pedidos';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
 import { touchTarget } from '@/lib/shared/ui/touch-target';
 
 import { orderCustomerLabel } from '@/components/shared/order-customer-label';
-import { OrderRecipeImage } from './order-recipe-image';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
   OrderResponsibles,
@@ -31,6 +30,7 @@ import { OrderPriorityBadge, OrderStatusBadge } from './order-status-badge';
 
 export const ORDER_RESPONSIBLES_SHEET_TESTID = 'order-responsibles-sheet';
 export const ORDER_RESPONSIBLES_SUMMARY_TESTID = 'order-responsibles-summary';
+export const ORDER_RESPONSIBLES_LINE_TESTID = 'order-responsibles-line';
 /** El contenedor de la gestión de responsables dentro de su hoja. */
 export const ORDER_SHEET_RESPONSIBLES_TESTID = 'order-sheet-responsibles';
 export const ORDER_RESPONSIBLES_CLOSE_TESTID = 'order-responsibles-close';
@@ -39,6 +39,7 @@ export const ORDER_RESPONSIBLES_SHEET_LABELS = {
   title: 'Responsables',
   orderNumber: 'Pedido',
   summary: 'Datos del pedido',
+  lines: 'Recetas',
   quantity: 'Cantidad',
   distribution: 'Reparto',
   priority: 'Prioridad',
@@ -67,6 +68,37 @@ function Missing() {
   return <span aria-label={LABELS.missing}>{EMPTY_MARK}</span>;
 }
 
+function LineRow({ line }: { readonly line: OrderLineView }) {
+  const nameId = `order-responsibles-line-${line.id}`;
+  const recipeName = line.recipeName?.trim() ?? '';
+  return (
+    <li
+      aria-labelledby={nameId}
+      data-testid={ORDER_RESPONSIBLES_LINE_TESTID}
+      data-line-id={line.id}
+      className="flex flex-col gap-2 rounded-md bg-muted px-4 py-3 text-sm"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h4 id={nameId} className="min-w-0 font-medium break-words">
+          {recipeName === '' ? <Missing /> : recipeName}
+        </h4>
+        <OrderStatusBadge status={line.status} />
+      </div>
+      <dl className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-x-4 gap-y-1">
+        <dt className="text-muted-foreground">{LABELS.quantity}</dt>
+        <dd className="font-mono tabular-nums" title={exactDecimalTitle(line.quantity)}>
+          {formatDecimalDisplay(line.quantity)}
+          {line.unitLabel === null ? null : ` ${line.unitLabel}`}
+        </dd>
+        <dt className="text-muted-foreground">{LABELS.distribution}</dt>
+        <dd className="min-w-0 break-words">
+          <OrderDistributionLabel lines={line.presentationLines.map(distributionLabelLine)} />
+        </dd>
+      </dl>
+    </li>
+  );
+}
+
 export type OrderResponsiblesSheetProps = {
   readonly order: OrderSummary;
   readonly open: boolean;
@@ -87,7 +119,8 @@ export function OrderResponsiblesSheet({
   responsibles,
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
 }: OrderResponsiblesSheetProps) {
-  const recipeName = order.recipeName?.trim() ?? '';
+  const linesId = `order-responsibles-lines-${order.id}`;
+  const lines = [...order.lines].sort((a, b) => a.position - b.position);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -124,32 +157,15 @@ export function OrderResponsiblesSheet({
             data-testid={ORDER_RESPONSIBLES_SUMMARY_TESTID}
           >
             <div className="flex flex-wrap items-center gap-3">
-              <div className="size-16 shrink-0">
-                <OrderRecipeImage imageUrl={order.recipeImageUrl} name={recipeName} />
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <h3 className="text-base font-semibold break-words">
-                  {recipeName === '' ? <Missing /> : recipeName}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {LABELS.orderNumber} <span className="font-mono">{order.numberText}</span>
-                </p>
-              </div>
+              <h3 className="min-w-0 flex-1 text-base font-semibold">
+                {LABELS.orderNumber} <span className="font-mono">{order.numberText}</span>
+              </h3>
               <OrderStatusBadge status={order.status} />
             </div>
 
             <dl
               className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-x-4 gap-y-2 rounded-md bg-muted px-4 py-3 text-sm"
             >
-              <dt className="text-muted-foreground">{LABELS.quantity}</dt>
-              <dd className="font-mono tabular-nums" title={exactDecimalTitle(order.quantity)}>
-                {formatDecimalDisplay(order.quantity)}
-                {order.unitLabel === null ? null : ` ${order.unitLabel}`}
-              </dd>
-              <dt className="text-muted-foreground">{LABELS.distribution}</dt>
-              <dd className="min-w-0 break-words">
-                <OrderDistributionLabel lines={order.presentationLines.map(distributionLabelLine)} />
-              </dd>
               <dt className="text-muted-foreground">{LABELS.priority}</dt>
               <dd>
                 <OrderPriorityBadge priority={order.priority} />
@@ -159,6 +175,15 @@ export function OrderResponsiblesSheet({
                 {order.customer === null ? <Missing /> : orderCustomerLabel(order.customer)}
               </dd>
             </dl>
+
+            <h4 id={linesId} className="text-sm font-medium">
+              {LABELS.lines}
+            </h4>
+            <ul aria-labelledby={linesId} className="flex flex-col gap-2">
+              {lines.map((line) => (
+                <LineRow key={line.id} line={line} />
+              ))}
+            </ul>
           </section>
 
           <div data-testid={ORDER_SHEET_RESPONSIBLES_TESTID} data-section="responsibles">

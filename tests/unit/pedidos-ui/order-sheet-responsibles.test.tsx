@@ -15,8 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ORDER_FORM_TESTID,
-  ORDER_RECIPE_IMAGE_TESTID,
   ORDER_RESPONSIBLES_CLOSE_TESTID,
+  ORDER_RESPONSIBLES_LINE_TESTID,
   ORDER_RESPONSIBLES_SHEET_LABELS,
   ORDER_RESPONSIBLES_SHEET_TESTID,
   ORDER_RESPONSIBLES_SUMMARY_TESTID,
@@ -44,7 +44,7 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
-import { LINEA_B_ID, lineaPedido } from '../../helpers/order-form-ui';
+import { LINEA_A_ID, LINEA_B_ID, lineaB, lineaPedido } from '../../helpers/order-form-ui';
 
 const { routerMock, listaDeResponsables, listaEnLote } = vi.hoisted(() => ({
   routerMock: {
@@ -254,19 +254,18 @@ describe('«Responsables» abre su propia hoja: ficha de solo lectura y gestion 
 
   it('la ficha muestra los datos del pedido como texto: ningun campo de edicion del pedido', async () => {
     const user = setupUser();
-    montarLista();
+    montarLista('PENDIENTE', CATALOGO_CON_ESCRITURA, [lineaPedido({ recipeName: 'Barniz', quantity: '12.5000' })]);
 
     await abrirResponsablesPorLaFila(user);
 
     const ficha = await screen.findByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID);
-    expect(ficha).toHaveTextContent(RECETA.name);
+    expect(ficha).toHaveTextContent('Barniz');
     expect(ficha).toHaveTextContent(formatOrderNumber({ year: 2026, sequence: 42 }));
     expect(ficha).toHaveTextContent('12.5');
-    expect(within(ficha).getByTestId('order-status')).toHaveAttribute('data-status', 'PENDIENTE');
+    expect(within(ficha).getAllByTestId('order-status')[0]).toHaveAttribute('data-status', 'PENDIENTE');
     expect(within(ficha).getByTestId('order-priority')).toHaveAttribute('data-priority', 'MEDIA');
     expect(within(ficha).getByText(ORDER_RESPONSIBLES_SHEET_LABELS.distribution)).toBeInTheDocument();
     expect(within(ficha).getByText(ORDER_RESPONSIBLES_SHEET_LABELS.customer)).toBeInTheDocument();
-    expect(within(ficha).getByTestId(ORDER_RECIPE_IMAGE_TESTID)).toBeInTheDocument();
 
     expect(within(ficha).queryAllByRole('textbox')).toHaveLength(0);
     expect(within(ficha).queryAllByRole('combobox')).toHaveLength(0);
@@ -466,4 +465,77 @@ describe('con el pedido PARCIAL, la escritura depende de sus recetas activas (R3
       expect(within(seccion).getAllByTestId(RESPONSIBLE_PERSON_TESTID)).toHaveLength(5);
     },
   );
+});
+
+describe('la ficha pinta una fila por receta del pedido, no los campos planos (R51, R24)', () => {
+  // La primera receta difiere a proposito de los campos planos del pedido (`pedido()`: «Esmalte
+  // azul», 12.5): si la ficha leyera esos campos, saldrian aqui.
+  const LINEA_C_ID = '50000000-0000-4000-8000-00000000000c';
+  const TRES_RECETAS: OrderSummary['lines'] = [
+    // Desordenadas: la ficha sigue `position`, no el orden del arreglo.
+    lineaB({ status: 'CANCELADO', cancellationReason: 'Sin materia prima' }),
+    lineaPedido({ id: LINEA_C_ID, position: 2, recipeName: 'Desinfectante', quantity: '7.2500', unitLabel: 'kg', presentationLines: [], status: 'TERMINADO' }),
+    lineaPedido({ status: 'EN_CURSO' }),
+  ];
+
+  async function abrirFicha(): Promise<HTMLElement> {
+    const user = setupUser();
+    montarLista('PARCIAL', CATALOGO_CON_ESCRITURA, TRES_RECETAS);
+    await abrirResponsablesPorLaFila(user);
+    return screen.findByTestId(ORDER_RESPONSIBLES_SUMMARY_TESTID);
+  }
+
+  it('R51: una fila por receta en el orden del pedido, canceladas incluidas', async () => {
+    const ficha = await abrirFicha();
+
+    const filas = within(ficha).getAllByTestId(ORDER_RESPONSIBLES_LINE_TESTID);
+    expect(filas.map((fila) => fila.getAttribute('data-line-id'))).toEqual([LINEA_A_ID, LINEA_B_ID, LINEA_C_ID]);
+    expect(within(ficha).getByRole('list', { name: ORDER_RESPONSIBLES_SHEET_LABELS.lines })).toBeInTheDocument();
+    expect(within(ficha).getByRole('listitem', { name: 'Suavizante lavanda' })).toBe(filas[1]);
+  });
+
+  it('R51: cada fila lleva el nombre, la cantidad con su unidad, el reparto y el estado de su receta', async () => {
+    const ficha = await abrirFicha();
+    const [a, b, c] = within(ficha).getAllByTestId(ORDER_RESPONSIBLES_LINE_TESTID);
+
+    expect(a).toHaveTextContent('Desengrasante');
+    expect(a).toHaveTextContent('15 L');
+    expect(within(a).getByTestId('order-distribution')).toHaveTextContent('3 × Envase 5 L · 5 L');
+    expect(within(a).getByTestId('order-status')).toHaveAttribute('data-status', 'EN_CURSO');
+
+    expect(b).toHaveTextContent('Suavizante lavanda');
+    expect(b).toHaveTextContent('30 L');
+    expect(within(b).getByTestId('order-distribution')).toHaveAttribute('data-empty', 'true');
+
+    expect(c).toHaveTextContent('Desinfectante');
+    expect(c).toHaveTextContent('7.25 kg');
+    expect(within(c).getByTestId('order-status')).toHaveAttribute('data-status', 'TERMINADO');
+  });
+
+  it('R51: la receta cancelada sale con su estado', async () => {
+    const ficha = await abrirFicha();
+    const cancelada = within(ficha).getAllByTestId(ORDER_RESPONSIBLES_LINE_TESTID)[1];
+
+    expect(within(cancelada).getByTestId('order-status')).toHaveAttribute('data-status', 'CANCELADO');
+  });
+
+  it('R51: la cabecera conserva el estado del pedido y la prioridad', async () => {
+    const ficha = await abrirFicha();
+    const filas = within(ficha).getAllByTestId(ORDER_RESPONSIBLES_LINE_TESTID);
+    const estadoDelPedido = within(ficha)
+      .getAllByTestId('order-status')
+      .filter((badge) => !filas.some((fila) => fila.contains(badge)));
+
+    expect(estadoDelPedido).toHaveLength(1);
+    expect(estadoDelPedido[0]).toHaveAttribute('data-status', 'PARCIAL');
+    expect(within(ficha).getByTestId('order-priority')).toHaveAttribute('data-priority', 'MEDIA');
+  });
+
+  it('R51, R24: ningun dato de los campos planos del pedido sale en la ficha', async () => {
+    const ficha = await abrirFicha();
+
+    expect(ficha).not.toHaveTextContent(RECETA.name);
+    expect(ficha).not.toHaveTextContent('12.5');
+    expect(within(ficha).queryByRole('img')).toBeNull();
+  });
 });

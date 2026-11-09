@@ -126,7 +126,7 @@ const ORDER = { id: DELIVERY_ORDER_ID, numberText: '2026-0000007' } as const;
 const LINE = { id: LINEA_A_ID, recipeName: null, recipeImageUrl: null } as const;
 const ANA = { id: 'c0000000-0000-4000-8000-00000000000a', name: 'Ana Perez', isDeleted: false };
 const LUIS = { id: SECOND_DELIVERY_CUSTOMER_ID, name: 'Luis Gil', isDeleted: false };
-const DRAFT_KEY = orderDeliveryDraftKey(DELIVERY_ORDER_ID);
+const DRAFT_KEY = orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID);
 const GONE_BATCH_ID = 'e0000000-0000-4000-8000-000000000099';
 
 const TEXTO = {
@@ -162,6 +162,7 @@ function guardarBorrador(bloques: readonly BloqueGuardado[]) {
     JSON.stringify({
       v: 2,
       orderId: DELIVERY_ORDER_ID,
+      lineId: LINEA_A_ID,
       deliveryKey: DELIVERY_KEY,
       blocks: bloques.map((bloque, index) => ({ key: String(index + 1), ...bloque })),
     }),
@@ -716,6 +717,7 @@ describe('borrador', () => {
       JSON.stringify({
         v: 1,
         orderId: DELIVERY_ORDER_ID,
+        lineId: LINEA_A_ID,
         deliveryKey: DELIVERY_KEY,
         customer: LUIS,
         packages: { [packagesKey(PENDING_LINE_ID, OLDER_BATCH_ID)]: '2' },
@@ -993,6 +995,100 @@ describe('entrega de una receta con el pedido PARCIAL (R32)', () => {
       expect.objectContaining({ orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY }),
     );
     await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('el borrador de «Entregar» va por receta (R52)', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
+  function pedidoDeDosTerminadas(): OrderSummary {
+    return {
+      ...VISTA_SIN_LINEAS,
+      lines: [
+        lineaPedido({ status: 'TERMINADO', recipeName: 'Desengrasante' }),
+        lineaPedido({ id: LINEA_B_ID, position: 1, status: 'TERMINADO', recipeName: 'Jabón líquido' }),
+      ],
+      progress: { total: 2, finished: 2 },
+      id: DELIVERY_ORDER_ID,
+      number: { year: 2026, sequence: 7 },
+      numberText: formatOrderNumber({ year: 2026, sequence: 7 }),
+      recipeId: '22222222-2222-4222-8222-222222222222',
+      recipeName: 'Esmalte azul',
+      recipeVersion: null,
+      quantity: '100.0000',
+      priority: 'MEDIA',
+      status: 'TERMINADO',
+      cancellationReason: null,
+      ingredientsCost: null,
+      packagingCost: null,
+      actualCost: null,
+      salePrice: null,
+      createdAt: new Date('2026-01-15T10:00:00.000Z'),
+      updatedAt: new Date('2026-01-15T10:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      presentationLines: [],
+      unitId: null,
+      unitLabel: null,
+      pendingDelivery: { kind: 'not_packed' },
+      customer: null,
+      recipeImageUrl: null,
+    };
+  }
+
+  async function entregar(user: ReturnType<typeof setupUser>, lineId: string, receta: string) {
+    await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+    const opcion = within(selector)
+      .getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID)
+      .find((el) => el.getAttribute('data-line-id') === lineId);
+    await user.click(opcion as HTMLElement);
+    await screen.findByRole('dialog', { name: receta });
+  }
+
+  async function cerrarConEscape(user: ReturnType<typeof setupUser>) {
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeNull());
+  }
+
+  it('R52: abre «Entregar» en dos recetas y, al volver a la primera, trae su borrador; la segunda no lo hereda', async () => {
+    const user = setupUser();
+    render(
+      <OrderTable
+        orders={[pedidoDeDosTerminadas()]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={{ items: [], totalPages: 1 }}
+        units={[]}
+        bridge={null}
+        canDeliver
+      />,
+    );
+
+    await entregar(user, LINEA_A_ID, 'Desengrasante');
+    await user.type(await campo(0, OLDER_BATCH_ID), '3');
+    await cerrarConEscape(user);
+
+    await entregar(user, LINEA_B_ID, 'Jabón líquido');
+    expect(await campo(0, OLDER_BATCH_ID)).toHaveValue('');
+    await user.type(await campo(0, NEWER_BATCH_ID), '1');
+    await cerrarConEscape(user);
+
+    expect(window.localStorage.getItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID))).not.toBeNull();
+    expect(window.localStorage.getItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_B_ID))).not.toBeNull();
+
+    await entregar(user, LINEA_A_ID, 'Desengrasante');
+    expect(await campo(0, OLDER_BATCH_ID)).toHaveValue('3');
+    expect(await campo(0, NEWER_BATCH_ID)).toHaveValue('');
+    expect(screen.queryByTestId(ORDER_DELIVERY_DRAFT_ADJUSTED_TESTID)).toBeNull();
+    await cerrarConEscape(user);
+
+    await entregar(user, LINEA_B_ID, 'Jabón líquido');
+    expect(await campo(0, NEWER_BATCH_ID)).toHaveValue('1');
+    expect(await campo(0, OLDER_BATCH_ID)).toHaveValue('');
   });
 });
 
