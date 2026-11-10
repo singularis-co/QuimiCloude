@@ -295,6 +295,11 @@ export const E2E_ESPERADOS = [
   // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
   // `reference`, asi que el diferimiento de la E2E de ese cruce sigue INTACTO.
   'pedidos-cotizacion.spec.ts',
+  // Alta el 2026-11-10 (QT-315 T12, R33) por el MISMO motivo y en el MISMO sitio que las demas. Lo
+  // que ejercita: un pedido de dos recetas por planta de punta a punta. NO lee ni afirma nada sobre
+  // el identificador de peticion ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'planta-con-varias-recetas.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',

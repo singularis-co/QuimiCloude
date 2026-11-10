@@ -188,7 +188,7 @@
 
 ## Cierre
 
-- [ ] **T14 · implementer — cierre**
+- [x] **T14 · implementer — cierre**
   - El mapa `R<n> → test` (R1–R34) va en `progress/impl_QT-315.md`.
   - `./init.sh` en verde.
   - Se comprueba R32: el diff no toca `db/` ni las dependencias de `package.json`.

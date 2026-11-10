@@ -1271,3 +1271,21 @@ Complementos al mapa:
   - Hay precedente: QT-313 y QT-314 añadieron a esa lista sus specs nuevos (l. 257 y 263; commits `c9d18d80e` y `5e980f7bd`).
   - No la he ampliado: la autorización cubría solo `scope.test.ts`, y queda a la decisión del leader.
 - T14 queda **sin `[x]`** por ese rojo.
+
+### T14 — cierre final (implementer, 2026-11-10)
+- `tests/guards/guard-identificador-de-request.test.ts`: `E2E_ESPERADOS` gana `'planta-con-varias-recetas.spec.ts'`, igual que QT-313 y QT-314 (autorizado por el leader).
+- `pnpm exec vitest run guard --maxWorkers=1`: **87 archivos, 1335 en verde, 22 omitidos**.
+- `tests/unit/recetas/scope.test.ts`: 5/5.
+- `pnpm run typecheck`: 0 errores.
+- T14 queda `[x]`.
+
+### Guardias ampliadas en QT-315 (todas con decisión del humano o del leader, sin cambiar el criterio)
+1. `tests/unit/recetas/module-contract.test.ts`, `PANTALLAS_AUTORIZADAS` (`35bd6503f`): entran `app/(private)/asignacion/page.tsx`, `asignacion/empaque/[id]/page.tsx` y `asignacion/acondicionamiento/[id]/page.tsx`. Las tres leen la receta de la ruta; no editan recetas.
+2. `tests/unit/recetas/scope.test.ts`:
+   - `PANTALLA_DE_EJECUCION` (`35bd6503f`): entran las mismas tres páginas.
+   - Lista cerrada de E2E de recetas (`92838d84e`): entra `helpers/recipe-route.ts`, el helper de rutas con receta.
+   - `COMPONENTES_PERMITIDOS` en la comprobación de `components/` (`3037fbf93`): entra `components/shared/recipes-first-more.tsx`, que pide T11 y design § 7.
+   - Lista cerrada de E2E de recetas (`cf059b665`): entra `planta-con-varias-recetas.spec.ts` (T12, R33).
+3. `tests/guards/guard-identificador-de-request.test.ts`, `E2E_ESPERADOS` (este commit): entra `planta-con-varias-recetas.spec.ts` (T12, R33).
+
+Además, `tests/guards/guard-ambito-empresa-pedidos.test.ts` gana `findAliveLineSummary` en `METODOS_DELEGADOS_EN_DOMINIO` (Tanda 1, `39cf981eb`). No es una ampliación de excepción: sigue el patrón de sus métodos hermanos.
