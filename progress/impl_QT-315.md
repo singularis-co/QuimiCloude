@@ -444,3 +444,9 @@ Sigue en T13: el E2E de dos recetas y cualquier adaptacion de comportamiento. Po
 Verificacion:
 - `pnpm run typecheck`: 0 errores.
 - `pnpm run lint`: 0 errores, 11 warnings (ninguno en `e2e/`), «✖ 11 problems (0 errors, 11 warnings)».
+
+## Tanda 3 — cierre definitivo (implementer, 2026-11-10)
+- Por decisión del leader, el ajuste de tipos de `e2e/` (parte de T13) se adelantó a la Tanda 3, en el commit `93c8e2e4e`. Una tanda no cierra con el typecheck rojo, y `tsconfig.json` incluye `**/*.ts`. T13 conserva el E2E de dos recetas y los cambios de comportamiento.
+- `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores, 11 avisos.
+- `tests/integration/asignaciones` entera, después del arreglo de `finish-with-finished-goods.int`: 29 archivos, 256 en verde.
+- T7 queda `[x]`. T8 se mueve a la Tanda 4, como decidió el leader. Los bloqueos de la Tanda 3 quedan resueltos.

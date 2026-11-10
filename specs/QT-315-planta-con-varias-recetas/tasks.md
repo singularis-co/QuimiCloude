@@ -179,6 +179,7 @@
   - **Hecho cuando:** `pnpm exec playwright test e2e/planta-con-varias-recetas.spec.ts` está en
     verde en local.
 - [ ] **T13 [P] · frontend_dev — adaptar los E2E de planta** (R33)
+  - _Nota: ajuste de tipos adelantado en la Tanda 3, `93c8e2e4e`._
   - Los E2E con las rutas o pantallas de planta (lista en `## Archivos esperados > E2E`) pasan
     a la receta en la dirección.
   - `dashboard-rediseno` y los dos `recorrido-*` pasan a las secciones.
