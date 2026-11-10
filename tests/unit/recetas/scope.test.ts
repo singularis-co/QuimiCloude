@@ -200,7 +200,13 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       `archivo de recetas que no cuelga de ninguna pantalla con ruta propia: ${sinPantallaPropia.join(', ')}`,
     ).toEqual([])
 
-    const componentMatches = matchingFiles(join(repoRoot, 'components'))
+    // AMPLIADA el 2026-11-10 (QT-315, planta-con-varias-recetas): pieza compartida que muestra
+    // "primera receta +N más" en listados; no es una pantalla de recetas. La pide el spec (T11,
+    // design § 7)
+    const COMPONENTES_PERMITIDOS = new Set(['components/shared/recipes-first-more.tsx'])
+    const componentMatches = matchingFiles(join(repoRoot, 'components')).filter(
+      (absolutePath) => !COMPONENTES_PERMITIDOS.has(relative(repoRoot, absolutePath).split(sep).join('/')),
+    )
     expect(
       componentMatches,
       `componente de recetas encontrado bajo components/: ${componentMatches.join(', ')}`,

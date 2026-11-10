@@ -969,3 +969,18 @@ Veredicto: T11 hecha, con typecheck 0, lint sin errores y los tests de T11, Pedi
   - (a) añadir a esa comprobación una lista cerrada con `components/shared/recipes-first-more.tsx`, como en las ampliaciones anteriores;
   - (b) que el spec cambie el nombre de la pieza.
 - T10 y T11 quedan **sin `[x]`**.
+
+## Tanda 5 — ampliacion de la guardia de components/
+
+- `tests/unit/recetas/scope.test.ts`: lista cerrada `COMPONENTES_PERMITIDOS` con solo `components/shared/recipes-first-more.tsx` (ruta relativa normalizada a `/`), decision del humano (salida a); motivo: pieza compartida "primera receta +N mas" pedida por T11 / design § 7, no es pantalla de recetas; criterio sin cambios; `pnpm exec vitest run --maxWorkers=1 tests/unit/recetas/scope.test.ts` -> 1 archivo, 5/5 tests en verde.
+
+## Tanda 5 — cierre (implementer, 2026-11-10)
+- La guardia de `components/` de `scope.test.ts` admite `components/shared/recipes-first-more.tsx` (opción (a), decisión del humano). El criterio no cambia.
+- `tests/unit/recetas/scope.test.ts`: 5/5.
+- `tests/unit/recetas` + `recetas-ui`, 81 archivos en 6 lotes con `--maxWorkers=1`: 221, 220, 193, 249, 297 y 182 tests, **todo en verde**.
+- `pnpm run typecheck`: 0 errores.
+- Las demás corridas del cierre siguen en verde y no se han repetido porque esta ampliación solo toca `scope.test.ts`:
+  - `tests/unit/asignaciones`, `tests/integration/asignaciones`, `tests/ui/dashboard`, `tests/unit/pedidos-ui` y `tests/unit/paridad`;
+  - `guard`: 87 archivos;
+  - lint: 11 avisos.
+- T10 y T11 quedan `[x]`. Los bloqueos de la Tanda 5 quedan resueltos.

@@ -139,7 +139,7 @@
 
 ## Tanda 5 — Dashboard y Recorrido
 
-- [ ] **T10 · backend_dev — recorrido por receta** (design § 3.5 y § 3.6)
+- [x] **T10 · backend_dev — recorrido por receta** (design § 3.5 y § 3.6)
   - **`listExecutionTraces`.** Agrupa por `orderLineId`. Añade `moreRecipes`, `progress` y
     `recipes[].presentations`. La duración es la suma, con «abierta gana» (R21–R23).
   - **`getExecutionTrace`.** Devuelve `recipes[]` solo con las recetas que tienen anotaciones,
@@ -154,7 +154,7 @@
       `progress` (R25);
     - hay un unit del pedido dado de baja (R24);
     - hay un unit de un pedido de una receta, igual que hoy en una sección (R29).
-- [ ] **T11 · frontend_dev — Dashboard y Recorrido** (design § 4.4, § 4.5 y § 7; misma tanda
+- [x] **T11 · frontend_dev — Dashboard y Recorrido** (design § 4.4, § 4.5 y § 7; misma tanda
   que T10)
   - **Piezas que suben.** `OrderProgress` y `RecipesFirstMore` suben a `components/shared`, con
     su fila en `CATALOGO.md` en el mismo commit. Pedidos importa desde ahí sin cambio visible.
