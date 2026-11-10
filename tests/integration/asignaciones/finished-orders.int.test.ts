@@ -59,6 +59,7 @@ import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, packingStepsWithoutEvidence, recipesWithoutEvidence } from '../../helpers/evidence-off';
 import { syncOnlyLine, updateOrderAndLine } from '../../helpers/only-order-line';
+import { onOnlyRecipe } from '../../helpers/only-recipe-plant';
 
 const summaryReaders = realOrderSummaries();
 
@@ -102,7 +103,7 @@ async function transitionAliveByIdReal(
 
 /** Cablea el caso de uso REAL sobre la `tx` del fixture, con los mismos adaptadores que
  *  `lib/composition` ata en produccion. */
-function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepository>[0]) {
+function wireListFinishedOrders(tx: FixtureTx['tx']) {
   const orders: OrderCatalog = {
     findAliveById: findAliveOrderTargetById,
     listAliveSummariesByIds: summaryReaders.listAliveSummariesByIds,
@@ -111,9 +112,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
     listDeliveryProgressByIdsIncludingDeleted: async () => {
       throw new Error('los terminados no leen el progreso de entrega');
     },
-    findAliveLineSummary: async () => {
-      throw new Error('este archivo no lee una receta suelta');
-    },
+    findAliveLineSummary: summaryReaders.findAliveLineSummary,
     listRecipeOutlinesByIdsIncludingDeleted: async () => {
       throw new Error('este archivo no lee las recetas del pedido');
     },
@@ -146,7 +145,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
   const assignments = createOrderAssignmentRepository(tx);
   const execution = executionOnClient(tx, orders);
 
-  return {
+  return onOnlyRecipe({
     orders,
     assignments,
     listFinishedOrders: createListFinishedOrders({
@@ -229,7 +228,7 @@ function wireListFinishedOrders(tx: Parameters<typeof createOrderAssignmentRepos
       log: execution.log,
       now: () => NOW,
     }),
-  };
+  }, tx);
 }
 
 type FixtureTx = Parameters<typeof createOrder>[0];
@@ -438,7 +437,7 @@ describe('asignaciones · listFinishedOrders con los permisos del Empacador (int
       const lineas = await fixture.tx.orderPresentationLine.findMany({ where: { orderId: pedido }, select: { id: true, packages: true } });
       const { numberText } = await finishPacking(actorEmpacador, {
         orderId: pedido,
-        lines: lineas.map((linea) => ({ lineId: linea.id, packedPackages: linea.packages, reason: null, reasonOther: null })),
+        counts: lineas.map((linea) => ({ presentationLineId: linea.id, packedPackages: linea.packages, reason: null, reasonOther: null })),
       });
       expect(numberText.length).toBeGreaterThan(0);
       expect(await estadoDe()).toBe('POR_ACONDICIONAR');

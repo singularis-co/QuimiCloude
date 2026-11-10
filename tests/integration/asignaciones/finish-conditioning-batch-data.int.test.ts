@@ -13,11 +13,15 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { asignaciones } from '@/lib/composition';
+import { asignaciones as asignacionesDeComposicion } from '@/lib/composition';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { receiveFinishedGoods } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { onOnlyRecipe } from '../../helpers/only-recipe-plant';
 import { syncOnlyLine, ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../../helpers/only-order-line';
+
+// Pedidos de una sola receta: el puente pone su unica linea en la entrada de cada caso de uso.
+const asignaciones = onOnlyRecipe(asignacionesDeComposicion, prisma);
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 

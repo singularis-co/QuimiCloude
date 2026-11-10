@@ -23,6 +23,7 @@ afterEach(() => {
 
 const ROW: ConditioningOrderRow = {
   id: 'order-a',
+  lineId: 'linea-order-a',
   numberText: '2026-0000040',
   recipeName: 'Jarabe simple',
   quantity: '20',
@@ -39,6 +40,7 @@ const ROW: ConditioningOrderRow = {
 
 const FINISHED: FinishedOrderView = {
   id: 'order-c',
+  lineId: 'linea-order-c',
   numberText: '2026-0000041',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',

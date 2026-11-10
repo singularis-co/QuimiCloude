@@ -46,8 +46,8 @@ function montar(options?: Opciones) {
   return { remove: createRemoveEvidence(deps), repo, filas, storage, todos };
 }
 
-const FABRICACION = { orderId: PEDIDO, phase: 'manufacturing', evidenceId: UNA.id } as const;
-const ENVASADO = { orderId: PEDIDO, phase: 'packing', evidenceId: DE_ENVASADO.id } as const;
+const FABRICACION = { orderId: PEDIDO, lineId: LINEA, phase: 'manufacturing', evidenceId: UNA.id } as const;
+const ENVASADO = { orderId: PEDIDO, lineId: LINEA, phase: 'packing', evidenceId: DE_ENVASADO.id } as const;
 
 describe('removeEvidence — autorizacion (R26, R27, R38, R39)', () => {
   it('R26, R27: sin ninguno de los dos permisos rechaza sin tocar ningun puerto', async () => {

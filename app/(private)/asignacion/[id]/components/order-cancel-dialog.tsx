@@ -26,6 +26,7 @@ export const ORDER_CANCEL_DISMISS_TESTID = 'order-cancel-dismiss';
 export const ORDER_CANCEL_ERROR_TESTID = 'order-cancel-error';
 
 export const ORDER_CANCEL_ORDER_ID_FIELD = 'orderId';
+export const ORDER_CANCEL_LINE_ID_FIELD = 'lineId';
 export const ORDER_CANCEL_STEP_POSITION_FIELD = 'stepPosition';
 export const ORDER_CANCEL_REASON_FIELD = 'reason';
 
@@ -57,6 +58,7 @@ function readString(formData: FormData, name: string): string {
 
 type OrderCancelFormProps = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly stepPosition: number | null;
 };
 
@@ -66,7 +68,13 @@ export type OrderCancelDialogProps = OrderCancelFormProps & {
   readonly onOpenChange?: (open: boolean) => void;
 };
 
-export function OrderCancelDialog({ orderId, stepPosition, open, onOpenChange }: OrderCancelDialogProps) {
+export function OrderCancelDialog({
+  orderId,
+  lineId,
+  stepPosition,
+  open,
+  onOpenChange,
+}: OrderCancelDialogProps) {
   const controlled = open !== undefined && onOpenChange !== undefined;
 
   return (
@@ -91,12 +99,12 @@ export function OrderCancelDialog({ orderId, stepPosition, open, onOpenChange }:
       testId={ORDER_CANCEL_DIALOG_TESTID}
     >
       {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
-      <OrderCancelForm orderId={orderId} stepPosition={stepPosition} />
+      <OrderCancelForm orderId={orderId} lineId={lineId} stepPosition={stepPosition} />
     </ConfirmDialogFrame>
   );
 }
 
-function OrderCancelForm({ orderId, stepPosition }: OrderCancelFormProps) {
+function OrderCancelForm({ orderId, lineId, stepPosition }: OrderCancelFormProps) {
   const fieldId = useId();
   const reasonId = `${fieldId}-reason`;
   const errorId = `${fieldId}-error`;
@@ -145,6 +153,7 @@ function OrderCancelForm({ orderId, stepPosition }: OrderCancelFormProps) {
         formClassName: 'flex flex-col gap-4',
         hidden: [
           { name: ORDER_CANCEL_ORDER_ID_FIELD, value: orderId, controlled: true },
+          { name: ORDER_CANCEL_LINE_ID_FIELD, value: lineId, controlled: true },
           {
             name: ORDER_CANCEL_STEP_POSITION_FIELD,
             value: stepPosition === null ? '' : String(stepPosition),

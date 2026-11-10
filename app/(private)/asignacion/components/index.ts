@@ -229,6 +229,7 @@ export {
   type OrderDistributionFullLine,
   type OrderDistributionFullProps,
 } from './order-distribution-full';
+export { recipeLineIdOf, type RecipeSearchParams } from './recipe-param';
 export {
   useStepEvidence,
   type StepEvidenceController,

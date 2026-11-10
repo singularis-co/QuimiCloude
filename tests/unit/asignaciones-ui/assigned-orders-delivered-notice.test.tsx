@@ -7,11 +7,7 @@ import {
   OrderOutcomeNotice,
 } from '@/app/(private)/asignacion/components';
 import AsignacionPage from '@/app/(private)/asignacion/page';
-import {
-  DELIVERED_ORDER_PACKAGES_PARAM,
-  DELIVERED_ORDER_PARAM,
-  DELIVERED_ORDER_PRODUCT_PARAM,
-} from '@/lib/shared/routes';
+import { MANUFACTURED_ORDER_PARAM } from '@/lib/shared/routes';
 
 /**
  * Resuelve los Server Components `async` del arbol antes de entregarselo al renderer de cliente.
@@ -46,7 +42,7 @@ async function resolverServerComponents(nodo: ReactNode): Promise<ReactNode> {
 
 /**
  * La lista de pedidos asignados pinta el aviso de «por empacar» al volver de finalizar (R9):
- * `finishAssignedOrderAction` redirige aqui con `DELIVERED_ORDER_PARAM` en la URL, nunca con un
+ * `finishAssignedOrderAction` redirige aqui con `MANUFACTURED_ORDER_PARAM` en la URL, nunca con un
  * estado de exito que la propia accion no puede resolver -ver `order-execution-screen.tsx`.
  */
 
@@ -98,7 +94,7 @@ afterEach(() => {
 
 describe('lista de pedidos asignados — R9: aviso de «por empacar» al volver de finalizar', () => {
   it('con el parametro presente, el aviso queda visible y nombra el pedido', async () => {
-    await renderPantalla({ [DELIVERED_ORDER_PARAM]: '2026-0000007' });
+    await renderPantalla({ [MANUFACTURED_ORDER_PARAM]: '2026-0000007' });
 
     const aviso = await screen.findByTestId(ASSIGNED_ORDER_DELIVERED_TESTID);
     expect(aviso).toBeVisible();
@@ -111,17 +107,19 @@ describe('lista de pedidos asignados — R9: aviso de «por empacar» al volver 
     expect(screen.queryByTestId(ASSIGNED_ORDER_DELIVERED_TESTID)).toBeNull();
   });
 
-  it('R9: con los parametros nuevos, tambien pasa los envases y el nombre del producto al aviso', async () => {
+  it('R19: el parametro se llama `fabricado`, no `entregado`, y el aviso no habla de envases', async () => {
+    expect(MANUFACTURED_ORDER_PARAM).toBe('fabricado');
     await renderPantalla({
-      [DELIVERED_ORDER_PARAM]: '2026-0000007',
-      [DELIVERED_ORDER_PACKAGES_PARAM]: '50',
-      [DELIVERED_ORDER_PRODUCT_PARAM]: 'Desengrasante industrial · Botella 1L',
+      [MANUFACTURED_ORDER_PARAM]: '2026-0000007',
+      entregado: '2026-0000008',
+      entregado_envases: '50',
+      entregado_producto: 'Desengrasante industrial · Botella 1L',
     });
 
-    const aviso = await screen.findByTestId(ASSIGNED_ORDER_DELIVERED_TESTID);
-    expect(aviso).toHaveTextContent(
-      'Pedido 2026-0000007 por empacar. Entraron 50 envases de Desengrasante industrial · Botella 1L.',
-    );
+    const avisos = await screen.findAllByTestId(ASSIGNED_ORDER_DELIVERED_TESTID);
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toHaveTextContent('Pedido 2026-0000007 por empacar');
+    expect(avisos[0]).not.toHaveTextContent('envases');
   });
 });
 

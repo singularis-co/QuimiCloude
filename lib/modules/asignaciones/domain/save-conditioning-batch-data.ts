@@ -1,7 +1,7 @@
 // lib/modules/asignaciones/domain/save-conditioning-batch-data.ts
 /**
- * Guardar lote, vencimiento y dia de produccion de un pedido. Solo lo hace quien acondiciona, y
- * solo desde que comenzo: en `EN_ACONDICIONAMIENTO`, `TERMINADO` o `ENTREGADO`. Los tres datos
+ * Guardar lote, vencimiento y dia de produccion de una receta del pedido. Solo lo hace quien la
+ * acondiciona, y solo desde que comenzo: en `EN_ACONDICIONAMIENTO`, `TERMINADO` o `ENTREGADO`. Los tres datos
  * pasan a todas las lineas con lote: que lotes son lo decide el servidor, no la entrada. Cada
  * guardado anota en el registro de ejecucion una foto de lo que escribio, en la misma transaccion.
  *
@@ -23,7 +23,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError } from './execution-entry';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ConditioningBatchSnapshotLine } from './conditioning-trace';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -36,8 +36,7 @@ import {
 } from '@/lib/modules/inventario';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 
-export const saveConditioningBatchDataSchema = z.strictObject({
-  orderId: z.string().uuid(),
+export const saveConditioningBatchDataSchema = orderLineInputSchema.extend({
   lot: typedLotSchema,
   expiryDate: civilDateSchema,
   productionDate: civilDateSchema,
@@ -54,7 +53,7 @@ export type SaveConditioningBatchDataDeps = {
 };
 
 const SUMMARY_STATUSES = ['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const;
-/** Fuera de `EN_ACONDICIONAMIENTO` el pedido solo existe para quien lo acondiciono: el detalle
+/** Fuera de `EN_ACONDICIONAMIENTO` la receta solo existe para quien la acondiciono: el detalle
  *  responde igual, y asi no se revela que esta en otro estado o es de otra persona. */
 const CLOSED_STATUSES: ReadonlySet<string> = new Set(['TERMINADO', 'ENTREGADO']);
 
@@ -112,15 +111,10 @@ export function createSaveConditioningBatchData(
 
     const parsed = saveConditioningBatchDataSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, lot, expiryDate, productionDate } = parsed.data;
+    const { orderId, lineId, lot, expiryDate, productionDate } = parsed.data;
 
-    const target = await deps.orders.findAliveById(orderId, actor.companyId);
-    if (target === null) throw new OrderNotFoundError();
-    if (!(SUMMARY_STATUSES as readonly string[]).includes(target.status)) throw new OrderNotConditionableError();
-
-    const summaryPage = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], [target.status], 1, 1);
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    if (!(SUMMARY_STATUSES as readonly string[]).includes(summary.status)) throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) {
       if (CLOSED_STATUSES.has(summary.status)) throw new OrderNotFoundError();
       throw new OrderConditioningTakenError();

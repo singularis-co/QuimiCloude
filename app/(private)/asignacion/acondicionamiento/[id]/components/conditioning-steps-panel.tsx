@@ -50,6 +50,7 @@ export type ConditioningStepsPanelView = 'steps' | 'done';
 
 export type ConditioningStepsPanelProps = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly conditioning: ConditioningStepsView;
   readonly view: ConditioningStepsPanelView;
   readonly onViewChange: (view: ConditioningStepsPanelView) => void;
@@ -81,6 +82,7 @@ function unexpectedFromRejection(): ErrorState {
  */
 export function ConditioningStepsPanel({
   orderId,
+  lineId,
   conditioning,
   view,
   onViewChange,
@@ -104,6 +106,7 @@ export function ConditioningStepsPanel({
 
   const evidence = useStepEvidence({
     orderId,
+    lineId,
     phase: 'conditioning',
     steps,
     initial: conditioning.evidence,
@@ -155,7 +158,7 @@ export function ConditioningStepsPanel({
   function record(position: number): Promise<RecordConditioningStepActionResult> {
     const responsibleUserIds = requiresAssignment(position) ? [...responsiblesOf(position)] : [];
     const sent = queue.current.then(() =>
-      recordConditioningStepAction({ orderId, stepPosition: position, responsibleUserIds }),
+      recordConditioningStepAction({ orderId, lineId, stepPosition: position, responsibleUserIds }),
     );
     queue.current = sent.then(
       () => undefined,

@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { openAssignedOrderAction } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
+
+import { recipeLineIdOf, type RecipeSearchParams } from '../components';
 
 import { OrderExecutionError, OrderExecutionScreen } from './components';
 
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Pantalla de ejecucion de la receta de un pedido asignado.
+ * Pantalla de ejecucion de una receta de un pedido asignado, la que nombra `?receta=`.
  *
  * El corte por permiso es la PRIMERA linea, antes de resolver `params`: sin `asignaciones.ejecutar`
  * responde 404, nunca 403. La direccion sale de `assignedOrderRoute` (`lib/shared/routes.ts`); esta
@@ -23,17 +26,22 @@ export const metadata: Metadata = {
  */
 export default async function AssignedOrderExecutionPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ id: string }>;
+  readonly searchParams: Promise<RecipeSearchParams>;
 }) {
   await requirePagePermission('asignaciones.ejecutar');
 
-  const { id } = await params;
-  const result = await openAssignedOrderAction(id);
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const lineId = recipeLineIdOf(query);
+  if (lineId === null) notFound();
+
+  const result = await openAssignedOrderAction(id, lineId);
 
   if (result.status === 'error') {
     return <OrderExecutionError error={result} />;
   }
 
-  return <OrderExecutionScreen execution={result.data} />;
+  return <OrderExecutionScreen execution={result.data} lineId={lineId} />;
 }

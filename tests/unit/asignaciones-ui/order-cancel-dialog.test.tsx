@@ -92,7 +92,7 @@ function motivo(dialogo: HTMLElement): HTMLElement {
 describe('dialogo de cancelar — sin motivo no se envia', () => {
   it('R9 — confirmar sin motivo no llama a la accion y el rechazo es texto visible', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const dialogo = await abrir(user);
 
     await user.click(await esperarInteractiva(confirmar(dialogo)));
@@ -106,7 +106,7 @@ describe('dialogo de cancelar — sin motivo no se envia', () => {
 
   it('R9 — un motivo de solo espacios tampoco se envia', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const dialogo = await abrir(user);
 
     await user.type(motivo(dialogo), '    ');
@@ -122,7 +122,7 @@ describe('dialogo de cancelar — sin motivo no se envia', () => {
 describe('dialogo de cancelar — envio', () => {
   it('R22, R23 — envia orderId, la posicion del paso mostrado y el motivo recortado', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const dialogo = await abrir(user);
 
     await user.type(motivo(dialogo), '   Se acabó el reactivo  ');
@@ -137,7 +137,7 @@ describe('dialogo de cancelar — envio', () => {
 
   it('R22 — tras retroceder, envia la posicion del paso al que se llego', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     fireEvent.click(screen.getByTestId('step-reader-previous'));
     expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 2 de 4');
 
@@ -152,19 +152,19 @@ describe('dialogo de cancelar — envio', () => {
 
   it('R22 — el menu esta en el primer y en el ultimo paso, fuera del lector de pasos', () => {
     const { unmount } = render(
-      <OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 1 }} />,
+      <OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 1 }} />,
     );
     expect(disparador()).toBeVisible();
     expect(screen.getByTestId('step-reader').contains(disparador())).toBe(false);
     unmount();
 
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 4 }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 4 }} />);
     expect(disparador()).toBeVisible();
   });
 
   it('Volver cierra el dialogo sin llamar a la accion', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const dialogo = await abrir(user);
 
     await user.type(motivo(dialogo), 'Me equivoqué');
@@ -187,7 +187,7 @@ describe('dialogo de cancelar — error de la accion', () => {
       }),
     );
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const dialogo = await abrir(user);
 
     await user.type(motivo(dialogo), 'Sin envases');
@@ -203,7 +203,7 @@ describe('dialogo de cancelar — error de la accion', () => {
   it('R24 — un error inesperado se pinta con su referencia', async () => {
     cancelAssignedOrderActionMock.mockImplementation(() => Promise.resolve(errorInesperado()));
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const dialogo = await abrir(user);
 
     await user.type(motivo(dialogo), 'Sin envases');
@@ -217,7 +217,7 @@ describe('dialogo de cancelar — error de la accion', () => {
 describe('dialogo de cancelar — multiplataforma', () => {
   it('R36 — objetivos tactiles de 44 px, campo a 16 px y nada en title', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
     const menu = disparador();
     expect(menu).toHaveClass('min-h-11', 'min-w-11');
 
@@ -231,7 +231,7 @@ describe('dialogo de cancelar — multiplataforma', () => {
 
   it('R36 — se abre, se escribe y se confirma solo con teclado', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     (await esperarInteractiva(disparador())).focus();
     await user.keyboard('{Enter}');
@@ -254,7 +254,7 @@ describe('dialogo de cancelar — multiplataforma', () => {
   });
 
   it('R11 — retroceder no abre ningun dialogo ni pide motivo', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     fireEvent.click(screen.getByTestId('step-reader-previous'));
 
@@ -268,7 +268,7 @@ describe('dialogo de cancelar — multiplataforma', () => {
 describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
   it('QC-265 R23: sin open ni onOpenChange pinta su disparador de hoy y se abre con el', async () => {
     const user = setupUser();
-    render(<OrderCancelDialog orderId="order-1" stepPosition={2} />);
+    render(<OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} />);
 
     const boton = screen.getByTestId(ORDER_CANCEL_TRIGGER_TESTID);
     expect(boton).toHaveTextContent(ORDER_CANCEL_TEXTS.trigger);
@@ -283,7 +283,7 @@ describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
   it('QC-265 R23: con open y onOpenChange no hay disparador y la apertura la decide quien lo usa', async () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
-      <OrderCancelDialog orderId="order-1" stepPosition={2} open={false} onOpenChange={onOpenChange} />,
+      <OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} open={false} onOpenChange={onOpenChange} />,
     );
 
     expect(screen.queryByTestId(ORDER_CANCEL_TRIGGER_TESTID)).toBeNull();
@@ -291,7 +291,7 @@ describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
 
     rerender(
-      <OrderCancelDialog orderId="order-1" stepPosition={2} open onOpenChange={onOpenChange} />,
+      <OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} open onOpenChange={onOpenChange} />,
     );
     const dialogo = await screen.findByRole('alertdialog');
     expect(dialogo).toHaveTextContent(ORDER_CANCEL_TEXTS.title);

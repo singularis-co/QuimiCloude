@@ -101,7 +101,7 @@ export function buildPackingOrdersColumns({
     },
     assignmentActionsColumn<PackingOrderRow>({
       canViewTrace,
-      enterHref: (order) => packingOrderRoute(order.id),
+      enterHref: (order) => packingOrderRoute(order.id, order.lineId),
     }),
   ];
 }

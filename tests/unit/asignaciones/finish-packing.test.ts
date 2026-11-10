@@ -28,7 +28,8 @@ function uuid(seed: string): string {
 const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
-const LINEA = 'linea-unica';
+const LINEA = uuid('e');
+const OTRA_LINEA = uuid('f');
 const OTRA_EMPRESA = uuid('9');
 const AHORA = new Date('2026-09-25T12:00:00.000Z');
 
@@ -39,7 +40,14 @@ const LINEAS = [
   { lineId: uuid('5'), packedPackages: 0, reason: 'rotura', reasonOther: null },
 ];
 
-const ENTRADA = { orderId: PEDIDO, lines: LINEAS };
+/** Un conteo de la entrada: la linea del reparto va en `presentationLineId`, no en `lineId`. */
+function aConteo({ lineId, ...resto }: { readonly lineId: string } & Record<string, unknown>) {
+  return { presentationLineId: lineId, ...resto };
+}
+
+const CONTEOS = LINEAS.map(aConteo);
+
+const ENTRADA = { orderId: PEDIDO, lineId: LINEA, counts: CONTEOS };
 
 type Resultado =
   | { readonly kind: 'ok'; readonly finishedGoods: readonly unknown[] }
@@ -70,7 +78,7 @@ function montar(options?: {
 }): {
   readonly deps: FinishPackingDeps;
   readonly findAliveById: ReturnType<typeof vi.fn>;
-  readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
+  readonly findAliveLineSummary: ReturnType<typeof vi.fn>;
   readonly finishPackingAliveById: ReturnType<typeof vi.fn>;
   readonly globalFinishPackingAliveById: ReturnType<typeof vi.fn>;
   readonly run: ReturnType<typeof vi.fn>;
@@ -81,14 +89,17 @@ function montar(options?: {
   readonly findPackingStepsById: ReturnType<typeof vi.fn>;
   readonly listEvidenceByLine: ReturnType<typeof vi.fn>;
 } {
-  const findAliveById = vi.fn(async () => (options?.target === undefined ? { id: PEDIDO, status: 'EN_EMPAQUE' } : options.target));
-  const listAliveSummariesByIds = vi.fn(async () => ({
-    items: options?.summaryItems ?? [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 } }],
-    total: 1,
-    page: 1,
-    pageSize: 1,
-    totalPages: 1,
-  }));
+  // El pedido esta PARCIAL a proposito: Terminar decide por la linea y no lee el pedido.
+  const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: 'PARCIAL', activeLineStatuses: [] }));
+  // `target` fija el estado de las dos recetas del pedido; `null` = ninguna existe para el actor.
+  const status = options?.target?.status ?? 'EN_EMPAQUE';
+  const lineas = (options?.summaryItems ?? [
+    { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, status },
+    { id: PEDIDO, lineId: OTRA_LINEA, number: { year: 2026, sequence: 7 }, status },
+  ]) as readonly { readonly lineId: string }[];
+  const findAliveLineSummary = vi.fn(async (_companyId: string, _orderId: string, lineId: string) =>
+    options?.target === null ? null : (lineas.find((linea) => linea.lineId === lineId) ?? null),
+  );
   const finishPackingAliveById = vi.fn(async () => options?.resultado ?? { kind: 'ok' as const, finishedGoods: [] });
 
   const estado: Estado = { dentroDeRun: false, appendDentroDeRun: null, confirmada: null };
@@ -124,7 +135,7 @@ function montar(options?: {
   const findPackingStepsById = vi.fn(async () => (options?.pasos === undefined ? [{ blocks: [] }] : options.pasos));
   const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const deps = {
-    orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById: globalFinishPackingAliveById },
+    orders: { findAliveById, findAliveLineSummary, finishPackingAliveById: globalFinishPackingAliveById },
     log: { append: depsAppend, findLastStepPosition: vi.fn(async () => null) },
     transaction: { run },
     now: () => AHORA,
@@ -135,7 +146,7 @@ function montar(options?: {
   return {
     deps,
     findAliveById,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     finishPackingAliveById,
     globalFinishPackingAliveById,
     run,
@@ -150,46 +161,46 @@ function montar(options?: {
 
 describe('finishPacking — autorizacion (R13)', () => {
   it('actor ausente rechaza sin tocar ningun puerto', async () => {
-    const { deps, findAliveById, finishPackingAliveById } = montar();
+    const { deps, findAliveLineSummary, finishPackingAliveById } = montar();
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(null, ENTRADA)).rejects.toBeInstanceOf(AsignacionesError);
-    expect(findAliveById).not.toHaveBeenCalled();
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
     expect(finishPackingAliveById).not.toHaveBeenCalled();
   });
 
   it('actor sin `empaque.modificar` rechaza sin tocar ningun puerto', async () => {
-    const { deps, findAliveById } = montar();
+    const { deps, findAliveLineSummary } = montar();
     const finishPacking = createFinishPacking(deps);
     const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: [] };
 
     await expect(finishPacking(actor, ENTRADA)).rejects.toThrow(UnauthorizedError);
-    expect(findAliveById).not.toHaveBeenCalled();
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 
   it('la autorizacion corre ANTES que zod', async () => {
-    const { deps, findAliveById } = montar();
+    const { deps, findAliveLineSummary } = montar();
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { ...ENTRADA, orderId: 'x' })).rejects.toThrow(
       UnauthorizedError,
     );
-    expect(findAliveById).not.toHaveBeenCalled();
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });
 
 describe('finishPacking — R21, R26: exito devuelve el numero leido antes de escribir', () => {
   it('lee el numero antes de llamar a `finishPackingAliveById` y lo devuelve', async () => {
-    const { deps, listAliveSummariesByIds, finishPackingAliveById } = montar();
+    const { deps, findAliveLineSummary, finishPackingAliveById } = montar();
     const finishPacking = createFinishPacking(deps);
 
     const result = await finishPacking(ACTOR, ENTRADA);
 
     expect(result).toEqual({ numberText: expect.any(String) });
-    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['EN_EMPAQUE'], 1, 1);
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date), LINEAS);
 
-    const ordenDeLlamadas = listAliveSummariesByIds.mock.invocationCallOrder[0]!;
+    const ordenDeLlamadas = findAliveLineSummary.mock.invocationCallOrder[0]!;
     const ordenDeEscritura = finishPackingAliveById.mock.invocationCallOrder[0]!;
     expect(ordenDeLlamadas).toBeLessThan(ordenDeEscritura);
   });
@@ -269,11 +280,10 @@ describe('finishPacking — R17-R21: da de alta el lote por linea del reparto', 
 
 describe('finishPacking — R24: no existe, esta de baja o es de otra empresa', () => {
   it('sin pedido vivo rechaza con `order_not_found` sin leer el numero ni escribir', async () => {
-    const { deps, listAliveSummariesByIds, finishPackingAliveById } = montar({ target: null });
+    const { deps, finishPackingAliveById } = montar({ target: null });
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
     expect(finishPackingAliveById).not.toHaveBeenCalled();
   });
 
@@ -297,11 +307,11 @@ describe('finishPacking — R25: ningun puerto de inventario', () => {
 
 describe('finishPacking — entrada', () => {
   it('un `orderId` que no es uuid rechaza con `invalid_input` sin tocar ningun puerto', async () => {
-    const { deps, findAliveById } = montar();
+    const { deps, findAliveLineSummary } = montar();
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, { ...ENTRADA, orderId: 'no-es-uuid' })).rejects.toThrow(ValidationError);
-    expect(findAliveById).not.toHaveBeenCalled();
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });
 
@@ -319,11 +329,11 @@ describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de env
     ['packingSteps', []],
     ['walkthrough', { completed: true }],
   ])('R13, R24: la entrada sigue siendo exactamente `{ orderId, lines }`: `%s` de mas rechaza sin tocar ningun puerto', async (clave, valor) => {
-    const { deps, findAliveById, finishPackingAliveById } = montar();
+    const { deps, findAliveLineSummary, finishPackingAliveById } = montar();
     const finishPacking = createFinishPacking(deps);
 
     await expect(finishPacking(ACTOR, { ...ENTRADA, [clave]: valor })).rejects.toThrow(ValidationError);
-    expect(findAliveById).not.toHaveBeenCalled();
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
     expect(finishPackingAliveById).not.toHaveBeenCalled();
   });
 
@@ -349,8 +359,7 @@ describe('finishPacking — R42: autorizacion antes de abrir la transaccion', ()
     await expect(finishPacking(null, ENTRADA)).rejects.toBeInstanceOf(AsignacionesError);
 
     expect(m.run).not.toHaveBeenCalled();
-    expect(m.findAliveById).not.toHaveBeenCalled();
-    expect(m.listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(m.findAliveLineSummary).not.toHaveBeenCalled();
     expect(m.finishPackingAliveById).not.toHaveBeenCalled();
     expect(m.globalFinishPackingAliveById).not.toHaveBeenCalled();
     expect(m.append).not.toHaveBeenCalled();
@@ -369,7 +378,7 @@ describe('finishPacking — R42: autorizacion antes de abrir la transaccion', ()
       finishPacking({ id: ANA, companyId: EMPRESA, permissions: [...permisos] }, ENTRADA),
     ).rejects.toThrow(UnauthorizedError);
     expect(m.run).not.toHaveBeenCalled();
-    expect(m.findAliveById).not.toHaveBeenCalled();
+    expect(m.findAliveLineSummary).not.toHaveBeenCalled();
     expect(m.finishPackingAliveById).not.toHaveBeenCalled();
     expect(m.append).not.toHaveBeenCalled();
   });
@@ -392,7 +401,7 @@ describe('finishPacking — R42: empresa del actor y sin comprobacion de respons
     expect(errorInexistente).toBeInstanceOf(OrderNotFoundError);
     expect((errorOtra as OrderNotFoundError).code).toBe((errorInexistente as OrderNotFoundError).code);
     expect((errorOtra as Error).message).toBe((errorInexistente as Error).message);
-    expect(otra.findAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_EMPRESA);
+    expect(otra.findAliveLineSummary).toHaveBeenCalledWith(OTRA_EMPRESA, PEDIDO, LINEA);
     expect(otra.run).not.toHaveBeenCalled();
     expect(otra.filas).toEqual([]);
   });
@@ -466,19 +475,15 @@ describe('finishPacking — R41, R5bis, R8, R24: el exito es el objeto y deja un
   it('R41: el numero se lee antes y fuera de `run`', async () => {
     const m = montar();
     const dentroAlLeer: boolean[] = [];
-    m.findAliveById.mockImplementation(async () => {
+    m.findAliveLineSummary.mockImplementation(async () => {
       dentroAlLeer.push(m.estado.dentroDeRun);
-      return { id: PEDIDO, status: 'EN_EMPAQUE' };
-    });
-    m.listAliveSummariesByIds.mockImplementation(async () => {
-      dentroAlLeer.push(m.estado.dentroDeRun);
-      return { items: [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 } }], total: 1, page: 1, pageSize: 1, totalPages: 1 };
+      return { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, status: 'EN_EMPAQUE' };
     });
 
     await createFinishPacking(m.deps)(ACTOR, ENTRADA);
 
-    expect(dentroAlLeer).toEqual([false, false]);
-    expect(m.listAliveSummariesByIds.mock.invocationCallOrder[0]!).toBeLessThan(m.run.mock.invocationCallOrder[0]!);
+    expect(dentroAlLeer).toEqual([false]);
+    expect(m.findAliveLineSummary.mock.invocationCallOrder[0]!).toBeLessThan(m.run.mock.invocationCallOrder[0]!);
   });
 });
 
@@ -581,11 +586,10 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
     const m = montar();
     const sinPermiso: Actor = { id: ANA, companyId: EMPRESA, permissions: [] };
 
-    await expect(createFinishPacking(m.deps)(sinPermiso, { orderId: PEDIDO, lines: 'roto' })).rejects.toThrow(
+    await expect(createFinishPacking(m.deps)(sinPermiso, { orderId: PEDIDO, lineId: LINEA, counts: 'roto' })).rejects.toThrow(
       UnauthorizedError,
     );
-    expect(m.findAliveById).not.toHaveBeenCalled();
-    expect(m.listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(m.findAliveLineSummary).not.toHaveBeenCalled();
     expect(m.run).not.toHaveBeenCalled();
   });
 
@@ -599,9 +603,9 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
 
   it('R13: pasa el conteo validado a `pedidos` y el texto de «Otro» recortado', async () => {
     const m = montar();
-    const lines = [{ lineId: uuid('4'), packedPackages: 2, reason: 'otro', reasonOther: '  Se cayo  ' }];
+    const counts = [{ presentationLineId: uuid('4'), packedPackages: 2, reason: 'otro', reasonOther: '  Se cayo  ' }];
 
-    await createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO, lines });
+    await createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA, counts });
 
     expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, [
       { lineId: uuid('4'), packedPackages: 2, reason: 'otro', reasonOther: 'Se cayo' },
@@ -609,25 +613,28 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
   });
 
   const linea = LINEAS[0]!;
+  const conteo = CONTEOS[0]!;
   it.each([
-    ['sin `lines`', { orderId: PEDIDO }],
-    ['`lines` undefined (JSON roto en el borde)', { orderId: PEDIDO, lines: undefined }],
-    ['`lines` vacio', { orderId: PEDIDO, lines: [] }],
-    ['`lines` que no es lista', { orderId: PEDIDO, lines: 'x' }],
-    ['`lineId` que no es uuid', { orderId: PEDIDO, lines: [{ ...linea, lineId: 'x' }] }],
-    ['envases negativos', { orderId: PEDIDO, lines: [{ ...linea, packedPackages: -1 }] }],
-    ['envases decimales', { orderId: PEDIDO, lines: [{ ...linea, packedPackages: 1.5 }] }],
-    ['envases como texto', { orderId: PEDIDO, lines: [{ ...linea, packedPackages: '3' }] }],
-    ['motivo fuera del catalogo', { orderId: PEDIDO, lines: [{ ...linea, reason: 'robo' }] }],
-    ['«Otro» en blanco', { orderId: PEDIDO, lines: [{ ...linea, reason: 'otro', reasonOther: '   ' }] }],
-    ['«Otro» de 201 caracteres', { orderId: PEDIDO, lines: [{ ...linea, reason: 'otro', reasonOther: 'a'.repeat(201) }] }],
-    ['un campo de mas en la linea', { orderId: PEDIDO, lines: [{ ...linea, packages: 3 }] }],
-    ['una linea sin `reasonOther`', { orderId: PEDIDO, lines: [{ lineId: linea.lineId, packedPackages: 3, reason: null }] }],
+    ['sin `counts`', { orderId: PEDIDO, lineId: LINEA }],
+    ['con `lines` en lugar de `counts`', { orderId: PEDIDO, lineId: LINEA, lines: LINEAS }],
+    ['un conteo con `lineId` en lugar de `presentationLineId`', { orderId: PEDIDO, lineId: LINEA, counts: [linea] }],
+    ['`lines` undefined (JSON roto en el borde)', { orderId: PEDIDO, lineId: LINEA, counts: undefined }],
+    ['`lines` vacio', { orderId: PEDIDO, lineId: LINEA, counts: [] }],
+    ['`lines` que no es lista', { orderId: PEDIDO, lineId: LINEA, counts: 'x' }],
+    ['`presentationLineId` que no es uuid', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, presentationLineId: 'x' }] }],
+    ['envases negativos', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, packedPackages: -1 }] }],
+    ['envases decimales', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, packedPackages: 1.5 }] }],
+    ['envases como texto', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, packedPackages: '3' }] }],
+    ['motivo fuera del catalogo', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, reason: 'robo' }] }],
+    ['«Otro» en blanco', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, reason: 'otro', reasonOther: '   ' }] }],
+    ['«Otro» de 201 caracteres', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, reason: 'otro', reasonOther: 'a'.repeat(201) }] }],
+    ['un campo de mas en la linea', { orderId: PEDIDO, lineId: LINEA, counts: [{ ...conteo, packages: 3 }] }],
+    ['un conteo sin `reasonOther`', { orderId: PEDIDO, lineId: LINEA, counts: [{ presentationLineId: conteo.presentationLineId, packedPackages: 3, reason: null }] }],
   ])('R13: %s rechaza con `invalid_input` sin tocar ningun puerto', async (_caso, entrada) => {
     const m = montar();
 
     await expect(createFinishPacking(m.deps)(ACTOR, entrada)).rejects.toThrow(ValidationError);
-    expect(m.findAliveById).not.toHaveBeenCalled();
+    expect(m.findAliveLineSummary).not.toHaveBeenCalled();
     expect(m.run).not.toHaveBeenCalled();
   });
 
@@ -637,7 +644,8 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
 
     await createFinishPacking(m.deps)(ACTOR, {
       orderId: PEDIDO,
-      lines: [{ ...linea, reason: 'otro', reasonOther: ` ${texto} ` }],
+      lineId: LINEA,
+      counts: [{ ...conteo, reason: 'otro', reasonOther: ` ${texto} ` }],
     });
 
     expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, [
@@ -663,14 +671,15 @@ describe('QC-281 — finishPacking con el conteo real de envases', () => {
 
 describe('finishPacking con excedente: mismo permiso y mismo empacador que hoy', () => {
   // 12 envases de una linea planificada en 5: el excedente no cambia quien puede terminar.
-  const CON_EXCEDENTE = { orderId: PEDIDO, lines: [{ lineId: uuid('4'), packedPackages: 12, reason: 'conteo_fisico', reasonOther: null }] };
+  const EXCEDENTE = [{ lineId: uuid('4'), packedPackages: 12, reason: 'conteo_fisico', reasonOther: null }];
+  const CON_EXCEDENTE = { orderId: PEDIDO, lineId: LINEA, counts: EXCEDENTE.map(aConteo) };
 
   it('R27: el actor con `empaque.modificar` que empaca el pedido termina y el conteo llega a `pedidos` tal cual', async () => {
     const m = montar();
 
     await expect(createFinishPacking(m.deps)(ACTOR, CON_EXCEDENTE)).resolves.toMatchObject({ numberText: '2026-0000007' });
 
-    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, CON_EXCEDENTE.lines);
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, EXCEDENTE);
     expect(m.estado.confirmada).toBe(true);
   });
 
@@ -679,7 +688,7 @@ describe('finishPacking con excedente: mismo permiso y mismo empacador que hoy',
     const sinPermiso: Actor = { id: ANA, companyId: EMPRESA, permissions: [] };
 
     await expect(createFinishPacking(m.deps)(sinPermiso, CON_EXCEDENTE)).rejects.toThrow(UnauthorizedError);
-    expect(m.findAliveById).not.toHaveBeenCalled();
+    expect(m.findAliveLineSummary).not.toHaveBeenCalled();
     expect(m.run).not.toHaveBeenCalled();
   });
 
@@ -695,5 +704,73 @@ describe('finishPacking con excedente: mismo permiso y mismo empacador que hoy',
 
     await expect(createFinishPacking(m.deps)(ACTOR, CON_EXCEDENTE)).rejects.toBeInstanceOf(OrderNotPackableError);
     expect(m.filas).toEqual([]);
+  });
+});
+
+describe('finishPacking — la receta nombrada y sus conteos (R10, R11, R12, R14, R15)', () => {
+  it('R11, R12: con dos recetas EN_EMPAQUE del mismo pedido, termina y anota solo la nombrada', async () => {
+    const m = montar();
+
+    await createFinishPacking(m.deps)(ACTOR, { ...ENTRADA, lineId: OTRA_LINEA });
+
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_LINEA, EMPRESA, ANA, AHORA, LINEAS);
+    expect(m.filas.map((fila) => fila.orderLineId)).toEqual([OTRA_LINEA]);
+  });
+
+  it('R10: la evidencia se exige por el estado y la persona de la receta, y se lee de esa receta', async () => {
+    const RECETA = uuid('a');
+    const m = montar({
+      summaryItems: [{ id: PEDIDO, lineId: OTRA_LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, status: 'EN_EMPAQUE', packedBy: ANA }],
+      pasos: [{ requiresEvidence: true }],
+      fotos: [],
+    });
+
+    await expect(createFinishPacking(m.deps)(ACTOR, { ...ENTRADA, lineId: OTRA_LINEA })).rejects.toMatchObject({
+      code: 'evidence_required',
+    });
+    expect(m.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, OTRA_LINEA, 'packing');
+    expect(m.findAliveById).not.toHaveBeenCalled();
+  });
+
+  it('cada `presentationLineId` llega a `pedidos` como el `lineId` de su conteo, en el mismo orden', async () => {
+    const m = montar();
+    const counts = [
+      { presentationLineId: uuid('5'), packedPackages: 1, reason: 'rotura', reasonOther: null },
+      { presentationLineId: uuid('4'), packedPackages: 4, reason: null, reasonOther: null },
+    ];
+
+    await createFinishPacking(m.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA, counts });
+
+    expect(m.finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA, [
+      { lineId: uuid('5'), packedPackages: 1, reason: 'rotura', reasonOther: null },
+      { lineId: uuid('4'), packedPackages: 4, reason: null, reasonOther: null },
+    ]);
+  });
+
+  it('R14: sin lineId, o con uno que no es uuid, da invalid_input sin leer ni abrir la transaccion', async () => {
+    const sinLinea = Object.fromEntries(Object.entries(ENTRADA).filter(([clave]) => clave !== 'lineId'));
+    for (const entrada of [sinLinea, { ...ENTRADA, lineId: 'linea-unica' }]) {
+      const m = montar();
+      await expect(createFinishPacking(m.deps)(ACTOR, entrada)).rejects.toThrow(ValidationError);
+      expect(m.findAliveLineSummary).not.toHaveBeenCalled();
+      expect(m.run).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin abrir la transaccion', async () => {
+    const m = montar();
+    await expect(createFinishPacking(m.deps)(ACTOR, { ...ENTRADA, lineId: uuid('6') })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(m.run).not.toHaveBeenCalled();
+    expect(m.filas).toEqual([]);
+  });
+
+  it('R15: sin empaque.modificar no lee la receta', async () => {
+    const m = montar();
+    await expect(
+      createFinishPacking(m.deps)({ ...ACTOR, permissions: ['asignaciones.ejecutar'] }, ENTRADA),
+    ).rejects.toThrow(UnauthorizedError);
+    expect(m.findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

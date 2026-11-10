@@ -4,15 +4,14 @@ import { z } from 'zod';
 import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionTransaction } from '../ports/execution-transaction';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
 import { cancelOrderSchema, formatOrderNumber, type OrderCatalog } from '@/lib/modules/pedidos';
 
-const cancelAssignedOrderSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const cancelAssignedOrderSchema = orderLineInputSchema.extend({
   stepPosition: z.number().int().min(1).nullable(),
   reason: cancelOrderSchema.shape.reason,
 });
@@ -29,16 +28,16 @@ export type CancelAssignedOrderResult = {
 };
 
 /**
- * Cancela el pedido por el camino unico de `pedidos` -motivo, liberacion de lo apartado- y anota
- * la cancelacion con el mismo motivo, todo en una transaccion: o quedan las dos cosas o ninguna.
+ * Cancela solo la receta nombrada por el camino de `pedidos` -motivo, liberacion de su material,
+ * estado del pedido derivado- y anota la cancelacion en el registro de esa receta con el mismo
+ * motivo, todo en una transaccion: o quedan las dos cosas o ninguna.
  *
- * Que el estado sea cancelable lo decide `pedidos` bajo el candado de la fila, no esta funcion:
- * por eso la escritura no se reintenta por carrera, y `POR_EMPACAR`, `EN_EMPAQUE`, `ENTREGADO` y
- * `CANCELADO` salen todos por `not_cancellable`.
+ * Que el estado de la linea sea cancelable lo decide `pedidos` bajo el candado de la fila, no esta
+ * funcion: por eso la escritura no se reintenta por carrera, y cualquier estado no cancelable sale
+ * por `not_cancellable`.
  *
  * El numero visible se lee antes de escribir, para que la lista pueda confirmar que pedido se
- * cancelo. Si el pedido cambia de estado mientras se lee, se relee una vez y la cancelacion se
- * pide igual: el estado nuevo lo juzga `pedidos`, no esta funcion.
+ * cancelo.
  */
 export function createCancelAssignedOrder(
   deps: CancelAssignedOrderDeps,
@@ -51,35 +50,18 @@ export function createCancelAssignedOrder(
 
     const parsed = cancelAssignedOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, stepPosition, reason } = parsed.data;
+    const { orderId, lineId, stepPosition, reason } = parsed.data;
 
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
     if (!ids.includes(orderId)) throw new OrderNotFoundError();
 
-    const order = await deps.orders.findAliveById(orderId, actor.companyId);
-    if (order === null) throw new OrderNotFoundError();
-
-    const readSummary = async (status: typeof order.status) =>
-      onlyLineOf(await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], [status], 1, 1));
-
-    let summary = await readSummary(order.status);
-    if (summary === undefined) {
-      // El resumen se filtra por el estado recien leido: si otro mueve el pedido entre las dos
-      // lecturas sale vacio aunque el pedido exista. Se relee una vez y la cancelacion decide.
-      const reread = await deps.orders.findAliveById(orderId, actor.companyId);
-      if (reread === null || reread.status === order.status) throw new OrderNotFoundError();
-      const stillAssigned = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
-      if (!stillAssigned.includes(orderId)) throw new OrderNotFoundError();
-      summary = await readSummary(reread.status);
-      if (summary === undefined) throw new OrderNotFoundError();
-    }
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
     const numberText = formatOrderNumber(summary.number);
-    const lineId = summary.lineId;
 
     const now = deps.now?.() ?? new Date();
     try {
       await deps.transaction.run(async ({ orders, log }) => {
-        const outcome = await orders.cancelAliveById(orderId, actor.companyId, reason, actor.id, now);
+        const outcome = await orders.cancelLineAliveById(orderId, lineId, actor.companyId, reason, actor.id, now);
         if (!isExecutionSuccess(outcome)) throw new ExecutionAbortedError(outcome);
         await log.append({
           action: 'cancel',

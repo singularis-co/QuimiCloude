@@ -54,6 +54,7 @@ function logStorageWarnings(warnings: readonly EvidenceStorageWarning[]): void {
 
 export type RequestEvidenceUploadInput = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly phase: EvidencePhase;
   readonly stepPosition: number;
   readonly replacesEvidenceId?: string;
@@ -79,6 +80,7 @@ export async function requestEvidenceUploadAction(
 
 export type RegisterEvidenceInput = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly phase: EvidencePhase;
   readonly stepPosition: number;
   readonly path: string;
@@ -106,6 +108,7 @@ export async function registerEvidenceAction(
 
 export type RemoveEvidenceInput = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly phase: EvidencePhase;
   readonly evidenceId: string;
 };

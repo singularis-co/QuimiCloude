@@ -22,6 +22,7 @@ import {
   OPERADOR,
   OTRA_EMPRESA,
   LINEA,
+  OTRA_LINEA,
   PEDIDO,
   PNG_VALIDO,
   acceso,
@@ -48,8 +49,8 @@ function montar(options?: Opciones) {
 }
 
 const RUTA = `${EMPRESA}/${PEDIDO}/${uuid('c')}`;
-const FABRICACION = { orderId: PEDIDO, phase: 'manufacturing', stepPosition: 2, path: RUTA } as const;
-const ENVASADO = { orderId: PEDIDO, phase: 'packing', stepPosition: 1, path: RUTA } as const;
+const FABRICACION = { orderId: PEDIDO, lineId: LINEA, phase: 'manufacturing', stepPosition: 2, path: RUTA } as const;
+const ENVASADO = { orderId: PEDIDO, lineId: LINEA, phase: 'packing', stepPosition: 1, path: RUTA } as const;
 const EN_EMPAQUE_DE_ANA = { status: 'EN_EMPAQUE', packedBy: ANA } as const;
 
 function sinEscrituras(d: ReturnType<typeof montar>): void {
@@ -316,5 +317,28 @@ describe('registerEvidence — tope, sustitucion y lectura (R29, R19, R21, R33)'
     const d = montar(EN_EMPAQUE_DE_ANA);
     await d.register(EMPACADOR, ENVASADO);
     expect(d.repo.insert).toHaveBeenCalledWith(expect.objectContaining({ phase: 'packing', stepPosition: 1 }));
+  });
+});
+
+describe('registerEvidence — la receta nombrada (R11, R12, R14)', () => {
+  it('R11, R12: con dos recetas del pedido EN_CURSO, la foto se guarda en la nombrada', async () => {
+    const d = montar();
+    await d.register(OPERADOR, { ...FABRICACION, lineId: OTRA_LINEA });
+    expect(d.repo.insert).toHaveBeenCalledWith(expect.objectContaining({ orderId: PEDIDO, orderLineId: OTRA_LINEA }));
+  });
+
+  it('R14: sin lineId, o con uno que no es uuid, da invalid_input sin tocar ningun puerto', async () => {
+    const sinLinea = Object.fromEntries(Object.entries(FABRICACION).filter(([clave]) => clave !== 'lineId'));
+    for (const entrada of [sinLinea, { ...FABRICACION, lineId: 'no-uuid' }]) {
+      const d = montar();
+      await expect(d.register(OPERADOR, entrada)).rejects.toBeInstanceOf(ValidationError);
+      for (const puerto of d.todos) expect(puerto).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin escribir', async () => {
+    const d = montar();
+    await expect(d.register(OPERADOR, { ...FABRICACION, lineId: uuid('d') })).rejects.toBeInstanceOf(OrderNotFoundError);
+    sinEscrituras(d);
   });
 });

@@ -23,7 +23,10 @@ export type PackingOrderViewDeps = ComposeOrderRowsDeps;
 /** Las piezas que la pantalla de «Por empacar» necesita de cada fila. `packedByName` y `packedById`
  *  viajan vacios (`null`) en `POR_EMPACAR`, porque todavia no hay quien empaca. */
 export type PackingOrderRow = {
+  /** El pedido. */
   readonly id: string;
+  /** La receta del pedido que pinta la fila. */
+  readonly lineId: string;
   readonly numberText: string;
   readonly recipeName: string | null;
   /** Cadena decimal, nunca `number`. */
@@ -104,6 +107,7 @@ export async function composePackingOrderRows(
     const rowComposed = composed.get(order.lineId);
     return {
       id: order.id,
+      lineId: order.lineId,
       numberText: formatOrderNumber(order.number),
       recipeName: rowComposed?.recipeName ?? null,
       quantity: order.quantity,

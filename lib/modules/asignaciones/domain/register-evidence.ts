@@ -12,6 +12,7 @@ import {
 } from './errors';
 import { describeWarning, removeEvidenceSafely, signStepPhotos, type EvidenceStorageWarning } from './evidence-photos';
 import { requireEvidenceAccess, resolveEvidenceTarget, type EvidenceTargetDeps } from './evidence-target';
+import { orderLineInputSchema } from './order-line-target';
 import { EVIDENCE_PHASES, isEvidencePathOf, stepRequiresEvidence, type StepEvidencePhotoView } from './step-evidence';
 
 import type { Actor } from './actor';
@@ -20,8 +21,7 @@ import type { NewStepEvidence, StepEvidenceRepository } from '../ports/step-evid
 
 import { validateRecipeImage } from '@/lib/modules/recetas';
 
-const registerEvidenceSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const registerEvidenceSchema = orderLineInputSchema.extend({
   phase: z.enum(EVIDENCE_PHASES),
   stepPosition: z.number().int().min(1),
   path: z.string().min(1).max(512),
@@ -56,9 +56,9 @@ export function createRegisterEvidence(
 
     const parsed = registerEvidenceSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, phase, stepPosition, path, replacesEvidenceId } = parsed.data;
+    const { orderId, lineId, phase, stepPosition, path, replacesEvidenceId } = parsed.data;
 
-    const target = await resolveEvidenceTarget(deps, actor, orderId, phase);
+    const target = await resolveEvidenceTarget(deps, actor, orderId, lineId, phase);
     // La formula pudo cambiar entre pedir el enlace y registrar.
     if (!stepRequiresEvidence(target.steps, stepPosition)) {
       throw new ValidationError(`el paso ${String(stepPosition)} no pide evidencia`);

@@ -331,6 +331,7 @@ describe('QC-145 — listCompanyOrders: R25 la fila y sus responsables', () => {
     expect(Object.keys(pagina.items[0] ?? {}).sort()).toEqual(
       [
         'id',
+        'lineId',
         'numberText',
         'recipeName',
         'quantity',

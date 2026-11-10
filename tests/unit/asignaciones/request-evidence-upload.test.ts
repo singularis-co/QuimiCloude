@@ -48,8 +48,8 @@ function montar(options?: Opciones) {
   return { request: createRequestEvidenceUpload(deps), repo, storage, todos };
 }
 
-const FABRICACION = { orderId: PEDIDO, phase: 'manufacturing', stepPosition: 2 } as const;
-const ENVASADO = { orderId: PEDIDO, phase: 'packing', stepPosition: 1 } as const;
+const FABRICACION = { orderId: PEDIDO, lineId: LINEA, phase: 'manufacturing', stepPosition: 2 } as const;
+const ENVASADO = { orderId: PEDIDO, lineId: LINEA, phase: 'packing', stepPosition: 1 } as const;
 const EN_EMPAQUE_DE_ANA = { status: 'EN_EMPAQUE', packedBy: ANA } as const;
 
 describe('requestEvidenceUpload — autorizacion (R26, R27)', () => {

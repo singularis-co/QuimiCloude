@@ -599,12 +599,16 @@ function dentroDeLaTransaccion(packing: Record<string, unknown>): { log: unknown
   };
 }
 
+/** La receta del pedido que nombran las acciones de empaque. */
+const LINEA = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
 describe('QC-168 — `startPacking` (R13, R18-R24)', () => {
   function montarDeps(): { deps: StartPackingDeps; startPackingAliveById: ReturnType<typeof vi.fn> } {
     const startPackingAliveById = vi.fn(async () => 'ok' as const);
-    const listAliveSummariesByIds = vi.fn(async () => ({ items: [{ id: PEDIDO, lineId: 'linea-unica' }], total: 1 }));
+    const listAliveSummariesByIds = vi.fn(async () => ({ items: [{ id: PEDIDO, lineId: LINEA }], total: 1 }));
+    const findAliveLineSummary = vi.fn(async () => ({ id: PEDIDO, lineId: LINEA, status: 'POR_EMPACAR' }));
     const deps = {
-      orders: { startPackingAliveById, listAliveSummariesByIds },
+      orders: { startPackingAliveById, listAliveSummariesByIds, findAliveLineSummary },
       ...dentroDeLaTransaccion({ startPackingAliveById }),
     } as unknown as StartPackingDeps;
     return { deps, startPackingAliveById };
@@ -628,7 +632,7 @@ describe('QC-168 — `startPacking` (R13, R18-R24)', () => {
     const { deps, startPackingAliveById } = montarDeps();
     const startPacking = createStartPacking(deps);
 
-    await startPacking(conPermisos(PERMISO_EMPAQUE), { orderId: PEDIDO });
+    await startPacking(conPermisos(PERMISO_EMPAQUE), { orderId: PEDIDO, lineId: LINEA });
 
     expect(startPackingAliveById).toHaveBeenCalledTimes(1);
   });
@@ -650,8 +654,14 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
       totalPages: 1,
     }));
     const finishPackingAliveById = vi.fn(async () => ({ kind: 'ok' as const, finishedGoods: [] }));
+    const findAliveLineSummary = vi.fn(async () => ({
+      id: PEDIDO,
+      lineId: LINEA,
+      number: { year: 2026, sequence: 1 },
+      status: 'EN_EMPAQUE',
+    }));
     const deps = {
-      orders: { findAliveById, listAliveSummariesByIds, finishPackingAliveById },
+      orders: { findAliveById, listAliveSummariesByIds, findAliveLineSummary, finishPackingAliveById },
       ...dentroDeLaTransaccion({ finishPackingAliveById }),
     } as unknown as FinishPackingDeps;
     return { deps, findAliveById, listAliveSummariesByIds, finishPackingAliveById };
@@ -679,7 +689,8 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
 
     await finishPacking(conPermisos(PERMISO_EMPAQUE), {
       orderId: PEDIDO,
-      lines: [{ lineId: PEDIDO, packedPackages: 1, reason: null, reasonOther: null }],
+      lineId: LINEA,
+      counts: [{ presentationLineId: PEDIDO, packedPackages: 1, reason: null, reasonOther: null }],
     });
 
     expect(finishPackingAliveById).toHaveBeenCalledTimes(1);

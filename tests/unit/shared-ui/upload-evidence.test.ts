@@ -24,7 +24,12 @@ type AssertAssignable<T extends U, U> = T;
 export type RequestFits = AssertAssignable<typeof requestEvidenceUploadAction, RequestEvidenceUpload>;
 export type RegisterFits = AssertAssignable<typeof registerEvidenceAction, RegisterEvidence>;
 
-const TARGET: EvidenceUploadTarget = { orderId: 'order-1', phase: 'manufacturing', stepPosition: 2 };
+const TARGET: EvidenceUploadTarget = {
+  orderId: 'order-1',
+  lineId: 'line-1',
+  phase: 'manufacturing',
+  stepPosition: 2,
+};
 const LINK = { path: 'company-1/order-1/abc', uploadUrl: 'https://storage.test/upload/abc', token: 't' };
 const PHOTOS = [{ id: 'ev-1', slot: 1, url: 'https://storage.test/read/abc' }];
 

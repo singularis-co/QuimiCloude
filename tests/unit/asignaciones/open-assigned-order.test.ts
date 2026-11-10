@@ -30,7 +30,7 @@ const ACTOR: Actor = {
   companyId: '33333333-3333-4333-8333-333333333333',
   permissions: ['asignaciones.ejecutar'],
 };
-const INPUT = { orderId: '77777777-7777-4777-8777-777777777777' };
+const INPUT = { orderId: '77777777-7777-4777-8777-777777777777', lineId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' };
 
 const VISTA: AssignedOrderExecutionView = {
   orderId: INPUT.orderId,

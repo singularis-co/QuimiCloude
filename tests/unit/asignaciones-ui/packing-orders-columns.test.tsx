@@ -30,6 +30,7 @@ afterEach(() => {
 
 const POR_EMPACAR_ORDER: PackingOrderRow = {
   id: 'order-1',
+  lineId: 'linea-order-1',
   numberText: '2026-0000021',
   recipeName: 'Jarabe simple',
   quantity: '40',
@@ -46,6 +47,7 @@ const POR_EMPACAR_ORDER: PackingOrderRow = {
 const EN_EMPAQUE_ORDER: PackingOrderRow = {
   ...POR_EMPACAR_ORDER,
   id: 'order-2',
+  lineId: 'linea-order-2',
   status: 'EN_EMPAQUE',
   packedByName: 'Ana López García',
   packedById: 'user-2',
@@ -208,9 +210,9 @@ describe('Prioridad - el mismo `PriorityMark` que «Todos» y «Mis asignados»'
 describe('Orden - la tabla respeta el orden que manda el servidor', () => {
   it('pinta las filas tal cual llegan: prioridad alta primero y, a igual prioridad, el más antiguo', () => {
     const rows: PackingOrderRow[] = [
-      { ...POR_EMPACAR_ORDER, id: 'alta', numberText: '2026-0000003', priority: 'ALTA', createdAt: new Date('2026-03-01T00:00:00.000Z') },
-      { ...POR_EMPACAR_ORDER, id: 'media-vieja', numberText: '2026-0000001', priority: 'MEDIA', createdAt: new Date('2026-01-01T00:00:00.000Z') },
-      { ...POR_EMPACAR_ORDER, id: 'media-nueva', numberText: '2026-0000002', priority: 'MEDIA', createdAt: new Date('2026-02-01T00:00:00.000Z') },
+      { ...POR_EMPACAR_ORDER, id: 'alta', lineId: 'linea-alta', numberText: '2026-0000003', priority: 'ALTA', createdAt: new Date('2026-03-01T00:00:00.000Z') },
+      { ...POR_EMPACAR_ORDER, id: 'media-vieja', lineId: 'linea-media-vieja', numberText: '2026-0000001', priority: 'MEDIA', createdAt: new Date('2026-01-01T00:00:00.000Z') },
+      { ...POR_EMPACAR_ORDER, id: 'media-nueva', lineId: 'linea-media-nueva', numberText: '2026-0000002', priority: 'MEDIA', createdAt: new Date('2026-02-01T00:00:00.000Z') },
     ];
     const params = { page: 1, pageSize: 10, sort: null, filters: {}, search: '' };
 
@@ -219,8 +221,8 @@ describe('Orden - la tabla respeta el orden que manda el servidor', () => {
     const renderedIds = screen
       .getAllByTestId(/^data-table-row-/)
       .map((row) => row.getAttribute('data-testid')?.replace('data-table-row-', ''));
-    expect(renderedIds).toEqual(['alta', 'media-vieja', 'media-nueva']);
-    expect(within(screen.getByTestId('data-table-row-alta')).getByTestId('packing-order-priority')).toHaveAttribute(
+    expect(renderedIds).toEqual(['linea-alta', 'linea-media-vieja', 'linea-media-nueva']);
+    expect(within(screen.getByTestId('data-table-row-linea-alta')).getByTestId('packing-order-priority')).toHaveAttribute(
       'data-priority',
       'ALTA',
     );

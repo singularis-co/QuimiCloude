@@ -16,6 +16,7 @@ export const FINISH_CONDITIONING_FORM_TESTID = 'finish-conditioning-form';
 export const FINISH_CONDITIONING_CANCEL_TESTID = 'finish-conditioning-cancel';
 export const FINISH_CONDITIONING_ERROR_TESTID = 'finish-conditioning-error';
 export const FINISH_CONDITIONING_ORDER_ID_FIELD = 'orderId';
+export const FINISH_CONDITIONING_LINE_ID_FIELD = 'lineId';
 
 export const FINISH_CONDITIONING_TEXTS = {
   title: 'Terminar el acondicionamiento',
@@ -33,6 +34,7 @@ export type FinishConditioningDialogProps = {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly orderId: string;
+  readonly lineId: string;
   readonly orderNumber: string;
 };
 
@@ -40,6 +42,7 @@ export function FinishConditioningDialog({
   open,
   onOpenChange,
   orderId,
+  lineId,
   orderNumber,
 }: FinishConditioningDialogProps) {
   return (
@@ -49,18 +52,19 @@ export function FinishConditioningDialog({
       contentClassName="max-h-[100dvh] overflow-y-auto"
       testId={FINISH_CONDITIONING_DIALOG_TESTID}
     >
-      <FinishConditioningForm orderId={orderId} orderNumber={orderNumber} />
+      <FinishConditioningForm orderId={orderId} lineId={lineId} orderNumber={orderNumber} />
     </ConfirmDialogFrame>
   );
 }
 
 type FinishConditioningFormProps = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly orderNumber: string;
 };
 
 // Con éxito la acción redirige fuera del detalle; aquí solo se pinta el rechazo.
-function FinishConditioningForm({ orderId, orderNumber }: FinishConditioningFormProps) {
+function FinishConditioningForm({ orderId, lineId, orderNumber }: FinishConditioningFormProps) {
   const [state, formAction, isPending] = useActionState<FinishFormState, FormData>(
     (_previous, formData) => finishConditioningAction(IGNORED_PREV_STATE, formData),
     INITIAL_STATE,
@@ -84,7 +88,10 @@ function FinishConditioningForm({ orderId, orderNumber }: FinishConditioningForm
       submit={{
         kind: 'action',
         action: formAction,
-        hidden: [{ name: FINISH_CONDITIONING_ORDER_ID_FIELD, value: orderId, controlled: true }],
+        hidden: [
+          { name: FINISH_CONDITIONING_ORDER_ID_FIELD, value: orderId, controlled: true },
+          { name: FINISH_CONDITIONING_LINE_ID_FIELD, value: lineId, controlled: true },
+        ],
         formClassName: 'flex flex-col gap-4',
       }}
       layout="form-wraps-all"

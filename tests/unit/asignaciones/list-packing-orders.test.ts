@@ -161,6 +161,7 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
     expect(page.items).toEqual([
       {
         id: PEDIDO_1,
+        lineId: 'linea-1',
         numberText: expect.any(String),
         recipeName: 'Desengrasante',
         quantity: '10.0000',
@@ -175,6 +176,7 @@ describe('listPackingOrders — R14, R15, R16: los dos estados de la empresa, co
       },
       {
         id: PEDIDO_2,
+        lineId: 'linea-2',
         numberText: expect.any(String),
         recipeName: 'Limpiador',
         quantity: '20.0000',

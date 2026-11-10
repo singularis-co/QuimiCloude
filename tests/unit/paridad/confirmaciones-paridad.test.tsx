@@ -317,6 +317,7 @@ const EMPACADOR_ID = '11111111-1111-4111-8111-111111111111';
 function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
     quantity: '12.5',
@@ -556,7 +557,7 @@ const CON_DISPARADOR: readonly DialogoConDisparador[] = [
   },
   {
     nombre: 'cancelar pedido desde asignacion',
-    pintar: () => render(<OrderCancelDialog orderId={PEDIDO.id} stepPosition={2} />),
+    pintar: () => render(<OrderCancelDialog lineId="linea-1" orderId={PEDIDO.id} stepPosition={2} />),
     accion: 'cancelAssignedOrderAction',
     disparador: 'order-cancel-trigger',
     dialogo: 'order-cancel-dialog',
@@ -707,7 +708,7 @@ describe('paridad de confirmaciones — borrar receta (transicion)', () => {
 describe('paridad de confirmaciones — comenzar un pedido asignado (ConfirmActionDialog)', () => {
   it('R1 R12 — abierto: solo el dialogo, en su portal', async () => {
     const { container } = render(
-      <OrderExecutionScreen execution={{ ...EJECUCION, status: 'PENDIENTE' }} />,
+      <OrderExecutionScreen lineId="linea-1" execution={{ ...EJECUCION, status: 'PENDIENTE' }} />,
     );
     fireEvent.click(screen.getByTestId('order-execution-start-button'));
     await screen.findByTestId('order-execution-start-dialog');
@@ -720,7 +721,7 @@ describe('paridad de confirmaciones — finalizar la ejecucion (ConfirmActionDia
     vi.useFakeTimers();
     let contenedor: HTMLElement;
     try {
-      contenedor = render(<OrderExecutionScreen execution={EJECUCION} />).container;
+      contenedor = render(<OrderExecutionScreen lineId="linea-1" execution={EJECUCION} />).container;
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
       });

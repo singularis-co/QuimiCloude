@@ -67,10 +67,12 @@ const SESSION_USER = {
 const SESSION_CONTEXT = { userId: 'user-1', companyId: 'company-1', roleName: 'Empacador' };
 
 const ORDER_ID = '3f1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38';
+const LINE_ID = '9a2d4c6e-1b3f-4a5c-8d7e-0f1a2b3c4d5e';
 
 function formDataConPedido(orderId: string): FormData {
   const formData = new FormData();
   formData.append('orderId', orderId);
+  formData.append('lineId', LINE_ID);
   return formData;
 }
 
@@ -81,13 +83,14 @@ beforeEach(() => {
 });
 
 describe('startPackingAction — Comenzar vuelve a la MISMA pantalla del pedido', () => {
-  it('exito: revalida la pantalla del pedido y no redirige (R26)', async () => {
+  it('R11, R26: exito: pasa la receta al caso de uso, revalida la pantalla de esa receta y no redirige', async () => {
     startPackingMock.mockResolvedValue(undefined);
 
     const resultado = await startPackingAction({ status: 'success' }, formDataConPedido(ORDER_ID));
 
     expect(resultado).toEqual({ status: 'success' });
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/empaque/${ORDER_ID}`);
+    expect(startPackingMock).toHaveBeenCalledWith(expect.anything(), { orderId: ORDER_ID, lineId: LINE_ID });
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/empaque/${ORDER_ID}?receta=${LINE_ID}`);
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
@@ -162,19 +165,19 @@ describe('finishPackingAction — la confirmacion viaja en la URL de vuelta, no 
   });
 });
 
-describe('finishPackingAction — conteo real de envases en `lines` (QC-281)', () => {
+describe('finishPackingAction — conteo real de envases en `counts` (QC-281)', () => {
   const LINEAS = [
-    { lineId: '9a1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38', packedPackages: 3, reason: null, reasonOther: null },
-    { lineId: '9b1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38', packedPackages: 1, reason: 'otro', reasonOther: 'Se cayo' },
+    { presentationLineId: '9a1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38', packedPackages: 3, reason: null, reasonOther: null },
+    { presentationLineId: '9b1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38', packedPackages: 1, reason: 'otro', reasonOther: 'Se cayo' },
   ];
 
-  function formDataConLineas(lines: string | null): FormData {
+  function formDataConLineas(counts: string | null): FormData {
     const formData = formDataConPedido(ORDER_ID);
-    if (lines !== null) formData.append('lines', lines);
+    if (counts !== null) formData.append('counts', counts);
     return formData;
   }
 
-  it('R13: un FormData valido pasa `orderId` y `lines` parseado al caso de uso y redirige como hoy', async () => {
+  it('R11, R13: un FormData valido pasa `orderId`, `lineId` y `counts` parseado al caso de uso y redirige como hoy', async () => {
     finishPackingMock.mockResolvedValue({ numberText: '2026-0000007' });
 
     await expect(
@@ -183,21 +186,21 @@ describe('finishPackingAction — conteo real de envases en `lines` (QC-281)', (
 
     expect(finishPackingMock).toHaveBeenCalledWith(
       { id: 'user-1', companyId: 'company-1', permissions: ['empaque.modificar'] },
-      { orderId: ORDER_ID, lines: LINEAS },
+      { orderId: ORDER_ID, lineId: LINE_ID, counts: LINEAS },
     );
     expect(redirectMock).toHaveBeenCalledWith('/asignacion?vista=por_empacar&empacado=2026-0000007');
     expect(revalidatePathMock).toHaveBeenCalledWith('/asignacion');
   });
 
   it.each([
-    ['sin `lines`', null],
-    ['`lines` con JSON roto', '[{"lineId":'],
-  ])('R13: %s llega al caso de uso como `lines: undefined`; esta capa no decide', async (_caso, lines) => {
+    ['sin `counts`', null],
+    ['`counts` con JSON roto', '[{"presentationLineId":'],
+  ])('R13: %s llega al caso de uso como `counts: undefined`; esta capa no decide', async (_caso, lines) => {
     finishPackingMock.mockRejectedValue(new ValidationError());
 
     const resultado = await finishPackingAction({ status: 'success' }, formDataConLineas(lines));
 
-    expect(finishPackingMock).toHaveBeenCalledWith(expect.anything(), { orderId: ORDER_ID, lines: undefined });
+    expect(finishPackingMock).toHaveBeenCalledWith(expect.anything(), { orderId: ORDER_ID, lineId: LINE_ID, counts: undefined });
     expect(resultado).toMatchObject({ status: 'error', code: 'invalid_input' });
     expect(redirectMock).not.toHaveBeenCalled();
   });

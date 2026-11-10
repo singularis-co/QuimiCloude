@@ -17,10 +17,9 @@ import {
   EvidenceRequiredError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
-  OrderNotFoundError,
   ValidationError,
 } from './errors';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
@@ -28,8 +27,7 @@ import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { ConditioningStepView, RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
-const recordConditioningStepSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const recordConditioningStepSchema = orderLineInputSchema.extend({
   stepPosition: z.number().int().min(1),
   responsibleUserIds: z
     .array(z.string().uuid())
@@ -80,15 +78,11 @@ export function createRecordConditioningStep(
 
     const parsed = recordConditioningStepSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, stepPosition, responsibleUserIds } = parsed.data;
+    const { orderId, lineId, stepPosition, responsibleUserIds } = parsed.data;
     const companyId = actor.companyId;
 
-    const target = await deps.orders.findAliveById(orderId, companyId);
-    if (target === null) throw new OrderNotFoundError();
-    const page = await deps.orders.listAliveSummariesByIds(companyId, [orderId], [target.status], 1, 1);
-    const summary = onlyLineOf(page);
-    if (summary === undefined) throw new OrderNotFoundError();
-    if (target.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
+    const summary = await findLine(deps.orders, companyId, orderId, lineId);
+    if (summary.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) throw new OrderConditioningTakenError();
 
     const steps = (await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, companyId)) ?? [];

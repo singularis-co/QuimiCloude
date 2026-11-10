@@ -111,6 +111,7 @@ async function renderSeccion(seccion: Promise<ReactNode>) {
 
 const POR_ACONDICIONAR: ConditioningOrderRow = {
   id: 'order-a',
+  lineId: 'linea-order-a',
   numberText: '2026-0000040',
   recipeName: 'Jarabe simple',
   quantity: '20.5000',
@@ -128,6 +129,7 @@ const POR_ACONDICIONAR: ConditioningOrderRow = {
 const EN_ACONDICIONAMIENTO: ConditioningOrderRow = {
   ...POR_ACONDICIONAR,
   id: 'order-b',
+  lineId: 'linea-order-b',
   numberText: '2026-0000041',
   recipeName: null,
   unitId: null,
@@ -140,6 +142,7 @@ const EN_ACONDICIONAMIENTO: ConditioningOrderRow = {
 
 const ACONDICIONADO: FinishedOrderView = {
   id: 'order-c',
+  lineId: 'linea-order-c',
   numberText: '2026-0000042',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
@@ -240,6 +243,7 @@ const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
 function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
     quantity: '12.5',
@@ -491,7 +495,7 @@ describe('paridad del acondicionador — equipo y selector', () => {
 describe('paridad del acondicionador — el dialogo de terminar', () => {
   function pintarDialogo() {
     render(
-      <FinishConditioningDialog
+      <FinishConditioningDialog lineId="linea-1"
         open
         onOpenChange={() => undefined}
         orderId="33333333-3333-4333-8333-333333333333"

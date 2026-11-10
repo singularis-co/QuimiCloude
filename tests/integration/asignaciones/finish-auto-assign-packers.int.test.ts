@@ -71,6 +71,18 @@ function ordersDoblados(orderId: string, lineId: string): OrderCatalog {
       pageSize: 1,
       totalPages: 1,
     }),
+    findAliveLineSummary: async (_companyId: string, id: string, linea: string) =>
+      id === orderId && linea === lineId
+        ? {
+            id: orderId,
+            lineId,
+            number: { year: 2026, sequence: 910001 },
+            recipeId: 'receta',
+            quantity: '10.0000',
+            priority: 'MEDIA',
+            status: 'EN_CURSO',
+          }
+        : null,
     transitionAliveById: async () => 'ok' as const,
   } as unknown as OrderCatalog;
 }
@@ -108,7 +120,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
-      await finish(actor, { orderId: pedido, stepPosition: null });
+      await finish(actor, { orderId: pedido, lineId: await ensureOnlyLine(fixture.tx, pedido), stepPosition: null });
 
       const filas = await readRows(fixture.tx, pedido);
       expect(filas.map((fila) => fila.userId).sort()).toEqual(
@@ -146,7 +158,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
-      await finish(actor, { orderId: pedido, stepPosition: null });
+      await finish(actor, { orderId: pedido, lineId: await ensureOnlyLine(fixture.tx, pedido), stepPosition: null });
 
       const filas = await readRows(fixture.tx, pedido);
       expect(filas.map((fila) => fila.userId).sort()).toEqual(
@@ -184,7 +196,7 @@ describe('asignaciones · el Finalizar asigna al empacador vinculado (integracio
         evidence: evidenceRepositoryUnused,
       });
       const actor: Actor = { id: operarioActor, companyId: fixture.companyA, permissions: ['asignaciones.consultar', 'asignaciones.ejecutar'] };
-      await finish(actor, { orderId: pedido, stepPosition: null });
+      await finish(actor, { orderId: pedido, lineId: await ensureOnlyLine(fixture.tx, pedido), stepPosition: null });
 
       const filas = await readRows(fixture.tx, pedido);
       expect(filas).toHaveLength(3);

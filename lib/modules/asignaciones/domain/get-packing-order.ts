@@ -1,11 +1,9 @@
 // lib/modules/asignaciones/domain/get-packing-order.ts
 /**
- * La misma fila de `list-packing-orders.ts` para un unico pedido: la pantalla de empaque abre con
- * esto. `null` o cualquier estado distinto de `POR_EMPACAR`/`EN_EMPAQUE` es `order_not_found`,
- * igual que un pedido inexistente: esta consulta no revela que el pedido existe en otro estado.
+ * La misma fila de `list-packing-orders.ts` para una receta: la pantalla de empaque abre con esto.
+ * Una linea inexistente o en un estado distinto de `POR_EMPACAR`/`EN_EMPAQUE` es `order_not_found`,
+ * igual que un pedido inexistente: esta consulta no revela que la receta existe en otro estado.
  */
-import { z } from 'zod';
-
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
@@ -16,18 +14,14 @@ import {
   type PackingOrderDetail,
   type PackingOrderViewDeps,
 } from './packing-order-view';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { EvidenceStorage } from '../ports/evidence-storage';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipePackingStepsReader } from '@/lib/modules/recetas';
 
-const PACKING_STATUSES = ['POR_EMPACAR', 'EN_EMPAQUE'] as const;
-
-const getPackingOrderSchema = z.strictObject({
-  orderId: z.string().uuid(),
-});
+const PACKING_STATUSES: ReadonlySet<string> = new Set(['POR_EMPACAR', 'EN_EMPAQUE']);
 
 export type GetPackingOrderDeps = PackingOrderViewDeps & PackingFinishViewDeps & {
   readonly orders: OrderCatalog;
@@ -46,19 +40,12 @@ export function createGetPackingOrder(
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'empaque.modificar');
 
-    const parsed = getPackingOrderSchema.safeParse(input);
+    const parsed = orderLineInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId } = parsed.data;
+    const { orderId, lineId } = parsed.data;
 
-    const summaryPage = await deps.orders.listAliveSummariesByIds(
-      actor.companyId,
-      [orderId],
-      PACKING_STATUSES,
-      1,
-      1,
-    );
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    if (!PACKING_STATUSES.has(summary.status)) throw new OrderNotFoundError();
 
     const [row] = await composePackingOrderRows(deps, actor.companyId, [summary]);
     if (row === undefined) throw new OrderNotFoundError();

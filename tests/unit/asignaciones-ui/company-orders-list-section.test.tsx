@@ -39,6 +39,7 @@ function parametros(overrides: Partial<DataTableParams> = {}): DataTableParams {
 
 const ORDER: CompanyOrderView = {
   id: 'order-1',
+  lineId: 'linea-order-1',
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',

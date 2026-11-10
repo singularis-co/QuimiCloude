@@ -126,7 +126,7 @@ export function CompanyOrdersTable({
         tableId={COMPANY_ORDERS_TABLE_ID}
         columns={columns}
         rows={rows}
-        getRowId={(order) => order.id}
+        getRowId={(order) => order.lineId}
         params={tableParams}
         totalPages={totalPages}
         onParamsChange={(next) =>

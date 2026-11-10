@@ -5,7 +5,10 @@ import type { OrderResponsible } from './assignment-view';
 import type { OrderDistributionLineView } from './order-distribution-view';
 
 export type AssignedOrderView = {
+  /** El pedido. */
   readonly id: string;
+  /** La receta del pedido que pinta la fila. */
+  readonly lineId: string;
   readonly numberText: string;
   /** `null` significa «no se pudo resolver»: la pantalla pinta el marcador de ausencia. */
   readonly recipeName: string | null;

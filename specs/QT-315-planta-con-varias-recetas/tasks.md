@@ -69,7 +69,7 @@
 
 ## Tanda 3 — la receta viaja de punta a punta (depende de T1–T5)
 
-- [ ] **T6 · backend_dev — casos de uso y acciones con `lineId`** (design § 2, § 3.4 y § 3.7)
+- [x] **T6 · backend_dev — casos de uso y acciones con `lineId`** (design § 2, § 3.4 y § 3.7)
   - **`only-order-line.ts`.** Se borra; entra `order-line-target.ts` (`findLine`) con
     `orderLineInputSchema`.
   - **Puerta de estado.** Todos los casos de uso de la tabla de § 3.4 pasan a

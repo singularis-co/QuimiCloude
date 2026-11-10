@@ -60,6 +60,7 @@ vi.mock('@/lib/composition', () => ({
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
 const ORDER_ID = '33333333-3333-4333-8333-333333333333';
+const LINE_ID = '55555555-5555-4555-8555-555555555555';
 
 function sesionCon(permissions: readonly string[]) {
   return {
@@ -73,6 +74,7 @@ function sesionCon(permissions: readonly string[]) {
 
 const ROW = {
   id: ORDER_ID,
+  lineId: LINE_ID,
   numberText: '2026-0000040',
   recipeName: 'Jarabe simple',
   quantity: '20',
@@ -92,8 +94,10 @@ const CANDIDATES = {
   workGroups: [],
 };
 
-function invocar(id: string = ORDER_ID) {
-  return ConditioningOrderPage({ params: Promise.resolve({ id }) });
+type Consulta = Record<string, string | string[] | undefined>;
+
+function invocar(id: string = ORDER_ID, consulta: Consulta = { receta: LINE_ID }) {
+  return ConditioningOrderPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve(consulta) });
 }
 
 afterEach(() => {
@@ -108,14 +112,14 @@ beforeEach(() => {
 });
 
 describe('con el permiso, la página pinta el detalle', () => {
-  it('R15: pide getConditioningOrder con el actor y el id, y monta la pantalla', async () => {
+  it('R15, R9: pide getConditioningOrder con el actor, el pedido y la receta de la direccion, y monta la pantalla', async () => {
     getConditioningOrderMock.mockResolvedValue(ROW);
 
     render(await invocar());
 
     expect(getConditioningOrderMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: ACTOR_ID, companyId: 'company-1' }),
-      { orderId: ORDER_ID },
+      { orderId: ORDER_ID, lineId: LINE_ID },
     );
     expect(screen.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID)).toBeInTheDocument();
     expect(notFoundMock).not.toHaveBeenCalled();
@@ -134,6 +138,26 @@ describe('el mismo 404 para todo lo que no se puede ver', () => {
     getConditioningOrderMock.mockRejectedValue(new ValidationError());
 
     await expect(invocar('no-es-un-uuid')).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each<[string, Consulta]>([
+    ['sin ?receta', {}],
+    ['con ?receta vacia', { receta: '' }],
+    ['con ?receta que no es un uuid', { receta: 'linea-1' }],
+    ['con ?receta repetida', { receta: [LINE_ID, LINE_ID] }],
+  ])('R9: %s responde notFound() sin leer ningun pedido', async (_caso, consulta) => {
+    await expect(invocar(ORDER_ID, consulta)).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+    expect(getConditioningOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('R9: con una receta ajena (de otro pedido, quitada o inexistente) responde el mismo notFound()', async () => {
+    const AJENA = '66666666-6666-4666-8666-666666666666';
+    getConditioningOrderMock.mockRejectedValue(new OrderNotFoundError());
+
+    await expect(invocar(ORDER_ID, { receta: AJENA })).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(getConditioningOrderMock).toHaveBeenCalledWith(expect.anything(), { orderId: ORDER_ID, lineId: AJENA });
     expect(notFoundMock).toHaveBeenCalledTimes(1);
   });
 

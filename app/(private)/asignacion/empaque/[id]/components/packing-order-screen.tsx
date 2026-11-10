@@ -70,7 +70,8 @@ export const PACKING_ORDER_BACK_LINK_TESTID = 'packing-order-back-link';
 export const PACKING_ORDER_STEPS_TESTID = 'packing-order-steps';
 export const PACKING_ORDER_MISSING_UNIT_TESTID = 'packing-order-missing-unit';
 export const PACKING_ORDER_ID_FIELD = 'orderId';
-export const PACKING_ORDER_LINES_FIELD = 'lines';
+export const PACKING_ORDER_LINE_ID_FIELD = 'lineId';
+export const PACKING_ORDER_COUNTS_FIELD = 'counts';
 export const PACKING_ORDER_START_DIALOG_TESTID = 'packing-order-start-dialog';
 export const PACKING_ORDER_START_CONFIRM_TESTID = 'packing-order-start-confirm';
 export const PACKING_ORDER_FINISH_DIALOG_TESTID = 'packing-order-finish-dialog';
@@ -131,7 +132,7 @@ export type PackingOrderScreenProps = {
 export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScreenProps) {
   const startFormRef = useRef<HTMLFormElement>(null);
   const finishFormRef = useRef<HTMLFormElement>(null);
-  const finishLinesRef = useRef<HTMLInputElement>(null);
+  const finishCountsRef = useRef<HTMLInputElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const [finishConfirmOpen, setFinishConfirmOpen] = useState(false);
   const [missingOpen, setMissingOpen] = useState(false);
@@ -161,6 +162,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
 
   const evidence = useStepEvidence({
     orderId: order.id,
+    lineId: order.lineId,
     phase: 'packing',
     steps: order.packingSteps,
     initial: order.packingEvidence,
@@ -184,7 +186,8 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
 
   // El diálogo vive en un portal, fuera del `<form>`: el conteo entra por el campo oculto.
   function submitFinish(lines: PackingFinishSubmission) {
-    if (finishLinesRef.current !== null) finishLinesRef.current.value = JSON.stringify(lines);
+    const counts = lines.map(({ lineId, ...count }) => ({ presentationLineId: lineId, ...count }));
+    if (finishCountsRef.current !== null) finishCountsRef.current.value = JSON.stringify(counts);
     finishFormRef.current?.requestSubmit();
   }
 
@@ -233,6 +236,7 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
       className="flex"
     >
       <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
+      <input type="hidden" name={PACKING_ORDER_LINE_ID_FIELD} defaultValue={order.lineId} />
       <Button
         type="button"
         size="xl"
@@ -264,7 +268,8 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
         className="flex"
       >
         <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
-        <input ref={finishLinesRef} type="hidden" name={PACKING_ORDER_LINES_FIELD} defaultValue="" />
+        <input type="hidden" name={PACKING_ORDER_LINE_ID_FIELD} defaultValue={order.lineId} />
+        <input ref={finishCountsRef} type="hidden" name={PACKING_ORDER_COUNTS_FIELD} defaultValue="" />
         <Button
           type="button"
           size="xl"
@@ -438,7 +443,8 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
           className="hidden"
         >
           <input type="hidden" name={PACKING_ORDER_ID_FIELD} defaultValue={order.id} />
-          <input ref={finishLinesRef} type="hidden" name={PACKING_ORDER_LINES_FIELD} defaultValue="" />
+          <input type="hidden" name={PACKING_ORDER_LINE_ID_FIELD} defaultValue={order.lineId} />
+          <input ref={finishCountsRef} type="hidden" name={PACKING_ORDER_COUNTS_FIELD} defaultValue="" />
           {finishDialog}
         </form>
       ) : null}

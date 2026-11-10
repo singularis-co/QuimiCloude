@@ -37,28 +37,28 @@ async function currentActor(): Promise<Actor | null> {
   };
 }
 
-function orderIdFromFormData(formData: FormData): unknown {
-  return { orderId: formData.get('orderId') };
+function orderLineFromFormData(formData: FormData): { orderId: unknown; lineId: unknown } {
+  return { orderId: formData.get('orderId'), lineId: formData.get('lineId') };
 }
 
-// `lines` llega como JSON porque es una lista de objetos; uno roto o ausente se deja `undefined`
+// `counts` llega como JSON porque es una lista de objetos; uno roto o ausente se deja `undefined`
 // para que lo rechace el zod del caso de uso, no esta capa.
 function finishPackingInputFromFormData(formData: FormData): unknown {
-  const raw = formData.get('lines');
-  let lines: unknown;
+  const raw = formData.get('counts');
+  let counts: unknown;
   if (typeof raw === 'string') {
     try {
-      lines = JSON.parse(raw);
+      counts = JSON.parse(raw);
     } catch {
-      lines = undefined;
+      counts = undefined;
     }
   }
-  return { orderId: formData.get('orderId'), lines };
+  return { ...orderLineFromFormData(formData), counts };
 }
 
 export type StartPackingResult = { status: 'success' } | ErrorState;
 
-/** Comienza el empaque —`POR_EMPACAR` a `EN_EMPAQUE`— y vuelve a la MISMA pantalla del pedido. */
+/** Comienza el empaque de la receta —`POR_EMPACAR` a `EN_EMPAQUE`— y se queda en su pantalla. */
 export async function startPackingAction(
   _prevState: StartPackingResult,
   formData: FormData,
@@ -66,19 +66,19 @@ export async function startPackingAction(
   const actor = await currentActor();
 
   try {
-    await asignaciones.startPacking(actor, orderIdFromFormData(formData));
+    await asignaciones.startPacking(actor, orderLineFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
-  const orderId = formData.get('orderId');
-  if (typeof orderId === 'string') revalidatePath(packingOrderRoute(orderId));
+  const { orderId, lineId } = orderLineFromFormData(formData);
+  if (typeof orderId === 'string' && typeof lineId === 'string') revalidatePath(packingOrderRoute(orderId, lineId));
   return { status: 'success' };
 }
 
 export type FinishPackingResult = { status: 'success' } | ErrorState;
 
-/** Deja el pedido `ENTREGADO` y vuelve a la pestaña «Por empacar» con la confirmacion. */
+/** Deja la receta `POR_ACONDICIONAR` y vuelve a la pestaña «Por empacar» con la confirmacion. */
 export async function finishPackingAction(
   _prevState: FinishPackingResult,
   formData: FormData,

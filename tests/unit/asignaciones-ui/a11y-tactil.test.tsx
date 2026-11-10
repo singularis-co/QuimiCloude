@@ -35,13 +35,13 @@ function esObjetivoTactil(elemento: Element): boolean {
 
 describe('objetivos tactiles de 44x44 en todo lo que esta feature monta (R32)', () => {
   it('el disparador «entrar» habilitado (PENDIENTE)', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', status: 'PENDIENTE' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', lineId: 'linea-order-1', status: 'PENDIENTE' }} />);
 
     expect(esObjetivoTactil(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID))).toBe(true);
   });
 
   it('el disparador «entrar» en curso (EN_CURSO)', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', lineId: 'linea-order-2', status: 'EN_CURSO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     expect(esObjetivoTactil(trigger)).toBe(true);
@@ -79,7 +79,7 @@ describe('objetivos tactiles de 44x44 en todo lo que esta feature monta (R32)', 
 
 describe('el motivo del disparador deshabilitado se alcanza SIN el puntero (R21, R32)', () => {
   it('es texto en el DOM, no un `title`, y su id coincide con `aria-describedby`', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-3', status: 'EN_CURSO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-3', lineId: 'linea-order-3', status: 'EN_CURSO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
@@ -92,7 +92,7 @@ describe('el motivo del disparador deshabilitado se alcanza SIN el puntero (R21,
 
 describe('R31 - el disparador deshabilitado de un BLOQUEADO conserva el objetivo tactil', () => {
   it('mide al menos 44x44 y su motivo es texto visible enlazado por aria-describedby', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-5', status: 'BLOQUEADO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-5', lineId: 'linea-order-5', status: 'BLOQUEADO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);

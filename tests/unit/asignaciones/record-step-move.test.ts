@@ -30,6 +30,8 @@ const OTRA_EMPRESA = uuid('9');
 const ANA = uuid('1');
 const PEDIDO = uuid('7');
 const OTRO_PEDIDO = uuid('8');
+const LINEA = uuid('e');
+const OTRA_LINEA = uuid('f');
 const AHORA = new Date('2026-10-06T12:00:00.000Z');
 
 const ACTOR: Actor = {
@@ -51,7 +53,12 @@ function montar(options?: {
 }) {
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const status = options?.status === undefined ? 'EN_CURSO' : options.status;
-  const findAliveById = vi.fn(async () => (status === null ? null : { id: PEDIDO, status }));
+  // Dos recetas del pedido en el mismo estado: el doble responde por cualquiera de las dos.
+  const findAliveLineSummary = vi.fn(async (_companyId: string, _orderId: string, lineId: string) =>
+    status === null || (lineId !== LINEA && lineId !== OTRA_LINEA)
+      ? null
+      : { id: PEDIDO, lineId, recipeId: 'receta-1', status },
+  );
   const append = vi.fn<ExecutionLogRepository['append']>(async () => {
     if (options?.appendFalla) throw options.appendFalla;
     return 'ok';
@@ -60,16 +67,7 @@ function montar(options?: {
 
   const deps: RecordStepMoveDeps = {
     assignments: { listOrderIdsByUserInCompany } as unknown as OrderAssignmentRepository,
-    orders: {
-      findAliveById,
-      listAliveSummariesByIds: vi.fn(async () => ({
-        items: [{ id: PEDIDO, recipeId: 'receta-1', status: 'EN_CURSO' }],
-        total: 1,
-        page: 1,
-        pageSize: 1,
-        totalPages: 1,
-      })),
-    } as unknown as OrderCatalog,
+    orders: { findAliveLineSummary } as unknown as OrderCatalog,
     log: {
       append,
       findLastStepPosition,
@@ -84,17 +82,17 @@ function montar(options?: {
     } as unknown as RecipeCatalog,
     evidence: { listByLine: vi.fn(async () => []) } as unknown as StepEvidenceRepository,
   };
-  return { deps, listOrderIdsByUserInCompany, findAliveById, append, findLastStepPosition };
+  return { deps, listOrderIdsByUserInCompany, findAliveLineSummary, append, findLastStepPosition };
 }
 
 function ningunDobleLlamado(d: ReturnType<typeof montar>): void {
   expect(d.listOrderIdsByUserInCompany).not.toHaveBeenCalled();
-  expect(d.findAliveById).not.toHaveBeenCalled();
+  expect(d.findAliveLineSummary).not.toHaveBeenCalled();
   expect(d.append).not.toHaveBeenCalled();
   expect(d.findLastStepPosition).not.toHaveBeenCalled();
 }
 
-const ENTRADA = { orderId: PEDIDO, direction: 'advance', stepPosition: 3 } as const;
+const ENTRADA = { orderId: PEDIDO, lineId: LINEA, direction: 'advance', stepPosition: 3 } as const;
 
 describe('recordStepMove — prologo', () => {
   it('R26: sin actor o sin permisos rechaza sin llamar a ningun doble', async () => {
@@ -149,14 +147,14 @@ describe('recordStepMove — prologo', () => {
       expect(d.append).not.toHaveBeenCalled();
     }
     expect(new Set(errores)).toEqual(new Set(['order_not_found']));
-    expect(noAsignado.findAliveById).not.toHaveBeenCalled();
+    expect(noAsignado.findAliveLineSummary).not.toHaveBeenCalled();
   });
 
   it('R28: la empresa sale del actor, nunca de la entrada', async () => {
     const d = montar();
     await createRecordStepMove(d.deps)(ACTOR, ENTRADA);
     expect(d.listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
-    expect(d.findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
+    expect(d.findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ companyId: EMPRESA, userId: ANA });
   });
 
@@ -173,7 +171,7 @@ describe('recordStepMove — prologo', () => {
       { ...ENTRADA, direction: 'finish' },
       { ...ENTRADA, stepPosition: 0 },
       { ...ENTRADA, stepPosition: 1.5 },
-      { orderId: PEDIDO, direction: 'advance' },
+      { orderId: PEDIDO, lineId: LINEA, direction: 'advance' },
       { ...ENTRADA, orderId: 'no-uuid' },
     ]) {
       const d = montar();
@@ -186,12 +184,13 @@ describe('recordStepMove — prologo', () => {
 describe('recordStepMove — que anota', () => {
   it('R17: `advance` escribe una anotacion `advance` con la posicion recibida', async () => {
     const d = montar();
-    await createRecordStepMove(d.deps)(ACTOR, { orderId: PEDIDO, direction: 'advance', stepPosition: 4 });
+    await createRecordStepMove(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA, direction: 'advance', stepPosition: 4 });
     expect(d.append).toHaveBeenCalledTimes(1);
     expect(d.append).toHaveBeenCalledWith({
       action: 'advance',
       companyId: EMPRESA,
       orderId: PEDIDO,
+      orderLineId: LINEA,
       userId: ANA,
       stepPosition: 4,
       occurredAt: AHORA,
@@ -200,11 +199,12 @@ describe('recordStepMove — que anota', () => {
 
   it('R18: `go_back` escribe una anotacion `go_back` con la posicion recibida', async () => {
     const d = montar();
-    await createRecordStepMove(d.deps)(ACTOR, { orderId: PEDIDO, direction: 'go_back', stepPosition: 2 });
+    await createRecordStepMove(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA, direction: 'go_back', stepPosition: 2 });
     expect(d.append).toHaveBeenCalledWith({
       action: 'go_back',
       companyId: EMPRESA,
       orderId: PEDIDO,
+      orderLineId: LINEA,
       userId: ANA,
       stepPosition: 2,
       occurredAt: AHORA,
@@ -213,7 +213,7 @@ describe('recordStepMove — que anota', () => {
 
   it('R5: con una receta sin pasos la posicion `null` se anota tal cual', async () => {
     const d = montar();
-    await createRecordStepMove(d.deps)(ACTOR, { orderId: PEDIDO, direction: 'advance', stepPosition: null });
+    await createRecordStepMove(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA, direction: 'advance', stepPosition: null });
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ stepPosition: null });
   });
 
@@ -249,6 +249,32 @@ describe('recordStepMove — solo EN_CURSO (R20, R43)', () => {
   it('R20: BLOQUEADO es OrderBlockedError aunque la tabla de escrituras de asignacion lo admita', async () => {
     const d = montar({ status: 'BLOQUEADO' });
     await expect(createRecordStepMove(d.deps)(ACTOR, ENTRADA)).rejects.toThrow(OrderBlockedError);
+    expect(d.append).not.toHaveBeenCalled();
+  });
+});
+
+describe('recordStepMove — la receta nombrada (R11, R12, R14)', () => {
+  it('R11, R12: con dos recetas EN_CURSO, anota en la nombrada', async () => {
+    const d = montar();
+    await createRecordStepMove(d.deps)(ACTOR, { ...ENTRADA, lineId: OTRA_LINEA });
+    expect(d.findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, OTRA_LINEA);
+    expect(d.append.mock.calls[0]?.[0]).toMatchObject({ orderId: PEDIDO, orderLineId: OTRA_LINEA });
+  });
+
+  it('R14: sin lineId, o con uno que no es uuid, da invalid_input sin tocar ningun puerto', async () => {
+    const sinLinea = Object.fromEntries(Object.entries(ENTRADA).filter(([clave]) => clave !== 'lineId'));
+    for (const entrada of [sinLinea, { ...ENTRADA, lineId: 'no-uuid' }]) {
+      const d = montar();
+      await expect(createRecordStepMove(d.deps)(ACTOR, entrada)).rejects.toThrow(ValidationError);
+      ningunDobleLlamado(d);
+    }
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin anotar', async () => {
+    const d = montar();
+    await expect(createRecordStepMove(d.deps)(ACTOR, { ...ENTRADA, lineId: uuid('d') })).rejects.toThrow(
+      OrderNotFoundError,
+    );
     expect(d.append).not.toHaveBeenCalled();
   });
 });

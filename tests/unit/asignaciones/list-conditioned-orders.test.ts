@@ -16,6 +16,7 @@ import {
   EMPRESA,
   PEDIDO_1,
   actoresSinElPermiso,
+  lineaDe,
   montar,
   persona,
   receta,
@@ -118,6 +119,7 @@ describe('R11 — solo TERMINADO, solo los que acondiciono el actor, filtrado en
 
     expect(fila).toEqual({
       id: PEDIDO_1,
+      lineId: lineaDe(PEDIDO_1),
       numberText: '2026-0000007',
       recipeName: 'Jabon liquido',
       quantity: '10.0000',

@@ -26,7 +26,10 @@ import {
 import type { ConditioningStepView } from '@/lib/modules/recetas';
 
 export type ConditioningOrderRow = {
+  /** El pedido. */
   readonly id: string;
+  /** La receta del pedido que pinta la fila. */
+  readonly lineId: string;
   readonly numberText: string;
   /** `null` = la receta ya no se encuentra. */
   readonly recipeName: string | null;
@@ -217,6 +220,7 @@ async function composeConditioningOrderRowsWithNames(
     const rowComposed = composed.get(order.lineId);
     return {
       id: order.id,
+      lineId: order.lineId,
       numberText: formatOrderNumber(order.number),
       recipeName: rowComposed?.recipeName ?? null,
       quantity: order.quantity,

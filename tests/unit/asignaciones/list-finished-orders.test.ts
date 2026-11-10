@@ -279,6 +279,7 @@ describe('QC-145 — listFinishedOrders: R21 la fila y sus responsables', () => 
     expect(Object.keys(pagina.items[0] ?? {}).sort()).toEqual(
       [
         'id',
+        'lineId',
         'numberText',
         'recipeName',
         'quantity',

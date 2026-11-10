@@ -40,7 +40,8 @@ const ANA = uuid('1');
 const BETO = uuid('2');
 const LOTE = uuid('8');
 const PEDIDO = uuid('7');
-const LINEA = 'linea-unica';
+const LINEA = uuid('e');
+const OTRA_LINEA = uuid('f');
 const RECETA = uuid('9');
 const AHORA = new Date('2026-10-08T12:00:00.000Z');
 
@@ -61,7 +62,7 @@ function montar(
 ): {
   readonly deps: FinishConditioningDeps;
   readonly findAliveById: ReturnType<typeof vi.fn>;
-  readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
+  readonly findAliveLineSummary: ReturnType<typeof vi.fn>;
   readonly finishConditioningAliveById: ReturnType<typeof vi.fn>;
   readonly listOfOrder: ReturnType<typeof vi.fn>;
   readonly run: ReturnType<typeof vi.fn>;
@@ -70,17 +71,19 @@ function montar(
   readonly findConditioningStepsById: ReturnType<typeof vi.fn>;
   readonly listEntriesForOrders: ReturnType<typeof vi.fn>;
 } {
-  const findAliveById = vi.fn(async () =>
-    options?.target === undefined ? { id: PEDIDO, status: 'EN_ACONDICIONAMIENTO' } : options.target,
-  );
-  const listAliveSummariesByIds = vi.fn(async () => ({
-    items: options?.summaryItems ?? [
-      { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: ANA, presentationLines: [] },
-    ],
-    total: 1,
-    page: 1,
-    pageSize: 1,
-  }));
+  // El pedido esta PARCIAL a proposito: Terminar decide por la linea y no lee el pedido.
+  const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: 'PARCIAL', activeLineStatuses: [] }));
+  // `target` fija el estado de las recetas del pedido; `null` = ninguna existe para el actor.
+  const status = options?.target?.status ?? 'EN_ACONDICIONAMIENTO';
+  const lineas = (options?.summaryItems ?? [
+    { id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: ANA, presentationLines: [] },
+    { id: PEDIDO, lineId: OTRA_LINEA, number: { year: 2026, sequence: 7 }, recipeId: RECETA, conditionedBy: ANA, presentationLines: [] },
+  ]) as readonly { readonly lineId: string }[];
+  const findAliveLineSummary = vi.fn(async (_companyId: string, _orderId: string, lineId: string) => {
+    if (options?.target === null) return null;
+    const linea = lineas.find((candidata) => candidata.lineId === lineId);
+    return linea === undefined ? null : { ...linea, status };
+  });
   const { transaction, run, finishConditioningAliveById, append, pasos } = transaccionDeAcondicionamiento({
     finish: resultado,
     append: options?.append,
@@ -89,7 +92,7 @@ function montar(
   const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
   const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
   const deps = {
-    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary } as unknown as OrderCatalog,
     batches: { listOfOrder },
     transaction,
     conditioningSteps: { findConditioningStepsById },
@@ -99,7 +102,7 @@ function montar(
   return {
     deps,
     findAliveById,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     finishConditioningAliveById,
     listOfOrder,
     run,
@@ -167,7 +170,7 @@ describe('finishConditioning — autorizacion', () => {
     'R15: actor %s rechaza con unauthorized sin tocar ningun puerto',
     async (_nombre, actor) => {
       const finishConditioning = createFinishConditioning(depsIntocables());
-      await expect(finishConditioning(actor, { orderId: PEDIDO })).rejects.toBeInstanceOf(UnauthorizedError);
+      await expect(finishConditioning(actor, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(UnauthorizedError);
     },
   );
 
@@ -185,7 +188,7 @@ describe('finishConditioning — autorizacion', () => {
     const { deps, finishConditioningAliveById } = montar('ok');
     const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO]! };
 
-    await expect(createFinishConditioning(deps)(actor, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(actor, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
@@ -199,7 +202,9 @@ describe('finishConditioning — validacion de la entrada', () => {
     ['vacia', {}],
     ['orderId no uuid', { orderId: 'no-es-uuid' }],
     ['orderId numerico', { orderId: 7 }],
-    ['con una clave de mas', { orderId: PEDIDO, companyId: EMPRESA }],
+    ['con una clave de mas', { orderId: PEDIDO, lineId: LINEA, companyId: EMPRESA }],
+    ['sin lineId (R14)', { orderId: PEDIDO }],
+    ['lineId que no es uuid (R14)', { orderId: PEDIDO, lineId: 'linea-unica' }],
   ];
 
   it.each(entradasInvalidas)('R16: entrada %s rechaza con invalid_input sin tocar ningun puerto', async (_n, entrada) => {
@@ -212,69 +217,67 @@ describe('finishConditioning — validacion de la entrada', () => {
 
 describe('finishConditioning — lectura del numero y traduccion del resultado', () => {
   it('R12: devuelve el numero visible leido ANTES de transicionar, con el estado actual del pedido', async () => {
-    const { deps, findAliveById, listAliveSummariesByIds, finishConditioningAliveById } = montar('ok');
+    const { deps, findAliveLineSummary, finishConditioningAliveById } = montar('ok');
 
-    const result = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO });
+    const result = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(result).toEqual({ numberText: '2026-0000007' });
-    expect(findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
-    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['EN_ACONDICIONAMIENTO'], 1, 1);
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
-    expect(listAliveSummariesByIds.mock.invocationCallOrder[0]!).toBeLessThan(
+    expect(findAliveLineSummary.mock.invocationCallOrder[0]!).toBeLessThan(
       finishConditioningAliveById.mock.invocationCallOrder[0]!,
     );
   });
 
   it('R13: not_conditioner rechaza con order_conditioning_taken', async () => {
     const { deps } = montar('not_conditioner');
-    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OrderConditioningTakenError);
     expect((error as OrderConditioningTakenError).code).toBe('order_conditioning_taken');
   });
 
   it('R14: not_conditionable rechaza con order_not_conditionable', async () => {
     const { deps } = montar('not_conditionable', { target: { id: PEDIDO, status: 'POR_ACONDICIONAR' } });
-    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OrderNotConditionableError);
     expect((error as OrderNotConditionableError).code).toBe('order_not_conditionable');
   });
 
   it('R14: not_found del catalogo rechaza con order_not_found', async () => {
     const { deps } = montar('not_found');
-    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(OrderNotFoundError);
     expect((error as OrderNotFoundError).code).toBe('order_not_found');
   });
 
   it('R14: pedido inexistente, de baja o de otra empresa rechaza con order_not_found sin transicionar', async () => {
-    const { deps, listAliveSummariesByIds, finishConditioningAliveById } = montar('ok', { target: null });
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    const { deps, finishConditioningAliveById } = montar('ok', { target: null });
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderNotFoundError,
     );
-    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
   });
 
   it('R14: si el resumen no aparece rechaza con order_not_found sin transicionar', async () => {
     const { deps, finishConditioningAliveById } = montar('ok', { summaryItems: [] });
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderNotFoundError,
     );
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
   });
 
   it('R14: la empresa sale del actor, nunca de la entrada', async () => {
-    const { deps, findAliveById, finishConditioningAliveById } = montar('ok');
+    const { deps, findAliveLineSummary, finishConditioningAliveById } = montar('ok');
     const otro: Actor = { ...ACTOR, companyId: uuid('9') };
 
-    await createFinishConditioning(deps)(otro, { orderId: PEDIDO });
-    expect(findAliveById).toHaveBeenCalledWith(PEDIDO, uuid('9'));
+    await createFinishConditioning(deps)(otro, { orderId: PEDIDO, lineId: LINEA });
+    expect(findAliveLineSummary).toHaveBeenCalledWith(uuid('9'), PEDIDO, LINEA);
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, uuid('9'), ANA, AHORA);
   });
 });
 
 describe('QC-219 — Terminar exige los datos de lote', () => {
-  const LINEA = { presentationId: 'pres-1', packages: 2, packagingName: 'Botella 1 L' };
+  const LINEA_REPARTO = { presentationId: 'pres-1', packages: 2, packagingName: 'Botella 1 L' };
   const CON_DATOS: FinishedBatchOfOrderLine = {
     batchId: LOTE,
     orderPresentationLineId: 'linea-1',
@@ -290,11 +293,11 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
 
   it('R15: si alguna linea no tiene datos rechaza con conditioning_batch_data_missing sin llamar a la transicion', async () => {
     const { deps, listOfOrder, finishConditioningAliveById } = montar('ok', {
-      summaryItems: resumenCon(ANA, [LINEA]),
+      summaryItems: resumenCon(ANA, [LINEA_REPARTO]),
       batches: [{ ...CON_DATOS, lot: 'AUTO-1', expiryDate: null, productionDate: null }],
     });
 
-    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ConditioningBatchDataMissingError);
     expect((error as ConditioningBatchDataMissingError).code).toBe('conditioning_batch_data_missing');
@@ -303,9 +306,9 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
   });
 
   it('R17: una linea sin lote de produccion cuenta como sin datos', async () => {
-    const { deps, finishConditioningAliveById } = montar('ok', { summaryItems: resumenCon(ANA, [LINEA]), batches: [] });
+    const { deps, finishConditioningAliveById } = montar('ok', { summaryItems: resumenCon(ANA, [LINEA_REPARTO]), batches: [] });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       ConditioningBatchDataMissingError,
     );
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
@@ -314,7 +317,7 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
   it('R17: un pedido sin lineas termina sin pedir datos', async () => {
     const { deps, finishConditioningAliveById } = montar('ok', { summaryItems: resumenCon(ANA, []), batches: [] });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
@@ -322,11 +325,11 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
 
   it('R15: con todas las lineas con datos termina', async () => {
     const { deps, finishConditioningAliveById } = montar('ok', {
-      summaryItems: resumenCon(ANA, [LINEA]),
+      summaryItems: resumenCon(ANA, [LINEA_REPARTO]),
       batches: [CON_DATOS],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
@@ -334,11 +337,11 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
 
   it('R16: un acondicionador que no es quien acondiciona recibe order_conditioning_taken aunque falten datos, sin leer los lotes', async () => {
     const { deps, listOfOrder, finishConditioningAliveById } = montar('ok', {
-      summaryItems: resumenCon(BETO, [LINEA]),
+      summaryItems: resumenCon(BETO, [LINEA_REPARTO]),
       batches: [],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderConditioningTakenError,
     );
     expect(listOfOrder).not.toHaveBeenCalled();
@@ -348,11 +351,11 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
   it('R16: un pedido que no esta EN_ACONDICIONAMIENTO da order_not_conditionable antes de mirar los datos', async () => {
     const { deps, listOfOrder } = montar('ok', {
       target: { id: PEDIDO, status: 'TERMINADO' },
-      summaryItems: resumenCon(ANA, [LINEA]),
+      summaryItems: resumenCon(ANA, [LINEA_REPARTO]),
       batches: [],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderNotConditionableError,
     );
     expect(listOfOrder).not.toHaveBeenCalled();
@@ -361,13 +364,13 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
   it('R16: un pedido inexistente da order_not_found antes de mirar los datos', async () => {
     const { deps, listOfOrder } = montar('ok', { target: null, batches: [] });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotFoundError);
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(OrderNotFoundError);
     expect(listOfOrder).not.toHaveBeenCalled();
   });
 
   it('R16: sin permiso da unauthorized y una entrada invalida da invalid_input, sin leer los lotes', async () => {
     const finishConditioning = createFinishConditioning(depsIntocables());
-    await expect(finishConditioning(null, { orderId: PEDIDO })).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(finishConditioning(null, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(UnauthorizedError);
     await expect(finishConditioning(ACTOR, { orderId: 'x' })).rejects.toBeInstanceOf(ValidationError);
   });
 });
@@ -376,7 +379,7 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
   it('R6: anota conditioning_finish en la transaccion, despues de la transicion', async () => {
     const { deps, pasos, append, finishConditioningAliveById } = montar('ok');
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
 
@@ -401,7 +404,7 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
   ] as const)('R6: un rechazo de la transicion (%s) no anota y mantiene el error', async (resultado, clase) => {
     const { deps, append, run } = montar(resultado);
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(clase);
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(clase);
     expect(run).toHaveBeenCalledTimes(1);
     expect(append).not.toHaveBeenCalled();
   });
@@ -416,10 +419,10 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
       summaryItems: [{ id: PEDIDO, lineId: LINEA, number: { year: 2026, sequence: 7 }, conditionedBy: BETO, presentationLines: [] }],
     });
 
-    await expect(createFinishConditioning(sinDatos.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(sinDatos.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       ConditioningBatchDataMissingError,
     );
-    await expect(createFinishConditioning(ajeno.deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(ajeno.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderConditioningTakenError,
     );
     expect(sinDatos.run).not.toHaveBeenCalled();
@@ -434,7 +437,7 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
       },
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBe(roto);
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBe(roto);
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
 });
@@ -462,7 +465,7 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
       batches: [CON_DATOS],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
@@ -474,7 +477,7 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
       batches: [],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
@@ -486,7 +489,7 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
       batches: [],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       ConditioningBatchDataMissingError,
     );
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
@@ -502,7 +505,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
       anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null)],
     });
 
-    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+    const error = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ConditioningStepsPendingError);
     expect((error as ConditioningStepsPendingError).code).toBe('conditioning_steps_pending');
@@ -515,7 +518,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
   it('R25: sin ningun paso completado tambien rechaza sin cambiar el pedido', async () => {
     const { deps, finishConditioningAliveById, append } = montar('ok', { pasos: PASOS, anotaciones: [] });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       ConditioningStepsPendingError,
     );
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
@@ -527,12 +530,12 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
       pasos: PASOS,
       anotaciones: [
         anotacionDePaso('conditioning_step_advance', 1, null, 1, LINEA),
-        anotacionDePaso('conditioning_step_advance', 1, null, 2, 'linea-otra-receta'),
-        anotacionDePaso('conditioning_steps_complete', 2, null, 3, 'linea-otra-receta'),
+        anotacionDePaso('conditioning_step_advance', 1, null, 2, OTRA_LINEA),
+        anotacionDePaso('conditioning_steps_complete', 2, null, 3, OTRA_LINEA),
       ],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       ConditioningStepsPendingError,
     );
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
@@ -547,7 +550,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
       ],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
@@ -559,7 +562,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
   ] as const)('R19, R25: una receta %s termina como hoy sin leer el registro', async (_n, pasos) => {
     const { deps, listEntriesForOrders, finishConditioningAliveById } = montar('ok', { pasos });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).resolves.toEqual({
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
     });
     expect(listEntriesForOrders).not.toHaveBeenCalled();
@@ -574,7 +577,7 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
       ],
     });
 
-    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderConditioningTakenError,
     );
     expect(findConditioningStepsById).not.toHaveBeenCalled();
@@ -595,9 +598,48 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
     });
 
     await expect(
-      createFinishConditioning(deps)({ ...ACTOR, companyId: otra }, { orderId: PEDIDO }),
+      createFinishConditioning(deps)({ ...ACTOR, companyId: otra }, { orderId: PEDIDO, lineId: LINEA }),
     ).rejects.toBeInstanceOf(ConditioningStepsPendingError);
     expect(findConditioningStepsById).toHaveBeenCalledWith(RECETA, otra);
     expect(listEntriesForOrders).toHaveBeenCalledWith(otra, [PEDIDO]);
+  });
+});
+
+describe('finishConditioning — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  it('R11, R12: con dos recetas EN_ACONDICIONAMIENTO del mismo pedido, termina y anota solo la nombrada', async () => {
+    const { deps, finishConditioningAliveById, append, listOfOrder } = montar('ok');
+
+    await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: OTRA_LINEA });
+
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, OTRA_LINEA);
+    expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_LINEA, EMPRESA, ANA, AHORA);
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: OTRA_LINEA }));
+  });
+
+  it('R10: con el pedido PARCIAL decide por el estado de la receta; el pedido no se lee', async () => {
+    const { deps, findAliveById, finishConditioningAliveById } = montar('ok');
+
+    await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
+
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin abrir la transaccion', async () => {
+    const { deps, run } = montar('ok');
+
+    await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: uuid('6') })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin acondicionamiento.modificar no lee la receta', async () => {
+    const { deps, findAliveLineSummary } = montar('ok');
+
+    await expect(
+      createFinishConditioning(deps)({ ...ACTOR, permissions: ['empaque.modificar'] }, { orderId: PEDIDO, lineId: LINEA }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

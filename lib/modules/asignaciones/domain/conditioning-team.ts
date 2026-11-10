@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 
+import { orderLineInputSchema } from './order-line-target';
 import {
   ConditioningTeamEmptyError,
   ConditioningTeamMemberNotAllowedError,
@@ -41,9 +42,8 @@ const uniqueIdList = z
     message: 'la lista no admite identificadores repetidos',
   });
 
-export const startConditioningSchema = z
-  .strictObject({
-    orderId: z.string().uuid(),
+export const startConditioningSchema = orderLineInputSchema
+  .extend({
     userIds: uniqueIdList,
     workGroupIds: uniqueIdList,
   })

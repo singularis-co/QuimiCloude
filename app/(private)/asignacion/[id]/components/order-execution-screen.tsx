@@ -52,6 +52,7 @@ export const ORDER_EXECUTION_SCREEN_TESTID = 'order-execution-screen';
 export const ORDER_EXECUTION_FINISH_ERROR_TESTID = 'order-execution-finish-error';
 export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
+export const ORDER_EXECUTION_LINE_ID_FIELD = 'lineId';
 export const ORDER_EXECUTION_STEP_POSITION_FIELD = 'stepPosition';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_ACTIONS_TESTID = 'order-execution-actions';
@@ -114,14 +115,16 @@ type StepChange = { readonly direction: 'advance' | 'go_back'; readonly position
 export type OrderExecutionScreenProps = {
   /** La de la pagina: `PENDIENTE` sin comenzar o `EN_CURSO` retomado. */
   readonly execution: StartedOrderExecution;
+  /** La receta del pedido que se ejecuta, la de la direccion. */
+  readonly lineId: string;
 };
 
-export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreenProps) {
+export function OrderExecutionScreen({ execution: opened, lineId }: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const startFormRef = useRef<HTMLFormElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const [startState, startFormAction, startPending] = useActionState<StartFormState, FormData>(
-    () => startAssignedOrderAction(opened.orderId),
+    () => startAssignedOrderAction(opened.orderId, lineId),
     START_INITIAL_STATE,
   );
   // Comenzado aqui, la ejecucion es la que devolvio la accion; si no, la que abrio la pagina.
@@ -149,6 +152,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
   const error = state.status === 'error' ? state : undefined;
   const evidence = useStepEvidence({
     orderId: execution.orderId,
+    lineId,
     phase: 'manufacturing',
     steps: execution.steps,
     initial: execution.evidence,
@@ -167,7 +171,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
   function handleStepChange({ direction, position }: StepChange) {
     setStepPosition(position);
     stepMoves.current = stepMoves.current
-      .then(() => recordStepMoveAction({ orderId: execution.orderId, direction, stepPosition: position }))
+      .then(() => recordStepMoveAction({ orderId: execution.orderId, lineId, direction, stepPosition: position }))
       .then(
         () => undefined,
         () => undefined,
@@ -311,6 +315,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
 
       <OrderCancelDialog
         orderId={execution.orderId}
+        lineId={lineId}
         stepPosition={stepPosition}
         open={cancelOpen}
         onOpenChange={setCancelOpen}
@@ -322,6 +327,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
           name={ORDER_EXECUTION_ORDER_ID_FIELD}
           defaultValue={execution.orderId}
         />
+        <input type="hidden" name={ORDER_EXECUTION_LINE_ID_FIELD} defaultValue={lineId} />
         <input
           type="hidden"
           name={ORDER_EXECUTION_STEP_POSITION_FIELD}

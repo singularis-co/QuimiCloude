@@ -1,9 +1,10 @@
 // lib/modules/asignaciones/domain/evidence-target.ts
 /**
- * Quien puede tocar las fotos de evidencia de un pedido, y con que lista de pasos. Fabricacion:
- * `asignaciones.ejecutar`, responsable asignado y `EN_CURSO`. Envasado: `empaque.modificar`,
- * `EN_EMPAQUE` y quien empaca es el actor. Acondicionamiento: `acondicionamiento.modificar`,
- * `EN_ACONDICIONAMIENTO` y quien acondiciona es el actor. Cualquier otro caso es `order_not_found`:
+ * Quien puede tocar las fotos de evidencia de una receta del pedido, y con que lista de pasos. El
+ * estado y la persona son los de la linea nombrada. Fabricacion: `asignaciones.ejecutar`,
+ * responsable asignado del pedido y `EN_CURSO`. Envasado: `empaque.modificar`, `EN_EMPAQUE` y quien
+ * empaca es el actor. Acondicionamiento: `acondicionamiento.modificar`, `EN_ACONDICIONAMIENTO` y
+ * quien acondiciona es el actor. Cualquier otro caso es `order_not_found`:
  * «no es tuyo», «no existe» y «ya no esta en curso» son la misma respuesta desde fuera.
  *
  * Los pasos son los de la formula ACTUAL, leidos en cada llamada: un switch encendido despues de
@@ -11,7 +12,7 @@
  */
 import { requireAnyPermission, requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError } from './errors';
-import { onlyLineOf } from './only-order-line';
+import { findLine } from './order-line-target';
 
 import type { EvidencePhase } from './step-evidence';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -42,18 +43,14 @@ async function resolveManufacturing(
   deps: EvidenceTargetDeps,
   actor: Actor,
   orderId: string,
+  lineId: string,
 ): Promise<EvidenceTarget> {
   const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
   if (!ids.includes(orderId)) throw new OrderNotFoundError();
 
-  const order = await deps.orders.findAliveById(orderId, actor.companyId);
-  if (order === null) throw new OrderNotFoundError();
-  if (order.status === 'BLOQUEADO') throw new OrderBlockedError();
-  if (order.status !== 'EN_CURSO') throw new OrderNotFoundError();
-
-  const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_CURSO'], 1, 1);
-  const summary = onlyLineOf(page);
-  if (summary === undefined) throw new OrderNotFoundError();
+  const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+  if (summary.status === 'BLOQUEADO') throw new OrderBlockedError();
+  if (summary.status !== 'EN_CURSO') throw new OrderNotFoundError();
 
   const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
   return { lineId: summary.lineId, recipeId: summary.recipeId, steps: content?.steps ?? [] };
@@ -63,10 +60,10 @@ async function resolvePacking(
   deps: EvidenceTargetDeps,
   actor: Actor,
   orderId: string,
+  lineId: string,
 ): Promise<EvidenceTarget> {
-  const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_EMPAQUE'], 1, 1);
-  const summary = onlyLineOf(page);
-  if (summary?.packedBy !== actor.id) throw new OrderNotFoundError();
+  const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+  if (summary.status !== 'EN_EMPAQUE' || summary.packedBy !== actor.id) throw new OrderNotFoundError();
 
   const steps = await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId);
   return { lineId: summary.lineId, recipeId: summary.recipeId, steps: steps ?? [] };
@@ -76,10 +73,12 @@ async function resolveConditioning(
   deps: EvidenceTargetDeps,
   actor: Actor,
   orderId: string,
+  lineId: string,
 ): Promise<EvidenceTarget> {
-  const page = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['EN_ACONDICIONAMIENTO'], 1, 1);
-  const summary = onlyLineOf(page);
-  if (summary?.conditionedBy !== actor.id) throw new OrderNotFoundError();
+  const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+  if (summary.status !== 'EN_ACONDICIONAMIENTO' || summary.conditionedBy !== actor.id) {
+    throw new OrderNotFoundError();
+  }
 
   const steps = await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, actor.companyId);
   return { lineId: summary.lineId, recipeId: summary.recipeId, steps: steps ?? [] };
@@ -90,18 +89,19 @@ export async function resolveEvidenceTarget(
   deps: EvidenceTargetDeps,
   actor: Actor | null | undefined,
   orderId: string,
+  lineId: string,
   phase: EvidencePhase,
 ): Promise<EvidenceTarget> {
   if (phase === 'manufacturing') {
     requirePermission(actor, 'asignaciones.ejecutar');
-    return resolveManufacturing(deps, actor, orderId);
+    return resolveManufacturing(deps, actor, orderId, lineId);
   }
   if (phase === 'packing') {
     requirePermission(actor, 'empaque.modificar');
-    return resolvePacking(deps, actor, orderId);
+    return resolvePacking(deps, actor, orderId, lineId);
   }
   requirePermission(actor, 'acondicionamiento.modificar');
-  return resolveConditioning(deps, actor, orderId);
+  return resolveConditioning(deps, actor, orderId, lineId);
 }
 
 /**

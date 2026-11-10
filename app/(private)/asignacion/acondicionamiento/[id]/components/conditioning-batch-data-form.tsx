@@ -23,6 +23,7 @@ export const CONDITIONING_BATCH_DATA_LOCKED_TESTID = 'conditioning-batch-data-lo
 
 export const CONDITIONING_BATCH_DATA_FIELDS = {
   orderId: 'orderId',
+  lineId: 'lineId',
   lot: 'lot',
   expiryDate: 'expiryDate',
   productionDate: 'productionDate',
@@ -65,6 +66,7 @@ function initialValues(form: ConditioningBatchForm): Values {
 
 export type ConditioningBatchDataFormProps = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly form: ConditioningBatchForm;
   /** Cada línea ya escrita como en el reparto, por `presentationId`; la compone la pantalla de servidor. */
   readonly divergentLabels: Readonly<Record<string, string>>;
@@ -74,6 +76,7 @@ export type ConditioningBatchDataFormProps = {
 
 export function ConditioningBatchDataForm({
   orderId,
+  lineId,
   form,
   divergentLabels,
   locked = false,
@@ -155,6 +158,7 @@ export function ConditioningBatchDataForm({
         data-locked={locked ? 'true' : undefined}
       >
         <input type="hidden" name={CONDITIONING_BATCH_DATA_FIELDS.orderId} value={orderId} />
+        <input type="hidden" name={CONDITIONING_BATCH_DATA_FIELDS.lineId} value={lineId} />
 
         {form.kind === 'divergent' ? (
           <Notice

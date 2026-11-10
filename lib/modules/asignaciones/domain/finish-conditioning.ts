@@ -1,18 +1,15 @@
 // lib/modules/asignaciones/domain/finish-conditioning.ts
 /**
- * Terminar el acondicionamiento: `EN_ACONDICIONAMIENTO -> TERMINADO`, con `finished_at`, solo si el
- * actor es quien acondiciona el pedido, completo los pasos de acondicionamiento de la formula
- * actual y todas las lineas del reparto tienen sus datos de lote. No toca inventario. La transicion
- * y su anotacion en el registro de ejecucion van en una transaccion.
+ * Terminar el acondicionamiento de la receta nombrada: `EN_ACONDICIONAMIENTO -> TERMINADO`, con
+ * `finished_at`, solo si el actor es quien la acondiciona, completo los pasos de acondicionamiento
+ * de la formula actual y todas las lineas del reparto tienen sus datos de lote. No toca inventario.
+ * La transicion y su anotacion en el registro de ejecucion van en una transaccion.
  *
- * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `TERMINADO`, el
- * filtro de estado con el que se leyo ya no lo encontraria.
+ * Devuelve el numero visible del pedido, leido antes de la transicion.
  *
  * Los datos de lote se comprueban fuera de la transicion: no se pueden borrar y el reparto no se
  * edita en este estado, asi que una vez completos siguen completos.
  */
-import { z } from 'zod';
-
 import { requirePermission, type Actor } from './actor';
 import { missingBatchDataLines } from './conditioning-batch-data';
 import { lineConditioningProgress } from './conditioning-steps';
@@ -26,7 +23,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -35,14 +32,9 @@ import type { FinishedBatchLabels } from '@/lib/modules/inventario';
 import {
   formatOrderNumber,
   type AssignedOrderSummary,
-  type OrderAssignmentTarget,
   type OrderCatalog,
 } from '@/lib/modules/pedidos';
 import type { RecipeConditioningStepsReader } from '@/lib/modules/recetas';
-
-const finishConditioningSchema = z.strictObject({
-  orderId: z.string().uuid(),
-});
 
 export type FinishConditioningDeps = {
   readonly orders: OrderCatalog;
@@ -87,26 +79,15 @@ export function createFinishConditioning(
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'acondicionamiento.modificar');
 
-    const parsed = finishConditioningSchema.safeParse(input);
+    const parsed = orderLineInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId } = parsed.data;
+    const { orderId, lineId } = parsed.data;
 
-    const target: OrderAssignmentTarget | null = await deps.orders.findAliveById(orderId, actor.companyId);
-    if (target === null) throw new OrderNotFoundError();
-
-    const summaryPage = await deps.orders.listAliveSummariesByIds(
-      actor.companyId,
-      [orderId],
-      [target.status],
-      1,
-      1,
-    );
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
     const numberText = formatOrderNumber(summary.number);
 
-    // Quien no acondiciona el pedido recibe su error aunque falten datos: no le toca saberlo.
-    if (target.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
+    // Quien no acondiciona la receta recibe su error aunque falten datos: no le toca saberlo.
+    if (summary.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) throw new OrderConditioningTakenError();
 
     await assertConditioningStepsCompleted(deps, actor.companyId, summary);

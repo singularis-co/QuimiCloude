@@ -65,6 +65,7 @@ const SCREEN_DIR = path.join(process.cwd(), 'app', '(private)', 'asignacion', 'a
 
 const ROW: ConditioningOrderDetail = {
   id: 'order-a',
+  lineId: 'linea-order-a',
   numberText: '2026-0000040',
   recipeName: 'Jarabe simple',
   quantity: '20.5000',

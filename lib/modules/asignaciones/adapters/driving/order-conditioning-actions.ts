@@ -34,6 +34,16 @@ async function currentActor(): Promise<Actor | null> {
   };
 }
 
+function orderLineFromFormData(formData: FormData): { orderId: unknown; lineId: unknown } {
+  return { orderId: formData.get('orderId'), lineId: formData.get('lineId') };
+}
+
+function revalidateConditioningOrder({ orderId, lineId }: { orderId?: unknown; lineId?: unknown }): void {
+  if (typeof orderId === 'string' && typeof lineId === 'string') {
+    revalidatePath(conditioningOrderRoute(orderId, lineId));
+  }
+}
+
 export type StartConditioningResult = { status: 'success' } | ErrorState;
 
 /** Comienza con el equipo marcado y se queda en el detalle, que ya ofrece «Terminar». */
@@ -45,7 +55,7 @@ export async function startConditioningAction(
 
   try {
     await asignaciones.startConditioning(actor, {
-      orderId: formData.get('orderId'),
+      ...orderLineFromFormData(formData),
       userIds: formData.getAll('userIds'),
       workGroupIds: formData.getAll('workGroupIds'),
     });
@@ -53,14 +63,13 @@ export async function startConditioningAction(
     return toErrorState(error);
   }
 
-  const orderId = formData.get('orderId');
-  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  revalidateConditioningOrder(orderLineFromFormData(formData));
   return { status: 'success' };
 }
 
 export type FinishConditioningResult = { status: 'success' } | ErrorState;
 
-/** Deja el pedido `TERMINADO` y vuelve a «Por acondicionar» con el aviso. */
+/** Deja la receta `TERMINADO` y vuelve a «Por acondicionar» con el aviso. */
 export async function finishConditioningAction(
   _prevState: FinishConditioningResult,
   formData: FormData,
@@ -69,7 +78,7 @@ export async function finishConditioningAction(
 
   let numberText: string;
   try {
-    ({ numberText } = await asignaciones.finishConditioning(actor, { orderId: formData.get('orderId') }));
+    ({ numberText } = await asignaciones.finishConditioning(actor, orderLineFromFormData(formData)));
   } catch (error) {
     return toErrorState(error);
   }
@@ -81,18 +90,17 @@ export async function finishConditioningAction(
 
 export type SaveConditioningBatchDataResult = { status: 'idle' } | { status: 'success' } | ErrorState;
 
-/** Guarda los datos de lote del pedido y se queda en el detalle. El campo culpable lo deduce el
+/** Guarda los datos de lote de la receta y se queda en el detalle. El campo culpable lo deduce el
  *  formulario por el `code`. */
 export async function saveConditioningBatchDataAction(
   _prevState: SaveConditioningBatchDataResult,
   formData: FormData,
 ): Promise<SaveConditioningBatchDataResult> {
   const actor = await currentActor();
-  const orderId = formData.get('orderId');
 
   try {
     await asignaciones.saveConditioningBatchData(actor, {
-      orderId,
+      ...orderLineFromFormData(formData),
       lot: formData.get('lot'),
       expiryDate: formData.get('expiryDate'),
       productionDate: formData.get('productionDate'),
@@ -101,7 +109,7 @@ export async function saveConditioningBatchDataAction(
     return toErrorState(error);
   }
 
-  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  revalidateConditioningOrder(orderLineFromFormData(formData));
   return { status: 'success' };
 }
 
@@ -120,7 +128,8 @@ export async function recordConditioningStepAction(input: unknown): Promise<Reco
     return toErrorState(error);
   }
 
-  const orderId = typeof input === 'object' && input !== null ? (input as { orderId?: unknown }).orderId : undefined;
-  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  if (typeof input === 'object' && input !== null) {
+    revalidateConditioningOrder(input as { orderId?: unknown; lineId?: unknown });
+  }
   return { status: 'success', data };
 }

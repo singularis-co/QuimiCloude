@@ -1,16 +1,14 @@
 // lib/modules/asignaciones/domain/get-conditioning-order.ts
 /**
- * El detalle del acondicionador: la misma fila de «Por acondicionar» para un unico pedido. Abre un
- * `POR_ACONDICIONAR` o `EN_ACONDICIONAMIENTO` de la empresa, lo acondicione quien lo acondicione, y
- * un `TERMINADO` o `ENTREGADO` solo si lo acondiciono el actor. Todo lo demas es `order_not_found`,
+ * El detalle del acondicionador: la misma fila de «Por acondicionar» para una receta. Abre una
+ * `POR_ACONDICIONAR` o `EN_ACONDICIONAMIENTO` de la empresa, la acondicione quien la acondicione, y
+ * una `TERMINADO` o `ENTREGADO` solo si la acondiciono el actor. Todo lo demas es `order_not_found`,
  * el mismo error que un pedido inexistente, para no revelar que existe en otro estado o de otra
  * persona.
  *
  * Los datos de lote solo los ve quien acondiciona, que es el unico que puede escribirlos. Los pasos
  * de acondicionamiento y su avance, solo mientras lo acondiciona: en cualquier otro caso ni se leen.
  */
-import { z } from 'zod';
-
 import { requirePermission, type Actor } from './actor';
 import {
   composeConditioningOrderDetail,
@@ -21,7 +19,7 @@ import {
 import { lineConditioningProgress } from './conditioning-steps';
 import { OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ComposeOrderRowsDeps } from './compose-order-rows';
 import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
@@ -33,13 +31,9 @@ import type { FinishedBatchLabels } from '@/lib/modules/inventario';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
-const DETAIL_STATUSES = ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const;
+const DETAIL_STATUSES: ReadonlySet<string> = new Set(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO']);
 const CLOSED_STATUSES: ReadonlySet<string> = new Set(['TERMINADO', 'ENTREGADO']);
 const TEAM_STATUSES: ReadonlySet<string> = new Set(['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO']);
-
-const getConditioningOrderSchema = z.strictObject({
-  orderId: z.string().uuid(),
-});
 
 export type GetConditioningOrderDeps = ComposeOrderRowsDeps & {
   readonly orders: OrderCatalog;
@@ -77,13 +71,12 @@ export function createGetConditioningOrder(
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'acondicionamiento.modificar');
 
-    const parsed = getConditioningOrderSchema.safeParse(input);
+    const parsed = orderLineInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId } = parsed.data;
+    const { orderId, lineId } = parsed.data;
 
-    const summaryPage = await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], DETAIL_STATUSES, 1, 1);
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    if (!DETAIL_STATUSES.has(summary.status)) throw new OrderNotFoundError();
     const isConditioner = summary.conditionedBy === actor.id;
     if (CLOSED_STATUSES.has(summary.status) && !isConditioner) throw new OrderNotFoundError();
 

@@ -91,6 +91,7 @@ function pagina(items: readonly unknown[], page = 1) {
 
 const ASIGNADO: AssignedOrderView = {
   id: 'order-1',
+  lineId: 'linea-order-1',
   numberText: '2026-000123',
   recipeName: 'Jarabe simple',
   quantity: '12.500',
@@ -106,6 +107,7 @@ const ASIGNADO: AssignedOrderView = {
 
 const TERMINADO: FinishedOrderView = {
   id: 'order-2',
+  lineId: 'linea-order-2',
   numberText: '2026-000124',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
@@ -120,6 +122,7 @@ const TERMINADO: FinishedOrderView = {
 
 const DE_LA_EMPRESA: CompanyOrderView = {
   id: 'order-3',
+  lineId: 'linea-order-3',
   numberText: '2026-000125',
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
@@ -136,6 +139,7 @@ const DE_LA_EMPRESA: CompanyOrderView = {
 
 const POR_EMPACAR = {
   id: 'order-4',
+  lineId: 'linea-order-4',
   numberText: '2026-0000030',
   recipeName: 'Jarabe simple',
   quantity: '20',

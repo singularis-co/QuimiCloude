@@ -55,11 +55,12 @@ const FRASCO = uuid('c');
 const GARRAFA = uuid('d');
 const SIN_NOMBRE = uuid('e');
 const LINEA_1 = uuid('f');
+const LINEA_2 = `aaaaaaaa${uuid('f').slice(8)}`;
 
 type Datos = { lot: string; expiryDate: string; productionDate: string };
 
 function entrada(overrides?: Partial<Datos>) {
-  return { orderId: PEDIDO_1, lot: 'CR-2610', expiryDate: '2027-04-30', productionDate: HOY, ...overrides };
+  return { orderId: PEDIDO_1, lineId: LINEA_1, lot: 'CR-2610', expiryDate: '2027-04-30', productionDate: HOY, ...overrides };
 }
 
 function presentacion(id: string, name: string): PresentationRef {
@@ -76,19 +77,13 @@ function montar(options?: {
   const status = options?.status === undefined ? 'EN_ACONDICIONAMIENTO' : options.status;
   const conditionedBy = options?.conditionedBy === undefined ? ANA : options.conditionedBy;
   const orden: string[] = [];
-  const findAliveById = vi.fn(async () => {
-    orden.push('pedido');
-    return status === null ? null : { id: PEDIDO_1, status };
-  });
-  const listAliveSummariesByIds = vi.fn(async () => {
+  // El pedido esta PARCIAL a proposito: el guardado decide por la linea y no lee el pedido.
+  const findAliveById = vi.fn(async () => ({ id: PEDIDO_1, status: 'PARCIAL', activeLineStatuses: [] }));
+  // Dos recetas del pedido en el mismo estado y de la misma persona; `status: null` = ninguna existe.
+  const findAliveLineSummary = vi.fn(async (_companyId: string, _orderId: string, lineId: string) => {
     orden.push('resumen');
-    return {
-      items: status === null ? [] : [{ id: PEDIDO_1, lineId: LINEA_1, status, conditionedBy, presentationLines: [] }],
-      total: 1,
-      page: 1,
-      pageSize: 1,
-      totalPages: 1,
-    };
+    if (status === null || (lineId !== LINEA_1 && lineId !== LINEA_2)) return null;
+    return { id: PEDIDO_1, lineId, status, conditionedBy, presentationLines: [] };
   });
   const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => {
     orden.push('lotes');
@@ -106,7 +101,7 @@ function montar(options?: {
     pasos: orden,
   });
   const deps = {
-    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary } as unknown as OrderCatalog,
     batches: { listOfOrder },
     presentations: { findRefs },
     transaction,
@@ -116,13 +111,13 @@ function montar(options?: {
     deps,
     orden,
     findAliveById,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     listOfOrder,
     findRefs,
     run,
     writeForOrder,
     append,
-    todos: [findAliveById, listAliveSummariesByIds, listOfOrder, findRefs, run, writeForOrder, append],
+    todos: [findAliveById, findAliveLineSummary, listOfOrder, findRefs, run, writeForOrder, append],
   };
 }
 
@@ -152,19 +147,21 @@ describe('R24 — el permiso antes de todo', () => {
   );
 });
 
-describe('R19 — la entrada es exactamente `{ orderId, lot, expiryDate, productionDate }`', () => {
+describe('R19 — la entrada es exactamente `{ orderId, lineId, lot, expiryDate, productionDate }`', () => {
   it.each([
     ['no es un objeto', 7],
-    ['sin lote', { orderId: PEDIDO_1, expiryDate: '2027-04-30', productionDate: HOY }],
-    ['sin vencimiento', { orderId: PEDIDO_1, lot: 'L', productionDate: HOY }],
-    ['sin dia de produccion', { orderId: PEDIDO_1, lot: 'L', expiryDate: '2027-04-30' }],
+    ['sin lineId (R14)', { orderId: PEDIDO_1, lot: 'L', expiryDate: '2027-04-30', productionDate: HOY }],
+    ['lineId no uuid (R14)', { ...entrada(), lineId: 'linea-1' }],
+    ['sin lote', { orderId: PEDIDO_1, lineId: LINEA_1, expiryDate: '2027-04-30', productionDate: HOY }],
+    ['sin vencimiento', { orderId: PEDIDO_1, lineId: LINEA_1, lot: 'L', productionDate: HOY }],
+    ['sin dia de produccion', { orderId: PEDIDO_1, lineId: LINEA_1, lot: 'L', expiryDate: '2027-04-30' }],
     ['orderId no uuid', { ...entrada(), orderId: 'pedido' }],
     ['clave de mas', { ...entrada(), companyId: EMPRESA }],
     ['con `lines` (datos por linea)', { ...entrada(), lines: [{ batchId: LOTE_A, lot: 'L' }] }],
     ['con `batchId`', { ...entrada(), batchId: LOTE_A }],
     [
       'la forma por linea de QC-219',
-      { orderId: PEDIDO_1, lines: [{ batchId: LOTE_A, lot: 'L', expiryDate: '2027-04-30', productionDate: HOY }] },
+      { orderId: PEDIDO_1, lineId: LINEA_1, lines: [{ batchId: LOTE_A, lot: 'L', expiryDate: '2027-04-30', productionDate: HOY }] },
     ],
     ['lote vacio', entrada({ lot: '' })],
     ['lote de solo espacios', entrada({ lot: '   ' })],
@@ -226,32 +223,31 @@ describe('R24 — los errores del pedido, antes de las fechas y de la escritura'
   });
 
   it.each(['POR_ACONDICIONAR', 'PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'CANCELADO', 'BLOQUEADO'] as const)(
-    'R24: %s -> `order_not_conditionable`, sin leer el resumen ni escribir',
+    'R24: %s -> `order_not_conditionable`, sin leer los lotes ni escribir',
     async (status) => {
-      const { deps, listAliveSummariesByIds, writeForOrder } = montar({ status, conditionedBy: null });
+      const { deps, listOfOrder, writeForOrder } = montar({ status, conditionedBy: null });
 
       expect(await fallo(deps, entrada())).toBeInstanceOf(OrderNotConditionableError);
-      expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+      expect(listOfOrder).not.toHaveBeenCalled();
       expect(writeForOrder).not.toHaveBeenCalled();
     },
   );
 
   it('R24: la empresa sale del actor, nunca de la entrada', async () => {
-    const { deps, findAliveById, listAliveSummariesByIds, writeForOrder } = montar();
+    const { deps, findAliveLineSummary, writeForOrder } = montar();
 
     await createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada());
 
-    expect(findAliveById).toHaveBeenCalledWith(PEDIDO_1, EMPRESA);
-    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO_1], ['EN_ACONDICIONAMIENTO'], 1, 1);
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, LINEA_1);
     expect(writeForOrder.mock.calls[0]?.[0]).toMatchObject({ companyId: EMPRESA, orderId: PEDIDO_1, actorId: ANA });
   });
 
-  it('R24: el orden de los puertos es pedido -> resumen -> lotes y presentaciones -> escritura -> anotacion', async () => {
+  it('R24: el orden de los puertos es resumen -> lotes y presentaciones -> escritura -> anotacion', async () => {
     const { deps, orden } = montar();
 
     await createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada());
 
-    expect(orden).toEqual(['pedido', 'resumen', 'lotes', 'presentaciones', 'transaccion', 'escribe-lotes', 'anota']);
+    expect(orden).toEqual(['resumen', 'lotes', 'presentaciones', 'transaccion', 'escribe-lotes', 'anota']);
   });
 });
 
@@ -365,11 +361,11 @@ describe('R18, R27 — guarda en los estados corregibles', () => {
   it.each(['EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'] as const)(
     'R18, R27: en %s propio escribe una sola terna para el pedido, con el reloj del caso de uso',
     async (status) => {
-      const { deps, writeForOrder, listAliveSummariesByIds } = montar({ status });
+      const { deps, writeForOrder, findAliveLineSummary } = montar({ status });
 
       await expect(createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada())).resolves.toBeUndefined();
 
-      expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO_1], [status], 1, 1);
+      expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, LINEA_1);
       expect(writeForOrder).toHaveBeenCalledTimes(1);
       expect(writeForOrder).toHaveBeenCalledWith({
         companyId: EMPRESA,
@@ -453,5 +449,42 @@ describe('QC-283 — cada guardado anota una foto en el registro de ejecucion', 
 
     expect(await fallo(deps, entrada())).toBe(roto);
     expect(writeForOrder).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('saveConditioningBatchData — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  it('R11, R12: con dos recetas EN_ACONDICIONAMIENTO del mismo pedido, lee y escribe solo los lotes de la nombrada', async () => {
+    const { deps, listOfOrder, writeForOrder, append } = montar();
+
+    await createSaveConditioningBatchData(deps)(ACONDICIONADOR, { ...entrada(), lineId: LINEA_2 });
+
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, LINEA_2);
+    expect(writeForOrder.mock.calls[0]?.[0]).toMatchObject({ orderId: PEDIDO_1, orderLineId: LINEA_2 });
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: LINEA_2 }));
+  });
+
+  it('R10: con el pedido PARCIAL decide por el estado de la receta; el pedido no se lee', async () => {
+    const { deps, findAliveById, writeForOrder } = montar();
+
+    await createSaveConditioningBatchData(deps)(ACONDICIONADOR, entrada());
+
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(writeForOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin escribir', async () => {
+    const { deps, writeForOrder } = montar();
+
+    expect(await fallo(deps, { ...entrada(), lineId: uuid('6') })).toBeInstanceOf(OrderNotFoundError);
+    expect(writeForOrder).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin acondicionamiento.modificar no lee la receta', async () => {
+    const { deps, findAliveLineSummary } = montar();
+
+    expect(await fallo(deps, entrada(), { ...ACONDICIONADOR, permissions: ['empaque.modificar'] })).toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

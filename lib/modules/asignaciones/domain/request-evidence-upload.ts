@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import { EvidenceLimitError, EvidenceNotFoundError, ValidationError } from './errors';
 import { requireEvidenceAccess, resolveEvidenceTarget, type EvidenceTargetDeps } from './evidence-target';
+import { orderLineInputSchema } from './order-line-target';
 import { EVIDENCE_PHASES, MAX_EVIDENCE_PER_STEP, buildEvidencePath, stepRequiresEvidence } from './step-evidence';
 
 import type { Actor } from './actor';
@@ -13,8 +14,7 @@ import type { EvidenceSignedUpload, EvidenceStorage } from '../ports/evidence-st
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 
 /** Estricto: ningun campo de la entrada puede elegir la ruta. */
-const requestEvidenceUploadSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const requestEvidenceUploadSchema = orderLineInputSchema.extend({
   phase: z.enum(EVIDENCE_PHASES),
   stepPosition: z.number().int().min(1),
   replacesEvidenceId: z.string().uuid().optional(),
@@ -38,9 +38,9 @@ export function createRequestEvidenceUpload(
 
     const parsed = requestEvidenceUploadSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, phase, stepPosition, replacesEvidenceId } = parsed.data;
+    const { orderId, lineId, phase, stepPosition, replacesEvidenceId } = parsed.data;
 
-    const target = await resolveEvidenceTarget(deps, actor, orderId, phase);
+    const target = await resolveEvidenceTarget(deps, actor, orderId, lineId, phase);
     if (!stepRequiresEvidence(target.steps, stepPosition)) {
       throw new ValidationError(`el paso ${String(stepPosition)} no pide evidencia`);
     }

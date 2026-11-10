@@ -31,7 +31,9 @@ import {
   actoresSinElPermiso,
   anotacionDePaso,
   fotoDeAcondicionamiento,
+  lineaDe,
   montarRegistroDePaso,
+  otraLineaDe,
   uuid,
 } from './conditioning-doubles';
 
@@ -70,7 +72,7 @@ describe('recordConditioningStep — autorizacion (R31)', () => {
     expect(actor.permissions).not.toContain('recetas.consultar');
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS });
 
-    await expect(createRecordConditioningStep(deps)(actor, { orderId: PEDIDO_1, stepPosition: 1 })).resolves.toEqual({
+    await expect(createRecordConditioningStep(deps)(actor, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 })).resolves.toEqual({
       completedCount: 1,
       allCompleted: false,
     });
@@ -81,11 +83,13 @@ describe('recordConditioningStep — autorizacion (R31)', () => {
 describe('recordConditioningStep — entrada', () => {
   it.each([
     ['orderId que no es uuid', { orderId: 'pedido', stepPosition: 1 }],
-    ['sin stepPosition', { orderId: PEDIDO_1 }],
-    ['stepPosition 0', { orderId: PEDIDO_1, stepPosition: 0 }],
-    ['stepPosition decimal', { orderId: PEDIDO_1, stepPosition: 1.5 }],
-    ['un responsable que no es uuid', { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: ['beto'] }],
-    ['una clave de mas', { orderId: PEDIDO_1, stepPosition: 1, companyId: EMPRESA }],
+    ['sin stepPosition', { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1) }],
+    ['sin lineId (R14)', { orderId: PEDIDO_1, stepPosition: 1 }],
+    ['lineId que no es uuid (R14)', { orderId: PEDIDO_1, lineId: 'linea-1', stepPosition: 1 }],
+    ['stepPosition 0', { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 0 }],
+    ['stepPosition decimal', { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1.5 }],
+    ['un responsable que no es uuid', { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: ['beto'] }],
+    ['una clave de mas', { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1, companyId: EMPRESA }],
     ['no es un objeto', PEDIDO_1],
   ])('R31: %s rechaza con invalid_input sin tocar ningun puerto', async (_nombre, entrada) => {
     const { deps, todos } = montarRegistroDePaso({ pasos: PASOS });
@@ -101,7 +105,7 @@ describe('recordConditioningStep — entrada', () => {
 
     await expect(
       createRecordConditioningStep(deps)(ACONDICIONADOR, {
-        orderId: PEDIDO_1,
+        orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1),
         stepPosition: 2,
         responsibleUserIds: [BETO, BETO],
       }),
@@ -124,7 +128,7 @@ describe('recordConditioningStep — solo sobre un pedido EN_ACONDICIONAMIENTO d
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).rejects.toBeInstanceOf(clase);
     expect(findConditioningStepsById).not.toHaveBeenCalled();
     expect(listEntriesForOrders).not.toHaveBeenCalled();
@@ -140,30 +144,29 @@ describe('recordConditioningStep — solo sobre un pedido EN_ACONDICIONAMIENTO d
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [CARLA] }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [CARLA] }),
     ).rejects.toBeInstanceOf(OrderNotConditionableError);
     expect(append).not.toHaveBeenCalled();
   });
 
   it('R32: un pedido inexistente o de otra empresa es order_not_found sin escribir', async () => {
-    const { deps, listAliveSummariesByIds, append } = montarRegistroDePaso({ target: null, pasos: PASOS });
+    const { deps, findConditioningStepsById, append } = montarRegistroDePaso({ target: null, pasos: PASOS });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    expect(findConditioningStepsById).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
   });
 
   it('R32: la empresa sale siempre del actor: pedido, receta, registro y anotacion', async () => {
     const actor: Actor = { ...ACONDICIONADOR, companyId: OTRA_EMPRESA };
-    const { deps, findAliveById, listAliveSummariesByIds, findConditioningStepsById, listEntriesForOrders, append } =
+    const { deps, findAliveLineSummary, findConditioningStepsById, listEntriesForOrders, append } =
       montarRegistroDePaso({ pasos: PASOS });
 
-    await createRecordConditioningStep(deps)(actor, { orderId: PEDIDO_1, stepPosition: 1 });
+    await createRecordConditioningStep(deps)(actor, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 });
 
-    expect(findAliveById).toHaveBeenCalledWith(PEDIDO_1, OTRA_EMPRESA);
-    expect(listAliveSummariesByIds.mock.calls[0]?.[0]).toBe(OTRA_EMPRESA);
+    expect(findAliveLineSummary).toHaveBeenCalledWith(OTRA_EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1));
     expect(findConditioningStepsById).toHaveBeenCalledWith(RECETA, OTRA_EMPRESA);
     expect(listEntriesForOrders).toHaveBeenCalledWith(OTRA_EMPRESA, [PEDIDO_1]);
     expect(append.mock.calls[0]?.[0]).toMatchObject({ companyId: OTRA_EMPRESA });
@@ -173,7 +176,7 @@ describe('recordConditioningStep — solo sobre un pedido EN_ACONDICIONAMIENTO d
     const { deps, append } = montarRegistroDePaso({ pasos: null });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).rejects.toBeInstanceOf(ConditioningStepOutOfOrderError);
     expect(append).not.toHaveBeenCalled();
   });
@@ -183,14 +186,14 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
   it('R27: sin avance, el paso 1 se anota como conditioning_step_advance sin responsables', async () => {
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS });
 
-    const resultado = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 });
+    const resultado = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 });
 
     expect(resultado).toEqual({ completedCount: 1, allCompleted: false });
     expect(append).toHaveBeenCalledWith({
       action: 'conditioning_step_advance',
       companyId: EMPRESA,
       orderId: PEDIDO_1,
-      orderLineId: `linea-${PEDIDO_1}`,
+      orderLineId: lineaDe(PEDIDO_1),
       userId: ANA,
       stepPosition: 1,
       responsibleUserIds: null,
@@ -204,7 +207,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
       anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null), anotacionDePaso('conditioning_step_advance', 2, [BETO])],
     });
 
-    const resultado = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 3 });
+    const resultado = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 3 });
 
     expect(resultado).toEqual({ completedCount: 3, allCompleted: true });
     expect(append).toHaveBeenCalledTimes(1);
@@ -215,7 +218,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
     const { deps, append } = montarRegistroDePaso({ pasos: [SIMPLE] });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 1, allCompleted: true });
     expect(append.mock.calls[0]?.[0]).toMatchObject({ action: 'conditioning_steps_complete' });
   });
@@ -226,7 +229,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
       anotaciones: [anotacionDePaso('conditioning_step_advance', 1, null)],
     });
 
-    const error = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 3 }).catch(
+    const error = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 3 }).catch(
       (e: unknown) => e,
     );
 
@@ -239,7 +242,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
     const { deps, append, listEntriesForOrders } = montarRegistroDePaso({ pasos: PASOS });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 4 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 4 }),
     ).rejects.toBeInstanceOf(ConditioningStepOutOfOrderError);
     expect(listEntriesForOrders).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
@@ -249,7 +252,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
     const { deps, append } = montarRegistroDePaso({ pasos: [] });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).rejects.toBeInstanceOf(ConditioningStepOutOfOrderError);
     expect(append).not.toHaveBeenCalled();
   });
@@ -258,7 +261,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS, desenlace: 'step_already_completed' });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).rejects.toBeInstanceOf(ConditioningStepOutOfOrderError);
     expect(append).toHaveBeenCalledTimes(1);
   });
@@ -271,7 +274,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
     });
 
     await createRecordConditioningStep(deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+      orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1),
       stepPosition: 2,
       responsibleUserIds: [CARLA, ANA],
     });
@@ -280,7 +283,7 @@ describe('recordConditioningStep — completa solo el siguiente (R27, R35)', () 
       action: 'conditioning_step_advance',
       companyId: EMPRESA,
       orderId: PEDIDO_1,
-      orderLineId: `linea-${PEDIDO_1}`,
+      orderLineId: lineaDe(PEDIDO_1),
       userId: ANA,
       stepPosition: 2,
       responsibleUserIds: [CARLA, ANA],
@@ -296,13 +299,13 @@ describe('recordConditioningStep — evidencia (R21)', () => {
       fotos: [fotoDeAcondicionamiento(2)],
     });
 
-    const error = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }).catch(
+    const error = await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }).catch(
       (e: unknown) => e,
     );
 
     expect(error).toBeInstanceOf(EvidenceRequiredError);
     expect((error as EvidenceRequiredError).code).toBe('evidence_required');
-    expect(listByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`, 'conditioning');
+    expect(listByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1), 'conditioning');
     expect(append).not.toHaveBeenCalled();
   });
 
@@ -310,7 +313,7 @@ describe('recordConditioningStep — evidencia (R21)', () => {
     const { deps, append } = montarRegistroDePaso({ pasos: [CON_FOTO, SIMPLE], fotos: [fotoDeAcondicionamiento(1)] });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 1, allCompleted: false });
     expect(append).toHaveBeenCalledTimes(1);
   });
@@ -318,7 +321,7 @@ describe('recordConditioningStep — evidencia (R21)', () => {
   it('R21: un paso sin evidencia no consulta las fotos', async () => {
     const { deps, listByLine } = montarRegistroDePaso({ pasos: PASOS });
 
-    await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 });
+    await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 });
 
     expect(listByLine).not.toHaveBeenCalled();
   });
@@ -331,7 +334,7 @@ describe('recordConditioningStep — responsables (R23)', () => {
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO, anotaciones: COMPLETADO_1 });
 
     const error = await createRecordConditioningStep(deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+      orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1),
       stepPosition: 2,
       responsibleUserIds: [],
     }).catch((e: unknown) => e);
@@ -345,7 +348,7 @@ describe('recordConditioningStep — responsables (R23)', () => {
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO, anotaciones: COMPLETADO_1 });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2 }),
     ).rejects.toBeInstanceOf(ConditioningResponsiblesRequiredError);
     expect(append).not.toHaveBeenCalled();
   });
@@ -358,21 +361,21 @@ describe('recordConditioningStep — responsables (R23)', () => {
     });
 
     const error = await createRecordConditioningStep(deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+      orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1),
       stepPosition: 2,
       responsibleUserIds: [BETO, EXTRANO],
     }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ConditioningResponsibleNotAllowedError);
     expect((error as ConditioningResponsibleNotAllowedError).code).toBe('conditioning_responsible_not_allowed');
-    expect(listByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, `linea-${PEDIDO_1}`);
+    expect(listByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1));
     expect(append).not.toHaveBeenCalled();
   });
 
   it('R23: el acondicionador solo, sin nadie del equipo, vale como responsable', async () => {
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO, anotaciones: COMPLETADO_1 });
 
-    await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [ANA] });
+    await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [ANA] });
 
     expect(append.mock.calls[0]?.[0]).toMatchObject({ stepPosition: 2, responsibleUserIds: [ANA] });
   });
@@ -381,7 +384,7 @@ describe('recordConditioningStep — responsables (R23)', () => {
     const { deps, append, listByLineInCompany } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1, responsibleUserIds: [BETO] }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1, responsibleUserIds: [BETO] }),
     ).rejects.toBeInstanceOf(ValidationError);
     expect(listByLineInCompany).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
@@ -395,10 +398,10 @@ describe('recordConditioningStep — responsables (R23)', () => {
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [EXTRANO] }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [EXTRANO] }),
     ).rejects.toBeInstanceOf(ConditioningResponsibleNotAllowedError);
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [] }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [] }),
     ).rejects.toBeInstanceOf(ConditioningResponsiblesRequiredError);
     expect(append).not.toHaveBeenCalled();
   });
@@ -414,7 +417,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO, anotaciones: HASTA_EL_2 });
 
     const resultado = await createRecordConditioningStep(deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+      orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1),
       stepPosition: 2,
       responsibleUserIds: [BETO, CARLA],
     });
@@ -425,7 +428,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
       action: 'conditioning_responsibles_change',
       companyId: EMPRESA,
       orderId: PEDIDO_1,
-      orderLineId: `linea-${PEDIDO_1}`,
+      orderLineId: lineaDe(PEDIDO_1),
       userId: ANA,
       stepPosition: 2,
       responsibleUserIds: [BETO, CARLA],
@@ -441,7 +444,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [CARLA, BETO] }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [CARLA, BETO] }),
     ).resolves.toEqual({ completedCount: 2, allCompleted: false });
     expect(append).not.toHaveBeenCalled();
   });
@@ -451,8 +454,8 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     const mismo = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO, anotaciones });
     const vuelta = montarRegistroDePaso({ pasos: PASOS, equipo: EQUIPO, anotaciones });
 
-    await createRecordConditioningStep(mismo.deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [CARLA] });
-    await createRecordConditioningStep(vuelta.deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2, responsibleUserIds: [BETO] });
+    await createRecordConditioningStep(mismo.deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [CARLA] });
+    await createRecordConditioningStep(vuelta.deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2, responsibleUserIds: [BETO] });
 
     expect(mismo.append).not.toHaveBeenCalled();
     expect(vuelta.append).toHaveBeenCalledTimes(1);
@@ -466,7 +469,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     const { deps, append } = montarRegistroDePaso({ pasos: PASOS, anotaciones: HASTA_EL_2 });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 2, allCompleted: false });
     expect(append).not.toHaveBeenCalled();
   });
@@ -478,7 +481,7 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 1, allCompleted: false });
     expect(listByLine).not.toHaveBeenCalled();
     expect(append).not.toHaveBeenCalled();
@@ -492,13 +495,13 @@ describe('recordConditioningStep — revisitar un paso completado (R28)', () => 
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 3, allCompleted: true });
   });
 });
 
 describe('recordConditioningStep — la receta del resumen', () => {
-  const OTRA_LINEA = 'linea-otra-receta';
+  const OTRA_LINEA = otraLineaDe(PEDIDO_1);
 
   it('R13: el avance de la otra receta del pedido no cuenta: su paso 1 completado no deja saltar al 2 en esta', async () => {
     const { deps, append } = montarRegistroDePaso({
@@ -507,13 +510,56 @@ describe('recordConditioningStep — la receta del resumen', () => {
     });
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 2 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 2 }),
     ).rejects.toBeInstanceOf(ConditioningStepOutOfOrderError);
     expect(append).not.toHaveBeenCalled();
 
     await expect(
-      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, stepPosition: 1 }),
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 }),
     ).resolves.toEqual({ completedCount: 1, allCompleted: false });
-    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: `linea-${PEDIDO_1}`, stepPosition: 1 }));
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: lineaDe(PEDIDO_1), stepPosition: 1 }));
+  });
+});
+
+describe('recordConditioningStep — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  const SIMPLE_PASOS = [{ blocks: [] }, { blocks: [] }];
+
+  it('R11, R12: con dos recetas EN_ACONDICIONAMIENTO del mismo pedido, completa el paso de la nombrada', async () => {
+    const { deps, append, findAliveLineSummary } = montarRegistroDePaso({ pasos: SIMPLE_PASOS });
+
+    await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: otraLineaDe(PEDIDO_1), stepPosition: 1 });
+
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, otraLineaDe(PEDIDO_1));
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: otraLineaDe(PEDIDO_1), stepPosition: 1 }));
+  });
+
+  it('R10: con el pedido PARCIAL decide por el estado de la receta; el pedido no se lee', async () => {
+    const { deps, findAliveById, append } = montarRegistroDePaso({ pasos: SIMPLE_PASOS });
+
+    await createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 });
+
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(append).toHaveBeenCalledTimes(1);
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin escribir', async () => {
+    const { deps, append } = montarRegistroDePaso({ pasos: SIMPLE_PASOS });
+
+    await expect(
+      createRecordConditioningStep(deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: uuid('9'), stepPosition: 1 }),
+    ).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(append).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin acondicionamiento.modificar no lee la receta', async () => {
+    const { deps, findAliveLineSummary } = montarRegistroDePaso({ pasos: SIMPLE_PASOS });
+
+    await expect(
+      createRecordConditioningStep(deps)(
+        { ...ACONDICIONADOR, permissions: ['asignaciones.consultar'] },
+        { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1), stepPosition: 1 },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

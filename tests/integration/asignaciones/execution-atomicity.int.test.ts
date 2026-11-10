@@ -38,7 +38,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-pr
   };
 });
 
-import { asignaciones, pedidos } from '@/lib/composition';
+import { asignaciones as asignacionesDeComposicion, pedidos } from '@/lib/composition';
 import {
   MaterialShortageError,
   OrderBlockedError,
@@ -48,11 +48,15 @@ import {
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { createWithFirstBatch } from '@/lib/modules/inventario/adapters/driven/persistence/product-prisma';
 import { prisma } from '@/lib/shared/db/prisma';
+import { onOnlyRecipe } from '../../helpers/only-recipe-plant';
 import { singleLineInput } from '@/tests/helpers/single-recipe-order';
 
-import { packedCountsOfPlan } from '../../helpers/packed-counts';
+import { packingCountsOfPlan } from '../../helpers/packed-counts';
 import { seedPackaging } from '../../helpers/packaging-seed';
 import { syncOnlyLine } from '../../helpers/only-order-line';
+
+// Pedidos de una sola receta: el puente pone su unica linea en la entrada de cada caso de uso.
+const asignaciones = onOnlyRecipe(asignacionesDeComposicion, prisma);
 
 /** El rechazo viene de Postgres: uno de los dos CHECK de posicion de la tabla. */
 const CHECK_DE_POSICION = /order_execution_entries_(step_position_positive|packing_has_no_step)/u;
@@ -519,7 +523,7 @@ describe('asignaciones · la anotacion y el pedido se confirman juntos (Postgres
   it('R20: anotar un paso sobre un ENTREGADO no escribe nada', async () => {
     await conFixture(async (fixture) => {
       const { orderId } = await enEmpaque(fixture);
-      await asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) });
+      await asignaciones.finishPacking(empacador(fixture), { orderId, counts: await packingCountsOfPlan(orderId) });
       expect((await pedidoEnBase(orderId)).status).toBe('POR_ACONDICIONAR');
       // Ninguna accion de la aplicacion escribe ENTREGADO: se fija a mano para sembrar el caso.
       await prisma.order.update({ where: { id: orderId }, data: { status: 'ENTREGADO' } }).then(() => syncOnlyLine(prisma, orderId));
@@ -558,10 +562,10 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       const antes = await anotaciones(orderId);
       const apartadoAntes = await apartadoNeto(orderId);
       const asientosAntes = await asientosDeInventario(orderId);
-      const lines = await packedCountsOfPlan(orderId);
+      const counts = await packingCountsOfPlan(orderId);
 
       await expect(
-        conAnotacionFallida(() => asignaciones.finishPacking(empacador(fixture), { orderId, lines })),
+        conAnotacionFallida(() => asignaciones.finishPacking(empacador(fixture), { orderId, counts })),
       ).rejects.toThrow(CHECK_DE_POSICION);
 
       const fila = await pedidoEnBase(orderId);
@@ -585,7 +589,7 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       const apartadoAntes = await apartadoNeto(orderId);
       const asientosAntes = await asientosDeInventario(orderId);
 
-      await expect(asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) })).rejects.toBeInstanceOf(
+      await expect(asignaciones.finishPacking(empacador(fixture), { orderId, counts: await packingCountsOfPlan(orderId) })).rejects.toBeInstanceOf(
         PackagingStockInsufficientError,
       );
 
@@ -618,7 +622,7 @@ describe('asignaciones · el empaque y su anotacion se confirman juntos (Postgre
       const { orderId } = await porEmpacar(fixture);
 
       await asignaciones.startPacking(empacador(fixture), { orderId });
-      await asignaciones.finishPacking(empacador(fixture), { orderId, lines: await packedCountsOfPlan(orderId) });
+      await asignaciones.finishPacking(empacador(fixture), { orderId, counts: await packingCountsOfPlan(orderId) });
 
       const fila = await pedidoEnBase(orderId);
       expect(fila.status).toBe('POR_ACONDICIONAR');

@@ -85,13 +85,17 @@ const SESSION_USER = {
 const SESSION_CONTEXT = { userId: 'user-1', companyId: 'company-1', roleName: 'Administrador de acondicionamiento' };
 
 const ORDER_ID = '3f1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38';
+const LINE_ID = '9a2d4c6e-1b3f-4a5c-8d7e-0f1a2b3c4d5e';
 const BETO = '22222222-2222-4222-8222-222222222222';
 const CARLA = '44444444-4444-4444-8444-444444444444';
 const GRUPO = '88888888-8888-4888-8888-888888888888';
 
 function formData(entradas: ReadonlyArray<readonly [string, string]>): FormData {
   const datos = new FormData();
-  for (const [clave, valor] of entradas) datos.append(clave, valor);
+  for (const [clave, valor] of entradas) {
+    datos.append(clave, valor);
+    if (clave === 'orderId') datos.append('lineId', LINE_ID);
+  }
   return datos;
 }
 
@@ -117,7 +121,7 @@ describe('startConditioningAction — Comenzar con equipo se queda en el detalle
 
     expect(startConditioningMock).toHaveBeenCalledWith(
       { id: 'user-1', companyId: 'company-1', permissions: SESSION_USER.permissions },
-      { orderId: ORDER_ID, userIds: [BETO, CARLA], workGroupIds: [GRUPO] },
+      { orderId: ORDER_ID, lineId: LINE_ID, userIds: [BETO, CARLA], workGroupIds: [GRUPO] },
     );
   });
 
@@ -128,6 +132,7 @@ describe('startConditioningAction — Comenzar con equipo se queda en el detalle
 
     expect(startConditioningMock).toHaveBeenCalledWith(expect.anything(), {
       orderId: ORDER_ID,
+      lineId: LINE_ID,
       userIds: [],
       workGroupIds: [],
     });
@@ -146,7 +151,7 @@ describe('startConditioningAction — Comenzar con equipo se queda en el detalle
     );
 
     expect(resultado).toEqual({ status: 'success' });
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}?receta=${LINE_ID}`);
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
@@ -183,6 +188,7 @@ describe('finishConditioningAction — Terminar vuelve a «Por acondicionar» co
 
     expect(finishConditioningMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-1' }), {
       orderId: ORDER_ID,
+      lineId: LINE_ID,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith('/asignacion');
     expect(redirectMock).toHaveBeenCalledWith('/asignacion?vista=por_acondicionar&acondicionado=2026-0000007');
@@ -252,7 +258,7 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
 
     expect(saveConditioningBatchDataMock).toHaveBeenCalledWith(
       { id: 'user-1', companyId: 'company-1', permissions: SESSION_USER.permissions },
-      { orderId: ORDER_ID, lot: 'CR-2610', expiryDate: '2027-04-30', productionDate: '2026-10-01' },
+      { orderId: ORDER_ID, lineId: LINE_ID, lot: 'CR-2610', expiryDate: '2027-04-30', productionDate: '2026-10-01' },
     );
   });
 
@@ -271,6 +277,7 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
 
     expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
       orderId: ORDER_ID,
+      lineId: LINE_ID,
       lot: 'CR-A',
       expiryDate: '2027-04-30',
       productionDate: '2026-10-01',
@@ -284,6 +291,7 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
 
     expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
       orderId: ORDER_ID,
+      lineId: LINE_ID,
       lot: null,
       expiryDate: null,
       productionDate: null,
@@ -301,6 +309,7 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
 
     expect(saveConditioningBatchDataMock.mock.calls[0]?.[1]).toEqual({
       orderId: ORDER_ID,
+      lineId: LINE_ID,
       lot: VACIO,
       expiryDate: VACIO,
       productionDate: VACIO,
@@ -316,7 +325,7 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
     );
 
     expect(resultado).toEqual({ status: 'success' });
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}?receta=${LINE_ID}`);
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
@@ -347,7 +356,7 @@ describe('QC-284 T10 — saveConditioningBatchDataAction: un solo juego de datos
 });
 
 describe('QC-299 T13 — recordConditioningStepAction: dejar atras un paso de acondicionamiento', () => {
-  const INPUT = { orderId: ORDER_ID, stepPosition: 2, responsibleUserIds: [BETO] };
+  const INPUT = { orderId: ORDER_ID, lineId: LINE_ID, stepPosition: 2, responsibleUserIds: [BETO] };
 
   it('R31: pasa el actor de la sesion y la entrada tal cual; exito -> devuelve el avance y revalida el detalle', async () => {
     recordConditioningStepMock.mockResolvedValue({ completedCount: 2, allCompleted: false });
@@ -359,7 +368,7 @@ describe('QC-299 T13 — recordConditioningStepAction: dejar atras un paso de ac
       INPUT,
     );
     expect(resultado).toEqual({ status: 'success', data: { completedCount: 2, allCompleted: false } });
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith(`/asignacion/acondicionamiento/${ORDER_ID}?receta=${LINE_ID}`);
     expect(redirectMock).not.toHaveBeenCalled();
   });
 

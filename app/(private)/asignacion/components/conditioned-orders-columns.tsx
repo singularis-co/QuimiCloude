@@ -22,7 +22,7 @@ export function buildConditionedOrdersColumns({
     ...buildFinishedOrdersColumns(),
     assignmentActionsColumn<FinishedOrderView>({
       canViewTrace,
-      enterHref: (order) => conditioningOrderRoute(order.id),
+      enterHref: (order) => conditioningOrderRoute(order.id, order.lineId),
     }),
   ];
 }

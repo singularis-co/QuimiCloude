@@ -31,6 +31,7 @@ type EntriesByStep = Readonly<Record<number, readonly Entry[]>>;
 
 export type UseStepEvidenceOptions = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly phase: EvidencePhase;
   readonly steps: readonly EvidenceStep[];
   readonly initial: readonly StepEvidenceView[];
@@ -72,6 +73,7 @@ function withServerPhotos(
 
 export function useStepEvidence({
   orderId,
+  lineId,
   phase,
   steps,
   initial,
@@ -98,6 +100,7 @@ export function useStepEvidence({
       file,
       {
         orderId,
+        lineId,
         phase,
         stepPosition: position,
         ...(replaces === undefined ? {} : { replacesEvidenceId: replaces.id }),
@@ -170,7 +173,7 @@ export function useStepEvidence({
     if (removing.current.has(id)) return;
     removing.current.add(id);
     try {
-      const result = await removeEvidenceAction({ orderId, phase, evidenceId: id });
+      const result = await removeEvidenceAction({ orderId, lineId, phase, evidenceId: id });
       if (result.status === 'success') {
         update(position, (current) => withServerPhotos(current, result.data.photos, null));
       } else {

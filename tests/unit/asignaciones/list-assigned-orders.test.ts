@@ -468,6 +468,7 @@ describe('QC-123 — el pedido asignado no lleva importe (R15)', () => {
     expect(Object.keys(fila ?? {}).sort()).toEqual(
       [
         'id',
+        'lineId',
         'numberText',
         'recipeName',
         'quantity',
@@ -734,5 +735,27 @@ describe('QC-305 — la lista de pedidos asignados no lleva el coste real (R24)'
     const sinEnvases: 'packagingCost' extends keyof AssignedOrderSummary ? false : true = true;
     const sinPrecio: 'salePrice' extends keyof AssignedOrderSummary ? false : true = true;
     expect([sinReal, sinEnvases, sinPrecio]).toEqual([true, true, true]);
+  });
+});
+
+describe('listAssignedOrders — una fila por receta', () => {
+  it('R2: dos recetas del mismo pedido salen como dos filas con el mismo `id` y su propio `lineId`', async () => {
+    const pedido = pedidoId(1);
+    const { deps } = montar({
+      ids: [pedido],
+      page: {
+        items: [resumen(pedido, { lineId: 'linea-a' }), resumen(pedido, { lineId: 'linea-b', status: 'EN_CURSO' })],
+        total: 2,
+      },
+      refs: [receta()],
+    });
+
+    const pagina = await createListAssignedOrders(deps)(ACTOR, { page: 1 });
+
+    expect(pagina.items.map((fila) => [fila.id, fila.lineId, fila.status])).toEqual([
+      [pedido, 'linea-a', 'PENDIENTE'],
+      [pedido, 'linea-b', 'EN_CURSO'],
+    ]);
+    expect(pagina.total).toBe(2);
   });
 });

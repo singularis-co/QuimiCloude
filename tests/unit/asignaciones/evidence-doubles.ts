@@ -201,8 +201,9 @@ export function bucket(options?: {
 }
 
 /**
- * El acceso al pedido: por defecto Ana es responsable del pedido `EN_CURSO` (fabricacion). Con
- * `status: 'EN_EMPAQUE'` y `packedBy`, el de envasado.
+ * El acceso al pedido: por defecto Ana es responsable del pedido y sus dos recetas, `LINEA` y
+ * `OTRA_LINEA`, estan `EN_CURSO` (fabricacion). Con `status: 'EN_EMPAQUE'` y `packedBy`, el de
+ * envasado. Las dos recetas comparten estado y persona.
  */
 export function acceso(options?: {
   readonly asignados?: readonly string[];
@@ -213,18 +214,11 @@ export function acceso(options?: {
 }) {
   const status = options?.status === undefined ? 'EN_CURSO' : options.status;
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.asignados ?? [PEDIDO]);
-  const findAliveById = vi.fn(async (_id: string, companyId: string) =>
-    status === null || companyId !== EMPRESA ? null : { id: PEDIDO, status },
-  );
-  const listAliveSummariesByIds = vi.fn(
-    async (companyId: string, _ids: readonly string[], statuses: readonly OrderStatus[]) => {
-      const visible = status !== null && companyId === EMPRESA && statuses.includes(status);
-      const items = visible
-        ? [{ id: PEDIDO, lineId: LINEA, recipeId: RECETA, status, packedBy: options?.packedBy ?? null }]
-        : [];
-      return { items, total: items.length, page: 1, pageSize: 1, totalPages: 1 };
-    },
-  );
+  const findAliveLineSummary = vi.fn(async (companyId: string, orderId: string, lineId: string) => {
+    const visible =
+      status !== null && companyId === EMPRESA && orderId === PEDIDO && (lineId === LINEA || lineId === OTRA_LINEA);
+    return visible ? { id: PEDIDO, lineId, recipeId: RECETA, status, packedBy: options?.packedBy ?? null } : null;
+  });
   const findExecutionContentById = vi.fn(async () => ({
     steps: options?.pasosFabricacion ?? PASOS_FABRICACION,
   }));
@@ -232,15 +226,14 @@ export function acceso(options?: {
 
   const deps = {
     assignments: { listOrderIdsByUserInCompany },
-    orders: { findAliveById, listAliveSummariesByIds },
+    orders: { findAliveLineSummary },
     recipes: { findExecutionContentById },
     packingSteps: { findPackingStepsById },
   } as unknown as EvidenceTargetDeps;
 
   const puertos = [
     listOrderIdsByUserInCompany,
-    findAliveById,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     findExecutionContentById,
     findPackingStepsById,
   ];

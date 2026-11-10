@@ -60,8 +60,8 @@ describe('la ruta de pedidos se declara una sola vez (R2)', () => {
   it('R14: conditioningOrderRoute cuelga de /asignacion, no de la ruta de pedidos', async () => {
     const { conditioningOrderRoute } = await import('@/lib/shared/routes');
 
-    expect(conditioningOrderRoute('order-a')).toBe('/asignacion/acondicionamiento/order-a');
-    expect(conditioningOrderRoute('order-a').startsWith(ORDERS_ROUTE)).toBe(false);
+    expect(conditioningOrderRoute('order-a', 'linea-a')).toBe('/asignacion/acondicionamiento/order-a?receta=linea-a');
+    expect(conditioningOrderRoute('order-a', 'linea-a').startsWith(ORDERS_ROUTE)).toBe(false);
   });
 
   it('nadie redeclara la constante: private-nav la IMPORTA (R2)', () => {

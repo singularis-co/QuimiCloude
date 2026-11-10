@@ -20,6 +20,7 @@ export const CONDITIONING_ACTIONS_TEXTS = {
 
 export type ConditioningActionsProps = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly orderNumber: string;
   /** Con candidatos se habilita «Acondicionar»; sin ellos se pinta deshabilitado. */
   readonly startCandidates?: ConditioningTeamCandidates | null;
@@ -37,6 +38,7 @@ export type ConditioningActionsProps = {
  */
 export function ConditioningActions({
   orderId,
+  lineId,
   orderNumber,
   startCandidates = null,
   canFinish = false,
@@ -91,6 +93,7 @@ export function ConditioningActions({
           open={openDialog === 'start'}
           onOpenChange={handleOpenChange}
           orderId={orderId}
+          lineId={lineId}
           orderNumber={orderNumber}
           candidates={startCandidates}
         />
@@ -101,6 +104,7 @@ export function ConditioningActions({
           open={openDialog === 'finish'}
           onOpenChange={handleOpenChange}
           orderId={orderId}
+          lineId={lineId}
           orderNumber={orderNumber}
         />
       ) : null}

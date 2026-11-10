@@ -89,6 +89,7 @@ export function createListAssignedOrders(
       const rowComposed = composed.get(row.lineId);
       return {
         id: row.id,
+        lineId: row.lineId,
         numberText: formatOrderNumber(row.number),
         recipeName: rowComposed?.recipeName ?? null,
         quantity: row.quantity,

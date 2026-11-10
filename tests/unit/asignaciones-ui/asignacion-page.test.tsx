@@ -57,9 +57,7 @@ import {
 } from '@/app/(private)/asignacion/components';
 import {
   CANCELLED_ORDER_PARAM,
-  DELIVERED_ORDER_PACKAGES_PARAM,
-  DELIVERED_ORDER_PARAM,
-  DELIVERED_ORDER_PRODUCT_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   PACKED_ORDER_PARAM,
 } from '@/lib/shared/routes';
 
@@ -602,23 +600,18 @@ describe('R13 — qué aviso sale con cada parámetro', () => {
     return encontrarPorTipo(arbol, OrderOutcomeNotice).map((aviso) => aviso.props);
   }
 
-  it('R13: `entregado` pinta el aviso `delivered` con los envases y el producto', async () => {
+  it('R19: `fabricado` pinta el aviso de por empacar, sin envases ni producto', async () => {
     getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
 
-    expect(
-      await avisos({
-        [DELIVERED_ORDER_PARAM]: '2026-0000001',
-        [DELIVERED_ORDER_PACKAGES_PARAM]: '3',
-        [DELIVERED_ORDER_PRODUCT_PARAM]: 'Jarabe · Botella 1L',
-      }),
-    ).toEqual([
-      {
-        kind: 'delivered',
-        orderNumber: '2026-0000001',
-        packages: '3',
-        productName: 'Jarabe · Botella 1L',
-      },
+    expect(await avisos({ [MANUFACTURED_ORDER_PARAM]: '2026-0000001' })).toEqual([
+      { kind: 'delivered', orderNumber: '2026-0000001' },
     ]);
+  });
+
+  it('R19: `entregado` ya no pinta ningun aviso', async () => {
+    getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
+
+    expect(await avisos({ entregado: '2026-0000001' })).toEqual([]);
   });
 
   it('R13: `cancelado` pinta el aviso `cancelled`', async () => {

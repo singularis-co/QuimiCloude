@@ -74,7 +74,7 @@ export function ConditionedOrdersTable({
         tableId={CONDITIONED_ORDERS_TABLE_ID}
         columns={columns}
         rows={rows}
-        getRowId={(order) => order.id}
+        getRowId={(order) => order.lineId}
         params={params}
         totalPages={totalPages}
         onParamsChange={(next) => navigate(assignedOrdersListHref(next, view))}

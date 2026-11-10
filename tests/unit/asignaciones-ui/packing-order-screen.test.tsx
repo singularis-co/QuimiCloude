@@ -7,8 +7,9 @@ import {
   PACKING_ORDER_FINISH_DIALOG_TESTID,
   PACKING_ORDER_FINISH_ERROR_TESTID,
   PACKING_ORDER_FINISH_FORM_TESTID,
+  PACKING_ORDER_COUNTS_FIELD,
   PACKING_ORDER_ID_FIELD,
-  PACKING_ORDER_LINES_FIELD,
+  PACKING_ORDER_LINE_ID_FIELD,
   PACKING_FINISH_DIALOG_TEXTS,
   PACKING_FINISH_LINE_TESTID,
   PACKING_FINISH_REASON_TESTID,
@@ -72,14 +73,15 @@ const FINISH_CONFIRM_TEXTS = {
 } as const;
 
 const PLAN_SIN_CAMBIOS = [
-  { lineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
-  { lineId: 'linea-2', packedPackages: 2, reason: null, reasonOther: null },
+  { presentationLineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
+  { presentationLineId: 'linea-2', packedPackages: 2, reason: null, reasonOther: null },
 ];
 const MISSING_DISTRIBUTION_TEXT = 'Falta el reparto: lo define quien edita pedidos';
 
 function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-0000030',
     recipeName: 'Jarabe simple',
     quantity: '12.5',
@@ -339,7 +341,7 @@ describe('pantalla del Empacador — Comenzar y Terminar piden confirmacion', ()
       expect(caso.action).not.toHaveBeenCalled();
     });
 
-    it(`${caso.nombre}: confirmar envia el formulario con el id del pedido`, async () => {
+    it(`R11: ${caso.nombre}: confirmar envia el formulario con el pedido y la receta`, async () => {
       caso.action.mockResolvedValue({ status: 'success' });
       pintar(caso.order());
 
@@ -352,6 +354,7 @@ describe('pantalla del Empacador — Comenzar y Terminar piden confirmacion', ()
       expect(caso.other).not.toHaveBeenCalled();
       const [, formData] = caso.action.mock.calls[0] as [unknown, FormData];
       expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
+      expect(formData.get(PACKING_ORDER_LINE_ID_FIELD)).toBe('linea-order-1');
     });
   }
 });
@@ -483,7 +486,8 @@ describe('pantalla del Empacador — los pasos de envasado', () => {
     expect(startPackingActionMock).not.toHaveBeenCalled();
     const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
     expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
-    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual(PLAN_SIN_CAMBIOS);
+    expect(formData.get(PACKING_ORDER_LINE_ID_FIELD)).toBe('linea-order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_COUNTS_FIELD)))).toEqual(PLAN_SIN_CAMBIOS);
   });
 
   it('R21: mientras termina, el ultimo boton dice «Terminando…» como el boton de hoy', async () => {
@@ -847,7 +851,7 @@ describe('el diálogo del conteo real desde el pie', () => {
     expect(dialogo).toHaveTextContent('2026-0000030 · Jarabe simple · Cantidad 12.5 kg');
   });
 
-  it('R1, R16: con una línea distinta y su motivo, el formulario lleva el conteo real en `lines`', async () => {
+  it('R1, R16, R11: con una línea distinta y su motivo, el formulario lleva el conteo real en `counts`', async () => {
     finishPackingActionMock.mockResolvedValue({ status: 'success' });
     pintar(enEmpaque());
     const user = setupUser();
@@ -861,9 +865,10 @@ describe('el diálogo del conteo real desde el pie', () => {
     await waitFor(() => expect(finishPackingActionMock).toHaveBeenCalledTimes(1));
     const [, formData] = finishPackingActionMock.mock.calls[0] as [unknown, FormData];
     expect(formData.get(PACKING_ORDER_ID_FIELD)).toBe('order-1');
-    expect(JSON.parse(String(formData.get(PACKING_ORDER_LINES_FIELD)))).toEqual([
-      { lineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
-      { lineId: 'linea-2', packedPackages: 1, reason: 'rotura', reasonOther: null },
+    expect(formData.get(PACKING_ORDER_LINE_ID_FIELD)).toBe('linea-order-1');
+    expect(JSON.parse(String(formData.get(PACKING_ORDER_COUNTS_FIELD)))).toEqual([
+      { presentationLineId: 'linea-1', packedPackages: 5, reason: null, reasonOther: null },
+      { presentationLineId: 'linea-2', packedPackages: 1, reason: 'rotura', reasonOther: null },
     ]);
   });
 

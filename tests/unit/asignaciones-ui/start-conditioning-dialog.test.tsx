@@ -63,7 +63,7 @@ afterEach(() => {
 
 function pintar() {
   return render(
-    <ConditioningActions orderId={ORDER_ID} orderNumber="2026-0000040" startCandidates={CANDIDATES} />,
+    <ConditioningActions lineId="linea-1" orderId={ORDER_ID} orderNumber="2026-0000040" startCandidates={CANDIDATES} />,
   );
 }
 

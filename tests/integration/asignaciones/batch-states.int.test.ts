@@ -50,6 +50,7 @@ import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, evidenceStorageUnused } from '../../helpers/evidence-off';
 import { syncOnlyLine } from '../../helpers/only-order-line';
+import { onOnlyRecipe } from '../../helpers/only-recipe-plant';
 
 const summaryReaders = realOrderSummaries();
 
@@ -138,7 +139,7 @@ function casosDelOperador(fixture: Fixture) {
     listAliveSummariesInCompany: noUsado('listAliveSummariesInCompany'),
     listSummariesByIdsIncludingDeleted: noUsado('listSummariesByIdsIncludingDeleted'),
     listDeliveryProgressByIdsIncludingDeleted: noUsado('listDeliveryProgressByIdsIncludingDeleted'),
-    findAliveLineSummary: noUsado('findAliveLineSummary'),
+    findAliveLineSummary: summaryReaders.findAliveLineSummary,
     listRecipeOutlinesByIdsIncludingDeleted: noUsado('listRecipeOutlinesByIdsIncludingDeleted'),
     transitionAliveById: noUsado('transitionAliveById'),
     startPackingAliveById: noUsado('startPackingAliveById'),
@@ -158,7 +159,7 @@ function casosDelOperador(fixture: Fixture) {
   } as unknown as PresentationCatalog;
   const assignments = createOrderAssignmentRepository(fixture.tx);
 
-  return {
+  return onOnlyRecipe({
     list: createListAssignedOrders({
       assignments,
       orders,
@@ -180,7 +181,7 @@ function casosDelOperador(fixture: Fixture) {
       evidence: evidenceRepositoryUnused,
       storage: evidenceStorageUnused,
     }),
-  };
+  }, fixture.tx);
 }
 
 describe('QC-138 — el Operador ve el pedido BLOQUEADO y no lo arranca (integracion)', () => {

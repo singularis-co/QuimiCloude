@@ -386,7 +386,7 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     invocar: async () =>
       (
         await import('@/lib/modules/asignaciones/adapters/driving/order-execution-actions')
-      ).startAssignedOrderAction('no-es-un-uuid'),
+      ).startAssignedOrderAction('no-es-un-uuid', 'no-es-un-uuid'),
   },
   {
     // Abrir la pantalla sin comenzar el pedido: mismo archivo de `driving/`, mismo `currentActor`.
@@ -395,7 +395,7 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
     invocar: async () =>
       (
         await import('@/lib/modules/asignaciones/adapters/driving/order-execution-actions')
-      ).openAssignedOrderAction('no-es-un-uuid'),
+      ).openAssignedOrderAction('no-es-un-uuid', 'no-es-un-uuid'),
   },
   {
     // Anadida por QC-168, que estrena la pantalla de empaque: su archivo de `driving/` resuelve
@@ -643,6 +643,7 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
         await import('@/lib/modules/asignaciones/adapters/driving/step-evidence-actions')
       ).requestEvidenceUploadAction({
         orderId: '7a2f1b40-3c5d-4e69-9a18-0d4b6f2e8c31',
+        lineId: '9a2d4c6e-1b3f-4a5c-8d7e-0f1a2b3c4d5e',
         phase: 'manufacturing',
         stepPosition: 1,
       }),

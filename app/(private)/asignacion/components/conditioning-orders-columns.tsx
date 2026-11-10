@@ -81,7 +81,7 @@ export function buildConditioningOrdersColumns({
     },
     assignmentActionsColumn<ConditioningOrderRow>({
       canViewTrace,
-      enterHref: (order) => conditioningOrderRoute(order.id),
+      enterHref: (order) => conditioningOrderRoute(order.id, order.lineId),
     }),
   ];
 }

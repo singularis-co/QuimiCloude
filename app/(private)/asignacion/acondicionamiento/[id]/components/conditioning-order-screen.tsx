@@ -112,6 +112,7 @@ export function ConditioningOrderScreen({
         <CardContent>
           <ConditioningBatchDataForm
             orderId={order.id}
+            lineId={order.lineId}
             form={batchData.form}
             divergentLabels={Object.fromEntries(
               batchData.lines.map((line) => [line.presentationId, orderDistributionFullText([line])]),
@@ -135,6 +136,7 @@ export function ConditioningOrderScreen({
       ) : null}
       <ConditioningActions
         orderId={order.id}
+        lineId={order.lineId}
         orderNumber={order.numberText}
         startCandidates={canStart ? candidates : null}
         canFinish={canFinish}
@@ -205,6 +207,7 @@ export function ConditioningOrderScreen({
         <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <ConditioningStepsPanel
             orderId={order.id}
+            lineId={order.lineId}
             conditioning={conditioning}
             view={showsStepReader ? 'steps' : 'done'}
             onViewChange={setStepsView}
