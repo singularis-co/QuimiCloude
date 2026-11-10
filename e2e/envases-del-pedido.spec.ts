@@ -153,7 +153,8 @@ const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 /** La ejecución: el `h1` es solo la receta y el número va en el rótulo de la cabecera (R23 de QC-265). */
 const EXECUTION_SCREEN_TESTID = 'order-execution-screen';
-const EXECUTION_EYEBROW_SELECTOR = '[data-slot="operator-eyebrow"]';
+/** El rótulo dice la fase y «Pedido <número>»: se comprueba que contiene el número. */
+const EXECUTION_EYEBROW_SELECTOR = '[data-testid="recipe-header-eyebrow"]';
 const EXECUTION_DISTRIBUTION_TESTID = 'order-execution-presentation';
 const ORDER_DISTRIBUTION_LABEL_TESTID = 'order-distribution';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
@@ -632,7 +633,7 @@ test.describe('envases del pedido como productos', () => {
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME, { timeout: 60_000 });
     await expect(
       page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
-    ).toHaveText(firstNumber);
+    ).toContainText(firstNumber);
 
     // R44: la ejecucion nombra los envases.
     const executionLabel = page

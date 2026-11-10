@@ -1075,3 +1075,46 @@ T13 sin terminar:
 - `pnpm run lint`: exit 0, con 0 errores y 11 warnings que ya existían (ninguno en el archivo tocado).
 
 **Veredicto:** el nombre de la receta ya parte las palabras y el desborde a 390/820 px está resuelto. Queda en rojo chromium a 390 px por el strict mode de `data-table` en el spec, que es otra causa.
+
+## Tanda 6 — specs pendientes de T13 (frontend_dev, 2026-11-10)
+
+Cada spec corrió solo, con `pnpm exec playwright test <spec> --workers=1` (los dos proyectos). Antes de cada corrida el puerto 3117 estaba libre, así que no hubo que matar ningún `next dev`. La memoria no cortó ninguna corrida.
+
+### Resultado
+
+Formato: pasados/fallidos/omitidos.
+
+| Spec | chromium | webkit |
+|---|---|---|
+| recetas-porcentaje | 4/0/0 | 4/0/0 |
+| envases-del-pedido (1.ª corrida) | 1/1/0 | 1/1/0 |
+| envases-del-pedido (2.ª, tras el ajuste) | 2/0/0 | 2/0/0 |
+| coste-real-de-produccion | 1/0/0 | 1/0/0 |
+| pedido-en-varias-presentaciones (con el mismo ajuste, aplicado antes de correrlo) | 2/0/0 | 2/0/0 |
+| pasos-de-envasado | 1/0/0 | 1/0/0 |
+| pedido-con-varias-recetas | 1/0/0 | 1/0/0 |
+
+### Ajustes (`e2e/`)
+- `envases-del-pedido.spec.ts` y `pedido-en-varias-presentaciones.spec.ts`:
+  - **Causa del fallo:** en esta rama la ejecución ya no usa la cabecera por defecto de `OperatorScreenFrame`, que tenía el `span[data-slot=operator-eyebrow]`. Usa `RecipeHeader`, y su rótulo es `span[data-testid=recipe-header-eyebrow]` con «Fabricación · Pedido <número>».
+  - **Ajuste:** `EXECUTION_EYEBROW_SELECTOR` pasa a `[data-testid="recipe-header-eyebrow"]` y la aserción, de `toHaveText(número)` a `toContainText(número)`.
+  - La comprobación es la misma: el número del pedido está en el rótulo de la cabecera y no en el `h1`.
+- `pnpm exec eslint` sobre los 2 archivos: sin problemas. LF: sin CR.
+
+### Parte B — `data-table` duplicada en `dashboard-rediseno` (solo lectura)
+- **Una sola fuente.** El testid `data-table` solo se pinta en `components/shared/data-table/data-table.tsx:292`. En el dashboard solo hay una `DataTable`: la de `ExecutionTraceTable`, dentro de `ExecutionTraceListSection`.
+- **Nada en la app pinta una segunda tabla.** No hay variante móvil aparte: las tarjetas viven dentro del mismo `div[data-testid=data-table]`. Tampoco hay portal, panel lateral ni `loading.tsx`, y `ScreenEnter` (`app/(private)/components/screen-enter.tsx`) no duplica a los hijos.
+- **Causa más probable: el streaming SSR de React 19.2.8 con Next 16.3.0.**
+  - `ExecutionTraceListSection` va dentro del `<Suspense>` de `app/(private)/dashboard/components/dashboard-content.tsx:16`.
+  - El servidor manda el contenido resuelto en un `<div hidden id="S:…">` al final del `body`, es decir, fuera de `dashboard-content`.
+  - En 19.2, `$RC` no lo revela al momento. Marca el límite como `$~` y aplaza la revelación (`$RV`) a `$RT+300 ms`, o hasta los 2300 ms si cae entre 2000 y 2300 (`node_modules/react-dom/cjs/react-dom-server.node.development.js`, script `$RC`/`$RV`).
+  - Mientras tanto existe una copia oculta fuera de `dashboard-content`. Si el cliente ya ha pintado el límite dentro de `dashboard-content`, coinciden las dos, y eso es lo que da el strict mode.
+  - Esto último es una inferencia de la lectura del código: no se ha confirmado ejecutando nada.
+- **Es preexistente, no de QT-315.**
+  - `dashboard-content.tsx`, `execution-trace-list-section.tsx`, `page.tsx`, `components/shared/data-table/*`, el layout privado y `screen-enter.tsx` no cambian frente a `origin/dev`.
+  - En `origin/dev`, el spec ya tenía el mismo selector sin acotar en `e2e/dashboard-rediseno.spec.ts:240`.
+  - Lo único que QT-315 toca del dashboard son las columnas (la columna de progreso): puede mover el tiempo de la carga, pero no la estructura.
+- **Arreglo propuesto (no aplicado):** acotar el selector a `page.getByTestId('dashboard-content').getByTestId('data-table')`.
+
+### Veredicto
+Los 6 specs pendientes de T13 están en verde en chromium y webkit, con un ajuste mínimo de selector en 2 specs. La `data-table` duplicada es preexistente y la causa más probable es el streaming SSR de React; falta confirmarla.
