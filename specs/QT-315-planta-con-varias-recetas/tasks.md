@@ -107,7 +107,7 @@
 
 ## Tanda 4 — «Receta N de M», cabecera, cancelar receta y avisos
 
-- [ ] **T8 · backend_dev — posición, otras recetas y nombre para el aviso** (design § 3.4)
+- [x] **T8 · backend_dev — posición, otras recetas y nombre para el aviso** (design § 3.4)
   - **Listas.** `composeOrderRows` lee los outlines en una llamada. Las vistas de lista ganan
     `recipe: { position, count }`.
   - **Detalle.** Las vistas de detalle ganan `lineId`, `recipe` y `otherRecipes`.
@@ -118,7 +118,7 @@
       las demás (R3, R7);
     - hay un unit de `otherRecipes` en orden de alta (R8);
     - el número de llamadas por página no crece con las filas.
-- [ ] **T9 · frontend_dev — piezas del tablero «Pantalla de una receta»** (design § 4.1–§ 4.3;
+- [x] **T9 · frontend_dev — piezas del tablero «Pantalla de una receta»** (design § 4.1–§ 4.3;
   depende de T8)
   - **Piezas nuevas.** `RecipeOfOrderLabel` (paso 4) y `RecipeHeader` (paso 3), con «Ir a esta
     receta» según la tabla de estado, destino y permiso de design § 3.4.

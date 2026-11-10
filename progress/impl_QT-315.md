@@ -716,6 +716,7 @@ Typecheck en 0. Queda en rojo la guardia de `recetas` (bloqueo 1).
 - **Por que:** decision del humano (2026-11-10), como en QC-180: las tres paginas solo leen la receta de la ruta (`?receta=`), no editan recetas.
 - **Resultado** (`pnpm exec vitest run tests/unit/recetas/scope.test.ts tests/unit/recetas/module-contract.test.ts`): `module-contract` en verde (todo); `scope` sigue con 1 rojo en el mismo `it` («la pantalla de recetas vive solo donde la declara…»), pero en OTRA asercion: la lista cerrada de E2E de recetas (linea ~283) recibe ademas `helpers/recipe-route.ts` (`e2e/helpers/recipe-route.ts`, tanda 3/4). Queda fuera del mandato de esta tanda (no se cambia otra regla de guardia): lo decide el leader o el humano (ampliar la lista cerrada de E2E o renombrar/mover el helper para que no case).
 - Total: 1 failed | 9 passed (10).
+- 2026-11-10 (backend_dev, decision del humano: opcion (a)): la lista CERRADA de specs E2E de `tests/unit/recetas/scope.test.ts` suma `'helpers/recipe-route.ts'` como ultima entrada (orden de `readdirSync`), sin cambiar regex ni recorrido; `pnpm exec vitest run tests/unit/recetas/scope.test.ts` -> 5 passed (5).
 
 ## Tanda 4 — verificación de cierre, en serie (implementer, 2026-11-10)
 - `pnpm run typecheck`: 0 errores.
@@ -737,3 +738,12 @@ Typecheck en 0. Queda en rojo la guardia de `recetas` (bloqueo 1).
      - (a) ampliar esa lista con el helper, que es otra ampliación de guardia;
      - (b) renombrar el helper sin «recipe» (p. ej. `e2e/helpers/line-route.ts`), que esquiva la guardia sin cambiar su criterio.
    - No hice ninguna de las dos.
+
+## Tanda 4 — cierre (implementer, 2026-11-10)
+- Por decisión del humano (opción a), la lista cerrada de E2E de `tests/unit/recetas/scope.test.ts` gana `helpers/recipe-route.ts`. El criterio de la guardia no cambia y el helper no se renombra.
+- `tests/unit/recetas`: la primera pasada dio 1361 en verde y 1 rojo: un timeout de 20 s en `recetas-ui/formula-import-review.test.tsx`.
+  - Ese archivo da 34/34 cuando corre solo, y esta feature no lo toca.
+  - En la segunda pasada de la carpeta entera: **81 archivos, 1362 en verde**.
+- `pnpm run typecheck`: 0 errores.
+- El resto del cierre de la Tanda 4 está en «verificación de cierre, en serie», todo en verde.
+- T8 y T9 quedan `[x]`. Los bloqueos de la Tanda 4 quedan resueltos.

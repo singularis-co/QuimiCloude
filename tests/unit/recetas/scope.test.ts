@@ -290,6 +290,8 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
       'recetas.spec.ts', // QC-26: E2E del CRUD de la pantalla de recetas
       'versiones-de-receta.spec.ts', // QC-172 / R44, R30: E2E del pedido con version de receta
       'versiones-en-la-receta.spec.ts', // QC-174 / R38, R6: E2E de versiones en la ficha
+      // AMPLIADA el 2026-11-10 (QT-315, planta-con-varias-recetas): helper de rutas con receta, no es un spec de la pantalla de recetas
+      'helpers/recipe-route.ts',
     ])
   })
 
