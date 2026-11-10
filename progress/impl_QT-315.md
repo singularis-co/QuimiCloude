@@ -1262,3 +1262,12 @@ Complementos al mapa:
 - **`tests/unit/recetas/scope.test.ts` está en rojo (1 de 5)** porque `e2e/planta-con-varias-recetas.spec.ts` no está en la lista cerrada de E2E de recetas (~l. 289).
   - El nombre del spec lo fija `tasks.md` (T12) y `requirements.md` R33, así que renombrarlo chocaría con el spec.
   - No se ha ampliado la guardia: hace falta la decisión del leader o del humano.
+
+### T14 — última ampliación y estado final (implementer, 2026-11-10)
+- `tests/unit/recetas/scope.test.ts`: la lista cerrada de E2E de recetas gana `'planta-con-varias-recetas.spec.ts'` («QT-315 / R33»), como en QT-313 y QT-314. Decisión del humano. El archivo da 5/5.
+- `pnpm run typecheck`: 0 errores.
+- `pnpm exec vitest run guard --maxWorkers=1`: 86 de 87 archivos en verde, **1 rojo**. Es `tests/guards/guard-identificador-de-request.test.ts`, en «no hay ningun archivo nuevo en e2e/ … (R21)».
+  - Su lista cerrada `E2E_ESPERADOS` (l. 57) no contiene `planta-con-varias-recetas.spec.ts`.
+  - Hay precedente: QT-313 y QT-314 añadieron a esa lista sus specs nuevos (l. 257 y 263; commits `c9d18d80e` y `5e980f7bd`).
+  - No la he ampliado: la autorización cubría solo `scope.test.ts`, y queda a la decisión del leader.
+- T14 queda **sin `[x]`** por ese rojo.
