@@ -660,8 +660,17 @@ describe('QC-168 — `finishPacking` (R13, R21-R24)', () => {
       number: { year: 2026, sequence: 1 },
       status: 'EN_EMPAQUE',
     }));
+    // QT-315 (T8): el aviso nombra la receta; aqui basta con que la lectura responda vacia.
+    const listRecipeOutlinesByIdsIncludingDeleted = vi.fn(async () => []);
     const deps = {
-      orders: { findAliveById, listAliveSummariesByIds, findAliveLineSummary, finishPackingAliveById },
+      orders: {
+        findAliveById,
+        listAliveSummariesByIds,
+        findAliveLineSummary,
+        finishPackingAliveById,
+        listRecipeOutlinesByIdsIncludingDeleted,
+      },
+      recipes: { findRefsIncludingDeleted: vi.fn(async () => []) },
       ...dentroDeLaTransaccion({ finishPackingAliveById }),
     } as unknown as FinishPackingDeps;
     return { deps, findAliveById, listAliveSummariesByIds, finishPackingAliveById };

@@ -160,9 +160,19 @@ describe('alcance de QC-25 (crud-de-recetas): sin route handler; la pantalla, so
     // `OrderListSection` a la pagina. Sigue prohibida cualquier OTRA segunda pantalla y el goteo
     // suelto de abajo; que la pagina de pedidos consuma `recetas` solo por su contrato publico lo
     // vigila `tests/unit/recetas/module-contract.test.ts`, con la misma lista de dos literales.
+    // AMPLIADA el 2026-11-10 (QT-315, planta-con-varias-recetas): el conjunto cerrado pasa de DOS
+    // a CINCO archivos y entran las paginas de asignacion `app/(private)/asignacion/page.tsx`,
+    // `.../asignacion/empaque/[id]/page.tsx` y `.../asignacion/acondicionamiento/[id]/page.tsx`.
+    // Las tres solo LEEN la receta de la ruta (`?receta=`) para mostrar la receta N de M del
+    // pedido; no editan recetas ni navegan el catalogo. Decision del humano, como en QC-180.
+    // Sigue prohibida cualquier OTRA segunda pantalla; la misma lista de cinco literales esta en
+    // `tests/unit/recetas/module-contract.test.ts`.
     const PANTALLA_DE_EJECUCION = new Set([
       join('app', '(private)', 'asignacion', '[id]', 'page.tsx'),
       join('app', '(private)', 'pedidos', 'page.tsx'),
+      join('app', '(private)', 'asignacion', 'page.tsx'),
+      join('app', '(private)', 'asignacion', 'empaque', '[id]', 'page.tsx'),
+      join('app', '(private)', 'asignacion', 'acondicionamiento', '[id]', 'page.tsx'),
     ])
 
     const segundasPantallas = filesIn(appDir, /^(page|layout)\.tsx$/)

@@ -551,6 +551,8 @@ T8 hecha. En `lib/` y sus tests todo en verde:
 - los detalles traen `lineId`, `recipe` y `otherRecipes`;
 - los avisos traen `recipeName` y `recipeCount`, y las acciones escriben `receta_aviso`.
 
+Ajuste posterior: el doble de `finishPacking` en `tests/unit/asignaciones/authorization.test.ts` recibe `recipes.findRefsIncludingDeleted` y `orders.listRecipeOutlinesByIdsIncludingDeleted`, los dos vacíos. Ninguna aserción cambia; el archivo pasa en verde (41/41). Ese archivo no tiene dobles de `finishConditioning` ni de `cancelAssignedOrder`.
+
 ## Tanda 4 — T9 (frontend_dev, 2026-11-10)
 
 Grafo: no se usó; todo con Grep/Read. No se tocó `lib/`, `e2e/`, `db/` ni las dependencias. Tampoco Dashboard, Recorrido ni `e2e/` (tandas 5-6).
@@ -707,3 +709,31 @@ Typecheck en 0. Queda en rojo la guardia de `recetas` (bloqueo 1).
   - el testid del aviso pasa a `assigned-order-manufactured-notice`;
   - `ejecucion-receta`, `empaque`, `producto-terminado` y `reserva-de-material` todavía buscan `assigned-order-delivered-notice`;
   - «Cancelar pedido» pasa a «Cancelar esta receta».
+
+## Tanda 4 — ampliacion de guardias de recetas
+
+- **Que:** `PANTALLAS_AUTORIZADAS` (`tests/unit/recetas/module-contract.test.ts`) y `PANTALLA_DE_EJECUCION` (`tests/unit/recetas/scope.test.ts`) pasan de DOS a CINCO literales: entran `app/(private)/asignacion/page.tsx`, `app/(private)/asignacion/empaque/[id]/page.tsx` y `app/(private)/asignacion/acondicionamiento/[id]/page.tsx`. Comentario «AMPLIADA el 2026-11-10 (QT-315, planta-con-varias-recetas)» en ambos sitios. Mismo formato que cada Set (POSIX en `module-contract` via `toPosix`; `join` en `scope`), asi casa igual en Windows y Linux. Criterio de las guardias sin tocar; se sigue aplicando `consumesOnlyPublicContract`.
+- **Por que:** decision del humano (2026-11-10), como en QC-180: las tres paginas solo leen la receta de la ruta (`?receta=`), no editan recetas.
+- **Resultado** (`pnpm exec vitest run tests/unit/recetas/scope.test.ts tests/unit/recetas/module-contract.test.ts`): `module-contract` en verde (todo); `scope` sigue con 1 rojo en el mismo `it` («la pantalla de recetas vive solo donde la declara…»), pero en OTRA asercion: la lista cerrada de E2E de recetas (linea ~283) recibe ademas `helpers/recipe-route.ts` (`e2e/helpers/recipe-route.ts`, tanda 3/4). Queda fuera del mandato de esta tanda (no se cambia otra regla de guardia): lo decide el leader o el humano (ampliar la lista cerrada de E2E o renombrar/mover el helper para que no case).
+- Total: 1 failed | 9 passed (10).
+
+## Tanda 4 — verificación de cierre, en serie (implementer, 2026-11-10)
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 11 avisos.
+- `tests/unit/recetas`: 81 archivos, 1361 en verde, **1 rojo** (`scope.test.ts`, ver Bloqueos).
+- `tests/unit/asignaciones-ui`, 49 archivos en 4 lotes: 186, 196, 184 y 278 tests, todo en verde.
+- `tests/unit/asignaciones`: 123 archivos.
+  - La primera pasada dio 2923 en verde y 1 rojo: el doble de `finishPacking` en `authorization.test.ts` no tenía la dependencia `recipes` que añadió T8.
+  - Arreglado solo en el doble; ese archivo da 41/41 al volver a correrlo.
+- `tests/integration/asignaciones`: 29 archivos, 256 en verde.
+- `pnpm exec vitest run guard`: 87 archivos, 1335 en verde, 22 omitidos.
+- T8 y T9 quedan **sin `[x]`** por el rojo de `scope.test.ts`.
+
+### Bloqueos (tanda 4)
+1. **`tests/unit/recetas/scope.test.ts` sigue en rojo, en el mismo `it`, pero por otra comprobación.**
+   - Es la lista CERRADA de «specs E2E de recetas» (~l. 283), que filtra los archivos de `e2e/` con `/recet|recipe/i`.
+   - Ahora encuentra `helpers/recipe-route.ts`: es el helper del ajuste de tipos de `e2e/` (`93c8e2e4e`) y no es un spec ni toca la pantalla de recetas.
+   - Hay dos salidas, y las dos exigen una decisión:
+     - (a) ampliar esa lista con el helper, que es otra ampliación de guardia;
+     - (b) renombrar el helper sin «recipe» (p. ej. `e2e/helpers/line-route.ts`), que esquiva la guardia sin cambiar su criterio.
+   - No hice ninguna de las dos.
