@@ -1047,3 +1047,31 @@ T13 sin terminar:
 - 17 specs en verde;
 - `dashboard-rediseno` en rojo, por el desborde del `h2` de la sección (app, T11);
 - 6 specs sin correr por memoria.
+
+## Tanda 6 — arreglo del desborde del nombre de receta
+
+**Cambio:** en `app/(private)/dashboard/recorrido/[id]/components/execution-trace-recipe-section.tsx` el `h2[data-testid=execution-trace-recipe-name]` pasa de `text-lg font-semibold` a `min-w-0 text-lg font-semibold [overflow-wrap:anywhere]`. Es el mismo patrón que ya usa el repo para un título que tiene que partir palabras (`send-template-dialog.tsx`, `whatsapp-template-table.tsx`). No hay más cambios en la app.
+
+**Archivos:**
+- `app/(private)/dashboard/recorrido/[id]/components/execution-trace-recipe-section.tsx` (modificado)
+- `tests/unit/paridad/__snapshots__/recorridos-paridad.test.tsx.snap` (actualizado con `-u`)
+
+**Resultados (un comando a la vez):**
+- `pnpm exec vitest run --maxWorkers=1 tests/ui/dashboard/{execution-trace-detail,planta-varias-recetas,execution-trace-evidence,recorrido-rediseno,textos-dashboard}.test.tsx tests/ui/dashboard/trace-evidence-placement.test.ts`: 6 archivos, 120 tests en verde.
+- `pnpm exec vitest run --maxWorkers=1 tests/unit/paridad/recorridos-paridad.test.tsx`: 3 snapshots fallaron. Revisé el diff: sus únicas líneas cambiadas son, 3 veces, la `class` del h2 (`font-semibold text-lg` → `[overflow-wrap:anywhere] font-semibold min-w-0 text-lg`). Lo actualicé con `-u` solo en ese archivo: 3 snapshots actualizados, 9/9 en verde.
+- `pnpm exec playwright test e2e/dashboard-rediseno.spec.ts --workers=1` (puerto 3117 libre antes de cada corrida):
+  - Corrida 1: 10 pasan y 2 fallan. Fallan chromium R8 a 390 px y chromium R20 a 390 px, las dos por el strict mode de `data-table`. El desborde ya no aparece: R20 a 820 px pasa en los dos proyectos y R20 a 390 px pasa en webkit.
+  - Corrida 2: 11 pasan y 1 falla, chromium R20 a 390 px por el mismo strict mode. Esta vez R8 pasa.
+  - Webkit: 6/6 en las dos corridas.
+- Strict mode, no intermitente (sale en 2 de 2 corridas, siempre en chromium a 390 px):
+  - El error salta en `openDashboard` (`e2e/dashboard-rediseno.spec.ts:240`), con `expect(page.getByTestId('data-table')).toBeVisible()`. El selector no está acotado y encuentra 2 `div[data-testid=data-table]`:
+    - el primero está dentro de `dashboard-content`;
+    - el segundo está fuera de `dashboard-content`, y Playwright solo lo identifica como `.nth(1)`. En el call log figura como `unexpected value "hidden"`.
+  - El usuario aterriza en `/dashboard` tras el login y el spec hace luego `page.goto(DASHBOARD_ROUTE)`. Durante esa carga existe un segundo árbol oculto con su propia `data-table`.
+  - El origen exacto del nodo oculto no está determinado. No es el fallback del `Suspense` (es un `<p role=status>`), y `cacheComponents` no está activo.
+  - No viene de este cambio: afecta al listado del dashboard, no al recorrido.
+  - Arreglo propuesto, fuera de mi alcance porque toca el spec: acotar el selector a `page.getByTestId('dashboard-content').getByTestId('data-table')`.
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: exit 0, con 0 errores y 11 warnings que ya existían (ninguno en el archivo tocado).
+
+**Veredicto:** el nombre de la receta ya parte las palabras y el desborde a 390/820 px está resuelto. Queda en rojo chromium a 390 px por el strict mode de `data-table` en el spec, que es otra causa.

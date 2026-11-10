@@ -61,7 +61,7 @@ export function ExecutionTraceRecipeSection({ recipe, evidence }: ExecutionTrace
       className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-[18px]"
     >
       <div className="flex flex-wrap items-center gap-2.5">
-        <h2 id={titleId} className="text-lg font-semibold" data-testid="execution-trace-recipe-name">
+        <h2 id={titleId} className="min-w-0 text-lg font-semibold [overflow-wrap:anywhere]" data-testid="execution-trace-recipe-name">
           {recipe.recipeName ?? EMPTY_MARK}
         </h2>
         <StatusBadge
