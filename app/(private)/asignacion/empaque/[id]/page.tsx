@@ -7,7 +7,12 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { assignmentViewHref, recipeLineIdOf, type RecipeSearchParams } from '../../components';
+import {
+  assignmentViewHref,
+  recipeAccessOf,
+  recipeLineIdOf,
+  type RecipeSearchParams,
+} from '../../components';
 
 import { PackingOrderScreen } from './components';
 
@@ -75,6 +80,7 @@ export default async function PackingOrderPage({
       order={order}
       actorId={actor.id}
       backHref={assignmentViewHref('por_empacar')}
+      access={recipeAccessOf(actor)}
     />
   );
 }

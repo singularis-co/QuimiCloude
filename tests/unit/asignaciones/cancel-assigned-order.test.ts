@@ -23,6 +23,7 @@ import type {
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PermissionCode } from '@/lib/modules/identity';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import { conDosRecetas } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -102,7 +103,8 @@ function montar(options?: {
 
   const deps: CancelAssignedOrderDeps = {
     assignments: { listOrderIdsByUserInCompany } as unknown as OrderAssignmentRepository,
-    orders: { findAliveById, findAliveLineSummary } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
+    recipes: { findRefsIncludingDeleted: vi.fn(async () => []) },
     transaction: { run } as ExecutionTransaction,
     now: () => AHORA,
   };
@@ -201,11 +203,22 @@ describe('cancelAssignedOrder — prologo (R26, R27, R28)', () => {
     ningunDobleLlamado(d);
   });
 
+  it('R20: devuelve numero, nombre de la receta y cuantas tiene el pedido, canceladas incluidas', async () => {
+    const d = montar();
+    await expect(createCancelAssignedOrder(conDosRecetas(d.deps))(ACTOR, ENTRADA)).resolves.toEqual({
+      numberText: '2026-0000007',
+      recipeName: expect.stringMatching(/^Receta /),
+      recipeCount: 2,
+    });
+  });
+
   it('R30: no necesita `pedidos.modificar` ni `asignaciones.modificar`', async () => {
     const d = montar();
     const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
     await expect(createCancelAssignedOrder(d.deps)(actor, ENTRADA)).resolves.toEqual({
       numberText: expect.any(String),
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
   });
@@ -265,7 +278,7 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
     const d = montar();
     const result = await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
 
-    expect(result).toEqual({ numberText: expect.stringContaining('7') });
+    expect(result).toEqual({ numberText: expect.stringContaining('7'), recipeName: null, recipeCount: 1 });
     expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
     expect(d.cancelLineAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ENTRADA.reason, ANA, AHORA);
     expect(d.append).toHaveBeenCalledTimes(1);

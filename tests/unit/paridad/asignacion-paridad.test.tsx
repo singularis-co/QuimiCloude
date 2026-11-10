@@ -93,6 +93,7 @@ const ASIGNADO: AssignedOrderView = {
   id: 'order-1',
   lineId: 'linea-order-1',
   numberText: '2026-000123',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.500',
   priority: 'ALTA',
@@ -109,6 +110,7 @@ const TERMINADO: FinishedOrderView = {
   id: 'order-2',
   lineId: 'linea-order-2',
   numberText: '2026-000124',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
@@ -124,6 +126,7 @@ const DE_LA_EMPRESA: CompanyOrderView = {
   id: 'order-3',
   lineId: 'linea-order-3',
   numberText: '2026-000125',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
@@ -141,6 +144,7 @@ const POR_EMPACAR = {
   id: 'order-4',
   lineId: 'linea-order-4',
   numberText: '2026-0000030',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '20',
   presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 4 }],

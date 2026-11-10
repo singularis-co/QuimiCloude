@@ -113,6 +113,7 @@ const POR_ACONDICIONAR: ConditioningOrderRow = {
   id: 'order-a',
   lineId: 'linea-order-a',
   numberText: '2026-0000040',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '20.5000',
   unitId: 'unit-kg',
@@ -144,6 +145,7 @@ const ACONDICIONADO: FinishedOrderView = {
   id: 'order-c',
   lineId: 'linea-order-c',
   numberText: '2026-0000042',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [
@@ -222,7 +224,7 @@ const FORMULARIO_COMPARTIDO: ConditioningBatchForm = {
 };
 
 function detalle(overrides: Partial<ConditioningOrderDetail> = {}): ConditioningOrderDetail {
-  return { ...POR_ACONDICIONAR, team: [], batchData: null, conditioningSteps: null, ...overrides };
+  return { ...POR_ACONDICIONAR, otherRecipes: [], team: [], batchData: null, conditioningSteps: null, ...overrides };
 }
 
 const MIO = {
@@ -245,6 +247,8 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     id: 'order-1',
     lineId: 'linea-order-1',
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [

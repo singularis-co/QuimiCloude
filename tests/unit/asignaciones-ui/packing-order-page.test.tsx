@@ -89,6 +89,8 @@ function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
     id: 'order-1',
     lineId: LINE_ID,
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '10',
     presentationLines: [{ presentationId: 'presentation-1', presentationName: 'Caja x 12', packages: 4 }],

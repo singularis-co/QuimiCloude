@@ -59,9 +59,7 @@ function wireListCompanyOrders(tx: Parameters<typeof createOrderAssignmentReposi
     findAliveLineSummary: async () => {
       throw new Error('este archivo no lee una receta suelta');
     },
-    listRecipeOutlinesByIdsIncludingDeleted: async () => {
-      throw new Error('este archivo no lee las recetas del pedido');
-    },
+    listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
     // Este archivo prueba `listCompanyOrders`, que nunca transiciona un pedido.
     transitionAliveById: async () => {
       throw new Error('listCompanyOrders no ejecuta ninguna transicion');

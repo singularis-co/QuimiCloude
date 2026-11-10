@@ -122,6 +122,7 @@ describe('R11 — solo TERMINADO, solo los que acondiciono el actor, filtrado en
       lineId: lineaDe(PEDIDO_1),
       numberText: '2026-0000007',
       recipeName: 'Jabon liquido',
+      recipe: { position: 1, count: 1 },
       quantity: '10.0000',
       presentationLines: [
         { lineId: 'linea-1', presentationId: 'pres-1', presentationName: 'Garrafa 5 L', packages: 3, packedPackages: null, packagingName: 'Garrafa', presentationContent: null, presentationUnitLabel: null },

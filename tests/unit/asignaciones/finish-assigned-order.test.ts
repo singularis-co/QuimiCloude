@@ -42,6 +42,7 @@ import type {
   WorkGroupDirectory,
   WorkGroupSnapshot,
 } from '@/lib/modules/identity';
+import { conDosRecetas } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -194,13 +195,14 @@ function montar(options?: {
       findAliveById,
       findAliveLineSummary,
       transitionAliveById,
+      listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []),
     } as unknown as OrderCatalog,
     people: { findAliveRefsInCompany } as unknown as PeopleDirectory,
     groups: { findSnapshotAliveInCompany } as unknown as WorkGroupDirectory,
     log,
     transaction: { run } as unknown as ExecutionTransaction,
     now: () => new Date('2026-09-17T12:00:00.000Z'),
-    recipes: { findExecutionContentById } as unknown as RecipeCatalog,
+    recipes: { findExecutionContentById, findRefsIncludingDeleted: vi.fn(async () => []) } as unknown as RecipeCatalog,
     evidence: { listByLine: listEvidenceByLine } as unknown as StepEvidenceRepository,
   };
 
@@ -285,6 +287,18 @@ describe('finishAssignedOrder — R5: EN_CURSO transiciona a POR_EMPACAR', () =>
   });
 });
 
+describe('finishAssignedOrder — la receta del aviso', () => {
+  it('R20: devuelve el nombre de la receta y cuantas tiene el pedido, canceladas incluidas', async () => {
+    const { deps } = montar({ ordenDeEstados: ['EN_CURSO'], transitionResults: ['ok'] });
+
+    await expect(createFinishAssignedOrder(conDosRecetas(deps))(ACTOR, ENTRADA)).resolves.toEqual({
+      numberText: '2026-0000007',
+      recipeName: expect.stringMatching(/^Receta /),
+      recipeCount: 2,
+    });
+  });
+});
+
 describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado real', () => {
   it('si `transitionAliveById` devuelve `stale`, relee y reintenta sin lanzar un error visible', async () => {
     const { deps, findAliveLineSummary, transitionAliveById } = montar({
@@ -295,6 +309,8 @@ describe('finishAssignedOrder — `stale`: relee y reintenta contra el estado re
 
     await expect(finishAssignedOrder(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(findAliveLineSummary).toHaveBeenCalledTimes(2);
     expect(transitionAliveById).toHaveBeenCalledTimes(2);
@@ -308,6 +324,8 @@ describe('finishAssignedOrder — confirmacion: devuelve el numero, leido ANTES 
 
     await expect(finishAssignedOrder(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
   });
 
@@ -897,7 +915,7 @@ describe('finishAssignedOrder — evidencia (R35, R37)', () => {
 
   it('R35: con al menos una foto en cada paso que la pide, finaliza', async () => {
     const d = montar({ pasos: CON_EVIDENCIA, fotos: [{ stepPosition: 2 }, { stepPosition: 3 }, { stepPosition: 3 }] });
-    await expect(createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA)).resolves.toEqual({ numberText: expect.any(String) });
+    await expect(createFinishAssignedOrder(d.deps)(ACTOR, ENTRADA)).resolves.toEqual({ numberText: expect.any(String), recipeName: null, recipeCount: 1 });
     expect(d.transitionAliveById).toHaveBeenCalledTimes(1);
   });
 

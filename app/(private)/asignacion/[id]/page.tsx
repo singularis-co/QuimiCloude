@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { identity } from '@/lib/composition';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { openAssignedOrderAction } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 
-import { recipeLineIdOf, type RecipeSearchParams } from '../components';
+import { recipeAccessOf, recipeLineIdOf, type RecipeSearchParams } from '../components';
 
 import { OrderExecutionError, OrderExecutionScreen } from './components';
 
@@ -43,5 +44,8 @@ export default async function AssignedOrderExecutionPage({
     return <OrderExecutionError error={result} />;
   }
 
-  return <OrderExecutionScreen execution={result.data} lineId={lineId} />;
+  // Misma lectura de sesion que `requirePagePermission`: esta memoizada por peticion.
+  const access = recipeAccessOf(await identity.getSessionUser());
+
+  return <OrderExecutionScreen execution={result.data} lineId={lineId} access={access} />;
 }

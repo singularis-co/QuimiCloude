@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useId, useState } from 'react';
+import { useActionState, useId, useState, type ReactNode } from 'react';
 
 import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,8 @@ import type { ErrorCode } from '@/lib/modules/errores';
 import { cancelOrderSchema } from '@/lib/modules/pedidos';
 
 /**
- * Cancela el pedido desde la ejecucion pidiendo antes el motivo. La accion redirige a la lista
- * cuando sale bien, asi que aqui solo se pinta el rechazo.
+ * Cancela la receta desde su ejecucion pidiendo antes el motivo; las demas recetas del pedido
+ * siguen. La accion redirige a la lista cuando sale bien, asi que aqui solo se pinta el rechazo.
  */
 
 export const ORDER_CANCEL_TRIGGER_TESTID = 'order-cancel-trigger';
@@ -31,14 +31,31 @@ export const ORDER_CANCEL_STEP_POSITION_FIELD = 'stepPosition';
 export const ORDER_CANCEL_REASON_FIELD = 'reason';
 
 export const ORDER_CANCEL_TEXTS = {
-  trigger: 'Cancelar pedido',
-  title: '¿Cancelar el pedido?',
-  description: 'El pedido queda cancelado y el material apartado se libera. No se puede deshacer.',
+  trigger: 'Cancelar esta receta',
+  title: 'Cancelar esta receta',
   reasonLabel: 'Motivo de la cancelación',
+  reasonHelp: 'Entre 1 y 500 caracteres.',
   reasonRequired: 'Escribe el motivo de la cancelación.',
-  confirm: 'Cancelar pedido',
+  confirm: 'Cancelar la receta',
   dismiss: 'Volver',
 } as const;
+
+/** Sin nombre, la receta está dada de baja: se nombra solo el pedido. */
+export function orderCancelDescription(recipeName: string | null, numberText: string): ReactNode {
+  return (
+    <>
+      {recipeName === null ? (
+        'Se cancela esta receta'
+      ) : (
+        <>
+          Se cancela <span className="font-medium text-foreground">{recipeName}</span>
+        </>
+      )}{' '}
+      del pedido <span className="font-mono">{numberText}</span> y se libera su material. Las demás
+      recetas del pedido siguen.
+    </>
+  );
+}
 
 // Por debajo de 16 px Safari en iOS hace zoom al enfocar el campo.
 const FIELD_TEXT = 'text-base md:text-base';
@@ -60,6 +77,8 @@ type OrderCancelFormProps = {
   readonly orderId: string;
   readonly lineId: string;
   readonly stepPosition: number | null;
+  readonly recipeName: string | null;
+  readonly numberText: string;
 };
 
 export type OrderCancelDialogProps = OrderCancelFormProps & {
@@ -72,6 +91,8 @@ export function OrderCancelDialog({
   orderId,
   lineId,
   stepPosition,
+  recipeName,
+  numberText,
   open,
   onOpenChange,
 }: OrderCancelDialogProps) {
@@ -99,14 +120,27 @@ export function OrderCancelDialog({
       testId={ORDER_CANCEL_DIALOG_TESTID}
     >
       {/* El popup se desmonta al cerrar: cada apertura empieza sin motivo ni error previos. */}
-      <OrderCancelForm orderId={orderId} lineId={lineId} stepPosition={stepPosition} />
+      <OrderCancelForm
+        orderId={orderId}
+        lineId={lineId}
+        stepPosition={stepPosition}
+        recipeName={recipeName}
+        numberText={numberText}
+      />
     </ConfirmDialogFrame>
   );
 }
 
-function OrderCancelForm({ orderId, lineId, stepPosition }: OrderCancelFormProps) {
+function OrderCancelForm({
+  orderId,
+  lineId,
+  stepPosition,
+  recipeName,
+  numberText,
+}: OrderCancelFormProps) {
   const fieldId = useId();
   const reasonId = `${fieldId}-reason`;
+  const helpId = `${fieldId}-help`;
   const errorId = `${fieldId}-error`;
   const [reason, setReason] = useState('');
 
@@ -134,7 +168,7 @@ function OrderCancelForm({ orderId, lineId, stepPosition }: OrderCancelFormProps
     <ConfirmDialogBody
       texts={{
         title: ORDER_CANCEL_TEXTS.title,
-        description: ORDER_CANCEL_TEXTS.description,
+        description: orderCancelDescription(recipeName, numberText),
         dismiss: ORDER_CANCEL_TEXTS.dismiss,
         confirm: ORDER_CANCEL_TEXTS.confirm,
       }}
@@ -177,9 +211,12 @@ function OrderCancelForm({ orderId, lineId, stepPosition }: OrderCancelFormProps
           onChange={(event) => setReason(event.target.value)}
           className={FIELD_TEXT}
           aria-invalid={error === undefined ? undefined : true}
-          aria-describedby={error === undefined ? undefined : errorId}
+          aria-describedby={error === undefined ? helpId : `${helpId} ${errorId}`}
           data-testid={ORDER_CANCEL_REASON_TESTID}
         />
+        <span id={helpId} className="text-xs text-muted-foreground">
+          {ORDER_CANCEL_TEXTS.reasonHelp}
+        </span>
       </div>
     </ConfirmDialogBody>
   );

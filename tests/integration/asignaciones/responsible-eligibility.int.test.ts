@@ -144,7 +144,7 @@ function ordersReales(): OrderCatalog {
     listSummariesByIdsIncludingDeleted: async () => noLlamar('orders.listSummariesByIdsIncludingDeleted'),
     listDeliveryProgressByIdsIncludingDeleted: async () => noLlamar('orders.listDeliveryProgressByIdsIncludingDeleted'),
     findAliveLineSummary: summaryReaders.findAliveLineSummary,
-    listRecipeOutlinesByIdsIncludingDeleted: async () => noLlamar('orders.listRecipeOutlinesByIdsIncludingDeleted'),
+    listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
     finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),

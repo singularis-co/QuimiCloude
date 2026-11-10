@@ -73,6 +73,9 @@ const HERRAMIENTAS = [
 const EXECUTION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',

@@ -19,6 +19,8 @@ import { AsignacionesError, type Actor, type StartedOrderExecution } from '@/lib
 import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, MANUFACTURED_ORDER_PARAM } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+import { outcomeRoute } from './outcome-query';
+
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
   observabilidad.readRequestIdHeader,
@@ -102,16 +104,15 @@ export async function finishAssignedOrderAction(
 ): Promise<FinishAssignedOrderResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.finishAssignedOrder>>;
   try {
-    ({ numberText } = await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData)));
+    outcome = await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ [MANUFACTURED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ [MANUFACTURED_ORDER_PARAM]: outcome.numberText }, outcome));
 }
 
 export type CancelAssignedOrderResult = { status: 'success' } | ErrorState;
@@ -132,16 +133,15 @@ export async function cancelAssignedOrderAction(
 ): Promise<CancelAssignedOrderResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.cancelAssignedOrder>>;
   try {
-    ({ numberText } = await asignaciones.cancelAssignedOrder(actor, cancelFromFormData(formData)));
+    outcome = await asignaciones.cancelAssignedOrder(actor, cancelFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ [CANCELLED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ [CANCELLED_ORDER_PARAM]: outcome.numberText }, outcome));
 }
 
 export type RecordStepMoveInput = {

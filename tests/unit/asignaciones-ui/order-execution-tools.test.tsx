@@ -30,6 +30,9 @@ function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): 
   return {
     orderId: 'order-1',
     numberText: 'PED-0007',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
+    lineId: 'linea-1',
     status: 'EN_CURSO',
     recipeName: 'Barniz acrílico',
     orderQuantity,

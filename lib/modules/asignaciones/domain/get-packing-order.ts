@@ -9,7 +9,7 @@ import { OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
 import {
   composePackingFinishView,
-  composePackingOrderRows,
+  composePackingOrderDetailRow,
   type PackingFinishViewDeps,
   type PackingOrderDetail,
   type PackingOrderViewDeps,
@@ -47,7 +47,7 @@ export function createGetPackingOrder(
     const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
     if (!PACKING_STATUSES.has(summary.status)) throw new OrderNotFoundError();
 
-    const [row] = await composePackingOrderRows(deps, actor.companyId, [summary]);
+    const row = await composePackingOrderDetailRow(deps, actor.companyId, summary);
     if (row === undefined) throw new OrderNotFoundError();
 
     // Antes de Comenzar, o si empaca otro, ni los pasos, ni las fotos, ni el conteo salen en la respuesta.

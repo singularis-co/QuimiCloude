@@ -78,6 +78,8 @@ function pedido(conditioningSteps: ConditioningStepsView): ConditioningOrderDeta
     id: ORDER_ID,
     lineId: LINE_ID,
     numberText: '2026-0000006',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Limpiador multiusos limón',
     quantity: '72',
     unitId: null,

@@ -55,6 +55,7 @@ const ORDER_ROW = {
   id: 'order-1',
   lineId: 'linea-order-1',
   numberText: '2026-0000030',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '20',
   presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 4 }],

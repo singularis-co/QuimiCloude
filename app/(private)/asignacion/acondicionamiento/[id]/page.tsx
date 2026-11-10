@@ -14,7 +14,7 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { recipeLineIdOf, type RecipeSearchParams } from '../../components';
+import { recipeAccessOf, recipeLineIdOf, type RecipeSearchParams } from '../../components';
 
 import { ConditioningOrderScreen } from './components';
 
@@ -94,6 +94,7 @@ export default async function ConditioningOrderPage({
       finishBlocked={finishBlocked}
       candidates={candidates}
       candidatesError={candidatesError}
+      access={recipeAccessOf(actor)}
     />
   );
 }

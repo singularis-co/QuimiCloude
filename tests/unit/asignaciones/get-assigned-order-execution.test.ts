@@ -25,6 +25,7 @@ import type { AssignedOrderSummary, OrderCatalog, OrderStatus } from '@/lib/modu
 import type { RecipeCatalog, RecipeExecutionContent } from '@/lib/modules/recetas';
 import type { PresentationCatalog, PresentationRef, ProductCatalog, ProductRef } from '@/lib/modules/inventario';
 import type { MassVolumeBridge, UnitCatalog, UnitRef } from '@/lib/modules/unidades';
+import { conTresRecetas, recetaDeTres } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -174,7 +175,7 @@ function montar(options?: {
       deleteByWorkGroup,
       listOrderIdsByUserInCompany,
     } as OrderAssignmentRepository,
-    orders: { findAliveById, findAliveLineSummary, transitionAliveById } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary, transitionAliveById, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted, findExecutionContentById } as unknown as RecipeCatalog,
     units: { findRefs, findRefsSharingBaseInCompany, listVisibleRefs: () => Promise.reject(new Error('no se usa')), findMassVolumeBridge } as UnitCatalog,
     products: {
@@ -314,6 +315,28 @@ describe('QC-215 — getAssignedOrderExecution: acondicionamiento y TERMINADO no
   }
 });
 
+describe('QT-315 — getAssignedOrderExecution: la receta entre las del pedido', () => {
+  it('R7, R8: trae su posicion, el total con la cancelada y las otras recetas en orden de alta', async () => {
+    const { deps } = montar();
+
+    const view = await createGetAssignedOrderExecution(conTresRecetas(deps, LINEA))(ACTOR, {
+      orderId: PEDIDO,
+      lineId: LINEA,
+    });
+
+    expect({ lineId: view.lineId, recipe: view.recipe, otherRecipes: view.otherRecipes }).toEqual(recetaDeTres(LINEA));
+  });
+
+  it('R29: con una sola receta, 1 de 1 y sin otras recetas', async () => {
+    const { deps } = montar();
+
+    const view = await createGetAssignedOrderExecution(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
+
+    expect(view.recipe).toEqual({ position: 1, count: 1 });
+    expect(view.otherRecipes).toEqual([]);
+  });
+});
+
 describe('getAssignedOrderExecution — la vista', () => {
   it('compone `recipeName`, `orderQuantity` y `numberText` desde el resumen y el contenido', async () => {
     const { deps } = montar();
@@ -377,6 +400,9 @@ describe('getAssignedOrderExecution — R19: sin factor de escala', () => {
     expect(claves.sort()).toEqual(
       [
         'orderId',
+        'lineId',
+        'recipe',
+        'otherRecipes',
         'numberText',
         'status',
         'recipeName',

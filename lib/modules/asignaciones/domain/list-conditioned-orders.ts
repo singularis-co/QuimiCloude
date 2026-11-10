@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
+import { SINGLE_RECIPE } from './recipe-of-order';
 import { ValidationError } from './errors';
 
 import type { FinishedOrderView } from './finished-order-view';
@@ -56,6 +57,7 @@ export function createListConditionedOrders(
         lineId: row.lineId,
         numberText: formatOrderNumber(row.number),
         recipeName: rowComposed?.recipeName ?? null,
+        recipe: rowComposed?.recipe ?? SINGLE_RECIPE,
         quantity: row.quantity,
         presentationLines: rowComposed?.presentationLines ?? [],
         unitId: row.unitId,

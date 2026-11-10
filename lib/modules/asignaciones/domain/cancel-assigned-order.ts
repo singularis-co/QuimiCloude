@@ -4,12 +4,14 @@ import { z } from 'zod';
 import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
+import { readOutcomeRecipe, type OutcomeRecipe } from './recipe-of-order';
 import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionTransaction } from '../ports/execution-transaction';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
 import { cancelOrderSchema, formatOrderNumber, type OrderCatalog } from '@/lib/modules/pedidos';
+import type { RecipeCatalog } from '@/lib/modules/recetas';
 
 const cancelAssignedOrderSchema = orderLineInputSchema.extend({
   stepPosition: z.number().int().min(1).nullable(),
@@ -19,11 +21,12 @@ const cancelAssignedOrderSchema = orderLineInputSchema.extend({
 export type CancelAssignedOrderDeps = {
   readonly assignments: OrderAssignmentRepository;
   readonly orders: OrderCatalog;
+  readonly recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>;
   readonly transaction: ExecutionTransaction;
   readonly now?: () => Date;
 };
 
-export type CancelAssignedOrderResult = {
+export type CancelAssignedOrderResult = OutcomeRecipe & {
   readonly numberText: string;
 };
 
@@ -36,8 +39,8 @@ export type CancelAssignedOrderResult = {
  * funcion: por eso la escritura no se reintenta por carrera, y cualquier estado no cancelable sale
  * por `not_cancellable`.
  *
- * El numero visible se lee antes de escribir, para que la lista pueda confirmar que pedido se
- * cancelo.
+ * El numero visible y la receta se leen antes de escribir, para que la lista pueda confirmar que
+ * receta de que pedido se cancelo.
  */
 export function createCancelAssignedOrder(
   deps: CancelAssignedOrderDeps,
@@ -58,6 +61,7 @@ export function createCancelAssignedOrder(
     const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
     const numberText = formatOrderNumber(summary.number);
 
+    const outcomeRecipe = await readOutcomeRecipe(deps, actor.companyId, orderId, summary.recipeId);
     const now = deps.now?.() ?? new Date();
     try {
       await deps.transaction.run(async ({ orders, log }) => {
@@ -81,6 +85,6 @@ export function createCancelAssignedOrder(
       throw error;
     }
 
-    return { numberText };
+    return { numberText, ...outcomeRecipe };
   };
 }

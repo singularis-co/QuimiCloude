@@ -140,7 +140,7 @@ function casosDelOperador(fixture: Fixture) {
     listSummariesByIdsIncludingDeleted: noUsado('listSummariesByIdsIncludingDeleted'),
     listDeliveryProgressByIdsIncludingDeleted: noUsado('listDeliveryProgressByIdsIncludingDeleted'),
     findAliveLineSummary: summaryReaders.findAliveLineSummary,
-    listRecipeOutlinesByIdsIncludingDeleted: noUsado('listRecipeOutlinesByIdsIncludingDeleted'),
+    listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
     transitionAliveById: noUsado('transitionAliveById'),
     startPackingAliveById: noUsado('startPackingAliveById'),
     finishPackingAliveById: noUsado('finishPackingAliveById'),

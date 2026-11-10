@@ -450,3 +450,260 @@ Verificacion:
 - `pnpm run typecheck`: 0 errores. `pnpm run lint`: 0 errores, 11 avisos.
 - `tests/integration/asignaciones` entera, después del arreglo de `finish-with-finished-goods.int`: 29 archivos, 256 en verde.
 - T7 queda `[x]`. T8 se mueve a la Tanda 4, como decidió el leader. Los bloqueos de la Tanda 3 quedan resueltos.
+
+## Tanda 4 — T8 (backend_dev, 2026-11-10)
+
+Grafo: no consultado; todo con Grep/Read. Sin migraciones, sin `db/`, sin dependencias, sin `app/` ni `components/`. Nada de Dashboard ni Recorrido (T10–T12).
+
+### Archivos
+
+**Producción (`lib/`)**
+- `lib/modules/asignaciones/domain/recipe-of-order.ts` (nuevo):
+  - tipos `RecipePosition { position, count }`, `OtherRecipeView { lineId, recipeName, status }`, `RecipeOfOrderView`, `OutcomeRecipe { recipeName, recipeCount }`; constante `SINGLE_RECIPE` (1 de 1);
+  - `readRecipeOutlines(orders, companyId, orderIds)`: UNA llamada a `listRecipeOutlinesByIdsIncludingDeleted`; con lista vacía no llama;
+  - `recipePositionOf(outline, lineId)` y `otherRecipesOf(outline, lineId, names)`: orden por `position`, canceladas incluidas;
+  - `readRecipeOfOrder(deps, companyId, orderId, lineId)`: outline + `recipes.findRefsIncludingDeleted` de las otras; sin otras, no llama;
+  - `readOutcomeRecipe(deps, companyId, orderId, recipeId)`: nombre de la receta y número de recetas del outline.
+- `compose-order-rows.ts`:
+  - `ComposeOrderRowsDeps` gana `orders: Pick<OrderCatalog, 'listRecipeOutlinesByIdsIncludingDeleted'>`;
+  - lee los outlines de la página en una llamada, y en la MISMA llamada de recetas pide los nombres de las filas y los de las otras recetas de sus pedidos;
+  - `ComposedOrderRow` gana `recipe` y `otherRecipes`.
+- Vistas de lista con `recipe: RecipePosition`:
+  - tipos: `AssignedOrderView`, `CompanyOrderView`, `FinishedOrderView`, `PackingOrderRow`, `ConditioningOrderRow`;
+  - quien las compone: `list-assigned-orders`, `list-company-orders`, `list-finished-orders`, `list-conditioned-orders`, `composePackingOrderRows` y la composición de `conditioning-order-view`.
+- Vistas de detalle:
+  - `AssignedOrderExecutionView` gana `lineId`, `recipe` y `otherRecipes`. Las compone `get-assigned-order-execution.ts` con `readRecipeOfOrder`; `start` y `open` las heredan;
+  - `PackingOrderDetail` gana `otherRecipes`; `lineId` y `recipe` vienen de `PackingOrderRow`. La compone la nueva `composePackingOrderDetailRow` de `packing-order-view.ts`, que usa `get-packing-order.ts`. La fila de lista sigue sin `otherRecipes`;
+  - `ConditioningOrderDetail` gana `otherRecipes` (`composeConditioningOrderDetail`).
+- Resultados con `recipeName` y `recipeCount` (`OutcomeRecipe & { numberText }`):
+  - `finish-assigned-order`, `cancel-assigned-order`, `finish-packing` y `finish-conditioning`;
+  - los tres últimos ganan `recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>` en sus deps;
+  - la lectura va después de las validaciones propias y antes de escribir.
+- `lib/composition/index.ts`: `recipes: recipeCatalog` en `finishPacking`, `cancelAssignedOrder` y `finishConditioning`. Las listas ya recibían `orders: orderCatalog`.
+- Driving: `adapters/driving/outcome-query.ts` (nuevo, sin `'use server'`).
+  - `outcomeRoute(params, outcome)` añade `OUTCOME_RECIPE_PARAM` solo si `recipeCount > 1` y hay nombre;
+  - lo usan `finishAssignedOrderAction`, `cancelAssignedOrderAction`, `finishPackingAction` y `finishConditioningAction`.
+- `lib/modules/asignaciones/index.ts`: exporta los tipos `OtherRecipeView`, `OutcomeRecipe` y `RecipePosition`.
+
+**Tests**
+- Nuevos: `tests/unit/asignaciones/recipe-of-order.test.ts` y los dobles compartidos `tests/unit/asignaciones/recipe-outline-doubles.ts` (`outlinesDe`, `refsConNombre`, `conDosRecetas`, `conTresRecetas`, `recetaDeTres`).
+- Casos nuevos en:
+  - listas y detalles: `list-assigned-orders`, `get-assigned-order-execution`, `get-packing-order`, `get-conditioning-order`;
+  - avisos: `finish-assigned-order`, `cancel-assigned-order`, `finish-packing`, `finish-conditioning`;
+  - acciones: `order-execution-actions`, `order-packing-actions`, `order-conditioning-actions`.
+- Adaptados a las vistas nuevas:
+  - qué se cambió: dobles con `listRecipeOutlinesByIdsIncludingDeleted`/`findRefsIncludingDeleted`, `recipe: {1,1}`, `recipeName: null, recipeCount: 1`, listas de claves y los mocks de los casos de uso en las acciones;
+  - archivos: `list-*-orders` (los seis), `get-{packing,conditioning}-order`, `get-assigned-order-execution`, `start-assigned-order`, `open-assigned-order`, `finish-*`, `cancel-assigned-order`, `conditioning-doubles.ts` y `order-*-actions`;
+  - en `finish-packing`, el caso «R25, R42: las dependencias declaradas…» suma `recipes` y R20 en el nombre.
+- Integración:
+  - lector real de outlines en lugar del doble que lanzaba: `assigned-orders`, `batch-states`, `company-orders`, `finished-orders` y `responsible-eligibility` con `summaryReaders`; `pedidos/finish-with-finished-goods` importa el adaptador real;
+  - `finish-auto-assign-packers` devuelve `[]`;
+  - `finished-orders` cablea `recipes` en `finishPacking` y `finishConditioning`;
+  - `tests/helpers/evidence-off.ts` (`recipesWithoutEvidence`) gana `findRefsIncludingDeleted: async () => []`;
+  - `order-lines-execution`: el caso de cancelar (R16, R17) comprueba además `recipeCount: 2` y el nombre (R20).
+
+### Mapa R<n> → test (T8)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R3 | `recipe-of-order.test.ts` | `R3, R7: una receta cancelada cuenta en M y las demas conservan su posicion`; `R3: una linea que el outline ya no trae se pinta como receta unica`; `R3: sin filas no lee outlines` |
+| R3 | `recipe-of-order.test.ts` | `R2, R3: el numero de llamadas por pagina no crece con las filas y los outlines van en UNA llamada` |
+| R3 | `list-assigned-orders.test.ts` | `R3: cada fila lleva su posicion y el total del pedido, canceladas incluidas; los outlines en UNA llamada` (con 1 y con 25 filas) |
+| R7, R8 | `get-assigned-order-execution`, `get-packing-order`, `get-conditioning-order` | `R7, R8: trae su posicion, el total con la cancelada y las otras recetas en orden de alta` |
+| R8 | `recipe-of-order.test.ts` | `R8: las otras recetas salen en orden de alta, con su nombre y su estado, canceladas incluidas`; `R8: composeOrderRows da las otras recetas de cada fila en orden de alta`; `R8: una receta que el catalogo no resuelve sale con nombre null` |
+| R19 | `order-execution-actions.test.ts` | `R19: redirige a /asignacion?fabricado=<numero>…` (sigue verde con el resultado nuevo) |
+| R20 | `recipe-of-order.test.ts` | `R20: da el nombre de la receta y el total de recetas, canceladas incluidas` |
+| R20 | `finish-assigned-order`, `cancel-assigned-order`, `finish-packing`, `finish-conditioning` | `R20: devuelve … el nombre de la receta y cuantas tiene el pedido, canceladas incluidas` |
+| R20 | `order-execution-actions.test.ts` | `R20: con mas de una receta, el aviso lleva el nombre de la receta en receta_aviso`; `R20: con mas de una receta, cancelar vuelve con el nombre de la receta cancelada` |
+| R20 | `order-packing-actions`, `order-conditioning-actions` | `R20: con mas de una receta, el aviso de empacado/acondicionado lleva el nombre de la receta` |
+| R20 | `order-lines-execution.int.test.ts` | `R16, R17, R20: cancelar desde la ejecucion … y el aviso trae la receta` |
+| R29 | `recipe-of-order`, `list-assigned-orders`, `get-assigned-order-execution` | `R3, R29: un pedido de una sola receta da 1 de 1 y ninguna otra receta`; `R8, R29: con una sola receta no hay otras y no se piden nombres`; `R29: un pedido de una sola receta da 1 de 1`; `R29: con una sola receta, 1 de 1 y sin otras recetas` |
+| R29 | `recipe-of-order`, `order-execution-actions` | `R20, R29: un pedido de una sola receta da recipeCount 1`; `R20, R29: con una sola receta, o sin nombre, el aviso no lleva receta_aviso` |
+
+### Salida real
+
+- `pnpm run typecheck`: 41 errores, **todos** en `tests/unit/asignaciones-ui/` (32) y `tests/unit/paridad/` (9).
+  - Son fixtures que construyen vistas sin `recipe`, `otherRecipes` o `lineId`; la lista va en el informe al leader, para T9.
+  - Ninguno en `lib/`, `app/`, `components/`, `e2e/`, `tests/integration/` ni `tests/unit/asignaciones/`.
+- `pnpm run lint`: 0 errores y 11 avisos, los mismos de antes. Ninguno en archivos de esta tanda.
+- Unit: `pnpm exec vitest run` con los 19 archivos tocados de `tests/unit/asignaciones/` → 668/668 en verde.
+- Integración, por archivo: `assigned-orders` 7/7, `batch-states` 4/4, `company-orders` 4/4, `finish-auto-assign-packers` 3/3, `finished-orders` 8/8, `responsible-eligibility` 7/7, `order-lines-execution` 16/16, `execution-atomicity` 14/14, `pedidos/finish-with-finished-goods` 33/33.
+- Guardias: `guard-arquitectura-modulos` y `guard-catalogo-de-errores` → 96/96.
+- Fin de línea: 41 archivos tocados habían quedado en CRLF al editarlos; se normalizaron a LF, como en `HEAD`.
+
+### Decisiones no cubiertas por el spec
+
+1. **Nombres de las otras recetas en la misma llamada.** `composeOrderRows` añade a su única llamada de `findRefsIncludingDeleted` las recetas de los outlines. Así empaque y acondicionamiento sacan `otherRecipes` sin otra composición, y las listas no ganan llamadas.
+2. **Línea ausente del outline** (se quitó entre las dos lecturas): se pinta como 1 de 1 y sin otras recetas, para no mostrar un «Receta N de M» incoherente.
+3. **`recipeName` del aviso** sale de `findRefsIncludingDeleted`, incluida una receta dada de baja, con el mismo criterio que las listas. `recipeCount` son las recetas del outline, canceladas incluidas (P1); con el outline vacío vale 1.
+4. **`OUTCOME_RECIPE_PARAM`** se escribe solo con `recipeCount > 1` **y** nombre resuelto (R20, R29). Sin nombre, el aviso nombra solo el pedido.
+5. **La lectura del aviso va antes de escribir** y después de las validaciones propias de cada caso de uso. Así los errores de dominio salen igual que hoy, y el aviso no depende de leer tras el commit.
+6. **`PackingOrderRow` (lista) no lleva `otherRecipes`.** Solo lo lleva `PackingOrderDetail`, como dice § 3.4.
+
+### Bloqueos
+
+Ninguno. Lo que queda rojo en typecheck son fixtures de UI (T9).
+
+### Veredicto
+
+T8 hecha. En `lib/` y sus tests todo en verde:
+- las listas muestran «Receta N de M» y leen los outlines en una sola llamada;
+- los detalles traen `lineId`, `recipe` y `otherRecipes`;
+- los avisos traen `recipeName` y `recipeCount`, y las acciones escriben `receta_aviso`.
+
+## Tanda 4 — T9 (frontend_dev, 2026-11-10)
+
+Grafo: no se usó; todo con Grep/Read. No se tocó `lib/`, `e2e/`, `db/` ni las dependencias. Tampoco Dashboard, Recorrido ni `e2e/` (tandas 5-6).
+
+### Archivos
+
+**Producción (`app/(private)/asignacion/`)**
+- Nuevos en `components/`:
+  - `recipe-of-order-label.tsx`:
+    - `RecipeOfOrderLabel` pinta «Receta N de M» y da `null` con una sola receta;
+    - además `recipeOfOrderText`, `hasSeveralRecipes` y `RecipeNameWithPosition`, que es la celda «Receta» de las listas.
+  - `recipe-header.tsx`:
+    - `RecipeHeader` pinta fase · Pedido · Receta N de M, el `h1`, cantidad · reparto, el estado y la lista «Otras recetas del pedido»;
+    - la función pura `otherRecipeHref(orderId, other, access)` sigue la tabla de design § 3.4;
+    - exporta también `RecipeAccess` y `NO_RECIPE_ACCESS`.
+  - `recipe-access.ts`: `recipeAccessOf(bearer)`. Usa `canExecuteAssignedOrders` y `resolveAssignmentViews` para no nombrar códigos de permiso fuera de `lib/`, como exigen las guardias de permisos.
+- `components/operator-screen-frame.tsx`: prop opcional `heading`, en unión de tipos con la cabecera de hoy. Los consumidores de hoy no cambian.
+- La celda «Receta» pinta `RecipeNameWithPosition` en `recipeColumn` (`components/assignment-list-parts.tsx`) y en `conditioning-orders-columns.tsx`. Con una receta, el DOM es el de hoy.
+- `components/assigned-order-enter-trigger.tsx`: `aria-label` «Entrar a <receta> del pedido <n>» (`assignedOrderEnterLabel`), como el tablero.
+- `components/order-outcome-notice.tsx`:
+  - `delivered` pasa a `manufactured`, con testid `assigned-order-manufactured-notice`;
+  - los cuatro textos aceptan la receta (design § 4.3);
+  - se borra la variante con envases y producto.
+- `page.tsx`: lee `OUTCOME_RECIPE_PARAM` y lo pasa a los cuatro avisos. Vacío cuenta como ausente.
+- `[id]/components/order-cancel-dialog.tsx`, ahora «Cancelar esta receta»:
+  - nombra la receta y el pedido, y avisa de que las demás recetas siguen;
+  - el motivo lleva la ayuda «Entre 1 y 500 caracteres.»;
+  - los botones son «Volver» y «Cancelar la receta»;
+  - props nuevas: `recipeName` y `numberText`.
+- Pantallas: `order-execution-screen.tsx`, `packing-order-screen.tsx` y `conditioning-order-screen.tsx` usan `RecipeHeader` vía `heading` y ganan la prop opcional `access`. La de ejecución gana además `StatusBadge` y `ORDER_EXECUTION_STATUS_TESTID`.
+- Páginas: `[id]/page.tsx`, `empaque/[id]/page.tsx` y `acondicionamiento/[id]/page.tsx` pasan `access={recipeAccessOf(...)}`.
+- Barriles: `components/index.ts` y `[id]/components/index.ts`.
+
+**Tests**
+- Nuevos: `tests/unit/asignaciones-ui/recipe-header.test.tsx` y `tests/unit/asignaciones-ui/recipe-screens.test.tsx`.
+- Renombrado: `assigned-orders-delivered-notice.test.tsx` pasa a `assigned-orders-manufactured-notice.test.tsx`. Pierde los casos de envases, que se fueron con la variante, y gana casos R19 y R20.
+- Con casos nuevos: `recipe-rows.test.tsx` (R3, R29, R30), `order-cancel-dialog.test.tsx` (R18) y `asignacion-page.test.tsx` (R20).
+- Los 41 errores de typecheck de T8:
+  - las fixtures ganan `recipe: { position: 1, count: 1 }`, `otherRecipes: []` y `lineId` donde faltaba;
+  - `twoRecipes` de `recipe-rows` da 1 de 2 y 2 de 2.
+- Fixtures sin tipo que fallaban al ejecutarse:
+  - `order-execution-page`, `packing-order-page`, `conditioning-order-page` y `packing-orders-list-section`;
+  - `paridad/asignacion-paridad`;
+  - `marca/tablas-marca`, que además gana `lineId`: le faltaba desde T7.
+- Ajustes:
+  - `packed-order-notice`: el kind y el testid;
+  - `assigned-orders-columns`: el nombre accesible del «Entrar» bloqueado;
+  - `paridad/confirmaciones-paridad`: las props del diálogo.
+- Snapshots de paridad: 18 regenerados, después de revisar el diff:
+  - `asignacion-paridad` (1): el «Entrar» de «Mis asignados» gana el `aria-label` «Entrar a Jarabe simple del pedido 2026-000123», en la tabla y en la tarjeta. Nada más;
+  - `confirmaciones-paridad` (4):
+    - «¿Cancelar el pedido?» pasa a «Cancelar esta receta» en el título y en el disparador;
+    - «Cancelar pedido» pasa a «Cancelar la receta» en el botón de confirmar;
+    - entran la descripción con la receta y el pedido, y la ayuda del motivo con su `aria-describedby`;
+  - `asignacion-acondicionamiento-paridad` (13, empaque y acondicionamiento):
+    - la cabecera pasa a `RecipeHeader`, con el eyebrow «<Fase> · Pedido <n>»;
+    - el `h1` y los testids son los mismos;
+    - empaque gana cantidad · reparto en la cabecera;
+    - con una receta no aparecen «Receta N de M» ni «Otras recetas».
+
+### Mapa R<n> → test (T9)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R3 | `recipe-rows.test.tsx` | `R3: «%s» pinta «Receta 1 de 2» y «Receta 2 de 2» en la tabla` (seis listas) |
+| R3, R30 | `recipe-rows.test.tsx` | `R3, R30: «%s» en el telefono, cada tarjeta lleva su «Receta N de M»` |
+| R3, R29 | `recipe-rows.test.tsx` | `R3, R29: «%s» con una sola receta no pinta «Receta 1 de 1»` |
+| R30 | `recipe-rows.test.tsx` | `R30: en el telefono, el «Entrar» de la tarjeta de «asignados» mide 44 × 44 px y nombra la receta` |
+| R30 | `recipe-header.test.tsx` | `R30: el «Ir a esta receta» tiene 44 × 44 px y la fila se apila en el telefono` |
+| R7 | `recipe-header.test.tsx` | `R7: nombra la fase, el pedido, «Receta N de M», …`; `R7: con la receta dada de baja, …` |
+| R7 | `recipe-screens.test.tsx` | `R7: $nombre nombra la fase, el pedido, «Receta 1 de 3», …` (ejecución, empaque, acondicionamiento) |
+| R8 | `recipe-header.test.tsx` | cabecera: `R8: lista las otras recetas …`; `R8: «Ir a esta receta» lleva …` |
+| R8 | `recipe-header.test.tsx` | destino: `R8: $status lleva a su pantalla` (seis estados) |
+| R8 | `recipe-header.test.tsx` | sin permiso: `R8: $status sin el permiso de su pantalla no ofrece enlace`; `R8: sin el permiso de la pantalla, …` |
+| R8 | `recipe-header.test.tsx` | sin enlace (CANCELADO, TERMINADO, BLOQUEADO, ENTREGADO): `R8: %s no ofrece enlace ni con todos los permisos`; `R8: la fila %s sale con su nombre y su estado, sin «Ir a esta receta»` |
+| R8 | `recipe-header.test.tsx` | `recipeAccessOf` (2 casos) |
+| R8 | `recipe-screens.test.tsx` | `R8: $nombre lista las otras recetas, …`; `R8: $nombre sin el permiso de la ejecucion …`; `R8: $nombre sin permisos pasados …`; `R8: empaque y acondicionamiento llevan a su pantalla, …` |
+| R29 | `recipe-header.test.tsx`, `recipe-screens.test.tsx` | `R29: con una sola receta no hay «Receta 1 de 1» ni «Otras recetas»`; `R29: $nombre con una sola receta …` |
+| R18 | `order-cancel-dialog.test.tsx` | `R18: el menu ofrece «Cancelar esta receta» y el dialogo nombra …`; `R18: el FormData lleva el pedido, la receta, el paso y el motivo`; `R18: con la receta dada de baja, …` |
+| R19 | `assigned-orders-manufactured-notice.test.tsx` | parámetro y testid: `R19: el parametro se llama `fabricado`, …`; `R19: el testid del aviso no se llama «entregado»` |
+| R19 | `assigned-orders-manufactured-notice.test.tsx` | texto: `R19, R20: con `receta_aviso`, el aviso de fabricada …`; `R19: sin receta pinta el aviso de siempre, sin envases` |
+| R19 | `assigned-orders-manufactured-notice.test.tsx` | `R19: «$kind» no dice «entregado», con receta ni sin ella` (los cuatro avisos) |
+| R20 | `assigned-orders-manufactured-notice.test.tsx` | `R20: con `receta_aviso`, el aviso de cancelada …`; `R20: «$kind» con receta nombra la receta y el pedido` (los cuatro avisos) |
+| R20, R29 | `assigned-orders-manufactured-notice.test.tsx` | `R20, R29: «$kind» sin receta nombra solo el pedido`; `R20, R29: con `receta_aviso` vacio, …` |
+| R20 | `asignacion-page.test.tsx` | `R20: con `receta_aviso`, los avisos de empacada y acondicionada llevan la receta` |
+| R31 | `recipe-screens.test.tsx` | `R31: $nombre no ofrece entregar la receta ni el pedido` (las tres pantallas) |
+| R31 | `recipe-screens.test.tsx` | `R31: %s no nombra ninguna accion de entrega` (páginas, pantallas, cabecera y menú de fila) |
+
+### Salida real
+
+- `pnpm run typecheck`: 0 errores. `tsc --noEmit` no da salida.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`. Son los 11 avisos de antes; ninguno en archivos de esta tanda.
+- `pnpm exec vitest run <rutas>`: 1308 en verde y 1 en rojo, `tests/unit/recetas/module-contract.test.ts` (ver Bloqueos). Las rutas fueron:
+  - los 60 archivos que montan las piezas tocadas;
+  - los dos nuevos;
+  - `asignaciones/module-contract`, `identity/roles/acondicionamiento-rol` y `marca/tablas-marca`.
+- Paridad (`asignacion-paridad`, `asignacion-acondicionamiento-paridad` y `confirmaciones-paridad`), con `-u` después de revisar el diff: `Snapshots 18 updated`, `Tests 107 passed (107)`.
+- `pnpm exec vitest run guard`:
+  - todo en verde salvo `tests/unit/recetas/scope.test.ts` (ver Bloqueos);
+  - `guard-asignacion-componentizada` 22/22, tras corregir dos comentarios sin tilde.
+- Fin de línea: todos los archivos tocados quedan en LF.
+
+### Decisiones no cubiertas por el spec
+
+1. **`RecipeHeader` entra por una prop `heading` de `OperatorScreenFrame`.** Es el paso 2: una extensión opcional.
+   - Así la cabecera, con su `h1` único, queda dentro del encabezado del marco, y el cuerpo de cada pantalla no cambia.
+   - La lista «Otras recetas» va dentro del encabezado, como en el tablero. Con varias recetas, el encabezado fijo crece.
+2. **Los permisos de «Ir a esta receta» los calcula la página** con `recipeAccessOf` y los baja como `access` (booleans serializables).
+   - La ejecución lee la sesión con `identity.getSessionUser()`, que está memoizada por petición.
+   - Empaque y acondicionamiento reusan el `actor` que ya tenían.
+   - Sin `access`, las pantallas no ofrecen ningún enlace.
+3. **«Cancelar esta receta» se queda en el menú ⋯ de la cabecera**, donde estaba «Cancelar pedido». Cambian los textos, no el sitio.
+4. **El `aria-label` del «Entrar»** solo se pone cuando la fila trae `numberText`. Con la receta dada de baja dice «Entrar al pedido <n>».
+5. **Empaque gana cantidad · reparto en la cabecera** (R7), aunque el cuerpo siga mostrando la cantidad y el reparto de hoy.
+6. **El testid del aviso de fabricada pasa a `assigned-order-manufactured-notice`**, porque R19 pide que el aviso no se llame «entregado».
+
+### Bloqueos
+
+1. **Las guardias de `recetas` están en rojo**: `tests/unit/recetas/module-contract.test.ts` y `tests/unit/recetas/scope.test.ts`.
+   - Marcan como «segunda pantalla de recetas» cualquier `page.tsx` fuera de `produccion/formulas` que contenga `recet|recipe`.
+   - `empaque/[id]/page.tsx` y `acondicionamiento/[id]/page.tsx` ya estaban en rojo desde T7: en `HEAD` contienen `recipeLineIdOf`.
+   - Esta tanda suma `asignacion/page.tsx`, porque design § 4.3 exige leer `OUTCOME_RECIPE_PARAM` ahí.
+   - No he tocado las guardias. Ampliar `PANTALLAS_AUTORIZADAS` lo decide el leader o el humano.
+2. **E2E (T13)**:
+   - `e2e/ejecucion-receta`, `empaque`, `producto-terminado` y `reserva-de-material` buscan `assigned-order-delivered-notice`, que ahora es `assigned-order-manufactured-notice`;
+   - también cambian los E2E que buscan «Cancelar pedido» en la ejecución.
+
+### Veredicto
+
+T9 hecha:
+- las listas muestran «Receta N de M» en la tabla y en la tarjeta;
+- la cabecera de receta lista «Otras recetas», con «Ir a esta receta» según el estado y el permiso;
+- la ejecución tiene el diálogo «Cancelar esta receta»;
+- los avisos son `manufactured` y llevan la receta.
+
+Typecheck en 0. Queda en rojo la guardia de `recetas` (bloqueo 1).
+
+## Tanda 4 — estado al cortar (implementer, 2026-11-10)
+- T8 y T9 están implementadas y commiteadas como trabajo en curso, **sin `[x]`**.
+- **Verificación de cierre incompleta.** La corrida se cortó por falta de memoria del sistema. Antes del corte:
+  - el diff de `lib/`, `app/` y `components/` no cita R/QT/QC;
+  - `pnpm run typecheck` da 0 errores.
+
+  Quedan sin correr en el cierre: lint, `asignaciones-ui` en lotes, `tests/unit/asignaciones`, los `.int` de `asignaciones` y las guardias. Los subagentes sí corrieron por ruta los archivos que tocaron (ver T8 y T9).
+- **Bloqueo: guardias de `recetas` en rojo**, fuera de `tests/baseline-rojos.json`:
+  - `tests/unit/recetas/scope.test.ts` («la pantalla de recetas vive solo donde la declara…»);
+  - `tests/unit/recetas/module-contract.test.ts` («la feature no añade ningún route handler…»).
+
+  Las dos buscan `/recet|recipe/i` en el código de cualquier `page.tsx` fuera de `produccion/formulas` y lo tratan como «segunda pantalla de recetas».
+  - `empaque/[id]/page.tsx` y `acondicionamiento/[id]/page.tsx` están en rojo **desde T7** (`fe1186ead`, ya publicado), por `recipeLineIdOf`. En la Tanda 3 no se vio: `vitest run guard` no recoge `tests/unit/recetas/`, y esa carpeta no estaba en las rutas del cierre.
+  - T9 añade `asignacion/page.tsx`, por `OUTCOME_RECIPE_PARAM`, que pide design § 4.3.
+  - Ponerlas en verde exige ampliar `PANTALLAS_AUTORIZADAS` (`module-contract`) y el conjunto cerrado de `scope`. Es cambiar una regla de guardia, como ya se hizo con QC-180: lo decide el leader o el humano.
+- **Para T13** (E2E):
+  - el testid del aviso pasa a `assigned-order-manufactured-notice`;
+  - `ejecucion-receta`, `empaque`, `producto-terminado` y `reserva-de-material` todavía buscan `assigned-order-delivered-notice`;
+  - «Cancelar pedido» pasa a «Cancelar esta receta».

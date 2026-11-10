@@ -5,6 +5,7 @@ import {
   ORDER_CANCEL_DIALOG_TESTID,
   ORDER_CANCEL_DISMISS_TESTID,
   ORDER_CANCEL_ERROR_TESTID,
+  ORDER_CANCEL_LINE_ID_FIELD,
   ORDER_CANCEL_ORDER_ID_FIELD,
   ORDER_CANCEL_REASON_FIELD,
   ORDER_CANCEL_REASON_TESTID,
@@ -13,6 +14,7 @@ import {
   ORDER_CANCEL_TRIGGER_TESTID,
   OrderCancelDialog,
   OrderExecutionScreen,
+  orderCancelDescription,
 } from '@/app/(private)/asignacion/[id]/components';
 import type { StartedOrderExecution } from '@/lib/modules/asignaciones';
 import type { CancelAssignedOrderResult } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
@@ -52,6 +54,9 @@ function paso(texto: string) {
 const EXECUTION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
@@ -268,7 +273,7 @@ describe('dialogo de cancelar — multiplataforma', () => {
 describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
   it('QC-265 R23: sin open ni onOpenChange pinta su disparador de hoy y se abre con el', async () => {
     const user = setupUser();
-    render(<OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} />);
+    render(<OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} recipeName="Jarabe simple" numberText="2026-0000001" />);
 
     const boton = screen.getByTestId(ORDER_CANCEL_TRIGGER_TESTID);
     expect(boton).toHaveTextContent(ORDER_CANCEL_TEXTS.trigger);
@@ -283,7 +288,7 @@ describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
   it('QC-265 R23: con open y onOpenChange no hay disparador y la apertura la decide quien lo usa', async () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
-      <OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} open={false} onOpenChange={onOpenChange} />,
+      <OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} recipeName="Jarabe simple" numberText="2026-0000001" open={false} onOpenChange={onOpenChange} />,
     );
 
     expect(screen.queryByTestId(ORDER_CANCEL_TRIGGER_TESTID)).toBeNull();
@@ -291,7 +296,7 @@ describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
 
     rerender(
-      <OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} open onOpenChange={onOpenChange} />,
+      <OrderCancelDialog lineId="linea-1" orderId="order-1" stepPosition={2} recipeName="Jarabe simple" numberText="2026-0000001" open onOpenChange={onOpenChange} />,
     );
     const dialogo = await screen.findByRole('alertdialog');
     expect(dialogo).toHaveTextContent(ORDER_CANCEL_TEXTS.title);
@@ -302,5 +307,50 @@ describe('dialogo de cancelar — QC-265 R23: modo controlado', () => {
       await esperarInteractiva(within(dialogo).getByTestId(ORDER_CANCEL_DISMISS_TESTID)),
     );
     expect(onOpenChange).toHaveBeenCalledWith(false, expect.anything());
+  });
+});
+
+describe('dialogo de cancelar — «Cancelar esta receta»', () => {
+  it('R18: el menu ofrece «Cancelar esta receta» y el dialogo nombra la receta y el pedido y avisa de que las demas siguen', async () => {
+    const user = setupUser();
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
+
+    const dialogo = await abrir(user);
+
+    expect(ORDER_CANCEL_TEXTS.trigger).toBe('Cancelar esta receta');
+    expect(within(dialogo).getByRole('heading', { name: 'Cancelar esta receta' })).toBeInTheDocument();
+    expect(dialogo).toHaveTextContent(
+      'Se cancela Barniz acrílico del pedido PED-0007 y se libera su material. Las demás recetas del pedido siguen.',
+    );
+    expect(within(dialogo).getByLabelText(ORDER_CANCEL_TEXTS.reasonLabel)).toHaveAccessibleDescription(
+      ORDER_CANCEL_TEXTS.reasonHelp,
+    );
+    expect(within(dialogo).getByRole('button', { name: 'Volver' })).toBeInTheDocument();
+    expect(confirmar(dialogo)).toHaveTextContent('Cancelar la receta');
+    expect(dialogo.textContent?.toLowerCase()).not.toContain('cancelar pedido');
+  });
+
+  it('R18: el FormData lleva el pedido, la receta, el paso y el motivo', async () => {
+    const user = setupUser();
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
+
+    const dialogo = await abrir(user);
+    await user.type(motivo(dialogo), 'Se derramo el lote');
+    await user.click(confirmar(dialogo));
+
+    await waitFor(() => expect(cancelAssignedOrderActionMock).toHaveBeenCalledTimes(1));
+    const formData = cancelAssignedOrderActionMock.mock.calls[0]![1];
+    expect(formData.get(ORDER_CANCEL_ORDER_ID_FIELD)).toBe('order-1');
+    expect(formData.get(ORDER_CANCEL_LINE_ID_FIELD)).toBe('linea-1');
+    expect(formData.get(ORDER_CANCEL_REASON_FIELD)).toBe('Se derramo el lote');
+    expect(formData.get(ORDER_CANCEL_STEP_POSITION_FIELD)).not.toBeNull();
+  });
+
+  it('R18: con la receta dada de baja, el texto nombra solo el pedido', () => {
+    render(<p data-testid="descripcion">{orderCancelDescription(null, 'PED-0007')}</p>);
+
+    expect(screen.getByTestId('descripcion')).toHaveTextContent(
+      'Se cancela esta receta del pedido PED-0007 y se libera su material. Las demás recetas del pedido siguen.',
+    );
   });
 });

@@ -299,6 +299,9 @@ const PEDIDO: OrderSummary = {
 const EJECUCION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
@@ -319,6 +322,8 @@ function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOr
     id: 'order-1',
     lineId: 'linea-order-1',
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
@@ -557,7 +562,15 @@ const CON_DISPARADOR: readonly DialogoConDisparador[] = [
   },
   {
     nombre: 'cancelar pedido desde asignacion',
-    pintar: () => render(<OrderCancelDialog lineId="linea-1" orderId={PEDIDO.id} stepPosition={2} />),
+    pintar: () => render(
+        <OrderCancelDialog
+          lineId="linea-1"
+          orderId={PEDIDO.id}
+          stepPosition={2}
+          recipeName="Jarabe simple"
+          numberText={PEDIDO.numberText}
+        />,
+      ),
     accion: 'cancelAssignedOrderAction',
     disparador: 'order-cancel-trigger',
     dialogo: 'order-cancel-dialog',

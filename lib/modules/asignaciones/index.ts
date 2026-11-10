@@ -216,6 +216,7 @@ export {
 // reformatea nada de lo de arriba.
 // ---------------------------------------------------------------------------------------
 export type { PackingOrderDetail, PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
+export type { OtherRecipeView, OutcomeRecipe, RecipePosition } from './domain/recipe-of-order';
 export { createListPackingOrders, type ListPackingOrdersDeps } from './domain/list-packing-orders';
 export { createGetPackingOrder, type GetPackingOrderDeps } from './domain/get-packing-order';
 export { createStartPacking, type StartPackingDeps } from './domain/start-packing';

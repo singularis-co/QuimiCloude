@@ -19,6 +19,7 @@ import type { PresentationCatalog, PresentationRef } from '@/lib/modules/inventa
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog, RecipeRef } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
+import { outlinesDe } from './recipe-outline-doubles';
 
 /** Un uuid valido y legible a partir de un solo digito hexadecimal. */
 function uuid(seed: string): string {
@@ -153,7 +154,7 @@ function montar(options?: {
       deleteByWorkGroup,
       listOrderIdsByUserInCompany,
     },
-    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { findAliveById, listAliveSummariesByIds, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findAliveRefsInCompany, findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
@@ -357,6 +358,43 @@ describe('QC-88 — listAssignedOrders: R14 numero de consultas CONSTANTE', () =
   });
 });
 
+describe('QT-315 — listAssignedOrders: «Receta N de M»', () => {
+  it('R3: cada fila lleva su posicion y el total del pedido, canceladas incluidas; los outlines en UNA llamada', async () => {
+    for (const cantidad of [1, 25]) {
+      const ids = Array.from({ length: cantidad }, (_, i) => pedidoId(i));
+      const items = ids.map((id) => resumen(id));
+      const { deps } = montar({ ids, page: { items, total: cantidad }, refs: [receta()] });
+      const listRecipeOutlinesByIdsIncludingDeleted = vi.fn(
+        async (companyId: string, orderIds: readonly string[]) =>
+          (
+            await Promise.all(
+              orderIds.map((id) => outlinesDe(['CANCELADO', 'PENDIENTE'], ['otra', `linea-${id}`])(companyId, [id])),
+            )
+          ).flat(),
+      );
+      const conOutlines = { ...deps, orders: { ...deps.orders, listRecipeOutlinesByIdsIncludingDeleted } };
+
+      const pagina = await createListAssignedOrders(conOutlines)(ACTOR, { page: 1, pageSize: 25 });
+
+      expect(pagina.items.map((fila) => fila.recipe)).toEqual(ids.map(() => ({ position: 2, count: 2 })));
+      expect(listRecipeOutlinesByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
+      expect(listRecipeOutlinesByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, ids);
+    }
+  });
+
+  it('R29: un pedido de una sola receta da 1 de 1', async () => {
+    const { deps } = montar({ ids: [pedidoId(0)], page: { items: [resumen(pedidoId(0))], total: 1 }, refs: [receta()] });
+    const conOutlines = {
+      ...deps,
+      orders: { ...deps.orders, listRecipeOutlinesByIdsIncludingDeleted: outlinesDe(['PENDIENTE'], [`linea-${pedidoId(0)}`]) },
+    };
+
+    const pagina = await createListAssignedOrders(conOutlines)(ACTOR, { page: 1, pageSize: 25 });
+
+    expect(pagina.items[0]?.recipe).toEqual({ position: 1, count: 1 });
+  });
+});
+
 describe('QC-88 — listAssignedOrders: R15 recetas y responsables', () => {
   it('deduplica los ids de receta antes de preguntar', async () => {
     const ids = [pedidoId(1), pedidoId(2)];
@@ -471,6 +509,7 @@ describe('QC-123 — el pedido asignado no lleva importe (R15)', () => {
         'lineId',
         'numberText',
         'recipeName',
+        'recipe',
         'quantity',
         'priority',
         'status',

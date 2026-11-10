@@ -38,6 +38,7 @@ import {
   resumen,
   uuid,
 } from './conditioning-doubles';
+import { conTresRecetas, recetaDeTres } from './recipe-outline-doubles';
 
 const LINEAS = [
   { id: 'linea-1', presentationId: 'pres-500', packages: 12, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '500 g' },
@@ -95,6 +96,18 @@ describe('R20 — la entrada es exactamente `{ orderId: <uuid>, lineId: <uuid> }
   });
 });
 
+describe('QT-315 — getConditioningOrder: la receta entre las del pedido', () => {
+  it('R7, R8: trae su posicion, el total con la cancelada y las otras recetas en orden de alta', async () => {
+    const { deps } = montarCon(resumen(PEDIDO_1));
+
+    const detalle = await createGetConditioningOrder(conTresRecetas(deps, ENTRADA.lineId))(ACONDICIONADOR, ENTRADA);
+
+    expect({ lineId: detalle.lineId, recipe: detalle.recipe, otherRecipes: detalle.otherRecipes }).toEqual(
+      recetaDeTres(ENTRADA.lineId),
+    );
+  });
+});
+
 describe('R15 — el detalle muestra la misma fila que la lista', () => {
   it('R15, D13 (QC-219): consulta esa receta del pedido en la empresa del actor', async () => {
     const { deps, findAliveLineSummary } = montarCon(resumen(PEDIDO_1));
@@ -127,13 +140,14 @@ describe('R15 — el detalle muestra la misma fila que la lista', () => {
     const detalle = montarCon(item);
     const lista = montarCon(item);
 
-    const { team, batchData, conditioningSteps, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
+    const { team, batchData, conditioningSteps, otherRecipes, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
       ...ENTRADA,
     });
     const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila).toEqual(deLaLista);
     expect(team).toEqual([]);
+    expect(otherRecipes).toEqual([]);
     // La receta de estos dobles no tiene pasos de acondicionamiento.
     expect(conditioningSteps).toBeNull();
     // QC-219 R3: los datos de lote solo viajan a quien acondiciona, desde que comenzo.

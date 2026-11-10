@@ -9,6 +9,7 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-s
 import { MissingValue } from './assignment-list-parts';
 import { assignmentActionsColumn } from './assignment-row-actions';
 import { OrderDistributionFull } from './order-distribution-full';
+import { RecipeNameWithPosition } from './recipe-of-order-label';
 
 /**
  * Las cinco columnas de «Por acondicionar»: número, receta, envases -el reparto entero, no un
@@ -47,8 +48,16 @@ export function buildConditioningOrdersColumns({
       id: CONDITIONING_ORDER_RECIPE_NAME_COLUMN_ID,
       label: 'Fórmula',
       align: 'start',
-      cell: (order) =>
-        order.recipeName ?? <MissingValue testIdPrefix="conditioning-order" field={CONDITIONING_ORDER_RECIPE_NAME_COLUMN_ID} />,
+      cell: (order) => (
+        <RecipeNameWithPosition
+          name={
+            order.recipeName ?? (
+              <MissingValue testIdPrefix="conditioning-order" field={CONDITIONING_ORDER_RECIPE_NAME_COLUMN_ID} />
+            )
+          }
+          recipe={order.recipe}
+        />
+      ),
     },
     {
       id: CONDITIONING_ORDER_PACKAGES_COLUMN_ID,

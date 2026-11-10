@@ -208,8 +208,9 @@ const orderCatalog: OrderCatalog = {
       packaging: packagingCatalog,
     })(companyId, orderId, lineId);
   },
-  listRecipeOutlinesByIdsIncludingDeleted: async () => {
-    throw new Error('este archivo no lee las recetas del pedido');
+  listRecipeOutlinesByIdsIncludingDeleted: async (companyId, orderIds) => {
+    const { listOrderRecipeOutlinesByIdsIncludingDeleted } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
+    return listOrderRecipeOutlinesByIdsIncludingDeleted(companyId, orderIds);
   },
   // R15, R16: Finalizar ya no da de alta ningun lote -eso se traslada a Terminar (T14)-.
   transitionAliveById: createTransitionOrder({ unitOfWork }),

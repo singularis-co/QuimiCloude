@@ -113,9 +113,7 @@ function wireListFinishedOrders(tx: FixtureTx['tx']) {
       throw new Error('los terminados no leen el progreso de entrega');
     },
     findAliveLineSummary: summaryReaders.findAliveLineSummary,
-    listRecipeOutlinesByIdsIncludingDeleted: async () => {
-      throw new Error('este archivo no lee las recetas del pedido');
-    },
+    listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
     transitionAliveById: transitionAliveByIdReal,
     // R27: las dos escrituras REALES de empaque, mismo patron que `setStatus` arriba -las dos
     // `UPDATE` condicionales de `order-prisma.ts` sobre el proxy de la `tx` del fixture-.
@@ -189,6 +187,7 @@ function wireListFinishedOrders(tx: FixtureTx['tx']) {
     startPacking: createStartPacking({ orders, ...execution, now: () => NOW }),
     finishPacking: createFinishPacking({
       orders,
+      recipes: { findRefsIncludingDeleted: findRecipeRefsIncludingDeleted },
       ...execution,
       now: () => NOW,
       packingSteps: packingStepsWithoutEvidence,
@@ -207,6 +206,7 @@ function wireListFinishedOrders(tx: FixtureTx['tx']) {
     // regla de Terminar sin datos se prueba en `finish-conditioning-batch-data.int.test.ts`.
     finishConditioning: createFinishConditioning({
       orders,
+      recipes: { findRefsIncludingDeleted: findRecipeRefsIncludingDeleted },
       batches: {
         listOfOrder: async (companyId, orderId) =>
           (

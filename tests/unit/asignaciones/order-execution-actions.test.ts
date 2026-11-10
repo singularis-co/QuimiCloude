@@ -98,7 +98,7 @@ describe('finishAssignedOrderAction — la confirmacion viaja en la URL de vuelt
   // R15, R16: Finalizar ya no da de alta ningun lote, asi que la confirmacion ya no
   // lleva envases ni producto -esa notificacion pasa a Terminar el empaque (T14)-.
   it('R19: redirige a `/asignacion?fabricado=<numero>` con el numero que devuelve el caso de uso', async () => {
-    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007' });
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishAssignedOrderAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
@@ -109,7 +109,7 @@ describe('finishAssignedOrderAction — la confirmacion viaja en la URL de vuelt
   });
 
   it('un numero con caracteres especiales viaja escapado en la cadena de consulta', async () => {
-    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026/0000007' });
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026/0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishAssignedOrderAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
@@ -118,6 +118,35 @@ describe('finishAssignedOrderAction — la confirmacion viaja en la URL de vuelt
     const [ruta] = redirectMock.mock.calls[0] as [string];
     const params = new URL(ruta, 'http://localhost').searchParams;
     expect(params.get('fabricado')).toBe('2026/0000007');
+  });
+
+  it('R20: con mas de una receta, el aviso lleva el nombre de la receta en `receta_aviso`', async () => {
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon & cera', recipeCount: 2 });
+
+    await expect(
+      finishAssignedOrderAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
+    ).rejects.toThrow('NEXT_REDIRECT');
+
+    const [ruta] = redirectMock.mock.calls[0] as [string];
+    const params = new URL(ruta, 'http://localhost').searchParams;
+    expect(params.get('fabricado')).toBe('2026-0000007');
+    expect(params.get('receta_aviso')).toBe('Jabon & cera');
+  });
+
+  it('R20, R29: con una sola receta, o sin nombre, el aviso no lleva `receta_aviso`', async () => {
+    for (const salida of [
+      { numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 },
+      { numberText: '2026-0000007', recipeName: null, recipeCount: 3 },
+    ]) {
+      redirectMock.mockClear();
+      finishAssignedOrderMock.mockResolvedValue(salida);
+
+      await expect(
+        finishAssignedOrderAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
+      ).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(redirectMock).toHaveBeenCalledWith('/asignacion?fabricado=2026-0000007');
+    }
   });
 
   it('un error del caso de uso se traduce por su `code` y NO redirige', async () => {
@@ -143,7 +172,7 @@ function formDataDe(campos: Record<string, string>): FormData {
 
 describe('finishAssignedOrderAction — la posicion del ultimo paso', () => {
   it('R21: envia al caso de uso la posicion del formulario como numero', async () => {
-    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007' });
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishAssignedOrderAction({ status: 'success' }, formDataDe({ orderId: ORDER_ID, lineId: LINE_ID, stepPosition: '4' })),
@@ -153,7 +182,7 @@ describe('finishAssignedOrderAction — la posicion del ultimo paso', () => {
   });
 
   it('R5: una posicion vacia es una receta sin pasos y viaja como `null`', async () => {
-    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007' });
+    finishAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishAssignedOrderAction({ status: 'success' }, formDataDe({ orderId: ORDER_ID, lineId: LINE_ID, stepPosition: '' })),
@@ -175,7 +204,7 @@ describe('finishAssignedOrderAction — la posicion del ultimo paso', () => {
 
 describe('cancelAssignedOrderAction — cancela y vuelve a la lista con la confirmacion', () => {
   it('R22, R25: envia pedido, posicion y motivo tal cual y redirige a `/asignacion?cancelado=<numero>`', async () => {
-    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007' });
+    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       cancelAssignedOrderAction(
@@ -193,8 +222,21 @@ describe('cancelAssignedOrderAction — cancela y vuelve a la lista con la confi
     expect(redirectMock).toHaveBeenCalledWith('/asignacion?cancelado=2026-0000007');
   });
 
+  it('R20: con mas de una receta, cancelar vuelve con el nombre de la receta cancelada', async () => {
+    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Barniz', recipeCount: 3 });
+
+    await expect(
+      cancelAssignedOrderAction(
+        { status: 'success' },
+        formDataDe({ orderId: ORDER_ID, lineId: LINE_ID, stepPosition: '2', reason: 'El cliente lo anulo' }),
+      ),
+    ).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(redirectMock).toHaveBeenCalledWith('/asignacion?cancelado=2026-0000007&receta_aviso=Barniz');
+  });
+
   it('R25: el numero viaja escapado en la cadena de consulta', async () => {
-    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026/0000007' });
+    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026/0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       cancelAssignedOrderAction({ status: 'success' }, formDataDe({ orderId: ORDER_ID, stepPosition: '1', reason: 'x' })),
@@ -278,7 +320,7 @@ describe('openAssignedOrderAction y startAssignedOrderAction — la receta viaja
 
 describe('cancelAssignedOrderAction y finishAssignedOrderAction — la receta viaja en el FormData (R11, R16)', () => {
   it('R16: cancelar envia el `lineId` del formulario', async () => {
-    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007' });
+    cancelAssignedOrderMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       cancelAssignedOrderAction({ status: 'success' }, formDataDe({ orderId: ORDER_ID, lineId: LINE_ID, stepPosition: '1', reason: 'x' })),

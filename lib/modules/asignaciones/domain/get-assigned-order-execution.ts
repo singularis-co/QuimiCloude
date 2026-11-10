@@ -4,6 +4,7 @@ import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors
 import { readStepEvidence } from './evidence-photos';
 import { toDistributionLines, toDistributionPresentations, unitLabelOf } from './order-distribution-view';
 import { findLine, orderLineInputSchema } from './order-line-target';
+import { readRecipeOfOrder } from './recipe-of-order';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { EvidenceStorage } from '../ports/evidence-storage';
@@ -149,8 +150,13 @@ export function createGetAssignedOrderExecution(
           )
         : [];
 
+    const recipeOfOrder = await readRecipeOfOrder(deps, actor.companyId, orderId, summary.lineId);
+
     return {
       orderId: summary.id,
+      lineId: recipeOfOrder.lineId,
+      recipe: recipeOfOrder.recipe,
+      otherRecipes: recipeOfOrder.otherRecipes,
       numberText: formatOrderNumber(summary.number),
       status,
       recipeName,

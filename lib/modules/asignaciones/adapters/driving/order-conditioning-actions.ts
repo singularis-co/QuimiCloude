@@ -17,6 +17,8 @@ import { AsignacionesError, type Actor, type RecordConditioningStepResult } from
 import { ASSIGNED_ORDERS_ROUTE, CONDITIONED_ORDER_PARAM, conditioningOrderRoute } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+import { outcomeRoute } from './outcome-query';
+
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
   observabilidad.readRequestIdHeader,
@@ -76,16 +78,15 @@ export async function finishConditioningAction(
 ): Promise<FinishConditioningResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.finishConditioning>>;
   try {
-    ({ numberText } = await asignaciones.finishConditioning(actor, orderLineFromFormData(formData)));
+    outcome = await asignaciones.finishConditioning(actor, orderLineFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ vista: 'por_acondicionar', [CONDITIONED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ vista: 'por_acondicionar', [CONDITIONED_ORDER_PARAM]: outcome.numberText }, outcome));
 }
 
 export type SaveConditioningBatchDataResult = { status: 'idle' } | { status: 'success' } | ErrorState;

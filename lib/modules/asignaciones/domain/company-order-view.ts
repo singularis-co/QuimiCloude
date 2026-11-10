@@ -1,4 +1,5 @@
 // lib/modules/asignaciones/domain/company-order-view.ts
+import type { RecipePosition } from './recipe-of-order';
 import type { OrderPriority, OrderStatus } from '@/lib/modules/pedidos';
 
 import type { OrderResponsible } from './assignment-view';
@@ -12,6 +13,8 @@ export type CompanyOrderView = {
   readonly numberText: string;
   /** `null` significa «no se pudo resolver»: la pantalla pinta el marcador de ausencia. */
   readonly recipeName: string | null;
+  /** Su lugar entre las recetas del pedido; con `count` 1 la fila no lo muestra. */
+  readonly recipe: RecipePosition;
   /** Cadena decimal, nunca `number` (`docs/architecture.md > Anti-patrones`). */
   readonly quantity: string;
   /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */

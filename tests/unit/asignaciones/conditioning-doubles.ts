@@ -159,7 +159,7 @@ export function montar(options?: Opciones) {
       deleteByWorkGroup: vi.fn(),
       listOrderIdsByUserInCompany: vi.fn(),
     },
-    orders: { listAliveSummariesInCompany, listAliveSummariesByIds, findAliveLineSummary } as unknown as OrderCatalog,
+    orders: { listAliveSummariesInCompany, listAliveSummariesByIds, findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,

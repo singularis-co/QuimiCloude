@@ -180,7 +180,7 @@ describe('startConditioningAction — Comenzar con equipo se queda en el detalle
 
 describe('finishConditioningAction — Terminar vuelve a «Por acondicionar» con el aviso', () => {
   it('R27, D11: con el pedido ya TERMINADO, redirige a /asignacion?vista=por_acondicionar&acondicionado=<numero>', async () => {
-    finishConditioningMock.mockResolvedValue({ numberText: '2026-0000007' });
+    finishConditioningMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(finishConditioningAction({ status: 'success' }, formData([['orderId', ORDER_ID]]))).rejects.toThrow(
       'NEXT_REDIRECT',
@@ -194,8 +194,20 @@ describe('finishConditioningAction — Terminar vuelve a «Por acondicionar» co
     expect(redirectMock).toHaveBeenCalledWith('/asignacion?vista=por_acondicionar&acondicionado=2026-0000007');
   });
 
+  it('R20: con mas de una receta, el aviso de acondicionado lleva el nombre de la receta', async () => {
+    finishConditioningMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Barniz', recipeCount: 2 });
+
+    await expect(finishConditioningAction({ status: 'success' }, formData([['orderId', ORDER_ID]]))).rejects.toThrow(
+      'NEXT_REDIRECT',
+    );
+
+    expect(redirectMock).toHaveBeenCalledWith(
+      '/asignacion?vista=por_acondicionar&acondicionado=2026-0000007&receta_aviso=Barniz',
+    );
+  });
+
   it('R27: un numero con caracteres especiales viaja escapado en la cadena de consulta', async () => {
-    finishConditioningMock.mockResolvedValue({ numberText: '2026/0000007' });
+    finishConditioningMock.mockResolvedValue({ numberText: '2026/0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(finishConditioningAction({ status: 'success' }, formData([['orderId', ORDER_ID]]))).rejects.toThrow(
       'NEXT_REDIRECT',

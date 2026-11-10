@@ -2250,6 +2250,7 @@ export const asignaciones = {
   }),
   finishPacking: createFinishPackingOrder({
     orders: orderCatalog,
+    recipes: recipeCatalog,
     log: executionLogRepository,
     transaction: executionTransaction,
     now: () => new Date(),
@@ -2259,6 +2260,7 @@ export const asignaciones = {
   cancelAssignedOrder: createCancelAssignedOrder({
     assignments: orderAssignmentRepository,
     orders: orderCatalog,
+    recipes: recipeCatalog,
     transaction: executionTransaction,
     now: () => new Date(),
   }),
@@ -2293,6 +2295,7 @@ export const asignaciones = {
   }),
   finishConditioning: createFinishConditioningOrder({
     orders: orderCatalog,
+    recipes: recipeCatalog,
     batches: createFinishedBatchLabels(),
     transaction: executionTransaction,
     conditioningSteps: { findConditioningStepsById: findRecipeConditioningStepsById },

@@ -164,9 +164,9 @@ function montar(options?: {
       deleteByWorkGroup: vi.fn(),
       listOrderIdsByUserInCompany,
     } as unknown as OrderAssignmentRepository,
-    orders: { findAliveById, findAliveLineSummary, transitionAliveById } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary, transitionAliveById, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
     recipes: {
-      findRefsIncludingDeleted: vi.fn(),
+      findRefsIncludingDeleted: vi.fn(async () => []),
       findExecutionContentById: vi.fn(async () => contenido(options?.pasos ?? 0)),
     } as unknown as RecipeCatalog,
     units: {

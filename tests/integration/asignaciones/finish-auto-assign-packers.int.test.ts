@@ -71,6 +71,7 @@ function ordersDoblados(orderId: string, lineId: string): OrderCatalog {
       pageSize: 1,
       totalPages: 1,
     }),
+    listRecipeOutlinesByIdsIncludingDeleted: async () => [],
     findAliveLineSummary: async (_companyId: string, id: string, linea: string) =>
       id === orderId && linea === lineId
         ? {

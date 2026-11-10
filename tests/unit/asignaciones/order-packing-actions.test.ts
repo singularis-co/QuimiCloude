@@ -122,8 +122,18 @@ describe('startPackingAction — Comenzar vuelve a la MISMA pantalla del pedido'
 });
 
 describe('finishPackingAction — la confirmacion viaja en la URL de vuelta, no en el return', () => {
+  it('R20: con mas de una receta, el aviso de empacado lleva el nombre de la receta', async () => {
+    finishPackingMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Barniz', recipeCount: 2 });
+
+    await expect(
+      finishPackingAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
+    ).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(redirectMock).toHaveBeenCalledWith('/asignacion?vista=por_empacar&empacado=2026-0000007&receta_aviso=Barniz');
+  });
+
   it('redirige a `/asignacion?vista=por_empacar&empacado=<numero>` (R26)', async () => {
-    finishPackingMock.mockResolvedValue({ numberText: '2026-0000007' });
+    finishPackingMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishPackingAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
@@ -134,7 +144,7 @@ describe('finishPackingAction — la confirmacion viaja en la URL de vuelta, no 
   });
 
   it('un numero con caracteres especiales viaja escapado en la cadena de consulta', async () => {
-    finishPackingMock.mockResolvedValue({ numberText: '2026/0000007' });
+    finishPackingMock.mockResolvedValue({ numberText: '2026/0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishPackingAction({ status: 'success' }, formDataConPedido(ORDER_ID)),
@@ -178,7 +188,7 @@ describe('finishPackingAction — conteo real de envases en `counts` (QC-281)', 
   }
 
   it('R11, R13: un FormData valido pasa `orderId`, `lineId` y `counts` parseado al caso de uso y redirige como hoy', async () => {
-    finishPackingMock.mockResolvedValue({ numberText: '2026-0000007' });
+    finishPackingMock.mockResolvedValue({ numberText: '2026-0000007', recipeName: 'Jabon liquido', recipeCount: 1 });
 
     await expect(
       finishPackingAction({ status: 'success' }, formDataConLineas(JSON.stringify(LINEAS))),

@@ -19,6 +19,8 @@ import { AsignacionesError, type Actor } from '@/lib/modules/asignaciones';
 import { ASSIGNED_ORDERS_ROUTE, PACKED_ORDER_PARAM, packingOrderRoute } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+import { outcomeRoute } from './outcome-query';
+
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
   observabilidad.readRequestIdHeader,
@@ -85,14 +87,13 @@ export async function finishPackingAction(
 ): Promise<FinishPackingResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.finishPacking>>;
   try {
-    ({ numberText } = await asignaciones.finishPacking(actor, finishPackingInputFromFormData(formData)));
+    outcome = await asignaciones.finishPacking(actor, finishPackingInputFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ vista: 'por_empacar', [PACKED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ vista: 'por_empacar', [PACKED_ORDER_PARAM]: outcome.numberText }, outcome));
 }

@@ -3,6 +3,7 @@
  * La fila comun de «Por acondicionar» y del detalle del acondicionador: una sola composicion para
  * las dos, para que la lista y el detalle nunca muestren datos distintos de un mismo pedido.
  */
+import type { OtherRecipeView, RecipePosition } from './recipe-of-order';
 import {
   batchDataForm,
   batchesByPresentation,
@@ -11,6 +12,7 @@ import {
   type ConditioningBatchForm,
 } from './conditioning-batch-data';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
+import { SINGLE_RECIPE } from './recipe-of-order';
 import type { ConditioningProgress } from './conditioning-steps';
 import type { OrderDistributionLineView } from './order-distribution-view';
 import type { StepEvidenceView } from './step-evidence';
@@ -33,6 +35,8 @@ export type ConditioningOrderRow = {
   readonly numberText: string;
   /** `null` = la receta ya no se encuentra. */
   readonly recipeName: string | null;
+  /** Su lugar entre las recetas del pedido; con `count` 1 la fila no lo muestra. */
+  readonly recipe: RecipePosition;
   /** Cadena decimal, nunca `number`. */
   readonly quantity: string;
   /** La unidad de `quantity`; los dos `null` = pedido sin unidad, la cifra va sola. */
@@ -95,6 +99,8 @@ export type ConditioningStepsView = {
  *  `batchData` es `null` para quien no puede escribir los datos de lote. `conditioningSteps` solo
  *  viaja a quien acondiciona un `EN_ACONDICIONAMIENTO` cuya receta tiene pasos. */
 export type ConditioningOrderDetail = ConditioningOrderRow & {
+  /** Las demas recetas del pedido en orden de alta, canceladas incluidas; vacio con una sola. */
+  readonly otherRecipes: readonly OtherRecipeView[];
   readonly team: readonly ConditioningTeamMemberView[];
   readonly batchData: ConditioningBatchData | null;
   readonly conditioningSteps: ConditioningStepsView | null;
@@ -147,7 +153,7 @@ export async function composeConditioningOrderDetail(
   team: readonly ConditioningTeamMemberRow[],
   batches: readonly FinishedBatchOfOrderLine[] | null,
 ): Promise<Omit<ConditioningOrderDetail, 'conditioningSteps'> | undefined> {
-  const { rows, names } = await composeConditioningOrderRowsWithNames(
+  const { rows, names, otherRecipes } = await composeConditioningOrderRowsWithNames(
     deps,
     companyId,
     [order],
@@ -157,6 +163,7 @@ export async function composeConditioningOrderDetail(
   if (row === undefined) return undefined;
   return {
     ...row,
+    otherRecipes: otherRecipes.get(row.lineId) ?? [],
     team: team.map((member) => ({
       userId: member.userId,
       displayName: names.get(member.userId) ?? member.userId,
@@ -200,7 +207,11 @@ async function composeConditioningOrderRowsWithNames(
   companyId: string,
   orders: readonly AssignedOrderSummary[],
   extraPersonIds: readonly string[],
-): Promise<{ readonly rows: readonly ConditioningOrderRow[]; readonly names: ReadonlyMap<string, string> }> {
+): Promise<{
+  readonly rows: readonly ConditioningOrderRow[];
+  readonly names: ReadonlyMap<string, string>;
+  readonly otherRecipes: ReadonlyMap<string, readonly OtherRecipeView[]>;
+}> {
   const composed = await composeOrderRows(deps, companyId, orders);
 
   const personIds = [
@@ -223,6 +234,7 @@ async function composeConditioningOrderRowsWithNames(
       lineId: order.lineId,
       numberText: formatOrderNumber(order.number),
       recipeName: rowComposed?.recipeName ?? null,
+      recipe: rowComposed?.recipe ?? SINGLE_RECIPE,
       quantity: order.quantity,
       unitId: order.unitId,
       unitLabel: rowComposed?.unitLabel ?? null,
@@ -235,5 +247,8 @@ async function composeConditioningOrderRowsWithNames(
       conditionedById: order.conditionedBy,
     };
   });
-  return { rows, names };
+  const otherRecipes = new Map(
+    [...composed.entries()].map(([lineId, rowComposed]) => [lineId, rowComposed.otherRecipes] as const),
+  );
+  return { rows, names, otherRecipes };
 }

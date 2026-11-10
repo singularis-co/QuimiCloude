@@ -20,6 +20,7 @@ import {
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { NewExecutionEntry } from '@/lib/modules/asignaciones/domain/execution-entry';
 import type { ExecutionWriters } from '@/lib/modules/asignaciones/ports/execution-transaction';
+import { conDosRecetas } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -135,7 +136,8 @@ function montar(options?: {
   const findPackingStepsById = vi.fn(async () => (options?.pasos === undefined ? [{ blocks: [] }] : options.pasos));
   const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const deps = {
-    orders: { findAliveById, findAliveLineSummary, finishPackingAliveById: globalFinishPackingAliveById },
+    orders: { findAliveById, findAliveLineSummary, finishPackingAliveById: globalFinishPackingAliveById, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) },
+    recipes: { findRefsIncludingDeleted: vi.fn(async () => []) },
     log: { append: depsAppend, findLastStepPosition: vi.fn(async () => null) },
     transaction: { run },
     now: () => AHORA,
@@ -196,7 +198,7 @@ describe('finishPacking — R21, R26: exito devuelve el numero leido antes de es
 
     const result = await finishPacking(ACTOR, ENTRADA);
 
-    expect(result).toEqual({ numberText: expect.any(String) });
+    expect(result).toEqual({ numberText: expect.any(String), recipeName: null, recipeCount: 1 });
     expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date), LINEAS);
 
@@ -299,9 +301,9 @@ describe('finishPacking — R25: ningun puerto de inventario', () => {
   // [2026-10-06] Ganan `log` y `transaction` y nada mas: la lista sigue siendo exacta.
   // [2026-10-13] QC-214 suma `packingSteps` y `evidence` para exigir las fotos (R36): ninguno es
   // de inventario.
-  it('R25, R42: las dependencias declaradas son solo `orders`, `log`, `transaction` y las dos de la evidencia', () => {
+  it('R25, R42, R20: las dependencias declaradas son solo `orders`, `log`, `transaction`, las dos de la evidencia y `recipes` para el aviso', () => {
     const { deps } = montar();
-    expect(Object.keys(deps).sort()).toEqual(['evidence', 'log', 'now', 'orders', 'packingSteps', 'transaction']);
+    expect(Object.keys(deps).sort()).toEqual(['evidence', 'log', 'now', 'orders', 'packingSteps', 'recipes', 'transaction']);
   });
 });
 
@@ -320,7 +322,7 @@ describe('QC-211 — finishPacking no comprueba el recorrido de los pasos de env
     const { deps, finishPackingAliveById } = montar();
     const finishPacking = createFinishPacking(deps);
 
-    await expect(finishPacking(ACTOR, ENTRADA)).resolves.toEqual({ numberText: expect.any(String) });
+    await expect(finishPacking(ACTOR, ENTRADA)).resolves.toEqual({ numberText: expect.any(String), recipeName: null, recipeCount: 1 });
     expect(finishPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date), LINEAS);
   });
 
@@ -436,6 +438,8 @@ describe('finishPacking — R42: empresa del actor y sin comprobacion de respons
 
     await expect(createFinishPacking(conAsignaciones)(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: expect.any(String),
+      recipeName: null,
+      recipeCount: 1,
     });
 
     expect(listOrderIdsByUserInCompany).not.toHaveBeenCalled();
@@ -446,11 +450,23 @@ describe('finishPacking — R42: empresa del actor y sin comprobacion de respons
 });
 
 describe('finishPacking — R41, R5bis, R8, R24: el exito es el objeto y deja una fila `pack_finish`', () => {
+  it('R20: devuelve el nombre de la receta y cuantas tiene el pedido, canceladas incluidas', async () => {
+    const m = montar({ resultado: { kind: 'ok', finishedGoods: [] } });
+
+    await expect(createFinishPacking(conDosRecetas(m.deps))(ACTOR, ENTRADA)).resolves.toEqual({
+      numberText: expect.any(String),
+      recipeName: expect.stringMatching(/^Receta /),
+      recipeCount: 2,
+    });
+  });
+
   it('R41, R5bis, R8: `{ kind: ok }` deja UNA fila sin posicion ni motivo, con instante, pedido, persona y empresa', async () => {
     const m = montar({ resultado: { kind: 'ok', finishedGoods: [{ lote: 1 }] } });
 
     await expect(createFinishPacking(m.deps)(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: expect.any(String),
+      recipeName: null,
+      recipeCount: 1,
     });
 
     expect(m.run).toHaveBeenCalledTimes(1);
@@ -546,6 +562,8 @@ describe('finishPacking — evidencia (R36, R37)', () => {
     });
     await expect(createFinishPacking(m.deps)(ACTOR, ENTRADA)).resolves.toEqual({
       numberText: expect.any(String),
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(m.finishPackingAliveById).toHaveBeenCalledTimes(1);
   });

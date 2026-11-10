@@ -7,7 +7,10 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { EntityImage } from '@/components/shared/entity-image';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { Notice } from '@/components/shared/notice';
-import { orderDistributionLineText } from '@/components/shared/order-distribution-label';
+import {
+  OrderDistributionLabel,
+  orderDistributionLineText,
+} from '@/components/shared/order-distribution-label';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { EvidenceMissingDialog } from '@/components/shared/step-evidence';
 import { StepReader } from '@/components/shared/step-reader';
@@ -28,6 +31,7 @@ import {
   OperatorScreenFrame,
   STEP_READER_SIDE_COLUMN_RESERVE,
 } from '../../../components/operator-screen-frame';
+import { NO_RECIPE_ACCESS, RecipeHeader, type RecipeAccess } from '../../../components/recipe-header';
 import { useStepEvidence } from '../../../components/use-step-evidence';
 import { PackingFinishDialog, type PackingFinishSubmission } from './packing-finish-dialog';
 
@@ -87,6 +91,7 @@ export const PACKING_ORDER_START_CONFIRM_TEXTS = {
 
 export const PACKING_ORDER_TEXTS = {
   back: 'Volver a «Por empacar»',
+  phase: 'Empaque',
   recipeMissing: 'Esta fórmula está dada de baja.',
   quantity: 'Cantidad:',
   distribution: 'Reparto',
@@ -127,9 +132,16 @@ export type PackingOrderScreenProps = {
   /** El id del actor de la sesion, nunca su nombre: se decide comparando `packedById`. */
   readonly actorId: string;
   readonly backHref: string;
+  /** A que otras recetas del pedido puede ir la sesion; sin valor, a ninguna. */
+  readonly access?: RecipeAccess;
 };
 
-export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScreenProps) {
+export function PackingOrderScreen({
+  order,
+  actorId,
+  backHref,
+  access = NO_RECIPE_ACCESS,
+}: PackingOrderScreenProps) {
   const startFormRef = useRef<HTMLFormElement>(null);
   const finishFormRef = useRef<HTMLFormElement>(null);
   const finishCountsRef = useRef<HTMLInputElement>(null);
@@ -322,15 +334,35 @@ export function PackingOrderScreen({ order, actorId, backHref }: PackingOrderScr
         testId: PACKING_ORDER_BACK_LINK_TESTID,
         disabled: canFinish,
       }}
-      eyebrow={order.numberText}
-      title={order.recipeName ?? PACKING_ORDER_TEXTS.recipeMissing}
-      titleTestId={PACKING_ORDER_RECIPE_TESTID}
-      status={
-        <StatusBadge
-          tone={ORDER_STATUS_TONES[order.status]}
-          label={ORDER_STATUS_LABELS[order.status]}
-          data-testid={PACKING_ORDER_STATUS_TESTID}
-          data-status={order.status}
+      heading={
+        <RecipeHeader
+          phase={PACKING_ORDER_TEXTS.phase}
+          orderId={order.id}
+          numberText={order.numberText}
+          recipeName={order.recipeName}
+          recipeMissingText={PACKING_ORDER_TEXTS.recipeMissing}
+          titleTestId={PACKING_ORDER_RECIPE_TESTID}
+          recipe={order.recipe}
+          otherRecipes={order.otherRecipes}
+          access={access}
+          details={
+            <>
+              <span title={exactDecimalTitle(order.quantity)}>
+                {formatDecimalDisplay(order.quantity)}
+                {order.unitLabel === null ? null : ` ${order.unitLabel}`}
+              </span>
+              <span aria-hidden="true">{' · '}</span>
+              <OrderDistributionLabel lines={order.presentationLines} />
+            </>
+          }
+          status={
+            <StatusBadge
+              tone={ORDER_STATUS_TONES[order.status]}
+              label={ORDER_STATUS_LABELS[order.status]}
+              data-testid={PACKING_ORDER_STATUS_TESTID}
+              data-status={order.status}
+            />
+          }
         />
       }
       footer={footer}

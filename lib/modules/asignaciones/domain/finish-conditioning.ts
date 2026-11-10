@@ -23,6 +23,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, type ExecutionWriteOutcome } from './execution-entry';
+import { readOutcomeRecipe, type OutcomeRecipe } from './recipe-of-order';
 import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
@@ -34,10 +35,11 @@ import {
   type AssignedOrderSummary,
   type OrderCatalog,
 } from '@/lib/modules/pedidos';
-import type { RecipeConditioningStepsReader } from '@/lib/modules/recetas';
+import type { RecipeCatalog, RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
 export type FinishConditioningDeps = {
   readonly orders: OrderCatalog;
+  readonly recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>;
   readonly batches: Pick<FinishedBatchLabels, 'listOfOrder'>;
   readonly transaction: ExecutionTransaction;
   readonly conditioningSteps: RecipeConditioningStepsReader;
@@ -65,7 +67,7 @@ function finishConditioningError(outcome: ExecutionWriteOutcome): AsignacionesEr
   return new OrderNotFoundError();
 }
 
-export type FinishConditioningResult = {
+export type FinishConditioningResult = OutcomeRecipe & {
   readonly numberText: string;
 };
 
@@ -95,6 +97,7 @@ export function createFinishConditioning(
     const batches = await deps.batches.listOfOrder(actor.companyId, orderId, summary.lineId);
     if (missingBatchDataLines(summary.presentationLines, batches) > 0) throw new ConditioningBatchDataMissingError();
 
+    const outcomeRecipe = await readOutcomeRecipe(deps, actor.companyId, orderId, summary.recipeId);
     const now = deps.now?.() ?? new Date();
     const companyId = actor.companyId;
     try {
@@ -115,6 +118,6 @@ export function createFinishConditioning(
       if (error instanceof ExecutionAbortedError) throw finishConditioningError(error.outcome);
       throw error;
     }
-    return { numberText };
+    return { numberText, ...outcomeRecipe };
   };
 }

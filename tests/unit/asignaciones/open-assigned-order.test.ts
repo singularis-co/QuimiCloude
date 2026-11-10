@@ -34,6 +34,9 @@ const INPUT = { orderId: '77777777-7777-4777-8777-777777777777', lineId: 'eeeeee
 
 const VISTA: AssignedOrderExecutionView = {
   orderId: INPUT.orderId,
+  lineId: INPUT.lineId,
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
   numberText: '2026-0000007',
   status: 'PENDIENTE',
   recipeName: 'Barniz acrílico',

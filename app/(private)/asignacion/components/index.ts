@@ -5,6 +5,7 @@ export {
   ASSIGNED_ORDER_ENTER_TESTID,
   AssignedOrderEnterTrigger,
   assignedOrderBlockedNoticeText,
+  assignedOrderEnterLabel,
   assignedOrderEnterNoticeText,
 } from './assigned-order-enter-trigger';
 export {
@@ -207,15 +208,14 @@ export {
 } from './packing-orders-table';
 export {
   ASSIGNED_ORDER_CANCELLED_TESTID,
-  ASSIGNED_ORDER_DELIVERED_TESTID,
+  ASSIGNED_ORDER_MANUFACTURED_TESTID,
   CONDITIONED_ORDER_NOTICE_TESTID,
   ORDER_OUTCOME_NOTICE_CLOSE_LABEL,
   OrderOutcomeNotice,
   PACKED_ORDER_NOTICE_TESTID,
   assignedOrderCancelledNoticeText,
-  assignedOrderDeliveredNoticeText,
-  assignedOrderDeliveredWithPackagesText,
   conditionedOrderNoticeText,
+  manufacturedOrderNoticeText,
   packedOrderNoticeText,
   type OrderOutcomeKind,
   type OrderOutcomeNoticeProps,
@@ -230,6 +230,26 @@ export {
   type OrderDistributionFullProps,
 } from './order-distribution-full';
 export { recipeLineIdOf, type RecipeSearchParams } from './recipe-param';
+export {
+  RECIPE_OF_ORDER_LABEL_TESTID,
+  RecipeNameWithPosition,
+  RecipeOfOrderLabel,
+  hasSeveralRecipes,
+  recipeOfOrderText,
+  type RecipeOfOrderLabelProps,
+} from './recipe-of-order-label';
+export {
+  NO_RECIPE_ACCESS,
+  OTHER_RECIPES_TESTID,
+  OTHER_RECIPE_GO_TESTID,
+  OTHER_RECIPE_TESTID,
+  RECIPE_HEADER_TEXTS,
+  RecipeHeader,
+  otherRecipeHref,
+  type RecipeAccess,
+  type RecipeHeaderProps,
+} from './recipe-header';
+export { recipeAccessOf } from './recipe-access';
 export {
   useStepEvidence,
   type StepEvidenceController,

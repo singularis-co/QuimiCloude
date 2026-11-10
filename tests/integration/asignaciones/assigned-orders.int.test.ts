@@ -260,9 +260,7 @@ describe('asignaciones · listAssignedOrders con los permisos del Empacador (int
           findAliveLineSummary: async () => {
             throw new Error('este archivo no lee una receta suelta');
           },
-          listRecipeOutlinesByIdsIncludingDeleted: async () => {
-            throw new Error('este archivo no lee las recetas del pedido');
-          },
+          listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
           transitionAliveById: async () => {
             throw new Error('QC-144: listAssignedOrders no escribe el estado del pedido');
           },

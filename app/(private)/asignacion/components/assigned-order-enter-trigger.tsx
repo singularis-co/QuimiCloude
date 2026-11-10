@@ -17,11 +17,23 @@ export function assignedOrderBlockedNoticeText(): string {
   return 'Falta material: no se puede iniciar';
 }
 
+/** Con dos recetas del mismo pedido en la lista, «Entrar» a secas no dice a cual lleva. */
+export function assignedOrderEnterLabel(recipeName: string | null, numberText: string): string {
+  return recipeName === null
+    ? `Entrar al pedido ${numberText}`
+    : `Entrar a ${recipeName} del pedido ${numberText}`;
+}
+
 export function AssignedOrderEnterTrigger({
   order,
 }: {
-  readonly order: Pick<AssignedOrderView, 'id' | 'lineId' | 'status'>;
+  readonly order: Pick<AssignedOrderView, 'id' | 'lineId' | 'status'> &
+    Partial<Pick<AssignedOrderView, 'recipeName' | 'numberText'>>;
 }) {
+  const ariaLabel =
+    order.numberText === undefined
+      ? undefined
+      : assignedOrderEnterLabel(order.recipeName ?? null, order.numberText);
   // El aviso va visible y no en `title`: un tooltip por `:hover` no llega en tactil.
   // Envoltorio en bloque y no flex: boton y aviso heredan la alineacion de la celda o del pie.
   if (order.status === 'BLOQUEADO') {
@@ -34,6 +46,7 @@ export function AssignedOrderEnterTrigger({
           type="button"
           variant="outline"
           disabled
+          aria-label={ariaLabel}
           aria-describedby={noticeId}
           data-testid={ASSIGNED_ORDER_ENTER_TESTID}
           touch
@@ -59,6 +72,7 @@ export function AssignedOrderEnterTrigger({
         <Link
           href={assignedOrderRoute(order.id, order.lineId)}
           data-slot="button"
+          aria-label={ariaLabel}
           aria-describedby={noticeId}
           data-testid={ASSIGNED_ORDER_ENTER_TESTID}
           className={cn(buttonVariants({ variant: 'outline', touch: true }))}
@@ -81,6 +95,7 @@ export function AssignedOrderEnterTrigger({
     <Link
       href={assignedOrderRoute(order.id, order.lineId)}
       data-slot="button"
+      aria-label={ariaLabel}
       data-testid={ASSIGNED_ORDER_ENTER_TESTID}
       className={cn(buttonVariants({ variant: 'outline', touch: true }))}
     >

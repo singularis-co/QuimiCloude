@@ -20,6 +20,7 @@ const BASE_ORDER: FinishedOrderView = {
   id: 'order-1',
   lineId: 'linea-order-1',
   numberText: '2026-000123',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'pres-1', presentationName: 'Caja x 12', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],

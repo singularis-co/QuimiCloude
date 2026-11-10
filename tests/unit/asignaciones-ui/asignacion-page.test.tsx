@@ -57,7 +57,9 @@ import {
 } from '@/app/(private)/asignacion/components';
 import {
   CANCELLED_ORDER_PARAM,
+  CONDITIONED_ORDER_PARAM,
   MANUFACTURED_ORDER_PARAM,
+  OUTCOME_RECIPE_PARAM,
   PACKED_ORDER_PARAM,
 } from '@/lib/shared/routes';
 
@@ -604,7 +606,7 @@ describe('R13 — qué aviso sale con cada parámetro', () => {
     getSessionUserMock.mockResolvedValue(sesionCon(OPERADOR));
 
     expect(await avisos({ [MANUFACTURED_ORDER_PARAM]: '2026-0000001' })).toEqual([
-      { kind: 'delivered', orderNumber: '2026-0000001' },
+      { kind: 'manufactured', orderNumber: '2026-0000001' },
     ]);
   });
 
@@ -629,6 +631,27 @@ describe('R13 — qué aviso sale con cada parámetro', () => {
       { kind: 'packed', orderNumber: '2026-0000003' },
     ]);
     expect(await avisos({ vista: 'asignados', [PACKED_ORDER_PARAM]: '2026-0000003' })).toEqual([]);
+  });
+
+  it('R20: con `receta_aviso`, los avisos de empacada y acondicionada llevan la receta', async () => {
+    getSessionUserMock.mockResolvedValue(
+      sesionCon([...EJECUTOR_CON_EMPAQUE, ...(SEED_ROLE_PERMISSIONS[ROLE_ACONDICIONAMIENTO] ?? [])]),
+    );
+
+    expect(
+      await avisos({
+        vista: 'por_empacar',
+        [PACKED_ORDER_PARAM]: '2026-0000003',
+        [OUTCOME_RECIPE_PARAM]: 'Jabón líquido',
+      }),
+    ).toEqual([{ kind: 'packed', orderNumber: '2026-0000003', recipeName: 'Jabón líquido' }]);
+    expect(
+      await avisos({
+        vista: 'por_acondicionar',
+        [CONDITIONED_ORDER_PARAM]: '2026-0000004',
+        [OUTCOME_RECIPE_PARAM]: 'Jabón líquido',
+      }),
+    ).toEqual([{ kind: 'conditioned', orderNumber: '2026-0000004', recipeName: 'Jabón líquido' }]);
   });
 
   it('R13: sin parámetros no hay aviso', async () => {

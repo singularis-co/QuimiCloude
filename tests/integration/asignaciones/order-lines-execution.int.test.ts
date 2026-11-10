@@ -515,18 +515,21 @@ describe('QT-313 T14a — asignaciones opera la unica linea del pedido', () => {
     });
   });
 
-  it('R16, R17: cancelar desde la ejecucion deja CANCELADO solo la receta nombrada, anota en su registro y la otra sigue', async () => {
+  it('R16, R17, R20: cancelar desde la ejecucion deja CANCELADO solo la receta nombrada, anota en su registro, la otra sigue y el aviso trae la receta', async () => {
     await conFixture(async (fixture) => {
       const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
       const [primera, segunda] = lines as [string, string];
       await asignar(fixture, orderId);
 
-      await asignaciones.cancelAssignedOrder(actorDe(fixture), {
+      const salida = await asignaciones.cancelAssignedOrder(actorDe(fixture), {
         orderId,
         lineId: primera,
         stepPosition: null,
         reason: 'Se derramo el lote',
       });
+
+      expect(salida.recipeCount).toBe(2);
+      expect(salida.recipeName).toEqual(expect.any(String));
 
       expect((await lineaDe(primera)).status).toBe('CANCELADO');
       expect((await lineaDe(segunda)).status).toBe('PENDIENTE');

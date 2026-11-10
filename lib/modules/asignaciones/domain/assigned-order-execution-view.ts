@@ -3,6 +3,7 @@ import type { RecipeStepView } from '@/lib/modules/recetas';
 import type { UnitRef } from '@/lib/modules/unidades';
 
 import type { OrderDistributionLineView } from './order-distribution-view';
+import type { OtherRecipeView, RecipePosition } from './recipe-of-order';
 import type { StepEvidenceView } from './step-evidence';
 
 /**
@@ -11,6 +12,12 @@ import type { StepEvidenceView } from './step-evidence';
  */
 export type AssignedOrderExecutionView = {
   readonly orderId: string;
+  /** La receta que se ejecuta. */
+  readonly lineId: string;
+  /** Su lugar entre las recetas del pedido; con `count` 1 la pantalla no lo muestra. */
+  readonly recipe: RecipePosition;
+  /** Las demas recetas del pedido en orden de alta, canceladas incluidas; vacio con una sola. */
+  readonly otherRecipes: readonly OtherRecipeView[];
   readonly numberText: string;
   readonly status: 'PENDIENTE' | 'EN_CURSO';
   /** `null` = receta dada de baja o no resuelta. */

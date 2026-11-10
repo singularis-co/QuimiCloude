@@ -76,6 +76,8 @@ const ROW = {
   id: ORDER_ID,
   lineId: LINE_ID,
   numberText: '2026-0000040',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
   recipeName: 'Jarabe simple',
   quantity: '20',
   unitId: null,

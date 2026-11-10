@@ -82,6 +82,8 @@ function sesionCon(permissions: readonly string[]) {
 const EXECUCION_MINIMA = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
   status: 'EN_CURSO' as const,
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',

@@ -50,12 +50,16 @@ const COMMON = {
   unitLabel: null,
 } as const;
 
-function twoRecipes<T extends { readonly lineId: string; readonly recipeName: string | null }>(
-  base: Omit<T, 'lineId' | 'recipeName'>,
-): readonly T[] {
+function twoRecipes<
+  T extends {
+    readonly lineId: string;
+    readonly recipeName: string | null;
+    readonly recipe: { readonly position: number; readonly count: number };
+  },
+>(base: Omit<T, 'lineId' | 'recipeName' | 'recipe'>): readonly T[] {
   return [
-    { ...base, lineId: LINE_A, recipeName: 'Jarabe simple' } as T,
-    { ...base, lineId: LINE_B, recipeName: 'Barniz acrílico' } as T,
+    { ...base, lineId: LINE_A, recipeName: 'Jarabe simple', recipe: { position: 1, count: 2 } } as T,
+    { ...base, lineId: LINE_B, recipeName: 'Barniz acrílico', recipe: { position: 2, count: 2 } } as T,
   ];
 }
 
@@ -182,5 +186,61 @@ describe('R4 — «Entrar» abre la pantalla de esa receta', () => {
       conditioningOrderRoute(ORDER_ID, LINE_A),
       conditioningOrderRoute(ORDER_ID, LINE_B),
     ]);
+  });
+});
+
+function oneRecipe<T extends { readonly recipe: { readonly position: number; readonly count: number } }>(
+  rows: readonly T[],
+): readonly T[] {
+  return [{ ...rows[0], recipe: { position: 1, count: 1 } }];
+}
+
+const SINGLE_TABLES: readonly (readonly [string, () => ReactElement])[] = [
+  [
+    'asignados',
+    () => (
+      <AssignedOrdersTable rows={oneRecipe(ASSIGNED)} params={PARAMS} totalPages={1} vista="asignados" canExecute />
+    ),
+  ],
+  ['todos', () => <CompanyOrdersTable rows={oneRecipe(COMPANY)} params={PARAMS} totalPages={1} statuses={[]} />],
+  ['terminados', () => <FinishedOrdersTable rows={oneRecipe(FINISHED)} params={PARAMS} totalPages={1} />],
+  ['por empacar', () => <PackingOrdersTable rows={oneRecipe(PACKING)} params={PARAMS} totalPages={1} />],
+  [
+    'por acondicionar',
+    () => <ConditioningOrdersTable rows={oneRecipe(CONDITIONING)} params={PARAMS} totalPages={1} />,
+  ],
+  ['acondicionados', () => <ConditionedOrdersTable rows={oneRecipe(FINISHED)} params={PARAMS} totalPages={1} />],
+];
+
+describe('R3 — «Receta N de M» bajo el nombre de la receta', () => {
+  it.each(TABLES)('R3: «%s» pinta «Receta 1 de 2» y «Receta 2 de 2» en la tabla', (_vista, table) => {
+    render(table());
+
+    const tabla = screen.getByRole('table');
+    expect(within(tabla).getByText('Receta 1 de 2')).toBeInTheDocument();
+    expect(within(tabla).getByText('Receta 2 de 2')).toBeInTheDocument();
+  });
+
+  it.each(TABLES)('R3, R30: «%s» en el telefono, cada tarjeta lleva su «Receta N de M»', (_vista, table) => {
+    render(table());
+
+    expect(within(screen.getByTestId(`data-table-card-${LINE_A}`)).getByText('Receta 1 de 2')).toBeInTheDocument();
+    expect(within(screen.getByTestId(`data-table-card-${LINE_B}`)).getByText('Receta 2 de 2')).toBeInTheDocument();
+  });
+
+  it.each(SINGLE_TABLES)('R3, R29: «%s» con una sola receta no pinta «Receta 1 de 1»', (_vista, table) => {
+    render(table());
+
+    expect(screen.getAllByText('Jarabe simple').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Receta \d+ de \d+/)).toBeNull();
+  });
+
+  it('R30: en el telefono, el «Entrar» de la tarjeta de «asignados» mide 44 × 44 px y nombra la receta', () => {
+    render(TABLES[0][1]());
+
+    const tarjeta = screen.getByTestId(`data-table-card-${LINE_B}`);
+    const entrar = within(tarjeta).getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
+    expect(entrar).toHaveClass('min-h-11', 'min-w-11');
+    expect(entrar).toHaveAccessibleName(`Entrar a Barniz acrílico del pedido ${NUMBER}`);
   });
 });

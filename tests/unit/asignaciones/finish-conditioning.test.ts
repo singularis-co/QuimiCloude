@@ -30,6 +30,7 @@ import type { OrderCatalog } from '@/lib/modules/pedidos';
 import type { ConditioningStepView } from '@/lib/modules/recetas';
 
 import { anotacionDePaso, transaccionDeAcondicionamiento } from './conditioning-doubles';
+import { conDosRecetas } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -92,7 +93,8 @@ function montar(
   const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
   const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
   const deps = {
-    orders: { findAliveById, findAliveLineSummary } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
+    recipes: { findRefsIncludingDeleted: vi.fn(async () => []) },
     batches: { listOfOrder },
     transaction,
     conditioningSteps: { findConditioningStepsById },
@@ -135,6 +137,11 @@ function depsIntocables(): FinishConditioningDeps {
         throw new Error(`se toco la transaccion: ${String(prop)}`);
       },
     }),
+    recipes: {
+      findRefsIncludingDeleted: () => {
+        throw new Error('se toco el puerto: findRefsIncludingDeleted');
+      },
+    },
     conditioningSteps: {
       findConditioningStepsById: () => {
         throw new Error('se toco el puerto: findConditioningStepsById');
@@ -190,6 +197,8 @@ describe('finishConditioning — autorizacion', () => {
 
     await expect(createFinishConditioning(deps)(actor, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
@@ -221,7 +230,7 @@ describe('finishConditioning — lectura del numero y traduccion del resultado',
 
     const result = await createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
-    expect(result).toEqual({ numberText: '2026-0000007' });
+    expect(result).toEqual({ numberText: '2026-0000007', recipeName: null, recipeCount: 1 });
     expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
     expect(findAliveLineSummary.mock.invocationCallOrder[0]!).toBeLessThan(
@@ -314,11 +323,21 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
     expect(finishConditioningAliveById).not.toHaveBeenCalled();
   });
 
+  it('R20: devuelve el nombre de la receta y cuantas tiene el pedido, canceladas incluidas', async () => {
+    const { deps } = montar('ok', { summaryItems: resumenCon(ANA, []), batches: [] });
+
+    await expect(
+      createFinishConditioning(conDosRecetas(deps))(ACTOR, { orderId: PEDIDO, lineId: LINEA }),
+    ).resolves.toEqual({ numberText: '2026-0000007', recipeName: expect.stringMatching(/^Receta /), recipeCount: 2 });
+  });
+
   it('R17: un pedido sin lineas termina sin pedir datos', async () => {
     const { deps, finishConditioningAliveById } = montar('ok', { summaryItems: resumenCon(ANA, []), batches: [] });
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
@@ -331,6 +350,8 @@ describe('QC-219 — Terminar exige los datos de lote', () => {
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
   });
@@ -381,6 +402,8 @@ describe('QC-283 — Terminar anota en el registro de ejecucion', () => {
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
 
     expect(pasos).toEqual(['transaccion', 'escribe-pedido', 'anota']);
@@ -467,6 +490,8 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
@@ -479,6 +504,8 @@ describe('QC-281 — Terminar el acondicionamiento con envases reales', () => {
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);
   });
@@ -552,6 +579,8 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(finishConditioningAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
   });
@@ -564,6 +593,8 @@ describe('QC-299 — Terminar exige los pasos de acondicionamiento completos', (
 
     await expect(createFinishConditioning(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toEqual({
       numberText: '2026-0000007',
+      recipeName: null,
+      recipeCount: 1,
     });
     expect(listEntriesForOrders).not.toHaveBeenCalled();
     expect(finishConditioningAliveById).toHaveBeenCalledTimes(1);

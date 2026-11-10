@@ -1,6 +1,6 @@
 // lib/modules/asignaciones/domain/compose-order-rows.ts
 /**
- * Compone receta, reparto, unidad y responsables para una pagina de lineas de pedido, por `lineId`,
+ * Compone receta, su posicion en el pedido, reparto, unidad y responsables para una pagina de lineas de pedido, por `lineId`,
  * con una llamada por cada dependencia sin importar cuantas filas traiga la pagina. Los
  * responsables son los del pedido de cada linea. Extraido de `list-assigned-orders.ts`
  * para que «Mis asignados», «Terminados» y «Todos» compartan la misma composicion en vez de tres
@@ -15,18 +15,26 @@ import {
   unitLabelOf,
   type OrderDistributionLineView,
 } from './order-distribution-view';
+import {
+  otherRecipesOf,
+  readRecipeOutlines,
+  recipePositionOf,
+  type OtherRecipeView,
+  type RecipePosition,
+} from './recipe-of-order';
 import { compareResponsibles, toOrigin } from './responsible-order';
 
 import type { OrderResponsible } from './assignment-view';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
 
-import type { AssignedOrderSummary } from '@/lib/modules/pedidos';
+import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { PeopleDirectory } from '@/lib/modules/identity';
 import type { PresentationCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog } from '@/lib/modules/unidades';
 
 export type ComposeOrderRowsDeps = {
+  readonly orders: Pick<OrderCatalog, 'listRecipeOutlinesByIdsIncludingDeleted'>;
   readonly assignments: OrderAssignmentRepository;
   readonly recipes: RecipeCatalog;
   readonly people: PeopleDirectory;
@@ -42,6 +50,9 @@ export type ComposedOrderRow = {
   /** `null` = pedido sin unidad: la cantidad se muestra sola. */
   readonly unitLabel: string | null;
   readonly responsibles: readonly OrderResponsible[];
+  readonly recipe: RecipePosition;
+  /** Las demas recetas del pedido en orden de alta; solo las pantallas de una receta las usan. */
+  readonly otherRecipes: readonly OtherRecipeView[];
 };
 
 export async function composeOrderRows(
@@ -49,7 +60,18 @@ export async function composeOrderRows(
   companyId: string,
   orders: readonly AssignedOrderSummary[],
 ): Promise<ReadonlyMap<string, ComposedOrderRow>> {
-  const recipeIds = [...new Set(orders.map((row) => row.recipeId))];
+  const outlines = await readRecipeOutlines(
+    deps.orders,
+    companyId,
+    orders.map((row) => row.id),
+  );
+  // Las recetas de las filas y las de las otras recetas de sus pedidos, en una sola llamada.
+  const recipeIds = [
+    ...new Set([
+      ...orders.map((row) => row.recipeId),
+      ...[...outlines.values()].flatMap((outline) => outline.recipes.map((recipe) => recipe.recipeId)),
+    ]),
+  ];
   const recipes =
     recipeIds.length === 0 ? [] : await deps.recipes.findRefsIncludingDeleted(recipeIds, companyId);
   const recipeNames = new Map(recipes.map((recipe) => [recipe.id, recipe.name]));
@@ -99,6 +121,8 @@ export async function composeOrderRows(
       presentationLines: toDistributionLines(row.presentationLines, distributionPresentations),
       unitLabel: row.unitId === null ? null : unitLabels.get(row.unitId) ?? null,
       responsibles: responsiblesByOrder.get(row.id) ?? [],
+      recipe: recipePositionOf(outlines.get(row.id), row.lineId),
+      otherRecipes: otherRecipesOf(outlines.get(row.id), row.lineId, recipeNames),
     });
   }
   return result;

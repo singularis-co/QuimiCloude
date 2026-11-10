@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   ASSIGNED_ORDER_CANCELLED_TESTID,
-  ASSIGNED_ORDER_DELIVERED_TESTID,
+  ASSIGNED_ORDER_MANUFACTURED_TESTID,
   CONDITIONED_ORDER_NOTICE_TESTID,
   PACKED_ORDER_NOTICE_TESTID,
   OrderOutcomeNotice,
@@ -47,7 +47,7 @@ describe('OrderOutcomeNotice kind="packed" — confirmacion visible al terminar 
 
 describe('R15 — los avisos de /asignacion se cierran con «Cerrar»', () => {
   const CASOS: readonly { kind: OrderOutcomeKind; testId: string }[] = [
-    { kind: 'delivered', testId: ASSIGNED_ORDER_DELIVERED_TESTID },
+    { kind: 'manufactured', testId: ASSIGNED_ORDER_MANUFACTURED_TESTID },
     { kind: 'cancelled', testId: ASSIGNED_ORDER_CANCELLED_TESTID },
     { kind: 'packed', testId: PACKED_ORDER_NOTICE_TESTID },
     { kind: 'conditioned', testId: CONDITIONED_ORDER_NOTICE_TESTID },

@@ -83,6 +83,8 @@ function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
     id: 'order-1',
     lineId: 'linea-order-1',
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [

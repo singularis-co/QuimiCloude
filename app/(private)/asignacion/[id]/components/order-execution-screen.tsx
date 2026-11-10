@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { Notice } from '@/components/shared/notice';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { RowActionsMenu } from '@/components/shared/row-actions-menu';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { EvidenceMissingDialog, STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import { StepReader } from '@/components/shared/step-reader';
 import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
@@ -23,11 +24,13 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 import {
   OperatorScreenFrame,
   STEP_READER_SIDE_COLUMN_RESERVE,
 } from '../../components/operator-screen-frame';
+import { NO_RECIPE_ACCESS, RecipeHeader, type RecipeAccess } from '../../components/recipe-header';
 import { useStepEvidence } from '../../components/use-step-evidence';
 
 import { ORDER_CANCEL_TEXTS, ORDER_CANCEL_TRIGGER_TESTID, OrderCancelDialog } from './order-cancel-dialog';
@@ -67,6 +70,7 @@ export const ORDER_EXECUTION_START_DIALOG_TESTID = 'order-execution-start-dialog
 export const ORDER_EXECUTION_START_CONFIRM_TESTID = 'order-execution-start-confirm';
 export const ORDER_EXECUTION_START_ERROR_TESTID = 'order-execution-start-error';
 export const ORDER_EXECUTION_NOT_STARTED_TESTID = 'order-execution-not-started';
+export const ORDER_EXECUTION_STATUS_TESTID = 'order-execution-status';
 
 /** Funcion y no literal, para que un test no pueda comparar contra una copia del texto. */
 export function assignedOrderStartConfirmTexts() {
@@ -87,6 +91,7 @@ export const ORDER_EXECUTION_FINISH_CONFIRM_TEXTS = {
 } as const;
 
 export const ORDER_EXECUTION_TEXTS = {
+  phase: 'Fabricación',
   recipeMissing: 'Esta fórmula está dada de baja.',
   orderQuantity: 'Pedido',
   presentation: 'Presentación:',
@@ -117,9 +122,15 @@ export type OrderExecutionScreenProps = {
   readonly execution: StartedOrderExecution;
   /** La receta del pedido que se ejecuta, la de la direccion. */
   readonly lineId: string;
+  /** A que otras recetas del pedido puede ir la sesion; sin valor, a ninguna. */
+  readonly access?: RecipeAccess;
 };
 
-export function OrderExecutionScreen({ execution: opened, lineId }: OrderExecutionScreenProps) {
+export function OrderExecutionScreen({
+  execution: opened,
+  lineId,
+  access = NO_RECIPE_ACCESS,
+}: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const startFormRef = useRef<HTMLFormElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
@@ -232,24 +243,42 @@ export function OrderExecutionScreen({ execution: opened, lineId }: OrderExecuti
         disabled: started,
       }}
       footer={startFooter}
-      eyebrow={execution.numberText}
-      title={execution.recipeName ?? ORDER_EXECUTION_TEXTS.recipeMissing}
-      titleTestId={ORDER_EXECUTION_TITLE_TESTID}
-      subtitle={
-        <>
-          <span
-            data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
-            title={exactDecimalTitle(execution.orderQuantity)}
-          >
-            {ORDER_EXECUTION_TEXTS.orderQuantity} {formatDecimalDisplay(execution.orderQuantity)}
-            {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
-          </span>
-          <span aria-hidden="true">{' · '}</span>
-          <span data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
-            {ORDER_EXECUTION_TEXTS.presentation}{' '}
-            <OrderDistributionLabel lines={execution.presentationLines} />
-          </span>
-        </>
+      heading={
+        <RecipeHeader
+          phase={ORDER_EXECUTION_TEXTS.phase}
+          orderId={execution.orderId}
+          numberText={execution.numberText}
+          recipeName={execution.recipeName}
+          recipeMissingText={ORDER_EXECUTION_TEXTS.recipeMissing}
+          titleTestId={ORDER_EXECUTION_TITLE_TESTID}
+          recipe={execution.recipe}
+          otherRecipes={execution.otherRecipes}
+          access={access}
+          status={
+            <StatusBadge
+              tone={ORDER_STATUS_TONES[execution.status]}
+              label={ORDER_STATUS_LABELS[execution.status]}
+              data-testid={ORDER_EXECUTION_STATUS_TESTID}
+              data-status={execution.status}
+            />
+          }
+          details={
+            <>
+              <span
+                data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
+                title={exactDecimalTitle(execution.orderQuantity)}
+              >
+                {ORDER_EXECUTION_TEXTS.orderQuantity} {formatDecimalDisplay(execution.orderQuantity)}
+                {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
+              </span>
+              <span aria-hidden="true">{' · '}</span>
+              <span data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
+                {ORDER_EXECUTION_TEXTS.presentation}{' '}
+                <OrderDistributionLabel lines={execution.presentationLines} />
+              </span>
+            </>
+          }
+        />
       }
       headerActions={
         <RowActionsMenu
@@ -317,6 +346,8 @@ export function OrderExecutionScreen({ execution: opened, lineId }: OrderExecuti
         orderId={execution.orderId}
         lineId={lineId}
         stepPosition={stepPosition}
+        recipeName={execution.recipeName}
+        numberText={execution.numberText}
         open={cancelOpen}
         onOpenChange={setCancelOpen}
       />

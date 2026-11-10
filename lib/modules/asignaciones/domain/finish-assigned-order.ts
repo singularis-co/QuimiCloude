@@ -12,6 +12,7 @@ import {
 import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
 import { assertOrderAcceptsWrites } from './order-state';
+import { readOutcomeRecipe, type OutcomeRecipe } from './recipe-of-order';
 import { findLine, lineAsTarget, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
@@ -50,7 +51,7 @@ export type FinishAssignedOrderDeps = {
  * Finalizar ya no da de alta ningun lote de producto terminado -eso se
  * traslada a Terminar el empaque-, asi que ya no hay envases ni producto que devolver aqui.
  */
-export type FinishAssignedOrderResult = {
+export type FinishAssignedOrderResult = OutcomeRecipe & {
   readonly numberText: string;
 };
 
@@ -204,6 +205,7 @@ export function createFinishAssignedOrder(
       content?.steps ?? [],
     );
 
+    const outcomeRecipe = await readOutcomeRecipe(deps, actor.companyId, orderId, summary.recipeId);
     const now = deps.now?.() ?? new Date();
     // El auto-asignado del empacador, ANTES de transicionar y UNA sola vez: el reintento
     // `stale` solo repite la transicion. Si esta falla despues, se compensa lo creado.
@@ -233,7 +235,7 @@ export function createFinishAssignedOrder(
             occurredAt: now,
           });
         });
-        return { numberText };
+        return { numberText, ...outcomeRecipe };
       } catch (error) {
         await compensatePackerAssignments(deps, actor.companyId, orderId, createdPackerIds);
         if (!(error instanceof ExecutionAbortedError)) throw error;

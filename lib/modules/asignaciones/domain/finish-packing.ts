@@ -26,6 +26,7 @@ import {
 } from './errors';
 import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
+import { readOutcomeRecipe, type OutcomeRecipe } from './recipe-of-order';
 import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
@@ -38,7 +39,7 @@ import {
   type OrderCatalog,
   type PackedLineCount,
 } from '@/lib/modules/pedidos';
-import type { RecipePackingStepsReader } from '@/lib/modules/recetas';
+import type { RecipeCatalog, RecipePackingStepsReader } from '@/lib/modules/recetas';
 
 // Aqui solo la forma de cada conteo: que sean justo las lineas del reparto y que el motivo case con
 // la diferencia lo decide `pedidos`, que es quien las lee.
@@ -55,6 +56,7 @@ const finishPackingSchema = orderLineInputSchema.extend({
 
 export type FinishPackingDeps = {
   readonly orders: OrderCatalog;
+  readonly recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>;
   readonly log: ExecutionLogRepository;
   readonly transaction: ExecutionTransaction;
   readonly packingSteps: RecipePackingStepsReader;
@@ -62,7 +64,7 @@ export type FinishPackingDeps = {
   readonly now?: () => Date;
 };
 
-export type FinishPackingResult = {
+export type FinishPackingResult = OutcomeRecipe & {
   readonly numberText: string;
 };
 
@@ -94,6 +96,7 @@ export function createFinishPacking(
       await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, summary.lineId, 'packing', steps ?? []);
     }
 
+    const outcomeRecipe = await readOutcomeRecipe(deps, actor.companyId, orderId, summary.recipeId);
     const now = deps.now?.() ?? new Date();
     try {
       await deps.transaction.run(async ({ packing, log }) => {
@@ -114,7 +117,7 @@ export function createFinishPacking(
       if (error instanceof ExecutionAbortedError) throw finishPackingError(error.outcome);
       throw error;
     }
-    return { numberText };
+    return { numberText, ...outcomeRecipe };
   };
 }
 

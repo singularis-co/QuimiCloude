@@ -5,6 +5,7 @@ import { createGetPackingOrder, type GetPackingOrderDeps } from '@/lib/modules/a
 import { AsignacionesError, OrderNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import { conTresRecetas, recetaDeTres } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -93,7 +94,7 @@ function montar(options?: {
   const createSignedReadUrl = vi.fn(async (path: string, ttl: number) => `https://bucket.test/${path}?ttl=${String(ttl)}`);
 
   const deps = {
-    orders: { findAliveLineSummary },
+    orders: { findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) },
     assignments: { listByOrdersInCompany },
     recipes: { findRefsIncludingDeleted },
     people: { findRefsIncludingDeletedInCompany },
@@ -149,6 +150,16 @@ describe('getPackingOrder — autorizacion (R13)', () => {
   });
 });
 
+describe('QT-315 — getPackingOrder: la receta entre las del pedido', () => {
+  it('R7, R8: trae su posicion, el total con la cancelada y las otras recetas en orden de alta', async () => {
+    const { deps } = montar();
+
+    const row = await createGetPackingOrder(conTresRecetas(deps, LINEA))(ACTOR, { orderId: PEDIDO, lineId: LINEA });
+
+    expect({ lineId: row.lineId, recipe: row.recipe, otherRecipes: row.otherRecipes }).toEqual(recetaDeTres(LINEA));
+  });
+});
+
 describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
   it('devuelve numero, receta, presentacion, estado y quien empaca, sin envases (QC-281 R12)', async () => {
     const { deps, findAliveLineSummary } = montar();
@@ -162,6 +173,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       lineId: LINEA,
       numberText: expect.any(String),
       recipeName: 'Desengrasante',
+      recipe: { position: 1, count: 1 },
       quantity: '10.0000',
       presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       unitId: 'unidad-1',
@@ -171,6 +183,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       createdAt: new Date('2026-09-01T08:00:00.000Z'),
       packedByName: null,
       packedById: null,
+      otherRecipes: [],
       packingSteps: [],
       packingEvidence: [],
       finish: null,

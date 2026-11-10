@@ -5,14 +5,29 @@ import { cn } from '@/lib/utils';
 
 import { ThemeToggle } from '../../components/theme-toggle';
 
-export type OperatorScreenFrameProps = {
-  readonly back?: OperatorScreenBack;
+type OperatorScreenDefaultHeading = {
+  readonly heading?: undefined;
   readonly eyebrow: string;
   readonly eyebrowTestId?: string;
   readonly title: string;
   readonly titleTestId?: string;
   readonly subtitle?: ReactNode;
   readonly status?: ReactNode;
+};
+
+/** Una cabecera propia, con su `h1`, en lugar de la de eyebrow, titulo y estado. */
+type OperatorScreenCustomHeading = {
+  readonly heading: ReactNode;
+  readonly eyebrow?: undefined;
+  readonly eyebrowTestId?: undefined;
+  readonly title?: undefined;
+  readonly titleTestId?: undefined;
+  readonly subtitle?: undefined;
+  readonly status?: undefined;
+};
+
+export type OperatorScreenFrameProps = (OperatorScreenDefaultHeading | OperatorScreenCustomHeading) & {
+  readonly back?: OperatorScreenBack;
   readonly headerActions?: ReactNode;
   readonly footer?: ReactNode;
   readonly testId: string;
@@ -39,19 +54,8 @@ export const STEP_READER_SIDE_COLUMN_RESERVE =
  * contenido. La raíz es contenedor de consultas para que las pantallas pasen a dos columnas
  * por el ancho que de verdad tienen.
  */
-export function OperatorScreenFrame({
-  back,
-  eyebrow,
-  eyebrowTestId,
-  title,
-  titleTestId,
-  subtitle,
-  status,
-  headerActions,
-  footer,
-  testId,
-  children,
-}: OperatorScreenFrameProps) {
+export function OperatorScreenFrame(props: OperatorScreenFrameProps) {
+  const { back, headerActions, footer, testId, children } = props;
   const controls = (
     <div className="flex flex-none items-center gap-2" data-slot="operator-header-controls">
       {headerActions}
@@ -59,24 +63,13 @@ export function OperatorScreenFrame({
     </div>
   );
 
-  const heading = (
-    <div className="flex min-w-0 flex-1 flex-wrap items-end justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span
-          className="font-mono text-xs text-muted-foreground tabular-nums"
-          data-slot="operator-eyebrow"
-          data-testid={eyebrowTestId}
-        >
-          {eyebrow}
-        </span>
-        <h1 className="m-0 text-[22px] leading-tight font-semibold" data-testid={titleTestId}>
-          {title}
-        </h1>
-        {subtitle ? <div className="text-sm text-muted-foreground">{subtitle}</div> : null}
-      </div>
-      {status ? <div className="flex-none">{status}</div> : null}
-    </div>
-  );
+  // `title` y no `heading` decide la rama: `ReactNode` admite `undefined` y no estrecha la union.
+  const heading =
+    props.title === undefined ? (
+      <div className="min-w-0 flex-1">{props.heading}</div>
+    ) : (
+      <DefaultHeading {...props} />
+    );
 
   return (
     <div
@@ -135,6 +128,34 @@ export function OperatorScreenFrame({
           <div className={CONTENT_WIDTH}>{footer}</div>
         </footer>
       ) : null}
+    </div>
+  );
+}
+
+function DefaultHeading({
+  eyebrow,
+  eyebrowTestId,
+  title,
+  titleTestId,
+  subtitle,
+  status,
+}: OperatorScreenDefaultHeading) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span
+          className="font-mono text-xs text-muted-foreground tabular-nums"
+          data-slot="operator-eyebrow"
+          data-testid={eyebrowTestId}
+        >
+          {eyebrow}
+        </span>
+        <h1 className="m-0 text-[22px] leading-tight font-semibold" data-testid={titleTestId}>
+          {title}
+        </h1>
+        {subtitle ? <div className="text-sm text-muted-foreground">{subtitle}</div> : null}
+      </div>
+      {status ? <div className="flex-none">{status}</div> : null}
     </div>
   );
 }
