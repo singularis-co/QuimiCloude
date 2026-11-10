@@ -1132,3 +1132,37 @@ Los 6 specs pendientes de T13 están en verde en chromium y webkit, con un ajust
 - **Nota para el reviewer / posible deuda**: la causa es preexistente. `data-table` aparece duplicada en el DOM del dashboard también en `origin/dev` (sin QT-315), y el selector sin acotar violaba el modo estricto de Playwright. Causa probable: Suspense con streaming de React 19.2, que deja en el DOM a la vez el contenido y su copia (ver «Tanda 6 — specs pendientes de T13»). El selector acotado lo esquiva; la duplicación en sí queda como deuda fuera de QT-315.
 
 Veredicto: spec `dashboard-rediseno` en verde en chromium (x2) y webkit con el selector acotado; typecheck y lint sin errores.
+
+## Tanda 6 — T12 (frontend_dev, 2026-11-10)
+
+### Archivo
+- `e2e/planta-con-varias-recetas.spec.ts` (nuevo). Reutiliza los helpers de `e2e/helpers/`: `addOrderLine`, `openCreateOrderPanel`, `saveOrder`, `enterAndStartAssignedOrder`, `clickAndConfirm`, `seedPackaging`, `enableAllAddons`, `deleteOrdersWithLines`, `deleteCompanyNotifications` y `pathOf`. Usa el prefijo `qt315_e2e_` y limpia los huérfanos por prefijo y por edad. No se toca `app/`, `lib/` ni `components/`.
+
+### Caso (uno, porque cada paso es la precondición del siguiente)
+`QT-315 R33 R7 R8 R21 R25`:
+1. El Administrador da de alta por Pedidos un pedido de dos recetas, A y B, cada una con su insumo y con el envase compartido.
+2. El Operador entra a A desde la fila de su línea en «Mis asignados». La cabecera muestra «Receta 1 de 2» (R7) y la otra receta aparece en `PENDIENTE` (R8). El Operador la fabrica. Base: `[POR_EMPACAR, PENDIENTE]`.
+3. El Operador fabrica B: cabecera «Receta 2 de 2», la otra receta en `POR_EMPACAR`. Base: `[POR_EMPACAR, POR_EMPACAR]`.
+4. El Empacador empaca A. Base: `[POR_ACONDICIONAR, POR_EMPACAR]`. El acondicionador comienza A (equipo: el Operador), guarda los datos de lote y termina. Base: `[TERMINADO, POR_EMPACAR]`.
+5. Dashboard (R21), acotado a `dashboard-content`: la fila del pedido muestra A, «+1 más» y «1 de 2» (`data-finished=1`).
+6. Se empaca y acondiciona B. Base: `[TERMINADO, POR_ACONDICIONAR]` y después `[TERMINADO, TERMINADO]`. Dashboard: «+1 más» y «2 de 2».
+7. Recorrido (R25): el resumen muestra «2 de 2 terminadas» y hay 2 `execution-trace-recipe-section`, en orden de alta (`data-line-id`), cada una `TERMINADO` y con el nombre de su receta.
+
+### Resultados
+Comando: `pnpm exec playwright test e2e/planta-con-varias-recetas.spec.ts --workers=1`. El puerto 3117 estaba libre antes y después; no había ningún `next dev` colgado.
+
+| Proyecto | Resultado |
+|---|---|
+| chromium | 1/0/0 (1.8m) |
+| webkit | 1/0/0 (3.5m) |
+
+Total: `2 passed (6.2m)`.
+
+- `pnpm run typecheck`: sin errores.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`. Son las mismas advertencias que ya había; ninguna está en el spec nuevo, y `eslint` sobre ese archivo no da salida. LF: sin CR.
+
+### Guardia de recetas
+`pnpm exec vitest run --maxWorkers=1 tests/unit/recetas/scope.test.ts` da **1 rojo de 5**: «la pantalla de recetas vive solo donde la declara QC-26…». En la lista cerrada de E2E de recetas aparece un spec inesperado, `planta-con-varias-recetas.spec.ts`; es el único de diferencia. Siguiendo la orden, no amplío la lista (l. ~289 de `tests/unit/recetas/scope.test.ts`). Hay dos salidas, y la decisión es del leader: añadir el spec a la lista, con su comentario `QT-315 / R33`, o renombrarlo sin «receta».
+
+### Veredicto
+T12 en verde en chromium y webkit, con typecheck y lint limpios. Queda pendiente la decisión del leader sobre la guardia `scope.test.ts`, que está en rojo por el nombre del spec nuevo.
