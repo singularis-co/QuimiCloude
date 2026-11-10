@@ -984,3 +984,66 @@ Veredicto: T11 hecha, con typecheck 0, lint sin errores y los tests de T11, Pedi
   - `guard`: 87 archivos;
   - lint: 11 avisos.
 - T10 y T11 quedan `[x]`. Los bloqueos de la Tanda 5 quedan resueltos.
+
+## Tanda 6 — T13 (frontend_dev, 2026-11-10)
+
+Solo se adaptan los E2E. No se tocan `lib/`, `app/`, `components/` ni `tests/`, y no entra el E2E de dos recetas (T12).
+
+### Archivos (`e2e/`)
+- `ejecucion-receta.spec.ts`, `empaque.spec.ts`, `producto-terminado.spec.ts`, `reserva-de-material.spec.ts`: el testid del aviso pasa de `assigned-order-delivered-notice` a `assigned-order-manufactured-notice` (la constante pasa a `MANUFACTURED_NOTICE_TESTID`). Lo que se comprueba sigue igual: número del pedido y «por empacar».
+- `registro-ejecucion.spec.ts`: el ítem del menú ⋯ pasa de «Cancelar pedido» a «Cancelar esta receta» y el botón del diálogo a «Cancelar la receta» (`ORDER_CANCEL_TEXTS`).
+- `operario-rediseno.spec.ts`:
+  - el nombre del diálogo de cancelar pasa a «cancelar esta receta»;
+  - las filas y tarjetas de «Mis asignados» y «Por acondicionar» (R21, QC-269) se buscan por `lineId`, porque `getRowId` es ya la línea.
+- `pedidos-terminados.spec.ts`: `rowDomIndex` recibe `firstLineIdOf(orderId)`, porque la fila de «Terminados» es la de la receta.
+- `recorrido-ejecucion.spec.ts`, `recorrido-acondicionamiento.spec.ts`: hay una sola `section` `execution-trace-recipe-section`; las anotaciones (y en acondicionamiento las tres duraciones por fase) se buscan dentro de ella.
+- `dashboard-rediseno.spec.ts`: `steps()` busca la línea de tiempo dentro de la sección de la receta.
+
+### Resultado (`pnpm exec playwright test <spec> --workers=1`, un spec cada vez)
+
+| Spec | chromium | webkit |
+|---|---|---|
+| recorrido-ejecucion | 4/0/0 | 4/0/0 |
+| recorrido-acondicionamiento | 1/0/0 | 1/0/0 |
+| dashboard-rediseno | 5/1/0 | 4/2/0 |
+| ejecucion-receta | 4/0/0 | 4/0/0 |
+| empaque | 1/0/0 | 1/0/0 |
+| producto-terminado | 1/0/0 | 1/0/0 |
+| reserva-de-material | 1/0/0 | 1/0/0 |
+| operario-rediseno (2.ª corrida, tras el ajuste a `lineId`) | 20/0/0 | 20/0/0 |
+| pedidos-terminados | 4/0/0 | 4/0/0 |
+| acondicionamiento | 3/0/0 | 3/0/0 |
+| acondicionar-con-equipo | 1/0/0 | 1/0/0 |
+| datos-de-lote-en-acondicionamiento | 1/0/0 | 1/0/0 |
+| envases-reales-empaque | 4/0/0 | 4/0/0 |
+| pasos-de-acondicionamiento | 1/0/0 | 1/0/0 |
+| pedidos-asignados | 4/0/0 | 4/0/0 |
+| registro-ejecucion (2.ª corrida, tras «Cancelar esta receta») | 2/0/0 | 2/0/0 |
+| consulta-de-evidencia | 2/0/0 | 2/0/0 |
+| recetas-porcentaje | sin resultado | sin resultado |
+| envases-del-pedido, coste-real-de-produccion, pedido-en-varias-presentaciones, pasos-de-envasado, pedido-con-varias-recetas | sin correr | sin correr |
+
+Formato: pasados/fallidos/omitidos.
+
+### Rojos
+- **`dashboard-rediseno` R20 «a 390 px» (chromium y webkit) y «a 820 px» (webkit): «recorrido a N px», `scrollWidth` 530–535 > 390 y 822 > 820.**
+  - Un diagnóstico temporal, ya revertido, localizó el desborde en el `h2` `execution-trace-recipe-name` de `ExecutionTraceRecipeSection` (T11): `right=530`, `w=495`.
+  - El nombre sembrado es una sola palabra larga (`qc261_e2e_<hex>…`) y el `h2` no la parte.
+  - Es un fallo de la UI de T11, en `app/`, fuera de mi alcance. Una solución posible: `min-w-0` y `break-words` (o `[overflow-wrap:anywhere]`) en el `h2` o en su contenedor flex.
+  - En la primera corrida, chromium 390 falló antes, en `openDashboard`, con «strict mode violation: `getByTestId('data-table')` resolved to 2 elements», uno oculto. Al repetir solo R20 no volvió a salir; el rojo fue el desborde. Lo trato como intermitente.
+
+### Bloqueos
+- **Memoria.** El sistema mató `recetas-porcentaje` por falta de memoria, con la sesión en espera. Su `next dev` quedó escuchando en el 3117 y se paró.
+  - No se ha vuelto a lanzar: el aviso pide no relanzar sin orden.
+  - Quedan sin correr `recetas-porcentaje`, `envases-del-pedido`, `coste-real-de-produccion`, `pedido-en-varias-presentaciones`, `pasos-de-envasado` y `pedido-con-varias-recetas`.
+
+### Verificación
+- `pnpm run typecheck`: 0 errores.
+- `pnpm exec eslint` de los 10 archivos tocados: sin errores ni avisos. El lint global no se corrió.
+- LF: sin CR en el diff.
+
+### Veredicto
+T13 sin terminar:
+- 17 specs en verde;
+- `dashboard-rediseno` en rojo, por el desborde del `h2` de la sección (app, T11);
+- 6 specs sin correr por memoria.

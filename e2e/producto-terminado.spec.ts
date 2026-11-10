@@ -137,7 +137,7 @@ const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const NAME_CELL_TESTID = 'data-table-cell-name';
@@ -693,7 +693,7 @@ test.describe('producto terminado', () => {
     });
     expect(producedOrder.status).toBe('POR_EMPACAR');
 
-    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    const aviso = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderNumber);
     await expect(aviso).toContainText('por empacar');

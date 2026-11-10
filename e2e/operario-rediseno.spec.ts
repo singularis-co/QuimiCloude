@@ -836,7 +836,7 @@ test.describe('R21 — tarjetas a 390 × 844', () => {
     await expect(page.getByTestId(TESTIDS.cards)).toBeVisible({ timeout: 60_000 });
     await expect(page.locator(TABLE_ROWS).filter({ visible: true })).toHaveCount(0);
 
-    const card = page.getByTestId(`data-table-card-${execPending.id}`);
+    const card = page.getByTestId(`data-table-card-${execPending.lineId}`);
     await expect(card).toBeVisible();
     await expect(card).toContainText(execPending.numberText);
     await expect(card).toContainText(RECIPE_NAME);
@@ -855,7 +855,7 @@ test.describe('R21 — tarjetas a 390 × 844', () => {
     await expect(page.getByTestId(TESTIDS.cards)).toBeVisible({ timeout: 60_000 });
     await expect(page.locator(TABLE_ROWS).filter({ visible: true })).toHaveCount(0);
 
-    const card = page.getByTestId(`data-table-card-${condTodo.id}`);
+    const card = page.getByTestId(`data-table-card-${condTodo.lineId}`);
     await expect(card).toBeVisible();
     await expect(card).toContainText(condTodo.numberText);
     await expect(card).toContainText(RECIPE_NAME);
@@ -913,7 +913,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
       await expect(cancelDialog).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 60_000 });
     await expectOperatorDialog(page, {
-      label: 'cancelar el pedido',
+      label: 'cancelar esta receta',
       dialog: 'order-cancel-dialog',
       dismiss: 'order-cancel-dismiss',
       confirm: 'order-cancel-confirm',
@@ -1124,7 +1124,7 @@ test.describe('QC-269 R1, R2, R3 — «Entrar» en «Mis asignados»', () => {
     // R1, R2: en la tabla, los tres botones y sus avisos comparten el borde derecho.
     const rightEdges: Array<{ readonly enter: number; readonly reason: number | null }> = [];
     for (const state of threeStates) {
-      const row = page.getByTestId(`data-table-row-${state.order.id}`);
+      const row = page.getByTestId(`data-table-row-${state.order.lineId}`);
       await expect(row, `fila ${state.label}`).toBeVisible({ timeout: 60_000 });
       const enterBox = await box(row.getByTestId(TESTIDS.assignedEnter));
       const reasonBox = state.hasReason ? await box(row.getByTestId(TESTIDS.assignedEnterReason)) : null;
@@ -1152,7 +1152,7 @@ test.describe('QC-269 R1, R2, R3 — «Entrar» en «Mis asignados»', () => {
     await expect(page.getByTestId(TESTIDS.cards)).toBeVisible({ timeout: 60_000 });
     const leftEdges: number[] = [];
     for (const state of threeStates) {
-      const card = page.getByTestId(`data-table-card-${state.order.id}`);
+      const card = page.getByTestId(`data-table-card-${state.order.lineId}`);
       await expect(card, `tarjeta ${state.label}`).toBeVisible();
       leftEdges.push((await box(card.getByTestId(TESTIDS.assignedEnter))).x);
     }

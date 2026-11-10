@@ -180,8 +180,8 @@ const ENTER_TESTID = 'assigned-order-enter';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const EXECUTION_ERROR_TESTID = 'order-execution-error';
 
-/** El mismo `data-testid` que exporta `AssignedOrderDeliveredNotice`. */
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+/** El mismo `data-testid` que pinta el aviso de fabricada. */
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 
 /** El item unico del primer bloque (`checklist`, indice 0) del primer paso. */
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
@@ -733,7 +733,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     expect(await orderStatus(orderPendingId)).toBe('POR_EMPACAR');
 
     // La confirmacion se pinta EN LA LISTA al volver, nunca en la pantalla de ejecucion.
-    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    const aviso = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderPendingNumber);
     await expect(aviso).toContainText('por empacar');

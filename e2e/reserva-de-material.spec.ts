@@ -140,7 +140,7 @@ const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -758,7 +758,7 @@ test.describe('reserva de material del pedido', () => {
     });
     expect(deliveredOrderB.status).toBe('POR_EMPACAR');
 
-    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    const aviso = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderBNumber);
     await expect(aviso).toContainText('por empacar');

@@ -529,8 +529,15 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     ).toBeVisible();
 
     // El entregado sin fecha que empaco el NO es «Terminados»: esa vista es solo `TERMINADO`.
-    expect(await rowDomIndex(page, withDateId), 'la fila terminada deberia estar en la tabla').toBeGreaterThanOrEqual(0);
-    expect(await rowDomIndex(page, noDateId), 'el ENTREGADO no deberia estar en «Terminados»').toBe(-1);
+    // La fila de la lista es la de la receta: su `id` es el de la linea del pedido.
+    expect(
+      await rowDomIndex(page, await firstLineIdOf(withDateId)),
+      'la fila terminada deberia estar en la tabla',
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      await rowDomIndex(page, await firstLineIdOf(noDateId)),
+      'el ENTREGADO no deberia estar en «Terminados»',
+    ).toBe(-1);
     await expect(rowByNumber(page, noDateNumber)).toHaveCount(0);
 
     // Ni el pendiente ni el cancelado son «Terminados».

@@ -177,6 +177,8 @@ const TRACE_TITLE_TESTID = 'execution-trace-title';
 const TRACE_LINK_TESTID = 'execution-trace-link';
 const TRACE_STEP_TESTID = 'execution-trace-step';
 const TRACE_DURATION_TESTID = 'execution-trace-duration';
+/** Una `section` por receta del pedido (`ExecutionTraceRecipeSection`). */
+const TRACE_RECIPE_SECTION_TESTID = 'execution-trace-recipe-section';
 
 /** Nombre visible del filtro de personas: la etiqueta de su columna (`execution-trace-columns`). */
 const PERSON_FILTER_LABEL = 'Personas';
@@ -668,7 +670,10 @@ async function expectAdminSeesTrace(
     await page.waitForURL((url) => url.pathname === executionTraceRoute(orderId), { timeout: 60_000 });
     await expect(page.getByTestId(TRACE_TITLE_TESTID)).toContainText(numberText, { timeout: 60_000 });
 
-    const steps = page.getByRole('list', { name: ANNOTATIONS_LIST_NAME }).getByTestId(TRACE_STEP_TESTID);
+    // El pedido tiene una sola receta: una sola sección, con sus anotaciones y sus duraciones.
+    const section = page.getByTestId(TRACE_RECIPE_SECTION_TESTID);
+    await expect(section).toHaveCount(1);
+    const steps = section.getByRole('list', { name: ANNOTATIONS_LIST_NAME }).getByTestId(TRACE_STEP_TESTID);
     await expect(steps).toHaveCount(EXPECTED_ACTIONS.length);
     const actions = await steps.evaluateAll((items) => items.map((item) => item.getAttribute('data-action')));
     expect(actions).toEqual([...EXPECTED_ACTIONS]);
@@ -729,7 +734,7 @@ async function expectAdminSeesTrace(
     });
 
     await test.step('R25 - las tres tarjetas de duración', async () => {
-      const cards = page.getByTestId(TRACE_DURATION_TESTID);
+      const cards = section.getByTestId(TRACE_DURATION_TESTID);
       await expect(cards).toHaveCount(PHASES.length);
       const expectedMs: Readonly<Record<ExecutionPhase, number>> = {
         production: PRODUCTION_MS,

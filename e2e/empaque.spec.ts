@@ -155,7 +155,7 @@ const ENTER_TESTID = 'assigned-order-enter';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 const ASSIGNMENT_VIEW_TABS_TESTID = 'assignment-view-tabs';
 const ASSIGNED_ORDERS_EMPTY_TESTID = 'assigned-orders-empty';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
@@ -626,10 +626,10 @@ test.describe('el recorrido de empaque (R48)', () => {
     expect(empacadorAssignment.workGroupId).toBe(workGroupId);
     expect(empacadorAssignment.workGroupName).toBe(WORK_GROUP_NAME);
 
-    const deliveredNotice = page.getByTestId(DELIVERED_NOTICE_TESTID);
-    await expect(deliveredNotice).toBeVisible({ timeout: 60_000 });
-    await expect(deliveredNotice).toContainText(orderNumber);
-    await expect(deliveredNotice).toContainText('por empacar');
+    const manufacturedNotice = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
+    await expect(manufacturedNotice).toBeVisible({ timeout: 60_000 });
+    await expect(manufacturedNotice).toContainText(orderNumber);
+    await expect(manufacturedNotice).toContainText('por empacar');
 
     // --- 2. El propio Operario no ve la pestaña «Por empacar»: solo tiene una vista, así que ni
     // siquiera se monta el conjunto de pestañas (R39).
