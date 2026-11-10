@@ -32,7 +32,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
   assignedOrderRoute,
@@ -60,6 +60,7 @@ import {
   saveOrder,
 } from './helpers/order-form';
 import { batchStock, seedPackaging } from './helpers/packaging';
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 
 const FIXTURE_PREFIX = 'qt313_e2e_';
 
@@ -399,6 +400,7 @@ test.describe('pedido con varias recetas: una receta por la pantalla actual', ()
       where: { companyId: companyId!, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true, status: true },
     });
+    const lineId = await firstLineIdOf(order.id);
     const orderNumber = formatOrderNumber({ year: order.orderYear, sequence: order.orderSequence });
     await expect(rowByNumber(page, orderNumber)).toBeVisible({ timeout: 60_000 });
 
@@ -431,7 +433,7 @@ test.describe('pedido con varias recetas: una receta por la pantalla actual', ()
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     await enterAndStartAssignedOrder(page, assignedRow.getByTestId('assigned-order-enter'));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), { timeout: 60_000 });
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(order.id, lineId)), { timeout: 60_000 });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
     expect((await prisma.orderLine.findUniqueOrThrow({ where: { id: line.id }, select: { status: true } })).status).toBe('EN_CURSO');
@@ -440,7 +442,7 @@ test.describe('pedido con varias recetas: una receta por la pantalla actual', ()
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -471,7 +473,7 @@ test.describe('pedido con varias recetas: una receta por la pantalla actual', ()
 
     // --- 3. El Empacador comienza y termina: Terminar da de alta el lote de producto terminado.
     await switchUser(page, empacadorUser);
-    await page.goto(packingOrderRoute(order.id));
+    await page.goto(packingOrderRoute(order.id, lineId));
     await expect(page.getByTestId('packing-order-screen')).toBeVisible({ timeout: 60_000 });
     await clickAndConfirm(page, page.getByTestId('packing-order-start-button'), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId('packing-order-finish-button')).toBeVisible({ timeout: 60_000 });

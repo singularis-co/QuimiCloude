@@ -185,7 +185,7 @@ const TAB_COUNT = '[data-slot="url-tabs-count"]';
 const RING_PROGRESS = '[data-slot="countdown-ring-progress"]';
 const TABLE_ROWS = '[data-testid^="data-table-row-"]';
 
-type SeededOrder = { readonly id: string; readonly numberText: string };
+type SeededOrder = { readonly id: string; readonly lineId: string; readonly numberText: string };
 type SeededOrders = {
   /** PENDIENTE del Operador: «Entrar» pide comenzar. */
   readonly execPending: SeededOrder;
@@ -391,7 +391,7 @@ test.beforeAll(async () => {
         conditionedBy: data.conditionedBy ?? null,
         finishedAt: data.finishedAt ?? null,
       });
-    return { id: order.id, numberText: formatOrderNumber({ year, sequence }) };
+    return { id: order.id, lineId: order.lineId, numberText: formatOrderNumber({ year, sequence }) };
   }
 
   const finishedAt = new Date();
@@ -590,24 +590,24 @@ const SCREENS: readonly ScreenCase[] = [
   {
     name: 'la ejecución',
     user: operatorUser,
-    url: (seededOrders) => assignedOrderRoute(seededOrders.execRunning.id),
+    url: (seededOrders) => assignedOrderRoute(seededOrders.execRunning.id, seededOrders.execRunning.lineId),
     // Un pedido que no existe pinta el error dentro de la pantalla; el 404 es el de quien no tiene
     // `asignaciones.ejecutar`.
-    notFound: { user: packerUser, url: (seededOrders) => assignedOrderRoute(seededOrders.execRunning.id) },
+    notFound: { user: packerUser, url: (seededOrders) => assignedOrderRoute(seededOrders.execRunning.id, seededOrders.execRunning.lineId) },
     screen: TESTIDS.executionScreen,
   },
   {
     name: 'el empaque',
     user: packerUser,
-    url: (seededOrders) => packingOrderRoute(seededOrders.packTodo.id),
-    notFound: { user: packerUser, url: () => packingOrderRoute(randomUUID()) },
+    url: (seededOrders) => packingOrderRoute(seededOrders.packTodo.id, seededOrders.packTodo.lineId),
+    notFound: { user: packerUser, url: () => packingOrderRoute(randomUUID(), randomUUID()) },
     screen: TESTIDS.packingScreen,
   },
   {
     name: 'el acondicionamiento',
     user: conditionerUser,
-    url: (seededOrders) => conditioningOrderRoute(seededOrders.condRunning.id),
-    notFound: { user: conditionerUser, url: () => conditioningOrderRoute(randomUUID()) },
+    url: (seededOrders) => conditioningOrderRoute(seededOrders.condRunning.id, seededOrders.condRunning.lineId),
+    notFound: { user: conditionerUser, url: () => conditioningOrderRoute(randomUUID(), randomUUID()) },
     screen: TESTIDS.conditioningScreen,
   },
 ];
@@ -885,7 +885,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     await page.goto(ASSIGNED_ORDERS_ROUTE);
 
     // «Entrar» ya no pide nada: «Comenzar» vive en el pie de la pantalla del pedido pendiente.
-    const pendingScreen = await openScreen(page, assignedOrderRoute(execPending.id), TESTIDS.executionScreen);
+    const pendingScreen = await openScreen(page, assignedOrderRoute(execPending.id, execPending.lineId), TESTIDS.executionScreen);
     await clickUntilVisible(
       pendingScreen.getByTestId('order-execution-start-button'),
       page.getByTestId('order-execution-start-dialog'),
@@ -897,7 +897,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
       confirm: 'order-execution-start-confirm',
     });
 
-    const screen = await openScreen(page, assignedOrderRoute(execRunning.id), TESTIDS.executionScreen);
+    const screen = await openScreen(page, assignedOrderRoute(execRunning.id, execRunning.lineId), TESTIDS.executionScreen);
     // En WebKit el menú ⋯ puede rehacerse al hidratar y desmontar el ítem entre abrirlo y pulsarlo:
     // se repite todo (abrir el menú si hace falta y elegir el ítem) hasta ver el diálogo, como en
     // `e2e/registro-ejecucion.spec.ts`.
@@ -936,7 +936,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     await page.setViewportSize(PHONE);
     await loginAndLand(page, packerUser);
 
-    await openScreen(page, packingOrderRoute(packTodo.id), TESTIDS.packingScreen);
+    await openScreen(page, packingOrderRoute(packTodo.id, packTodo.lineId), TESTIDS.packingScreen);
     await clickUntilVisible(page.getByTestId(TESTIDS.packingStart), page.getByTestId('packing-order-start-dialog'));
     await expectOperatorDialog(page, {
       label: '¿Comenzar el empaque?',
@@ -945,7 +945,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
       confirm: 'packing-order-start-confirm',
     });
 
-    await openScreen(page, packingOrderRoute(packRunning.id), TESTIDS.packingScreen);
+    await openScreen(page, packingOrderRoute(packRunning.id, packRunning.lineId), TESTIDS.packingScreen);
     await clickUntilVisible(page.getByTestId(TESTIDS.packingFinish), page.getByTestId('packing-order-finish-dialog'));
     await expectOperatorDialog(page, {
       label: '¿Terminar el empaque?',
@@ -962,7 +962,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
     await page.setViewportSize(PHONE);
     await loginAndLand(page, conditionerUser);
 
-    await openScreen(page, conditioningOrderRoute(condTodo.id), TESTIDS.conditioningScreen);
+    await openScreen(page, conditioningOrderRoute(condTodo.id, condTodo.lineId), TESTIDS.conditioningScreen);
     await clickUntilVisible(
       page.getByTestId(TESTIDS.conditioningStart),
       page.getByTestId('start-conditioning-dialog'),
@@ -974,7 +974,7 @@ test.describe('R41 — diálogos del operario a 390 × 844', () => {
       confirm: TESTIDS.countdownButton,
     });
 
-    await openScreen(page, conditioningOrderRoute(condRunning.id), TESTIDS.conditioningScreen);
+    await openScreen(page, conditioningOrderRoute(condRunning.id, condRunning.lineId), TESTIDS.conditioningScreen);
     await clickUntilVisible(
       page.getByTestId(TESTIDS.conditioningFinish),
       page.getByTestId('finish-conditioning-dialog'),
@@ -997,7 +997,7 @@ test.describe('R37 — el anillo del botón con espera', () => {
     await page.setViewportSize(DESKTOP);
     await loginAndLand(page, conditionerUser);
 
-    await openScreen(page, conditioningOrderRoute(condRunning.id), TESTIDS.conditioningScreen);
+    await openScreen(page, conditioningOrderRoute(condRunning.id, condRunning.lineId), TESTIDS.conditioningScreen);
     const dialog = page.getByTestId('finish-conditioning-dialog');
     await clickUntilVisible(page.getByTestId(TESTIDS.conditioningFinish), dialog);
 
@@ -1188,7 +1188,7 @@ test.describe('QC-269 R4, R6, R9, R10 — ejecución con muchos materiales', () 
     let wrappedRows = 0;
     for (const width of OPERATOR_WIDTHS) {
       await page.setViewportSize(width.size);
-      const screen = await openScreen(page, assignedOrderRoute(execMany.id), TESTIDS.executionScreen);
+      const screen = await openScreen(page, assignedOrderRoute(execMany.id, execMany.lineId), TESTIDS.executionScreen);
       await waitForScreenEnterToSettle(page);
 
       const panel = screen.getByTestId(TESTIDS.executionMaterials);
@@ -1295,7 +1295,7 @@ test.describe('QC-269 R5 — ejecución con un paso largo', () => {
 
     for (const width of OPERATOR_WIDTHS) {
       await page.setViewportSize(width.size);
-      const screen = await openScreen(page, assignedOrderRoute(execLongStep.id), TESTIDS.executionScreen);
+      const screen = await openScreen(page, assignedOrderRoute(execLongStep.id, execLongStep.lineId), TESTIDS.executionScreen);
       await waitForScreenEnterToSettle(page);
 
       await expect(screen.getByTestId(LAST_LONG_STEP_ITEM)).toBeAttached();

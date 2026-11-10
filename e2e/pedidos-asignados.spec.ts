@@ -38,6 +38,7 @@ import { ASSIGNED_ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import {
   enterAndStartAssignedOrder,
 } from './helpers/confirm-dialog';
@@ -361,7 +362,7 @@ test.describe('la lista de pedidos asignados del Operador (R38)', () => {
 
     const enterInProgress = inProgressRow.getByTestId(ENTER_TESTID);
     await expect(enterInProgress).toBeEnabled();
-    await expect(enterInProgress).toHaveAttribute('href', assignedOrderRoute(orderInProgressId));
+    await expect(enterInProgress).toHaveAttribute('href', assignedOrderRoute(orderInProgressId, await firstLineIdOf(orderInProgressId)));
     await expect(inProgressRow.getByTestId(ENTER_REASON_TESTID)).toBeVisible();
 
     const enterPending = pendingRow.getByTestId(ENTER_TESTID);
@@ -440,7 +441,7 @@ const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const EXECUTION_ERROR_TESTID = 'order-execution-error';
 
-type SeededOrder = { readonly id: string; readonly numberText: string };
+type SeededOrder = { readonly id: string; readonly lineId: string; readonly numberText: string };
 
 let packerCompanyId: string | null = null;
 let packerRecipeId: string | null = null;
@@ -473,8 +474,8 @@ function visibleTab(page: Page, testId: string): Locator {
   return page.getByTestId(testId).filter({ visible: true });
 }
 
-function executionLinks(page: Page, orderId: string): Locator {
-  return page.locator(`a[href="${assignedOrderRoute(orderId)}"]`);
+function executionLinks(page: Page, order: SeededOrder): Locator {
+  return page.locator(`a[href="${assignedOrderRoute(order.id, order.lineId)}"]`);
 }
 
 function assignmentViewUrl(view: 'asignados' | 'terminados' | 'por_empacar'): string {
@@ -545,7 +546,7 @@ async function seedPackerOrder(params: {
       conditionedBy: params.conditionedBy ?? null,
     });
 
-  return { id: order.id, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
+  return { id: order.id, lineId: order.lineId, numberText: formatOrderNumber({ year, sequence: params.sequence }) };
 }
 
 test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () => {
@@ -709,7 +710,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     for (const order of hiddenOrders) {
       await expect(packingRowByNumber(page, order.numberText)).toHaveCount(0);
       await expect(rowByNumber(page, order.numberText)).toHaveCount(0);
-      await expect(executionLinks(page, order.id)).toHaveCount(0);
+      await expect(executionLinks(page, order)).toHaveCount(0);
     }
     await expect(page.getByTestId(ENTER_TESTID)).toHaveCount(0);
 
@@ -717,7 +718,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     await expect(page.getByTestId(FINISHED_ORDERS_SECTION_TESTID)).toBeVisible({ timeout: 60_000 });
     for (const order of hiddenOrders) {
       await expect(rowByNumber(page, order.numberText)).toHaveCount(0);
-      await expect(executionLinks(page, order.id)).toHaveCount(0);
+      await expect(executionLinks(page, order)).toHaveCount(0);
     }
     await expect(page.getByTestId(ENTER_TESTID)).toHaveCount(0);
   });
@@ -734,7 +735,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     );
 
     await loginAndLand(page, empacadorUser);
-    const response = await page.goto(assignedOrderRoute(executable.id));
+    const response = await page.goto(assignedOrderRoute(executable.id, executable.lineId));
     expect(response?.status(), 'sin asignaciones.ejecutar la pantalla debe responder 404').toBe(404);
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveCount(0);
     await expect(page.getByTestId(EXECUTION_ERROR_TESTID)).toHaveCount(0);
@@ -754,7 +755,7 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     const row = rowByNumber(page, executable.numberText);
     await expect(row).toHaveCount(1, { timeout: 60_000 });
     await enterAndStartAssignedOrder(page, row.getByTestId(ENTER_TESTID));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(executable!.id), {
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(executable!.id, executable!.lineId)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -775,6 +776,6 @@ test.describe('el Empacador no ejecuta pedidos ni los ve antes del empaque', () 
     await expect(rowByNumber(page, deliveredOwn.numberText)).toHaveCount(1, { timeout: 60_000 });
     await expect(rowByNumber(page, deliveredOther.numberText)).toHaveCount(0);
     await expect(rowByNumber(page, deliveredNoPacker.numberText)).toHaveCount(0);
-    await expect(executionLinks(page, deliveredOwn.id)).toHaveCount(0);
+    await expect(executionLinks(page, deliveredOwn)).toHaveCount(0);
   });
 });

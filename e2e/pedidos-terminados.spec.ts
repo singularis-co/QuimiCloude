@@ -76,6 +76,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { firstLineIdOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
@@ -559,7 +560,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
 
     // `/asignacion/<id>` de un pedido al que el Administrador NUNCA fue asignado: "no encontrado",
     // sin que haya escrito nada.
-    await page.goto(assignedOrderRoute(pendingId));
+    await page.goto(assignedOrderRoute(pendingId, await firstLineIdOf(pendingId)));
     await expect(page.getByTestId(ORDER_EXECUTION_ERROR_TESTID)).toBeVisible({ timeout: 60_000 });
   });
 

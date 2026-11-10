@@ -52,12 +52,13 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
   assignedOrderRoute,
 } from '@/lib/shared/routes';
 
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
@@ -728,7 +729,8 @@ test.describe('reserva de material del pedido', () => {
     const assignedRowB = rowByNumber(page, orderBNumber);
     await expect(assignedRowB).toHaveCount(1, { timeout: 60_000 });
     await enterAndStartAssignedOrder(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderB.id), {
+    const lineIdB = await firstLineIdOf(orderB.id);
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(orderB.id, lineIdB)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -744,7 +746,7 @@ test.describe('reserva de material del pedido', () => {
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 

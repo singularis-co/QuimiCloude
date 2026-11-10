@@ -73,7 +73,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
   CONDITIONED_ORDER_PARAM,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   FORMULAS_ROUTE,
   NEW_RECIPE_ROUTE,
   PACKED_ORDER_PARAM,
@@ -90,6 +90,7 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
+import { pathOf } from './helpers/recipe-route';
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
@@ -567,6 +568,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
         status: 'PENDIENTE',
       });
     const orderId = order.id;
+    const lineId = order.lineId;
     await prisma.orderPresentationLine.create({
       data: {
         orderId,
@@ -599,7 +601,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
       const assignedRow = rowByNumber(page, orderNumber);
       await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
       await enterAndStartAssignedOrder(page, assignedRow.getByTestId(ENTER_TESTID));
-      await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId), {
+      await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(orderId, lineId)), {
         timeout: 60_000,
       });
       await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -612,7 +614,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
 
       await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
       await page.waitForURL(
-        (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+        (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
         { timeout: 60_000 },
       );
       expect(await orderStatus(orderId)).toBe('POR_EMPACAR');
@@ -629,7 +631,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
       await expect(packingRow).toHaveCount(1, { timeout: 60_000 });
       await packingRow.getByTestId(ROW_ACTIONS_TESTID).click();
       await page.getByTestId(ROW_ENTER_TESTID).click();
-      await page.waitForURL((url) => url.pathname === packingOrderRoute(orderId), {
+      await page.waitForURL((url) => url.pathname === pathOf(packingOrderRoute(orderId, lineId)), {
         timeout: 60_000,
       });
       await expect(page.getByTestId(PACKING_ORDER_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -660,7 +662,7 @@ test.describe('pasos de acondicionamiento de punta a punta (R39)', () => {
     // --- 5. El acondicionador pulsa «Acondicionar» con el Operador en el equipo.
     await page.context().clearCookies();
     await loginAndLand(page, conditionerUser);
-    await page.goto(conditioningOrderRoute(orderId));
+    await page.goto(conditioningOrderRoute(orderId, lineId));
     const screen = page.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID);
     await expect(screen).toBeVisible({ timeout: 60_000 });
     await expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID)).toHaveAttribute(

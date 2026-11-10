@@ -77,6 +77,7 @@ import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
 import { pickOrderLine } from './helpers/order-form';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
+import { firstLineIdOf } from './helpers/recipe-route';
 import { ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc281_e2e_';
@@ -391,7 +392,7 @@ async function switchUser(page: Page, user: Credentials): Promise<void> {
 
 /** En WebKit un clic antes de hidratar se pierde sin error: se repite hasta que el diálogo aparece. */
 async function openFinishDialog(page: Page, orderId: string): Promise<Locator> {
-  await page.goto(packingOrderRoute(orderId));
+  await page.goto(packingOrderRoute(orderId, await firstLineIdOf(orderId)));
   await expect(page.getByTestId(PACKING_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });
   const trigger = page.getByTestId(PACKING_FINISH_BUTTON_TESTID);
   const dialog = page.getByTestId(PACKING_FINISH_DIALOG_TESTID);
@@ -669,7 +670,7 @@ test.describe('envases reales al terminar el empaque', () => {
 
     await updateOrderAndLine(prisma, order.id, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId });
     await switchUser(page, conditionerUser);
-    await page.goto(conditioningOrderRoute(order.id));
+    await page.goto(conditioningOrderRoute(order.id, await firstLineIdOf(order.id)));
     const screen = page.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID);
     await expect(screen).toBeVisible({ timeout: 60_000 });
     await expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toContainText(

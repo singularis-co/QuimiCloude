@@ -89,6 +89,7 @@ import {
   executionTraceRoute,
 } from '@/lib/shared/routes';
 
+import { firstLineIdOf } from './helpers/recipe-route';
 import { enableAllAddons } from './helpers/addons';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
@@ -764,7 +765,7 @@ test.describe('acondicionamiento en el recorrido (R36)', () => {
 
     // --- 1. Comenzar con un equipo de dos: uno suelto y otro por el grupo.
     await loginAndLand(page, conditionerUser);
-    await gotoSettled(page, conditioningOrderRoute(orderId));
+    await gotoSettled(page, conditioningOrderRoute(orderId, await firstLineIdOf(orderId)));
     const screen = page.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID);
     await expect(screen).toBeVisible({ timeout: 60_000 });
     await expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID)).toHaveAttribute(

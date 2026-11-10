@@ -41,9 +41,10 @@ import { errorMessage } from '@/lib/modules/errores';
 import { formatOrderNumber } from '@/lib/modules/pedidos';
 import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
-import { ASSIGNED_ORDERS_ROUTE, DELIVERED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, MANUFACTURED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
 import { createFixtureUser } from './helpers/fixture-user';
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { loginAndLand } from './helpers/landing';
 import {
   clickAndConfirm,
@@ -704,8 +705,9 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     const pendingRow = rowByNumber(page, orderPendingNumber);
     await expect(pendingRow).toHaveCount(1, { timeout: 60_000 });
 
+    const pendingLineId = await firstLineIdOf(orderPendingId);
     await enterAndStartAssignedOrder(page, pendingRow.getByTestId(ENTER_TESTID));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderPendingId!), {
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(orderPendingId!, pendingLineId)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -719,10 +721,10 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
 
     // Paso 2 de 2, el ultimo: Finalizar envia el formulario que llama a
     // `finishAssignedOrderAction`, que termina en el servidor con un `redirect` a la lista que
-    // lleva `DELIVERED_ORDER_PARAM` con el numero del pedido.
+    // lleva `MANUFACTURED_ORDER_PARAM` con el numero del pedido.
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -744,7 +746,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
 
     // La direccion sale de `assignedOrderRoute`, nunca de un literal: un UUID cualquiera basta,
     // porque el corte por permiso ocurre ANTES de resolver ningun pedido.
-    const response = await page.goto(assignedOrderRoute(randomUUID()));
+    const response = await page.goto(assignedOrderRoute(randomUUID(), randomUUID()));
 
     expect(
       response?.status(),
@@ -768,7 +770,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
 
     await loginAndLand(page, operatorUser);
 
-    await page.goto(assignedOrderRoute(orderInProgressId));
+    await page.goto(assignedOrderRoute(orderInProgressId, await firstLineIdOf(orderInProgressId)));
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(EXECUTION_ERROR_TESTID)).toHaveCount(0);
     expect(await orderStatus(orderInProgressId)).toBe('EN_CURSO');
@@ -788,10 +790,11 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     expect(orderEvidenceId, 'el fixture no existe: fallo el beforeAll').not.toBeNull();
     if (orderEvidenceId === null) return;
     const orderId = orderEvidenceId;
+    const lineId = await firstLineIdOf(orderId);
 
     const storage = await interceptEvidenceStorage(page);
     await loginAndLand(page, operatorUser);
-    await page.goto(assignedOrderRoute(orderId));
+    await page.goto(assignedOrderRoute(orderId, lineId));
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     const region = page.getByRole('region', { name: EVIDENCE_REGION_NAME });
 
@@ -841,7 +844,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     // en el paso 2 creyendo que la tiene: solo el servidor puede frenar el Finalizar (R35).
     const other = await context.newPage();
     await interceptEvidenceStorage(other);
-    await other.goto(assignedOrderRoute(orderId));
+    await other.goto(assignedOrderRoute(orderId, lineId));
     await expect(other.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await other.getByTestId(STEP_PREVIOUS_TESTID).click();
     const otherRegion = other.getByRole('region', { name: EVIDENCE_REGION_NAME });
@@ -885,7 +888,7 @@ test.describe('la ejecucion de la receta de un pedido asignado', () => {
     await expect(finishDialog).toContainText(EVIDENCE_FINISH_WARNING);
     await page.getByTestId(ORDER_EXECUTION_FINISH_CONFIRM_TESTID).click();
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 

@@ -420,3 +420,27 @@ T7 hecha: las tres pantallas exigen `?receta`, las seis listas tienen una fila p
    - Por eso **T7 queda sin `[x]`**. Su trabajo está hecho y verde fuera de `e2e/`.
    - Decide el leader: adelantar a esta tanda el ajuste de tipos de `e2e/` (de T13) o aceptar el rojo hasta la Tanda 6. Con el rojo, `gate-completo` no pasa.
 2. **T8 no se hizo.** La orden la pone en la Tanda 3, pero en `tasks.md` es de la Tanda 4 («No toques las tandas 4–6»), y depende del «Receta N de M» que consume T9. Queda pendiente para la Tanda 4.
+
+## Tanda 3 — ajuste de tipos de e2e/ (adelanto de T13)
+
+Decision del leader: se adelanta de T13 solo el ajuste de tipos de `e2e/`. Una tanda no cierra con typecheck rojo y `tsconfig.json` incluye `**/*.ts`, asi que los 64 errores de `e2e/` (20 specs) bloqueaban el «Hecho» de T7.
+
+Que se hizo (sin cambiar lo que comprueba cada spec):
+- `assignedOrderRoute`, `packingOrderRoute` y `conditioningOrderRoute` reciben el `lineId`.
+- Donde se comparaba `url.pathname === <ruta>(id)` se compara contra `pathOf(<ruta>(id, lineId))`: sigue comprobando la misma ruta, sin la consulta `?receta=`.
+- `DELIVERED_ORDER_PARAM` pasa a `MANUFACTURED_ORDER_PARAM` en las esperas de la redireccion de Finalizar.
+- Los 404 con un pedido inventado pasan `randomUUID()` tambien como `lineId`.
+
+Como se obtiene el `lineId`:
+- Si el spec siembra con `createOrderWithLine`, se usa `order.lineId` y se anade `lineId` al tipo de lo sembrado.
+- Si el pedido nace por la UI o solo se tiene el id, se usa `firstLineIdOf(orderId)`: la linea viva de menor `position`.
+
+Helper anadido: `e2e/helpers/recipe-route.ts` (`pathOf`, `firstLineIdOf`).
+
+Archivos (20 specs + 1 helper): acondicionamiento, acondicionar-con-equipo, coste-real-de-produccion, datos-de-lote-en-acondicionamiento, ejecucion-receta, empaque, envases-del-pedido, envases-reales-empaque, operario-rediseno, pasos-de-acondicionamiento, pasos-de-envasado, pedido-con-varias-recetas, pedido-en-varias-presentaciones, pedidos-asignados, pedidos-terminados, producto-terminado, recetas-porcentaje, recorrido-acondicionamiento, registro-ejecucion, reserva-de-material (`e2e/*.spec.ts`).
+
+Sigue en T13: el E2E de dos recetas y cualquier adaptacion de comportamiento. Por ejemplo, los avisos de vuelta a la lista que aun buscan el testid «delivered» o los textos de la entrega. No se corrio Playwright.
+
+Verificacion:
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores, 11 warnings (ninguno en `e2e/`), «✖ 11 problems (0 errors, 11 warnings)».

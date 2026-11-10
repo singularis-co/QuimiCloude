@@ -60,6 +60,7 @@ import {
   recipeEditRoute,
 } from '@/lib/shared/routes';
 
+import { firstLineIdOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { applyOrderLine, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
@@ -566,7 +567,7 @@ test.describe('cantidades de receta en porcentaje (QC-147)', () => {
   }) => {
     await loginAndLand(page, operatorUser);
 
-    await page.goto(assignedOrderRoute(assignedOrderId));
+    await page.goto(assignedOrderRoute(assignedOrderId, await firstLineIdOf(assignedOrderId)));
     await expect(page.getByTestId('order-execution-title')).toBeVisible({ timeout: 60_000 });
 
     // La cantidad del pedido va en SU PROPIA linea, fuera de la lista de la receta.

@@ -37,6 +37,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, conditioningOrderRoute } from '@/lib/shared/routes';
 
+import { pathOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { seedPackaging } from './helpers/packaging';
@@ -140,7 +141,7 @@ const PRIVATE_NOT_FOUND_TESTID = 'private-not-found';
 
 let companyId: string | null = null;
 
-type SeededOrder = { readonly id: string; readonly numberText: string };
+type SeededOrder = { readonly id: string; readonly lineId: string; readonly numberText: string };
 /** A: POR_ACONDICIONAR con dos líneas. B: EN_ACONDICIONAMIENTO del 2. C: TERMINADO del 1.
  *  D: TERMINADO del 2. E: ENTREGADO del 1. */
 let orders: Record<'A' | 'B' | 'C' | 'D' | 'E', SeededOrder> | null = null;
@@ -345,7 +346,7 @@ test.beforeAll(async () => {
         conditionedBy: data.conditionedBy,
         finishedAt: data.finishedAt,
       });
-    return { id: order.id, numberText: formatOrderNumber({ year, sequence }) };
+    return { id: order.id, lineId: order.lineId, numberText: formatOrderNumber({ year, sequence }) };
   }
 
   const orderA = await seedOrder(0, { status: 'POR_ACONDICIONAR', conditionedBy: null, finishedAt: null });
@@ -448,7 +449,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
 
     // --- 3. «Entrar» del menú ⋯ de A abre el detalle: número, estado y un único botón habilitado, «Acondicionar».
     await enterFromRow(page, rowA);
-    await page.waitForURL((url) => url.pathname === conditioningOrderRoute(A.id), {
+    await page.waitForURL((url) => url.pathname === pathOf(conditioningOrderRoute(A.id, A.lineId)), {
       timeout: 60_000,
     });
     const screenA = page.getByTestId(SCREEN_TESTID);
@@ -476,7 +477,7 @@ test.describe('las pestañas del acondicionador (R22)', () => {
 
     // --- 5. «Entrar» del menú ⋯ de C abre su detalle.
     await enterFromRow(page, rowC);
-    await page.waitForURL((url) => url.pathname === conditioningOrderRoute(C.id), {
+    await page.waitForURL((url) => url.pathname === pathOf(conditioningOrderRoute(C.id, C.lineId)), {
       timeout: 60_000,
     });
     const screenC = page.getByTestId(SCREEN_TESTID);
@@ -523,7 +524,7 @@ test.describe('quien no tiene acondicionamiento.modificar no ve las pestañas (R
       await expect(page.getByTestId(CONDITIONING_SECTION_TESTID)).toHaveCount(0);
 
       // --- 3. El detalle de un POR_ACONDICIONAR de su empresa responde el 404 de la zona privada.
-      const response = await page.goto(conditioningOrderRoute(A.id));
+      const response = await page.goto(conditioningOrderRoute(A.id, A.lineId));
       expect(
         response?.status(),
         'sin acondicionamiento.modificar el detalle debe responder 404, indistinguible de una ruta que no existe',

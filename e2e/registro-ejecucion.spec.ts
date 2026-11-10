@@ -24,6 +24,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { enterAndStartAssignedOrder } from './helpers/confirm-dialog';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
@@ -127,7 +128,8 @@ async function openFromList(page: Page, order: { id: string; numberText: string 
   await expect(row).toHaveCount(1, { timeout: 60_000 });
 
   await enterAndStartAssignedOrder(page, row.getByTestId(ENTER_TESTID));
-  await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), { timeout: 60_000 });
+  const lineId = await firstLineIdOf(order.id);
+  await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(order.id, lineId)), { timeout: 60_000 });
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 }
 

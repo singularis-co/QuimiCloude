@@ -57,7 +57,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
   assignedOrderRoute,
@@ -87,6 +87,7 @@ import {
   saveOrder,
 } from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
+import { firstLineIdOf } from './helpers/recipe-route';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc305_e2e_';
@@ -547,6 +548,7 @@ test.describe('coste real de producción', () => {
       where: { companyId, lines: { some: { recipeId } }, deletedAt: null },
       select: { id: true, orderYear: true, orderSequence: true },
     });
+    const lineId = await firstLineIdOf(order.id);
     const numberText = formatOrderNumber({ year: order.orderYear, sequence: order.orderSequence });
     const created = await savedCosts(order.id);
     expect(created.status).toBe('PENDIENTE');
@@ -595,7 +597,7 @@ test.describe('coste real de producción', () => {
 
     // --- 4. El Operador finaliza: consume los 8 l del ingrediente.
     await switchUser(page, operatorUser);
-    await page.goto(assignedOrderRoute(order.id));
+    await page.goto(assignedOrderRoute(order.id, lineId));
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     // Un clic antes de hidratar se pierde sin error: se repite hasta que la casilla quede marcada.
     const checklistItem = page.getByTestId(STEP_CHECKLIST_ITEM_TESTID);
@@ -605,7 +607,7 @@ test.describe('coste real de producción', () => {
     }).toPass({ timeout: 60_000 });
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
     expect((await savedCosts(order.id)).status).toBe('POR_EMPACAR');
@@ -617,7 +619,7 @@ test.describe('coste real de producción', () => {
 
     // --- 5. El Empacador comienza y termina con 7 envases en vez de 6.
     await switchUser(page, empacadorUser);
-    await page.goto(packingOrderRoute(order.id));
+    await page.goto(packingOrderRoute(order.id, lineId));
     await expect(page.getByTestId(PACKING_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });
     await clickAndConfirm(page, page.getByTestId('packing-order-start-button'), PACKING_ORDER_START_CONFIRM_TESTID);
     const finishButton = page.getByTestId(PACKING_FINISH_BUTTON_TESTID);

@@ -91,7 +91,7 @@
     - sin `lineId` da `invalid_input` (R14);
     - permisos sin cambios (R15);
     - un `PARCIAL` con la receta en `EN_CURSO` abre la ejecución (R10).
-- [ ] **T7 · frontend_dev — la UI pasa la receta** (design § 2 y § 4.1; misma tanda que T6, va
+- [x] **T7 · frontend_dev — la UI pasa la receta** (design § 2 y § 4.1; misma tanda que T6, va
   después)
   - **Páginas.** Las tres `page.tsx` exigen `?receta=<uuid>`, con `notFound()` si falta, y llaman
     con `{ orderId, lineId }`. Empaque captura también `ValidationError` (R9).

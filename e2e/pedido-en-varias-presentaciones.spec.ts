@@ -44,7 +44,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
   assignedOrderRoute,
@@ -76,6 +76,7 @@ import {
 } from './helpers/order-form';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
+import { firstLineIdOf } from './helpers/recipe-route';
 import { createOrderWithLine, firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc170_e2e_';
@@ -332,7 +333,7 @@ async function finishProduction(page: Page, orderId: string, numberText: string)
   await page.goto(ASSIGNED_ORDERS_ROUTE);
   await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 
-  await page.goto(assignedOrderRoute(orderId));
+  await page.goto(assignedOrderRoute(orderId, await firstLineIdOf(orderId)));
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME);
   await expect(
@@ -356,13 +357,13 @@ async function finishProduction(page: Page, orderId: string, numberText: string)
   await expect(finish).toBeEnabled({ timeout: 60_000 });
   await clickAndConfirm(page, finish, ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
   await page.waitForURL(
-    (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+    (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
     { timeout: 60_000 },
   );
 }
 
 async function openPackingScreen(page: Page, orderId: string): Promise<Locator> {
-  await page.goto(packingOrderRoute(orderId));
+  await page.goto(packingOrderRoute(orderId, await firstLineIdOf(orderId)));
   const screen = page.getByTestId(PACKING_SCREEN_TESTID);
   await expect(screen).toBeVisible({ timeout: 60_000 });
   return screen;

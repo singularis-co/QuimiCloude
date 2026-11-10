@@ -58,7 +58,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
@@ -67,6 +67,7 @@ import {
   packingOrderRoute,
 } from '@/lib/shared/routes';
 
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
@@ -671,7 +672,8 @@ test.describe('producto terminado', () => {
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     await enterAndStartAssignedOrder(page, assignedRow.getByTestId('assigned-order-enter'));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), {
+    const lineId = await firstLineIdOf(order.id);
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(order.id, lineId)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -680,7 +682,7 @@ test.describe('producto terminado', () => {
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -707,7 +709,7 @@ test.describe('producto terminado', () => {
     await page.goto('about:blank');
     await page.context().clearCookies();
     await loginAndLand(page, empacadorUser);
-    await page.goto(packingOrderRoute(order.id));
+    await page.goto(packingOrderRoute(order.id, lineId));
     await expect(page.getByTestId('packing-order-screen')).toBeVisible({ timeout: 60_000 });
     await clickAndConfirm(page, page.getByTestId('packing-order-start-button'), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId('packing-order-finish-button')).toBeVisible({ timeout: 60_000 });

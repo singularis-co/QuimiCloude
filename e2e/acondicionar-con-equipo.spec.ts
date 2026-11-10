@@ -44,6 +44,7 @@ import {
 
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
+import { pathOf } from './helpers/recipe-route';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
 
@@ -151,6 +152,7 @@ const COUNTDOWN_TIMER_TESTID = 'countdown-timer';
 let companyId: string | null = null;
 
 type Seeded = {
+  readonly lineId: string;
   readonly orderId: string;
   readonly numberText: string;
   readonly conditioner1Id: string;
@@ -265,12 +267,12 @@ async function expectRealWait(
 }
 
 /** Entra con el acondicionador 2 en su propio contexto y mira el detalle del pedido (R34). */
-async function expectConditioner2SeesItReadOnly(browser: Browser, orderId: string): Promise<void> {
+async function expectConditioner2SeesItReadOnly(browser: Browser, orderId: string, lineId: string): Promise<void> {
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
     await loginAndLand(page, conditioner2User);
-    await page.goto(conditioningOrderRoute(orderId));
+    await page.goto(conditioningOrderRoute(orderId, lineId));
 
     const screen = page.getByTestId(SCREEN_TESTID);
     await expect(screen).toBeVisible({ timeout: 60_000 });
@@ -380,6 +382,7 @@ test.beforeAll(async () => {
 
   fixture = {
     orderId: order.id,
+    lineId: order.lineId,
     numberText: formatOrderNumber({ year, sequence: ORDER_SEQUENCE }),
     conditioner1Id,
     conditioner2Id,
@@ -408,7 +411,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
     page,
     browser,
   }) => {
-    const { orderId, numberText, conditioner2Id, adminId, operatorId, workGroupId } = seeded();
+    const { orderId, lineId, numberText, conditioner2Id, adminId, operatorId, workGroupId } = seeded();
 
     // --- 1. Aterriza en `/asignacion` y abre el pedido desde «Por acondicionar».
     const landing = await loginAndLand(page, conditioner1User);
@@ -421,7 +424,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
     await expect(queueRow).toHaveCount(1, { timeout: 60_000 });
     await queueRow.getByTestId(ROW_ACTIONS_TESTID).click();
     await page.getByTestId(ROW_ENTER_TESTID).click();
-    await page.waitForURL((url) => url.pathname === conditioningOrderRoute(orderId), {
+    await page.waitForURL((url) => url.pathname === pathOf(conditioningOrderRoute(orderId, lineId)), {
       timeout: 60_000,
     });
 
@@ -496,7 +499,7 @@ test.describe('acondicionar con equipo (R33, R34)', () => {
 
     // --- 5. R34: el acondicionador 2, aun estando en el equipo, solo mira.
     await test.step('R34 - el acondicionador 2 ve «Terminar» y «Acondicionar» deshabilitados y ve quién acondiciona', async () => {
-      await expectConditioner2SeesItReadOnly(browser, orderId);
+      await expectConditioner2SeesItReadOnly(browser, orderId, lineId);
     });
 
     // --- 6. «Terminar» abre la confirmación con su propia espera real.

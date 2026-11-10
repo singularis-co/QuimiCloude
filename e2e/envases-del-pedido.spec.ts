@@ -37,7 +37,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   NEW_RECIPE_ROUTE,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
@@ -77,6 +77,7 @@ import {
   saveOrder,
 } from './helpers/order-form';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
+import { firstLineIdOf } from './helpers/recipe-route';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 
 const FIXTURE_PREFIX = 'qc195_e2e_';
@@ -542,6 +543,7 @@ test.describe('envases del pedido como productos', () => {
 
     const first = await latestOrder();
     expect(first.status).toBe('PENDIENTE');
+    const firstLineId = await firstLineIdOf(first.id);
     const firstNumber = formatOrderNumber({ year: first.orderYear, sequence: first.orderSequence });
 
     // R14: cada linea guarda su envase y copia la presentacion y el contenido de ese envase.
@@ -626,7 +628,7 @@ test.describe('envases del pedido como productos', () => {
     await switchUser(page, operatorUser);
     await page.goto(ASSIGNED_ORDERS_ROUTE);
     await expect(page.getByTestId(ASIGNACION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
-    await page.goto(assignedOrderRoute(first.id));
+    await page.goto(assignedOrderRoute(first.id, firstLineId));
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toHaveText(RECIPE_NAME, { timeout: 60_000 });
     await expect(
       page.getByTestId(EXECUTION_SCREEN_TESTID).locator(EXECUTION_EYEBROW_SELECTOR),
@@ -662,7 +664,7 @@ test.describe('envases del pedido como productos', () => {
     await expect(finishStep).toBeEnabled({ timeout: 60_000 });
     await clickAndConfirm(page, finishStep, ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -682,7 +684,7 @@ test.describe('envases del pedido como productos', () => {
 
     // --- 4. El Empacador ve los envases, comienza y termina.
     await switchUser(page, empacadorUser);
-    await page.goto(packingOrderRoute(first.id));
+    await page.goto(packingOrderRoute(first.id, firstLineId));
     const packingScreen = page.getByTestId(PACKING_SCREEN_TESTID);
     await expect(packingScreen).toBeVisible({ timeout: 60_000 });
 
