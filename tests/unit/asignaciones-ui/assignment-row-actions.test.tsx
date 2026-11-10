@@ -312,3 +312,46 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
     expect(within(tarjeta).getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toBeInTheDocument();
   });
 });
+
+describe('R5 — las acciones de una fila actúan sobre el pedido, sea cual sea su receta', () => {
+  const RECETA_2 = { recipe: { position: 2, count: 2 }, recipeName: 'Desengrasante alcalino' } as const;
+
+  it('R5: en la fila de la segunda receta, «Ver recorrido» va al pedido (row.id), no a su lineId', () => {
+    const segundas: [readonly DataTableColumn<never>[], { id: string; lineId: string }][] = [
+      [buildAssignedOrdersColumns({ canExecute: true, canViewTrace: true }) as readonly DataTableColumn<never>[], { ...ASSIGNED, ...RECETA_2, lineId: 'linea-2-order-a' }],
+      [buildFinishedOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...FINISHED, ...RECETA_2, lineId: 'linea-2-order-f' }],
+      [
+        buildCompanyOrdersColumns({ showFinishedAt: false, canViewTrace: true }) as readonly DataTableColumn<never>[],
+        { ...ASSIGNED, ...RECETA_2, lineId: 'linea-2-order-a', responsibles: [], finishedAt: null } as never,
+      ],
+      [buildPackingOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...PACKING, ...RECETA_2, lineId: 'linea-2-order-p' }],
+      [buildConditioningOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...CONDITIONING, ...RECETA_2, lineId: 'linea-2-order-c' }],
+      [buildConditionedOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...FINISHED, ...RECETA_2, lineId: 'linea-2-order-f' }],
+    ];
+    for (const [columns, row] of segundas) {
+      const trace = menuItems(columns, row as never).find((item) => item.key === 'trace');
+      expect(trace?.href).toBe(executionTraceRoute(row.id));
+      expect(trace?.href).not.toContain(row.lineId);
+    }
+  });
+
+  it('R5: dos filas del mismo pedido (dos lineId) se pintan aparte y ambas actúan sobre el mismo pedido', async () => {
+    const user = setupUser();
+    const primera: PackingOrderRow = { ...PACKING, recipe: { position: 1, count: 2 } };
+    const segunda: PackingOrderRow = { ...PACKING, ...RECETA_2, lineId: 'linea-2-order-p' };
+    render(<PackingOrdersTable rows={[primera, segunda]} params={PARAMS} totalPages={1} canViewTrace />);
+
+    const tarjeta = screen.getByTestId('data-table-card-linea-2-order-p');
+    expect(screen.getByTestId('data-table-card-linea-order-p')).not.toBe(tarjeta);
+    await user.click(within(tarjeta).getByTestId(ASSIGNMENT_ROW_ACTIONS_TESTID));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByTestId(ASSIGNMENT_ROW_ENTER_TESTID)).toHaveAttribute(
+      'href',
+      packingOrderRoute('order-p', 'linea-2-order-p'),
+    );
+    expect(within(dialogo).getByTestId(ASSIGNMENT_ROW_TRACE_TESTID)).toHaveAttribute(
+      'href',
+      executionTraceRoute('order-p'),
+    );
+  });
+});

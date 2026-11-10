@@ -1166,3 +1166,99 @@ Total: `2 passed (6.2m)`.
 
 ### Veredicto
 T12 en verde en chromium y webkit, con typecheck y lint limpios. Queda pendiente la decisión del leader sobre la guardia `scope.test.ts`, que está en rojo por el nombre del spec nuevo.
+
+## T14 — tests de trazabilidad R5 y R6
+
+Solo tests; nada en `app/`, `lib/` ni `components/`.
+
+### Archivos modificados
+- `tests/unit/asignaciones-ui/assignment-row-actions.test.tsx`
+- `tests/unit/asignaciones-ui/recipe-screens.test.tsx`
+
+### Mapa R → test
+- **R5** → `assignment-row-actions.test.tsx`:
+  - «R5: en la fila de la segunda receta, «Ver recorrido» va al pedido (row.id), no a su lineId» (las seis vistas).
+  - «R5: dos filas del mismo pedido (dos lineId) se pintan aparte y ambas actúan sobre el mismo pedido».
+  - **Nota:** las filas de `/asignacion` no ofrecen asignar, desasignar ni quitar grupo; su menú solo tiene «Entrar» y «Ver recorrido». Esas acciones viven en `/pedidos` (`OrderResponsibles`, con `orderId={order.id}`), cuya tabla tiene una fila por pedido (`getRowId={(order) => order.id}`). Por eso el caso cubre lo que la fila sí hace: actúa sobre `row.id`, como dice design § 4.1.
+- **R6** → `recipe-screens.test.tsx`:
+  - «R6: $nombre muestra los datos de la receta nombrada y la otra receta solo sale en «Otras recetas»» (ejecucion, empaque, acondicionamiento).
+  - «R6: ejecucion pinta los pasos de su receta, no los de otra del mismo pedido».
+
+### Salida
+- `pnpm exec vitest run --maxWorkers=1 tests/unit/asignaciones-ui/assignment-row-actions.test.tsx tests/unit/asignaciones-ui/recipe-screens.test.tsx` → `Test Files 2 passed (2)`, `Tests 47 passed (47)`.
+- `pnpm run typecheck` → `tsc --noEmit`, sin errores.
+- `pnpm run lint` → `✖ 11 problems (0 errors, 11 warnings)`; ningún aviso en los dos archivos tocados.
+
+### Veredicto
+R5 y R6 ya tienen tests y están en verde. R5 solo puede cubrir «Ver recorrido», porque las filas de `/asignacion` no tienen acciones de responsables.
+
+## T14 — cierre (implementer, 2026-11-10)
+
+### Mapa R1–R34 → test
+Se sacó de los nombres de caso **añadidos o cambiados desde el spec** (`git diff b8a756300..HEAD -- tests e2e`). Formato: requisito (n.º de archivos): rutas bajo `tests/` o `e2e/`. Los nombres exactos de cada caso están en las secciones de cada tanda.
+- R1 (1): unit/asignaciones-ui/packing-order-screen.tsx
+- R2 (4): ui/dashboard/execution-trace-table.tsx, unit/asignaciones-ui/recipe-rows.tsx, unit/asignaciones/list-assigned-orders.ts +1
+- R3 (5): integration/pedidos/order-line-outlines.int.ts, unit/asignaciones-ui/recipe-rows.tsx, unit/asignaciones/list-assigned-orders.ts +2
+- R4 (2): unit/asignaciones-ui/assigned-order-enter-trigger.tsx, unit/asignaciones-ui/recipe-rows.tsx
+- R5 (0): 
+- R6 (0): 
+- R7 (6): e2e/planta-con-varias-recetas.ts, unit/asignaciones-ui/recipe-header.tsx, unit/asignaciones/get-assigned-order-execution.ts +3
+- R8 (7): e2e/planta-con-varias-recetas.ts, unit/asignaciones-ui/recipe-header.tsx, unit/asignaciones-ui/recipe-screens.tsx +4
+- R9 (5): unit/asignaciones-ui/assigned-orders-manufactured-notice.tsx, unit/asignaciones-ui/conditioning-order-page.tsx, unit/asignaciones-ui/order-execution-page.tsx +2
+- R10 (11): unit/asignaciones/finish-assigned-order.ts, unit/asignaciones/finish-conditioning.ts, unit/asignaciones/finish-packing.ts +8
+- R11 (23): integration/asignaciones/order-lines-execution.int.ts, unit/asignaciones-ui/conditioning-batch-data-form.tsx, unit/asignaciones-ui/finish-conditioning-dialog.tsx +20
+- R12 (16): integration/asignaciones/order-lines-execution.int.ts, ui/dashboard/recorrido-rediseno.tsx, unit/asignaciones/evidence-target.ts +13
+- R13 (13): integration/asignaciones/conditioning-team-repository.int.ts, integration/asignaciones/execution-log-read.int.ts, integration/asignaciones/step-evidence-repository.int.ts +10
+- R14 (22): integration/asignaciones/order-lines-execution.int.ts, integration/pedidos/order-line-outlines.int.ts, unit/asignaciones/cancel-assigned-order.ts +19
+- R15 (12): unit/asignaciones-ui/conditioning-order-page.tsx, unit/asignaciones/cancel-assigned-order.ts, unit/asignaciones/finish-conditioning.ts +9
+- R16 (7): integration/asignaciones/order-lines-execution.int.ts, integration/pedidos/cancel-line-from-execution.int.ts, unit/asignaciones-ui/packing-order-screen.tsx +4
+- R17 (6): integration/asignaciones/order-lines-execution.int.ts, integration/pedidos/cancel-line-from-execution.int.ts, unit/asignaciones-ui/order-execution-step-log.tsx +3
+- R18 (2): unit/asignaciones-ui/order-cancel-dialog.tsx, unit/asignaciones-ui/order-execution-step-log.tsx
+- R19 (5): unit/asignaciones-ui/asignacion-page.tsx, unit/asignaciones-ui/assigned-orders-manufactured-notice.tsx, unit/asignaciones/order-execution-actions.ts +2
+- R20 (13): integration/asignaciones/order-lines-execution.int.ts, unit/asignaciones-ui/asignacion-page.tsx, unit/asignaciones-ui/assigned-orders-manufactured-notice.tsx +10
+- R21 (6): e2e/planta-con-varias-recetas.ts, integration/pedidos/order-line-outlines.int.ts, ui/dashboard/planta-varias-recetas.tsx +3
+- R22 (4): integration/pedidos/order-line-outlines.int.ts, ui/dashboard/planta-varias-recetas.tsx, unit/asignaciones/list-execution-traces.ts +1
+- R23 (1): unit/asignaciones/list-execution-traces.ts
+- R24 (5): integration/pedidos/order-line-outlines.int.ts, unit/asignaciones/get-execution-trace.ts, unit/asignaciones/list-execution-traces.ts +2
+- R25 (8): e2e/planta-con-varias-recetas.ts, ui/dashboard/execution-trace-detail.tsx, ui/dashboard/planta-varias-recetas.tsx +5
+- R26 (5): ui/dashboard/planta-varias-recetas.tsx, unit/asignaciones/get-execution-evidence.ts, unit/asignaciones/get-execution-trace.ts +2
+- R27 (3): unit/asignaciones-ui/finish-conditioning-dialog.tsx, unit/asignaciones/get-execution-trace.ts, unit/asignaciones/list-execution-traces.ts
+- R28 (2): ui/dashboard/planta-varias-recetas.tsx, unit/asignaciones/get-execution-trace.ts
+- R29 (11): unit/asignaciones-ui/assigned-orders-manufactured-notice.tsx, unit/asignaciones-ui/recipe-header.tsx, unit/asignaciones-ui/recipe-rows.tsx +8
+- R30 (2): unit/asignaciones-ui/recipe-header.tsx, unit/asignaciones-ui/recipe-rows.tsx
+- R31 (1): unit/asignaciones-ui/recipe-screens.tsx
+- R32 (0): 
+- R33 (1): e2e/planta-con-varias-recetas.ts
+- R34 (0): 
+
+Complementos al mapa:
+- **R1** (una fila por receta) lo cubren los casos «R2: … pinta una fila por receta …» de `unit/asignaciones-ui/recipe-rows`, en las seis tablas.
+- **R5**: `unit/asignaciones-ui/assignment-row-actions` tiene dos casos:
+  - «R5: en la fila de la segunda receta, «Ver recorrido» va al pedido (row.id), no a su lineId»;
+  - «R5: dos filas del mismo pedido (dos lineId) se pintan aparte y ambas actúan sobre el mismo pedido».
+
+  **Para el reviewer:** las filas de `/asignacion` no tienen asignar, desasignar ni quitar grupo. Esas acciones viven en `/pedidos` (`OrderResponsibles`, una fila por pedido), así que de la fila de una receta solo se puede probar «Ver recorrido».
+- **R6**: `unit/asignaciones-ui/recipe-screens` tiene dos casos:
+  - «R6: $nombre muestra los datos de la receta nombrada y la otra receta solo sale en «Otras recetas»», en ejecución, empaque y acondicionamiento;
+  - «R6: ejecucion pinta los pasos de su receta, no los de otra del mismo pedido».
+
+  Lo completan los casos R13 de lecturas por línea.
+- **R32**, comprobado sobre el diff `origin/dev...HEAD`: 0 archivos en `db/`, y ni `package.json` ni `pnpm-lock.yaml` cambian. No hay permisos nuevos.
+- **R34**, comprobado sobre el diff `b8a756300..HEAD`:
+  - no se tocan `batch-evidence-dialog.tsx`, `get-order-evidence.ts` ni los tests de `getOrderEvidence` (`get-order-evidence`, `read-order-evidence`, `order-evidence-actions`), y esos tests siguen en verde;
+  - `read-order-evidence.ts` gana `readOrderEvidenceByLine` (T10), pero `readOrderEvidence` conserva firma y resultado.
+
+### `node scripts/archivos-en-vuelo.mjs --candidata QT-315`
+- Resultado: «QT-315: sin conflicto de archivos con 6 feature(s) en vuelo», con 8 avisos:
+  - QC-96 en vuelo con la rama sin publicar;
+  - QC-131 sin `## Archivos esperados`;
+  - `CATALOGO.md` es archivo de apéndice compartido con QC-291 y con QT-314;
+  - mismo dueño, sin choque: QC-291, QT-296, QT-304 y QT-314.
+
+### `./init.sh`
+- **Rojo en el validador de `feature_list.json`**: «id duplicado» 290–308 entre fichas QC y QT, la deuda ya registrada. Es el único rojo, pero `init.sh` **se corta ahí**, así que typecheck, lint, `vitest related` y guardias no llegan a correr dentro de `init.sh`. Se verificaron a mano en los cierres de cada tanda.
+
+### Bloqueo abierto
+- **`tests/unit/recetas/scope.test.ts` está en rojo (1 de 5)** porque `e2e/planta-con-varias-recetas.spec.ts` no está en la lista cerrada de E2E de recetas (~l. 289).
+  - El nombre del spec lo fija `tasks.md` (T12) y `requirements.md` R33, así que renombrarlo chocaría con el spec.
+  - No se ha ampliado la guardia: hace falta la decisión del leader o del humano.

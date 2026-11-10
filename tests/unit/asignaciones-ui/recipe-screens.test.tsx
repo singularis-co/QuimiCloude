@@ -270,3 +270,42 @@ describe('R31 — ninguna pantalla de planta importa la accion de entregar', () 
     expect(readFileSync(archivo, 'utf8')).not.toMatch(/deliver[A-Za-z]*Action|deliverOrder|Entregar/);
   });
 });
+
+describe('R6 — la pantalla muestra solo la receta de la dirección', () => {
+  it.each(PANTALLAS)(
+    'R6: $nombre muestra los datos de la receta nombrada y la otra receta solo sale en «Otras recetas»',
+    ({ pintar }) => {
+      render(pintar({ access: FULL_ACCESS }));
+
+      const lista = screen.getByRole('list', { name: RECIPE_HEADER_TEXTS.otherRecipes });
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hipoclorito 5 %');
+      for (const otra of ['Desengrasante alcalino', 'Jabón líquido']) {
+        const apariciones = screen.getAllByText(otra);
+        expect(apariciones).toHaveLength(1);
+        expect(lista).toContainElement(apariciones[0]!);
+      }
+      for (const enlace of document.querySelectorAll('[href*="' + LINE_B + '"], [href*="' + LINE_C + '"]')) {
+        expect(lista).toContainElement(enlace as HTMLElement);
+      }
+    },
+  );
+
+  it('R6: ejecucion pinta los pasos de su receta, no los de otra del mismo pedido', () => {
+    render(
+      <OrderExecutionScreen
+        lineId={LINE_A}
+        access={FULL_ACCESS}
+        execution={{
+          ...EJECUCION,
+          status: 'EN_CURSO',
+          otherRecipes: [{ lineId: LINE_B, recipeName: 'Desengrasante alcalino', status: 'EN_CURSO' }],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText('Paso uno').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Paso de la otra receta/)).toBeNull();
+    const lista = screen.getByRole('list', { name: RECIPE_HEADER_TEXTS.otherRecipes });
+    expect(lista).toContainElement(screen.getByText('Desengrasante alcalino'));
+  });
+});
