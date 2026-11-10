@@ -16,6 +16,7 @@ import {
 import { errorInesperado } from '../../helpers/identificador-de-request';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { arbolAccesible, nuncaResuelve, resolverServerComponents } from './arbol-accesible';
+import { oneRecipeRowFields } from '../../fixtures/execution-trace-recipes';
 
 /**
  * Paridad de la lista de recorridos del dashboard: su error interno pasa a ser el estado de error
@@ -69,7 +70,7 @@ const FILAS: readonly ExecutionTraceRow[] = [
     goBackCount: 1,
     formulaName: null,
     formulaImageUrl: null,
-    presentations: [],
+    ...oneRecipeRowFields([], 'TERMINADO'),
   },
   {
     orderId: 'order-2',
@@ -84,7 +85,7 @@ const FILAS: readonly ExecutionTraceRow[] = [
     goBackCount: 0,
     formulaName: null,
     formulaImageUrl: null,
-    presentations: [],
+    ...oneRecipeRowFields([], 'EN_CURSO'),
   },
 ];
 

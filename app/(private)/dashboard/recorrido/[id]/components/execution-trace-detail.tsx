@@ -1,29 +1,21 @@
-import type { ReactNode } from 'react';
-
 import { ArrowLink } from '@/components/shared/arrow-link';
 import { ErrorState } from '@/components/shared/error-state';
+import { OrderProgress } from '@/components/shared/order-progress';
 import { PageHeader } from '@/components/shared/page-header';
 import { PageShell } from '@/components/shared/page-shell';
 import { StatusBadge } from '@/components/shared/status-badge';
-import {
-  DeletedOrderMark,
-  PHASE_DURATION_LABELS,
-  PHASE_OPEN_MARK,
-  PHASE_UNCLOSED_MARK,
-  TRACE_ORDER_STATUS_LABELS,
-  formatElapsed,
-} from '@/app/(private)/dashboard/components';
+import { DeletedOrderMark, TRACE_ORDER_STATUS_LABELS } from '@/app/(private)/dashboard/components';
 import type {
-  ExecutionPhase,
   ExecutionTraceDetail as ExecutionTraceDetailData,
-  TraceDuration,
+  OrderEvidence,
 } from '@/lib/modules/asignaciones';
 import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
-import { ExecutionTimeline } from './execution-timeline';
-import { TracePackingEvidence } from './trace-packing-evidence';
+import type { TraceEvidenceResult } from './execution-timeline';
+import { ExecutionTraceRecipeSection } from './execution-trace-recipe-section';
+import { DurationValue, STAT_GRID_CLASS, Stat } from './execution-trace-stat';
 
 export const BACK_TO_LIST_TEXT = 'Volver a la lista';
 export { EMPTY_MARK as MISSING_PERSON_MARK } from '@/lib/shared/ui/empty-mark';
@@ -31,11 +23,13 @@ export { EMPTY_MARK as MISSING_PERSON_MARK } from '@/lib/shared/ui/empty-mark';
 const TITLE_PREFIX = 'Recorrido del pedido';
 const ERROR_TITLE = 'Recorrido';
 const ERROR_MESSAGE = 'No se pudo cargar el recorrido.';
-const STAT_LABELS = {
+export const TRACE_SUMMARY_LABELS = {
   status: 'Estado',
-  goBacks: 'Vueltas atrás',
+  progress: 'Avance',
+  duration: 'Duración',
 } as const;
-const PHASE_ORDER: readonly ExecutionPhase[] = ['production', 'packing', 'conditioning'];
+
+const NO_EVIDENCE: OrderEvidence = { manufacturing: [], packing: [], conditioning: [] };
 
 function BackToList({ href }: { readonly href: string }) {
   return (
@@ -45,51 +39,14 @@ function BackToList({ href }: { readonly href: string }) {
   );
 }
 
-type StatProps = {
-  readonly label: string;
-  readonly children: ReactNode;
-  readonly testId?: string;
-  readonly phase?: ExecutionPhase;
-  readonly kind?: TraceDuration['kind'];
-};
-
-function Stat({ label, children, testId = 'execution-trace-stat', phase, kind }: StatProps) {
-  return (
-    <div
-      data-testid={testId}
-      data-phase={phase}
-      data-kind={kind}
-      className="flex min-w-0 flex-col gap-1.5 rounded-xl border bg-card px-[18px] py-4"
-    >
-      <dt className="text-xs font-semibold text-muted-foreground">{label}</dt>
-      <dd className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-[22px] font-semibold">{children}</dd>
-    </div>
-  );
-}
-
-function PhaseDuration({ phase, duration }: { readonly phase: ExecutionPhase; readonly duration: TraceDuration }) {
-  return (
-    <Stat label={PHASE_DURATION_LABELS[phase]} testId="execution-trace-duration" phase={phase} kind={duration.kind}>
-      <span className="font-mono">{formatElapsed(duration.ms)}</span>
-      {duration.kind === 'open' ? (
-        <StatusBadge tone="progress" label={PHASE_OPEN_MARK} data-testid="execution-trace-phase-open" />
-      ) : null}
-      {duration.kind === 'unclosed' ? (
-        <StatusBadge tone="muted" label={PHASE_UNCLOSED_MARK} data-testid="execution-trace-phase-unclosed" />
-      ) : null}
-    </Stat>
-  );
-}
-
-function GoBackCount({ count }: { readonly count: number }) {
-  if (count === 0) {
-    return (
-      <span data-testid="execution-trace-go-backs" className="font-mono text-muted-foreground tabular-nums">
-        {count}
-      </span>
-    );
-  }
-  return <StatusBadge tone="waiting" label={String(count)} data-testid="execution-trace-go-backs" />;
+/** Las fotos llegan agrupadas por línea: cada sección se queda solo con las suyas. */
+export function evidenceOfLine(
+  evidence: ExecutionEvidenceResult | undefined,
+  lineId: string,
+): TraceEvidenceResult | undefined {
+  if (evidence === undefined || evidence.status !== 'success') return evidence;
+  const recipe = evidence.data.recipes.find((entry) => entry.lineId === lineId);
+  return { status: 'success', data: recipe?.evidence ?? NO_EVIDENCE };
 }
 
 export type ExecutionTraceDetailProps = {
@@ -111,8 +68,8 @@ export function ExecutionTraceDetail({ trace, evidence, backHref }: ExecutionTra
           }
           titleTestId="execution-trace-title"
         />
-        <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))] gap-3">
-          <Stat label={STAT_LABELS.status}>
+        <dl className={STAT_GRID_CLASS} data-testid="execution-trace-summary">
+          <Stat label={TRACE_SUMMARY_LABELS.status}>
             <StatusBadge
               tone={ORDER_STATUS_TONES[trace.status]}
               label={TRACE_ORDER_STATUS_LABELS[trace.status]}
@@ -121,18 +78,20 @@ export function ExecutionTraceDetail({ trace, evidence, backHref }: ExecutionTra
             />
             {trace.deleted ? <DeletedOrderMark /> : null}
           </Stat>
-          {PHASE_ORDER.map((phase) => {
-            const duration = trace.durations[phase];
-            return duration === null ? null : <PhaseDuration key={phase} phase={phase} duration={duration} />;
-          })}
-          <Stat label={STAT_LABELS.goBacks}>
-            <GoBackCount count={trace.goBackCount} />
+          <Stat label={TRACE_SUMMARY_LABELS.progress} testId="execution-trace-progress">
+            <OrderProgress progress={trace.progress} variant="long" className="text-base font-normal" />
+          </Stat>
+          <Stat label={TRACE_SUMMARY_LABELS.duration} testId="execution-trace-total-duration" kind={trace.totalDuration.kind}>
+            <DurationValue duration={trace.totalDuration} markTestIdPrefix="execution-trace-total" />
           </Stat>
         </dl>
-        <ExecutionTimeline steps={trace.steps} evidence={evidence} />
-        {evidence?.status === 'success' && evidence.data.packing.length > 0 ? (
-          <TracePackingEvidence groups={evidence.data.packing} />
-        ) : null}
+        {trace.recipes.map((recipe) => (
+          <ExecutionTraceRecipeSection
+            key={recipe.lineId}
+            recipe={recipe}
+            evidence={evidenceOfLine(evidence, recipe.lineId)}
+          />
+        ))}
       </div>
     </PageShell>
   );

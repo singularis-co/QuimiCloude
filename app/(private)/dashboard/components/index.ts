@@ -21,7 +21,11 @@ export {
   TRACE_LINK_TEXT,
   TRACE_MENU_TITLE_PREFIX,
   TRACE_PRESENTATIONS_COLUMN_ID,
+  TRACE_PROGRESS_COLUMN_ID,
+  TRACE_PROGRESS_LABEL,
+  TRACE_RECIPE_GROUP_SEPARATOR,
   buildExecutionTraceColumns,
+  groupedPresentationsText,
   type ExecutionTraceColumnsDeps,
 } from './execution-trace-columns';
 export {

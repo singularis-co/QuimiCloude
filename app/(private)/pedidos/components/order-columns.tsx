@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 
 import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
+import { OrderProgress } from '@/components/shared/order-progress';
+import { RecipesFirstMore } from '@/components/shared/recipes-first-more';
 import { Button } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
@@ -25,7 +27,6 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
-import { OrderProgress } from './order-progress';
 import { orderRowActionsSpec, type OrderRowAction } from './order-row-actions';
 import { OrderRowResponsibles } from './order-sheet';
 import {
@@ -291,21 +292,14 @@ function OrderRecipesCell({
 }) {
   const [first] = order.lines;
   if (first === undefined) return <MissingValue field={RECIPE_NAME_COLUMN_ID} />;
-  const more = order.lines.length - 1;
   return (
-    <span>
-      <span data-testid={ORDER_RECIPES_FIRST_TESTID}>
-        {first.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />}
-      </span>
-      {more > 0 ? (
-        <>
-          {' '}
-          <span data-testid={ORDER_RECIPES_MORE_TESTID} className="text-muted-foreground">
-            {texts.moreRecipes(more)}
-          </span>
-        </>
-      ) : null}
-    </span>
+    <RecipesFirstMore
+      first={first.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />}
+      moreCount={order.lines.length - 1}
+      firstTestId={ORDER_RECIPES_FIRST_TESTID}
+      moreTestId={ORDER_RECIPES_MORE_TESTID}
+      texts={{ more: texts.moreRecipes }}
+    />
   );
 }
 

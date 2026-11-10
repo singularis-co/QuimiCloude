@@ -252,12 +252,14 @@ export {
   type ExecutionTracePerson,
   type ExecutionTracePresentation,
   type ExecutionTraceRow,
+  type ExecutionTraceRowRecipe,
   type ListExecutionTracesDeps,
 } from './domain/list-execution-traces';
 export {
   createGetExecutionTrace,
   type ExecutionTraceDetail,
   type ExecutionTraceDetailStep,
+  type ExecutionTraceRecipe,
   type GetExecutionTraceDeps,
   type TracePerson,
 } from './domain/get-execution-trace';
@@ -382,6 +384,9 @@ export {
 // ---------------------------------------------------------------------------------------
 export {
   groupEvidenceRows,
+  type ExecutionEvidence,
+  type ExecutionEvidenceRead,
+  type RecipeEvidence,
   type OrderEvidence,
   type OrderEvidenceCount,
   type OrderEvidenceGroup,

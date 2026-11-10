@@ -30,6 +30,7 @@ import {
 import { executionTraceRoute } from '@/lib/shared/routes';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
+import { oneRecipeRowFields } from '../../fixtures/execution-trace-recipes';
 
 const { routerMock, listExecutionTracesActionMock } = vi.hoisted(() => ({
   routerMock: {
@@ -69,10 +70,10 @@ const ACTIVO: ExecutionTraceRow = {
   goBackCount: 2,
   formulaName: 'Gel antibacterial',
   formulaImageUrl: 'https://cdn.example.test/gel.png',
-  presentations: [
+  ...oneRecipeRowFields([
     { label: 'galones', quantity: 10 },
     { label: 'vasos', quantity: 5 },
-  ],
+  ], 'EN_CURSO'),
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -88,7 +89,7 @@ const DE_BAJA: ExecutionTraceRow = {
   goBackCount: 0,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'EN_CURSO'),
 };
 
 const CERRADO: ExecutionTraceRow = {
@@ -104,7 +105,7 @@ const CERRADO: ExecutionTraceRow = {
   goBackCount: 1,
   formulaName: 'Jabón líquido',
   formulaImageUrl: null,
-  presentations: [{ label: 'galones', quantity: 3 }],
+  ...oneRecipeRowFields([{ label: 'galones', quantity: 3 }], 'ENTREGADO'),
 };
 
 const ROWS = [ACTIVO, DE_BAJA, CERRADO];
@@ -122,7 +123,7 @@ const ACTIVO_POR_EMPACAR: ExecutionTraceRow = {
   goBackCount: 0,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'POR_EMPACAR'),
 };
 
 function params(overrides: Partial<ExecutionTraceListParams> = {}): ExecutionTraceListParams {
@@ -181,11 +182,11 @@ describe('R2 - columnas de la fila', () => {
     expect(within(activa).getByRole('img', { name: ANA.displayName })).toBeInTheDocument();
   });
 
-  it('R2 - tras «Nº de pedido» van Foto, Fórmula, Presentaciones y Estado', () => {
+  it('R2 - tras «Nº de pedido» van Foto, Fórmula, Avance, Presentaciones y Estado', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     const desde = cabeceras.findIndex((texto) => texto.includes('Nº de pedido'));
-    ['Foto', 'Fórmula', 'Presentaciones', 'Estado'].forEach((etiqueta, i) =>
+    ['Foto', 'Fórmula', 'Avance', 'Presentaciones', 'Estado'].forEach((etiqueta, i) =>
       expect(cabeceras[desde + 1 + i]).toContain(etiqueta),
     );
   });

@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
 
-import type { OrderSummary } from '@/lib/modules/pedidos';
 import { cn } from '@/lib/utils';
 
 export const ORDER_PROGRESS_TESTID = 'order-progress';
 export const ORDER_PROGRESS_BAR_TESTID = 'order-progress-bar';
 
-type OrderProgressValue = OrderSummary['progress'];
+export type OrderProgressValue = { readonly finished: number; readonly total: number };
 
 export type OrderProgressTexts = {
   readonly short: (finished: number, total: number) => string;

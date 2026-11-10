@@ -2285,6 +2285,9 @@ export const asignaciones = {
     orders: orderCatalog,
     people: peopleDirectory,
     team: createConditioningTeamRepository(),
+    recipes: recipeCatalog,
+    presentations: presentationCatalog,
+    units: unitCatalog,
   }),
   startConditioning: createStartConditioningOrder({
     orders: orderCatalog,

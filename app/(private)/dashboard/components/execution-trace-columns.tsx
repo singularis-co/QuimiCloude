@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
 import { EntityImage } from '@/components/shared/entity-image';
+import { OrderProgress } from '@/components/shared/order-progress';
+import { RecipesFirstMore } from '@/components/shared/recipes-first-more';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { StatusBadge } from '@/components/shared/status-badge';
 import type {
@@ -14,10 +16,7 @@ import type {
 } from '@/lib/modules/asignaciones';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
-import {
-  formatPresentationQuantities,
-  type PresentationQuantity,
-} from '@/lib/shared/ui/presentation-quantities';
+import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quantities';
 
 import {
   DELETED_ORDER_MARK,
@@ -36,6 +35,7 @@ import {
 export const TRACE_NUMBER_COLUMN_ID = 'orderNumber';
 export const TRACE_IMAGE_COLUMN_ID = 'formulaImage';
 export const TRACE_FORMULA_COLUMN_ID = 'formulaName';
+export const TRACE_PROGRESS_COLUMN_ID = 'progress';
 export const TRACE_PRESENTATIONS_COLUMN_ID = 'presentations';
 export const TRACE_STATUS_COLUMN_ID = 'status';
 
@@ -43,6 +43,9 @@ export const TRACE_IMAGE_EMPTY_ALT = 'Pedido sin fórmula';
 export const TRACE_FIRST_AT_COLUMN_ID = 'firstAt';
 export const TRACE_DURATION_COLUMN_ID = 'duration';
 export const TRACE_GO_BACK_COLUMN_ID = 'goBackCount';
+
+export const TRACE_PROGRESS_LABEL = 'Avance';
+export const TRACE_RECIPE_GROUP_SEPARATOR = ' · ';
 
 export const TRACE_LINK_TEXT = 'Ver recorrido';
 export const TRACE_ACTIONS_LABEL_PREFIX = 'Acciones del pedido ';
@@ -70,15 +73,16 @@ function MutedText({ testId, children }: { readonly testId: string; readonly chi
   );
 }
 
+/** Las de cada receta juntas y en su orden, para no mezclar ni sumar presentaciones de recetas distintas. */
+export function groupedPresentationsText(recipes: ExecutionTraceRow['recipes']): string {
+  return recipes
+    .filter((recipe) => recipe.presentations.length > 0)
+    .map((recipe) => formatPresentationQuantities(recipe.presentations))
+    .join(TRACE_RECIPE_GROUP_SEPARATOR);
+}
+
 /** Como `OrderDistributionLabel`: con varias presentaciones salta de linea en vez de ensanchar la celda. */
-function PresentationsText({
-  testId,
-  items,
-}: {
-  readonly testId: string;
-  readonly items: readonly PresentationQuantity[];
-}) {
-  const text = formatPresentationQuantities(items);
+function PresentationsText({ testId, text }: { readonly testId: string; readonly text: string }) {
   return (
     <span
       data-testid={testId}
@@ -130,23 +134,38 @@ export function buildExecutionTraceColumns({
       id: TRACE_FORMULA_COLUMN_ID,
       label: 'Fórmula',
       align: 'start',
-      cell: (row) =>
-        row.formulaName === null ? (
-          <MutedText testId="execution-trace-formula">{EMPTY_MARK}</MutedText>
-        ) : (
-          <span data-testid="execution-trace-formula">{row.formulaName}</span>
-        ),
+      cell: (row) => (
+        <RecipesFirstMore
+          first={
+            row.formulaName === null ? (
+              <MutedText testId="execution-trace-formula">{EMPTY_MARK}</MutedText>
+            ) : (
+              <span data-testid="execution-trace-formula">{row.formulaName}</span>
+            )
+          }
+          moreCount={row.moreRecipes}
+          moreTestId="execution-trace-more-recipes"
+        />
+      ),
+    },
+    {
+      id: TRACE_PROGRESS_COLUMN_ID,
+      label: TRACE_PROGRESS_LABEL,
+      align: 'start',
+      cell: (row) => <OrderProgress progress={row.progress} />,
     },
     {
       id: TRACE_PRESENTATIONS_COLUMN_ID,
       label: 'Presentaciones',
       align: 'start',
-      cell: (row) =>
-        row.presentations.length === 0 ? (
+      cell: (row) => {
+        const text = groupedPresentationsText(row.recipes);
+        return text === '' ? (
           <MutedText testId="execution-trace-presentations">{EMPTY_MARK}</MutedText>
         ) : (
-          <PresentationsText testId="execution-trace-presentations" items={row.presentations} />
-        ),
+          <PresentationsText testId="execution-trace-presentations" text={text} />
+        );
+      },
     },
     {
       id: TRACE_STATUS_COLUMN_ID,

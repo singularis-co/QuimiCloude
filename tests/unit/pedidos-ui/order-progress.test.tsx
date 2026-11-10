@@ -1,30 +1,13 @@
 // La barra de avance de un pedido: forma corta para el listado y larga para el detalle.
-//
-// El barrel de la ruta arrastra la sección, que importa las actions de `pedidos`; se sustituyen
-// por dobles que fallan si se les llama: este componente solo pinta lo que recibe.
 
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   ORDER_PROGRESS_BAR_TESTID,
   ORDER_PROGRESS_TESTID,
   OrderProgress,
-} from '@/app/(private)/pedidos/components';
-
-vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
-  const noDebeInvocarse = (nombre: string) => () => {
-    throw new Error(`${nombre} no debe invocarse desde la barra de avance`);
-  };
-  return {
-    listOrdersAction: vi.fn(noDebeInvocarse('listOrdersAction')),
-    getOrderAction: vi.fn(noDebeInvocarse('getOrderAction')),
-    createOrderAction: vi.fn(noDebeInvocarse('createOrderAction')),
-    updateOrderAction: vi.fn(noDebeInvocarse('updateOrderAction')),
-    cancelOrderAction: vi.fn(noDebeInvocarse('cancelOrderAction')),
-    deleteOrderAction: vi.fn(noDebeInvocarse('deleteOrderAction')),
-  };
-});
+} from '@/components/shared/order-progress';
 
 afterEach(cleanup);
 

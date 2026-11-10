@@ -24,6 +24,7 @@ import {
   ORDER_EVIDENCE_UNSIGNED,
   orderEvidenceGroup,
 } from '@/tests/fixtures/order-evidence';
+import { onlyRecipe, oneRecipeTrace } from '@/tests/fixtures/execution-trace-recipes';
 
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
@@ -67,7 +68,7 @@ function step(
 }
 
 // Paso 1, 2, vuelta a 1, otra vez 2 y 3, termina y empaca. El paso 4 de la fixture no tiene anotacion.
-const TRACE: ExecutionTraceDetailData = {
+const TRACE: ExecutionTraceDetailData = oneRecipeTrace({
   orderId: ORDER_ID,
   numberText: '2026-0000042',
   status: 'TERMINADO',
@@ -91,9 +92,13 @@ const TRACE: ExecutionTraceDetailData = {
     step('e7', 'pack_start', null, 30),
     step('e8', 'pack_finish', null, 35),
   ],
-};
+});
+const LINE_ID = onlyRecipe(TRACE).lineId;
 
-const success = (data: typeof ORDER_EVIDENCE): ExecutionEvidenceResult => ({ status: 'success', data });
+const success = (evidence: typeof ORDER_EVIDENCE): ExecutionEvidenceResult => ({
+  status: 'success',
+  data: { recipes: [{ lineId: LINE_ID, evidence }] },
+});
 const READ_FAILED: ExecutionEvidenceResult = {
   status: 'error',
   code: 'unexpected',
@@ -186,7 +191,7 @@ describe('R12 - R13 - R14 - donde se pintan las fotos', () => {
     const packing = [orderEvidenceGroup('p', 1, 2), orderEvidenceGroup('p', 2, 1)];
     montar(success({ ...ORDER_EVIDENCE, packing }));
     const tarjeta = screen.getByRole('region', { name: PACKING_EVIDENCE_TEXTS.title });
-    expect(within(tarjeta).getByRole('heading', { level: 2, name: PACKING_EVIDENCE_TEXTS.title })).toBeVisible();
+    expect(within(tarjeta).getByRole('heading', { level: 3, name: PACKING_EVIDENCE_TEXTS.title })).toBeVisible();
     expect(within(tarjeta).getByTestId('trace-packing-evidence-count')).toHaveTextContent('3');
     expect(within(tarjeta).getByTestId('trace-packing-evidence-count')).toHaveAccessibleName('3 fotos de envasado');
     const filas = within(tarjeta).getAllByTestId('evidence-step-row');

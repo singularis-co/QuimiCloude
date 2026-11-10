@@ -10,6 +10,8 @@ import type {
   ExecutionTraceTeamMember,
 } from '@/lib/modules/asignaciones';
 
+import { oneRecipeRowFields, oneRecipeTrace } from './execution-trace-recipes';
+
 const S = 1000;
 const MIN = 60 * S;
 const H = 60 * MIN;
@@ -151,7 +153,7 @@ export const PREVIOUS_ORDER_ID = 'f4000000-0000-4000-8000-000000000002';
 export const UNCLOSED_ORDER_ID = 'f4000000-0000-4000-8000-000000000008';
 
 /** Variante `terminado`: producción, empaque y acondicionamiento cerrados; equipo mixto y dos guardados. */
-export const FINISHED_CONDITIONING_TRACE: ExecutionTraceDetail = {
+export const FINISHED_CONDITIONING_TRACE: ExecutionTraceDetail = oneRecipeTrace({
   orderId: FINISHED_ORDER_ID,
   numberText: '2026-0000006',
   status: 'TERMINADO',
@@ -172,10 +174,10 @@ export const FINISHED_CONDITIONING_TRACE: ExecutionTraceDetail = {
     conditioning: { kind: 'closed', ms: CONDITIONING_DURATION_MS.conditioningClosed },
   },
   goBackCount: 1,
-};
+});
 
 /** Variante `en_curso`: Comenzar sin equipo y la fase de acondicionamiento abierta. */
-export const IN_PROGRESS_CONDITIONING_TRACE: ExecutionTraceDetail = {
+export const IN_PROGRESS_CONDITIONING_TRACE: ExecutionTraceDetail = oneRecipeTrace({
   orderId: IN_PROGRESS_ORDER_ID,
   numberText: '2026-0000003',
   status: 'EN_ACONDICIONAMIENTO',
@@ -194,10 +196,10 @@ export const IN_PROGRESS_CONDITIONING_TRACE: ExecutionTraceDetail = {
     conditioning: { kind: 'open', ms: CONDITIONING_DURATION_MS.conditioningOpen },
   },
   goBackCount: 1,
-};
+});
 
 /** Variante `anterior`: sin Comenzar anotado, así que no hay duración de acondicionamiento. */
-export const PREVIOUS_CONDITIONING_TRACE: ExecutionTraceDetail = {
+export const PREVIOUS_CONDITIONING_TRACE: ExecutionTraceDetail = oneRecipeTrace({
   orderId: PREVIOUS_ORDER_ID,
   numberText: '2026-0000002',
   status: 'TERMINADO',
@@ -212,13 +214,16 @@ export const PREVIOUS_CONDITIONING_TRACE: ExecutionTraceDetail = {
     conditioning: null,
   },
   goBackCount: 1,
-};
+});
 
 /** Dado de baja a mitad del acondicionamiento: la fase queda sin cierre anotado. */
-export const UNCLOSED_CONDITIONING_TRACE: ExecutionTraceDetail = {
-  ...IN_PROGRESS_CONDITIONING_TRACE,
-  orderId: UNCLOSED_ORDER_ID,
+export const UNCLOSED_CONDITIONING_TRACE: ExecutionTraceDetail = oneRecipeTrace({
   numberText: '2026-0000008',
+  status: 'EN_ACONDICIONAMIENTO',
+  firstAt: at('08:12'),
+  lastAt: at('13:45'),
+  goBackCount: 1,
+  orderId: UNCLOSED_ORDER_ID,
   deleted: true,
   active: false,
   steps: withIds(UNCLOSED_ORDER_ID, [
@@ -231,7 +236,7 @@ export const UNCLOSED_CONDITIONING_TRACE: ExecutionTraceDetail = {
     packing: { kind: 'closed', ms: CONDITIONING_DURATION_MS.packing },
     conditioning: { kind: 'unclosed', ms: 25 * MIN },
   },
-};
+});
 
 function row(overrides: Partial<ExecutionTraceRow> & Pick<ExecutionTraceRow, 'orderId' | 'numberText'>): ExecutionTraceRow {
   return {
@@ -245,7 +250,7 @@ function row(overrides: Partial<ExecutionTraceRow> & Pick<ExecutionTraceRow, 'or
     goBackCount: 0,
     formulaName: null,
     formulaImageUrl: null,
-    presentations: [],
+    ...oneRecipeRowFields([], overrides.status ?? 'TERMINADO'),
     ...overrides,
   };
 }

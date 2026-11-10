@@ -15,7 +15,9 @@ import { PERMISSIONS, type PersonRef } from '@/lib/modules/identity';
 import {
   ORDER_STATUS_VALUES,
   type OrderCatalog,
-  type OrderDeliveryProgress,
+  type OrderLineStatus,
+  type OrderRecipeOutline,
+  type OrderRecipesOutline,
   type OrderHistorySummary,
   type Page,
 } from '@/lib/modules/pedidos';
@@ -76,22 +78,41 @@ const RECETA = uuid('d');
 const GALON = uuid('e');
 const VASO = uuid('f');
 
-function progreso(id: string, recipeId: string, lines: OrderDeliveryProgress['lines']): OrderDeliveryProgress {
-  return { id, recipeId, lines };
+type LineaDeReparto = OrderRecipeOutline['presentationLines'][number];
+
+/** Una receta del pedido; la linea es `linea-<pedido>` en la primera, como en `anotacion`. */
+function recetaDelPedido(
+  orderId: string,
+  position: number,
+  recipeId: string,
+  status: OrderLineStatus,
+  presentationLines: readonly LineaDeReparto[] = [],
+  lineId = position === 1 ? `linea-${orderId}` : `linea-${orderId}-${position}`,
+): OrderRecipeOutline {
+  return { lineId, position, recipeId, status, quantity: '10', unitId: null, presentationLines };
 }
 
-function linea(
-  presentationId: string,
-  packages: number,
-  overrides?: { readonly packedPackages?: number | null; readonly deliveredPackages?: number },
-): OrderDeliveryProgress['lines'][number] {
+function outline(
+  id: string,
+  recipes: readonly OrderRecipeOutline[],
+  options?: { readonly deleted?: boolean; readonly finished?: number; readonly total?: number },
+): OrderRecipesOutline {
+  const vivas = recipes.filter((recipe) => recipe.status !== 'CANCELADO').length;
   return {
-    presentationId,
-    packages,
-    packedPackages: overrides?.packedPackages ?? null,
-    packedSurplusPackages: 0,
-    deliveredPackages: overrides?.deliveredPackages ?? 0,
+    id,
+    deleted: options?.deleted ?? false,
+    recipes,
+    progress: { total: options?.total ?? vivas, finished: options?.finished ?? 0 },
   };
+}
+
+/** Pedido de una sola receta con su reparto. */
+function progreso(id: string, recipeId: string, lines: readonly LineaDeReparto[]): OrderRecipesOutline {
+  return outline(id, [recetaDelPedido(id, 1, recipeId, 'ENTREGADO', lines)]);
+}
+
+function linea(presentationId: string, packages: number): LineaDeReparto {
+  return { presentationId, packages };
 }
 
 function receta(id: string, name: string, imageUrl: string | null, isDeleted = false): RecipeRef {
@@ -123,7 +144,7 @@ function montar(options?: {
   readonly usersWithEntries?: readonly string[];
   readonly people?: readonly PersonRef[];
   readonly team?: readonly TeamRow[];
-  readonly progress?: readonly OrderDeliveryProgress[];
+  readonly progress?: readonly OrderRecipesOutline[];
   readonly recipes?: readonly RecipeRef[];
   readonly presentations?: readonly PresentationRef[];
 }) {
@@ -145,12 +166,12 @@ function montar(options?: {
   const listSummariesByIdsIncludingDeleted = vi.fn<OrderCatalog['listSummariesByIdsIncludingDeleted']>(
     async (_companyId, _ids, _statuses, page, pageSize) => pagina(options?.orders ?? [], page, pageSize ?? 10),
   );
-  const listDeliveryProgressByIdsIncludingDeleted = vi.fn<OrderCatalog['listDeliveryProgressByIdsIncludingDeleted']>(
+  const listRecipeOutlinesByIdsIncludingDeleted = vi.fn<OrderCatalog['listRecipeOutlinesByIdsIncludingDeleted']>(
     async (_companyId, ids) => (options?.progress ?? []).filter((order) => ids.includes(order.id)),
   );
   const orders = {
     listSummariesByIdsIncludingDeleted,
-    listDeliveryProgressByIdsIncludingDeleted,
+    listRecipeOutlinesByIdsIncludingDeleted,
   } as unknown as OrderCatalog;
 
   const findRecipeRefs = vi.fn(async (ids: readonly string[], _companyId: string) =>
@@ -183,7 +204,7 @@ function montar(options?: {
     findLastStepPosition,
     listSummariesByIdsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
-    listDeliveryProgressByIdsIncludingDeleted,
+    listRecipeOutlinesByIdsIncludingDeleted,
     findRecipeRefs,
     findPresentationRefs,
   ];
@@ -195,7 +216,7 @@ function montar(options?: {
     listSummariesByIdsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
     listByOrdersInCompany,
-    listDeliveryProgressByIdsIncludingDeleted,
+    listRecipeOutlinesByIdsIncludingDeleted,
     findRecipeRefs,
     findPresentationRefs,
     ningunPuertoLlamado: () => todos.every((fn) => fn.mock.calls.length === 0),
@@ -425,7 +446,9 @@ describe('listExecutionTraces — la fila', () => {
       goBackCount: 1,
       formulaName: null,
       formulaImageUrl: null,
-      presentations: [],
+      moreRecipes: 0,
+      progress: { total: 0, finished: 0 },
+      recipes: [],
     });
     // Produccion 60 + empaque 30: la espera entre finish y pack_start no cuenta.
     expect(fila!.totalDuration).toEqual({ kind: 'closed', ms: 90 * MIN });
@@ -481,7 +504,7 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
       ...m.listEntriesForOrders.mock.calls,
       ...m.findRefsIncludingDeletedInCompany.mock.calls,
       ...m.listByOrdersInCompany.mock.calls,
-      ...m.listDeliveryProgressByIdsIncludingDeleted.mock.calls,
+      ...m.listRecipeOutlinesByIdsIncludingDeleted.mock.calls,
     ] as unknown as readonly (readonly unknown[])[];
     expect(llamadas.length).toBeGreaterThan(0);
     for (const llamada of llamadas) expect(llamada[0]).toBe(EMPRESA);
@@ -494,7 +517,7 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
       progress: [progreso(PEDIDO_A, RECETA, [linea(GALON, 10)])],
     });
     await m.listar(ACTOR, {}, NOW);
-    expect(m.listDeliveryProgressByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, [PEDIDO_A]);
+    expect(m.listRecipeOutlinesByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, [PEDIDO_A]);
     expect(m.findRecipeRefs).toHaveBeenCalledWith([RECETA], EMPRESA);
     expect(m.findPresentationRefs).toHaveBeenCalledWith([GALON], EMPRESA);
   });
@@ -524,7 +547,7 @@ describe('listExecutionTraces — empresa y numero de consultas', () => {
     expect(m.listSummariesByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
     expect(m.listEntriesForOrders).toHaveBeenCalledTimes(1);
     expect(m.listByOrdersInCompany).toHaveBeenCalledTimes(1);
-    expect(m.listDeliveryProgressByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
+    expect(m.listRecipeOutlinesByIdsIncludingDeleted).toHaveBeenCalledTimes(1);
     expect(m.findRecipeRefs).toHaveBeenCalledTimes(1);
     expect(m.findPresentationRefs).toHaveBeenCalledTimes(1);
     expect(m.findPresentationRefs).toHaveBeenCalledWith([GALON, VASO], EMPRESA);
@@ -703,7 +726,8 @@ describe('listExecutionTraces — formula y presentaciones', () => {
       ...catalogos,
     });
     const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
-    expect(fila.presentations).toEqual([
+    expect(fila.recipes).toHaveLength(1);
+    expect(fila.recipes[0]!.presentations).toEqual([
       { label: 'Galón', quantity: 10 },
       { label: 'Vaso', quantity: 5 },
     ]);
@@ -721,14 +745,14 @@ describe('listExecutionTraces — formula y presentaciones', () => {
     expect(fila.deleted).toBe(true);
     expect(fila.formulaName).toBe('Shampoo');
     expect(fila.formulaImageUrl).toBe(IMAGEN);
-    expect(fila.presentations).toEqual([{ label: 'Vaso', quantity: 2 }]);
+    expect(fila.recipes[0]!.presentations).toEqual([{ label: 'Vaso', quantity: 2 }]);
   });
 
   it('un pedido sin progreso sale con listas vacias y sin consultar los catalogos', async () => {
     const m = montar({ orders: [resumen(PEDIDO_A)], entries: [anotacion(PEDIDO_A, 'start', 0)] });
     const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
     expect([fila.formulaName, fila.formulaImageUrl]).toEqual([null, null]);
-    expect(fila.presentations).toEqual([]);
+    expect(fila.recipes).toEqual([]);
     expect(m.findPresentationRefs).not.toHaveBeenCalled();
     expect(m.findRecipeRefs).not.toHaveBeenCalled();
   });
@@ -775,14 +799,185 @@ describe('listExecutionTraces — pasos de acondicionamiento', () => {
       'formulaName',
       'goBackCount',
       'lastAt',
+      'moreRecipes',
       'numberText',
       'orderId',
       'people',
-      'presentations',
+      'progress',
+      'recipes',
       'status',
       'totalDuration',
     ]);
     expect(fila.totalDuration).toEqual({ kind: 'closed', ms: 30 * MIN });
     expect(fila.goBackCount).toBe(0);
+  });
+});
+
+describe('listExecutionTraces — un pedido de varias recetas', () => {
+  const CREMA = uuid('7');
+  const LINEA_2 = `linea-${PEDIDO_A}-2`;
+  const catalogos = {
+    recipes: [receta(RECETA, 'Shampoo', 'https://cdn.example/shampoo.png'), receta(CREMA, 'Crema', null)],
+    presentations: [presentacion(GALON, 'Galón'), presentacion(VASO, 'Vaso')],
+  };
+
+  function deLaLinea2(action: ExecutionAction, offsetMin: number, userId = ANA): ExecutionEntryRecord {
+    return { ...anotacion(PEDIDO_A, action, offsetMin, userId), orderLineId: LINEA_2 };
+  }
+
+  it('R21, R22, R23, R27: un PARCIAL con una fase abierta en una receta y cerrada en la otra suma y queda abierto', async () => {
+    const entries = [
+      anotacion(PEDIDO_A, 'start', 0),
+      anotacion(PEDIDO_A, 'go_back', 10),
+      anotacion(PEDIDO_A, 'finish', 30),
+      deLaLinea2('start', 60, BEA),
+      deLaLinea2('go_back', 70, BEA),
+    ];
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'PARCIAL' })],
+      entries,
+      progress: [
+        outline(
+          PEDIDO_A,
+          [
+            recetaDelPedido(PEDIDO_A, 1, RECETA, 'TERMINADO', [linea(GALON, 10)]),
+            recetaDelPedido(PEDIDO_A, 2, CREMA, 'EN_CURSO', [linea(VASO, 5), linea(GALON, 2)]),
+          ],
+          { finished: 1 },
+        ),
+      ],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+
+    // La primera receta cerro su produccion en 30; la segunda sigue en curso aunque el pedido este en PARCIAL.
+    const abierta = NOW.getTime() - (T0 + 60 * MIN);
+    expect(fila.totalDuration).toEqual({ kind: 'open', ms: 30 * MIN + abierta });
+    expect(fila.goBackCount).toBe(2);
+    expect(fila.active).toBe(true);
+    expect([fila.firstAt, fila.lastAt]).toEqual([new Date(T0), new Date(T0 + 70 * MIN)]);
+    expect([fila.formulaName, fila.formulaImageUrl, fila.moreRecipes]).toEqual([
+      'Shampoo',
+      'https://cdn.example/shampoo.png',
+      1,
+    ]);
+    expect(fila.progress).toEqual({ total: 2, finished: 1 });
+    expect(fila.recipes).toEqual([
+      { recipeName: 'Shampoo', presentations: [{ label: 'Galón', quantity: 10 }] },
+      {
+        recipeName: 'Crema',
+        presentations: [
+          { label: 'Vaso', quantity: 5 },
+          { label: 'Galón', quantity: 2 },
+        ],
+      },
+    ]);
+    expect(fila.people.map((person) => person.userId)).toEqual([ANA, BEA]);
+  });
+
+  it('R23: con las dos recetas cerradas la suma es cerrada', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'TERMINADO' })],
+      entries: [
+        anotacion(PEDIDO_A, 'start', 0),
+        anotacion(PEDIDO_A, 'finish', 30),
+        deLaLinea2('start', 40),
+        deLaLinea2('finish', 55),
+      ],
+      progress: [
+        outline(PEDIDO_A, [
+          recetaDelPedido(PEDIDO_A, 1, RECETA, 'TERMINADO'),
+          recetaDelPedido(PEDIDO_A, 2, CREMA, 'TERMINADO'),
+        ]),
+      ],
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    // La espera entre recetas (30 a 40) no cuenta: cada receta mide sus fases.
+    expect(fila.totalDuration).toEqual({ kind: 'closed', ms: 45 * MIN });
+  });
+
+  it('R21, R22: la primera receta y el orden de las presentaciones salen por orden de alta, no por el del outline', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'PARCIAL' })],
+      entries: [anotacion(PEDIDO_A, 'start', 0)],
+      progress: [
+        outline(PEDIDO_A, [
+          recetaDelPedido(PEDIDO_A, 2, CREMA, 'CANCELADO', [linea(VASO, 5)]),
+          recetaDelPedido(PEDIDO_A, 1, RECETA, 'EN_CURSO', [linea(GALON, 10)]),
+        ]),
+      ],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.formulaName).toBe('Shampoo');
+    // La cancelada cuenta en «+N más» pero no en el avance.
+    expect(fila.moreRecipes).toBe(1);
+    expect(fila.progress).toEqual({ total: 1, finished: 0 });
+    expect(fila.recipes.map((recipe) => recipe.recipeName)).toEqual(['Shampoo', 'Crema']);
+  });
+
+  it('R24: un pedido dado de baja toma las recetas del outline de la baja y ninguna fase queda abierta', async () => {
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'EN_CURSO', deleted: true })],
+      entries: [anotacion(PEDIDO_A, 'start', 0), anotacion(PEDIDO_A, 'advance', 5)],
+      progress: [
+        outline(
+          PEDIDO_A,
+          [recetaDelPedido(PEDIDO_A, 1, RECETA, 'EN_CURSO'), recetaDelPedido(PEDIDO_A, 2, CREMA, 'PENDIENTE')],
+          { deleted: true },
+        ),
+      ],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(m.listRecipeOutlinesByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, [PEDIDO_A]);
+    expect(fila.deleted).toBe(true);
+    expect(fila.active).toBe(false);
+    expect(fila.totalDuration).toEqual({ kind: 'unclosed', ms: 5 * MIN });
+    expect(fila.moreRecipes).toBe(1);
+    expect(fila.recipes.map((recipe) => recipe.recipeName)).toEqual(['Shampoo', 'Crema']);
+  });
+
+  it('R26: el equipo de una receta sin Comenzar no entra en la fila', async () => {
+    const CARLA = uuid('5');
+    const DIEGO = uuid('6');
+    const m = montar({
+      orders: [resumen(PEDIDO_A, { status: 'PARCIAL' })],
+      entries: [anotacion(PEDIDO_A, 'conditioning_start', 0, ANA), deLaLinea2('start', 5, ANA)],
+      people: [persona(ANA, 'Ana Perez'), persona(CARLA, 'Carla Diaz'), persona(DIEGO, 'Diego Sanz')],
+      team: [miembro(PEDIDO_A, CARLA), { ...miembro(PEDIDO_A, DIEGO), orderLineId: LINEA_2 }],
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    expect(fila.people.map((person) => person.userId)).toEqual([ANA, CARLA]);
+  });
+
+  it('R29: un pedido de una sola receta da la misma fila que su unico recorrido, sin «+N más»', async () => {
+    const entries = [
+      anotacion(PEDIDO_A, 'start', 0),
+      anotacion(PEDIDO_A, 'go_back', 10),
+      anotacion(PEDIDO_A, 'finish', 60),
+      anotacion(PEDIDO_A, 'pack_start', 90),
+    ];
+    const orden = resumen(PEDIDO_A, { status: 'EN_EMPAQUE' });
+    const m = montar({
+      orders: [orden],
+      entries,
+      progress: [outline(PEDIDO_A, [recetaDelPedido(PEDIDO_A, 1, RECETA, 'EN_EMPAQUE', [linea(GALON, 10)])])],
+      ...catalogos,
+    });
+    const fila = (await m.listar(ACTOR, {}, NOW)).page.items[0]!;
+    const esperado = buildExecutionTrace(entries, orden, NOW);
+    expect(fila).toMatchObject({
+      active: esperado.active,
+      firstAt: esperado.firstAt,
+      lastAt: esperado.lastAt,
+      totalDuration: esperado.totalDuration,
+      goBackCount: esperado.goBackCount,
+      formulaName: 'Shampoo',
+      moreRecipes: 0,
+      progress: { total: 1, finished: 0 },
+      recipes: [{ recipeName: 'Shampoo', presentations: [{ label: 'Galón', quantity: 10 }] }],
+    });
+    expect(fila.totalDuration.kind).toBe('open');
   });
 });

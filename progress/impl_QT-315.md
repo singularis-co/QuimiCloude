@@ -747,3 +747,197 @@ Typecheck en 0. Queda en rojo la guardia de `recetas` (bloqueo 1).
 - `pnpm run typecheck`: 0 errores.
 - El resto del cierre de la Tanda 4 está en «verificación de cierre, en serie», todo en verde.
 - T8 y T9 quedan `[x]`. Los bloqueos de la Tanda 4 quedan resueltos.
+
+## Tanda 5 — T10 (backend_dev, 2026-11-10)
+
+### Archivos
+
+**Producción (`lib/`)**
+- `lib/modules/asignaciones/domain/execution-trace.ts`: `combineDurations(durations[])` exportada (la regla «abierta gana a sin cerrar, sin cerrar gana a cerrada»); `sumDurations` la usa. `buildExecutionTrace` no cambia de firma.
+- `lib/modules/asignaciones/domain/list-execution-traces.ts`:
+  - `ExecutionTraceRow` pierde `presentations` y gana `moreRecipes`, `progress: OrderProgress` y `recipes: ExecutionTraceRowRecipe[]` (`{ recipeName, presentations }`);
+  - el catálogo pasa de `listDeliveryProgressByIdsIncludingDeleted` a `listRecipeOutlinesByIdsIncludingDeleted` (vía `readRecipeOutlines`, una llamada por página);
+  - helpers nuevos exportados: `NO_PROGRESS`, `OrderContents`/`listOrderContents`, `recipesInOrder`, `groupEntriesByLine`, `traceRecipes`, `isOrderActive`, `entriesSpan`, `signerIds`;
+  - `listConditioningTeams` recibe las anotaciones y devuelve el equipo **por `lineId`**, solo de las líneas con `conditioning_start`;
+  - `toTracePresentations` recibe las `presentationLines` de una receta.
+- `lib/modules/asignaciones/domain/get-execution-trace.ts`: `ExecutionTraceRecipe` nuevo; `ExecutionTraceDetail` según design § 3.6; `GetExecutionTraceDeps = ListExecutionTracesDeps & { units }`.
+- `lib/modules/asignaciones/domain/order-evidence.ts`: tipos `RecipeEvidence`, `ExecutionEvidence`, `ExecutionEvidenceRead`.
+- `lib/modules/asignaciones/domain/read-order-evidence.ts`: `readOrderEvidenceByLine` (nueva); `readOrderEvidence` se reparte en helpers privados sin cambiar su resultado ni el orden de las firmas.
+- `lib/modules/asignaciones/domain/get-execution-evidence.ts`: usa `readOrderEvidenceByLine` y devuelve `ExecutionEvidenceRead`.
+- `lib/modules/asignaciones/adapters/driving/execution-trace-actions.ts`: `ExecutionEvidenceResult.data` pasa a `ExecutionEvidence`.
+- `lib/modules/asignaciones/index.ts`: exporta `ExecutionTraceRowRecipe`, `ExecutionTraceRecipe`, `ExecutionEvidence`, `ExecutionEvidenceRead`, `RecipeEvidence`.
+- `lib/composition/index.ts`: `getExecutionTrace` recibe `recipes`, `presentations` y `units`.
+
+**Tests**
+- `tests/unit/asignaciones/list-execution-traces.test.ts`: dobles de outline en vez de reparto; claves de la fila; describe nuevo «un pedido de varias recetas».
+- `tests/unit/asignaciones/get-execution-trace.test.ts`: `montar` con outline de una receta por defecto (estado de la línea = estado del pedido), catálogos y unidades; helper `unica()` para la sección única; describe nuevo «una seccion por receta».
+- `tests/unit/asignaciones/get-execution-evidence.test.ts`: una aserción adaptada a `recipes[0]`; describe nuevo «las fotos por receta».
+- **No se tocan:** los tests de `getOrderEvidence`, `readOrderEvidence` y `countOrderEvidence` (R34), ni `app/`, `components/`, `tests/ui`, `tests/fixtures`, `tests/unit/paridad`, `e2e/`, guardias ni snapshots.
+
+### Mapa R → test
+
+| R | Archivo | Caso |
+|---|---|---|
+| R21 | `list-execution-traces.test.ts` | `R21, R22, R23, R27: un PARCIAL con una fase abierta en una receta y cerrada en la otra suma y queda abierto`; `R21, R22: la primera receta y el orden de las presentaciones salen por orden de alta, no por el del outline` |
+| R22 | `list-execution-traces.test.ts` | los dos de R21 (presentaciones agrupadas por receta, en orden de alta) |
+| R23 | `list-execution-traces.test.ts` | `R21, R22, R23, R27: …` (abierta + cerrada = abierta, suma); `R23: con las dos recetas cerradas la suma es cerrada` |
+| R24 | `list-execution-traces.test.ts` | `R24: un pedido dado de baja toma las recetas del outline de la baja y ninguna fase queda abierta` |
+| R24 | `get-execution-trace.test.ts` | `R24: un pedido dado de baja muestra las recetas que tenia al darse de baja, sin ninguna fase abierta` |
+| R25 | `get-execution-trace.test.ts` | `R25, R27: un PARCIAL de dos recetas mide cada fase con el estado de su linea y suma la duracion`; `R25: una receta sin anotaciones no tiene seccion pero cuenta en el avance`; `R25: las secciones van en orden de alta aunque las anotaciones lleguen en otro orden` |
+| R25 | `get-execution-evidence.test.ts` | `R25: un pedido sin fotos da la lista de recetas vacia y no firma` |
+| R26 | `get-execution-trace.test.ts` | `R26: equipo y responsables por receta: nada de una seccion pasa a la otra` |
+| R26 | `get-execution-evidence.test.ts` | `R26: cada receta trae solo sus fotos, y una sola firma para todas`; `R26: con la firma caida cada receta conserva sus grupos y su cifra, sin fotos` |
+| R26 | `list-execution-traces.test.ts` | `R26: el equipo de una receta sin Comenzar no entra en la fila` |
+| R27 | `get-execution-trace.test.ts` | `R25, R27: un PARCIAL de dos recetas …` (fase abierta en una, cerrada en otra) |
+| R27 | `list-execution-traces.test.ts` | `R21, R22, R23, R27: un PARCIAL …` |
+| R28 | `get-execution-trace.test.ts` | `R28: una receta cancelada con anotaciones tiene su seccion, Cancelado y su linea de tiempo hasta la cancelacion` |
+| R29 | `list-execution-traces.test.ts` | `R29: un pedido de una sola receta da la misma fila que su unico recorrido, sin «+N más»` |
+| R29 | `get-execution-trace.test.ts` | `R29: un pedido de una receta da una sola seccion con el mismo recorrido de siempre`; además, todos los casos previos del archivo pasan por la sección única |
+| R29 | `get-execution-evidence.test.ts` | `R29: un pedido de una receta da una sola entrada con las mismas fotos de siempre` |
+| R34 | `get-order-evidence.test.ts`, `read-order-evidence.test.ts`, `count-order-evidence.test.ts` | sin tocar, en verde |
+
+### Salida
+
+- `pnpm exec vitest run tests/unit/asignaciones/list-execution-traces.test.ts tests/unit/asignaciones/get-execution-evidence.test.ts`: 2 archivos, **77/77**.
+- `pnpm exec vitest run tests/unit/asignaciones/get-execution-trace.test.ts`: **37/37**.
+- `pnpm exec vitest run tests/unit/asignaciones/get-order-evidence.test.ts tests/unit/asignaciones/read-order-evidence.test.ts tests/unit/asignaciones/count-order-evidence.test.ts tests/unit/asignaciones/execution-trace.test.ts tests/unit/asignaciones/execution-trace-actions.test.ts tests/unit/composition/asignaciones-facade.test.ts tests/unit/dashboard-route-contract.test.ts`: 7 archivos, **157/157**.
+- `pnpm exec vitest run tests/guards/guard-arquitectura-modulos.test.ts tests/guards/guard-qc261-limites-de-la-ficha.test.ts`: 72 en verde, 1 omitido.
+- `pnpm run lint`: 0 errores, 14 avisos, ninguno en archivos de esta tanda.
+- `pnpm run typecheck`: **`lib/` y los tests de `lib/` limpios**. Quedan 44 errores, todos de T11 (`app/`, `tests/ui`, `tests/fixtures`, `tests/unit/paridad`); lista abajo.
+
+### Errores de typecheck para T11
+
+- `app/(private)/dashboard/components/execution-trace-columns.tsx:145, 148`: `ExecutionTraceRow.presentations` ya no existe → `recipes[].presentations`.
+- `app/(private)/dashboard/recorrido/[id]/components/execution-timeline.tsx:253, 254`: `ExecutionEvidence.manufacturing` y `.conditioning` → `recipes[].evidence.*`.
+- `app/(private)/dashboard/recorrido/[id]/components/execution-trace-detail.tsx:125` (`durations`), `:129` (`goBackCount`), `:132` (`steps`) → por sección en `recipes[]`; `:133, 134` (`ExecutionEvidence.packing`).
+- `tests/fixtures/execution-trace-conditioning.ts:160, 184, 206, 224` (`steps` en `ExecutionTraceDetail`) y `:248` (`presentations` en `ExecutionTraceRow`).
+- `tests/unit/paridad/recorridos-paridad.test.tsx:72, 87`: `presentations`.
+- `tests/ui/dashboard/dashboard-rediseno.test.tsx:76, 92, 108`: `presentations`.
+- `tests/ui/dashboard/execution-trace-detail.test.tsx`: `:79` `durations`; `:216, 505, 508, 667, 670` `steps` (y `:505` `step` implícito `any`); `:311` `goBackCount`; `:701, 720, 729, 748, 777, 810`: el `data` del resultado de evidencia tiene forma `OrderEvidence`, no `ExecutionEvidence`.
+- `tests/ui/dashboard/execution-trace-evidence.test.tsx:78` `durations`; `:96` falta `recipes` en `ExecutionEvidence`.
+- `tests/ui/dashboard/execution-trace-table.test.tsx:72, 91, 107, 125`: `presentations`.
+- `tests/ui/dashboard/recorrido-rediseno.test.tsx:255` `durations`; `:357` `goBackCount`.
+- `tests/ui/dashboard/textos-dashboard.test.tsx:164, 180` `presentations`; `:266` `durations`.
+
+### Decisiones no cubiertas por el spec
+
+1. **Sin outline, `progress` es `{ total: 0, finished: 0 }`** (`NO_PROGRESS`). Solo pasa si el catálogo no devuelve el outline de un pedido que sí devolvió el resumen.
+2. **Una línea con anotaciones que el outline no trae** (quitada antes de la baja, por ejemplo):
+   - en el Dashboard cuenta en la fila: se mide con el estado del pedido y va al final;
+   - en el Recorrido no tiene sección, porque las recetas del pedido son las del outline (R24).
+   - Con un outline completo no hay diferencia. Si conviene igualarlo, es una línea en `traceRecipes`.
+3. **`recipes[]` de la fila incluye las canceladas**, como `moreRecipes`, porque el outline las trae y R22 habla de «sus recetas». `progress` no las cuenta.
+4. **`active`, `firstAt` y `lastAt` son de nivel pedido.** `active` sale del estado del pedido (un `PARCIAL` está activo). `firstAt` y `lastAt` son el mínimo y el máximo de todas sus anotaciones, en la fila y en el detalle.
+5. **`people` de la fila**: quien firma, en el orden del registro, y después el equipo de cada receta con Comenzar anotado, en orden de alta. El equipo de una línea sin `conditioning_start` ya no entra aunque otra receta del pedido sí tenga Comenzar.
+6. **Fotos por línea sin leer el outline**:
+   - `readOrderEvidenceByLine` usa los tres `listByOrder` de siempre y agrupa por `orderLineId`, con una sola firma para todas;
+   - salen solo las líneas con fotos, en el orden de su primera foto, y la UI las cruza con las secciones por `lineId`;
+   - no se usa `listByLine`, que haría 3 × N consultas.
+7. **`getExecutionEvidence` devuelve `{ evidence: { recipes }, signingFailure }`**. Se mantiene el envoltorio para que la acción siga mandando la firma caída al log. La acción devuelve `data: ExecutionEvidence` (`{ recipes }`), la forma del design.
+8. **`unitLabel` del detalle**: `symbol ?? name` de la unidad (`unitLabelOf`), igual que las listas.
+
+### Bloqueos
+
+- Ninguno en `lib/`. El typecheck global queda rojo hasta T11 (lista de arriba).
+- No se tocó ninguna guardia ni ningún snapshot. `tests/unit/paridad/__snapshots__/recorridos-paridad.test.tsx.snap` puede cambiar cuando T11 adapte la vista.
+
+Veredicto: T10 hecha en `lib/` con sus tests en verde. El typecheck global espera a T11.
+
+## Tanda 5 — T11 (frontend_dev, 2026-11-10)
+
+### Archivos
+
+**Suben a `components/shared`** (fila en `CATALOGO.md` en el mismo cambio)
+- `components/shared/order-progress.tsx`: movido desde `app/(private)/pedidos/components/order-progress.tsx` (borrado). Misma API; la entrada pasa a `OrderProgressValue = { finished; total }` estructural, sin importar `pedidos`.
+- `components/shared/recipes-first-more.tsx` (nuevo): «primera receta +N más», sacado de `OrderRecipesCell`. Props `first`, `moreCount`, `firstTestId`, `moreTestId`, `texts.more`.
+- `components/shared/CATALOGO.md`: filas de `OrderProgress` y `RecipesFirstMore` (Diseño: `PedidosVariasRecetas.dc.html`, `PlantaVariasRecetas.dc.html`).
+
+**Pedidos (sin cambio visible)**
+- `app/(private)/pedidos/components/order-columns.tsx`: `OrderRecipesCell` usa `RecipesFirstMore` con los testids de siempre (`order-recipes-first`, `order-recipes-more`); `OrderProgress` desde shared.
+- `app/(private)/pedidos/components/order-detail-sheet.tsx`: `OrderProgress` desde shared.
+- `app/(private)/pedidos/components/index.ts`: deja de exportar `OrderProgress` y sus constantes.
+
+**Dashboard**
+- `app/(private)/dashboard/components/execution-trace-columns.tsx`: «Fórmula» con `RecipesFirstMore` («+N más», testid `execution-trace-more-recipes`); columna nueva «Avance» (`TRACE_PROGRESS_COLUMN_ID`) tras «Fórmula» con `OrderProgress` corto; «Presentaciones» agrupadas por receta (`groupedPresentationsText`, separador « · »).
+- `app/(private)/dashboard/components/execution-trace-table.tsx`: la tarjeta del teléfono lleva «Avance» como primer dato de `meta`.
+- `app/(private)/dashboard/components/index.ts`: exporta `TRACE_PROGRESS_COLUMN_ID`, `TRACE_PROGRESS_LABEL`, `TRACE_RECIPE_GROUP_SEPARATOR`, `groupedPresentationsText`.
+
+**Recorrido**
+- `.../recorrido/[id]/components/execution-trace-detail.tsx`: resumen (`execution-trace-summary`: Estado, Avance largo, Duración total) y una `ExecutionTraceRecipeSection` por `trace.recipes`; `evidenceOfLine` cruza las fotos por `lineId` (sin entrada → evidencia vacía; error → se pasa a cada sección).
+- `.../execution-trace-recipe-section.tsx` (nuevo, paso 3 · componer): `section` con `h2` del nombre, `StatusBadge` de la línea, «cantidad · reparto · duración · vueltas atrás N», duraciones por fase, `ExecutionTimeline` y `TracePackingEvidence` de esa línea.
+- `.../execution-trace-stat.tsx` (nuevo, interno): `Stat`, `DurationValue`, `PhaseDuration` y `STAT_GRID_CLASS`, sacados de `execution-trace-detail.tsx` para usarlos en el resumen y en la sección.
+- `.../execution-timeline.tsx`: `evidence` pasa a `TraceEvidenceResult` (fotos de una receta o el error); props `headingId` y `headingLevel` (ids únicos con varias líneas de tiempo).
+- `.../trace-packing-evidence.tsx`: prop `headingLevel` (h3 dentro de la sección).
+- `.../index.ts`: reexporta las piezas nuevas.
+
+**Tests**
+- `tests/fixtures/execution-trace-recipes.ts` (nuevo): `oneRecipeTrace`, `onlyRecipe`, `withSteps`, `oneRecipeRowFields` para llevar los dobles de una receta a la forma nueva.
+- Adaptados a la forma nueva (los 44 errores): `tests/fixtures/execution-trace-conditioning.ts`, `tests/ui/dashboard/{dashboard-rediseno,execution-trace-detail,execution-trace-evidence,execution-trace-table,recorrido-rediseno,textos-dashboard}.test.tsx`, `tests/unit/paridad/recorridos-paridad.test.tsx`.
+- Imports de `OrderProgress` a shared: `tests/unit/pedidos-ui/{order-progress,order-detail-sheet,order-cards,order-columns}.test.tsx` (en `order-progress.test.tsx` sobra el doble de las actions: ya no se importa el barril).
+- Nuevo: `tests/ui/dashboard/planta-varias-recetas.test.tsx` (12 casos).
+
+### Mapa R → test (UI)
+
+| R | Archivo | Caso |
+|---|---|---|
+| R21 | `tests/ui/dashboard/planta-varias-recetas.test.tsx` | `R21: una fila por pedido, con «Parcial» en tono progress, la primera receta, «+1 más» y el avance «1 de 2» con su barra`; `R21: la cabecera de la tabla tiene la columna «Avance» después de «Fórmula»`; `R21: un pedido de una receta no lleva «+N más» y su avance es «0 de 1»`; `R21: en el teléfono la tarjeta lleva el avance con su barra` |
+| R22 | `tests/ui/dashboard/planta-varias-recetas.test.tsx` | `R22: las presentaciones salen agrupadas por receta en orden de alta, unidas con « · » y sin sumar` |
+| R25 | `tests/ui/dashboard/planta-varias-recetas.test.tsx` | `R25: el resumen lleva el estado, el avance «F de T terminadas» y la duración total`; `R25: una sección por receta, en orden de alta, …`; `R25: una receta sin anotaciones no tiene sección pero cuenta en el avance`; `R25: cada sección lleva su propia línea de tiempo, …` |
+| R26 | `tests/ui/dashboard/planta-varias-recetas.test.tsx` | `R26: ninguna sección muestra anotaciones, fotos ni presentaciones de otra receta`; `R26: una receta sin fotos en la lectura no hereda las de otra` |
+| R28 | `tests/ui/dashboard/planta-varias-recetas.test.tsx` | `R28: la receta cancelada se muestra «Cancelado» con su línea de tiempo hasta la cancelación` |
+| R29 | `tests/ui/dashboard/*` adaptados | los casos previos del Dashboard y del Recorrido pasan con la fila y la sección única (`oneRecipeTrace`, `oneRecipeRowFields`) |
+
+### Salida
+
+- `pnpm run typecheck`: **0 errores** (antes 44).
+- `pnpm exec vitest run tests/ui/dashboard/planta-varias-recetas.test.tsx`: 1 archivo, **12/12**.
+- `pnpm exec vitest run tests/ui/dashboard/execution-trace-detail.test.tsx tests/ui/dashboard/execution-trace-table.test.tsx tests/ui/dashboard/dashboard-rediseno.test.tsx tests/ui/dashboard/textos-dashboard.test.tsx`: 4 archivos, **101/101**.
+- `pnpm exec vitest run tests/ui/dashboard/execution-trace-evidence.test.tsx tests/ui/dashboard/recorrido-rediseno.test.tsx tests/ui/dashboard/trace-evidence-placement.test.ts` (dentro de una tanda de 7 archivos; los 3 en verde).
+- `pnpm exec vitest run tests/unit/pedidos-ui/order-progress.test.tsx tests/unit/pedidos-ui/order-detail-sheet.test.tsx tests/unit/pedidos-ui/order-cards.test.tsx tests/unit/pedidos-ui/order-columns.test.tsx`: 4 archivos, **133/133**.
+- `pnpm exec vitest run tests/guards/guard-catalogo-de-componentes.test.ts tests/guards/guard-qc261-limites-de-la-ficha.test.ts`: **69 en verde, 1 omitido**.
+- `pnpm exec vitest run` de `guard-pedidos-rediseno`, `guard-pantalla-pedidos-se-amplia`, `guard-piezas-base`, `guard-arquitectura-modulos`, `guard-asignacion-componentizada`, `guard-tests-de-arbol-en-el-gate`, `guard-anillo-de-foco`, `guard-contrato-listados`, `guard-dependencias-aprobadas`: 9 archivos, **149 en verde, 3 omitidos**.
+- `pnpm exec vitest run tests/unit/paridad/recorridos-paridad.test.tsx`: **6 en verde, 3 en rojo por snapshot** (ver abajo). No se corrió `-u`.
+- `pnpm run lint`: 0 errores, 14 avisos (los mismos de antes, ninguno en archivos de T11).
+
+### Snapshots y guardias afectados
+
+- **Guardias:** ninguna en rojo y ninguna editada.
+- **Snapshot en rojo, sin actualizar:** `tests/unit/paridad/__snapshots__/recorridos-paridad.test.tsx.snap`, los 3 casos `paridad del detalle del recorrido con acondicionamiento > … — terminado | en curso | anterior`. Los 6 del Dashboard (`con filas`, cargando, vacío, sin resultados, dos errores) siguen en verde. Lo que cambia en el detalle:
+  - el primer `dl` gana `data-testid="execution-trace-summary"` y pasa a «Estado», «Avance» (`OrderProgress` largo, `role=img` «F de T terminadas» con su barra) y «Duración» (`execution-trace-total-duration`, total del pedido); salen de él las duraciones por fase y «Vueltas atrás»;
+  - entra una `section role=region` con el nombre de la receta: `h2` con el nombre, insignia del estado de la línea, `p` «cantidad · reparto · duración · vueltas atrás N», un `dl` con las duraciones por fase (mismos `execution-trace-duration`) y la línea de tiempo;
+  - la línea de tiempo pasa dentro de la sección: «Anotaciones» de `h2` a `h3` y `aria-labelledby` de `execution-trace-annotations` a `execution-trace-annotations-<lineId>`; las anotaciones no cambian.
+  - Lo decide el leader: es el cambio del design § 4.5.
+
+### Decisiones
+
+1. **Las duraciones por fase se quedan dentro de cada sección.** El design § 4.5 no las nombra, pero R29 pide que un pedido de una receta siga dando lo de hoy, con las marcas «En curso» y «Sin cierre anotado». La duración de la cabecera de la sección va sin sufijo (`formatElapsed`), como pide la regla previa de no repetir «(en curso)» en el detalle. Las marcas del total del resumen usan `execution-trace-total-open|unclosed`, así no chocan con las de fase.
+2. **«Vueltas atrás»** pasa de dato del resumen a la cabecera de la sección («vueltas atrás N», como el tablero), con la misma insignia que antes.
+3. **«Avance» en el Dashboard** va tras «Fórmula». No se reordenan las demás columnas: el tablero tiene otro orden, pero T11 solo pide añadir la columna. En el teléfono va como primer dato `meta` de la tarjeta. La fórmula no se añade a la tarjeta, porque no estaba y T11 no lo pide.
+4. **Presentaciones:** dentro de una receta, «, » como hasta ahora; entre recetas, « · ». Una receta sin presentaciones no deja hueco.
+5. **Fotos por `lineId`:** una línea sin entrada en `recipes` recibe evidencia vacía; con el error de lectura, cada sección pinta su aviso de error.
+6. **`execution-trace-stat.tsx`** es un subcomponente interno sacado del detalle, sin UI nueva. `TracePackingEvidence` y `ExecutionTimeline` ganan `headingLevel` (y la segunda `headingId`), y sus usos actuales no cambian.
+7. **Cantidad de la sección:** `formatDecimalDisplay(quantity)` + `unitLabel`, como las listas de Asignación.
+
+### Bloqueos
+
+- Ninguno en código. Queda pendiente la decisión del leader sobre los 3 snapshots del detalle (arriba).
+
+Veredicto: T11 hecha, con typecheck 0, lint sin errores y los tests de T11, Pedidos y guardias en verde. Quedan en rojo 3 snapshots del detalle del Recorrido, pendientes del leader.
+
+## Tanda 5 — estado al cortar (implementer, 2026-11-10)
+- **Snapshots de `tests/unit/paridad/recorridos-paridad.test.tsx`.** El leader los acepta: R29 exceptúa «la sección única del Recorrido» y R25 pide un resumen más una sección por receta.
+  - Regenerados solo los de ese archivo (`-u`): 3 actualizados, 9/9 en verde.
+  - El diff neto, sin contar la sangría, es este:
+    - el resumen `execution-trace-summary`, con Avance (`order-progress`), `execution-trace-total-duration` y `execution-trace-total-open`; sustituye a `execution-trace-stat`;
+    - un `section` por receta, con nombre en `h2`, `execution-trace-recipe-status` y la línea «cantidad · reparto · duración · vueltas atrás» (design § 4.5);
+    - Anotaciones pasa de `h2` a `h3`, y su `aria-labelledby` lleva el `lineId`.
+  - Las entradas de la línea de tiempo no cambian.
+- `order-progress.tsx` queda registrado en git como rename: `app/(private)/pedidos/components/` → `components/shared/`.
+- `pnpm run typecheck`: 0 errores.
+- `pnpm run lint`: 0 errores.
+  - Los avisos habían subido de 11 a 14. Los 3 nuevos eran de T10: `_companyId` sin usar en los dobles de `tests/unit/asignaciones/get-execution-trace.test.ts` (l. 143, 147 y 151).
+  - Ya están quitados. `eslint` de ese archivo sale sin avisos y el archivo da 37/37. El lint global no se ha vuelto a correr.
+- El diff de `lib/`, `app/` y `components/` no cita R/QT/QC.
+- **Corte por memoria.** El sistema mató `pnpm exec vitest run tests/unit/asignaciones`, el primer comando de tests del cierre.
+  - Quedan sin correr: `tests/unit/asignaciones`, `tests/integration/asignaciones`, `tests/ui/dashboard`, `tests/unit/pedidos-ui`, `tests/unit/paridad`, `tests/unit/recetas` y `guard`.
+  - T10 y T11 quedan **sin `[x]`**.

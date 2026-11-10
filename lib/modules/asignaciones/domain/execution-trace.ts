@@ -128,15 +128,21 @@ function measurePhase(
   return { kind, ms: Math.max(0, endAt - openAt - pauses) };
 }
 
-/** `open` gana a `unclosed`, y `unclosed` a `closed`. Una fase `null` suma 0. */
-function sumDurations(durations: TraceDurations): TraceDuration {
-  const present = [durations.production, durations.packing, durations.conditioning].filter(
-    (duration): duration is TraceDuration => duration !== null,
-  );
-  const ms = present.reduce((sum, duration) => sum + duration.ms, 0);
-  if (present.some((duration) => duration.kind === 'open')) return { kind: 'open', ms };
-  if (present.some((duration) => duration.kind === 'unclosed')) return { kind: 'unclosed', ms };
+/** `open` gana a `unclosed`, y `unclosed` a `closed`. Sin duraciones, cerrada en 0. */
+export function combineDurations(durations: readonly TraceDuration[]): TraceDuration {
+  const ms = durations.reduce((sum, duration) => sum + duration.ms, 0);
+  if (durations.some((duration) => duration.kind === 'open')) return { kind: 'open', ms };
+  if (durations.some((duration) => duration.kind === 'unclosed')) return { kind: 'unclosed', ms };
   return { kind: 'closed', ms };
+}
+
+/** Una fase `null` suma 0. */
+function sumDurations(durations: TraceDurations): TraceDuration {
+  return combineDurations(
+    [durations.production, durations.packing, durations.conditioning].filter(
+      (duration): duration is TraceDuration => duration !== null,
+    ),
+  );
 }
 
 /**

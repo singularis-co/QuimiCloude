@@ -30,6 +30,7 @@ import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { resolverServerComponents } from '../../unit/paridad/arbol-accesible';
+import { oneRecipeRowFields } from '../../fixtures/execution-trace-recipes';
 
 const { routerMock, listExecutionTracesActionMock, requirePagePermissionMock } = vi.hoisted(() => ({
   routerMock: {
@@ -73,7 +74,7 @@ const ACTIVO: ExecutionTraceRow = {
   goBackCount: 2,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'EN_CURSO'),
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -89,7 +90,7 @@ const DE_BAJA: ExecutionTraceRow = {
   goBackCount: 0,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'CANCELADO'),
 };
 
 const ENTREGADO: ExecutionTraceRow = {
@@ -105,7 +106,7 @@ const ENTREGADO: ExecutionTraceRow = {
   goBackCount: 0,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'ENTREGADO'),
 };
 
 const ROWS = [ACTIVO, DE_BAJA, ENTREGADO];
@@ -215,6 +216,7 @@ describe('R3 - columnas', () => {
       'Nº de pedido',
       'Foto',
       'Fórmula',
+      'Avance',
       'Presentaciones',
       'Estado',
       'Personas',

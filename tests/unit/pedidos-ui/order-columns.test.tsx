@@ -29,7 +29,6 @@ import {
   ORDER_NUMBER_COLUMN_ID,
   ORDER_NUMBER_DETAIL_TESTID,
   ORDER_PRIORITY_LABELS,
-  ORDER_PROGRESS_TESTID,
   ORDER_RECIPES_FIRST_TESTID,
   ORDER_RECIPES_MORE_TESTID,
   ORDER_ROW_WITHOUT_PRICE_TESTID,
@@ -52,6 +51,7 @@ import {
   orderRowActionsSpec,
   parseOrderListParams,
 } from '@/app/(private)/pedidos/components';
+import { ORDER_PROGRESS_TESTID } from '@/components/shared/order-progress';
 import {
   ORDER_PRIORITY_VALUES,
   ORDER_QUERYABLE,

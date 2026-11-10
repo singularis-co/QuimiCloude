@@ -16,7 +16,6 @@ import {
   ORDER_ACTION_CUSTOMER_TESTID,
   ORDER_ACTION_DETAIL_TESTID,
   ORDER_DETAIL_SHEET_TESTID,
-  ORDER_PROGRESS_TESTID,
   ORDER_RECIPES_FIRST_TESTID,
   ORDER_RECIPES_MORE_TESTID,
   ORDER_ROW_WITHOUT_PRICE_TESTID,
@@ -33,6 +32,7 @@ import {
   SALE_PRICE_COLUMN_ID,
   SALE_PRICE_TESTID,
 } from '@/app/(private)/pedidos/components';
+import { ORDER_PROGRESS_TESTID } from '@/components/shared/order-progress';
 import type { DataTableParams } from '@/components/shared/data-table';
 import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';

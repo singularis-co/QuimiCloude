@@ -36,6 +36,7 @@ import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { resolverServerComponents } from '../../unit/paridad/arbol-accesible';
+import { oneRecipeRowFields, oneRecipeTrace } from '../../fixtures/execution-trace-recipes';
 
 const { routerMock, listExecutionTracesActionMock, requirePagePermissionMock } = vi.hoisted(() => ({
   routerMock: {
@@ -79,6 +80,7 @@ const TEXTOS = {
     'Nº de pedido',
     'Foto',
     'Fórmula',
+    'Avance',
     'Presentaciones',
     'Estado',
     'Personas',
@@ -105,11 +107,13 @@ const TEXTOS = {
     titulo: (numero: string) => `Recorrido del pedido ${numero}`,
     datos: [
       'Estado',
+      'Avance',
+      'Duración',
       'Duración de producción',
       'Duración de empaque',
       'Duración de acondicionamiento',
-      'Vueltas atrás',
     ],
+    vueltasAtras: 'vueltas atrás',
     faseEnCurso: 'En curso',
     faseSinCierre: 'Sin cierre anotado',
     anotaciones: 'Anotaciones',
@@ -161,7 +165,7 @@ const ACTIVO: ExecutionTraceRow = {
   goBackCount: 2,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'EN_CURSO'),
 };
 
 const DE_BAJA: ExecutionTraceRow = {
@@ -177,7 +181,7 @@ const DE_BAJA: ExecutionTraceRow = {
   goBackCount: 0,
   formulaName: null,
   formulaImageUrl: null,
-  presentations: [],
+  ...oneRecipeRowFields([], 'CANCELADO'),
 };
 
 const ROWS = [ACTIVO, DE_BAJA];
@@ -255,7 +259,7 @@ const STEPS: readonly ExecutionTraceDetailStep[] = [
   step({ id: 'e8', action: 'pack_finish', stepPosition: null, gapToNextMs: null }),
 ];
 
-const TRACE: ExecutionTraceDetailData = {
+const TRACE: ExecutionTraceDetailData = oneRecipeTrace({
   orderId: ORDER_ID,
   numberText: '2026-0000042',
   status: 'EN_CURSO',
@@ -270,7 +274,7 @@ const TRACE: ExecutionTraceDetailData = {
   },
   goBackCount: 1,
   steps: STEPS,
-};
+});
 
 const BACK_HREF = `${DASHBOARD_ROUTE}?page=2&pageSize=25`;
 
@@ -306,7 +310,7 @@ describe('R21 - textos del Dashboard', () => {
     expect(screen.getByText(TEXTOS.dashboard.soloCancelados)).toBeVisible();
   });
 
-  it('R21 - las columnas se llaman «Nº de pedido», «Foto», «Fórmula», «Presentaciones», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás»', () => {
+  it('R21 - las columnas se llaman «Nº de pedido», «Foto», «Fórmula», «Avance», «Presentaciones», «Estado», «Personas», «Primera anotación», «Última anotación», «Duración», «Vueltas atrás»', () => {
     montarTabla();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
     TEXTOS.columnas.forEach((etiqueta, indice) => {
@@ -378,7 +382,7 @@ describe('R21 - textos del Dashboard', () => {
 // ---------------------------------------------------------------------------------------------
 
 describe('R21 - textos del recorrido', () => {
-  it('R21 - R25 - «Volver a la lista», «Recorrido del pedido {n}», «Estado», una «Duración de …» por fase, «Vueltas atrás» y «Anotaciones»', () => {
+  it('R21 - R25 - «Volver a la lista», «Recorrido del pedido {n}», «Estado», «Avance», «Duración», una «Duración de …» por fase, «vueltas atrás» y «Anotaciones»', () => {
     const { container } = render(<ExecutionTraceDetail trace={TRACE} backHref={BACK_HREF} />);
 
     expect(screen.getByRole('link', { name: TEXTOS.recorrido.volver })).toBeInTheDocument();
@@ -390,7 +394,8 @@ describe('R21 - textos del recorrido', () => {
     );
     expect(screen.getByTestId('execution-trace-phase-open').textContent).toBe(TEXTOS.recorrido.faseEnCurso);
     expect(screen.getByTestId('execution-trace-phase-unclosed').textContent).toBe(TEXTOS.recorrido.faseSinCierre);
-    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(TEXTOS.recorrido.anotaciones);
+    expect(screen.getByTestId('execution-trace-recipe-summary').textContent).toContain(TEXTOS.recorrido.vueltasAtras);
+    expect(screen.getByRole('heading', { level: 3 }).textContent).toBe(TEXTOS.recorrido.anotaciones);
     expect(screen.getByRole('list', { name: TEXTOS.recorrido.anotaciones })).toBeInTheDocument();
   });
 

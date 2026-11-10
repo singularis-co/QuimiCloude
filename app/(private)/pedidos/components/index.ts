@@ -521,14 +521,6 @@ export {
   type ProducedProductsByOrder,
 } from './order-produced-presentations';
 export {
-  ORDER_PROGRESS_BAR_TESTID,
-  ORDER_PROGRESS_TESTID,
-  ORDER_PROGRESS_TEXTS,
-  OrderProgress,
-  type OrderProgressProps,
-  type OrderProgressTexts,
-} from './order-progress';
-export {
   ORDER_DETAIL_EDIT_TESTID,
   ORDER_DETAIL_LINE_TESTID,
   ORDER_DETAIL_SHEET_TESTID,

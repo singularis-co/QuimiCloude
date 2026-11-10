@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { orderCustomerLabel } from '@/components/shared/order-customer-label';
+import { OrderProgress } from '@/components/shared/order-progress';
 import { ResponsibleAvatars } from '@/components/shared/responsible-avatars';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +26,6 @@ import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
 import { canEditOrder } from './order-line-actions';
 import { OrderProducedPresentations } from './order-produced-presentations';
-import { OrderProgress } from './order-progress';
 import { distributionLabelLine } from './order-responsibles-sheet';
 import { OrderPriorityBadge, OrderStatusBadge } from './order-status-badge';
 

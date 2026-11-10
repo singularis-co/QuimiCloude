@@ -11,9 +11,9 @@ import {
   ORDER_DETAIL_LINE_TESTID,
   ORDER_DETAIL_SHEET_TESTID,
   ORDER_DETAIL_SUMMARY_TESTID,
-  ORDER_PROGRESS_TESTID,
   OrderDetailSheet,
 } from '@/app/(private)/pedidos/components';
+import { ORDER_PROGRESS_TESTID } from '@/components/shared/order-progress';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import type {
   OrderLineView,
