@@ -237,7 +237,7 @@ async function openDashboard(page: Page, width: number): Promise<void> {
   await loginAndLand(page, adminUser);
   await page.goto(DASHBOARD_ROUTE);
   await expect(page.getByTestId('dashboard-title')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('dashboard-content').getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
 }
 
 async function openTrace(page: Page, order: SeededOrder): Promise<void> {

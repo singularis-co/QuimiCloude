@@ -1118,3 +1118,17 @@ Formato: pasados/fallidos/omitidos.
 
 ### Veredicto
 Los 6 specs pendientes de T13 están en verde en chromium y webkit, con un ajuste mínimo de selector en 2 specs. La `data-table` duplicada es preexistente y la causa más probable es el streaming SSR de React; falta confirmarla.
+
+## Tanda 6 — selector de data-table en dashboard-rediseno (frontend_dev, 2026-11-10)
+
+- **Cambio** (solo `e2e/dashboard-rediseno.spec.ts`, l. 240, `openDashboard`): `page.getByTestId('data-table')` → `page.getByTestId('dashboard-content').getByTestId('data-table')`. Era el único `getByTestId('data-table')` sin acotar del spec. No cambia lo que comprueba.
+- **Puerto 3117**: libre antes de cada corrida; ningún `next dev` colgado.
+- **Resultados** (`--workers=1`, en primer plano, uno a la vez):
+  - chromium, corrida 1: `6 passed (59.3s)`
+  - chromium, corrida 2: `6 passed (1.0m)`
+  - webkit: `6 passed (1.4m)`
+- `pnpm run typecheck` (`tsc --noEmit`): sin errores.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`; warnings preexistentes, ninguno en el spec tocado.
+- **Nota para el reviewer / posible deuda**: la causa es preexistente. `data-table` aparece duplicada en el DOM del dashboard también en `origin/dev` (sin QT-315), y el selector sin acotar violaba el modo estricto de Playwright. Causa probable: Suspense con streaming de React 19.2, que deja en el DOM a la vez el contenido y su copia (ver «Tanda 6 — specs pendientes de T13»). El selector acotado lo esquiva; la duplicación en sí queda como deuda fuera de QT-315.
+
+Veredicto: spec `dashboard-rediseno` en verde en chromium (x2) y webkit con el selector acotado; typecheck y lint sin errores.
