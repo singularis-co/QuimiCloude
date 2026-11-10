@@ -672,3 +672,13 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
   - **E2E que depende de un interno de React.** `e2e/pedido-en-varias-presentaciones.spec.ts:696-712` llama al `onClick` de «Aplicar» a través de `__reactFiber`, y eso se puede romper al actualizar React. Arreglo: un camino de envío forzado por la UI.
   - **Test de R47 que se salta.** `pedidos-convenciones` se salta cuando el rango no tiene commits de QT-314, y eso va a pasar siempre después del merge. Arreglo: fijar el caso a la lista de archivos del spec, no al historial de git.
   - **Base de los E2E por borrar.** `QuimiCloude_QT314` se creó para los E2E de la feature. Hay que borrarla al cerrar la feature.
+- 2026-11-10 (QT-315, review menores):
+  - **`data-table` duplicada en el Dashboard.**
+    - Qué pasa: `e2e/dashboard-rediseno.spec.ts` encontraba dos `[data-testid=data-table]`, uno de ellos oculto fuera de `dashboard-content`.
+    - Desde cuándo: ya ocurría en `dev`. Causa probable, sin confirmar en ejecución: el `<Suspense>` de `dashboard-content.tsx` con el streaming SSR de React 19.2 deja un `div hidden` durante unos 300 ms.
+    - Qué se hizo: QT-315 acotó el selector del spec.
+    - Qué falta: confirmar la causa. Riesgo: otros E2E que buscan `data-table` sin acotar pueden fallar de forma intermitente.
+  - **Anotaciones de una línea fuera del outline:** el Dashboard las mide y el Recorrido no les da sección. Solo importa si una línea quitada puede tener anotaciones, y eso está sin verificar.
+  - **Redacción del spec:**
+    - R5 casi no tiene contenido en `/asignacion`.
+    - En R9, el paréntesis «página no encontrada» no encaja con la pantalla de ejecución, que responde `OrderExecutionError` como con un pedido inexistente.
