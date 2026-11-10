@@ -951,3 +951,21 @@ Veredicto: T11 hecha, con typecheck 0, lint sin errores y los tests de T11, Pedi
 - **Corte por memoria en `pnpm exec vitest run --maxWorkers=2 tests/unit/paridad`**: 44 archivos, en una sola corrida y sin partir.
   - Quedan sin correr: `tests/unit/paridad`, `tests/unit/recetas`, `guard --maxWorkers=2` y el lint global.
   - T10 y T11 siguen sin `[x]`.
+
+## Tanda 5 — cierre en lotes de 15, `--maxWorkers=1` (implementer, 2026-11-10)
+- `tests/unit/paridad`, 22 archivos en 2 lotes: 351 y 60 tests, todo en verde. No ha cambiado ningún snapshot más.
+- `tests/unit/recetas` + `tests/unit/recetas-ui`, 81 archivos en 6 lotes: 221, 220, 192 + **1 rojo**, 249, 297 y 182.
+- `pnpm exec vitest run guard --maxWorkers=1`: 87 archivos, 1335 en verde, 22 omitidos.
+- `pnpm run lint`: 0 errores, 11 avisos, otra vez los de siempre.
+- Antes, en la reanudación con `--maxWorkers=2`, ya estaban en verde `tests/unit/asignaciones`, `tests/integration/asignaciones`, `tests/ui/dashboard` y `tests/unit/pedidos-ui`.
+
+### Bloqueo (tanda 5)
+- **`tests/unit/recetas/scope.test.ts` está en rojo** («la pantalla de recetas vive solo donde la declara…»), esta vez por la comprobación de `components/` (~l. 203).
+  - El mensaje es «componente de recetas encontrado bajo components/: `components/shared/recipes-first-more.tsx`».
+  - La comprobación busca `/recet|recipe/i` en los archivos de `components/` y no admite excepciones.
+- La pieza la exige el spec. T11 dice «`OrderProgress` y `RecipesFirstMore` suben a `components/shared`», y design § 7 lo repite.
+- Por regla del leader, no se amplía ninguna guardia sin su decisión. No se ha tocado nada.
+- Hay dos salidas:
+  - (a) añadir a esa comprobación una lista cerrada con `components/shared/recipes-first-more.tsx`, como en las ampliaciones anteriores;
+  - (b) que el spec cambie el nombre de la pieza.
+- T10 y T11 quedan **sin `[x]`**.
