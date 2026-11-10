@@ -941,3 +941,13 @@ Veredicto: T11 hecha, con typecheck 0, lint sin errores y los tests de T11, Pedi
 - **Corte por memoria.** El sistema mató `pnpm exec vitest run tests/unit/asignaciones`, el primer comando de tests del cierre.
   - Quedan sin correr: `tests/unit/asignaciones`, `tests/integration/asignaciones`, `tests/ui/dashboard`, `tests/unit/pedidos-ui`, `tests/unit/paridad`, `tests/unit/recetas` y `guard`.
   - T10 y T11 quedan **sin `[x]`**.
+
+## Tanda 5 — reanudación del cierre (implementer, 2026-11-10, con `--maxWorkers=2`)
+- `tests/unit/asignaciones`, 74 archivos en 3 lotes de 30, 30 y 14: 1030, 648 y 419 tests, todo en verde.
+- `tests/integration/asignaciones`: 29 archivos, 256 en verde.
+  - La primera pasada la corrí, por error, a la vez que `tests/ui/dashboard`, y las dos escribían en el mismo archivo de salida. La descarté y repetí cada una sola.
+- `tests/ui/dashboard`: 8 archivos, 164 en verde.
+- `tests/unit/pedidos-ui`, 66 archivos en 2 lotes de 33: 571 en verde; 518 en verde y 3 omitidos.
+- **Corte por memoria en `pnpm exec vitest run --maxWorkers=2 tests/unit/paridad`**: 44 archivos, en una sola corrida y sin partir.
+  - Quedan sin correr: `tests/unit/paridad`, `tests/unit/recetas`, `guard --maxWorkers=2` y el lint global.
+  - T10 y T11 siguen sin `[x]`.
