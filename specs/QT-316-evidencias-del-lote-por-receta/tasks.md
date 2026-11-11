@@ -153,7 +153,7 @@
 
 ## Tanda 5 — E2E (CI; depende de T6, T7 y T8)
 
-- [ ] **T9 · frontend_dev — ampliar `e2e/consulta-de-evidencia.spec.ts`** (R19, R20)
+- [x] **T9 · frontend_dev — ampliar `e2e/consulta-de-evidencia.spec.ts`** (R19, R20)
   - Fixture con el prefijo del spec (`qc271_e2e_`): un pedido de **dos** líneas, con dos recetas y
     dos productos terminados, cada uno con su lote y su asiento `production` atado a su línea.
   - Fotos solo en la línea A, de fabricación, envasado y acondicionamiento.

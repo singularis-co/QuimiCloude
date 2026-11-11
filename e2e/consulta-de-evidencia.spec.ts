@@ -1,13 +1,17 @@
 /**
- * E2E de la consulta de evidencia por paso (QC-271, TI: R27 y R28).
+ * E2E de la consulta de evidencia por paso (QC-271, TI: R27 y R28; QT-316, R19 y R20).
  *
- * Dos casos, dos `test()`. Ninguno escribe en la base: los dos leen el mismo fixture.
+ * Tres casos, tres `test()`. Ninguno escribe en la base: todos leen el mismo fixture.
  *   - R27, Administrador: el recorrido del pedido pinta las fotos de fabricacion bajo la ULTIMA
  *     anotacion de su paso -que se repite- y las de envasado en la tarjeta «Envasado»; despues, la
  *     ficha del producto terminado de ese pedido muestra en Lotes el boton con el total y su
  *     dialogo, los grupos «Fabricacion» y «Envasado».
  *   - R28, Operador (sin `pedidos.consultar`): la misma ficha, en Lotes, sin la columna «Evidencia»
  *     y sin ninguna foto; el navegador no pide nada al almacenamiento.
+ *   - R19 (QT-316), Administrador: un pedido de DOS recetas, cada una con su producto terminado y
+ *     su lote. La ficha del producto A cuenta solo las fotos de su receta y su dialogo las muestra
+ *     en «Fabricacion», «Envasado» y «Acondicionamiento» (R20), con la receta A en el titulo; la
+ *     ficha del producto B, sin fotos en su receta, muestra «—».
  *
  * FIXTURE, sembrado por Prisma con los mismos pasos que `e2e/recorrido-ejecucion.spec.ts` (empresa,
  * roles REALES del seed, anotaciones) y `e2e/detalle-de-producto-terminado.spec.ts` (presentacion,
@@ -16,6 +20,9 @@
  *   anotacion es la quinta;
  * - dos fotos de fabricacion en el paso 2 y una de envasado en el paso 1, como filas de
  *   `order_step_evidence`.
+ * - (QT-316) un segundo pedido `TERMINADO` con dos lineas (recetas A y B), un producto terminado y
+ *   un lote por receta, y el asiento `production` de cada lote atado a SU linea; fotos de
+ *   fabricacion, envasado y acondicionamiento solo en la linea A.
  *
  * ALMACENAMIENTO: el doble en memoria (`EVIDENCE_E2E_DOUBLES`, en `playwright.config.ts`) firma las
  * lecturas bajo `https://evidencias-e2e.invalid`, que no resuelve; este spec intercepta ese origen
@@ -23,7 +30,9 @@
  *
  * AISLAMIENTO: prefijo propio `qc271_e2e_` + `RUN_ID` por proceso de worker, empresa efimera y
  * limpieza de huerfanos por prefijo Y POR EDAD, porque Chromium y WebKit corren a la vez sobre la
- * misma base. `afterAll` borra solo por los identificadores de este worker.
+ * misma base. `afterAll` borra solo por los identificadores de este worker. Las filas de QT-316
+ * (lineas, recetas, productos, lotes, asientos y fotos) son de la misma empresa efimera: las borra
+ * `deleteCompanyData`, en el orden de sus FK, igual en `afterAll` que en la limpieza de huerfanos.
  *
  * LOS `data-testid` Y LOS TEXTOS VAN COMO CONSTANTES LOCALES y no importados de los componentes:
  * sus modulos son de cliente y arrastrarian React al proceso del runner.
@@ -62,6 +71,14 @@ const RECIPE_NAME = `${SHARED_TOKEN}_receta`;
 const PRESENTATION_NAME = `${SHARED_TOKEN}_botella`;
 const FINISHED_NAME = `${SHARED_TOKEN}_terminado`;
 const LOT = `${SHARED_TOKEN}_lote`;
+
+/** QT-316: el pedido de dos recetas. Cada receta, su producto terminado y su lote. */
+const RECIPE_A_NAME = `${SHARED_TOKEN}_receta_a`;
+const RECIPE_B_NAME = `${SHARED_TOKEN}_receta_b`;
+const FINISHED_A_NAME = `${SHARED_TOKEN}_terminado_a`;
+const FINISHED_B_NAME = `${SHARED_TOKEN}_terminado_b`;
+const LOT_A = `${SHARED_TOKEN}_lote_a`;
+const LOT_B = `${SHARED_TOKEN}_lote_b`;
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -112,6 +129,22 @@ const PACKING_PHOTOS = 1;
 
 const TOTAL_PHOTOS = MANUFACTURING_PHOTOS + PACKING_PHOTOS;
 
+/** QT-316: el segundo pedido es otro numero de la misma empresa (la unicidad es por empresa). */
+const TWO_RECIPES_ORDER_SEQUENCE = ORDER_SEQUENCE + 1;
+const TWO_RECIPES_ORDER_NUMBER_TEXT = formatOrderNumber({
+  year: ORDER_YEAR,
+  sequence: TWO_RECIPES_ORDER_SEQUENCE,
+});
+
+/** QT-316: las fotos de la receta A, una fase por grupo del dialogo. La receta B no tiene ninguna. */
+const A_MANUFACTURING_STEP = 1;
+const A_MANUFACTURING_PHOTOS = 1;
+const A_PACKING_STEP = 1;
+const A_PACKING_PHOTOS = 2;
+const A_CONDITIONING_STEP = 2;
+const A_CONDITIONING_PHOTOS = 1;
+const A_TOTAL_PHOTOS = A_MANUFACTURING_PHOTOS + A_PACKING_PHOTOS + A_CONDITIONING_PHOTOS;
+
 /** El mismo origen que firma `evidence-storage-memory.ts`. No resuelve: sin interceptar, falla. */
 const EVIDENCE_STORAGE_ORIGIN = 'https://evidencias-e2e.invalid';
 
@@ -132,12 +165,17 @@ const TRACE_PACKING_COUNT_TESTID = 'trace-packing-evidence-count';
 const FINISHED_PRODUCT_NAME_TESTID = 'finished-product-name';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const BATCH_ROW_TESTID = 'finished-product-batch-row';
+const BATCH_ORDER_TESTID = 'finished-product-batch-order';
 const EVIDENCE_HEAD_TESTID = 'data-table-head-evidence';
 const EVIDENCE_CELL_TESTID = 'finished-product-batch-evidence';
 const EVIDENCE_BUTTON_TESTID = 'batch-evidence-button';
 const EVIDENCE_DIALOG_TESTID = 'batch-evidence-dialog';
 const DIALOG_MANUFACTURING_TESTID = 'batch-evidence-manufacturing';
 const DIALOG_PACKING_TESTID = 'batch-evidence-packing';
+const DIALOG_CONDITIONING_TESTID = 'batch-evidence-conditioning';
+
+/** `EMPTY_MARK` de `lib/shared/ui/empty-mark.ts`: la celda de un lote sin fotos. */
+const EMPTY_MARK = '—';
 
 /** `data-testid` de cada grupo de `StepEvidence`. */
 const STEP_EVIDENCE_GRID_TESTID = 'step-evidence-grid';
@@ -147,6 +185,10 @@ const ANNOTATIONS_LIST_NAME = 'Anotaciones';
 const PACKING_CARD_NAME = 'Envasado';
 const MANUFACTURING_SECTION_NAME = 'Fabricación';
 const PACKING_SECTION_NAME = 'Envasado';
+const CONDITIONING_SECTION_NAME = 'Acondicionamiento';
+/** El titulo del dialogo con la receta del lote (QT-316 R7). */
+const recipeDialogTitle = (lot: string, orderNumber: string, recipe: string): string =>
+  `Evidencia · Lote ${lot} · Pedido ${orderNumber} · ${recipe}`;
 const photoLabel = (n: number, step: number): string => `Foto ${n} del paso ${step}`;
 const groupLabel = (phase: string, step: number): string => `Evidencia de ${phase}, paso ${step}`;
 const photosText = (n: number): string => (n === 1 ? '1 foto' : `${n} fotos`);
@@ -156,6 +198,8 @@ let companyId: string | null = null;
 let adminUserId: string | null = null;
 let orderId: string | null = null;
 let productId: string | null = null;
+let productAId: string | null = null;
+let productBId: string | null = null;
 
 function required<T>(value: T | null, what: string): T {
   if (value === null) throw new Error(`falta ${what}: fallo el beforeAll`);
@@ -192,9 +236,14 @@ async function gotoSettled(page: Page, url: string): Promise<void> {
 }
 
 /** Abre la ficha, cambia a Lotes por su enlace y espera la fila del lote. */
-async function openBatchesTab(page: Page, product: string): Promise<Locator> {
+async function openBatchesTab(
+  page: Page,
+  product: string,
+  finishedName: string = FINISHED_NAME,
+  lot: string = LOT,
+): Promise<Locator> {
   await gotoSettled(page, finishedProductDetailRoute(product));
-  await expect(page.getByTestId(FINISHED_PRODUCT_NAME_TESTID)).toHaveText(exactText(FINISHED_NAME), {
+  await expect(page.getByTestId(FINISHED_PRODUCT_NAME_TESTID)).toHaveText(exactText(finishedName), {
     timeout: 60_000,
   });
   await page.getByTestId('finished-product-tab-lotes').click();
@@ -206,7 +255,7 @@ async function openBatchesTab(page: Page, product: string): Promise<Locator> {
   const table = page.getByTestId('finished-product-lotes');
   const rows = table.locator(`[data-testid^="${TABLE_ROW_TESTID_PREFIX}"]`);
   await expect(rows).toHaveCount(1, { timeout: 60_000 });
-  await expect(rows.getByTestId(BATCH_ROW_TESTID)).toHaveText(exactText(LOT));
+  await expect(rows.getByTestId(BATCH_ROW_TESTID)).toHaveText(exactText(lot));
   return table;
 }
 
@@ -452,6 +501,148 @@ test.beforeAll(async () => {
       ...Array.from({ length: PACKING_PHOTOS }, (_, index) => evidenceRow('PACKING', PACKING_STEP, index + 1)),
     ],
   });
+
+  // QT-316 R19: el pedido de dos recetas. Todo cuelga de la misma empresa efimera, asi que
+  // `deleteCompanyData` (afterAll y huerfanos) lo borra con lo de QC-271.
+  const createRecipe = async (name: string): Promise<string> =>
+    (
+      await prisma.recipe.create({
+        data: { name, nameNormalized: normalizeRecipeName(name), createdBy: admin, companyId: company },
+        select: { id: true },
+      })
+    ).id;
+  const recipeAId = await createRecipe(RECIPE_A_NAME);
+  const recipeBId = await createRecipe(RECIPE_B_NAME);
+
+  const createFinished = async (name: string, recipe: string): Promise<string> =>
+    (
+      await prisma.product.create({
+        data: {
+          name,
+          nameNormalized: normalizeProductName(name),
+          type: 'FINISHED_PRODUCT',
+          unitId: unit.id,
+          stock: BATCH_STOCK,
+          recipeId: recipe,
+          presentationId: presentation.id,
+          companyId: company,
+        },
+        select: { id: true },
+      })
+    ).id;
+  productAId = await createFinished(FINISHED_A_NAME, recipeAId);
+  productBId = await createFinished(FINISHED_B_NAME, recipeBId);
+
+  const createBatch = async (product: string, lot: string): Promise<string> =>
+    (
+      await prisma.productBatch.create({
+        data: {
+          productId: product,
+          presentationId: presentation.id,
+          stock: BATCH_STOCK,
+          unitCost: '1.0000',
+          packageContent: CONTENT,
+          lot,
+          purchaseDate: new Date('2026-09-01T00:00:00Z'),
+          companyId: company,
+          createdBy: admin,
+        },
+        select: { id: true },
+      })
+    ).id;
+  const batchAId = await createBatch(productAId, LOT_A);
+  const batchBId = await createBatch(productBId, LOT_B);
+
+  // La linea A nace con el pedido (position 0); la B se escribe aparte con lo mismo de su etapa.
+  const twoRecipesOrder = await createOrderWithLine(prisma, {
+    companyId: company,
+    orderYear: ORDER_YEAR,
+    orderSequence: TWO_RECIPES_ORDER_SEQUENCE,
+    recipeId: recipeAId,
+    quantity: BATCH_STOCK,
+    status: 'TERMINADO',
+    finishedAt: FINISHED_AT,
+    packedBy: admin,
+    conditionedBy: admin,
+    unitId: unit.id,
+    createdBy: admin,
+  });
+  const lineAId = twoRecipesOrder.lineId;
+  const lineBId = (
+    await prisma.orderLine.create({
+      data: {
+        orderId: twoRecipesOrder.id,
+        companyId: company,
+        position: 1,
+        recipeId: recipeBId,
+        originalRecipeId: recipeBId,
+        quantity: BATCH_STOCK,
+        unitId: unit.id,
+        status: 'TERMINADO',
+        finishedAt: FINISHED_AT,
+        packedBy: admin,
+        conditionedBy: admin,
+        createdBy: admin,
+      },
+      select: { id: true },
+    })
+  ).id;
+
+  // Cada lote, atado por su asiento `production` a SU linea: de ahi sale la receta del lote.
+  for (const [lineId, batch] of [
+    [lineAId, batchAId],
+    [lineBId, batchBId],
+  ] as const) {
+    const presentationLine = await prisma.orderPresentationLine.create({
+      data: {
+        orderId: twoRecipesOrder.id,
+        orderLineId: lineId,
+        companyId: company,
+        presentationId: presentation.id,
+        packages: LINE_PACKAGES,
+        presentationContent: CONTENT,
+      },
+      select: { id: true },
+    });
+    await prisma.inventoryMovement.create({
+      data: {
+        batchId: batch,
+        kind: 'production',
+        quantity: BATCH_STOCK,
+        reason: null,
+        orderId: twoRecipesOrder.id,
+        orderLineId: lineId,
+        orderPresentationLineId: presentationLine.id,
+        companyId: company,
+        createdBy: admin,
+      },
+    });
+  }
+
+  // Fotos solo en la linea A, de las tres fases.
+  const lineARow = (phase: 'MANUFACTURING' | 'PACKING' | 'CONDITIONING', stepPosition: number, slot: number) => ({
+    companyId: company,
+    orderId: twoRecipesOrder.id,
+    orderLineId: lineAId,
+    phase,
+    stepPosition,
+    slot,
+    path: `${company}/${twoRecipesOrder.id}/${randomUUID()}`,
+    contentType: 'image/png',
+    sizeBytes: EVIDENCE_PNG.length,
+    uploadedBy: operator,
+  });
+  await prisma.orderStepEvidence.createMany({
+    data: [
+      ...Array.from({ length: A_MANUFACTURING_PHOTOS }, (_, index) =>
+        lineARow('MANUFACTURING', A_MANUFACTURING_STEP, index + 1),
+      ),
+      ...Array.from({ length: A_PACKING_PHOTOS }, (_, index) => lineARow('PACKING', A_PACKING_STEP, index + 1)),
+      ...Array.from({ length: A_CONDITIONING_PHOTOS }, (_, index) =>
+        lineARow('CONDITIONING', A_CONDITIONING_STEP, index + 1),
+      ),
+    ],
+  });
 });
 
 test.afterAll(async () => {
@@ -554,5 +745,73 @@ test.describe('consulta de evidencia por paso', () => {
     await expect(page.getByRole('button', { name: ANY_PHOTO_BUTTON })).toHaveCount(0);
     await expect(page.locator(`img[src^="${EVIDENCE_STORAGE_ORIGIN}"]`)).toHaveCount(0);
     expect(storage.requests(), 'sin pedidos.consultar el navegador no pide ninguna foto').toBe(0);
+  });
+
+  test('R19 - pedido de dos recetas: el lote de la receta A cuenta y muestra solo sus fotos, en Fabricacion, Envasado y Acondicionamiento, con la receta en el titulo; el de la receta B muestra «—»', async ({
+    page,
+  }) => {
+    const productA = required(productAId, 'el producto terminado A');
+    const productB = required(productBId, 'el producto terminado B');
+
+    const storage = await interceptEvidenceStorage(page);
+    await loginAndLand(page, adminUser);
+
+    // 1. Ficha del producto A: la celda cuenta solo las fotos de la receta A.
+    const tableA = await openBatchesTab(page, productA, FINISHED_A_NAME, LOT_A);
+    await expect(tableA.getByTestId(EVIDENCE_HEAD_TESTID)).toBeVisible();
+    const button = tableA.getByTestId(EVIDENCE_BUTTON_TESTID);
+    await expect(button).toHaveCount(1, { timeout: 60_000 });
+    await expect(button).toHaveText(exactText(photosText(A_TOTAL_PHOTOS)));
+    await expect(button).toHaveAccessibleName(`Ver evidencia del lote ${LOT_A}: ${photosText(A_TOTAL_PHOTOS)}`);
+
+    // 2. El dialogo: la receta A en el titulo y sus fotos en los tres grupos (R20).
+    await button.click();
+    const dialog = page.getByTestId(EVIDENCE_DIALOG_TESTID);
+    await expect(dialog).toBeVisible({ timeout: 60_000 });
+    await expect(dialog).toHaveAttribute('data-status', 'ready', { timeout: 60_000 });
+    await expect(
+      page.getByRole('dialog', {
+        name: recipeDialogTitle(LOT_A, TWO_RECIPES_ORDER_NUMBER_TEXT, RECIPE_A_NAME),
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    const sections = [
+      {
+        testId: DIALOG_MANUFACTURING_TESTID,
+        name: MANUFACTURING_SECTION_NAME,
+        step: A_MANUFACTURING_STEP,
+        photos: A_MANUFACTURING_PHOTOS,
+      },
+      { testId: DIALOG_PACKING_TESTID, name: PACKING_SECTION_NAME, step: A_PACKING_STEP, photos: A_PACKING_PHOTOS },
+      {
+        testId: DIALOG_CONDITIONING_TESTID,
+        name: CONDITIONING_SECTION_NAME,
+        step: A_CONDITIONING_STEP,
+        photos: A_CONDITIONING_PHOTOS,
+      },
+    ] as const;
+    for (const section of sections) {
+      const scope = dialog.getByTestId(section.testId);
+      await expect(scope.getByRole('heading', { name: new RegExp(`^${section.name}`) })).toBeVisible();
+      await expect(scope.getByTestId(`${section.testId}-count`)).toHaveText(String(section.photos));
+      await expectLoadedPhotos(scope, section.step, section.photos);
+    }
+
+    // Solo las fotos de la receta A: la suma de los grupos es el conteo de la celda, y no hay mas.
+    await expect(dialog.getByRole('button', { name: ANY_PHOTO_BUTTON })).toHaveCount(A_TOTAL_PHOTOS);
+    await expect(dialog.locator('img')).toHaveCount(A_TOTAL_PHOTOS);
+    expect(storage.requests(), 'las miniaturas se sirven desde el origen del doble').toBeGreaterThan(0);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+
+    // 3. Ficha del producto B: su receta no tiene fotos, la celda muestra «—» y no hay boton.
+    const tableB = await openBatchesTab(page, productB, FINISHED_B_NAME, LOT_B);
+    await expect(tableB.getByTestId(EVIDENCE_HEAD_TESTID)).toBeVisible();
+    // El lote B es del MISMO pedido que el A: el «—» no es un lote sin pedido.
+    await expect(tableB.getByTestId(BATCH_ORDER_TESTID)).toHaveText(exactText(TWO_RECIPES_ORDER_NUMBER_TEXT));
+    await expect(tableB.getByTestId(EVIDENCE_CELL_TESTID)).toHaveText(exactText(EMPTY_MARK), { timeout: 60_000 });
+    await expect(tableB.getByTestId(EVIDENCE_BUTTON_TESTID)).toHaveCount(0);
   });
 });

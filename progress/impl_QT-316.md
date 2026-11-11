@@ -223,3 +223,62 @@ Sin coincidencias, `e2e/` incluido. `grep -rlE "get-order-evidence|count-order-e
 - `pnpm exec vitest run guard`: exit 0, `Test Files 87 passed (87)`, `Tests 1335 passed | 22 skipped (1357)`. Ninguna guardia ni snapshot cambió.
 
 Veredicto: tanda 4 (T8) hecha; la lectura y el conteo del pedido entero ya no existen (R21, P1, P4); typecheck, lint, tests tocados, integración y guardias en verde.
+
+## Tanda 5 (T9) — frontend_dev, 2026-11-11
+
+Ningún archivo nace en `e2e/`; no se tocó `lib/`, `app/`, `components/`, `db/` ni `package.json`.
+
+### Archivos
+
+- `e2e/consulta-de-evidencia.spec.ts` (modificado):
+  - fixture (mismo prefijo `qc271_e2e_` y misma empresa efímera): segundo pedido `TERMINADO`
+    (`ORDER_SEQUENCE + 1`, la unicidad es por empresa) con dos líneas, recetas
+    `_receta_a`/`_receta_b`, productos terminados `_terminado_a`/`_terminado_b` y lotes
+    `_lote_a`/`_lote_b`; cada lote con su línea de reparto y su asiento `production` atado a SU
+    línea. Fotos solo en la línea A: 1 de fabricación (paso 1), 2 de envasado (paso 1) y 1 de
+    acondicionamiento (paso 2), total 4;
+  - caso nuevo «R19 - pedido de dos recetas…»;
+  - `openBatchesTab` acepta el nombre del producto y el lote (por defecto, los de QC-271: R27 y R28
+    no cambian);
+  - limpieza: las filas nuevas son de la misma empresa, así que `deleteCompanyData` las borra en
+    `afterAll` y en la de huérfanos (líneas de reparto antes que líneas, asientos antes que lotes,
+    productos antes que recetas). Comentario de cabecera actualizado.
+
+### Mapa R<n> → test (tanda 5)
+
+| R | Test |
+|---|---|
+| R19 | `e2e/consulta-de-evidencia.spec.ts` › «R19 - pedido de dos recetas…»: ficha de A → botón «4 fotos» y su nombre accesible; diálogo `ready` con nombre accesible exacto «Evidencia · Lote <A> · Pedido <N> · <receta A>»; 4 botones de foto y 4 `img` en todo el diálogo (solo las de A); ficha de B → mismo pedido en «Pedido de origen», celda «—» y sin botón. R27 y R28 siguen verdes sin cambiar sus afirmaciones |
+| R20 | el mismo caso: secciones `batch-evidence-manufacturing`, `-packing` y `-conditioning` con su encabezado («Fabricación», «Envasado», «Acondicionamiento»), su total (1, 2, 1) y sus fotos cargadas por paso; la suma (4) es el conteo de la celda |
+
+### Verificación (salida real, un comando a la vez)
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: exit 0, `✖ 11 problems (0 errors, 11 warnings)`, los de base.
+- `pnpm exec vitest run guard --maxWorkers=1`: `Test Files 87 passed (87)`,
+  `Tests 1335 passed | 22 skipped (1357)` (incluye `guard-identificador-de-request` y
+  `guard-dobles-e2e`).
+- E2E, con las variables del `.env` del checkout principal solo en el shell (sin comillas ni CR),
+  puerto 3117 libre antes y después de cada corrida:
+
+```
+$ pnpm exec playwright test e2e/consulta-de-evidencia.spec.ts --workers=1 --project=chromium
+  ✓  1 [chromium] › e2e\consulta-de-evidencia.spec.ts:665:7 › consulta de evidencia por paso › R27 - … (1.6m)
+  ✓  2 [chromium] › e2e\consulta-de-evidencia.spec.ts:732:7 › consulta de evidencia por paso › R28 - … (15.8s)
+  ✓  3 [chromium] › e2e\consulta-de-evidencia.spec.ts:750:7 › consulta de evidencia por paso › R19 - pedido de dos recetas: … (12.7s)
+  3 passed (3.2m)
+
+$ pnpm exec playwright test e2e/consulta-de-evidencia.spec.ts --workers=1 --project=webkit
+  ✓  1 [webkit] › e2e\consulta-de-evidencia.spec.ts:665:7 › consulta de evidencia por paso › R27 - … (20.8s)
+  ✓  2 [webkit] › e2e\consulta-de-evidencia.spec.ts:732:7 › consulta de evidencia por paso › R28 - … (9.4s)
+  ✓  3 [webkit] › e2e\consulta-de-evidencia.spec.ts:750:7 › consulta de evidencia por paso › R19 - pedido de dos recetas: … (11.4s)
+  3 passed (56.6s)
+```
+
+  En la corrida de chromium el log del servidor trae una línea `[WebServer] ⨯ Error: aborted` entre
+  R27 y R28: es una petición que el navegador cortó al navegar. No falló ningún caso, y en webkit
+  no sale.
+- Huérfanos tras las dos corridas (conteo por Prisma de filas con prefijo `qc271_e2e_`):
+  `{"companies":0,"recipes":0,"products":0,"batches":0,"users":0}`.
+
+Veredicto: T9 hecha. R19 y R20 cubiertos en E2E, verde en chromium y webkit, R27 y R28 siguen verdes.
