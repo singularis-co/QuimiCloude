@@ -7,7 +7,7 @@
 > `pnpm exec vitest run guard`. Nadie corre `pnpm test` completo.
 > P1–P10 de `requirements.md` quedaron cerradas el 2026-11-11 (D6–D15); el barrido es horario (D7).
 
-## T1 — Esquema y migración · R40
+## [x] T1 — Esquema y migración · R40
 
 - `db/schema.prisma`: `templateComponents Json? @map("template_components")` en `WhatsappMessage`.
 - `db/migrations/20261111120000_whatsapp_system_send/migration.sql` y `down.sql` (design §2.2):
@@ -16,7 +16,7 @@
   `tests/integration/aislamiento.json`.
 - **Hecho:** `prisma validate` verde; down + up deja el mismo esquema; el índice existe.
 
-## T2 — Dominio puro [P] · R12, R22, R23, R25, R26
+## [x] T2 — Dominio puro [P] · R12, R22, R23, R25, R26
 
 - `domain/whatsapp-send-retry-policy.ts` (plazos, `maxAttemptsOf`, `isTemporarySendFailure`, motivos
   de design §7).
@@ -29,7 +29,7 @@
 - **Hecho:** tabla temporal/permanente cubierta caso a caso; textos fijados en test; los tests de
   `send/` siguen verdes.
 
-## T3 — Puertos [P] · R36, R38
+## [x] T3 — Puertos [P] · R36, R38
 
 - `ports/whatsapp-send-queue.ts`, `ports/whatsapp-queue-signature.ts`,
   `ports/whatsapp-send-queue-repository.ts` (8 métodos, `scope` al final),

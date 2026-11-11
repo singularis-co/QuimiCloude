@@ -62,6 +62,7 @@
     "integraciones/whatsapp-conversation-prisma.int.test.ts",
     "integraciones/whatsapp-messages-migration.int.test.ts",
     "integraciones/whatsapp-outbound-messages-migration.int.test.ts",
+    "integraciones/whatsapp-system-send-migration.int.test.ts",
     "integraciones/whatsapp-template-migration.int.test.ts",
     "integraciones/whatsapp-variable-keys-migration.int.test.ts",
     "integraciones/ai-provider-migration.int.test.ts",

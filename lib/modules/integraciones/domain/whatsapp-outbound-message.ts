@@ -27,6 +27,27 @@ export type NewOutboundMessage = {
   readonly payload: Record<string, unknown>;
 };
 
+/** Un aviso del sistema por plantilla: sin autor, y con los parámetros de Meta ya armados. */
+export type NewQueuedMessage = {
+  readonly connectionId: string;
+  readonly contactId: string;
+  readonly body: string;
+  readonly templateName: string;
+  readonly templateLanguage: string;
+  readonly payload: Record<string, unknown>;
+  readonly templateComponents: readonly unknown[];
+};
+
+export type ClaimedMessage = {
+  readonly id: string;
+  readonly connectionId: string;
+  readonly contactId: string;
+  readonly templateName: string;
+  readonly templateLanguage: string;
+  readonly templateComponents: readonly unknown[];
+  readonly attempts: number;
+};
+
 /** Un mensaje de la empresa tal como está guardado: puede ser un entrante, sin origen ni autor. */
 export type OutboundMessageRecord = {
   readonly id: string;

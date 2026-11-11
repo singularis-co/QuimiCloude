@@ -878,6 +878,8 @@ export const MIGRACIONES_ESPERADAS = [
   '20261103120150_order_lines_references_required',
   // 2026-11-05: orders deja de guardar lo de cada receta; no toca el identificador.
   '20261103120200_orders_drop_line_columns',
+  // 2026-11-11: los parametros de plantilla del envio del sistema y su indice; no toca el identificador.
+  '20261111120000_whatsapp_system_send',
 ] as const
 
 export function hallazgosDeMigraciones(

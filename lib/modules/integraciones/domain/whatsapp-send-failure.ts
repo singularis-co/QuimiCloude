@@ -9,7 +9,7 @@ export const UNREACHABLE_REASON = 'No se pudo contactar con Meta. Intenta de nue
 
 const TOKEN_INVALID_CODE = 190;
 const WINDOW_CLOSED_CODE = 131047;
-const RATE_LIMITED_CODES: readonly number[] = [130429, 131056];
+export const RATE_LIMITED_CODES: readonly number[] = [130429, 131056];
 
 export function rejectedWithCodeReason(code: number): string {
   return `Meta no aceptó el mensaje (código ${code}). Intenta de nuevo o revisa la conexión.`;
@@ -38,4 +38,9 @@ export function sendFailureOf(failure: GraphFailure): SendFailure {
     errorReason: sendFailureReasonOf(code),
     effect: code === TOKEN_INVALID_CODE ? 'token_invalid' : null,
   };
+}
+
+/** Para el log interno: el tipo de fallo y los códigos de Meta, nunca su texto. */
+export function sendDiagnosticOf(failure: GraphFailure): string {
+  return `Graph enviar mensaje: ${failure.kind}; code=${failure.code ?? '-'}; subcode=${failure.subcode ?? '-'}`;
 }
