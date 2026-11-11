@@ -64,7 +64,8 @@ export interface StepEvidenceRepository {
     candidates: readonly { readonly orderId: string; readonly phase: EvidencePhase }[],
   ): Promise<readonly string[]>;
   /** Fotos por linea, de las tres fases. Una linea sin fotos, de otro pedido o de otra empresa no
-   *  sale. Clave: `lineId`. */
+   *  sale. Clave: `lineEvidenceKey(orderId, lineId)`, la pareja: la misma linea pedida con otro
+   *  pedido no hereda su conteo. */
   countByLines(
     companyId: string,
     lines: readonly { readonly orderId: string; readonly lineId: string }[],

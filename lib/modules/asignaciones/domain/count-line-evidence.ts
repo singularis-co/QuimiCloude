@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
 import { readRecipeOutlines } from './recipe-of-order';
+import { lineEvidenceKey } from './step-evidence';
 
 import type { LineEvidenceCount } from './order-evidence';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
@@ -46,13 +47,13 @@ export function createCountLineEvidence(
     if (!parsed.success) throw new ValidationError();
 
     const byPair = new Map<string, Line>();
-    for (const { orderId, lineId } of parsed.data.lines) byPair.set(`${orderId}:${lineId}`, { orderId, lineId });
+    for (const { orderId, lineId } of parsed.data.lines) byPair.set(lineEvidenceKey(orderId, lineId), { orderId, lineId });
     const lines = [...byPair.values()];
     if (lines.length === 0) return [];
 
     const counts = await deps.evidence.countByLines(actor.companyId, lines);
     const withPhotos = lines.flatMap((line) => {
-      const photoCount = counts.get(line.lineId) ?? 0;
+      const photoCount = counts.get(lineEvidenceKey(line.orderId, line.lineId)) ?? 0;
       return photoCount > 0 ? [{ ...line, photoCount }] : [];
     });
     if (withPhotos.length === 0) return [];

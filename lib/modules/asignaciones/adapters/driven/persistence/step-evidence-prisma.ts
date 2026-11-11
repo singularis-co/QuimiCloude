@@ -2,7 +2,12 @@ import { Prisma, type EvidencePhase as DbEvidencePhase, type PrismaClient } from
 
 import { prisma } from '@/lib/shared/db/prisma';
 
-import { EVIDENCE_PHASES, MAX_EVIDENCE_PER_STEP, type EvidencePhase } from '../../../domain/step-evidence';
+import {
+  EVIDENCE_PHASES,
+  MAX_EVIDENCE_PER_STEP,
+  lineEvidenceKey,
+  type EvidencePhase,
+} from '../../../domain/step-evidence';
 
 import type {
   NewStepEvidence,
@@ -196,16 +201,16 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
 
     async countByLines(companyId, lines) {
       if (lines.length === 0) return new Map();
-      const orderOfLine = new Map(lines.map((line) => [line.lineId, line.orderId]));
+      const asked = new Set(lines.map((line) => lineEvidenceKey(line.orderId, line.lineId)));
       const groups = await db.orderStepEvidence.groupBy({
         by: ['orderId', 'orderLineId'],
-        where: { companyId, orderLineId: { in: [...orderOfLine.keys()] } },
+        where: { companyId, orderLineId: { in: [...new Set(lines.map((line) => line.lineId))] } },
         _count: { _all: true },
       });
       return new Map(
         groups
-          .filter((group) => orderOfLine.get(group.orderLineId) === group.orderId)
-          .map((group) => [group.orderLineId, group._count._all]),
+          .map((group) => [lineEvidenceKey(group.orderId, group.orderLineId), group._count._all] as const)
+          .filter(([key]) => asked.has(key)),
       );
     },
   };

@@ -230,13 +230,31 @@ describe('getLineEvidence — sin receta, el mismo order_not_found', () => {
     }
   });
 
+  it.each([
+    ['una linea de otro pedido', LINEA_DE_OTRO_PEDIDO],
+    ['una linea inexistente', LINEA_INEXISTENTE],
+    ['una linea quitada sin fotos', LINEA_QUITADA],
+  ])('R14: %s en un pedido de la empresa con fotos de otra receta es order_not_found sin firmar', async (_caso, lineId) => {
+    const m = montar();
+
+    const error = await errorDe(m.leer(LECTOR, { orderId: PEDIDO, lineId }));
+
+    expect(error).toBeInstanceOf(OrderNotFoundError);
+    expect((error as OrderNotFoundError).code).toBe('order_not_found');
+    expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
+    expect(m.storage.createSignedReadUrl).not.toHaveBeenCalled();
+    expect(m.repo.listByOrder).not.toHaveBeenCalled();
+    expect(m.repo.countByLines).toHaveBeenCalledWith(EMPRESA, [{ orderId: PEDIDO, lineId }]);
+  });
+
   it('R14: el pedido de otra empresa no firma ninguna lectura', async () => {
     const m = montar();
 
     await expect(
       m.leer({ ...LECTOR, companyId: OTRA_EMPRESA }, { orderId: PEDIDO, lineId: LINEA }),
     ).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(m.listSummariesByIdsIncludingDeleted.mock.calls[0]![0]).toBe(OTRA_EMPRESA);
+    expect(m.repo.countByLines.mock.calls[0]![0]).toBe(OTRA_EMPRESA);
+    expect(m.listRecipeOutlinesByIdsIncludingDeleted.mock.calls[0]![0]).toBe(OTRA_EMPRESA);
     expect(m.repo.listByOrder).not.toHaveBeenCalled();
     expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
   });
@@ -269,7 +287,11 @@ describe('getLineEvidence — la empresa del actor y solo lectura', () => {
 
     await m.leer(LECTOR, { orderId: PEDIDO, lineId: LINEA_SIN_FOTOS });
 
+    await m.leer(LECTOR, { orderId: PEDIDO, lineId: LINEA });
+
+    for (const llamada of m.repo.countByLines.mock.calls) expect(llamada[0]).toBe(EMPRESA);
     for (const llamada of m.repo.listByOrder.mock.calls) expect(llamada[0]).toBe(EMPRESA);
+    expect(m.listSummariesByIdsIncludingDeleted.mock.calls[0]![0]).toBe(EMPRESA);
     expect(m.listRecipeOutlinesByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, [PEDIDO]);
   });
 

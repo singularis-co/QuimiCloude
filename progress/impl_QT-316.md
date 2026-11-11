@@ -351,3 +351,58 @@ entero se retiran y `readOrderEvidenceByLine` se queda con el código común.
 
 Veredicto: T1–T9 hechas y verificadas por tanda; `./init.sh` rojo solo por el validador de
 `feature_list.json` (ids duplicados y el aviso de assignee de QT-316).
+
+## Review vuelta 1 (B1, B2) — backend_dev, 2026-11-11
+
+Sin tocar el spec, `app/` ni `components/`. Grafo: no usado (Grep/Read). La forma de la respuesta de
+`countLineEvidence` y de `countLineEvidenceAction` (`{ orderId, lineId, photoCount, recipeName }[]`) **no cambia**:
+la pantalla no se toca.
+
+### B1 (R14): no se firma nada cuando la respuesta es `order_not_found`
+
+- `lib/modules/asignaciones/domain/get-line-evidence.ts`: antes de leer, `countByLines(companyId, [{ orderId, lineId }])`.
+  Con 0 fotos no se llama a `readOrderEvidenceByLine` ni se firma; decide el outline (evidencia vacía u
+  `OrderNotFoundError`). Con más de 0, `readOrderEvidenceByLine` sin cambios (R16).
+- `tests/unit/asignaciones/get-line-evidence.test.ts`:
+  - nuevo `R14: %s en un pedido de la empresa con fotos de otra receta es order_not_found sin firmar` (3 casos:
+    línea de otro pedido, línea inexistente, línea quitada sin fotos): `order_not_found`, `createSignedReadUrls`,
+    `createSignedReadUrl` y `listByOrder` no llamados, `countByLines` con la empresa y el par;
+  - ajustados: «el pedido de otra empresa no firma» comprueba ahora la empresa en `countByLines` y en el outline
+    (ya no llega a `listSummariesByIdsIncludingDeleted`); «lista las fotos y el pedido con la empresa del actor»
+    lee también `LINEA` para comprobar la empresa en `countByLines`, `listByOrder` y el resumen del pedido.
+
+### B2 (R15): el conteo va por la pareja pedido-línea
+
+- `lib/modules/asignaciones/domain/step-evidence.ts`: nuevo `lineEvidenceKey(orderId, lineId)` → `${orderId}:${lineId}`.
+- `lib/modules/asignaciones/ports/step-evidence-repository.ts`: `countByLines` documenta la clave por pareja.
+- `lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma.ts`: el resultado se indexa con
+  `lineEvidenceKey` y se filtra por las parejas pedidas (fuera el `Map` lineId→orderId).
+- `lib/modules/asignaciones/domain/count-line-evidence.ts`: busca con `lineEvidenceKey(line.orderId, line.lineId)`
+  (y deduplica con la misma clave).
+- `tests/unit/asignaciones/evidence-doubles.ts`: el doble indexa con `lineEvidenceKey`.
+- `tests/helpers/evidence-off.ts`: sin cambios (su `countByLines` rechaza siempre; no indexa).
+- Casos nuevos:
+  - `tests/unit/asignaciones/count-line-evidence.test.ts`: `R15: la misma linea pedida con dos pedidos (%s) solo
+    cuenta con el suyo` (la ajena primero / la propia primero): solo `(PEDIDO, LINEA)` con 3 fotos;
+  - `tests/integration/asignaciones/step-evidence-repository.int.test.ts` (describe de `countByLines`):
+    `QT-316 R15: la misma linea con dos pedidos (%s) solo cuenta con el suyo` (los dos órdenes): solo `(A, L)` con 3
+    y `(B, L)` ausente. Los casos existentes del describe pasan a esperar la clave por pareja.
+
+### Verificación
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: exit 0, `✖ 11 problems (0 errors, 11 warnings)` (los de base).
+- Unit, por ruta, `--maxWorkers=1`:
+  - 14 archivos (los de `tests/unit/asignaciones` de evidencia, incluidos `get-line-evidence`, `count-line-evidence`,
+    `get-execution-evidence` (R16) y `order-evidence-actions`, + `composition/asignaciones-facade`,
+    `identity/session-once-per-request-actions`, `inventario/producto-terminado/finished-product-route-contract`):
+    `Test Files 14 passed (14)`, `Tests 373 passed (373)`;
+  - 13 archivos (`tests/unit/inventario-ui` de la action: 3; `tests/unit/recetas` con `evidence-off`: 10):
+    `Test Files 13 passed (13)`, `Tests 233 passed (233)`.
+- Integración, base efímera del `globalSetup` (`DATABASE_URL` del `.env` principal solo en el shell; borrada al final):
+  - `step-evidence-repository` + las 8 `.int` con `evidence-off`: `Test Files 9 passed (9)`, `Tests 108 passed (108)`;
+  - resto de `tests/integration/asignaciones/`, dos lotes de 12: `12 passed / 94 passed` y `12 passed / 117 passed`.
+- `pnpm exec vitest run guard --maxWorkers=1`: `Test Files 87 passed (87)`, `Tests 1335 passed | 22 skipped (1357)`.
+
+Veredicto: B1 y B2 resueltos sin cambiar la forma de la respuesta; typecheck, lint, tests tocados y relacionados,
+integración de asignaciones y guardias en verde.

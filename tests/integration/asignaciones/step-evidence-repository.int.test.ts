@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createStepEvidenceRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/step-evidence-prisma';
+import { lineEvidenceKey } from '@/lib/modules/asignaciones/domain/step-evidence';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
 
@@ -459,8 +460,8 @@ describe('countByLines: fotos por linea de la empresa (QT-316; QC-271 R6, R29)',
 
     expect(counts).toEqual(
       new Map([
-        [lineA, 2],
-        [lineB, 1],
+        [lineEvidenceKey(orderId, lineA), 2],
+        [lineEvidenceKey(orderId, lineB), 1],
       ]),
     );
     expect(watched.calls()).toBe(1);
@@ -474,7 +475,9 @@ describe('countByLines: fotos por linea de la empresa (QT-316; QC-271 R6, R29)',
     inserted(await repo.insert(evidence(a, orderId, { phase: 'conditioning' })));
     inserted(await repo.insert(evidence(a, orderId, { phase: 'conditioning', stepPosition: 2 })));
 
-    expect(await repo.countByLines(a.companyId, [{ orderId, lineId: lineA }])).toEqual(new Map([[lineA, 4]]));
+    expect(await repo.countByLines(a.companyId, [{ orderId, lineId: lineA }])).toEqual(
+      new Map([[lineEvidenceKey(orderId, lineA), 4]]),
+    );
   });
 
   it('QT-316 R2: una linea sin fotos no sale en el resultado', async () => {
@@ -488,8 +491,8 @@ describe('countByLines: fotos por linea de la empresa (QT-316; QC-271 R6, R29)',
       { orderId, lineId: empty },
     ]);
 
-    expect(counts.has(empty)).toBe(false);
-    expect(counts).toEqual(new Map([[lineA, 1]]));
+    expect(counts.has(lineEvidenceKey(orderId, empty))).toBe(false);
+    expect(counts).toEqual(new Map([[lineEvidenceKey(orderId, lineA), 1]]));
   });
 
   it('QT-316 R15, QC-271 R29: una fila de otra empresa no cuenta aunque se pida su linea', async () => {
@@ -503,8 +506,8 @@ describe('countByLines: fotos por linea de la empresa (QT-316; QC-271 R6, R29)',
       { orderId: ofB, lineId: line(ofB) },
     ];
 
-    expect(await repo.countByLines(a.companyId, pairs)).toEqual(new Map([[line(ofA), 1]]));
-    expect(await repo.countByLines(b.companyId, pairs)).toEqual(new Map([[line(ofB), 2]]));
+    expect(await repo.countByLines(a.companyId, pairs)).toEqual(new Map([[lineEvidenceKey(ofA, line(ofA)), 1]]));
+    expect(await repo.countByLines(b.companyId, pairs)).toEqual(new Map([[lineEvidenceKey(ofB, line(ofB)), 2]]));
   });
 
   it('QT-316 R15: un par con el orderId cambiado no cuenta las fotos de la linea', async () => {
@@ -520,7 +523,27 @@ describe('countByLines: fotos por linea de la empresa (QT-316; QC-271 R6, R29)',
         { orderId: otherOrderId, lineId: lineA },
         { orderId: otherOrderId, lineId: line(otherOrderId) },
       ]),
-    ).toEqual(new Map([[line(otherOrderId), 1]]));
+    ).toEqual(new Map([[lineEvidenceKey(otherOrderId, line(otherOrderId)), 1]]));
+  });
+
+  it.each([
+    ['la ajena primero', true],
+    ['la propia primero', false],
+  ])('QT-316 R15: la misma linea con dos pedidos (%s) solo cuenta con el suyo', async (_orden, ajenaPrimero) => {
+    const orderId = await createOrder(a.companyId);
+    const otherOrderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    inserted(await repo.insert(evidence(a, orderId)));
+    inserted(await repo.insert(evidence(a, orderId, { stepPosition: 2 })));
+    inserted(await repo.insert(evidence(a, orderId, { phase: 'packing' })));
+    inserted(await repo.insert(evidence(a, otherOrderId)));
+    const propia = { orderId, lineId: lineA };
+    const ajena = { orderId: otherOrderId, lineId: lineA };
+
+    const counts = await repo.countByLines(a.companyId, ajenaPrimero ? [ajena, propia] : [propia, ajena]);
+
+    expect(counts).toEqual(new Map([[lineEvidenceKey(orderId, lineA), 3]]));
+    expect(counts.has(lineEvidenceKey(otherOrderId, lineA))).toBe(false);
   });
 
   it('QT-316 R4: con la lista vacia devuelve un Map vacio sin consultar', async () => {

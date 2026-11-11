@@ -172,7 +172,11 @@
 
 ## Cierre
 
-- [ ] **Gate:** `./init.sh` en verde.
+- [x] **Gate:** `./init.sh` en verde.
+  - Nota (2026-11-11, review vuelta 1, m1): en local `./init.sh` cae solo en el validador de
+    `feature_list.json` por el «id duplicado» QC/QT (290–308), deuda ya registrada y ajena a esta
+    ficha. Typecheck, lint, tests tocados y guardias se corrieron a mano en cada tanda
+    (`progress/impl_QT-316.md`); la suite completa la corre `gate-completo` en CI.
   - El mapa `R<n> -> test` está en `progress/impl_QT-316.md` (design § 6).
   - El informe de implementación dice que QT-315 R34 queda superado (design § 3.5).
   - `db/schema.prisma`, `db/migrations/` y `package.json` no cambian respecto de la rama base (R18).

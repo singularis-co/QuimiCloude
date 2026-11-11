@@ -3,6 +3,8 @@
 // metodo un `vi.fn` que se puede inspeccionar.
 import { vi } from 'vitest';
 
+import { lineEvidenceKey } from '@/lib/modules/asignaciones/domain/step-evidence';
+
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
 import type { EvidenceTargetDeps } from '@/lib/modules/asignaciones/domain/evidence-target';
 import type { EvidencePhase } from '@/lib/modules/asignaciones/domain/step-evidence';
@@ -161,7 +163,7 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
         const total = filas.filter(
           (f) => f.companyId === companyId && f.orderId === orderId && f.orderLineId === lineId,
         ).length;
-        if (total > 0) conteo.set(lineId, total);
+        if (total > 0) conteo.set(lineEvidenceKey(orderId, lineId), total);
       }
       return conteo;
     }),

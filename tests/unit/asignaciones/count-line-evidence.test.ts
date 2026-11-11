@@ -301,6 +301,19 @@ describe('countLineEvidence — que recetas salen', () => {
     await expect(m.contar(LECTOR, { lines: [{ orderId: OTRO_PEDIDO, lineId: LINEA }] })).resolves.toEqual([]);
   });
 
+  it.each([
+    ['la ajena primero', true],
+    ['la propia primero', false],
+  ])('R15: la misma linea pedida con dos pedidos (%s) solo cuenta con el suyo', async (_orden, ajenaPrimero) => {
+    const m = montar();
+    const propia = { orderId: PEDIDO, lineId: LINEA };
+    const ajena = { orderId: OTRO_PEDIDO, lineId: LINEA };
+
+    const conteo = await m.contar(LECTOR, { lines: ajenaPrimero ? [ajena, propia] : [propia, ajena] });
+
+    expect(conteo).toEqual([{ ...propia, photoCount: 3, recipeName: 'Crema · Lavanda' }]);
+  });
+
   it('R15: cuenta con la empresa del actor y lee pedidos y recetas con ella', async () => {
     const m = montar();
 

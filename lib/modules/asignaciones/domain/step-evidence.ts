@@ -77,3 +77,9 @@ export function missingEvidencePositions(
   });
   return missing;
 }
+
+/** Clave de una pareja pedido-linea en el conteo de fotos: la misma linea con otro pedido es otra
+ *  pareja y no hereda su conteo. */
+export function lineEvidenceKey(orderId: string, lineId: string): string {
+  return `${orderId}:${lineId}`;
+}
