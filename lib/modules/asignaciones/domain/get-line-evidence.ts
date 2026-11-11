@@ -27,7 +27,7 @@ export function createGetLineEvidence(
     const { orderId, lineId } = parsed.data;
 
     // Sin fotos de la linea no se lee ni se firma nada: si no, una linea ajena firmaria las fotos de
-    // las otras recetas antes de responder order_not_found (R14).
+    // las otras recetas antes de responder order_not_found.
     const photoCount = (await deps.evidence.countByLines(actor.companyId, [{ orderId, lineId }])).get(
       lineEvidenceKey(orderId, lineId),
     );

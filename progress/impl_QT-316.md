@@ -406,3 +406,7 @@ la pantalla no se toca.
 
 Veredicto: B1 y B2 resueltos sin cambiar la forma de la respuesta; typecheck, lint, tests tocados y relacionados,
 integración de asignaciones y guardias en verde.
+
+## Review vuelta 2 (B3) — backend_dev, 2026-11-11
+
+- B3: quitado `(R14)` del comentario en `lib/modules/asignaciones/domain/get-line-evidence.ts`; sin más citas R/QT/QC en comentarios añadidos (`git diff 4a480b944` sobre `lib app components`). Typecheck 0, eslint sin issues, `tests/unit/asignaciones/get-line-evidence.test.ts` 31/31.
