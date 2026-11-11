@@ -62,6 +62,7 @@ const {
   listCostsMock,
   listDistributionMock,
   getForVoidMock,
+  countLineMock,
 } = vi.hoisted(() => ({
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -77,6 +78,7 @@ const {
   listCostsMock: vi.fn(),
   listDistributionMock: vi.fn(),
   getForVoidMock: vi.fn(),
+  countLineMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -91,8 +93,8 @@ vi.mock('@/lib/composition', () => ({
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions', () => ({
-  getOrderEvidenceAction: vi.fn(),
-  countOrderEvidenceAction: vi.fn(),
+  getLineEvidenceAction: vi.fn(),
+  countLineEvidenceAction: countLineMock,
 }));
 
 vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => ({
@@ -967,5 +969,45 @@ describe('Listados', () => {
     expect(listDistributionMock).toHaveBeenCalledWith(FINISHED_PRODUCT_ID, { page: 2, pageSize: 10 });
     expect(listCostsMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('finished-product-reparto')).toBeInTheDocument();
+  });
+
+  // 2026-11-11 (QT-316): la columna «Evidencia» cuenta por receta (línea del pedido) en una lectura.
+  function batchesOfTenOrders(): ReturnType<typeof finishedProductBatchRow>[] {
+    return Array.from({ length: 25 }, (_, index) =>
+      finishedProductBatchRow({
+        id: `lote-${index}`,
+        lot: `L-2026-${String(index).padStart(4, '0')}`,
+        orderId: `a0000000-0000-4000-8000-0000000010${String(index % 10).padStart(2, '0')}`,
+        orderLineId: `a1000000-0000-4000-8000-0000000010${String(index).padStart(2, '0')}`,
+      }),
+    );
+  }
+
+  it('QT-316 R4 — 25 lotes de 10 pedidos: una sola lectura de conteos, con un par por receta', async () => {
+    const rows = batchesOfTenOrders();
+    listBatchesMock.mockResolvedValue({ status: 'success', data: finishedProductPage(rows) });
+    countLineMock.mockResolvedValue({ status: 'success', data: [] });
+    vi.mocked(identity.getSessionUser).mockResolvedValueOnce(
+      sessionUser(['inventario.consultar', 'pedidos.consultar']),
+    );
+    await renderSection('lotes');
+
+    expect(countLineMock).toHaveBeenCalledTimes(1);
+    expect(countLineMock).toHaveBeenCalledWith(
+      rows.map((row) => ({ orderId: row.orderId, lineId: row.orderLineId })),
+    );
+    expect(screen.getAllByRole('columnheader').at(-1)).toHaveTextContent('Evidencia');
+  });
+
+  it('QT-316 R13 — sin pedidos.consultar no hay columna «Evidencia» ni se piden los conteos', async () => {
+    listBatchesMock.mockResolvedValue({ status: 'success', data: finishedProductPage(batchesOfTenOrders()) });
+    vi.mocked(identity.getSessionUser).mockResolvedValueOnce(sessionUser(['inventario.consultar']));
+    await renderSection('lotes');
+
+    expect(countLineMock).not.toHaveBeenCalled();
+    expect(
+      screen.getAllByRole('columnheader').some((th) => (th.textContent ?? '').includes('Evidencia')),
+    ).toBe(false);
+    expect(screen.queryByTestId('finished-product-batch-evidence')).toBeNull();
   });
 });

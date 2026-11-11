@@ -10,11 +10,22 @@ import { BATCH_EVIDENCE_TEXTS, BatchEvidenceDialog } from './batch-evidence-dial
 export type BatchEvidenceButtonProps = {
   readonly lot: string;
   readonly orderId: string;
+  /** La línea del pedido que produjo el lote: el diálogo lee solo sus fotos. */
+  readonly lineId: string;
+  /** `null` con una sola receta viva o sin nombre: el diálogo no la nombra. */
+  readonly recipeName: string | null;
   readonly orderNumberText: string;
   readonly photoCount: number;
 };
 
-export function BatchEvidenceButton({ lot, orderId, orderNumberText, photoCount }: BatchEvidenceButtonProps) {
+export function BatchEvidenceButton({
+  lot,
+  orderId,
+  lineId,
+  recipeName,
+  orderNumberText,
+  photoCount,
+}: BatchEvidenceButtonProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -37,6 +48,8 @@ export function BatchEvidenceButton({ lot, orderId, orderNumberText, photoCount 
         onOpenChange={setOpen}
         lot={lot}
         orderId={orderId}
+        lineId={lineId}
+        recipeName={recipeName}
         orderNumberText={orderNumberText}
         photoCount={photoCount}
       />

@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
 import { identity } from '@/lib/composition';
 import { canConsultOrderEvidence } from '@/lib/modules/asignaciones';
-import { countOrderEvidenceAction } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
+import { countLineEvidenceAction } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import { assertPermission, type PermissionCode, type SessionUser } from '@/lib/modules/identity';
 import {
@@ -138,8 +138,8 @@ function dispatch<P extends Page<unknown>>(
 
 /**
  * Presentación, no autorización: sin el permiso la columna no se pinta y el conteo no se pide; la
- * action vuelve a exigirlo. Un conteo fallido deja la tabla sin columna, porque «—» diría que el
- * pedido no tiene fotos.
+ * action vuelve a exigirlo. Un conteo fallido deja la tabla sin columna, porque «—» diría que la
+ * receta no tiene fotos. Cada lote cuenta solo las fotos de la línea del pedido que lo produjo.
  */
 async function loadEvidenceCounts(
   rows: readonly FinishedProductBatchRow[],
@@ -147,12 +147,19 @@ async function loadEvidenceCounts(
   if (rows.length === 0) return undefined;
   if (!canConsultOrderEvidence(await identity.getSessionUser())) return undefined;
 
-  const orderIds = [...new Set(rows.flatMap((row) => (row.orderId === null ? [] : [row.orderId])))];
-  if (orderIds.length === 0) return new Map();
+  const lines = new Map<string, { orderId: string; lineId: string }>();
+  for (const row of rows) {
+    if (row.orderId !== null && row.orderLineId !== null) {
+      lines.set(row.orderLineId, { orderId: row.orderId, lineId: row.orderLineId });
+    }
+  }
+  if (lines.size === 0) return new Map();
 
-  const result = await countOrderEvidenceAction(orderIds);
+  const result = await countLineEvidenceAction([...lines.values()]);
   if (result.status === 'error') return undefined;
-  return new Map(result.data.map((count) => [count.orderId, count.photoCount]));
+  return new Map(
+    result.data.map((count) => [count.lineId, { photoCount: count.photoCount, recipeName: count.recipeName }]),
+  );
 }
 
 const PERMISSION_DENIED = new Error('permiso denegado');

@@ -114,3 +114,48 @@ Grafo: no usado (sin índice de este worktree); Grep/Read. No hizo falta regener
 - `pnpm exec vitest run guard`: 87 archivos, 1335 pasados, 22 saltados, 0 rojos.
 
 Veredicto: tanda 2 (T3, T4, T5) hecha; typecheck, lint, tests tocados y guardias en verde.
+
+## Tanda 3 (frontend_dev, 2026-11-11)
+
+### Archivos
+
+**T6 — conteo por receta en Lotes**
+- `app/(private)/inventario/producto-terminado/[id]/components/finished-product-list-section.tsx`: `loadEvidenceCounts` arma los pares `(orderId, orderLineId)` de las filas con pedido (sin repetir línea) y llama una vez a `countLineEvidenceAction`; mapa por `lineId` con `{ photoCount, recipeName }`. Ya no importa `countOrderEvidenceAction`.
+- `.../components/finished-product-batches-table.tsx`: `EvidenceCounts` = `ReadonlyMap<lineId, { photoCount, recipeName }>`; la celda busca por `row.orderLineId`; sin entrada o con 0, «—». Pasa `lineId` y `recipeName` al botón.
+- `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`: `LECTURAS_DE_EVIDENCIA` = `getLineEvidenceAction`, `countLineEvidenceAction` (comentario 2026-11-11, QT-316, P1); la fuente fabricada de R26 usa `getLineEvidenceAction`.
+- `tests/unit/inventario-ui/finished-product-batches-evidence.test.tsx`: mocks a las actions de línea; los casos de QC-271 pasan a pares por línea; «R19 — dos lotes del mismo pedido muestran el mismo total» (QC-271) queda sustituido por `QT-316 R1` (comentario con fecha).
+- `tests/unit/inventario-ui/finished-product-tables.test.tsx`: mock a las actions de línea; casos `QT-316 R4` y `QT-316 R13`.
+
+**T7 — el diálogo de la receta**
+- `.../components/batch-evidence-button.tsx`: props `lineId` y `recipeName`, al diálogo.
+- `.../components/batch-evidence-dialog.tsx`: lee con `getLineEvidenceAction(orderId, lineId)` (el efecto depende de `lineId`); con `recipeName !== null` el título suma ` · <receta>` y la descripción es `recipeDescription`; `BATCH_EVIDENCE_TEXTS` gana `recipeDescription`, `conditioning`, `conditioningPhase`; tercer `PhaseSection` «Acondicionamiento» (`batch-evidence-conditioning`); `DialogTitle` con `break-words [overflow-wrap:anywhere]`. `components/shared/step-evidence` y `BATCH_EVIDENCE_DIALOG_CLASS` sin cambios.
+- `tests/unit/inventario-ui/batch-evidence-dialog.test.tsx`: mock a `getLineEvidenceAction`; los casos de QC-271 con `lineId` y `recipeName={null}`; `describe('BatchEvidenceDialog, por receta')` nuevo.
+
+Nota: en `tests/fixtures/order-evidence.ts`, `ORDER_EVIDENCE` suma 8 fotos (6 + 2) pero `ORDER_EVIDENCE_PHOTO_TOTAL` vale 9. Es de antes de esta tanda y no lo toqué (lo usan otros tests). Los casos R20 calculan el conteo de la celda a partir de la evidencia.
+
+### Mapa R<n> → test (tanda 3)
+
+| R | Archivo | Caso(s) |
+|---|---|---|
+| R1 | `finished-product-batches-evidence.test.tsx` | `QT-316 R1 — dos lotes del mismo pedido, cada uno con las fotos de su receta` |
+| R2 | ídem | `QT-316 R2 — una receta sin fotos muestra «—» sin botón, aunque la otra receta del pedido tenga` |
+| R3 | ídem | `QT-316 R3 — un lote sin pedido de origen sigue con «—», aunque el mapa tenga conteos` |
+| R4 | `finished-product-tables.test.tsx` | `QT-316 R4 — 25 lotes de 10 pedidos: una sola lectura de conteos, con un par por receta` |
+| R4 | `finished-product-batches-evidence.test.tsx` | `R16, QT-316 R4 — … se cuenta una vez por página` |
+| R6 | `batch-evidence-dialog.test.tsx` | `QT-316 R6 — lee con el pedido y la línea del lote, y vuelve a leer si cambia la línea` |
+| R6, R7 | `finished-product-batches-evidence.test.tsx` | `QT-316 R6, R7 — el botón abre el diálogo de su receta: lee por línea y nombra la receta` |
+| R7 | `batch-evidence-dialog.test.tsx` | `QT-316 R7 — con varias recetas, el título nombra la receta y la descripción es la de la receta` |
+| R8, R9 | ídem | `QT-316 R8, R9 — sin nombre de receta, título y descripción de hoy, y las fotos salen igual` |
+| R10 | ídem | `QT-316 R10 — esqueleto con el conteo de la receta, y el error con «Reintentar»`; `QT-316 R10 — firma caída: los grupos de la receta con su cantidad y sin fotos` |
+| R11 | ídem | `QT-316 R11 — el título parte palabras largas y el diálogo sigue a pantalla completa en teléfono` |
+| R13 | `finished-product-tables.test.tsx` | `QT-316 R13 — sin pedidos.consultar no hay columna «Evidencia» ni se piden los conteos` |
+| R20 | `batch-evidence-dialog.test.tsx` | `QT-316 R20 — grupo «Acondicionamiento» tras Envasado, con sus pasos y su total; la suma da el conteo`; `QT-316 R20 — sin fotos de acondicionamiento no hay sección, y la suma sigue dando el conteo` |
+
+### Verificación (salida real, un comando a la vez, `--maxWorkers=1`)
+
+- `pnpm run typecheck`: exit 0, 0 errores.
+- `pnpm run lint`: `✖ 11 problems (0 errors, 11 warnings)`, la base.
+- `batch-evidence-dialog`, `finished-product-batches-evidence`, `finished-product-tables`, `finished-product-route-contract`, `pedidos/scope`, `recetas/scope`, `finished-product-tabs`, `finished-product-page`, `finished-product-params`, `finished-product-header`, `direct-delivery-void-dialog`: `Test Files 11 passed (11)`, `Tests 155 passed (155)`.
+- `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1335 passed | 22 skipped (1357)`.
+
+Veredicto: tanda 3 (T6, T7) hecha; la pantalla ya no importa las actions del pedido entero; typecheck, lint, tests tocados y guardias en verde.

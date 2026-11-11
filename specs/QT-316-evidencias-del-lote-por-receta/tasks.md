@@ -91,7 +91,7 @@
 
 ## Tanda 3 — la pantalla (frontend_dev; depende de T1 y T5)
 
-- [ ] **T6 · frontend_dev — conteo por receta en Lotes** (design § 4 · R1, R2, R3, R4, R13)
+- [x] **T6 · frontend_dev — conteo por receta en Lotes** (design § 4 · R1, R2, R3, R4, R13)
   - `loadEvidenceCounts` llama a `countLineEvidenceAction` una vez, con los pares de la página.
   - El mapa queda por `lineId` con `{ photoCount, recipeName }`.
   - La celda busca por `row.orderLineId`.
@@ -103,7 +103,7 @@
     - `finished-product-tables.test.tsx` cubre R4 (una sola llamada) y R13 (sin permiso no hay
       columna ni llamada);
     - el contrato de la ruta está en verde.
-- [ ] **T7 · frontend_dev — el diálogo de la receta** (design § 4 · R6, R7, R8, R9, R10, R11, R20; depende de T6)
+- [x] **T7 · frontend_dev — el diálogo de la receta** (design § 4 · R6, R7, R8, R9, R10, R11, R20; depende de T6)
   - `batch-evidence-button.tsx` y `batch-evidence-dialog.tsx` reciben `lineId` y `recipeName`.
   - El diálogo lee con `getLineEvidenceAction`.
   - Título y descripción con la receta cuando `recipeName !== null`.

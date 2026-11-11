@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { OrderEvidence, OrderEvidenceGroup } from '@/lib/modules/asignaciones';
-import { getOrderEvidenceAction } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
+import { getLineEvidenceAction } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
 
 export const BATCH_EVIDENCE_TEXTS = {
   column: 'Evidencia',
@@ -31,10 +31,13 @@ export const BATCH_EVIDENCE_TEXTS = {
   lot: 'Lote',
   order: 'Pedido',
   description: 'Fotos tomadas durante la ejecución del pedido. Solo consulta.',
+  recipeDescription: 'Fotos tomadas durante la ejecución de esta receta del pedido. Solo consulta.',
   manufacturing: 'Fabricación',
   packing: 'Envasado',
+  conditioning: 'Acondicionamiento',
   manufacturingPhase: 'fabricación',
   packingPhase: 'envasado',
+  conditioningPhase: 'acondicionamiento',
 } as const;
 
 /** En teléfono ocupa la pantalla; desde 768 px vuelve a ser un diálogo centrado. */
@@ -48,8 +51,12 @@ export type BatchEvidenceDialogProps = {
   readonly onOpenChange: (open: boolean) => void;
   readonly lot: string;
   readonly orderId: string;
+  /** La línea del pedido que produjo el lote: solo se leen sus fotos. */
+  readonly lineId: string;
+  /** Con nombre, el título y la descripción nombran la receta; con `null`, quedan como hoy. */
+  readonly recipeName: string | null;
   readonly orderNumberText: string;
-  /** Total del pedido: da cuántas casillas esqueleto pintar mientras se lee. */
+  /** Total de la receta del lote: da cuántas casillas esqueleto pintar mientras se lee. */
   readonly photoCount: number;
 };
 
@@ -113,6 +120,8 @@ export function BatchEvidenceDialog({
   onOpenChange,
   lot,
   orderId,
+  lineId,
+  recipeName,
   orderNumberText,
   photoCount,
 }: BatchEvidenceDialogProps) {
@@ -123,7 +132,7 @@ export function BatchEvidenceDialog({
   useEffect(() => {
     if (!open) return;
     let live = true;
-    getOrderEvidenceAction(orderId).then(
+    getLineEvidenceAction(orderId, lineId).then(
       (result) => {
         if (!live) return;
         setSettled(
@@ -139,7 +148,7 @@ export function BatchEvidenceDialog({
     return () => {
       live = false;
     };
-  }, [open, attempt, orderId]);
+  }, [open, attempt, orderId, lineId]);
 
   const reread = () => setAttempt((current) => current + 1);
   const current = settled !== null && settled.attempt === attempt ? settled : null;
@@ -160,12 +169,15 @@ export function BatchEvidenceDialog({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <DialogTitle className="text-lg leading-snug font-semibold">
+            <DialogTitle className="text-lg leading-snug font-semibold break-words [overflow-wrap:anywhere]">
               {BATCH_EVIDENCE_TEXTS.title} · {BATCH_EVIDENCE_TEXTS.lot}{' '}
               <span className="font-mono">{lot}</span> · {BATCH_EVIDENCE_TEXTS.order}{' '}
               <span className="font-mono">{orderNumberText}</span>
+              {recipeName !== null && <> · {recipeName}</>}
             </DialogTitle>
-            <DialogDescription>{BATCH_EVIDENCE_TEXTS.description}</DialogDescription>
+            <DialogDescription>
+              {recipeName === null ? BATCH_EVIDENCE_TEXTS.description : BATCH_EVIDENCE_TEXTS.recipeDescription}
+            </DialogDescription>
           </div>
           <DialogClose
             render={<Button type="button" variant="ghost" size="icon" touch />}
@@ -200,6 +212,14 @@ export function BatchEvidenceDialog({
               onRetry={reread}
               onReload={reread}
               testId="batch-evidence-packing"
+            />
+            <PhaseSection
+              name={BATCH_EVIDENCE_TEXTS.conditioning}
+              phaseLabel={BATCH_EVIDENCE_TEXTS.conditioningPhase}
+              groups={current.evidence.conditioning}
+              onRetry={reread}
+              onReload={reread}
+              testId="batch-evidence-conditioning"
             />
           </div>
         )}

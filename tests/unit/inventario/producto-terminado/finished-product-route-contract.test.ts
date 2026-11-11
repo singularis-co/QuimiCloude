@@ -178,7 +178,9 @@ const LECTURAS_PERMITIDAS = new Set([
 // 2026-10-14 (QC-271): la pestaña Lotes lee, solo lee, las fotos del pedido de origen de cada lote.
 // Es el segundo archivo de acciones que la ruta puede importar, y solo con estas dos lecturas.
 const ACCIONES_DE_EVIDENCIA = '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
-const LECTURAS_DE_EVIDENCIA = new Set(['getOrderEvidenceAction', 'countOrderEvidenceAction']);
+// 2026-11-11 (QT-316, P1): el lote lee las fotos de su receta, no las del pedido entero. Las dos
+// lecturas pasan a ser las de la línea; las del pedido salen porque la ruta ya no las importa.
+const LECTURAS_DE_EVIDENCIA = new Set(['getLineEvidenceAction', 'countLineEvidenceAction']);
 
 // 2026-10-16 (QC-288, enmienda de QC-225 R7): la ficha entrega sin pedido y, en Entregas, anula las
 // entregas sin pedido. De las actions de `pedidos` admite solo esas dos escrituras y la lectura que
@@ -350,7 +352,7 @@ describe('contrato de la ficha de producto terminado', () => {
     const fabricada = [
       `import { registerEvidenceAction } from '${ACCIONES_DE_ESCRITURA_DE_EVIDENCIA}';`,
       `import { StepEvidence, uploadEvidence } from '${PIEZA_DE_EVIDENCIA}';`,
-      `import { getOrderEvidenceAction, removeEvidenceAction } from '${ACCIONES_DE_EVIDENCIA}';`,
+      `import { getLineEvidenceAction, removeEvidenceAction } from '${ACCIONES_DE_EVIDENCIA}';`,
     ].join('\n');
     expect(especificadores(fabricada)).toContain(ACCIONES_DE_ESCRITURA_DE_EVIDENCIA);
     expect(nombresImportadosDe(fabricada, PIEZA_DE_EVIDENCIA)).toContain('uploadEvidence');

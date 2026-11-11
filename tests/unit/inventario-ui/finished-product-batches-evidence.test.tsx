@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -9,6 +9,7 @@ import type { SessionUser } from '@/lib/modules/identity';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   FINISHED_ORDER_ID,
+  FINISHED_ORDER_LINE_ID,
   FINISHED_PRODUCT_ID,
   GALLON_BATCH_ID,
   UNPACKAGED_BATCH_ROW,
@@ -17,10 +18,12 @@ import {
   finishedProductPage,
 } from '../../fixtures/finished-product-detail';
 import {
-  ORDER_EVIDENCE_COUNTS,
+  LINE_EVIDENCE_COUNTS,
+  ORDER_EVIDENCE,
   ORDER_EVIDENCE_ERROR_STATES,
   ORDER_EVIDENCE_PHOTO_TOTAL,
 } from '../../fixtures/order-evidence';
+import { setupUser } from '../../helpers/user-event';
 
 const { routerMock, listBatchesMock, countMock, getEvidenceMock, getSessionUserMock } = vi.hoisted(
   () => ({
@@ -50,8 +53,8 @@ vi.mock('@/lib/composition', () => ({
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions', () => ({
-  getOrderEvidenceAction: getEvidenceMock,
-  countOrderEvidenceAction: countMock,
+  getLineEvidenceAction: getEvidenceMock,
+  countLineEvidenceAction: countMock,
 }));
 
 vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', () => ({
@@ -65,7 +68,12 @@ vi.mock('@/lib/modules/inventario/adapters/driving/finished-product-actions', ()
 
 const UNIT = 'L';
 const OTHER_ORDER_ID = 'a0000000-0000-4000-8000-000000000999';
+const OTHER_LINE_ID = 'a1000000-0000-4000-8000-000000000999';
 const NO_PHOTOS_ORDER_ID = 'a0000000-0000-4000-8000-000000000998';
+const NO_PHOTOS_LINE_ID = 'a1000000-0000-4000-8000-000000000998';
+/** La segunda receta del pedido de `WITH_ORDER`. */
+const SECOND_LINE_ID = 'a1000000-0000-4000-8000-000000000226';
+const RECIPE_NAME = LINE_EVIDENCE_COUNTS[0].recipeName;
 
 function sessionUser(permissions: readonly string[]): SessionUser {
   return { id: 'u-1', username: 'admin', displayName: 'Admin', roleName: null, permissions };
@@ -75,7 +83,14 @@ const WITH_PERMISSION = sessionUser(['inventario.consultar', 'pedidos.consultar'
 const WITHOUT_PERMISSION = sessionUser(['inventario.consultar']);
 
 const WITH_ORDER = finishedProductBatchRow();
-const SAME_ORDER = finishedProductBatchRow({ id: GALLON_BATCH_ID, lot: 'L-2026-0226' });
+/** Mismo pedido, otra receta. */
+const SAME_ORDER = finishedProductBatchRow({ id: GALLON_BATCH_ID, lot: 'L-2026-0226', orderLineId: SECOND_LINE_ID });
+
+function counts(
+  entries: readonly (readonly [string, number, string | null])[],
+): ReadonlyMap<string, { photoCount: number; recipeName: string | null }> {
+  return new Map(entries.map(([lineId, photoCount, recipeName]) => [lineId, { photoCount, recipeName }]));
+}
 
 function evidenceCell(batchId: string): HTMLElement {
   return within(screen.getByTestId(`data-table-row-${batchId}`)).getByTestId(
@@ -101,7 +116,7 @@ async function renderLotes(rows = [WITH_ORDER, UNPACKAGED_BATCH_ROW]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  countMock.mockResolvedValue({ status: 'success', data: ORDER_EVIDENCE_COUNTS });
+  countMock.mockResolvedValue({ status: 'success', data: LINE_EVIDENCE_COUNTS });
 });
 
 afterEach(cleanup);
@@ -138,22 +153,34 @@ describe('Lotes, columna «Evidencia»', () => {
     expect(headers()).toHaveLength(8);
   });
 
-  it('R16 — con el permiso, «Evidencia» es la ultima columna y se cuenta una vez por pedido', async () => {
+  // 2026-11-11 (QT-316): el conteo pasa a ser por receta; una sola lectura con un par por línea.
+  it('R16, QT-316 R4 — con el permiso, «Evidencia» es la ultima columna y se cuenta una vez por página', async () => {
     getSessionUserMock.mockResolvedValue(WITH_PERMISSION);
     await renderLotes([WITH_ORDER, SAME_ORDER, UNPACKAGED_BATCH_ROW]);
 
     expect(countMock).toHaveBeenCalledTimes(1);
-    expect(countMock).toHaveBeenCalledWith([FINISHED_ORDER_ID]);
+    expect(countMock).toHaveBeenCalledWith([
+      { orderId: FINISHED_ORDER_ID, lineId: FINISHED_ORDER_LINE_ID },
+      { orderId: FINISHED_ORDER_ID, lineId: SECOND_LINE_ID },
+    ]);
     const todas = headers();
     expect(todas.at(-1)).toContain('Evidencia');
   });
 
   it('R16 — botón con cámara, «N fotos» y aria-label; «—» sin pedido y sin fotos', async () => {
     getSessionUserMock.mockResolvedValue(WITH_PERMISSION);
-    const sinFotos = finishedProductBatchRow({ id: 'sin-fotos', lot: 'L-2026-0300', orderId: NO_PHOTOS_ORDER_ID });
+    const sinFotos = finishedProductBatchRow({
+      id: 'sin-fotos',
+      lot: 'L-2026-0300',
+      orderId: NO_PHOTOS_ORDER_ID,
+      orderLineId: NO_PHOTOS_LINE_ID,
+    });
     await renderLotes([WITH_ORDER, sinFotos, UNPACKAGED_BATCH_ROW]);
 
-    expect(countMock).toHaveBeenCalledWith([FINISHED_ORDER_ID, NO_PHOTOS_ORDER_ID]);
+    expect(countMock).toHaveBeenCalledWith([
+      { orderId: FINISHED_ORDER_ID, lineId: FINISHED_ORDER_LINE_ID },
+      { orderId: NO_PHOTOS_ORDER_ID, lineId: NO_PHOTOS_LINE_ID },
+    ]);
 
     const boton = within(evidenceCell(WITH_ORDER.id)).getByRole('button', {
       name: `Ver evidencia del lote ${WITH_ORDER.lot}: ${ORDER_EVIDENCE_PHOTO_TOTAL} fotos`,
@@ -174,7 +201,7 @@ describe('Lotes, columna «Evidencia»', () => {
         productId={FINISHED_PRODUCT_ID}
         page={finishedProductPage([WITH_ORDER])}
         unitLabel={UNIT}
-        evidenceCounts={new Map([[FINISHED_ORDER_ID, 1]])}
+        evidenceCounts={counts([[FINISHED_ORDER_LINE_ID, 1, null]])}
       />,
     );
 
@@ -203,24 +230,75 @@ describe('Lotes, columna «Evidencia»', () => {
     expect(screen.getAllByTestId('finished-product-batch-evidence')).toHaveLength(2);
   });
 
-  it('R19 — dos lotes del mismo pedido muestran el mismo total', () => {
-    const otro = finishedProductBatchRow({ id: 'otro-pedido', lot: 'L-2026-0400', orderId: OTHER_ORDER_ID });
+  // 2026-11-11 (QT-316 R1): sustituye a «R19 — dos lotes del mismo pedido muestran el mismo total» de
+  // QC-271. Cada lote cuenta solo las fotos de su receta.
+  it('QT-316 R1 — dos lotes del mismo pedido, cada uno con las fotos de su receta', async () => {
+    getSessionUserMock.mockResolvedValue(WITH_PERMISSION);
+    const otro = finishedProductBatchRow({
+      id: 'otro-pedido',
+      lot: 'L-2026-0400',
+      orderId: OTHER_ORDER_ID,
+      orderLineId: OTHER_LINE_ID,
+    });
+    countMock.mockResolvedValue({
+      status: 'success',
+      data: [
+        { orderId: FINISHED_ORDER_ID, lineId: FINISHED_ORDER_LINE_ID, photoCount: 6, recipeName: 'Crema A' },
+        { orderId: FINISHED_ORDER_ID, lineId: SECOND_LINE_ID, photoCount: 3, recipeName: 'Crema B' },
+        { orderId: OTHER_ORDER_ID, lineId: OTHER_LINE_ID, photoCount: 2, recipeName: null },
+      ],
+    });
+    await renderLotes([WITH_ORDER, SAME_ORDER, otro]);
+
+    expect(countMock).toHaveBeenCalledTimes(1);
+    expect(within(evidenceCell(WITH_ORDER.id)).getByRole('button')).toHaveTextContent('6 fotos');
+    expect(within(evidenceCell(SAME_ORDER.id)).getByRole('button')).toHaveTextContent('3 fotos');
+    expect(within(evidenceCell('otro-pedido')).getByRole('button')).toHaveTextContent('2 fotos');
+  });
+
+  it('QT-316 R2 — una receta sin fotos muestra «—» sin botón, aunque la otra receta del pedido tenga', () => {
     render(
       <FinishedProductBatchesTable
         productId={FINISHED_PRODUCT_ID}
-        page={finishedProductPage([WITH_ORDER, SAME_ORDER, otro])}
+        page={finishedProductPage([WITH_ORDER, SAME_ORDER])}
         unitLabel={UNIT}
-        evidenceCounts={new Map([
-          [FINISHED_ORDER_ID, 6],
-          [OTHER_ORDER_ID, 2],
-        ])}
+        evidenceCounts={counts([[FINISHED_ORDER_LINE_ID, 6, 'Crema A']])}
       />,
     );
 
-    const uno = within(evidenceCell(WITH_ORDER.id)).getByRole('button');
-    const dos = within(evidenceCell(SAME_ORDER.id)).getByRole('button');
-    expect(uno).toHaveTextContent('6 fotos');
-    expect(dos).toHaveTextContent('6 fotos');
-    expect(within(evidenceCell('otro-pedido')).getByRole('button')).toHaveTextContent('2 fotos');
+    expect(within(evidenceCell(WITH_ORDER.id)).getByRole('button')).toHaveTextContent('6 fotos');
+    expect(evidenceCell(SAME_ORDER.id)).toHaveTextContent(EMPTY_MARK);
+    expect(within(evidenceCell(SAME_ORDER.id)).queryByRole('button')).toBeNull();
+  });
+
+  it('QT-316 R3 — un lote sin pedido de origen sigue con «—», aunque el mapa tenga conteos', () => {
+    render(
+      <FinishedProductBatchesTable
+        productId={FINISHED_PRODUCT_ID}
+        page={finishedProductPage([UNPACKAGED_BATCH_ROW, WITH_ORDER])}
+        unitLabel={UNIT}
+        evidenceCounts={counts([[FINISHED_ORDER_LINE_ID, 6, null]])}
+      />,
+    );
+
+    expect(evidenceCell(UNPACKAGED_BATCH_ROW.id)).toHaveTextContent(EMPTY_MARK);
+    expect(within(evidenceCell(UNPACKAGED_BATCH_ROW.id)).queryByRole('button')).toBeNull();
+  });
+
+  it('QT-316 R6, R7 — el botón abre el diálogo de su receta: lee por línea y nombra la receta', async () => {
+    getSessionUserMock.mockResolvedValue(WITH_PERMISSION);
+    getEvidenceMock.mockResolvedValue({ status: 'success', data: ORDER_EVIDENCE });
+    const user = setupUser();
+    await renderLotes([WITH_ORDER, UNPACKAGED_BATCH_ROW]);
+
+    await user.click(within(evidenceCell(WITH_ORDER.id)).getByRole('button'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('batch-evidence-dialog')).toHaveAttribute('data-status', 'ready'),
+    );
+    expect(getEvidenceMock).toHaveBeenCalledWith(FINISHED_ORDER_ID, FINISHED_ORDER_LINE_ID);
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      `Evidencia · Lote ${WITH_ORDER.lot} · Pedido ${WITH_ORDER.orderNumberText} · ${RECIPE_NAME}`,
+    );
   });
 });

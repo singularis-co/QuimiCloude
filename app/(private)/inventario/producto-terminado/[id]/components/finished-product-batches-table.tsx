@@ -19,8 +19,11 @@ import { packagedText, quantityText } from './finished-product-stock';
 export const FINISHED_PRODUCT_BATCHES_TABLE_ID = 'inventario-producto-terminado-lotes';
 export const WITHOUT_ORDER_LABEL = 'Sin pedido';
 
-/** Fotos por pedido de origen; sin el mapa, la columna no existe. */
-export type EvidenceCounts = ReadonlyMap<string, number>;
+/** Fotos por línea del pedido (la receta del lote); sin el mapa, la columna no existe. */
+export type EvidenceCounts = ReadonlyMap<
+  string,
+  { readonly photoCount: number; readonly recipeName: string | null }
+>;
 
 function evidenceColumn(evidenceCounts: EvidenceCounts): DataTableColumn<FinishedProductBatchRow> {
   return {
@@ -28,15 +31,17 @@ function evidenceColumn(evidenceCounts: EvidenceCounts): DataTableColumn<Finishe
     label: BATCH_EVIDENCE_TEXTS.column,
     align: 'start',
     cell: (row) => {
-      const photoCount = row.orderId === null ? 0 : (evidenceCounts.get(row.orderId) ?? 0);
+      const count = row.orderLineId === null ? undefined : evidenceCounts.get(row.orderLineId);
       return (
         <span data-testid="finished-product-batch-evidence">
-          {row.orderId !== null && photoCount > 0 ? (
+          {row.orderId !== null && row.orderLineId !== null && count !== undefined && count.photoCount > 0 ? (
             <BatchEvidenceButton
               lot={row.lot}
               orderId={row.orderId}
+              lineId={row.orderLineId}
+              recipeName={count.recipeName}
               orderNumberText={row.orderNumberText ?? EMPTY_MARK}
-              photoCount={photoCount}
+              photoCount={count.photoCount}
             />
           ) : (
             EMPTY_MARK

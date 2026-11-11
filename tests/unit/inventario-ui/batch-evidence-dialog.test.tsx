@@ -8,29 +8,63 @@ import {
   BatchEvidenceButton,
   BatchEvidenceDialog,
 } from '@/app/(private)/inventario/producto-terminado/[id]/components';
+import type { OrderEvidence } from '@/lib/modules/asignaciones';
 import type { OrderEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/order-evidence-actions';
-import { FINISHED_ORDER_ID, FINISHED_ORDER_NUMBER } from '../../fixtures/finished-product-detail';
 import {
+  FINISHED_ORDER_ID,
+  FINISHED_ORDER_LINE_ID,
+  FINISHED_ORDER_NUMBER,
+} from '../../fixtures/finished-product-detail';
+import {
+  LINE_EVIDENCE_COUNTS,
   ORDER_EVIDENCE,
   ORDER_EVIDENCE_ERROR_STATES,
   ORDER_EVIDENCE_MANUFACTURING_ONLY,
   ORDER_EVIDENCE_PHOTO_TOTAL,
   ORDER_EVIDENCE_UNSIGNED,
+  orderEvidenceGroup,
 } from '../../fixtures/order-evidence';
 import { setupUser } from '../../helpers/user-event';
 
 const { getEvidenceMock } = vi.hoisted(() => ({
-  getEvidenceMock: vi.fn<(orderId: string) => Promise<OrderEvidenceResult>>(),
+  getEvidenceMock: vi.fn<(orderId: string, lineId: string) => Promise<OrderEvidenceResult>>(),
 }));
 
 vi.mock('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions', () => ({
-  getOrderEvidenceAction: getEvidenceMock,
-  countOrderEvidenceAction: vi.fn(),
+  getLineEvidenceAction: getEvidenceMock,
+  countLineEvidenceAction: vi.fn(),
 }));
 
 const LOT = 'L-2026-0225';
+const RECIPE_NAME = LINE_EVIDENCE_COUNTS[0].recipeName as string;
+const OTHER_LINE_ID = 'a1000000-0000-4000-8000-000000000226';
+const TODAY_TITLE = `Evidencia · Lote ${LOT} · Pedido ${FINISHED_ORDER_NUMBER}`;
+const TODAY_DESCRIPTION = 'Fotos tomadas durante la ejecución del pedido. Solo consulta.';
+const RECIPE_DESCRIPTION = 'Fotos tomadas durante la ejecución de esta receta del pedido. Solo consulta.';
 
-function OpenDialog({ photoCount = ORDER_EVIDENCE_PHOTO_TOTAL }: { readonly photoCount?: number }) {
+/** La receta con las tres fases: acondicionamiento en los pasos 2 (2 fotos) y 3 (1). */
+const LINE_EVIDENCE_WITH_CONDITIONING: OrderEvidence = {
+  ...ORDER_EVIDENCE,
+  conditioning: [orderEvidenceGroup('p', 2, 2), orderEvidenceGroup('p', 3, 1)],
+};
+
+/** El conteo que la celda recibe de `countLineEvidence`: la suma de las tres fases. */
+function cellPhotoCount(evidence: OrderEvidence): number {
+  return [...evidence.manufacturing, ...evidence.packing, ...evidence.conditioning].reduce(
+    (sum, group) => sum + group.photoCount,
+    0,
+  );
+}
+
+function OpenDialog({
+  photoCount = ORDER_EVIDENCE_PHOTO_TOTAL,
+  lineId = FINISHED_ORDER_LINE_ID,
+  recipeName = null,
+}: {
+  readonly photoCount?: number;
+  readonly lineId?: string;
+  readonly recipeName?: string | null;
+}) {
   const [open, setOpen] = useState(true);
   return (
     <BatchEvidenceDialog
@@ -38,10 +72,17 @@ function OpenDialog({ photoCount = ORDER_EVIDENCE_PHOTO_TOTAL }: { readonly phot
       onOpenChange={setOpen}
       lot={LOT}
       orderId={FINISHED_ORDER_ID}
+      lineId={lineId}
+      recipeName={recipeName}
       orderNumberText={FINISHED_ORDER_NUMBER}
       photoCount={photoCount}
     />
   );
+}
+
+function sectionCount(el: HTMLElement, testId: string): number {
+  const badge = within(el).queryByTestId(`${testId}-count`);
+  return badge === null ? 0 : Number(badge.textContent);
 }
 
 function success(evidence = ORDER_EVIDENCE): OrderEvidenceResult {
@@ -69,10 +110,8 @@ describe('BatchEvidenceDialog', () => {
     render(<OpenDialog />);
 
     const el = await ready();
-    expect(getEvidenceMock).toHaveBeenCalledWith(FINISHED_ORDER_ID);
-    expect(
-      screen.getByRole('dialog', { name: `Evidencia · Lote ${LOT} · Pedido ${FINISHED_ORDER_NUMBER}` }),
-    ).toBeInTheDocument();
+    expect(getEvidenceMock).toHaveBeenCalledWith(FINISHED_ORDER_ID, FINISHED_ORDER_LINE_ID);
+    expect(screen.getByRole('dialog', { name: TODAY_TITLE })).toBeInTheDocument();
     expect(el).toHaveTextContent('Fotos tomadas durante la ejecución del pedido. Solo consulta.');
 
     const fabricacion = within(el).getByRole('region', { name: /Fabricación/ });
@@ -215,6 +254,8 @@ describe('BatchEvidenceDialog', () => {
       <BatchEvidenceButton
         lot={LOT}
         orderId={FINISHED_ORDER_ID}
+        lineId={FINISHED_ORDER_LINE_ID}
+        recipeName={null}
         orderNumberText={FINISHED_ORDER_NUMBER}
         photoCount={ORDER_EVIDENCE_PHOTO_TOTAL}
       />,
@@ -228,6 +269,133 @@ describe('BatchEvidenceDialog', () => {
     await user.click(screen.getByRole('button', { name: `Ver evidencia del lote ${LOT}: 9 fotos` }));
     await ready();
     expect(getEvidenceMock).toHaveBeenCalledTimes(2);
-    expect(getEvidenceMock.mock.calls.every(([orderId]) => orderId === FINISHED_ORDER_ID)).toBe(true);
+    expect(
+      getEvidenceMock.mock.calls.every(
+        ([orderId, lineId]) => orderId === FINISHED_ORDER_ID && lineId === FINISHED_ORDER_LINE_ID,
+      ),
+    ).toBe(true);
+  });
+});
+
+// 2026-11-11 (QT-316): el diálogo es el de la receta del lote.
+describe('BatchEvidenceDialog, por receta', () => {
+  it('QT-316 R6 — lee con el pedido y la línea del lote, y vuelve a leer si cambia la línea', async () => {
+    getEvidenceMock.mockResolvedValue(success());
+    const { rerender } = render(<OpenDialog />);
+
+    await ready();
+    expect(getEvidenceMock).toHaveBeenCalledTimes(1);
+    expect(getEvidenceMock).toHaveBeenCalledWith(FINISHED_ORDER_ID, FINISHED_ORDER_LINE_ID);
+
+    rerender(<OpenDialog lineId={OTHER_LINE_ID} />);
+    await waitFor(() => expect(getEvidenceMock).toHaveBeenCalledWith(FINISHED_ORDER_ID, OTHER_LINE_ID));
+  });
+
+  it('QT-316 R7 — con varias recetas, el título nombra la receta y la descripción es la de la receta', async () => {
+    getEvidenceMock.mockResolvedValue(success());
+    render(<OpenDialog recipeName={RECIPE_NAME} />);
+
+    const el = await ready();
+    expect(screen.getByRole('dialog', { name: `${TODAY_TITLE} · ${RECIPE_NAME}` })).toBeInTheDocument();
+    expect(el).toHaveTextContent(RECIPE_DESCRIPTION);
+    expect(el).not.toHaveTextContent(TODAY_DESCRIPTION);
+  });
+
+  it('QT-316 R8, R9 — sin nombre de receta, título y descripción de hoy, y las fotos salen igual', async () => {
+    getEvidenceMock.mockResolvedValue(success());
+    render(<OpenDialog recipeName={null} />);
+
+    const el = await ready();
+    expect(screen.getByRole('dialog', { name: TODAY_TITLE })).toBeInTheDocument();
+    expect(el).toHaveTextContent(TODAY_DESCRIPTION);
+    expect(el).not.toHaveTextContent(RECIPE_DESCRIPTION);
+    expect(within(el).getByTestId('batch-evidence-manufacturing-count')).toHaveTextContent('6');
+    expect(within(el).getByTestId('batch-evidence-packing-count')).toHaveTextContent('2');
+  });
+
+  it('QT-316 R10 — esqueleto con el conteo de la receta, y el error con «Reintentar»', async () => {
+    getEvidenceMock.mockReturnValueOnce(new Promise(() => {}));
+    render(<OpenDialog photoCount={1} recipeName={RECIPE_NAME} />);
+    expect(dialog()).toHaveAttribute('data-status', 'loading');
+    expect(within(dialog()).getAllByTestId(/^step-evidence-tile-/)).toHaveLength(1);
+    cleanup();
+
+    getEvidenceMock.mockResolvedValueOnce(ORDER_EVIDENCE_ERROR_STATES.orderNotFound);
+    getEvidenceMock.mockResolvedValueOnce(success());
+    const user = setupUser();
+    render(<OpenDialog recipeName={RECIPE_NAME} />);
+
+    await waitFor(() => expect(dialog()).toHaveAttribute('data-status', 'error'));
+    const aviso = within(dialog()).getByTestId('batch-evidence-error');
+    await user.click(within(aviso).getByRole('button', { name: 'Reintentar' }));
+    await ready();
+    expect(getEvidenceMock).toHaveBeenLastCalledWith(FINISHED_ORDER_ID, FINISHED_ORDER_LINE_ID);
+  });
+
+  it('QT-316 R10 — firma caída: los grupos de la receta con su cantidad y sin fotos', async () => {
+    getEvidenceMock.mockResolvedValue(success(ORDER_EVIDENCE_UNSIGNED));
+    render(<OpenDialog recipeName={RECIPE_NAME} />);
+
+    const el = await ready();
+    expect(within(el).getByTestId('batch-evidence-manufacturing-count')).toHaveTextContent('6');
+    expect(within(el).queryAllByRole('img')).toHaveLength(0);
+    expect(within(el).getAllByRole('button', { name: 'Reintentar' }).length).toBeGreaterThan(0);
+  });
+
+  it('QT-316 R11 — el título parte palabras largas y el diálogo sigue a pantalla completa en teléfono', async () => {
+    getEvidenceMock.mockResolvedValue(success());
+    render(<OpenDialog recipeName="Supercalifragilisticoespialidosoextralargo" />);
+
+    const el = await ready();
+    const titleId = screen.getByRole('dialog').getAttribute('aria-labelledby');
+    expect(titleId).not.toBeNull();
+    const title = document.getElementById(titleId as string) as HTMLElement;
+    expect(title.className.split(/\s+/)).toEqual(
+      expect.arrayContaining(['break-words', '[overflow-wrap:anywhere]']),
+    );
+    for (const clase of ['h-dvh', 'w-full', 'max-w-none']) {
+      expect(el.className.split(/\s+/), clase).toContain(clase);
+    }
+  });
+
+  it('QT-316 R20 — grupo «Acondicionamiento» tras Envasado, con sus pasos y su total; la suma da el conteo', async () => {
+    getEvidenceMock.mockResolvedValue(success(LINE_EVIDENCE_WITH_CONDITIONING));
+    render(<OpenDialog photoCount={cellPhotoCount(LINE_EVIDENCE_WITH_CONDITIONING)} recipeName={RECIPE_NAME} />);
+
+    const el = await ready();
+    const regiones = within(el).getAllByRole('region');
+    expect(regiones.map((region) => region.getAttribute('data-testid'))).toEqual([
+      'batch-evidence-manufacturing',
+      'batch-evidence-packing',
+      'batch-evidence-conditioning',
+    ]);
+
+    const acondicionamiento = within(el).getByRole('region', { name: /Acondicionamiento/ });
+    expect(within(acondicionamiento).getByRole('heading', { level: 3 })).toHaveTextContent('Acondicionamiento');
+    expect(within(acondicionamiento).getByTestId('batch-evidence-conditioning-count')).toHaveTextContent('3');
+    expect(
+      within(acondicionamiento).getAllByTestId('evidence-step-row').map((row) => row.getAttribute('data-step')),
+    ).toEqual(['2', '3']);
+    expect(
+      within(acondicionamiento).getByRole('group', { name: 'Evidencia de acondicionamiento, paso 2' }),
+    ).toHaveTextContent('Paso 2');
+
+    const suma = ['batch-evidence-manufacturing', 'batch-evidence-packing', 'batch-evidence-conditioning']
+      .map((testId) => sectionCount(el, testId))
+      .reduce((a, b) => a + b, 0);
+    expect(suma).toBe(cellPhotoCount(LINE_EVIDENCE_WITH_CONDITIONING));
+  });
+
+  it('QT-316 R20 — sin fotos de acondicionamiento no hay sección, y la suma sigue dando el conteo', async () => {
+    getEvidenceMock.mockResolvedValue(success());
+    render(<OpenDialog recipeName={RECIPE_NAME} />);
+
+    const el = await ready();
+    expect(within(el).queryByTestId('batch-evidence-conditioning')).toBeNull();
+    expect(within(el).queryByText('Acondicionamiento')).toBeNull();
+    const suma = ['batch-evidence-manufacturing', 'batch-evidence-packing', 'batch-evidence-conditioning']
+      .map((testId) => sectionCount(el, testId))
+      .reduce((a, b) => a + b, 0);
+    expect(suma).toBe(cellPhotoCount(ORDER_EVIDENCE));
   });
 });
