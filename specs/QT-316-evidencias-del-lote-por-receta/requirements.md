@@ -18,11 +18,124 @@
 
 ## Requisitos (EARS)
 
-_Pendiente: los escribe spec_author (F1.2)._
+> Escritos por `spec_author` (F1.2, 2026-11-11). Vocabulario:
+> - **Receta**: una línea del pedido (QT-313). «Receta» y «línea» son lo mismo.
+> - **Lote de un pedido**: lote de producto terminado con asiento `production`. **Su receta** es la
+>   línea del pedido que guarda ese asiento.
+> - **Receta viva**: no quitada; una cancelada sigue viva (QT-315). «Una sola receta viva» es la
+>   misma regla que QT-315 R3 y R29.
+> - **La ficha**: Inventario › Producto terminado › pestaña «Lotes», con su columna «Evidencia» y
+>   su diálogo de evidencias (QC-271).
+> - Entre corchetes, la fila de `## Decisiones cerradas` (o la pregunta abierta) que cubre cada
+>   requisito.
+
+### Columna «Evidencia»
+
+- **R1** — CUANDO se pinta la pestaña «Lotes» de la ficha con la columna «Evidencia», el sistema
+  DEBE mostrar en cada lote de un pedido el número de fotos **de su receta**, y NO DEBE sumar las
+  fotos de las demás recetas del pedido. *[Conteo de la columna «Evidencia»]*
+- **R2** — SI la receta de un lote no tiene ninguna foto, ENTONCES su celda DEBE mostrar «—» y no
+  ofrecer el botón de evidencia, aunque otra receta del mismo pedido sí tenga fotos.
+  *[Conteo de la columna «Evidencia»]*
+- **R3** — Un lote sin pedido de origen DEBE seguir mostrando «—», como hoy. *[Conteo de la columna
+  «Evidencia»]*
+- **R4** — El sistema DEBE obtener los conteos de todos los lotes de una página con **una sola**
+  lectura, sea cual sea el número de lotes y de pedidos de esa página. *[Conteo de la columna
+  «Evidencia»]*
+- **R5** — El listado de lotes de la ficha DEBE identificar, para cada lote de un pedido, la receta
+  del pedido que lo produjo; para un lote sin asiento `production` DEBE no identificar ninguna.
+  *[Conteo de la columna «Evidencia» · Lo que ya existe]*
+
+### Diálogo de evidencias
+
+- **R6** — CUANDO se abre el diálogo de evidencias de un lote, el sistema DEBE mostrar solo las
+  fotos de la receta de ese lote, agrupadas por fase y paso como hoy, y NO DEBE mostrar ninguna foto
+  de otra receta del pedido. *[Alcance · Conteo de la columna «Evidencia»]*
+- **R7** — DONDE el pedido del lote tiene más de una receta viva, el título del diálogo DEBE ser
+  «Evidencia · Lote L · Pedido N · <receta>», con el nombre de la receta del lote, y la descripción
+  DEBE decir «Fotos tomadas durante la ejecución de esta receta del pedido. Solo consulta.».
+  *[Título del diálogo · Pase `/design`]*
+- **R8** — MIENTRAS el pedido del lote tenga una sola receta viva, el título, la descripción, el
+  conteo de la celda y las fotos del diálogo DEBEN ser los de hoy, sin nombrar la receta.
+  *[Título del diálogo]*
+- **R9** — SI el nombre de la receta del lote no se puede resolver, ENTONCES el título y la
+  descripción DEBEN ser los de hoy, sin nombrar receta, y las fotos DEBEN salir igual. *[P3]*
+- **R10** — Los estados del diálogo DEBEN ser los de QC-271: mientras lee, tantas casillas esqueleto
+  como fotos tiene la receta del lote (entre 1 y el tope por paso); si la lectura falla, el error con
+  «Reintentar»; si la firma de las fotos falla, los grupos con su cantidad y sin fotos, y la causa
+  al log, nunca a la pantalla. *[Pase `/design` (Estados)]*
+- **R11** — En el teléfono el diálogo DEBE ocupar la pantalla completa y su título DEBE partirse en
+  varias líneas, palabras largas incluidas, sin desplazamiento horizontal. En tablet DEBE
+  comportarse como en QC-271. *[Pase `/design` (Tablet, Teléfono)]*
+
+### Reglas de la lectura
+
+- **R12** — Las fotos de una receta DEBEN salir y contar aunque su receta se haya borrado del
+  catálogo, la línea se haya quitado del pedido, el pedido esté dado de baja o su paso ya no pida
+  evidencia, igual que `readOrderEvidence` hoy. *[Fotos de una receta quitada · P3]*
+- **R13** — La lectura de las fotos de una receta y la de sus conteos DEBEN exigir `pedidos.consultar`
+  en el caso de uso, antes de leer ningún dato, con el mismo error que `getOrderEvidence` hoy. Sin
+  ese permiso, la ficha NO DEBE pintar la columna ni pedir los conteos, como hoy. El catálogo de
+  permisos NO DEBE cambiar. *[Permisos]*
+- **R14** — SI la lectura de las fotos nombra un pedido inexistente o de otra empresa, una línea de
+  otro pedido o de otra empresa, una línea inexistente, o ids mal formados, ENTONCES el sistema DEBE
+  responder `order_not_found` sin devolver ninguna foto ni firmar ninguna lectura. *[Receta ajena o
+  inexistente]*
+- **R15** — CUANDO se piden conteos, una línea de otro pedido o de otra empresa NO DEBE contar ni
+  salir en la respuesta; SI la petición trae más de 25 recetas o algún id mal formado, ENTONCES el
+  sistema DEBE responder `invalid_input` sin leer la base. *[Receta ajena o inexistente]*
+- **R16** — La lectura de las fotos de una receta DEBE reutilizar `readOrderEvidenceByLine` (QT-315),
+  y `readOrderEvidence`, `readOrderEvidenceByLine`, el Recorrido y las pantallas de planta NO DEBEN
+  cambiar de comportamiento: sus tests de hoy siguen verdes sin tocarlos. *[Lo que ya existe ·
+  Alcance (Lo que NO entra)]*
+- **R17** — La consulta DEBE ser solo de lectura: no DEBE escribir en la base, mover inventario ni
+  tocar importes. *[¿Hace falta E2E?]*
+- **R18** — Esta ficha NO DEBE añadir tablas, columnas, migraciones, permisos ni dependencias:
+  `db/schema.prisma`, `db/migrations/`, el catálogo de permisos y `package.json` DEBEN quedar como en
+  la rama base. *[Alcance (Lo que NO entra) · Permisos]*
+
+### Verificación
+
+- **R19** — `e2e/consulta-de-evidencia.spec.ts` DEBE ampliarse con un pedido de **dos** recetas, cada
+  una con su lote: el lote de la receta con fotos muestra su conteo y su diálogo solo con sus fotos
+  y el nombre de la receta en el título; el lote de la receta sin fotos muestra «—». Los casos de hoy
+  (R27 y R28 de QC-271) DEBEN seguir pasando. No se crea ningún E2E nuevo. *[¿Hace falta E2E?]*
+
+### Cobertura de la tabla de decisiones
+
+| Decisión (fila) | Requisitos |
+|---|---|
+| Conteo de la columna «Evidencia» | R1, R2, R3, R4, R5, R6 |
+| Título del diálogo | R7, R8 |
+| ¿Hace falta E2E? | R17, R19 |
+| Permisos | R13, R18 |
+| Receta ajena o inexistente | R14, R15 |
+| Fotos de una receta quitada | R12 |
+| Lo que ya existe | R5, R16 |
+| Alcance (Lo que NO entra: Recorrido, planta, migraciones) | R16, R18 |
+| Pase `/design` aprobado (`EvidenciaLoteVariasRecetas*`) | R7, R10, R11 |
 
 ## Preguntas abiertas
 
-Ninguna.
+- **P1 — ¿Se retiran `getOrderEvidence` y `countOrderEvidence`?** Con esta ficha la ficha de
+  producto terminado deja de usarlos, y con ellos sus dos actions; no les queda ningún otro
+  consumidor. **Recomendación:** mantenerlos en esta ficha (el cambio queda aditivo, el censo de la
+  fachada solo crece y QT-315 R34 sigue cierto) y anotar en `progress/deudas.md` su retirada en una
+  ficha de limpieza. Si el humano prefiere retirarlos aquí, se añade una task que los quita junto con
+  sus tests y las entradas de los censos (`asignaciones-facade`, `finished-product-route-contract`,
+  `session-once-per-request-actions`).
+- **P2 — ¿Qué fases cuenta la columna?** Hoy `countByOrders` cuenta las filas de las tres fases
+  (fabricación, envasado y acondicionamiento), pero el diálogo solo pinta fabricación y envasado:
+  con fotos de acondicionamiento, la celda dice más fotos de las que se ven. **Recomendación:**
+  mantener el criterio de hoy (las mismas fases que `countByOrders`), porque la ficha solo cambia
+  el «por receta», y anotar la diferencia como deuda para otra ficha.
+- **P3 — Receta cuya línea se quitó del pedido.** El catálogo de `pedidos` solo publica las líneas
+  vivas (`listRecipeOutlinesByIdsIncludingDeleted`). De una línea quitada no se sabe la receta y, si
+  no tiene fotos, tampoco que es del pedido. **Recomendación:** si tiene fotos, salen y cuentan
+  (R12) con el título de hoy (R9); si no tiene fotos, la lectura responde `order_not_found` (R14).
+  Desde la pantalla no se puede llegar ahí: sin fotos la celda no ofrece el diálogo. Así
+  `pedidos` no gana ningún método. La otra opción, que `pedidos` publique también las líneas
+  quitadas, cambia su contrato por un caso que la pantalla no alcanza.
 
 ## Decisiones cerradas (no reabrir)
 
