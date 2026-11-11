@@ -150,3 +150,7 @@ En una línea de producción que el diff añade, citar `R<n>` es BLOQUEANTE. Hay
 ### Veredicto vuelta 2
 
 **RECHAZADO**, solo por B3. Es un cambio de una línea en un comentario; quitar `(R14)` basta. B1, B2 y m1 están resueltos, sin regresiones en lo que corrí. Con B3 corregido el veredicto será OK, salvo que el arreglo toque algo más.
+
+## Cierre (leader, 2026-11-11)
+
+El arreglo de B3 es `998ca0684`. El diff `4ca47dd75..998ca0684` en `lib/` cambia solo esa línea: se quita `(R14)` del comentario. En los comentarios añadidos de `lib/`, `app/` y `components/` no queda ninguna cita a `R<n>`, `QT-` ni `QC-`. Se cumple la condición de la vuelta 2 («queda OK salvo que el arreglo toque algo más»). **Veredicto final: OK.**
