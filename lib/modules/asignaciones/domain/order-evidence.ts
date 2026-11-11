@@ -25,6 +25,14 @@ export type OrderEvidence = {
 
 export type OrderEvidenceCount = { readonly orderId: string; readonly photoCount: number };
 
+/** Una receta del pedido con fotos. `recipeName` `null` = la pantalla no nombra la receta. */
+export type LineEvidenceCount = {
+  readonly orderId: string;
+  readonly lineId: string;
+  readonly photoCount: number;
+  readonly recipeName: string | null;
+};
+
 /** Lo que devuelven los casos de uso: `signingFailure` va al log y nunca a la pantalla. */
 export type OrderEvidenceRead = {
   readonly evidence: OrderEvidence;

@@ -514,6 +514,8 @@ import {
   createGetExecutionEvidence,
   createGetOrderEvidence,
   createCountOrderEvidence,
+  createGetLineEvidence,
+  createCountLineEvidence,
 } from '@/lib/modules/asignaciones';
 import { createConditioningTeamRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/conditioning-team-prisma';
 import { createOrderAssignmentRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/order-assignment-prisma';
@@ -2384,6 +2386,16 @@ export const asignaciones = {
     storage: evidenceStorage,
   }),
   countOrderEvidence: createCountOrderEvidence({ evidence: stepEvidenceRepository }),
+  getLineEvidence: createGetLineEvidence({
+    orders: orderCatalog,
+    evidence: stepEvidenceRepository,
+    storage: evidenceStorage,
+  }),
+  countLineEvidence: createCountLineEvidence({
+    evidence: stepEvidenceRepository,
+    orders: orderCatalog,
+    recipes: recipeCatalog,
+  }),
 } as const;
 
 // ---------------------------------------------------------------------------------------

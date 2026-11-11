@@ -46,7 +46,7 @@
 
 ## Tanda 2 — casos de uso, actions y composición (backend_dev; depende de T2)
 
-- [ ] **T3 [P] · backend_dev — `countLineEvidence`** (design § 3.3 · R1, R2, R4, R7, R8, R9, R12, R13, R15, R17)
+- [x] **T3 [P] · backend_dev — `countLineEvidence`** (design § 3.3 · R1, R2, R4, R7, R8, R9, R12, R13, R15, R17)
   - `domain/count-line-evidence.ts` y el tipo `LineEvidenceCount` en `order-evidence.ts`.
   - El barril `index.ts` exporta el tipo y `createCountLineEvidence`.
   - **Hecho cuando:** `tests/unit/asignaciones/count-line-evidence.test.ts` cubre:
@@ -60,7 +60,7 @@
     - receta borrada del catálogo con nombre (`findRefsIncludingDeleted`);
     - líneas con 0 fuera;
     - ningún método de escritura llamado.
-- [ ] **T4 [P] · backend_dev — `getLineEvidence`** (design § 3.3 · R6, R10, R12, R13, R14, R16, R17, R20)
+- [x] **T4 [P] · backend_dev — `getLineEvidence`** (design § 3.3 · R6, R10, R12, R13, R14, R16, R17, R20)
   - `domain/get-line-evidence.ts` sobre `readOrderEvidenceByLine`, sin cambiar
     `readOrderEvidenceByLine`.
   - **Hecho cuando:** `tests/unit/asignaciones/get-line-evidence.test.ts` cubre:
@@ -76,7 +76,7 @@
 
     `get-execution-evidence.test.ts` y los casos de `readOrderEvidenceByLine` siguen verdes sin
     modificarlos (R16).
-- [ ] **T5 · backend_dev — actions y composición** (design § 3.4; depende de T3 y T4)
+- [x] **T5 · backend_dev — actions y composición** (design § 3.4; depende de T3 y T4)
   - `getLineEvidenceAction` y `countLineEvidenceAction` en `order-evidence-actions.ts`. Las dos de
     hoy se quedan hasta T8.
   - `asignaciones.getLineEvidence` y `asignaciones.countLineEvidence` en `lib/composition/index.ts`.

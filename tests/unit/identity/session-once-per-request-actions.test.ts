@@ -659,6 +659,24 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       ).getOrderEvidenceAction('no-es-un-uuid'),
   },
   {
+    // 2026-11-11 (QT-316): las lecturas de una receta del pedido viven en el mismo archivo y cada
+    // una resuelve su propio actor. En la tanda 4 (P1) sale la fila de `getOrderEvidenceAction`.
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts',
+    nombre: 'getLineEvidenceAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions')
+      ).getLineEvidenceAction('no-es-un-uuid', 'no-es-un-uuid'),
+  },
+  {
+    archivo: 'lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts',
+    nombre: 'countLineEvidenceAction',
+    invocar: async () =>
+      (
+        await import('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions')
+      ).countLineEvidenceAction([{ orderId: 'no-es-un-uuid', lineId: 'no-es-un-uuid' }]),
+  },
+  {
     archivo: 'lib/modules/integraciones/adapters/driving/ai-provider-actions.ts',
     nombre: 'getAiProviderConnectionAction',
     invocar: async () =>

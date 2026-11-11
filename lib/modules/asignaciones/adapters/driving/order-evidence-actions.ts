@@ -13,6 +13,7 @@ import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/error
 import {
   AsignacionesError,
   type Actor,
+  type LineEvidenceCount,
   type OrderEvidence,
   type OrderEvidenceCount,
 } from '@/lib/modules/asignaciones';
@@ -67,6 +68,39 @@ export async function countOrderEvidenceAction(
 
   try {
     const data = await asignaciones.countOrderEvidence(actor, { orderIds });
+    return { status: 'success', data };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+/** Una linea de otro pedido, de otra empresa o inexistente vuelve como `order_not_found`. */
+export async function getLineEvidenceAction(orderId: string, lineId: string): Promise<OrderEvidenceResult> {
+  const actor = await currentActor();
+
+  try {
+    const { evidence, signingFailure } = await asignaciones.getLineEvidence(actor, { orderId, lineId });
+    if (signingFailure !== null) {
+      log.warn('evidence_read_signing_failed', { orderId, lineId, message: signingFailure });
+    }
+    return { status: 'success', data: evidence };
+  } catch (error) {
+    return toErrorState(error);
+  }
+}
+
+export type LineEvidenceCountResult =
+  | { status: 'success'; data: readonly LineEvidenceCount[] }
+  | ErrorState;
+
+/** Solo salen las lineas con alguna foto. */
+export async function countLineEvidenceAction(
+  lines: readonly { orderId: string; lineId: string }[],
+): Promise<LineEvidenceCountResult> {
+  const actor = await currentActor();
+
+  try {
+    const data = await asignaciones.countLineEvidence(actor, { lines });
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);

@@ -3,13 +3,14 @@
 // la firma caida en un grupo de cada fase.
 import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import type {
+  LineEvidenceCount,
   OrderEvidence,
   OrderEvidenceCount,
   OrderEvidenceGroup,
   StepEvidencePhotoView,
 } from '@/lib/modules/asignaciones';
 
-import { FINISHED_ORDER_ID } from './finished-product-detail';
+import { FINISHED_ORDER_ID, FINISHED_ORDER_LINE_ID } from './finished-product-detail';
 
 export const EVIDENCE_ORDER_ID = FINISHED_ORDER_ID;
 
@@ -58,6 +59,18 @@ export const ORDER_EVIDENCE_EMPTY: OrderEvidence = { manufacturing: [], packing:
 
 export const ORDER_EVIDENCE_COUNTS: readonly OrderEvidenceCount[] = [
   { orderId: EVIDENCE_ORDER_ID, photoCount: ORDER_EVIDENCE_PHOTO_TOTAL },
+];
+
+export const EVIDENCE_LINE_ID = FINISHED_ORDER_LINE_ID;
+
+/** El conteo de la receta del lote, en un pedido de varias recetas: la pantalla la nombra. */
+export const LINE_EVIDENCE_COUNTS: readonly LineEvidenceCount[] = [
+  {
+    orderId: EVIDENCE_ORDER_ID,
+    lineId: EVIDENCE_LINE_ID,
+    photoCount: ORDER_EVIDENCE_PHOTO_TOTAL,
+    recipeName: 'Crema base · Lavanda',
+  },
 ];
 
 const errorState = <C extends Exclude<ErrorState['code'], 'unexpected'>>(code: C) =>
