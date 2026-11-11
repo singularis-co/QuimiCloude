@@ -50,14 +50,15 @@
 
 - **R6** — CUANDO se abre el diálogo de evidencias de un lote, el sistema DEBE mostrar solo las
   fotos de la receta de ese lote, agrupadas por fase y paso como hoy, y NO DEBE mostrar ninguna foto
-  de otra receta del pedido. *[Alcance · Conteo de la columna «Evidencia»]*
+  de otra receta del pedido. *[Alcance · Conteo de la columna «Evidencia»]* Los grupos por fase, en
+  R20.
 - **R7** — DONDE el pedido del lote tiene más de una receta viva, el título del diálogo DEBE ser
   «Evidencia · Lote L · Pedido N · <receta>», con el nombre de la receta del lote, y la descripción
   DEBE decir «Fotos tomadas durante la ejecución de esta receta del pedido. Solo consulta.».
   *[Título del diálogo · Pase `/design`]*
 - **R8** — MIENTRAS el pedido del lote tenga una sola receta viva, el título, la descripción, el
-  conteo de la celda y las fotos del diálogo DEBEN ser los de hoy, sin nombrar la receta.
-  *[Título del diálogo]*
+  conteo de la celda y las fotos del diálogo DEBEN ser los de hoy, sin nombrar la receta; la única
+  diferencia es el grupo «Acondicionamiento» de R20. *[Título del diálogo · P2]*
 - **R9** — SI el nombre de la receta del lote no se puede resolver, ENTONCES el título y la
   descripción DEBEN ser los de hoy, sin nombrar receta, y las fotos DEBEN salir igual. *[P3]*
 - **R10** — Los estados del diálogo DEBEN ser los de QC-271: mientras lee, tantas casillas esqueleto
@@ -72,9 +73,11 @@
 
 - **R12** — Las fotos de una receta DEBEN salir y contar aunque su receta se haya borrado del
   catálogo, la línea se haya quitado del pedido, el pedido esté dado de baja o su paso ya no pida
-  evidencia, igual que `readOrderEvidence` hoy. *[Fotos de una receta quitada · P3]*
+  evidencia, igual que la lectura del pedido entero de la rama base. *[Fotos de una receta quitada
+  · P3]*
 - **R13** — La lectura de las fotos de una receta y la de sus conteos DEBEN exigir `pedidos.consultar`
-  en el caso de uso, antes de leer ningún dato, con el mismo error que `getOrderEvidence` hoy. Sin
+  en el caso de uso, antes de leer ningún dato, con el mismo error que la lectura del pedido entero
+  de la rama base (`unauthorized`). Sin
   ese permiso, la ficha NO DEBE pintar la columna ni pedir los conteos, como hoy. El catálogo de
   permisos NO DEBE cambiar. *[Permisos]*
 - **R14** — SI la lectura de las fotos nombra un pedido inexistente o de otra empresa, una línea de
@@ -85,9 +88,9 @@
   salir en la respuesta; SI la petición trae más de 25 recetas o algún id mal formado, ENTONCES el
   sistema DEBE responder `invalid_input` sin leer la base. *[Receta ajena o inexistente]*
 - **R16** — La lectura de las fotos de una receta DEBE reutilizar `readOrderEvidenceByLine` (QT-315),
-  y `readOrderEvidence`, `readOrderEvidenceByLine`, el Recorrido y las pantallas de planta NO DEBEN
-  cambiar de comportamiento: sus tests de hoy siguen verdes sin tocarlos. *[Lo que ya existe ·
-  Alcance (Lo que NO entra)]*
+  y `readOrderEvidenceByLine`, el Recorrido (`getExecutionEvidence`) y las pantallas de planta NO
+  DEBEN cambiar de comportamiento: sus tests de hoy siguen verdes sin tocarlos. *[Lo que ya existe
+  · Alcance (Lo que NO entra)]*
 - **R17** — La consulta DEBE ser solo de lectura: no DEBE escribir en la base, mover inventario ni
   tocar importes. *[¿Hace falta E2E?]*
 - **R18** — Esta ficha NO DEBE añadir tablas, columnas, migraciones, permisos ni dependencias:
@@ -97,9 +100,23 @@
 ### Verificación
 
 - **R19** — `e2e/consulta-de-evidencia.spec.ts` DEBE ampliarse con un pedido de **dos** recetas, cada
-  una con su lote: el lote de la receta con fotos muestra su conteo y su diálogo solo con sus fotos
-  y el nombre de la receta en el título; el lote de la receta sin fotos muestra «—». Los casos de hoy
-  (R27 y R28 de QC-271) DEBEN seguir pasando. No se crea ningún E2E nuevo. *[¿Hace falta E2E?]*
+  una con su lote: el lote de la receta con fotos (de fabricación, envasado y acondicionamiento)
+  muestra su conteo y su diálogo solo con sus fotos, los tres grupos y el nombre de la receta en el
+  título; el lote de la receta sin fotos muestra «—». Los casos de hoy
+  (R27 y R28 de QC-271) DEBEN seguir pasando. No se crea ningún E2E nuevo. *[¿Hace falta E2E? ·
+  P2]*
+
+### Decisiones P1 y P2
+
+- **R20** — El diálogo DEBE mostrar, tras «Fabricación» y «Envasado», el grupo «Acondicionamiento»
+  con las fotos de acondicionamiento de la receta, por paso, igual que los otros dos grupos y con su
+  total en la cabecera. Un grupo sin fotos NO DEBE pintarse. La suma de los totales de los grupos
+  pintados DEBE ser igual al conteo de la celda del lote. *[P2 · Pase `/design`]*
+- **R21** — La lectura y el conteo de las fotos de **todo el pedido** DEBEN dejar de existir:
+  `getOrderEvidence`, `countOrderEvidence`, sus actions `getOrderEvidenceAction` y
+  `countOrderEvidenceAction`, y lo que solo ellos usan. Ni la fachada de `asignaciones`, ni su
+  barril, ni `order-evidence-actions.ts` DEBEN exponerlos, y ningún archivo de `app/`,
+  `components/`, `lib/` ni `tests/` DEBE nombrarlos. Esto supera QT-315 R34. *[P1 · P4]*
 
 ### Cobertura de la tabla de decisiones
 
@@ -113,29 +130,26 @@
 | Fotos de una receta quitada | R12 |
 | Lo que ya existe | R5, R16 |
 | Alcance (Lo que NO entra: Recorrido, planta, migraciones) | R16, R18 |
-| Pase `/design` aprobado (`EvidenciaLoteVariasRecetas*`) | R7, R10, R11 |
+| Pase `/design` aprobado (`EvidenciaLoteVariasRecetas*`) | R7, R10, R11, R20 |
+| P1 — retirar las lecturas del pedido entero | R21 |
+| P2 — mostrar acondicionamiento | R20, R19 |
+| P3 — receta de una línea quitada | R9, R12, R14 |
+| P4 — `readOrderEvidence` y `countByOrders` sin consumidor | R21 (si se acepta la recomendación) |
 
 ## Preguntas abiertas
 
-- **P1 — ¿Se retiran `getOrderEvidence` y `countOrderEvidence`?** Con esta ficha la ficha de
-  producto terminado deja de usarlos, y con ellos sus dos actions; no les queda ningún otro
-  consumidor. **Recomendación:** mantenerlos en esta ficha (el cambio queda aditivo, el censo de la
-  fachada solo crece y QT-315 R34 sigue cierto) y anotar en `progress/deudas.md` su retirada en una
-  ficha de limpieza. Si el humano prefiere retirarlos aquí, se añade una task que los quita junto con
-  sus tests y las entradas de los censos (`asignaciones-facade`, `finished-product-route-contract`,
-  `session-once-per-request-actions`).
-- **P2 — ¿Qué fases cuenta la columna?** Hoy `countByOrders` cuenta las filas de las tres fases
-  (fabricación, envasado y acondicionamiento), pero el diálogo solo pinta fabricación y envasado:
-  con fotos de acondicionamiento, la celda dice más fotos de las que se ven. **Recomendación:**
-  mantener el criterio de hoy (las mismas fases que `countByOrders`), porque la ficha solo cambia
-  el «por receta», y anotar la diferencia como deuda para otra ficha.
-- **P3 — Receta cuya línea se quitó del pedido.** El catálogo de `pedidos` solo publica las líneas
-  vivas (`listRecipeOutlinesByIdsIncludingDeleted`). De una línea quitada no se sabe la receta y, si
-  no tiene fotos, tampoco que es del pedido. **Recomendación:** si tiene fotos, salen y cuentan
-  (R12) con el título de hoy (R9); si no tiene fotos, la lectura responde `order_not_found` (R14).
-  Desde la pantalla no se puede llegar ahí: sin fotos la celda no ofrece el diálogo. Así
-  `pedidos` no gana ningún método. La otra opción, que `pedidos` publique también las líneas
-  quitadas, cambia su contrato por un caso que la pantalla no alcanza.
+- **P4 — `readOrderEvidence` y `countByOrders` se quedan sin consumidor.** Al retirar
+  `getOrderEvidence` (P1), `readOrderEvidence` solo lo usa su test
+  (`tests/unit/asignaciones/read-order-evidence.test.ts`): no lo usa nadie más y el barril no lo
+  exporta. Lo mismo pasa con `StepEvidenceRepository.countByOrders` al retirar `countOrderEvidence`:
+  solo lo usan sus dobles y su test de integración. **Recomendación:** retirarlos también en esta
+  ficha, dentro de la misma task de P1. `readOrderEvidenceByLine` se queda, con la misma lectura y
+  la misma firma, y el código común (`readOrderEvidenceRows`, `signAll`, `toEvidence`) sigue siendo
+  suyo. Los casos de `read-order-evidence.test.ts` que no estén ya cubiertos por la lectura por
+  línea (pedido cancelado y dado de baja, firma, empresa, acondicionamiento de QC-299 R21 y R32) se
+  pasan a `readOrderEvidenceByLine` en el mismo archivo, sin perder ninguno. Las tasks ya siguen
+  esta recomendación (T9). Si el humano prefiere conservarlos, T9 se limita a P1 y la retirada se
+  anota en `progress/deudas.md`.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -148,3 +162,6 @@
 | 2026-11-11 | Receta ajena o inexistente | Heredado de QT-313 R43: una línea de otro pedido o de otra empresa se trata igual que un pedido inexistente. |
 | 2026-11-11 | Fotos de una receta quitada | Heredado: las fotos salen aunque la receta se haya quitado o su paso ya no pida evidencia, igual que con `readOrderEvidence` hoy. |
 | 2026-11-11 | Lo que ya existe | Se reutiliza la lectura por línea `readOrderEvidenceByLine` de QT-315. No se rehace. |
+| 2026-11-11 | P1 — ¿Se retiran `getOrderEvidence` y `countOrderEvidence`? | **Se retiran en esta ficha**, con sus actions (`getOrderEvidenceAction` y `countOrderEvidenceAction`), sus tests y sus entradas en los censos (`asignaciones-facade`, `finished-product-route-contract`, `session-once-per-request-actions` y los que aparezcan). `readOrderEvidence` se queda solo si tiene otro consumidor. QT-315 R34 queda superado, con la justificación en `design.md`. El cambio en `asignaciones` deja de ser solo aditivo. |
+| 2026-11-11 | P2 — ¿Qué fases cuenta la columna? | **Se muestra el acondicionamiento.** El diálogo suma el grupo «Acondicionamiento» con sus fotos por paso, igual que los otros. Un grupo vacío no se pinta. Así el conteo de la celda coincide con lo que se ve. Tablero actualizado: `docs/diseno/canvas/EvidenciaLoteVariasRecetas.dc.html` (`3080a2ebd`). |
+| 2026-11-11 | P3 — Receta cuya línea se quitó del pedido | **La recomendación del spec.** Sus fotos salen y cuentan, sin nombre de receta: el título queda como hoy. Una línea quitada sin fotos responde `order_not_found`. No se toca el contrato de `pedidos`. |

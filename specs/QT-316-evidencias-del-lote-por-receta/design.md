@@ -3,8 +3,10 @@
 > **Zona** fullstack · **Complejidad** medium · **Rama** `feature/QT-316-evidencias-del-lote-por-receta`
 > (nace de `origin/dev` con `origin/feature/QT-315-planta-con-varias-recetas` mergeada).
 >
-> Requisitos: `requirements.md` (R1–R19). Preguntas abiertas P1–P3: este diseño sigue la
-> recomendación de cada una y marca dónde cambiaría si el humano decide otra cosa.
+> Requisitos: `requirements.md` (R1–R21). P1–P3 cerradas por el humano el 2026-11-11 (retirar las
+> lecturas del pedido entero, mostrar acondicionamiento, receta quitada sin nombre). Queda abierta
+> P4 (`readOrderEvidence` y `countByOrders` sin consumidor): el diseño sigue su recomendación,
+> retirarlos, y § 3.5 dice qué cambia si no.
 
 ## Lo que ya existe
 
@@ -19,9 +21,14 @@
 - **Código:** el MCP `codebase-memory-mcp` responde, pero no tiene índice de este worktree (no está
   en `list_projects`). La exploración se hizo con Grep/Read sobre el worktree:
   - `lib/modules/asignaciones/domain/read-order-evidence.ts`: `readOrderEvidence` (todo el pedido) y
-    `readOrderEvidenceByLine` (QT-315: por línea, una sola firma). **Se reutiliza** la segunda.
+    `readOrderEvidenceByLine` (QT-315: por línea, una sola firma). **Se reutiliza** la segunda. La
+    primera solo la usa `getOrderEvidence` (y su test): **se retira** con ella (P1, P4).
+  - `lib/modules/asignaciones/domain/get-order-evidence.ts` y `count-order-evidence.ts` (QC-271):
+    su único consumidor es la ficha de producto terminado, a través de `order-evidence-actions.ts`.
+    **Se retiran** (P1).
   - `lib/modules/asignaciones/ports/step-evidence-repository.ts`: `StepEvidenceRow.orderLineId`,
-    `listByLine` y `countByOrders`. **Se amplía** con `countByLines`.
+    `listByLine` y `countByOrders`. **Se amplía** con `countByLines`. `countByOrders` solo lo usa
+    `countOrderEvidence`: **se retira** (P4).
   - `lib/modules/asignaciones/domain/recipe-of-order.ts`: `readRecipeOutlines` (QT-315). **Se
     reutiliza** para saber cuántas recetas vivas tiene el pedido y cuál es la de la línea.
   - `OrderCatalog.listRecipeOutlinesByIdsIncludingDeleted` y `RecipeCatalog.findRefsIncludingDeleted`
@@ -38,17 +45,19 @@
 | Fila | Uso | Paso de la regla de decisión |
 |---|---|---|
 | `DataTable` (`components/shared/data-table`) | la tabla de lotes, sin cambios | 1. Reutiliza |
-| `StepEvidence` (`components/shared/step-evidence`, con `EvidenceStepList` y `EvidenceReadError`) | grupos del diálogo, esqueleto y error, sin cambios | 1. Reutiliza |
+| `StepEvidence` (`components/shared/step-evidence`, con `EvidenceStepList` y `EvidenceReadError`) | grupos del diálogo (también «Acondicionamiento»), esqueleto y error, sin cambios: `EvidenceStepList` recibe el nombre de la fase como `phaseLabel` (texto libre), así que la pieza no necesita conocer la fase nueva | 1. Reutiliza |
 | `Dialog` (`components/ui/dialog`) | el diálogo, sin cambios | 1. Reutiliza |
 | `EMPTY_MARK` (`lib/shared/ui/empty-mark.ts`) | «—» de la celda | 1. Reutiliza |
 
 **No nace ningún componente.** Cambian tres componentes de la ruta
 (`batch-evidence-dialog.tsx`, `batch-evidence-button.tsx` y `finished-product-batches-table.tsx`):
-reciben la receta, y el diálogo suma la receta al título y la descripción. Ese cambio visual tiene
-su pase `/design` aprobado por el humano el 2026-11-11:
+reciben la receta, y el diálogo suma la receta al título y la descripción y el grupo
+«Acondicionamiento». Ese cambio visual tiene su pase `/design` aprobado por el humano el 2026-11-11:
 
 - `docs/diseno/canvas/EvidenciaLoteVariasRecetas.dc.html` (escritorio, interactivo: «Varias
-  recetas» / «Una receta», rol y estados de fotos);
+  recetas» / «Una receta», rol y estados de fotos). Actualizado en `3080a2ebd` con el grupo
+  «Acondicionamiento» (P2): el lote de ejemplo cuenta 7 fotos de las tres fases y el diálogo pinta
+  los tres grupos;
 - `docs/diseno/canvas/EvidenciaLoteVariasRecetasTablet.dc.html`;
 - `docs/diseno/canvas/EvidenciaLoteVariasRecetasMovil.dc.html`, con la ficha: Reutiliza, Cambia,
   Librerías (ninguna), Estados, Tablet, Teléfono y Animación (la de QC-271).
@@ -63,9 +72,16 @@ su pase `/design` aprobado por el humano el 2026-11-11:
    `recetas` (lo prohíben `tests/unit/recetas/scope.test.ts` y `module-contract.test.ts`). Quien
    decide si se nombra la receta es el dominio: `recipeName` llega `null` cuando el pedido tiene una
    sola receta viva (R8) o cuando no se resuelve (R9). La UI no cuenta recetas.
-3. **Aditivo.** Nacen dos casos de uso y dos actions; `getOrderEvidence`, `countOrderEvidence`,
-   `readOrderEvidence` y `readOrderEvidenceByLine` no cambian (R16; P1).
-4. **Sin migraciones, tablas, permisos ni dependencias** (R18).
+3. **En `asignaciones` el cambio NO es solo aditivo** (P1). Nacen dos casos de uso y dos actions
+   por línea, y **se retiran** las dos lecturas del pedido entero de QC-271: `getOrderEvidence` y
+   `countOrderEvidence`, sus actions y, por P4, `readOrderEvidence` y
+   `StepEvidenceRepository.countByOrders`. La fachada pierde dos operaciones y el barril pierde
+   `createGetOrderEvidence`, `createCountOrderEvidence`, sus tipos `Deps` y `OrderEvidenceCount`.
+   El contrato de la fachada encoge, pero no rompe a nadie: el único consumidor era esta ficha (§ 3.5,
+   § 5). En `inventario` el cambio sí es aditivo. `readOrderEvidenceByLine` no cambia (R16).
+4. **Acondicionamiento en el diálogo** (P2, R20). La lectura ya trae `conditioning`
+   (`OrderEvidence.conditioning`) y el conteo ya cuenta las tres fases: solo cambia la UI.
+5. **Sin migraciones, tablas, permisos ni dependencias** (R18).
 
 ## 2. Modelo de datos
 
@@ -98,8 +114,8 @@ su pase `/design` aprobado por el humano el 2026-11-11:
 rojo `guard-identificador-de-request > hallazgosDePuertoNuevo`) gana:
 
 ```ts
-/** Fotos por linea, de todas las fases, como `countByOrders`. Una linea sin fotos, de otro pedido
- *  o de otra empresa no sale. Clave: `lineId`. */
+/** Fotos por linea, de las tres fases. Una linea sin fotos, de otro pedido o de otra empresa no
+ *  sale. Clave: `lineId`. */
 countByLines(
   companyId: string,
   lines: readonly { readonly orderId: string; readonly lineId: string }[],
@@ -108,7 +124,9 @@ countByLines(
 
 `step-evidence-prisma.ts`: un solo `groupBy` por `['orderId', 'orderLineId']` con
 `where: { companyId, orderLineId: { in: lineIds } }`. Se descartan los grupos cuyo `orderId` no es
-el del par pedido. Con `lines` vacío no consulta. Mismas fases que `countByOrders` (P2).
+el del par pedido. Con `lines` vacío no consulta. Cuenta las tres fases (fabricación, envasado y
+acondicionamiento), las mismas que pinta el diálogo (P2, R20). En el mismo archivo se retira
+`countByOrders` (§ 3.5).
 
 ### 3.3 `asignaciones`: casos de uso (backend_dev)
 
@@ -146,7 +164,8 @@ output: OrderEvidenceRead                // { evidence: OrderEvidence; signingFa
 ```
 
 1. `requirePermission(actor, 'pedidos.consultar')`.
-2. Entrada mal formada → `OrderNotFoundError`, como `getOrderEvidence` (la pantalla no distingue).
+2. Entrada mal formada → `OrderNotFoundError`, como hacía `getOrderEvidence` (la pantalla no
+   distingue).
 3. `readOrderEvidenceByLine(deps, companyId, orderId)`. Lanza `OrderNotFoundError` si el pedido no
    es de la empresa; acepta los dados de baja.
 4. Si `recipes` trae la línea, devuelve su `evidence` y el `signingFailure` de la lectura.
@@ -177,10 +196,57 @@ export type LineEvidenceCount = {
   - `getLineEvidenceAction(orderId: string, lineId: string): Promise<OrderEvidenceResult>`. La firma
     caída va a `log.warn('evidence_read_signing_failed', { orderId, lineId, message })`, como hoy.
   - `countLineEvidenceAction(lines: readonly { orderId: string; lineId: string }[]): Promise<LineEvidenceCountResult>`.
-  - `getOrderEvidenceAction` y `countOrderEvidenceAction` no cambian (P1).
+  - Se retiran `getOrderEvidenceAction`, `countOrderEvidenceAction` y `OrderEvidenceCountResult`
+    (§ 3.5). `OrderEvidenceResult` se queda: es el resultado de `getLineEvidenceAction`.
 - `lib/composition/index.ts`: `asignaciones.getLineEvidence` (orders = `orderCatalog`, evidence,
-  storage) y `asignaciones.countLineEvidence` (evidence, orders, recipes = `recipeCatalog`). Las
-  dos operaciones nuevas se añaden al final del bloque de `asignaciones`, sin reordenar nada.
+  storage) y `asignaciones.countLineEvidence` (evidence, orders, recipes = `recipeCatalog`) ocupan
+  el sitio de `getOrderEvidence` y `countOrderEvidence`, al final del bloque de `asignaciones`. Salen
+  sus dos imports. No se reordena nada más.
+
+### 3.5 Lo que se retira (backend_dev · R21; P1 y P4)
+
+| Pieza | Archivo | Por qué no le queda consumidor |
+|---|---|---|
+| `getOrderEvidence` (`createGetOrderEvidence`, `GetOrderEvidenceDeps`) | `lib/modules/asignaciones/domain/get-order-evidence.ts` (se borra) | solo lo llamaba `getOrderEvidenceAction` |
+| `countOrderEvidence` (`createCountOrderEvidence`, `CountOrderEvidenceDeps`) | `lib/modules/asignaciones/domain/count-order-evidence.ts` (se borra) | solo lo llamaba `countOrderEvidenceAction` |
+| `getOrderEvidenceAction`, `countOrderEvidenceAction`, `OrderEvidenceCountResult` | `adapters/driving/order-evidence-actions.ts` | solo los importaban `batch-evidence-dialog.tsx` y `finished-product-list-section.tsx`, que pasan a las de línea |
+| `OrderEvidenceCount` | `domain/order-evidence.ts` y barril | solo lo usaban `countOrderEvidence` y su action |
+| `readOrderEvidence` | `domain/read-order-evidence.ts` | solo lo llamaba `getOrderEvidence`; el barril no lo exporta (P4) |
+| `StepEvidenceRepository.countByOrders` | puerto y `step-evidence-prisma.ts` | solo lo llamaba `countOrderEvidence` (P4) |
+
+Comprobado con Grep sobre `app/`, `components/`, `lib/`, `tests/`, `e2e/`, `scripts/` y `docs/`: no
+hay más consumidores. `getExecutionEvidence` (el Recorrido) usa `readOrderEvidenceByLine` y no se
+toca. `readOrderEvidenceRows`, `signAll`, `toEvidence` y `allRows` se quedan en
+`read-order-evidence.ts` porque los usa `readOrderEvidenceByLine`.
+
+**Tests que se van o se mudan:**
+- `tests/unit/asignaciones/get-order-evidence.test.ts` y `count-order-evidence.test.ts` se borran.
+  Sus casos (permiso antes de todo, por permiso y nunca por rol, entrada, empresa) tienen su
+  equivalente en `get-line-evidence.test.ts` y `count-line-evidence.test.ts` (T3, T4).
+- `tests/unit/asignaciones/read-order-evidence.test.ts`: los casos de `readOrderEvidence` pasan a
+  `readOrderEvidenceByLine`, sin perder ninguno: qué fotos se leen, pedidos cancelados y dados de
+  baja, la firma, la empresa y el acondicionamiento (QC-299 R21 y R32).
+- `tests/integration/asignaciones/step-evidence-repository.int.test.ts`: el `describe` de
+  `countByOrders` (QC-271 R6 y R29) pasa a `countByLines`, con los mismos casos por línea.
+- `tests/fixtures/order-evidence.ts`: `ORDER_EVIDENCE_COUNTS` pasa a `LINE_EVIDENCE_COUNTS`
+  (`LineEvidenceCount[]`). `ORDER_EVIDENCE` y los demás se quedan: los usan el Recorrido y
+  `evidence-step-list`.
+
+**QT-315 R34 queda superado.** R34 decía que QT-315 no debía cambiar la consulta de evidencias del
+lote, y que esa consulta debía seguir devolviendo las fotos del pedido «como en la rama base». Era
+una frontera de alcance **de QT-315**: protegía la ficha de producto terminado hasta que QT-316 la
+separara por receta (decisión P4 de QT-315). QT-316 es esa separación. Con ella, la lectura del
+pedido entero no tiene ningún consumidor. El humano decidió retirarla aquí (P1, 2026-11-11), en vez
+de dejar código muerto que un futuro consumidor podría usar para volver a mezclar las recetas.
+
+Los tests de R34 en QT-315 son los de `get-order-evidence.test.ts` y el E2E de QC-271, sin
+modificar. Se borran (unit) o cambian de forma (E2E, R19) en esta ficha. El reviewer de QT-316 no
+debe leer su desaparición como regresión de QT-315. Si QT-315 aún no está mergeado cuando se integre
+esta rama, su `impl_QT-315.md` sigue siendo cierto en su propia rama.
+
+**Si el humano rechaza P4** (conservar `readOrderEvidence` y `countByOrders`): salen las dos últimas
+filas de la tabla. `read-order-evidence.test.ts` y el `describe` de `countByOrders` en la integración
+no se tocan, y la retirada se anota en `progress/deudas.md`. Nada más cambia.
 
 ## 4. UI (frontend_dev)
 
@@ -195,7 +261,17 @@ Ruta `app/(private)/inventario/producto-terminado/[id]/components/`. Sin compone
   `ReadonlyMap<string, { photoCount: number; recipeName: string | null }>` por `lineId`. La celda
   busca por `row.orderLineId`. Sin entrada o con 0, «—».
 - **`batch-evidence-button.tsx`**: props nuevas `lineId` y `recipeName`; pasa las dos al diálogo.
-- **`batch-evidence-dialog.tsx`** (R6–R11):
+- **`batch-evidence-dialog.tsx`** (R6–R11, R20):
+  - tercer `PhaseSection` tras Envasado: `name={BATCH_EVIDENCE_TEXTS.conditioning}`,
+    `phaseLabel={BATCH_EVIDENCE_TEXTS.conditioningPhase}`, `groups={current.evidence.conditioning}`,
+    `testId="batch-evidence-conditioning"`. `PhaseSection` ya devuelve `null` con los grupos vacíos,
+    así que un grupo vacío no se pinta (R20). `BATCH_EVIDENCE_TEXTS` gana
+    `conditioning: 'Acondicionamiento'` y `conditioningPhase: 'acondicionamiento'`, en minúscula
+    como `manufacturingPhase` y `packingPhase`, porque `STEP_EVIDENCE_TEXTS.groupLabel` la mete en
+    mitad de una frase. **`components/shared/step-evidence` no cambia**: recibe la fase como texto;
+    no tiene lista de fases;
+  - se quita el comentario de `OrderEvidence.conditioning` en `order-evidence.ts`, que decía «la
+    ficha de producto terminado no lo pinta», porque ya no es verdad;
   - props `lineId` y `recipeName`; lee con `getLineEvidenceAction(orderId, lineId)` (el efecto
     depende también de `lineId`);
   - con `recipeName !== null`, el título suma ` · <recipeName>` y la descripción pasa a
@@ -211,11 +287,15 @@ Ruta `app/(private)/inventario/producto-terminado/[id]/components/`. Sin compone
 | Contrato | Antes | Después | Tipo |
 |---|---|---|---|
 | `inventario` › `FinishedProductBatchRow` | `orderId` | + `orderLineId: string \| null` | aditivo |
-| `asignaciones` › barril | `OrderEvidence`, `OrderEvidenceCount`… | + `LineEvidenceCount` | aditivo |
-| `asignaciones` › `StepEvidenceRepository` (interno) | `countByOrders` | + `countByLines` | aditivo |
-| fachada `asignaciones` (`lib/composition`) | 35 operaciones de hoy (las cuenta el censo) | + `getLineEvidence`, `countLineEvidence` | aditivo |
-| `order-evidence-actions.ts` | 2 lecturas | + `getLineEvidenceAction`, `countLineEvidenceAction` | aditivo |
+| `asignaciones` › barril | `OrderEvidenceCount`, `createGetOrderEvidence`, `createCountOrderEvidence` y sus `Deps` | − esos cinco; + `LineEvidenceCount`, `createGetLineEvidence`, `createCountLineEvidence` | **no aditivo** (retira) |
+| `asignaciones` › `StepEvidenceRepository` (interno) | `countByOrders` | − `countByOrders`; + `countByLines` | **no aditivo**, interno al módulo |
+| fachada `asignaciones` (`lib/composition`) | `getOrderEvidence`, `countOrderEvidence` | − esas dos; + `getLineEvidence`, `countLineEvidence` (el total del censo no cambia) | **no aditivo** (retira) |
+| `order-evidence-actions.ts` | `getOrderEvidenceAction`, `countOrderEvidenceAction` | − esas dos; + `getLineEvidenceAction`, `countLineEvidenceAction` | **no aditivo** (retira) |
 | `pedidos`, `recetas` | — | sin cambios | — |
+
+Lo que se retira no rompe a nadie: el único consumidor era la ficha de producto terminado, que se
+cambia en la misma rama (§ 3.5). Es una retirada decidida por el humano (P1), no una conveniencia
+del diseño.
 
 ## 6. Verificación (R → test)
 
@@ -236,30 +316,41 @@ Ruta `app/(private)/inventario/producto-terminado/[id]/components/`. Sin compone
 | R13 | `get-line-evidence.test.ts` y `count-line-evidence.test.ts`: sin `pedidos.consultar` → `UnauthorizedError` sin llamar a ningún puerto; `finished-product-tables.test.tsx`: sin permiso no hay columna ni conteo; `tests/guards/guard-permisos-sembrados.test.ts` sin cambios |
 | R14 | `get-line-evidence.test.ts`: pedido ajeno, línea de otro pedido, línea inexistente e ids mal formados → `OrderNotFoundError` sin firmar (`createSignedReadUrls` no llamado en la entrada mal formada y en el pedido ajeno; en la línea ajena no sale ninguna foto) |
 | R15 | `count-line-evidence.test.ts`: 26 líneas o id no uuid → `ValidationError` sin llamar; `tests/integration/asignaciones/step-evidence-repository.int.test.ts`: `countByLines` no cuenta filas de otra empresa ni un par con el pedido cambiado |
-| R16 | `read-order-evidence.test.ts` / `get-order-evidence.test.ts` / `get-execution-evidence.test.ts` / `count-order-evidence.test.ts` verdes **sin modificar** (el reviewer mira el diff); `get-line-evidence.test.ts` comprueba que llama a `readOrderEvidenceByLine` (no hay segunda lectura por línea) |
+| R16 | `get-execution-evidence.test.ts` y los casos de `readOrderEvidenceByLine` en `read-order-evidence.test.ts` verdes **sin modificar** (el reviewer mira el diff: los casos que se mudan de `readOrderEvidence` se añaden, ninguno de los de línea cambia); `get-line-evidence.test.ts` comprueba que llama a `readOrderEvidenceByLine` (no hay segunda lectura por línea) |
 | R17 | `get-line-evidence.test.ts` y `count-line-evidence.test.ts`: los dobles no exponen escrituras llamadas (`insert`, `replace`, `delete` no llamados) |
 | R18 | `tests/guards/guard-identificador-de-request.test.ts` (migraciones y dependencias, sin tocar) y `guard-dependencias-aprobadas.test.ts` |
-| R19 | `e2e/consulta-de-evidencia.spec.ts`: caso nuevo «R19 - pedido de dos recetas» |
+| R19 | `e2e/consulta-de-evidencia.spec.ts`: caso nuevo «R19 - pedido de dos recetas» (con fotos de las tres fases en la receta A y los tres grupos en su diálogo) |
+| R20 | `batch-evidence-dialog.test.tsx`: con fotos de acondicionamiento, la sección `batch-evidence-conditioning` con «Acondicionamiento», sus pasos y su total; sin ellas, la sección no existe; la suma de los totales de las secciones es igual al `photoCount` de la celda; `get-line-evidence.test.ts`: la evidencia trae `conditioning` de la línea |
+| R21 | `asignaciones-facade.test.ts` (el censo ya no lista `getOrderEvidence` ni `countOrderEvidence`); `finished-product-route-contract.test.ts` (`LECTURAS_DE_EVIDENCIA` solo admite las de línea); `order-evidence-actions.test.ts` (el módulo ya no exporta las dos actions: `Object.keys` del import); typecheck (los archivos borrados no se importan) |
 
-### Listas cerradas que el cambio toca (se amplían, no se aflojan)
+### Listas cerradas que el cambio toca (se reescriben por P1; no se aflojan)
 
-- `tests/unit/composition/asignaciones-facade.test.ts`: el censo de la fachada crece con
-  `countLineEvidence` y `getLineEvidence` (comentario con fecha y QT-316).
+- `tests/unit/composition/asignaciones-facade.test.ts`: en el censo de la fachada salen
+  `countOrderEvidence` y `getOrderEvidence` y entran `countLineEvidence` y `getLineEvidence`. El
+  total sigue igual. Lleva un comentario con fecha, QT-316 y P1, y el título del `it` lo nombra. Los
+  dos casos «QC-271 R2» (rechazo sin `pedidos.consultar` sin llegar a la base) pasan a las
+  operaciones de línea.
 - `tests/unit/inventario/producto-terminado/finished-product-route-contract.test.ts`:
-  `LECTURAS_DE_EVIDENCIA` crece con `getLineEvidenceAction` y `countLineEvidenceAction`. Con P1
-  recomendada, las dos de hoy se quedan. Si se retiran, salen de la lista.
-- `tests/unit/identity/session-once-per-request-actions.test.ts`: caso de `getLineEvidenceAction`
-  (y de `countLineEvidenceAction` si el censo es por action), junto al de `getOrderEvidenceAction`.
+  `LECTURAS_DE_EVIDENCIA` pasa a `getLineEvidenceAction` y `countLineEvidenceAction`, con su
+  comentario de fecha y QT-316. Las de hoy salen: la lista sigue cerrada y con dos nombres.
+- `tests/unit/identity/session-once-per-request-actions.test.ts`: la entrada de
+  `getOrderEvidenceAction` pasa a `getLineEvidenceAction` (`('no-es-un-uuid', 'no-es-un-uuid')`).
+  Si el censo exige una entrada por action exportada, entra también `countLineEvidenceAction`.
 - `tests/unit/asignaciones/evidence-doubles.ts` y `tests/helpers/evidence-off.ts`: implementan
-  `StepEvidenceRepository`; ganan `countByLines` o el typecheck se pone rojo.
+  `StepEvidenceRepository`. Pierden `countByOrders` y ganan `countByLines`, o el typecheck se pone
+  rojo.
 - `tests/fixtures/finished-product-detail.ts`: las filas de lote ganan `orderLineId`.
+- `tests/fixtures/order-evidence.ts`: `ORDER_EVIDENCE_COUNTS` pasa a `LINE_EVIDENCE_COUNTS`.
+- `tests/guards/guard-dobles-e2e.test.ts` cita `specs/QC-271-…/design.md > 4` como prosa y no
+  cambia.
 - **No se tocan**, comprobado:
   - `tests/unit/recetas/scope.test.ts` y `module-contract.test.ts`: ningún `page.tsx` cambia, la
     pantalla no importa `@/lib/modules/recetas` y ningún archivo nuevo lleva «recipe» o «receta» en
     su ruta. El E2E ampliado ya importa `normalizeRecipeName` hoy, y la lista de E2E de recetas va
     por nombre de archivo.
   - `guard-identificador-de-request`: no nace ningún E2E, ninguna migración ni ningún archivo en
-    `ports/`.
+    `ports/`. Borrar dos archivos de `domain/` no le afecta: su barrido de `domain/` exige más de 20
+    archivos y hay muchos más.
   - `guard-lote-sin-join`: el adaptador nuevo no usa `include`.
 
 ## 7. Alternativas descartadas
@@ -276,11 +367,16 @@ Ruta `app/(private)/inventario/producto-terminado/[id]/components/`. Sin compone
 3. **Nombre de la receta en la lectura del diálogo** (no en el conteo). El título cambiaría al
    terminar de leer (salto visible) y en el error no se sabría la receta. Además, la lectura tendría
    que llamar otra vez al catálogo de recetas por cada apertura.
-4. **Ampliar `getOrderEvidence` y `countOrderEvidence` con un `lineId` opcional.** Mezcla dos
-   contratos en uno: la salida del conteo cambia de forma, `{ orderId, photoCount }` no lleva
-   `lineId` ni `recipeName`. Y rompe QT-315 R34 («`getOrderEvidence` devuelve las fotos del pedido
-   como en la rama base»).
-5. **Decidir en la UI si nombrar la receta** (pasar `recipeCount` y que la pantalla compare con 1).
+4. **Ampliar `getOrderEvidence` y `countOrderEvidence` con un `lineId` opcional**, en vez de
+   retirarlos y crear los de línea. Mezcla dos contratos en uno: la salida del conteo cambia de
+   forma (`{ orderId, photoCount }` no lleva `lineId` ni `recipeName`), y el «sin `lineId`»
+   conservaría justo la lectura del pedido entero que P1 manda retirar.
+5. **Conservar las lecturas del pedido entero** como código sin consumidor (la recomendación
+   inicial de P1). La descartó el humano: el código muerto se puede volver a usar y mezclar otra vez
+   las recetas, y los censos lo mantendrían vivo sin motivo.
+6. **Contar solo fabricación y envasado** para que la celda cuadre con el diálogo de hoy, en vez de
+   pintar el acondicionamiento. Escondería fotos que existen. El humano eligió mostrarlas (P2).
+7. **Decidir en la UI si nombrar la receta** (pasar `recipeCount` y que la pantalla compare con 1).
    Duplica la regla de QT-315 R29 en un componente. Se prefiere que el dominio entregue
    `recipeName: null`.
 
