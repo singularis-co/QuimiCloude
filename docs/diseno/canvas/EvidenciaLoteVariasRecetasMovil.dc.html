@@ -18,7 +18,7 @@
     <h2 class="h2">Evidencia del lote por receta · QT-316</h2>
     <dl class="spec">
       <dt>Reutiliza</dt><dd>La ficha con evidencia de QC-271, sin cambiar su forma: <span class="mono">shared/data-table</span>, <span class="mono">shared/step-evidence</span> (readOnly) y <span class="mono">ui/dialog</span>. La lectura por línea <span class="mono">readOrderEvidenceByLine</span> de QT-315.</dd>
-      <dt>Cambia</dt><dd><b>Columna «Evidencia»:</b> cuenta solo las fotos de la receta del lote (su línea del pedido). Si esa receta no tiene fotos, «—», aunque otra receta del pedido sí tenga. <b>Diálogo:</b> solo las fotos de esa receta. El título suma la receta: «Evidencia · Lote L-2026-1003 · Pedido 2026-0000013 · Hipoclorito de sodio 5 %», y la descripción dice «esta receta del pedido».</dd>
+      <dt>Cambia</dt><dd><b>Columna «Evidencia»:</b> cuenta solo las fotos de la receta del lote (su línea del pedido). Si esa receta no tiene fotos, «—», aunque otra receta del pedido sí tenga. <b>Diálogo:</b> solo las fotos de esa receta, en tres grupos: Fabricación, Envasado y <b>Acondicionamiento</b> (nuevo, para que el conteo de la celda coincida con lo que se ve). Un grupo vacío no se pinta. El título suma la receta: «Evidencia · Lote L-2026-1003 · Pedido 2026-0000013 · Hipoclorito de sodio 5 %», y la descripción dice «esta receta del pedido».</dd>
       <dt>Librerías</dt><dd>Ninguna nueva.</dd>
       <dt>Estados</dt><dd>Pedido de una sola receta viva: igual que hoy, sin la receta en el título (regla de QT-315 R29) · Cargando, Error y Enlace vencido: los de QC-271 · receta quitada después: sus fotos siguen saliendo.</dd>
       <dt>Tablet</dt><dd>Igual que QC-271: barra lateral en modo icono y la tabla se desplaza en horizontal.</dd>
