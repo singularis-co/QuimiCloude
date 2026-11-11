@@ -282,3 +282,72 @@ $ pnpm exec playwright test e2e/consulta-de-evidencia.spec.ts --workers=1 --proj
   `{"companies":0,"recipes":0,"products":0,"batches":0,"users":0}`.
 
 Veredicto: T9 hecha. R19 y R20 cubiertos en E2E, verde en chromium y webkit, R27 y R28 siguen verdes.
+
+## Cierre (implementer, 2026-11-11)
+
+Commits: `023b81b32` (tanda 1), `220d11b4c` (tanda 2), `8120b5469` (tanda 3), `f236f8e71` (tanda 4) y
+`b79512d56` (tanda 5), todos pusheados a `origin/feature/QT-316-evidencias-del-lote-por-receta`.
+Todas las tasks, T1–T9, quedan `[x]`.
+
+### Mapa R<n> → test (consolidado; el detalle de cada caso está en la tabla de su tanda)
+
+| R | Tests |
+|---|---|
+| R1 | `step-evidence-repository.int.test.ts` (countByLines), `count-line-evidence.test.ts`, `finished-product-batches-evidence.test.tsx` |
+| R2 | `step-evidence-repository.int.test.ts`, `count-line-evidence.test.ts`, `finished-product-batches-evidence.test.tsx`; E2E R19 (ficha B, «—») |
+| R3 | `finished-product-batches-evidence.test.tsx` |
+| R4 | `step-evidence-repository.int.test.ts`, `count-line-evidence.test.ts`, `finished-product-tables.test.tsx` |
+| R5 | `finished-product-detail.int.test.ts`, `list-finished-product-batches.test.ts` |
+| R6 | `get-line-evidence.test.ts`, `batch-evidence-dialog.test.tsx`; E2E R19 |
+| R7 | `count-line-evidence.test.ts` (recipeName), `batch-evidence-dialog.test.tsx`; E2E R19 (título) |
+| R8 | `count-line-evidence.test.ts`, `batch-evidence-dialog.test.tsx` |
+| R9 | `count-line-evidence.test.ts`, `batch-evidence-dialog.test.tsx` |
+| R10 | `get-line-evidence.test.ts`, `order-evidence-actions.test.ts` (log.warn con lineId), `batch-evidence-dialog.test.tsx` |
+| R11 | `batch-evidence-dialog.test.tsx` |
+| R12 | `count-line-evidence.test.ts`, `get-line-evidence.test.ts` |
+| R13 | `count-line-evidence.test.ts`, `get-line-evidence.test.ts`, `asignaciones-facade.test.ts`, `finished-product-tables.test.tsx` |
+| R14 | `get-line-evidence.test.ts`, `order-evidence-actions.test.ts` |
+| R15 | `step-evidence-repository.int.test.ts`, `count-line-evidence.test.ts`, `order-evidence-actions.test.ts` |
+| R16 | `get-execution-evidence.test.ts` sin modificar (verde en tandas 2 y 4); `read-order-evidence.test.ts` (los 17 casos, ahora sobre la lectura por línea) |
+| R17 | `count-line-evidence.test.ts`, `get-line-evidence.test.ts` (ninguna escritura) |
+| R18 | Sin test: comprobación estructural, abajo (`git diff` vacío en `db/` y `package.json`) |
+| R19 | `e2e/consulta-de-evidencia.spec.ts` › «R19 - pedido de dos recetas» (chromium y webkit) |
+| R20 | `step-evidence-repository.int.test.ts`, `get-line-evidence.test.ts`, `batch-evidence-dialog.test.tsx`; E2E R19 (tres grupos 1/2/1) |
+| R21 | `order-evidence-actions.test.ts` (exports), `asignaciones-facade.test.ts` (censo 35), Grep de R21 sin coincidencias |
+
+**QT-315 R34 queda superado** por R21 (P1 y P4, design § 3.5): la lectura y el conteo del pedido
+entero se retiran y `readOrderEvidenceByLine` se queda con el código común.
+
+### Comprobaciones de cierre
+
+- `git diff --stat 7470673e6 HEAD -- db/ package.json pnpm-lock.yaml`: vacío (R18).
+- Grep de R21 (`git grep -nE "getOrderEvidence|countOrderEvidence|readOrderEvidence\b|countByOrders|OrderEvidenceCount\b" -- app components lib tests e2e`): sin coincidencias (exit 1).
+- `node scripts/archivos-en-vuelo.mjs --candidata QT-316`: choques solo con features del mismo dueño
+  (QT-304: `lib/composition/index.ts`; QT-314: composición y `session-once-per-request-actions`;
+  QT-315: la rama base, esperado). Avisos: QC-96 sin rama publicada y QC-131 sin `## Archivos esperados`.
+- `./init.sh` (modo rápido): exit 1. Se corta en el paso 4, `feature_list.json invalido`, por:
+  - 18 «id duplicado» (290–308, QC/QT), la deuda ya registrada;
+  - además: «features en vuelo sin assignee en el tracker: QT-316». En el `feature_list.json` del
+    checkout principal QT-316 está `in_progress` con assignee «Camilo», así que el validador mira
+    otro dato (lo debe revisar el leader).
+
+  Por cortarse ahí, `./init.sh` **no llegó** a correr typecheck, lint, `vitest related` ni las guardias.
+  Esos pasos se corrieron a mano en cada tanda, sobre el código final en la tanda 4 (último cambio de
+  `lib/` y `tests/`) y la 5 (solo `e2e/`): typecheck 0, lint con 0 errores y 11 avisos, guardias
+  1335 en verde y 22 saltadas.
+
+### Para el reviewer
+
+1. R14 y la firma: con una línea de otro pedido del mismo pedido-empresa, `readOrderEvidenceByLine`
+   firma las fotos de las otras recetas antes de responder `order_not_found` (no salen del dominio).
+   Según el informe de la tanda 2, design § 7 lo acepta; R14 dice «ni firmar ninguna lectura».
+2. `countLineEvidence` con la misma línea pedida con dos pedidos distintos en una petición: el
+   conteo podría asignarse también al par equivocado (misma empresa; la pantalla no lo pide así; el
+   spec no lo cubre).
+3. Tanda 3: el caso QC-271 «R19 — dos lotes del mismo pedido muestran el mismo total» se reemplazó
+   por QT-316 R1, que pide lo contrario (comentario fechado).
+4. Tanda 4: `ORDER_EVIDENCE_PHOTO_TOTAL` del fixture valía 9 con 8 fotos reales (deuda previa); ahora
+   se calcula y vale 8, y `batch-evidence-dialog.test.tsx` usa la constante.
+
+Veredicto: T1–T9 hechas y verificadas por tanda; `./init.sh` rojo solo por el validador de
+`feature_list.json` (ids duplicados y el aviso de assignee de QT-316).
