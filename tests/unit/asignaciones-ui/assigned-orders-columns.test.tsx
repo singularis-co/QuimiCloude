@@ -29,7 +29,9 @@ afterEach(() => {
 
 const BASE_ORDER: AssignedOrderView = {
   id: 'order-1',
+  lineId: 'linea-order-1',
   numberText: '2026-000123',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.500',
   priority: 'ALTA',
@@ -211,6 +213,6 @@ describe('R31, R34 - un pedido BLOQUEADO se marca en la lista del Operador', () 
     });
 
     expect(container.querySelector('a')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Entrar' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Entrar/ })).toBeDisabled();
   });
 });

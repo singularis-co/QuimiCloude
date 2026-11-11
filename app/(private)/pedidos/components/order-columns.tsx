@@ -1,8 +1,12 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import { withCardFieldLabel } from '@/components/shared/card-field-label';
 import { actionsColumn, type DataTableColumn } from '@/components/shared/data-table';
-import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
+import { OrderProgress } from '@/components/shared/order-progress';
+import { RecipesFirstMore } from '@/components/shared/recipes-first-more';
+import { Button } from '@/components/ui/button';
 import type { OrderResponsible } from '@/lib/modules/asignaciones';
 import {
   formatOrderNumber,
@@ -15,10 +19,6 @@ import { formatPresentationQuantities } from '@/lib/shared/ui/presentation-quant
 
 import { orderCustomerLabel } from '@/components/shared/order-customer-label';
 import {
-  OrderProducedPresentations,
-  type ProducedProductsByOrder,
-} from './order-produced-presentations';
-import {
   CREATED_AT_COLUMN_ID,
   PRIORITY_COLUMN_ID,
   STATUS_COLUMN_ID,
@@ -27,7 +27,6 @@ import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
 } from './order-responsibles';
-import { distributionLabelLine } from './order-responsibles-sheet';
 import { orderRowActionsSpec, type OrderRowAction } from './order-row-actions';
 import { OrderRowResponsibles } from './order-sheet';
 import {
@@ -91,8 +90,8 @@ export const ORDER_NUMBER_COLUMN_ID = 'orderNumber';
 
 /** Ids de las columnas que no filtran ni ordenan, pero que los tests localizan por su celda. */
 export const RECIPE_NAME_COLUMN_ID = 'recipeName';
+export const PROGRESS_COLUMN_ID = 'progress';
 export const ORDER_CUSTOMER_NAME_COLUMN_ID = 'customer';
-export const PRESENTATION_NAME_COLUMN_ID = 'presentationName';
 export const PENDING_DELIVERY_COLUMN_ID = 'pendingDelivery';
 export const CANCELLATION_REASON_COLUMN_ID = 'cancellationReason';
 export const COVERAGE_COLUMN_ID = 'coverage';
@@ -106,6 +105,25 @@ export const ACTUAL_COST_TESTID = 'order-actual-cost';
 export const SALE_PRICE_COLUMN_ID = 'salePrice';
 export const SALE_PRICE_TESTID = 'order-sale-price';
 export const ACTIONS_COLUMN_ID = 'actions';
+
+export const ORDER_NUMBER_DETAIL_TESTID = 'order-number-detail';
+export const ORDER_RECIPES_FIRST_TESTID = 'order-recipes-first';
+export const ORDER_RECIPES_MORE_TESTID = 'order-recipes-more';
+export const ORDER_ROW_WITHOUT_PRICE_TESTID = 'order-row-without-price';
+
+export type OrderColumnsTexts = {
+  readonly progress: string;
+  readonly detailLabel: (numberText: string) => string;
+  readonly moreRecipes: (count: number) => string;
+  readonly withoutPrice: (count: number) => string;
+};
+
+export const ORDER_COLUMNS_TEXTS: OrderColumnsTexts = {
+  progress: 'Avance',
+  detailLabel: (numberText) => `Ver detalle del pedido ${numberText}`,
+  moreRecipes: (count) => `+${count} más`,
+  withoutPrice: (count) => `${count} sin precio`,
+};
 
 /** Glifo del marcador de ausencia. Constante para que ningun test dependa del caracter. */
 export const MISSING_VALUE_MARK = '—';
@@ -201,34 +219,16 @@ export type OrderColumnsDeps = {
   readonly canEditCustomer?: boolean;
   /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
   readonly canDeliver?: boolean;
-  /** Por pedido, el producto terminado de cada presentación; `{}` si no se pudo resolver. */
-  readonly producedProductsByOrder?: ProducedProductsByOrder;
+  /** Si el actor puede cancelar una receta (modificar pedidos); lo resuelve el servidor. */
+  readonly canCancelLine?: boolean;
   /** Lo que la persona elige en el menu de la fila. Sin valor, los items no abren nada. */
   readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
+  readonly texts?: OrderColumnsTexts;
 };
 
-const PRODUCED_ORDER_STATUSES: ReadonlySet<OrderSummary['status']> = new Set([
-  'TERMINADO',
-  'ENTREGADO',
-]);
-
-/** El mapa puede traer pedidos que ya cambiaron de estado: el estado de la fila manda. */
-function producedProductsOf(
-  order: OrderSummary,
-  producedProductsByOrder: ProducedProductsByOrder,
-): Readonly<Record<string, string>> | null {
-  if (!PRODUCED_ORDER_STATUSES.has(order.status)) return null;
-  const products = producedProductsByOrder[order.id];
-  if (products === undefined || Object.keys(products).length === 0) return null;
-  return products;
-}
-
 /**
- * Celda de importe. El estimado es `ingredientsCost` y NADA MAS: ya incluye los envases, y sumar
- * `packagingCost` los contaria dos veces. Sin importe, el marcador de ausencia; nunca `0`.
- *
- * La misma celda va a la tarjeta de telefono con su rotulo delante
- * (`withCardFieldLabel`), que dentro de la tabla se oculta: la cabecera ya lo dice.
+ * Celda de importe: un total del pedido, o el marcador de ausencia si no existe; nunca `0`. La misma
+ * celda va a la tarjeta de telefono con su rotulo delante, que dentro de la tabla se oculta.
  */
 export const PRODUCTION_COST_LABEL = 'Costo estimado';
 export const ACTUAL_COST_LABEL = 'Costo real';
@@ -243,20 +243,63 @@ const AMOUNT_TESTIDS = {
 function AmountCell({
   value,
   field,
+  note,
 }: {
   readonly value: string | null;
   readonly field: keyof typeof AMOUNT_TESTIDS;
+  readonly note?: ReactNode;
 }) {
   const { testId, label } = AMOUNT_TESTIDS[field];
   return withCardFieldLabel(
     label,
-    value === null ? (
-      <MissingValue field={field} />
-    ) : (
-      <span data-testid={testId} title={exactDecimalTitle(value)}>
-        {formatMoneyDisplay(value)}
-      </span>
-    ),
+    <>
+      {value === null ? (
+        <MissingValue field={field} />
+      ) : (
+        <span data-testid={testId} title={exactDecimalTitle(value)}>
+          {formatMoneyDisplay(value)}
+        </span>
+      )}
+      {note}
+    </>,
+  );
+}
+
+function WithoutPriceNote({
+  count,
+  texts,
+}: {
+  readonly count: number;
+  readonly texts: OrderColumnsTexts;
+}) {
+  if (count === 0) return null;
+  return (
+    <span
+      data-testid={ORDER_ROW_WITHOUT_PRICE_TESTID}
+      className="ml-1.5 text-xs text-muted-foreground [table_&]:ml-0 [table_&]:block"
+    >
+      {texts.withoutPrice(count)}
+    </span>
+  );
+}
+
+function OrderRecipesCell({
+  order,
+  texts,
+}: {
+  readonly order: OrderSummary;
+  readonly texts: OrderColumnsTexts;
+}) {
+  const [first] = order.lines;
+  if (first === undefined) return <MissingValue field={RECIPE_NAME_COLUMN_ID} />;
+  return (
+    <RecipesFirstMore
+      first={first.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />}
+      moreCount={order.lines.length - 1}
+      firstTestId={ORDER_RECIPES_FIRST_TESTID}
+      moreTestId={ORDER_RECIPES_MORE_TESTID}
+      texts={{ more: texts.moreRecipes }}
+    />
   );
 }
 
@@ -269,8 +312,9 @@ export function buildOrderColumns({
   canEditDistribution = false,
   canEditCustomer = false,
   canDeliver = false,
-  producedProductsByOrder = {},
+  canCancelLine = false,
   onAction = ignoreAction,
+  texts = ORDER_COLUMNS_TEXTS,
 }: OrderColumnsDeps): readonly DataTableColumn<OrderSummary>[] {
   return [
     {
@@ -281,9 +325,20 @@ export function buildOrderColumns({
       // Nace fijada al borde izquierdo (R19): es un defecto, con preferencia guardada gana
       // la del usuario.
       defaultPinned: 'left',
-      // R10: el correlativo SIEMPRE sale de la funcion de formato del contrato. Ni aqui ni en
-      // ningun otro archivo se compone `${year}-${sequence}` a mano.
-      cell: (order) => formatOrderNumber(order.number),
+      // El correlativo SIEMPRE sale de la funcion de formato del contrato.
+      cell: (order) => (
+        <Button
+          type="button"
+          variant="link"
+          touch="mobile"
+          className="h-auto px-0 font-mono"
+          aria-label={texts.detailLabel(order.numberText)}
+          data-testid={ORDER_NUMBER_DETAIL_TESTID}
+          onClick={() => onAction('detail', order)}
+        >
+          {formatOrderNumber(order.number)}
+        </Button>
+      ),
     },
     {
       id: STATUS_COLUMN_ID,
@@ -307,8 +362,13 @@ export function buildOrderColumns({
       align: 'start',
       width: 500,
       hideText: false,
-      cell: (order) =>
-        order.recipeName ?? <MissingValue field={RECIPE_NAME_COLUMN_ID} />,
+      cell: (order) => <OrderRecipesCell order={order} texts={texts} />,
+    },
+    {
+      id: PROGRESS_COLUMN_ID,
+      label: texts.progress,
+      align: 'start',
+      cell: (order) => <OrderProgress progress={order.progress} />,
     },
     {
       id: ORDER_CUSTOMER_NAME_COLUMN_ID,
@@ -322,28 +382,11 @@ export function buildOrderColumns({
           orderCustomerLabel(order.customer)
         ),
     },
-        {
+    {
       id: PENDING_DELIVERY_COLUMN_ID,
       label: 'Por entregar',
       align: 'start',
       cell: (order) => <PendingDelivery order={order} />,
-    },
-    {
-      id: PRESENTATION_NAME_COLUMN_ID,
-      label: 'Presentación',
-      align: 'center',
-      // Solo informa, como el importe: sin `sortable` y sin `filter`.
-      cell: (order) => {
-        const products = producedProductsOf(order, producedProductsByOrder);
-        return products === null ? (
-          <OrderDistributionLabel lines={order.presentationLines.map(distributionLabelLine)} />
-        ) : (
-          <OrderProducedPresentations
-            lines={order.presentationLines}
-            productByPresentation={products}
-          />
-        );
-      },
     },
     {
       id: CREATED_AT_COLUMN_ID,
@@ -402,26 +445,41 @@ export function buildOrderColumns({
       label: SALE_PRICE_LABEL,
       align: 'end',
       tabular: true,
-      cell: (order) => <AmountCell value={order.salePrice} field={SALE_PRICE_COLUMN_ID} />,
+      cell: (order) => (
+        <AmountCell
+          value={order.salePriceTotal}
+          field={SALE_PRICE_COLUMN_ID}
+          note={<WithoutPriceNote count={order.linesWithoutPrice} texts={texts} />}
+        />
+      ),
     },
     {
       id: PRODUCTION_COST_COLUMN_ID,
       label: PRODUCTION_COST_LABEL,
       align: 'end',
       tabular: true,
-      cell: (order) => <AmountCell value={order.ingredientsCost} field={PRODUCTION_COST_COLUMN_ID} />,
+      cell: (order) => (
+        <AmountCell value={order.ingredientsCostTotal} field={PRODUCTION_COST_COLUMN_ID} />
+      ),
     },
     {
       id: ACTUAL_COST_COLUMN_ID,
       label: ACTUAL_COST_LABEL,
       align: 'end',
       tabular: true,
-      cell: (order) => <AmountCell value={order.actualCost} field={ACTUAL_COST_COLUMN_ID} />,
+      cell: (order) => <AmountCell value={order.actualCostTotal} field={ACTUAL_COST_COLUMN_ID} />,
     },
     actionsColumn({
       id: ACTIONS_COLUMN_ID,
       menu: (order) =>
-        orderRowActionsSpec({ order, canEditDistribution, canEditCustomer, canDeliver, onAction }),
+        orderRowActionsSpec({
+          order,
+          canEditDistribution,
+          canEditCustomer,
+          canDeliver,
+          canCancelLine,
+          onAction,
+        }),
     }),
   ];
 }

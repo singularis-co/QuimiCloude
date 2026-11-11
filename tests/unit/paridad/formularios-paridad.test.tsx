@@ -6,7 +6,7 @@ import { PresentationSheet } from '@/app/(private)/configuracion/presentaciones/
 import { UnitSheet } from '@/app/(private)/configuracion/unidades/components';
 import { UserSheet, WorkGroupSheet } from '@/app/(private)/configuracion/usuarios/components';
 import { ProductSheet } from '@/app/(private)/inventario/components/product-sheet';
-import { ORDER_DISTRIBUTION_DEBOUNCE_MS, OrderSheet } from '@/app/(private)/pedidos/components';
+import { OrderSheet } from '@/app/(private)/pedidos/components';
 import { CatalogLineSheet } from '@/app/(private)/proveedores/[id]/components';
 import { SupplierSheet } from '@/components/shared/supplier/supplier-sheet';
 import type { CustomerView } from '@/lib/modules/clientes';
@@ -22,6 +22,7 @@ import { setupUser } from '../../helpers/user-event';
 import { resetViewport, setViewportWidth, WIDE_VIEWPORT } from '../../helpers/viewport';
 import { arbolAccesible } from './arbol-accesible';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 /**
  * Paridad de los formularios en panel de `design.md > 2.1`, congelada contra el codigo de hoy antes
@@ -366,30 +367,34 @@ const DETALLE_RECETA: RecipeDetail = {
 
 const PEDIDO: OrderSummary = {
   ...VISTA_SIN_LINEAS,
+  // Desde QT-314 el panel edita recetas: el pedido trae la suya, sin la cual no se guarda.
+  lines: [
+    lineaPedido({
+      id: 'eeeeeeee-eeee-4eee-8eee-0000000000e1',
+      recipeId: RECETA.id,
+      originalRecipeId: RECETA.id,
+      recipeName: RECETA.name,
+      quantity: '25',
+      unitId: UNIDAD_KG.id,
+      unitLabel: UNIDAD_KG.symbol,
+      status: 'EN_CURSO',
+      presentationLines: [],
+      salePrice: null,
+      ingredientsCost: null,
+    }),
+  ],
   id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
   number: { year: 2026, sequence: 42 },
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-  recipeId: RECETA.id,
-  recipeName: RECETA.name,
-  recipeVersion: null,
-  quantity: '25',
   priority: 'ALTA',
   status: 'EN_CURSO',
   cancellationReason: null,
-  ingredientsCost: null,
-  packagingCost: null,
-  actualCost: null,
-  salePrice: null,
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   createdBy: null,
   updatedBy: null,
-  presentationLines: [],
-  unitId: UNIDAD_KG.id,
-  unitLabel: UNIDAD_KG.symbol,
   pendingDelivery: { kind: 'not_packed' },
   customer: null,
-  recipeImageUrl: null,
 };
 
 function porDefecto() {
@@ -441,27 +446,14 @@ type Formulario = {
   readonly accion: string;
   /** Lo que el panel sigue recalculando despues de enviar, y hay que dejar terminar. */
   readonly trasEnviar?: () => Promise<void>;
+  /** El error general que devuelve su operacion; por defecto, `ERROR_DE_CATALOGO`. */
+  readonly errorGeneral?: ErrorState;
   readonly errorDeCampo?: {
     readonly resultado?: ErrorState;
     readonly preparar?: (user: ReturnType<typeof setupUser>) => Promise<void>;
     readonly testId: string;
   };
 };
-
-/**
- * El reparto del pedido pide el disponible con una espera (`ORDER_DISTRIBUTION_DEBOUNCE_MS`) al
- * abrirse y tras cada envio: se deja terminar para que el arbol no dependa de en que punto de esa
- * espera se fotografie.
- */
-async function esperarDisponible() {
-  await new Promise((resolver) => setTimeout(resolver, ORDER_DISTRIBUTION_DEBOUNCE_MS + 100));
-  await waitFor(() =>
-    expect(
-      screen.getByTestId('order-distribution-available').closest('[aria-busy]'),
-    ).toHaveAttribute('aria-busy', 'false'),
-  );
-  await asentar();
-}
 
 function montar(elemento: ReactElement) {
   render(elemento);
@@ -648,16 +640,19 @@ const FORMULARIOS: readonly Formulario[] = [
         />,
       );
       await screen.findByTestId('order-form');
-      await screen.findByTestId('order-ingredients-table');
       await asentar();
-      await esperarDisponible();
     },
     form: 'order-form',
     submit: 'order-form-submit',
     error: 'order-form-error',
     accion: 'updateOrderAction',
-    trasEnviar: () => esperarDisponible(),
-    errorDeCampo: { resultado: errorDe('recipe_not_found'), testId: 'recipe-picker-error' },
+    // El alta y la edicion del pedido devuelven siempre las posiciones de las recetas que fallan.
+    errorGeneral: Object.assign({ ...ERROR_DE_CATALOGO }, { linePositions: [] }),
+    // Desde QT-314 el error de una receta no señala un campo del panel: marca su fila en un aviso.
+    errorDeCampo: {
+      resultado: Object.assign(errorDe('recipe_not_found'), { linePositions: [0] }),
+      testId: 'order-form-lines-error',
+    },
   },
   {
     nombre: 'linea de catalogo',
@@ -729,7 +724,7 @@ for (const formulario of FORMULARIOS) {
     });
 
     it('R1 R10 — con error general: el panel sigue abierto', async () => {
-      acciones.fn(formulario.accion).mockResolvedValue(ERROR_DE_CATALOGO);
+      acciones.fn(formulario.accion).mockResolvedValue(formulario.errorGeneral ?? ERROR_DE_CATALOGO);
       const user = setupUser();
       await formulario.edicion(user);
       await user.click(screen.getByTestId(formulario.submit));

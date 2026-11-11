@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createCancelOrder } from '@/lib/modules/pedidos/domain/cancel-order'
 import { createCancelOrderLine } from '@/lib/modules/pedidos/domain/cancel-order-line'
 import { createCancelAliveOrder } from '@/lib/modules/pedidos/domain/order-cancellation'
+import { createCancelAliveOrderLine } from '@/lib/modules/pedidos/domain/order-cancellation'
 import { createDeleteOrder } from '@/lib/modules/pedidos/domain/delete-order'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
 
@@ -274,5 +275,71 @@ describe('QT-313 T11 — deleteOrder con varias lineas', () => {
       'not_deletable',
     )
     expect(d.orden).toEqual([])
+  })
+})
+
+describe('QT-315 — cancelLineAliveById, cancelar una receta por encargo de otro modulo', () => {
+  it('R16: ok cancela solo la linea nombrada con el motivo dado, libera su material, vacia su plazo y deriva el pedido', async () => {
+    const d = dobles([linea(LINEA_A, 0, 'EN_CURSO'), linea(LINEA_B, 1, 'PENDIENTE')])
+
+    const resultado = await createCancelAliveOrderLine({ unitOfWork: d.unitOfWork })(
+      PEDIDO.id,
+      LINEA_B,
+      ADMIN.companyId,
+      'se derramo',
+      ADMIN.id,
+      AHORA,
+    )
+
+    expect(resultado).toBe('ok')
+    expect(d.orders.lockAliveLine).toHaveBeenCalledWith(PEDIDO.id, LINEA_B, SCOPE)
+    expect(d.orders.cancelLine.mock.calls).toEqual([[PEDIDO.id, LINEA_B, 'se derramo', ADMIN.id, AHORA, SCOPE]])
+    expect(d.reservations.releaseForLine.mock.calls[0]?.[0]).toEqual({
+      orderId: PEDIDO.id,
+      orderLineId: LINEA_B,
+      companyId: ADMIN.companyId,
+      reason: 'release',
+      actorId: ADMIN.id,
+      now: AHORA,
+    })
+    expect(d.orden).toEqual([`cancelLine:${LINEA_B}`, `releaseForLine:${LINEA_B}`, `setLineReservedAt:${LINEA_B}`, 'refreshStatus'])
+    expect(d.orders.refreshStatus).toHaveBeenCalledWith(PEDIDO.id, ADMIN.id, AHORA, SCOPE)
+    expect(d.orders.lockAliveLines).not.toHaveBeenCalled()
+  })
+
+  it('R14, R16: not_found con una linea de otro pedido, quitada o de otra empresa, sin escribir nada', async () => {
+    const d = dobles([linea(LINEA_A, 0, 'PENDIENTE')])
+
+    const resultado = await createCancelAliveOrderLine({ unitOfWork: d.unitOfWork })(
+      PEDIDO.id,
+      LINEA_B,
+      ADMIN.companyId,
+      'motivo',
+      ADMIN.id,
+      AHORA,
+    )
+
+    expect(resultado).toBe('not_found')
+    expect(d.orden).toEqual([])
+    expect(d.reservations.releaseForLine).not.toHaveBeenCalled()
+  })
+
+  it('R17: not_cancellable con la linea en un estado no cancelable, sin escribir nada', async () => {
+    for (const status of ['POR_EMPACAR', 'EN_EMPAQUE', 'POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO', 'CANCELADO'] as const) {
+      const d = dobles([linea(LINEA_A, 0, status), linea(LINEA_B, 1, 'PENDIENTE')])
+
+      const resultado = await createCancelAliveOrderLine({ unitOfWork: d.unitOfWork })(
+        PEDIDO.id,
+        LINEA_A,
+        ADMIN.companyId,
+        'motivo',
+        ADMIN.id,
+        AHORA,
+      )
+
+      expect(resultado, status).toBe('not_cancellable')
+      expect(d.orden, status).toEqual([])
+      expect(d.reservations.releaseForLine, status).not.toHaveBeenCalled()
+    }
   })
 })

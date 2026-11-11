@@ -91,6 +91,12 @@ async function createOrder(companyId: string): Promise<string> {
 /** La unica linea de cada pedido sembrado, por pedido. */
 const lineOf = new Map<string, string>();
 
+function line(orderId: string): string {
+  const id = lineOf.get(orderId);
+  if (id === undefined) throw new Error(`el pedido ${orderId} no tiene linea sembrada`);
+  return id;
+}
+
 function evidence(
   company: Company,
   orderId: string,
@@ -155,7 +161,7 @@ describe('insert: primer slot libre y tope de 3 (R29)', () => {
     const orderId = await createOrder(a.companyId);
     const rows = [];
     for (let i = 0; i < 3; i += 1) rows.push(inserted(await repo.insert(evidence(a, orderId))));
-    expect(await repo.delete(a.companyId, orderId, 'manufacturing', rows[1]!.id)).toEqual(rows[1]);
+    expect(await repo.delete(a.companyId, orderId, line(orderId), 'manufacturing', rows[1]!.id)).toEqual(rows[1]);
 
     expect(inserted(await repo.insert(evidence(a, orderId))).slot).toBe(2);
   });
@@ -281,20 +287,95 @@ describe('replace: sustituir en el mismo slot, todo o nada (R19, R29)', () => {
   });
 });
 
+/** Una segunda receta en el pedido, con su propia linea. */
+async function addSecondLine(company: Company, orderId: string): Promise<string> {
+  const marca = token();
+  const recipe = await prisma.recipe.create({
+    data: { name: `Receta B ${marca}`, nameNormalized: `recetab${marca}`, companyId: company.companyId },
+    select: { id: true },
+  });
+  const created = await prisma.orderLine.create({
+    data: {
+      orderId,
+      companyId: company.companyId,
+      position: 1,
+      recipeId: recipe.id,
+      originalRecipeId: recipe.id,
+      quantity: '5',
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+describe('las fotos de un paso son de la receta nombrada (QT-315)', () => {
+  it('R13: el tope de 3 fotos por paso es por receta; listByLine solo trae las de su linea', async () => {
+    const orderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    const lineB = await addSecondLine(a, orderId);
+    const deA: StepEvidenceRow[] = [];
+    for (let i = 0; i < 3; i += 1) deA.push(inserted(await repo.insert(evidence(a, orderId))));
+    expect(await repo.insert(evidence(a, orderId)), 'la receta A ya llego al tope del paso').toBe('limit');
+
+    const deB: StepEvidenceRow[] = [];
+    for (let i = 0; i < 3; i += 1) deB.push(inserted(await repo.insert(evidence(a, orderId, { orderLineId: lineB }))));
+    expect(deB.map((row) => row.slot), 'la receta B empieza sus slots en 1').toEqual([1, 2, 3]);
+    expect(deB.every((row) => row.orderLineId === lineB)).toBe(true);
+    expect(await repo.insert(evidence(a, orderId, { orderLineId: lineB }))).toBe('limit');
+
+    expect(await repo.listByLine(a.companyId, orderId, lineA, 'manufacturing')).toEqual(deA);
+    expect(await repo.listByLine(a.companyId, orderId, lineB, 'manufacturing')).toEqual(deB);
+    expect(await repo.listByOrder(a.companyId, orderId, 'manufacturing')).toHaveLength(6);
+    expect(await repo.listByLine(b.companyId, orderId, lineB, 'manufacturing')).toEqual([]);
+  });
+
+  it('R13: findById, delete y replace con la otra receta no ven la foto ni la tocan', async () => {
+    const orderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    const lineB = await addSecondLine(a, orderId);
+    const photo = inserted(await repo.insert(evidence(a, orderId)));
+
+    expect(await repo.findById(a.companyId, orderId, lineB, 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.delete(a.companyId, orderId, lineB, 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.replace(photo.id, evidence(a, orderId, { orderLineId: lineB }))).toBe('not_found');
+
+    expect(await repo.findById(a.companyId, orderId, lineA, 'manufacturing', photo.id)).toEqual(photo);
+    expect(await repo.listByLine(a.companyId, orderId, lineA, 'manufacturing')).toEqual([photo]);
+    expect(await repo.listByLine(a.companyId, orderId, lineB, 'manufacturing')).toEqual([]);
+  });
+
+  it('R13: la sustitucion conserva el slot dentro de la receta', async () => {
+    const orderId = await createOrder(a.companyId);
+    const lineB = await addSecondLine(a, orderId);
+    inserted(await repo.insert(evidence(a, orderId)));
+    const first = inserted(await repo.insert(evidence(a, orderId, { orderLineId: lineB })));
+    const second = inserted(await repo.insert(evidence(a, orderId, { orderLineId: lineB })));
+
+    const replaced = inserted(await repo.replace(second.id, evidence(a, orderId, { orderLineId: lineB })));
+
+    expect(replaced.slot).toBe(second.slot);
+    expect(replaced.orderLineId).toBe(lineB);
+    expect((await repo.listByLine(a.companyId, orderId, lineB, 'manufacturing')).map((row) => row.id)).toEqual([
+      first.id,
+      replaced.id,
+    ]);
+  });
+});
+
 describe('toda lectura y escritura filtra por empresa (R39)', () => {
   it('R39: la empresa B no lee, no sustituye ni borra fotos de la A', async () => {
     const orderId = await createOrder(a.companyId);
     const photo = inserted(await repo.insert(evidence(a, orderId)));
 
     expect(await repo.listByOrder(b.companyId, orderId, 'manufacturing')).toEqual([]);
-    expect(await repo.findById(b.companyId, orderId, 'manufacturing', photo.id)).toBeNull();
-    expect(await repo.delete(b.companyId, orderId, 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.findById(b.companyId, orderId, line(orderId), 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.delete(b.companyId, orderId, line(orderId), 'manufacturing', photo.id)).toBeNull();
     expect(await repo.listOrderIdsWithEvidence(b.companyId, [{ orderId, phase: 'manufacturing' }])).toEqual([]);
 
     const fromB: NewStepEvidence = { ...evidence(b, orderId), path: `${b.companyId}/${orderId}/${randomUUID()}` };
     expect(await repo.replace(photo.id, fromB)).toBe('not_found');
 
-    expect(await repo.findById(a.companyId, orderId, 'manufacturing', photo.id)).toEqual(photo);
+    expect(await repo.findById(a.companyId, orderId, line(orderId), 'manufacturing', photo.id)).toEqual(photo);
   });
 
   it('R39: findById y delete exigen el pedido y la fase de la foto', async () => {
@@ -302,12 +383,12 @@ describe('toda lectura y escritura filtra por empresa (R39)', () => {
     const otherOrderId = await createOrder(a.companyId);
     const photo = inserted(await repo.insert(evidence(a, orderId)));
 
-    expect(await repo.findById(a.companyId, otherOrderId, 'manufacturing', photo.id)).toBeNull();
-    expect(await repo.findById(a.companyId, orderId, 'packing', photo.id)).toBeNull();
-    expect(await repo.delete(a.companyId, orderId, 'packing', photo.id)).toBeNull();
-    expect(await repo.delete(a.companyId, otherOrderId, 'manufacturing', photo.id)).toBeNull();
-    expect(await repo.delete(a.companyId, orderId, 'manufacturing', photo.id)).toEqual(photo);
-    expect(await repo.delete(a.companyId, orderId, 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.findById(a.companyId, otherOrderId, line(otherOrderId), 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.findById(a.companyId, orderId, line(orderId), 'packing', photo.id)).toBeNull();
+    expect(await repo.delete(a.companyId, orderId, line(orderId), 'packing', photo.id)).toBeNull();
+    expect(await repo.delete(a.companyId, otherOrderId, line(otherOrderId), 'manufacturing', photo.id)).toBeNull();
+    expect(await repo.delete(a.companyId, orderId, line(orderId), 'manufacturing', photo.id)).toEqual(photo);
+    expect(await repo.delete(a.companyId, orderId, line(orderId), 'manufacturing', photo.id)).toBeNull();
   });
 });
 

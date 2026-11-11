@@ -45,7 +45,9 @@ const PARAMS: DataTableParams = { page: 1, pageSize: 10, sort: null, filters: {}
 const ORDERS: readonly AssignedOrderView[] = [
   {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-000123',
+    recipe: { position: 1, count: 1 },
     recipeName: 'Jarabe simple',
     quantity: '12.500',
     priority: 'ALTA',
@@ -57,7 +59,9 @@ const ORDERS: readonly AssignedOrderView[] = [
   },
   {
     id: 'order-2',
+    lineId: 'linea-order-2',
     numberText: '2026-000124',
+    recipe: { position: 1, count: 1 },
     recipeName: 'Barniz',
     quantity: '3',
     priority: 'BAJA',
@@ -71,7 +75,7 @@ const ORDERS: readonly AssignedOrderView[] = [
 
 function enlacesDeEjecucion(): HTMLAnchorElement[] {
   return ORDERS.flatMap((order) =>
-    Array.from(document.querySelectorAll<HTMLAnchorElement>(`a[href="${assignedOrderRoute(order.id)}"]`)),
+    Array.from(document.querySelectorAll<HTMLAnchorElement>(`a[href="${assignedOrderRoute(order.id, order.lineId)}"]`)),
   );
 }
 

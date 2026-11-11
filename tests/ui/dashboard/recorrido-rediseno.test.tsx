@@ -29,6 +29,8 @@ import { ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 
+import { oneRecipeTrace, type OneRecipeTraceInput } from '../../fixtures/execution-trace-recipes';
+
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
@@ -244,7 +246,7 @@ describe('ExecutionTimeline', () => {
   });
 });
 
-const TRACE: ExecutionTraceDetailData = {
+const TRACE_INPUT: OneRecipeTraceInput = {
   orderId: ORDER_ID,
   numberText: '2026-0000042',
   status: 'CANCELADO',
@@ -256,11 +258,12 @@ const TRACE: ExecutionTraceDetailData = {
   goBackCount: 1,
   steps: STEPS,
 };
+const TRACE: ExecutionTraceDetailData = oneRecipeTrace(TRACE_INPUT);
 
 const BACK_HREF = `${DASHBOARD_ROUTE}?page=2&pageSize=25`;
 
-function renderDetail(overrides: Partial<ExecutionTraceDetailData> = {}) {
-  return render(<ExecutionTraceDetail trace={{ ...TRACE, ...overrides }} backHref={BACK_HREF} />);
+function renderDetail(overrides: Partial<OneRecipeTraceInput> = {}) {
+  return render(<ExecutionTraceDetail trace={oneRecipeTrace({ ...TRACE_INPUT, ...overrides })} backHref={BACK_HREF} />);
 }
 
 function renderError() {
@@ -323,16 +326,21 @@ describe('ExecutionTraceDetail', () => {
     expect(back).toHaveClass('min-h-11', 'min-w-11');
   });
 
-  it('R12: dl con «Estado», una duración por fase y «Vueltas atrás» en una rejilla que se reparte', () => {
+  it('R12: el resumen es un dl con «Estado», «Avance» y «Duración»; la sección lleva una duración por fase y sus vueltas atrás', () => {
     const { container } = renderDetail();
 
-    const dl = container.querySelector('dl');
-    expect(dl).not.toBeNull();
-    expect(dl).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))]');
-    expect(Array.from(dl!.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual([
+    const dls = container.querySelectorAll('dl');
+    expect(dls).toHaveLength(2);
+    for (const dl of dls) {
+      expect(dl).toHaveClass('grid', 'grid-cols-[repeat(auto-fit,minmax(min(170px,calc(50%_-_6px)),1fr))]');
+    }
+    expect(Array.from(dls[0]!.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual([
       'Estado',
+      'Avance',
+      'Duración',
+    ]);
+    expect(Array.from(dls[1]!.querySelectorAll('dt')).map((dt) => dt.textContent)).toEqual([
       PHASE_DURATION_LABELS.production,
-      'Vueltas atrás',
     ]);
 
     const status = screen.getByTestId('execution-trace-status');
@@ -348,7 +356,7 @@ describe('ExecutionTraceDetail', () => {
     expect(within(duration).getByText(formatElapsed(20 * MIN))).toHaveClass('font-mono');
 
     const goBacks = screen.getByTestId('execution-trace-go-backs');
-    expect(statValue('Vueltas atrás').contains(goBacks)).toBe(true);
+    expect(screen.getByTestId('execution-trace-recipe-summary').contains(goBacks)).toBe(true);
     expect(goBacks).toHaveAttribute('data-tone', 'waiting');
     expect(goBacks).toHaveTextContent('1');
   });
@@ -377,11 +385,11 @@ describe('ExecutionTraceDetail', () => {
     expect(screen.queryByTestId('execution-trace-active')).toBeNull();
   });
 
-  it('R12: la línea de tiempo va después de los tres datos, con todas las anotaciones', () => {
+  it('R12: la línea de tiempo va después de los datos de la sección, con todas las anotaciones', () => {
     const { container } = renderDetail();
 
     const timeline = screen.getByTestId('execution-trace-timeline');
-    expect(follows(container.querySelector('dl')!, timeline)).toBe(true);
+    expect(follows(container.querySelectorAll('dl')[1]!, timeline)).toBe(true);
     expect(within(timeline).getAllByTestId('execution-trace-step')).toHaveLength(STEPS.length);
   });
 

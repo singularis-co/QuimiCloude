@@ -92,6 +92,7 @@ export {
   OrderPresentationLineNotEditableError,
   CustomerNotFoundError,
 } from './domain/errors';
+export { linePositionsOf } from './domain/errors';
 
 /** La pagina y su esquema (R34, R36). El defecto de 10 y el tope de 25 NO viven aqui: los
  *  aplica `lib/shared/pagination` en el adaptador driven (R35, R37). */
@@ -104,6 +105,7 @@ export {
   createOrderSchema,
   updateOrderSchema,
   cancelOrderSchema,
+  cancelOrderLineSchema,
   quoteOrderCostSchema,
   presentationLinesSchema,
   ORDER_DISTRIBUTION_PRESENTATION_FIELD,
@@ -125,7 +127,14 @@ export type {
 
 /** La guardia de transiciones (R22). Se publica para que QC-35 pueda saber que estados ofrecer
  *  sin escribir una segunda tabla; la tabla sigue viviendo en un solo archivo. */
-export { assertTransition, isAllowedTransition } from './domain/order-transitions';
+export { assertTransition, isAllowedTransition, isEditableOrderLineStatus } from './domain/order-transitions';
+
+/** Las reglas que la pantalla anticipa, las mismas funciones que aplican los casos de uso. */
+export { isCancellableStatus } from './domain/order-cancellation';
+export { isRemovableOrderLineStatus } from './domain/order-line-removal';
+export { isDeletableOrder } from './domain/delete-order';
+export { sumDecimal4 } from './domain/order-totals';
+export { orderLineInputSchema } from './domain/order-input';
 
 /** Los tipos de entrada y de salida (R42, R43, R46). `OrderRow` es lo que devuelve el PUERTO
  *  y se publica porque `lib/composition` tiene que poder nombrar el tipo del repositorio.
@@ -168,8 +177,6 @@ export type { GetOrderDeps } from './domain/get-order';
 export { createListOrders } from './domain/list-orders';
 export type { ListOrdersDeps } from './domain/list-orders';
 export { createUpdateOrder } from './domain/update-order';
-/** Las lineas vivas de un pedido, para que el formulario de una receta nombre la que edita. */
-export { createListOrderLineIds } from './domain/list-order-line-ids';
 export type { UpdateOrderDeps } from './domain/update-order';
 export { createCancelOrder } from './domain/cancel-order';
 export type { CancelOrderDeps } from './domain/cancel-order';
@@ -177,7 +184,7 @@ export { createCancelOrderLine } from './domain/cancel-order-line';
 export type { CancelOrderLineDeps } from './domain/cancel-order-line';
 /** Cancelar por encargo de otro modulo, con la unidad de trabajo que le cablee la composicion:
  *  mismas comprobaciones y la misma liberacion que `createCancelOrder`, sin permiso ni motivo. */
-export { createCancelAliveOrder } from './domain/order-cancellation';
+export { createCancelAliveOrder, createCancelAliveOrderLine } from './domain/order-cancellation';
 export type { CancelAliveOrderDeps, OrderCancellation } from './domain/order-cancellation';
 export { createDeleteOrder } from './domain/delete-order';
 export type { DeleteOrderDeps } from './domain/delete-order';
@@ -227,11 +234,22 @@ export type {
 
 /** Implementan los dos listados de resumen de `OrderCatalog`, con el nombre del envase de cada
  *  linea ya resuelto. */
-export { createListAliveSummariesByIds, createListAliveSummariesInCompany } from './domain/list-order-summaries';
+export {
+  createFindAliveLineSummary,
+  createListAliveSummariesByIds,
+  createListAliveSummariesInCompany,
+} from './domain/list-order-summaries';
 export type { ListOrderSummariesDeps } from './domain/list-order-summaries';
 export { createListSummariesByIdsIncludingDeleted } from './domain/list-order-summaries';
 export type { ListHistorySummariesDeps } from './domain/list-order-summaries';
-export type { OrderDeliveryProgress, OrderDeliveryProgressLine, OrderHistorySummary } from './domain/order-catalog';
+export type {
+  OrderDeliveryProgress,
+  OrderDeliveryProgressLine,
+  OrderHistorySummary,
+  OrderRecipeOutline,
+  OrderRecipesOutline,
+} from './domain/order-catalog';
+export type { OrderProgress } from './domain/order-totals';
 
 /** La cobertura de varios pedidos a la vez, una consulta por pagina, para pintar «sin
  *  cobertura completa» sin N+1. */

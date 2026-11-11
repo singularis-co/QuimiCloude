@@ -78,8 +78,16 @@ import {
   openOrderRowMenu,
   packagingLine,
   rowMenuTrigger,
-  submitOrderWithLeftover,
 } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  chooseLineUnit,
+  closeWithEscape,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  openOrderDetail,
+  panelLine,
+} from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { firstLineSelect, withFirstLine } from '../tests/helpers/only-order-line';
 
@@ -457,31 +465,30 @@ test.describe('pantalla de pedidos', () => {
 
     // --- 2. El disparador del alta abre el panel lateral (R25). Aparece en la cabecera de la
     // lista y tambien en el estado vacio: vale cualquiera de los dos.
-    await page.getByTestId('order-create-open').first().click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+    // QT-314: el panel lleva una tabla de recetas; la receta se escribe en su sub-panel.
+    const orderForm = await openCreateOrderPanel(page);
+    const lineSheet = await openAddOrderLine(page, orderForm);
 
     // --- 3. Receta TOMADA DEL SELECTOR CON BUSQUEDA (R31): se escribe el nombre, la consulta la
     // resuelve el servidor y se elige la opcion. Nada de inventar el id a mano.
-    const picker = page.getByTestId('recipe-picker');
+    const picker = lineSheet.getByTestId('recipe-picker');
     await picker.click();
     await picker.fill(recipeName);
     const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: recipeName });
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
     // Lo que viaja en el `FormData` es el id elegido, no el texto escrito.
-    await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
+    await expect(lineSheet.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
     // --- 4. Cantidad DECIMAL, escrita como texto (R39), y la unidad del pedido.
-    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
-    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
-    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
+    await lineSheet.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await chooseLineUnit(page, lineSheet, unitId ?? '');
 
     // --- 4b. Una linea de reparto con el envase, tomado del selector de envases con busqueda.
-    const orderForm = page.getByTestId('order-form');
-    const distribution = page.getByTestId('order-distribution-field');
+    const distribution = lineSheet.getByTestId('order-distribution-field');
     await addPackagingLine(
       page,
-      orderForm,
+      lineSheet,
       { productId: packagingId ?? '', name: packagingName },
       ORDER_PACKAGES,
     );
@@ -498,12 +505,15 @@ test.describe('pantalla de pedidos', () => {
     // --- 5. La prioridad por defecto esta VISIBLE y preseleccionada (R27): no se toca el
     // desplegable, solo se comprueba que muestra algo. Que ese algo sea el defecto del contrato
     // se afirma mas abajo sobre lo que el backend guardo, sin depender de ningun copy (R44).
-    await expect(page.getByTestId('order-priority-select')).not.toHaveText('');
+    // 12.5 en 12 envases de 1: queda sobrante y, con QT-314, es «Aplicar» quien pregunta antes.
+    await applyOrderLine(page, lineSheet, { leftover: true });
+    await expect(panelLine(orderForm, recipeName)).toHaveCount(1, { timeout: 60_000 });
+
+    await expect(orderForm.getByTestId('order-priority-select')).not.toHaveText('');
 
     // --- 7. Guardar: la Server Action REAL de `pedidos` (QC-34) contra Postgres, sin `fetch` de
     // por medio (R41).
-    // 12.5 en 12 envases de 1: queda sobrante y Guardar pregunta antes.
-    await submitOrderWithLeftover(page, orderForm);
+    await orderForm.getByTestId('order-form-submit').click();
 
     // --- 8. Con exito el panel se cierra y avisa por el `<Toaster />` que el layout privado YA
     // monta (R35, R36). Se afirma que HAY un aviso, no cual es su texto.
@@ -543,9 +553,12 @@ test.describe('pantalla de pedidos', () => {
       timeout: 60_000,
     });
     await expect(row.getByTestId('data-table-cell-recipeName')).toHaveText(recipeName);
+    // QT-314: la fila ya no lleva el reparto (cada receta tiene el suyo); se ve en la tarjeta de la
+    // receta del detalle, abierto desde el numero de pedido de la fila.
+    const detail = await openOrderDetail(page, created.id);
     await expect(
-      row.getByTestId('order-distribution'),
-      'la fila del listado muestra el reparto con el envase elegido y el volumen de su presentacion (R29)',
+      detail.getByTestId('order-detail-line').getByTestId('order-distribution'),
+      'el detalle muestra el reparto de la receta con el envase elegido y el volumen de su presentacion (R29)',
     ).toHaveText(
       // El mismo formateo que pinta la etiqueta compartida («12 × Envase · 1 ml»); la unidad de la
       // fixture no tiene simbolo, asi que se nombra por su nombre (`unit.symbol ?? unit.name`).
@@ -557,6 +570,7 @@ test.describe('pantalla de pedidos', () => {
         presentationUnitLabel: unitName,
       }),
     );
+    await closeWithEscape(page, detail);
 
     // --- 11. Cancelacion con motivo (R37): el dialogo pide el motivo y solo entonces confirma.
     await (await openOrderRowMenu(page, rowMenuTrigger(row), 'order-action-cancel')).click();

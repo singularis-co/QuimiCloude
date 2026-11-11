@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { groupEvidenceRows } from '@/lib/modules/asignaciones';
 import type { StepEvidenceRow } from '@/lib/modules/asignaciones/ports/step-evidence-repository';
 
-import { PEDIDO } from './evidence-doubles';
+import { LINEA, PEDIDO } from './evidence-doubles';
 
 function fila(id: string, stepPosition: number, slot: number): StepEvidenceRow {
-  return { id, orderId: PEDIDO, phase: 'manufacturing', stepPosition, slot, path: `c/${PEDIDO}/${id}` };
+  return { id, orderId: PEDIDO, orderLineId: LINEA, phase: 'manufacturing', stepPosition, slot, path: `c/${PEDIDO}/${id}` };
 }
 
 describe('groupEvidenceRows', () => {

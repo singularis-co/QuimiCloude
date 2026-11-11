@@ -146,9 +146,9 @@ export function createExecutionLogRepository(db: PrismaLike = prisma): Execution
       return 'ok';
     },
 
-    async findLastStepPosition(companyId: string, orderId: string): Promise<number | null> {
+    async findLastStepPosition(companyId: string, orderId: string, orderLineId: string): Promise<number | null> {
       const row = await db.orderExecutionEntry.findFirst({
-        where: { companyId, orderId, stepPosition: { not: null } },
+        where: { companyId, orderId, orderLineId, stepPosition: { not: null } },
         // `id` desempata dos anotaciones con el mismo instante.
         orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
         select: { stepPosition: true },
@@ -185,6 +185,7 @@ export function createExecutionLogRepository(db: PrismaLike = prisma): Execution
         select: {
           id: true,
           orderId: true,
+          orderLineId: true,
           userId: true,
           action: true,
           stepPosition: true,

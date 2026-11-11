@@ -108,7 +108,7 @@ export function AssignedOrdersTable({
         tableId={ASSIGNED_ORDERS_TABLE_ID}
         columns={columns}
         rows={rows}
-        getRowId={(order) => order.id}
+        getRowId={(order) => order.lineId}
         params={params}
         totalPages={totalPages}
         onParamsChange={(next) => navigate(assignedOrdersListHref(next, vista))}

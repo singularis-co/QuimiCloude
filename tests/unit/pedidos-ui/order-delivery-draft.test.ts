@@ -29,6 +29,7 @@ import {
   deliveryView,
   multiCustomerDeliveryView,
 } from '../../fixtures/order-delivery';
+import { LINEA_A_ID, LINEA_B_ID } from '../../helpers/order-form-ui';
 
 const OTHER_ORDER_ID = 'a0000000-0000-4000-8000-000000000002';
 const GONE_BATCH_ID = 'e0000000-0000-4000-8000-000000000099';
@@ -61,6 +62,7 @@ function draft(overrides: Partial<OrderDeliveryDraft> = {}): OrderDeliveryDraft 
   return {
     v: 2,
     orderId: DELIVERY_ORDER_ID,
+    lineId: LINEA_A_ID,
     deliveryKey: DELIVERY_KEY,
     blocks: [
       block({ key: '1', customer: ANA }),
@@ -86,8 +88,8 @@ describe('borrador de entrega con bloques', () => {
     const storage = memoryStorage();
     saveOrderDeliveryDraft(storage, draft());
 
-    expect([...storage.items.keys()]).toEqual([orderDeliveryDraftKey(DELIVERY_ORDER_ID)]);
-    const loaded = loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), neverCalled);
+    expect([...storage.items.keys()]).toEqual([orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID)]);
+    const loaded = loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), LINEA_A_ID, neverCalled);
     expect(loaded).toEqual({ draft: draft(), adjusted: false });
     expect(loaded.draft.blocks.map((b) => b.customer?.name)).toEqual(['Ana Perez', 'Luis Gil']);
   });
@@ -97,7 +99,7 @@ describe('borrador de entrega con bloques', () => {
     saveOrderDeliveryDraft(storage, draft());
     const newKey = vi.fn(() => 'b0000000-0000-4000-8000-0000000000b2');
 
-    const loaded = loadOrderDeliveryDraft(storage, deliveryView({ orderId: OTHER_ORDER_ID }), newKey);
+    const loaded = loadOrderDeliveryDraft(storage, deliveryView({ orderId: OTHER_ORDER_ID }), LINEA_A_ID, newKey);
 
     expect(newKey).toHaveBeenCalledOnce();
     expect(loaded.draft.orderId).toBe(OTHER_ORDER_ID);
@@ -105,12 +107,13 @@ describe('borrador de entrega con bloques', () => {
   });
 
   it('R4: sin borrador empieza con un solo bloque con el cliente vivo del pedido y una clave nueva', () => {
-    const loaded = loadOrderDeliveryDraft(memoryStorage(), deliveryView(), () => DELIVERY_KEY);
+    const loaded = loadOrderDeliveryDraft(memoryStorage(), deliveryView(), LINEA_A_ID, () => DELIVERY_KEY);
 
     expect(loaded).toEqual({
       draft: {
         v: 2,
         orderId: DELIVERY_ORDER_ID,
+        lineId: LINEA_A_ID,
         deliveryKey: DELIVERY_KEY,
         blocks: [{ key: '1', customer: ANA, packages: {} }],
       },
@@ -122,7 +125,7 @@ describe('borrador de entrega con bloques', () => {
     ['sin cliente', null],
     ['con el cliente dado de baja', { ...LUIS, isDeleted: true }],
   ])('R5: sin borrador y %s, el unico bloque queda sin cliente', (_caso, customer) => {
-    const loaded = loadOrderDeliveryDraft(null, deliveryView({ customer }), () => DELIVERY_KEY);
+    const loaded = loadOrderDeliveryDraft(null, deliveryView({ customer }), LINEA_A_ID, () => DELIVERY_KEY);
     expect(loaded.draft.blocks).toEqual([{ key: '1', customer: null, packages: {} }]);
   });
 
@@ -133,19 +136,25 @@ describe('borrador de entrega con bloques', () => {
       [packagesKey(PENDING_LINE_ID, NEWER_BATCH_ID)]: '1',
     };
     storage.setItem(
-      orderDeliveryDraftKey(DELIVERY_ORDER_ID),
-      JSON.stringify({ v: 1, orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, customer: LUIS, packages }),
+      orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID),
+      JSON.stringify({ v: 1, orderId: DELIVERY_ORDER_ID, lineId: LINEA_A_ID, deliveryKey: DELIVERY_KEY, customer: LUIS, packages }),
     );
 
-    expect(loadOrderDeliveryDraft(storage, deliveryView(), neverCalled)).toEqual({
-      draft: { v: 2, orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, blocks: [{ key: '1', customer: LUIS, packages }] },
+    expect(loadOrderDeliveryDraft(storage, deliveryView(), LINEA_A_ID, neverCalled)).toEqual({
+      draft: {
+        v: 2,
+        orderId: DELIVERY_ORDER_ID,
+        lineId: LINEA_A_ID,
+        deliveryKey: DELIVERY_KEY,
+        blocks: [{ key: '1', customer: LUIS, packages }],
+      },
       adjusted: false,
     });
   });
 
   it('R45: un borrador v1 sin cliente se lee como un bloque sin cliente', () => {
-    const raw = JSON.stringify({ v: 1, orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, customer: null, packages: {} });
-    expect(parseOrderDeliveryDraft(raw, DELIVERY_ORDER_ID)?.blocks).toEqual([{ key: '1', customer: null, packages: {} }]);
+    const raw = JSON.stringify({ v: 1, orderId: DELIVERY_ORDER_ID, lineId: LINEA_A_ID, deliveryKey: DELIVERY_KEY, customer: null, packages: {} });
+    expect(parseOrderDeliveryDraft(raw, DELIVERY_ORDER_ID, LINEA_A_ID)?.blocks).toEqual([{ key: '1', customer: null, packages: {} }]);
   });
 
   it('borra el borrador del pedido y deja los de los demas', () => {
@@ -153,9 +162,9 @@ describe('borrador de entrega con bloques', () => {
     saveOrderDeliveryDraft(storage, draft());
     saveOrderDeliveryDraft(storage, draft({ orderId: OTHER_ORDER_ID }));
 
-    clearOrderDeliveryDraft(storage, DELIVERY_ORDER_ID);
+    clearOrderDeliveryDraft(storage, DELIVERY_ORDER_ID, LINEA_A_ID);
 
-    expect([...storage.items.keys()]).toEqual([orderDeliveryDraftKey(OTHER_ORDER_ID)]);
+    expect([...storage.items.keys()]).toEqual([orderDeliveryDraftKey(OTHER_ORDER_ID, LINEA_A_ID)]);
   });
 
   it('R46: descarta de todos los bloques los envases de los lotes que ya no se ofrecen y marca `adjusted`', () => {
@@ -210,14 +219,15 @@ describe('borrador de entrega con bloques', () => {
     ['dos bloques con la misma clave', JSON.stringify({ ...draft(), blocks: [block(), block()] })],
     ['envases que no son texto', JSON.stringify({ ...draft(), blocks: [{ ...block(), packages: { a: 3 } }] })],
     ['cliente mal formado', JSON.stringify({ ...draft(), blocks: [{ ...block(), customer: { id: 'x' } }] })],
-    ['v1 con envases que no son texto', JSON.stringify({ v: 1, orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY, customer: null, packages: { a: 3 } })],
+    ['v1 con envases que no son texto', JSON.stringify({ v: 1, orderId: DELIVERY_ORDER_ID, lineId: LINEA_A_ID, deliveryKey: DELIVERY_KEY, customer: null, packages: { a: 3 } })],
+    ['sin receta', JSON.stringify({ ...draft(), lineId: undefined })],
     ['un array', '[]'],
   ])('%s: se descarta sin lanzar', (_caso, raw) => {
-    expect(parseOrderDeliveryDraft(raw, DELIVERY_ORDER_ID)).toBeNull();
+    expect(parseOrderDeliveryDraft(raw, DELIVERY_ORDER_ID, LINEA_A_ID)).toBeNull();
 
     const storage = memoryStorage();
-    storage.setItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID), raw);
-    const loaded = loadOrderDeliveryDraft(storage, deliveryView(), () => 'nueva');
+    storage.setItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID), raw);
+    const loaded = loadOrderDeliveryDraft(storage, deliveryView(), LINEA_A_ID, () => 'nueva');
     expect(loaded.draft.deliveryKey).toBe('nueva');
     expect(loaded.draft.blocks).toEqual([{ key: '1', customer: ANA, packages: {} }]);
   });
@@ -225,9 +235,84 @@ describe('borrador de entrega con bloques', () => {
   it('sin localStorage, o con uno que lanza, ninguna operacion lanza', () => {
     for (const storage of [null, throwingStorage()]) {
       expect(() => saveOrderDeliveryDraft(storage, draft())).not.toThrow();
-      expect(() => clearOrderDeliveryDraft(storage, DELIVERY_ORDER_ID)).not.toThrow();
-      expect(loadOrderDeliveryDraft(storage, deliveryView(), () => DELIVERY_KEY).draft.blocks).toHaveLength(1);
+      expect(() => clearOrderDeliveryDraft(storage, DELIVERY_ORDER_ID, LINEA_A_ID)).not.toThrow();
+      expect(loadOrderDeliveryDraft(storage, deliveryView(), LINEA_A_ID, () => DELIVERY_KEY).draft.blocks).toHaveLength(1);
     }
+  });
+});
+
+describe('el borrador de entrega va por receta (R52)', () => {
+  const SEGUNDA_RECETA = draft({
+    lineId: LINEA_B_ID,
+    deliveryKey: 'b0000000-0000-4000-8000-0000000000b9',
+    blocks: [block({ key: '1', customer: LUIS, packages: { [packagesKey(PENDING_LINE_ID, NEWER_BATCH_ID)]: '1' } })],
+  });
+
+  it('R52: dos recetas del mismo pedido guardan cada una su borrador y se leen cada una con lo suyo', () => {
+    const storage = memoryStorage();
+    saveOrderDeliveryDraft(storage, draft());
+    saveOrderDeliveryDraft(storage, SEGUNDA_RECETA);
+
+    expect([...storage.items.keys()].sort()).toEqual(
+      [orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID), orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_B_ID)].sort(),
+    );
+    expect(loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), LINEA_A_ID, neverCalled).draft).toEqual(draft());
+    expect(loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), LINEA_B_ID, neverCalled).draft).toEqual(
+      SEGUNDA_RECETA,
+    );
+  });
+
+  it('R52: abrir la segunda receta no borra ni cambia el borrador de la primera', () => {
+    const storage = memoryStorage();
+    saveOrderDeliveryDraft(storage, draft());
+    const antes = storage.getItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID));
+
+    const segunda = loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), LINEA_B_ID, () => 'nueva');
+    saveOrderDeliveryDraft(storage, setDraftBlockCustomer(segunda.draft, '1', LUIS));
+
+    expect(storage.getItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID))).toBe(antes);
+    expect(loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), LINEA_A_ID, neverCalled).draft).toEqual(draft());
+  });
+
+  it('R52: el borrador de una receta no se carga en otra: la otra empieza uno nuevo', () => {
+    const storage = memoryStorage();
+    saveOrderDeliveryDraft(storage, draft());
+    const newKey = vi.fn(() => 'nueva');
+
+    const otra = loadOrderDeliveryDraft(storage, multiCustomerDeliveryView(), LINEA_B_ID, newKey);
+
+    expect(newKey).toHaveBeenCalledOnce();
+    expect(otra.draft).toEqual({
+      v: 2,
+      orderId: DELIVERY_ORDER_ID,
+      lineId: LINEA_B_ID,
+      deliveryKey: 'nueva',
+      blocks: [{ key: '1', customer: ANA, packages: {} }],
+    });
+  });
+
+  it('R52: el texto de una receta no vale para otra aunque se lea con su clave', () => {
+    expect(parseOrderDeliveryDraft(JSON.stringify(draft()), DELIVERY_ORDER_ID, LINEA_B_ID)).toBeNull();
+  });
+
+  it('R52: borrar el borrador de una receta deja el de la otra', () => {
+    const storage = memoryStorage();
+    saveOrderDeliveryDraft(storage, draft());
+    saveOrderDeliveryDraft(storage, SEGUNDA_RECETA);
+
+    clearOrderDeliveryDraft(storage, DELIVERY_ORDER_ID, LINEA_A_ID);
+
+    expect([...storage.items.keys()]).toEqual([orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_B_ID)]);
+  });
+
+  it('un borrador guardado con la clave antigua, por pedido, no se recupera', () => {
+    const storage = memoryStorage();
+    const antiguo = { ...draft(), lineId: undefined };
+    storage.setItem(`qc.order-delivery-draft.${DELIVERY_ORDER_ID}`, JSON.stringify(antiguo));
+
+    const loaded = loadOrderDeliveryDraft(storage, deliveryView(), LINEA_A_ID, () => 'nueva');
+
+    expect(loaded.draft.deliveryKey).toBe('nueva');
   });
 });
 

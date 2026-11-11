@@ -14,7 +14,7 @@ import {
   PACKING_ORDER_START_CONFIRM_TESTID,
   PACKING_ORDER_START_ERROR_TESTID,
 } from '@/app/(private)/asignacion/empaque/[id]/components';
-import { OrderNotFoundError } from '@/lib/modules/asignaciones';
+import { OrderNotFoundError, ValidationError } from '@/lib/modules/asignaciones';
 
 /**
  * La pantalla de un pedido de empaque: el corte por permiso (R40), «no encontrado» (`design.md >
@@ -64,6 +64,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () 
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_PACKER_ID = '22222222-2222-4222-8222-222222222222';
+const LINE_ID = '55555555-5555-4555-8555-555555555555';
 
 function sesionCon(permissions: readonly string[]) {
   return {
@@ -86,7 +87,10 @@ const FINISH = {
 function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'order-1',
+    lineId: LINE_ID,
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '10',
     presentationLines: [{ presentationId: 'presentation-1', presentationName: 'Caja x 12', packages: 4 }],
@@ -102,8 +106,10 @@ function filaCon(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function arbolDeLaPagina(id = 'order-1') {
-  return PackingOrderPage({ params: Promise.resolve({ id }) });
+type Consulta = Record<string, string | string[] | undefined>;
+
+function arbolDeLaPagina(id = 'order-1', consulta: Consulta = { receta: LINE_ID }) {
+  return PackingOrderPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve(consulta) });
 }
 
 beforeEach(() => {
@@ -147,6 +153,41 @@ describe('pagina del pedido de empaque — «no existe» responde 404 (`design.m
     await expect(arbolDeLaPagina()).rejects.toThrow();
 
     expect(notFoundMock).toHaveBeenCalled();
+  });
+
+  it('R9: pide getPackingOrder con el pedido y la receta de la direccion', async () => {
+    render(await arbolDeLaPagina());
+
+    expect(getPackingOrderMock).toHaveBeenCalledWith(expect.anything(), { orderId: 'order-1', lineId: LINE_ID });
+    expect(notFoundMock).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Consulta]>([
+    ['sin ?receta', {}],
+    ['con ?receta que no es un uuid', { receta: 'linea-1' }],
+    ['con ?receta repetida', { receta: [LINE_ID, LINE_ID] }],
+  ])('R9: %s responde 404 sin leer ningun pedido', async (_caso, consulta) => {
+    await expect(arbolDeLaPagina('order-1', consulta)).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
+    expect(getPackingOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('R9: con una receta ajena (de otro pedido, quitada o inexistente) responde 404', async () => {
+    const AJENA = '66666666-6666-4666-8666-666666666666';
+    getPackingOrderMock.mockRejectedValue(new OrderNotFoundError());
+
+    await expect(arbolDeLaPagina('order-1', { receta: AJENA })).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(getPackingOrderMock).toHaveBeenCalledWith(expect.anything(), { orderId: 'order-1', lineId: AJENA });
+  });
+
+  it('R9: un id que no es uuid (ValidationError) da el mismo 404', async () => {
+    getPackingOrderMock.mockRejectedValue(new ValidationError());
+
+    await expect(arbolDeLaPagina('no-es-un-uuid')).rejects.toThrow('NEXT_NOT_FOUND');
+
+    expect(notFoundMock).toHaveBeenCalledTimes(1);
   });
 });
 

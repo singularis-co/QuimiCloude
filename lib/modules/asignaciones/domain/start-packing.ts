@@ -1,14 +1,12 @@
 // lib/modules/asignaciones/domain/start-packing.ts
 /**
- * Comenzar: `POR_EMPACAR -> EN_EMPAQUE` con el actor como quien empaca. Sin comprobacion de
- * asignacion: cualquier actor con `empaque.modificar` puede tomar cualquier pedido vivo de su
- * empresa que este `POR_EMPACAR`.
+ * Comenzar: la receta nombrada pasa `POR_EMPACAR -> EN_EMPAQUE` con el actor como quien empaca. Sin
+ * comprobacion de asignacion: cualquier actor con `empaque.modificar` puede tomar cualquier receta
+ * `POR_EMPACAR` de un pedido vivo de su empresa.
  *
  * No consume, aparta ni libera material, ni da de alta ningun lote, ni escribe ningun asiento de
  * inventario: escribe la transicion y su anotacion en el registro, en la misma transaccion.
  */
-import { z } from 'zod';
-
 import { requirePermission, type Actor } from './actor';
 import {
   OrderNotFoundError,
@@ -19,15 +17,11 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
 import type { OrderCatalog } from '@/lib/modules/pedidos';
-
-const startPackingSchema = z.strictObject({
-  orderId: z.string().uuid(),
-});
 
 export type StartPackingDeps = {
   readonly orders: OrderCatalog;
@@ -50,31 +44,24 @@ export function createStartPacking(
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'empaque.modificar');
 
-    const parsed = startPackingSchema.safeParse(input);
+    const parsed = orderLineInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId } = parsed.data;
+    const { orderId, lineId } = parsed.data;
 
-    const line = onlyLineOf(
-      await deps.orders.listAliveSummariesByIds(actor.companyId, [orderId], ['POR_EMPACAR', 'EN_EMPAQUE'], 1, 1),
-    );
-    // Sin linea que empacar, el pedido no existe o esta en otro estado: cada caso con su error.
-    if (line === undefined) {
-      throw (await deps.orders.findAliveById(orderId, actor.companyId)) === null
-        ? new OrderNotFoundError()
-        : new OrderNotPackableError();
-    }
+    const line = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    if (line.status !== 'POR_EMPACAR' && line.status !== 'EN_EMPAQUE') throw new OrderNotPackableError();
 
     const now = deps.now?.() ?? new Date();
     try {
       await deps.transaction.run(async ({ packing, log }) => {
-        const result = await packing.startPackingAliveById(orderId, line.lineId, actor.companyId, actor.id, now);
+        const result = await packing.startPackingAliveById(orderId, lineId, actor.companyId, actor.id, now);
         // Repetir Comenzar sobre el propio `EN_EMPAQUE` es exito: no escribio nada, asi que no se anota.
         if (result === 'already_mine') return;
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await log.append({
           companyId: actor.companyId,
           orderId,
-          orderLineId: line.lineId,
+          orderLineId: lineId,
           userId: actor.id,
           occurredAt: now,
           action: 'pack_start',

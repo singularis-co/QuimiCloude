@@ -4,9 +4,22 @@ export {
   ExecutionTraceDetail,
   ExecutionTraceDetailError,
   MISSING_PERSON_MARK,
+  TRACE_SUMMARY_LABELS,
+  evidenceOfLine,
   type ExecutionTraceDetailProps,
 } from './execution-trace-detail';
-export { ExecutionTimeline, type ExecutionTimelineProps } from './execution-timeline';
+export {
+  EXECUTION_TRACE_RECIPE_SECTION_TESTID,
+  ExecutionTraceRecipeSection,
+  RECIPE_SECTION_TEXTS,
+  type ExecutionTraceRecipeSectionProps,
+} from './execution-trace-recipe-section';
+export { DurationValue, PhaseDuration, STAT_GRID_CLASS, Stat } from './execution-trace-stat';
+export {
+  ExecutionTimeline,
+  type ExecutionTimelineProps,
+  type TraceEvidenceResult,
+} from './execution-timeline';
 export {
   ConditioningBatchLinesTable,
   ConditioningBatchSaveBody,

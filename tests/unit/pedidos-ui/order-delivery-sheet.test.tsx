@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_LINE_PICKER_DIALOG_TESTID,
+  ORDER_LINE_PICKER_OPTION_TESTID,
   ORDER_ACTION_DELIVER_TESTID,
   ORDER_DELIVERY_ADD_CUSTOMER_TESTID,
   ORDER_DELIVERY_BATCH_OVER_TESTID,
@@ -61,9 +63,10 @@ import {
 import { setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { LINEA_A_ID, LINEA_B_ID, lineaPedido } from '../../helpers/order-form-ui';
 
 const { getDeliveryMock, deliverMock, searchCustomersMock, routerMock } = vi.hoisted(() => ({
-  getDeliveryMock: vi.fn<(orderId: string) => Promise<OrderDeliveryResult>>(),
+  getDeliveryMock: vi.fn<(orderId: string, lineId: string) => Promise<OrderDeliveryResult>>(),
   deliverMock: vi.fn<(input: unknown) => Promise<DeliverOrderActionResult>>(),
   searchCustomersMock: vi.fn<(query: unknown, purpose: string) => Promise<OrderCustomerOptionsResult>>(),
   routerMock: {
@@ -119,9 +122,11 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 }));
 
 const ORDER = { id: DELIVERY_ORDER_ID, numberText: '2026-0000007' } as const;
+/** La receta que se entrega; sin nombre, el título cae al número del pedido. */
+const LINE = { id: LINEA_A_ID, recipeName: null, recipeImageUrl: null } as const;
 const ANA = { id: 'c0000000-0000-4000-8000-00000000000a', name: 'Ana Perez', isDeleted: false };
 const LUIS = { id: SECOND_DELIVERY_CUSTOMER_ID, name: 'Luis Gil', isDeleted: false };
-const DRAFT_KEY = orderDeliveryDraftKey(DELIVERY_ORDER_ID);
+const DRAFT_KEY = orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID);
 const GONE_BATCH_ID = 'e0000000-0000-4000-8000-000000000099';
 
 const TEXTO = {
@@ -157,6 +162,7 @@ function guardarBorrador(bloques: readonly BloqueGuardado[]) {
     JSON.stringify({
       v: 2,
       orderId: DELIVERY_ORDER_ID,
+      lineId: LINEA_A_ID,
       deliveryKey: DELIVERY_KEY,
       blocks: bloques.map((bloque, index) => ({ key: String(index + 1), ...bloque })),
     }),
@@ -164,7 +170,7 @@ function guardarBorrador(bloques: readonly BloqueGuardado[]) {
 }
 
 function montar() {
-  render(<OrderDeliverySheet order={ORDER} open onOpenChange={cerrar} />);
+  render(<OrderDeliverySheet order={ORDER} line={LINE} open onOpenChange={cerrar} />);
 }
 
 /** Monta el sheet como lo monta la fila: solo mientras esta abierto, con un boton para reabrir. */
@@ -175,7 +181,7 @@ function ConReapertura() {
       <button type="button" onClick={() => setOpen(true)} data-testid="reabrir">
         reabrir
       </button>
-      {open ? <OrderDeliverySheet order={ORDER} open onOpenChange={setOpen} /> : null}
+      {open ? <OrderDeliverySheet order={ORDER} line={LINE} open onOpenChange={setOpen} /> : null}
     </>
   );
 }
@@ -261,7 +267,7 @@ describe('lectura', () => {
     montar();
 
     expect(screen.getByTestId(ORDER_DELIVERY_SKELETON_TESTID)).toBeInTheDocument();
-    expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID);
+    expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINEA_A_ID);
     resolver(ok());
     expect(await bloques()).toHaveLength(1);
     expect(screen.queryByTestId(ORDER_DELIVERY_SKELETON_TESTID)).toBeNull();
@@ -711,6 +717,7 @@ describe('borrador', () => {
       JSON.stringify({
         v: 1,
         orderId: DELIVERY_ORDER_ID,
+        lineId: LINEA_A_ID,
         deliveryKey: DELIVERY_KEY,
         customer: LUIS,
         packages: { [packagesKey(PENDING_LINE_ID, OLDER_BATCH_ID)]: '2' },
@@ -788,34 +795,31 @@ describe('montaje desde la fila', () => {
   beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
   afterEach(() => resetViewport());
 
+  // La fila ofrece «Entregar…» si alguna receta está TERMINADO; se elige en el selector.
   function pedidoTerminado(): OrderSummary {
     return {
       ...VISTA_SIN_LINEAS,
+      lines: [lineaPedido({ status: 'TERMINADO' })],
       id: DELIVERY_ORDER_ID,
       number: { year: 2026, sequence: 7 },
       numberText: formatOrderNumber({ year: 2026, sequence: 7 }),
-      recipeId: '22222222-2222-4222-8222-222222222222',
-      recipeName: 'Esmalte azul',
-      recipeVersion: null,
-      quantity: '100.0000',
       priority: 'MEDIA',
       status: 'TERMINADO',
       cancellationReason: null,
-      ingredientsCost: null,
-      packagingCost: null,
-      actualCost: null,
-      salePrice: null,
       createdAt: new Date('2026-01-15T10:00:00.000Z'),
       updatedAt: new Date('2026-01-15T10:00:00.000Z'),
       createdBy: null,
       updatedBy: null,
-      presentationLines: [],
-      unitId: null,
-      unitLabel: null,
       pendingDelivery: { kind: 'not_packed' },
       customer: null,
-      recipeImageUrl: null,
     };
+  }
+
+  async function elegirLaReceta(user: ReturnType<typeof setupUser>) {
+    const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+    const [opcion] = within(selector).getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID);
+    expect(opcion).toHaveAttribute('data-line-id', LINEA_A_ID);
+    await user.click(opcion as HTMLElement);
   }
 
   it('QC-223 R4: solo se monta al pulsar «Entregar» en la fila y pide la entrega de ese pedido', async () => {
@@ -837,13 +841,19 @@ describe('montaje desde la fila', () => {
 
     await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeInTheDocument();
-    expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID);
+    expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINEA_A_ID);
   });
-  it('desde la fila, el titulo es la receta del pedido y la imagen es la que trae el pedido', async () => {
+  it('desde la fila, el titulo es la receta elegida y la imagen es la de esa receta', async () => {
     const user = setupUser();
-    const pedido = { ...pedidoTerminado(), recipeImageUrl: 'https://img.example/esmalte.png' };
+    const pedido = {
+      ...pedidoTerminado(),
+      lines: [
+        lineaPedido({ status: 'TERMINADO', recipeName: 'Esmalte azul', recipeImageUrl: 'https://img.example/esmalte.png' }),
+      ],
+    };
     render(
       <OrderTable
         orders={[pedido]}
@@ -858,6 +868,7 @@ describe('montaje desde la fila', () => {
 
     await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
     await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    await elegirLaReceta(user);
 
     expect(await screen.findByRole('dialog', { name: 'Esmalte azul' })).toBeInTheDocument();
     const resumen = await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID);
@@ -865,6 +876,183 @@ describe('montaje desde la fila', () => {
       'src',
       'https://img.example/esmalte.png',
     );
+  });
+});
+
+describe('entrega de una receta con el pedido PARCIAL (R32)', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
+  const IMAGEN_B = 'https://img.example/jabon.png';
+
+  /** Una receta en curso y otra terminada; el pedido plano nombra otra receta e imagen. */
+  function pedidoParcial(): OrderSummary {
+    return {
+      ...VISTA_SIN_LINEAS,
+      lines: [
+        lineaPedido({ status: 'EN_CURSO', recipeName: 'Desengrasante' }),
+        lineaPedido({
+          id: LINEA_B_ID,
+          position: 1,
+          status: 'TERMINADO',
+          recipeName: 'Jabón líquido',
+          recipeImageUrl: IMAGEN_B,
+        }),
+      ],
+      progress: { total: 2, finished: 1 },
+      id: DELIVERY_ORDER_ID,
+      number: { year: 2026, sequence: 7 },
+      numberText: formatOrderNumber({ year: 2026, sequence: 7 }),
+      priority: 'MEDIA',
+      status: 'PARCIAL',
+      cancellationReason: null,
+      createdAt: new Date('2026-01-15T10:00:00.000Z'),
+      updatedAt: new Date('2026-01-15T10:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      pendingDelivery: { kind: 'not_packed' },
+      customer: null,
+    };
+  }
+
+  async function entregarLaTerminada(user: ReturnType<typeof setupUser>) {
+    render(
+      <OrderTable
+        orders={[pedidoParcial()]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={{ items: [], totalPages: 1 }}
+        units={[]}
+        bridge={null}
+        canDeliver
+      />,
+    );
+    await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+    const opcion = within(selector)
+      .getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID)
+      .find((el) => el.getAttribute('data-line-id') === LINEA_B_ID);
+    await user.click(opcion as HTMLElement);
+  }
+
+  it('R32: el panel lleva el nombre y la imagen de la receta elegida, no los del pedido', async () => {
+    const user = setupUser();
+    await entregarLaTerminada(user);
+
+    expect(await screen.findByRole('dialog', { name: 'Jabón líquido' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Esmalte azul' })).toBeNull();
+    const imagen = within(await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID)).getByTestId(
+      ORDER_RECIPE_IMAGE_TESTID,
+    );
+    expect(imagen).toHaveAttribute('src', IMAGEN_B);
+    expect(imagen).toHaveAttribute('alt', 'Jabón líquido');
+  });
+
+  it('R32: pide lo que queda por entregar de esa receta, con el pedido PARCIAL', async () => {
+    const user = setupUser();
+    await entregarLaTerminada(user);
+
+    await screen.findByTestId(ORDER_DELIVERY_SHEET_TESTID);
+    expect(getDeliveryMock).toHaveBeenCalledTimes(1);
+    expect(getDeliveryMock).toHaveBeenCalledWith(DELIVERY_ORDER_ID, LINEA_B_ID);
+  });
+
+  it('R32: registra la entrega de esa receta con el pedido PARCIAL', async () => {
+    const user = setupUser();
+    await entregarLaTerminada(user);
+
+    await user.type(await campo(0, OLDER_BATCH_ID), '2');
+    await user.click(screen.getByTestId(ORDER_DELIVERY_SUBMIT_TESTID));
+
+    await waitFor(() => expect(deliverMock).toHaveBeenCalledTimes(1));
+    expect(deliverMock).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: DELIVERY_ORDER_ID, deliveryKey: DELIVERY_KEY }),
+    );
+    await waitFor(() => expect(routerMock.refresh).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('el borrador de «Entregar» va por receta (R52)', () => {
+  // La tabla consulta el ancho con `matchMedia`, que jsdom no trae.
+  beforeEach(() => setViewportWidth(WIDE_VIEWPORT));
+  afterEach(() => resetViewport());
+
+  function pedidoDeDosTerminadas(): OrderSummary {
+    return {
+      ...VISTA_SIN_LINEAS,
+      lines: [
+        lineaPedido({ status: 'TERMINADO', recipeName: 'Desengrasante' }),
+        lineaPedido({ id: LINEA_B_ID, position: 1, status: 'TERMINADO', recipeName: 'Jabón líquido' }),
+      ],
+      progress: { total: 2, finished: 2 },
+      id: DELIVERY_ORDER_ID,
+      number: { year: 2026, sequence: 7 },
+      numberText: formatOrderNumber({ year: 2026, sequence: 7 }),
+      priority: 'MEDIA',
+      status: 'TERMINADO',
+      cancellationReason: null,
+      createdAt: new Date('2026-01-15T10:00:00.000Z'),
+      updatedAt: new Date('2026-01-15T10:00:00.000Z'),
+      createdBy: null,
+      updatedBy: null,
+      pendingDelivery: { kind: 'not_packed' },
+      customer: null,
+    };
+  }
+
+  async function entregar(user: ReturnType<typeof setupUser>, lineId: string, receta: string) {
+    await user.click(within(screen.getByTestId(`data-table-row-${DELIVERY_ORDER_ID}`)).getByTestId('order-row-actions'));
+    await user.click(await screen.findByTestId(ORDER_ACTION_DELIVER_TESTID));
+    const selector = await screen.findByTestId(ORDER_LINE_PICKER_DIALOG_TESTID);
+    const opcion = within(selector)
+      .getAllByTestId(ORDER_LINE_PICKER_OPTION_TESTID)
+      .find((el) => el.getAttribute('data-line-id') === lineId);
+    await user.click(opcion as HTMLElement);
+    await screen.findByRole('dialog', { name: receta });
+  }
+
+  async function cerrarConEscape(user: ReturnType<typeof setupUser>) {
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId(ORDER_DELIVERY_SHEET_TESTID)).toBeNull());
+  }
+
+  it('R52: abre «Entregar» en dos recetas y, al volver a la primera, trae su borrador; la segunda no lo hereda', async () => {
+    const user = setupUser();
+    render(
+      <OrderTable
+        orders={[pedidoDeDosTerminadas()]}
+        params={createDefaultParams()}
+        totalPages={1}
+        recipes={{ items: [], totalPages: 1 }}
+        units={[]}
+        bridge={null}
+        canDeliver
+      />,
+    );
+
+    await entregar(user, LINEA_A_ID, 'Desengrasante');
+    await user.type(await campo(0, OLDER_BATCH_ID), '3');
+    await cerrarConEscape(user);
+
+    await entregar(user, LINEA_B_ID, 'Jabón líquido');
+    expect(await campo(0, OLDER_BATCH_ID)).toHaveValue('');
+    await user.type(await campo(0, NEWER_BATCH_ID), '1');
+    await cerrarConEscape(user);
+
+    expect(window.localStorage.getItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_A_ID))).not.toBeNull();
+    expect(window.localStorage.getItem(orderDeliveryDraftKey(DELIVERY_ORDER_ID, LINEA_B_ID))).not.toBeNull();
+
+    await entregar(user, LINEA_A_ID, 'Desengrasante');
+    expect(await campo(0, OLDER_BATCH_ID)).toHaveValue('3');
+    expect(await campo(0, NEWER_BATCH_ID)).toHaveValue('');
+    expect(screen.queryByTestId(ORDER_DELIVERY_DRAFT_ADJUSTED_TESTID)).toBeNull();
+    await cerrarConEscape(user);
+
+    await entregar(user, LINEA_B_ID, 'Jabón líquido');
+    expect(await campo(0, NEWER_BATCH_ID)).toHaveValue('1');
+    expect(await campo(0, OLDER_BATCH_ID)).toHaveValue('');
   });
 });
 
@@ -881,7 +1069,9 @@ describe('los textos del panel son los de hoy (QC-262 R20)', () => {
 
 describe('cabecera con el producto', () => {
   it('el titulo es el nombre de la receta y debajo va «Pedido <numero>» con el numero en mono', async () => {
-    render(<OrderDeliverySheet order={{ ...ORDER, recipeName: 'Esmalte azul' }} open onOpenChange={cerrar} />);
+    render(
+      <OrderDeliverySheet order={ORDER} line={{ ...LINE, recipeName: 'Esmalte azul' }} open onOpenChange={cerrar} />,
+    );
 
     const dialog = await screen.findByRole('dialog', { name: 'Esmalte azul' });
     expect(within(dialog).getByRole('heading', { name: 'Esmalte azul' })).toBeInTheDocument();
@@ -894,7 +1084,8 @@ describe('cabecera con el producto', () => {
   it('la imagen del producto va junto a «Por entregar»; sin imagen, el marcador', async () => {
     const { unmount } = render(
       <OrderDeliverySheet
-        order={{ ...ORDER, recipeName: 'Esmalte azul', recipeImageUrl: 'https://img.example/esmalte.png' }}
+        order={ORDER}
+        line={{ ...LINE, recipeName: 'Esmalte azul', recipeImageUrl: 'https://img.example/esmalte.png' }}
         open
         onOpenChange={cerrar}
       />,
@@ -907,7 +1098,9 @@ describe('cabecera con el producto', () => {
     expect(imagen).not.toHaveAttribute('data-missing');
     unmount();
 
-    render(<OrderDeliverySheet order={{ ...ORDER, recipeName: 'Esmalte azul' }} open onOpenChange={cerrar} />);
+    render(
+      <OrderDeliverySheet order={ORDER} line={{ ...LINE, recipeName: 'Esmalte azul' }} open onOpenChange={cerrar} />,
+    );
     const sinImagen = within(await screen.findByTestId(ORDER_DELIVERY_SUMMARY_TESTID)).getByTestId(
       ORDER_RECIPE_IMAGE_TESTID,
     );

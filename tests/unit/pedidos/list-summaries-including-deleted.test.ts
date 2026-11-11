@@ -38,6 +38,9 @@ function montar() {
     listAliveByIds: vi.fn(async () => {
       throw new Error('el historial no lee los vivos')
     }),
+    findAliveLine: vi.fn(async () => {
+      throw new Error('el historial no lee los vivos')
+    }),
     listAliveInCompany: vi.fn(async () => {
       throw new Error('el historial no lee los vivos')
     }),

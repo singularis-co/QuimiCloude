@@ -14,6 +14,8 @@ import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/r
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+import { recipeAccessOf, recipeLineIdOf, type RecipeSearchParams } from '../../components';
+
 import { ConditioningOrderScreen } from './components';
 
 const toErrorState = createErrorStateTranslator(
@@ -48,18 +50,22 @@ async function currentActor(): Promise<Actor | null> {
  */
 export default async function ConditioningOrderPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ id: string }>;
+  readonly searchParams: Promise<RecipeSearchParams>;
 }) {
   await requirePagePermission('acondicionamiento.modificar');
 
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const lineId = recipeLineIdOf(query);
+  if (lineId === null) notFound();
   const actor = await currentActor();
   if (actor === null) notFound();
 
   let order;
   try {
-    order = await asignaciones.getConditioningOrder(actor, { orderId: id });
+    order = await asignaciones.getConditioningOrder(actor, { orderId: id, lineId });
   } catch (error) {
     if (error instanceof OrderNotFoundError || error instanceof ValidationError) notFound();
     throw error;
@@ -88,6 +94,7 @@ export default async function ConditioningOrderPage({
       finishBlocked={finishBlocked}
       candidates={candidates}
       candidatesError={candidatesError}
+      access={recipeAccessOf(actor)}
     />
   );
 }

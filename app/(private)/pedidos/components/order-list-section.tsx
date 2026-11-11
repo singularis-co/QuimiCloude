@@ -380,6 +380,7 @@ export async function OrderListSection({
         canEditDistribution={canEditDistribution}
         canEditCustomer={canEditCustomer}
         canDeliver={canDeliver}
+        canCancelLine={canModifyOrders}
         canVoidDelivery={canVoidDelivery}
         producedProductsByOrder={producedProductsByOrder}
         customerFilter={customerFilter}

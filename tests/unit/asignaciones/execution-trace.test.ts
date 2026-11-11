@@ -20,6 +20,7 @@ function entry(action: ExecutionAction, offsetMs: number, userId = ANA): Executi
   return {
     id: `e-${String(seq).padStart(4, '0')}`,
     orderId: ORDER,
+    orderLineId: `linea-${ORDER}`,
     userId,
     action,
     stepPosition: sinPaso ? null : 1,

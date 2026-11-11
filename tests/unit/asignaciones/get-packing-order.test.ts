@@ -2,9 +2,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createGetPackingOrder, type GetPackingOrderDeps } from '@/lib/modules/asignaciones/domain/get-packing-order';
-import { AsignacionesError, OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignaciones/domain/errors';
+import { AsignacionesError, OrderNotFoundError, UnauthorizedError, ValidationError } from '@/lib/modules/asignaciones/domain/errors';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
+import { conTresRecetas, recetaDeTres } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -14,11 +15,14 @@ const EMPRESA = uuid('3');
 const ANA = uuid('1');
 const BETO = uuid('2');
 const PEDIDO = uuid('7');
+const LINEA = uuid('e');
+const OTRA_LINEA = uuid('f');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
 
 const RESUMEN = {
   id: PEDIDO,
+  lineId: LINEA,
   number: { year: 2026, sequence: 7 },
   recipeId: 'receta-1',
   quantity: '10.0000',
@@ -36,12 +40,12 @@ const RESUMEN_EN_EMPAQUE = { ...RESUMEN, status: 'EN_EMPAQUE', packedBy: BETO };
 
 type Dobles = {
   readonly deps: GetPackingOrderDeps;
-  readonly listAliveSummariesByIds: ReturnType<typeof vi.fn>;
+  readonly findAliveLineSummary: ReturnType<typeof vi.fn>;
   readonly findPackagingRefs: ReturnType<typeof vi.fn>;
   readonly findPresentationRefs: ReturnType<typeof vi.fn>;
   readonly findUnitRefs: ReturnType<typeof vi.fn>;
   readonly findPackingStepsById: ReturnType<typeof vi.fn>;
-  readonly listEvidenceByOrder: ReturnType<typeof vi.fn>;
+  readonly listEvidenceByLine: ReturnType<typeof vi.fn>;
   readonly createSignedReadUrl: ReturnType<typeof vi.fn>;
   readonly todos: readonly ReturnType<typeof vi.fn>[];
 };
@@ -62,13 +66,12 @@ function montar(options?: {
   readonly unidades?: readonly unknown[];
   readonly envases?: readonly unknown[];
 }): Dobles {
-  const listAliveSummariesByIds = vi.fn(async () => ({
-    items: options?.items ?? [RESUMEN],
-    total: (options?.items ?? [RESUMEN]).length,
-    page: 1,
-    pageSize: 1,
-    totalPages: 1,
-  }));
+  const lineas = (options?.items ?? [RESUMEN, { ...RESUMEN, lineId: OTRA_LINEA, recipeId: 'receta-2' }]) as readonly {
+    readonly lineId: string;
+  }[];
+  const findAliveLineSummary = vi.fn(
+    async (_companyId: string, _orderId: string, lineId: string) => lineas.find((linea) => linea.lineId === lineId) ?? null,
+  );
   const findPackagingRefs = vi.fn(async () => options?.envases ?? []);
   const findPackingStepsById = vi.fn(async () =>
     options?.packingSteps === undefined ? [ENVASAR, ETIQUETAR] : options.packingSteps,
@@ -87,11 +90,11 @@ function montar(options?: {
     async () => options?.unidades ?? [{ id: 'unidad-1', name: 'Litro', symbol: 'L', baseUnitId: null, factor: null }],
   );
 
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const createSignedReadUrl = vi.fn(async (path: string, ttl: number) => `https://bucket.test/${path}?ttl=${String(ttl)}`);
 
   const deps = {
-    orders: { listAliveSummariesByIds },
+    orders: { findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) },
     assignments: { listByOrdersInCompany },
     recipes: { findRefsIncludingDeleted },
     people: { findRefsIncludingDeletedInCompany },
@@ -100,21 +103,21 @@ function montar(options?: {
     packaging: { findRefs: findPackagingRefs },
     packingSteps: { findPackingStepsById },
     now: () => new Date('2026-09-25T12:00:00.000Z'),
-    evidence: { listByOrder: listEvidenceByOrder },
+    evidence: { listByLine: listEvidenceByLine },
     storage: { createSignedReadUrl },
   } as unknown as GetPackingOrderDeps;
 
   return {
     deps,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     findPackagingRefs,
     findPresentationRefs,
     findUnitRefs,
     findPackingStepsById,
-    listEvidenceByOrder,
+    listEvidenceByLine,
     createSignedReadUrl,
     todos: [
-      listAliveSummariesByIds,
+      findAliveLineSummary,
       listByOrdersInCompany,
       findRefsIncludingDeleted,
       findRefsIncludingDeletedInCompany,
@@ -122,7 +125,7 @@ function montar(options?: {
       findUnitRefs,
       findPackagingRefs,
       findPackingStepsById,
-      listEvidenceByOrder,
+      listEvidenceByLine,
       createSignedReadUrl,
     ],
   };
@@ -130,35 +133,47 @@ function montar(options?: {
 
 describe('getPackingOrder — autorizacion (R13)', () => {
   it('actor ausente rechaza sin tocar ningun puerto', async () => {
-    const { deps, listAliveSummariesByIds } = montar();
+    const { deps, findAliveLineSummary } = montar();
     const getPackingOrder = createGetPackingOrder(deps);
 
-    await expect(getPackingOrder(null, { orderId: PEDIDO })).rejects.toBeInstanceOf(AsignacionesError);
-    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    await expect(getPackingOrder(null, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(AsignacionesError);
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 
   it('actor sin `empaque.modificar` rechaza con `unauthorized` sin tocar ningun puerto', async () => {
-    const { deps, listAliveSummariesByIds } = montar();
+    const { deps, findAliveLineSummary } = montar();
     const getPackingOrder = createGetPackingOrder(deps);
     const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: [] };
 
-    await expect(getPackingOrder(actor, { orderId: PEDIDO })).rejects.toThrow(UnauthorizedError);
-    expect(listAliveSummariesByIds).not.toHaveBeenCalled();
+    await expect(getPackingOrder(actor, { orderId: PEDIDO, lineId: LINEA })).rejects.toThrow(UnauthorizedError);
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
+  });
+});
+
+describe('QT-315 — getPackingOrder: la receta entre las del pedido', () => {
+  it('R7, R8: trae su posicion, el total con la cancelada y las otras recetas en orden de alta', async () => {
+    const { deps } = montar();
+
+    const row = await createGetPackingOrder(conTresRecetas(deps, LINEA))(ACTOR, { orderId: PEDIDO, lineId: LINEA });
+
+    expect({ lineId: row.lineId, recipe: row.recipe, otherRecipes: row.otherRecipes }).toEqual(recetaDeTres(LINEA));
   });
 });
 
 describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
   it('devuelve numero, receta, presentacion, estado y quien empaca, sin envases (QC-281 R12)', async () => {
-    const { deps, listAliveSummariesByIds } = montar();
+    const { deps, findAliveLineSummary } = montar();
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
-    expect(listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['POR_EMPACAR', 'EN_EMPAQUE'], 1, 1);
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(row).toEqual({
       id: PEDIDO,
+      lineId: LINEA,
       numberText: expect.any(String),
       recipeName: 'Desengrasante',
+      recipe: { position: 1, count: 1 },
       quantity: '10.0000',
       presentationLines: [{ presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 1, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
       unitId: 'unidad-1',
@@ -168,6 +183,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
       createdAt: new Date('2026-09-01T08:00:00.000Z'),
       packedByName: null,
       packedById: null,
+      otherRecipes: [],
       packingSteps: [],
       packingEvidence: [],
       finish: null,
@@ -178,7 +194,7 @@ describe('getPackingOrder — la misma fila que `listPackingOrders`', () => {
     const { deps } = montar({ items: [RESUMEN_EN_EMPAQUE] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.packedById).toBe(BETO);
   });
@@ -189,7 +205,7 @@ describe('getPackingOrder — R24: no existe, esta de baja, es de otra empresa o
     const { deps } = montar({ items: [] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    await expect(getPackingOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotFoundError);
+    await expect(getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(OrderNotFoundError);
   });
 });
 
@@ -205,7 +221,7 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const { deps } = montar({ items: [conDosLineas] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.presentationLines).toEqual([
       { presentationId: 'presentacion-2', presentationName: 'Botella 200 ml', packages: 5, packagingName: null, presentationContent: null, presentationUnitLabel: null },
@@ -219,7 +235,7 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const { deps } = montar({ items: [{ ...RESUMEN, presentationLines: [] }] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.status).toBe('POR_EMPACAR');
     expect(row.presentationLines).toEqual([]);
@@ -236,7 +252,7 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const { deps } = montar({ items: [conEnvase] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.presentationLines).toEqual([
       { presentationId: 'presentacion-1', presentationName: 'Botella 1L', packages: 3, packagingName: 'Envase PET 1L', presentationContent: null, presentationUnitLabel: null },
@@ -248,7 +264,7 @@ describe('QC-170 — getPackingOrder: el reparto y la unidad para la pantalla de
     const { deps } = montar({ items: [{ ...RESUMEN, unitId: null }] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.unitId).toBeNull();
     expect(row.unitLabel).toBeNull();
@@ -262,7 +278,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const { deps, findPackingStepsById } = montar();
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.packingSteps).toEqual([]);
     expect(findPackingStepsById).not.toHaveBeenCalled();
@@ -272,7 +288,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const { deps, findPackingStepsById } = montar({ items: [RESUMEN_EN_EMPAQUE] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.packingSteps).toEqual([]);
     expect(findPackingStepsById).not.toHaveBeenCalled();
@@ -282,7 +298,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const { deps, findPackingStepsById } = montar({ items: [RESUMEN_DEL_ACTOR] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.packingSteps).toEqual([ENVASAR, ETIQUETAR]);
     expect(findPackingStepsById).toHaveBeenCalledTimes(1);
@@ -292,7 +308,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const { deps } = montar({ items: [RESUMEN_DEL_ACTOR], packingSteps: null });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.packingSteps).toEqual([]);
   });
@@ -301,7 +317,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const { deps, findPackingStepsById } = montar({ items: [RESUMEN_DEL_ACTOR] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(findPackingStepsById).toHaveBeenCalledWith('receta-1', EMPRESA);
   });
@@ -310,7 +326,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const { deps } = montar({ items: [RESUMEN_DEL_ACTOR] });
     const getPackingOrder = createGetPackingOrder(deps);
 
-    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO });
+    const row = await getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(Object.keys(row).filter((key) => /steps/i.test(key))).toEqual(['packingSteps']);
     expect(JSON.stringify(row)).not.toContain(MEZCLAR_OPERADOR);
@@ -321,7 +337,7 @@ describe('QC-211 — getPackingOrder: los pasos de envasado', () => {
     const getPackingOrder = createGetPackingOrder(deps);
     const soloEmpaque: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
 
-    const row = await getPackingOrder(soloEmpaque, { orderId: PEDIDO });
+    const row = await getPackingOrder(soloEmpaque, { orderId: PEDIDO, lineId: LINEA });
 
     expect(row.packingSteps).toEqual([ENVASAR, ETIQUETAR]);
   });
@@ -344,16 +360,12 @@ describe('getPackingOrder — un pedido en un estado de acondicionamiento no tie
   it.each(['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO'] as const)(
     'R23: un pedido %s responde `order_not_found` sin leer envases ni pasos',
     async (status) => {
-      const { deps, listAliveSummariesByIds, findPackagingRefs, findPackingStepsById } = montar();
-      // El catalogo filtra por los estados que recibe, como el adaptador real.
-      listAliveSummariesByIds.mockImplementation(async (...args: unknown[]) => {
-        const statuses = args[2] as readonly string[];
-        const items = statuses.includes(status) ? [{ ...RESUMEN, status, packedBy: ANA }] : [];
-        return { items, total: items.length, page: 1, pageSize: 1, totalPages: items.length };
-      });
+      const { deps, findAliveLineSummary, findPackagingRefs, findPackingStepsById } = montar();
+      // La linea existe en cualquier estado; el caso de uso decide por el suyo.
+      findAliveLineSummary.mockImplementation(async () => ({ ...RESUMEN, status, packedBy: ANA }));
       const getPackingOrder = createGetPackingOrder(deps);
 
-      await expect(getPackingOrder(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotFoundError);
+      await expect(getPackingOrder(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(OrderNotFoundError);
       expect(findPackagingRefs).not.toHaveBeenCalled();
       expect(findPackingStepsById).not.toHaveBeenCalled();
     },
@@ -374,7 +386,7 @@ describe('getPackingOrder — evidencia (R14, R27, R33)', () => {
       packingSteps: PASOS_CON_EVIDENCIA,
       fotos: [fila('f2', 1, 2), fila('f1', 1, 1)],
     });
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
     expect(order.packingEvidence).toEqual([
       {
         stepPosition: 1,
@@ -384,31 +396,31 @@ describe('getPackingOrder — evidencia (R14, R27, R33)', () => {
         ],
       },
     ]);
-    expect(d.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
+    expect(d.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'packing');
     for (const call of d.createSignedReadUrl.mock.calls) expect(call[1]).toBe(15 * 60);
   });
 
   it('R27, R33: si empaca otro, ni pasos ni fotos: no consulta ni firma nada', async () => {
     const d = montar({ items: [RESUMEN_EN_EMPAQUE], packingSteps: PASOS_CON_EVIDENCIA, fotos: [fila('f1', 1, 1)] });
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
     expect(order.packingSteps).toEqual([]);
     expect(order.packingEvidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
     expect(d.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
   it('R14: antes de Comenzar (POR_EMPACAR) no hay fotos que leer', async () => {
     const d = montar({ packingSteps: PASOS_CON_EVIDENCIA });
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
     expect(order.packingEvidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
   });
 
   it('R14: sin pasos de envasado que pidan evidencia no consulta fotos', async () => {
     const d = montar({ items: [EN_EMPAQUE_DE_ANA] });
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
     expect(order.packingEvidence).toEqual([]);
-    expect(d.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(d.listEvidenceByLine).not.toHaveBeenCalled();
   });
 });
 
@@ -479,7 +491,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('R1: al empacador en `EN_EMPAQUE` le llega cada linea con su plan, contenido, unidad y envase', async () => {
     const d = montarConteo([EN_EMPAQUE_DE_ANA]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish).toEqual({
       orderQuantity: '80.0000',
@@ -511,7 +523,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
       { ...EN_EMPAQUE_DE_ANA, presentationLines: [{ ...LINEA_GALON_PLAN, presentationContent: '4.0000' }] },
     ]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish?.lines[0]?.content).toBe('4.0000');
   });
@@ -519,7 +531,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('R9: `freePackages` es la parte entera del disponible libre, leido sin excluir ningun pedido', async () => {
     const d = montarConteo([EN_EMPAQUE_DE_ANA]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(d.findPackagingRefs).toHaveBeenCalledTimes(1);
     expect(d.findPackagingRefs).toHaveBeenCalledWith([GALON, BOTELLA], EMPRESA);
@@ -529,7 +541,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('R9: un disponible negativo o un envase que no vuelve del catalogo dan 0 libres', async () => {
     const d = montarConteo([EN_EMPAQUE_DE_ANA], [{ ...ENVASE_GALON, available: '-3.0000' }]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish?.lines.map((line) => line.packaging)).toEqual([
       { productId: GALON, name: 'Envase galon', freePackages: 0, imageUrl: null },
@@ -543,7 +555,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
       [{ ...ENVASE_GALON, imageUrl: 'https://cdn.test/productos/galon.png' }, { ...ENVASE_BOTELLA, imageUrl: null }],
     );
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish?.lines.map((line) => line.packaging?.imageUrl)).toEqual([
       'https://cdn.test/productos/galon.png',
@@ -565,7 +577,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
       [],
     );
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish?.lines.map((line) => line.packaging?.imageUrl)).toEqual([
       'https://cdn.test/productos/galon-linea.png',
@@ -583,7 +595,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
     };
     const d = montarConteo([{ ...EN_EMPAQUE_DE_ANA, presentationLines: [antigua] }]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish?.lines).toEqual([
       {
@@ -601,7 +613,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('R1: en `POR_EMPACAR` no hay conteo y no se lee ningun envase', async () => {
     const d = montarConteo([{ ...EN_EMPAQUE_DE_ANA, status: 'POR_EMPACAR', packedBy: null }]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish).toBeNull();
     expect(d.findPackagingRefs).not.toHaveBeenCalled();
@@ -610,7 +622,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('R1, R14: en `EN_EMPAQUE` de otro empacador no hay conteo y no se lee ningun envase', async () => {
     const d = montarConteo([{ ...EN_EMPAQUE_DE_ANA, packedBy: BETO }]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish).toBeNull();
     expect(d.findPackagingRefs).not.toHaveBeenCalled();
@@ -619,7 +631,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('un pedido sin unidad no tiene con que validar el conteo: `finish` es null', async () => {
     const d = montarConteo([{ ...EN_EMPAQUE_DE_ANA, unitId: null }]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish).toBeNull();
   });
@@ -632,7 +644,7 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('m5: un `EN_EMPAQUE` legado sin reparto (imposible por Comenzar y el backfill) sale con `finish` de cero lineas, no null', async () => {
     const d = montarConteo([{ ...EN_EMPAQUE_DE_ANA, presentationLines: [] }]);
 
-    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    const order = await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(order.finish).toEqual({
       orderQuantity: '80.0000',
@@ -646,10 +658,56 @@ describe('QC-281 — getPackingOrder: lo que necesita el dialogo de Terminar', (
   it('R29: todas las lecturas del conteo van con la empresa del actor', async () => {
     const d = montarConteo([EN_EMPAQUE_DE_ANA]);
 
-    await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO });
+    await createGetPackingOrder(d.deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     for (const call of d.findPresentationRefs.mock.calls) expect(call[1]).toBe(EMPRESA);
     for (const call of d.findUnitRefs.mock.calls) expect(call[1]).toBe(EMPRESA);
     for (const call of d.findPackagingRefs.mock.calls) expect(call[1]).toBe(EMPRESA);
+  });
+});
+
+describe('getPackingOrder — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  it('R11, R12: con dos recetas POR_EMPACAR del mismo pedido, devuelve la fila de la nombrada', async () => {
+    const { deps, findAliveLineSummary } = montar();
+
+    const row = await createGetPackingOrder(deps)(ACTOR, { orderId: PEDIDO, lineId: OTRA_LINEA });
+
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, OTRA_LINEA);
+    expect(row.lineId).toBe(OTRA_LINEA);
+  });
+
+  it('R10: decide por el estado de la receta: la otra en EN_CURSO no impide abrir esta', async () => {
+    const { deps } = montar({ items: [RESUMEN, { ...RESUMEN, lineId: OTRA_LINEA, status: 'EN_CURSO' }] });
+
+    await expect(createGetPackingOrder(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toMatchObject({
+      status: 'POR_EMPACAR',
+    });
+    await expect(createGetPackingOrder(deps)(ACTOR, { orderId: PEDIDO, lineId: OTRA_LINEA })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+  });
+
+  it('R14: sin lineId, o con uno que no es uuid, da invalid_input sin tocar ningun puerto', async () => {
+    for (const entrada of [{ orderId: PEDIDO }, { orderId: PEDIDO, lineId: 'no-uuid' }]) {
+      const { deps, todos } = montar();
+      await expect(createGetPackingOrder(deps)(ACTOR, entrada)).rejects.toThrow(ValidationError);
+      for (const doble of todos) expect(doble).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found', async () => {
+    const { deps, findPackagingRefs } = montar();
+    await expect(createGetPackingOrder(deps)(ACTOR, { orderId: PEDIDO, lineId: uuid('9') })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(findPackagingRefs).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin empaque.modificar rechaza antes de leer la receta', async () => {
+    const { deps, findAliveLineSummary } = montar();
+    await expect(
+      createGetPackingOrder(deps)({ ...ACTOR, permissions: ['asignaciones.ejecutar'] }, { orderId: PEDIDO, lineId: LINEA }),
+    ).rejects.toThrow(UnauthorizedError);
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

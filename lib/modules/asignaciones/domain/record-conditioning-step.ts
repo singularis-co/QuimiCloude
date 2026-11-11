@@ -9,7 +9,7 @@
 import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
-import { conditioningProgress, sameResponsibles } from './conditioning-steps';
+import { lineConditioningProgress, sameResponsibles } from './conditioning-steps';
 import {
   ConditioningResponsibleNotAllowedError,
   ConditioningResponsiblesRequiredError,
@@ -17,19 +17,17 @@ import {
   EvidenceRequiredError,
   OrderConditioningTakenError,
   OrderNotConditionableError,
-  OrderNotFoundError,
   ValidationError,
 } from './errors';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ConditioningTeamRepository } from '../ports/conditioning-team-repository';
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
-import type { OrderCatalog } from '@/lib/modules/pedidos';
+import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { ConditioningStepView, RecipeConditioningStepsReader } from '@/lib/modules/recetas';
 
-const recordConditioningStepSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const recordConditioningStepSchema = orderLineInputSchema.extend({
   stepPosition: z.number().int().min(1),
   responsibleUserIds: z
     .array(z.string().uuid())
@@ -40,9 +38,9 @@ const recordConditioningStepSchema = z.strictObject({
 export type RecordConditioningStepDeps = {
   readonly orders: OrderCatalog;
   readonly conditioningSteps: RecipeConditioningStepsReader;
-  readonly team: Pick<ConditioningTeamRepository, 'listByOrderInCompany'>;
+  readonly team: Pick<ConditioningTeamRepository, 'listByLineInCompany'>;
   readonly log: Pick<ExecutionLogRepository, 'append' | 'listEntriesForOrders'>;
-  readonly evidence: Pick<StepEvidenceRepository, 'listByOrder'>;
+  readonly evidence: Pick<StepEvidenceRepository, 'listByLine'>;
   readonly now?: () => Date;
 };
 
@@ -54,7 +52,7 @@ export type RecordConditioningStepResult = {
 async function assertResponsibles(
   deps: RecordConditioningStepDeps,
   actor: Actor,
-  orderId: string,
+  summary: Pick<AssignedOrderSummary, 'id' | 'lineId'>,
   step: ConditioningStepView,
   responsibleUserIds: readonly string[],
 ): Promise<void> {
@@ -63,7 +61,7 @@ async function assertResponsibles(
     return;
   }
   if (responsibleUserIds.length === 0) throw new ConditioningResponsiblesRequiredError();
-  const team = await deps.team.listByOrderInCompany(actor.companyId, orderId);
+  const team = await deps.team.listByLineInCompany(actor.companyId, summary.id, summary.lineId);
   const allowed = new Set([actor.id, ...team.map((member) => member.userId)]);
   if (responsibleUserIds.some((id) => !allowed.has(id))) throw new ConditioningResponsibleNotAllowedError();
 }
@@ -80,25 +78,21 @@ export function createRecordConditioningStep(
 
     const parsed = recordConditioningStepSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, stepPosition, responsibleUserIds } = parsed.data;
+    const { orderId, lineId, stepPosition, responsibleUserIds } = parsed.data;
     const companyId = actor.companyId;
 
-    const target = await deps.orders.findAliveById(orderId, companyId);
-    if (target === null) throw new OrderNotFoundError();
-    const page = await deps.orders.listAliveSummariesByIds(companyId, [orderId], [target.status], 1, 1);
-    const summary = onlyLineOf(page);
-    if (summary === undefined) throw new OrderNotFoundError();
-    if (target.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
+    const summary = await findLine(deps.orders, companyId, orderId, lineId);
+    if (summary.status !== 'EN_ACONDICIONAMIENTO') throw new OrderNotConditionableError();
     if (summary.conditionedBy !== actor.id) throw new OrderConditioningTakenError();
 
     const steps = (await deps.conditioningSteps.findConditioningStepsById(summary.recipeId, companyId)) ?? [];
     const step = steps[stepPosition - 1];
     if (step === undefined) throw new ConditioningStepOutOfOrderError(`paso ${String(stepPosition)} inexistente`);
 
-    await assertResponsibles(deps, actor, orderId, step, responsibleUserIds);
+    await assertResponsibles(deps, actor, summary, step, responsibleUserIds);
 
     const entries = await deps.log.listEntriesForOrders(companyId, [orderId]);
-    const progress = conditioningProgress(entries, steps.length);
+    const progress = lineConditioningProgress(entries, summary.lineId, steps.length);
     const occurredAt = deps.now?.() ?? new Date();
     const assigned = step.requiresAssignment === true;
 
@@ -126,7 +120,7 @@ export function createRecordConditioningStep(
     }
 
     if (step.requiresEvidence === true) {
-      const photos = await deps.evidence.listByOrder(companyId, orderId, 'conditioning');
+      const photos = await deps.evidence.listByLine(companyId, orderId, summary.lineId, 'conditioning');
       if (!photos.some((photo) => photo.stepPosition === stepPosition)) {
         throw new EvidenceRequiredError(`paso ${String(stepPosition)} sin evidencia`);
       }

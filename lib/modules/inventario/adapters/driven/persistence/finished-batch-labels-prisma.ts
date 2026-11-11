@@ -21,11 +21,12 @@ function toCivilDate(date: Date | null): string | null {
 async function findFinishedBatchesOfOrder(
   db: Prisma.TransactionClient,
   orderId: string,
+  orderLineId: string,
   scope: InventoryScope,
 ): Promise<readonly FinishedBatchOfOrderLine[]> {
   const rows = await db.inventoryMovement.findMany({
     where: {
-      AND: [movementCompanyScope(scope), { orderId, kind: 'production', batch: batchCompanyScope(scope) }],
+      AND: [movementCompanyScope(scope), { orderId, orderLineId, kind: 'production', batch: batchCompanyScope(scope) }],
     },
     select: {
       orderPresentationLineId: true,
@@ -58,8 +59,8 @@ async function findFinishedBatchesOfOrder(
  */
 export function createFinishedBatchLabels(db?: Prisma.TransactionClient): FinishedBatchLabels {
   return {
-    listOfOrder(companyId, orderId): Promise<readonly FinishedBatchOfOrderLine[]> {
-      return findFinishedBatchesOfOrder(db ?? prisma, orderId, { companyId });
+    listOfOrder(companyId, orderId, orderLineId): Promise<readonly FinishedBatchOfOrderLine[]> {
+      return findFinishedBatchesOfOrder(db ?? prisma, orderId, orderLineId, { companyId });
     },
 
     async writeForOrder(input): Promise<FinishedBatchLabelsOutcome> {
@@ -67,7 +68,13 @@ export function createFinishedBatchLabels(db?: Prisma.TransactionClient): Finish
       const write = (tx: Prisma.TransactionClient) =>
         writeFinishedBatchLabels(
           tx,
-          { orderId: input.orderId, label: input.label, actorId: input.actorId, now: input.now },
+          {
+            orderId: input.orderId,
+            orderLineId: input.orderLineId,
+            label: input.label,
+            actorId: input.actorId,
+            now: input.now,
+          },
           scope,
         );
       try {

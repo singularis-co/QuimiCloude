@@ -18,15 +18,12 @@ import {
 const {
   quoteOrderPresentationAvailabilityMock,
   updateOrderPresentationLinesMock,
-  listOrderLineIdsMock,
   getSessionUserMock,
   getSessionContextMock,
 } =
   vi.hoisted(() => ({
     quoteOrderPresentationAvailabilityMock: vi.fn(),
     updateOrderPresentationLinesMock: vi.fn(),
-    // QT-313: el formulario de una receta edita el reparto de la unica linea del pedido.
-    listOrderLineIdsMock: vi.fn(),
     getSessionUserMock: vi.fn(),
     getSessionContextMock: vi.fn(),
   }))
@@ -37,7 +34,6 @@ vi.mock('@/lib/composition', () => ({
   pedidos: {
     quoteOrderPresentationAvailability: quoteOrderPresentationAvailabilityMock,
     updateOrderPresentationLines: updateOrderPresentationLinesMock,
-    listOrderLineIds: listOrderLineIdsMock,
   },
 }))
 
@@ -67,7 +63,6 @@ beforeEach(() => {
   vi.clearAllMocks()
   getSessionUserMock.mockResolvedValue(ADMIN_SESSION_USER)
   getSessionContextMock.mockResolvedValue(SESSION_CONTEXT)
-  listOrderLineIdsMock.mockResolvedValue([LINE_ID])
 })
 
 describe('quoteOrderPresentationAvailabilityAction — T11', () => {
@@ -120,6 +115,7 @@ describe('updateOrderDistributionAction — T25', () => {
     getSessionUserMock.mockResolvedValue(SOLO_EMPAQUE_SESSION_USER)
 
     const result = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       presentationLines: [{ presentationId: PRESENTATION_ID, packages: 1 }],
     })
@@ -128,8 +124,9 @@ describe('updateOrderDistributionAction — T25', () => {
     expect(updateOrderPresentationLinesMock).not.toHaveBeenCalled()
   })
 
-  it('R46: rechaza con invalid_input cualquier campo que no sea unitId/presentationLines, sin llamar a la fachada', async () => {
+  it('R46: rechaza con invalid_input cualquier campo que no sea lineId/unitId/presentationLines, sin llamar a la fachada', async () => {
     const result = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       presentationLines: [],
       quantity: '999',
@@ -139,10 +136,11 @@ describe('updateOrderDistributionAction — T25', () => {
     expect(updateOrderPresentationLinesMock).not.toHaveBeenCalled()
   })
 
-  it('llama a la fachada con el unitId y las lineas ya validadas, y el actor de la sesion', async () => {
+  it('R31: llama a la fachada con la receta, el unitId y las lineas ya validadas, y el actor de la sesion', async () => {
     updateOrderPresentationLinesMock.mockResolvedValue('ok')
 
     const result = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       presentationLines: [{ presentationId: PRESENTATION_ID, packages: 2 }],
     })
@@ -176,6 +174,7 @@ describe('updateOrderDistributionAction — T25', () => {
     updateOrderPresentationLinesMock.mockResolvedValue(resultado)
 
     const result = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       presentationLines: [{ presentationId: PRESENTATION_ID, packages: 1 }],
     })
@@ -187,6 +186,7 @@ describe('updateOrderDistributionAction — T25', () => {
     updateOrderPresentationLinesMock.mockResolvedValue('unit_not_convertible')
 
     const result = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       presentationLines: [{ presentationId: PRESENTATION_ID, packages: 1 }],
     })
@@ -199,6 +199,7 @@ describe('updateOrderDistributionAction — T25', () => {
     const ENVASE_ID = 'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1'
 
     const result = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
       unitId: UNIT_ID,
       presentationLines: [{ packagingProductId: ENVASE_ID, packages: '30' }],
     })
@@ -215,10 +216,10 @@ describe('updateOrderDistributionAction — T25', () => {
   it('QC-195 R17, R37: confirmBlocked viaja al caso de uso; solo un booleano lo confirma', async () => {
     updateOrderPresentationLinesMock.mockResolvedValue('ok')
 
-    await updateOrderDistributionAction(ORDER_ID, { unitId: UNIT_ID, presentationLines: [], confirmBlocked: true })
+    await updateOrderDistributionAction(ORDER_ID, { lineId: LINE_ID, unitId: UNIT_ID, presentationLines: [], confirmBlocked: true })
     expect(updateOrderPresentationLinesMock.mock.calls[0]?.[2]).toMatchObject({ confirmBlocked: true })
 
-    const result = await updateOrderDistributionAction(ORDER_ID, { unitId: UNIT_ID, presentationLines: [], confirmBlocked: 'true' })
+    const result = await updateOrderDistributionAction(ORDER_ID, { lineId: LINE_ID, unitId: UNIT_ID, presentationLines: [], confirmBlocked: 'true' })
     expect(result).toEqual({ status: 'error', code: 'invalid_input', message: expect.any(String) })
     expect(updateOrderPresentationLinesMock).toHaveBeenCalledTimes(1)
   })
@@ -226,15 +227,47 @@ describe('updateOrderDistributionAction — T25', () => {
   it('un reparto vacio (R9) se acepta: presentationLines: [] pasa la validacion', async () => {
     updateOrderPresentationLinesMock.mockResolvedValue('ok')
 
-    const result = await updateOrderDistributionAction(ORDER_ID, { unitId: UNIT_ID, presentationLines: [] })
+    const result = await updateOrderDistributionAction(ORDER_ID, { lineId: LINE_ID, unitId: UNIT_ID, presentationLines: [] })
 
     expect(result).toEqual({ status: 'success' })
   })
 
   it('un error ajeno se devuelve como unexpected, sin detalle', async () => {
     updateOrderPresentationLinesMock.mockRejectedValueOnce(new Error('la conexion se cayo'))
-    const result = await updateOrderDistributionAction(ORDER_ID, { unitId: UNIT_ID, presentationLines: [] })
+    const result = await updateOrderDistributionAction(ORDER_ID, { lineId: LINE_ID, unitId: UNIT_ID, presentationLines: [] })
     expect(result).toMatchObject({ status: 'error' })
     expect(JSON.stringify(result)).not.toContain('la conexion se cayo')
+  })
+
+  it('R31: en un pedido de dos recetas entrega la receta de la entrada, sin leer las del pedido ni rechazarlo', async () => {
+    updateOrderPresentationLinesMock.mockResolvedValue('ok')
+    const SEGUNDA_RECETA = '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f'
+
+    const primera = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: LINE_ID,
+      unitId: UNIT_ID,
+      presentationLines: [{ presentationId: PRESENTATION_ID, packages: 1 }],
+    })
+    const segunda = await updateOrderDistributionAction(ORDER_ID, {
+      lineId: SEGUNDA_RECETA,
+      unitId: UNIT_ID,
+      presentationLines: [{ presentationId: PRESENTATION_ID, packages: 3 }],
+    })
+
+    expect(primera).toEqual({ status: 'success' })
+    expect(segunda).toEqual({ status: 'success' })
+    expect(updateOrderPresentationLinesMock.mock.calls.map((call) => [call[0], (call[2] as { lineId: string }).lineId])).toEqual([
+      [ORDER_ID, LINE_ID],
+      [ORDER_ID, SEGUNDA_RECETA],
+    ])
+  })
+
+  it('R31: sin lineId, o con uno sin forma de uuid, responde invalid_input sin llamar a la fachada', async () => {
+    const sinReceta = await updateOrderDistributionAction(ORDER_ID, { unitId: UNIT_ID, presentationLines: [] })
+    const sinForma = await updateOrderDistributionAction(ORDER_ID, { lineId: 'receta-1', unitId: UNIT_ID, presentationLines: [] })
+
+    expect(sinReceta).toEqual({ status: 'error', code: 'invalid_input', message: expect.any(String) })
+    expect(sinForma).toEqual({ status: 'error', code: 'invalid_input', message: expect.any(String) })
+    expect(updateOrderPresentationLinesMock).not.toHaveBeenCalled()
   })
 })

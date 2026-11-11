@@ -18,6 +18,7 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
   ORDER_EXECUTION_FINISH_CONFIRM_TEXTS,
   ORDER_EXECUTION_FINISH_DIALOG_TESTID,
+  ORDER_EXECUTION_LINE_ID_FIELD,
   ORDER_EXECUTION_ORDER_ID_FIELD,
   ORDER_EXECUTION_ORDER_QUANTITY_TESTID,
   ORDER_EXECUTION_PRESENTATION_TESTID,
@@ -74,6 +75,9 @@ const MILILITRO = {
 const EXECUTION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
@@ -127,7 +131,7 @@ const EXECUTION_DOS_PASOS: StartedOrderExecution = {
 
 describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la linea ya calculada', () => {
   it('muestra la cantidad del pedido y la cantidad de la linea CARACTER A CARACTER', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.getByText(new RegExp(EXECUTION.orderQuantity))).toBeVisible();
     expect(screen.getByTestId('order-execution-line-quantity-0')).toHaveTextContent(
@@ -138,7 +142,7 @@ describe('pantalla de ejecucion — sin factor de escala, con la cantidad de la 
 
 describe('pantalla de ejecucion — QC-147 R19: sin ningun factor de escala', () => {
   it('no monta ningun banner ni factor de escala: `order-scale-banner` se borro', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.queryByTestId('order-scale-banner')).toBeNull();
     expect(screen.queryByTestId('order-scale-banner-factor')).toBeNull();
@@ -147,7 +151,7 @@ describe('pantalla de ejecucion — QC-147 R19: sin ningun factor de escala', ()
 
 describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su propia linea', () => {
   it('pinta "Pedido 250" en un elemento propio con su testid, fuera de la lista de lineas', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
     expect(cantidadPedido).toHaveTextContent('Pedido 250');
@@ -155,7 +159,7 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
   });
 
   it('pinta "Pedido 200" cuando la cantidad del pedido llega con ceros de relleno', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID)).toHaveTextContent(
       'Pedido 200',
@@ -163,7 +167,7 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
   });
 
   it('QC-132 R3: expone el valor exacto en el title cuando difiere del pintado', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '0.1255' }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, orderQuantity: '0.1255' }} />);
 
     const cantidadPedido = screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID);
     expect(cantidadPedido.textContent).toBe('Pedido 0.13');
@@ -172,7 +176,7 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
 
   it('QC-170 R42: la cantidad del pedido lleva su unidad; sin unidad va la cifra sola', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{ ...EXECUTION, orderQuantity: '200.0000', unitId: 'unit-l', unitLabel: 'L' }}
       />,
     );
@@ -181,14 +185,14 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
     );
     cleanup();
 
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
     expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID).textContent).toBe(
       'Pedido 200',
     );
   });
 
   it('QC-132 R4: sin title cuando el valor pintado coincide con el exacto', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, orderQuantity: '200.0000' }} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_ORDER_QUANTITY_TESTID)).not.toHaveAttribute('title');
   });
@@ -196,7 +200,7 @@ describe('pantalla de ejecucion — QC-147 R26: la cantidad del pedido en su pro
 
 describe('pantalla de ejecucion — R19: bloqueo sin escape con el motivo visible', () => {
   it('no permite finalizar mientras queden items sin marcar, y no invoca la operacion', async () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const finalizar = screen.getByTestId('step-reader-finish');
     expect(finalizar).toBeDisabled();
@@ -210,7 +214,7 @@ describe('pantalla de ejecucion — R4: la espera minima de 5 segundos por paso'
   it('a los 4999 ms el avance sigue impedido y a los 5000 ms deja de estarlo', async () => {
     vi.useFakeTimers();
     try {
-      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+      render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION_SIN_ELEMENTOS} />);
       const finalizar = screen.getByTestId('step-reader-finish');
 
       await act(async () => {
@@ -230,7 +234,7 @@ describe('pantalla de ejecucion — R4: la espera minima de 5 segundos por paso'
 
 describe('pantalla de ejecucion — R5: la cuenta del primer paso arranca sola', () => {
   it('muestra la cuenta completa al montar sin ninguna accion del usuario y no ofrece ningun control "Comenzar"', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.getByTestId('countdown-timer')).toHaveTextContent('00:05');
     expect(screen.queryByRole('button', { name: /comenzar/i })).toBeNull();
@@ -249,7 +253,7 @@ describe('pantalla de ejecucion — el error de la operacion se muestra sin bloq
     });
     vi.useFakeTimers();
     try {
-      render(<OrderExecutionScreen execution={EXECUTION} />);
+      render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
       marcarTodo();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
@@ -271,7 +275,7 @@ describe('pantalla de ejecucion — Finalizar pide confirmar antes de terminar e
   async function pulsarFinalizar(): Promise<void> {
     vi.useFakeTimers();
     try {
-      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+      render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION_SIN_ELEMENTOS} />);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
       });
@@ -320,7 +324,7 @@ describe('pantalla de ejecucion — R13: el ultimo paso tambien espera', () => {
   it('pulsar Finalizar antes de los 5 s no invoca finishAssignedOrderAction', async () => {
     vi.useFakeTimers();
     try {
-      render(<OrderExecutionScreen execution={EXECUTION_SIN_ELEMENTOS} />);
+      render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION_SIN_ELEMENTOS} />);
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000);
@@ -335,11 +339,11 @@ describe('pantalla de ejecucion — R13: el ultimo paso tambien espera', () => {
 });
 
 describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar la reinicia', () => {
-  it('el FormData enviado tras cumplir la espera y finalizar solo lleva orderId; remontar reinicia la cuenta en el paso 1', async () => {
+  it('R11: el FormData enviado tras cumplir la espera y finalizar solo lleva pedido, receta y paso; remontar reinicia la cuenta en el paso 1', async () => {
     finishAssignedOrderActionMock.mockResolvedValue({ status: 'success' });
     vi.useFakeTimers();
     try {
-      const { unmount } = render(<OrderExecutionScreen execution={EXECUTION_DOS_PASOS} />);
+      const { unmount } = render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION_DOS_PASOS} />);
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
@@ -364,12 +368,14 @@ describe('pantalla de ejecucion — R18: el envio no lleva la espera y remontar 
       // no viaja nada de la espera.
       expect([...formData.keys()]).toEqual([
         ORDER_EXECUTION_ORDER_ID_FIELD,
+        ORDER_EXECUTION_LINE_ID_FIELD,
         ORDER_EXECUTION_STEP_POSITION_FIELD,
       ]);
       expect(formData.get(ORDER_EXECUTION_ORDER_ID_FIELD)).toBe(EXECUTION_DOS_PASOS.orderId);
+      expect(formData.get(ORDER_EXECUTION_LINE_ID_FIELD)).toBe('linea-1');
 
       unmount();
-      render(<OrderExecutionScreen execution={EXECUTION_DOS_PASOS} />);
+      render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION_DOS_PASOS} />);
 
       expect(screen.getByTestId('step-reader-position')).toHaveTextContent('Paso 1 de 2');
       expect(screen.getByTestId('countdown-timer')).toHaveTextContent('00:05');
@@ -385,7 +391,7 @@ describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Fina
     finishAssignedOrderActionMock.mockResolvedValue({ status: 'error', code: codigo, message: mensaje });
     vi.useFakeTimers();
     try {
-      render(<OrderExecutionScreen execution={EXECUTION} />);
+      render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
       marcarTodo();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
@@ -425,7 +431,7 @@ describe('pantalla de ejecucion — QC-150 R18, R19: los errores nuevos del Fina
 
 describe('pantalla de ejecucion — R25: muestra la presentación o Sin presentación', () => {
   it('QC-170 R26: pinta la primera linea del reparto en su propia linea', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
     expect(linea).toHaveTextContent('Presentación:');
@@ -434,7 +440,7 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
 
   it('QC-170 R26: con varias lineas pinta todas separadas por coma', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{
           ...EXECUTION,
           presentationLines: [
@@ -452,7 +458,7 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
 
   it('una linea con envase y volumen conocido pinta el envase y el volumen', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{
           ...EXECUTION,
           presentationLines: [
@@ -468,7 +474,7 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
   });
 
   it('QC-170 R27: con el reparto vacio pinta «Sin presentación»', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, presentationLines: [] }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, presentationLines: [] }} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID)).toHaveTextContent(
       'Sin presentación',
@@ -478,7 +484,7 @@ describe('pantalla de ejecucion — R25: muestra la presentación o Sin presenta
 
 describe('pantalla de ejecucion — R26: no hay ningún control de presentación', () => {
   it('la linea de presentación no ofrece ningun boton, enlace ni campo de edicion', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const linea = screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID);
     expect(linea.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0);
@@ -487,7 +493,7 @@ describe('pantalla de ejecucion — R26: no hay ningún control de presentación
 
 describe('pantalla de ejecucion — R20: ningun control de edicion', () => {
   it('no ofrece ningun campo de texto ni area de edicion', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.queryAllByRole('textbox')).toHaveLength(0);
     expect(screen.getByTestId(ORDER_EXECUTION_TITLE_TESTID)).toHaveTextContent(
@@ -498,7 +504,7 @@ describe('pantalla de ejecucion — R20: ningun control de edicion', () => {
 
 describe('pantalla de ejecucion — QC-265 R23: cabecera fija con número, receta y menú', () => {
   it('QC-265 R2, R23: pinta el número en la cabecera y la receta como único h1, con su testid', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const raiz = screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID);
     expect(raiz).toHaveAttribute('data-operator-screen');
@@ -513,7 +519,7 @@ describe('pantalla de ejecucion — QC-265 R23: cabecera fija con número, recet
   });
 
   it('QC-265 R23: con la receta dada de baja el h1 dice «Esta fórmula está dada de baja.»', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, recipeName: null }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, recipeName: null }} />);
 
     const titulo = screen.getByRole('heading', { level: 1 });
     expect(ORDER_EXECUTION_TEXTS.recipeMissing).toBe('Esta fórmula está dada de baja.');
@@ -523,7 +529,7 @@ describe('pantalla de ejecucion — QC-265 R23: cabecera fija con número, recet
 
   it('QC-265 R23: la cabecera pinta «Pedido <cantidad> <unidad> · Presentación: <reparto>»', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{ ...EXECUTION, orderQuantity: '200.0000', unitId: 'unit-l', unitLabel: 'L' }}
       />,
     );
@@ -539,7 +545,7 @@ describe('pantalla de ejecucion — QC-265 R23: cabecera fija con número, recet
 
   it('QC-265 R23: el menú «Acciones del pedido <número>» ofrece «Cancelar pedido» y abre el diálogo de hoy', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.queryByTestId(ORDER_CANCEL_DIALOG_TESTID)).toBeNull();
     const menu = screen.getByRole('button', { name: 'Acciones del pedido PED-0007' });
@@ -561,7 +567,7 @@ describe('pantalla de ejecucion — QC-265 R23: cabecera fija con número, recet
 
 describe('pantalla de ejecucion — QC-265 R25: el pie del paso a paso', () => {
   it('QC-265 R25: Anterior y Siguiente van en el pie fijo, en talla xl y con el motivo encima', () => {
-    render(<OrderExecutionScreen execution={EXECUTION_DOS_PASOS} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION_DOS_PASOS} />);
 
     const pie = screen.getByTestId('step-reader-actions');
     expect(pie.className).toContain('fixed');
@@ -576,7 +582,7 @@ describe('pantalla de ejecucion — QC-265 R25: el pie del paso a paso', () => {
   });
 
   it('QC-265 R25: en el último paso el pie ofrece Finalizar en talla xl con el motivo del bloqueo', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const pie = screen.getByTestId('step-reader-actions');
     expect(within(pie).getByTestId('step-reader-finish').className).toContain('h-13');
@@ -587,7 +593,7 @@ describe('pantalla de ejecucion — QC-265 R25: el pie del paso a paso', () => {
 describe('pantalla de ejecucion — materiales y herramientas en su propio contenedor', () => {
   it('las lineas y las herramientas viven dentro del contenedor, separadas del lector de pasos', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
       />,
     );
@@ -600,7 +606,7 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
   });
 
   it('QC-269 R4, R7: la Card de materiales reserva el pie fijo del lector, sin envoltorio nuevo', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const contenedor = screen.getByTestId(ORDER_EXECUTION_MATERIALS_TESTID);
     expect(contenedor.className.split(/\s+/)).toContain(STEP_READER_SIDE_COLUMN_RESERVE);
@@ -611,7 +617,7 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
   it('QC-269 R4, R7, R8: la reserva de la Card usa el mismo calc que el pie fijo del lector', () => {
     // Vive aqui porque este test es el que el guardia de recipe-route-contract deja nombrar el
     // lector de pasos; evita la deriva entre los dos sitios (design.md § 4.2).
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const readerReserve = /(?:^|\s)pb-\[(calc\([^\]]+\))\](?:\s|$)/.exec(
       screen.getByTestId('step-reader').className,
@@ -626,7 +632,7 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
 
   it('con herramientas, herramientas y materiales van en Cards distintas, herramientas primero', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{ ...EXECUTION, tools: [{ productName: 'Espátula', quantity: 1 }] }}
       />,
     );
@@ -640,7 +646,7 @@ describe('pantalla de ejecucion — materiales y herramientas en su propio conte
   });
 
   it('sin herramientas solo queda la Card de materiales', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, tools: [] }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, tools: [] }} />);
 
     expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
     expect(screen.getByTestId(ORDER_EXECUTION_MATERIALS_PANEL_TESTID)).toContainElement(
@@ -659,7 +665,7 @@ describe('pantalla de ejecucion — R26: objetivos tactiles de 44x44 en todo con
   }
 
   it('todo boton y todo selector de la pantalla cumple el objetivo tactil minimo', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const controles = [
       ...Array.from(document.querySelectorAll('button')),
@@ -674,7 +680,7 @@ describe('pantalla de ejecucion — R26: objetivos tactiles de 44x44 en todo con
   });
 
   it('no usa `100vh` en su contenedor: usa `min-h-dvh`', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_SCREEN_TESTID).className).toContain('min-h-dvh');
   });
@@ -750,7 +756,7 @@ describe('R18 — el asistente heredado solo puede cambiar step-reader.tsx (list
 describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
   it('R44: una linea con envase pinta el nombre del envase, no el de la presentacion', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={{
           ...EXECUTION,
           presentationLines: [
@@ -770,7 +776,7 @@ describe('pantalla de ejecucion — el nombre del envase de la linea', () => {
   });
 
   it('R44: una linea antigua (`packagingName` null) pinta el nombre de su presentacion', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_PRESENTATION_TESTID).textContent).toBe(
       'Presentación: 5 × Caja x 12',
@@ -782,7 +788,7 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
   const PENDIENTE: StartedOrderExecution = { ...EXECUTION, status: 'PENDIENTE' };
 
   it('PENDIENTE: pinta «Comenzar» en el pie, sin paso a paso ni Finalizar', () => {
-    render(<OrderExecutionScreen execution={PENDIENTE} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={PENDIENTE} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toHaveTextContent(
       ORDER_EXECUTION_TEXTS.start,
@@ -793,7 +799,7 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
   });
 
   it('PENDIENTE: la vuelta es un enlace habilitado a la lista de pedidos asignados', () => {
-    render(<OrderExecutionScreen execution={PENDIENTE} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={PENDIENTE} />);
 
     const back = screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID);
     expect(back.tagName).toBe('A');
@@ -802,7 +808,7 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
   });
 
   it('pulsar «Comenzar» abre la confirmacion con sus textos y no comienza todavia', () => {
-    render(<OrderExecutionScreen execution={PENDIENTE} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={PENDIENTE} />);
 
     expect(screen.queryByTestId(ORDER_EXECUTION_START_DIALOG_TESTID)).toBeNull();
     fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
@@ -816,7 +822,7 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
   });
 
   it('cancelar la confirmacion no comienza el pedido', () => {
-    render(<OrderExecutionScreen execution={PENDIENTE} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={PENDIENTE} />);
 
     fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
     fireEvent.click(screen.getByRole('button', { name: assignedOrderStartConfirmTexts().cancel }));
@@ -829,14 +835,14 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
       status: 'success',
       data: { ...PENDIENTE, status: 'EN_CURSO', resumeStepPosition: 1 },
     });
-    render(<OrderExecutionScreen execution={PENDIENTE} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={PENDIENTE} />);
 
     fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
     fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID));
 
     expect(await screen.findByText('Verifica el equipo antes de cargar')).toBeVisible();
     expect(startAssignedOrderActionMock).toHaveBeenCalledTimes(1);
-    expect(startAssignedOrderActionMock).toHaveBeenCalledWith(PENDIENTE.orderId);
+    expect(startAssignedOrderActionMock).toHaveBeenCalledWith(PENDIENTE.orderId, 'linea-1');
     expect(screen.queryByTestId(ORDER_EXECUTION_START_BUTTON_TESTID)).toBeNull();
     expect(screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID)).toHaveAttribute('aria-disabled', 'true');
   });
@@ -847,7 +853,7 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
       code: 'order_blocked',
       message: 'Falta material.',
     });
-    render(<OrderExecutionScreen execution={PENDIENTE} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={PENDIENTE} />);
 
     fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_BUTTON_TESTID));
     fireEvent.click(screen.getByTestId(ORDER_EXECUTION_START_CONFIRM_TESTID));
@@ -858,7 +864,7 @@ describe('pantalla de ejecucion — entrar es libre: «Comenzar» dentro de la p
   });
 
   it('EN_CURSO: la vuelta se ve pero esta deshabilitada, sin href ni foco', () => {
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     const back = screen.getByTestId(ORDER_EXECUTION_BACK_LINK_TESTID);
     expect(back.tagName).not.toBe('A');

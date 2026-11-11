@@ -610,9 +610,20 @@ describe('lib/modules/recetas — forma del modulo y frontera con inventario', (
     // sigue aplicando `consumesOnlyPublicContract`. Cualquier OTRA segunda pantalla sigue
     // prohibida. Los dos literales son los mismos que `PANTALLA_DE_EJECUCION` de
     // `tests/unit/recetas/scope.test.ts`.
+    // AMPLIADA el 2026-11-10 (QT-315, planta-con-varias-recetas): la lista pasa de DOS a CINCO
+    // archivos y entran `app/(private)/asignacion/page.tsx`,
+    // `app/(private)/asignacion/empaque/[id]/page.tsx` y
+    // `app/(private)/asignacion/acondicionamiento/[id]/page.tsx`. Las tres solo LEEN la receta de
+    // la ruta (`?receta=`) para mostrar la receta N de M del pedido; no editan recetas. Decision
+    // del humano, como en QC-180. Tampoco quedan exentas: se les sigue aplicando
+    // `consumesOnlyPublicContract`. Los cinco literales son los mismos que
+    // `PANTALLA_DE_EJECUCION` de `tests/unit/recetas/scope.test.ts`.
     const PANTALLAS_AUTORIZADAS = new Set([
       'app/(private)/asignacion/[id]/page.tsx',
       'app/(private)/pedidos/page.tsx',
+      'app/(private)/asignacion/page.tsx',
+      'app/(private)/asignacion/empaque/[id]/page.tsx',
+      'app/(private)/asignacion/acondicionamiento/[id]/page.tsx',
     ])
 
     const fueraDeSuCarpeta = sourcesIn(appDir).filter(

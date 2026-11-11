@@ -77,6 +77,7 @@ import {
 import { realOrderSummaries } from '../../helpers/order-summaries';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, evidenceStorageUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
+import { onOnlyRecipe } from '../../helpers/only-recipe-plant';
 
 const summaryReaders = realOrderSummaries();
 
@@ -142,6 +143,8 @@ function ordersReales(): OrderCatalog {
     listAliveSummariesInCompany: async () => noLlamar('orders.listAliveSummariesInCompany'),
     listSummariesByIdsIncludingDeleted: async () => noLlamar('orders.listSummariesByIdsIncludingDeleted'),
     listDeliveryProgressByIdsIncludingDeleted: async () => noLlamar('orders.listDeliveryProgressByIdsIncludingDeleted'),
+    findAliveLineSummary: summaryReaders.findAliveLineSummary,
+    listRecipeOutlinesByIdsIncludingDeleted: summaryReaders.listRecipeOutlinesByIdsIncludingDeleted,
     transitionAliveById: transitionAliveByIdReal,
     startPackingAliveById: async () => noLlamar('orders.startPackingAliveById'),
     finishPackingAliveById: async () => noLlamar('orders.finishPackingAliveById'),
@@ -167,7 +170,7 @@ function wireExecutionUseCases(fixture: Fixture) {
     storage: evidenceStorageUnused,
   };
 
-  return {
+  return onOnlyRecipe({
     get: createGetAssignedOrderExecution(deps),
     start: createStartAssignedOrder({ ...deps, ...execution, now: () => NOW }),
     finish: createFinishAssignedOrder({
@@ -180,7 +183,7 @@ function wireExecutionUseCases(fixture: Fixture) {
       recipes: recipesWithoutEvidence,
       evidence: evidenceRepositoryUnused,
     }),
-  };
+  }, fixture.tx);
 }
 
 /** Un rol efimero con el permiso indicado, para que `assignment-directory-prisma.ts` lo lea de

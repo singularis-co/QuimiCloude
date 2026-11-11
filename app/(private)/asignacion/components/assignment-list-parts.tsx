@@ -12,8 +12,11 @@ import {
   type ResponsibleAvatarsProps,
 } from '@/components/shared/responsible-avatars';
 import { TableSkeleton } from '@/components/shared/table-skeleton';
+import type { RecipePosition } from '@/lib/modules/asignaciones';
 import type { ErrorState as OperationError } from '@/lib/modules/errores';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
+
+import { RecipeNameWithPosition } from './recipe-of-order-label';
 
 const PAST_LAST_PAGE_MESSAGE = 'Esta página ya no tiene pedidos.';
 const FIRST_PAGE_LABEL = 'Volver a la primera página';
@@ -124,15 +127,19 @@ export function orderNumberColumn<TRow extends { readonly numberText: string }>(
   };
 }
 
-export function recipeColumn<TRow extends { readonly recipeName: string | null }>(
-  id: string,
-  missingTestIdPrefix: string,
-): DataTableColumn<TRow> {
+export function recipeColumn<
+  TRow extends { readonly recipeName: string | null; readonly recipe: RecipePosition },
+>(id: string, missingTestIdPrefix: string): DataTableColumn<TRow> {
   return {
     id,
     label: 'Fórmula',
     align: 'start',
-    cell: (order) => order.recipeName ?? <MissingValue testIdPrefix={missingTestIdPrefix} field={id} />,
+    cell: (order) => (
+      <RecipeNameWithPosition
+        name={order.recipeName ?? <MissingValue testIdPrefix={missingTestIdPrefix} field={id} />}
+        recipe={order.recipe}
+      />
+    ),
   };
 }
 

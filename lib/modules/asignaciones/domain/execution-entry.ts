@@ -62,6 +62,7 @@ export type NewExecutionEntry =
 export type ExecutionEntryRecord = {
   readonly id: string;
   readonly orderId: string;
+  readonly orderLineId: string;
   readonly userId: string;
   readonly action: ExecutionAction;
   readonly stepPosition: number | null;

@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/shared/db/prisma';
 
 import type {
+  ConditioningTeamMemberOfOrderRow,
   ConditioningTeamMemberRow,
   ConditioningTeamRepository,
   NewConditioningTeamMember,
@@ -28,12 +29,13 @@ export function createConditioningTeamRepository(db: PrismaLike = prisma): Condi
       return result.count;
     },
 
-    async listByOrderInCompany(
+    async listByLineInCompany(
       companyId: string,
       orderId: string,
+      orderLineId: string,
     ): Promise<readonly ConditioningTeamMemberRow[]> {
       return db.orderConditioningTeamMember.findMany({
-        where: { companyId, orderId },
+        where: { companyId, orderId, orderLineId },
         orderBy: { position: 'asc' },
         select: { userId: true, workGroupId: true, workGroupName: true },
       });
@@ -42,12 +44,12 @@ export function createConditioningTeamRepository(db: PrismaLike = prisma): Condi
     async listByOrdersInCompany(
       companyId: string,
       orderIds: readonly string[],
-    ): Promise<readonly (ConditioningTeamMemberRow & { readonly orderId: string })[]> {
+    ): Promise<readonly ConditioningTeamMemberOfOrderRow[]> {
       if (orderIds.length === 0) return [];
       return db.orderConditioningTeamMember.findMany({
         where: { companyId, orderId: { in: [...orderIds] } },
         orderBy: [{ orderId: 'asc' }, { position: 'asc' }],
-        select: { orderId: true, userId: true, workGroupId: true, workGroupName: true },
+        select: { orderId: true, orderLineId: true, userId: true, workGroupId: true, workGroupName: true },
       });
     },
   };

@@ -47,12 +47,13 @@ const BETO = uuid('2');
 const CARLA = uuid('4');
 const DIEGO = uuid('5');
 const PEDIDO = uuid('7');
-const LINEA = 'linea-unica';
+const LINEA = uuid('e');
+const OTRA_LINEA = uuid('f');
 const GRUPO = uuid('8');
 const AHORA = new Date('2026-10-08T12:00:00.000Z');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['acondicionamiento.modificar'] };
-const ENTRADA = { orderId: PEDIDO, userIds: [BETO], workGroupIds: [] as string[] };
+const ENTRADA = { orderId: PEDIDO, lineId: LINEA, userIds: [BETO], workGroupIds: [] as string[] };
 
 function persona(id: string, overrides?: Partial<PersonRef>): PersonRef {
   return { id, displayName: `Persona ${id.slice(0, 1)}`, isActive: true, permissions: [], roleName: 'Operador', ...overrides };
@@ -74,9 +75,13 @@ function montar(opciones: Opciones = {}) {
   const status = opciones.status === undefined ? 'POR_ACONDICIONAR' : opciones.status;
   const people = opciones.people ?? [persona(BETO), persona(CARLA), persona(DIEGO)];
 
-  const findAliveById = vi.fn(async (id: string) => {
+  // El pedido esta PARCIAL a proposito: Comenzar decide por la linea y no lee el pedido.
+  const findAliveById = vi.fn(async (id: string) => ({ id, status: 'PARCIAL', activeLineStatuses: [] }));
+  // Dos recetas del pedido en el mismo estado; `status: null` = ninguna existe para el actor.
+  const findAliveLineSummary = vi.fn(async (_companyId: string, orderId: string, lineId: string) => {
     pasos.push('pedido');
-    return status === null ? null : { id, status };
+    if (status === null || (lineId !== LINEA && lineId !== OTRA_LINEA)) return null;
+    return { id: orderId, lineId, status };
   });
   const findAliveRefsInCompany = vi.fn(async (_companyId: string, ids: readonly string[]) => {
     pasos.push('personas');
@@ -102,21 +107,13 @@ function montar(opciones: Opciones = {}) {
     pasos.push('transaccion');
     return work({
       conditioning: { startConditioningAliveById },
-      team: { insertAll, listByOrderInCompany: vi.fn() },
+      team: { insertAll, listByLineInCompany: vi.fn() },
       log: { append },
     } as unknown as ExecutionWriters);
   });
 
-  // La unica linea del pedido, en el estado del pedido: la que Comenzar opera.
-  const listAliveSummariesByIds = vi.fn(async () => ({
-    items: [{ id: PEDIDO, lineId: LINEA }],
-    total: 1,
-    page: 1,
-    pageSize: 1,
-    totalPages: 1,
-  }));
   const deps: StartConditioningDeps = {
-    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary } as unknown as OrderCatalog,
     people: { findAliveRefsInCompany } as unknown as PeopleDirectory,
     groups: { findSnapshotAliveInCompany } as unknown as WorkGroupDirectory,
     transaction: { run } as ExecutionTransaction,
@@ -126,6 +123,7 @@ function montar(opciones: Opciones = {}) {
     deps,
     pasos,
     findAliveById,
+    findAliveLineSummary,
     findAliveRefsInCompany,
     findSnapshotAliveInCompany,
     startConditioningAliveById,
@@ -201,13 +199,15 @@ describe('startConditioning — la forma de la entrada', () => {
     ['no objeto', 'texto'],
     ['vacia', {}],
     ['solo con orderId', { orderId: PEDIDO }],
-    ['sin userIds', { orderId: PEDIDO, workGroupIds: [GRUPO] }],
-    ['sin workGroupIds', { orderId: PEDIDO, userIds: [BETO] }],
-    ['con las dos listas vacias', { orderId: PEDIDO, userIds: [], workGroupIds: [] }],
-    ['con una persona repetida', { orderId: PEDIDO, userIds: [BETO, BETO], workGroupIds: [] }],
-    ['con un grupo repetido', { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO, GRUPO] }],
-    ['con un id de persona que no es uuid', { orderId: PEDIDO, userIds: ['beto'], workGroupIds: [] }],
-    ['con orderId que no es uuid', { orderId: 'no-es-uuid', userIds: [BETO], workGroupIds: [] }],
+    ['sin lineId (R14)', { orderId: PEDIDO, userIds: [BETO], workGroupIds: [] }],
+    ['con lineId que no es uuid (R14)', { orderId: PEDIDO, lineId: 'linea-unica', userIds: [BETO], workGroupIds: [] }],
+    ['sin userIds', { orderId: PEDIDO, lineId: LINEA, workGroupIds: [GRUPO] }],
+    ['sin workGroupIds', { orderId: PEDIDO, lineId: LINEA, userIds: [BETO] }],
+    ['con las dos listas vacias', { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [] }],
+    ['con una persona repetida', { orderId: PEDIDO, lineId: LINEA, userIds: [BETO, BETO], workGroupIds: [] }],
+    ['con un grupo repetido', { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO, GRUPO] }],
+    ['con un id de persona que no es uuid', { orderId: PEDIDO, lineId: LINEA, userIds: ['beto'], workGroupIds: [] }],
+    ['con orderId que no es uuid', { orderId: 'no-es-uuid', lineId: LINEA, userIds: [BETO], workGroupIds: [] }],
     ['con una clave de mas', { ...ENTRADA, companyId: EMPRESA }],
   ];
 
@@ -222,7 +222,7 @@ describe('startConditioning — la forma de la entrada', () => {
     const { startConditioning } = montar({ groups: { [GRUPO]: { id: GRUPO, name: 'Turno', activeMemberIds: [CARLA] } } });
 
     await expect(
-      startConditioning(ACTOR, { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO] }),
+      startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO] }),
     ).resolves.toBeUndefined();
   });
 });
@@ -233,7 +233,7 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
       groups: { [GRUPO]: { id: GRUPO, name: 'Turno manana', activeMemberIds: [CARLA, BETO] } },
     });
 
-    await startConditioning(ACTOR, { orderId: PEDIDO, userIds: [BETO], workGroupIds: [GRUPO] });
+    await startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [BETO], workGroupIds: [GRUPO] });
 
     expect(pasos[0]).toBe('pedido');
     expect(pasos.slice(1, 3).sort()).toEqual(['grupo', 'personas']);
@@ -250,19 +250,19 @@ describe('startConditioning — el orden auth -> zod -> pedido -> equipo -> tran
       groups: { [GRUPO]: { id: GRUPO, name: 'Turno', activeMemberIds: [CARLA] } },
     });
 
-    await startConditioning(ACTOR, { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO] });
+    await startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO] });
 
     expect(findSnapshotAliveInCompany).toHaveBeenCalledWith(EMPRESA, GRUPO, AHORA);
     expect(findAliveRefsInCompany).toHaveBeenCalledWith(EMPRESA, [CARLA], AHORA);
   });
 
   it('R12: la empresa sale del actor, nunca de la entrada', async () => {
-    const { startConditioning, findAliveById, insertAll } = montar();
+    const { startConditioning, findAliveLineSummary, insertAll } = montar();
     const otro: Actor = { ...ACTOR, companyId: uuid('9') };
 
     await startConditioning(otro, ENTRADA);
 
-    expect(findAliveById).toHaveBeenCalledWith(PEDIDO, uuid('9'));
+    expect(findAliveLineSummary).toHaveBeenCalledWith(uuid('9'), PEDIDO, LINEA);
     expect(insertAll.mock.calls[0]?.[0].every((row) => row.companyId === uuid('9'))).toBe(true);
   });
 
@@ -346,7 +346,7 @@ describe('startConditioning — anota Comenzar en el registro de ejecucion', () 
 
 describe('startConditioning — los errores del pedido van antes que los del equipo (R20)', () => {
   // Una entrada cuyo equipo fallaria si se resolviera: la persona no existe y el grupo tampoco.
-  const EQUIPO_INVALIDO = { orderId: PEDIDO, userIds: [uuid('6')], workGroupIds: [GRUPO] };
+  const EQUIPO_INVALIDO = { orderId: PEDIDO, lineId: LINEA, userIds: [uuid('6')], workGroupIds: [GRUPO] };
 
   it('R20: pedido inexistente, de baja o de otra empresa -> order_not_found sin resolver el equipo ni escribir', async () => {
     const { startConditioning, findAliveRefsInCompany, findSnapshotAliveInCompany, run } = montar({ status: null });
@@ -397,7 +397,7 @@ describe('startConditioning — el propio actor repite Comenzar (R21)', () => {
       montar({ status: 'EN_ACONDICIONAMIENTO', escritura: 'already_mine' });
 
     await expect(
-      startConditioning(ACTOR, { orderId: PEDIDO, userIds: [uuid('6')], workGroupIds: [GRUPO] }),
+      startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [uuid('6')], workGroupIds: [GRUPO] }),
     ).resolves.toBeUndefined();
 
     expect(findAliveRefsInCompany).not.toHaveBeenCalled();
@@ -430,7 +430,7 @@ describe('startConditioning — el equipo invalido rechaza sin escribir (R16, R1
   it('R16: grupo inexistente, de baja o de otra empresa -> work_group_not_found, sin abrir la transaccion', async () => {
     const { startConditioning, run } = montar({ groups: { [GRUPO]: null } });
 
-    const error = await startConditioning(ACTOR, { orderId: PEDIDO, userIds: [BETO], workGroupIds: [GRUPO] }).catch(
+    const error = await startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [BETO], workGroupIds: [GRUPO] }).catch(
       (e: unknown) => e,
     );
 
@@ -442,7 +442,7 @@ describe('startConditioning — el equipo invalido rechaza sin escribir (R16, R1
   it('R16: una suelta invalida gana a un grupo inexistente: primero las personas, despues los grupos', async () => {
     const { startConditioning } = montar({ people: [], groups: { [GRUPO]: null } });
 
-    const error = await startConditioning(ACTOR, { orderId: PEDIDO, userIds: [BETO], workGroupIds: [GRUPO] }).catch(
+    const error = await startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [BETO], workGroupIds: [GRUPO] }).catch(
       (e: unknown) => e,
     );
 
@@ -455,7 +455,7 @@ describe('startConditioning — el equipo invalido rechaza sin escribir (R16, R1
       groups: { [GRUPO]: { id: GRUPO, name: 'Turno', activeMemberIds: [CARLA, DIEGO] } },
     });
 
-    const error = await startConditioning(ACTOR, { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO] }).catch(
+    const error = await startConditioning(ACTOR, { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO] }).catch(
       (e: unknown) => e,
     );
 
@@ -478,5 +478,43 @@ describe('startConditioning — lo que responde la escritura del pedido (R22)', 
     expect(error).toBeInstanceOf(clase);
     expect((error as { code: string }).code).toBe(code);
     expect(insertAll).not.toHaveBeenCalled();
+  });
+});
+
+describe('startConditioning — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  it('R11, R12: con dos recetas POR_ACONDICIONAR del mismo pedido, comienza, guarda el equipo y anota solo la nombrada', async () => {
+    const { startConditioning, startConditioningAliveById, insertAll, append } = montar();
+
+    await startConditioning(ACTOR, { ...ENTRADA, lineId: OTRA_LINEA });
+
+    expect(startConditioningAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_LINEA, EMPRESA, ANA, AHORA);
+    expect(insertAll.mock.calls[0]?.[0].every((row) => row.orderLineId === OTRA_LINEA)).toBe(true);
+    expect(append).toHaveBeenCalledWith(expect.objectContaining({ orderLineId: OTRA_LINEA }));
+  });
+
+  it('R10: con el pedido PARCIAL decide por el estado de la receta; el pedido no se lee', async () => {
+    const { startConditioning, findAliveById, startConditioningAliveById } = montar();
+
+    await startConditioning(ACTOR, ENTRADA);
+
+    expect(findAliveById).not.toHaveBeenCalled();
+    expect(startConditioningAliveById).toHaveBeenCalledTimes(1);
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin resolver el equipo ni escribir', async () => {
+    const { startConditioning, findAliveRefsInCompany, run } = montar();
+
+    await expect(startConditioning(ACTOR, { ...ENTRADA, lineId: uuid('6') })).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(findAliveRefsInCompany).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin acondicionamiento.modificar no lee la receta', async () => {
+    const { startConditioning, findAliveLineSummary } = montar();
+
+    await expect(startConditioning({ ...ACTOR, permissions: ['empaque.modificar'] }, ENTRADA)).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

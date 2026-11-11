@@ -5,7 +5,7 @@ import { requirePermission, type Actor } from './actor';
 import { EvidenceRequiredError, OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 import { assertOrderAcceptsWrites } from './order-state';
 import { stepRequiresEvidence } from './step-evidence';
-import { findOnlyLine } from './only-order-line';
+import { findLine, lineAsTarget, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { OrderAssignmentRepository } from '../ports/order-assignment-repository';
@@ -13,8 +13,7 @@ import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 import type { AssignedOrderSummary, OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
-const recordStepMoveSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const recordStepMoveSchema = orderLineInputSchema.extend({
   direction: z.enum(['advance', 'go_back']),
   stepPosition: z.number().int().min(1).nullable(),
 });
@@ -43,15 +42,15 @@ async function assertLeavingStepHasEvidence(
   const content = await deps.recipes.findExecutionContentById(summary.recipeId, companyId);
   if (!stepRequiresEvidence(content?.steps ?? [], position)) return;
 
-  const rows = await deps.evidence.listByOrder(companyId, orderId, 'manufacturing');
+  const rows = await deps.evidence.listByLine(companyId, orderId, summary.lineId, 'manufacturing');
   if (!rows.some((row) => row.stepPosition === position)) {
     throw new EvidenceRequiredError(`paso ${String(position)} sin evidencia`);
   }
 }
 
 /**
- * Anota un paso adelante o atras, con la posicion del paso al que se llega. Solo sobre un
- * `EN_CURSO`: cualquier otro estado lanza sin escribir.
+ * Anota un paso adelante o atras, con la posicion del paso al que se llega. Solo sobre una linea
+ * `EN_CURSO`: cualquier otro estado de la linea lanza sin escribir.
  *
  * `BLOQUEADO` se rechaza aqui y antes que nada porque `assertOrderAcceptsWrites` lo deja pasar:
  * esa tabla admite asignar responsables a un pedido sin material, no recorrer su receta.
@@ -72,21 +71,18 @@ export function createRecordStepMove(
 
     const parsed = recordStepMoveSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, direction, stepPosition } = parsed.data;
+    const { orderId, lineId, direction, stepPosition } = parsed.data;
 
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
     if (!ids.includes(orderId)) throw new OrderNotFoundError();
 
-    const order = await deps.orders.findAliveById(orderId, actor.companyId);
-    if (order === null) throw new OrderNotFoundError();
-
-    if (order.status !== 'EN_CURSO') {
-      if (order.status === 'BLOQUEADO') throw new OrderBlockedError();
-      assertOrderAcceptsWrites(order);
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    if (summary.status !== 'EN_CURSO') {
+      if (summary.status === 'BLOQUEADO') throw new OrderBlockedError();
+      assertOrderAcceptsWrites(lineAsTarget(summary));
       throw new OrderNotFoundError();
     }
 
-    const summary = await findOnlyLine(deps.orders, actor.companyId, orderId, ['EN_CURSO']);
     // Volver atras nunca se bloquea: corregir un paso anterior siempre se permite.
     if (direction === 'advance' && stepPosition !== null && stepPosition >= 2) {
       await assertLeavingStepHasEvidence(deps, actor.companyId, orderId, summary, stepPosition - 1);

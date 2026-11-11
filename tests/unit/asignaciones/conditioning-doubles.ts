@@ -42,6 +42,16 @@ export const PEDIDO_1 = uuid('5');
 export const PEDIDO_2 = uuid('6');
 export const AHORA = new Date('2026-10-08T10:00:00.000Z');
 
+/** La receta de un pedido en estos dobles: un uuid derivado del del pedido. */
+export function lineaDe(orderId: string): string {
+  return `eeeeeeee${orderId.slice(8)}`;
+}
+
+/** Otra receta del mismo pedido, en el mismo estado y de la misma persona. */
+export function otraLineaDe(orderId: string): string {
+  return `ffffffff${orderId.slice(8)}`;
+}
+
 export const ACONDICIONADOR: Actor = {
   id: ANA,
   companyId: EMPRESA,
@@ -51,7 +61,7 @@ export const ACONDICIONADOR: Actor = {
 export function resumen(id: string, overrides?: Partial<AssignedOrderSummary>): AssignedOrderSummary {
   return {
     id,
-    lineId: `linea-${id}`,
+    lineId: lineaDe(id),
     number: { year: 2026, sequence: 7 },
     recipeId: RECETA,
     quantity: '10.0000',
@@ -124,16 +134,20 @@ export function montar(options?: Opciones) {
     async (_companyId: string, _ids: readonly string[], _statuses: readonly string[], page: number, pageSize?: number) =>
       pagina(items, total, page, pageSize),
   );
+  const findAliveLineSummary = vi.fn(
+    async (_companyId: string, orderId: string, lineId: string) =>
+      items.find((item) => item.id === orderId && item.lineId === lineId) ?? null,
+  );
   const listByOrdersInCompany = vi.fn(async () => options?.rows ?? []);
   const findRefsIncludingDeleted = vi.fn(async () => options?.refs ?? []);
   const findRefsIncludingDeletedInCompany = vi.fn(async () => options?.people ?? []);
   const findRefsPresentations = vi.fn(async () => options?.presentations ?? []);
   const findRefsUnits = vi.fn(async () => options?.units ?? []);
-  const listTeamByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(async () => options?.team ?? []);
+  const listTeamByLineInCompany = vi.fn<ConditioningTeamRepository['listByLineInCompany']>(async () => options?.team ?? []);
   const listOfOrder = vi.fn<FinishedBatchLabels['listOfOrder']>(async () => options?.batches ?? []);
   const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
   const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
-  const listEvidenceByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listEvidenceByLine = vi.fn(async () => options?.fotos ?? []);
   const createSignedReadUrl = vi.fn(async (path: string) => `firmada:${path}`);
 
   const deps = {
@@ -145,16 +159,16 @@ export function montar(options?: Opciones) {
       deleteByWorkGroup: vi.fn(),
       listOrderIdsByUserInCompany: vi.fn(),
     },
-    orders: { listAliveSummariesInCompany, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { listAliveSummariesInCompany, listAliveSummariesByIds, findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
     units: { findRefs: findRefsUnits } as unknown as UnitCatalog,
-    team: { insertAll: vi.fn(), listByOrderInCompany: listTeamByOrderInCompany, listByOrdersInCompany: vi.fn() },
+    team: { insertAll: vi.fn(), listByLineInCompany: listTeamByLineInCompany, listByOrdersInCompany: vi.fn() },
     batches: { listOfOrder },
     conditioningSteps: { findConditioningStepsById },
     log: { listEntriesForOrders },
-    evidence: { listByOrder: listEvidenceByOrder },
+    evidence: { listByLine: listEvidenceByLine },
     storage: { createSignedReadUrl },
     now: () => AHORA,
   } as unknown as GetConditioningOrderDeps;
@@ -163,30 +177,32 @@ export function montar(options?: Opciones) {
     deps,
     listAliveSummariesInCompany,
     listAliveSummariesByIds,
+    findAliveLineSummary,
     listByOrdersInCompany,
     findRefsIncludingDeleted,
     findRefsIncludingDeletedInCompany,
     findRefsPresentations,
     findRefsUnits,
-    listTeamByOrderInCompany,
+    listTeamByLineInCompany,
     listOfOrder,
     findConditioningStepsById,
     listEntriesForOrders,
-    listEvidenceByOrder,
+    listEvidenceByLine,
     createSignedReadUrl,
     todos: [
       findConditioningStepsById,
       listEntriesForOrders,
-      listEvidenceByOrder,
+      listEvidenceByLine,
       createSignedReadUrl,
       listAliveSummariesInCompany,
       listAliveSummariesByIds,
+      findAliveLineSummary,
       listByOrdersInCompany,
       findRefsIncludingDeleted,
       findRefsIncludingDeletedInCompany,
       findRefsPresentations,
       findRefsUnits,
-      listTeamByOrderInCompany,
+      listTeamByLineInCompany,
       listOfOrder,
     ],
   };
@@ -264,10 +280,12 @@ export function anotacionDePaso(
   stepPosition: number,
   responsibleUserIds: readonly string[] | null,
   seq = stepPosition,
+  orderLineId = lineaDe(PEDIDO_1),
 ): ExecutionEntryRecord {
   return {
     id: `anotacion-${String(seq)}`,
     orderId: PEDIDO_1,
+    orderLineId,
     userId: ANA,
     action,
     stepPosition,
@@ -283,6 +301,7 @@ export function fotoDeAcondicionamiento(stepPosition: number, slot = 1): StepEvi
   return {
     id: `foto-${String(stepPosition)}-${String(slot)}`,
     orderId: PEDIDO_1,
+    orderLineId: lineaDe(PEDIDO_1),
     phase: 'conditioning',
     stepPosition,
     slot,
@@ -292,7 +311,8 @@ export function fotoDeAcondicionamiento(stepPosition: number, slot = 1): StepEvi
 
 /**
  * Los puertos de `recordConditioningStep` sobre `PEDIDO_1`, `EN_ACONDICIONAMIENTO` a nombre de Ana
- * por defecto. `pasos` es lo que devuelve el lector de la formula (`null` = receta que no se
+ * por defecto, con dos recetas en el mismo estado: `lineaDe(PEDIDO_1)` y `otraLineaDe(PEDIDO_1)`. El
+ * pedido esta `PARCIAL`: el caso de uso decide por la linea. `pasos` es lo que devuelve el lector de la formula (`null` = receta que no se
  * encuentra); `anotaciones`, el registro del pedido.
  */
 export function montarRegistroDePaso(options?: {
@@ -307,49 +327,52 @@ export function montarRegistroDePaso(options?: {
 }) {
   const status = options?.status ?? 'EN_ACONDICIONAMIENTO';
   const conditionedBy = options?.conditionedBy === undefined ? ANA : options.conditionedBy;
-  const findAliveById = vi.fn<OrderCatalog['findAliveById']>(async () =>
-    options?.target === null ? null : { id: PEDIDO_1, status, activeLineStatuses: [status] },
-  );
-  const listAliveSummariesByIds = vi.fn(
-    async (_companyId: string, _ids: readonly string[], _statuses: readonly string[], page: number, pageSize?: number) =>
-      pagina([resumen(PEDIDO_1, { status, conditionedBy })], 1, page, pageSize),
-  );
+  const findAliveById = vi.fn<OrderCatalog['findAliveById']>(async () => ({
+    id: PEDIDO_1,
+    status: 'PARCIAL',
+    activeLineStatuses: [status],
+  }));
+  const findAliveLineSummary = vi.fn(async (_companyId: string, orderId: string, lineId: string) => {
+    const nombrada = lineId === lineaDe(PEDIDO_1) || lineId === otraLineaDe(PEDIDO_1);
+    if (options?.target === null || orderId !== PEDIDO_1 || !nombrada) return null;
+    return resumen(PEDIDO_1, { lineId, status, conditionedBy });
+  });
   const findConditioningStepsById = vi.fn(async () => (options?.pasos === undefined ? [] : options.pasos));
-  const listByOrderInCompany = vi.fn<ConditioningTeamRepository['listByOrderInCompany']>(
+  const listByLineInCompany = vi.fn<ConditioningTeamRepository['listByLineInCompany']>(
     async () => options?.equipo ?? [],
   );
   const listEntriesForOrders = vi.fn(async () => options?.anotaciones ?? []);
   const append = vi.fn<(entry: NewExecutionEntry) => Promise<ExecutionAppendOutcome>>(
     async () => options?.desenlace ?? 'ok',
   );
-  const listByOrder = vi.fn(async () => options?.fotos ?? []);
+  const listByLine = vi.fn(async () => options?.fotos ?? []);
 
   const deps = {
-    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary } as unknown as OrderCatalog,
     conditioningSteps: { findConditioningStepsById },
-    team: { listByOrderInCompany },
+    team: { listByLineInCompany },
     log: { append, listEntriesForOrders },
-    evidence: { listByOrder },
+    evidence: { listByLine },
     now: () => AHORA,
   } satisfies RecordConditioningStepDeps;
 
   return {
     deps,
     findAliveById,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     findConditioningStepsById,
-    listByOrderInCompany,
+    listByLineInCompany,
     listEntriesForOrders,
     append,
-    listByOrder,
+    listByLine,
     todos: [
       findAliveById,
-      listAliveSummariesByIds,
+      findAliveLineSummary,
       findConditioningStepsById,
-      listByOrderInCompany,
+      listByLineInCompany,
       listEntriesForOrders,
       append,
-      listByOrder,
+      listByLine,
     ],
   };
 }

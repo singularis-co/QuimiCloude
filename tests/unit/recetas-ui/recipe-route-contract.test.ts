@@ -1444,23 +1444,6 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // asistente de lectura. La lista sigue CERRADA.
         'CUSTOMER_CONTACTS_ROUTE',
         'DASHBOARD_ROUTE',
-        // Alta el 2026-09-17: la trae el aviso de entrega de QC-63. NO es una ruta ni una funcion
-        // de ruta: es el NOMBRE DE UN PARAMETRO DE CONSULTA de la lista de pedidos asignados
-        // (`?entregado=<numero>`), que la pantalla de ejecucion pone al volver y la lista lee para
-        // pintar la confirmacion. Verificado antes de darla de alta: no estrena ninguna ruta del
-        // asistente de lectura -no la marca el patron de arriba ni apunta a ninguna URL-, asi que
-        // R12 de QC-64 sigue INTACTA. La lista sigue siendo CERRADA y por igualdad exacta: una
-        // constante mas vuelve a ponerla en rojo.
-        'DELIVERED_ORDER_PARAM',
-        // Altas junto a `DELIVERED_ORDER_PARAM`: los nombres de los
-        // parametros de consulta que la pantalla de ejecucion pone al Finalizar -cuantos envases
-        // enteros de producto terminado y el nombre del producto- y que la confirmacion lee.
-        // Tampoco son rutas ni funciones de ruta ni estrenan ninguna del asistente de lectura -no
-        // las marca el patron de arriba ni apuntan a ninguna URL-, asi que ese contrato sigue
-        // INTACTO. La lista sigue siendo CERRADA y por igualdad exacta: una constante mas vuelve
-        // a ponerla en rojo.
-        'DELIVERED_ORDER_PACKAGES_PARAM',
-        'DELIVERED_ORDER_PRODUCT_PARAM',
         'FORGOT_PASSWORD_ROUTE',
         'FORMULAS_ROUTE',
         // No es una pantalla: redirige al primer enlace del menu efectivo (logo y /login con
@@ -1472,13 +1455,18 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         'LOGIN_ROUTE',
         // No es una pantalla: el destino del login tras un corte de sesion, derivado de LOGIN_ROUTE.
         'LOGIN_ROUTE_SESSION_ENDED',
+        // Los parametros de consulta de las pantallas de una receta y de sus avisos: `receta`,
+        // `fabricado` y `receta_aviso`. No son rutas ni apuntan a ninguna URL del asistente.
+        'MANUFACTURED_ORDER_PARAM',
         'NEW_RECIPE_ROUTE',
         'ORDERS_ROUTE',
         // Alta junto con `packingOrderRoute`: el nombre del parametro de consulta que la pantalla
         // de empaque, dentro de /asignacion, no es un detalle de Pedidos.
         'PACKED_ORDER_PARAM',
         'PRESENTATIONS_ROUTE',
+        'OUTCOME_RECIPE_PARAM',
         'PRIVATE_ROUTE_PREFIXES',
+        'RECIPE_PARAM',
         // No es una ruta: el nombre del parametro de LOGIN_ROUTE_SESSION_ENDED.
         'SESSION_ENDED_PARAM',
         'SUPPLIERS_ROUTE',

@@ -75,7 +75,9 @@ function pagina<T>(items: readonly T[], overrides: Partial<Record<string, number
 
 const QUEUE_ROW: ConditioningOrderRow = {
   id: 'order-a',
+  lineId: 'linea-order-a',
   numberText: '2026-0000040',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '20',
   unitId: null,
@@ -91,7 +93,9 @@ const QUEUE_ROW: ConditioningOrderRow = {
 
 const FINISHED_ROW: FinishedOrderView = {
   id: 'order-c',
+  lineId: 'linea-order-c',
   numberText: '2026-0000041',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [],
@@ -202,7 +206,7 @@ describe('«Terminados» del acondicionador', () => {
     expect(within(tabla).queryByRole('link', { name: '2026-0000041' })).toBeNull();
     await user.click(within(tabla).getByRole('button', { name: 'Acciones del pedido 2026-0000041' }));
     const entrar = await esperarInteractiva(await screen.findByTestId('assignment-row-enter'));
-    expect(entrar).toHaveAttribute('href', '/asignacion/acondicionamiento/order-c');
+    expect(entrar).toHaveAttribute('href', '/asignacion/acondicionamiento/order-c?receta=linea-order-c');
   });
 
   it('R12: vacía dice «Todavía no has terminado ningún acondicionamiento.»', async () => {

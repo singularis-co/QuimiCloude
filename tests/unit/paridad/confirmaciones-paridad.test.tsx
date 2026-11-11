@@ -285,32 +285,23 @@ const PEDIDO: OrderSummary = {
   id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   number: { year: 2026, sequence: 42 },
   numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-  recipeId: RECETA.id,
-  recipeName: RECETA.name,
-  recipeVersion: null,
-  quantity: '25',
   priority: 'ALTA',
   status: 'EN_CURSO',
   cancellationReason: null,
-  ingredientsCost: null,
-  packagingCost: null,
-  actualCost: null,
-  salePrice: null,
   createdAt: new Date('2026-01-15T10:00:00.000Z'),
   updatedAt: new Date('2026-01-15T10:00:00.000Z'),
   createdBy: null,
   updatedBy: null,
-  presentationLines: [],
-  unitId: UNIDAD.id,
-  unitLabel: UNIDAD.symbol,
   pendingDelivery: { kind: 'not_packed' },
   customer: null,
-  recipeImageUrl: null,
 };
 
 const EJECUCION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
@@ -329,7 +320,10 @@ const EMPACADOR_ID = '11111111-1111-4111-8111-111111111111';
 function pedidoDeEmpaque(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [
@@ -568,7 +562,15 @@ const CON_DISPARADOR: readonly DialogoConDisparador[] = [
   },
   {
     nombre: 'cancelar pedido desde asignacion',
-    pintar: () => render(<OrderCancelDialog orderId={PEDIDO.id} stepPosition={2} />),
+    pintar: () => render(
+        <OrderCancelDialog
+          lineId="linea-1"
+          orderId={PEDIDO.id}
+          stepPosition={2}
+          recipeName="Jarabe simple"
+          numberText={PEDIDO.numberText}
+        />,
+      ),
     accion: 'cancelAssignedOrderAction',
     disparador: 'order-cancel-trigger',
     dialogo: 'order-cancel-dialog',
@@ -719,7 +721,7 @@ describe('paridad de confirmaciones — borrar receta (transicion)', () => {
 describe('paridad de confirmaciones — comenzar un pedido asignado (ConfirmActionDialog)', () => {
   it('R1 R12 — abierto: solo el dialogo, en su portal', async () => {
     const { container } = render(
-      <OrderExecutionScreen execution={{ ...EJECUCION, status: 'PENDIENTE' }} />,
+      <OrderExecutionScreen lineId="linea-1" execution={{ ...EJECUCION, status: 'PENDIENTE' }} />,
     );
     fireEvent.click(screen.getByTestId('order-execution-start-button'));
     await screen.findByTestId('order-execution-start-dialog');
@@ -732,7 +734,7 @@ describe('paridad de confirmaciones — finalizar la ejecucion (ConfirmActionDia
     vi.useFakeTimers();
     let contenedor: HTMLElement;
     try {
-      contenedor = render(<OrderExecutionScreen execution={EJECUCION} />).container;
+      contenedor = render(<OrderExecutionScreen lineId="linea-1" execution={EJECUCION} />).container;
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
       });

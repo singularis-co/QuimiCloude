@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/components/shared/error-alert';
 import { Notice } from '@/components/shared/notice';
 import { OrderDistributionLabel } from '@/components/shared/order-distribution-label';
 import { RowActionsMenu } from '@/components/shared/row-actions-menu';
+import { StatusBadge } from '@/components/shared/status-badge';
 import { EvidenceMissingDialog, STEP_EVIDENCE_TEXTS } from '@/components/shared/step-evidence';
 import { StepReader } from '@/components/shared/step-reader';
 import { clampStepPosition } from '@/components/shared/step-reader/step-reader';
@@ -23,11 +24,13 @@ import {
 } from '@/lib/modules/asignaciones/adapters/driving/order-execution-actions';
 import { ASSIGNED_ORDERS_ROUTE } from '@/lib/shared/routes';
 import { exactDecimalTitle, formatDecimalDisplay } from '@/lib/shared/ui/decimal-display';
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TONES } from '@/lib/shared/ui/order-status';
 
 import {
   OperatorScreenFrame,
   STEP_READER_SIDE_COLUMN_RESERVE,
 } from '../../components/operator-screen-frame';
+import { NO_RECIPE_ACCESS, RecipeHeader, type RecipeAccess } from '../../components/recipe-header';
 import { useStepEvidence } from '../../components/use-step-evidence';
 
 import { ORDER_CANCEL_TEXTS, ORDER_CANCEL_TRIGGER_TESTID, OrderCancelDialog } from './order-cancel-dialog';
@@ -52,6 +55,7 @@ export const ORDER_EXECUTION_SCREEN_TESTID = 'order-execution-screen';
 export const ORDER_EXECUTION_FINISH_ERROR_TESTID = 'order-execution-finish-error';
 export const ORDER_EXECUTION_FINISH_FORM_TESTID = 'order-execution-finish-form';
 export const ORDER_EXECUTION_ORDER_ID_FIELD = 'orderId';
+export const ORDER_EXECUTION_LINE_ID_FIELD = 'lineId';
 export const ORDER_EXECUTION_STEP_POSITION_FIELD = 'stepPosition';
 export const ORDER_EXECUTION_TITLE_TESTID = 'order-execution-title';
 export const ORDER_EXECUTION_ACTIONS_TESTID = 'order-execution-actions';
@@ -66,6 +70,7 @@ export const ORDER_EXECUTION_START_DIALOG_TESTID = 'order-execution-start-dialog
 export const ORDER_EXECUTION_START_CONFIRM_TESTID = 'order-execution-start-confirm';
 export const ORDER_EXECUTION_START_ERROR_TESTID = 'order-execution-start-error';
 export const ORDER_EXECUTION_NOT_STARTED_TESTID = 'order-execution-not-started';
+export const ORDER_EXECUTION_STATUS_TESTID = 'order-execution-status';
 
 /** Funcion y no literal, para que un test no pueda comparar contra una copia del texto. */
 export function assignedOrderStartConfirmTexts() {
@@ -86,6 +91,7 @@ export const ORDER_EXECUTION_FINISH_CONFIRM_TEXTS = {
 } as const;
 
 export const ORDER_EXECUTION_TEXTS = {
+  phase: 'Fabricación',
   recipeMissing: 'Esta fórmula está dada de baja.',
   orderQuantity: 'Pedido',
   presentation: 'Presentación:',
@@ -114,14 +120,22 @@ type StepChange = { readonly direction: 'advance' | 'go_back'; readonly position
 export type OrderExecutionScreenProps = {
   /** La de la pagina: `PENDIENTE` sin comenzar o `EN_CURSO` retomado. */
   readonly execution: StartedOrderExecution;
+  /** La receta del pedido que se ejecuta, la de la direccion. */
+  readonly lineId: string;
+  /** A que otras recetas del pedido puede ir la sesion; sin valor, a ninguna. */
+  readonly access?: RecipeAccess;
 };
 
-export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreenProps) {
+export function OrderExecutionScreen({
+  execution: opened,
+  lineId,
+  access = NO_RECIPE_ACCESS,
+}: OrderExecutionScreenProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const startFormRef = useRef<HTMLFormElement>(null);
   const [startConfirmOpen, setStartConfirmOpen] = useState(false);
   const [startState, startFormAction, startPending] = useActionState<StartFormState, FormData>(
-    () => startAssignedOrderAction(opened.orderId),
+    () => startAssignedOrderAction(opened.orderId, lineId),
     START_INITIAL_STATE,
   );
   // Comenzado aqui, la ejecucion es la que devolvio la accion; si no, la que abrio la pagina.
@@ -149,6 +163,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
   const error = state.status === 'error' ? state : undefined;
   const evidence = useStepEvidence({
     orderId: execution.orderId,
+    lineId,
     phase: 'manufacturing',
     steps: execution.steps,
     initial: execution.evidence,
@@ -167,7 +182,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
   function handleStepChange({ direction, position }: StepChange) {
     setStepPosition(position);
     stepMoves.current = stepMoves.current
-      .then(() => recordStepMoveAction({ orderId: execution.orderId, direction, stepPosition: position }))
+      .then(() => recordStepMoveAction({ orderId: execution.orderId, lineId, direction, stepPosition: position }))
       .then(
         () => undefined,
         () => undefined,
@@ -228,24 +243,42 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
         disabled: started,
       }}
       footer={startFooter}
-      eyebrow={execution.numberText}
-      title={execution.recipeName ?? ORDER_EXECUTION_TEXTS.recipeMissing}
-      titleTestId={ORDER_EXECUTION_TITLE_TESTID}
-      subtitle={
-        <>
-          <span
-            data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
-            title={exactDecimalTitle(execution.orderQuantity)}
-          >
-            {ORDER_EXECUTION_TEXTS.orderQuantity} {formatDecimalDisplay(execution.orderQuantity)}
-            {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
-          </span>
-          <span aria-hidden="true">{' · '}</span>
-          <span data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
-            {ORDER_EXECUTION_TEXTS.presentation}{' '}
-            <OrderDistributionLabel lines={execution.presentationLines} />
-          </span>
-        </>
+      heading={
+        <RecipeHeader
+          phase={ORDER_EXECUTION_TEXTS.phase}
+          orderId={execution.orderId}
+          numberText={execution.numberText}
+          recipeName={execution.recipeName}
+          recipeMissingText={ORDER_EXECUTION_TEXTS.recipeMissing}
+          titleTestId={ORDER_EXECUTION_TITLE_TESTID}
+          recipe={execution.recipe}
+          otherRecipes={execution.otherRecipes}
+          access={access}
+          status={
+            <StatusBadge
+              tone={ORDER_STATUS_TONES[execution.status]}
+              label={ORDER_STATUS_LABELS[execution.status]}
+              data-testid={ORDER_EXECUTION_STATUS_TESTID}
+              data-status={execution.status}
+            />
+          }
+          details={
+            <>
+              <span
+                data-testid={ORDER_EXECUTION_ORDER_QUANTITY_TESTID}
+                title={exactDecimalTitle(execution.orderQuantity)}
+              >
+                {ORDER_EXECUTION_TEXTS.orderQuantity} {formatDecimalDisplay(execution.orderQuantity)}
+                {execution.unitLabel === null ? null : ` ${execution.unitLabel}`}
+              </span>
+              <span aria-hidden="true">{' · '}</span>
+              <span data-testid={ORDER_EXECUTION_PRESENTATION_TESTID}>
+                {ORDER_EXECUTION_TEXTS.presentation}{' '}
+                <OrderDistributionLabel lines={execution.presentationLines} />
+              </span>
+            </>
+          }
+        />
       }
       headerActions={
         <RowActionsMenu
@@ -311,7 +344,10 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
 
       <OrderCancelDialog
         orderId={execution.orderId}
+        lineId={lineId}
         stepPosition={stepPosition}
+        recipeName={execution.recipeName}
+        numberText={execution.numberText}
         open={cancelOpen}
         onOpenChange={setCancelOpen}
       />
@@ -322,6 +358,7 @@ export function OrderExecutionScreen({ execution: opened }: OrderExecutionScreen
           name={ORDER_EXECUTION_ORDER_ID_FIELD}
           defaultValue={execution.orderId}
         />
+        <input type="hidden" name={ORDER_EXECUTION_LINE_ID_FIELD} defaultValue={lineId} />
         <input
           type="hidden"
           name={ORDER_EXECUTION_STEP_POSITION_FIELD}

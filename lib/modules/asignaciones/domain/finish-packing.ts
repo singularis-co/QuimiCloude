@@ -1,14 +1,12 @@
 // lib/modules/asignaciones/domain/finish-packing.ts
 /**
- * Terminar: `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finished_at`, solo si el actor es quien tiene
- * el pedido en empaque. Sin comprobacion de asignacion:
- * cualquier actor con `empaque.modificar` puede terminar cualquier pedido vivo de su empresa, y
- * sin ningun puerto de inventario: los envases los consume `pedidos` dentro de Terminar, segun el
- * conteo real por linea que trae la entrada.
+ * Terminar: la receta nombrada pasa `EN_EMPAQUE -> POR_ACONDICIONAR`, sin `finished_at`, solo si el
+ * actor es quien la tiene en empaque. Sin comprobacion de asignacion: cualquier actor con
+ * `empaque.modificar` puede terminar cualquier receta de un pedido vivo de su empresa, y sin ningun
+ * puerto de inventario: los envases los consume `pedidos` dentro de Terminar, segun el conteo real
+ * por linea del reparto que trae la entrada.
  *
- * Devuelve el numero visible del pedido, leido ANTES de la transicion: una vez `POR_ACONDICIONAR`, el
- * filtro de estado con el que se leyo ya no lo encontraria (mismo motivo que
- * `finish-assigned-order.ts`).
+ * Devuelve el numero visible del pedido, leido antes de la transicion.
  */
 import { z } from 'zod';
 
@@ -28,7 +26,8 @@ import {
 } from './errors';
 import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
-import { onlyLineOf } from './only-order-line';
+import { readOutcomeRecipe, type OutcomeRecipe } from './recipe-of-order';
+import { findLine, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -37,27 +36,27 @@ import {
   PACKING_DIFFERENCE_REASONS,
   PACKING_REASON_OTHER_MAX,
   formatOrderNumber,
-  type OrderAssignmentTarget,
   type OrderCatalog,
+  type PackedLineCount,
 } from '@/lib/modules/pedidos';
-import type { RecipePackingStepsReader } from '@/lib/modules/recetas';
+import type { RecipeCatalog, RecipePackingStepsReader } from '@/lib/modules/recetas';
 
-// Aqui solo la forma de cada conteo: que sean justo las lineas del pedido y que el motivo case con
-// la diferencia lo decide `pedidos`, que es quien lee las lineas.
-const packedLineSchema = z.strictObject({
-  lineId: z.string().uuid(),
+// Aqui solo la forma de cada conteo: que sean justo las lineas del reparto y que el motivo case con
+// la diferencia lo decide `pedidos`, que es quien las lee.
+const packedCountSchema = z.strictObject({
+  presentationLineId: z.string().uuid(),
   packedPackages: z.number().int().min(0),
   reason: z.enum(PACKING_DIFFERENCE_REASONS).nullable(),
   reasonOther: z.string().trim().min(1).max(PACKING_REASON_OTHER_MAX).nullable(),
 });
 
-const finishPackingSchema = z.strictObject({
-  orderId: z.string().uuid(),
-  lines: z.array(packedLineSchema).min(1),
+const finishPackingSchema = orderLineInputSchema.extend({
+  counts: z.array(packedCountSchema).min(1),
 });
 
 export type FinishPackingDeps = {
   readonly orders: OrderCatalog;
+  readonly recipes: Pick<RecipeCatalog, 'findRefsIncludingDeleted'>;
   readonly log: ExecutionLogRepository;
   readonly transaction: ExecutionTransaction;
   readonly packingSteps: RecipePackingStepsReader;
@@ -65,7 +64,7 @@ export type FinishPackingDeps = {
   readonly now?: () => Date;
 };
 
-export type FinishPackingResult = {
+export type FinishPackingResult = OutcomeRecipe & {
   readonly numberText: string;
 };
 
@@ -81,34 +80,28 @@ export function createFinishPacking(
 
     const parsed = finishPackingSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, lines } = parsed.data;
+    const { orderId, lineId, counts } = parsed.data;
 
-    const target: OrderAssignmentTarget | null = await deps.orders.findAliveById(orderId, actor.companyId);
-    if (target === null) throw new OrderNotFoundError();
-
-    const summaryPage = await deps.orders.listAliveSummariesByIds(
-      actor.companyId,
-      [orderId],
-      [target.status],
-      1,
-      1,
-    );
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
     const numberText = formatOrderNumber(summary.number);
+    const packed: PackedLineCount[] = counts.map(({ presentationLineId, ...count }) => ({
+      lineId: presentationLineId,
+      ...count,
+    }));
 
     // Solo quien lo tiene en empaque puede tener fotos; cualquier otro caso lo rechaza la
     // transaccion con su error propio.
     if (summary.status === 'EN_EMPAQUE' && summary.packedBy === actor.id) {
       const steps = await deps.packingSteps.findPackingStepsById(summary.recipeId, actor.companyId);
-      await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, 'packing', steps ?? []);
+      await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, summary.lineId, 'packing', steps ?? []);
     }
 
+    const outcomeRecipe = await readOutcomeRecipe(deps, actor.companyId, orderId, summary.recipeId);
     const now = deps.now?.() ?? new Date();
     try {
       await deps.transaction.run(async ({ packing, log }) => {
         // El exito de Terminar es un objeto con los lotes dados de alta, no el literal `'ok'`.
-        const result = await packing.finishPackingAliveById(orderId, summary.lineId, actor.companyId, actor.id, now, lines);
+        const result = await packing.finishPackingAliveById(orderId, summary.lineId, actor.companyId, actor.id, now, packed);
         if (!isExecutionSuccess(result)) throw new ExecutionAbortedError(result);
         await log.append({
           companyId: actor.companyId,
@@ -124,7 +117,7 @@ export function createFinishPacking(
       if (error instanceof ExecutionAbortedError) throw finishPackingError(error.outcome);
       throw error;
     }
-    return { numberText };
+    return { numberText, ...outcomeRecipe };
   };
 }
 

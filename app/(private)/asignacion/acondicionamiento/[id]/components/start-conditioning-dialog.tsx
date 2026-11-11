@@ -33,6 +33,7 @@ export const START_CONDITIONING_FORM_TESTID = 'start-conditioning-form';
 export const START_CONDITIONING_CANCEL_TESTID = 'start-conditioning-cancel';
 export const START_CONDITIONING_ERROR_TESTID = 'start-conditioning-error';
 export const START_CONDITIONING_ORDER_ID_FIELD = 'orderId';
+export const START_CONDITIONING_LINE_ID_FIELD = 'lineId';
 
 export const START_CONDITIONING_TEXTS = {
   title: (orderNumber: string) => `Acondicionar el pedido ${orderNumber}`,
@@ -49,6 +50,7 @@ export type StartConditioningDialogProps = {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly orderId: string;
+  readonly lineId: string;
   readonly orderNumber: string;
   readonly candidates: ConditioningTeamCandidates;
 };
@@ -57,6 +59,7 @@ export function StartConditioningDialog({
   open,
   onOpenChange,
   orderId,
+  lineId,
   orderNumber,
   candidates,
 }: StartConditioningDialogProps) {
@@ -69,6 +72,7 @@ export function StartConditioningDialog({
       >
         <StartConditioningForm
           orderId={orderId}
+          lineId={lineId}
           orderNumber={orderNumber}
           candidates={candidates}
           onStarted={() => onOpenChange(false)}
@@ -80,12 +84,19 @@ export function StartConditioningDialog({
 
 type StartConditioningFormProps = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly orderNumber: string;
   readonly candidates: ConditioningTeamCandidates;
   readonly onStarted: () => void;
 };
 
-function StartConditioningForm({ orderId, orderNumber, candidates, onStarted }: StartConditioningFormProps) {
+function StartConditioningForm({
+  orderId,
+  lineId,
+  orderNumber,
+  candidates,
+  onStarted,
+}: StartConditioningFormProps) {
   const [selection, setSelection] = useState<ConditioningTeamSelection>(EMPTY_CONDITIONING_TEAM_SELECTION);
 
   const [state, formAction, isPending] = useActionState<StartFormState, FormData>(
@@ -106,6 +117,7 @@ function StartConditioningForm({ orderId, orderNumber, candidates, onStarted }: 
       </DialogHeader>
 
       <input type="hidden" name={START_CONDITIONING_ORDER_ID_FIELD} value={orderId} />
+      <input type="hidden" name={START_CONDITIONING_LINE_ID_FIELD} value={lineId} />
 
       <ConditioningTeamPicker
         candidates={candidates}

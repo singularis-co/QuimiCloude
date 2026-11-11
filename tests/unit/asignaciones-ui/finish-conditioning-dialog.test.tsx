@@ -6,6 +6,7 @@ import {
   ConditioningActions,
   FINISH_CONDITIONING_DIALOG_TESTID,
   FINISH_CONDITIONING_ERROR_TESTID,
+  FINISH_CONDITIONING_LINE_ID_FIELD,
   FINISH_CONDITIONING_ORDER_ID_FIELD,
   FINISH_CONDITIONING_TEXTS,
 } from '@/app/(private)/asignacion/acondicionamiento/[id]/components';
@@ -37,7 +38,7 @@ afterEach(() => {
 });
 
 function pintar() {
-  return render(<ConditioningActions orderId={ORDER_ID} orderNumber="2026-0000040" canFinish />);
+  return render(<ConditioningActions lineId="linea-1" orderId={ORDER_ID} orderNumber="2026-0000040" canFinish />);
 }
 
 function abrir(): HTMLElement {
@@ -130,7 +131,7 @@ describe('el modal de Terminar', () => {
     expect(finishConditioningActionMock).not.toHaveBeenCalled();
   });
 
-  it('R27: confirmar envía solo el id del pedido', async () => {
+  it('R27, R11: confirmar envía solo el pedido y la receta', async () => {
     pintar();
     abrir();
 
@@ -138,8 +139,12 @@ describe('el modal de Terminar', () => {
 
     expect(finishConditioningActionMock).toHaveBeenCalledTimes(1);
     const [, formData] = finishConditioningActionMock.mock.calls[0] ?? [];
-    expect([...(formData?.keys() ?? [])]).toEqual([FINISH_CONDITIONING_ORDER_ID_FIELD]);
+    expect([...(formData?.keys() ?? [])]).toEqual([
+      FINISH_CONDITIONING_ORDER_ID_FIELD,
+      FINISH_CONDITIONING_LINE_ID_FIELD,
+    ]);
     expect(formData?.get(FINISH_CONDITIONING_ORDER_ID_FIELD)).toBe(ORDER_ID);
+    expect(formData?.get(FINISH_CONDITIONING_LINE_ID_FIELD)).toBe('linea-1');
   });
 
   it('R28: si la acción falla, el modal sigue abierto con el mensaje en role="alert"', async () => {

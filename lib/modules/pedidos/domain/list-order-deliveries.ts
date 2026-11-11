@@ -2,14 +2,14 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { OrderNotFoundError } from './errors';
-import type { OrderStatus } from './order-classification';
+import type { OrderLineStatus, OrderStatus } from './order-classification';
 import { formatOrderCustomerName } from './order-customer';
 import { formatOrderNumber } from './order-number';
 import type { OrderScope } from './order-scope';
 
 import type { DeliveryHistoryRow, OrderDeliveryHistoryReader } from '../ports/order-delivery-void-repository';
 import type { OrderRepository } from '../ports/order-repository';
-import type { OrderWriteRepository } from '../ports/order-write-repository';
+import type { FinishPackingLine, OrderWriteRepository } from '../ports/order-write-repository';
 
 import type { CustomerCatalog } from '@/lib/modules/clientes';
 import type { PeopleDirectory } from '@/lib/modules/identity';
@@ -19,6 +19,8 @@ export type OrderDeliveryHistoryView = {
   readonly orderId: string;
   readonly numberText: string;
   readonly orderStatus: OrderStatus;
+  /** El de la receta pedida. */
+  readonly lineStatus: OrderLineStatus;
   readonly deliveries: readonly {
     readonly id: string;
     /** ISO */
@@ -139,10 +141,10 @@ function toDeliveryView(row: DeliveryHistoryRow, names: Names): DeliveryView {
 
 async function resolveNames(
   deps: ListOrderDeliveriesDeps,
-  orderId: string,
   rows: readonly DeliveryHistoryRow[],
   now: Date,
   scope: OrderScope,
+  presentationLines: readonly FinishPackingLine[],
 ): Promise<Names> {
   const lines = rows.flatMap((row) => row.lines);
   const customerIds = [...new Set(lines.map((line) => line.customerId))];
@@ -155,17 +157,17 @@ async function resolveNames(
   const batchIds = [...new Set(lines.map((line) => line.batchId))];
 
   const [presentationByLine, customerNames, people, lots] = await Promise.all([
-    deps.lines.findPresentationLinesForFinish(orderId, scope).then(async (orderLines) => {
-      const presentationIds = [...new Set(orderLines.map((line) => line.presentationId))];
+    (async () => {
+      const presentationIds = [...new Set(presentationLines.map((line) => line.presentationId))];
       const refs = await deps.presentations.findRefs(presentationIds, scope.companyId);
       const nameById = new Map(refs.map((ref) => [ref.id, ref.name]));
       const byLine = new Map<string, string>();
-      for (const line of orderLines) {
+      for (const line of presentationLines) {
         const name = nameById.get(line.presentationId);
         if (name !== undefined) byLine.set(line.id, name);
       }
       return byLine;
-    }),
+    })(),
     deps.customerCatalog
       .findRefsIncludingDeleted(customerIds, scope.companyId)
       .then((refs) => new Map(refs.map((ref) => [ref.id, formatOrderCustomerName(ref)]))),
@@ -177,26 +179,56 @@ async function resolveNames(
   return { presentationByLine, customerNames, people, lots };
 }
 
+/** Lo entregado de una receta del pedido. */
+export type ListOrderDeliveries = (
+  orderId: string,
+  lineId: string,
+  actor: Actor | null | undefined,
+) => Promise<OrderDeliveryHistoryView>;
+
+/** Deja en cada entrega solo las lineas de esas presentaciones y quita las que se quedan sin ninguna. */
+function onlyPresentationLines(
+  rows: readonly DeliveryHistoryRow[],
+  presentationLineIds: ReadonlySet<string>,
+): readonly DeliveryHistoryRow[] {
+  return rows
+    .map((row) => ({ ...row, lines: row.lines.filter((line) => presentationLineIds.has(line.presentationLineId)) }))
+    .filter((row) => row.lines.length > 0);
+}
+
 /** Las entregas de un pedido, por cliente, con lo anulado de cada una. */
-export function createListOrderDeliveries(
-  deps: ListOrderDeliveriesDeps,
-): (orderId: string, actor: Actor | null | undefined) => Promise<OrderDeliveryHistoryView> {
+export function createListOrderDeliveries(deps: ListOrderDeliveriesDeps): ListOrderDeliveries {
   const now = deps.now ?? (() => new Date());
 
-  return async function listOrderDeliveries(orderId, actor) {
+  return async function listOrderDeliveries(orderId, lineId, actor) {
     requirePermission(actor, 'pedidos.consultar');
 
     if (!orderIdSchema.safeParse(orderId).success) throw new OrderNotFoundError();
+    if (!orderIdSchema.safeParse(lineId).success) throw new OrderNotFoundError();
     const scope: OrderScope = { companyId: actor.companyId };
 
     const order = await deps.orders.findAliveById(orderId, scope);
     if (order === null) throw new OrderNotFoundError();
 
-    const rows = await deps.history.listByOrder(orderId, scope);
-    const header = { orderId: order.id, numberText: formatOrderNumber(order.number), orderStatus: order.status };
+    // `findAliveLines` ya deja fuera las quitadas y las de otro pedido o empresa.
+    const line = (await deps.orders.findAliveLines(orderId, scope)).find((candidate) => candidate.id === lineId);
+    if (line === undefined) throw new OrderNotFoundError();
+
+    const allRows = await deps.history.listByOrder(orderId, scope);
+    const header = {
+      orderId: order.id,
+      numberText: formatOrderNumber(order.number),
+      orderStatus: order.status,
+      lineStatus: line.status,
+    };
+    if (allRows.length === 0) return { ...header, deliveries: [] };
+
+    const presentationLines = await deps.lines.findPresentationLinesForFinish(orderId, scope);
+    const ofLine = new Set(presentationLines.filter((row) => row.orderLineId === lineId).map((row) => row.id));
+    const rows = onlyPresentationLines(allRows, ofLine);
     if (rows.length === 0) return { ...header, deliveries: [] };
 
-    const names = await resolveNames(deps, orderId, rows, now(), scope);
+    const names = await resolveNames(deps, rows, now(), scope, presentationLines);
     return { ...header, deliveries: rows.map((row) => toDeliveryView(row, names)) };
   };
 }

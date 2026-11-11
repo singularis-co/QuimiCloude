@@ -36,8 +36,8 @@ import {
   addPackagingLine,
   openOrderRowMenu,
   orderMenuTrigger,
-  submitOrderWithLeftover,
 } from './helpers/order-distribution';
+import { applyOrderLine, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
@@ -95,7 +95,6 @@ const DELETE_DIALOG = 'delete-order-dialog';
 const DELETE_ID_FIELD = 'delete-order-id';
 const DELETE_CONFIRM = 'delete-order-confirm';
 const DELETE_ERROR = 'delete-order-error';
-const CREATE_OPEN = 'order-create-open';
 const ORDER_FORM = 'order-form';
 const RECIPE_PICKER = 'recipe-picker';
 const RECIPE_PICKER_OPTION = 'recipe-picker-option';
@@ -495,25 +494,26 @@ test.describe('aislamiento por empresa de pedidos', () => {
     });
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId(CREATE_OPEN).first().click();
-    await expect(page.getByTestId(ORDER_FORM)).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta se escribe en su sub-panel, abierto con «Añadir receta» desde el panel.
+    const form = await openCreateOrderPanel(page);
+    const sheet = await openAddOrderLine(page, form);
 
-    const picker = page.getByTestId(RECIPE_PICKER);
+    const picker = sheet.getByTestId(RECIPE_PICKER);
     await picker.click();
     await picker.fill(RECIPE_NAME);
     const recipeOption = page.getByTestId(RECIPE_PICKER_OPTION).filter({ hasText: RECIPE_NAME });
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
-    await expect(page.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(recipeId);
+    await expect(sheet.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(recipeId);
 
-    await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
-    await page.getByTestId(ORDER_FORM).getByTestId(UNIT_SELECT).click();
+    await sheet.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
+    await sheet.getByTestId(UNIT_SELECT).click();
     await page.locator(`[data-testid="${UNIT_OPTION}"][data-value="${unitId}"]`).click();
 
-    const distribution = page.getByTestId(DISTRIBUTION_FIELD);
+    const distribution = sheet.getByTestId(DISTRIBUTION_FIELD);
     await addPackagingLine(
       page,
-      page.getByTestId(ORDER_FORM),
+      sheet,
       { productId: packagingId!, name: PACKAGING_NAME },
       ORDER_PACKAGES,
     );
@@ -523,8 +523,9 @@ test.describe('aislamiento por empresa de pedidos', () => {
       { timeout: 60_000 },
     );
 
-    // 7.25 en un envase de 1: queda sobrante y Guardar pregunta antes.
-    await submitOrderWithLeftover(page, page.getByTestId(ORDER_FORM));
+    // 7.25 en un envase de 1: queda sobrante y, con QT-314, «Aplicar» pregunta antes.
+    await applyOrderLine(page, sheet, { leftover: true });
+    await saveOrder(page, form);
     await expect(page.getByTestId(ORDER_FORM)).toHaveCount(0, { timeout: 60_000 });
 
     const createdInA = await prisma.order.findMany({

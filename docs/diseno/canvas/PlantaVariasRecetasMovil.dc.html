@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Planta con varias recetas en teléfono</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="qc" style="width: 960px; height: 1300px; padding: 30px; display: flex; gap: 40px; align-items: flex-start">
+  <div class="dev"><span class="dev-cap">Teléfono · 390 × 844</span><div class="frame-phone"><div class="frame-in"><dc-import name="PlantaVariasRecetas" hint-size="100%,100%"></dc-import></div></div></div>
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 30px">
+    <h2 class="h2">Planta con varias recetas · ficha (QT-315)</h2>
+    <dl class="spec">
+      <dt>Reutiliza</dt><dd>Las pantallas de hoy, sin cambios en su cuerpo: <span class="mono">Asignacion</span>, <span class="mono">Ejecucion</span>, <span class="mono">Empaque</span>, <span class="mono">Acondicionamiento</span>, <span class="mono">Dashboard</span> y <span class="mono">Recorrido</span>. Piezas: <span class="mono">shared/data-table · status-badge · priority-mark · responsible-avatars · confirm-dialog · ui/sonner</span>. La barra de avance «N de M» es la de QT-314 (<span class="mono">order-progress</span>).</dd>
+      <dt>Nuevo</dt><dd>«Receta N de M» bajo el nombre de la receta en las listas · cabecera de receta en ejecución, empaque y acondicionamiento, con las otras recetas del pedido y «Ir a esta receta» · «Cancelar esta receta» · el Recorrido con una sección por receta.</dd>
+      <dt>Librerías</dt><dd>Ninguna nueva.</dd>
+      <dt>Escritorio</dt><dd><b>Listas de Asignación:</b> una fila por receta, con el estado de la receta, y «Entrar» lleva a la pantalla de esa receta. <b>Pantalla de una receta:</b> la cabecera nombra la fase, el pedido y «Receta N de M», y lista las otras recetas del pedido con su estado. <b>Dashboard:</b> una fila por pedido, con «primera receta +N más», el avance y las presentaciones agrupadas por receta. <b>Recorrido:</b> resumen del pedido (estado, avance, duración) y, debajo, una sección por receta con su línea de tiempo.</dd>
+      <dt>Estados</dt><dd>Un pedido de una sola receta se ve como hoy, sin «Receta 1 de 1» · receta cancelada: sale en el Recorrido con su estado y no tiene «Ir a esta receta» · receta terminada: tampoco se puede entrar desde otra receta · ruta con una receta ajena o quitada: «pedido no encontrado», como hoy · lista vacía: el mensaje de hoy, por vista.</dd>
+      <dt>Tablet</dt><dd>Barra lateral en modo icono · las tablas se desplazan en horizontal dentro de su caja.</dd>
+      <dt>Teléfono</dt><dd>Las listas pasan a tarjetas con «Receta N de M» y «Entrar» de 44 px · la cabecera de receta se apila · el Recorrido muestra las secciones una debajo de otra.</dd>
+      <dt>Animación</dt><dd>La de hoy: entrada escalonada, la línea de tiempo con su retardo por evento, el diálogo con zoom y el toast.</dd>
+      <dt>Por confirmar</dt><dd>Nada: las decisiones están en <span class="mono">specs/QT-315-planta-con-varias-recetas/requirements.md</span>.</dd>
+    </dl>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

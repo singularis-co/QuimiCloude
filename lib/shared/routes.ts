@@ -234,43 +234,45 @@ export const FORGOT_PASSWORD_ROUTE = '/recuperar-contrasena';
  */
 export const ASSIGNED_ORDERS_ROUTE = '/asignacion';
 
-/**
- * Hoy responde 404: la pantalla de detalle todavia no existe.
- *
- * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la guardia y el middleware comparan por
- * segmentos, asi que la de `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/<id>`.
- */
-export function assignedOrderRoute(id: string): string {
-  return `${ASSIGNED_ORDERS_ROUTE}/${id}`;
+/** Parametro de consulta de las pantallas de una receta: `?receta=<lineId>`. */
+export const RECIPE_PARAM = 'receta';
+
+function withRecipe(path: string, lineId: string): string {
+  return `${path}?${new URLSearchParams({ [RECIPE_PARAM]: lineId }).toString()}`;
 }
 
 /**
- * Nombre del parametro de consulta con el que la lista de pedidos asignados anuncia que uno
- * acaba de entregarse: la pantalla de ejecucion vuelve a `ASSIGNED_ORDERS_ROUTE` con
- * `?entregado=<numero>` y la lista pinta la confirmacion al aterrizar.
+ * La ejecucion de una receta del pedido. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la
+ * guardia y el middleware comparan por segmentos, asi que la de `ASSIGNED_ORDERS_ROUTE` ya cubre
+ * `/asignacion/<id>`.
  */
-export const DELIVERED_ORDER_PARAM = 'entregado';
-
-/**
- * Junto a `DELIVERED_ORDER_PARAM`, cuantos envases enteros de producto terminado
- * entraron y el nombre del producto que los recibio: `?entregado=<numero>&entregado_envases=
- * <n>&entregado_producto=<nombre>`.
- */
-export const DELIVERED_ORDER_PACKAGES_PARAM = 'entregado_envases';
-export const DELIVERED_ORDER_PRODUCT_PARAM = 'entregado_producto';
-
-/**
- * Pantalla del pedido de empaque, derivada de `ASSIGNED_ORDERS_ROUTE` como `assignedOrderRoute`.
- * No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la comparacion por segmentos de
- * `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/empaque/<id>`.
- */
-export function packingOrderRoute(id: string): string {
-  return `${ASSIGNED_ORDERS_ROUTE}/empaque/${id}`;
+export function assignedOrderRoute(orderId: string, lineId: string): string {
+  return withRecipe(`${ASSIGNED_ORDERS_ROUTE}/${orderId}`, lineId);
 }
 
-/** Detalle del pedido para quien acondiciona; como `packingOrderRoute`, sin fila propia. */
-export function conditioningOrderRoute(id: string): string {
-  return `${ASSIGNED_ORDERS_ROUTE}/acondicionamiento/${id}`;
+/**
+ * Con `?fabricado=<numero>`, la lista de pedidos asignados anuncia que una receta acaba de
+ * terminar de fabricarse y queda por empacar.
+ */
+export const MANUFACTURED_ORDER_PARAM = 'fabricado';
+
+/**
+ * Junto a cualquiera de los avisos de vuelta a la lista, el nombre de la receta. Solo se escribe
+ * si el pedido tiene mas de una receta viva.
+ */
+export const OUTCOME_RECIPE_PARAM = 'receta_aviso';
+
+/**
+ * El empaque de una receta del pedido. No necesita fila propia en `PRIVATE_ROUTE_PREFIXES`: la
+ * comparacion por segmentos de `ASSIGNED_ORDERS_ROUTE` ya cubre `/asignacion/empaque/<id>`.
+ */
+export function packingOrderRoute(orderId: string, lineId: string): string {
+  return withRecipe(`${ASSIGNED_ORDERS_ROUTE}/empaque/${orderId}`, lineId);
+}
+
+/** El acondicionamiento de una receta del pedido; como `packingOrderRoute`, sin fila propia. */
+export function conditioningOrderRoute(orderId: string, lineId: string): string {
+  return withRecipe(`${ASSIGNED_ORDERS_ROUTE}/acondicionamiento/${orderId}`, lineId);
 }
 
 /** Ya cae bajo el prefijo privado de `DASHBOARD_ROUTE`: la comparacion es por segmentos. */
@@ -279,10 +281,8 @@ export function executionTraceRoute(orderId: string): string {
 }
 
 /**
- * Nombre del parametro de consulta con el que Terminar anuncia, al volver a la pestaña «Por
- * empacar», que un pedido acaba de quedar `ENTREGADO`: `?vista=por_empacar&empacado=<numero>`.
- * Mismo patron que `DELIVERED_ORDER_PARAM`, con su propio nombre porque son dos confirmaciones
- * en dos pestañas distintas.
+ * Con `?vista=por_empacar&empacado=<numero>`, Terminar el empaque anuncia al volver a «Por empacar»
+ * que una receta acaba de quedar `POR_ACONDICIONAR`.
  */
 export const PACKED_ORDER_PARAM = 'empacado';
 

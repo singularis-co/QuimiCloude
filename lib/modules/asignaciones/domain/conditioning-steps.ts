@@ -31,6 +31,18 @@ export function conditioningProgress(
   return { completedCount: Math.min(completed, Math.max(0, stepsCount)), responsibles };
 }
 
+/** El avance de UNA linea del pedido: las anotaciones de las otras lineas no cuentan. */
+export function lineConditioningProgress(
+  entries: readonly ExecutionEntryRecord[],
+  orderLineId: string,
+  stepsCount: number,
+): ConditioningProgress {
+  return conditioningProgress(
+    entries.filter((entry) => entry.orderLineId === orderLineId),
+    stepsCount,
+  );
+}
+
 export function sameResponsibles(a: readonly string[], b: readonly string[]): boolean {
   const left = new Set(a);
   const right = new Set(b);

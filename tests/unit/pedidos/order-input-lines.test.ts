@@ -1,13 +1,14 @@
 // QT-313 T6 — Los esquemas de entrada del pedido con lineas.
+// QT-314 T13 (R40) — con sus nombres finales: los esquemas planos de una receta ya no existen.
 
 import { describe, expect, it } from 'vitest'
 
 import {
   cancelOrderLineSchema,
-  createOrderWithLinesSchema,
+  createOrderSchema,
   orderLineInputSchema,
-  updateOrderLineDistributionSchema,
-  updateOrderWithLinesSchema,
+  updateOrderDistributionSchema,
+  updateOrderSchema,
 } from '@/lib/modules/pedidos/domain/order-input'
 
 const RECETA_X = '22222222-2222-4222-8222-222222222222'
@@ -26,15 +27,15 @@ function pedido(lines: unknown[], overrides: Record<string, unknown> = {}): Reco
   return { lines, ...overrides }
 }
 
-describe('createOrderWithLinesSchema y updateOrderWithLinesSchema', () => {
+describe('createOrderSchema y updateOrderSchema', () => {
   it('R3: sin lineas se rechaza', () => {
-    expect(createOrderWithLinesSchema.safeParse(pedido([])).success).toBe(false)
-    expect(updateOrderWithLinesSchema.safeParse(pedido([])).success).toBe(false)
-    expect(createOrderWithLinesSchema.safeParse({}).success).toBe(false)
+    expect(createOrderSchema.safeParse(pedido([])).success).toBe(false)
+    expect(updateOrderSchema.safeParse(pedido([])).success).toBe(false)
+    expect(createOrderSchema.safeParse({}).success).toBe(false)
   })
 
   it('R3: con una o varias lineas se admite y aplica los defectos del pedido', () => {
-    const parsed = createOrderWithLinesSchema.parse(pedido([linea(), linea({ recipeId: RECETA_Y })]))
+    const parsed = createOrderSchema.parse(pedido([linea(), linea({ recipeId: RECETA_Y })]))
     expect(parsed.lines).toHaveLength(2)
     expect(parsed.priority).toBe('BAJA')
     expect(parsed.customerId).toBeNull()
@@ -43,33 +44,33 @@ describe('createOrderWithLinesSchema y updateOrderWithLinesSchema', () => {
   })
 
   it('R3: una linea en el alta no trae id', () => {
-    expect(createOrderWithLinesSchema.safeParse(pedido([linea({ id: LINEA_A })])).success).toBe(false)
+    expect(createOrderSchema.safeParse(pedido([linea({ id: LINEA_A })])).success).toBe(false)
   })
 
   it('R20: en la edicion una linea con id es la edicion de esa linea y sin id es nueva', () => {
-    const parsed = updateOrderWithLinesSchema.parse(pedido([linea({ id: LINEA_A }), linea({ recipeId: RECETA_Y })]))
+    const parsed = updateOrderSchema.parse(pedido([linea({ id: LINEA_A }), linea({ recipeId: RECETA_Y })]))
     expect(parsed.lines[0]?.id).toBe(LINEA_A)
     expect(parsed.lines[1]?.id).toBeUndefined()
   })
 
   it('R20: el mismo id dos veces en la edicion se rechaza', () => {
     expect(
-      updateOrderWithLinesSchema.safeParse(pedido([linea({ id: LINEA_A }), linea({ id: LINEA_A })])).success,
+      updateOrderSchema.safeParse(pedido([linea({ id: LINEA_A }), linea({ id: LINEA_A })])).success,
     ).toBe(false)
   })
 
   it('R20: un id sin forma de UUID se rechaza', () => {
-    expect(updateOrderWithLinesSchema.safeParse(pedido([linea({ id: 'no-uuid' })])).success).toBe(false)
+    expect(updateOrderSchema.safeParse(pedido([linea({ id: 'no-uuid' })])).success).toBe(false)
   })
 
   it('R42: prioridad y cliente son del pedido', () => {
-    const parsed = createOrderWithLinesSchema.parse(pedido([linea()], { priority: 'ALTA', customerId: CLIENTE }))
+    const parsed = createOrderSchema.parse(pedido([linea()], { priority: 'ALTA', customerId: CLIENTE }))
     expect(parsed.priority).toBe('ALTA')
     expect(parsed.customerId).toBe(CLIENTE)
   })
 
   it('R42: prioridad y cliente dentro de una linea se descartan', () => {
-    const parsed = createOrderWithLinesSchema.parse(
+    const parsed = createOrderSchema.parse(
       pedido([linea({ priority: 'CRITICA', customerId: CLIENTE })]),
     )
     expect(parsed.lines[0]).not.toHaveProperty('priority')
@@ -98,7 +99,7 @@ describe('orderLineInputSchema', () => {
   })
 
   it('R15: cada linea lleva su propio precio', () => {
-    const parsed = createOrderWithLinesSchema.parse(
+    const parsed = createOrderSchema.parse(
       pedido([linea({ salePrice: '10' }), linea({ recipeId: RECETA_Y })]),
     )
     expect(parsed.lines.map((line) => line.salePrice)).toEqual(['10', null])
@@ -106,7 +107,7 @@ describe('orderLineInputSchema', () => {
 
   it('R15: un precio invalido en una linea rechaza el pedido entero', () => {
     expect(
-      createOrderWithLinesSchema.safeParse(pedido([linea(), linea({ recipeId: RECETA_Y, salePrice: '-3' })]))
+      createOrderSchema.safeParse(pedido([linea(), linea({ recipeId: RECETA_Y, salePrice: '-3' })]))
         .success,
     ).toBe(false)
   })
@@ -120,7 +121,7 @@ describe('orderLineInputSchema', () => {
   })
 })
 
-describe('cancelOrderLineSchema y updateOrderLineDistributionSchema', () => {
+describe('cancelOrderLineSchema y updateOrderDistributionSchema', () => {
   it('R27: el motivo de cancelar una linea tiene las reglas del de cancelar el pedido', () => {
     expect(cancelOrderLineSchema.parse({ reason: '  sin material  ' }).reason).toBe('sin material')
     expect(cancelOrderLineSchema.safeParse({ reason: '   ' }).success).toBe(false)
@@ -129,8 +130,27 @@ describe('cancelOrderLineSchema y updateOrderLineDistributionSchema', () => {
 
   it('R26: la edicion acotada del reparto nombra la linea y rechaza claves de mas', () => {
     const valida = { lineId: LINEA_A, unitId: UNIDAD, presentationLines: [{ packagingProductId: ENVASE, packages: 2 }] }
-    expect(updateOrderLineDistributionSchema.parse(valida).lineId).toBe(LINEA_A)
-    expect(updateOrderLineDistributionSchema.safeParse({ ...valida, lineId: undefined }).success).toBe(false)
-    expect(updateOrderLineDistributionSchema.safeParse({ ...valida, quantity: '3' }).success).toBe(false)
+    expect(updateOrderDistributionSchema.parse(valida).lineId).toBe(LINEA_A)
+    expect(updateOrderDistributionSchema.safeParse({ ...valida, lineId: undefined }).success).toBe(false)
+    expect(updateOrderDistributionSchema.safeParse({ ...valida, quantity: '3' }).success).toBe(false)
+  })
+})
+
+describe('QT-314 R40 — el contrato publica los esquemas con sus nombres finales', () => {
+  it('R40: createOrderSchema y updateOrderSchema son un pedido con lines; updateOrderDistributionSchema lleva lineId', async () => {
+    const contrato: Record<string, unknown> = await import('@/lib/modules/pedidos')
+    expect(contrato.createOrderSchema).toBe(createOrderSchema)
+    expect(contrato.updateOrderSchema).toBe(updateOrderSchema)
+    expect(contrato.cancelOrderLineSchema).toBe(cancelOrderLineSchema)
+    expect(contrato.updateOrderDistributionSchema).toBe(updateOrderDistributionSchema)
+    expect(contrato.orderLineInputSchema).toBe(orderLineInputSchema)
+    expect(Object.keys(createOrderSchema.shape).sort()).toEqual(['confirmBlocked', 'customerId', 'lines', 'priority'])
+    expect(Object.keys(updateOrderSchema.shape).sort()).toEqual(['confirmBlocked', 'customerId', 'lines', 'priority'])
+    expect(Object.keys(updateOrderDistributionSchema.shape)).toContain('lineId')
+  })
+
+  it('R40: una receta suelta, sin lines, ya no es un pedido valido', () => {
+    expect(createOrderSchema.safeParse(linea()).success).toBe(false)
+    expect(updateOrderSchema.safeParse(linea()).success).toBe(false)
   })
 })

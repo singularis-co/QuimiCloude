@@ -136,7 +136,7 @@ type LineState = {
   readonly reasonOther: string;
 };
 
-/** Lo que viaja en el campo `lines` del formulario. */
+/** El conteo de cada linea del reparto; la pantalla lo envia en el campo `counts`. */
 export type PackingFinishSubmission = readonly PackedLineCount[];
 
 export type PackingFinishDialogTestIds = {

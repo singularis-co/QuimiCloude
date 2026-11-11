@@ -19,32 +19,46 @@ async function withPackagingNames(
   companyId: string,
   page: Page<OrderSummaryRecord>,
 ): Promise<Page<AssignedOrderSummary>> {
+  return { ...page, items: await itemsWithPackagingNames(packaging, companyId, page.items) };
+}
+
+async function itemsWithPackagingNames(
+  packaging: PackagingCatalog,
+  companyId: string,
+  items: readonly OrderSummaryRecord[],
+): Promise<AssignedOrderSummary[]> {
   const packagingIds = [
     ...new Set(
-      page.items.flatMap((item) =>
+      items.flatMap((item) =>
         item.presentationLines.flatMap((line) => (line.packagingProductId === null ? [] : [line.packagingProductId])),
       ),
     ),
   ];
   const info = await findPackagingInfo(packaging, packagingIds, companyId);
-  return {
-    ...page,
-    items: page.items.map((item) => ({
-      ...item,
-      presentationLines: item.presentationLines.map((line) => {
-        const packagingInfo = line.packagingProductId === null ? undefined : info.get(line.packagingProductId);
-        return {
-          id: line.id,
-          presentationId: line.presentationId,
-          packages: line.packages,
-          packedPackages: line.packedPackages,
-          presentationContent: line.presentationContent,
-          packagingProductId: line.packagingProductId,
-          packagingName: packagingInfo?.name ?? null,
-          packagingImageUrl: packagingInfo?.imageUrl ?? null,
-        };
-      }),
-    })),
+  return items.map((item) => ({
+    ...item,
+    presentationLines: item.presentationLines.map((line) => {
+      const packagingInfo = line.packagingProductId === null ? undefined : info.get(line.packagingProductId);
+      return {
+        id: line.id,
+        presentationId: line.presentationId,
+        packages: line.packages,
+        packedPackages: line.packedPackages,
+        presentationContent: line.presentationContent,
+        packagingProductId: line.packagingProductId,
+        packagingName: packagingInfo?.name ?? null,
+        packagingImageUrl: packagingInfo?.imageUrl ?? null,
+      };
+    }),
+  }));
+}
+
+export function createFindAliveLineSummary(deps: ListOrderSummariesDeps): OrderCatalog['findAliveLineSummary'] {
+  return async (companyId, orderId, lineId) => {
+    const record = await deps.summaries.findAliveLine(companyId, orderId, lineId);
+    if (record === null) return null;
+    const [summary] = await itemsWithPackagingNames(deps.packaging, companyId, [record]);
+    return summary ?? null;
   };
 }
 

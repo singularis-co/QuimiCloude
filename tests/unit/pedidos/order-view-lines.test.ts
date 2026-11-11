@@ -87,24 +87,39 @@ function linea(orderId: string, datos: LineaParcial): OrderLineRow {
   }
 }
 
-function dobles(filas: readonly SingleRecipeOrderRow[], lineas: readonly OrderLineRow[]) {
+type Unidad = { readonly id: string; readonly name: string; readonly symbol: string | null }
+
+function dobles(
+  filas: readonly SingleRecipeOrderRow[],
+  lineas: readonly OrderLineRow[],
+  recetas: readonly RecipeRef[] = RECETAS,
+  unidades: readonly Unidad[] = [],
+) {
   const findAliveById = vi.fn(async (id: string) => filas.find((row) => row.id === id) ?? null)
   const findAliveLines = vi.fn(async (orderId: string) => lineas.filter((line) => line.orderId === orderId))
   const findAliveLinesByOrderIds = vi.fn(async (orderIds: readonly string[]) =>
     lineas.filter((line) => orderIds.includes(line.orderId)),
   )
   const listAlive = vi.fn(async () => ({ items: filas, total: filas.length, page: 1, pageSize: 10, totalPages: 1 }))
-  const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) => RECETAS.filter((ref) => ids.includes(ref.id)))
+  const findRefsIncludingDeleted = vi.fn(async (ids: readonly string[]) => recetas.filter((ref) => ids.includes(ref.id)))
+  const findPresentationRefs = vi.fn(async () => [])
+  const findUnitRefs = vi.fn(async (ids: readonly string[]) =>
+    unidades
+      .filter((unit) => ids.includes(unit.id))
+      .map((unit) => ({ ...unit, baseUnitId: null, factor: null })),
+  )
   return {
     findAliveLines,
     findAliveLinesByOrderIds,
     findRefsIncludingDeleted,
+    findPresentationRefs,
+    findUnitRefs,
     deps: {
       orders: { findAliveById, findAliveLines, findAliveLinesByOrderIds, listAlive } as unknown as OrderRepository,
       recipes: { findRefsIncludingDeleted, findIdsMatchingName: vi.fn(async () => null) } as unknown as RecipeCatalog,
-      presentations: { findRefs: vi.fn(async () => []) } as unknown as PresentationCatalog,
+      presentations: { findRefs: findPresentationRefs } as unknown as PresentationCatalog,
       packaging: fakePackagingCatalog(),
-      units: { findRefs: vi.fn(async () => []) } as unknown as UnitCatalog,
+      units: { findRefs: findUnitRefs } as unknown as UnitCatalog,
       customerCatalog: fakeCustomerCatalog(),
       deliveryProgress: fakeDeliveryProgress(),
       log: { ignoredFields: vi.fn() },
@@ -113,6 +128,168 @@ function dobles(filas: readonly SingleRecipeOrderRow[], lineas: readonly OrderLi
 }
 
 const CONSULTA = { page: 1, sort: null, filters: {}, search: '' }
+
+// Un pedido de dos recetas: una original y una version de otra, con unidades distintas.
+const JABON_LAVANDA = '77777777-7777-4777-8777-777777777777'
+const KG = '88888888-8888-4888-8888-888888888888'
+const LITRO = '99999999-9999-4999-8999-999999999999'
+const IMAGEN_CREMA = 'https://cdn.test/crema.png'
+const IMAGEN_JABON = 'https://cdn.test/jabon.png'
+
+const RECETAS_CON_VERSION: readonly RecipeRef[] = [
+  { ...receta(CREMA, 'Crema base'), imageUrl: IMAGEN_CREMA },
+  {
+    id: JABON_LAVANDA,
+    name: 'Jabon neutro · Lavanda',
+    ownName: 'Lavanda',
+    isDeleted: false,
+    isUnderReview: false,
+    original: { id: JABON, name: 'Jabon neutro' },
+    // El catalogo ya devuelve la imagen de la original para una version.
+    imageUrl: IMAGEN_JABON,
+  },
+]
+
+// `KG` con simbolo y `LITRO` sin el: la etiqueta cae al nombre.
+const UNIDADES: readonly Unidad[] = [
+  { id: KG, name: 'Kilogramo', symbol: 'kg' },
+  { id: LITRO, name: 'Litro', symbol: null },
+]
+
+function lineasDosRecetas(orderId: string): OrderLineRow[] {
+  return [
+    linea(orderId, { position: 1, status: 'PENDIENTE', recipeId: JABON_LAVANDA, originalRecipeId: JABON, unitId: LITRO }),
+    linea(orderId, { position: 0, status: 'PENDIENTE', recipeId: CREMA, originalRecipeId: CREMA, unitId: KG }),
+  ]
+}
+
+const CAMPOS_ESPERADOS = [
+  {
+    position: 0,
+    recipeId: CREMA,
+    originalRecipeId: CREMA,
+    recipeVersion: null,
+    recipeImageUrl: IMAGEN_CREMA,
+    unitLabel: 'kg',
+  },
+  {
+    position: 1,
+    recipeId: JABON_LAVANDA,
+    originalRecipeId: JABON,
+    recipeVersion: { originalId: JABON, originalName: 'Jabon neutro', versionName: 'Lavanda' },
+    recipeImageUrl: IMAGEN_JABON,
+    unitLabel: 'Litro',
+  },
+]
+
+function camposDeReceta(lines: readonly { position: number; recipeId: string; originalRecipeId: string; recipeVersion: unknown; recipeImageUrl: string | null; unitLabel: string | null }[]) {
+  return lines.map(({ position, recipeId, originalRecipeId, recipeVersion, recipeImageUrl, unitLabel }) => ({
+    position,
+    recipeId,
+    originalRecipeId,
+    recipeVersion,
+    recipeImageUrl,
+    unitLabel,
+  }))
+}
+
+function llamadasACatalogos(d: ReturnType<typeof dobles>) {
+  return {
+    recetas: d.findRefsIncludingDeleted.mock.calls.length,
+    presentaciones: d.findPresentationRefs.mock.calls.length,
+    unidades: d.findUnitRefs.mock.calls.length,
+    envases: d.deps.packaging.findRefs.mock.calls.length,
+    clientes: d.deps.customerCatalog.findRefsIncludingDeleted.mock.calls.length,
+  }
+}
+
+describe('getOrder y listOrders — los datos de cada receta para su edicion y su detalle', () => {
+  it('R18, R30, R32, R39: getOrder da a cada receta su original, su version, su imagen y su unidad', async () => {
+    const d = dobles([fila(PEDIDO, 'PENDIENTE')], lineasDosRecetas(PEDIDO), RECETAS_CON_VERSION, UNIDADES)
+
+    const vista = await createGetOrder(d.deps)(PEDIDO, ADMIN)
+
+    expect(camposDeReceta(vista.lines)).toEqual(CAMPOS_ESPERADOS)
+  })
+
+  it('R18, R30, R32, R39: getOrder no hace mas llamadas a los catalogos con dos recetas que con una', async () => {
+    const conUna = dobles(
+      [fila(PEDIDO, 'PENDIENTE')],
+      [linea(PEDIDO, { position: 0, status: 'PENDIENTE', recipeId: CREMA, unitId: KG })],
+      RECETAS_CON_VERSION,
+      UNIDADES,
+    )
+    const conDos = dobles([fila(PEDIDO, 'PENDIENTE')], lineasDosRecetas(PEDIDO), RECETAS_CON_VERSION, UNIDADES)
+
+    await createGetOrder(conUna.deps)(PEDIDO, ADMIN)
+    await createGetOrder(conDos.deps)(PEDIDO, ADMIN)
+
+    expect(llamadasACatalogos(conDos)).toEqual(llamadasACatalogos(conUna))
+    expect(conDos.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+    expect(conDos.findUnitRefs).toHaveBeenCalledTimes(1)
+    expect([...(conDos.findUnitRefs.mock.calls[0]?.[0] ?? [])].sort()).toEqual([KG, LITRO].sort())
+  })
+
+  it('R18, R30, R32, R39: listOrders da los mismos cuatro campos a cada receta de cada pedido de la pagina', async () => {
+    const d = dobles(
+      [fila(PEDIDO, 'PENDIENTE'), fila(OTRO_PEDIDO, 'PENDIENTE')],
+      [...lineasDosRecetas(PEDIDO), ...lineasDosRecetas(OTRO_PEDIDO)],
+      RECETAS_CON_VERSION,
+      UNIDADES,
+    )
+
+    const pagina = await createListOrders(d.deps)(CONSULTA, ADMIN)
+
+    expect(pagina.items).toHaveLength(2)
+    for (const pedido of pagina.items) expect(camposDeReceta(pedido.lines)).toEqual(CAMPOS_ESPERADOS)
+  })
+
+  it('R18, R30, R32, R39: listOrders no hace mas llamadas a los catalogos con dos recetas por pedido que con una', async () => {
+    const conUna = dobles(
+      [fila(PEDIDO, 'PENDIENTE'), fila(OTRO_PEDIDO, 'PENDIENTE')],
+      [
+        linea(PEDIDO, { position: 0, status: 'PENDIENTE', recipeId: CREMA, unitId: KG }),
+        linea(OTRO_PEDIDO, { position: 0, status: 'PENDIENTE', recipeId: CREMA, unitId: KG }),
+      ],
+      RECETAS_CON_VERSION,
+      UNIDADES,
+    )
+    const conDos = dobles(
+      [fila(PEDIDO, 'PENDIENTE'), fila(OTRO_PEDIDO, 'PENDIENTE')],
+      [...lineasDosRecetas(PEDIDO), ...lineasDosRecetas(OTRO_PEDIDO)],
+      RECETAS_CON_VERSION,
+      UNIDADES,
+    )
+
+    await createListOrders(conUna.deps)(CONSULTA, ADMIN)
+    await createListOrders(conDos.deps)(CONSULTA, ADMIN)
+
+    expect(llamadasACatalogos(conDos)).toEqual(llamadasACatalogos(conUna))
+    expect(conDos.findRefsIncludingDeleted).toHaveBeenCalledTimes(1)
+    expect(conDos.findUnitRefs).toHaveBeenCalledTimes(1)
+    expect([...(conDos.findUnitRefs.mock.calls[0]?.[0] ?? [])].sort()).toEqual([KG, LITRO].sort())
+  })
+
+  it('R18: una receta sin unidad sale con unitLabel null y una que no vuelve del catalogo, sin version ni imagen', async () => {
+    const PERDIDA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const d = dobles(
+      [fila(PEDIDO, 'PENDIENTE')],
+      [linea(PEDIDO, { position: 0, status: 'PENDIENTE', recipeId: PERDIDA, originalRecipeId: PERDIDA, unitId: null })],
+      RECETAS_CON_VERSION,
+      UNIDADES,
+    )
+
+    const vista = await createGetOrder(d.deps)(PEDIDO, ADMIN)
+
+    expect(vista.lines[0]).toMatchObject({
+      originalRecipeId: PERDIDA,
+      recipeName: null,
+      recipeVersion: null,
+      recipeImageUrl: null,
+      unitLabel: null,
+    })
+  })
+})
 
 describe('getOrder — las recetas del pedido', () => {
   it('R6: devuelve las lineas por position aunque lleguen desordenadas, con su receta resuelta', async () => {
@@ -227,7 +404,7 @@ describe('getOrder — las recetas del pedido', () => {
     expect(vista.lines.map((line) => line.status)).toEqual(['EN_CURSO', 'PENDIENTE'])
   })
 
-  it('R44: un pedido de una linea conserva los campos planos de hoy junto a la linea', async () => {
+  it('QT-314 R24: un pedido de una linea lleva sus datos solo en la linea, sin campos planos en el pedido', async () => {
     const d = dobles(
       [{ ...fila(PEDIDO, 'PENDIENTE'), salePrice: '12.0000' }],
       [linea(PEDIDO, { position: 0, status: 'PENDIENTE', quantity: '10.0000', salePrice: '12.0000' })],
@@ -235,8 +412,9 @@ describe('getOrder — las recetas del pedido', () => {
 
     const vista = await createGetOrder(d.deps)(PEDIDO, ADMIN)
 
-    expect(vista).toMatchObject({ recipeId: CREMA, recipeName: 'Crema base', quantity: '10.0000', salePrice: '12.0000' })
     expect(vista.lines).toHaveLength(1)
+    expect(vista.lines[0]).toMatchObject({ recipeId: CREMA, recipeName: 'Crema base', quantity: '10.0000', salePrice: '12.0000' })
+    for (const plano of ['recipeId', 'recipeName', 'quantity', 'salePrice']) expect(vista).not.toHaveProperty(plano)
     expect(vista.salePriceTotal).toBe('12.0000')
   })
 })

@@ -24,6 +24,8 @@ import {
   quoteOrderCostSchema,
   updateOrderDistributionSchema,
   updateOrderSchema,
+  type CreateOrderInput,
+  type OrderLineInput,
 } from '@/lib/modules/pedidos/domain/order-input'
 import { ORDER_QUERYABLE } from '@/lib/modules/pedidos/domain/order-queryable'
 
@@ -32,6 +34,8 @@ const PRESENTATION_ID = '22222222-2222-4222-8222-222222222222'
 const OTHER_PRESENTATION_ID = '55555555-5555-4555-8555-555555555555'
 /** QC-170 [Q4]: la unidad del pedido, obligatoria. */
 const UNIT_ID = '33333333-3333-4333-8333-333333333333'
+/** La receta del pedido que edita «Reparto y unidad» (QT-314 R31). */
+const LINEA_ID = '66666666-6666-4666-8666-666666666666'
 
 /** Un alta valida, para mutarla campo a campo en cada caso. Sin reparto (`[]`, R9): quien
  *  ejercite el reparto en si mismo lo anade con `presentationLines`. */
@@ -43,11 +47,46 @@ function altaValida(): Record<string, unknown> {
   }
 }
 
+// QT-314 R40: el alta y la edicion son un pedido con `lines`, y los esquemas de una sola receta ya no
+// existen. Estos casos siguen midiendo las reglas de una receta con los esquemas de verdad: la entrada
+// plana de cada caso se envia como un pedido de UNA receta (los campos del pedido, en el pedido; el
+// resto, en la receta) y la salida se vuelve a aplanar para leerla igual que antes.
+const CAMPOS_DEL_PEDIDO = ['priority', 'customerId', 'confirmBlocked'] as const
+
+type Plano = OrderLineInput & Pick<CreateOrderInput, (typeof CAMPOS_DEL_PEDIDO)[number]>
+
+function comoPedidoDeUnaReceta(entrada: Record<string, unknown>): Record<string, unknown> {
+  const pedido: Record<string, unknown> = {}
+  const receta: Record<string, unknown> = {}
+  for (const [clave, valor] of Object.entries(entrada)) {
+    if ((CAMPOS_DEL_PEDIDO as readonly string[]).includes(clave)) pedido[clave] = valor
+    else receta[clave] = valor
+  }
+  return { ...pedido, lines: [receta] }
+}
+
+function deUnaReceta(schema: typeof createOrderSchema | typeof updateOrderSchema) {
+  return {
+    parse(entrada: Record<string, unknown>): Plano {
+      const { lines, ...pedido } = schema.parse(comoPedidoDeUnaReceta(entrada))
+      const [receta] = lines
+      if (receta === undefined || lines.length !== 1) throw new Error('se esperaba una sola receta')
+      return { ...receta, ...pedido }
+    },
+    safeParse(entrada: Record<string, unknown>): { success: boolean } {
+      return schema.safeParse(comoPedidoDeUnaReceta(entrada))
+    },
+  }
+}
+
+const alta = deUnaReceta(createOrderSchema)
+const edicion = deUnaReceta(updateOrderSchema)
+
 describe('pedidos — createOrderSchema (alta)', () => {
   it('acepta un alta valida y devuelve la cantidad como CADENA, no como number', () => {
     // R8 y `design.md > 7.1`: 14 digitos con 4 decimales no caben en un `number` sin riesgo de
     // redondeo, asi que viaja como texto y el adaptador la convierte a `Prisma.Decimal`.
-    const parsed = createOrderSchema.parse(altaValida())
+    const parsed = alta.parse(altaValida())
     expect(parsed.quantity).toBe('12.5000')
     expect(typeof parsed.quantity).toBe('string')
   })
@@ -57,11 +96,11 @@ describe('pedidos — createOrderSchema (alta)', () => {
     // forma valida y lo que los rechaza es el `> 0`.
     for (const quantity of [undefined, '0', '0.0000', '-1', '-0.0001', '', 'abc']) {
       const entrada = { ...altaValida(), quantity }
-      expect(createOrderSchema.safeParse(entrada).success, `quantity=${String(quantity)}`).toBe(
+      expect(alta.safeParse(entrada).success, `quantity=${String(quantity)}`).toBe(
         false,
       )
     }
-    expect(createOrderSchema.safeParse({ ...altaValida(), quantity: '0.0001' }).success).toBe(true)
+    expect(alta.safeParse({ ...altaValida(), quantity: '0.0001' }).success).toBe(true)
   })
 
   it('el precio unitario sigue sin existir: se DESCARTA sin dejar rastro; la unidad SI existe (QC-170 [Q4])', () => {
@@ -75,7 +114,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
       unitPrice: '3.7500',
     }
 
-    const parsed = createOrderSchema.parse(conCampoViejo)
+    const parsed = alta.parse(conCampoViejo)
 
     expect(parsed.unitId).toBe(UNIT_ID)
     expect(parsed).not.toHaveProperty('unitPrice')
@@ -84,22 +123,22 @@ describe('pedidos — createOrderSchema (alta)', () => {
   it('R41: rechaza la unidad ausente o con forma que no es un uuid', () => {
     for (const unitId of [undefined, '', 'no-es-uuid', null, 123]) {
       expect(
-        createOrderSchema.safeParse({ ...altaValida(), unitId }).success,
+        alta.safeParse({ ...altaValida(), unitId }).success,
         `unitId=${String(unitId)}`,
       ).toBe(false)
     }
-    expect(createOrderSchema.safeParse(altaValida()).success).toBe(true)
+    expect(alta.safeParse(altaValida()).success).toBe(true)
   })
 
   it('R9: sin `presentationLines` en la entrada, el reparto por defecto es `[]`', () => {
-    const parsed = createOrderSchema.parse(altaValida())
+    const parsed = alta.parse(altaValida())
     expect(parsed.presentationLines).toEqual([])
   })
 
   it('R1: cada linea exige un uuid de presentacion y envases enteros positivos', () => {
     for (const packages of [0, -1, 1.5, undefined, 'x']) {
       expect(
-        createOrderSchema.safeParse({
+        alta.safeParse({
           ...altaValida(),
           presentationLines: [{ presentationId: PRESENTATION_ID, packages }],
         }).success,
@@ -108,7 +147,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
     }
     for (const presentationId of ['no-es-uuid', undefined, null]) {
       expect(
-        createOrderSchema.safeParse({
+        alta.safeParse({
           ...altaValida(),
           presentationLines: [{ presentationId, packages: 1 }],
         }).success,
@@ -116,7 +155,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
       ).toBe(false)
     }
     expect(
-      createOrderSchema.safeParse({
+      alta.safeParse({
         ...altaValida(),
         presentationLines: [{ presentationId: PRESENTATION_ID, packages: 3 }],
       }).success,
@@ -139,31 +178,31 @@ describe('pedidos — createOrderSchema (alta)', () => {
   })
 
   it('R4: `presentationId` (la presentacion UNICA de QC-146) ya no existe en el esquema del pedido', () => {
-    const parsed = createOrderSchema.parse({ ...altaValida(), presentationId: PRESENTATION_ID })
+    const parsed = alta.parse({ ...altaValida(), presentationId: PRESENTATION_ID })
     expect(parsed).not.toHaveProperty('presentationId')
   })
 
   it('rechaza la receta ausente o con forma que no es un uuid', () => {
     // R15 en su mitad de BORDE: aqui solo se valida la forma; la existencia y la vigencia las
     // comprueba el caso de uso por el contrato publico de `recetas`.
-    expect(createOrderSchema.safeParse({ ...altaValida(), recipeId: undefined }).success).toBe(
+    expect(alta.safeParse({ ...altaValida(), recipeId: undefined }).success).toBe(
       false,
     )
-    expect(createOrderSchema.safeParse({ ...altaValida(), recipeId: 'no-es-uuid' }).success).toBe(
+    expect(alta.safeParse({ ...altaValida(), recipeId: 'no-es-uuid' }).success).toBe(
       false,
     )
   })
 
   it('la prioridad es opcional y su ausencia significa BAJA; fuera del conjunto se rechaza', () => {
     // R9 y R19. El defecto es el del dominio, no un literal repetido, y el conjunto es cerrado.
-    expect(createOrderSchema.parse(altaValida()).priority).toBe('BAJA')
+    expect(alta.parse(altaValida()).priority).toBe('BAJA')
     for (const priority of ORDER_PRIORITY_VALUES) {
-      const parsed = createOrderSchema.parse({ ...altaValida(), priority })
+      const parsed = alta.parse({ ...altaValida(), priority })
       expect(parsed.priority).toBe(priority)
     }
     for (const priority of ['URGENTE', 'baja', '', 'CRITICA ', 1]) {
       expect(
-        createOrderSchema.safeParse({ ...altaValida(), priority }).success,
+        alta.safeParse({ ...altaValida(), priority }).success,
         `priority=${String(priority)}`,
       ).toBe(false)
     }
@@ -172,7 +211,7 @@ describe('pedidos — createOrderSchema (alta)', () => {
   it('descarta status, cancellationReason, el correlativo, las fechas y los dos autores', () => {
     // R6, R9: lo que el esquema no declara NO PUEDE LLEGAR. Se envia todo lo prohibido a la vez
     // y se comprueba que la salida tiene exactamente las cinco claves del alta.
-    const parsed = createOrderSchema.parse({
+    const parsed = alta.parse({
       ...altaValida(),
       status: 'ENTREGADO',
       cancellationReason: 'porque si',
@@ -217,9 +256,9 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     expect(EDITABLE_STATUS_VALUES).not.toContain('CANCELADO')
   })
 
-  it('R6: `updateOrderSchema` es EXACTAMENTE `createOrderSchema`, sin campo de estado', () => {
-    expect(updateOrderSchema).toBe(createOrderSchema)
-    expect(Object.keys(updateOrderSchema.parse(edicionValida)).sort()).toEqual([
+  it('R6: la edicion declara los mismos campos que el alta, sin campo de estado', () => {
+    expect(Object.keys(edicion.parse(edicionValida)).sort()).toEqual(Object.keys(alta.parse(edicionValida)).sort())
+    expect(Object.keys(edicion.parse(edicionValida)).sort()).toEqual([
       'confirmBlocked',
       'customerId',
       'presentationLines',
@@ -237,7 +276,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
     // La edicion ya no puede ni EXPRESAR un cambio de estado: `z.object` descarta la clave
     // desconocida igual que con cualquier otro campo ajeno, no la rechaza como invalida.
     for (const status of ['PENDIENTE', 'EN_CURSO', 'ENTREGADO', 'CANCELADO', 'ANULADO', 3]) {
-      const parsed = updateOrderSchema.parse({ ...edicionValida, status })
+      const parsed = edicion.parse({ ...edicionValida, status })
       expect(parsed, `status=${String(status)}`).not.toHaveProperty('status')
     }
   })
@@ -245,7 +284,7 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
   it('no admite ningun motivo de cancelacion: cancelar es `cancelOrder` y solo el', () => {
     // Decision cerrada 7: la edicion NO puede cancelar, y `reason` ni siquiera existe en este
     // esquema, asi que se descarta silenciosamente en vez de convertirse en un motivo escrito.
-    const parsed = updateOrderSchema.parse({
+    const parsed = edicion.parse({
       ...edicionValida,
       reason: 'me arrepenti',
       cancellationReason: 'me arrepenti',
@@ -255,45 +294,45 @@ describe('pedidos — updateOrderSchema (edicion)', () => {
   })
 
   it('la edicion es valida SIN estado: ya no es un campo obligatorio', () => {
-    expect(updateOrderSchema.safeParse(edicionValida).success).toBe(true)
+    expect(edicion.safeParse(edicionValida).success).toBe(true)
   })
 
   it('R41: la edicion exige unidad, con las mismas reglas que el alta', () => {
     for (const unitId of [undefined, '', 'no-es-uuid', null]) {
       expect(
-        updateOrderSchema.safeParse({ ...edicionValida, unitId }).success,
+        edicion.safeParse({ ...edicionValida, unitId }).success,
         `unitId=${String(unitId)}`,
       ).toBe(false)
     }
-    expect(updateOrderSchema.safeParse(edicionValida).success).toBe(true)
+    expect(edicion.safeParse(edicionValida).success).toBe(true)
   })
 
   it('hereda del alta la regla de la cantidad', () => {
     // R17: no hay dos verdades sobre la cantidad segun se cree o se edite.
-    expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '0' }).success).toBe(false)
-    expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '-1' }).success).toBe(false)
-    expect(updateOrderSchema.safeParse({ ...edicionValida, quantity: '0.0001' }).success).toBe(true)
+    expect(edicion.safeParse({ ...edicionValida, quantity: '0' }).success).toBe(false)
+    expect(edicion.safeParse({ ...edicionValida, quantity: '-1' }).success).toBe(false)
+    expect(edicion.safeParse({ ...edicionValida, quantity: '0.0001' }).success).toBe(true)
   })
 })
 
 describe('QC-138 — confirmBlocked en el alta y la edicion', () => {
   it('R6: sin confirmBlocked, la entrada vale y no confirma', () => {
-    expect(createOrderSchema.parse(altaValida()).confirmBlocked).toBe(false)
-    expect(updateOrderSchema.parse(altaValida()).confirmBlocked).toBe(false)
+    expect(alta.parse(altaValida()).confirmBlocked).toBe(false)
+    expect(edicion.parse(altaValida()).confirmBlocked).toBe(false)
   })
 
   it('R8: confirmBlocked=true se conserva; un valor que no es booleano se rechaza', () => {
-    expect(createOrderSchema.parse({ ...altaValida(), confirmBlocked: true }).confirmBlocked).toBe(true)
+    expect(alta.parse({ ...altaValida(), confirmBlocked: true }).confirmBlocked).toBe(true)
     for (const confirmBlocked of ['true', 1, null, 'si']) {
       expect(
-        createOrderSchema.safeParse({ ...altaValida(), confirmBlocked }).success,
+        alta.safeParse({ ...altaValida(), confirmBlocked }).success,
         `confirmBlocked=${String(confirmBlocked)}`,
       ).toBe(false)
     }
   })
 
   it('R6: confirmar no permite elegir el estado: un status BLOQUEADO se descarta', () => {
-    const parsed = createOrderSchema.parse({ ...altaValida(), confirmBlocked: true, status: 'BLOQUEADO' })
+    const parsed = alta.parse({ ...altaValida(), confirmBlocked: true, status: 'BLOQUEADO' })
     expect(parsed).not.toHaveProperty('status')
   })
 
@@ -332,30 +371,30 @@ describe('pedidos — cancelOrderSchema (cancelacion)', () => {
   })
 })
 
-// `quoteOrderCostSchema` es un `pick` de `createOrderSchema` y acepta/rechaza
+// `quoteOrderCostSchema` es un `pick` de la receta del pedido y acepta/rechaza
 // exactamente lo mismo que el alta en `recipeId`, `quantity` y `unitId`, sin declarar nada mas.
 describe('pedidos — quoteOrderCostSchema (cotizacion)', () => {
-  it('acepta y rechaza exactamente lo mismo que createOrderSchema en recipeId, quantity y unitId', () => {
+  it('acepta y rechaza exactamente lo mismo que una receta del alta en recipeId, quantity y unitId', () => {
     for (const quantity of [undefined, '0', '0.0000', '-1', '-0.0001', '', 'abc', '0.0001', '12.5000']) {
       const entrada = { recipeId: RECIPE_ID, quantity, unitId: UNIT_ID }
       expect(
         quoteOrderCostSchema.safeParse(entrada).success,
         `quantity=${String(quantity)}`,
-      ).toBe(createOrderSchema.safeParse({ ...altaValida(), quantity }).success)
+      ).toBe(alta.safeParse({ ...altaValida(), quantity }).success)
     }
     for (const recipeId of [undefined, '', 'no-es-uuid', RECIPE_ID]) {
       const entrada = { recipeId, quantity: '12.5000', unitId: UNIT_ID }
       expect(
         quoteOrderCostSchema.safeParse(entrada).success,
         `recipeId=${String(recipeId)}`,
-      ).toBe(createOrderSchema.safeParse({ ...altaValida(), recipeId }).success)
+      ).toBe(alta.safeParse({ ...altaValida(), recipeId }).success)
     }
     for (const unitId of [undefined, '', 'no-es-uuid', UNIT_ID]) {
       const entrada = { recipeId: RECIPE_ID, quantity: '12.5000', unitId }
       expect(
         quoteOrderCostSchema.safeParse(entrada).success,
         `unitId=${String(unitId)}`,
-      ).toBe(createOrderSchema.safeParse({ ...altaValida(), unitId }).success)
+      ).toBe(alta.safeParse({ ...altaValida(), unitId }).success)
     }
   })
 
@@ -466,17 +505,17 @@ describe('pedidos — recipeVersionId en alta y edicion', () => {
   const VERSION_ID = '33333333-3333-4333-8333-333333333333'
 
   it('R31: sin el campo, la entrada de hoy sigue valiendo y la version es null', () => {
-    expect(createOrderSchema.parse(altaValida()).recipeVersionId).toBeNull()
-    expect(updateOrderSchema.parse(altaValida()).recipeVersionId).toBeNull()
+    expect(alta.parse(altaValida()).recipeVersionId).toBeNull()
+    expect(edicion.parse(altaValida()).recipeVersionId).toBeNull()
   })
 
   it('R31: la cadena vacia que envia «Original» en el formulario se lee como null', () => {
-    expect(createOrderSchema.parse({ ...altaValida(), recipeVersionId: '' }).recipeVersionId).toBeNull()
-    expect(createOrderSchema.parse({ ...altaValida(), recipeVersionId: null }).recipeVersionId).toBeNull()
+    expect(alta.parse({ ...altaValida(), recipeVersionId: '' }).recipeVersionId).toBeNull()
+    expect(alta.parse({ ...altaValida(), recipeVersionId: null }).recipeVersionId).toBeNull()
   })
 
   it('R30: un UUID de version se conserva tal cual', () => {
-    expect(createOrderSchema.parse({ ...altaValida(), recipeVersionId: VERSION_ID }).recipeVersionId).toBe(
+    expect(alta.parse({ ...altaValida(), recipeVersionId: VERSION_ID }).recipeVersionId).toBe(
       VERSION_ID,
     )
   })
@@ -484,7 +523,7 @@ describe('pedidos — recipeVersionId en alta y edicion', () => {
   it('R32: una version que no es UUID se rechaza en el borde', () => {
     for (const recipeVersionId of ['no-es-uuid', ' ', 42]) {
       expect(
-        createOrderSchema.safeParse({ ...altaValida(), recipeVersionId }).success,
+        alta.safeParse({ ...altaValida(), recipeVersionId }).success,
         `recipeVersionId=${String(recipeVersionId)}`,
       ).toBe(false)
     }
@@ -545,8 +584,8 @@ describe('QC-195 — la linea del reparto nombra su envase', () => {
 
   it('R11: el alta, la edicion y el disponible aceptan lineas con envase con el mismo esquema', () => {
     const conEnvase = { ...altaValida(), presentationLines: [{ packagingProductId: ENVASE_ID, packages: 3 }] }
-    expect(createOrderSchema.parse(conEnvase).presentationLines).toEqual([{ packagingProductId: ENVASE_ID, packages: 3 }])
-    expect(updateOrderSchema.safeParse(conEnvase).success).toBe(true)
+    expect(alta.parse(conEnvase).presentationLines).toEqual([{ packagingProductId: ENVASE_ID, packages: 3 }])
+    expect(edicion.safeParse(conEnvase).success).toBe(true)
     expect(
       orderPresentationAvailabilitySchema.safeParse({
         quantity: '20',
@@ -556,6 +595,7 @@ describe('QC-195 — la linea del reparto nombra su envase', () => {
     ).toBe(true)
     expect(
       updateOrderDistributionSchema.safeParse({
+        lineId: LINEA_ID,
         unitId: UNIT_ID,
         presentationLines: [{ packagingProductId: ENVASE_ID, packages: '30' }],
       }).success,
@@ -572,67 +612,67 @@ describe('QC-307 — salePrice en el alta y la edicion', () => {
   }
 
   it('R4: ausente es un pedido sin precio (null)', () => {
-    expect(createOrderSchema.parse(altaValida()).salePrice).toBeNull()
-    expect(updateOrderSchema.parse(altaValida()).salePrice).toBeNull()
+    expect(alta.parse(altaValida()).salePrice).toBeNull()
+    expect(edicion.parse(altaValida()).salePrice).toBeNull()
   })
 
   it("R4: '' es un pedido sin precio (null)", () => {
-    expect(createOrderSchema.parse(conPrecio('')).salePrice).toBeNull()
+    expect(alta.parse(conPrecio('')).salePrice).toBeNull()
   })
 
   it("R4: '   ' (solo espacios) es un pedido sin precio (null)", () => {
-    expect(createOrderSchema.parse(conPrecio('   ')).salePrice).toBeNull()
+    expect(alta.parse(conPrecio('   ')).salePrice).toBeNull()
   })
 
   it("R6: '0' y '0.0000' se aceptan (se regala)", () => {
-    expect(createOrderSchema.parse(conPrecio('0')).salePrice).toBe('0')
-    expect(createOrderSchema.parse(conPrecio('0.0000')).salePrice).toBe('0.0000')
+    expect(alta.parse(conPrecio('0')).salePrice).toBe('0')
+    expect(alta.parse(conPrecio('0.0000')).salePrice).toBe('0.0000')
   })
 
   it("R5: '1250.5' se acepta como cadena, no como number", () => {
-    const parsed = createOrderSchema.parse(conPrecio('1250.5'))
+    const parsed = alta.parse(conPrecio('1250.5'))
     expect(parsed.salePrice).toBe('1250.5')
     expect(typeof parsed.salePrice).toBe('string')
-    expect(updateOrderSchema.parse(conPrecio('1250.5')).salePrice).toBe('1250.5')
+    expect(edicion.parse(conPrecio('1250.5')).salePrice).toBe('1250.5')
   })
 
   it("R5: '9999999999.9999' (el maximo de decimal(14,4)) se acepta", () => {
-    expect(createOrderSchema.parse(conPrecio('9999999999.9999')).salePrice).toBe('9999999999.9999')
+    expect(alta.parse(conPrecio('9999999999.9999')).salePrice).toBe('9999999999.9999')
   })
 
   it("R7: '-1' falla", () => {
-    expect(createOrderSchema.safeParse(conPrecio('-1')).success).toBe(false)
-    expect(updateOrderSchema.safeParse(conPrecio('-1')).success).toBe(false)
+    expect(alta.safeParse(conPrecio('-1')).success).toBe(false)
+    expect(edicion.safeParse(conPrecio('-1')).success).toBe(false)
   })
 
   it("R8: '1,5' (coma decimal) falla", () => {
-    expect(createOrderSchema.safeParse(conPrecio('1,5')).success).toBe(false)
+    expect(alta.safeParse(conPrecio('1,5')).success).toBe(false)
   })
 
   it("R8: '1e3' (notacion exponencial) falla", () => {
-    expect(createOrderSchema.safeParse(conPrecio('1e3')).success).toBe(false)
+    expect(alta.safeParse(conPrecio('1e3')).success).toBe(false)
   })
 
   it("R8: '1.12345' (cinco decimales) falla", () => {
-    expect(createOrderSchema.safeParse(conPrecio('1.12345')).success).toBe(false)
+    expect(alta.safeParse(conPrecio('1.12345')).success).toBe(false)
   })
 
   it("R8: '12345678901' (once enteros) falla", () => {
-    expect(createOrderSchema.safeParse(conPrecio('12345678901')).success).toBe(false)
+    expect(alta.safeParse(conPrecio('12345678901')).success).toBe(false)
   })
 
   it("R8: 'abc' falla", () => {
-    expect(createOrderSchema.safeParse(conPrecio('abc')).success).toBe(false)
+    expect(alta.safeParse(conPrecio('abc')).success).toBe(false)
   })
 
   it('R3: una clave currency se descarta', () => {
-    const parsed = createOrderSchema.parse({ ...conPrecio('10'), currency: 'USD' })
+    const parsed = alta.parse({ ...conPrecio('10'), currency: 'USD' })
     expect(parsed).not.toHaveProperty('currency')
-    expect(updateOrderSchema.parse({ ...conPrecio('10'), currency: 'USD' })).not.toHaveProperty('currency')
+    expect(edicion.parse({ ...conPrecio('10'), currency: 'USD' })).not.toHaveProperty('currency')
   })
 
   it('R14: updateOrderDistributionSchema con salePrice falla por .strict()', () => {
-    const reparto = { unitId: UNIT_ID, presentationLines: [] }
+    const reparto = { lineId: LINEA_ID, unitId: UNIT_ID, presentationLines: [] }
     expect(updateOrderDistributionSchema.safeParse(reparto).success).toBe(true)
     expect(updateOrderDistributionSchema.safeParse({ ...reparto, salePrice: '10' }).success).toBe(false)
   })

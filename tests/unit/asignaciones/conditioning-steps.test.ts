@@ -3,11 +3,12 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { conditioningProgress, sameResponsibles } from '@/lib/modules/asignaciones/domain/conditioning-steps'
+import { conditioningProgress, lineConditioningProgress, sameResponsibles } from '@/lib/modules/asignaciones/domain/conditioning-steps'
 import { conditioningResponsiblesSchema } from '@/lib/modules/asignaciones/domain/conditioning-trace'
 import type { ExecutionAction, ExecutionEntryRecord } from '@/lib/modules/asignaciones/domain/execution-entry'
 
 const ORDER = '22222222-2222-4222-8222-222222222222'
+const LINE = '66666666-6666-4666-8666-666666666666'
 const ANA = '33333333-3333-4333-8333-333333333333'
 const BEA = '44444444-4444-4444-8444-444444444444'
 const CARLOS = '55555555-5555-4555-8555-555555555555'
@@ -23,6 +24,7 @@ function anotacion(
   return {
     id: `e-${String(seq).padStart(4, '0')}`,
     orderId: ORDER,
+    orderLineId: LINE,
     userId: ANA,
     action,
     stepPosition,
@@ -140,5 +142,27 @@ describe('conditioningResponsiblesSchema (R28)', () => {
     ['null', null],
   ])('R28: rechaza %s', (_caso, valor) => {
     expect(conditioningResponsiblesSchema.safeParse(valor).success).toBe(false)
+  })
+})
+
+describe('lineConditioningProgress: el avance de una receta del pedido', () => {
+  const OTRA_LINEA = '77777777-7777-4777-8777-777777777777'
+  const deOtra = (entry: ExecutionEntryRecord): ExecutionEntryRecord => ({ ...entry, orderLineId: OTRA_LINEA })
+
+  it('R13: las anotaciones de la otra linea del mismo pedido no cuentan ni como avance ni como responsables', () => {
+    const anotaciones = [
+      anotacion('conditioning_step_advance', 1, [ANA]),
+      deOtra(anotacion('conditioning_step_advance', 2, [BEA])),
+      deOtra(anotacion('conditioning_steps_complete', 3, [BEA])),
+      deOtra(anotacion('conditioning_responsibles_change', 1, [CARLOS])),
+    ]
+
+    const deLaLinea = lineConditioningProgress(anotaciones, LINE, 3)
+    expect(deLaLinea.completedCount).toBe(1)
+    expect([...deLaLinea.responsibles]).toEqual([[1, [ANA]]])
+
+    const deLaOtra = lineConditioningProgress(anotaciones, OTRA_LINEA, 3)
+    expect(deLaOtra.completedCount).toBe(3)
+    expect(deLaOtra.responsibles.get(1)).toEqual([CARLOS])
   })
 })

@@ -14,12 +14,16 @@ import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 import type { OrderCoverage } from '@/lib/modules/inventario';
 
 import { CancelOrderDialog } from './cancel-order-dialog';
+import { CancelOrderLineDialog } from './cancel-order-line-dialog';
 import { DeleteOrderDialog } from './delete-order-dialog';
 import { OrderCustomerDialog } from './order-customer-dialog';
 import { OrderDeliveriesSheet } from './order-deliveries-sheet';
 import { OrderDeliverySheet } from './order-delivery-sheet';
+import { OrderDetailSheet } from './order-detail-sheet';
 import { OrderDistributionDialog, type OrderDistributionDraft } from './order-distribution-dialog';
 import { OrderForm } from './order-form';
+import { LINE_ACTION_KINDS, type LineActionKind } from './order-line-actions';
+import { OrderLinePickerDialog } from './order-line-picker-dialog';
 import {
   EMPTY_RESPONSIBLES_CATALOG,
   type OrderResponsiblesCatalog,
@@ -155,6 +159,8 @@ export type OrderRowSheetActionsProps = {
   readonly action: OrderRowAction;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  /** Pasa a otra acción del mismo pedido sin cerrar: «Editar» desde el detalle. */
+  readonly onAction?: (action: OrderRowAction, order: OrderSummary) => void;
   readonly recipes: RecipePickerPage;
   readonly units: readonly UnitView[];
   readonly bridge: MassVolumeBridge | null;
@@ -164,16 +170,23 @@ export type OrderRowSheetActionsProps = {
   readonly responsiblesCatalog?: OrderResponsiblesCatalog;
   /** La cobertura de este pedido, ya traída por el lote de la sección. */
   readonly coverage?: OrderCoverage;
+  /** `presentationId` → `productId` de este pedido, ya traído por la sección. */
+  readonly producedProducts?: Readonly<Record<string, string>>;
   /** Si el actor puede anular entregas; lo resuelve el servidor. */
   readonly canVoidDelivery?: boolean;
 };
+
+function isLineAction(action: OrderRowAction): action is LineActionKind {
+  return (LINE_ACTION_KINDS as readonly OrderRowAction[]).includes(action);
+}
+
+function ignoreAction(): void {}
 
 /**
  * Monta el panel o el diálogo de la acción elegida en el menú de una fila. Uno por tabla: así
  * nunca hay dos abiertos y la tarjeta y la fila abren lo mismo.
  *
- * «Editar» abre el formulario y «Responsables», su propia hoja de solo lectura con la gestión de
- * responsables.
+ * Una acción de una receta abre primero el selector; elegida la receta, su diálogo o panel.
  * Cerrado, lo montado sigue en el árbol para animar la salida; cada apertura lo remonta para que
  * arranque sin el estado de la anterior.
  */
@@ -182,12 +195,14 @@ export function OrderRowSheetActions({
   action,
   open,
   onOpenChange,
+  onAction = ignoreAction,
   recipes,
   units,
   bridge,
   responsibles = [],
   responsiblesCatalog = EMPTY_RESPONSIBLES_CATALOG,
   coverage,
+  producedProducts,
   canVoidDelivery = false,
 }: OrderRowSheetActionsProps) {
   const [opening, setOpening] = useState(0);
@@ -196,6 +211,16 @@ export function OrderRowSheetActions({
     setWasOpen(open);
     if (open) setOpening((count) => count + 1);
   }
+  // La receta elegida vale solo para la apertura y la acción en que se eligió.
+  const [picked, setPicked] = useState<{
+    readonly opening: number;
+    readonly action: OrderRowAction;
+    readonly lineId: string;
+  } | null>(null);
+  const pickedLine =
+    picked !== null && picked.opening === opening && picked.action === action
+      ? order.lines.find((line) => line.id === picked.lineId)
+      : undefined;
   // Atado a la instancia de `order`: cuando llega el refresco trae otra y lo guardado se descarta.
   const [savedDistribution, setSavedDistribution] = useState<{
     readonly order: OrderSummary;
@@ -204,7 +229,32 @@ export function OrderRowSheetActions({
   const pendingDistribution =
     savedDistribution?.order === order ? savedDistribution.draft : undefined;
 
+  if (isLineAction(action) && pickedLine === undefined) {
+    return (
+      <OrderLinePickerDialog
+        key={opening}
+        order={order}
+        action={action}
+        open={open}
+        onOpenChange={onOpenChange}
+        onPick={(lineId) => setPicked({ opening, action, lineId })}
+      />
+    );
+  }
+
   switch (action) {
+    case 'detail':
+      return (
+        <OrderDetailSheet
+          key={opening}
+          order={order}
+          open={open}
+          onOpenChange={onOpenChange}
+          responsibles={responsibles}
+          producedProducts={producedProducts}
+          onEdit={() => onAction('edit', order)}
+        />
+      );
     case 'edit':
       return (
         <OrderSheet
@@ -234,10 +284,11 @@ export function OrderRowSheetActions({
     case 'delete':
       return <DeleteOrderDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
     case 'distribution':
-      return (
+      return pickedLine === undefined ? null : (
         <OrderDistributionDialog
           key={opening}
           order={order}
+          line={pickedLine}
           units={units}
           open={open}
           onOpenChange={onOpenChange}
@@ -248,22 +299,34 @@ export function OrderRowSheetActions({
     case 'customer':
       return <OrderCustomerDialog key={opening} order={order} open={open} onOpenChange={onOpenChange} />;
     case 'deliver':
-      return (
+      return pickedLine === undefined ? null : (
         <OrderDeliverySheet
           key={opening}
           order={order}
+          line={pickedLine}
           open={open}
           onOpenChange={onOpenChange}
         />
       );
     case 'deliveries':
-      return (
+      return pickedLine === undefined ? null : (
         <OrderDeliveriesSheet
           key={opening}
           order={order}
+          line={pickedLine}
           open={open}
           onOpenChange={onOpenChange}
           canVoid={canVoidDelivery}
+        />
+      );
+    case 'cancelLine':
+      return pickedLine === undefined ? null : (
+        <CancelOrderLineDialog
+          key={opening}
+          order={order}
+          line={pickedLine}
+          open={open}
+          onOpenChange={onOpenChange}
         />
       );
   }

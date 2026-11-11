@@ -1,11 +1,10 @@
 // lib/modules/asignaciones/domain/get-assigned-order-execution.ts
-import { z } from 'zod';
-
 import { requirePermission, type Actor } from './actor';
 import { OrderBlockedError, OrderNotFoundError, ValidationError } from './errors';
 import { readStepEvidence } from './evidence-photos';
 import { toDistributionLines, toDistributionPresentations, unitLabelOf } from './order-distribution-view';
-import { onlyLineOf } from './only-order-line';
+import { findLine, orderLineInputSchema } from './order-line-target';
+import { readRecipeOfOrder } from './recipe-of-order';
 
 import type { AssignedOrderExecutionView, ExecutionLineView } from './assigned-order-execution-view';
 import type { EvidenceStorage } from '../ports/evidence-storage';
@@ -16,10 +15,6 @@ import { formatOrderNumber, resolveLineNeed, type OrderCatalog } from '@/lib/mod
 import type { PresentationCatalog, ProductCatalog } from '@/lib/modules/inventario';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 import type { UnitCatalog, UnitRef } from '@/lib/modules/unidades';
-
-const getAssignedOrderExecutionSchema = z.strictObject({
-  orderId: z.string().uuid(),
-});
 
 export type GetAssignedOrderExecutionDeps = {
   readonly assignments: OrderAssignmentRepository;
@@ -47,30 +42,18 @@ export function createGetAssignedOrderExecution(
     // Autorizar va antes de validar la entrada y antes de tocar ningun puerto.
     requirePermission(actor, 'asignaciones.ejecutar');
 
-    const parsed = getAssignedOrderExecutionSchema.safeParse(input);
+    const parsed = orderLineInputSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId } = parsed.data;
+    const { orderId, lineId } = parsed.data;
 
     // «No es tuyo» y «no existe» son la misma respuesta desde fuera.
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
     if (!ids.includes(orderId)) throw new OrderNotFoundError();
 
-    const target = await deps.orders.findAliveById(orderId, actor.companyId);
-    if (target === null) throw new OrderNotFoundError();
-    if (target.status === 'BLOQUEADO') throw new OrderBlockedError();
-    if (target.status !== 'PENDIENTE' && target.status !== 'EN_CURSO') {
-      throw new OrderNotFoundError();
-    }
-
-    const summaryPage = await deps.orders.listAliveSummariesByIds(
-      actor.companyId,
-      [orderId],
-      [target.status],
-      1,
-      1,
-    );
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    const status = summary.status;
+    if (status === 'BLOQUEADO') throw new OrderBlockedError();
+    if (status !== 'PENDIENTE' && status !== 'EN_CURSO') throw new OrderNotFoundError();
 
     const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
     const recipeName = content !== null && !content.isDeleted ? content.name : null;
@@ -155,14 +138,27 @@ export function createGetAssignedOrderExecution(
 
     // Un pedido PENDIENTE todavia no puede tener fotos.
     const evidence =
-      target.status === 'EN_CURSO'
-        ? await readStepEvidence(deps.evidence, deps.storage, actor.companyId, orderId, 'manufacturing', steps)
+      status === 'EN_CURSO'
+        ? await readStepEvidence(
+            deps.evidence,
+            deps.storage,
+            actor.companyId,
+            orderId,
+            summary.lineId,
+            'manufacturing',
+            steps,
+          )
         : [];
+
+    const recipeOfOrder = await readRecipeOfOrder(deps, actor.companyId, orderId, summary.lineId);
 
     return {
       orderId: summary.id,
+      lineId: recipeOfOrder.lineId,
+      recipe: recipeOfOrder.recipe,
+      otherRecipes: recipeOfOrder.otherRecipes,
       numberText: formatOrderNumber(summary.number),
-      status: target.status,
+      status,
       recipeName,
       orderQuantity: summary.quantity,
       steps,

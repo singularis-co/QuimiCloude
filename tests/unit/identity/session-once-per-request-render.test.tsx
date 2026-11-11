@@ -375,6 +375,7 @@ async function pintarPantallaDeEmpaque(): Promise<void> {
   try {
     await PackingOrderPage({
       params: Promise.resolve({ id: '0a3f2b1c-9e0d-4a4c-8b9e-772a5f6c1d8b' }),
+      searchParams: Promise.resolve({ receta: '5c1d8b0a-3f2b-4c9e-8a4c-0d8b9e772a5f' }),
     });
   } catch (error) {
     if (!(error instanceof CorteDeNext)) throw error;
@@ -401,6 +402,7 @@ async function pintarDetalleDeAcondicionamiento(): Promise<void> {
   try {
     await ConditioningOrderPage({
       params: Promise.resolve({ id: '0a3f2b1c-9e0d-4a4c-8b9e-772a5f6c1d8b' }),
+      searchParams: Promise.resolve({ receta: '5c1d8b0a-3f2b-4c9e-8a4c-0d8b9e772a5f' }),
     });
   } catch (error) {
     if (!(error instanceof CorteDeNext)) throw error;

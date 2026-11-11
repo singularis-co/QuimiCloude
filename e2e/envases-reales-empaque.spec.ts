@@ -75,7 +75,9 @@ import {
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { pickOrderLine } from './helpers/order-form';
 import { batchStock, netReservedInBatch, seedPackaging } from './helpers/packaging';
+import { firstLineIdOf } from './helpers/recipe-route';
 import { ensureOnlyLine, createOrderWithLine, updateOrderAndLine } from '../tests/helpers/only-order-line';
 
 const FIXTURE_PREFIX = 'qc281_e2e_';
@@ -234,6 +236,8 @@ type SeededLine = {
 
 type SeededOrder = {
   readonly id: string;
+  /** La unica receta del pedido: «Entregar» es una accion por receta (QT-314). */
+  readonly orderLineId: string;
   readonly numberText: string;
   readonly lines: readonly SeededLine[];
 };
@@ -377,7 +381,7 @@ async function seedPackingOrder(
     });
   }
 
-  return { id: order.id, numberText: formatOrderNumber({ year, sequence }), lines };
+  return { id: order.id, orderLineId, numberText: formatOrderNumber({ year, sequence }), lines };
 }
 
 async function switchUser(page: Page, user: Credentials): Promise<void> {
@@ -388,7 +392,7 @@ async function switchUser(page: Page, user: Credentials): Promise<void> {
 
 /** En WebKit un clic antes de hidratar se pierde sin error: se repite hasta que el diálogo aparece. */
 async function openFinishDialog(page: Page, orderId: string): Promise<Locator> {
-  await page.goto(packingOrderRoute(orderId));
+  await page.goto(packingOrderRoute(orderId, await firstLineIdOf(orderId)));
   await expect(page.getByTestId(PACKING_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });
   const trigger = page.getByTestId(PACKING_FINISH_BUTTON_TESTID);
   const dialog = page.getByTestId(PACKING_FINISH_DIALOG_TESTID);
@@ -666,7 +670,7 @@ test.describe('envases reales al terminar el empaque', () => {
 
     await updateOrderAndLine(prisma, order.id, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: conditionerId });
     await switchUser(page, conditionerUser);
-    await page.goto(conditioningOrderRoute(order.id));
+    await page.goto(conditioningOrderRoute(order.id, await firstLineIdOf(order.id)));
     const screen = page.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID);
     await expect(screen).toBeVisible({ timeout: 60_000 });
     await expect(screen.getByTestId(CONDITIONING_ORDER_DISTRIBUTION_TESTID)).toContainText(
@@ -813,6 +817,8 @@ test.describe('envases reales al terminar el empaque', () => {
     await expect(page.getByTestId(ORDERS_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId(`${TABLE_ROW_TESTID_PREFIX}${order.id}`)).toHaveCount(1, { timeout: 60_000 });
     await (await openOrderRowMenu(page, orderMenuTrigger(page, order.id), ORDER_ACTION_DELIVER_TESTID)).click();
+    // QT-314: la accion va en «Por receta» y pide la receta en el selector.
+    await pickOrderLine(page, order.orderLineId);
     const deliverySheet = page.getByTestId(DELIVERY_SHEET_TESTID);
     await expect(deliverySheet).toBeVisible({ timeout: 60_000 });
     await expect(deliverySheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });

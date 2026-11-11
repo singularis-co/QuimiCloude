@@ -37,12 +37,16 @@ vi.mock('@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-pr
   };
 });
 
-import { asignaciones } from '@/lib/composition';
+import { asignaciones as asignacionesDeComposicion } from '@/lib/composition';
 import { ConditioningStepOutOfOrderError, OrderNotFoundError } from '@/lib/modules/asignaciones';
 import { createExecutionLogRepository } from '@/lib/modules/asignaciones/adapters/driven/persistence/execution-log-prisma';
 import { normalizeCompanyName } from '@/lib/modules/identity';
 import { prisma } from '@/lib/shared/db/prisma';
+import { onOnlyRecipe } from '../../helpers/only-recipe-plant';
 import { ensureOnlyLine, syncOnlyLine, createOrderWithLine, updateOrderAndLine } from '../../helpers/only-order-line';
+
+// Pedidos de una sola receta: el puente pone su unica linea en la entrada de cada caso de uso.
+const asignaciones = onOnlyRecipe(asignacionesDeComposicion, prisma);
 
 type Actor = { readonly id: string; readonly companyId: string; readonly permissions: readonly string[] };
 

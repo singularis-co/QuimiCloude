@@ -24,6 +24,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { enterAndStartAssignedOrder } from './helpers/confirm-dialog';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
@@ -85,8 +86,10 @@ const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_NEXT_TESTID = 'step-reader-next';
 const STEP_POSITION_TESTID = 'step-reader-position';
 
-const CANCEL_ORDER_BUTTON_NAME = 'Cancelar pedido';
-/** «Cancelar pedido» vive en el menú ⋯ de la cabecera de la ejecución (R23 de QC-265). */
+/** Ítem del menú ⋯ de la cabecera de la ejecución (R23 de QC-265): cancela la receta de la dirección. */
+const CANCEL_RECIPE_TRIGGER_NAME = 'Cancelar esta receta';
+/** Botón que confirma la cancelación dentro del diálogo. */
+const CANCEL_RECIPE_CONFIRM_NAME = 'Cancelar la receta';
 const EXECUTION_ACTIONS_TESTID = 'order-execution-actions';
 const CANCEL_ORDER_TRIGGER_TESTID = 'order-cancel-trigger';
 const CANCEL_REASON_LABEL = /motivo/i;
@@ -127,7 +130,8 @@ async function openFromList(page: Page, order: { id: string; numberText: string 
   await expect(row).toHaveCount(1, { timeout: 60_000 });
 
   await enterAndStartAssignedOrder(page, row.getByTestId(ENTER_TESTID));
-  await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), { timeout: 60_000 });
+  const lineId = await firstLineIdOf(order.id);
+  await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(order.id, lineId)), { timeout: 60_000 });
   await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
 }
 
@@ -391,7 +395,7 @@ test.describe('el registro de ejecucion de un pedido asignado', () => {
 
     await openFromList(page, order);
 
-    // «Cancelar pedido» se pide desde el menú ⋯ de la cabecera. En WebKit un clic antes de hidratar
+    // «Cancelar esta receta» se pide desde el menú ⋯ de la cabecera. En WebKit un clic antes de hidratar
     // se pierde sin error: se repite (abrir el menú si hace falta y elegir el ítem) hasta ver el dialogo.
     const actions = page.getByTestId(EXECUTION_ACTIONS_TESTID);
     const trigger = page.getByTestId(CANCEL_ORDER_TRIGGER_TESTID);
@@ -399,14 +403,14 @@ test.describe('el registro de ejecucion de un pedido asignado', () => {
     await expect(async () => {
       if ((await dialog.count()) === 0) {
         if (!(await trigger.isVisible())) await actions.click();
-        await expect(trigger).toHaveText(CANCEL_ORDER_BUTTON_NAME, { timeout: 5_000 });
+        await expect(trigger).toHaveText(CANCEL_RECIPE_TRIGGER_NAME, { timeout: 5_000 });
         await trigger.click({ timeout: 5_000 });
       }
       await expect(dialog).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 60_000 });
 
     await dialog.getByRole('textbox', { name: CANCEL_REASON_LABEL }).fill(CANCELLATION_REASON);
-    await dialog.getByRole('button', { name: CANCEL_ORDER_BUTTON_NAME, exact: true }).click();
+    await dialog.getByRole('button', { name: CANCEL_RECIPE_CONFIRM_NAME, exact: true }).click();
 
     await page.waitForURL(
       (url) =>

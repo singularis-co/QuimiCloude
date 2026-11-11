@@ -216,6 +216,7 @@ export {
 // reformatea nada de lo de arriba.
 // ---------------------------------------------------------------------------------------
 export type { PackingOrderDetail, PackingOrderRow, PackingOrderViewDeps } from './domain/packing-order-view';
+export type { OtherRecipeView, OutcomeRecipe, RecipePosition } from './domain/recipe-of-order';
 export { createListPackingOrders, type ListPackingOrdersDeps } from './domain/list-packing-orders';
 export { createGetPackingOrder, type GetPackingOrderDeps } from './domain/get-packing-order';
 export { createStartPacking, type StartPackingDeps } from './domain/start-packing';
@@ -251,12 +252,14 @@ export {
   type ExecutionTracePerson,
   type ExecutionTracePresentation,
   type ExecutionTraceRow,
+  type ExecutionTraceRowRecipe,
   type ListExecutionTracesDeps,
 } from './domain/list-execution-traces';
 export {
   createGetExecutionTrace,
   type ExecutionTraceDetail,
   type ExecutionTraceDetailStep,
+  type ExecutionTraceRecipe,
   type GetExecutionTraceDeps,
   type TracePerson,
 } from './domain/get-execution-trace';
@@ -381,6 +384,9 @@ export {
 // ---------------------------------------------------------------------------------------
 export {
   groupEvidenceRows,
+  type ExecutionEvidence,
+  type ExecutionEvidenceRead,
+  type RecipeEvidence,
   type OrderEvidence,
   type OrderEvidenceCount,
   type OrderEvidenceGroup,

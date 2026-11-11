@@ -63,6 +63,7 @@ const SESSION_CONTEXT = { userId: 'user-1', companyId: 'company-1', roleName: 'O
 const ACTOR = { id: 'user-1', companyId: 'company-1', permissions: ['asignaciones.ejecutar'] };
 
 const ORDER_ID = '3f1c9b2e-8d47-4a10-9c65-2b7e4f0a1d38';
+const LINE_ID = '9a2d4c6e-1b3f-4a5c-8d7e-0f1a2b3c4d5e';
 const EVIDENCE_ID = '9a1d4e77-2c3b-4f58-8e06-1b7a9d3c5e02';
 const PATH = `company-1/${ORDER_ID}/5b6f3d21-9c4e-4a7f-8b03-6d2e1f5a9c44`;
 const PHOTOS = [{ id: EVIDENCE_ID, slot: 1, url: 'https://evidencias-e2e.invalid/1' }];
@@ -74,7 +75,7 @@ beforeEach(() => {
 });
 
 describe('requestEvidenceUploadAction', () => {
-  const input = { orderId: ORDER_ID, phase: 'manufacturing' as const, stepPosition: 1 };
+  const input = { orderId: ORDER_ID, lineId: LINE_ID, phase: 'manufacturing' as const, stepPosition: 1 };
 
   it('devuelve el enlace firmado y entrega el actor de la sesion al caso de uso (R18)', async () => {
     requestEvidenceUploadMock.mockResolvedValue({ path: PATH, uploadUrl: 'https://up', token: 't' });
@@ -129,7 +130,7 @@ describe('requestEvidenceUploadAction', () => {
 });
 
 describe('registerEvidenceAction', () => {
-  const input = { orderId: ORDER_ID, phase: 'manufacturing' as const, stepPosition: 1, path: PATH };
+  const input = { orderId: ORDER_ID, lineId: LINE_ID, phase: 'manufacturing' as const, stepPosition: 1, path: PATH };
 
   it('la foto cuenta cuando el servidor la registra: devuelve las fotos del paso (R18)', async () => {
     registerEvidenceMock.mockResolvedValue({ photos: PHOTOS, warnings: [] });
@@ -181,7 +182,7 @@ describe('registerEvidenceAction', () => {
 });
 
 describe('removeEvidenceAction', () => {
-  const input = { orderId: ORDER_ID, phase: 'packing' as const, evidenceId: EVIDENCE_ID };
+  const input = { orderId: ORDER_ID, lineId: LINE_ID, phase: 'packing' as const, evidenceId: EVIDENCE_ID };
 
   it('devuelve las fotos que le quedan al paso, sin las advertencias', async () => {
     removeEvidenceMock.mockResolvedValue({

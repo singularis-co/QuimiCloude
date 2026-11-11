@@ -55,7 +55,9 @@ const PARAMS = { page: 1, pageSize: 10, sort: null, filters: {}, search: '' };
 
 const ASSIGNED: AssignedOrderView = {
   id: 'order-a',
+  lineId: 'linea-order-a',
   numberText: '2026-0000010',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.500',
   priority: 'ALTA',
@@ -68,7 +70,9 @@ const ASSIGNED: AssignedOrderView = {
 
 const FINISHED: FinishedOrderView = {
   id: 'order-f',
+  lineId: 'linea-order-f',
   numberText: '2026-0000011',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '12.5000',
   presentationLines: [],
@@ -80,7 +84,9 @@ const FINISHED: FinishedOrderView = {
 
 const PACKING: PackingOrderRow = {
   id: 'order-p',
+  lineId: 'linea-order-p',
   numberText: '2026-0000012',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '40',
   presentationLines: [],
@@ -95,7 +101,9 @@ const PACKING: PackingOrderRow = {
 
 const CONDITIONING: ConditioningOrderRow = {
   id: 'order-c',
+  lineId: 'linea-order-c',
   numberText: '2026-0000013',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '20',
   unitId: null,
@@ -124,18 +132,18 @@ const TRACE = (id: string) => ({
 
 describe('R19 — «Entrar» del menú lleva a la pantalla de cada vista', () => {
   it('R19: «Por empacar» entra a la pantalla de empaque', () => {
-    expect(menuItems(buildPackingOrdersColumns(), PACKING)).toEqual([ENTER(packingOrderRoute('order-p'))]);
+    expect(menuItems(buildPackingOrdersColumns(), PACKING)).toEqual([ENTER(packingOrderRoute('order-p', 'linea-order-p'))]);
   });
 
   it('R19: «Por acondicionar» entra a la de acondicionamiento', () => {
     expect(menuItems(buildConditioningOrdersColumns(), CONDITIONING)).toEqual([
-      ENTER(conditioningOrderRoute('order-c')),
+      ENTER(conditioningOrderRoute('order-c', 'linea-order-c')),
     ]);
   });
 
   it('R19: «Acondicionados» y «Entregados» (la misma tabla) entran a la de acondicionamiento', () => {
     expect(menuItems(buildConditionedOrdersColumns(), FINISHED)).toEqual([
-      ENTER(conditioningOrderRoute('order-f')),
+      ENTER(conditioningOrderRoute('order-f', 'linea-order-f')),
     ]);
   });
 
@@ -171,15 +179,15 @@ describe('R20 — «Ver recorrido» solo con `dashboard.consultar`', () => {
       }),
     ).toEqual([TRACE('order-a')]);
     expect(menuItems(buildPackingOrdersColumns({ canViewTrace: true }), PACKING)).toEqual([
-      ENTER(packingOrderRoute('order-p')),
+      ENTER(packingOrderRoute('order-p', 'linea-order-p')),
       TRACE('order-p'),
     ]);
     expect(menuItems(buildConditioningOrdersColumns({ canViewTrace: true }), CONDITIONING)).toEqual([
-      ENTER(conditioningOrderRoute('order-c')),
+      ENTER(conditioningOrderRoute('order-c', 'linea-order-c')),
       TRACE('order-c'),
     ]);
     expect(menuItems(buildConditionedOrdersColumns({ canViewTrace: true }), FINISHED)).toEqual([
-      ENTER(conditioningOrderRoute('order-f')),
+      ENTER(conditioningOrderRoute('order-f', 'linea-order-f')),
       TRACE('order-f'),
     ]);
     expect(TRACE('order-a').href).toBe('/dashboard/recorrido/order-a');
@@ -207,7 +215,7 @@ describe('R20 — «Ver recorrido» solo con `dashboard.consultar`', () => {
     render(
       <AssignmentRowActions
         orderNumber="2026-0000012"
-        enterHref={packingOrderRoute('order-p')}
+        enterHref={packingOrderRoute('order-p', 'linea-order-p')}
         traceHref={executionTraceRoute('order-p')}
       />,
     );
@@ -219,7 +227,7 @@ describe('R20 — «Ver recorrido» solo con `dashboard.consultar`', () => {
     const entrar = await screen.findByTestId(ASSIGNMENT_ROW_ENTER_TESTID);
     await esperarInteractiva(entrar);
     expect(entrar).toHaveTextContent('Entrar');
-    expect(entrar).toHaveAttribute('href', '/asignacion/empaque/order-p');
+    expect(entrar).toHaveAttribute('href', '/asignacion/empaque/order-p?receta=linea-order-p');
     expect(screen.getByTestId(ASSIGNMENT_ROW_TRACE_TESTID)).toHaveAttribute(
       'href',
       '/dashboard/recorrido/order-p',
@@ -235,7 +243,7 @@ describe('R18 — en «Mis asignados» «Entrar» es la única acción visible',
     const entrar = columns.find((column) => column.id === 'enter');
     if (entrar === undefined) throw new Error('falta la columna «Entrar»');
     render(<>{entrar.cell({ ...ASSIGNED, status: 'EN_CURSO' })}</>);
-    expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveAttribute('href', '/asignacion/order-a');
+    expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveAttribute('href', '/asignacion/order-a?receta=linea-order-a');
   });
 
   it('R18: pendiente, «Entrar» es un enlace directo: se comienza dentro de la pantalla', () => {
@@ -245,7 +253,7 @@ describe('R18 — en «Mis asignados» «Entrar» es la única acción visible',
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     expect(trigger.tagName).toBe('A');
-    expect(trigger).toHaveAttribute('href', '/asignacion/order-a');
+    expect(trigger).toHaveAttribute('href', '/asignacion/order-a?receta=linea-order-a');
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 });
@@ -263,7 +271,7 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
       />,
     );
 
-    const tarjeta = screen.getByTestId('data-table-card-order-a');
+    const tarjeta = screen.getByTestId('data-table-card-linea-order-a');
     const campo = (id: string) => within(tarjeta).getByTestId(`data-table-card-field-${id}`);
     expect(campo('orderNumber')).toHaveTextContent('2026-0000010');
     expect(within(campo('status')).getByTestId('assigned-order-status')).toHaveTextContent('En fabricación');
@@ -279,7 +287,7 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
     const user = setupUser();
     render(<PackingOrdersTable rows={[PACKING]} params={PARAMS} totalPages={1} />);
 
-    const tarjeta = screen.getByTestId('data-table-card-order-p');
+    const tarjeta = screen.getByTestId('data-table-card-linea-order-p');
     expect(within(tarjeta).queryByRole('link')).toBeNull();
     const acciones = within(tarjeta).getByTestId(ASSIGNMENT_ROW_ACTIONS_TESTID);
     expect(acciones).toHaveTextContent('Acciones');
@@ -290,7 +298,7 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
     expect(dialogo).toHaveAccessibleName('Pedido 2026-0000012');
     expect(within(dialogo).getByTestId(ASSIGNMENT_ROW_ENTER_TESTID)).toHaveAttribute(
       'href',
-      '/asignacion/empaque/order-p',
+      '/asignacion/empaque/order-p?receta=linea-order-p',
     );
   });
 
@@ -299,8 +307,51 @@ describe('R21 — con 760 px o menos, cada fila es una tarjeta', () => {
       <AssignedOrdersTable rows={[ASSIGNED]} params={PARAMS} totalPages={1} vista="asignados" canExecute />,
     );
 
-    const tarjeta = screen.getByTestId('data-table-card-order-a');
+    const tarjeta = screen.getByTestId('data-table-card-linea-order-a');
     expect(within(tarjeta).queryByTestId(ASSIGNMENT_ROW_ACTIONS_TESTID)).toBeNull();
     expect(within(tarjeta).getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toBeInTheDocument();
+  });
+});
+
+describe('R5 — las acciones de una fila actúan sobre el pedido, sea cual sea su receta', () => {
+  const RECETA_2 = { recipe: { position: 2, count: 2 }, recipeName: 'Desengrasante alcalino' } as const;
+
+  it('R5: en la fila de la segunda receta, «Ver recorrido» va al pedido (row.id), no a su lineId', () => {
+    const segundas: [readonly DataTableColumn<never>[], { id: string; lineId: string }][] = [
+      [buildAssignedOrdersColumns({ canExecute: true, canViewTrace: true }) as readonly DataTableColumn<never>[], { ...ASSIGNED, ...RECETA_2, lineId: 'linea-2-order-a' }],
+      [buildFinishedOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...FINISHED, ...RECETA_2, lineId: 'linea-2-order-f' }],
+      [
+        buildCompanyOrdersColumns({ showFinishedAt: false, canViewTrace: true }) as readonly DataTableColumn<never>[],
+        { ...ASSIGNED, ...RECETA_2, lineId: 'linea-2-order-a', responsibles: [], finishedAt: null } as never,
+      ],
+      [buildPackingOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...PACKING, ...RECETA_2, lineId: 'linea-2-order-p' }],
+      [buildConditioningOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...CONDITIONING, ...RECETA_2, lineId: 'linea-2-order-c' }],
+      [buildConditionedOrdersColumns({ canViewTrace: true }) as readonly DataTableColumn<never>[], { ...FINISHED, ...RECETA_2, lineId: 'linea-2-order-f' }],
+    ];
+    for (const [columns, row] of segundas) {
+      const trace = menuItems(columns, row as never).find((item) => item.key === 'trace');
+      expect(trace?.href).toBe(executionTraceRoute(row.id));
+      expect(trace?.href).not.toContain(row.lineId);
+    }
+  });
+
+  it('R5: dos filas del mismo pedido (dos lineId) se pintan aparte y ambas actúan sobre el mismo pedido', async () => {
+    const user = setupUser();
+    const primera: PackingOrderRow = { ...PACKING, recipe: { position: 1, count: 2 } };
+    const segunda: PackingOrderRow = { ...PACKING, ...RECETA_2, lineId: 'linea-2-order-p' };
+    render(<PackingOrdersTable rows={[primera, segunda]} params={PARAMS} totalPages={1} canViewTrace />);
+
+    const tarjeta = screen.getByTestId('data-table-card-linea-2-order-p');
+    expect(screen.getByTestId('data-table-card-linea-order-p')).not.toBe(tarjeta);
+    await user.click(within(tarjeta).getByTestId(ASSIGNMENT_ROW_ACTIONS_TESTID));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByTestId(ASSIGNMENT_ROW_ENTER_TESTID)).toHaveAttribute(
+      'href',
+      packingOrderRoute('order-p', 'linea-2-order-p'),
+    );
+    expect(within(dialogo).getByTestId(ASSIGNMENT_ROW_TRACE_TESTID)).toHaveAttribute(
+      'href',
+      executionTraceRoute('order-p'),
+    );
   });
 });

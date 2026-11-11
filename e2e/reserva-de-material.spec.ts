@@ -52,12 +52,13 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
   assignedOrderRoute,
 } from '@/lib/shared/routes';
 
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
@@ -66,6 +67,13 @@ import {
   ORDER_EXECUTION_FINISH_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
 import { addPackagingLine, openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  ORDER_FORM_LINES_ERROR_TESTID,
+  ORDER_FORM_SAVE_BLOCKED_TESTID,
+} from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
@@ -132,7 +140,7 @@ const ASSIGNED_ORDER_ENTER_TESTID = 'assigned-order-enter';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 
 type Credentials = { readonly username: string; readonly password: string };
 
@@ -212,26 +220,27 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
   await page.goto(ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId('order-create-open').first().click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+  // QT-314: la receta se escribe en su sub-panel, abierto con «Añadir receta» desde el panel.
+  const form = await openCreateOrderPanel(page);
+  const sheet = await openAddOrderLine(page, form);
 
-  const recipePicker = page.getByTestId('recipe-picker');
+  const recipePicker = sheet.getByTestId('recipe-picker');
   await recipePicker.click();
   await recipePicker.fill(RECIPE_NAME);
   const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: RECIPE_NAME });
   await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
   await recipeOption.click();
-  await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
+  await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  await page.getByTestId('order-field-quantity').fill(quantity);
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await sheet.getByTestId('order-field-quantity').fill(quantity);
+  await sheet.getByTestId('presentation-unit-select').click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
   // Toda la cantidad en una sola linea: con contenido 1, un envase por unidad del pedido.
-  const distribution = page.getByTestId('order-distribution-field');
+  const distribution = sheet.getByTestId('order-distribution-field');
   await addPackagingLine(
     page,
-    page.getByTestId('order-form'),
+    sheet,
     { productId: packagingId ?? '', name: PACKAGING_NAME },
     quantity,
   );
@@ -241,7 +250,8 @@ async function submitNewOrder(page: Page, quantity: string): Promise<void> {
     { timeout: 60_000 },
   );
 
-  await page.getByTestId('order-form-submit').click();
+  await applyOrderLine(page, sheet);
+  await form.getByTestId('order-form-submit').click();
 }
 
 /** Crea un pedido que alcanza: se guarda sin aviso y el formulario se cierra. */
@@ -253,9 +263,10 @@ async function createOrder(page: Page, quantity: string): Promise<void> {
 /** Crea un pedido que no alcanza: el alta pide confirmacion y se guarda bloqueado. */
 async function createBlockedOrder(page: Page, quantity: string): Promise<void> {
   await submitNewOrder(page, quantity);
-  const dialog = page.getByTestId('blocked-order-dialog');
+  // QT-314 (R17): el modal de bloqueo pasa a ser el aviso por receta del panel.
+  const dialog = page.getByTestId('order-form').getByTestId(ORDER_FORM_LINES_ERROR_TESTID);
   await expect(dialog).toBeVisible({ timeout: 60_000 });
-  await dialog.getByTestId('blocked-order-confirm').click();
+  await dialog.getByTestId(ORDER_FORM_SAVE_BLOCKED_TESTID).click();
   await expect(dialog).toHaveCount(0, { timeout: 60_000 });
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
@@ -718,7 +729,8 @@ test.describe('reserva de material del pedido', () => {
     const assignedRowB = rowByNumber(page, orderBNumber);
     await expect(assignedRowB).toHaveCount(1, { timeout: 60_000 });
     await enterAndStartAssignedOrder(page, assignedRowB.getByTestId(ASSIGNED_ORDER_ENTER_TESTID));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderB.id), {
+    const lineIdB = await firstLineIdOf(orderB.id);
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(orderB.id, lineIdB)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -734,7 +746,7 @@ test.describe('reserva de material del pedido', () => {
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -746,7 +758,7 @@ test.describe('reserva de material del pedido', () => {
     });
     expect(deliveredOrderB.status).toBe('POR_EMPACAR');
 
-    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    const aviso = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderBNumber);
     await expect(aviso).toContainText('por empacar');

@@ -62,6 +62,7 @@ const SESSION_USER = {
 }
 
 const COMPANY_ID = '33333333-3333-4333-8333-333333333333'
+const LINE_ID = 'c0000000-0000-4000-8000-00000000000a'
 const OTRA_EMPRESA = '44444444-4444-4444-8444-444444444444'
 
 const EXPECTED_ACTOR = {
@@ -74,7 +75,7 @@ const VOID_ACTIONS = [
   {
     nombre: 'listOrderDeliveriesAction',
     useCase: listOrderDeliveriesMock,
-    invocar: () => listOrderDeliveriesAction(VOID_ORDER_ID),
+    invocar: () => listOrderDeliveriesAction(VOID_ORDER_ID, LINE_ID),
   },
   {
     nombre: 'voidDeliveryAction',
@@ -102,16 +103,16 @@ beforeEach(() => {
 })
 
 describe('Server Actions de la anulacion: entrada, actor y resultado', () => {
-  it('R4, R7: listOrderDeliveriesAction entrega el id y el actor de la sesion, y devuelve la vista tal cual', async () => {
+  it('R4, R7: listOrderDeliveriesAction entrega el id, la receta y el actor de la sesion, y devuelve la vista tal cual', async () => {
     const view = deliveryHistoryView()
     listOrderDeliveriesMock.mockResolvedValue(view)
 
-    const result = await listOrderDeliveriesAction(VOID_ORDER_ID)
+    const result = await listOrderDeliveriesAction(VOID_ORDER_ID, LINE_ID)
 
     expect(result).toEqual({ status: 'success', data: view })
     expect(listOrderDeliveriesMock.mock.calls[0]?.[0]).toBe(VOID_ORDER_ID)
     expect(listOrderDeliveriesMock).toHaveBeenCalledTimes(1)
-    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(VOID_ORDER_ID, EXPECTED_ACTOR)
+    expect(listOrderDeliveriesMock).toHaveBeenCalledWith(VOID_ORDER_ID, LINE_ID, EXPECTED_ACTOR)
   })
 
   it('R17: voidDeliveryAction pasa la entrada tal cual al caso de uso, sin quitar ni anadir campos', async () => {
@@ -144,7 +145,7 @@ describe('Server Actions de la anulacion: entrada, actor y resultado', () => {
     const view = deliveryHistoryView({ deliveries: [] })
     listOrderDeliveriesMock.mockResolvedValue(view)
 
-    expect(await listOrderDeliveriesAction(VOID_ORDER_ID)).toEqual({ status: 'success', data: view })
+    expect(await listOrderDeliveriesAction(VOID_ORDER_ID, LINE_ID)).toEqual({ status: 'success', data: view })
   })
 
   for (const action of VOID_ACTIONS) {

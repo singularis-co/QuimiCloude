@@ -76,6 +76,7 @@ import { normalizeRecipeName } from '@/lib/modules/recetas';
 import { prisma } from '@/lib/shared/db/prisma';
 import { ASSIGNED_ORDERS_ROUTE, ORDERS_ROUTE, assignedOrderRoute } from '@/lib/shared/routes';
 
+import { firstLineIdOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
@@ -528,8 +529,15 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
     ).toBeVisible();
 
     // El entregado sin fecha que empaco el NO es «Terminados»: esa vista es solo `TERMINADO`.
-    expect(await rowDomIndex(page, withDateId), 'la fila terminada deberia estar en la tabla').toBeGreaterThanOrEqual(0);
-    expect(await rowDomIndex(page, noDateId), 'el ENTREGADO no deberia estar en «Terminados»').toBe(-1);
+    // La fila de la lista es la de la receta: su `id` es el de la linea del pedido.
+    expect(
+      await rowDomIndex(page, await firstLineIdOf(withDateId)),
+      'la fila terminada deberia estar en la tabla',
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      await rowDomIndex(page, await firstLineIdOf(noDateId)),
+      'el ENTREGADO no deberia estar en «Terminados»',
+    ).toBe(-1);
     await expect(rowByNumber(page, noDateNumber)).toHaveCount(0);
 
     // Ni el pendiente ni el cancelado son «Terminados».
@@ -559,7 +567,7 @@ test.describe('QC-145 — los tres roles en /asignacion y el cierre de /pedidos'
 
     // `/asignacion/<id>` de un pedido al que el Administrador NUNCA fue asignado: "no encontrado",
     // sin que haya escrito nada.
-    await page.goto(assignedOrderRoute(pendingId));
+    await page.goto(assignedOrderRoute(pendingId, await firstLineIdOf(pendingId)));
     await expect(page.getByTestId(ORDER_EXECUTION_ERROR_TESTID)).toBeVisible({ timeout: 60_000 });
   });
 

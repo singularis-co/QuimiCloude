@@ -63,7 +63,7 @@ const DIVERGENT: ConditioningBatchForm = {
 };
 
 function pintar(form: ConditioningBatchForm = { kind: 'empty' }) {
-  return render(<ConditioningBatchDataForm orderId={ORDER_ID} form={form} divergentLabels={LABELS} />);
+  return render(<ConditioningBatchDataForm lineId="linea-1" orderId={ORDER_ID} form={form} divergentLabels={LABELS} />);
 }
 
 function campos() {
@@ -157,7 +157,7 @@ describe('la sección «Datos de lote»', () => {
 });
 
 describe('guardar', () => {
-  it('R13: envía orderId y un solo valor por campo, y confirma con un solo toast', async () => {
+  it('R13, R11: envía orderId, lineId y un solo valor por campo, y confirma con un solo toast', async () => {
     saveActionMock.mockResolvedValue({ status: 'success' });
     const user = setupUser();
     pintar(DIVERGENT);
@@ -170,8 +170,9 @@ describe('guardar', () => {
 
     await waitFor(() => expect(saveActionMock).toHaveBeenCalledTimes(1));
     const enviado = saveActionMock.mock.calls[0]?.[1];
-    expect([...(enviado?.keys() ?? [])].sort()).toEqual(['expiryDate', 'lot', 'orderId', 'productionDate']);
+    expect([...(enviado?.keys() ?? [])].sort()).toEqual(['expiryDate', 'lineId', 'lot', 'orderId', 'productionDate']);
     expect(enviado?.getAll('orderId')).toEqual([ORDER_ID]);
+    expect(enviado?.getAll('lineId')).toEqual(['linea-1']);
     expect(enviado?.getAll('lot')).toEqual(['CR-2610-B']);
     expect(enviado?.getAll('expiryDate')).toEqual(['2027-11-01']);
     expect(enviado?.getAll('productionDate')).toEqual(['2026-10-02']);
@@ -190,7 +191,7 @@ describe('guardar', () => {
     await user.click(guardar());
     await waitFor(() => expect(toastExito).toHaveBeenCalledTimes(1));
 
-    rerender(<ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} />);
+    rerender(<ConditioningBatchDataForm lineId="linea-1" orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} />);
     expect(toastExito).toHaveBeenCalledTimes(1);
 
     await user.click(guardar());
@@ -259,7 +260,7 @@ describe('guardar', () => {
 
 describe('«Datos de lote» bloqueada hasta completar los pasos', () => {
   it('QC-299 R25: con `locked`, los campos y «Guardar datos de lote» van deshabilitados y la nota dice «Al completar los pasos»', () => {
-    render(<ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked />);
+    render(<ConditioningBatchDataForm lineId="linea-1" orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked />);
 
     const nota = screen.getByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID);
     expect(nota).toHaveTextContent('Al completar los pasos');
@@ -272,7 +273,7 @@ describe('«Datos de lote» bloqueada hasta completar los pasos', () => {
   });
 
   it('QC-299 R25: bloqueada, enviar el formulario no llama a la acción', () => {
-    render(<ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked />);
+    render(<ConditioningBatchDataForm lineId="linea-1" orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked />);
 
     fireEvent.click(guardar());
 
@@ -284,7 +285,7 @@ describe('«Datos de lote» bloqueada hasta completar los pasos', () => {
     const sinProp = container.innerHTML;
     cleanup();
     const { container: enFalso } = render(
-      <ConditioningBatchDataForm orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked={false} />,
+      <ConditioningBatchDataForm lineId="linea-1" orderId={ORDER_ID} form={SHARED} divergentLabels={LABELS} locked={false} />,
     );
 
     expect(screen.queryByTestId(CONDITIONING_BATCH_DATA_LOCKED_TESTID)).toBeNull();

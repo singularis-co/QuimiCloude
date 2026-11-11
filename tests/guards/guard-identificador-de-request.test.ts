@@ -255,6 +255,12 @@ export const E2E_ESPERADOS = [
   // consumido y el lote de producto terminado. NO lee ni afirma nada sobre el identificador de
   // peticion ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue INTACTO.
   'pedido-con-varias-recetas.spec.ts',
+  // Alta el 2026-11-09 (QT-314 T18) por el MISMO motivo y en el MISMO sitio que las demas. Lo que
+  // ejercita: alta de un pedido de dos recetas con precio, detalle con avance y totales, cancelar
+  // una receta y anadir otra con «Editar»; afirma receta a receta lo apartado y lo liberado. NO lee
+  // ni afirma nada sobre el identificador de peticion ni sobre `reference`, asi que el
+  // diferimiento de QC-71 R21 sigue INTACTO.
+  'pedidos-varias-recetas.spec.ts',
   'pedidos.spec.ts',
   // Alta el 2026-09-23 (QC-122) por el MISMO motivo y en el MISMO sitio que las demas: esta lista
   // es CERRADA y su punto de extension por diseno es darse de alta en ella. El ancla NO se relaja
@@ -289,6 +295,11 @@ export const E2E_ESPERADOS = [
   // identificador de peticion: el spec no lee ni afirma nada sobre el identificador ni sobre
   // `reference`, asi que el diferimiento de la E2E de ese cruce sigue INTACTO.
   'pedidos-cotizacion.spec.ts',
+  // Alta el 2026-11-10 (QT-315 T12, R33) por el MISMO motivo y en el MISMO sitio que las demas. Lo
+  // que ejercita: un pedido de dos recetas por planta de punta a punta. NO lee ni afirma nada sobre
+  // el identificador de peticion ni sobre `reference`, asi que el diferimiento de QC-71 R21 sigue
+  // INTACTO.
+  'planta-con-varias-recetas.spec.ts',
   'presentaciones.spec.ts',
   'proveedores.spec.ts',
   'recetas-pasos.spec.ts',
@@ -1078,7 +1089,7 @@ export const SUPERFICIES_QUE_APLANAN: readonly SuperficieAplanada[] = [
     motivo: 'mismo canal `error: string` de AsyncAutocomplete que product-name-picker.',
   },
   {
-    archivo: 'app/(private)/pedidos/components/order-form.tsx',
+    archivo: 'app/(private)/pedidos/components/order-line-sheet.tsx',
     idioma: 'set-estado-string',
     ocurrencias: 1,
     motivo:
@@ -1510,13 +1521,13 @@ describe('guardia: casos sinteticos -- cada comprobacion, con su rojo y su verde
 
   it('R17: una entrada de la lista que YA NO aplana se caza — la lista no es un vertedero', () => {
     const arreglada = SUPERFICIES_QUE_APLANAN.filter(
-      ({ archivo }) => archivo !== 'app/(private)/pedidos/components/order-form.tsx',
+      ({ archivo }) => archivo !== 'app/(private)/pedidos/components/order-line-sheet.tsx',
     ).map(({ archivo, idioma }) => ({ relPath: archivo, idioma }))
 
     const rojo = hallazgosDeAplanado(arreglada, SUPERFICIES_QUE_APLANAN)
 
     expect(rojo).toHaveLength(1)
-    expect(rojo[0]).toContain('app/(private)/pedidos/components/order-form.tsx')
+    expect(rojo[0]).toContain('app/(private)/pedidos/components/order-line-sheet.tsx')
     expect(rojo[0]).toContain('ya NO lo hace')
   })
 

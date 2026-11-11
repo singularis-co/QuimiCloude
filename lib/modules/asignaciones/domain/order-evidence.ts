@@ -31,6 +31,22 @@ export type OrderEvidenceRead = {
   readonly signingFailure: string | null;
 };
 
+/** Las fotos de una receta del pedido, por su linea. */
+export type RecipeEvidence = {
+  readonly lineId: string;
+  readonly evidence: OrderEvidence;
+};
+
+/** Las fotos del recorrido: solo las recetas con alguna foto. */
+export type ExecutionEvidence = {
+  readonly recipes: readonly RecipeEvidence[];
+};
+
+export type ExecutionEvidenceRead = {
+  readonly evidence: ExecutionEvidence;
+  readonly signingFailure: string | null;
+};
+
 export type StepEvidenceRowGroup = {
   readonly stepPosition: number;
   readonly rows: readonly StepEvidenceRow[];

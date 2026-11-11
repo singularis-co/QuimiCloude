@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { assignmentViewHref } from '../../../components/assignment-view-params';
 import { OperatorScreenFrame, STEP_READER_SIDE_COLUMN_RESERVE } from '../../../components/operator-screen-frame';
 import { OrderDistributionFull, orderDistributionFullText } from '../../../components/order-distribution-full';
+import { NO_RECIPE_ACCESS, RecipeHeader, type RecipeAccess } from '../../../components/recipe-header';
 
 import { ConditioningActions } from './conditioning-actions';
 import { ConditioningBatchDataForm } from './conditioning-batch-data-form';
@@ -45,6 +46,7 @@ export const CONDITIONING_ORDER_CANDIDATES_ERROR_TESTID = 'conditioning-order-ca
 export const CONDITIONING_ORDER_BATCH_DATA_MISSING_TESTID = 'conditioning-order-batch-data-missing';
 
 export const CONDITIONING_ORDER_SCREEN_TEXTS = {
+  phase: 'Acondicionamiento',
   recipeMissing: 'Esta fórmula está dada de baja.',
   quantityLabel: 'Cantidad:',
   conditionedBy: (name: string) => `Lo acondiciona ${name}.`,
@@ -72,6 +74,8 @@ export type ConditioningOrderScreenProps = {
   /** Sin candidatos «Acondicionar» se pinta deshabilitado. */
   readonly candidates?: ConditioningTeamCandidates | null;
   readonly candidatesError?: ErrorState | null;
+  /** A que otras recetas del pedido puede ir la sesion; sin valor, a ninguna. */
+  readonly access?: RecipeAccess;
 };
 
 export function ConditioningOrderScreen({
@@ -81,6 +85,7 @@ export function ConditioningOrderScreen({
   finishBlocked = false,
   candidates = null,
   candidatesError = null,
+  access = NO_RECIPE_ACCESS,
 }: ConditioningOrderScreenProps) {
   const back = backLink(order.status);
   const batchData = order.batchData;
@@ -112,6 +117,7 @@ export function ConditioningOrderScreen({
         <CardContent>
           <ConditioningBatchDataForm
             orderId={order.id}
+            lineId={order.lineId}
             form={batchData.form}
             divergentLabels={Object.fromEntries(
               batchData.lines.map((line) => [line.presentationId, orderDistributionFullText([line])]),
@@ -135,6 +141,7 @@ export function ConditioningOrderScreen({
       ) : null}
       <ConditioningActions
         orderId={order.id}
+        lineId={order.lineId}
         orderNumber={order.numberText}
         startCandidates={canStart ? candidates : null}
         canFinish={canFinish}
@@ -155,36 +162,46 @@ export function ConditioningOrderScreen({
         testId: CONDITIONING_ORDER_BACK_LINK_TESTID,
         disabled: canFinish,
       }}
-      eyebrow={order.numberText}
-      eyebrowTestId={CONDITIONING_ORDER_NUMBER_TESTID}
-      title={order.recipeName ?? CONDITIONING_ORDER_SCREEN_TEXTS.recipeMissing}
-      titleTestId={CONDITIONING_ORDER_RECIPE_TESTID}
-      subtitle={
-        <>
-          <span
-            className="block"
-            data-testid={CONDITIONING_ORDER_QUANTITY_TESTID}
-            title={exactDecimalTitle(order.quantity)}
-          >
-            {CONDITIONING_ORDER_SCREEN_TEXTS.quantityLabel} {formatDecimalDisplay(order.quantity)}
-            {order.unitLabel === null ? null : ` ${order.unitLabel}`}
-          </span>
-          <div className="mt-2" data-testid={CONDITIONING_ORDER_DISTRIBUTION_TESTID}>
-            <OrderDistributionFull lines={order.presentationLines} withImages />
-          </div>
-          {order.conditionedByName === null ? null : (
-            <span className="block" data-testid={CONDITIONING_ORDER_CONDITIONER_TESTID}>
-              {CONDITIONING_ORDER_SCREEN_TEXTS.conditionedBy(order.conditionedByName)}
-            </span>
-          )}
-        </>
-      }
-      status={
-        <StatusBadge
-          tone={ORDER_STATUS_TONES[order.status]}
-          label={ORDER_STATUS_LABELS[order.status]}
-          data-testid={CONDITIONING_ORDER_STATUS_TESTID}
-          data-status={order.status}
+      heading={
+        <RecipeHeader
+          phase={CONDITIONING_ORDER_SCREEN_TEXTS.phase}
+          orderId={order.id}
+          numberText={order.numberText}
+          numberTestId={CONDITIONING_ORDER_NUMBER_TESTID}
+          recipeName={order.recipeName}
+          recipeMissingText={CONDITIONING_ORDER_SCREEN_TEXTS.recipeMissing}
+          titleTestId={CONDITIONING_ORDER_RECIPE_TESTID}
+          recipe={order.recipe}
+          otherRecipes={order.otherRecipes}
+          access={access}
+          details={
+            <>
+              <span
+                className="block"
+                data-testid={CONDITIONING_ORDER_QUANTITY_TESTID}
+                title={exactDecimalTitle(order.quantity)}
+              >
+                {CONDITIONING_ORDER_SCREEN_TEXTS.quantityLabel} {formatDecimalDisplay(order.quantity)}
+                {order.unitLabel === null ? null : ` ${order.unitLabel}`}
+              </span>
+              <div className="mt-2" data-testid={CONDITIONING_ORDER_DISTRIBUTION_TESTID}>
+                <OrderDistributionFull lines={order.presentationLines} withImages />
+              </div>
+              {order.conditionedByName === null ? null : (
+                <span className="block" data-testid={CONDITIONING_ORDER_CONDITIONER_TESTID}>
+                  {CONDITIONING_ORDER_SCREEN_TEXTS.conditionedBy(order.conditionedByName)}
+                </span>
+              )}
+            </>
+          }
+          status={
+            <StatusBadge
+              tone={ORDER_STATUS_TONES[order.status]}
+              label={ORDER_STATUS_LABELS[order.status]}
+              data-testid={CONDITIONING_ORDER_STATUS_TESTID}
+              data-status={order.status}
+            />
+          }
         />
       }
       // Mientras se recorren los pasos, el pie es el del paso a paso.
@@ -205,6 +222,7 @@ export function ConditioningOrderScreen({
         <div className="grid grid-cols-1 items-start gap-5 @min-[1101px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <ConditioningStepsPanel
             orderId={order.id}
+            lineId={order.lineId}
             conditioning={conditioning}
             view={showsStepReader ? 'steps' : 'done'}
             onViewChange={setStepsView}

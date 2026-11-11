@@ -1495,6 +1495,62 @@
       "w": 380,
       "h": 560,
       "title": "WaBurbuja"
+    },
+    "PedidosVariasRecetas.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "page": "pedidos",
+      "title": "Pedidos con varias recetas (QT-314)",
+      "w": 1440,
+      "x": 0,
+      "y": 7800
+    },
+    "PedidosVariasRecetasTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pedidos",
+      "title": "PedidosVariasRecetasTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 7800
+    },
+    "PedidosVariasRecetasMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "pedidos",
+      "title": "PedidosVariasRecetasMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 7800
+    },
+    "PlantaVariasRecetas.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "page": "operario",
+      "title": "Planta con varias recetas (QT-315)",
+      "w": 1440,
+      "x": 0,
+      "y": 12540
+    },
+    "PlantaVariasRecetasTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "operario",
+      "title": "PlantaVariasRecetasTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 12540
+    },
+    "PlantaVariasRecetasMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "operario",
+      "title": "PlantaVariasRecetasMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 12540
     }
   },
   "createdOnFiles": {
@@ -2112,6 +2168,22 @@
       "w": 1400,
       "x": 0,
       "y": 1530
+    },
+    "t_qt314": {
+      "x": 0,
+      "y": 7520,
+      "text": "QT-314 · Pedido con varias recetas",
+      "kind": "title1",
+      "maxW": 3464,
+      "page": "pedidos"
+    },
+    "t_qt315": {
+      "x": 0,
+      "y": 12260,
+      "text": "QT-315 · Planta con varias recetas",
+      "kind": "title1",
+      "maxW": 3464,
+      "page": "operario"
     }
   },
   "order": [
@@ -2276,7 +2348,13 @@
     "PlantillasWhatsappMovil.dc.html",
     "ModalesPlantillasWhatsapp.dc.html",
     "PlantillaAlta.dc.html",
-    "WaBurbuja.dc.html"
+    "WaBurbuja.dc.html",
+    "PedidosVariasRecetas.dc.html",
+    "PedidosVariasRecetasTablet.dc.html",
+    "PedidosVariasRecetasMovil.dc.html",
+    "PlantaVariasRecetas.dc.html",
+    "PlantaVariasRecetasTablet.dc.html",
+    "PlantaVariasRecetasMovil.dc.html"
   ],
   "pages": [
     {

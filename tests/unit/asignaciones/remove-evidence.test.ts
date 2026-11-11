@@ -18,6 +18,7 @@ import {
   EMPRESA,
   OPERADOR,
   OTRA_EMPRESA,
+  LINEA,
   PEDIDO,
   acceso,
   bucket,
@@ -45,8 +46,8 @@ function montar(options?: Opciones) {
   return { remove: createRemoveEvidence(deps), repo, filas, storage, todos };
 }
 
-const FABRICACION = { orderId: PEDIDO, phase: 'manufacturing', evidenceId: UNA.id } as const;
-const ENVASADO = { orderId: PEDIDO, phase: 'packing', evidenceId: DE_ENVASADO.id } as const;
+const FABRICACION = { orderId: PEDIDO, lineId: LINEA, phase: 'manufacturing', evidenceId: UNA.id } as const;
+const ENVASADO = { orderId: PEDIDO, lineId: LINEA, phase: 'packing', evidenceId: DE_ENVASADO.id } as const;
 
 describe('removeEvidence — autorizacion (R26, R27, R38, R39)', () => {
   it('R26, R27: sin ninguno de los dos permisos rechaza sin tocar ningun puerto', async () => {
@@ -112,7 +113,7 @@ describe('removeEvidence — que borra (R19, R21, R39)', () => {
   it('R19: Quitar borra la fila y el archivo y devuelve las fotos que le quedan al paso, firmadas', async () => {
     const d = montar();
     const result = await d.remove(OPERADOR, FABRICACION);
-    expect(d.repo.delete).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing', UNA.id);
+    expect(d.repo.delete).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'manufacturing', UNA.id);
     expect(d.storage.remove).toHaveBeenCalledWith(UNA.path);
     expect(result).toEqual({
       stepPosition: 2,
@@ -148,7 +149,7 @@ describe('removeEvidence — que borra (R19, R21, R39)', () => {
   it('R27: quien empaca quita fotos de envasado', async () => {
     const d = montar({ status: 'EN_EMPAQUE', packedBy: ANA });
     const result = await d.remove(EMPACADOR, ENVASADO);
-    expect(d.repo.delete).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing', DE_ENVASADO.id);
+    expect(d.repo.delete).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA, 'packing', DE_ENVASADO.id);
     expect(result.stepPosition).toBe(1);
   });
 });

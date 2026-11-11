@@ -1,8 +1,7 @@
 import { requirePermission, type Actor } from './actor';
 import { NotCancellableError, OrderNotFoundError, ValidationError } from './errors';
-import { cancelLockedLine, isCancellableStatus } from './order-cancellation';
+import { cancelLineInsideTransaction } from './order-cancellation';
 import { cancelOrderLineSchema } from './order-input';
-import type { OrderScope } from './order-scope';
 
 import type { OrderUnitOfWork } from '../ports/order-unit-of-work';
 
@@ -29,27 +28,17 @@ export function createCancelOrderLine(
     if (!parsed.success) throw new ValidationError();
     const { reason } = parsed.data;
 
-    const scope: OrderScope = { companyId: actor.companyId };
     const instant = now();
-
-    const result = await deps.unitOfWork.run(async (transaction) => {
-      // Pedido y despues linea, el mismo orden que las demas escrituras, para no cruzar candados.
-      const locked = await transaction.orders.lockAliveLine(orderId, lineId, scope);
-      if (locked === null) return 'not_found' as const;
-      if (!isCancellableStatus(locked.line.status)) return 'not_cancellable' as const;
-
-      await cancelLockedLine(transaction, {
+    const result = await deps.unitOfWork.run((transaction) =>
+      cancelLineInsideTransaction(transaction, {
         orderId,
         lineId,
         reason,
-        releaseReason: 'release',
         actorId: actor.id,
         now: instant,
         companyId: actor.companyId,
-      });
-      await transaction.orders.refreshStatus(orderId, actor.id, instant, scope);
-      return 'ok' as const;
-    });
+      }),
+    );
 
     if (result === 'not_found') throw new OrderNotFoundError();
     if (result === 'not_cancellable') throw new NotCancellableError();

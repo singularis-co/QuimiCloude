@@ -7,7 +7,7 @@ import { OrderNotFoundError, UnauthorizedError } from '@/lib/modules/asignacione
 import { createGetExecutionEvidence } from '@/lib/modules/asignaciones/domain/get-execution-evidence';
 import { PERMISSIONS, ROLE_ADMINISTRADOR, SEED_ROLE_PERMISSIONS } from '@/lib/modules/identity';
 
-import { ANA, EMPRESA, OTRA_EMPRESA, PEDIDO } from './evidence-doubles';
+import { ANA, EMPRESA, filaFoto, LINEA, OTRA_EMPRESA, OTRA_LINEA, PEDIDO } from './evidence-doubles';
 import { FILAS_DEL_PEDIDO, montarLectura } from './order-evidence-doubles';
 
 import type { Actor } from '@/lib/modules/asignaciones/domain/actor';
@@ -57,7 +57,7 @@ describe('getExecutionEvidence — autorizacion antes de todo', () => {
   it('R1: con dashboard.consultar solo, las fotos se leen', async () => {
     const m = montar();
     const lectura = await m.leer(LECTOR, { orderId: PEDIDO });
-    expect(lectura.evidence.manufacturing.length).toBeGreaterThan(0);
+    expect(lectura.evidence.recipes[0]!.evidence.manufacturing.length).toBeGreaterThan(0);
   });
 });
 
@@ -131,5 +131,57 @@ describe('getExecutionEvidence — la empresa del actor', () => {
     await m.leer(LECTOR, { orderId: PEDIDO });
 
     for (const llamada of m.repo.listByOrder.mock.calls) expect(llamada[0]).toBe(EMPRESA);
+  });
+});
+
+describe('getExecutionEvidence — las fotos por receta', () => {
+  const DE_DOS_RECETAS = [
+    filaFoto({ id: 'a-m1', slot: 1, stepPosition: 1 }),
+    filaFoto({ id: 'b-m1', slot: 1, stepPosition: 1, orderLineId: OTRA_LINEA }),
+    filaFoto({ id: 'b-p2', slot: 1, stepPosition: 2, phase: 'packing', orderLineId: OTRA_LINEA }),
+    filaFoto({ id: 'a-c1', slot: 1, stepPosition: 1, phase: 'conditioning' }),
+  ];
+
+  it('R26: cada receta trae solo sus fotos, y una sola firma para todas', async () => {
+    const m = montar({ filas: DE_DOS_RECETAS });
+    const { evidence, signingFailure } = await m.leer(LECTOR, { orderId: PEDIDO });
+
+    expect(signingFailure).toBeNull();
+    const fotos = (lineId: string) => {
+      const receta = evidence.recipes.find((item) => item.lineId === lineId)!;
+      return [receta.evidence.manufacturing, receta.evidence.packing, receta.evidence.conditioning].map((grupos) =>
+        grupos.flatMap((grupo) => (grupo.photos ?? []).map((foto) => foto.id)),
+      );
+    };
+    expect(evidence.recipes.map((item) => item.lineId).sort()).toEqual([LINEA, OTRA_LINEA].sort());
+    expect(fotos(LINEA)).toEqual([['a-m1'], [], ['a-c1']]);
+    expect(fotos(OTRA_LINEA)).toEqual([['b-m1'], ['b-p2'], []]);
+    expect(m.storage.createSignedReadUrls).toHaveBeenCalledTimes(1);
+  });
+
+  it('R26: con la firma caida cada receta conserva sus grupos y su cifra, sin fotos', async () => {
+    const m = montar({ filas: DE_DOS_RECETAS, firmaFalla: new Error('storage caido') });
+    const { evidence, signingFailure } = await m.leer(LECTOR, { orderId: PEDIDO });
+
+    expect(signingFailure).toBe('storage caido');
+    const otra = evidence.recipes.find((item) => item.lineId === OTRA_LINEA)!;
+    expect(otra.evidence.packing).toEqual([{ stepPosition: 2, photoCount: 1, photos: null }]);
+  });
+
+  it('R29: un pedido de una receta da una sola entrada con las mismas fotos de siempre', async () => {
+    const m = montar();
+    const { evidence } = await m.leer(LECTOR, { orderId: PEDIDO });
+    expect(evidence.recipes.map((item) => item.lineId)).toEqual([LINEA]);
+    expect(evidence.recipes[0]!.evidence.manufacturing.map((grupo) => [grupo.stepPosition, grupo.photoCount])).toEqual([
+      [1, 2],
+      [3, 1],
+    ]);
+  });
+
+  it('R25: un pedido sin fotos da la lista de recetas vacia y no firma', async () => {
+    const m = montar({ filas: [] });
+    const { evidence } = await m.leer(LECTOR, { orderId: PEDIDO });
+    expect(evidence.recipes).toEqual([]);
+    expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
   });
 });

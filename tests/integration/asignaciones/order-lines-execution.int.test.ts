@@ -408,7 +408,7 @@ describe('QT-313 T14a — el flujo de planta escribe la linea y deriva el pedido
 });
 
 describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
-  it('QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
+  it('QT-313 R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
     await conFixture(async (fixture) => {
       const { orderId, lines } = await crearPedido(fixture, ['4']);
       const [linea] = lines as [string];
@@ -419,7 +419,7 @@ describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
       const vista = await pedidos.getOrder(orderId, actorDe(fixture));
       expect(vista.status).toBe('TERMINADO');
       // 4 del insumo a 2.5000 y 4 envases a 0.5000.
-      expect(vista.actualCost).toBe('12.0000');
+      expect(vista.lines[0]?.actualCost).toBe('12.0000');
       expect(vista.actualCostTotal).toBe('12.0000');
       expect(vista.lines[0]?.finishedAt?.toISOString()).toBe(terminado.toISOString());
       const etapa = await lineaDe(linea);
@@ -482,11 +482,11 @@ describe('QT-313 T14a — asignaciones opera la unica linea del pedido', () => {
       await asignar(fixture, orderId);
       const actor = actorDe(fixture);
 
-      const abierta = await asignaciones.startAssignedOrder(actor, { orderId });
+      const abierta = await asignaciones.startAssignedOrder(actor, { orderId, lineId: linea });
       expect(abierta.status).toBe('EN_CURSO');
-      await asignaciones.finishAssignedOrder(actor, { orderId, stepPosition: null });
-      await asignaciones.startPacking(actor, { orderId });
-      await asignaciones.finishPacking(actor, { orderId, lines: await conteoDe(linea) });
+      await asignaciones.finishAssignedOrder(actor, { orderId, lineId: linea, stepPosition: null });
+      await asignaciones.startPacking(actor, { orderId, lineId: linea });
+      await asignaciones.finishPacking(actor, { orderId, lineId: linea, counts: (await conteoDe(linea)).map(({ lineId, ...resto }) => ({ presentationLineId: lineId, ...resto })) });
 
       expect((await lineaDe(linea)).status).toBe('POR_ACONDICIONAR');
       expect((await pedidoDe(orderId)).status).toBe('POR_ACONDICIONAR');
@@ -500,7 +500,50 @@ describe('QT-313 T14a — asignaciones opera la unica linea del pedido', () => {
     });
   });
 
-  it('QT-313 R35: con dos lineas en el mismo estado, abrir responde invalid_input sin escribir', async () => {
+  it('R11, R12: con dos lineas PENDIENTE, comenzar la nombrada la deja EN_CURSO, la anota y no toca la otra', async () => {
+    await conFixture(async (fixture) => {
+      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
+      const [primera, segunda] = lines as [string, string];
+      await asignar(fixture, orderId);
+
+      await asignaciones.startAssignedOrder(actorDe(fixture), { orderId, lineId: segunda });
+
+      expect((await lineaDe(segunda)).status).toBe('EN_CURSO');
+      expect((await lineaDe(primera)).status).toBe('PENDIENTE');
+      const anotaciones = await prisma.orderExecutionEntry.findMany({ where: { orderId }, select: { orderLineId: true } });
+      expect(anotaciones.map((anotacion) => anotacion.orderLineId)).toEqual([segunda]);
+    });
+  });
+
+  it('R16, R17, R20: cancelar desde la ejecucion deja CANCELADO solo la receta nombrada, anota en su registro, la otra sigue y el aviso trae la receta', async () => {
+    await conFixture(async (fixture) => {
+      const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
+      const [primera, segunda] = lines as [string, string];
+      await asignar(fixture, orderId);
+
+      const salida = await asignaciones.cancelAssignedOrder(actorDe(fixture), {
+        orderId,
+        lineId: primera,
+        stepPosition: null,
+        reason: 'Se derramo el lote',
+      });
+
+      expect(salida.recipeCount).toBe(2);
+      expect(salida.recipeName).toEqual(expect.any(String));
+
+      expect((await lineaDe(primera)).status).toBe('CANCELADO');
+      expect((await lineaDe(segunda)).status).toBe('PENDIENTE');
+      const anotaciones = await prisma.orderExecutionEntry.findMany({ where: { orderId }, select: { action: true, orderLineId: true } });
+      expect(anotaciones).toEqual([{ action: 'CANCEL', orderLineId: primera }]);
+
+      await expect(
+        asignaciones.cancelAssignedOrder(actorDe(fixture), { orderId, lineId: primera, stepPosition: null, reason: 'otra vez' }),
+      ).rejects.toMatchObject({ code: 'not_cancellable' });
+      expect(await prisma.orderExecutionEntry.count({ where: { orderId } })).toBe(1);
+    });
+  });
+
+  it('R14: sin lineId responde invalid_input sin escribir', async () => {
     await conFixture(async (fixture) => {
       const { orderId, lines } = await crearPedido(fixture, ['2', '3']);
       await asignar(fixture, orderId);

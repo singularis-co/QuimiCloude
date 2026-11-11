@@ -22,6 +22,7 @@ function uuid(seed: string): string {
 
 const EMPRESA = uuid('3');
 const PEDIDO = uuid('7');
+const LINEA = uuid('e');
 const ANA = uuid('1');
 const BETO = uuid('2');
 const CARLA = uuid('4');
@@ -42,25 +43,27 @@ function grupo(id: string, name: string, activeMemberIds: readonly string[]): Wo
 
 describe('startConditioningSchema — la forma de la entrada (R18)', () => {
   it.each([
-    ['sin userIds', { orderId: PEDIDO, workGroupIds: [GRUPO_A] }],
-    ['sin workGroupIds', { orderId: PEDIDO, userIds: [ANA] }],
-    ['sin orderId', { userIds: [ANA], workGroupIds: [] }],
-    ['userIds que no es lista', { orderId: PEDIDO, userIds: ANA, workGroupIds: [] }],
-    ['una persona repetida', { orderId: PEDIDO, userIds: [ANA, BETO, ANA], workGroupIds: [] }],
-    ['un grupo repetido', { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO_A, GRUPO_A] }],
-    ['las dos listas vacias', { orderId: PEDIDO, userIds: [], workGroupIds: [] }],
-    ['un id que no es uuid', { orderId: PEDIDO, userIds: ['ana'], workGroupIds: [] }],
-    ['orderId que no es uuid', { orderId: 'pedido', userIds: [ANA], workGroupIds: [] }],
-    ['una clave de mas (companyId)', { orderId: PEDIDO, userIds: [ANA], workGroupIds: [], companyId: EMPRESA }],
-    ['una clave de mas (workGroupName)', { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO_A], workGroupName: 'x' }],
+    ['sin userIds', { orderId: PEDIDO, lineId: LINEA, workGroupIds: [GRUPO_A] }],
+    ['sin workGroupIds', { orderId: PEDIDO, lineId: LINEA, userIds: [ANA] }],
+    ['sin lineId (R14)', { orderId: PEDIDO, userIds: [ANA], workGroupIds: [] }],
+    ['lineId que no es uuid (R14)', { orderId: PEDIDO, lineId: 'linea-1', userIds: [ANA], workGroupIds: [] }],
+    ['sin orderId', { lineId: LINEA, userIds: [ANA], workGroupIds: [] }],
+    ['userIds que no es lista', { orderId: PEDIDO, lineId: LINEA, userIds: ANA, workGroupIds: [] }],
+    ['una persona repetida', { orderId: PEDIDO, lineId: LINEA, userIds: [ANA, BETO, ANA], workGroupIds: [] }],
+    ['un grupo repetido', { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO_A, GRUPO_A] }],
+    ['las dos listas vacias', { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [] }],
+    ['un id que no es uuid', { orderId: PEDIDO, lineId: LINEA, userIds: ['ana'], workGroupIds: [] }],
+    ['orderId que no es uuid', { orderId: 'pedido', lineId: LINEA, userIds: [ANA], workGroupIds: [] }],
+    ['una clave de mas (companyId)', { orderId: PEDIDO, lineId: LINEA, userIds: [ANA], workGroupIds: [], companyId: EMPRESA }],
+    ['una clave de mas (workGroupName)', { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO_A], workGroupName: 'x' }],
   ])('R18: rechaza %s', (_n, entrada) => {
     expect(startConditioningSchema.safeParse(entrada).success).toBe(false);
   });
 
   it.each([
-    ['solo personas', { orderId: PEDIDO, userIds: [ANA, BETO], workGroupIds: [] }],
-    ['solo grupos', { orderId: PEDIDO, userIds: [], workGroupIds: [GRUPO_A] }],
-    ['las dos', { orderId: PEDIDO, userIds: [ANA], workGroupIds: [GRUPO_A, GRUPO_B] }],
+    ['solo personas', { orderId: PEDIDO, lineId: LINEA, userIds: [ANA, BETO], workGroupIds: [] }],
+    ['solo grupos', { orderId: PEDIDO, lineId: LINEA, userIds: [], workGroupIds: [GRUPO_A] }],
+    ['las dos', { orderId: PEDIDO, lineId: LINEA, userIds: [ANA], workGroupIds: [GRUPO_A, GRUPO_B] }],
   ])('R18: acepta %s', (_n, entrada) => {
     expect(startConditioningSchema.safeParse(entrada)).toEqual({ success: true, data: entrada });
   });

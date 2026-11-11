@@ -8,7 +8,9 @@
  * vista no los necesita, pero una segunda composicion paralela es la que podria divergir el dia que
  * cambie el criterio de nombre de receta, de presentacion o de etiqueta de la unidad.
  */
+import type { OtherRecipeView, RecipePosition } from './recipe-of-order';
 import { composeOrderRows, type ComposeOrderRowsDeps } from './compose-order-rows';
+import { SINGLE_RECIPE } from './recipe-of-order';
 import { unitLabelOf, type OrderDistributionLineView } from './order-distribution-view';
 import type { StepEvidenceView } from './step-evidence';
 
@@ -23,9 +25,14 @@ export type PackingOrderViewDeps = ComposeOrderRowsDeps;
 /** Las piezas que la pantalla de «Por empacar» necesita de cada fila. `packedByName` y `packedById`
  *  viajan vacios (`null`) en `POR_EMPACAR`, porque todavia no hay quien empaca. */
 export type PackingOrderRow = {
+  /** El pedido. */
   readonly id: string;
+  /** La receta del pedido que pinta la fila. */
+  readonly lineId: string;
   readonly numberText: string;
   readonly recipeName: string | null;
+  /** Su lugar entre las recetas del pedido; con `count` 1 la fila no lo muestra. */
+  readonly recipe: RecipePosition;
   /** Cadena decimal, nunca `number`. */
   readonly quantity: string;
   /** El reparto en orden de alta; vacio = «Sin presentacion». Solo lectura. */
@@ -75,6 +82,8 @@ export type PackingFinishView = {
 
 /** La fila de un unico pedido, con los pasos con que se empaca. */
 export type PackingOrderDetail = PackingOrderRow & {
+  /** Las demas recetas del pedido en orden de alta, canceladas incluidas; vacio con una sola. */
+  readonly otherRecipes: readonly OtherRecipeView[];
   /** Vacio salvo `EN_EMPAQUE` a nombre del actor. Nunca trae pasos del operador. */
   readonly packingSteps: readonly RecipeStepView[];
   /** Las fotos de envasado por paso, con URL firmada. Vacio en los mismos casos que `packingSteps`. */
@@ -89,6 +98,25 @@ export async function composePackingOrderRows(
   companyId: string,
   orders: readonly AssignedOrderSummary[],
 ): Promise<readonly PackingOrderRow[]> {
+  const rows = await composePackingRowsWithOthers(deps, companyId, orders);
+  return rows.map(({ row }) => row);
+}
+
+/** La fila de una receta con las demas del pedido, para la pantalla de empaque. */
+export async function composePackingOrderDetailRow(
+  deps: PackingOrderViewDeps,
+  companyId: string,
+  order: AssignedOrderSummary,
+): Promise<(PackingOrderRow & Pick<PackingOrderDetail, 'otherRecipes'>) | undefined> {
+  const [composed] = await composePackingRowsWithOthers(deps, companyId, [order]);
+  return composed === undefined ? undefined : { ...composed.row, otherRecipes: composed.otherRecipes };
+}
+
+async function composePackingRowsWithOthers(
+  deps: PackingOrderViewDeps,
+  companyId: string,
+  orders: readonly AssignedOrderSummary[],
+): Promise<readonly { readonly row: PackingOrderRow; readonly otherRecipes: readonly OtherRecipeView[] }[]> {
   const composed = await composeOrderRows(deps, companyId, orders);
 
   const packerIds = [
@@ -102,10 +130,12 @@ export async function composePackingOrderRows(
 
   return orders.map((order) => {
     const rowComposed = composed.get(order.lineId);
-    return {
+    const row: PackingOrderRow = {
       id: order.id,
+      lineId: order.lineId,
       numberText: formatOrderNumber(order.number),
       recipeName: rowComposed?.recipeName ?? null,
+      recipe: rowComposed?.recipe ?? SINGLE_RECIPE,
       quantity: order.quantity,
       presentationLines: rowComposed?.presentationLines ?? [],
       unitId: order.unitId,
@@ -116,6 +146,7 @@ export async function composePackingOrderRows(
       packedByName: order.packedBy === null ? null : packerNames.get(order.packedBy) ?? order.packedBy,
       packedById: order.packedBy,
     };
+    return { row, otherRecipes: rowComposed?.otherRecipes ?? [] };
   });
 }
 

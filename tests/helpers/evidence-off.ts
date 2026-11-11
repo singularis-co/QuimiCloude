@@ -12,6 +12,7 @@ function noUsado(operation: string): () => Promise<never> {
 
 export const evidenceRepositoryUnused: StepEvidenceRepository = {
   listByOrder: noUsado('listByOrder'),
+  listByLine: noUsado('listByLine'),
   findById: noUsado('findById'),
   insert: noUsado('insert'),
   replace: noUsado('replace'),
@@ -31,6 +32,7 @@ export const evidenceStorageUnused: EvidenceStorage = {
 /** Lector de pasos de fabricacion sin contenido: ningun paso pide evidencia. */
 export const recipesWithoutEvidence = {
   findExecutionContentById: async () => null,
+  findRefsIncludingDeleted: async () => [],
 } as unknown as RecipeCatalog;
 
 /** Lector de pasos de envasado sin pasos. */

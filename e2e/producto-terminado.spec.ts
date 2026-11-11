@@ -58,7 +58,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   INVENTORY_ROUTE,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
@@ -67,6 +67,7 @@ import {
   packingOrderRoute,
 } from '@/lib/shared/routes';
 
+import { firstLineIdOf, pathOf } from './helpers/recipe-route';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import {
@@ -76,7 +77,8 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
-import { addPackagingLine, submitOrderWithLeftover } from './helpers/order-distribution';
+import { addPackagingLine } from './helpers/order-distribution';
+import { applyOrderLine, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { exactProductNameCellText, productRowByNameAndPresentation } from './helpers/product-name-cell';
 import { batchActionsTrigger, openRowActionsMenuItem } from './helpers/row-actions-menu';
@@ -135,7 +137,7 @@ const ASIGNACION_TITLE_TESTID = 'asignacion-title';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 const ORDER_NUMBER_CELL_TESTID = 'data-table-cell-orderNumber';
 const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const NAME_CELL_TESTID = 'data-table-cell-name';
@@ -264,26 +266,27 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
   await gotoSettled(page, ordersUrl());
   await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
 
-  await page.getByTestId('order-create-open').first().click();
-  await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+  // QT-314: la receta se escribe en su sub-panel, abierto con «Añadir receta» desde el panel.
+  const form = await openCreateOrderPanel(page);
+  const sheet = await openAddOrderLine(page, form);
 
-  const recipePicker = page.getByTestId('recipe-picker');
+  const recipePicker = sheet.getByTestId('recipe-picker');
   await recipePicker.click();
   await recipePicker.fill(RECIPE_NAME);
   const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: RECIPE_NAME });
   await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
   await recipeOption.click();
-  await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
+  await expect(sheet.getByTestId('recipe-picker-value')).toHaveValue(recipeId ?? '');
 
-  await page.getByTestId('order-field-quantity').fill(quantity);
-  await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
+  await sheet.getByTestId('order-field-quantity').fill(quantity);
+  await sheet.getByTestId('presentation-unit-select').click();
   await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
 
   // El selector solo ofrece el envase cuando su presentacion ya tiene contenido.
-  const distribution = page.getByTestId('order-distribution-field');
+  const distribution = sheet.getByTestId('order-distribution-field');
   await addPackagingLine(
     page,
-    page.getByTestId('order-form'),
+    sheet,
     { productId: packagingId ?? '', name: PACKAGING_NAME },
     packages,
   );
@@ -293,8 +296,9 @@ async function createOrder(page: Page, quantity: string, packages: string): Prom
     { timeout: 60_000 },
   );
 
-  // 50.5 en 50 envases de 1: queda sobrante y Guardar pregunta antes.
-  await submitOrderWithLeftover(page, page.getByTestId('order-form'));
+  // 50.5 en 50 envases de 1: queda sobrante y, con QT-314, «Aplicar» pregunta antes.
+  await applyOrderLine(page, sheet, { leftover: true });
+  await saveOrder(page, form);
   await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
 }
 
@@ -668,7 +672,8 @@ test.describe('producto terminado', () => {
     const assignedRow = rowByNumber(page, orderNumber);
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     await enterAndStartAssignedOrder(page, assignedRow.getByTestId('assigned-order-enter'));
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(order.id), {
+    const lineId = await firstLineIdOf(order.id);
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(order.id, lineId)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -677,7 +682,7 @@ test.describe('producto terminado', () => {
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -688,7 +693,7 @@ test.describe('producto terminado', () => {
     });
     expect(producedOrder.status).toBe('POR_EMPACAR');
 
-    const aviso = page.getByTestId(DELIVERED_NOTICE_TESTID);
+    const aviso = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
     await expect(aviso).toBeVisible({ timeout: 60_000 });
     await expect(aviso).toContainText(orderNumber);
     await expect(aviso).toContainText('por empacar');
@@ -704,7 +709,7 @@ test.describe('producto terminado', () => {
     await page.goto('about:blank');
     await page.context().clearCookies();
     await loginAndLand(page, empacadorUser);
-    await page.goto(packingOrderRoute(order.id));
+    await page.goto(packingOrderRoute(order.id, lineId));
     await expect(page.getByTestId('packing-order-screen')).toBeVisible({ timeout: 60_000 });
     await clickAndConfirm(page, page.getByTestId('packing-order-start-button'), PACKING_ORDER_START_CONFIRM_TESTID);
     await expect(page.getByTestId('packing-order-finish-button')).toBeVisible({ timeout: 60_000 });

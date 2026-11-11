@@ -54,6 +54,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { pickOrderLine } from './helpers/order-form';
 import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -146,6 +147,8 @@ let companyId: string | null = null;
 let adminUserId: string | null = null;
 let recipeId: string | null = null;
 let orderId: string | null = null;
+/** La unica receta del pedido: «Entregar» es una accion por receta (QT-314). */
+let orderLineId: string | null = null;
 let customerOfOrderId: string | null = null;
 let customerOfDeliveryId: string | null = null;
 let batchOneAId: string | null = null;
@@ -190,6 +193,8 @@ async function gotoOrders(page: Page): Promise<void> {
 async function openDeliverySheet(page: Page, id: string): Promise<Locator> {
   await expect(orderRow(page, id)).toHaveCount(1, { timeout: 60_000 });
   await (await openOrderRowMenu(page, orderMenuTrigger(page, id), ORDER_ACTION_DELIVER_TESTID)).click();
+  // QT-314: la accion va en «Por receta» y pide la receta en el selector.
+  await pickOrderLine(page, required(orderLineId, 'la receta del pedido'));
   const sheet = page.getByTestId(DELIVERY_SHEET_TESTID);
   await expect(sheet).toBeVisible({ timeout: 60_000 });
   await expect(sheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -455,7 +460,7 @@ test.beforeAll(async () => {
         createdBy: adminUserId,
       })
   ).id;
-  const orderLineId = await ensureOnlyLine(prisma, orderId);
+  orderLineId = await ensureOnlyLine(prisma, orderId);
   await prisma.orderPresentationLine.create({
     data: {
       orderId,

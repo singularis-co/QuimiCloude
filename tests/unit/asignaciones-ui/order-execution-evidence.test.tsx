@@ -64,6 +64,9 @@ function ejecucion(overrides: Partial<StartedOrderExecution> = {}): StartedOrder
   return {
     orderId: 'order-1',
     numberText: 'PED-0007',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
+    lineId: 'linea-1',
     status: 'EN_CURSO',
     recipeName: 'Desengrasante alcalino',
     orderQuantity: '250',
@@ -95,7 +98,7 @@ function archivo(): File {
 
 describe('ejecucion — el bloque de evidencia', () => {
   it('R13: el paso que exige evidencia pinta «Evidencia», 0/3, el texto de obligatoria y «Añadir foto»', () => {
-    render(<OrderExecutionScreen execution={ejecucion()} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={ejecucion()} />);
 
     const bloque = screen.getByRole('region', { name: STEP_EVIDENCE_TEXTS.heading });
     expect(within(bloque).getByTestId('step-evidence-count')).toHaveTextContent('0/3');
@@ -105,7 +108,7 @@ describe('ejecucion — el bloque de evidencia', () => {
 
   it('R13: el paso que no exige evidencia no pinta el bloque', async () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={ejecucion({ evidence: [{ stepPosition: 1, photos: [PHOTO] }] })}
       />,
     );
@@ -120,7 +123,7 @@ describe('ejecucion — el bloque de evidencia', () => {
 
   it('R14: al retomar, el paso muestra las fotos que ya tiene', () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={ejecucion({
           evidence: [
             {
@@ -144,7 +147,7 @@ describe('ejecucion — el bloque de evidencia', () => {
   });
 
   it('R15: sin fotos, «Siguiente» queda deshabilitado con su motivo', async () => {
-    render(<OrderExecutionScreen execution={ejecucion()} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={ejecucion()} />);
 
     await esperarPaso();
 
@@ -153,7 +156,7 @@ describe('ejecucion — el bloque de evidencia', () => {
   });
 
   it('R15: en el ultimo paso sin fotos, el boton de terminar queda deshabilitado con su motivo', async () => {
-    render(<OrderExecutionScreen execution={ejecucion({ steps: [paso('Unico', true)] })} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={ejecucion({ steps: [paso('Unico', true)] })} />);
 
     await esperarPaso();
 
@@ -172,7 +175,7 @@ describe('ejecucion — el bloque de evidencia', () => {
         });
       },
     );
-    render(<OrderExecutionScreen execution={ejecucion()} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={ejecucion()} />);
     const user = setupUser();
     await esperarPaso();
 
@@ -184,7 +187,7 @@ describe('ejecucion — el bloque de evidencia', () => {
     expect(motivo()).toBe(STEP_EVIDENCE_TEXTS.uploadingReason);
     expect(mocks.uploadEvidence).toHaveBeenCalledWith(
       expect.any(File),
-      { orderId: 'order-1', phase: 'manufacturing', stepPosition: 1 },
+      { orderId: 'order-1', lineId: 'linea-1', phase: 'manufacturing', stepPosition: 1 },
       expect.objectContaining({
         requestUpload: mocks.requestEvidenceUploadAction,
         register: mocks.registerEvidenceAction,
@@ -205,7 +208,7 @@ describe('ejecucion — el bloque de evidencia', () => {
       stage: 'file',
       message: 'No se pudo subir: pesa más de 4.4 MB. Elige otra foto.',
     });
-    render(<OrderExecutionScreen execution={ejecucion()} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={ejecucion()} />);
     const user = setupUser();
 
     await user.upload(screen.getByTestId('step-evidence-input'), archivo());
@@ -221,7 +224,7 @@ describe('ejecucion — el bloque de evidencia', () => {
     const nueva = { id: 'ev-9', slot: 1, url: 'https://bucket.test/ev-9.jpg' };
     mocks.uploadEvidence.mockResolvedValue({ status: 'success', photos: [nueva] });
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={ejecucion({ evidence: [{ stepPosition: 1, photos: [PHOTO] }] })}
       />,
     );
@@ -232,7 +235,7 @@ describe('ejecucion — el bloque de evidencia', () => {
 
     expect(mocks.uploadEvidence).toHaveBeenCalledWith(
       expect.any(File),
-      { orderId: 'order-1', phase: 'manufacturing', stepPosition: 1, replacesEvidenceId: 'ev-1' },
+      { orderId: 'order-1', lineId: 'linea-1', phase: 'manufacturing', stepPosition: 1, replacesEvidenceId: 'ev-1' },
       expect.anything(),
     );
     expect(await screen.findByRole('button', { name: 'Foto 1 del paso 1' })).toBeVisible();
@@ -245,7 +248,7 @@ describe('ejecucion — el bloque de evidencia', () => {
   it('R19/R15: «Quitar» una foto contada la retira en el servidor y el paso vuelve a bloquearse', async () => {
     mocks.removeEvidenceAction.mockResolvedValue({ status: 'success', data: { photos: [] } });
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={ejecucion({ evidence: [{ stepPosition: 1, photos: [PHOTO] }] })}
       />,
     );
@@ -257,6 +260,7 @@ describe('ejecucion — el bloque de evidencia', () => {
 
     expect(mocks.removeEvidenceAction).toHaveBeenCalledWith({
       orderId: 'order-1',
+      lineId: 'linea-1',
       phase: 'manufacturing',
       evidenceId: 'ev-1',
     });
@@ -274,7 +278,7 @@ describe('ejecucion — terminar con evidencia', () => {
   });
 
   it('R22: con un paso sin fotos, «Finalizar» abre «Falta evidencia» y no la confirmacion', async () => {
-    render(<OrderExecutionScreen execution={SIN_FOTOS_ATRAS} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={SIN_FOTOS_ATRAS} />);
     const user = setupUser();
     await esperarPaso();
 
@@ -287,7 +291,7 @@ describe('ejecucion — terminar con evidencia', () => {
   });
 
   it('R22: el boton «Paso n» lleva a ese paso y anota la vuelta', async () => {
-    render(<OrderExecutionScreen execution={SIN_FOTOS_ATRAS} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={SIN_FOTOS_ATRAS} />);
     const user = setupUser();
     await esperarPaso();
     await user.click(screen.getByTestId('step-reader-finish'));
@@ -299,6 +303,7 @@ describe('ejecucion — terminar con evidencia', () => {
     expect(screen.getByRole('region', { name: STEP_EVIDENCE_TEXTS.heading })).toBeVisible();
     expect(mocks.recordStepMoveAction).toHaveBeenCalledWith({
       orderId: 'order-1',
+      lineId: 'linea-1',
       direction: 'go_back',
       stepPosition: 1,
     });
@@ -306,7 +311,7 @@ describe('ejecucion — terminar con evidencia', () => {
 
   it('R23: sin pasos pendientes y con evidencia en la lista, la confirmacion avisa de que las fotos quedan fijas', async () => {
     render(
-      <OrderExecutionScreen
+      <OrderExecutionScreen lineId="linea-1"
         execution={ejecucion({
           steps: [paso('Unico', true)],
           evidence: [{ stepPosition: 1, photos: [PHOTO] }],
@@ -327,7 +332,7 @@ describe('ejecucion — terminar con evidencia', () => {
   });
 
   it('R23: sin ningun paso con evidencia, la confirmacion conserva su texto de siempre', async () => {
-    render(<OrderExecutionScreen execution={ejecucion({ steps: [paso('Unico')] })} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={ejecucion({ steps: [paso('Unico')] })} />);
     const user = setupUser();
     await esperarPaso();
 

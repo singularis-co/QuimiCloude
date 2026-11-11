@@ -32,11 +32,12 @@ const count = vi.fn()
 /** Los resumenes salen de las lineas: una fila por linea, y su reparto en una segunda consulta. */
 const lineFindMany = vi.fn()
 const lineCount = vi.fn()
+const lineFindFirst = vi.fn()
 const distributionFindMany = vi.fn()
 vi.mock('@/lib/shared/db/prisma', () => ({
   prisma: {
     order: { findFirst, updateMany, findMany, count },
-    orderLine: { findMany: lineFindMany, count: lineCount },
+    orderLine: { findMany: lineFindMany, count: lineCount, findFirst: lineFindFirst },
     orderPresentationLine: { findMany: distributionFindMany },
   },
 }))
@@ -172,6 +173,7 @@ beforeEach(() => {
   count.mockReset()
   lineFindMany.mockReset()
   lineCount.mockReset()
+  lineFindFirst.mockReset()
   distributionFindMany.mockReset()
   distributionFindMany.mockResolvedValue([])
 })
@@ -970,5 +972,174 @@ describe('listOrderDeliveryProgressByIdsIncludingDeleted — receta, reparto y l
   it('con ids vacio no consulta', async () => {
     await expect(listOrderDeliveryProgressByIdsIncludingDeleted(EMPRESA, [])).resolves.toEqual([])
     expect(findMany).not.toHaveBeenCalled()
+  })
+})
+
+const {
+  findAliveOrderLineSummary,
+  listOrderRecipeOutlinesByIdsIncludingDeleted,
+  toOrderRecipesOutline,
+} = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma')
+const { createFindAliveLineSummary } = await import('@/lib/modules/pedidos')
+
+const lineDeps = {
+  ...summaryDeps,
+  summaries: { ...summaryDeps.summaries, findAliveLine: findAliveOrderLineSummary },
+} as unknown as Parameters<typeof createFindAliveLineSummary>[0]
+
+function lineaDeOutline(id: string, status: string, deletedAt: Date | null, quantity = '10.0000') {
+  return { id, recipeId: `r-${id}`, status, quantity: { toFixed: () => quantity }, unitId: 'u-1', deletedAt }
+}
+
+describe('toOrderRecipesOutline — las recetas de un pedido', () => {
+  it('R3, R21, R22: un pedido vivo toma sus lineas vivas en orden de alta, canceladas incluidas; el avance no cuenta las canceladas', () => {
+    const quitada = new Date('2026-11-01T10:00:00.000Z')
+    const outline = toOrderRecipesOutline({
+      id: 'o-1',
+      deletedAt: null,
+      lines: [
+        lineaDeOutline('l-a', 'TERMINADO', null, '12.5000'),
+        lineaDeOutline('l-quitada', 'PENDIENTE', quitada),
+        lineaDeOutline('l-b', 'CANCELADO', null),
+        lineaDeOutline('l-c', 'EN_CURSO', null),
+      ],
+      presentationLines: [
+        { orderLineId: 'l-c', presentationId: 'p-2', packages: 3 },
+        { orderLineId: 'l-a', presentationId: 'p-1', packages: 5 },
+        { orderLineId: 'l-quitada', presentationId: 'p-9', packages: 1 },
+        { orderLineId: 'l-a', presentationId: 'p-2', packages: 2 },
+      ],
+    })
+
+    expect(outline).toEqual({
+      id: 'o-1',
+      deleted: false,
+      recipes: [
+        {
+          lineId: 'l-a',
+          position: 1,
+          recipeId: 'r-l-a',
+          status: 'TERMINADO',
+          quantity: '12.5000',
+          unitId: 'u-1',
+          presentationLines: [
+            { presentationId: 'p-1', packages: 5 },
+            { presentationId: 'p-2', packages: 2 },
+          ],
+        },
+        {
+          lineId: 'l-b',
+          position: 2,
+          recipeId: 'r-l-b',
+          status: 'CANCELADO',
+          quantity: '10.0000',
+          unitId: 'u-1',
+          presentationLines: [],
+        },
+        {
+          lineId: 'l-c',
+          position: 3,
+          recipeId: 'r-l-c',
+          status: 'EN_CURSO',
+          quantity: '10.0000',
+          unitId: 'u-1',
+          presentationLines: [{ presentationId: 'p-2', packages: 3 }],
+        },
+      ],
+      progress: { total: 2, finished: 1 },
+    })
+  })
+
+  it('R24: un pedido dado de baja toma solo las lineas quitadas en el mismo instante que el pedido', () => {
+    const antes = new Date('2026-11-01T10:00:00.000Z')
+    const baja = new Date('2026-11-05T09:30:00.123Z')
+    const outline = toOrderRecipesOutline({
+      id: 'o-baja',
+      deletedAt: baja,
+      lines: [
+        lineaDeOutline('l-quitada-antes', 'PENDIENTE', antes),
+        lineaDeOutline('l-a', 'PENDIENTE', new Date(baja.getTime())),
+        lineaDeOutline('l-b', 'CANCELADO', new Date(baja.getTime())),
+      ],
+      presentationLines: [],
+    })
+
+    expect(outline.deleted).toBe(true)
+    expect(outline.recipes.map((receta) => [receta.lineId, receta.position])).toEqual([
+      ['l-a', 1],
+      ['l-b', 2],
+    ])
+    expect(outline.progress).toEqual({ total: 1, finished: 0 })
+  })
+})
+
+describe('listOrderRecipeOutlinesByIdsIncludingDeleted — una consulta por pagina', () => {
+  it('R24: filtra por empresa sin excluir los dados de baja y pide todas las lineas en orden de alta', async () => {
+    findMany.mockResolvedValue([
+      { id: 'o-1', deletedAt: null, lines: [lineaDeOutline('l-a', 'PENDIENTE', null)], presentationLines: [] },
+    ])
+
+    const outlines = await listOrderRecipeOutlinesByIdsIncludingDeleted(EMPRESA, ['o-1', 'o-2'])
+
+    expect(findMany).toHaveBeenCalledTimes(1)
+    const args = findMany.mock.calls[0]![0] as {
+      where: { AND: readonly Record<string, unknown>[] }
+      select: { lines: { orderBy: unknown; where?: unknown } }
+    }
+    expect(args.where.AND).toEqual([{ companyId: EMPRESA }, { id: { in: ['o-1', 'o-2'] } }])
+    expect(args.where.AND.some((termino) => 'deletedAt' in termino)).toBe(false)
+    expect(args.select.lines.where).toBeUndefined()
+    expect(args.select.lines.orderBy).toEqual([{ position: 'asc' }, { id: 'asc' }])
+    expect(outlines.map((outline) => outline.id)).toEqual(['o-1'])
+  })
+
+  it('R24: con ids vacio no consulta', async () => {
+    await expect(listOrderRecipeOutlinesByIdsIncludingDeleted(EMPRESA, [])).resolves.toEqual([])
+    expect(findMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('findAliveLineSummary — la fila de una linea concreta', () => {
+  it('R14: busca esa linea viva de ese pedido vivo de la empresa, en cualquier estado, y la mapea como el resumen', async () => {
+    lineFindFirst.mockResolvedValue(filaDeLinea({ id: 'l-2', orderId: 'o-1', status: 'CANCELADO' }))
+    distributionFindMany.mockResolvedValue([
+      {
+        id: 'pl-1',
+        orderLineId: 'l-2',
+        presentationId: 'p-1',
+        packages: 4,
+        packedPackages: null,
+        presentationContent: null,
+        packagingProductId: 'env-1',
+      },
+    ])
+
+    const record = await findAliveOrderLineSummary(EMPRESA, 'o-1', 'l-2')
+
+    const args = lineFindFirst.mock.calls[0]![0] as { where: Record<string, unknown> }
+    expect(args.where).toEqual({
+      companyId: EMPRESA,
+      deletedAt: null,
+      order: { AND: [{ companyId: EMPRESA }, { deletedAt: null }] },
+      id: 'l-2',
+      orderId: 'o-1',
+    })
+    expect(args.where).not.toHaveProperty('status')
+    expect(record).toMatchObject({ id: 'o-1', lineId: 'l-2', status: 'CANCELADO' })
+
+    const summary = await createFindAliveLineSummary(lineDeps)(EMPRESA, 'o-1', 'l-2')
+    expect(summary?.presentationLines).toEqual([
+      expect.objectContaining({ id: 'pl-1', packagingProductId: 'env-1', packagingName: 'Envase PET 1L' }),
+    ])
+  })
+
+  it('R14: una linea de otro pedido, quitada, de otra empresa o inexistente da null sin leer envases', async () => {
+    lineFindFirst.mockResolvedValue(null)
+    findPackagingRefs.mockClear()
+
+    await expect(findAliveOrderLineSummary(EMPRESA, 'o-1', 'l-ajena')).resolves.toBeNull()
+    await expect(createFindAliveLineSummary(lineDeps)(EMPRESA, 'o-1', 'l-ajena')).resolves.toBeNull()
+    expect(distributionFindMany).not.toHaveBeenCalled()
+    expect(findPackagingRefs).not.toHaveBeenCalled()
   })
 })

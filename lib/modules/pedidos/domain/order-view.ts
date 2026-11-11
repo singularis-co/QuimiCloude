@@ -151,7 +151,7 @@ export type OrderLineRow = {
  * la UNICA definicion del formato (R14, QC-33 R24); no se persiste ni se vuelve a formatear en
  * ningun otro sitio.
  *
- * `recipeName` es `string | null`: `null` solo si el id no vuelve del catalogo
+ * El `recipeName` de cada linea es `string | null`: `null` solo si el id no vuelve del catalogo
  * -una receta borrada FISICAMENTE por consola, que las FK `RESTRICT` de QC-33 hacen casi
  * imposible-. La fila SIGUE apareciendo (mismo criterio que QC-25 R18 y QC-43 R37). Una receta
  * dada de BAJA si vuelve, con su nombre (R44).
@@ -159,56 +159,23 @@ export type OrderLineRow = {
  * `createdBy`/`updatedBy` son IDENTIFICADORES, no nombres (R46): este modulo no consulta el
  * modelo `User`. Resolverlos es de QC-35.
  *
- * Los campos planos de receta, cantidad, unidad, reparto, precio y coste estimado son los de la
- * primera linea (`lines[0]`), los que la pantalla de una receta ya pinta. `actualCost` es la suma
- * de las lineas activas, igual que `actualCostTotal`. Esta salida no tiene moneda.
+ * Lo de cada receta -receta, cantidad, unidad, reparto, precio y costes- vive solo en `lines`:
+ * el pedido no copia ninguna, para que nadie pinte la primera como si fuera el pedido entero.
+ * Esta salida no tiene moneda.
  */
 export type OrderView = {
   readonly id: string;
   readonly number: OrderNumber;
   readonly numberText: string;
-  readonly recipeId: string;
-  /** El nombre mostrado: «Original · Version» si `recipeId` es una version. */
-  readonly recipeName: string | null;
-  /** `null` si la receta es una original o no vuelve del catalogo. */
-  readonly recipeVersion: {
-    readonly originalId: string;
-    readonly originalName: string;
-    readonly versionName: string;
-  } | null;
-  /** URL publica de la imagen de la receta; la de la original si `recipeId` es una version.
-   *  Llega con la misma lectura del catalogo que `recipeName`, sin consulta por fila. `null` =
-   *  sin imagen, o receta que no vuelve del catalogo. */
-  readonly recipeImageUrl: string | null;
-  readonly quantity: string;
   readonly priority: OrderPriority;
   readonly status: OrderStatus;
   readonly cancellationReason: string | null;
-  readonly ingredientsCost: string | null;
-  /** La parte de envases que ya va dentro de `ingredientsCost`, no un sumando aparte. `null` si y
-   *  solo si `ingredientsCost` lo es. */
-  readonly packagingCost: string | null;
-  /** Coste real de lo consumido, fijado al Terminar el empaque; `null` sin terminar o sin
-   *  calculo posible, nunca `0`. Va aparte del estimado y no lo sustituye. */
-  readonly actualCost: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly createdBy: string | null;
   readonly updatedBy: string | null;
-  /** El reparto en orden de alta; `[]` = sin reparto. Cada linea lleva lo que
-   *  `presentationLinesSchema` acepta, asi que la edicion lo precarga tal cual. */
-  readonly presentationLines: readonly OrderPresentationLineView[];
-  /** La unidad en que se expresa `quantity`; `null` en los pedidos que no la
-   *  tienen todavia. */
-  readonly unitId: string | null;
-  /** El simbolo de la unidad, o su nombre si no tiene simbolo; `null` cuando `unitId`
-   *  es `null`, nunca cuando el id no vuelve del catalogo -la FK con `RESTRICT` hace ese caso
-   *  imposible por construccion-. */
-  readonly unitLabel: string | null;
   /** `null` = pedido sin cliente. Un cliente dado de baja vuelve con `isDeleted: true`. */
   readonly customer: OrderCustomer | null;
-  /** Precio de venta del pedido entero; `null` = sin precio, distinto de `'0.0000'`. */
-  readonly salePrice: string | null;
   /** Las recetas vivas del pedido, canceladas incluidas, por `position`. */
   readonly lines: readonly OrderLineView[];
   /** Lineas activas y cuantas de ellas estan en `TERMINADO` o `ENTREGADO`. */
@@ -229,8 +196,20 @@ export type OrderLineView = {
   readonly recipeId: string;
   /** El nombre mostrado; `null` si la receta no vuelve del catalogo. */
   readonly recipeName: string | null;
+  /** La original de `recipeId`; la misma si `recipeId` ya es una original. */
+  readonly originalRecipeId: string;
+  /** `null` si la receta es una original o no vuelve del catalogo. */
+  readonly recipeVersion: {
+    readonly originalId: string;
+    readonly originalName: string;
+    readonly versionName: string;
+  } | null;
+  /** La de la original si `recipeId` es una version; `null` = sin imagen o receta que no vuelve. */
+  readonly recipeImageUrl: string | null;
   readonly quantity: string;
   readonly unitId: string | null;
+  /** El simbolo de la unidad, o su nombre si no tiene simbolo; `null` cuando `unitId` es `null`. */
+  readonly unitLabel: string | null;
   readonly status: OrderLineStatus;
   readonly cancellationReason: string | null;
   readonly presentationLines: readonly OrderPresentationLineView[];

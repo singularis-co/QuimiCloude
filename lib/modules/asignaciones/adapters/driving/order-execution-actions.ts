@@ -16,8 +16,10 @@ import { redirect } from 'next/navigation';
 import { asignaciones, identity, observabilidad } from '@/lib/composition';
 import { createErrorStateTranslator, type ErrorState } from '@/lib/modules/errores';
 import { AsignacionesError, type Actor, type StartedOrderExecution } from '@/lib/modules/asignaciones';
-import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, DELIVERED_ORDER_PARAM } from '@/lib/shared/routes';
+import { ASSIGNED_ORDERS_ROUTE, CANCELLED_ORDER_PARAM, MANUFACTURED_ORDER_PARAM } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
+
+import { outcomeRoute } from './outcome-query';
 
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
@@ -45,11 +47,11 @@ export type StartAssignedOrderResult =
  * Abre la pantalla: un `PENDIENTE` se lee sin comenzarlo y un `EN_CURSO` se retoma. Lo usa la
  * pagina al renderizar; comenzar es `startAssignedOrderAction`.
  */
-export async function openAssignedOrderAction(orderId: string): Promise<StartAssignedOrderResult> {
+export async function openAssignedOrderAction(orderId: string, lineId: string): Promise<StartAssignedOrderResult> {
   const actor = await currentActor();
 
   try {
-    const data = await asignaciones.openAssignedOrder(actor, { orderId });
+    const data = await asignaciones.openAssignedOrder(actor, { orderId, lineId });
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
@@ -57,15 +59,15 @@ export async function openAssignedOrderAction(orderId: string): Promise<StartAss
 }
 
 /**
- * «Comenzar» de la pantalla: lleva el pedido de `PENDIENTE` a `EN_CURSO` y devuelve la ejecucion
+ * «Comenzar» de la pantalla: lleva la receta de `PENDIENTE` a `EN_CURSO` y devuelve la ejecucion
  * ya comenzada, que la pantalla pinta sin volver a cargar la ruta. No revalida: recargar la ruta
  * anotaria un retomar justo detras del arranque.
  */
-export async function startAssignedOrderAction(orderId: string): Promise<StartAssignedOrderResult> {
+export async function startAssignedOrderAction(orderId: string, lineId: string): Promise<StartAssignedOrderResult> {
   const actor = await currentActor();
 
   try {
-    const data = await asignaciones.startAssignedOrder(actor, { orderId });
+    const data = await asignaciones.startAssignedOrder(actor, { orderId, lineId });
     return { status: 'success', data };
   } catch (error) {
     return toErrorState(error);
@@ -88,31 +90,29 @@ function stepPositionFromFormData(formData: FormData): unknown {
 }
 
 function finishFromFormData(formData: FormData): unknown {
-  return { orderId: formData.get('orderId'), stepPosition: stepPositionFromFormData(formData) };
+  return {
+    orderId: formData.get('orderId'),
+    lineId: formData.get('lineId'),
+    stepPosition: stepPositionFromFormData(formData),
+  };
 }
 
-/**
- * Deja el pedido `POR_EMPACAR` y vuelve a la lista de pedidos asignados.
- *
- * Finalizar ya no da de alta ningun lote, asi que la confirmacion ya no
- * lleva envases ni producto -esa notificacion pasa a Terminar el empaque-.
- */
+/** Deja la receta `POR_EMPACAR` y vuelve a la lista de pedidos asignados con el aviso. */
 export async function finishAssignedOrderAction(
   _prevState: FinishAssignedOrderResult,
   formData: FormData,
 ): Promise<FinishAssignedOrderResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.finishAssignedOrder>>;
   try {
-    ({ numberText } = await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData)));
+    outcome = await asignaciones.finishAssignedOrder(actor, finishFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ [DELIVERED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ [MANUFACTURED_ORDER_PARAM]: outcome.numberText }, outcome));
 }
 
 export type CancelAssignedOrderResult = { status: 'success' } | ErrorState;
@@ -120,32 +120,33 @@ export type CancelAssignedOrderResult = { status: 'success' } | ErrorState;
 function cancelFromFormData(formData: FormData): unknown {
   return {
     orderId: formData.get('orderId'),
+    lineId: formData.get('lineId'),
     stepPosition: stepPositionFromFormData(formData),
     reason: formData.get('reason'),
   };
 }
 
-/** Cancela el pedido desde la ejecucion y vuelve a la lista con la confirmacion. */
+/** Cancela la receta desde la ejecucion y vuelve a la lista con la confirmacion. */
 export async function cancelAssignedOrderAction(
   _prevState: CancelAssignedOrderResult,
   formData: FormData,
 ): Promise<CancelAssignedOrderResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.cancelAssignedOrder>>;
   try {
-    ({ numberText } = await asignaciones.cancelAssignedOrder(actor, cancelFromFormData(formData)));
+    outcome = await asignaciones.cancelAssignedOrder(actor, cancelFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ [CANCELLED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ [CANCELLED_ORDER_PARAM]: outcome.numberText }, outcome));
 }
 
 export type RecordStepMoveInput = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly direction: 'advance' | 'go_back';
   readonly stepPosition: number | null;
 };

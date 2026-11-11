@@ -678,6 +678,9 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
     //
     // QT-313 2026-11-03: `order-line-diff.ts` la consume para la linea editada con cambios, con el
     // mismo «quedarse en su estado» que `update-order.ts` aplicaba al pedido.
+    //
+    // QT-314 2026-11-06: `update-order.ts` deja de llamarla: usa `isEditableOrderLineStatus`, que
+    // vive en el dueno y se publica para la pantalla, en vez de su copia local.
     expect(
       pedidosSources.filter((file) => CONSUME_LA_GUARDIA.test(read(file))).map(etiqueta),
     ).toEqual([
@@ -687,7 +690,6 @@ describe('lib/modules/pedidos — forma del modulo, fronteras y limite de alcanc
       'lib/modules/pedidos/domain/order-packing.ts',
       DUENO,
       'lib/modules/pedidos/domain/transition-order.ts',
-      'lib/modules/pedidos/domain/update-order.ts',
     ])
 
     for (const file of pedidosSources) {

@@ -29,7 +29,6 @@ const {
   setOrderCustomerMock,
   searchOrderCustomersMock,
   getOrderCustomerFilterOptionMock,
-  listOrderLineIdsMock,
   getSessionUserMock,
   getSessionContextMock,
   REQUEST_ID,
@@ -39,8 +38,6 @@ const {
   setOrderCustomerMock: vi.fn(),
   searchOrderCustomersMock: vi.fn(),
   getOrderCustomerFilterOptionMock: vi.fn(),
-  // QT-313: la edicion desde el formulario de una receta nombra la unica linea del pedido.
-  listOrderLineIdsMock: vi.fn(async () => ['0e0e0e0e-0e0e-4e0e-8e0e-0e0e0e0e0e0e']),
   getSessionUserMock: vi.fn(),
   getSessionContextMock: vi.fn(),
   REQUEST_ID: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
@@ -55,7 +52,6 @@ vi.mock('@/lib/composition', () => ({
     setOrderCustomer: setOrderCustomerMock,
     searchOrderCustomers: searchOrderCustomersMock,
     getOrderCustomerFilterOption: getOrderCustomerFilterOptionMock,
-    listOrderLineIds: listOrderLineIdsMock,
   },
 }))
 
@@ -106,13 +102,18 @@ function errorState(code: Parameters<typeof errorMessage>[0]) {
   return { status: 'error', code, message: errorMessage(code) }
 }
 
-function minimalOrderForm(extra: Record<string, string> = {}): FormData {
-  const formData = new FormData()
-  formData.set('recipeId', '22222222-2222-4222-8222-222222222222')
-  formData.set('quantity', '10')
-  formData.set('unitId', '77777777-7777-4777-8777-777777777777')
-  for (const [name, value] of Object.entries(extra)) formData.set(name, value)
-  return formData
+/** Un pedido de una receta, como lo arma el panel. */
+function minimalOrder(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    lines: [
+      {
+        recipeId: '22222222-2222-4222-8222-222222222222',
+        quantity: '10',
+        unitId: '77777777-7777-4777-8777-777777777777',
+      },
+    ],
+    ...extra,
+  }
 }
 
 beforeEach(() => {
@@ -259,9 +260,9 @@ describe('Server Actions del cliente del pedido: traduccion de errores', () => {
   }
 })
 
-describe('Alta y edicion: el campo customerId del formulario', () => {
-  it('R10: createOrderAction entrega el customerId del formulario en el candidato', async () => {
-    await createOrderAction({ status: 'idle' }, minimalOrderForm({ customerId: CUSTOMER_ID }))
+describe('Alta y edicion: el campo customerId de la entrada', () => {
+  it('R10: createOrderAction entrega el customerId de la entrada en el candidato', async () => {
+    await createOrderAction(minimalOrder({ customerId: CUSTOMER_ID }))
 
     expect(createOrderMock).toHaveBeenCalledWith(
       expect.objectContaining({ customerId: CUSTOMER_ID }),
@@ -269,32 +270,33 @@ describe('Alta y edicion: el campo customerId del formulario', () => {
     )
   })
 
-  it('R10: sin campo customerId el candidato lo lleva ausente, y vacio se entrega tal cual al esquema', async () => {
-    await createOrderAction({ status: 'idle' }, minimalOrderForm())
-    await createOrderAction({ status: 'idle' }, minimalOrderForm({ customerId: '' }))
+  it('R10: sin customerId el candidato lo lleva ausente, y vacio se entrega tal cual al esquema', async () => {
+    await createOrderAction(minimalOrder())
+    await createOrderAction(minimalOrder({ customerId: '' }))
 
-    expect(createOrderMock.mock.calls[0]?.[0]).toMatchObject({ customerId: undefined })
+    expect(createOrderMock.mock.calls[0]?.[0]).not.toHaveProperty('customerId')
     expect(createOrderMock.mock.calls[1]?.[0]).toMatchObject({ customerId: '' })
   })
 
-  it('R11: createOrderAction traduce CustomerNotFoundError a customer_not_found', async () => {
+  it('R11: createOrderAction traduce CustomerNotFoundError a customer_not_found, sin posiciones de receta', async () => {
     createOrderMock.mockRejectedValueOnce(new CustomerNotFoundError())
 
-    expect(await createOrderAction({ status: 'idle' }, minimalOrderForm({ customerId: CUSTOMER_ID }))).toEqual(
-      errorState('customer_not_found'),
-    )
+    expect(await createOrderAction(minimalOrder({ customerId: CUSTOMER_ID }))).toEqual({
+      ...errorState('customer_not_found'),
+      linePositions: [],
+    })
   })
 
-  it('R13: updateOrderAction entrega el customerId del formulario y traduce customer_not_found', async () => {
+  it('R13: updateOrderAction entrega el customerId de la entrada y traduce customer_not_found', async () => {
     updateOrderMock.mockRejectedValueOnce(new CustomerNotFoundError())
 
-    const result = await updateOrderAction(ORDER_ID, { status: 'idle' }, minimalOrderForm({ customerId: CUSTOMER_ID }))
+    const result = await updateOrderAction(ORDER_ID, minimalOrder({ customerId: CUSTOMER_ID }))
 
     expect(updateOrderMock).toHaveBeenCalledWith(
       ORDER_ID,
       expect.objectContaining({ customerId: CUSTOMER_ID }),
       EXPECTED_ACTOR,
     )
-    expect(result).toEqual(errorState('customer_not_found'))
+    expect(result).toEqual({ ...errorState('customer_not_found'), linePositions: [] })
   })
 })

@@ -36,6 +36,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/step-evidence-actions', () 
 
 const ACTOR_ID = 'user-me';
 const ORDER_ID = 'order-a';
+const LINE_ID = 'linea-a';
 
 const REVISAR = 'Revisa que cada garrafa esté sellada y sin fugas.';
 const ETIQUETAR = 'Etiqueta cada garrafa con el lote y la fecha de vencimiento.';
@@ -75,7 +76,10 @@ function pasos(overrides: Partial<ConditioningStepsView> = {}): ConditioningStep
 function pedido(conditioningSteps: ConditioningStepsView): ConditioningOrderDetail {
   return {
     id: ORDER_ID,
+    lineId: LINE_ID,
     numberText: '2026-0000006',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Limpiador multiusos limón',
     quantity: '72',
     unitId: null,
@@ -232,8 +236,8 @@ describe('el paso a paso del acondicionador', () => {
     await esperar(0);
 
     expect(recordMock.mock.calls.map(([input]) => input)).toEqual([
-      { orderId: ORDER_ID, stepPosition: 1, responsibleUserIds: ['user-lg', ACTOR_ID] },
-      { orderId: ORDER_ID, stepPosition: 2, responsibleUserIds: [] },
+      { orderId: ORDER_ID, lineId: LINE_ID, stepPosition: 1, responsibleUserIds: ['user-lg', ACTOR_ID] },
+      { orderId: ORDER_ID, lineId: LINE_ID, stepPosition: 2, responsibleUserIds: [] },
     ]);
   });
 
@@ -287,7 +291,7 @@ describe('«Completar pasos» y «Terminar»', () => {
     await esperar(0);
 
     expect(recordMock).toHaveBeenCalledTimes(1);
-    expect(recordMock).toHaveBeenCalledWith({ orderId: ORDER_ID, stepPosition: 3, responsibleUserIds: [ACTOR_ID] });
+    expect(recordMock).toHaveBeenCalledWith({ orderId: ORDER_ID, lineId: LINE_ID, stepPosition: 3, responsibleUserIds: [ACTOR_ID] });
     const hecho = screen.getByTestId(CONDITIONING_STEPS_DONE_TESTID);
     expect(within(hecho).getByRole('heading', { name: 'Pasos completos' })).toBeInTheDocument();
     expect(within(hecho).getByText('Guarda los datos de lote y pulsa «Terminar».')).toBeInTheDocument();

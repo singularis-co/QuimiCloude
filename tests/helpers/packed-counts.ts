@@ -8,3 +8,9 @@ export async function packedCountsOfPlan(orderId: string): Promise<readonly Pack
   const lines = await prisma.orderPresentationLine.findMany({ where: { orderId }, select: { id: true, packages: true } });
   return lines.map((line) => ({ lineId: line.id, packedPackages: line.packages, reason: null, reasonOther: null }));
 }
+
+/** El mismo conteo con la forma de la entrada de Terminar: la linea del reparto va en
+ *  `presentationLineId`. */
+export async function packingCountsOfPlan(orderId: string) {
+  return (await packedCountsOfPlan(orderId)).map(({ lineId, ...resto }) => ({ presentationLineId: lineId, ...resto }));
+}

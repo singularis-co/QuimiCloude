@@ -331,31 +331,35 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
       id: ORDER_ID,
       number: { year: 2026, sequence: 7 },
       numberText: '2026-0000007',
-      recipeId: RECIPE_ID,
-      recipeName: 'Acido citrico 50%',
-      recipeVersion: null,
-      recipeImageUrl: null,
-      quantity: '10.0000',
       priority: 'BAJA',
       status: 'PENDIENTE',
       cancellationReason: null,
-      ingredientsCost: null,
-      packagingCost: null,
-      actualCost: null,
-      salePrice: null,
       createdAt: new Date('2026-01-02T03:04:05.000Z'),
       updatedAt: new Date('2026-01-02T03:04:05.000Z'),
       // R46: los dos autores salen como IDENTIFICADORES; resolver sus nombres es de QC-35.
       createdBy: 'admin-0',
       updatedBy: 'admin-0',
-      // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
-      presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
-      // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
-      unitId: UNIT_ID,
-      unitLabel: 'L',
       customer: null,
-      // QT-313: los campos planos son los de su unica linea, la que sigue.
-      lines: [expect.objectContaining({ recipeId: RECIPE_ID, quantity: '10.0000', unitId: UNIT_ID, status: 'PENDIENTE' })],
+      // QT-314 R24: lo de la receta va solo en su linea; el pedido no copia ningun campo plano.
+      lines: [
+        expect.objectContaining({
+          recipeId: RECIPE_ID,
+          recipeName: 'Acido citrico 50%',
+          recipeVersion: null,
+          recipeImageUrl: null,
+          quantity: '10.0000',
+          status: 'PENDIENTE',
+          ingredientsCost: null,
+          packagingCost: null,
+          actualCost: null,
+          salePrice: null,
+          // R26: el reparto, con el nombre de cada presentacion resuelto por el contrato.
+          presentationLines: [{ presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null }],
+          // [Q4]: la unidad y su etiqueta, resueltas por el contrato de `unidades`.
+          unitId: UNIT_ID,
+          unitLabel: 'L',
+        }),
+      ],
       progress: { total: 1, finished: 0 },
       salePriceTotal: null,
       linesWithoutPrice: 1,
@@ -369,7 +373,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.presentationLines).toEqual([])
+    expect(vista.lines[0]?.presentationLines).toEqual([])
     expect(d.findPresentationRefs).not.toHaveBeenCalled()
   })
 
@@ -389,7 +393,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
     expect(d.findPresentationRefs).toHaveBeenCalledTimes(1)
     expect(d.findPresentationRefs.mock.calls[0]?.[0]).toEqual([OTRA, PRESENTATION_ID])
     // `OTRA` no vuelve del doble del catalogo: la linea sigue saliendo, con el nombre a `null`.
-    expect(vista.presentationLines).toEqual([
+    expect(vista.lines[0]?.presentationLines).toEqual([
       { presentationId: OTRA, presentationName: null, packages: 2, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
       { presentationId: PRESENTATION_ID, presentationName: 'Bidon 20L', packages: 5, packagingProductId: null, packagingName: null, presentationContent: null, presentationUnitLabel: null },
     ])
@@ -400,8 +404,8 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
 
     const vista = await createGetOrder(d)(ORDER_ID, ADMIN)
 
-    expect(vista.unitId).toBeNull()
-    expect(vista.unitLabel).toBeNull()
+    expect(vista.lines[0]?.unitId).toBeNull()
+    expect(vista.lines[0]?.unitLabel).toBeNull()
   })
 
   it('[Q4]: sin simbolo, la etiqueta cae al nombre de la unidad', async () => {
@@ -413,7 +417,7 @@ describe('getOrder — ficha (R42, R43, R46, R29, R33)', () => {
 
     const vista = await createGetOrder(conUnitsSinSimbolo)(ORDER_ID, ADMIN)
 
-    expect(vista.unitLabel).toBe('Litro')
+    expect(vista.lines[0]?.unitLabel).toBe('Litro')
   })
 
   it('devuelve el motivo de un pedido cancelado (R29, R40)', async () => {
@@ -445,7 +449,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
 
     const dFicha = dobles({ fila: CON_IMPORTE })
     const vista = await createGetOrder(dFicha)(ORDER_ID, ADMIN)
-    expect(vista.ingredientsCost).toBe('1234.5600')
+    expect(vista.lines[0]?.ingredientsCost).toBe('1234.5600')
 
     // El listado se monta con dobles propios: `dobles()` de este archivo hace explotar
     // `orders.listAlive` a proposito porque no es el caso de uso que ejercita este fichero.
@@ -476,7 +480,7 @@ describe('lecturas — el importe se devuelve a quien tiene pedidos.consultar (R
       deliveryProgress: fakeDeliveryProgress(),
     })({ page: 1 }, ADMIN)
 
-    expect(pagina.items[0]?.ingredientsCost).toBe('1234.5600')
+    expect(pagina.items[0]?.lines[0]?.ingredientsCost).toBe('1234.5600')
   })
 })
 

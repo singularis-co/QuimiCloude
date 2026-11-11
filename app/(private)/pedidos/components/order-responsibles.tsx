@@ -186,10 +186,8 @@ export type OrderResponsiblesProps = {
    */
   readonly canWrite?: boolean;
   /**
-   * QC-102 R29 — `ENTREGADO` o `CANCELADO`. Con `true` **no se monta** ningun control de asignar
-   * ni de quitar, **y no se pinta ninguna frase que lo explique**: la seccion simplemente calla
-   * (decision cerrada 3, `design.md > 0` H2). El predicado es `isFinalOrderStatus`, que ya existe
-   * y se resuelve arriba: aqui no se compara ningun estado contra literales.
+   * Con `true` no se monta ningun control de asignar ni de quitar, y no se pinta ninguna frase que
+   * lo explique. Lo resuelve quien monta la seccion: aqui no se compara ningun estado.
    */
   readonly isFinal?: boolean;
   /** Catalogo de personas, por props (R27). Vacio → se degrada con su texto (H1). */

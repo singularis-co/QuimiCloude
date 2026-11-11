@@ -237,7 +237,7 @@ async function openDashboard(page: Page, width: number): Promise<void> {
   await loginAndLand(page, adminUser);
   await page.goto(DASHBOARD_ROUTE);
   await expect(page.getByTestId('dashboard-title')).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('dashboard-content').getByTestId('data-table')).toBeVisible({ timeout: 60_000 });
 }
 
 async function openTrace(page: Page, order: SeededOrder): Promise<void> {
@@ -248,8 +248,12 @@ async function openTrace(page: Page, order: SeededOrder): Promise<void> {
   });
 }
 
+/** El pedido sembrado tiene una sola receta: su línea de tiempo vive en la única sección. */
 function steps(page: Page): Locator {
-  return page.getByTestId('execution-trace-timeline').locator('li[data-testid="execution-trace-step"]');
+  return page
+    .getByTestId('execution-trace-recipe-section')
+    .getByTestId('execution-trace-timeline')
+    .locator('li[data-testid="execution-trace-step"]');
 }
 
 async function box(locator: Locator) {

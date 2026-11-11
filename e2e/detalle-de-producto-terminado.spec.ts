@@ -53,6 +53,7 @@ import { INVENTORY_ROUTE, ORDERS_ROUTE, finishedProductDetailRoute } from '@/lib
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { openOrderRowMenu, orderMenuTrigger } from './helpers/order-distribution';
+import { openOrderDetail, pickOrderLine } from './helpers/order-form';
 import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
 
 /** Prefijo con el que este spec marca TODO lo que crea. Nada fuera de el se toca. */
@@ -149,6 +150,8 @@ let companyId: string | null = null;
 let adminUserId: string | null = null;
 let recipeId: string | null = null;
 let orderId: string | null = null;
+/** La unica receta del pedido: «Entregar» es una accion por receta (QT-314). */
+let orderLineId: string | null = null;
 let productId: string | null = null;
 let batchId: string | null = null;
 
@@ -196,6 +199,8 @@ async function gotoOrders(page: Page): Promise<void> {
 async function deliverPart(page: Page, id: string, batch: string, packages: string): Promise<void> {
   await expect(orderRow(page, id)).toHaveCount(1, { timeout: 60_000 });
   await (await openOrderRowMenu(page, orderMenuTrigger(page, id), ORDER_ACTION_DELIVER_TESTID)).click();
+  // QT-314: la accion va en «Por receta» y pide la receta en el selector.
+  await pickOrderLine(page, required(orderLineId, 'la receta del pedido'));
   const sheet = page.getByTestId(DELIVERY_SHEET_TESTID);
   await expect(sheet).toBeVisible({ timeout: 60_000 });
   await expect(sheet.getByTestId(DELIVERY_SUBMIT_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -418,7 +423,7 @@ test.beforeAll(async () => {
       createdBy: adminUserId,
     });
   orderId = order.id;
-  const orderLineId = await ensureOnlyLine(prisma, order.id);
+  orderLineId = await ensureOnlyLine(prisma, order.id);
   const line = await prisma.orderPresentationLine.create({
     data: {
       orderId: order.id,
@@ -496,9 +501,11 @@ test.describe('ficha de producto terminado', () => {
       .poll(() => prisma.orderDelivery.count({ where: { orderId: order } }), { timeout: 30_000 })
       .toBe(1);
 
-    // 2. La presentacion del pedido enlaza a la ficha de su producto.
+    // 2. La presentacion del pedido enlaza a la ficha de su producto. QT-314: el reparto ya no es
+    // columna de la fila; vive en la tarjeta de la receta del detalle, abierto desde el numero.
     await gotoOrders(page);
-    const producedLink = orderRow(page, order).getByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID);
+    const detail = await openOrderDetail(page, order);
+    const producedLink = detail.getByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID);
     await expect(producedLink).toHaveCount(1, { timeout: 60_000 });
     await expect(producedLink).toHaveAttribute('href', finishedProductDetailRoute(product));
     await producedLink.click();

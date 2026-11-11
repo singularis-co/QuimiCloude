@@ -31,6 +31,12 @@ export abstract class PedidosError extends Error {
    */
   readonly diagnostic?: string;
 
+  /**
+   * Las posiciones, en las lineas de la entrada, de las recetas que hacen fallar un alta o una
+   * edicion. A diferencia del diagnostico, si cruzan al navegador: la pantalla marca esas filas.
+   */
+  private positions: readonly number[] = [];
+
   constructor(code: ErrorCode, diagnostic?: string) {
     // R7: el mensaje se resuelve aqui, desde el catalogo. No entra por parametro.
     super(errorMessage(code));
@@ -38,6 +44,24 @@ export abstract class PedidosError extends Error {
     this.name = new.target.name;
     Object.setPrototypeOf(this, new.target.prototype);
   }
+
+  get linePositions(): readonly number[] {
+    return this.positions;
+  }
+
+  /** Se llama solo sobre un error recien construido, justo antes de lanzarlo: las clases no
+   *  aceptan las posiciones por constructor porque solo unas pocas reglas las conocen. */
+  withLinePositions(positions: readonly number[]): this {
+    this.positions = [...positions];
+    return this;
+  }
+}
+
+/** Las posiciones de un error, de menor a mayor y sin repetir. Lo que no es un error del modulo no
+ *  tiene posiciones. */
+export function linePositionsOf(error: unknown): readonly number[] {
+  if (!(error instanceof PedidosError)) return [];
+  return [...new Set(error.linePositions)].sort((a, b) => a - b);
 }
 
 /** QC-74 (R14, R15): actor ausente, sin conjunto de permisos, o sin el permiso exigido en el. */

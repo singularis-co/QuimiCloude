@@ -191,7 +191,9 @@ describe('tablas con la nueva marca', () => {
       items: [
         {
           id: 'order-1',
+          lineId: 'order-1',
           numberText: '2026-0000030',
+          recipe: { position: 1, count: 1 },
           recipeName: 'Jarabe simple',
           quantity: '20',
           presentationLines: [],

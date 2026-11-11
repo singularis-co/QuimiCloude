@@ -3,7 +3,7 @@ import { OrderNotFoundError, OrderWouldBlockError, ValidationError } from './err
 import { DEFAULT_ORDER_STATUS, type OrderLineStatus } from './order-classification';
 import type { StoredOrderCost } from './order-cost';
 import { requireAliveCustomer } from './order-customer';
-import { createOrderWithLinesSchema, type OrderLineInput } from './order-input';
+import { createOrderSchema, type OrderLineInput } from './order-input';
 import { assertNoDuplicateOrderRecipe, atLinePosition } from './order-line-diff';
 import { formatOrderNumber, type OrderNumber } from './order-number';
 import { orderRecipeIds, requireOrderRecipe } from './order-recipe';
@@ -108,7 +108,7 @@ export function createCreateOrder(
     // La empresa sale del actor y jamas de la entrada: nadie puede elegir consultar otra.
     const scope: OrderScope = { companyId: actor.companyId };
 
-    const parsed = createOrderWithLinesSchema.safeParse(input);
+    const parsed = createOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const { confirmBlocked, priority, customerId, lines } = parsed.data;
 
@@ -217,7 +217,7 @@ export function createCreateOrder(
       const blocked = outcomes.flatMap((outcome, position) => (outcome.kind === 'insufficient' ? [position] : []));
       // Lanzar deshace el pedido, sus lineas y lo apartado: sin confirmacion no queda nada.
       if (blocked.length > 0 && !confirmBlocked) {
-        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`);
+        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`).withLinePositions(blocked);
       }
 
       for (const [position, line] of written.entries()) {

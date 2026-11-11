@@ -39,6 +39,9 @@ function paso(texto: string) {
 const EXECUTION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
@@ -74,7 +77,7 @@ function posicionVisible(): string {
 }
 
 describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
-  it('R17 — Siguiente dos veces anota avanzar con 2 y despues con 3, en el orden de los clics', async () => {
+  it('R17, R11 — Siguiente dos veces anota avanzar con 2 y despues con 3, en el orden de los clics', async () => {
     let resolverPrimera: (value: { status: 'success' }) => void = () => undefined;
     recordStepMoveActionMock.mockImplementationOnce(
       () =>
@@ -82,7 +85,7 @@ describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
           resolverPrimera = resolve;
         }),
     );
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     await siguiente();
     await siguiente();
@@ -95,27 +98,27 @@ describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
     await vaciarMicrotareas();
 
     expect(recordStepMoveActionMock.mock.calls).toEqual([
-      [{ orderId: 'order-1', direction: 'advance', stepPosition: 2 }],
-      [{ orderId: 'order-1', direction: 'advance', stepPosition: 3 }],
+      [{ orderId: 'order-1', lineId: 'linea-1', direction: 'advance', stepPosition: 2 }],
+      [{ orderId: 'order-1', lineId: 'linea-1', direction: 'advance', stepPosition: 3 }],
     ]);
   });
 
-  it('R18 — Anterior anota retroceder con la posicion del paso al que se llega', async () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 3 }} />);
+  it('R18, R11 — Anterior anota retroceder con la posicion del paso al que se llega', async () => {
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 3 }} />);
 
     fireEvent.click(screen.getByTestId('step-reader-previous'));
     await vaciarMicrotareas();
 
     expect(posicionVisible()).toContain('Paso 2 de 4');
     expect(recordStepMoveActionMock.mock.calls).toEqual([
-      [{ orderId: 'order-1', direction: 'go_back', stepPosition: 2 }],
+      [{ orderId: 'order-1', lineId: 'linea-1', direction: 'go_back', stepPosition: 2 }],
     ]);
   });
 
   it('R19 — si la anotacion rechaza, el paso cambia igual, sin alerta y sin reintento', async () => {
     recordStepMoveActionMock.mockReset();
     recordStepMoveActionMock.mockRejectedValue(new Error('red caida'));
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     await siguiente();
     await vaciarMicrotareas();
@@ -131,7 +134,7 @@ describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
     recordStepMoveActionMock.mockImplementation(() => {
       throw new Error('fallo sincrono');
     });
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     await siguiente();
     await vaciarMicrotareas();
@@ -148,7 +151,7 @@ describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
       code: 'order_not_found',
       message: 'No existe.',
     });
-    render(<OrderExecutionScreen execution={EXECUTION} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={EXECUTION} />);
 
     await siguiente();
     await vaciarMicrotareas();
@@ -159,7 +162,7 @@ describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
   });
 
   it('R13 — con resumeStepPosition 3 la pantalla abre en «Paso 3 de 4» sin anotar nada', async () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 3 }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 3 }} />);
     await vaciarMicrotareas();
 
     expect(posicionVisible()).toContain('Paso 3 de 4');
@@ -167,14 +170,14 @@ describe('pantalla de ejecucion — anotacion de cada cambio de paso', () => {
   });
 
   it('R14 — una posicion anotada mayor que los pasos de hoy abre en el ultimo paso', () => {
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 9 }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 9 }} />);
 
     expect(posicionVisible()).toContain('Paso 4 de 4');
   });
 
   it('R21 — Finalizar envia la posicion del ultimo paso', async () => {
     finishAssignedOrderActionMock.mockResolvedValue({ status: 'success' });
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 3 }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 3 }} />);
 
     await siguiente();
     await esperarMinimo();

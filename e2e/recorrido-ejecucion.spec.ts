@@ -149,6 +149,8 @@ const TABLE_ROW_TESTID_PREFIX = 'data-table-row-';
 const DASHBOARD_TITLE_TESTID = 'dashboard-title';
 const TRACE_TITLE_TESTID = 'execution-trace-title';
 const TRACE_STEP_TESTID = 'execution-trace-step';
+/** Una `section` por receta del pedido (`ExecutionTraceRecipeSection`). */
+const TRACE_RECIPE_SECTION_TESTID = 'execution-trace-recipe-section';
 
 /** Nombre visible del filtro de personas: la etiqueta de su columna (`execution-trace-columns`). */
 const PERSON_FILTER_LABEL = 'Personas';
@@ -447,7 +449,10 @@ test.describe('el recorrido de ejecucion en el dashboard', () => {
       timeout: 60_000,
     });
 
-    const steps = page.getByRole('list', { name: 'Anotaciones' }).getByTestId(TRACE_STEP_TESTID);
+    // El pedido tiene una sola receta: una sola sección, con sus anotaciones.
+    const section = page.getByTestId(TRACE_RECIPE_SECTION_TESTID);
+    await expect(section).toHaveCount(1);
+    const steps = section.getByRole('list', { name: 'Anotaciones' }).getByTestId(TRACE_STEP_TESTID);
     await expect(steps).toHaveCount(ENTRIES_A.length);
     const actions = await steps.evaluateAll((items) =>
       items.map((item) => item.getAttribute('data-action')),
@@ -520,7 +525,10 @@ test.describe('el recorrido de ejecucion en el dashboard', () => {
     });
     await expect(page.getByText(DELETED_ORDER_MARK, { exact: true })).toBeVisible();
     await expect(
-      page.getByRole('list', { name: 'Anotaciones' }).getByTestId(TRACE_STEP_TESTID),
+      page
+        .getByTestId(TRACE_RECIPE_SECTION_TESTID)
+        .getByRole('list', { name: 'Anotaciones' })
+        .getByTestId(TRACE_STEP_TESTID),
     ).toHaveCount(ENTRIES_DELETED.length);
 
     // La misma pagina pedida directamente responde 200, no 404 (R18).

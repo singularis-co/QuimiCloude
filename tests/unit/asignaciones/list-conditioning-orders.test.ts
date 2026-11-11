@@ -15,6 +15,7 @@ import {
   PEDIDO_2,
   UNIDAD,
   actoresSinElPermiso,
+  lineaDe,
   montar,
   persona,
   receta,
@@ -132,8 +133,10 @@ describe('R7 — cada fila trae numero, receta, reparto completo, estado y quien
 
     expect(fila).toEqual({
       id: PEDIDO_1,
+      lineId: lineaDe(PEDIDO_1),
       numberText: '2026-0000007',
       recipeName: 'Jabon liquido',
+      recipe: { position: 1, count: 1 },
       quantity: '10.0000',
       unitId: UNIDAD,
       unitLabel: 'kg',

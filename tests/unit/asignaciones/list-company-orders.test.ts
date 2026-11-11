@@ -108,7 +108,7 @@ function montar(options?: {
       deleteByWorkGroup: vi.fn(),
       listOrderIdsByUserInCompany: vi.fn(),
     },
-    orders: { listAliveSummariesInCompany } as unknown as OrderCatalog,
+    orders: { listAliveSummariesInCompany, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
     recipes: { findRefsIncludingDeleted } as unknown as RecipeCatalog,
     people: { findRefsIncludingDeletedInCompany },
     presentations: { findRefs: findRefsPresentations } as unknown as PresentationCatalog,
@@ -331,8 +331,10 @@ describe('QC-145 — listCompanyOrders: R25 la fila y sus responsables', () => {
     expect(Object.keys(pagina.items[0] ?? {}).sort()).toEqual(
       [
         'id',
+        'lineId',
         'numberText',
         'recipeName',
+        'recipe',
         'quantity',
         'presentationLines',
         'unitId',

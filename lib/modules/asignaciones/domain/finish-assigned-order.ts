@@ -12,7 +12,8 @@ import {
 import { assertEvidenceComplete } from './evidence-photos';
 import { ExecutionAbortedError, isExecutionSuccess } from './execution-entry';
 import { assertOrderAcceptsWrites } from './order-state';
-import { onlyLineOf } from './only-order-line';
+import { readOutcomeRecipe, type OutcomeRecipe } from './recipe-of-order';
+import { findLine, lineAsTarget, orderLineInputSchema } from './order-line-target';
 
 import type { ExecutionLogRepository } from '../ports/execution-log-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -27,11 +28,10 @@ import type {
   WorkGroupDirectory,
 } from '@/lib/modules/identity';
 
-import { formatOrderNumber, type OrderAssignmentTarget, type OrderCatalog } from '@/lib/modules/pedidos';
+import { formatOrderNumber, type AssignedOrderSummary, type OrderCatalog } from '@/lib/modules/pedidos';
 import type { RecipeCatalog } from '@/lib/modules/recetas';
 
-const finishAssignedOrderSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const finishAssignedOrderSchema = orderLineInputSchema.extend({
   stepPosition: z.number().int().min(1).nullable(),
 });
 
@@ -51,20 +51,19 @@ export type FinishAssignedOrderDeps = {
  * Finalizar ya no da de alta ningun lote de producto terminado -eso se
  * traslada a Terminar el empaque-, asi que ya no hay envases ni producto que devolver aqui.
  */
-export type FinishAssignedOrderResult = {
+export type FinishAssignedOrderResult = OutcomeRecipe & {
   readonly numberText: string;
 };
 
 /**
- * Solo `EN_CURSO` puede finalizarse. `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y `EN_EMPAQUE` los
- * rechaza `assertOrderAcceptsWrites`, con el error propio de cada uno; el unico estado que esa
- * funcion admite sin ser `EN_CURSO` es `PENDIENTE` -abrir la pantalla del pedido ya lo habria
- * dejado `EN_CURSO`, asi que llegar aqui es un Finalizar disparado antes de eso-, y se rechaza
- * con `invalid_transition` en vez de un error propio, porque ese estado no tiene uno.
+ * Solo una linea `EN_CURSO` puede finalizarse. `ENTREGADO`, `CANCELADO`, `POR_EMPACAR` y
+ * `EN_EMPAQUE` los rechaza `assertOrderAcceptsWrites`, con el error propio de cada uno; los que esa
+ * funcion admite sin ser `EN_CURSO` (`PENDIENTE`, `BLOQUEADO`) son un Finalizar disparado antes de
+ * comenzar, y se rechazan con `invalid_transition` porque no tienen error propio.
  */
-function assertFinishable(order: OrderAssignmentTarget): void {
-  if (order.status === 'EN_CURSO') return;
-  assertOrderAcceptsWrites(order);
+function assertFinishable(line: Pick<AssignedOrderSummary, 'id' | 'status'>): void {
+  if (line.status === 'EN_CURSO') return;
+  assertOrderAcceptsWrites(lineAsTarget(line));
   throw new InvalidTransitionError();
 }
 
@@ -159,14 +158,12 @@ async function compensatePackerAssignments(
 }
 
 /**
- * Deja el pedido en `POR_EMPACAR`, no en `ENTREGADO`: el Empacador lo entrega despues, con
- * Terminar. No recibe ni admite ningun dato de lo marcado: la entrada es el pedido y la posicion
- * del paso en que se finaliza, que se anota con la transicion en la misma transaccion.
+ * Deja la receta nombrada en `POR_EMPACAR`. No recibe ni admite ningun dato de lo marcado: la
+ * entrada es la receta y la posicion del paso en que se finaliza, que se anota con la transicion en
+ * la misma transaccion.
  *
- * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar que
- * queda por empacar, junto con los envases y el producto terminado que recibio el lote. Se lee
- * ANTES de transicionar: una vez `POR_EMPACAR`, el pedido ya no aparece entre los estados de
- * trabajo que consulta `listAliveSummariesByIds`.
+ * Devuelve el numero visible del pedido para que la lista, al volver, pueda confirmar que la
+ * receta queda por empacar.
  *
  * `transitionAliveById` consume el material por dentro: `'insufficient_material'` se traduce a
  * `MaterialShortageError` y `'recipe_without_lines'` a `RecipeWithoutLinesError`, las dos
@@ -187,34 +184,28 @@ export function createFinishAssignedOrder(
 
     const parsed = finishAssignedOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, stepPosition } = parsed.data;
+    const { orderId, lineId, stepPosition } = parsed.data;
 
     const ids = await deps.assignments.listOrderIdsByUserInCompany(actor.companyId, actor.id);
     if (!ids.includes(orderId)) throw new OrderNotFoundError();
 
-    let order: OrderAssignmentTarget | null = await deps.orders.findAliveById(
-      orderId,
-      actor.companyId,
-    );
-    if (order === null) throw new OrderNotFoundError();
-    assertFinishable(order);
-
-    const summaryPage = await deps.orders.listAliveSummariesByIds(
-      actor.companyId,
-      [orderId],
-      [order.status],
-      1,
-      1,
-    );
-    const summary = onlyLineOf(summaryPage);
-    if (summary === undefined) throw new OrderNotFoundError();
+    const summary = await findLine(deps.orders, actor.companyId, orderId, lineId);
+    assertFinishable(summary);
     const numberText = formatOrderNumber(summary.number);
 
     // Fuera de la transaccion: quitar la ultima foto justo al finalizar lo provoca la misma
     // persona desde su pantalla, que ya bloquea el boton.
     const content = await deps.recipes.findExecutionContentById(summary.recipeId, actor.companyId);
-    await assertEvidenceComplete(deps.evidence, actor.companyId, orderId, 'manufacturing', content?.steps ?? []);
+    await assertEvidenceComplete(
+      deps.evidence,
+      actor.companyId,
+      orderId,
+      summary.lineId,
+      'manufacturing',
+      content?.steps ?? [],
+    );
 
+    const outcomeRecipe = await readOutcomeRecipe(deps, actor.companyId, orderId, summary.recipeId);
     const now = deps.now?.() ?? new Date();
     // El auto-asignado del empacador, ANTES de transicionar y UNA sola vez: el reintento
     // `stale` solo repite la transicion. Si esta falla despues, se compensa lo creado.
@@ -244,7 +235,7 @@ export function createFinishAssignedOrder(
             occurredAt: now,
           });
         });
-        return { numberText };
+        return { numberText, ...outcomeRecipe };
       } catch (error) {
         await compensatePackerAssignments(deps, actor.companyId, orderId, createdPackerIds);
         if (!(error instanceof ExecutionAbortedError)) throw error;
@@ -255,9 +246,7 @@ export function createFinishAssignedOrder(
       }
       // 'stale': alguien lo movio entre la lectura y esta llamada. Se relee y se reintenta
       // contra el estado real.
-      order = await deps.orders.findAliveById(orderId, actor.companyId);
-      if (order === null) throw new OrderNotFoundError();
-      assertFinishable(order);
+      assertFinishable(await findLine(deps.orders, actor.companyId, orderId, lineId));
     }
   };
 }

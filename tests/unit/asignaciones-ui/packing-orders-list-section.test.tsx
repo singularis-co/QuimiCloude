@@ -53,7 +53,9 @@ function paginaCon(items: readonly unknown[], overrides: Partial<Record<string, 
 
 const ORDER_ROW = {
   id: 'order-1',
+  lineId: 'linea-order-1',
   numberText: '2026-0000030',
+  recipe: { position: 1, count: 1 },
   recipeName: 'Jarabe simple',
   quantity: '20',
   presentationLines: [{ presentationId: 'pres-1', presentationName: 'Caja x 12', packages: 4 }],
@@ -89,11 +91,11 @@ describe('R14, R16 - la seccion pide la pagina y pinta la fila con sus seis dato
     );
     expect(screen.getByTestId('packing-orders-list-section')).toBeInTheDocument();
     const tabla = screen.getByRole('table');
-    expect(within(tabla).getByTestId('data-table-row-order-1')).toBeInTheDocument();
+    expect(within(tabla).getByTestId('data-table-row-linea-order-1')).toBeInTheDocument();
     expect(screen.queryByTestId('packing-order-link')).toBeNull();
     await user.click(within(tabla).getByRole('button', { name: 'Acciones del pedido 2026-0000030' }));
     const entrar = await esperarInteractiva(await screen.findByTestId('assignment-row-enter'));
-    expect(entrar).toHaveAttribute('href', '/asignacion/empaque/order-1');
+    expect(entrar).toHaveAttribute('href', '/asignacion/empaque/order-1?receta=linea-order-1');
   });
 });
 

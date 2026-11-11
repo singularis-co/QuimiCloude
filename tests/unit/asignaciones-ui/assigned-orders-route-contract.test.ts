@@ -48,8 +48,8 @@ describe('la ruta de pedidos asignados se declara una sola vez (R1, R33)', () =>
 
   it('existe un helper de ruta de detalle y deriva de la constante (R21, R22)', () => {
     expect(typeof assignedOrderRoute).toBe('function');
-    expect(assignedOrderRoute('x')).toBe('/asignacion/x');
-    expect(assignedOrderRoute('x')).toBe(`${ASSIGNED_ORDERS_ROUTE}/x`);
+    expect(assignedOrderRoute('x', 'y')).toBe('/asignacion/x?receta=y');
+    expect(assignedOrderRoute('x', 'y')).toBe(`${ASSIGNED_ORDERS_ROUTE}/x?receta=y`);
   });
 
   it('nadie redeclara la constante: private-nav la IMPORTA', () => {

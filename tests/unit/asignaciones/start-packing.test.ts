@@ -25,6 +25,7 @@ const ANA = uuid('1');
 const PEDIDO = uuid('7');
 const LINEA = uuid('e');
 const OTRA_EMPRESA = uuid('9');
+const OTRA_LINEA = uuid('f');
 const AHORA = new Date('2026-09-25T12:00:00.000Z');
 
 const ACTOR: Actor = { id: ANA, companyId: EMPRESA, permissions: ['empaque.modificar'] };
@@ -38,12 +39,13 @@ type Estado = { dentroDeRun: boolean; appendDentroDeRun: boolean | null; confirm
 // (resolvio) o deshizo (lanzo): solo lo confirmado llega a `filas`.
 function montar(
   resultado: Resultado,
-  options?: { readonly appendFalla?: Error },
+  options?: { readonly appendFalla?: Error; readonly lineStatus?: string },
 ): {
   readonly deps: StartPackingDeps;
   readonly startPackingAliveById: ReturnType<typeof vi.fn>;
   readonly globalStartPackingAliveById: ReturnType<typeof vi.fn>;
   readonly run: ReturnType<typeof vi.fn>;
+  readonly findAliveLineSummary: ReturnType<typeof vi.fn>;
   readonly append: ReturnType<typeof vi.fn>;
   readonly depsAppend: ReturnType<typeof vi.fn>;
   readonly filas: NewExecutionEntry[];
@@ -82,21 +84,17 @@ function montar(
 
   const globalStartPackingAliveById = vi.fn(async () => resultado);
   const depsAppend = vi.fn(async () => undefined);
-  // La unica linea del pedido, en un estado de empaque: la que Comenzar opera.
-  const listAliveSummariesByIds = vi.fn(async () => ({
-    items: [{ id: PEDIDO, lineId: LINEA }],
-    total: 1,
-    page: 1,
-    pageSize: 1,
-    totalPages: 1,
-  }));
+  // Dos recetas del pedido en el mismo estado de empaque; la empresa la juzga la escritura.
+  const findAliveLineSummary = vi.fn(async (_companyId: string, orderId: string, lineId: string) =>
+    lineId === LINEA || lineId === OTRA_LINEA ? { id: orderId, lineId, status: options?.lineStatus ?? 'POR_EMPACAR' } : null,
+  );
   const deps = {
-    orders: { startPackingAliveById: globalStartPackingAliveById, listAliveSummariesByIds },
+    orders: { startPackingAliveById: globalStartPackingAliveById, findAliveLineSummary },
     log: { append: depsAppend, findLastStepPosition: vi.fn(async () => null) },
     transaction: { run },
     now: () => AHORA,
   } as unknown as StartPackingDeps;
-  return { deps, startPackingAliveById, globalStartPackingAliveById, run, append, depsAppend, filas, estado };
+  return { deps, startPackingAliveById, globalStartPackingAliveById, run, findAliveLineSummary, append, depsAppend, filas, estado };
 }
 
 describe('startPacking — autorizacion (R13)', () => {
@@ -104,7 +102,7 @@ describe('startPacking — autorizacion (R13)', () => {
     const { deps, startPackingAliveById } = montar('ok');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(null, { orderId: PEDIDO })).rejects.toBeInstanceOf(AsignacionesError);
+    await expect(startPacking(null, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(AsignacionesError);
     expect(startPackingAliveById).not.toHaveBeenCalled();
   });
 
@@ -113,7 +111,7 @@ describe('startPacking — autorizacion (R13)', () => {
     const startPacking = createStartPacking(deps);
 
     await expect(
-      startPacking({ id: ANA, companyId: EMPRESA } as unknown as Actor, { orderId: PEDIDO }),
+      startPacking({ id: ANA, companyId: EMPRESA } as unknown as Actor, { orderId: PEDIDO, lineId: LINEA }),
     ).rejects.toBeInstanceOf(AsignacionesError);
     expect(startPackingAliveById).not.toHaveBeenCalled();
   });
@@ -122,7 +120,7 @@ describe('startPacking — autorizacion (R13)', () => {
     const { deps, startPackingAliveById } = montar('ok');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: PEDIDO })).rejects.toThrow(
+    await expect(startPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: PEDIDO, lineId: LINEA })).rejects.toThrow(
       UnauthorizedError,
     );
     expect(startPackingAliveById).not.toHaveBeenCalled();
@@ -133,7 +131,7 @@ describe('startPacking — autorizacion (R13)', () => {
     const startPacking = createStartPacking(deps);
     const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.consultar'] };
 
-    await expect(startPacking(actor, { orderId: PEDIDO })).rejects.toThrow(UnauthorizedError);
+    await expect(startPacking(actor, { orderId: PEDIDO, lineId: LINEA })).rejects.toThrow(UnauthorizedError);
     expect(startPackingAliveById).not.toHaveBeenCalled();
   });
 
@@ -141,7 +139,7 @@ describe('startPacking — autorizacion (R13)', () => {
     const { deps, startPackingAliveById } = montar('ok');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: 'no-es-uuid' })).rejects.toThrow(
+    await expect(startPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: 'no-es-uuid', lineId: LINEA })).rejects.toThrow(
       UnauthorizedError,
     );
     expect(startPackingAliveById).not.toHaveBeenCalled();
@@ -153,7 +151,7 @@ describe('startPacking — R18: `ok` deja al actor como quien empaca', () => {
     const { deps, startPackingAliveById } = montar('ok');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: PEDIDO })).resolves.toBeUndefined();
+    await expect(startPacking(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toBeUndefined();
     expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, expect.any(Date));
   });
 });
@@ -163,7 +161,7 @@ describe('startPacking — R20: repetir Comenzar sobre el propio EN_EMPAQUE es e
     const { deps } = montar('already_mine');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: PEDIDO })).resolves.toBeUndefined();
+    await expect(startPacking(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toBeUndefined();
   });
 });
 
@@ -172,7 +170,7 @@ describe('startPacking — R19, R20: tomado por otro', () => {
     const { deps } = montar('taken');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderPackingTakenError);
+    await expect(startPacking(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(OrderPackingTakenError);
   });
 });
 
@@ -181,7 +179,7 @@ describe('startPacking — R23: estado que no admite Comenzar', () => {
     const { deps } = montar('not_packable');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotPackableError);
+    await expect(startPacking(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(OrderNotPackableError);
   });
 });
 
@@ -190,7 +188,7 @@ describe('startPacking — QC-215: los estados de acondicionamiento y TERMINADO 
     it(`R23, R30: el catalogo clasifica ${estado} como not_packable -> order_not_packable, sin fila en el registro`, async () => {
       const { deps, filas, estado: run } = montar('not_packable');
 
-      const error = await createStartPacking(deps)(ACTOR, { orderId: PEDIDO }).catch((e: unknown) => e);
+      const error = await createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(OrderNotPackableError);
       expect((error as OrderNotPackableError).code).toBe('order_not_packable');
@@ -205,7 +203,7 @@ describe('startPacking — R10: POR_EMPACAR sin ninguna linea de reparto', () =>
     const { deps } = montar('without_distribution');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(
+    await expect(startPacking(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(
       OrderWithoutDistributionError,
     );
   });
@@ -216,7 +214,7 @@ describe('startPacking — R24: no existe, esta de baja o es de otra empresa', (
     const { deps } = montar('not_found');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(OrderNotFoundError);
+    await expect(startPacking(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(OrderNotFoundError);
   });
 });
 
@@ -233,7 +231,7 @@ describe('startPacking — entrada', () => {
     const { deps, startPackingAliveById } = montar('ok');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking(ACTOR, { orderId: 'no-es-uuid' })).rejects.toThrow(ValidationError);
+    await expect(startPacking(ACTOR, { orderId: 'no-es-uuid', lineId: LINEA })).rejects.toThrow(ValidationError);
     expect(startPackingAliveById).not.toHaveBeenCalled();
   });
 });
@@ -244,10 +242,10 @@ describe('startPacking — R42: autorizacion antes de abrir la transaccion', () 
     const { deps, startPackingAliveById, globalStartPackingAliveById, run, append, depsAppend } = montar('ok');
     const startPacking = createStartPacking(deps);
 
-    await expect(startPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: PEDIDO })).rejects.toThrow(
+    await expect(startPacking({ id: ANA, companyId: EMPRESA, permissions: [] }, { orderId: PEDIDO, lineId: LINEA })).rejects.toThrow(
       UnauthorizedError,
     );
-    await expect(startPacking(null, { orderId: PEDIDO })).rejects.toBeInstanceOf(AsignacionesError);
+    await expect(startPacking(null, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(AsignacionesError);
 
     expect(run).not.toHaveBeenCalled();
     expect(startPackingAliveById).not.toHaveBeenCalled();
@@ -265,7 +263,7 @@ describe('startPacking — R42: autorizacion antes de abrir la transaccion', () 
     const startPacking = createStartPacking(deps);
 
     await expect(
-      startPacking({ id: ANA, companyId: EMPRESA, permissions: [...permisos] }, { orderId: PEDIDO }),
+      startPacking({ id: ANA, companyId: EMPRESA, permissions: [...permisos] }, { orderId: PEDIDO, lineId: LINEA }),
     ).rejects.toThrow(UnauthorizedError);
     expect(run).not.toHaveBeenCalled();
     expect(startPackingAliveById).not.toHaveBeenCalled();
@@ -279,10 +277,10 @@ describe('startPacking — R42: empresa del actor y sin comprobacion de responsa
     const inexistente = montar('not_found');
     const actorDeOtra: Actor = { id: ANA, companyId: OTRA_EMPRESA, permissions: ['empaque.modificar'] };
 
-    const errorOtra: unknown = await createStartPacking(otra.deps)(actorDeOtra, { orderId: PEDIDO }).catch(
+    const errorOtra: unknown = await createStartPacking(otra.deps)(actorDeOtra, { orderId: PEDIDO, lineId: LINEA }).catch(
       (e: unknown) => e,
     );
-    const errorInexistente: unknown = await createStartPacking(inexistente.deps)(ACTOR, { orderId: uuid('8') }).catch(
+    const errorInexistente: unknown = await createStartPacking(inexistente.deps)(ACTOR, { orderId: uuid('8'), lineId: LINEA }).catch(
       (e: unknown) => e,
     );
 
@@ -298,7 +296,7 @@ describe('startPacking — R42: empresa del actor y sin comprobacion de responsa
   it('R42: la empresa no se acepta en la entrada', async () => {
     const { deps, run } = montar('ok');
 
-    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, companyId: OTRA_EMPRESA })).rejects.toThrow(
+    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA, companyId: OTRA_EMPRESA })).rejects.toThrow(
       ValidationError,
     );
     expect(run).not.toHaveBeenCalled();
@@ -312,7 +310,7 @@ describe('startPacking — R42: empresa del actor y sin comprobacion de responsa
       assignments: { listOrderIdsByUserInCompany },
     } as unknown as StartPackingDeps;
 
-    await expect(createStartPacking(conAsignaciones)(ACTOR, { orderId: PEDIDO })).resolves.toBeUndefined();
+    await expect(createStartPacking(conAsignaciones)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toBeUndefined();
 
     expect(listOrderIdsByUserInCompany).not.toHaveBeenCalled();
     expect(startPackingAliveById).toHaveBeenCalledTimes(1);
@@ -325,7 +323,7 @@ describe('startPacking — R41, R5bis, R8: el exito deja una fila `pack_start`',
   it('R41, R5bis, R8: `ok` deja UNA fila sin posicion ni motivo, con instante, pedido, persona y empresa', async () => {
     const { deps, filas, estado, run } = montar('ok');
 
-    await createStartPacking(deps)(ACTOR, { orderId: PEDIDO });
+    await createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(run).toHaveBeenCalledTimes(1);
     expect(estado.confirmada).toBe(true);
@@ -338,7 +336,7 @@ describe('startPacking — R41, R5bis, R8: el exito deja una fila `pack_start`',
   it('R42: escribe con el `packing` y el `log` de la transaccion, nunca con los globales', async () => {
     const { deps, startPackingAliveById, globalStartPackingAliveById, depsAppend, estado } = montar('ok');
 
-    await createStartPacking(deps)(ACTOR, { orderId: PEDIDO });
+    await createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA });
 
     expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ANA, AHORA);
     expect(globalStartPackingAliveById).not.toHaveBeenCalled();
@@ -351,7 +349,7 @@ describe('startPacking — R41: `already_mine` no anota', () => {
   it('R41: `already_mine` resuelve, sale de `run` sin abortar y deja CERO filas', async () => {
     const { deps, append, filas, estado } = montar('already_mine');
 
-    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO })).resolves.toBeUndefined();
+    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).resolves.toBeUndefined();
 
     expect(estado.confirmada).toBe(true);
     expect(append).not.toHaveBeenCalled();
@@ -368,7 +366,7 @@ describe('startPacking — R24: cualquier otro desenlace aborta sin fila y con e
   ] as const)('R24: `%s` deshace la transaccion, no anota y rechaza con su error', async (resultado, Esperado) => {
     const { deps, append, filas, estado } = montar(resultado);
 
-    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBeInstanceOf(Esperado);
+    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBeInstanceOf(Esperado);
 
     expect(estado.confirmada).toBe(false);
     expect(append).not.toHaveBeenCalled();
@@ -379,11 +377,57 @@ describe('startPacking — R24: cualquier otro desenlace aborta sin fila y con e
     const fallo = new Error('append fallo');
     const { deps, run, filas, estado } = montar('ok', { appendFalla: fallo });
 
-    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO })).rejects.toBe(fallo);
+    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA })).rejects.toBe(fallo);
 
     expect(estado.appendDentroDeRun).toBe(true);
     expect(estado.confirmada).toBe(false);
     await expect(run.mock.results[0]!.value).rejects.toBe(fallo);
     expect(filas).toEqual([]);
+  });
+});
+
+describe('startPacking — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  it('R11, R12: con dos recetas POR_EMPACAR del mismo pedido, comienza y anota solo la nombrada', async () => {
+    const { deps, startPackingAliveById, filas } = montar('ok');
+
+    await createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: OTRA_LINEA });
+
+    expect(startPackingAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_LINEA, EMPRESA, ANA, AHORA);
+    expect(filas.map((fila) => fila.orderLineId)).toEqual([OTRA_LINEA]);
+  });
+
+  it('R10: decide por el estado de la receta: una receta que no esta en empaque da order_not_packable sin abrir la transaccion', async () => {
+    for (const lineStatus of ['EN_CURSO', 'PENDIENTE', 'POR_ACONDICIONAR']) {
+      const { deps, run } = montar('ok', { lineStatus });
+      await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: LINEA }), lineStatus).rejects.toBeInstanceOf(
+        OrderNotPackableError,
+      );
+      expect(run).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R14: sin lineId, o con uno que no es uuid, da invalid_input sin leer ni abrir la transaccion', async () => {
+    for (const entrada of [{ orderId: PEDIDO }, { orderId: PEDIDO, lineId: 'no-uuid' }]) {
+      const { deps, run, findAliveLineSummary } = montar('ok');
+      await expect(createStartPacking(deps)(ACTOR, entrada)).rejects.toThrow(ValidationError);
+      expect(findAliveLineSummary).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+    }
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin abrir la transaccion', async () => {
+    const { deps, run } = montar('ok');
+    await expect(createStartPacking(deps)(ACTOR, { orderId: PEDIDO, lineId: uuid('6') })).rejects.toBeInstanceOf(
+      OrderNotFoundError,
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin empaque.modificar no lee la receta', async () => {
+    const { deps, findAliveLineSummary } = montar('ok');
+    await expect(
+      createStartPacking(deps)({ ...ACTOR, permissions: ['asignaciones.ejecutar'] }, { orderId: PEDIDO, lineId: LINEA }),
+    ).rejects.toThrow(UnauthorizedError);
+    expect(findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

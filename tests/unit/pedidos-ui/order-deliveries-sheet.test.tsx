@@ -44,7 +44,7 @@ import {
 import { setupUser } from '../../helpers/user-event';
 
 const { listMock, voidMock, routerMock } = vi.hoisted(() => ({
-  listMock: vi.fn<(orderId: string) => Promise<OrderDeliveriesResult>>(),
+  listMock: vi.fn<(orderId: string, lineId: string) => Promise<OrderDeliveriesResult>>(),
   voidMock: vi.fn<(input: unknown) => Promise<VoidDeliveryActionResult>>(),
   routerMock: {
     push: vi.fn<(href: string) => void>(),
@@ -78,6 +78,7 @@ vi.mock('@/lib/modules/pedidos/adapters/driving/order-actions', () => {
 type Uuid = `${string}-${string}-${string}-${string}-${string}`;
 
 const ORDER = { id: VOID_ORDER_ID, numberText: '2026-0000024' } as const;
+const LINE = { id: '50000000-0000-4000-8000-00000000000b' } as const;
 
 function ok(view: OrderDeliveryHistoryView = deliveryHistoryView()): OrderDeliveriesResult {
   return { status: 'success', data: view };
@@ -116,7 +117,7 @@ function trasAnular(): OrderDeliveryHistoryView {
 const cerrar = vi.fn<(open: boolean) => void>();
 
 function montar(canVoid = true) {
-  render(<OrderDeliveriesSheet order={ORDER} open onOpenChange={cerrar} canVoid={canVoid} />);
+  render(<OrderDeliveriesSheet order={ORDER} line={LINE} open onOpenChange={cerrar} canVoid={canVoid} />);
 }
 
 function entrada(id: string): HTMLElement {
@@ -165,7 +166,7 @@ describe('lectura', () => {
 
     expect(screen.getByTestId(ORDER_DELIVERIES_SHEET_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(ORDER_DELIVERIES_SKELETON_TESTID)).toBeInTheDocument();
-    expect(listMock).toHaveBeenCalledWith(VOID_ORDER_ID);
+    expect(listMock).toHaveBeenCalledWith(VOID_ORDER_ID, LINE.id);
     expect(screen.queryByTestId(ORDER_DELIVERY_ENTRY_TESTID)).toBeNull();
   });
 
@@ -280,5 +281,44 @@ describe('anular desde el sheet', () => {
 
     expect(await screen.findByTestId(ORDER_DELIVERIES_ERROR_TESTID)).toHaveAttribute('data-code', 'order_not_found');
     expect(screen.getAllByTestId(ORDER_DELIVERY_ENTRY_TESTID)).toHaveLength(2);
+  });
+});
+
+describe('entregas de una receta (R34)', () => {
+  it('R34: pide solo las entregas de la receta elegida, también al releer tras anular', async () => {
+    const user = setupUser();
+    montar();
+
+    await anularLaMasReciente(user);
+
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    for (const llamada of listMock.mock.calls) expect(llamada).toEqual([VOID_ORDER_ID, LINE.id]);
+  });
+
+  it.each(['TERMINADO', 'ENTREGADO'] as const)(
+    'R34: con la receta %s y el pedido PARCIAL ofrece «Anular»',
+    async (lineStatus) => {
+      listMock.mockResolvedValue(ok(deliveryHistoryView({ orderStatus: 'PARCIAL', lineStatus })));
+      montar();
+
+      await screen.findAllByTestId(ORDER_DELIVERY_ENTRY_TESTID);
+      expect(screen.getAllByTestId(ORDER_DELIVERY_VOID_TESTID)).toHaveLength(2);
+    },
+  );
+
+  it('R34: manda el estado de la receta, no el del pedido: con el pedido ENTREGADO y la receta CANCELADO no ofrece «Anular»', async () => {
+    listMock.mockResolvedValue(ok(deliveryHistoryView({ orderStatus: 'ENTREGADO', lineStatus: 'CANCELADO' })));
+    montar();
+
+    await screen.findAllByTestId(ORDER_DELIVERY_ENTRY_TESTID);
+    expect(screen.queryByTestId(ORDER_DELIVERY_VOID_TESTID)).toBeNull();
+  });
+
+  it('R34: con la receta TERMINADO y sin el permiso de anular no ofrece «Anular»', async () => {
+    listMock.mockResolvedValue(ok(deliveryHistoryView({ orderStatus: 'PARCIAL', lineStatus: 'TERMINADO' })));
+    montar(false);
+
+    await screen.findAllByTestId(ORDER_DELIVERY_ENTRY_TESTID);
+    expect(screen.queryByTestId(ORDER_DELIVERY_VOID_TESTID)).toBeNull();
   });
 });

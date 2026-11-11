@@ -17,7 +17,10 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/order-packing-actions', () 
 function fila(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Jarabe simple',
     quantity: '12.5',
     presentationLines: [{ lineId: 'linea-1', packedPackages: null, presentationId: 'p-1', presentationName: 'Botella 200 ml', packagingName: null, packages: 5, presentationContent: null, presentationUnitLabel: null }],

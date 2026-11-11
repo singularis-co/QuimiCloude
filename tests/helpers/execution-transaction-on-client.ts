@@ -41,7 +41,11 @@ export function executionOnClient(
     transaction: {
       run: (work) =>
         work({
-          orders: { transitionAliveById: orders.transitionAliveById, cancelAliveById },
+          orders: {
+            transitionAliveById: orders.transitionAliveById,
+            cancelAliveById,
+            cancelLineAliveById: unused('cancela recetas desde la ejecucion'),
+          },
           packing: {
             startPackingAliveById: orders.startPackingAliveById,
             finishPackingAliveById: orders.finishPackingAliveById,

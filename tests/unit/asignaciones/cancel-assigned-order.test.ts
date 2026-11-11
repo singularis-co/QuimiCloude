@@ -23,6 +23,7 @@ import type {
 import type { OrderAssignmentRepository } from '@/lib/modules/asignaciones/ports/order-assignment-repository';
 import type { PermissionCode } from '@/lib/modules/identity';
 import type { OrderCatalog, OrderStatus } from '@/lib/modules/pedidos';
+import { conDosRecetas } from './recipe-outline-doubles';
 
 function uuid(seed: string): string {
   return `${seed.repeat(8)}-${seed.repeat(4)}-4${seed.repeat(3)}-8${seed.repeat(3)}-${seed.repeat(12)}`;
@@ -33,7 +34,8 @@ const OTRA_EMPRESA = uuid('9');
 const ANA = uuid('1');
 const BETO = uuid('2');
 const PEDIDO = uuid('7');
-const LINEA = 'linea-unica';
+const LINEA = uuid('e');
+const OTRA_LINEA = uuid('f');
 const OTRO_PEDIDO = uuid('8');
 const AHORA = new Date('2026-10-06T12:00:00.000Z');
 const NUMERO_PEDIDO = { year: 2026, sequence: 7 };
@@ -61,22 +63,17 @@ function montar(options?: {
   const eventos: string[] = [];
   const listOrderIdsByUserInCompany = vi.fn(async () => options?.ids ?? [PEDIDO]);
   const status = options?.status === undefined ? 'EN_CURSO' : options.status;
-  const findAliveById = vi.fn(async () => {
-    eventos.push('findAliveById');
-    return status === null ? null : { id: PEDIDO, status };
+  // El pedido esta PARCIAL a proposito: la cancelacion es de la linea y no mira el pedido.
+  const findAliveById = vi.fn(async () => ({ id: PEDIDO, status: 'PARCIAL' as const, activeLineStatuses: [] }));
+  // Dos recetas del pedido en el mismo estado; `status: null` = ninguna existe para el actor.
+  const findAliveLineSummary = vi.fn(async (_companyId: string, _orderId: string, lineId: string) => {
+    eventos.push('findAliveLineSummary');
+    if (status === null || (lineId !== LINEA && lineId !== OTRA_LINEA)) return null;
+    return { id: PEDIDO, lineId, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status };
   });
-  const listAliveSummariesByIds = vi.fn(async () => {
-    eventos.push('listAliveSummariesByIds');
-    return {
-      items: [{ id: PEDIDO, lineId: LINEA, number: NUMERO_PEDIDO, recipeId: 'receta-1', quantity: '10.0000', priority: 'MEDIA', status }],
-      total: 1,
-      page: 1,
-      pageSize: 1,
-      totalPages: 1,
-    };
-  });
-  const cancelAliveById = vi.fn<ExecutionWriters['orders']['cancelAliveById']>(async () => {
-    eventos.push('cancelAliveById');
+  const cancelAliveById = vi.fn();
+  const cancelLineAliveById = vi.fn<ExecutionWriters['orders']['cancelLineAliveById']>(async () => {
+    eventos.push('cancelLineAliveById');
     return options?.outcome ?? 'ok';
   });
   const append = vi.fn<ExecutionLogRepository['append']>(async () => {
@@ -87,7 +84,7 @@ function montar(options?: {
   const transitionAliveById = vi.fn();
   const runRejections: unknown[] = [];
   const writers = {
-    orders: { cancelAliveById, transitionAliveById },
+    orders: { cancelAliveById, cancelLineAliveById, transitionAliveById },
     packing: { startPackingAliveById: vi.fn(), finishPackingAliveById: vi.fn() },
     log: { append, findLastStepPosition: vi.fn() },
   } as unknown as ExecutionWriters;
@@ -106,7 +103,8 @@ function montar(options?: {
 
   const deps: CancelAssignedOrderDeps = {
     assignments: { listOrderIdsByUserInCompany } as unknown as OrderAssignmentRepository,
-    orders: { findAliveById, listAliveSummariesByIds } as unknown as OrderCatalog,
+    orders: { findAliveById, findAliveLineSummary, listRecipeOutlinesByIdsIncludingDeleted: vi.fn(async () => []) } as unknown as OrderCatalog,
+    recipes: { findRefsIncludingDeleted: vi.fn(async () => []) },
     transaction: { run } as ExecutionTransaction,
     now: () => AHORA,
   };
@@ -116,8 +114,9 @@ function montar(options?: {
     runRejections,
     listOrderIdsByUserInCompany,
     findAliveById,
-    listAliveSummariesByIds,
+    findAliveLineSummary,
     cancelAliveById,
+    cancelLineAliveById,
     append,
     run,
   };
@@ -125,14 +124,13 @@ function montar(options?: {
 
 function ningunDobleLlamado(d: ReturnType<typeof montar>): void {
   expect(d.listOrderIdsByUserInCompany).not.toHaveBeenCalled();
-  expect(d.findAliveById).not.toHaveBeenCalled();
-  expect(d.listAliveSummariesByIds).not.toHaveBeenCalled();
+  expect(d.findAliveLineSummary).not.toHaveBeenCalled();
   expect(d.run).not.toHaveBeenCalled();
-  expect(d.cancelAliveById).not.toHaveBeenCalled();
+  expect(d.cancelLineAliveById).not.toHaveBeenCalled();
   expect(d.append).not.toHaveBeenCalled();
 }
 
-const ENTRADA = { orderId: PEDIDO, stepPosition: 2, reason: 'Se derramo el lote' } as const;
+const ENTRADA = { orderId: PEDIDO, lineId: LINEA, stepPosition: 2, reason: 'Se derramo el lote' } as const;
 
 describe('cancelAssignedOrder — prologo (R26, R27, R28)', () => {
   it('R26: sin actor o sin permisos rechaza sin llamar a ningun doble', async () => {
@@ -174,7 +172,7 @@ describe('cancelAssignedOrder — prologo (R26, R27, R28)', () => {
       expect(error).toBeInstanceOf(OrderNotFoundError);
       expect((error as OrderNotFoundError).code).toBe('order_not_found');
       expect(d.run).not.toHaveBeenCalled();
-      expect(d.cancelAliveById).not.toHaveBeenCalled();
+      expect(d.cancelLineAliveById).not.toHaveBeenCalled();
       expect(d.append).not.toHaveBeenCalled();
     }
   });
@@ -184,7 +182,7 @@ describe('cancelAssignedOrder — prologo (R26, R27, R28)', () => {
     const beto: Actor = { id: BETO, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
     await createCancelAssignedOrder(d.deps)(beto, ENTRADA);
     expect(d.listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, BETO);
-    expect(d.cancelAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ENTRADA.reason, BETO, AHORA);
+    expect(d.cancelLineAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ENTRADA.reason, BETO, AHORA);
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ userId: BETO });
   });
 
@@ -192,8 +190,8 @@ describe('cancelAssignedOrder — prologo (R26, R27, R28)', () => {
     const d = montar();
     await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
     expect(d.listOrderIdsByUserInCompany).toHaveBeenCalledWith(EMPRESA, ANA);
-    expect(d.findAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA);
-    expect(d.cancelAliveById.mock.calls[0]?.[1]).toBe(EMPRESA);
+    expect(d.findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
+    expect(d.cancelLineAliveById.mock.calls[0]?.[2]).toBe(EMPRESA);
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ companyId: EMPRESA });
   });
 
@@ -205,19 +203,30 @@ describe('cancelAssignedOrder — prologo (R26, R27, R28)', () => {
     ningunDobleLlamado(d);
   });
 
+  it('R20: devuelve numero, nombre de la receta y cuantas tiene el pedido, canceladas incluidas', async () => {
+    const d = montar();
+    await expect(createCancelAssignedOrder(conDosRecetas(d.deps))(ACTOR, ENTRADA)).resolves.toEqual({
+      numberText: '2026-0000007',
+      recipeName: expect.stringMatching(/^Receta /),
+      recipeCount: 2,
+    });
+  });
+
   it('R30: no necesita `pedidos.modificar` ni `asignaciones.modificar`', async () => {
     const d = montar();
     const actor: Actor = { id: ANA, companyId: EMPRESA, permissions: ['asignaciones.ejecutar'] };
     await expect(createCancelAssignedOrder(d.deps)(actor, ENTRADA)).resolves.toEqual({
       numberText: expect.any(String),
+      recipeName: null,
+      recipeCount: 1,
     });
-    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+    expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('cancelAssignedOrder — el motivo (R9, R10)', () => {
   it.each([
-    ['ausente', { orderId: PEDIDO, stepPosition: 2 }],
+    ['ausente', { orderId: PEDIDO, lineId: LINEA, stepPosition: 2 }],
     ['vacio', { ...ENTRADA, reason: '' }],
     ['solo espacios', { ...ENTRADA, reason: '   \t  ' }],
     ['no texto', { ...ENTRADA, reason: 42 }],
@@ -237,7 +246,7 @@ describe('cancelAssignedOrder — el motivo (R9, R10)', () => {
 
     const ok = montar();
     await createCancelAssignedOrder(ok.deps)(ACTOR, { ...ENTRADA, reason: quinientos });
-    expect(ok.cancelAliveById).toHaveBeenCalledTimes(1);
+    expect(ok.cancelLineAliveById).toHaveBeenCalledTimes(1);
 
     const largo = montar();
     await expect(
@@ -249,7 +258,7 @@ describe('cancelAssignedOrder — el motivo (R9, R10)', () => {
   it('R9, R22: el motivo se normaliza igual que `cancelOrderSchema` y ese mismo llega a los dos', async () => {
     const d = montar();
     await createCancelAssignedOrder(d.deps)(ACTOR, { ...ENTRADA, reason: '  Se derramo  ' });
-    expect(d.cancelAliveById.mock.calls[0]?.[2]).toBe('Se derramo');
+    expect(d.cancelLineAliveById.mock.calls[0]?.[3]).toBe('Se derramo');
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ reason: 'Se derramo' });
   });
 
@@ -269,9 +278,9 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
     const d = montar();
     const result = await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
 
-    expect(result).toEqual({ numberText: expect.stringContaining('7') });
-    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
-    expect(d.cancelAliveById).toHaveBeenCalledWith(PEDIDO, EMPRESA, ENTRADA.reason, ANA, AHORA);
+    expect(result).toEqual({ numberText: expect.stringContaining('7'), recipeName: null, recipeCount: 1 });
+    expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
+    expect(d.cancelLineAliveById).toHaveBeenCalledWith(PEDIDO, LINEA, EMPRESA, ENTRADA.reason, ANA, AHORA);
     expect(d.append).toHaveBeenCalledTimes(1);
     expect(d.append).toHaveBeenCalledWith({
       action: 'cancel',
@@ -283,7 +292,8 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
       reason: ENTRADA.reason,
       occurredAt: AHORA,
     });
-    const [, , motivoCancelado, , instanteCancelado] = d.cancelAliveById.mock.calls[0] as unknown as [
+    const [, , , motivoCancelado, , instanteCancelado] = d.cancelLineAliveById.mock.calls[0] as unknown as [
+      string,
       string,
       string,
       string,
@@ -300,19 +310,18 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
     await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
     expect(d.run).toHaveBeenCalledTimes(1);
     expect(d.eventos).toEqual([
-      'findAliveById',
-      'listAliveSummariesByIds',
+      'findAliveLineSummary',
       'run:open',
-      'cancelAliveById',
+      'cancelLineAliveById',
       'append',
       'run:commit',
     ]);
   });
 
-  it('R25: devuelve el numero visible del pedido, leido con el estado que tenia', async () => {
+  it('R25: devuelve el numero visible del pedido, leido de la receta en el estado que tenia', async () => {
     const d = montar({ status: 'BLOQUEADO' });
     const result = await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
-    expect(d.listAliveSummariesByIds).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ['BLOQUEADO'], 1, 1);
+    expect(d.findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO, LINEA);
     expect(result.numberText).toMatch(/7/);
   });
 
@@ -332,7 +341,7 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
     async (status) => {
       const d = montar({ status, outcome: 'not_cancellable' });
       await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toThrow(NotCancellableError);
-      expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+      expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
       expect(d.append).not.toHaveBeenCalled();
     },
   );
@@ -349,7 +358,7 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
     const fallo = new Error('registro caido');
     const d = montar({ appendFalla: fallo });
     await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBe(fallo);
-    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+    expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
     expect(d.runRejections).toEqual([fallo]);
     expect(d.eventos).not.toContain('run:commit');
   });
@@ -357,7 +366,7 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
   it("R29: un BLOQUEADO cancela por 'ok' y se anota", async () => {
     const d = montar({ status: 'BLOQUEADO', outcome: 'ok' });
     await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
-    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+    expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
     expect(d.append).toHaveBeenCalledTimes(1);
     expect(d.append.mock.calls[0]?.[0]).toMatchObject({ action: 'cancel', reason: ENTRADA.reason });
   });
@@ -369,79 +378,60 @@ describe('cancelAssignedOrder — la escritura (R22, R23, R24, R29)', () => {
   });
 });
 
-const RESUMEN_VACIO = { items: [], total: 0, page: 1, pageSize: 1, totalPages: 0 };
+describe('cancelAssignedOrder — la receta nombrada (R14, R15, R16, R17)', () => {
+  it('R16: cancela solo la receta nombrada por `cancelLineAliveById` y anota en su registro', async () => {
+    const d = montar();
+    await createCancelAssignedOrder(d.deps)(ACTOR, { ...ENTRADA, lineId: OTRA_LINEA });
+    expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
+    expect(d.cancelLineAliveById).toHaveBeenCalledWith(PEDIDO, OTRA_LINEA, EMPRESA, ENTRADA.reason, ANA, AHORA);
+    expect(d.cancelAliveById).not.toHaveBeenCalled();
+    expect(d.append.mock.calls[0]?.[0]).toMatchObject({ action: 'cancel', orderLineId: OTRA_LINEA });
+  });
 
-/**
- * El pedido se lee con `inicial` y el resumen filtrado por ese estado sale vacio: otro lo movio
- * entre las dos lecturas. La relectura devuelve `releido` (o nada si es `null`).
- */
-function conCarreraEntreLecturas(inicial: OrderStatus, releido: OrderStatus | null, outcome?: CancelOutcome) {
-  const d = montar({ status: inicial, ...(outcome === undefined ? {} : { outcome }) });
-  d.findAliveById
-    .mockImplementationOnce(async () => ({ id: PEDIDO, status: inicial }))
-    .mockImplementationOnce(async () => (releido === null ? null : { id: PEDIDO, status: releido }));
-  d.listAliveSummariesByIds.mockResolvedValueOnce(RESUMEN_VACIO as never);
-  return d;
-}
+  it('R16: con el pedido PARCIAL decide `pedidos` por la linea; el estado del pedido no se lee', async () => {
+    const d = montar({ status: 'EN_CURSO' });
+    await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
+    expect(d.findAliveById).not.toHaveBeenCalled();
+    expect(d.cancelLineAliveById).toHaveBeenCalledTimes(1);
+  });
 
-// Nota 2026-10-06: revision vuelta 1, hallazgo 7. Misma ventana que la carrera de R16 en
-// startAssignedOrder: el resumen se filtra por el estado leido justo antes.
-describe('cancelAssignedOrder — el pedido cambia de estado entre las dos lecturas (R27, R29)', () => {
-  it('R29: lo Finalizan en medio (EN_CURSO -> POR_EMPACAR) => not_cancellable de `pedidos`, sin anotar', async () => {
-    const d = conCarreraEntreLecturas('EN_CURSO', 'POR_EMPACAR', 'not_cancellable');
-
-    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(NotCancellableError);
-    expect(d.findAliveById).toHaveBeenCalledTimes(2);
-    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(2);
-    expect(d.listAliveSummariesByIds).toHaveBeenLastCalledWith(EMPRESA, [PEDIDO], ['POR_EMPACAR'], 1, 1);
-    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
+  it('R17: una receta en un estado no cancelable da not_cancellable sin anotar', async () => {
+    const d = montar({ status: 'POR_EMPACAR', outcome: 'not_cancellable' });
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toThrow(NotCancellableError);
     expect(d.append).not.toHaveBeenCalled();
     expect(d.eventos).not.toContain('run:commit');
   });
 
-  it('R29: si el estado nuevo es BLOQUEADO, `pedidos` lo cancela y se anota (asignaciones no decide)', async () => {
-    const d = conCarreraEntreLecturas('EN_CURSO', 'BLOQUEADO', 'ok');
-
-    const result = await createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA);
-    expect(result.numberText).toMatch(/7/);
-    expect(d.cancelAliveById).toHaveBeenCalledTimes(1);
-    expect(d.append).toHaveBeenCalledTimes(1);
+  it('R17: el motivo sigue siendo obligatorio y de 1 a 500 caracteres con la receta en la entrada', async () => {
+    for (const reason of [undefined, '', '   ', 'a'.repeat(501)]) {
+      const d = montar();
+      await expect(createCancelAssignedOrder(d.deps)(ACTOR, { ...ENTRADA, reason })).rejects.toThrow(ValidationError);
+      ningunDobleLlamado(d);
+    }
   });
 
-  it('R27: si al releer el pedido ya no existe, sigue siendo not_found y no se abre la transaccion', async () => {
-    const d = conCarreraEntreLecturas('EN_CURSO', null);
+  it('R14: sin lineId, o con uno que no es uuid, da invalid_input sin tocar ningun puerto', async () => {
+    const sinLinea = Object.fromEntries(Object.entries(ENTRADA).filter(([clave]) => clave !== 'lineId'));
+    for (const entrada of [sinLinea, { ...ENTRADA, lineId: 'linea-unica' }]) {
+      const d = montar();
+      await expect(createCancelAssignedOrder(d.deps)(ACTOR, entrada)).rejects.toThrow(ValidationError);
+      ningunDobleLlamado(d);
+    }
+  });
 
-    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(d.findAliveById).toHaveBeenCalledTimes(2);
-    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(1);
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found sin abrir la transaccion', async () => {
+    const d = montar();
+    await expect(createCancelAssignedOrder(d.deps)(ACTOR, { ...ENTRADA, lineId: uuid('6') })).rejects.toThrow(
+      OrderNotFoundError,
+    );
     expect(d.run).not.toHaveBeenCalled();
   });
 
-  it('R27: si al releer el estado no cambio, sigue siendo not_found y no se abre la transaccion', async () => {
-    const d = conCarreraEntreLecturas('EN_CURSO', 'EN_CURSO');
-
-    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(1);
-    expect(d.run).not.toHaveBeenCalled();
-  });
-
-  it('R27: si al releer ya no esta asignado al actor, sigue siendo not_found y no se abre la transaccion', async () => {
-    const d = conCarreraEntreLecturas('EN_CURSO', 'POR_EMPACAR', 'not_cancellable');
-    d.listOrderIdsByUserInCompany.mockResolvedValueOnce([PEDIDO]).mockResolvedValueOnce([]);
-
-    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(d.listOrderIdsByUserInCompany).toHaveBeenCalledTimes(2);
-    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(1);
-    expect(d.run).not.toHaveBeenCalled();
-  });
-
-  it('R27: el reintento es uno solo: si el segundo resumen tambien falta, not_found sin abrir la transaccion', async () => {
-    const d = conCarreraEntreLecturas('EN_CURSO', 'POR_EMPACAR', 'not_cancellable');
-    d.listAliveSummariesByIds.mockResolvedValueOnce(RESUMEN_VACIO as never);
-
-    await expect(createCancelAssignedOrder(d.deps)(ACTOR, ENTRADA)).rejects.toBeInstanceOf(OrderNotFoundError);
-    expect(d.findAliveById).toHaveBeenCalledTimes(2);
-    expect(d.listAliveSummariesByIds).toHaveBeenCalledTimes(2);
-    expect(d.run).not.toHaveBeenCalled();
+  it('R15: quien es responsable del pedido puede cancelar cualquiera de sus recetas', async () => {
+    for (const lineId of [LINEA, OTRA_LINEA]) {
+      const d = montar();
+      await createCancelAssignedOrder(d.deps)(ACTOR, { ...ENTRADA, lineId });
+      expect(d.cancelLineAliveById).toHaveBeenCalledWith(PEDIDO, lineId, EMPRESA, ENTRADA.reason, ANA, AHORA);
+    }
   });
 });

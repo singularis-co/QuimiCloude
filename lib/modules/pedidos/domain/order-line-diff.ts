@@ -63,7 +63,7 @@ export function assertNoDuplicateOrderRecipe(
     if (first !== undefined) {
       throw new DuplicateOrderRecipeError(
         `receta ${line.originalRecipeId} en las posiciones ${first} y ${position} de la entrada`,
-      );
+      ).withLinePositions([first, position]);
     }
     positionByRecipe.set(line.originalRecipeId, position);
   });
@@ -71,8 +71,8 @@ export function assertNoDuplicateOrderRecipe(
 
 /**
  * Corre la validacion de una linea y, si falla con un error del modulo, lo relanza con el mismo
- * codigo y la posicion de la linea en el diagnostico, que va al registro del servidor y nunca a la
- * respuesta.
+ * codigo, la posicion de la linea en el diagnostico, que va al registro del servidor y nunca a la
+ * respuesta, y esa misma posicion como dato, que si la lleva.
  */
 export async function atLinePosition<T>(position: number, work: () => Promise<T> | T): Promise<T> {
   try {
@@ -81,6 +81,6 @@ export async function atLinePosition<T>(position: number, work: () => Promise<T>
     if (!(error instanceof PedidosError)) throw error;
     const detail = error.diagnostic === undefined ? '' : `: ${error.diagnostic}`;
     const SameError = error.constructor as new (diagnostic?: string) => PedidosError;
-    throw new SameError(`linea en la posicion ${String(position)}${detail}`);
+    throw new SameError(`linea en la posicion ${String(position)}${detail}`).withLinePositions([position]);
   }
 }

@@ -48,6 +48,7 @@ import { prisma } from '@/lib/shared/db/prisma';
 
 import {
   createCreateOrder as createLinesOrder,
+  createFindAliveLineSummary,
   createFinishPacking,
   createListAliveSummariesByIds,
   createStartPacking,
@@ -76,7 +77,7 @@ import { packedCountsOfPlan } from '../../helpers/packed-counts';
 import { orderScopeReaders } from '../../helpers/order-scope-readers';
 import { executionOnClient } from '../../helpers/execution-transaction-on-client';
 import { evidenceRepositoryUnused, recipesWithoutEvidence } from '../../helpers/evidence-off';
-import { onOnlyLine, singleLineFlow, updateOrderAndLine } from '../../helpers/only-order-line';
+import { ensureOnlyLine, onOnlyLine, singleLineFlow, updateOrderAndLine } from '../../helpers/only-order-line';
 import { findAliveCustomerRefById } from '@/lib/modules/clientes/adapters/driven/persistence/customer-catalog-prisma';
 
 
@@ -160,6 +161,9 @@ const orderCatalog: OrderCatalog = {
     return createListAliveSummariesByIds({
       summaries: {
         listAliveByIds: listAliveOrderSummariesByIds,
+        findAliveLine: async () => {
+          throw new Error('este archivo no lee una receta suelta');
+        },
         listAliveInCompany: async () => {
           throw new Error('este archivo no ejercita listAliveSummariesInCompany');
         },
@@ -181,6 +185,32 @@ const orderCatalog: OrderCatalog = {
   },
   listDeliveryProgressByIdsIncludingDeleted: async () => {
     throw new Error('este archivo no ejercita listDeliveryProgressByIdsIncludingDeleted');
+  },
+  // QT-315: Finalizar lee la receta nombrada; cableado como en `lib/composition`.
+  findAliveLineSummary: async (companyId, orderId, lineId) => {
+    const { findAliveOrderLineSummary } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
+    return createFindAliveLineSummary({
+      summaries: {
+        findAliveLine: findAliveOrderLineSummary,
+        listAliveByIds: async () => {
+          throw new Error('Finalizar no lista pedidos');
+        },
+        listAliveInCompany: async () => {
+          throw new Error('este archivo no ejercita listAliveSummariesInCompany');
+        },
+        listNumbersByIdsIncludingDeleted: async () => {
+          throw new Error('este archivo no ejercita listSummariesByIdsIncludingDeleted');
+        },
+        listHistoryByIdsIncludingDeleted: async () => {
+          throw new Error('este archivo no ejercita listSummariesByIdsIncludingDeleted');
+        },
+      },
+      packaging: packagingCatalog,
+    })(companyId, orderId, lineId);
+  },
+  listRecipeOutlinesByIdsIncludingDeleted: async (companyId, orderIds) => {
+    const { listOrderRecipeOutlinesByIdsIncludingDeleted } = await import('@/lib/modules/pedidos/adapters/driven/persistence/order-catalog-prisma');
+    return listOrderRecipeOutlinesByIdsIncludingDeleted(companyId, orderIds);
   },
   // R15, R16: Finalizar ya no da de alta ningun lote -eso se traslada a Terminar (T14)-.
   transitionAliveById: createTransitionOrder({ unitOfWork }),
@@ -814,7 +844,7 @@ describe('R26 — el Finalizar de asignaciones exige el permiso primero, sin dar
       const creado = await createOrder(nuevoPedido(recipeId, fixture, '10.0000', 10), actorDe(fixture));
       await unaLinea.transitionAliveById(creado.id, fixture.companyId, 'PENDIENTE', 'EN_CURSO', fixture.actorId, new Date());
 
-      const resultado = await finishAssignedOrderPara(creado.id)(asignacionesActorDe(fixture), { orderId: creado.id, stepPosition: null });
+      const resultado = await finishAssignedOrderPara(creado.id)(asignacionesActorDe(fixture), { orderId: creado.id, lineId: await ensureOnlyLine(prisma, creado.id), stepPosition: null });
 
       expect(resultado.numberText).toMatch(/^\d{4}-\d+$/);
       expect(await finishedProductDe(fixture.companyId, recipeId, fixture.presentationId)).toBeNull();
@@ -833,7 +863,7 @@ describe('R26 — el Finalizar de asignaciones exige el permiso primero, sin dar
       const creado = await createOrder(nuevoPedido(recipeId, fixture, '10.0000', 10), actorDe(fixture));
 
       await expect(
-        finishAssignedOrderPara(creado.id)({ id: fixture.actorId, companyId: fixture.companyId, permissions: [] }, { orderId: creado.id }),
+        finishAssignedOrderPara(creado.id)({ id: fixture.actorId, companyId: fixture.companyId, permissions: [] }, { orderId: creado.id, lineId: await ensureOnlyLine(prisma, creado.id) }),
       ).rejects.toBeInstanceOf(UnauthorizedError);
 
       const row = await prisma.order.findUniqueOrThrow({ where: { id: creado.id }, select: { status: true } });

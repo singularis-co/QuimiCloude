@@ -39,7 +39,7 @@ import { normalizeRecipeName, type RecipeStepDocument } from '@/lib/modules/rece
 import { prisma } from '@/lib/shared/db/prisma';
 import {
   ASSIGNED_ORDERS_ROUTE,
-  DELIVERED_ORDER_PARAM,
+  MANUFACTURED_ORDER_PARAM,
   ORDERS_ROUTE,
   PACKED_ORDER_PARAM,
   assignedOrderRoute,
@@ -54,6 +54,7 @@ import {
   PACKING_ORDER_FINISH_CONFIRM_TESTID,
   PACKING_ORDER_START_CONFIRM_TESTID,
 } from './helpers/confirm-dialog';
+import { pathOf } from './helpers/recipe-route';
 import { openOrderRowMenu, rowMenuTrigger } from './helpers/order-distribution';
 import { batchStock, seedPackaging } from './helpers/packaging';
 import { ensureOnlyLine, createOrderWithLine } from '../tests/helpers/only-order-line';
@@ -154,7 +155,7 @@ const ENTER_TESTID = 'assigned-order-enter';
 const EXECUTION_TITLE_TESTID = 'order-execution-title';
 const STEP_CHECKLIST_ITEM_TESTID = 'step-reader-item-0-0';
 const STEP_FINISH_TESTID = 'step-reader-finish';
-const DELIVERED_NOTICE_TESTID = 'assigned-order-delivered-notice';
+const MANUFACTURED_NOTICE_TESTID = 'assigned-order-manufactured-notice';
 const ASSIGNMENT_VIEW_TABS_TESTID = 'assignment-view-tabs';
 const ASSIGNED_ORDERS_EMPTY_TESTID = 'assigned-orders-empty';
 const PACKING_ORDERS_SECTION_TESTID = 'packing-orders-list-section';
@@ -190,6 +191,7 @@ let operatorUserId: string | null = null;
 let empacadorUserId: string | null = null;
 let workGroupId: string | null = null;
 let orderId: string | null = null;
+let lineId: string | null = null;
 let orderNumber: string | null = null;
 
 /** Igualdad EXACTA de texto: un correlativo no puede casar con un prefijo suyo. */
@@ -470,6 +472,7 @@ test.beforeAll(async () => {
     },
   });
   orderId = order.id;
+  lineId = order.lineId;
   orderNumber = formatOrderNumber({ year, sequence: BASE_SEQUENCE });
 
   // El equipo vinculado, con el Operario y el Empacador dentro. Al pedido solo se le escribe la
@@ -602,7 +605,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(assignedRow).toHaveCount(1, { timeout: 60_000 });
     // EN_CURSO: Entrar es un enlace y no vuelve a pedir la confirmacion de comenzar.
     await assignedRow.getByTestId(ENTER_TESTID).click();
-    await page.waitForURL((url) => url.pathname === assignedOrderRoute(orderId!), {
+    await page.waitForURL((url) => url.pathname === pathOf(assignedOrderRoute(orderId!, lineId!)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(EXECUTION_TITLE_TESTID)).toBeVisible({ timeout: 60_000 });
@@ -610,7 +613,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     await page.getByTestId(STEP_CHECKLIST_ITEM_TESTID).click();
     await clickAndConfirm(page, page.getByTestId(STEP_FINISH_TESTID), ORDER_EXECUTION_FINISH_CONFIRM_TESTID);
     await page.waitForURL(
-      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(DELIVERED_ORDER_PARAM),
+      (url) => url.pathname === ASSIGNED_ORDERS_ROUTE && url.searchParams.has(MANUFACTURED_ORDER_PARAM),
       { timeout: 60_000 },
     );
 
@@ -623,10 +626,10 @@ test.describe('el recorrido de empaque (R48)', () => {
     expect(empacadorAssignment.workGroupId).toBe(workGroupId);
     expect(empacadorAssignment.workGroupName).toBe(WORK_GROUP_NAME);
 
-    const deliveredNotice = page.getByTestId(DELIVERED_NOTICE_TESTID);
-    await expect(deliveredNotice).toBeVisible({ timeout: 60_000 });
-    await expect(deliveredNotice).toContainText(orderNumber);
-    await expect(deliveredNotice).toContainText('por empacar');
+    const manufacturedNotice = page.getByTestId(MANUFACTURED_NOTICE_TESTID);
+    await expect(manufacturedNotice).toBeVisible({ timeout: 60_000 });
+    await expect(manufacturedNotice).toContainText(orderNumber);
+    await expect(manufacturedNotice).toContainText('por empacar');
 
     // --- 2. El propio Operario no ve la pestaña «Por empacar»: solo tiene una vista, así que ni
     // siquiera se monta el conjunto de pestañas (R39).
@@ -667,7 +670,7 @@ test.describe('el recorrido de empaque (R48)', () => {
     await expect(packingRow).toHaveCount(1, { timeout: 60_000 });
     await packingRow.getByTestId(ROW_ACTIONS_TESTID).click();
     await page.getByTestId(ROW_ENTER_TESTID).click();
-    await page.waitForURL((url) => url.pathname === packingOrderRoute(orderId!), {
+    await page.waitForURL((url) => url.pathname === pathOf(packingOrderRoute(orderId!, lineId!)), {
       timeout: 60_000,
     });
     await expect(page.getByTestId(PACKING_ORDER_SCREEN_TESTID)).toBeVisible({ timeout: 60_000 });

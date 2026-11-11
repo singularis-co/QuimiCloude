@@ -186,6 +186,7 @@ type SeededLine = {
 
 type Seeded = {
   readonly orderId: string;
+  readonly lineId: string;
   readonly numberText: string;
   readonly lines: readonly [SeededLine, SeededLine];
   readonly previousProductionBatchId: string;
@@ -670,6 +671,7 @@ test.beforeAll(async () => {
 
   fixture = {
     orderId: order.id,
+    lineId: order.lineId,
     numberText: formatOrderNumber({ year, sequence: ORDER_SEQUENCE }),
     lines: [line1, line2],
     previousProductionBatchId: previousProduction.id,
@@ -695,7 +697,7 @@ test.describe('datos de lote en el acondicionamiento: un formulario por pedido',
     page,
     browser,
   }) => {
-    const { orderId, numberText, lines } = seeded();
+    const { orderId, lineId, numberText, lines } = seeded();
     const [line1, line2] = lines;
 
     const today = utcDay(0);
@@ -704,7 +706,7 @@ test.describe('datos de lote en el acondicionamiento: un formulario por pedido',
 
     // --- 1. Entra y abre el detalle de su pedido.
     await loginAndLand(page, conditioner1User);
-    await page.goto(conditioningOrderRoute(orderId));
+    await page.goto(conditioningOrderRoute(orderId, lineId));
     const screen = page.getByTestId(CONDITIONING_ORDER_SCREEN_TESTID);
     await expect(screen).toBeVisible({ timeout: 60_000 });
     await expect(screen.getByTestId(CONDITIONING_ORDER_STATUS_TESTID)).toHaveAttribute(

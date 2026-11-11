@@ -24,9 +24,10 @@ import type {
   ConditioningAction,
   ExecutionAction,
   ExecutionTraceDetailStep,
+  OrderEvidence,
   OrderEvidenceGroup,
 } from '@/lib/modules/asignaciones';
-import type { ExecutionEvidenceResult } from '@/lib/modules/asignaciones/adapters/driving/execution-trace-actions';
+import type { ErrorState } from '@/lib/modules/errores';
 import { avatarTone } from '@/lib/shared/ui/avatar-tone';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import { getInitials } from '@/lib/shared/ui/initials';
@@ -214,9 +215,15 @@ function TimelineStep({
   );
 }
 
+/** Las fotos de una sola receta, o el error de la lectura de todas. */
+export type TraceEvidenceResult = { readonly status: 'success'; readonly data: OrderEvidence } | ErrorState;
+
 export type ExecutionTimelineProps = {
   readonly steps: readonly ExecutionTraceDetailStep[];
-  readonly evidence?: ExecutionEvidenceResult;
+  readonly evidence?: TraceEvidenceResult;
+  /** Con varias líneas de tiempo en la página, cada una necesita su propio id de encabezado. */
+  readonly headingId?: string;
+  readonly headingLevel?: 2 | 3;
 };
 
 const NO_PLACEMENT: TraceEvidencePlacement = { byStepId: new Map(), others: [] };
@@ -242,7 +249,7 @@ function isConditioningAction(action: ExecutionAction): action is ConditioningAc
  */
 function placeEvidence(
   steps: readonly ExecutionTraceDetailStep[],
-  evidence: ExecutionEvidenceResult | undefined,
+  evidence: TraceEvidenceResult | undefined,
 ): { readonly manufacturing: TraceEvidencePlacement; readonly conditioning: TraceEvidencePlacement } {
   if (evidence?.status !== 'success') return { manufacturing: NO_PLACEMENT, conditioning: NO_PLACEMENT };
   const productionSteps = steps.filter((step) => !isConditioningAction(step.action));
@@ -255,14 +262,20 @@ function placeEvidence(
   };
 }
 
-export function ExecutionTimeline({ steps, evidence }: ExecutionTimelineProps) {
+export function ExecutionTimeline({
+  steps,
+  evidence,
+  headingId = HEADING_ID,
+  headingLevel = 2,
+}: ExecutionTimelineProps) {
   const { manufacturing: placement, conditioning } = placeEvidence(steps, evidence);
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   return (
     <Card className="px-4" data-testid="execution-trace-timeline">
       <div className="flex items-center gap-2">
-        <h2 id={HEADING_ID} className="text-base font-semibold">
+        <Heading id={headingId} className="text-base font-semibold">
           {HEADING_TEXT}
-        </h2>
+        </Heading>
         <span
           className="rounded-full bg-muted px-2 text-xs font-medium tabular-nums text-muted-foreground"
           data-testid="execution-trace-step-count"
@@ -271,7 +284,7 @@ export function ExecutionTimeline({ steps, evidence }: ExecutionTimelineProps) {
         </span>
       </div>
       <ol
-        aria-labelledby={HEADING_ID}
+        aria-labelledby={headingId}
         className="relative m-0 list-none p-0 before:absolute before:top-5 before:bottom-5 before:left-[19px] before:w-0.5 before:bg-border"
       >
         {steps.map((step, index) => (

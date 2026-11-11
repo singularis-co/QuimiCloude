@@ -341,7 +341,7 @@ describe('Terminar guarda el coste real de lo consumido', () => {
       expect(lote.unitCost).toBe('14.5000');
 
       const vista = await pedidos.getOrder(orderId, actorDe(fixture));
-      expect(vista.actualCost).toBe('145.0000');
+      expect(vista.actualCostTotal).toBe('145.0000');
 
       const tab = await inventario.listFinishedProductCosts(lote.productId, {}, actorDeInventario(fixture));
       expect(tab.items).toHaveLength(1);

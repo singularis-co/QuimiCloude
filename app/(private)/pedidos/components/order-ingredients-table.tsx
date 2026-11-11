@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { createOrderSchema, resolveLineNeed, type OrderLineNeed } from '@/lib/modules/pedidos';
+import { orderLineInputSchema, resolveLineNeed, type OrderLineNeed } from '@/lib/modules/pedidos';
 import { formatPercentage, type RecipeLineView } from '@/lib/modules/recetas';
 import type { MassVolumeBridge, UnitConversion, UnitView } from '@/lib/modules/unidades';
 import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
@@ -107,7 +107,7 @@ export function ingredientNeedOf(
   bridge: MassVolumeBridge | null,
 ): OrderLineNeed | null {
   if (orderUnitId === '') return null;
-  const validQuantity = createOrderSchema.shape.quantity.safeParse(quantity).success ? quantity : '0';
+  const validQuantity = orderLineInputSchema.shape.quantity.safeParse(quantity).success ? quantity : '0';
   return resolveLineNeed(validQuantity, line.percentage, unitConversionOf(line.productUnitId, units), {
     orderUnitId,
     orderUnit: unitConversionOf(orderUnitId, units),

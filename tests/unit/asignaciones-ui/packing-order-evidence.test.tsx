@@ -62,7 +62,10 @@ function paso(text: string, requiresEvidence?: boolean) {
 function pedido(overrides: Partial<PackingOrderDetail> = {}): PackingOrderDetail {
   return {
     id: 'order-1',
+    lineId: 'linea-order-1',
     numberText: '2026-0000030',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
     recipeName: 'Desengrasante alcalino',
     quantity: '12.5',
     presentationLines: [],
@@ -166,7 +169,7 @@ describe('empaque — el bloque de evidencia', () => {
     expect(motivo()).toBe(STEP_EVIDENCE_TEXTS.uploadingReason);
     expect(mocks.uploadEvidence).toHaveBeenCalledWith(
       expect.any(File),
-      { orderId: 'order-1', phase: 'packing', stepPosition: 1 },
+      { orderId: 'order-1', lineId: 'linea-order-1', phase: 'packing', stepPosition: 1 },
       expect.objectContaining({
         requestUpload: mocks.requestEvidenceUploadAction,
         register: mocks.registerEvidenceAction,
@@ -190,6 +193,7 @@ describe('empaque — el bloque de evidencia', () => {
 
     expect(mocks.removeEvidenceAction).toHaveBeenCalledWith({
       orderId: 'order-1',
+      lineId: 'linea-order-1',
       phase: 'packing',
       evidenceId: 'ev-1',
     });

@@ -17,6 +17,8 @@ import { AsignacionesError, type Actor, type RecordConditioningStepResult } from
 import { ASSIGNED_ORDERS_ROUTE, CONDITIONED_ORDER_PARAM, conditioningOrderRoute } from '@/lib/shared/routes';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
+import { outcomeRoute } from './outcome-query';
+
 const toErrorState = createErrorStateTranslator(
   AsignacionesError,
   observabilidad.readRequestIdHeader,
@@ -34,6 +36,16 @@ async function currentActor(): Promise<Actor | null> {
   };
 }
 
+function orderLineFromFormData(formData: FormData): { orderId: unknown; lineId: unknown } {
+  return { orderId: formData.get('orderId'), lineId: formData.get('lineId') };
+}
+
+function revalidateConditioningOrder({ orderId, lineId }: { orderId?: unknown; lineId?: unknown }): void {
+  if (typeof orderId === 'string' && typeof lineId === 'string') {
+    revalidatePath(conditioningOrderRoute(orderId, lineId));
+  }
+}
+
 export type StartConditioningResult = { status: 'success' } | ErrorState;
 
 /** Comienza con el equipo marcado y se queda en el detalle, que ya ofrece «Terminar». */
@@ -45,7 +57,7 @@ export async function startConditioningAction(
 
   try {
     await asignaciones.startConditioning(actor, {
-      orderId: formData.get('orderId'),
+      ...orderLineFromFormData(formData),
       userIds: formData.getAll('userIds'),
       workGroupIds: formData.getAll('workGroupIds'),
     });
@@ -53,46 +65,43 @@ export async function startConditioningAction(
     return toErrorState(error);
   }
 
-  const orderId = formData.get('orderId');
-  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  revalidateConditioningOrder(orderLineFromFormData(formData));
   return { status: 'success' };
 }
 
 export type FinishConditioningResult = { status: 'success' } | ErrorState;
 
-/** Deja el pedido `TERMINADO` y vuelve a «Por acondicionar» con el aviso. */
+/** Deja la receta `TERMINADO` y vuelve a «Por acondicionar» con el aviso. */
 export async function finishConditioningAction(
   _prevState: FinishConditioningResult,
   formData: FormData,
 ): Promise<FinishConditioningResult> {
   const actor = await currentActor();
 
-  let numberText: string;
+  let outcome: Awaited<ReturnType<typeof asignaciones.finishConditioning>>;
   try {
-    ({ numberText } = await asignaciones.finishConditioning(actor, { orderId: formData.get('orderId') }));
+    outcome = await asignaciones.finishConditioning(actor, orderLineFromFormData(formData));
   } catch (error) {
     return toErrorState(error);
   }
 
   revalidatePath(ASSIGNED_ORDERS_ROUTE);
-  const query = new URLSearchParams({ vista: 'por_acondicionar', [CONDITIONED_ORDER_PARAM]: numberText });
-  redirect(`${ASSIGNED_ORDERS_ROUTE}?${query.toString()}`);
+  redirect(outcomeRoute({ vista: 'por_acondicionar', [CONDITIONED_ORDER_PARAM]: outcome.numberText }, outcome));
 }
 
 export type SaveConditioningBatchDataResult = { status: 'idle' } | { status: 'success' } | ErrorState;
 
-/** Guarda los datos de lote del pedido y se queda en el detalle. El campo culpable lo deduce el
+/** Guarda los datos de lote de la receta y se queda en el detalle. El campo culpable lo deduce el
  *  formulario por el `code`. */
 export async function saveConditioningBatchDataAction(
   _prevState: SaveConditioningBatchDataResult,
   formData: FormData,
 ): Promise<SaveConditioningBatchDataResult> {
   const actor = await currentActor();
-  const orderId = formData.get('orderId');
 
   try {
     await asignaciones.saveConditioningBatchData(actor, {
-      orderId,
+      ...orderLineFromFormData(formData),
       lot: formData.get('lot'),
       expiryDate: formData.get('expiryDate'),
       productionDate: formData.get('productionDate'),
@@ -101,7 +110,7 @@ export async function saveConditioningBatchDataAction(
     return toErrorState(error);
   }
 
-  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  revalidateConditioningOrder(orderLineFromFormData(formData));
   return { status: 'success' };
 }
 
@@ -120,7 +129,8 @@ export async function recordConditioningStepAction(input: unknown): Promise<Reco
     return toErrorState(error);
   }
 
-  const orderId = typeof input === 'object' && input !== null ? (input as { orderId?: unknown }).orderId : undefined;
-  if (typeof orderId === 'string') revalidatePath(conditioningOrderRoute(orderId));
+  if (typeof input === 'object' && input !== null) {
+    revalidateConditioningOrder(input as { orderId?: unknown; lineId?: unknown });
+  }
   return { status: 'success', data };
 }

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Planta con varias recetas</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./qc.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>body{margin:0}</style>
+</helmet>
+<div class="{{ rootCls }}">
+  <div class="shell">
+    <div style="display: flex; flex: none"><dc-import name="Sidebar" active="{{ navActive }}" hint-size="272px,100%"></dc-import></div>
+    <div class="main">
+      <header class="topbar">
+        <div class="tb-left"><button class="tb-btn" type="button" aria-label="Alternar barra lateral" aria-expanded="{{ menuStr }}" onClick="{{ openMenu }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3zM9 4v16m5-11 3 3-3 3"></path></svg></button><img src="/_blob/f9f03873139f42e5e761f3e112cb67d9" alt="QuimiCloude" style="width: 28px; height: 28px"></div>
+        <div class="tb-right">
+          <button class="tb-btn" type="button" aria-label="Cambiar tema" onClick="{{ toggleDark }}"><span class="theme-ic"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span><span class="tip">Cambiar tema</span></button>
+        </div>
+      </header>
+
+      <div class="main-bd page enter">
+        <nav class="tabs scroll" aria-label="Pantallas del tablero (solo para revisar el diseño)">
+          <sc-for list="{{ screens }}" as="t" hint-placeholder-count="4"><button class="tab" type="button" aria-current="{{ t.cur }}" onClick="{{ t.pick }}">{{ t.label }}</button></sc-for>
+        </nav>
+
+        <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+          <div class="ph"><div class="ph-t"><h1 class="h1">Asignación</h1></div></div>
+          <nav class="tabs scroll" aria-label="Vistas de asignación">
+            <sc-for list="{{ views }}" as="t" hint-placeholder-count="4"><button class="tab" type="button" aria-current="{{ t.cur }}" onClick="{{ t.pick }}">{{ t.label }}<span class="count mono">{{ t.n }}</span></button></sc-for>
+          </nav>
+          <div class="tw">
+            <div class="scroll">
+              <table class="collapse">
+                <thead><tr><th scope="col">Nº de pedido</th><th scope="col">Receta</th><th scope="col" class="num">Cantidad</th><th scope="col">Presentación</th><th scope="col">Prioridad</th><th scope="col">Estado</th><th scope="col">Responsables</th><th scope="col"><span class="sr">Entrar</span></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                    <tr>
+                      <td class="mono">{{ r.no }}</td>
+                      <td><span style="display: flex; flex-direction: column; gap: 2px"><span class="strong">{{ r.rec }}</span><sc-if value="{{ r.multi }}" hint-placeholder-val="{{ false }}"><span class="cap">{{ r.of }}</span></sc-if></span></td>
+                      <td class="num mono">{{ r.qty }}</td>
+                      <td>{{ r.pres }}</td>
+                      <td><span class="{{ r.pmCls }}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"></rect><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor" opacity="{{ r.o2 }}"></rect><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor" opacity="{{ r.o3 }}"></rect></svg>{{ r.pr }}</span></td>
+                      <td><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></td>
+                      <td><span class="avs"><span class="av sm">LG</span><span class="av sm c2">MS</span></span></td>
+                      <td class="num"><button class="b b-pri b-sm b-go" type="button" aria-label="{{ r.enterLabel }}" onClick="{{ r.enter }}">Entrar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div class="rows-m">
+                <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+                  <div class="rm">
+                    <div class="rm-top"><span class="mono strong">{{ r.no }}</span><span class="{{ r.stCls }}"><i></i>{{ r.st }}</span></div>
+                    <span class="strong">{{ r.rec }}</span>
+                    <sc-if value="{{ r.multi }}" hint-placeholder-val="{{ false }}"><span class="cap">{{ r.of }}</span></sc-if>
+                    <div class="rm-meta"><span class="mono">{{ r.qty }}</span><span>{{ r.pres }}</span><span>{{ r.pr }}</span></div>
+                    <div class="rm-top" style="padding-top: 4px"><span class="avs"><span class="av sm">LG</span><span class="av sm c2">MS</span></span><button class="b b-pri b-touch b-go" type="button" aria-label="{{ r.enterLabel }}" onClick="{{ r.enter }}">Entrar<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div class="pg"><span>{{ pgText }}</span></div>
+          </div>
+          <p class="cap">Una fila por receta. Si un pedido tiene dos recetas en la misma vista, sale dos veces con el mismo número y la receta distinta; «Receta N de M» solo aparece en pedidos de varias recetas.</p>
+        </sc-if>
+
+        <sc-if value="{{ isExec }}" hint-placeholder-val="{{ false }}">
+          <div><button class="b b-out b-back" type="button" onClick="{{ backToList }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a Asignación</button></div>
+          <section class="card" aria-labelledby="pv-ex" style="padding: 18px; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap">
+              <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+                <span class="cap">{{ ex.phase }} · Pedido <span class="mono">{{ ex.no }}</span> · Receta {{ ex.pos }} de {{ ex.total }}</span>
+                <h1 id="pv-ex" class="h1">{{ ex.rec }}</h1>
+                <span class="sub"><span class="mono">{{ ex.qty }}</span> · {{ ex.pres }}</span>
+              </div>
+              <span class="{{ ex.stCls }}"><i></i>{{ ex.st }}</span>
+            </div>
+            <div class="lbox" aria-label="Otras recetas del pedido">
+              <sc-for list="{{ ex.others }}" as="o" hint-placeholder-count="1">
+                <div class="lrow"><span style="display: flex; flex-direction: column; gap: 2px"><span class="cap">Otra receta de este pedido</span><span class="strong">{{ o.rec }}</span></span><span style="display: flex; align-items: center; gap: 10px"><span class="{{ o.stCls }}"><i></i>{{ o.st }}</span><sc-if value="{{ o.canEnter }}" hint-placeholder-val="{{ true }}"><button class="b b-out b-sm" type="button" onClick="{{ o.go }}">Ir a esta receta</button></sc-if></span></div>
+              </sc-for>
+            </div>
+          </section>
+          <div class="card" style="padding: 18px; gap: 10px">
+            <span class="h3">{{ ex.body }}</span>
+            <span class="cap">El contenido de cada pantalla (pasos, reparto, evidencias, equipo) es el de hoy, ahora de esta receta. QC-291 rediseña ese contenido aparte.</span>
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap">
+            <sc-if value="{{ ex.canCancel }}" hint-placeholder-val="{{ true }}"><button class="b b-gho b-touch-m" type="button" style="color: var(--d-fg)" onClick="{{ openCancel }}">Cancelar esta receta</button></sc-if>
+            <button class="b b-pri b-touch-m" type="button" onClick="{{ advance }}">{{ ex.cta }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDash }}" hint-placeholder-val="{{ false }}">
+          <div class="ph"><div class="ph-t"><h1 class="h1">Recorridos</h1></div></div>
+          <div class="tw">
+            <div class="scroll">
+              <table class="collapse">
+                <thead><tr><th scope="col">Nº de pedido</th><th scope="col">Estado</th><th scope="col">Fórmula</th><th scope="col">Avance</th><th scope="col">Presentaciones</th><th scope="col" class="num">Duración</th><th scope="col"><span class="sr">Recorrido</span></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{ dash }}" as="d" hint-placeholder-count="4">
+                    <tr>
+                      <td class="mono">{{ d.no }}</td>
+                      <td><span class="{{ d.stCls }}"><i></i>{{ d.st }}</span></td>
+                      <td><span class="strong">{{ d.first }}</span><sc-if value="{{ d.hasMore }}" hint-placeholder-val="{{ true }}"> <span class="cap">{{ d.more }}</span></sc-if></td>
+                      <td><span style="display: flex; flex-direction: column; gap: 4px; min-width: 84px"><span class="mono" style="font-size: 13px">{{ d.prog }}</span><span class="progress" aria-hidden="true"><i style="{{ d.progW }}"></i></span></span></td>
+                      <td>{{ d.pres }}</td>
+                      <td class="num mono">{{ d.dur }}</td>
+                      <td class="num"><button class="b b-out b-sm" type="button" onClick="{{ d.open }}">Ver recorrido</button></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div class="rows-m">
+                <sc-for list="{{ dash }}" as="d" hint-placeholder-count="4">
+                  <div class="rm">
+                    <div class="rm-top"><span class="mono strong">{{ d.no }}</span><span class="{{ d.stCls }}"><i></i>{{ d.st }}</span></div>
+                    <span><span class="strong">{{ d.first }}</span><sc-if value="{{ d.hasMore }}" hint-placeholder-val="{{ true }}"> <span class="cap">{{ d.more }}</span></sc-if></span>
+                    <div style="display: flex; align-items: center; gap: 10px"><span class="progress" aria-hidden="true" style="flex: 1"><i style="{{ d.progW }}"></i></span><span class="mono" style="font-size: 13px">{{ d.prog }}</span></div>
+                    <div class="rm-top"><span class="mono cap">{{ d.dur }}</span><button class="b b-out b-touch" type="button" onClick="{{ d.open }}">Ver recorrido</button></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isTrace }}" hint-placeholder-val="{{ false }}">
+          <div><button class="b b-out b-back" type="button" onClick="{{ backToDash }}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>Volver a la lista</button></div>
+          <div class="ph"><div class="ph-t"><h1 class="h1">Recorrido del pedido <span class="mono">2026-0001042</span></h1></div></div>
+          <dl class="g3 cq-1" style="margin: 0">
+            <div class="stat"><dt>Estado</dt><dd><span class="sb t-progress"><i></i>Parcial</span></dd></div>
+            <div class="stat"><dt>Avance</dt><dd class="mono">1 de 2 terminadas</dd></div>
+            <div class="stat"><dt>Duración</dt><dd class="mono">5 h 02 min</dd></div>
+          </dl>
+          <sc-for list="{{ sections }}" as="sec" hint-placeholder-count="2">
+            <section class="card" style="padding: 18px; gap: 12px">
+              <div class="card-hd" style="flex-wrap: wrap; gap: 10px"><h2 class="h2">{{ sec.rec }}</h2><span class="{{ sec.stCls }}"><i></i>{{ sec.st }}</span></div>
+              <span class="cap"><span class="mono">{{ sec.qty }}</span> · {{ sec.pres }} · {{ sec.dur }} · vueltas atrás {{ sec.back }}</span>
+              <ol class="tl">
+                <sc-for list="{{ sec.events }}" as="e" hint-placeholder-count="4">
+                  <li class="{{ e.cls }}">
+                    <span class="ev-dot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{ e.icon }}"></path></svg></span>
+                    <div class="ev-body">
+                      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap"><span class="strong">{{ e.act }}</span><time class="mono cap">{{ e.time }}</time></div>
+                      <div class="rm-meta"><span>{{ e.phase }}</span><span>{{ e.pos }}</span><span>{{ e.who }}</span></div>
+                    </div>
+                  </li>
+                </sc-for>
+              </ol>
+            </section>
+          </sc-for>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <div class="{{ ovCls }}" onClick="{{ closeAll }}"></div>
+  <aside class="{{ menuSheetCls }}" aria-label="Menú">
+    <dc-import name="Sidebar" active="{{ navActive }}" sheet="{{ true }}" hint-size="100%,100%"></dc-import>
+  </aside>
+
+  <div class="{{ cancelCls }}" role="alertdialog" aria-modal="true" aria-labelledby="pv-cr">
+    <div class="dlg-ic danger"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM6 6l12 12"></path></svg></div>
+    <h2 id="pv-cr" class="h2">Cancelar esta receta</h2>
+    <p class="sub">Se cancela <span class="strong">{{ ex.rec }}</span> del pedido <span class="mono">{{ ex.no }}</span> y se libera su material. Las demás recetas del pedido siguen.</p>
+    <div class="f"><label for="pv-crm">Motivo de la cancelación</label><textarea id="pv-crm" class="in" rows="3"></textarea><span class="help">Entre 1 y 500 caracteres.</span></div>
+    <div class="actions"><button class="b b-out b-touch-m" type="button" onClick="{{ closeAll }}">Volver</button><button class="b b-des b-touch-m" type="button" onClick="{{ doCancel }}">Cancelar la receta</button></div>
+  </div>
+
+  <div class="toastwrap" aria-live="polite"><div class="{{ toastCls }}"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--s-fg)"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6"></path></svg><span>{{ toastText }}</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"oscuro":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+componentWillUnmount() { clearTimeout(this.t); }
+renderVals() {
+const s = this.state || {};
+const dark = s.dark !== undefined ? s.dark : !!this.props.oscuro;
+const scr = s.scr || 'list';
+const ST = { PENDIENTE: ['Pendiente', 'neutral'], EN_CURSO: ['En fabricación', 'progress'], POR_EMPACAR: ['Por empacar', 'waiting'], EN_EMPAQUE: ['En empaque', 'progress'], POR_ACONDICIONAR: ['Por acondicionar', 'waiting'], TERMINADO: ['Terminado', 'success'], CANCELADO: ['Cancelado', 'muted'], PARCIAL: ['Parcial', 'progress'] };
+const pm = (l) => ({ pmCls: l === 4 ? 'pm crit' : 'pm', o2: l >= 2 ? '1' : '0.2', o3: l >= 3 ? '1' : '0.2' });
+const lines = [
+{ id: 'a', no: '2026-0001042', rec: 'Hipoclorito 5 %', qty: '200,00 L', pres: 'Bidón 20 L', pr: 'Alta', lvl: 3, st: s.aSt || 'EN_CURSO', pos: 1, total: 2 },
+{ id: 'b', no: '2026-0001042', rec: 'Desengrasante alcalino', qty: '50,00 L', pres: 'Garrafa 5 L', pr: 'Alta', lvl: 3, st: s.bSt || 'PENDIENTE', pos: 2, total: 2 },
+{ id: 'c', no: '2026-0001045', rec: 'Jabón líquido', qty: '120,00 L', pres: 'Garrafa 5 L', pr: 'Crítica', lvl: 4, st: 'PENDIENTE', pos: 1, total: 1 },
+{ id: 'd', no: '2026-0001046', rec: 'Limpiador multiusos limón', qty: '45,00 kg', pres: 'Galón 3,78 L', pr: 'Media', lvl: 2, st: 'POR_EMPACAR', pos: 1, total: 1 }
+];
+const VIEWS = [
+{ label: 'Mis asignados', sts: ['PENDIENTE', 'EN_CURSO'], phase: 'Fabricación', body: 'Pasos de la receta y evidencias', cta: 'Finalizar fabricación', next: 'POR_EMPACAR' },
+{ label: 'Por empacar', sts: ['POR_EMPACAR', 'EN_EMPAQUE'], phase: 'Empaque', body: 'Reparto en envases y envases reales', cta: 'Terminar empaque', next: 'POR_ACONDICIONAR' },
+{ label: 'Por acondicionar', sts: ['POR_ACONDICIONAR'], phase: 'Acondicionamiento', body: 'Pasos de acondicionamiento, equipo y datos de lote', cta: 'Terminar acondicionamiento', next: 'TERMINADO' },
+{ label: 'Terminados', sts: ['TERMINADO'], phase: 'Terminado', body: 'Resumen', cta: 'Volver', next: null }
+];
+const view = s.view || 0;
+const V = VIEWS[view];
+const inView = (v) => lines.filter((l) => v.sts.includes(l.st));
+const enter = (l) => () => this.setState({ scr: 'exec', cur: l.id });
+const rows = inView(V).map((l) => Object.assign({ no: l.no, rec: l.rec, qty: l.qty, pres: l.pres, pr: l.pr, st: ST[l.st][0], stCls: 'sb t-' + ST[l.st][1], multi: l.total > 1, of: 'Receta ' + l.pos + ' de ' + l.total, enterLabel: 'Entrar a ' + l.rec + ' del pedido ' + l.no, enter: enter(l) }, pm(l.lvl)));
+const cur = lines.find((l) => l.id === s.cur) || lines[0];
+const vOf = VIEWS.find((v) => v.sts.includes(cur.st)) || VIEWS[3];
+const others = lines.filter((l) => l.no === cur.no && l.id !== cur.id).map((l) => ({ rec: l.rec, st: ST[l.st][0], stCls: 'sb t-' + ST[l.st][1], canEnter: l.st !== 'CANCELADO' && l.st !== 'TERMINADO', go: () => this.setState({ cur: l.id }) }));
+const setSt = (id, st) => (id === 'a' ? { aSt: st } : id === 'b' ? { bSt: st } : {});
+const toast = (text, extra) => { this.setState(Object.assign({ dlg: null, toast: text }, extra || {})); clearTimeout(this.t); this.t = setTimeout(() => this.setState({ toast: null }), 3200); };
+const E = (cls, icon, act, phase, pos, time, who) => ({ cls: cls ? 'ev ' + cls : 'ev', icon, act, phase, pos, time, who });
+const I = { start: 'M7 4v16l13-8z', fwd: 'M5 12h14M13 6l6 6-6 6', end: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6', box: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8' };
+return {
+rootCls: dark ? 'qc app dk' : 'qc app',
+toggleDark: () => this.setState({ dark: !dark }),
+navActive: (scr === 'dash' || scr === 'trace') ? 'dashboard' : 'asignacion',
+menuStr: s.menu ? 'true' : 'false', openMenu: () => this.setState({ menu: true }),
+menuSheetCls: s.menu ? 'sheet nav-l open' : 'sheet nav-l',
+screens: [['list', 'Asignación'], ['exec', 'Pantalla de una receta'], ['dash', 'Recorridos'], ['trace', 'Recorrido del pedido']].map((x) => ({ label: x[1], cur: (scr === x[0]) ? 'page' : 'false', pick: () => this.setState({ scr: x[0] }) })),
+isList: scr === 'list', isExec: scr === 'exec', isDash: scr === 'dash', isTrace: scr === 'trace',
+views: VIEWS.map((v, i) => ({ label: v.label, n: inView(v).length, cur: i === view ? 'page' : 'false', pick: () => this.setState({ view: i }) })),
+rows, pgText: rows.length === 1 ? '1 receta' : rows.length + ' recetas',
+backToList: () => this.setState({ scr: 'list' }),
+ex: { no: cur.no, rec: cur.rec, qty: cur.qty, pres: cur.pres, pos: cur.pos, total: cur.total, st: ST[cur.st][0], stCls: 'sb t-' + ST[cur.st][1], phase: vOf.phase, body: vOf.body, cta: vOf.cta, others, canCancel: ['PENDIENTE', 'EN_CURSO'].includes(cur.st) },
+advance: () => (vOf.next ? toast(cur.rec + ': ' + ST[vOf.next][0].toLowerCase() + '.', Object.assign({ scr: 'list' }, setSt(cur.id, vOf.next))) : this.setState({ scr: 'list' })),
+openCancel: () => this.setState({ dlg: 'cancel' }),
+cancelCls: s.dlg === 'cancel' ? 'dlg open' : 'dlg',
+doCancel: () => toast('Receta cancelada. Su material quedó libre.', Object.assign({ scr: 'list' }, setSt(cur.id, 'CANCELADO'))),
+dash: [
+{ no: '2026-0001042', st: 'Parcial', stCls: 'sb t-progress', first: 'Hipoclorito 5 %', hasMore: true, more: '+1 más', prog: '1 de 2', progW: 'width: 50%', pres: '10 bidón 20 L · 10 garrafa 5 L', dur: '5 h 02 min' },
+{ no: '2026-0001044', st: 'Terminado', stCls: 'sb t-success', first: 'Jabón líquido', hasMore: true, more: '+2 más', prog: '3 de 3', progW: 'width: 100%', pres: '8 garrafa 5 L · 21 galón 3,78 L · 3 bidón 20 L', dur: '9 h 40 min' },
+{ no: '2026-0001046', st: 'Por empacar', stCls: 'sb t-waiting', first: 'Limpiador multiusos limón', hasMore: false, more: '', prog: '0 de 1', progW: 'width: 0%', pres: '12 galón 3,78 L', dur: '1 h 15 min' }
+].map((d) => Object.assign(d, { open: () => this.setState({ scr: 'trace' }) })),
+backToDash: () => this.setState({ scr: 'dash' }),
+sections: [
+{ rec: 'Hipoclorito 5 %', st: 'Terminado', stCls: 'sb t-success', qty: '200,00 L', pres: '10 × bidón 20 L', dur: '3 h 28 min', back: '0', events: [
+E('k-start', I.start, 'Arrancar', 'Fabricación', 'Paso 1 de 6', '02/11 08:12', 'Laura Gómez'),
+E('k-end', I.end, 'Finalizar', 'Fabricación', 'Paso 6 de 6', '02/11 10:48', 'Laura Gómez'),
+E('k-start', I.box, 'Comenzar empaque', 'Empaque', '', '02/11 11:02', 'Mateo Sánchez'),
+E('k-end', I.end, 'Terminar acondicionamiento', 'Acondicionamiento', '', '02/11 11:40', 'Valentina Herrera')
+] },
+{ rec: 'Desengrasante alcalino', st: 'En fabricación', stCls: 'sb t-progress', qty: '50,00 L', pres: '10 × garrafa 5 L', dur: '1 h 34 min', back: '1', events: [
+E('k-start', I.start, 'Arrancar', 'Fabricación', 'Paso 1 de 4', '02/11 11:10', 'Laura Gómez'),
+E('', I.fwd, 'Avanzar', 'Fabricación', 'Paso 2 de 4', '02/11 11:52', 'Laura Gómez')
+] }
+],
+ovCls: (s.dlg || s.menu) ? 'ov open' : 'ov',
+closeAll: () => this.setState({ dlg: null, menu: false }),
+toastCls: s.toast ? 'toast show' : 'toast', toastText: s.toast || ''
+};
+}
+}
+</script>
+</body>
+</html>

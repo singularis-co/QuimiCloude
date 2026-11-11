@@ -30,6 +30,9 @@ function execution(tools: readonly ExecutionToolView[], orderQuantity = '250'): 
   return {
     orderId: 'order-1',
     numberText: 'PED-0007',
+    recipe: { position: 1, count: 1 },
+    otherRecipes: [],
+    lineId: 'linea-1',
     status: 'EN_CURSO',
     recipeName: 'Barniz acrílico',
     orderQuantity,
@@ -105,23 +108,23 @@ describe('bloque de herramientas del operador', () => {
 
 describe('bloque de herramientas dentro de la pantalla del operador', () => {
   it('R28 — la pantalla monta el bloque con las herramientas de la vista', () => {
-    render(<OrderExecutionScreen execution={execution(TOOLS)} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={execution(TOOLS)} />);
 
     expect(screen.getByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(`${ORDER_EXECUTION_TOOL_TESTID}-0`)).toHaveTextContent('Agitador');
   });
 
   it('R29 — la cantidad pintada es la de la receta, sea cual sea la del pedido', () => {
-    const { unmount } = render(<OrderExecutionScreen execution={execution(TOOLS, '250')} />);
+    const { unmount } = render(<OrderExecutionScreen lineId="linea-1" execution={execution(TOOLS, '250')} />);
     expect(screen.getByTestId(`${ORDER_EXECUTION_TOOL_QUANTITY_TESTID}-0`)).toHaveTextContent('2');
     unmount();
 
-    render(<OrderExecutionScreen execution={execution(TOOLS, '9000')} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={execution(TOOLS, '9000')} />);
     expect(screen.getByTestId(`${ORDER_EXECUTION_TOOL_QUANTITY_TESTID}-0`)).toHaveTextContent('2');
   });
 
   it('R31 — la pantalla sin herramientas no monta el bloque', () => {
-    render(<OrderExecutionScreen execution={execution([])} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={execution([])} />);
 
     expect(screen.queryByTestId(ORDER_EXECUTION_TOOLS_TESTID)).toBeNull();
   });

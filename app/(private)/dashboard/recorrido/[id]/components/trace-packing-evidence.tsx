@@ -15,22 +15,24 @@ export const PACKING_EVIDENCE_TEXTS = {
 
 export type TracePackingEvidenceProps = {
   readonly groups: readonly OrderEvidenceGroup[];
+  readonly headingLevel?: 2 | 3;
 };
 
 /** Las fotos de envasado del pedido, en su propia tarjeta después de Anotaciones. */
-export function TracePackingEvidence({ groups }: TracePackingEvidenceProps) {
+export function TracePackingEvidence({ groups, headingLevel = 2 }: TracePackingEvidenceProps) {
   const router = useRouter();
   const titleId = useId();
   if (groups.length === 0) return null;
   const refresh = () => router.refresh();
   const total = groups.reduce((sum, group) => sum + group.photoCount, 0);
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
 
   return (
     <Card role="region" aria-labelledby={titleId} className="px-4" data-testid="trace-packing-evidence">
       <div className="flex items-center gap-2">
-        <h2 id={titleId} className="text-base font-semibold">
+        <Heading id={titleId} className="text-base font-semibold">
           {PACKING_EVIDENCE_TEXTS.title}
-        </h2>
+        </Heading>
         <span
           aria-label={PACKING_EVIDENCE_TEXTS.countLabel(total)}
           className="rounded-full bg-muted px-2 text-xs font-medium tabular-nums text-muted-foreground"

@@ -15,9 +15,8 @@ import { ASSIGNED_ORDERS_LABEL, BRAND_LABEL } from '@/lib/shared/navigation/priv
 import {
   CANCELLED_ORDER_PARAM,
   CONDITIONED_ORDER_PARAM,
-  DELIVERED_ORDER_PACKAGES_PARAM,
-  DELIVERED_ORDER_PARAM,
-  DELIVERED_ORDER_PRODUCT_PARAM,
+  MANUFACTURED_ORDER_PARAM,
+  OUTCOME_RECIPE_PARAM,
   PACKED_ORDER_PARAM,
 } from '@/lib/shared/routes';
 
@@ -89,18 +88,12 @@ export default async function AsignacionPage({
   const canViewTrace = canViewExecutionTrace(sessionUser);
   const vista = resolveAssignmentView(firstSearchParamValue(resolvedSearchParams[VIEW_PARAM]), views);
 
-  const deliveredOrderNumber = firstSearchParamValue(
-    resolvedSearchParams[DELIVERED_ORDER_PARAM],
-  );
-  const deliveredOrderPackages = firstSearchParamValue(
-    resolvedSearchParams[DELIVERED_ORDER_PACKAGES_PARAM],
-  );
-  const deliveredOrderProductName = firstSearchParamValue(
-    resolvedSearchParams[DELIVERED_ORDER_PRODUCT_PARAM],
-  );
+  const manufacturedOrderNumber = firstSearchParamValue(resolvedSearchParams[MANUFACTURED_ORDER_PARAM]);
   const packedOrderNumber = firstSearchParamValue(resolvedSearchParams[PACKED_ORDER_PARAM]);
   const conditionedOrderNumber = firstSearchParamValue(resolvedSearchParams[CONDITIONED_ORDER_PARAM]);
   const cancelledOrderNumber = firstSearchParamValue(resolvedSearchParams[CANCELLED_ORDER_PARAM]);
+  // Vacio cuenta como ausente: el aviso nombra entonces solo el pedido.
+  const outcomeRecipeName = firstSearchParamValue(resolvedSearchParams[OUTCOME_RECIPE_PARAM]) || undefined;
 
   const assignedOrdersParams = parseAssignedOrdersListParams(resolvedSearchParams);
   const genericListParams = parseAssignmentListParams(resolvedSearchParams);
@@ -109,22 +102,29 @@ export default async function AsignacionPage({
   return (
     <PageShell>
       <PageHeader title={ASSIGNED_ORDERS_LABEL} titleTestId="asignacion-title" />
-      {deliveredOrderNumber !== undefined ? (
+      {manufacturedOrderNumber !== undefined ? (
         <OrderOutcomeNotice
-          kind="delivered"
-          orderNumber={deliveredOrderNumber}
-          packages={deliveredOrderPackages}
-          productName={deliveredOrderProductName}
+          kind="manufactured"
+          orderNumber={manufacturedOrderNumber}
+          recipeName={outcomeRecipeName}
         />
       ) : null}
       {cancelledOrderNumber !== undefined ? (
-        <OrderOutcomeNotice kind="cancelled" orderNumber={cancelledOrderNumber} />
+        <OrderOutcomeNotice
+          kind="cancelled"
+          orderNumber={cancelledOrderNumber}
+          recipeName={outcomeRecipeName}
+        />
       ) : null}
       {vista === 'por_empacar' && packedOrderNumber !== undefined ? (
-        <OrderOutcomeNotice kind="packed" orderNumber={packedOrderNumber} />
+        <OrderOutcomeNotice kind="packed" orderNumber={packedOrderNumber} recipeName={outcomeRecipeName} />
       ) : null}
       {vista === 'por_acondicionar' && conditionedOrderNumber !== undefined ? (
-        <OrderOutcomeNotice kind="conditioned" orderNumber={conditionedOrderNumber} />
+        <OrderOutcomeNotice
+          kind="conditioned"
+          orderNumber={conditionedOrderNumber}
+          recipeName={outcomeRecipeName}
+        />
       ) : null}
       {views.length > 1 ? (
         <Suspense fallback={<AssignmentViewTabs current={vista} views={views} />}>

@@ -15,15 +15,24 @@ export type ConditioningTeamMemberRow = {
   readonly workGroupName: string | null;
 };
 
+export type ConditioningTeamMemberOfOrderRow = ConditioningTeamMemberRow & {
+  readonly orderId: string;
+  readonly orderLineId: string;
+};
+
 /** Solo insercion y lectura: el equipo guardado no se edita ni se borra. */
 export interface ConditioningTeamRepository {
   /** Una sola sentencia. Lanza si la PK choca: el caso de uso nunca manda duplicados. */
   insertAll(rows: readonly NewConditioningTeamMember[]): Promise<number>;
-  /** Ordenadas por `position`, que es el orden de composicion. */
-  listByOrderInCompany(companyId: string, orderId: string): Promise<readonly ConditioningTeamMemberRow[]>;
+  /** El equipo de esa linea del pedido, ordenado por `position`, que es el orden de composicion. */
+  listByLineInCompany(
+    companyId: string,
+    orderId: string,
+    orderLineId: string,
+  ): Promise<readonly ConditioningTeamMemberRow[]>;
   /** Ordenadas por pedido y luego por `position`. Con `orderIds` vacio no consulta. */
   listByOrdersInCompany(
     companyId: string,
     orderIds: readonly string[],
-  ): Promise<readonly (ConditioningTeamMemberRow & { readonly orderId: string })[]>;
+  ): Promise<readonly ConditioningTeamMemberOfOrderRow[]>;
 }

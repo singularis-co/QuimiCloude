@@ -22,17 +22,18 @@ export type FinishedBatchLabelsOutcome =
   | { readonly kind: 'no_batches' }
   | { readonly kind: 'duplicate_lot'; readonly batchId: string | null };
 
-/** Escribe lote, vencimiento y dia de produccion solo en lotes que entraron por produccion del
- *  pedido. No cambia existencias ni asienta movimientos. */
+/** Escribe lote, vencimiento y dia de produccion solo en lotes que entraron por produccion de esa
+ *  linea del pedido. No cambia existencias ni asienta movimientos. */
 export interface FinishedBatchLabels {
-  /** Un elemento por linea que tiene asiento `production` de ese pedido; una linea sin lote no
-   *  aparece. Fuera de transaccion. */
-  listOfOrder(companyId: string, orderId: string): Promise<readonly FinishedBatchOfOrderLine[]>;
+  /** Un elemento por linea del reparto que tiene asiento `production` de esa linea del pedido; una
+   *  linea sin lote no aparece. Fuera de transaccion. */
+  listOfOrder(companyId: string, orderId: string, orderLineId: string): Promise<readonly FinishedBatchOfOrderLine[]>;
   /** El mismo dato en todos los lotes que devuelve `listOfOrder`: los elige el servidor, no quien
    *  llama. Todo o nada, en la transaccion que recibe o en la suya. */
   writeForOrder(input: {
     readonly companyId: string;
     readonly orderId: string;
+    readonly orderLineId: string;
     readonly label: FinishedBatchLabel;
     readonly actorId: string;
     readonly now: Date;

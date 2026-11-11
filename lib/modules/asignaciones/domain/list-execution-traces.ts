@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 import { requirePermission, type Actor } from './actor';
 import { ValidationError } from './errors';
-import { buildExecutionTrace, type TraceDuration } from './execution-trace';
+import {
+  buildExecutionTrace,
+  combineDurations,
+  FINAL_STATUSES,
+  type ExecutionTrace,
+  type TraceDuration,
+} from './execution-trace';
+import { readRecipeOutlines } from './recipe-of-order';
 
 import type { ExecutionTraceTeamMember } from './conditioning-trace';
 import type { ExecutionEntryRecord } from './execution-entry';
@@ -14,7 +21,10 @@ import {
   formatOrderNumber,
   ORDER_STATUS_VALUES,
   type OrderCatalog,
-  type OrderDeliveryProgress,
+  type OrderHistorySummary,
+  type OrderProgress,
+  type OrderRecipeOutline,
+  type OrderRecipesOutline,
   type OrderStatus,
   type Page,
 } from '@/lib/modules/pedidos';
@@ -58,6 +68,12 @@ export type ExecutionTracePresentation = {
   readonly quantity: number;
 };
 
+export type ExecutionTraceRowRecipe = {
+  /** `null` = la receta no vuelve del catalogo. */
+  readonly recipeName: string | null;
+  readonly presentations: readonly ExecutionTracePresentation[];
+};
+
 export type ExecutionTraceRow = {
   readonly orderId: string;
   readonly numberText: string;
@@ -68,14 +84,18 @@ export type ExecutionTraceRow = {
   readonly people: readonly ExecutionTracePerson[];
   readonly firstAt: Date;
   readonly lastAt: Date;
+  /** La suma de las recetas: abierta si alguna lo esta. */
   readonly totalDuration: TraceDuration;
   readonly goBackCount: number;
-  /** Nombre de la receta del pedido, tambien dada de baja; `null` si no vuelve del catalogo. */
+  /** La primera receta en orden de alta, tambien dada de baja; `null` si no vuelve del catalogo. */
   readonly formulaName: string | null;
-  /** URL publica de la imagen de la receta (la de la original en una version); `null` = sin imagen. */
+  /** URL publica de la imagen de esa receta (la de la original en una version); `null` = sin imagen. */
   readonly formulaImageUrl: string | null;
-  /** Lo que pide el pedido: los envases planeados de cada linea, en el orden de alta. */
-  readonly presentations: readonly ExecutionTracePresentation[];
+  /** Recetas del pedido ademas de la primera, canceladas incluidas. */
+  readonly moreRecipes: number;
+  readonly progress: OrderProgress;
+  /** Lo que pide cada receta, en orden de alta, sin mezclar envases de recetas distintas. */
+  readonly recipes: readonly ExecutionTraceRowRecipe[];
 };
 
 export type ExecutionTraceList = {
@@ -92,46 +112,55 @@ export type ListExecutionTracesDeps = {
   readonly presentations: Pick<PresentationCatalog, 'findRefs'>;
 };
 
-/** Receta y reparto de la pagina, cada catalogo una sola vez sin importar cuantas filas haya. */
-type OrderContents = {
-  readonly progress: ReadonlyMap<string, OrderDeliveryProgress>;
+/** Sin outline no hay recetas que contar. */
+export const NO_PROGRESS: OrderProgress = { total: 0, finished: 0 };
+
+/** Recetas y reparto de la pagina, cada catalogo una sola vez sin importar cuantas filas haya. */
+export type OrderContents = {
+  readonly outlines: ReadonlyMap<string, OrderRecipesOutline>;
   readonly recipes: ReadonlyMap<string, RecipeRef>;
   readonly presentationNames: ReadonlyMap<string, string>;
 };
 
-async function listOrderContents(
-  deps: ListExecutionTracesDeps,
+export async function listOrderContents(
+  deps: Pick<ListExecutionTracesDeps, 'orders' | 'recipes' | 'presentations'>,
   companyId: string,
   orderIds: readonly string[],
 ): Promise<OrderContents> {
-  const progress = await deps.orders.listDeliveryProgressByIdsIncludingDeleted(companyId, orderIds);
-  const recipeIds = [...new Set(progress.map((order) => order.recipeId))];
+  const outlines = await readRecipeOutlines(deps.orders, companyId, orderIds);
+  const recipesOfPage = [...outlines.values()].flatMap((outline) => outline.recipes);
+  const recipeIds = [...new Set(recipesOfPage.map((recipe) => recipe.recipeId))];
   const presentationIds = [
-    ...new Set(progress.flatMap((order) => order.lines.map((line) => line.presentationId))),
+    ...new Set(recipesOfPage.flatMap((recipe) => recipe.presentationLines.map((line) => line.presentationId))),
   ];
   const [recipes, presentations] = await Promise.all([
     recipeIds.length === 0 ? [] : deps.recipes.findRefsIncludingDeleted(recipeIds, companyId),
     presentationIds.length === 0 ? [] : deps.presentations.findRefs(presentationIds, companyId),
   ]);
   return {
-    progress: new Map(progress.map((order) => [order.id, order])),
+    outlines,
     recipes: new Map(recipes.map((recipe) => [recipe.id, recipe])),
     presentationNames: new Map(presentations.map((presentation) => [presentation.id, presentation.name])),
   };
 }
 
+/** En orden de alta. */
+export function recipesInOrder(outline: OrderRecipesOutline | undefined): readonly OrderRecipeOutline[] {
+  return [...(outline?.recipes ?? [])].sort((a, b) => a.position - b.position);
+}
+
 /** Una linea cuya presentacion no vuelve del catalogo se omite: se devuelve lo que hay. */
 export function toTracePresentations(
-  progress: OrderDeliveryProgress | undefined,
+  presentationLines: OrderRecipeOutline['presentationLines'],
   presentationNames: ReadonlyMap<string, string>,
-): Pick<ExecutionTraceRow, 'presentations'> {
+): readonly ExecutionTracePresentation[] {
   const presentations: ExecutionTracePresentation[] = [];
-  for (const line of progress?.lines ?? []) {
+  for (const line of presentationLines) {
     const label = presentationNames.get(line.presentationId);
     if (label === undefined) continue;
     presentations.push({ label, quantity: line.packages });
   }
-  return { presentations };
+  return presentations;
 }
 
 function startOfDayUtc(day: string): Date {
@@ -157,17 +186,74 @@ function emptyPage(page: number, pageSize: number): Page<ExecutionTraceRow> {
   return { items: [], total: 0, page, pageSize, totalPages: 1 };
 }
 
+function groupEntriesBy(
+  entries: readonly ExecutionEntryRecord[],
+  keyOf: (entry: ExecutionEntryRecord) => string,
+): Map<string, ExecutionEntryRecord[]> {
+  const groups = new Map<string, ExecutionEntryRecord[]>();
+  for (const entry of entries) {
+    const key = keyOf(entry);
+    const group = groups.get(key);
+    if (group === undefined) groups.set(key, [entry]);
+    else group.push(entry);
+  }
+  return groups;
+}
+
 /** Agrupa por pedido conservando el orden en que el registro devuelve las anotaciones. */
 export function groupEntriesByOrder(
   entries: readonly ExecutionEntryRecord[],
 ): Map<string, ExecutionEntryRecord[]> {
-  const byOrder = new Map<string, ExecutionEntryRecord[]>();
-  for (const entry of entries) {
-    const group = byOrder.get(entry.orderId);
-    if (group === undefined) byOrder.set(entry.orderId, [entry]);
-    else group.push(entry);
-  }
-  return byOrder;
+  return groupEntriesBy(entries, (entry) => entry.orderId);
+}
+
+/** Agrupa por linea del pedido conservando el orden del registro. */
+export function groupEntriesByLine(
+  entries: readonly ExecutionEntryRecord[],
+): Map<string, ExecutionEntryRecord[]> {
+  return groupEntriesBy(entries, (entry) => entry.orderLineId);
+}
+
+export type RecipeTrace = { readonly lineId: string; readonly trace: ExecutionTrace };
+
+/**
+ * Un recorrido por receta, medido con el estado de su linea: un pedido `PARCIAL` no esta en
+ * ninguna fase, sus recetas si. Una linea que el outline no trae se mide con el estado del pedido
+ * y va al final.
+ */
+export function traceRecipes(
+  orderEntries: readonly ExecutionEntryRecord[],
+  order: Pick<OrderHistorySummary, 'status' | 'deleted'>,
+  outline: OrderRecipesOutline | undefined,
+  now: Date,
+): readonly RecipeTrace[] {
+  const recipeOf = new Map((outline?.recipes ?? []).map((recipe) => [recipe.lineId, recipe]));
+  const positionOf = (lineId: string): number => recipeOf.get(lineId)?.position ?? Number.POSITIVE_INFINITY;
+  return [...groupEntriesByLine(orderEntries)]
+    .map(([lineId, lineEntries]) => ({
+      lineId,
+      trace: buildExecutionTrace(
+        lineEntries,
+        { status: recipeOf.get(lineId)?.status ?? order.status, deleted: order.deleted },
+        now,
+      ),
+    }))
+    .sort((a, b) => positionOf(a.lineId) - positionOf(b.lineId));
+}
+
+export function isOrderActive(order: Pick<OrderHistorySummary, 'status' | 'deleted'>): boolean {
+  return !order.deleted && !FINAL_STATUSES.includes(order.status);
+}
+
+/** Primera y ultima anotacion del pedido (al menos una), sin suponer el orden en que llegan. */
+export function entriesSpan(entries: readonly ExecutionEntryRecord[]): { firstAt: Date; lastAt: Date } {
+  const times = entries.map((entry) => entry.occurredAt.getTime());
+  return { firstAt: new Date(Math.min(...times)), lastAt: new Date(Math.max(...times)) };
+}
+
+/** Quien firma, en el orden del registro y sin repetir. */
+export function signerIds(entries: readonly ExecutionEntryRecord[]): readonly string[] {
+  return [...new Set(entries.map((entry) => entry.userId))];
 }
 
 export async function findPeopleByIds(
@@ -181,23 +267,32 @@ export async function findPeopleByIds(
   return new Map(refs.map((ref) => [ref.id, ref]));
 }
 
-/** Solo los pedidos con `conditioning_start` anotado: un equipo sin Comenzar no se muestra. */
+/**
+ * El equipo de cada linea, por `lineId`. Solo las lineas con `conditioning_start` anotado: un
+ * equipo sin Comenzar no se muestra.
+ */
 export async function listConditioningTeams(
   team: ListExecutionTracesDeps['team'],
   companyId: string,
-  entriesByOrder: ReadonlyMap<string, readonly ExecutionEntryRecord[]>,
+  entries: readonly ExecutionEntryRecord[],
 ): Promise<Map<string, ConditioningTeamMemberRow[]>> {
-  const orderIds = [...entriesByOrder]
-    .filter(([, entries]) => entries.some((entry) => entry.action === 'conditioning_start'))
-    .map(([orderId]) => orderId);
-  const byOrder = new Map<string, ConditioningTeamMemberRow[]>();
-  if (orderIds.length === 0) return byOrder;
-  for (const { orderId, ...member } of await team.listByOrdersInCompany(companyId, orderIds)) {
-    const members = byOrder.get(orderId);
-    if (members === undefined) byOrder.set(orderId, [member]);
+  const starts = entries.filter((entry) => entry.action === 'conditioning_start');
+  const startedLines = new Set(starts.map((entry) => entry.orderLineId));
+  const orderIds = [...new Set(starts.map((entry) => entry.orderId))];
+  const byLine = new Map<string, ConditioningTeamMemberRow[]>();
+  if (orderIds.length === 0) return byLine;
+  for (const row of await team.listByOrdersInCompany(companyId, orderIds)) {
+    if (!startedLines.has(row.orderLineId)) continue;
+    const member: ConditioningTeamMemberRow = {
+      userId: row.userId,
+      workGroupId: row.workGroupId,
+      workGroupName: row.workGroupName,
+    };
+    const members = byLine.get(row.orderLineId);
+    if (members === undefined) byLine.set(row.orderLineId, [member]);
     else members.push(member);
   }
-  return byOrder;
+  return byLine;
 }
 
 export function toTraceTeamMember(
@@ -214,13 +309,23 @@ export function toTraceTeamMember(
   };
 }
 
-function toTraceFormula(
+function toRowRecipes(
   contents: OrderContents,
   orderId: string,
-): Pick<ExecutionTraceRow, 'formulaName' | 'formulaImageUrl'> {
-  const recipeId = contents.progress.get(orderId)?.recipeId;
-  const recipe = recipeId === undefined ? undefined : contents.recipes.get(recipeId);
-  return { formulaName: recipe?.name ?? null, formulaImageUrl: recipe?.imageUrl ?? null };
+): Pick<ExecutionTraceRow, 'formulaName' | 'formulaImageUrl' | 'moreRecipes' | 'progress' | 'recipes'> {
+  const outline = contents.outlines.get(orderId);
+  const recipes = recipesInOrder(outline);
+  const first = recipes[0] === undefined ? undefined : contents.recipes.get(recipes[0].recipeId);
+  return {
+    formulaName: first?.name ?? null,
+    formulaImageUrl: first?.imageUrl ?? null,
+    moreRecipes: Math.max(recipes.length - 1, 0),
+    progress: outline?.progress ?? NO_PROGRESS,
+    recipes: recipes.map((recipe) => ({
+      recipeName: contents.recipes.get(recipe.recipeId)?.name ?? null,
+      presentations: toTracePresentations(recipe.presentationLines, contents.presentationNames),
+    })),
+  };
 }
 
 async function listPersonOptions(
@@ -270,46 +375,52 @@ export function createListExecutionTraces(
         ordersPage.items.map((order) => order.id),
       );
       const byOrder = groupEntriesByOrder(entries);
-
-      const traces = ordersPage.items.flatMap((order) => {
+      const executed = ordersPage.items.flatMap((order) => {
         const orderEntries = byOrder.get(order.id);
-        if (orderEntries === undefined) return [];
-        return [{ order, trace: buildExecutionTrace(orderEntries, order, now) }];
+        return orderEntries === undefined ? [] : [{ order, orderEntries }];
       });
 
       const [teams, contents] = await Promise.all([
-        listConditioningTeams(deps.team, companyId, byOrder),
+        listConditioningTeams(deps.team, companyId, entries),
         listOrderContents(
           deps,
           companyId,
-          traces.map(({ order }) => order.id),
+          executed.map(({ order }) => order.id),
         ),
       ]);
+      const traces = executed.map(({ order, orderEntries }) => ({
+        order,
+        orderEntries,
+        recipes: traceRecipes(orderEntries, order, contents.outlines.get(order.id), now),
+      }));
       const peopleOf = new Map(
-        traces.map(({ order, trace }) => [
+        traces.map(({ order, orderEntries, recipes }) => [
           order.id,
-          [...new Set([...trace.userIds, ...(teams.get(order.id) ?? []).map((member) => member.userId)])],
+          [
+            ...new Set([
+              ...signerIds(orderEntries),
+              ...recipes.flatMap(({ lineId }) => (teams.get(lineId) ?? []).map((member) => member.userId)),
+            ]),
+          ],
         ]),
       );
       const userIds = [...new Set([...peopleOf.values()].flat())];
       const refs = await findPeopleByIds(deps.people, companyId, userIds, now);
 
-      const items: ExecutionTraceRow[] = traces.map(({ order, trace }) => ({
+      const items: ExecutionTraceRow[] = traces.map(({ order, orderEntries, recipes }) => ({
         orderId: order.id,
         numberText: formatOrderNumber(order.number),
         status: order.status,
         deleted: order.deleted,
-        active: trace.active,
+        active: isOrderActive(order),
         people: (peopleOf.get(order.id) ?? []).flatMap((userId) => {
           const ref = refs.get(userId);
           return ref === undefined ? [] : [{ userId, displayName: ref.displayName }];
         }),
-        firstAt: trace.firstAt,
-        lastAt: trace.lastAt,
-        totalDuration: trace.totalDuration,
-        goBackCount: trace.goBackCount,
-        ...toTraceFormula(contents, order.id),
-        ...toTracePresentations(contents.progress.get(order.id), contents.presentationNames),
+        ...entriesSpan(orderEntries),
+        totalDuration: combineDurations(recipes.map(({ trace }) => trace.totalDuration)),
+        goBackCount: recipes.reduce((sum, { trace }) => sum + trace.goBackCount, 0),
+        ...toRowRecipes(contents, order.id),
       }));
 
       return {

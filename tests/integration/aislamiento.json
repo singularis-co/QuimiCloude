@@ -896,6 +896,21 @@
       "archivo": "pedidos/order-lines-blocked-retry.int.test.ts",
       "motivo": "QT-313 T16b: guardar sin cambios la edicion de un pedido de dos lineas (una PENDIENTE, otra BLOQUEADO) por los casos de uso cableados a mano con los adaptadores driven reales, con y sin material repuesto; 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con sus lotes, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-11-06"
+    },
+    {
+      "archivo": "pedidos/order-delivery-by-line.int.test.ts",
+      "motivo": "QT-314 T4: lo que queda por entregar y la lista de entregas de un pedido de dos recetas, leidos por receta por la fachada real de lib/composition; la siembra entrega con pedidos.deliverOrder, cuya 'withOrderTransaction' abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, asi que una transaccion del test con ROLLBACK no la envolveria. Cada caso fabrica su empresa efimera (tests/helpers/order-delivery-seed.ts, randomUUID) y la borra en un 'finally' con borrarEmpresaDeEntrega. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-06"
+    },
+    {
+      "archivo": "pedidos/order-line-outlines.int.test.ts",
+      "motivo": "QT-315 T1: 'findAliveLineSummary' y 'listRecipeOutlinesByIdsIncludingDeleted' leen con el cliente Prisma GLOBAL, y el pedido dado de baja se da de baja con la escritura real 'softDeleteAliveOrder' sobre ese mismo cliente, asi que una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica sus empresas efimeras con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, recetas, pedidos y lineas) y las borra en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-09"
+    },
+    {
+      "archivo": "pedidos/cancel-line-from-execution.int.test.ts",
+      "motivo": "QT-315 T2: cancelar una receta desde la ejecucion con 'createCancelAliveOrderLine' unida a 'withExecutionTransaction', que abre SU PROPIA 'prisma.$transaction' contra el cliente GLOBAL, igual que el alta con 'withOrderTransaction'; una transaccion del test con ROLLBACK no las envolveria. Cada caso fabrica su propia empresa efimera con randomUUID (usuario, rol, tipo de documento, unidad, presentacion, insumo con dos lotes, recetas) y la limpia en un 'finally' en el orden de las FK. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-09"
     }
   ]
 }

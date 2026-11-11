@@ -7,14 +7,14 @@ import { z } from 'zod';
 import { EvidenceNotFoundError, ValidationError } from './errors';
 import { removeEvidenceSafely, signStepPhotos, type EvidenceStorageWarning } from './evidence-photos';
 import { requireEvidenceAccess, resolveEvidenceTarget, type EvidenceTargetDeps } from './evidence-target';
+import { orderLineInputSchema } from './order-line-target';
 import { EVIDENCE_PHASES, type StepEvidencePhotoView } from './step-evidence';
 
 import type { Actor } from './actor';
 import type { EvidenceStorage } from '../ports/evidence-storage';
 import type { StepEvidenceRepository } from '../ports/step-evidence-repository';
 
-const removeEvidenceSchema = z.strictObject({
-  orderId: z.string().uuid(),
+const removeEvidenceSchema = orderLineInputSchema.extend({
   phase: z.enum(EVIDENCE_PHASES),
   evidenceId: z.string().uuid(),
 });
@@ -42,15 +42,15 @@ export function createRemoveEvidence(
 
     const parsed = removeEvidenceSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, phase, evidenceId } = parsed.data;
+    const { orderId, lineId, phase, evidenceId } = parsed.data;
 
-    await resolveEvidenceTarget(deps, actor, orderId, phase);
+    const target = await resolveEvidenceTarget(deps, actor, orderId, lineId, phase);
 
-    const removed = await deps.evidence.delete(actor.companyId, orderId, phase, evidenceId);
+    const removed = await deps.evidence.delete(actor.companyId, orderId, target.lineId, phase, evidenceId);
     if (removed === null) throw new EvidenceNotFoundError();
 
     const warning = await removeEvidenceSafely(deps.storage, removed.path);
-    const rows = await deps.evidence.listByOrder(actor.companyId, orderId, phase);
+    const rows = await deps.evidence.listByLine(actor.companyId, orderId, target.lineId, phase);
     return {
       stepPosition: removed.stepPosition,
       photos: await signStepPhotos(deps.storage, rows, removed.stepPosition),

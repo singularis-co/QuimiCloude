@@ -73,6 +73,9 @@ const HERRAMIENTAS = [
 const EXECUTION: StartedOrderExecution = {
   orderId: 'order-1',
   numberText: 'PED-0007',
+  recipe: { position: 1, count: 1 },
+  otherRecipes: [],
+  lineId: 'linea-1',
   status: 'EN_CURSO',
   recipeName: 'Barniz acrílico',
   orderQuantity: '250',
@@ -233,7 +236,7 @@ describe('OrderExecutionToolsPanel', () => {
 describe('OrderExecutionToolsPanel dentro de la ejecución', () => {
   it('QC-265 R24: plegar y desplegar no cambia el paso vigente ni lo marcado', async () => {
     const user = setupUser();
-    render(<OrderExecutionScreen execution={{ ...EXECUTION, resumeStepPosition: 1 }} />);
+    render(<OrderExecutionScreen lineId="linea-1" execution={{ ...EXECUTION, resumeStepPosition: 1 }} />);
 
     const columna = screen.getByTestId(ORDER_EXECUTION_MATERIALS_TESTID);
     expect(columna).toContainElement(disparador());

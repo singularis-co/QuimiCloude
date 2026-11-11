@@ -29,18 +29,23 @@ import {
   actoresSinElPermiso,
   anotacionDePaso,
   fotoDeAcondicionamiento,
+  lineaDe,
   loteDeLinea,
   montar,
+  otraLineaDe,
   persona,
   receta,
   resumen,
   uuid,
 } from './conditioning-doubles';
+import { conTresRecetas, recetaDeTres } from './recipe-outline-doubles';
 
 const LINEAS = [
   { id: 'linea-1', presentationId: 'pres-500', packages: 12, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '500 g' },
   { id: 'linea-2', presentationId: 'pres-1k', packages: 4, packedPackages: null, presentationContent: null, packagingProductId: null, packagingName: '1 kg' },
 ];
+
+const ENTRADA = { orderId: PEDIDO_1, lineId: lineaDe(PEDIDO_1) };
 
 function montarCon(item: AssignedOrderSummary | null, batches?: readonly FinishedBatchOfOrderLine[]) {
   return montar({
@@ -71,11 +76,13 @@ describe('R19 — getConditioningOrder exige el permiso antes de validar y sin t
   );
 });
 
-describe('R20 — la entrada es exactamente `{ orderId: <uuid> }`', () => {
+describe('R20 — la entrada es exactamente `{ orderId: <uuid>, lineId: <uuid> }`', () => {
   it.each([
-    ['id que no es uuid', { orderId: 'pedido-1' }],
+    ['id que no es uuid', { orderId: 'pedido-1', lineId: lineaDe(PEDIDO_1) }],
+    ['sin lineId (R14)', { orderId: PEDIDO_1 }],
+    ['lineId que no es uuid (R14)', { orderId: PEDIDO_1, lineId: 'linea-1' }],
     ['sin orderId', {}],
-    ['una clave de mas', { orderId: PEDIDO_1, extra: 1 }],
+    ['una clave de mas', { ...ENTRADA, extra: 1 }],
     ['orderId numerico', { orderId: 7 }],
     ['no es un objeto', PEDIDO_1],
   ])('R20: %s se rechaza con `invalid_input` sin tocar ningun puerto', async (_nombre, entrada) => {
@@ -89,19 +96,25 @@ describe('R20 — la entrada es exactamente `{ orderId: <uuid> }`', () => {
   });
 });
 
-describe('R15 — el detalle muestra la misma fila que la lista', () => {
-  it('R15, D13 (QC-219): consulta ese pedido de la empresa del actor con los cuatro estados que abre el detalle', async () => {
-    const { deps, listAliveSummariesByIds } = montarCon(resumen(PEDIDO_1));
+describe('QT-315 — getConditioningOrder: la receta entre las del pedido', () => {
+  it('R7, R8: trae su posicion, el total con la cancelada y las otras recetas en orden de alta', async () => {
+    const { deps } = montarCon(resumen(PEDIDO_1));
 
-    await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(conTresRecetas(deps, ENTRADA.lineId))(ACONDICIONADOR, ENTRADA);
 
-    expect(listAliveSummariesByIds).toHaveBeenCalledWith(
-      EMPRESA,
-      [PEDIDO_1],
-      ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO', 'TERMINADO', 'ENTREGADO'],
-      1,
-      1,
+    expect({ lineId: detalle.lineId, recipe: detalle.recipe, otherRecipes: detalle.otherRecipes }).toEqual(
+      recetaDeTres(ENTRADA.lineId),
     );
+  });
+});
+
+describe('R15 — el detalle muestra la misma fila que la lista', () => {
+  it('R15, D13 (QC-219): consulta esa receta del pedido en la empresa del actor', async () => {
+    const { deps, findAliveLineSummary } = montarCon(resumen(PEDIDO_1));
+
+    await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
+
+    expect(findAliveLineSummary).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1));
   });
 
   it.each([
@@ -127,13 +140,14 @@ describe('R15 — el detalle muestra la misma fila que la lista', () => {
     const detalle = montarCon(item);
     const lista = montarCon(item);
 
-    const { team, batchData, conditioningSteps, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+    const { team, batchData, conditioningSteps, otherRecipes, ...fila } = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, {
+      ...ENTRADA,
     });
     const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(fila).toEqual(deLaLista);
     expect(team).toEqual([]);
+    expect(otherRecipes).toEqual([]);
     // La receta de estos dobles no tiene pasos de acondicionamiento.
     expect(conditioningSteps).toBeNull();
     // QC-219 R3: los datos de lote solo viajan a quien acondiciona, desde que comenzo.
@@ -156,21 +170,20 @@ describe('R17 — el mismo `order_not_found` en todos los casos que el detalle n
   it('R17: un pedido que no existe, esta de baja o es de otra empresa (la consulta no lo devuelve)', async () => {
     const { deps } = montarCon(null);
 
-    const resultado = createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const resultado = createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     await expect(resultado).rejects.toBeInstanceOf(OrderNotFoundError);
     await expect(resultado).rejects.toMatchObject({ code: 'order_not_found' });
   });
 
-  it('R17: los estados de antes del acondicionamiento y CANCELADO no estan entre los consultados', async () => {
-    const { deps, listAliveSummariesByIds } = montarCon(null);
+  it('R17: una receta en un estado de antes del acondicionamiento o CANCELADO es `order_not_found`', async () => {
+    for (const status of ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'CANCELADO', 'BLOQUEADO'] as const) {
+      const { deps, findRefsIncludingDeleted } = montarCon(resumen(PEDIDO_1, { status, conditionedBy: ANA }));
 
-    await expect(createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 })).rejects.toBeInstanceOf(
-      OrderNotFoundError,
-    );
-    const estados = listAliveSummariesByIds.mock.calls[0]?.[2];
-    for (const fuera of ['PENDIENTE', 'EN_CURSO', 'POR_EMPACAR', 'EN_EMPAQUE', 'CANCELADO', 'BLOQUEADO']) {
-      expect(estados).not.toContain(fuera);
+      await expect(createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA), status).rejects.toBeInstanceOf(
+        OrderNotFoundError,
+      );
+      expect(findRefsIncludingDeleted).not.toHaveBeenCalled();
     }
   });
 
@@ -184,7 +197,7 @@ describe('R17 — el mismo `order_not_found` en todos los casos que el detalle n
       resumen(PEDIDO_1, { status, conditionedBy, finishedAt: new Date('2026-10-02T00:00:00.000Z') }),
     );
 
-    const resultado = createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const resultado = createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     await expect(resultado).rejects.toBeInstanceOf(OrderNotFoundError);
     await expect(resultado).rejects.toMatchObject({ code: 'order_not_found' });
@@ -201,7 +214,7 @@ describe('R17 — el mismo `order_not_found` en todos los casos que el detalle n
     ];
     const errores = await Promise.all(
       casos.map(({ deps }) =>
-        createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 }).catch((error: unknown) => error),
+        createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA).catch((error: unknown) => error),
       ),
     );
 
@@ -248,9 +261,9 @@ describe('R25 — el detalle trae el equipo guardado (D12)', () => {
       persona(DIEGO, 'Diego Mora'),
     ]);
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
-    expect(dobles.listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(dobles.listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1));
     expect(detalle.team).toEqual([
       { userId: BETO, displayName: 'Beto Ruiz', origin: { kind: 'direct' } },
       {
@@ -276,7 +289,7 @@ describe('R25 — el detalle trae el equipo guardado (D12)', () => {
       persona(DIEGO, 'Diego Mora (de baja)'),
     ]);
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(dobles.findRefsIncludingDeletedInCompany).toHaveBeenCalledTimes(1);
     const [empresa, ids] = dobles.findRefsIncludingDeletedInCompany.mock.calls[0] as unknown as [string, string[]];
@@ -288,9 +301,9 @@ describe('R25 — el detalle trae el equipo guardado (D12)', () => {
   it('R25: en POR_ACONDICIONAR no lee el equipo y lo devuelve vacio', async () => {
     const dobles = montarConEquipo(resumen(PEDIDO_1), [persona(ANA, 'Ana Lopez')]);
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
-    expect(dobles.listTeamByOrderInCompany).not.toHaveBeenCalled();
+    expect(dobles.listTeamByLineInCompany).not.toHaveBeenCalled();
     expect(detalle.team).toEqual([]);
   });
 });
@@ -309,7 +322,7 @@ describe('QC-219 — los datos de lote del detalle', () => {
   ])('R3: en %s `batchData` es null y no se leen los lotes', async (_nombre, item) => {
     const { deps, listOfOrder } = montarCon(item, [loteDeLinea('pres-500', LOTE_500, DATOS)]);
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.batchData).toBeNull();
     expect(listOfOrder).not.toHaveBeenCalled();
@@ -331,9 +344,9 @@ describe('QC-219 — los datos de lote del detalle', () => {
       loteDeLinea('pres-500', LOTE_500, DATOS),
     ]);
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
-    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1));
     expect(detalle.batchData).toEqual({
       lines: [
         {
@@ -377,7 +390,7 @@ describe('QC-219 — los datos de lote del detalle', () => {
       [loteDeLinea('pres-500', LOTE_500, DATOS)],
     );
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.batchData?.lines[1]).toMatchObject({ batchId: null, provisionalLot: null, lot: null });
     expect(detalle.batchData?.missingCount).toBe(1);
@@ -386,7 +399,7 @@ describe('QC-219 — los datos de lote del detalle', () => {
   it('R17: un pedido sin reparto trae la seccion vacia y nada que falte', async () => {
     const { deps } = montarCon(resumen(PEDIDO_1, { status: 'EN_ACONDICIONAMIENTO', conditionedBy: ANA }));
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.batchData).toEqual({ lines: [], missingCount: 0, form: { kind: 'no_batches' } });
   });
@@ -397,7 +410,7 @@ describe('QC-219 — los datos de lote del detalle', () => {
       [loteDeLinea('pres-500', LOTE_500, DATOS), loteDeLinea('pres-1k', LOTE_1K, DATOS)],
     );
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.batchData?.form).toEqual({ kind: 'shared', ...DATOS });
   });
@@ -411,7 +424,7 @@ describe('QC-219 — los datos de lote del detalle', () => {
 
     const detalle = await createGetConditioningOrder({ ...deps, batches: { listOfOrder, writeForOrder } as never })(
       ACONDICIONADOR,
-      { orderId: PEDIDO_1 },
+      ENTRADA,
     );
 
     expect(detalle.batchData?.form.kind).toBe('divergent');
@@ -420,14 +433,14 @@ describe('QC-219 — los datos de lote del detalle', () => {
   });
 
   it('D13 (QC-219 R21): un ENTREGADO propio abre con su equipo', async () => {
-    const { deps, listTeamByOrderInCompany } = montarCon(
+    const { deps, listTeamByLineInCompany } = montarCon(
       resumen(PEDIDO_1, { status: 'ENTREGADO', conditionedBy: ANA, finishedAt: new Date() }),
     );
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.status).toBe('ENTREGADO');
-    expect(listTeamByOrderInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1);
+    expect(listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1));
   });
 });
 
@@ -444,7 +457,7 @@ describe('QC-281 — acondicionamiento con los envases reales', () => {
     const detalle = montarCon(item, [loteDeLinea('pres-500', LOTE_500, DATOS)]);
     const lista = montarCon(item);
 
-    const order = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const order = await createGetConditioningOrder(detalle.deps)(ACONDICIONADOR, ENTRADA);
     const [deLaLista] = (await createListConditioningOrders(lista.deps)(ACONDICIONADOR, { page: 1 })).items;
 
     expect(order.presentationLines.map((line) => [line.lineId, line.packages, line.packedPackages])).toEqual([
@@ -462,7 +475,7 @@ describe('QC-281 — acondicionamiento con los envases reales', () => {
       [loteDeLinea('pres-500', LOTE_500, DATOS)],
     );
 
-    const order = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const order = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(order.presentationLines.map((line) => [line.packages, line.packedPackages])).toEqual([
       [12, null],
@@ -514,12 +527,12 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
   ])('R17: en %s no entrega pasos ni avance, y no llama al lector, al registro ni a las fotos', async (_n, item) => {
     const dobles = montarPasos(item);
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.conditioningSteps).toBeNull();
     expect(dobles.findConditioningStepsById).not.toHaveBeenCalled();
     expect(dobles.listEntriesForOrders).not.toHaveBeenCalled();
-    expect(dobles.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(dobles.listEvidenceByLine).not.toHaveBeenCalled();
     expect(dobles.createSignedReadUrl).not.toHaveBeenCalled();
   });
 
@@ -529,12 +542,12 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
   ] as const)('R19: con una receta %s, `conditioningSteps` es null y no se lee el registro', async (_n, pasos) => {
     const dobles = montarPasos(MIO, { pasos });
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.conditioningSteps).toBeNull();
     expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
     expect(dobles.listEntriesForOrders).not.toHaveBeenCalled();
-    expect(dobles.listEvidenceByOrder).not.toHaveBeenCalled();
+    expect(dobles.listEvidenceByLine).not.toHaveBeenCalled();
   });
 
   it('R19: sin pasos, el resto del detalle es el mismo que sin la ficha', async () => {
@@ -542,10 +555,10 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     const conPasos = montarPasos(MIO);
 
     const { conditioningSteps: nulo, ...uno } = await createGetConditioningOrder(sinPasos.deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+      ...ENTRADA,
     });
     const { conditioningSteps: vista, ...otro } = await createGetConditioningOrder(conPasos.deps)(ACONDICIONADOR, {
-      orderId: PEDIDO_1,
+      ...ENTRADA,
     });
 
     expect(nulo).toBeNull();
@@ -562,7 +575,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
       ],
     });
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, EMPRESA);
     expect(dobles.listEntriesForOrders).toHaveBeenCalledWith(EMPRESA, [PEDIDO_1]);
@@ -584,7 +597,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
       ],
     });
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.conditioningSteps).toMatchObject({
       completedCount: 2,
@@ -595,11 +608,28 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     });
   });
 
+  it('R13: el avance sale solo de las anotaciones de la linea del resumen, no de la otra receta del pedido', async () => {
+    const otra = 'linea-otra-receta';
+    const dobles = montarPasos(MIO, {
+      anotaciones: [
+        anotacionDePaso('conditioning_step_advance', 1, null),
+        anotacionDePaso('conditioning_step_advance', 2, [BETO], 2, otra),
+        anotacionDePaso('conditioning_steps_complete', 3, null, 3, otra),
+      ],
+    });
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
+
+    expect(detalle.conditioningSteps?.completedCount).toBe(1);
+    expect(dobles.listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, MIO.lineId);
+    expect(dobles.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, MIO.lineId, 'conditioning');
+  });
+
   it('R31: un acondicionador sin recetas.consultar recibe los pasos', async () => {
     const actor = { ...ACONDICIONADOR, permissions: ['acondicionamiento.modificar'] };
     const dobles = montarPasos(MIO);
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(actor, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(actor, ENTRADA);
 
     expect(detalle.conditioningSteps?.steps).toEqual(PASOS);
     expect(detalle.conditioningSteps?.completedCount).toBe(0);
@@ -608,7 +638,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
   it('R22: los candidatos son el propio acondicionador primero, marcado, y despues el equipo en su orden', async () => {
     const dobles = montarPasos(MIO);
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.conditioningSteps?.candidates).toEqual([
       { userId: ANA, displayName: 'Ana Lopez', isSelf: true },
@@ -622,7 +652,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
       equipo: [...EQUIPO, { userId: ANA, workGroupId: null, workGroupName: null }],
     });
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.conditioningSteps?.candidates.map((c) => [c.userId, c.isSelf])).toEqual([
       [ANA, true],
@@ -634,9 +664,9 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
   it('R21, R26: las fotos guardadas de acondicionamiento viajan firmadas, por paso', async () => {
     const dobles = montarPasos(MIO, { fotos: [fotoDeAcondicionamiento(3, 1)] });
 
-    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA);
 
-    expect(dobles.listEvidenceByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, 'conditioning');
+    expect(dobles.listEvidenceByLine).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, lineaDe(PEDIDO_1), 'conditioning');
     expect(detalle.conditioningSteps?.evidence).toEqual([
       {
         stepPosition: 3,
@@ -655,7 +685,7 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
       packingSteps: { findPackingStepsById },
     };
 
-    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, { orderId: PEDIDO_1 });
+    const detalle = await createGetConditioningOrder(deps)(ACONDICIONADOR, ENTRADA);
 
     expect(detalle.conditioningSteps?.steps).toEqual(PASOS);
     expect(findExecutionContentById).not.toHaveBeenCalled();
@@ -666,10 +696,72 @@ describe('QC-299 — los pasos de acondicionamiento del detalle', () => {
     const otra = uuid('4');
     const dobles = montarPasos(MIO);
 
-    await createGetConditioningOrder(dobles.deps)({ ...ACONDICIONADOR, companyId: otra }, { orderId: PEDIDO_1 });
+    await createGetConditioningOrder(dobles.deps)({ ...ACONDICIONADOR, companyId: otra }, ENTRADA);
 
     expect(dobles.findConditioningStepsById).toHaveBeenCalledWith(RECETA, otra);
     expect(dobles.listEntriesForOrders).toHaveBeenCalledWith(otra, [PEDIDO_1]);
-    expect(dobles.listEvidenceByOrder).toHaveBeenCalledWith(otra, PEDIDO_1, 'conditioning');
+    expect(dobles.listEvidenceByLine).toHaveBeenCalledWith(otra, PEDIDO_1, lineaDe(PEDIDO_1), 'conditioning');
+  });
+});
+
+describe('getConditioningOrder — la receta nombrada (R10, R11, R12, R14, R15)', () => {
+  function dosRecetas(status: AssignedOrderSummary['status'], conditionedBy: string | null) {
+    return montar({
+      items: [
+        resumen(PEDIDO_1, { status, conditionedBy }),
+        resumen(PEDIDO_1, { lineId: otraLineaDe(PEDIDO_1), status, conditionedBy }),
+      ],
+      refs: [receta()],
+      people: [persona(ANA, 'Ana Lopez')],
+      units: [{ id: UNIDAD, name: 'Kilogramo', symbol: 'kg', baseUnitId: null, factor: null }],
+    });
+  }
+
+  it('R11, R12: con dos recetas EN_ACONDICIONAMIENTO del mismo pedido, lee equipo y lotes de la nombrada', async () => {
+    const dobles = dosRecetas('EN_ACONDICIONAMIENTO', ANA);
+
+    const detalle = await createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, {
+      orderId: PEDIDO_1,
+      lineId: otraLineaDe(PEDIDO_1),
+    });
+
+    expect(detalle.lineId).toBe(otraLineaDe(PEDIDO_1));
+    expect(dobles.listTeamByLineInCompany).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, otraLineaDe(PEDIDO_1));
+    expect(dobles.listOfOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO_1, otraLineaDe(PEDIDO_1));
+  });
+
+  it('R10: decide por el estado de la receta: la otra en EN_CURSO no cambia lo que abre esta', async () => {
+    const dobles = montar({
+      items: [
+        resumen(PEDIDO_1, { status: 'POR_ACONDICIONAR' }),
+        resumen(PEDIDO_1, { lineId: otraLineaDe(PEDIDO_1), status: 'EN_CURSO' }),
+      ],
+      refs: [receta()],
+    });
+
+    await expect(createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, ENTRADA)).resolves.toMatchObject({
+      status: 'POR_ACONDICIONAR',
+    });
+    await expect(
+      createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: otraLineaDe(PEDIDO_1) }),
+    ).rejects.toBeInstanceOf(OrderNotFoundError);
+  });
+
+  it('R14: una receta de otro pedido, quitada o inexistente da order_not_found', async () => {
+    const dobles = dosRecetas('POR_ACONDICIONAR', null);
+
+    await expect(
+      createGetConditioningOrder(dobles.deps)(ACONDICIONADOR, { orderId: PEDIDO_1, lineId: uuid('9') }),
+    ).rejects.toBeInstanceOf(OrderNotFoundError);
+    expect(dobles.findRefsIncludingDeleted).not.toHaveBeenCalled();
+  });
+
+  it('R15: sin acondicionamiento.modificar no lee la receta', async () => {
+    const dobles = dosRecetas('POR_ACONDICIONAR', null);
+
+    await expect(
+      createGetConditioningOrder(dobles.deps)({ ...ACONDICIONADOR, permissions: ['asignaciones.consultar'] }, ENTRADA),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(dobles.findAliveLineSummary).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,9 @@ const catalogoReal = readFileSync(join(process.cwd(), CATALOGO), 'utf8');
 
 const SIN_UI = 'sin UI';
 const tablero = (nombre: string): string => `docs/diseno/canvas/${nombre}.dc.html`;
+const PEDIDOS_VARIAS_RECETAS = ['PedidosVariasRecetas', 'PedidosVariasRecetasTablet', 'PedidosVariasRecetasMovil']
+  .map(tablero)
+  .join(', ');
 
 type PiezaEsperada = {
   readonly pieza: string;
@@ -42,11 +45,12 @@ const PIEZAS_NUEVAS: readonly PiezaEsperada[] = [
     menciona: ['`level`', '`label`'],
   },
   // QC-265 (D7) le dio a Notice el cierre opcional `dismissible`, dibujado en Asignacion.dc.html,
-  // y su fila cita los dos tableros.
+  // y su fila cita los dos tableros. QT-314 (T7) le dio `actions`, dibujado en los tres tableros
+  // de PedidosVariasRecetas, que la fila cita también.
   {
     pieza: 'Notice',
     archivo: 'components/shared/notice.tsx',
-    diseno: `${tablero('Avisos')}, ${tablero('Asignacion')}`,
+    diseno: `${tablero('Avisos')}, ${tablero('Asignacion')}, ${PEDIDOS_VARIAS_RECETAS}`,
   },
   {
     pieza: 'PasswordField',
@@ -95,7 +99,8 @@ const PIEZAS_EXTENDIDAS: readonly PiezaEsperada[] = [
   {
     pieza: 'RowActionsMenu',
     archivo: 'components/shared/row-actions-menu.tsx',
-    diseno: tablero('Tabla'),
+    // QT-314 (T6) le dio `groupLabel`, dibujado en los tres tableros de PedidosVariasRecetas.
+    diseno: `${tablero('Tabla')}, ${PEDIDOS_VARIAS_RECETAS}`,
     menciona: ['`presentation`'],
   },
   {

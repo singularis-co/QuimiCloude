@@ -14,17 +14,26 @@ afterEach(cleanup);
 
 describe('PENDIENTE: «Entrar» es un enlace directo, sin confirmacion', () => {
   it('es un enlace habilitado cuyo href deriva de assignedOrderRoute: el pedido se comienza en la pantalla', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', status: 'PENDIENTE' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', lineId: 'linea-order-1', status: 'PENDIENTE' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     expect(trigger.tagName).toBe('A');
-    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-1'));
+    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-1', 'linea-order-1'));
     expect(trigger).not.toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
+  it('R4: lleva a la ejecucion de esa receta, con la receta en ?receta', () => {
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', lineId: 'linea-b', status: 'PENDIENTE' }} />);
+
+    expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toHaveAttribute(
+      'href',
+      '/asignacion/order-1?receta=linea-b',
+    );
+  });
+
   it('no pinta ningun motivo: el disparador habilitado no necesita explicarse', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', status: 'PENDIENTE' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-1', lineId: 'linea-order-1', status: 'PENDIENTE' }} />);
 
     expect(screen.queryByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID)).not.toBeInTheDocument();
   });
@@ -32,17 +41,17 @@ describe('PENDIENTE: «Entrar» es un enlace directo, sin confirmacion', () => {
 
 describe('R27 (QC-63, 2026-09-17; enmienda QC-88 R21) - EN_CURSO: el disparador ENTRA y avisa', () => {
   it('es un enlace habilitado cuyo href deriva de assignedOrderRoute, no un boton deshabilitado', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', lineId: 'linea-order-2', status: 'EN_CURSO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     expect(trigger.tagName).toBe('A');
-    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-2'));
+    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-2', 'linea-order-2'));
     expect(trigger).not.toBeDisabled();
     expect(trigger).not.toHaveAttribute('aria-disabled', 'true');
   });
 
   it('el aviso es VISIBLE en pantalla, no solo un `title` (R32)', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', lineId: 'linea-order-2', status: 'EN_CURSO' }} />);
 
     const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
     expect(reason).toBeVisible();
@@ -50,7 +59,7 @@ describe('R27 (QC-63, 2026-09-17; enmienda QC-88 R21) - EN_CURSO: el disparador 
   });
 
   it('el aviso tiene su propio nombre accesible via aria-describedby, no solo title', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', status: 'EN_CURSO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-2', lineId: 'linea-order-2', status: 'EN_CURSO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
@@ -61,22 +70,22 @@ describe('R27 (QC-63, 2026-09-17; enmienda QC-88 R21) - EN_CURSO: el disparador 
 
   it('el mismo data-testid en los dos estados: un test lo localiza sin dos selectores', () => {
     const { unmount } = render(
-      <AssignedOrderEnterTrigger order={{ id: 'order-3', status: 'PENDIENTE' }} />,
+      <AssignedOrderEnterTrigger order={{ id: 'order-3', lineId: 'linea-order-3', status: 'PENDIENTE' }} />,
     );
     expect(screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID)).toBeInTheDocument();
     unmount();
 
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-3', status: 'EN_CURSO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-3', lineId: 'linea-order-3', status: 'EN_CURSO' }} />);
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     expect(trigger).toBeInTheDocument();
-    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-3'));
+    expect(trigger).toHaveAttribute('href', assignedOrderRoute('order-3', 'linea-order-3'));
   });
 });
 
 describe('R31 - BLOQUEADO: el disparador esta deshabilitado y explica por que', () => {
   it('es un boton deshabilitado y no un enlace: no hay href hacia la ejecucion', () => {
     const { container } = render(
-      <AssignedOrderEnterTrigger order={{ id: 'order-4', status: 'BLOQUEADO' }} />,
+      <AssignedOrderEnterTrigger order={{ id: 'order-4', lineId: 'linea-order-4', status: 'BLOQUEADO' }} />,
     );
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
@@ -87,7 +96,7 @@ describe('R31 - BLOQUEADO: el disparador esta deshabilitado y explica por que', 
   });
 
   it('el motivo es texto VISIBLE, no un `title`, y se enlaza con aria-describedby', () => {
-    render(<AssignedOrderEnterTrigger order={{ id: 'order-4', status: 'BLOQUEADO' }} />);
+    render(<AssignedOrderEnterTrigger order={{ id: 'order-4', lineId: 'linea-order-4', status: 'BLOQUEADO' }} />);
 
     const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
     const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);
@@ -106,7 +115,7 @@ describe('R1, R2, R3 (QC-269) - el envoltorio hereda la alineacion de su contene
   it.each(['BLOQUEADO', 'EN_CURSO'] as const)(
     '%s: el envoltorio no es flex ni fija items-*, y boton y aviso siguen enlazados',
     (status) => {
-      render(<AssignedOrderEnterTrigger order={{ id: 'order-5', status }} />);
+      render(<AssignedOrderEnterTrigger order={{ id: 'order-5', lineId: 'linea-order-5', status }} />);
 
       const trigger = screen.getByTestId(ASSIGNED_ORDER_ENTER_TESTID);
       const reason = screen.getByTestId(ASSIGNED_ORDER_ENTER_REASON_TESTID);

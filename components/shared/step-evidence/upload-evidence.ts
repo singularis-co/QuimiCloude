@@ -22,6 +22,8 @@ export const UPLOAD_EVIDENCE_TEXTS = {
 
 export type EvidenceUploadTarget = {
   readonly orderId: string;
+  /** La receta del pedido cuyo paso lleva la foto. */
+  readonly lineId: string;
   readonly phase: EvidencePhase;
   readonly stepPosition: number;
   readonly replacesEvidenceId?: string;
@@ -120,6 +122,7 @@ export async function uploadEvidence(
 
   const destination = {
     orderId: target.orderId,
+    lineId: target.lineId,
     phase: target.phase,
     stepPosition: target.stepPosition,
     ...(target.replacesEvidenceId === undefined

@@ -1,12 +1,13 @@
 // lib/modules/asignaciones/domain/start-conditioning.ts
 /**
- * Comenzar el acondicionamiento: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO` con el actor como quien
- * acondiciona y, en la misma transaccion, el equipo que lo acompana y la anotacion en el registro.
- * Sin comprobacion de asignacion: cualquier actor con `acondicionamiento.modificar` puede tomar
- * cualquier pedido vivo de su empresa que este `POR_ACONDICIONAR`. No toca inventario.
+ * Comenzar el acondicionamiento de la receta nombrada: `POR_ACONDICIONAR -> EN_ACONDICIONAMIENTO`
+ * con el actor como quien acondiciona y, en la misma transaccion, el equipo que lo acompana y la
+ * anotacion en el registro. Sin comprobacion de asignacion: cualquier actor con
+ * `acondicionamiento.modificar` puede tomar cualquier receta `POR_ACONDICIONAR` de un pedido vivo de
+ * su empresa. No toca inventario.
  *
- * Los errores del pedido se deciden antes que los del equipo, y el equipo solo se resuelve si el
- * pedido esta `POR_ACONDICIONAR`: repetir Comenzar sobre el propio pedido no lee ni escribe equipo.
+ * Los errores de la receta se deciden antes que los del equipo, y el equipo solo se resuelve si la
+ * receta esta `POR_ACONDICIONAR`: repetir Comenzar sobre la propia no lee ni escribe equipo.
  */
 import { requirePermission, type Actor } from './actor';
 import { assertLooseTeamMembers, composeConditioningTeam, startConditioningSchema } from './conditioning-team';
@@ -19,7 +20,7 @@ import {
   type AsignacionesError,
 } from './errors';
 import { ExecutionAbortedError, isExecutionSuccess, type ExecutionWriteOutcome } from './execution-entry';
-import { findOnlyLine } from './only-order-line';
+import { findLine } from './order-line-target';
 
 import type { NewConditioningTeamMember } from '../ports/conditioning-team-repository';
 import type { ExecutionTransaction } from '../ports/execution-transaction';
@@ -76,22 +77,19 @@ export function createStartConditioning(
 
     const parsed = startConditioningSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
-    const { orderId, userIds, workGroupIds } = parsed.data;
+    const { orderId, lineId, userIds, workGroupIds } = parsed.data;
     const companyId = actor.companyId;
 
-    const target = await deps.orders.findAliveById(orderId, companyId);
-    if (target === null) throw new OrderNotFoundError();
-    if (target.status !== 'POR_ACONDICIONAR' && target.status !== 'EN_ACONDICIONAMIENTO') {
+    const line = await findLine(deps.orders, companyId, orderId, lineId);
+    if (line.status !== 'POR_ACONDICIONAR' && line.status !== 'EN_ACONDICIONAMIENTO') {
       throw new OrderNotConditionableError();
     }
-
-    const { lineId } = await findOnlyLine(deps.orders, companyId, orderId, ['POR_ACONDICIONAR', 'EN_ACONDICIONAMIENTO']);
 
     const now = deps.now?.() ?? new Date();
     // `EN_ACONDICIONAMIENTO` va directo a la escritura sin equipo: el `UPDATE` exige
     // `POR_ACONDICIONAR`, asi que solo puede responder `already_mine` o `taken`.
     const team =
-      target.status === 'POR_ACONDICIONAR'
+      line.status === 'POR_ACONDICIONAR'
         ? (await resolveTeam(deps, orderId, companyId, userIds, workGroupIds, now)).map((member) => ({
             ...member,
             orderLineId: lineId,

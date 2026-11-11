@@ -22,7 +22,6 @@ import type {
 } from '@/lib/modules/asignaciones';
 import { DASHBOARD_ROUTE } from '@/lib/shared/routes';
 import {
-  ORDER_EVIDENCE_EMPTY,
   ORDER_EVIDENCE_ERROR_STATES,
   orderEvidenceGroup,
 } from '@/tests/fixtures/order-evidence';
@@ -38,6 +37,7 @@ import {
   UNCLOSED_CONDITIONING_TRACE,
   WORK_GROUP_NAME,
 } from '../../fixtures/execution-trace-conditioning';
+import { onlyRecipe, oneRecipeTrace, withSteps } from '../../fixtures/execution-trace-recipes';
 
 const { requirePagePermissionMock, getExecutionTraceActionMock, getExecutionEvidenceActionMock, notFoundMock } = vi.hoisted(() => ({
   requirePagePermissionMock: vi.fn<(code: string) => Promise<void>>(),
@@ -68,7 +68,7 @@ vi.mock('@/lib/modules/asignaciones/adapters/driving/execution-trace-actions', (
 const ORDER_ID = '0b1c2d3e-4f50-4a61-8b72-c3d4e5f60718';
 const MIN = 60 * 1000;
 
-const TRACE: ExecutionTraceDetailData = {
+const TRACE: ExecutionTraceDetailData = oneRecipeTrace({
   orderId: ORDER_ID,
   numberText: '2026-0000042',
   status: 'CANCELADO',
@@ -128,7 +128,7 @@ const TRACE: ExecutionTraceDetailData = {
       isGoBack: false,
     },
   ],
-};
+});
 
 async function abrir(searchParams: Record<string, string> = {}, id = ORDER_ID) {
   return ExecutionTracePage({
@@ -145,7 +145,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requirePagePermissionMock.mockResolvedValue(undefined);
   getExecutionTraceActionMock.mockResolvedValue({ status: 'success', data: TRACE });
-  getExecutionEvidenceActionMock.mockResolvedValue({ status: 'success', data: ORDER_EVIDENCE_EMPTY });
+  getExecutionEvidenceActionMock.mockResolvedValue({ status: 'success', data: { recipes: [] } });
 });
 
 afterEach(() => {
@@ -213,7 +213,7 @@ describe('R12 - R18 - R20 - la pagina del recorrido', () => {
     render(await abrir());
     expect(notFoundMock).not.toHaveBeenCalled();
     expect(screen.getByTestId('execution-trace-detail')).toBeInTheDocument();
-    expect(screen.getAllByTestId('execution-trace-step')).toHaveLength(TRACE.steps.length);
+    expect(screen.getAllByTestId('execution-trace-step')).toHaveLength(onlyRecipe(TRACE).steps.length);
     expect(screen.getByTestId('trace-evidence-read-error')).toBeInTheDocument();
   });
 
@@ -308,7 +308,7 @@ describe('R13 - R14 - R15 - R16 - lo que muestra el detalle', () => {
     expect(marca).toHaveTextContent(GO_BACK_MARK);
     expect(marca).toHaveClass('sr-only');
     expect(screen.getAllByText(GO_BACK_MARK)).toHaveLength(1);
-    expect(screen.getByTestId('execution-trace-go-backs')).toHaveTextContent(String(TRACE.goBackCount));
+    expect(screen.getByTestId('execution-trace-go-backs')).toHaveTextContent(String(onlyRecipe(TRACE).goBackCount));
   });
 });
 
@@ -381,14 +381,15 @@ describe('R25 - R28 - duraciones por fase y marca «En curso» con acondicionami
     expect(within(acondicionamiento).queryByTestId('execution-trace-phase-open')).toBeNull();
   });
 
-  it('R25 - estado, tres fases y vueltas atras: cinco datos en orden', () => {
+  it('R25 - el resumen (estado, avance y duracion) y las tres fases de la seccion, en orden', () => {
     render(<ExecutionTraceDetail trace={FINISHED_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
     expect(datos().map((d) => d.querySelector('dt')?.textContent)).toEqual([
       'Estado',
+      'Avance',
+      'Duración',
       'Duración de producción',
       'Duración de empaque',
       'Duración de acondicionamiento',
-      'Vueltas atrás',
     ]);
     expect(screen.queryByTestId('execution-trace-phase-open')).toBeNull();
     expect(screen.queryByTestId('execution-trace-phase-unclosed')).toBeNull();
@@ -396,7 +397,7 @@ describe('R25 - R28 - duraciones por fase y marca «En curso» con acondicionami
 
   it('R25 - un pedido anterior a la feature no pinta la tarjeta de acondicionamiento', () => {
     render(<ExecutionTraceDetail trace={PREVIOUS_CONDITIONING_TRACE} backHref={DASHBOARD_ROUTE} />);
-    expect(datos()).toHaveLength(4);
+    expect(datos()).toHaveLength(5);
     expect(tarjetas().map((t) => t.getAttribute('data-phase'))).toEqual(['production', 'packing']);
     expect(screen.queryByText('Duración de acondicionamiento')).toBeNull();
   });
@@ -502,10 +503,10 @@ describe('R12 - R18 - las tres anotaciones de acondicionamiento en la linea de t
   });
 
   it('R13 - un miembro que el directorio no devuelve se pinta «—» con «Sin dato»', () => {
-    const steps = FINISHED_CONDITIONING_TRACE.steps.map((step) =>
+    const steps = onlyRecipe(FINISHED_CONDITIONING_TRACE).steps.map((step) =>
       step.action === 'conditioning_start' ? { ...step, team: [{ ...MIXED_TEAM[2], displayName: null }] } : step,
     );
-    render(<ExecutionTraceDetail trace={{ ...FINISHED_CONDITIONING_TRACE, steps }} backHref={DASHBOARD_ROUTE} />);
+    render(<ExecutionTraceDetail trace={withSteps(FINISHED_CONDITIONING_TRACE, steps)} backHref={DASHBOARD_ROUTE} />);
     const miembro = within(paso('conditioning_start')).getByTestId('execution-trace-team-member');
     expect(within(miembro).getByLabelText('Sin dato')).toHaveTextContent('—');
   });
@@ -664,10 +665,10 @@ describe('QC-299 R35 - R36 - pasos de acondicionamiento en la linea de tiempo', 
   ];
 
   function conPasos(steps: readonly ExecutionTraceDetailStep[]): ExecutionTraceDetailData {
-    const todos = [...FINISHED_CONDITIONING_TRACE.steps];
+    const todos = [...onlyRecipe(FINISHED_CONDITIONING_TRACE).steps];
     const comenzar = todos.findIndex((step) => step.action === 'conditioning_start');
     todos.splice(comenzar + 1, 0, ...steps);
-    return { ...FINISHED_CONDITIONING_TRACE, steps: todos };
+    return withSteps(FINISHED_CONDITIONING_TRACE, todos);
   }
 
   const TRAZA = conPasos(PASOS);
@@ -676,9 +677,16 @@ describe('QC-299 R35 - R36 - pasos de acondicionamiento en la linea de tiempo', 
   const EVIDENCIA = {
     status: 'success' as const,
     data: {
-      manufacturing: [orderEvidenceGroup('m', 2, 3)],
-      packing: [],
-      conditioning: [orderEvidenceGroup('p', 2, 2), orderEvidenceGroup('p', 3, 1)],
+      recipes: [
+        {
+          lineId: onlyRecipe(FINISHED_CONDITIONING_TRACE).lineId,
+          evidence: {
+            manufacturing: [orderEvidenceGroup('m', 2, 3)],
+            packing: [],
+            conditioning: [orderEvidenceGroup('p', 2, 2), orderEvidenceGroup('p', 3, 1)],
+          },
+        },
+      ],
     },
   };
 

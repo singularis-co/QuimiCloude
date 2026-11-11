@@ -2,12 +2,17 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { asignaciones, identity } from '@/lib/composition';
-import { OrderNotFoundError, type Actor } from '@/lib/modules/asignaciones';
+import { OrderNotFoundError, ValidationError, type Actor } from '@/lib/modules/asignaciones';
 import { requirePagePermission } from '@/lib/modules/identity/adapters/driving/require-page-permission';
 import { BRAND_LABEL } from '@/lib/shared/navigation/private-nav';
 import { runInRequestScope } from '@/lib/shared/request-scope';
 
-import { assignmentViewHref } from '../../components';
+import {
+  assignmentViewHref,
+  recipeAccessOf,
+  recipeLineIdOf,
+  type RecipeSearchParams,
+} from '../../components';
 
 import { PackingOrderScreen } from './components';
 
@@ -49,20 +54,24 @@ async function currentActor(): Promise<Actor | null> {
  */
 export default async function PackingOrderPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ id: string }>;
+  readonly searchParams: Promise<RecipeSearchParams>;
 }) {
   await requirePagePermission('empaque.modificar');
 
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const lineId = recipeLineIdOf(query);
+  if (lineId === null) notFound();
   const actor = await currentActor();
   if (actor === null) notFound();
 
   let order;
   try {
-    order = await asignaciones.getPackingOrder(actor, { orderId: id });
+    order = await asignaciones.getPackingOrder(actor, { orderId: id, lineId });
   } catch (error) {
-    if (error instanceof OrderNotFoundError) notFound();
+    if (error instanceof OrderNotFoundError || error instanceof ValidationError) notFound();
     throw error;
   }
 
@@ -71,6 +80,7 @@ export default async function PackingOrderPage({
       order={order}
       actorId={actor.id}
       backHref={assignmentViewHref('por_empacar')}
+      access={recipeAccessOf(actor)}
     />
   );
 }
