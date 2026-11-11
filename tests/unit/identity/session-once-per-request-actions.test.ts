@@ -649,18 +649,11 @@ const ACCIONES: readonly { archivo: string; nombre: string; invocar: () => Promi
       }),
   },
   {
-    // La accion captura el error y devuelve un estado, asi que un `orderId` invalido no rompe la
+    // La accion captura el error y devuelve un estado, asi que un id invalido no rompe la
     // invocacion.
-    archivo: 'lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts',
-    nombre: 'getOrderEvidenceAction',
-    invocar: async () =>
-      (
-        await import('@/lib/modules/asignaciones/adapters/driving/order-evidence-actions')
-      ).getOrderEvidenceAction('no-es-un-uuid'),
-  },
-  {
-    // 2026-11-11 (QT-316): las lecturas de una receta del pedido viven en el mismo archivo y cada
-    // una resuelve su propio actor. En la tanda 4 (P1) sale la fila de `getOrderEvidenceAction`.
+    // 2026-11-11 (QT-316): las lecturas de una receta del pedido viven en este archivo y cada una
+    // resuelve su propio actor. 2026-11-11 (QT-316, tanda 4, P1): sale la fila de la lectura del
+    // pedido entero, que se retiro; el archivo solo expone estas dos.
     archivo: 'lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts',
     nombre: 'getLineEvidenceAction',
     invocar: async () =>

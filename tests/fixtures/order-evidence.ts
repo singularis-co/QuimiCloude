@@ -5,7 +5,6 @@ import { errorMessage, type ErrorState } from '@/lib/modules/errores';
 import type {
   LineEvidenceCount,
   OrderEvidence,
-  OrderEvidenceCount,
   OrderEvidenceGroup,
   StepEvidencePhotoView,
 } from '@/lib/modules/asignaciones';
@@ -32,14 +31,20 @@ export function orderEvidenceGroup(phase: 'm' | 'p', stepPosition: number, count
   return { stepPosition, photoCount: count, photos: photos(phase, stepPosition, count) };
 }
 
-/** Fabricacion: pasos 1, 2 y 4. Envasado: paso 1. Nueve fotos en total. */
+/** Fabricacion: pasos 1, 2 y 4. Envasado: paso 1. Ocho fotos en total. */
 export const ORDER_EVIDENCE: OrderEvidence = {
   manufacturing: [orderEvidenceGroup('m', 1, 2), orderEvidenceGroup('m', 2, 3), orderEvidenceGroup('m', 4, 1)],
   packing: [orderEvidenceGroup('p', 1, 2)],
   conditioning: [],
 };
 
-export const ORDER_EVIDENCE_PHOTO_TOTAL = 9;
+// 2026-11-11, QT-316: sale de sumar los grupos del fixture. Antes era el literal 9, que no
+// coincidia con las 8 fotos de `ORDER_EVIDENCE`.
+export const ORDER_EVIDENCE_PHOTO_TOTAL = [
+  ...ORDER_EVIDENCE.manufacturing,
+  ...ORDER_EVIDENCE.packing,
+  ...ORDER_EVIDENCE.conditioning,
+].reduce((total, group) => total + group.photoCount, 0);
 
 /** La misma evidencia con la firma caida: cada grupo conserva su `photoCount` y no trae fotos. */
 export const ORDER_EVIDENCE_UNSIGNED: OrderEvidence = {
@@ -56,10 +61,6 @@ export const ORDER_EVIDENCE_MANUFACTURING_ONLY: OrderEvidence = {
 };
 
 export const ORDER_EVIDENCE_EMPTY: OrderEvidence = { manufacturing: [], packing: [], conditioning: [] };
-
-export const ORDER_EVIDENCE_COUNTS: readonly OrderEvidenceCount[] = [
-  { orderId: EVIDENCE_ORDER_ID, photoCount: ORDER_EVIDENCE_PHOTO_TOTAL },
-];
 
 export const EVIDENCE_LINE_ID = FINISHED_ORDER_LINE_ID;
 

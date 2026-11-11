@@ -4,7 +4,6 @@ import {
   type ExecutionEvidenceRead,
   type OrderEvidence,
   type OrderEvidenceGroup,
-  type OrderEvidenceRead,
   type StepEvidenceRowGroup,
 } from './order-evidence';
 import { EVIDENCE_READ_LINK_TTL_SECONDS } from './step-evidence';
@@ -67,32 +66,11 @@ function allRows(rows: OrderEvidenceRows): readonly StepEvidenceRow[] {
 }
 
 /**
- * Lanza `OrderNotFoundError` si el pedido no es de la empresa, vivo o dado de baja.
+ * Las fotos del pedido, separadas por linea: solo salen las lineas con alguna foto, en el orden en
+ * que aparece su primera foto. Una sola firma para todas.
  *
- * No mira la formula: las fotos salen aunque su paso ya no exista o ya no pida evidencia.
- */
-export async function readOrderEvidence(
-  deps: ReadOrderEvidenceDeps,
-  companyId: string,
-  orderId: string,
-): Promise<OrderEvidenceRead> {
-  const rows = await readOrderEvidenceRows(deps, companyId, orderId);
-  const all = allRows(rows);
-
-  if (all.length === 0) {
-    return { evidence: { manufacturing: [], packing: [], conditioning: [] }, signingFailure: null };
-  }
-
-  const signing = await signAll(deps.storage, all);
-  return {
-    evidence: toEvidence(rows, signing),
-    signingFailure: 'failure' in signing ? signing.failure : null,
-  };
-}
-
-/**
- * Las mismas fotos que `readOrderEvidence`, separadas por linea del pedido: solo salen las lineas
- * con alguna foto, en el orden en que aparece su primera foto. Una sola firma para todas.
+ * Lanza `OrderNotFoundError` si el pedido no es de la empresa, vivo o dado de baja. No mira la
+ * formula: las fotos salen aunque su paso ya no exista o ya no pida evidencia.
  */
 export async function readOrderEvidenceByLine(
   deps: ReadOrderEvidenceDeps,

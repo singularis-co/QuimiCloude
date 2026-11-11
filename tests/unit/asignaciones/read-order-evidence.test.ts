@@ -1,17 +1,30 @@
-// La lectura compartida de las fotos de un pedido, con los puertos simulados: todas las fotos
-// guardadas sin mirar la formula, agrupadas por fase y paso, firmadas en una sola llamada, y la
-// firma caida que no tumba la lectura.
+// La lectura compartida de las fotos de un pedido, por linea, con los puertos simulados: todas las
+// fotos guardadas sin mirar la formula, agrupadas por fase y paso, firmadas en una sola llamada, y
+// la firma caida que no tumba la lectura.
+//
+// 2026-11-11, QT-316 (P1, P4): la lectura del pedido entero se retiro y sus casos pasaron aqui a
+// `readOrderEvidenceByLine`, sin perder ninguno. Las filas de los dobles son todas de `LINEA`: la
+// lectura devuelve esa sola receta, con lo mismo que devolvia la del pedido entero.
 import { describe, expect, it } from 'vitest';
 
 import { OrderNotFoundError } from '@/lib/modules/asignaciones/domain/errors';
-import { readOrderEvidence } from '@/lib/modules/asignaciones/domain/read-order-evidence';
+import { readOrderEvidenceByLine } from '@/lib/modules/asignaciones/domain/read-order-evidence';
 import { EVIDENCE_READ_LINK_TTL_SECONDS } from '@/lib/modules/asignaciones/domain/step-evidence';
 import { ORDER_STATUS_VALUES } from '@/lib/modules/pedidos';
 
-import { EMPRESA, OTRA_EMPRESA, PASOS_FABRICACION, PEDIDO, filaFoto } from './evidence-doubles';
+import { EMPRESA, LINEA, OTRA_EMPRESA, PASOS_FABRICACION, PEDIDO, filaFoto } from './evidence-doubles';
 import { FILAS_DEL_PEDIDO, montarLectura, pedido } from './order-evidence-doubles';
 
-describe('readOrderEvidence — que fotos se leen', () => {
+import type { ReadOrderEvidenceDeps } from '@/lib/modules/asignaciones/domain/read-order-evidence';
+
+/** Lee por linea y comprueba que la unica receta con fotos es `LINEA`; devuelve su evidencia. */
+async function leerLinea(deps: ReadOrderEvidenceDeps, companyId: string, orderId: string) {
+  const lectura = await readOrderEvidenceByLine(deps, companyId, orderId);
+  expect(lectura.evidence.recipes.map((receta) => receta.lineId)).toEqual([LINEA]);
+  return { evidence: lectura.evidence.recipes[0]!.evidence, signingFailure: lectura.signingFailure };
+}
+
+describe('readOrderEvidenceByLine — que fotos se leen', () => {
   it('R7: devuelve las fotos de un paso que hoy no pide evidencia y de uno que ya no existe en la formula', async () => {
     // En la formula de los dobles el paso 1 no pide evidencia y no hay paso 9.
     expect(PASOS_FABRICACION[0]?.requiresEvidence).toBeUndefined();
@@ -20,7 +33,7 @@ describe('readOrderEvidence — que fotos se leen', () => {
       filas: [filaFoto({ id: 'a', slot: 1, stepPosition: 1 }), filaFoto({ id: 'b', slot: 1, stepPosition: 9 })],
     });
 
-    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const { evidence } = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(evidence.manufacturing.map((grupo) => grupo.stepPosition)).toEqual([1, 9]);
     expect(evidence.manufacturing.map((grupo) => grupo.photos?.map((foto) => foto.id))).toEqual([['a'], ['b']]);
@@ -29,7 +42,7 @@ describe('readOrderEvidence — que fotos se leen', () => {
   it('R7: lee las dos fases del pedido y las devuelve por separado', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const { evidence } = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(m.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'manufacturing');
     expect(m.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'packing');
@@ -42,7 +55,7 @@ describe('readOrderEvidence — que fotos se leen', () => {
   it('R8: los grupos van por numero de paso guardado ascendente y las fotos por casilla', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const { evidence } = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(evidence.manufacturing.map((grupo) => grupo.stepPosition)).toEqual([1, 3]);
     expect(evidence.manufacturing[0]!.photos!.map((foto) => [foto.id, foto.slot])).toEqual([
@@ -54,7 +67,7 @@ describe('readOrderEvidence — que fotos se leen', () => {
   it('R8: cada foto lleva la URL firmada de su propia ruta', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const { evidence } = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     const fotos = [...evidence.manufacturing, ...evidence.packing].flatMap((grupo) => grupo.photos ?? []);
     for (const foto of fotos) {
@@ -63,15 +76,15 @@ describe('readOrderEvidence — que fotos se leen', () => {
   });
 });
 
-describe('readOrderEvidence — pedidos cancelados y dados de baja', () => {
+describe('readOrderEvidenceByLine — pedidos cancelados y dados de baja', () => {
   it.each([
     ['cancelado', pedido({ status: 'CANCELADO' })],
     ['dado de baja', pedido({ status: 'TERMINADO', deleted: true })],
   ])('R9: un pedido %s devuelve sus fotos igual que uno vigente', async (_caso, resumen) => {
-    const vigente = await readOrderEvidence(montarLectura({ filas: FILAS_DEL_PEDIDO }).deps, EMPRESA, PEDIDO);
+    const vigente = await leerLinea(montarLectura({ filas: FILAS_DEL_PEDIDO }).deps, EMPRESA, PEDIDO);
     const m = montarLectura({ pedido: resumen, filas: FILAS_DEL_PEDIDO });
 
-    const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const lectura = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(lectura).toEqual(vigente);
     expect(lectura.signingFailure).toBeNull();
@@ -80,22 +93,19 @@ describe('readOrderEvidence — pedidos cancelados y dados de baja', () => {
   it('R9: pregunta por el pedido con todos los estados y dados de baja incluidos', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(m.listSummariesByIdsIncludingDeleted).toHaveBeenCalledWith(EMPRESA, [PEDIDO], ORDER_STATUS_VALUES, 1, 1);
   });
 });
 
-describe('readOrderEvidence — la firma', () => {
-  it('R10: sin fotos devuelve las dos fases vacias y no firma nada', async () => {
+describe('readOrderEvidenceByLine — la firma', () => {
+  it('R10: sin fotos no devuelve ninguna receta y no firma nada', async () => {
     const m = montarLectura();
 
-    const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const lectura = await readOrderEvidenceByLine(m.deps, EMPRESA, PEDIDO);
 
-    expect(lectura).toEqual({
-      evidence: { manufacturing: [], packing: [], conditioning: [] },
-      signingFailure: null,
-    });
+    expect(lectura).toEqual({ evidence: { recipes: [] }, signingFailure: null });
     expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
     expect(m.storage.createSignedReadUrl).not.toHaveBeenCalled();
   });
@@ -103,7 +113,7 @@ describe('readOrderEvidence — la firma', () => {
   it('R10: firma todas las rutas en una sola llamada con un plazo de 900 segundos', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(EVIDENCE_READ_LINK_TTL_SECONDS).toBe(900);
     expect(m.storage.createSignedReadUrls).toHaveBeenCalledTimes(1);
@@ -116,7 +126,7 @@ describe('readOrderEvidence — la firma', () => {
   it('R10: la ruta del archivo en el bucket no sale en la respuesta', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const lectura = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     const fotos = [...lectura.evidence.manufacturing, ...lectura.evidence.packing].flatMap((g) => g.photos ?? []);
     expect(fotos).toHaveLength(FILAS_DEL_PEDIDO.length);
@@ -129,7 +139,7 @@ describe('readOrderEvidence — la firma', () => {
   it('R11: si la firma lanza, la lectura no falla: cada grupo sale con su paso y su cantidad y sin fotos', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO, firmaFalla: new Error('storage caido') });
 
-    const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const lectura = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(lectura.evidence).toEqual({
       manufacturing: [
@@ -144,7 +154,7 @@ describe('readOrderEvidence — la firma', () => {
   it('R11: la causa de la firma caida viaja en `signingFailure` para el log', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO, firmaFalla: new Error('storage caido') });
 
-    const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const lectura = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(lectura.signingFailure).toBe('storage caido');
   });
@@ -153,7 +163,7 @@ describe('readOrderEvidence — la firma', () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
     m.storage.createSignedReadUrls.mockRejectedValue('https://secreto?token=x');
 
-    const lectura = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const lectura = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(lectura.evidence.manufacturing.every((grupo) => grupo.photos === null)).toBe(true);
     expect(lectura.signingFailure).not.toBeNull();
@@ -161,11 +171,11 @@ describe('readOrderEvidence — la firma', () => {
   });
 });
 
-describe('readOrderEvidence — el pedido tiene que ser de la empresa', () => {
+describe('readOrderEvidenceByLine — el pedido tiene que ser de la empresa', () => {
   it('R5: un pedido que no vuelve del catalogo lanza order_not_found sin listar ni firmar', async () => {
     const m = montarLectura({ pedido: null, filas: FILAS_DEL_PEDIDO });
 
-    await expect(readOrderEvidence(m.deps, EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
+    await expect(readOrderEvidenceByLine(m.deps, EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
     expect(m.repo.listByOrder).not.toHaveBeenCalled();
     expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
   });
@@ -173,13 +183,13 @@ describe('readOrderEvidence — el pedido tiene que ser de la empresa', () => {
   it('R29: un pedido de otra empresa lanza order_not_found sin listar ni firmar', async () => {
     const m = montarLectura({ filas: FILAS_DEL_PEDIDO });
 
-    await expect(readOrderEvidence(m.deps, OTRA_EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
+    await expect(readOrderEvidenceByLine(m.deps, OTRA_EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
     expect(m.repo.listByOrder).not.toHaveBeenCalled();
     expect(m.storage.createSignedReadUrls).not.toHaveBeenCalled();
   });
 });
 
-describe('readOrderEvidence — acondicionamiento (QC-299: R21, R32)', () => {
+describe('readOrderEvidenceByLine — acondicionamiento (QC-299: R21, R32)', () => {
   const FILAS_ACONDICIONAMIENTO = [
     filaFoto({ id: 'c2-2', slot: 2, stepPosition: 2, phase: 'conditioning' }),
     filaFoto({ id: 'c2-1', slot: 1, stepPosition: 2, phase: 'conditioning' }),
@@ -189,7 +199,7 @@ describe('readOrderEvidence — acondicionamiento (QC-299: R21, R32)', () => {
   it('R21: lee la fase conditioning y la devuelve aparte, por paso y por casilla, firmada en la misma llamada', async () => {
     const m = montarLectura({ filas: [...FILAS_DEL_PEDIDO, ...FILAS_ACONDICIONAMIENTO] });
 
-    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const { evidence } = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(m.repo.listByOrder).toHaveBeenCalledWith(EMPRESA, PEDIDO, 'conditioning');
     expect(evidence.conditioning.map((grupo) => [grupo.stepPosition, grupo.photoCount])).toEqual([
@@ -204,7 +214,7 @@ describe('readOrderEvidence — acondicionamiento (QC-299: R21, R32)', () => {
   it('R21: si la firma cae, los grupos de acondicionamiento salen con su cantidad y sin fotos', async () => {
     const m = montarLectura({ filas: FILAS_ACONDICIONAMIENTO, firmaFalla: new Error('storage caido') });
 
-    const { evidence } = await readOrderEvidence(m.deps, EMPRESA, PEDIDO);
+    const { evidence } = await leerLinea(m.deps, EMPRESA, PEDIDO);
 
     expect(evidence.conditioning).toEqual([
       { stepPosition: 1, photoCount: 1, photos: null },
@@ -215,7 +225,7 @@ describe('readOrderEvidence — acondicionamiento (QC-299: R21, R32)', () => {
   it('R32: las fotos de acondicionamiento de un pedido de otra empresa no se leen', async () => {
     const m = montarLectura({ filas: FILAS_ACONDICIONAMIENTO });
 
-    await expect(readOrderEvidence(m.deps, OTRA_EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
+    await expect(readOrderEvidenceByLine(m.deps, OTRA_EMPRESA, PEDIDO)).rejects.toBeInstanceOf(OrderNotFoundError);
     expect(m.repo.listByOrder).not.toHaveBeenCalled();
   });
 });

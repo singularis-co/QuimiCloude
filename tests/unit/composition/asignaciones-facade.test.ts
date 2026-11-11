@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/db/prisma', () => ({ prisma: {} }));
 
 import { asignaciones } from '@/lib/composition';
 
-describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-215, QC-218, QC-219, QC-214, la de abrir la pantalla, QC-271, QC-299 y QT-316, menos QC-301) — la fachada de `asignaciones` lista sus TREINTA Y SIETE operaciones', () => {
+describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-215, QC-218, QC-219, QC-214, la de abrir la pantalla, QC-271, QC-299 y QT-316, menos QC-301 y las dos que QT-316 retira) — la fachada de `asignaciones` lista sus TREINTA Y CINCO operaciones', () => {
   // El censo CRECE, no se afloja: primero llegaron las tres de la pantalla de ejecucion, luego
   // las tres de las vistas nuevas -`listFinishedOrders`, `listCompanyOrders`,
   // `listResponsibleCandidates`- y ahora las CUATRO del empaque de QC-168. Siguen nombradas UNA A
@@ -34,8 +34,8 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
   // quita; el censo pasa de veintiocho a TREINTA Y UNA.
   // Crece con `openAssignedOrder`: abrir la pantalla sin comenzar un PENDIENTE. Pasa a TREINTA Y DOS.
   // 2026-10-14 (QC-271): crece con TRES lecturas de las fotos de un pedido ejecutado,
-  // `getExecutionEvidence`, `getOrderEvidence` y `countOrderEvidence`. Ninguna previa se quita; el
-  // censo pasa de treinta y dos a TREINTA Y CINCO.
+  // `getExecutionEvidence` y la lectura y el conteo del pedido entero para la ficha de producto
+  // terminado. Ninguna previa se quita; el censo pasa de treinta y dos a TREINTA Y CINCO.
   // 2026-10-19 (QC-301 R6): sale `listDeliveredConditionedOrders`, que alimentaba la pestana
   // «Entregados» del acondicionador. Es la unica que se quita; el censo baja a TREINTA Y CUATRO.
   // 2026-10-21 (QC-299): crece con `recordConditioningStep`, el avance de los pasos de
@@ -43,14 +43,15 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
   // Merge de dev en QC-299 (2026-10-21): 35 = 34 que deja QC-301 + `recordConditioningStep`.
   // 2026-11-11 (QT-316, tanda 2): crece con `getLineEvidence` y `countLineEvidence`, las lecturas
   // de las fotos de UNA receta del pedido para la ficha de producto terminado. Ninguna previa se
-  // quita todavia; el censo pasa a TREINTA Y SIETE. En la tanda 4 (P1) salen `getOrderEvidence` y
-  // `countOrderEvidence` y vuelve a TREINTA Y CINCO.
-  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo, la de QC-219 que sigue (QC-301 R6 quita la de «Entregados»), las TRES de QC-214, la de abrir la pantalla, las TRES de QC-271, la de QC-299 y las DOS de QT-316, y ninguna mas', () => {
+  // quita todavia; el censo pasa a TREINTA Y SIETE.
+  // 2026-11-11 (QT-316, tanda 4, P1): salen la lectura y el conteo de las fotos del pedido entero
+  // que QC-271 sumo para la ficha: la ficha ya lee por receta y no les queda consumidor. Son las
+  // unicas que se quitan; el censo vuelve a TREINTA Y CINCO.
+  it('R31: expone las doce anteriores, las CUATRO de QC-168, las DOS de QC-82, las DOS de QC-167, las DOS de QC-215, las TRES del acondicionamiento, los candidatos del equipo, la de QC-219 que sigue (QC-301 R6 quita la de «Entregados»), las TRES de QC-214, la de abrir la pantalla, la de QC-271 que sigue (QT-316 P1 quita las dos del pedido entero), la de QC-299 y las DOS de QT-316, y ninguna mas', () => {
     expect(Object.keys(asignaciones).sort()).toEqual([
       'assignResponsibles',
       'cancelAssignedOrder',
       'countLineEvidence',
-      'countOrderEvidence',
       'finishAssignedOrder',
       'finishConditioning',
       'finishPacking',
@@ -59,7 +60,6 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
       'getExecutionEvidence',
       'getExecutionTrace',
       'getLineEvidence',
-      'getOrderEvidence',
       'getPackingOrder',
       'listAssignedOrders',
       'listCompanyOrders',
@@ -294,23 +294,9 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
     expect((error as { code?: string }).code).toBe('unauthorized');
   });
 
-  it('QC-271 R2: `getOrderEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
-    const error = await asignaciones
-      .getOrderEvidence({ id: 'u', companyId: 'c', permissions: ['inventario.consultar'] }, { orderId: 'o' })
-      .catch((caught: unknown) => caught);
-
-    expect((error as { code?: string }).code).toBe('unauthorized');
-  });
-
-  it('QC-271 R2: `countOrderEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
-    const error = await asignaciones
-      .countOrderEvidence({ id: 'u', companyId: 'c', permissions: ['inventario.consultar'] }, { orderIds: [] })
-      .catch((caught: unknown) => caught);
-
-    expect((error as { code?: string }).code).toBe('unauthorized');
-  });
-
-  it('QT-316 R13: `getLineEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
+  // 2026-11-11 (QT-316, P1): los dos casos «QC-271 R2» pasan a las operaciones de linea, que
+  // sustituyen a las del pedido entero en la ficha. El permiso que exigen es el mismo.
+  it('QC-271 R2, QT-316 R13: `getLineEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
     const error = await asignaciones
       .getLineEvidence(
         { id: 'u', companyId: 'c', permissions: ['inventario.consultar'] },
@@ -321,7 +307,7 @@ describe('QC-88 T8 (censo crecido por QC-63, QC-145, QC-168, QC-82, QC-167, QC-2
     expect((error as { code?: string }).code).toBe('unauthorized');
   });
 
-  it('QT-316 R13: `countLineEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
+  it('QC-271 R2, QT-316 R13: `countLineEvidence` rechaza sin `pedidos.consultar` sin llegar a la base', async () => {
     const error = await asignaciones
       .countLineEvidence({ id: 'u', companyId: 'c', permissions: ['inventario.consultar'] }, { lines: [] })
       .catch((caught: unknown) => caught);

@@ -261,12 +261,12 @@ describe('BatchEvidenceDialog', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: `Ver evidencia del lote ${LOT}: 9 fotos` }));
+    await user.click(screen.getByRole('button', { name: `Ver evidencia del lote ${LOT}: ${ORDER_EVIDENCE_PHOTO_TOTAL} fotos` }));
     await ready();
     await user.click(within(dialog()).getByRole('button', { name: 'Cerrar' }));
     await waitFor(() => expect(screen.queryByTestId(BATCH_EVIDENCE_DIALOG_TESTID)).toBeNull());
 
-    await user.click(screen.getByRole('button', { name: `Ver evidencia del lote ${LOT}: 9 fotos` }));
+    await user.click(screen.getByRole('button', { name: `Ver evidencia del lote ${LOT}: ${ORDER_EVIDENCE_PHOTO_TOTAL} fotos` }));
     await ready();
     expect(getEvidenceMock).toHaveBeenCalledTimes(2);
     expect(

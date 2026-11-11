@@ -18,7 +18,6 @@ export const evidenceRepositoryUnused: StepEvidenceRepository = {
   replace: noUsado('replace'),
   delete: noUsado('delete'),
   listOrderIdsWithEvidence: noUsado('listOrderIdsWithEvidence'),
-  countByOrders: noUsado('countByOrders'),
   countByLines: noUsado('countByLines'),
 };
 

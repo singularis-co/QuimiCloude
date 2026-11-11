@@ -512,8 +512,6 @@ import {
   createRemoveEvidence,
   createCountEvidenceLockingOrders,
   createGetExecutionEvidence,
-  createGetOrderEvidence,
-  createCountOrderEvidence,
   createGetLineEvidence,
   createCountLineEvidence,
 } from '@/lib/modules/asignaciones';
@@ -2380,12 +2378,6 @@ export const asignaciones = {
     evidence: stepEvidenceRepository,
     storage: evidenceStorage,
   }),
-  getOrderEvidence: createGetOrderEvidence({
-    orders: orderCatalog,
-    evidence: stepEvidenceRepository,
-    storage: evidenceStorage,
-  }),
-  countOrderEvidence: createCountOrderEvidence({ evidence: stepEvidenceRepository }),
   getLineEvidence: createGetLineEvidence({
     orders: orderCatalog,
     evidence: stepEvidenceRepository,

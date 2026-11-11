@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * Las fotos de un pedido vistas desde fuera del recorrido. Esta capa no decide nada: resuelve el
+ * Las fotos de una receta del pedido vistas desde fuera del recorrido. Esta capa no decide nada: resuelve el
  * actor y traduce el error por su `code`. Ningun permiso se comprueba aqui.
  *
  * No se reexporta desde el barril del modulo: un `'use server'` en su cierre de imports lo
@@ -15,7 +15,6 @@ import {
   type Actor,
   type LineEvidenceCount,
   type OrderEvidence,
-  type OrderEvidenceCount,
 } from '@/lib/modules/asignaciones';
 import { forModule } from '@/lib/shared/observability/logger';
 import { runInRequestScope } from '@/lib/shared/request-scope';
@@ -42,44 +41,13 @@ async function currentActor(): Promise<Actor | null> {
 
 export type OrderEvidenceResult = { status: 'success'; data: OrderEvidence } | ErrorState;
 
-/** Un pedido inexistente o de otra empresa vuelve como `order_not_found`. */
-export async function getOrderEvidenceAction(orderId: string): Promise<OrderEvidenceResult> {
-  const actor = await currentActor();
-
-  try {
-    const { evidence, signingFailure } = await asignaciones.getOrderEvidence(actor, { orderId });
-    // La firma caida no es un error de la lectura: los grupos salen sin fotos y la causa, al log.
-    if (signingFailure !== null) log.warn('evidence_read_signing_failed', { orderId, message: signingFailure });
-    return { status: 'success', data: evidence };
-  } catch (error) {
-    return toErrorState(error);
-  }
-}
-
-export type OrderEvidenceCountResult =
-  | { status: 'success'; data: readonly OrderEvidenceCount[] }
-  | ErrorState;
-
-/** Solo salen los pedidos con alguna foto. */
-export async function countOrderEvidenceAction(
-  orderIds: readonly string[],
-): Promise<OrderEvidenceCountResult> {
-  const actor = await currentActor();
-
-  try {
-    const data = await asignaciones.countOrderEvidence(actor, { orderIds });
-    return { status: 'success', data };
-  } catch (error) {
-    return toErrorState(error);
-  }
-}
-
 /** Una linea de otro pedido, de otra empresa o inexistente vuelve como `order_not_found`. */
 export async function getLineEvidenceAction(orderId: string, lineId: string): Promise<OrderEvidenceResult> {
   const actor = await currentActor();
 
   try {
     const { evidence, signingFailure } = await asignaciones.getLineEvidence(actor, { orderId, lineId });
+    // La firma caida no es un error de la lectura: los grupos salen sin fotos y la causa, al log.
     if (signingFailure !== null) {
       log.warn('evidence_read_signing_failed', { orderId, lineId, message: signingFailure });
     }

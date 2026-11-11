@@ -124,7 +124,7 @@
 
 ## Tanda 4 — retirar la lectura del pedido entero (backend_dev; depende de T6 y T7)
 
-- [ ] **T8 · backend_dev — retirar `getOrderEvidence` y `countOrderEvidence`** (design § 3.5, § 5 · R21; P1, P4)
+- [x] **T8 · backend_dev — retirar `getOrderEvidence` y `countOrderEvidence`** (design § 3.5, § 5 · R21; P1, P4)
   - Se borran `domain/get-order-evidence.ts` y `domain/count-order-evidence.ts`.
   - Se borran también sus tests: `get-order-evidence.test.ts` y `count-order-evidence.test.ts`.
   - Fuera del barril: `createGetOrderEvidence`, `createCountOrderEvidence`, sus `Deps` y

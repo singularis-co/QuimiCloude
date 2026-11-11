@@ -388,7 +388,6 @@ export {
   type ExecutionEvidenceRead,
   type RecipeEvidence,
   type OrderEvidence,
-  type OrderEvidenceCount,
   type LineEvidenceCount,
   type OrderEvidenceGroup,
   type OrderEvidenceRead,
@@ -398,8 +397,6 @@ export {
   createGetExecutionEvidence,
   type GetExecutionEvidenceDeps,
 } from './domain/get-execution-evidence';
-export { createGetOrderEvidence, type GetOrderEvidenceDeps } from './domain/get-order-evidence';
-export { createCountOrderEvidence, type CountOrderEvidenceDeps } from './domain/count-order-evidence';
 export { createGetLineEvidence, type GetLineEvidenceDeps } from './domain/get-line-evidence';
 export { createCountLineEvidence, type CountLineEvidenceDeps } from './domain/count-line-evidence';
 export { canConsultOrderEvidence } from './domain/actor';

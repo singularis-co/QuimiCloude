@@ -159,3 +159,67 @@ Nota: en `tests/fixtures/order-evidence.ts`, `ORDER_EVIDENCE` suma 8 fotos (6 + 
 - `pnpm exec vitest run guard`: `Test Files 87 passed (87)`, `Tests 1335 passed | 22 skipped (1357)`.
 
 Veredicto: tanda 3 (T6, T7) hecha; la pantalla ya no importa las actions del pedido entero; typecheck, lint, tests tocados y guardias en verde.
+
+## Tanda 4 (T8) — backend_dev, 2026-11-11
+
+Grafo: no usado (lo tocado se vio con Grep/Read). P4 aplicada (retirada, aprobada con el spec). No hizo falta regenerar tipos.
+
+### Archivos
+
+**Borrados** (con `git rm`, quedan en el índice)
+- `lib/modules/asignaciones/domain/get-order-evidence.ts`, `lib/modules/asignaciones/domain/count-order-evidence.ts`.
+- `tests/unit/asignaciones/get-order-evidence.test.ts`, `tests/unit/asignaciones/count-order-evidence.test.ts`.
+
+**`lib/`**
+- `lib/modules/asignaciones/index.ts`: fuera `OrderEvidenceCount`, `createGetOrderEvidence` + `GetOrderEvidenceDeps`, `createCountOrderEvidence` + `CountOrderEvidenceDeps`.
+- `lib/modules/asignaciones/domain/order-evidence.ts`: fuera `OrderEvidenceCount` y el comentario de `OrderEvidence.conditioning` («la ficha de producto terminado no lo pinta»).
+- `lib/modules/asignaciones/domain/read-order-evidence.ts`: fuera `readOrderEvidence` (P4); su comentario (no mira la fórmula, `OrderNotFoundError`) pasa a `readOrderEvidenceByLine`, cuyo código no cambia (R16). `readOrderEvidenceRows`, `toEvidence`, `allRows` y `signAll` se quedan.
+- `lib/modules/asignaciones/adapters/driving/order-evidence-actions.ts`: fuera `getOrderEvidenceAction`, `countOrderEvidenceAction` y `OrderEvidenceCountResult`; el comentario de la firma caída pasa a `getLineEvidenceAction`. Queda `OrderEvidenceResult` (lo usa `getLineEvidenceAction`).
+- `lib/composition/index.ts`: fuera `getOrderEvidence` y `countOrderEvidence` y sus dos imports.
+- `lib/modules/asignaciones/ports/step-evidence-repository.ts` y `adapters/driven/persistence/step-evidence-prisma.ts`: fuera `countByOrders` (P4).
+
+**`tests/`**
+- `tests/unit/asignaciones/evidence-doubles.ts` y `tests/helpers/evidence-off.ts`: fuera `countByOrders`.
+- `tests/unit/asignaciones/read-order-evidence.test.ts`: los 17 casos de la lectura del pedido entero pasan a `readOrderEvidenceByLine`, sin perder ninguno (17 antes, 17 después). El ayudante `leerLinea` comprueba que la única receta devuelta es `LINEA` y entrega su evidencia. El caso «sin fotos» pasa a esperar `{ recipes: [] }`, que es lo que la lectura por línea devuelve sin fotos. Comentario 2026-11-11, QT-316, P1/P4. Nota: el archivo no tenía casos previos de `readOrderEvidenceByLine` (los de línea viven en `get-execution-evidence.test.ts`, sin tocar).
+- `tests/unit/asignaciones/order-evidence-actions.test.ts`: fuera los `describe` y mocks de las dos actions retiradas; nuevo caso `R21: solo exporta getLineEvidenceAction y countLineEvidenceAction` (`Object.keys` del import del módulo).
+- `tests/unit/composition/asignaciones-facade.test.ts`: censo 37 → 35 (salen las dos del pedido entero), título del `describe` e `it` reescritos, comentario 2026-11-11 (QT-316, tanda 4, P1). Los dos casos «QC-271 R2» pasan a las de línea: los casos existentes `getLineEvidence` / `countLineEvidence` se titulan ahora `QC-271 R2, QT-316 R13: …` (mismo permiso, `inventario.consultar` sin `pedidos.consultar`). El comentario histórico de QC-271 ya no nombra los símbolos (para que el Grep de R21 quede vacío).
+- `tests/unit/identity/session-once-per-request-actions.test.ts`: sale la entrada de la action del pedido entero; comentario 2026-11-11 (QT-316, tanda 4, P1) en la de `getLineEvidenceAction`.
+- `tests/integration/asignaciones/step-evidence-repository.int.test.ts`: sale el `describe` de `countByOrders`. T2 ya cubre sus 4 casos por línea (fases sumadas → `R20`; otra empresa → `R15`; sin fotos → `R2`; lista vacía sin consultar → `R4`). El `describe` de `countByLines` lo cita (`QC-271 R6, R29`), con comentario 2026-11-11, QT-316, P4.
+- `tests/fixtures/order-evidence.ts`: fuera `ORDER_EVIDENCE_COUNTS` (`LINE_EVIDENCE_COUNTS` ya existía desde T5) y el import de `OrderEvidenceCount`.
+
+**Encargo extra del coordinador: total de fotos del fixture**
+- `tests/fixtures/order-evidence.ts`: `ORDER_EVIDENCE_PHOTO_TOTAL` deja el literal 9. Ahora sale de sumar `photoCount` de los grupos de las tres fases de `ORDER_EVIDENCE`, y vale 8 (6 de fabricación + 2 de envasado). Lleva comentario 2026-11-11, QT-316. El docstring de `ORDER_EVIDENCE` decía «Nueve fotos» y ahora dice «Ocho».
+- `tests/unit/inventario-ui/batch-evidence-dialog.test.tsx` (solo este ajuste): el nombre accesible del botón en los dos `getByRole` del caso «R19, R24 — cerrar y volver a abrir» pasa del literal `9 fotos` a `${ORDER_EVIDENCE_PHOTO_TOTAL} fotos`. El botón se monta con `photoCount={ORDER_EVIDENCE_PHOTO_TOTAL}`, así que el caso comprueba lo mismo.
+- `finished-product-batches-evidence.test.tsx` ya usaba la constante. Sus literales «6 / 3 / 2 fotos» son de mapas propios del caso y no dependen de ella. Ningún otro test de `tests/` usaba el literal.
+
+### Mapa R<n> → test (tanda 4)
+
+| R | Archivo | Caso(s) |
+|---|---|---|
+| R13 (y QC-271 R2) | `asignaciones-facade.test.ts` | `QC-271 R2, QT-316 R13: getLineEvidence / countLineEvidence rechaza sin pedidos.consultar sin llegar a la base` |
+| R15 (y QC-271 R29) | `step-evidence-repository.int.test.ts` | `QT-316 R15, QC-271 R29: una fila de otra empresa no cuenta aunque se pida su linea` |
+| R16 | `read-order-evidence.test.ts` | los 17 casos de `readOrderEvidenceByLine — …` (QC-271 R5, R7–R11, R29 y QC-299 R21, R32), sin cambio en el código de la función; `get-execution-evidence.test.ts` verde sin tocarlo |
+| R21 | `order-evidence-actions.test.ts` | `R21: solo exporta getLineEvidenceAction y countLineEvidenceAction` |
+| R21 | `asignaciones-facade.test.ts` | `R31: … ninguna mas` (censo de 35, sin las dos del pedido entero) |
+| R21 | `finished-product-route-contract.test.ts` | `LECTURAS_DE_EVIDENCIA` solo admite las de línea (T6) |
+| R21 | typecheck | los archivos borrados no se importan |
+
+### Grep de R21
+
+```
+$ grep -rnE "getOrderEvidence|countOrderEvidence|readOrderEvidence\b|countByOrders|OrderEvidenceCount\b" app components lib tests e2e; echo "exit=$?"
+exit=1
+```
+Sin coincidencias, `e2e/` incluido. `grep -rlE "get-order-evidence|count-order-evidence" app components lib tests e2e scripts docs *.json` tampoco da nada (exit 1).
+
+### Verificación (salida real, un comando a la vez, `--maxWorkers=1`)
+
+- `pnpm run typecheck`: exit 0, 0 errores.
+- `pnpm run lint`: exit 0, `✖ 11 problems (0 errors, 11 warnings)`, la base; ninguno en archivos tocados.
+- Tocados y R16 (`read-order-evidence`, `order-evidence-actions`, `get-execution-evidence`, `get-line-evidence`, `count-line-evidence`, `asignaciones-facade`, `session-once-per-request-actions`, `batch-evidence-dialog`, `finished-product-batches-evidence`, `finished-product-tables`, `finished-product-route-contract`): `Test Files 11 passed (11)`, `Tests 349 passed (349)`.
+- Los que usan los dobles / el fixture (`count-evidence-locking-orders`, `execution-trace-actions`, `order-evidence`, `record-step-move-evidence`, `register-evidence`, `remove-evidence`, `request-evidence-upload`, `evidence-step-list`, `execution-trace-detail`, `execution-trace-evidence`, `planta-varias-recetas`, `trace-evidence-placement`): `Test Files 12 passed (12)`, `Tests 191 passed (191)`.
+- `tests/unit/recetas/` que usan `evidence-off` (10 archivos): `Test Files 10 passed (10)`, `Tests 160 passed (160)`.
+- Integración, base efímera copiada de la plantilla (`DATABASE_URL` del `.env` del checkout principal solo en ese shell; la borró el teardown): `step-evidence-repository.int.test.ts`: `Test Files 1 passed (1)`, `Tests 25 passed (25)` (29 − los 4 de `countByOrders`). Las 8 `.int` que importan `evidence-off` solo pierden una clave del doble: las cubre el typecheck y no se corrieron.
+- `pnpm exec vitest run guard`: exit 0, `Test Files 87 passed (87)`, `Tests 1335 passed | 22 skipped (1357)`. Ninguna guardia ni snapshot cambió.
+
+Veredicto: tanda 4 (T8) hecha; la lectura y el conteo del pedido entero ya no existen (R21, P1, P4); typecheck, lint, tests tocados, integración y guardias en verde.

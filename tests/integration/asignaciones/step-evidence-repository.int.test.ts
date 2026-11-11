@@ -422,72 +422,6 @@ describe('listOrderIdsWithEvidence (R8, R39)', () => {
   });
 });
 
-describe('countByOrders: fotos por pedido de la empresa (QC-271 R6, R29)', () => {
-  it('cuenta las fotos de fabricacion y de envasado de cada pedido', async () => {
-    const both = await createOrder(a.companyId);
-    const onlyPacking = await createOrder(a.companyId);
-    inserted(await repo.insert(evidence(a, both)));
-    inserted(await repo.insert(evidence(a, both)));
-    inserted(await repo.insert(evidence(a, both, { stepPosition: 4 })));
-    inserted(await repo.insert(evidence(a, both, { phase: 'packing' })));
-    inserted(await repo.insert(evidence(a, onlyPacking, { phase: 'packing' })));
-
-    const counts = await repo.countByOrders(a.companyId, [both, onlyPacking]);
-
-    expect(counts).toEqual(
-      new Map([
-        [both, 4],
-        [onlyPacking, 1],
-      ]),
-    );
-  });
-
-  it('R6, R29: no cuenta filas de otra empresa aunque se pida su pedido', async () => {
-    const ofB = await createOrder(b.companyId);
-    const ofA = await createOrder(a.companyId);
-    inserted(await repo.insert(evidence(b, ofB)));
-    inserted(await repo.insert(evidence(b, ofB, { phase: 'packing' })));
-    inserted(await repo.insert(evidence(a, ofA)));
-
-    const counts = await repo.countByOrders(a.companyId, [ofA, ofB]);
-
-    expect(counts).toEqual(new Map([[ofA, 1]]));
-    expect(await repo.countByOrders(b.companyId, [ofA, ofB])).toEqual(new Map([[ofB, 2]]));
-  });
-
-  it('un pedido sin fotos no sale en el resultado', async () => {
-    const withPhotos = await createOrder(a.companyId);
-    const empty = await createOrder(a.companyId);
-    inserted(await repo.insert(evidence(a, withPhotos)));
-
-    const counts = await repo.countByOrders(a.companyId, [withPhotos, empty]);
-
-    expect(counts.has(empty)).toBe(false);
-    expect(counts).toEqual(new Map([[withPhotos, 1]]));
-  });
-
-  it('con la lista vacia devuelve un Map vacio sin consultar', async () => {
-    let groupByCalls = 0;
-    const delegate = prisma.orderStepEvidence;
-    const watched = new Proxy(prisma, {
-      get(target, property, receiver) {
-        if (property !== 'orderStepEvidence') return Reflect.get(target, property, receiver) as unknown;
-        return new Proxy(delegate, {
-          get(innerTarget, innerProperty, innerReceiver) {
-            if (innerProperty === 'groupBy') groupByCalls += 1;
-            return Reflect.get(innerTarget, innerProperty, innerReceiver) as unknown;
-          },
-        });
-      },
-    });
-
-    const counts = await createStepEvidenceRepository(watched).countByOrders(a.companyId, []);
-
-    expect(counts).toEqual(new Map());
-    expect(groupByCalls).toBe(0);
-  });
-});
-
 /** Un repositorio sobre el cliente global que cuenta las llamadas a `groupBy`. */
 function watchGroupBy(): { readonly repo: ReturnType<typeof createStepEvidenceRepository>; readonly calls: () => number } {
   let groupByCalls = 0;
@@ -506,7 +440,9 @@ function watchGroupBy(): { readonly repo: ReturnType<typeof createStepEvidenceRe
   return { repo: createStepEvidenceRepository(watched), calls: () => groupByCalls };
 }
 
-describe('countByLines: fotos por linea de la empresa (QT-316)', () => {
+// 2026-11-11 (QT-316, P4): el conteo por pedido se retiro. Sus casos (QC-271 R6, R29: fases sumadas,
+// otra empresa, sin fotos, lista vacia) los cubren los de abajo, por linea.
+describe('countByLines: fotos por linea de la empresa (QT-316; QC-271 R6, R29)', () => {
   it('QT-316 R1: dos lineas del mismo pedido se cuentan por separado, en una sola consulta', async () => {
     const orderId = await createOrder(a.companyId);
     const lineA = line(orderId);
@@ -556,7 +492,7 @@ describe('countByLines: fotos por linea de la empresa (QT-316)', () => {
     expect(counts).toEqual(new Map([[lineA, 1]]));
   });
 
-  it('QT-316 R15: una fila de otra empresa no cuenta aunque se pida su linea', async () => {
+  it('QT-316 R15, QC-271 R29: una fila de otra empresa no cuenta aunque se pida su linea', async () => {
     const ofB = await createOrder(b.companyId);
     const ofA = await createOrder(a.companyId);
     inserted(await repo.insert(evidence(b, ofB)));
