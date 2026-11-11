@@ -1551,6 +1551,34 @@
       "w": 960,
       "x": 2504,
       "y": 12540
+    },
+    "EvidenciaLoteVariasRecetas.dc.html": {
+      "expand": "fill",
+      "h": 1000,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "Evidencia del lote por receta (QT-316)",
+      "w": 1440,
+      "x": 0,
+      "y": 21900
+    },
+    "EvidenciaLoteVariasRecetasTablet.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "EvidenciaLoteVariasRecetasTablet",
+      "w": 904,
+      "x": 1520,
+      "y": 21900
+    },
+    "EvidenciaLoteVariasRecetasMovil.dc.html": {
+      "h": 1300,
+      "is_interactive": true,
+      "page": "inventario",
+      "title": "EvidenciaLoteVariasRecetasMovil",
+      "w": 960,
+      "x": 2504,
+      "y": 21900
     }
   },
   "createdOnFiles": {
@@ -2184,6 +2212,14 @@
       "kind": "title1",
       "maxW": 3464,
       "page": "operario"
+    },
+    "t_qt316": {
+      "x": 0,
+      "y": 21620,
+      "text": "QT-316 · Evidencia del lote por receta",
+      "kind": "title1",
+      "maxW": 3464,
+      "page": "inventario"
     }
   },
   "order": [
@@ -2354,7 +2390,10 @@
     "PedidosVariasRecetasMovil.dc.html",
     "PlantaVariasRecetas.dc.html",
     "PlantaVariasRecetasTablet.dc.html",
-    "PlantaVariasRecetasMovil.dc.html"
+    "PlantaVariasRecetasMovil.dc.html",
+    "EvidenciaLoteVariasRecetas.dc.html",
+    "EvidenciaLoteVariasRecetasTablet.dc.html",
+    "EvidenciaLoteVariasRecetasMovil.dc.html"
   ],
   "pages": [
     {
