@@ -87,3 +87,66 @@ Grafo: no usado. Este worktree no tiene índice en el MCP, igual que en el desig
 ### Veredicto
 
 **RECHAZADO.** Hay dos bloqueantes: B1 (R14) y B2 (R15). Los dos vuelven al implementer (backend_dev). B1 también puede resolverse con una decisión del humano que enmiende R14. Lo demás, incluidas las retiradas P1/P4, las listas cerradas, R8/R9, R20 y el fixture, está bien.
+
+## Vuelta 2 (acotada a f4e0fd45b..4180e676d)
+
+Solo reviso B1, B2, m1 y lo que el diff `4180e676d` pueda haber roto.
+
+### Verificación ejecutada
+
+| Qué | Resultado |
+|---|---|
+| `tsc --noEmit` | 0 errores |
+| `eslint` sobre los `.ts` del diff | 0 |
+| Unit (`count-line-evidence`, `get-line-evidence`, `read-order-evidence`, `order-evidence-actions`, `get-execution-evidence`, `asignaciones-facade`, `finished-product-batches-evidence`, `record-step-move-evidence`, `register-evidence`), `--maxWorkers=1` | 194/194 |
+| Integración `step-evidence-repository.int`, con `DATABASE_URL` cargada solo en el shell | 27/27 |
+
+### B1 (R14, firma con línea ajena): resuelto
+
+- **El arreglo.** `getLineEvidence` cuenta primero con `countByLines(companyId, [{ orderId, lineId }])`:
+  - con 0 fotos no llama a `readOrderEvidenceByLine`, así que no lista ni firma; el outline decide entre evidencia vacía y `order_not_found`;
+  - con más de 0 reutiliza `readOrderEvidenceByLine` como antes (R16 intacto).
+- **R12 sigue igual.** Una línea quitada con fotos tiene conteo mayor que 0, se lee y sale.
+- **Test nuevo.** El `it.each` cubre la línea de otro pedido, la inexistente y la quitada sin fotos. Las tres van contra un pedido de la empresa con fotos de otra receta. Comprueba que el error es `order_not_found`, que no se llama a `createSignedReadUrls`, `createSignedReadUrl` ni `listByOrder`, y que `countByLines` va con la empresa y la pareja.
+- **Coste.** Una consulta más por apertura del diálogo. Es aceptable: no hay requisito de número de consultas en la lectura.
+
+**Los dos tests de empresa ajustados: no se aflojaron.**
+
+1. *«R14: el pedido de otra empresa no firma ninguna lectura».*
+   - **Antes** comprobaba que la primera consulta, `listSummaries…`, iba con `OTRA_EMPRESA`.
+   - **Ahora** esa consulta ya no ocurre: el conteo de la otra empresa da 0 y no se lee el pedido. Comprueba en su lugar que las dos consultas que sí ocurren, `countByLines` y `listRecipeOutlines…`, van con `OTRA_EMPRESA`.
+   - Siguen las aserciones de que no se llama a `listByOrder` ni a `createSignedReadUrls`.
+   - Comprueba lo mismo (la consulta va con la empresa del actor y no se firma) sobre el camino nuevo.
+2. *«R14: lista las fotos y el pedido con la empresa del actor».*
+   - Sale más fuerte que antes.
+   - Antes solo leía `LINEA_SIN_FOTOS`, y el bucle sobre `listByOrder` no comprobaba nada.
+   - Ahora lee también `LINEA` (con fotos). Comprueba la empresa en todas las llamadas a `countByLines` y `listByOrder`, en `listSummaries…` (la primera llamada) y en `listRecipeOutlines…`.
+
+### B2 (R15, misma línea con dos pedidos): resuelto
+
+- **Una sola clave para la pareja.** `lineEvidenceKey(orderId, lineId)` (en `domain/step-evidence.ts`) se usa en todos los sitios:
+  - el puerto, documentado;
+  - el adaptador: el `groupBy` sigue siendo una sola consulta, y filtra por las parejas pedidas, no por un mapa de línea a pedido;
+  - el caso de uso, al quitar repetidos y al buscar el conteo;
+  - el doble.
+- **Tests de los dos órdenes, unit e integración:** solo cuenta `(A, L)` y con su total; `(B, L)` no sale.
+- **Los tests de integración anteriores no se aflojaron.** Pasaron a la clave nueva con los mismos valores.
+- **La forma de `LineEvidenceCount`, y con ella la pantalla, no cambia.**
+
+### m1: cerrado
+
+La casilla está marcada en `tasks.md`, con una nota del motivo: deuda QC/QT del validador y gate completo en CI. Me vale.
+
+### Hallazgo nuevo
+
+**B3 — BLOQUEANTE · un comentario de producción cita un requisito** (`docs/perfil-agentes.md > reviewer`, punto 9). El diff añade este comentario en `lib/modules/asignaciones/domain/get-line-evidence.ts`:
+
+```ts
+    // las otras recetas antes de responder order_not_found (R14).
+```
+
+En una línea de producción que el diff añade, citar `R<n>` es BLOQUEANTE. Hay que quitar `(R14)`. El motivo ya se entiende sin la cita: «si no, una línea ajena firmaría las fotos de las otras recetas antes de responder order_not_found». Fuera de esa línea, el diff no añade ninguna cita prohibida en `app/`, `lib/` ni `components/`.
+
+### Veredicto vuelta 2
+
+**RECHAZADO**, solo por B3. Es un cambio de una línea en un comentario; quitar `(R14)` basta. B1, B2 y m1 están resueltos, sin regresiones en lo que corrí. Con B3 corregido el veredicto será OK, salvo que el arreglo toque algo más.
