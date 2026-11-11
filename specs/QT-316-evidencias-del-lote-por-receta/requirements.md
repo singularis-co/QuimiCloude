@@ -134,22 +134,11 @@
 | P1 — retirar las lecturas del pedido entero | R21 |
 | P2 — mostrar acondicionamiento | R20, R19 |
 | P3 — receta de una línea quitada | R9, R12, R14 |
-| P4 — `readOrderEvidence` y `countByOrders` sin consumidor | R21 (si se acepta la recomendación) |
+| P4 — `readOrderEvidence` y `countByOrders` sin consumidor | R21 |
 
 ## Preguntas abiertas
 
-- **P4 — `readOrderEvidence` y `countByOrders` se quedan sin consumidor.** Al retirar
-  `getOrderEvidence` (P1), `readOrderEvidence` solo lo usa su test
-  (`tests/unit/asignaciones/read-order-evidence.test.ts`): no lo usa nadie más y el barril no lo
-  exporta. Lo mismo pasa con `StepEvidenceRepository.countByOrders` al retirar `countOrderEvidence`:
-  solo lo usan sus dobles y su test de integración. **Recomendación:** retirarlos también en esta
-  ficha, dentro de la misma task de P1. `readOrderEvidenceByLine` se queda, con la misma lectura y
-  la misma firma, y el código común (`readOrderEvidenceRows`, `signAll`, `toEvidence`) sigue siendo
-  suyo. Los casos de `read-order-evidence.test.ts` que no estén ya cubiertos por la lectura por
-  línea (pedido cancelado y dado de baja, firma, empresa, acondicionamiento de QC-299 R21 y R32) se
-  pasan a `readOrderEvidenceByLine` en el mismo archivo, sin perder ninguno. Las tasks ya siguen
-  esta recomendación (T9). Si el humano prefiere conservarlos, T9 se limita a P1 y la retirada se
-  anota en `progress/deudas.md`.
+Ninguna.
 
 ## Decisiones cerradas (no reabrir)
 
@@ -165,3 +154,4 @@
 | 2026-11-11 | P1 — ¿Se retiran `getOrderEvidence` y `countOrderEvidence`? | **Se retiran en esta ficha**, con sus actions (`getOrderEvidenceAction` y `countOrderEvidenceAction`), sus tests y sus entradas en los censos (`asignaciones-facade`, `finished-product-route-contract`, `session-once-per-request-actions` y los que aparezcan). `readOrderEvidence` se queda solo si tiene otro consumidor. QT-315 R34 queda superado, con la justificación en `design.md`. El cambio en `asignaciones` deja de ser solo aditivo. |
 | 2026-11-11 | P2 — ¿Qué fases cuenta la columna? | **Se muestra el acondicionamiento.** El diálogo suma el grupo «Acondicionamiento» con sus fotos por paso, igual que los otros. Un grupo vacío no se pinta. Así el conteo de la celda coincide con lo que se ve. Tablero actualizado: `docs/diseno/canvas/EvidenciaLoteVariasRecetas.dc.html` (`3080a2ebd`). |
 | 2026-11-11 | P3 — Receta cuya línea se quitó del pedido | **La recomendación del spec.** Sus fotos salen y cuentan, sin nombre de receta: el título queda como hoy. Una línea quitada sin fotos responde `order_not_found`. No se toca el contrato de `pedidos`. |
+| 2026-11-11 | P4 — `readOrderEvidence` y `countByOrders` sin consumidor | **Se retiran también, en la misma task que P1.** `readOrderEvidenceByLine` se queda con el código común. Los casos de `read-order-evidence.test.ts` pasan a la lectura por línea sin perder ninguno. Lo aprobó el humano junto con el spec. |
