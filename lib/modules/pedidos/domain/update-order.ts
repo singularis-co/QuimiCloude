@@ -10,7 +10,7 @@ import { isStartedOrderStatus, type OrderLineStatus } from './order-classificati
 import type { StoredOrderCost } from './order-cost';
 import { requireAliveCustomer } from './order-customer';
 import { isUnchangedOrderLine } from './order-edit-change';
-import { updateOrderWithLinesSchema, type OrderLineInput } from './order-input';
+import { updateOrderSchema, type OrderLineInput } from './order-input';
 import {
   assertNoDuplicateOrderRecipe,
   assertOrderLineEditable,
@@ -23,7 +23,7 @@ import { buildOrderRequirement } from './order-requirement';
 import { loadRequirementUnits, requireConvertibleRequirement } from './order-requirement-units';
 import { packagingLinesOfInput, resolveDistribution, type ResolvedDistribution } from './resolve-distribution';
 import type { OrderScope } from './order-scope';
-import { isAllowedTransition } from './order-transitions';
+import { isEditableOrderLineStatus } from './order-transitions';
 import type { OrderLineRow } from './order-view';
 import { resolveStoredOrderCost } from './resolve-ingredients-cost';
 
@@ -82,9 +82,6 @@ type EditPlan = {
  *  a planear bajo el candado. */
 type RecipeRefs = Map<string, RecipeRef>;
 
-const EDITABLE_ACTIVE = (status: OrderLineStatus): boolean =>
-  status !== 'CANCELADO' && isAllowedTransition(status, status);
-
 /**
  * Edicion de pedido: reemplazo completo de sus lineas, su prioridad y su cliente.
  *
@@ -116,7 +113,7 @@ export function createUpdateOrder(
     const scope: OrderScope = { companyId: actor.companyId };
     const companyId = actor.companyId;
 
-    const parsed = updateOrderWithLinesSchema.safeParse(input);
+    const parsed = updateOrderSchema.safeParse(input);
     if (!parsed.success) throw new ValidationError();
     const { confirmBlocked, priority, customerId, lines: entry } = parsed.data;
 
@@ -231,7 +228,9 @@ export function createUpdateOrder(
         });
         // Una linea en curso tiene que seguir teniendo con que producirse.
         if (outcome.kind === 'insufficient' && status === 'EN_CURSO') {
-          throw new InsufficientMaterialError(`linea en la posicion ${String(line.planned.position)}`);
+          throw new InsufficientMaterialError(`linea en la posicion ${String(line.planned.position)}`).withLinePositions([
+            line.planned.position,
+          ]);
         }
         outcomes.push(outcome);
       }
@@ -241,7 +240,7 @@ export function createUpdateOrder(
       );
       // Lanzar deshace todo lo escrito: sin confirmacion no queda nada.
       if (blocked.length > 0 && !confirmBlocked) {
-        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`);
+        throw new OrderWouldBlockError(`lineas en las posiciones ${blocked.join(', ')}`).withLinePositions(blocked);
       }
 
       for (const [index, { line, lineId, status }] of toSync.entries()) {
@@ -330,7 +329,7 @@ async function planEdit(
     saved,
   );
 
-  if (diff.added.length === 0 && !saved.some((line) => EDITABLE_ACTIVE(line.status))) {
+  if (diff.added.length === 0 && !saved.some((line) => isEditableOrderLineStatus(line.status))) {
     throw new InvalidTransitionError('ninguna linea activa admite edicion');
   }
 

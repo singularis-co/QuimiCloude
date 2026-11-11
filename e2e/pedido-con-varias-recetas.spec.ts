@@ -50,6 +50,15 @@ import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createFixtureUser } from './helpers/fixture-user';
 import { loginAndLand } from './helpers/landing';
 import { addPackagingLine } from './helpers/order-distribution';
+import {
+  applyOrderLine,
+  chooseLineUnit,
+  chooseRecipe,
+  openAddOrderLine,
+  openCreateOrderPanel,
+  panelLines,
+  saveOrder,
+} from './helpers/order-form';
 import { batchStock, seedPackaging } from './helpers/packaging';
 
 const FIXTURE_PREFIX = 'qt313_e2e_';
@@ -367,28 +376,24 @@ test.describe('pedido con varias recetas: una receta por la pantalla actual', ()
     await loginAndLand(page, adminUser);
     await gotoSettled(page, `${ORDERS_ROUTE}?pageSize=25`);
     await expect(page.getByTestId('pedidos-title')).toBeVisible({ timeout: 60_000 });
-    await page.getByTestId('order-create-open').first().click();
-    await expect(page.getByTestId('order-form')).toBeVisible({ timeout: 60_000 });
+    // QT-314: el panel lleva la tabla de recetas; la receta se escribe en su sub-panel.
+    const orderForm = await openCreateOrderPanel(page);
+    const lineSheet = await openAddOrderLine(page, orderForm);
 
-    const recipePicker = page.getByTestId('recipe-picker');
-    await recipePicker.click();
-    await recipePicker.fill(RECIPE_NAME);
-    const recipeOption = page.getByTestId('recipe-picker-option').filter({ hasText: RECIPE_NAME });
-    await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
-    await recipeOption.click();
-    await expect(page.getByTestId('recipe-picker-value')).toHaveValue(recipeId);
+    // La receta, tomada del selector con busqueda; `chooseRecipe` comprueba el id elegido.
+    await chooseRecipe(page, lineSheet, { id: recipeId, name: RECIPE_NAME });
 
-    await page.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
-    await page.getByTestId('order-form').getByTestId('presentation-unit-select').click();
-    await page.locator(`[data-testid="presentation-unit-option"][data-value="${unitId}"]`).click();
-    await addPackagingLine(page, page.getByTestId('order-form'), { productId: packagingId ?? '', name: PACKAGING_NAME }, ORDER_PACKAGES);
-    await expect(page.getByTestId('order-distribution-field').getByTestId('order-distribution-available')).toHaveAttribute(
+    await lineSheet.getByTestId('order-field-quantity').fill(ORDER_QUANTITY);
+    await chooseLineUnit(page, lineSheet, unitId ?? '');
+    await addPackagingLine(page, lineSheet, { productId: packagingId ?? '', name: PACKAGING_NAME }, ORDER_PACKAGES);
+    await expect(lineSheet.getByTestId('order-distribution-field').getByTestId('order-distribution-available')).toHaveAttribute(
       'data-state',
       'ready',
       { timeout: 60_000 },
     );
-    await page.getByTestId('order-form-submit').click();
-    await expect(page.getByTestId('order-form')).toHaveCount(0, { timeout: 60_000 });
+    await applyOrderLine(page, lineSheet);
+    await expect(panelLines(orderForm)).toHaveCount(1);
+    await saveOrder(page, orderForm);
 
     const order = await prisma.order.findFirstOrThrow({
       where: { companyId: companyId!, deletedAt: null },

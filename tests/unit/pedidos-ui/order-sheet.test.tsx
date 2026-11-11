@@ -1,4 +1,5 @@
-// QC-35 T10 — El panel lateral de alta y edicion: R25, R35 y R36.
+// QC-35 T10 — El panel lateral de alta y edicion: R25, R35 y R36. QT-314: el panel tiene la tabla de
+// recetas y cada receta se rellena en su sub-panel.
 //
 // **La pantalla se monta DENTRO del layout privado**, igual que en produccion, reutilizando el
 // patron de mocks de `tests/unit/private-layout.test.tsx` (`next/headers`, `next/navigation`,
@@ -19,17 +20,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PrivateLayout from '@/app/(private)/layout';
 import PedidosPage from '@/app/(private)/pedidos/page';
 import {
-  ORDER_COST_QUOTE_TESTID,
   ORDER_CREATE_OPEN_TESTID,
   ORDER_FORM_CANCEL_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   ORDER_FORM_TESTID,
   ORDER_FORM_TITLE_TESTID,
+  ORDER_LINES_EDIT_TESTID,
+  ORDER_LINES_EMPTY_TESTID,
+  ORDER_LINES_ROW_TESTID,
   ORDER_SHEET_TESTID,
   OrderTable,
   PAGE_PARAM,
   PAGE_SIZE_PARAM,
-  RECIPE_PICKER_TESTID,
   SEARCH_PARAM,
   SORT_PARAM,
   STATUS_PARAM,
@@ -41,7 +43,7 @@ import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
 import type {
   CreateOrderFormState,
   OrderListResult,
-  OrderMutationFormState,
+  UpdateOrderFormState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { RecipeListResult, RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
 import type { UnitListResult } from '@/lib/modules/unidades/adapters/driving/unit-actions';
@@ -51,6 +53,7 @@ import { ORDERS_ROUTE } from '@/lib/shared/routes';
 
 import { WIDE_VIEWPORT, clearSidebarStateCookie, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { anadirReceta, lineaPedido, subPanel } from '../../helpers/order-form-ui';
 
 type CookieStoreStub = { get: (name: string) => { name: string; value: string } | undefined };
 
@@ -97,12 +100,8 @@ const {
   cookiesMock: vi.fn<() => Promise<CookieStoreStub>>(),
   getSessionUserMock: vi.fn(),
   listOrdersActionMock: vi.fn<(query: unknown) => Promise<OrderListResult>>(),
-  createOrderActionMock:
-    vi.fn<(prev: CreateOrderFormState, data: FormData) => Promise<CreateOrderFormState>>(),
-  updateOrderActionMock:
-    vi.fn<
-      (id: string, prev: OrderMutationFormState, data: FormData) => Promise<OrderMutationFormState>
-    >(),
+  createOrderActionMock: vi.fn<(input: unknown) => Promise<CreateOrderFormState>>(),
+  updateOrderActionMock: vi.fn<(id: string, input: unknown) => Promise<UpdateOrderFormState>>(),
   listRecipesActionMock: vi.fn<(query: unknown) => Promise<RecipeListResult>>(),
   listUnitsActionMock: vi.fn<() => Promise<UnitListResult>>(),
   getRecipeActionMock: vi.fn<(id: string) => Promise<RecipeQueryResult>>(),
@@ -254,42 +253,40 @@ const PRESENTACION = {
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
+    lines: [
+      lineaPedido({
+        recipeId: RECETA.id,
+        recipeName: RECETA.name,
+        originalRecipeId: RECETA.id,
+        quantity: CANTIDAD,
+        unitId: UNIDAD.id,
+        unitLabel: UNIDAD.symbol,
+        presentationLines: [
+          {
+            presentationId: PRESENTACION.id,
+            presentationName: PRESENTACION.name,
+            packages: 1,
+            packagingProductId: null,
+            packagingName: null,
+            presentationContent: null,
+            presentationUnitLabel: null,
+          },
+        ],
+      }),
+    ],
+    progress: { total: 1, finished: 0 },
     id: crypto.randomUUID(),
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: CANTIDAD,
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-
-      {
-        presentationId: PRESENTACION.id,
-        presentationName: PRESENTACION.name,
-        packages: 1,
-        packagingProductId: null,
-        packagingName: null,
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-
-    ],
-    unitId: UNIDAD.id,
-    unitLabel: UNIDAD.symbol,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -418,12 +415,9 @@ afterEach(() => {
   clearSidebarStateCookie();
 });
 
+/** Añade una receta desde su sub-panel: el panel del pedido ya no tiene campos de receta. */
 async function rellenarAlta(user: ReturnType<typeof setupUser>) {
-  await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
-  await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
-  await user.click(screen.getByTestId('presentation-unit-select'));
-  await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
-  await user.type(screen.getByTestId('order-field-quantity'), CANTIDAD);
+  await anadirReceta(user, { recetaId: RECETA.id, cantidad: CANTIDAD });
 }
 
 /**
@@ -558,6 +552,7 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
       status: 'error',
       code: 'unauthorized',
       message: 'No autorizado.',
+      linePositions: [],
     });
     await renderPantalla();
 
@@ -585,20 +580,17 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     expect(screen.getAllByRole('region')).toHaveLength(1);
     expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
 
-    // Al abrir el panel aparece el bloque de coste del propio formulario (`role="status"`, siempre
-    // montado): se cuenta aparte, y fuera de el sigue habiendo exactamente el mismo aviso de antes
-    // -asi que ningun `<Toaster />` propio de esta pantalla se ha sumado.
+    // Las regiones vivas del propio panel (el total, el coste) se cuentan aparte: fuera de él sigue
+    // habiendo exactamente el aviso de antes, así que ningún `<Toaster />` propio se ha sumado.
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
-    await screen.findByTestId(ORDER_FORM_TESTID);
+    const panel = await screen.findByTestId(ORDER_SHEET_TESTID);
 
-    const bloqueDeCoste = document.querySelector(`[data-testid="${ORDER_COST_QUOTE_TESTID}"]`);
-    const avisosFueraDelBloqueDeCoste = Array.from(document.querySelectorAll('[aria-live]')).filter(
-      (nodo) => !bloqueDeCoste?.contains(nodo),
+    const avisosFueraDelPanel = Array.from(document.querySelectorAll('[aria-live]')).filter(
+      (nodo) => !panel.contains(nodo),
     );
 
     expect(screen.getAllByRole('region')).toHaveLength(1);
-    expect(avisosFueraDelBloqueDeCoste).toHaveLength(1);
-    expect(bloqueDeCoste?.querySelectorAll('[aria-live]')).toHaveLength(1);
+    expect(avisosFueraDelPanel).toHaveLength(1);
   });
 
   it('la accion de editar de la fila abre el panel con el pedido precargado', async () => {
@@ -625,14 +617,15 @@ describe('panel lateral de pedidos (R25, R35, R36)', () => {
     await user.click(await screen.findByTestId('order-action-edit'));
 
     await screen.findByTestId(ORDER_FORM_TESTID);
-    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue(elPedido.recipeId);
+    const [fila] = screen.getAllByTestId(ORDER_LINES_ROW_TESTID);
+    expect(fila).toHaveTextContent(RECETA.name);
+    await user.click(within(fila as HTMLElement).getByTestId(ORDER_LINES_EDIT_TESTID));
+    await waitFor(() => expect(subPanel()).not.toBeNull());
     // Cadena del DOM y no `toHaveValue`: sobre el control numerico ese matcher compara
-    // `valueAsNumber`, y «12.5000» y «12.5» son el mismo numero pero no la misma cadena (R39).
-    // Esa distincion es justo la que se afirma aqui: desde el 2026-09-17 el panel precarga la
-    // cantidad SIN los ceros de relleno («12.5000» -> «12.5»). Recortarlos no cambia el numero
-    // -y por eso es seguro sobre un campo que se vuelve a guardar-, pero si cambia la cadena.
+    // `valueAsNumber`, y «12.5000» y «12.5» son el mismo numero pero no la misma cadena: el
+    // sub-panel precarga la cantidad sin los ceros de relleno.
     expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('12.5');
-    expect(elPedido.quantity, 'el dato del pedido NO se toca, solo lo que el campo muestra').toBe(
+    expect(elPedido.lines[0]?.quantity, 'el dato del pedido NO se toca, solo lo que el campo muestra').toBe(
       CANTIDAD,
     );
   });
@@ -680,9 +673,8 @@ it('con el pedido en estado final la accion de editar no abre ningun panel', asy
     await user.click(screen.getByTestId(ORDER_CREATE_OPEN_TESTID));
     await screen.findByTestId(ORDER_FORM_TESTID);
 
-    expect(screen.getByTestId(`${RECIPE_PICKER_TESTID}-value`)).toHaveValue('');
-    // El control numerico: se lee la CADENA del DOM, no `toHaveValue` (que compara `valueAsNumber`).
-    expect((screen.getByTestId('order-field-quantity') as HTMLInputElement).value).toBe('');
+    expect(screen.queryAllByTestId(ORDER_LINES_ROW_TESTID)).toHaveLength(0);
+    expect(screen.getByTestId(ORDER_LINES_EMPTY_TESTID)).toBeInTheDocument();
     expect(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID)).toBeDisabled();
     expect(screen.getByTestId(ORDER_FORM_TITLE_TESTID).textContent).not.toContain(RECETA.name);
   });

@@ -40,6 +40,8 @@ type Escenario = {
   readonly customerId: string;
   readonly otherCustomerId: string;
   readonly orderId: string;
+  /** La receta del pedido: las lecturas de entregas son por receta (QT-314 R33, R35). */
+  readonly orderLineId: string;
   /** Linea de 5 envases de 2 L y linea de 3 envases de 1 L. */
   readonly lineId: string;
   readonly smallLineId: string;
@@ -60,7 +62,7 @@ async function crearEscenario(): Promise<Escenario> {
   const otherCustomerId = await crearCliente(a, 'Lopez');
   const presentationId = await crearPresentacion(a, '2.0000');
   const smallPresentationId = await crearPresentacion(a, '1.0000');
-  const { orderId, lineIds } = await crearPedido(a, 'TERMINADO', customerId, [
+  const { orderId, lineIds, orderLineId } = await crearPedido(a, 'TERMINADO', customerId, [
     { presentationId, packages: 5 },
     { presentationId: smallPresentationId, packages: 3 },
   ]);
@@ -75,6 +77,7 @@ async function crearEscenario(): Promise<Escenario> {
     customerId,
     otherCustomerId,
     orderId,
+    orderLineId,
     lineId: lineIds[0] as string,
     smallLineId: lineIds[1] as string,
     productId,
@@ -716,8 +719,8 @@ describe('getOrderDelivery contra Postgres', () => {
   it('QT-313 R45: con una linea ofrece los lotes de la receta de la linea', async () => {
     const e = await crearEscenario();
     try {
-      const hoy = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
-      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const hoy = await pedidos.getOrderDelivery(e.orderId, e.orderLineId, e.a.actor);
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.orderLineId, e.a.actor);
 
       expect(vista).toEqual(hoy);
       expect(vista.lines.map((linea) => linea.batches.map((lote) => lote.batchId))).toEqual([
@@ -741,7 +744,7 @@ describe('getOrderDelivery contra Postgres', () => {
         e.a.actor,
       );
 
-      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.orderLineId, e.a.actor);
 
       expect(vista.orderId).toBe(e.orderId);
       expect(vista.customer).toMatchObject({ id: e.customerId, isDeleted: false });
@@ -772,11 +775,11 @@ describe('getOrderDelivery contra Postgres', () => {
     const e = await crearEscenario();
     try {
       const presentationB = await crearPresentacion(e.b, '1.0000');
-      const { orderId: orderB } = await crearPedido(e.b, 'TERMINADO', null, [{ presentationId: presentationB, packages: 1 }]);
-      const { orderId: entregado } = await crearPedido(e.a, 'ENTREGADO', e.customerId, []);
+      const { orderId: orderB, orderLineId: lineB } = await crearPedido(e.b, 'TERMINADO', null, [{ presentationId: presentationB, packages: 1 }]);
+      const { orderId: entregado, orderLineId: lineEntregada } = await crearPedido(e.a, 'ENTREGADO', e.customerId, []);
 
-      expect(await codigoDe(pedidos.getOrderDelivery(orderB, e.a.actor))).toBe('order_not_found');
-      expect(await codigoDe(pedidos.getOrderDelivery(entregado, e.a.actor))).toBe('action_not_allowed');
+      expect(await codigoDe(pedidos.getOrderDelivery(orderB, lineB, e.a.actor))).toBe('order_not_found');
+      expect(await codigoDe(pedidos.getOrderDelivery(entregado, lineEntregada, e.a.actor))).toBe('action_not_allowed');
     } finally {
       await borrarEscenario(e);
     }
@@ -790,6 +793,7 @@ describe('QC-290 — la entrega espera solo lo pedido, contra Postgres', () => {
     readonly a: EmpresaDeEntrega;
     readonly customerId: string;
     readonly orderId: string;
+    readonly orderLineId: string;
     readonly lineId: string;
     readonly productId: string;
     readonly batchId: string;
@@ -799,7 +803,7 @@ describe('QC-290 — la entrega espera solo lo pedido, contra Postgres', () => {
     const a = await crearEmpresaDeEntrega('A');
     const customerId = await crearCliente(a, 'Garcia');
     const presentationId = await crearPresentacion(a, '1.0000');
-    const { orderId, lineIds } = await crearPedido(a, 'TERMINADO', customerId, [{ presentationId, packages: 10 }]);
+    const { orderId, lineIds, orderLineId } = await crearPedido(a, 'TERMINADO', customerId, [{ presentationId, packages: 10 }]);
     const lineId = lineIds[0] as string;
     await prisma.orderPresentationLine.update({
       where: { id: lineId },
@@ -807,7 +811,7 @@ describe('QC-290 — la entrega espera solo lo pedido, contra Postgres', () => {
     });
     const productId = await crearTerminado(a, presentationId);
     const batchId = await crearLote(a, productId, presentationId, '12.0000', '1.0000');
-    return { a, customerId, orderId, lineId, productId, batchId };
+    return { a, customerId, orderId, orderLineId, lineId, productId, batchId };
   }
 
   function entregaDe(e: ConLibres, packages: number) {
@@ -821,7 +825,7 @@ describe('QC-290 — la entrega espera solo lo pedido, contra Postgres', () => {
   it('R12, R15: el sheet y el progreso del listado leen la columna y esperan 10, no los 12 reales', async () => {
     const e = await crearConLibres();
     try {
-      const vista = await pedidos.getOrderDelivery(e.orderId, e.a.actor);
+      const vista = await pedidos.getOrderDelivery(e.orderId, e.orderLineId, e.a.actor);
       expect(vista.lines).toHaveLength(1);
       expect(vista.lines[0]).toMatchObject({
         presentationLineId: e.lineId,

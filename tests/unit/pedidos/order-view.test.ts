@@ -15,6 +15,7 @@ import type { AssignedOrderSummary } from '@/lib/modules/pedidos/domain/order-ca
 import type {
   NewOrder,
   OrderLineRow,
+  OrderLineView,
   OrderRow,
   OrderSummary,
   OrderView,
@@ -115,9 +116,11 @@ describe('pedidos — la salida de las consultas (R40, R46, R47)', () => {
     const nombreDeUnidad: Declara<OrderRow, 'unitName'> = false
     expect([nombreDeReceta, nombreDeUnidad]).toEqual([false, false])
 
-    // Y en la vista SI estan, anulables: la fila sigue apareciendo aunque el id no vuelva.
-    const enLaVista: Declara<OrderView, 'recipeName'> = true
-    expect(enLaVista).toBe(true)
+    // Y en cada receta de la vista SI esta, anulable: la fila sigue apareciendo aunque el id no
+    // vuelva. El pedido no lo copia (QT-314 R24).
+    const enLaLinea: Declara<OrderLineView, 'recipeName'> = true
+    const enElPedido: Declara<OrderView, 'recipeName'> = false
+    expect([enLaLinea, enElPedido]).toEqual([true, false])
   })
 
   it('los filtros del listado son estado, prioridad, fecha y cliente, y la busqueda ya se abrio (R11, R23, R24, R26)', () => {
@@ -159,23 +162,25 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
     expect([precio, precioUnitario, total]).toEqual([false, false, false])
   })
 
-  it('QT-313 R1: el coste va en la linea y en la vista, no en la fila del pedido', () => {
+  it('QT-313 R1, QT-314 R24: el coste va en la linea y en su vista, no en la fila ni en la vista del pedido', () => {
     const enLaFila: Declara<OrderRow, 'ingredientsCost'> = false
     const enLaLinea: Declara<OrderLineRow, 'ingredientsCost'> = true
-    const enLaVista: Declara<OrderView, 'ingredientsCost'> = true
-    expect([enLaFila, enLaLinea, enLaVista]).toEqual([false, true, true])
+    const enLaVista: Declara<OrderLineView, 'ingredientsCost'> = true
+    const enElPedido: Declara<OrderView, 'ingredientsCost'> = false
+    expect([enLaFila, enLaLinea, enLaVista, enElPedido]).toEqual([false, true, true, false])
   })
 
-  it('QT-313 R1: la parte de envases del importe va en la linea y en la vista, no en la fila del pedido', () => {
+  it('QT-313 R1, QT-314 R24: la parte de envases del importe va en la linea y en su vista, no en el pedido', () => {
     const enLaFila: Declara<OrderRow, 'packagingCost'> = false
     const enLaLinea: Declara<OrderLineRow, 'packagingCost'> = true
-    const enLaVista: Declara<OrderView, 'packagingCost'> = true
-    const sinCoste: OrderView['packagingCost'] = null
-    expect([enLaFila, enLaLinea, enLaVista, sinCoste]).toEqual([false, true, true, null])
+    const enLaVista: Declara<OrderLineView, 'packagingCost'> = true
+    const enElPedido: Declara<OrderView, 'packagingCost'> = false
+    const sinCoste: OrderLineView['packagingCost'] = null
+    expect([enLaFila, enLaLinea, enLaVista, enElPedido, sinCoste]).toEqual([false, true, true, false, null])
   })
 
   it('ingredientsCost en null no se vuelve "0.0000"', () => {
-    const sinCoste: OrderView['ingredientsCost'] = null
+    const sinCoste: OrderLineView['ingredientsCost'] = null
     expect(sinCoste).toBeNull()
     expect(sinCoste).not.toBe('0.0000')
   })
@@ -188,25 +193,27 @@ describe('pedidos — el coste de ingredientes en la salida', () => {
 })
 
 describe('QC-307 — el precio de venta del pedido entero en el contrato', () => {
-  it('R1, R2, QT-313 R1: la escritura y la fila de la linea y la vista declaran salePrice como cadena o null; el pedido no', () => {
+  it('R1, R2, QT-313 R1, QT-314 R24: la escritura, la fila y la vista de la linea declaran salePrice como cadena o null; el pedido no', () => {
     const enLaEscritura: Declara<OrderLineWrite, 'salePrice'> = true
     const enLaLinea: Declara<OrderLineRow, 'salePrice'> = true
+    const enLaVistaDeLinea: Declara<OrderLineView, 'salePrice'> = true
     const enElAlta: Declara<NewOrder, 'salePrice'> = false
     const enLaFila: Declara<OrderRow, 'salePrice'> = false
-    const enLaVista: Declara<OrderView, 'salePrice'> = true
-    const enElListado: Declara<OrderSummary, 'salePrice'> = true
-    expect([enLaEscritura, enLaLinea, enElAlta, enLaFila, enLaVista, enElListado]).toEqual([
+    const enLaVista: Declara<OrderView, 'salePrice'> = false
+    const enElListado: Declara<OrderSummary, 'salePrice'> = false
+    expect([enLaEscritura, enLaLinea, enLaVistaDeLinea, enElAlta, enLaFila, enLaVista, enElListado]).toEqual([
+      true,
       true,
       true,
       false,
       false,
-      true,
-      true,
+      false,
+      false,
     ])
 
     // Cadena decimal, nunca `number`.
     const conPrecio: OrderLineWrite = { ...LINE_WRITE, salePrice: '1250.5000' }
-    const sinPrecio: OrderView['salePrice'] = null
+    const sinPrecio: OrderLineView['salePrice'] = null
     // @ts-expect-error salePrice no admite number
     const comoNumero: OrderLineWrite = { ...LINE_WRITE, salePrice: 1250.5 }
     expect([conPrecio.salePrice, sinPrecio, comoNumero.salePrice]).toEqual(['1250.5000', null, 1250.5])
@@ -264,5 +271,34 @@ describe('pedidos — el puerto declara sus metodos de LECTURA: los dos de desig
     const restaurar: Declara<OrderRepository, 'restore'> = false
     const listarBorrados: Declara<OrderRepository, 'listDeleted'> = false
     expect([restaurar, listarBorrados]).toEqual([false, false])
+  })
+})
+
+describe('QT-314 — la vista del pedido no copia la primera receta', () => {
+  it('R24: OrderView y OrderSummary no declaran ninguno de los campos planos de la primera receta', () => {
+    const enLaVista = [
+      false satisfies Declara<OrderView, 'recipeId'>,
+      false satisfies Declara<OrderView, 'recipeName'>,
+      false satisfies Declara<OrderView, 'recipeVersion'>,
+      false satisfies Declara<OrderView, 'recipeImageUrl'>,
+      false satisfies Declara<OrderView, 'quantity'>,
+      false satisfies Declara<OrderView, 'unitId'>,
+      false satisfies Declara<OrderView, 'unitLabel'>,
+      false satisfies Declara<OrderView, 'presentationLines'>,
+      false satisfies Declara<OrderView, 'salePrice'>,
+      false satisfies Declara<OrderView, 'ingredientsCost'>,
+      false satisfies Declara<OrderView, 'packagingCost'>,
+      false satisfies Declara<OrderView, 'actualCost'>,
+    ]
+    const enElListado = [
+      false satisfies Declara<OrderSummary, 'recipeName'>,
+      false satisfies Declara<OrderSummary, 'quantity'>,
+      false satisfies Declara<OrderSummary, 'presentationLines'>,
+    ]
+    expect([...enLaVista, ...enElListado].every((declara) => declara === false)).toBe(true)
+
+    // El motivo de cancelacion del pedido entero se queda.
+    const motivo: Declara<OrderView, 'cancellationReason'> = true
+    expect(motivo).toBe(true)
   })
 })

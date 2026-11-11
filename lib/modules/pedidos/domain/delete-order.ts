@@ -32,7 +32,10 @@ const NO_BORRABLES: readonly OrderStatus[] = [
 ];
 
 /** Se borra solo si el pedido y cada una de sus lineas vivas estan en un estado borrable. */
-function isDeletable(status: OrderStatus, lines: readonly { readonly status: OrderStatus }[]): boolean {
+export function isDeletableOrder(
+  status: OrderStatus,
+  lines: readonly { readonly status: OrderStatus }[],
+): boolean {
   return !NO_BORRABLES.includes(status) && lines.every((line) => !NO_BORRABLES.includes(line.status));
 }
 
@@ -66,14 +69,14 @@ export function createDeleteOrder(
     const row = await deps.orders.findAliveById(id, scope);
     if (row === null) throw new OrderNotFoundError();
     const lines = await deps.orders.findAliveLines(id, scope);
-    if (!isDeletable(row.status, lines)) throw new NotDeletableError();
+    if (!isDeletableOrder(row.status, lines)) throw new NotDeletableError();
 
     const instant = now();
 
     const result = await deps.unitOfWork.run(async (transaction) => {
       const locked = await transaction.orders.lockAliveLines(id, scope);
       if (locked === null) return 'not_found' as const;
-      if (!isDeletable(locked.order.status, locked.lines)) throw new NotDeletableError();
+      if (!isDeletableOrder(locked.order.status, locked.lines)) throw new NotDeletableError();
 
       // Libera y vacia los plazos ANTES de marcar `deleted_at`: esas escrituras solo tocan filas
       // vivas, asi que despues del borrado no tocarian nada.

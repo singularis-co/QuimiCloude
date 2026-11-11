@@ -99,6 +99,7 @@ import { clickRowAction } from '../../helpers/row-actions-menu';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 /** Lo que devuelve cualquier Server Action de baja de estas pantallas. */
 type EstadoDeBaja = { status: 'idle' } | { status: 'success' } | ErrorState;
@@ -530,32 +531,22 @@ describe('grupos de trabajo: borrado (R33)', () => {
 describe('pedidos: cancelar y borrar desde la fila (R33)', () => {
   const RECETAS: RecipePickerPage = { items: [], totalPages: 1 };
 
+  // Una receta PENDIENTE: «Cancelar pedido» se habilita si alguna receta es cancelable.
   const PEDIDO: OrderSummary = {
     ...VISTA_SIN_LINEAS,
+    lines: [lineaPedido()],
     id: '11111111-1111-4111-8111-111111111111',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: '22222222-2222-4222-8222-222222222222',
-    recipeName: 'Esmalte azul',
-    recipeVersion: null,
-    quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
   };
 
   function montar() {

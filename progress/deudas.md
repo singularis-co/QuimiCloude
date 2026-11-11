@@ -663,3 +663,12 @@ Ver progress/review_QC-256-piezas-compartidas-rediseno.md.
 - **Dueño:** Christian Quevedo.
 
 - 2026-10-31: `wt.sh done QT-303-agente-ia-whatsapp-base` falló al borrar el directorio (archivo en uso en Windows); se borró a mano con `rm -rf` el mismo día. Sin acción pendiente.
+
+- 2026-11-06: `./init.sh` local sale en rojo en `validate-features.mjs`, con «id duplicado: 290…308». El board tiene fichas QC-290…308 y QT-290…308 con el mismo número, y el validador exige que `id` sea único sin tener en cuenta el prefijo. No lo causa QT-314: aparece con cualquier F0 desde que existe el prefijo QT. CI no lo ve porque `feature_list.json` no se versiona. Hay que arreglarlo con `/afinar-regla`, para que el `id` único sea por clave (`QC-290` ≠ `QT-290`).
+- 2026-11-06: `wt.sh done QT-313-pedido-con-varias-recetas-backend` desregistró el worktree, pero no pudo borrar el directorio (archivo en uso en Windows). Se borró a mano con `rm -rf` el mismo día. Sin acción pendiente.
+
+- 2026-11-09 (QT-314, review vuelta 1):
+  - **Copia del mapa de estados de `asignaciones`.** `responsiblesFrozen` lleva en la UI de pedidos una copia de ese mapa, porque `asignaciones` no publica el predicado. Arreglo: publicar el predicado en `lib/modules/asignaciones` y que la pantalla lo use.
+  - **E2E que depende de un interno de React.** `e2e/pedido-en-varias-presentaciones.spec.ts:696-712` llama al `onClick` de «Aplicar» a través de `__reactFiber`, y eso se puede romper al actualizar React. Arreglo: un camino de envío forzado por la UI.
+  - **Test de R47 que se salta.** `pedidos-convenciones` se salta cuando el rango no tiene commits de QT-314, y eso va a pasar siempre después del merge. Arreglo: fijar el caso a la lista de archivos del spec, no al historial de git.
+  - **Base de los E2E por borrar.** `QuimiCloude_QT314` se creó para los E2E de la feature. Hay que borrarla al cerrar la feature.

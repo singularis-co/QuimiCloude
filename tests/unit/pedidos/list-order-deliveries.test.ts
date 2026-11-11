@@ -21,14 +21,14 @@ import {
   VOIDED_LINE_ID,
   deliveryHistoryView,
 } from '@/tests/fixtures/order-delivery-void'
-import { fakeOrderRow } from '@/tests/helpers/order-unit-of-work-double'
+import { fakeOrderRow, orderLineOf } from '@/tests/helpers/order-unit-of-work-double'
 
 import type { CustomerRef } from '@/lib/modules/clientes'
 import type { PersonRef } from '@/lib/modules/identity'
 import type { PresentationRef } from '@/lib/modules/inventario'
 import type { Actor } from '@/lib/modules/pedidos/domain/actor'
 import type { PedidosError } from '@/lib/modules/pedidos/domain/errors'
-import type { OrderRow } from '@/lib/modules/pedidos/domain/order-view'
+import type { OrderLineRow, OrderRow } from '@/lib/modules/pedidos/domain/order-view'
 import type { DeliveryHistoryRow } from '@/lib/modules/pedidos/ports/order-delivery-void-repository'
 import type { OrderRepository } from '@/lib/modules/pedidos/ports/order-repository'
 import type { FinishPackingLine } from '@/lib/modules/pedidos/ports/order-write-repository'
@@ -50,9 +50,12 @@ const PEDIDO: OrderRow = fakeOrderRow({
   status: 'ENTREGADO',
 })
 
+/** La unica receta del pedido de los casos que no van por receta: todo el reparto es suyo. */
+const LINEA = 'c0000000-0000-4000-8000-000000000001'
+
 const REPARTO: readonly FinishPackingLine[] = [
-  { id: OPEN_LINE_ID, presentationId: BOTELLA, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: 'linea-1' },
-  { id: VOIDED_LINE_ID, presentationId: GALON, packages: 3, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: 'linea-1' },
+  { id: OPEN_LINE_ID, presentationId: BOTELLA, packages: 10, presentationContent: '1.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: LINEA },
+  { id: VOIDED_LINE_ID, presentationId: GALON, packages: 3, presentationContent: '4.0000', packagingProductId: null, packedPackages: null, packedSurplusPackages: 0, orderLineId: LINEA },
 ]
 
 const PRESENTACIONES: readonly PresentationRef[] = [
@@ -110,6 +113,7 @@ type Fn = ReturnType<typeof vi.fn>
 type Montaje = {
   readonly deps: ListOrderDeliveriesDeps
   readonly findAliveById: Fn
+  readonly findAliveLines: Fn
   readonly listByOrder: Fn
   readonly findPresentationLinesForFinish: Fn
   readonly findRefs: Fn
@@ -125,11 +129,14 @@ function montar(
     personas?: readonly PersonRef[]
     clientes?: readonly CustomerRef[]
     lotes?: ReadonlyMap<string, string>
+    reparto?: readonly FinishPackingLine[]
+    lineasDelPedido?: readonly OrderLineRow[]
   } = {},
 ): Montaje {
   const findAliveById = vi.fn(async () => (opciones.pedido === undefined ? PEDIDO : opciones.pedido))
   const listByOrder = vi.fn(async () => opciones.filas ?? FILAS)
-  const findPresentationLinesForFinish = vi.fn(async () => REPARTO)
+  const findPresentationLinesForFinish = vi.fn(async () => opciones.reparto ?? REPARTO)
+  const findAliveLines = vi.fn(async () => opciones.lineasDelPedido ?? [orderLineOf(PEDIDO, { id: LINEA })])
   const findRefs = vi.fn(async () => PRESENTACIONES)
   const findRefsIncludingDeleted = vi.fn(async () => opciones.clientes ?? [CLIENTE, SEGUNDO_CLIENTE])
   const findRefsIncludingDeletedInCompany = vi.fn(async () => opciones.personas ?? PERSONAS)
@@ -138,7 +145,7 @@ function montar(
     vi.fn(() => {
       throw new Error(`OrderRepository.${nombre} no deberia llamarse`)
     })
-  const orders = { findAliveById, listAlive: explota('listAlive'), findBlockedIds: explota('findBlockedIds') }
+  const orders = { findAliveById, findAliveLines, listAlive: explota('listAlive'), findBlockedIds: explota('findBlockedIds') }
 
   return {
     deps: {
@@ -152,6 +159,7 @@ function montar(
       now: () => AHORA,
     },
     findAliveById,
+    findAliveLines,
     listByOrder,
     findPresentationLinesForFinish,
     findRefs,
@@ -173,6 +181,7 @@ async function codigoDelFallo(operacion: () => Promise<unknown>): Promise<string
 function ningunPuerto(m: Montaje): void {
   for (const puerto of [
     m.findAliveById,
+    m.findAliveLines,
     m.listByOrder,
     m.findPresentationLinesForFinish,
     m.findRefs,
@@ -191,8 +200,8 @@ describe('listOrderDeliveries — acceso (R4)', () => {
     const soloEntregas: Actor = { ...CONSULTOR, permissions: ['entregas.anular', 'entregas.modificar', 'pedidos.modificar'] }
 
     for (const actor of [null, undefined, { ...CONSULTOR, permissions: [], roleName: 'Operador' }, soloEntregas]) {
-      expect(await codigoDelFallo(() => listar(VOID_ORDER_ID, actor))).toBe('unauthorized')
-      expect(await codigoDelFallo(() => listar('no-es-uuid', actor))).toBe('unauthorized')
+      expect(await codigoDelFallo(() => listar(VOID_ORDER_ID, LINEA, actor))).toBe('unauthorized')
+      expect(await codigoDelFallo(() => listar('no-es-uuid', LINEA, actor))).toBe('unauthorized')
     }
     ningunPuerto(m)
   })
@@ -200,7 +209,7 @@ describe('listOrderDeliveries — acceso (R4)', () => {
   it('R4: decide por el permiso: un actor de otro rol con pedidos.consultar lee la lista', async () => {
     const m = montar()
     const deOtroRol: Actor = { id: 'u-operador', companyId: EMPRESA, permissions: ['asignaciones.consultar', 'pedidos.consultar'] }
-    await expect(createListOrderDeliveries(m.deps)(VOID_ORDER_ID, deOtroRol)).resolves.toEqual(deliveryHistoryView())
+    await expect(createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, deOtroRol)).resolves.toEqual(deliveryHistoryView())
   })
 
   it('R4: un Administrador sin pedidos.consultar en su conjunto es rechazado', async () => {
@@ -212,7 +221,7 @@ describe('listOrderDeliveries — acceso (R4)', () => {
       companyId: EMPRESA,
       permissions: delAdministrador.filter((p) => p !== 'pedidos.consultar'),
     }
-    expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, adminSinPermiso))).toBe('unauthorized')
+    expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, adminSinPermiso))).toBe('unauthorized')
     ningunPuerto(m)
   })
 })
@@ -220,14 +229,14 @@ describe('listOrderDeliveries — acceso (R4)', () => {
 describe('listOrderDeliveries — pedido (R6)', () => {
   it('R6: un id sin forma de uuid responde order_not_found sin leer nada', async () => {
     const m = montar()
-    expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)('pedido-1', CONSULTOR))).toBe('order_not_found')
+    expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)('pedido-1', LINEA, CONSULTOR))).toBe('order_not_found')
     ningunPuerto(m)
   })
 
   for (const caso of ['no existe', 'esta borrado', 'es de otra empresa']) {
     it(`R6: el pedido que ${caso} (el puerto devuelve null) responde order_not_found sin devolver datos`, async () => {
       const m = montar({ pedido: null })
-      expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR))).toBe('order_not_found')
+      expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR))).toBe('order_not_found')
       expect(m.findAliveById).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
       expect(m.listByOrder).not.toHaveBeenCalled()
       expect(m.findRefsIncludingDeleted).not.toHaveBeenCalled()
@@ -238,7 +247,7 @@ describe('listOrderDeliveries — pedido (R6)', () => {
 
   it('R6: lee con el ambito de la empresa del actor', async () => {
     const m = montar()
-    await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)
+    await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)
     expect(m.listByOrder).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
     expect(m.findPresentationLinesForFinish).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
     expect(m.findRefs).toHaveBeenCalledWith([BOTELLA, GALON], EMPRESA)
@@ -252,19 +261,19 @@ describe('listOrderDeliveries — pedido (R6)', () => {
 describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
   it('R7, R9: compone la vista entera: cabecera, entregas, presentaciones, lotes y lo anulado', async () => {
     const m = montar()
-    await expect(createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).resolves.toEqual(deliveryHistoryView())
+    await expect(createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).resolves.toEqual(deliveryHistoryView())
   })
 
   it('R7: conserva el orden del lector, de la mas reciente a la mas antigua', async () => {
     const m = montar()
-    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)
     expect(vista.deliveries.map((d) => d.id)).toEqual([NEWER_DELIVERY_ID, OLDER_DELIVERY_ID])
     expect(vista.deliveries.map((d) => d.createdAt)).toEqual(['2026-10-08T15:30:00.000Z', '2026-10-07T11:00:00.000Z'])
   })
 
   it('R7: agrupa por presentacion las lineas de una entrega, aunque lleguen intercaladas, y suma sus lotes', async () => {
     const m = montar()
-    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).deliveries
     expect(reciente?.customers[0]?.presentations.map((p) => [p.presentationLineId, p.packages])).toEqual([
       [OPEN_LINE_ID, 6],
       [VOIDED_LINE_ID, 3],
@@ -277,7 +286,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
 
   it('R7: muestra el cliente y el autor aunque esten dados de baja', async () => {
     const m = montar()
-    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)
     expect(vista.deliveries.map((d) => [d.customers[0]?.customerName, d.authorName])).toEqual([
       ['Ana Perez', 'Laura Gomez'],
       ['Ana Perez', 'Carlos Ruiz'],
@@ -286,7 +295,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
 
   it('R7: un nombre que no vuelve de su catalogo se muestra como identificador corto, sin lanzar', async () => {
     const m = montar({ personas: [], clientes: [], lotes: new Map() })
-    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).deliveries
     expect(reciente?.customers[0]?.customerName).toBe(CLIENTE_ID.slice(0, 8))
     expect(reciente?.authorName).toBe(LAURA.slice(0, 8))
     expect(reciente?.customers[0]?.presentations[0]?.batches[0]?.lot).toBe(FIRST_BATCH_ID.slice(0, 8))
@@ -295,7 +304,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
 
   it('R8: un pedido sin entregas devuelve la lista vacia sin consultar catalogos', async () => {
     const m = montar({ filas: [] })
-    await expect(createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).resolves.toEqual(
+    await expect(createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).resolves.toEqual(
       deliveryHistoryView({ deliveries: [] }),
     )
     expect(m.findRefs).not.toHaveBeenCalled()
@@ -306,7 +315,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
 
   it('R9: la presentacion anulada lleva motivo, autor y fecha de su anulacion, junto a sus envases y lotes', async () => {
     const m = montar()
-    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).deliveries
     expect(reciente?.customers[0]?.presentations[1]).toEqual({
       presentationLineId: VOIDED_LINE_ID,
       presentationName: 'Galon 4 L',
@@ -331,7 +340,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
       filas,
       personas: [...PERSONAS, { id: OTRA, displayName: 'Marta Diaz', isActive: true, permissions: [], roleName: 'Operador' }],
     })
-    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).deliveries
     expect(m.findRefsIncludingDeletedInCompany).toHaveBeenCalledWith(EMPRESA, [LAURA, CARLOS, OTRA], AHORA)
     expect(reciente?.customers[0]?.presentations[1]?.void?.authorName).toBe('Marta Diaz')
   })
@@ -340,7 +349,7 @@ describe('listOrderDeliveries — la lista (R7, R8, R9)', () => {
 describe('listOrderDeliveries — por cliente (R33, R34)', () => {
   it('R33: cada entrega trae su total de envases, anulados incluidos, y un subbloque por cliente', async () => {
     const m = montar()
-    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)
     expect(vista.deliveries.map((d) => [d.packages, d.customers.length])).toEqual([
       [11, 2],
       [4, 1],
@@ -366,27 +375,27 @@ describe('listOrderDeliveries — por cliente (R33, R34)', () => {
     const invertidas = [{ ...reciente, lines: [...reciente.lines].reverse() }]
 
     const porNombre = montar({ filas: invertidas })
-    const vista = await createListOrderDeliveries(porNombre.deps)(VOID_ORDER_ID, CONSULTOR)
+    const vista = await createListOrderDeliveries(porNombre.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)
     expect(vista.deliveries[0]?.customers.map((c) => c.customerName)).toEqual(['Ana Perez', 'Bruno Diaz'])
 
     const homonimos = montar({
       filas: invertidas,
       clientes: [CLIENTE, { ...SEGUNDO_CLIENTE, firstNames: 'Ana', lastNames: 'Perez' }],
     })
-    const empate = await createListOrderDeliveries(homonimos.deps)(VOID_ORDER_ID, CONSULTOR)
+    const empate = await createListOrderDeliveries(homonimos.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)
     expect(empate.deliveries[0]?.customers.map((c) => c.customerId)).toEqual([CLIENTE_ID, SECOND_CUSTOMER_ID])
   })
 
   it('R33: el nombre de un cliente dado de baja se sigue mostrando en su subbloque', async () => {
     const m = montar()
-    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).deliveries
     expect(CLIENTE.isDeleted).toBe(true)
     expect(reciente?.customers[0]?.customerName).toBe('Ana Perez')
   })
 
   it('R34: la presentacion anulada de un cliente no sale anulada en el subbloque de otro cliente', async () => {
     const m = montar()
-    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, CONSULTOR)).deliveries
+    const [reciente] = (await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA, CONSULTOR)).deliveries
     const anuladaDe = (customerId: string) =>
       reciente?.customers
         .find((c) => c.customerId === customerId)
@@ -397,5 +406,121 @@ describe('listOrderDeliveries — por cliente (R33, R34)', () => {
       createdAt: '2026-10-09T09:00:00.000Z',
     })
     expect(anuladaDe(SECOND_CUSTOMER_ID)).toBeNull()
+  })
+})
+
+describe('QT-314 T4 — listOrderDeliveries por receta', () => {
+  const LINEA_A = 'c0000000-0000-4000-8000-00000000000a'
+  const LINEA_B = 'c0000000-0000-4000-8000-00000000000b'
+  const PEDIDO_PARCIAL: OrderRow = { ...PEDIDO, status: 'PARCIAL' }
+  const PEDIDO_TERMINADO: OrderRow = { ...PEDIDO, status: 'TERMINADO' }
+  // OPEN_LINE_ID es de la receta A; VOIDED_LINE_ID, de la B.
+  const REPARTO_DOS: readonly FinishPackingLine[] = [
+    { ...REPARTO[0]!, orderLineId: LINEA_A },
+    { ...REPARTO[1]!, orderLineId: LINEA_B },
+  ]
+  const LINEAS_DEL_PEDIDO: readonly OrderLineRow[] = [
+    orderLineOf(PEDIDO_TERMINADO, { id: LINEA_A, status: 'ENTREGADO' }),
+    orderLineOf(PEDIDO_TERMINADO, { id: LINEA_B, position: 1, status: 'TERMINADO' }),
+  ]
+
+  function dosRecetas() {
+    return montar({ pedido: PEDIDO_PARCIAL, reparto: REPARTO_DOS, lineasDelPedido: LINEAS_DEL_PEDIDO })
+  }
+
+  function presentacionesDe(vista: Awaited<ReturnType<ReturnType<typeof createListOrderDeliveries>>>) {
+    return vista.deliveries.map((entrega) => ({
+      id: entrega.id,
+      packages: entrega.packages,
+      customers: entrega.customers.map((cliente) => ({
+        customerId: cliente.customerId,
+        lineas: cliente.presentations.map((p) => p.presentationLineId),
+      })),
+    }))
+  }
+
+  it('R35: con la receta A solo salen sus lineas de entrega, con el total de envases de esas lineas', async () => {
+    const m = dosRecetas()
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA_A, CONSULTOR)
+
+    expect(presentacionesDe(vista)).toEqual([
+      { id: NEWER_DELIVERY_ID, packages: 6, customers: [{ customerId: CLIENTE_ID, lineas: [OPEN_LINE_ID] }] },
+      { id: OLDER_DELIVERY_ID, packages: 4, customers: [{ customerId: CLIENTE_ID, lineas: [OPEN_LINE_ID] }] },
+    ])
+    expect(m.findAliveLines).toHaveBeenCalledWith(VOID_ORDER_ID, SCOPE)
+    expect(m.findPresentationLinesForFinish).toHaveBeenCalledTimes(1)
+    expect(m.findLots).toHaveBeenCalledWith([FIRST_BATCH_ID, SECOND_BATCH_ID], EMPRESA)
+  })
+
+  it('R35: con la receta B quita la entrega que se queda sin lineas de esa receta y conserva sus anulaciones', async () => {
+    const m = dosRecetas()
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, LINEA_B, CONSULTOR)
+
+    expect(presentacionesDe(vista)).toEqual([
+      {
+        id: NEWER_DELIVERY_ID,
+        packages: 5,
+        customers: [
+          { customerId: CLIENTE_ID, lineas: [VOIDED_LINE_ID] },
+          { customerId: SECOND_CUSTOMER_ID, lineas: [VOIDED_LINE_ID] },
+        ],
+      },
+    ])
+    expect(vista.deliveries[0]?.customers[0]?.presentations[0]?.void?.reason).toBe(VOID_REASON)
+  })
+
+  it('R35: la vista lleva el estado de la receta y conserva el del pedido', async () => {
+    const listar = createListOrderDeliveries(dosRecetas().deps)
+    expect(await listar(VOID_ORDER_ID, LINEA_A, CONSULTOR)).toMatchObject({ orderStatus: 'PARCIAL', lineStatus: 'ENTREGADO' })
+    expect(await listar(VOID_ORDER_ID, LINEA_B, CONSULTOR)).toMatchObject({ orderStatus: 'PARCIAL', lineStatus: 'TERMINADO' })
+  })
+
+  it('R35: una receta sin entregas devuelve la lista vacia, con su estado, sin consultar catalogos', async () => {
+    const m = montar({
+      pedido: PEDIDO_PARCIAL,
+      reparto: [...REPARTO_DOS, { ...REPARTO[0]!, id: 'd0000000-0000-4000-8000-0000000000cc', orderLineId: 'c0000000-0000-4000-8000-00000000000c' }],
+      lineasDelPedido: [
+        ...LINEAS_DEL_PEDIDO,
+        orderLineOf(PEDIDO_TERMINADO, { id: 'c0000000-0000-4000-8000-00000000000c', position: 2, status: 'TERMINADO' }),
+      ],
+    })
+    const vista = await createListOrderDeliveries(m.deps)(VOID_ORDER_ID, 'c0000000-0000-4000-8000-00000000000c', CONSULTOR)
+
+    expect(vista).toMatchObject({ lineStatus: 'TERMINADO', deliveries: [] })
+    expect(m.findRefs).not.toHaveBeenCalled()
+    expect(m.findLots).not.toHaveBeenCalled()
+  })
+
+  it('R35: una receta de otro pedido, quitada o de otra empresa (el puerto no la devuelve) es order_not_found sin leer el historial', async () => {
+    const m = dosRecetas()
+    expect(
+      await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, 'c0000000-0000-4000-8000-0000000000ff', CONSULTOR)),
+    ).toBe('order_not_found')
+    expect(m.listByOrder).not.toHaveBeenCalled()
+
+    const sinPedido = montar({ pedido: null, lineasDelPedido: LINEAS_DEL_PEDIDO })
+    expect(await codigoDelFallo(() => createListOrderDeliveries(sinPedido.deps)(VOID_ORDER_ID, LINEA_A, CONSULTOR))).toBe(
+      'order_not_found',
+    )
+    expect(sinPedido.findAliveLines).not.toHaveBeenCalled()
+  })
+
+  it('R35: un lineId sin forma de uuid es order_not_found sin consultar', async () => {
+    const m = dosRecetas()
+    expect(await codigoDelFallo(() => createListOrderDeliveries(m.deps)(VOID_ORDER_ID, 'linea-a', CONSULTOR))).toBe(
+      'order_not_found',
+    )
+    ningunPuerto(m)
+  })
+
+  it('R35: la receta es obligatoria: sin ella responde order_not_found sin leer nada', async () => {
+    const m = dosRecetas()
+    const listar = createListOrderDeliveries(m.deps) as (
+      orderId: string,
+      lineId: string | undefined,
+      actor: Actor,
+    ) => Promise<unknown>
+    expect(await codigoDelFallo(() => listar(VOID_ORDER_ID, undefined, CONSULTOR))).toBe('order_not_found')
+    ningunPuerto(m)
   })
 })

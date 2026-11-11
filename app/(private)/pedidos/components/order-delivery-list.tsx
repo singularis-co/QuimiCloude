@@ -4,7 +4,7 @@ import { BanIcon } from 'lucide-react';
 
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Button } from '@/components/ui/button';
-import type { OrderDeliveryHistoryView, OrderStatus } from '@/lib/modules/pedidos';
+import type { OrderDeliveryHistoryView, OrderLineStatus } from '@/lib/modules/pedidos';
 
 export type OrderDeliveryHistoryEntry = OrderDeliveryHistoryView['deliveries'][number];
 type OrderDeliveryHistoryCustomer = OrderDeliveryHistoryEntry['customers'][number];
@@ -31,8 +31,7 @@ const VOID_AUTHOR_LABEL = 'Anuló';
 const VOID_DATE_LABEL = 'Fecha de anulación';
 const VOID_ACTION_LABEL = 'Anular';
 
-const STATUS_ACCEPTS_VOID: Readonly<Record<OrderStatus, boolean>> = {
-  PARCIAL: false,
+const STATUS_ACCEPTS_VOID: Readonly<Record<OrderLineStatus, boolean>> = {
   PENDIENTE: false,
   EN_CURSO: false,
   POR_EMPACAR: false,
@@ -64,11 +63,12 @@ export type OrderDeliveryListProps = {
   readonly deliveries: OrderDeliveryHistoryView['deliveries'];
   /** Lo decide el servidor con el permiso de anular entregas; sin él, la acción no se pinta. */
   readonly canVoid: boolean;
-  readonly orderStatus: OrderStatus;
+  /** El de la receta cuyas entregas se pintan, no el del pedido. */
+  readonly lineStatus: OrderLineStatus;
   readonly onVoid?: (delivery: OrderDeliveryHistoryEntry) => void;
 };
 
-export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: OrderDeliveryListProps) {
+export function OrderDeliveryList({ deliveries, canVoid, lineStatus, onVoid }: OrderDeliveryListProps) {
   if (deliveries.length === 0) {
     return (
       <p className="text-sm text-muted-foreground" data-testid={ORDER_DELIVERIES_EMPTY_TESTID}>
@@ -77,7 +77,7 @@ export function OrderDeliveryList({ deliveries, canVoid, orderStatus, onVoid }: 
     );
   }
 
-  const statusAcceptsVoid = canVoid && STATUS_ACCEPTS_VOID[orderStatus];
+  const statusAcceptsVoid = canVoid && STATUS_ACCEPTS_VOID[lineStatus];
 
   return (
     <ul className="flex flex-col gap-4" aria-label={LIST_LABEL}>

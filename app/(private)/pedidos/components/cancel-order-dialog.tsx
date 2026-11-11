@@ -7,7 +7,14 @@ import { toast } from 'sonner';
 import { ConfirmDialogBody, ConfirmDialogFrame } from '@/components/shared/confirm-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import type { ErrorCode } from '@/lib/modules/errores';
-import { cancelOrderSchema, formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
+import {
+  cancelOrderSchema,
+  formatOrderNumber,
+  isCancellableStatus,
+  type OrderLineView,
+  type OrderSummary,
+} from '@/lib/modules/pedidos';
+import { EMPTY_MARK } from '@/lib/shared/ui/empty-mark';
 import {
   cancelOrderAction,
   type OrderMutationFormState,
@@ -55,6 +62,8 @@ export const CANCEL_ORDER_CONFIRM_TESTID = 'cancel-order-confirm';
 export const CANCEL_ORDER_DISMISS_TESTID = 'cancel-order-dismiss';
 export const CANCEL_ORDER_ERROR_TESTID = 'cancel-order-error';
 export const CANCEL_ORDER_ID_TESTID = 'cancel-order-id';
+export const CANCEL_ORDER_CANCELLED_LINES_TESTID = 'cancel-order-cancelled-lines';
+export const CANCEL_ORDER_KEPT_LINES_TESTID = 'cancel-order-kept-lines';
 
 /** Nombres de campo del `FormData`, los que lee el adaptador driving (`design.md > 4`). */
 export const CANCEL_ORDER_ID_FIELD = 'id';
@@ -69,6 +78,7 @@ const CONFIRM_LABEL = 'Cancelar el pedido';
 const CONFIRM_PENDING_LABEL = 'Cancelando…';
 const DISMISS_LABEL = 'Volver';
 const CANCEL_SUCCESS = 'Pedido cancelado.';
+const CANCELLED_IS_FINAL = 'Un pedido cancelado ya no se puede editar.';
 /**
  * QC-70 (R21): el codigo que este dialogo FABRICA cuando su validacion previa rechaza el motivo
  * sale del catalogo -tipado `ErrorCode`, la union cerrada-, no de un literal escrito aqui. El
@@ -86,6 +96,12 @@ const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
 const REASON_REQUIRED = 'Escribe el motivo de la cancelación.';
 
 const INITIAL_STATE: OrderMutationFormState = { status: 'idle' };
+
+const RECIPE_NAMES = new Intl.ListFormat('es', { style: 'long', type: 'conjunction' });
+
+function recipeNames(lines: readonly Pick<OrderLineView, 'recipeName'>[]): string {
+  return RECIPE_NAMES.format(lines.map((line) => line.recipeName ?? EMPTY_MARK));
+}
 
 function readString(formData: FormData, name: string): string {
   const value = formData.get(name);
@@ -151,6 +167,11 @@ function CancelOrderDialogBody({ order, onOpenChange, fieldId }: CancelOrderDial
   const error = state.status === 'error' ? state : undefined;
   // El motivo se mide RECORTADO, igual que lo mide el esquema del contrato.
   const isEmpty = reason.trim() === '';
+  const cancelled = order.lines.filter((line) => isCancellableStatus(line.status));
+  const kept = order.lines.filter((line) => !isCancellableStatus(line.status));
+  // Solo si no queda ninguna receta viva el pedido entero acaba cancelado.
+  const closing = kept.every((line) => line.status === 'CANCELADO') ? ` ${CANCELLED_IS_FINAL}` : '';
+  const namesLines = order.lines.length > 0;
 
   return (
     <ConfirmDialogBody
@@ -160,8 +181,28 @@ function CancelOrderDialogBody({ order, onOpenChange, fieldId }: CancelOrderDial
         title: TITLE,
         description: (
           <>
-            Se va a cancelar el pedido {formatOrderNumber(order.number)}. Un pedido cancelado ya no
-            se puede editar.
+            Se va a cancelar el pedido {formatOrderNumber(order.number)}
+            {namesLines ? '.' : `.${closing}`}
+            {cancelled.length === 0 ? null : (
+              <>
+                {' '}
+                Se cancelan las recetas que aún no se fabricaron:{' '}
+                <span className="font-semibold" data-testid={CANCEL_ORDER_CANCELLED_LINES_TESTID}>
+                  {recipeNames(cancelled)}
+                </span>
+                .
+              </>
+            )}
+            {kept.length === 0 ? null : (
+              <>
+                {' '}
+                <span className="font-semibold" data-testid={CANCEL_ORDER_KEPT_LINES_TESTID}>
+                  {recipeNames(kept)}
+                </span>{' '}
+                {kept.length === 1 ? 'se queda como está.' : 'se quedan como están.'}
+              </>
+            )}
+            {namesLines ? closing : null}
           </>
         ),
         dismiss: DISMISS_LABEL,

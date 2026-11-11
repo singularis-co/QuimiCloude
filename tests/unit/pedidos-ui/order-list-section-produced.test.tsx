@@ -1,26 +1,30 @@
 // La sección de /pedidos pide el producto terminado solo de los pedidos producidos de la página, y
-// si esa lectura falla la lista se pinta igual, sin enlaces.
+// si esa lectura falla la lista se pinta igual, sin enlaces. Desde QT-314 el reparto, con sus
+// enlaces, está en el detalle del pedido y no en la lista.
 //
 // `OrderListSection` es un Server Component `async`: se le llama como función y se pinta lo que
 // devuelve. Los bordes de los módulos que no se ejercitan aquí se sustituyen igual que en
 // `order-list-section.test.tsx`.
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ORDER_DETAIL_SHEET_TESTID,
+  ORDER_NUMBER_DETAIL_TESTID,
   ORDER_PRODUCED_PRODUCT_LINK_TESTID,
   OrderListSection,
 } from '@/app/(private)/pedidos/components';
 import type { DataTableParams } from '@/components/shared/data-table';
 import type { ProducedProductsResult } from '@/lib/modules/inventario/adapters/driving/finished-product-actions';
-import { formatOrderNumber, type OrderSummary } from '@/lib/modules/pedidos';
+import { formatOrderNumber, type OrderLineStatus, type OrderSummary } from '@/lib/modules/pedidos';
 import type { OrderListResult } from '@/lib/modules/pedidos/adapters/driving/order-actions';
 import type { UnitView } from '@/lib/modules/unidades';
 import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { finishedProductDetailRoute } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 const { listOrdersActionMock, listProducedProductsActionMock, routerMock, getSessionUserMock } =
   vi.hoisted(() => ({
@@ -149,43 +153,34 @@ const PARAMETROS: DataTableParams = {
   search: '',
 };
 
-function pedido(id: string, sequence: number, status: OrderSummary['status']): OrderSummary {
+const REPARTO = [
+  {
+    presentationId: PRESENTACION_ID,
+    presentationName: 'Bidón 20L',
+    packages: 2,
+    packagingProductId: null,
+    packagingName: null,
+    presentationContent: null,
+    presentationUnitLabel: null,
+  },
+];
+
+function pedido(id: string, sequence: number, status: OrderLineStatus): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
+    lines: [lineaPedido({ status, presentationLines: REPARTO })],
     id,
     number: { year: 2026, sequence },
     numberText: formatOrderNumber({ year: 2026, sequence }),
-    recipeId: '88888888-8888-4888-8888-888888888888',
-    recipeName: 'Esmalte azul',
-    recipeVersion: null,
-    quantity: '12.5000',
     priority: 'MEDIA',
     status,
     cancellationReason: status === 'CANCELADO' ? 'Sin stock' : null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-      {
-        presentationId: PRESENTACION_ID,
-        presentationName: 'Bidón 20L',
-        packages: 2,
-        packagingProductId: null,
-        packagingName: null,
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-    ],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
   };
 }
 
@@ -194,6 +189,14 @@ function pagina(items: readonly OrderSummary[]): OrderListResult {
     status: 'success',
     data: { items, total: items.length, page: 1, pageSize: DEFAULT_PAGE_SIZE, totalPages: 1 },
   };
+}
+
+/** El reparto vive en el detalle: se abre con el número del pedido. */
+async function abrirDetalle(orderId: string): Promise<HTMLElement> {
+  fireEvent.click(
+    within(screen.getByTestId(`data-table-row-${orderId}`)).getByTestId(ORDER_NUMBER_DETAIL_TESTID),
+  );
+  return screen.findByTestId(ORDER_DETAIL_SHEET_TESTID);
 }
 
 async function pintarSeccion() {
@@ -242,7 +245,8 @@ describe('la sección de /pedidos y el producto terminado de sus pedidos produci
         formatOrderNumber({ year: 2026, sequence: 3 }),
       ),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('2 × Bidón 20L').length).toBeGreaterThan(0);
+    const detalle = await abrirDetalle(PEDIDO_TERMINADO);
+    expect(within(detalle).getAllByText('2 × Bidón 20L').length).toBeGreaterThan(0);
     expect(screen.queryAllByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toHaveLength(0);
   });
 
@@ -280,10 +284,14 @@ describe('la sección de /pedidos y el producto terminado de sus pedidos produci
     expect(listProducedProductsActionMock).toHaveBeenCalledTimes(1);
     expect(listProducedProductsActionMock).toHaveBeenCalledWith([PEDIDO_TERMINADO, PEDIDO_ENTREGADO]);
 
-    const enlaces = screen.getAllByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID);
-    expect(enlaces).toHaveLength(2);
-    for (const enlace of enlaces) {
+    // La lista ya no pinta el reparto (R23): el enlace sale en el detalle de cada pedido producido.
+    expect(screen.queryAllByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID)).toHaveLength(0);
+    for (const orderId of [PEDIDO_TERMINADO, PEDIDO_ENTREGADO]) {
+      const detalle = await abrirDetalle(orderId);
+      const enlace = within(detalle).getByTestId(ORDER_PRODUCED_PRODUCT_LINK_TESTID);
       expect(enlace).toHaveAttribute('href', finishedProductDetailRoute(PRODUCTO_ID));
+      cleanup();
+      await pintarSeccion();
     }
   });
 });

@@ -24,6 +24,7 @@ import {
   ORDER_DISTRIBUTION_AVAILABLE_TESTID,
   ORDER_DISTRIBUTION_DIALOG_ERROR_TESTID,
   ORDER_DISTRIBUTION_DIALOG_SUBMIT_TESTID,
+  ORDER_FORM_ADD_LINE_TESTID,
   ORDER_FORM_ERROR_TESTID,
   ORDER_FORM_SUBMIT_TESTID,
   OrderCustomerDialog,
@@ -31,6 +32,8 @@ import {
   OrderDistributionDialog,
   OrderResponsibles,
   OrderSheet,
+  ORDER_LINE_SHEET_APPLY_TESTID,
+  ORDER_LINE_SHEET_TESTID,
   RECIPE_PICKER_TESTID,
   RESPONSIBLE_CANDIDATE_TESTID,
   RESPONSIBLE_CONFIRM_TESTID,
@@ -53,6 +56,7 @@ import {
 } from '../../fixtures/order-delivery';
 import { esperarInteractiva, setupUser } from '../../helpers/user-event';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 const acciones = vi.hoisted(() => ({
   toastSuccess: vi.fn<(message: unknown) => void>(),
@@ -158,6 +162,8 @@ vi.mock('@/lib/modules/inventario/adapters/driving/product-actions', () => ({
 type User = ReturnType<typeof setupUser>;
 
 const ERROR = { status: 'error', code: 'unauthorized', message: 'No tienes permiso.' } as const;
+/** El alta y la edición del pedido devuelven además las posiciones de las recetas que fallan. */
+const ERROR_DEL_PEDIDO = { ...ERROR, linePositions: [] };
 
 const UNIDAD: UnitView = {
   id: '33333333-3333-4333-8333-333333333333',
@@ -192,37 +198,15 @@ function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
     id: PEDIDO_ID,
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: '100.0000',
     priority: 'MEDIA',
     status: 'POR_EMPACAR',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-      {
-        presentationId: '44444444-4444-4444-8444-444444444444',
-        presentationName: '20 L',
-        packages: 2,
-        packagingProductId: ENVASE_ID,
-        packagingName: 'Bidón PET 20 L',
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-    ],
-    unitId: UNIDAD.id,
-    unitLabel: UNIDAD.symbol,
     pendingDelivery: { kind: 'not_packed' },
     customer: { id: '6f1c2a3b-4d5e-4f60-8a71-b2c3d4e5f601', name: 'Ana Garcia', isDeleted: false },
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -277,6 +261,7 @@ async function entregar(user: User) {
   render(
     <OrderDeliverySheet
       order={{ id: DELIVERY_ORDER_ID, numberText: '2026-0000007' }}
+      line={lineaPedido({ status: 'TERMINADO' })}
       open
       onOpenChange={vi.fn()}
     />,
@@ -306,15 +291,19 @@ const CASOS: readonly Caso[] = [
       acciones.createOrder.mockResolvedValue(
         exito
           ? { status: 'success', id: crypto.randomUUID(), numberText: formatOrderNumber({ year: 2026, sequence: 43 }) }
-          : ERROR,
+          : ERROR_DEL_PEDIDO,
       ),
     actuar: async (user) => {
       render(<OrderSheet recipes={RECETAS} units={[UNIDAD]} bridge={null} open onOpenChange={vi.fn()} />);
+      // Desde QT-314 la receta se añade en su sub-panel y se aplica antes de guardar el pedido.
+      await user.click(screen.getByTestId(ORDER_FORM_ADD_LINE_TESTID));
       await user.click(screen.getByTestId(RECIPE_PICKER_TESTID));
       await user.click(await esperarInteractiva(await screen.findByTestId(`${RECIPE_PICKER_TESTID}-option`)));
       await user.click(screen.getByTestId('presentation-unit-select'));
       await user.click(await esperarInteractiva(await screen.findByTestId('presentation-unit-option')));
       await user.type(screen.getByTestId('order-field-quantity'), '10');
+      await user.click(screen.getByTestId(ORDER_LINE_SHEET_APPLY_TESTID));
+      await waitFor(() => expect(screen.queryByTestId(ORDER_LINE_SHEET_TESTID)).toBeNull());
       await user.click(screen.getByTestId(ORDER_FORM_SUBMIT_TESTID));
     },
     errorTestId: ORDER_FORM_ERROR_TESTID,
@@ -322,11 +311,12 @@ const CASOS: readonly Caso[] = [
   {
     nombre: 'edicion del pedido',
     texto: 'Pedido actualizado.',
-    preparar: (exito) => acciones.updateOrder.mockResolvedValue(exito ? { status: 'success' } : ERROR),
+    preparar: (exito) =>
+      acciones.updateOrder.mockResolvedValue(exito ? { status: 'success' } : ERROR_DEL_PEDIDO),
     actuar: async (user) => {
       render(
         <OrderSheet
-          order={pedido({ status: 'EN_CURSO', presentationLines: [] })}
+          order={pedido({ status: 'EN_CURSO', lines: [lineaPedido({ status: 'EN_CURSO' })] })}
           recipes={RECETAS}
           units={[UNIDAD]}
           bridge={null}
@@ -376,7 +366,29 @@ const CASOS: readonly Caso[] = [
       acciones.updateDistribution.mockResolvedValue(exito ? { status: 'success' } : ERROR),
     actuar: async (user) => {
       render(
-        <OrderDistributionDialog order={pedido()} units={[UNIDAD]} open onOpenChange={vi.fn()} />,
+        <OrderDistributionDialog
+          order={pedido()}
+          line={lineaPedido({
+            status: 'POR_EMPACAR',
+            quantity: '100.0000',
+            unitId: UNIDAD.id,
+            unitLabel: UNIDAD.symbol,
+            presentationLines: [
+              {
+                presentationId: '44444444-4444-4444-8444-444444444444',
+                presentationName: '20 L',
+                packages: 2,
+                packagingProductId: ENVASE_ID,
+                packagingName: 'Bidón PET 20 L',
+                presentationContent: null,
+                presentationUnitLabel: null,
+              },
+            ],
+          })}
+          units={[UNIDAD]}
+          open
+          onOpenChange={vi.fn()}
+        />,
       );
       await waitFor(() =>
         expect(screen.getByTestId(ORDER_DISTRIBUTION_AVAILABLE_TESTID)).toHaveTextContent('60 L'),

@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { errorMessage, UNEXPECTED_ERROR_CODE, type ErrorState } from '@/lib/modules/errores';
 import { newRequestId } from '@/lib/modules/observabilidad';
-import type { OrderDeliveryHistoryView, OrderSummary } from '@/lib/modules/pedidos';
+import type { OrderDeliveryHistoryView, OrderLineView, OrderSummary } from '@/lib/modules/pedidos';
 import {
   listOrderDeliveriesAction,
   type OrderDeliveriesResult,
@@ -34,9 +34,9 @@ function unexpectedFromRejection(): ErrorState {
   };
 }
 
-async function readDeliveries(orderId: string): Promise<OrderDeliveriesResult> {
+async function readDeliveries(orderId: string, lineId: string): Promise<OrderDeliveriesResult> {
   try {
-    return await listOrderDeliveriesAction(orderId);
+    return await listOrderDeliveriesAction(orderId, lineId);
   } catch {
     return unexpectedFromRejection();
   }
@@ -60,14 +60,15 @@ type LoadState =
 
 export type OrderDeliveriesSheetProps = {
   readonly order: Pick<OrderSummary, 'id' | 'numberText'>;
+  readonly line: Pick<OrderLineView, 'id'>;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   /** Lo decide el servidor con el permiso de anular entregas. */
   readonly canVoid: boolean;
 };
 
-/** Historial de entregas de un pedido, con la anulación de cada una. */
-export function OrderDeliveriesSheet({ order, open, onOpenChange, canVoid }: OrderDeliveriesSheetProps) {
+/** Historial de entregas de una receta del pedido, con la anulación de cada una. */
+export function OrderDeliveriesSheet({ order, line, open, onOpenChange, canVoid }: OrderDeliveriesSheetProps) {
   const [load, setLoad] = useState<LoadState>({ kind: 'loading' });
   const [reloadError, setReloadError] = useState<ErrorState | null>(null);
   const [voidingId, setVoidingId] = useState<string | null>(null);
@@ -84,18 +85,18 @@ export function OrderDeliveriesSheet({ order, open, onOpenChange, canVoid }: Ord
   }, []);
 
   const reload = useCallback(async () => {
-    apply(await readDeliveries(order.id));
-  }, [apply, order.id]);
+    apply(await readDeliveries(order.id, line.id));
+  }, [apply, order.id, line.id]);
 
   useEffect(() => {
     let active = true;
-    void readDeliveries(order.id).then((result) => {
+    void readDeliveries(order.id, line.id).then((result) => {
       if (active) apply(result);
     });
     return () => {
       active = false;
     };
-  }, [apply, order.id]);
+  }, [apply, order.id, line.id]);
 
   const view = load.kind === 'ready' ? load.view : null;
   // Se busca en la vista vigente: tras una relectura el diálogo ve la entrega ya actualizada.
@@ -129,7 +130,7 @@ export function OrderDeliveriesSheet({ order, open, onOpenChange, canVoid }: Ord
               <OrderDeliveryList
                 deliveries={view.deliveries}
                 canVoid={canVoid}
-                orderStatus={view.orderStatus}
+                lineStatus={view.lineStatus}
                 onVoid={(delivery) => setVoidingId(delivery.id)}
               />
             </>

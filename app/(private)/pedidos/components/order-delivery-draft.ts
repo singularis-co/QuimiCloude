@@ -16,6 +16,7 @@ export type OrderDeliveryDraftBlock = {
 export type OrderDeliveryDraft = {
   readonly v: typeof DRAFT_VERSION;
   readonly orderId: string;
+  readonly lineId: string;
   readonly deliveryKey: string;
   readonly blocks: readonly OrderDeliveryDraftBlock[];
 };
@@ -28,8 +29,9 @@ export type LoadedOrderDeliveryDraft = {
   readonly adjusted: boolean;
 };
 
-export function orderDeliveryDraftKey(orderId: string): string {
-  return `${DRAFT_KEY_PREFIX}${orderId}`;
+// Una clave por receta: abrir «Entregar» en otra receta del pedido no pisa este borrador.
+export function orderDeliveryDraftKey(orderId: string, lineId: string): string {
+  return `${DRAFT_KEY_PREFIX}${orderId}.${lineId}`;
 }
 
 export function packagesKey(presentationLineId: string, batchId: string): string {
@@ -94,8 +96,12 @@ function parseLegacyBlocks(value: Record<string, unknown>): OrderDeliveryDraftBl
   return [{ key: FIRST_BLOCK_KEY, customer, packages }];
 }
 
-/** Un texto que no es un borrador valido de este pedido devuelve `null`, sin lanzar. */
-export function parseOrderDeliveryDraft(raw: string | null, orderId: string): OrderDeliveryDraft | null {
+/** Un texto que no es un borrador valido de esta receta del pedido devuelve `null`, sin lanzar. */
+export function parseOrderDeliveryDraft(
+  raw: string | null,
+  orderId: string,
+  lineId: string,
+): OrderDeliveryDraft | null {
   if (raw === null) return null;
   let value: unknown;
   try {
@@ -103,7 +109,7 @@ export function parseOrderDeliveryDraft(raw: string | null, orderId: string): Or
   } catch {
     return null;
   }
-  if (!isRecord(value) || value.orderId !== orderId) return null;
+  if (!isRecord(value) || value.orderId !== orderId || value.lineId !== lineId) return null;
   if (typeof value.deliveryKey !== 'string' || value.deliveryKey === '') return null;
   const blocks =
     value.v === DRAFT_VERSION
@@ -112,15 +118,20 @@ export function parseOrderDeliveryDraft(raw: string | null, orderId: string): Or
         ? parseLegacyBlocks(value)
         : undefined;
   if (blocks === undefined) return null;
-  return { v: DRAFT_VERSION, orderId, deliveryKey: value.deliveryKey, blocks };
+  return { v: DRAFT_VERSION, orderId, lineId, deliveryKey: value.deliveryKey, blocks };
 }
 
 /** Un solo bloque con el cliente del pedido, si sigue vivo. */
-export function newOrderDeliveryDraft(view: OrderDeliveryView, deliveryKey: string): OrderDeliveryDraft {
+export function newOrderDeliveryDraft(
+  view: OrderDeliveryView,
+  lineId: string,
+  deliveryKey: string,
+): OrderDeliveryDraft {
   const customer = view.customer !== null && !view.customer.isDeleted ? view.customer : null;
   return {
     v: DRAFT_VERSION,
     orderId: view.orderId,
+    lineId,
     deliveryKey,
     blocks: [{ key: FIRST_BLOCK_KEY, customer, packages: {} }],
   };
@@ -150,23 +161,24 @@ export function adjustOrderDeliveryDraft(
 }
 
 /**
- * Lee el borrador del pedido y lo ajusta a la vista. Sin borrador valido, empieza uno con el
+ * Lee el borrador de la receta y lo ajusta a la vista. Sin borrador valido, empieza uno con el
  * cliente vivo del pedido y una clave de entrega nueva.
  */
 export function loadOrderDeliveryDraft(
   storage: DraftStorage | null,
   view: OrderDeliveryView,
+  lineId: string,
   newDeliveryKey: () => string,
 ): LoadedOrderDeliveryDraft {
   let raw: string | null = null;
   try {
-    raw = storage?.getItem(orderDeliveryDraftKey(view.orderId)) ?? null;
+    raw = storage?.getItem(orderDeliveryDraftKey(view.orderId, lineId)) ?? null;
   } catch {
     raw = null;
   }
-  const saved = parseOrderDeliveryDraft(raw, view.orderId);
+  const saved = parseOrderDeliveryDraft(raw, view.orderId, lineId);
   if (saved === null) {
-    return { draft: newOrderDeliveryDraft(view, newDeliveryKey()), adjusted: false };
+    return { draft: newOrderDeliveryDraft(view, lineId, newDeliveryKey()), adjusted: false };
   }
   return adjustOrderDeliveryDraft(saved, view);
 }
@@ -209,15 +221,15 @@ export function setDraftBlockPackages(
 // Sin almacenamiento, o con la cuota llena, el sheet sigue funcionando: solo deja de persistir.
 export function saveOrderDeliveryDraft(storage: DraftStorage | null, draft: OrderDeliveryDraft): void {
   try {
-    storage?.setItem(orderDeliveryDraftKey(draft.orderId), JSON.stringify(draft));
+    storage?.setItem(orderDeliveryDraftKey(draft.orderId, draft.lineId), JSON.stringify(draft));
   } catch {
     // Ignorado a proposito: ver arriba.
   }
 }
 
-export function clearOrderDeliveryDraft(storage: DraftStorage | null, orderId: string): void {
+export function clearOrderDeliveryDraft(storage: DraftStorage | null, orderId: string, lineId: string): void {
   try {
-    storage?.removeItem(orderDeliveryDraftKey(orderId));
+    storage?.removeItem(orderDeliveryDraftKey(orderId, lineId));
   } catch {
     // Ignorado a proposito: ver `saveOrderDeliveryDraft`.
   }

@@ -3,135 +3,55 @@
 import {
   startTransition,
   useActionState,
-  useCallback,
   useEffect,
   useId,
-  useMemo,
-  useRef,
   useState,
   type FormEvent,
 } from 'react';
+import { PlusIcon } from 'lucide-react';
 
-import {
-  PRESENTATION_UNIT_FIELD,
-  PresentationUnitSelect,
-} from '@/components/shared/presentation-unit-select';
+import { PRESENTATION_UNIT_FIELD } from '@/components/shared/presentation-unit-select';
 import { ErrorAlert } from '@/components/shared/error-alert';
 import { FormSheet } from '@/components/shared/form-sheet';
+import { Notice } from '@/components/shared/notice';
 import { SelectField } from '@/components/shared/select-field';
+import { Button } from '@/components/ui/button';
 import {
   DEFAULT_ORDER_PRIORITY,
   ORDER_PRIORITY_VALUES,
-  isStartedOrderStatus,
-  createOrderSchema,
-  updateOrderSchema,
+  type OrderPriority,
   type OrderSummary,
 } from '@/lib/modules/pedidos';
 import {
   createOrderAction,
   updateOrderAction,
+  type OrderLinesErrorState,
 } from '@/lib/modules/pedidos/adapters/driving/order-actions';
-import type { ErrorCode, ErrorState } from '@/lib/modules/errores';
-import { getRecipeAction } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeQueryResult } from '@/lib/modules/recetas/adapters/driving/recipe-actions';
-import type { RecipeLineView } from '@/lib/modules/recetas';
+import type { ErrorCode } from '@/lib/modules/errores';
 import type { MassVolumeBridge, UnitView } from '@/lib/modules/unidades';
 // Solo el tipo: la arista pedidos -> inventario ya existe en el contrato del modulo.
 import type { OrderCoverage } from '@/lib/modules/inventario';
-import { trimDecimal } from '@/lib/shared/ui/decimal-display';
-import { BlockedOrderDialog } from './blocked-order-dialog';
-import { compatibleUnitIds } from './compatible-unit-ids';
-import { OrderCostQuote } from './order-cost-quote';
+import { touchTarget } from '@/lib/shared/ui/touch-target';
 import type { OrderCustomerChoice } from '@/components/shared/order-customer-label';
 import { OrderCustomerPicker } from '@/components/shared/order-customer-picker';
+
 import {
-  ORDER_DISTRIBUTION_PACKAGES_FIELD,
-  ORDER_DISTRIBUTION_PACKAGING_FIELD,
-  ORDER_DISTRIBUTION_PRESENTATION_FIELD,
-  OrderDistributionField,
-} from './order-distribution-field';
-import { OrderField } from './order-field';
-import { leftoverOf, OrderLeftoverDialog } from './order-leftover-dialog';
-import { ingredientNeedOf, OrderIngredientsTable } from './order-ingredients-table';
-import { OrderRecipeImage } from './order-recipe-image';
-import {
-  RECIPE_FIELD,
-  RecipePicker,
-  type RecipePickerOption,
-  type RecipePickerPage,
-} from './recipe-picker';
-import { RECIPE_VERSION_FIELD, RecipeVersionSelect } from './recipe-version-select';
+  candidateOf,
+  draftFromOrder,
+  draftTotals,
+  type OrderCandidate,
+  type OrderLineDraft,
+} from './order-line-draft';
+import { OrderLineSheet } from './order-line-sheet';
+import { OrderLinesEmpty, OrderLinesTable, OrderLinesTotals } from './order-lines-table';
+import { RECIPE_FIELD, type RecipePickerPage } from './recipe-picker';
+import { RECIPE_VERSION_FIELD } from './recipe-version-select';
 import { ORDER_PRIORITY_LABELS, OrderCoverageBadge } from './order-status-badge';
-import { useOrderCostQuote } from './use-order-cost-quote';
-import {
-  availabilityBlocksSave,
-  distributionLinesValid,
-  fromOrderPresentationLines,
-  toDistributionLinesInput,
-  useOrderDistributionAvailability,
-  type OrderDistributionLine,
-} from './use-order-distribution-availability';
 
 /** La etiqueta de cobertura de la hoja. */
 export const ORDER_SHEET_COVERAGE_TESTID = 'order-sheet-coverage';
 
-/**
- * Formulario de alta y edicion de pedido (R26-R30, R33, R34, R39, R45, `design.md > 8`).
- *
- * **Mismo patron no controlado ya mergeado en `product-form.tsx` y `supplier-form.tsx`**:
- * `<form action>` + `useActionState`, con el literal `{ status: 'idle' }` **construido aqui**
- * -un archivo `'use server'` no puede exportar constantes, y las actions de `pedidos` lo dejaron
- * escrito-. **Sin ninguna libreria de formularios** (R33, R42): la tabla de decisiones de esta
- * ficha la veta expresamente remitiendo a QC-22, no se instalo nada y no se corrio el CLI para la
- * primitiva de formulario. (Los nombres de los paquetes descartados no se escriben aqui, para que
- * una guardia de fuente que los busque no encuentre un falso positivo.)
- *
- * **La validacion previa usa LOS MISMOS esquemas que valida el servidor** (`createOrderSchema` /
- * `updateOrderSchema`, del barrel de `pedidos`, que es client-safe): el patron decimal, el «mayor
- * que cero» de la cantidad, el cero admitido en el precio y los conjuntos cerrados salen de ahi y
- * no se reescriben (R33). El servidor revalida igual: el cliente nunca es la frontera.
- *
- * **`bind` y no un argumento de mas**: `updateOrderAction` tiene la firma
- * `(id, prevState, formData)`, que no es la que `useActionState` espera. Aplicarle parcialmente el
- * `id` es el patron estandar de React y evita tocar el adaptador driving de QC-34, que R46
- * prohibe abrir.
- *
- * **R26 — el alta lleva LOS CINCO campos de negocio y nada mas**: ni estado, ni motivo, ni
- * correlativo, ni fecha de solicitud, ni autoria. El estado de alta es siempre `PENDIENTE` y lo
- * pone el caso de uso; el correlativo lo entrega la secuencia de la base; los autores salen de la
- * sesion.
- *
- * **R27 — la prioridad es OPCIONAL con su defecto VISIBLE**, no implicito: un campo ausente del
- * formulario es ausencia para `readOptionalFormString`, pero un campo VACIO es error, asi que
- * este formulario emite **siempre** un valor valido y arranca con `DEFAULT_ORDER_PRIORITY`
- * preseleccionada.
- *
- * La edicion precarga y es REEMPLAZO COMPLETO de los campos de negocio. El formulario de
- * edicion no ofrece ningun control de estado: el estado no se cambia desde aqui, ni siquiera
- * hacia `CANCELADO` -ese camino sigue siendo unicamente `cancelOrderAction`-.
- *
- * **R30 — no hay campo de fecha de solicitud** en ningun modo: la pone el sistema.
- *
- * **R34 — la traduccion de errores es por `code`, NUNCA por texto** (`design.md > 8`): el mensaje
- * que devuelve la operacion se pinta, pero quien decide DONDE se pinta es el codigo estable. Un
- * rechazo no cierra el panel ni pierde lo escrito: React 19 resetea los campos no controlados de
- * un `<form action>` al completarse la action, asi que el estado de fallo devuelve los valores
- * escritos y cada campo los recupera por `defaultValue`.
- *
- * **Los INGREDIENTES de la receta elegida se muestran en el propio panel** (2026-09-09): al
- * elegir una receta -o al abrir la edicion, donde ya viene elegida- se pide su detalle
- * (`getRecipeAction`) y se pinta la tabla con los datos de los productos. El JOIN con `products`
- * lo hace el detalle de `recetas`; la unidad se resuelve aqui con el catalogo que baja por props
- * (R43). El id de la receta elegida viaja igual por el `FormData`; la tabla no anade ningun campo
- * al envio.
- */
-
-/**
- * Los campos de negocio de un solo valor, con el mismo nombre que el adaptador driving lee del
- * `FormData`. Es la unica fuente: `readValues` la recorre, asi que un campo aqui y no en el
- * formulario -o al reves- se nota. El reparto viaja aparte, como pares repetidos de presentacion
- * y envases.
- */
+/** Los campos de una receta del pedido, más la prioridad del pedido. */
 export const ORDER_BUSINESS_FIELDS = [
   RECIPE_FIELD,
   'quantity',
@@ -141,17 +61,8 @@ export const ORDER_BUSINESS_FIELDS = [
   'salePrice',
 ] as const;
 
-const PRESENTATION_LINES_FIELD = 'presentationLines';
-
-/**
- * El estado ya no tiene control propio en este formulario: ninguna de las tres constantes de
- * abajo etiqueta ya ningun elemento del DOM. Se conservan porque otro archivo del repo las sigue
- * exportando desde aqui.
- */
 export const ORDER_STATUS_FIELD = 'status';
-
 export const ORDER_CONFIRM_BLOCKED_FIELD = 'confirmBlocked';
-
 export const ORDER_PRIORITY_SELECT_TESTID = 'order-priority-select';
 export const ORDER_PRIORITY_OPTION_TESTID = 'order-priority-option';
 export const ORDER_STATUS_SELECT_TESTID = 'order-status-select';
@@ -161,206 +72,114 @@ export const ORDER_FORM_TITLE_TESTID = 'order-form-title';
 export const ORDER_FORM_ERROR_TESTID = 'order-form-error';
 export const ORDER_FORM_SUBMIT_TESTID = 'order-form-submit';
 export const ORDER_FORM_CANCEL_TESTID = 'order-form-cancel';
-
-type OrderFieldName = (typeof ORDER_BUSINESS_FIELDS)[number] | typeof PRESENTATION_LINES_FIELD;
-
-const CREATE_TITLE = 'Nuevo pedido';
-const EDIT_TITLE = 'Editar pedido';
-
-/** Separador entre receta y cantidad en el titulo. Es el signo de multiplicar, no la letra equis. */
-const TITLE_SEPARATOR = '×';
-
-/**
- * Titulo del panel a partir de lo elegido (decision humana del 2026-09-08): `<receta> × <cantidad>`
- * y, sin cantidad todavia, solo la receta. Devuelve `null` cuando no hay receta elegida, que es la
- * senal de que el panel debe volver a su rotulo.
- *
- * La cantidad se pinta TAL CUAL se escribio: no se convierte, no se redondea y no se formatea.
- */
-function describeOrder(recipeName: string, quantity: string): string | null {
-  const receta = recipeName.trim();
-  if (receta === '') return null;
-
-  const cantidad = quantity.trim();
-  return cantidad === '' ? receta : `${receta} ${TITLE_SEPARATOR} ${cantidad}`;
-}
-
-/**
- * Copy de los errores por campo. Se escribe aqui y no se toma de zod: sus mensajes describen el
- * esquema, no lo que el usuario tiene que hacer. **La REGLA sigue siendo la del esquema**; aqui
- * solo se traduce su incumplimiento.
- */
-const FIELD_MESSAGES: Readonly<Record<OrderFieldName, string>> = {
-  recipeId: 'Elige una fórmula de la lista.',
-  quantity: 'Ingresa un número mayor a 0.',
-  unitId: 'Elige la unidad del pedido.',
-  presentationLines:
-    'Revisa el reparto: envases enteros mayores que cero, una línea por envase y por presentación.',
-  priority: 'Elige una de las prioridades disponibles.',
-  recipeVersionId: 'Elige una versión de la lista.',
-  salePrice: 'Ingresa un número mayor o igual a 0, con hasta 4 decimales.',
-};
-
-const FIELD_LABELS = {
-  quantity: 'Cantidad',
-  priority: 'Prioridad',
-  customer: 'Cliente (opcional)',
-  salePrice: 'Precio de venta (opcional)',
-} as const;
+export const ORDER_FORM_LINES_COUNT_TESTID = 'order-form-lines-count';
+export const ORDER_FORM_ADD_LINE_TESTID = 'order-form-add-line';
+export const ORDER_FORM_LINES_ERROR_TESTID = 'order-form-lines-error';
+export const ORDER_FORM_LINES_ERROR_ITEM_TESTID = 'order-form-lines-error-item';
+export const ORDER_FORM_REVIEW_LINE_TESTID = 'order-form-review-line';
+export const ORDER_FORM_SAVE_BLOCKED_TESTID = 'order-form-save-blocked';
 
 /** Nombre del campo del `FormData` con el id del cliente; vacio = sin cliente. */
 export const ORDER_CUSTOMER_FIELD = 'customerId';
 
-const CUSTOMER_PLACEHOLDER = 'Busca un cliente por su nombre';
-const CUSTOMER_EMPTY_LABEL = 'Ningún cliente coincide con la búsqueda.';
-
-/**
- * Donde se pinta cada `code` estable de `pedidos/domain/errors.ts` (`design.md > 8`). Los codigos
- * que NO estan aqui -`order_not_found`, `duplicate_number`, `unauthorized`, `invalid_transition`,
- * `invalid_input` sin campo senalado- van a la region `role="alert"` del formulario: sin control
- * de estado en la pantalla, `invalid_transition` ya no puede senalar ningun campo.
- *
- * QC-70 (R20): las claves se tipan con `ErrorCode`, la union CERRADA del catalogo. **Ningun valor
- * cambia** -los dos codigos que esta pantalla mapea ya eran inequivocos y R19 los congela-; lo que
- * cambia es que una clave mal escrita, o un codigo que el catalogo no declare, deja de compilar.
- * `Partial` porque el mapa es deliberadamente incompleto: solo los codigos que senalan UN campo.
- */
-const CODE_TO_FIELD: Readonly<Partial<Record<ErrorCode, OrderFieldName>>> = {
-  recipe_not_found: RECIPE_FIELD,
-  unit_not_found: PRESENTATION_UNIT_FIELD,
-  order_without_unit: PRESENTATION_UNIT_FIELD,
-  presentation_not_found: PRESENTATION_LINES_FIELD,
-  presentation_without_content: PRESENTATION_LINES_FIELD,
-  incompatible_units: PRESENTATION_LINES_FIELD,
-  order_distribution_exceeds_quantity: PRESENTATION_LINES_FIELD,
-  product_not_found: PRESENTATION_LINES_FIELD,
+export type OrderFormTexts = {
+  readonly createTitle: string;
+  readonly editTitle: (numberText: string) => string;
+  readonly createDescription: string;
+  readonly editDescription: string;
+  readonly customer: string;
+  readonly customerPlaceholder: string;
+  readonly customerEmpty: string;
+  readonly priority: string;
+  readonly lines: string;
+  readonly addLine: string;
+  readonly save: string;
+  readonly materialLine: (recipeName: string, number: number) => string;
+  readonly catalogLine: (message: string, recipeName: string, number: number) => string;
+  readonly reviewLine: string;
+  readonly saveBlocked: string;
 };
 
-/**
- * QC-70 (R21): el codigo que este formulario FABRICA cuando su propia validacion previa rechaza
- * la entrada sale del catalogo -tipado `ErrorCode`-, en vez de ser un literal suelto. El valor no
- * cambia. El MENSAJE que lo acompana (`FORM_ERROR_MESSAGE`) es del formulario y se queda: la
- * validacion del front no se toca (R31, `design.md > 6 bis`).
- *
- * QC-71 (R16, R18): `satisfies` en vez de anotacion, para que el tipo se quede en el literal y
- * pueda construir la rama CATALOGADA de `ErrorState`. Con `: ErrorCode` el tipo incluiria el
- * codigo generico y este literal exigiria un `reference` que aqui no existe: el rechazo lo
- * fabrica el formulario, no el servidor.
- */
-const INVALID_INPUT_CODE = 'invalid_input' satisfies ErrorCode;
+export const ORDER_FORM_TEXTS: OrderFormTexts = {
+  createTitle: 'Nuevo pedido',
+  editTitle: (numberText) => `Editar pedido ${numberText}`,
+  createDescription: 'Añade una o más recetas. La fecha y el número los pone el sistema.',
+  editDescription:
+    'Las recetas que ya no se pueden editar salen en solo lectura. Siempre puedes añadir otra.',
+  customer: 'Cliente (opcional)',
+  customerPlaceholder: 'Busca un cliente por su nombre',
+  customerEmpty: 'Ningún cliente coincide con la búsqueda.',
+  priority: 'Prioridad',
+  lines: 'Recetas',
+  addLine: 'Añadir receta',
+  save: 'Guardar pedido',
+  materialLine: (recipeName, number) => `No alcanza el material para ${recipeName} (receta ${number}).`,
+  catalogLine: (message, recipeName, number) => `${message} ${recipeName} (receta ${number}).`,
+  reviewLine: 'Revisar receta',
+  saveBlocked: 'Guardar bloqueada',
+};
+
 const WOULD_BLOCK_CODE = 'order_would_block' satisfies ErrorCode;
-const FORM_ERROR_MESSAGE = 'Revisa los campos marcados.';
+const MATERIAL_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+  WOULD_BLOCK_CODE,
+  'insufficient_material',
+]);
 
-type FieldErrors = Partial<Record<OrderFieldName, string>>;
+/** Lo que se envió, para reenviarlo tal cual con «Guardar bloqueada». */
+type SaveRequest = {
+  readonly candidate: OrderCandidate;
+  readonly rowOfPosition: readonly number[];
+  readonly lines: readonly OrderLineDraft[];
+};
 
-/** Lo escrito en el formulario, para devolverlo tras un fallo: R34 prohibe perderlo. */
-type FieldValues = Partial<Record<OrderFieldName, string>>;
+type FailedLine = { readonly key: string; readonly name: string; readonly number: number };
 
-/**
- * Estado del formulario. **No es el estado que devuelve la action**: anade los errores por campo
- * de la validacion previa y los valores escritos. A la action se le pasa siempre el literal
- * `{ status: 'idle' }`.
- */
 type OrderFormState =
-  | { status: 'idle' }
-  | { status: 'success' }
+  | { readonly status: 'idle' }
+  | { readonly status: 'success' }
   | {
-      status: 'error';
-      /**
-       * El error TAL CUAL: el de la operacion, o el `invalid_input` que fabrica la validacion
-       * previa.
-       *
-       * **QC-71 (R17): entero, no copiado campo a campo.** La copia de `code` y `message` perdia
-       * el `reference` del error inesperado; un `reference?: string` local reabriria el agujero
-       * por el otro lado. Se guarda la union cerrada y el render estrecha por `code`.
-       */
-      serverError: ErrorState;
-      fieldErrors: FieldErrors;
-      values: FieldValues;
-    }
-  | {
-      status: 'wouldBlock';
-      message: string;
-      /** El envio que se repite, tal cual, si se confirma guardarlo bloqueado. */
-      formData: FormData;
-      values: FieldValues;
+      readonly status: 'error';
+      readonly error: OrderLinesErrorState;
+      readonly failed: readonly FailedLine[];
+      readonly request: SaveRequest;
     };
 
 const INITIAL_STATE: OrderFormState = { status: 'idle' };
 
-function readString(formData: FormData, name: string): string {
-  const value = formData.get(name);
-  return typeof value === 'string' ? value : '';
-}
-
-function readValues(formData: FormData): FieldValues {
-  const values: FieldValues = {};
-  for (const field of ORDER_BUSINESS_FIELDS) {
-    values[field] = readString(formData, field);
-  }
-  return values;
-}
-
-/** Las tres listas repetidas del reparto, unidas por posicion: cada linea lleva envase o, si es
- *  antigua, presentacion. */
-function readDistributionLines(formData: FormData): OrderDistributionLine[] {
-  const text = (value: FormDataEntryValue | undefined): string =>
-    typeof value === 'string' ? value : '';
-  const packagingIds = formData.getAll(ORDER_DISTRIBUTION_PACKAGING_FIELD);
-  const presentationIds = formData.getAll(ORDER_DISTRIBUTION_PRESENTATION_FIELD);
-  return formData.getAll(ORDER_DISTRIBUTION_PACKAGES_FIELD).map((count, index) => {
-    const packagingProductId = text(packagingIds[index]);
-    return {
-      presentationId: text(presentationIds[index]),
-      presentationName: null,
-      packages: text(count),
-      content: null,
-      unitId: null,
-      packagingProductId: packagingProductId === '' ? null : packagingProductId,
-    };
+function failedLinesOf(positions: readonly number[], request: SaveRequest): FailedLine[] {
+  return positions.flatMap((position) => {
+    const row = request.rowOfPosition[position];
+    const line = row === undefined ? undefined : request.lines[row];
+    return row === undefined || line === undefined
+      ? []
+      : [{ key: line.key, name: line.recipe.name, number: row + 1 }];
   });
 }
 
-/**
- * Invoca la operacion que toca y normaliza su resultado. El alta devuelve ademas el id creado y
- * su correlativo; aqui no hace falta ninguno de los dos: lo unico que el formulario necesita
- * saber es si fallo y con que codigo.
- */
-async function submit(
-  order: OrderSummary | undefined,
-  formData: FormData,
-): Promise<{ status: 'success' } | ErrorState> {
-  if (order === undefined) {
-    const result = await createOrderAction({ status: 'idle' }, formData);
-    return result.status === 'error' ? result : { status: 'success' };
-  }
-
-  const update = updateOrderAction.bind(null, order.id);
-  const result = await update({ status: 'idle' }, formData);
-  return result.status === 'error' ? result : { status: 'success' };
+function priorityOf(formData: FormData): OrderPriority {
+  const raw = formData.get('priority');
+  return ORDER_PRIORITY_VALUES.find((value) => value === raw) ?? DEFAULT_ORDER_PRIORITY;
 }
 
+type SubPanel = { readonly session: number; readonly line: OrderLineDraft | null };
+
 export type OrderFormProps = {
-  /** Pedido que se edita. Ausente en el alta (R26). */
+  /** Pedido que se edita. Ausente en el alta. */
   readonly order?: OrderSummary;
-  /** Primera pagina del catalogo de recetas, por props (R43). */
   readonly recipes: RecipePickerPage;
-  /**
-   * Catalogo de unidades, por props (R43): resuelve la unidad de cada ingrediente de la
-   * receta elegida. `recetas` no resuelve unidades (R50), asi que lo hace esta pantalla.
-   */
   readonly units: readonly UnitView[];
-  /** Puente masa-volumen del catalogo; `null` si el catalogo no lo tiene. */
   readonly bridge: MassVolumeBridge | null;
-  /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar (R35). */
+  /** Lo llama el panel cuando la operacion termina bien: cerrar, avisar y refrescar. */
   readonly onSaved: () => void;
-  /**
-   * La cobertura que **la fila del listado ya trajo**. `undefined` con el lote caido: la hoja no
-   * pinta la etiqueta, igual que `loadResponsiblesCatalog` se degrada sin decir nada.
-   */
+  /** La cobertura que la fila del listado ya trajo; sin ella no se pinta la etiqueta. */
   readonly coverage?: OrderCoverage;
+  readonly texts?: OrderFormTexts;
 };
 
+/**
+ * Panel de alta y edición de un pedido: cliente, prioridad y la tabla de recetas. Las recetas se
+ * añaden y se editan en un sub-panel y solo viven en el borrador hasta «Guardar pedido».
+ */
 export function OrderForm({
   order,
   recipes,
@@ -368,375 +187,176 @@ export function OrderForm({
   bridge,
   onSaved,
   coverage,
+  texts = ORDER_FORM_TEXTS,
 }: OrderFormProps) {
   const fieldId = useId();
-  const formErrorId = `${fieldId}-form-error`;
   const customerFieldId = `${fieldId}-customer`;
   const isEdit = order !== undefined;
   const [customer, setCustomer] = useState<OrderCustomerChoice | null>(
     order?.customer ? { kind: 'customer', customer: order.customer } : null,
   );
-
-  /*
-    Eleccion VIGENTE de receta: con ella se pintan la CABECERA, la IMAGEN y la tabla de
-    ingredientes, y decide si Guardar esta habilitado. Lo que se ENVIA sigue saliendo del
-    `FormData` -el id de la receta del `input` oculto del selector y la cantidad del propio campo-;
-    este estado es solo el reflejo en pantalla de esa eleccion.
-
-    La pone `onSelect` cuando se elige una opcion de la lista, y el propio selector la RETIRA con
-    `null` cuando lo escrito deja de coincidir con lo elegido (decision humana del 2026-09-09): la
-    receta «crema 1» no puede guardarse con el campo diciendo «crema 1a». En la edicion el nombre
-    se sabe desde el principio -viene en el resumen del pedido- pero la imagen no: `OrderSummary`
-    no la trae, asi que hasta que se elija una receta se ve el marcador.
-  */
-  // Con version, el selector de receta muestra la original y la version va en su propio selector.
-  const [recipe, setRecipe] = useState<RecipePickerOption | null>(
-    order === undefined
-      ? null
-      : {
-          id: order.recipeVersion?.originalId ?? order.recipeId,
-          name: order.recipeVersion?.originalName ?? order.recipeName ?? '',
-          imageUrl: null,
-        },
+  const [lines, setLines] = useState<readonly OrderLineDraft[]>(() =>
+    order === undefined ? [] : draftFromOrder(order),
   );
-  const [versionId, setVersionId] = useState<string | null>(
-    order === undefined || order.recipeVersion === null ? null : order.recipeId,
-  );
-  // Cada eleccion de receta remonta el selector de version: vuelve a «Original» y suelta la
-  // version del pedido editado, aunque se elija otra vez la misma receta.
-  const [recipeChoice, setRecipeChoice] = useState(0);
-  // La cantidad guardada llega con la escala de la columna («15.0000») y aqui se precarga SIN
-  // sus ceros de relleno: `trimDecimal` deja «15», no «15.00». NO redondea, y la diferencia
-  // importa porque este valor es el que se vuelve a guardar: recortar ceros no cambia el
-  // numero, redondearlo si -una cantidad de 0.1255 reabierta y guardada se convertiria en
-  // 0.13 sin que nadie lo pidiera-.
-  const [quantity, setQuantity] = useState(trimDecimal(order?.quantity ?? ''));
+  const [subPanel, setSubPanel] = useState<SubPanel | null>(null);
+  const [subPanelOpen, setSubPanelOpen] = useState(false);
 
-  /** Arranca con el importe guardado en la edicion; `null` en el alta. `order.id` solo viaja en la
-   *  edicion, para que la cotizacion cuente como disponible lo que el propio pedido tiene apartado. */
-  const [unitId, setUnitId] = useState(order?.unitId ?? '');
-  const [lines, setLines] = useState<readonly OrderDistributionLine[]>(() =>
-    fromOrderPresentationLines(order?.presentationLines ?? []),
-  );
-  const quote = useOrderCostQuote(order?.ingredientsCost ?? null, order?.id, lines, {
-    frozen: order !== undefined && isStartedOrderStatus(order.status),
-  });
-  const availability = useOrderDistributionAvailability({ quantity, unitId, lines });
-  const unitLabel = orderUnitLabel(units, unitId, order);
-  const compatibleIds = useMemo(() => compatibleUnitIds(units, unitId), [units, unitId]);
+  const totals = draftTotals(lines);
+  const canSave = totals.activeLines > 0;
 
-  const recipeName = recipe?.name ?? '';
-  const recipeImageUrl = recipe?.imageUrl ?? null;
-  /** Id de la receta elegida: decide si la tabla de ingredientes se monta. */
-  const recipeId = recipe?.id ?? '';
-  /** La receta cuyas lineas valen: la version elegida o, sin ella, la original. */
-  const effectiveRecipeId = recipe === null ? null : (versionId ?? recipe.id);
-  /** Guardar solo se habilita con una receta elegida: sin receta no hay pedido (decision 2026-09-09). */
-  const canSave = recipe !== null && !availabilityBlocksSave(availability);
-
-  /*
-    Los ingredientes de la receta elegida. Se piden al SERVIDOR al elegir receta -en el alta- o al
-    montar el panel -en la edicion, donde la receta ya viene elegida-: el detalle de `recetas` hace
-    el JOIN con `products` (`ProductCatalog.findRefs`) y trae por linea el nombre y la existencia
-    del producto en la unidad de la linea, mas la cantidad y la unidad de la linea.
-
-    `ingredientsRequestRef` descarta la respuesta de una receta ya superada: elegir A y luego B no
-    debe dejar que la linea de A pise a la de B cuando llegue la respuesta mas lenta. Es el mismo
-    problema de carreras que ya resuelve el hook del selector de recetas, aqui a mano porque esta
-    consulta la dispara un gesto puntual y no hay motor compartido que la cubra.
-  */
-  const [ingredients, setIngredients] = useState<readonly RecipeLineView[]>([]);
-  // En la edicion la receta ya viene elegida al montar el panel: la carga inicial SIEMPRE arranca
-  // en vuelo, asi que el estado arranca en `true` y el efecto no tiene que pintarlo a posteriori.
-  const [ingredientsLoading, setIngredientsLoading] = useState(isEdit);
-  const [ingredientsError, setIngredientsError] = useState<string | null>(null);
-  // Se calcula aqui y no viaja en la cotizacion: la edicion abre con el importe guardado sin cotizar.
-  const costApproximate =
-    quote.state.amount !== null &&
-    ingredients.some(
-      (line) => ingredientNeedOf(line, quantity, unitId, units, bridge)?.kind === 'approximate',
-    );
-  const ingredientsRequestRef = useRef(0);
-
-  /**
-   * Aplica el detalle de una receta al estado, SOLO si sigue siendo la receta elegida: el de una
-   * eleccion anterior, si llega despues, se descarta. Es la unica funcion que escribe el estado de
-   * los ingredientes, y siempre se invoca DENTRO de un callback `.then` -nunca sincrono desde el
-   * efecto (`react-hooks/set-state-in-effect`)-.
-   */
-  const applyIngredientsResult = useCallback(
-    (requestId: number, result: RecipeQueryResult) => {
-      if (requestId !== ingredientsRequestRef.current) return;
-
-      setIngredientsLoading(false);
-      if (result.status === 'error') {
-        setIngredients([]);
-        setIngredientsError(result.message);
-        return;
-      }
-      setIngredients(result.data.lines);
-      setIngredientsError(null);
-    },
-    [],
-  );
-
-  /** Pide el detalle de una receta y deja su resultado en `applyIngredientsResult`. */
-  const loadIngredients = useCallback(
-    (selectedId: string) => {
-      const requestId = ++ingredientsRequestRef.current;
-      void getRecipeAction(selectedId).then((result) => applyIngredientsResult(requestId, result));
-    },
-    [applyIngredientsResult],
-  );
-
-  /** La edicion arranca con la receta ya elegida: sus ingredientes se piden al montar. */
-  useEffect(() => {
-    if (order?.recipeId) void loadIngredients(order.recipeId);
-  }, [loadIngredients, order?.recipeId]);
-
-  /** `null` = el selector retiro la eleccion (lo escrito deja de coincidir): se apaga todo. */
-  function chooseRecipe(option: RecipePickerOption | null) {
-    setVersionId(null);
-    setRecipeChoice((count) => count + 1);
-    if (option === null) {
-      setRecipe(null);
-      setIngredients([]);
-      setIngredientsError(null);
-      quote.onRecipeChange(null, quantity, unitId);
-      return;
-    }
-    setRecipe({ id: option.id, name: option.name, imageUrl: option.imageUrl });
-    setIngredientsLoading(true);
-    setIngredientsError(null);
-    loadIngredients(option.id);
-    quote.onRecipeChange(option.id, quantity, unitId);
+  async function save(_previous: OrderFormState, request: SaveRequest): Promise<OrderFormState> {
+    const result =
+      order === undefined
+        ? await createOrderAction(request.candidate)
+        : await updateOrderAction(order.id, request.candidate);
+    if (result.status !== 'error') return { status: 'success' };
+    return { status: 'error', error: result, failed: failedLinesOf(result.linePositions, request), request };
   }
 
-  function chooseVersion(nextVersionId: string | null) {
-    if (recipe === null) return;
-    const nextRecipeId = nextVersionId ?? recipe.id;
-    setVersionId(nextVersionId);
-    setIngredientsLoading(true);
-    setIngredientsError(null);
-    loadIngredients(nextRecipeId);
-    quote.onRecipeChange(nextRecipeId, quantity, unitId);
-  }
-
-  async function save(_previous: OrderFormState, formData: FormData): Promise<OrderFormState> {
-    const values = readValues(formData);
-    const lines = readDistributionLines(formData);
-    const candidate = { ...values, presentationLines: toDistributionLinesInput(lines) };
-
-    // El esquema del alta y el de la edicion son el mismo objeto (reemplazo completo); se
-    // nombran los dos para que quede escrito de donde sale cada regla.
-    const parsed = isEdit
-      ? updateOrderSchema.safeParse(candidate)
-      : createOrderSchema.safeParse(candidate);
-    const linesValid = distributionLinesValid(lines);
-
-    if (!parsed.success || !linesValid) {
-      const fieldErrors: FieldErrors = {};
-      for (const issue of parsed.success ? [] : parsed.error.issues) {
-        const field = String(issue.path[0] ?? '') as OrderFieldName;
-        if (field in FIELD_MESSAGES && fieldErrors[field] === undefined) {
-          fieldErrors[field] = FIELD_MESSAGES[field];
-        }
-      }
-      if (!linesValid) fieldErrors[PRESENTATION_LINES_FIELD] = FIELD_MESSAGES[PRESENTATION_LINES_FIELD];
-
-      // Rechazo de la validacion previa: ni se llama a la operacion. El panel sigue abierto.
-      return {
-        status: 'error',
-        serverError: { status: 'error', code: INVALID_INPUT_CODE, message: FORM_ERROR_MESSAGE },
-        fieldErrors,
-        values,
-      };
-    }
-
-    const result = await submit(order, formData);
-
-    if (result.status === 'error' && result.code === WOULD_BLOCK_CODE) {
-      return { status: 'wouldBlock', message: result.message, formData, values };
-    }
-
-    if (result.status === 'error') {
-      // R34: DONDE se pinta lo decide el `code`, nunca el texto del mensaje.
-      const field = CODE_TO_FIELD[result.code];
-      return {
-        status: 'error',
-        serverError: result,
-        fieldErrors: field === undefined ? {} : { [field]: result.message },
-        values,
-      };
-    }
-
-    return { status: 'success' };
-  }
-
-  const [state, formAction, isPending] = useActionState(save, INITIAL_STATE);
+  const [state, dispatch, isPending] = useActionState(save, INITIAL_STATE);
 
   useEffect(() => {
     if (state.status !== 'success') return;
     onSaved();
   }, [state, onSaved]);
 
-  // Se recuerda que estado se cerro, no un booleano: un nuevo aviso es otro objeto y vuelve a abrir.
-  const [closedWarning, setClosedWarning] = useState<OrderFormState | null>(null);
-  const blockedOpen = state.status === 'wouldBlock' && closedWarning !== state;
+  // Se recuerda qué aviso se cerró, no un booleano: el de un envío nuevo es otro objeto y se ve.
+  const [closedNotice, setClosedNotice] = useState<OrderFormState | null>(null);
+
+  // Sin `<form action>`: React reiniciaría la prioridad al terminar el envío.
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSave || isPending) return;
+    const { candidate, rowOfPosition } = candidateOf(lines, {
+      priority: priorityOf(new FormData(event.currentTarget)),
+      customerId: customer?.kind === 'customer' ? customer.customer.id : null,
+      confirmBlocked: false,
+    });
+    startTransition(() => dispatch({ candidate, rowOfPosition, lines }));
+  }
 
   function saveBlocked() {
-    if (state.status !== 'wouldBlock') return;
-    const confirmed = new FormData();
-    for (const [name, value] of state.formData) confirmed.append(name, value);
-    confirmed.set(ORDER_CONFIRM_BLOCKED_FIELD, 'true');
-    setClosedWarning(state);
-    startTransition(() => formAction(confirmed));
+    if (state.status !== 'error') return;
+    const { request } = state;
+    setClosedNotice(state);
+    startTransition(() =>
+      dispatch({ ...request, candidate: { ...request.candidate, confirmBlocked: true } }),
+    );
   }
 
-  // Con sobrante cotizado, Guardar no envia: guarda el envio y pregunta antes. Sin cotizacion
-  // todavia (o con error) se guarda como siempre.
-  const leftover = leftoverOf(availability);
-  // Se guarda la cantidad avisada con el envio: el aviso no cambia si la cotizacion se mueve.
-  const [leftoverSubmit, setLeftoverSubmit] = useState<{
-    formData: FormData;
-    leftover: string;
-  } | null>(null);
-
-  function askLeftover(event: FormEvent<HTMLFormElement>) {
-    if (leftover === null) return;
-    event.preventDefault();
-    setLeftoverSubmit({ formData: new FormData(event.currentTarget), leftover });
+  function openSubPanel(line: OrderLineDraft | null) {
+    setSubPanel((current) => ({ session: (current?.session ?? 0) + 1, line }));
+    setSubPanelOpen(true);
   }
 
-  function saveWithLeftover() {
-    if (leftoverSubmit === null) return;
-    const { formData } = leftoverSubmit;
-    setLeftoverSubmit(null);
-    startTransition(() => formAction(formData));
+  function applyLine(draft: OrderLineDraft) {
+    setLines((current) =>
+      current.some((line) => line.key === draft.key)
+        ? current.map((line) => (line.key === draft.key ? draft : line))
+        : [...current, draft],
+    );
+    setSubPanelOpen(false);
   }
 
-  const fieldErrors = state.status === 'error' ? state.fieldErrors : {};
-  const values =
-    state.status === 'error' || state.status === 'wouldBlock' ? state.values : undefined;
+  function removeLine(key: string) {
+    setLines((current) => current.filter((line) => line.key !== key));
+    setSubPanelOpen(false);
+  }
 
-  /** Valor inicial de un campo: lo escrito en el intento fallido; si no, el del pedido. */
-  const initialValue = (field: OrderFieldName, fromOrder: string): string =>
-    values?.[field] ?? fromOrder;
-
-  /*
-    Es el ERROR, no un booleano: asi el render estrecha por `code` y le pide el identificador al
-    inesperado sin ningun `as` (QC-71 R17, R18).
-  */
-  const formError =
-    state.status === 'error' && Object.keys(fieldErrors).length === 0
-      ? state.serverError
-      : undefined;
+  const failed = state.status === 'error' ? state.failed : [];
+  const markedKeys = new Set(failed.map((line) => line.key));
+  const showLinesNotice = state.status === 'error' && failed.length > 0 && closedNotice !== state;
+  const formError = state.status === 'error' && failed.length === 0 ? state.error : undefined;
 
   return (
-    <FormSheet
-      minScreenWidth={70}
-      formAction={formAction}
-      onSubmit={askLeftover}
-      noValidate
-      testIds={{
-        sheet: 'order-sheet',
-        form: ORDER_FORM_TESTID,
-        cancel: ORDER_FORM_CANCEL_TESTID,
-        submit: ORDER_FORM_SUBMIT_TESTID,
-        title: ORDER_FORM_TITLE_TESTID,
-      }}
-      canSave={canSave}
-      busy={isPending}
-      saveTouch="class"
-      beforeHeader={
-        <>
-          <OrderLeftoverDialog
-            open={leftoverSubmit !== null}
-            leftover={leftoverSubmit?.leftover ?? '0'}
-            unitLabel={unitLabel}
-            onConfirm={saveWithLeftover}
-            onDismiss={() => setLeftoverSubmit(null)}
-          />
-          <BlockedOrderDialog
-            open={blockedOpen}
-            message={state.status === 'wouldBlock' ? state.message : ''}
-            onConfirm={saveBlocked}
-            onDismiss={() => setClosedWarning(state)}
-          />
-        </>
-      }
-      title={describeOrder(recipeName, quantity) ?? (isEdit ? EDIT_TITLE : CREATE_TITLE)}
-      description={
-        isEdit
-          ? 'Cambia los datos del pedido. Se guardan todos los campos.'
-          : 'Completa los datos del pedido. La fecha y el número los pone el sistema.'
-      }
-      headerExtra={
-        isEdit && coverage !== undefined ? (
-          <div data-testid={ORDER_SHEET_COVERAGE_TESTID}>
-            <OrderCoverageBadge coverage={coverage} />
-          </div>
-        ) : null
-      }
-    >
-      {formError === undefined ? null : (
-        // Aqui van los rechazos que no senalan campo.
-        <ErrorAlert
-          error={formError}
-          id={formErrorId}
-          className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
-          testId={ORDER_FORM_ERROR_TESTID}
-          renderCatalogued={(catalogued) => (
-            <>
-              <p data-testid="order-form-error-message">{catalogued.message}</p>
-              <p className="text-xs" data-testid="order-form-error-code">
-                {catalogued.code}
-              </p>
-            </>
-          )}
-        />
-      )}
-
-      {/*
-        Rejilla de 12: la imagen ocupa 3 columnas y los campos las 9 restantes, uno al lado del
-        otro y alineados por arriba. Por debajo de `sm` la rejilla es de una sola columna -en un
-        movil, 3 de 12 no da para ninguna imagen legible-, asi que la imagen queda encima.
-
-        El hueco de la imagen esta SIEMPRE, con marcador mientras no haya receta elegida o su
-        `imageUrl` sea nula, para que la columna no cambie de ancho al elegir la primera.
-      */}
-      <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-12">
-        <div className="sm:col-span-3">
-          <OrderRecipeImage imageUrl={recipeImageUrl} name={recipeName} />
-        </div>
-
-        <div className="flex flex-col gap-4 sm:col-span-9">
-          <RecipePicker
-            initialPage={recipes}
-            onSelect={chooseRecipe}
-            defaultValue={initialValue(
-              RECIPE_FIELD,
-              order?.recipeVersion?.originalId ?? order?.recipeId ?? '',
-            )}
-            defaultLabel={order?.recipeVersion?.originalName ?? order?.recipeName ?? ''}
-            error={fieldErrors.recipeId}
-          />
-
-          <RecipeVersionSelect
-            key={recipeChoice}
-            recipeId={recipe?.id ?? null}
-            initialVersion={
-              recipeChoice === 0 && order !== undefined && order.recipeVersion !== null
-                ? { id: order.recipeId, name: order.recipeVersion.versionName }
-                : null
+    <>
+      <FormSheet
+        minScreenWidth={70}
+        formAction={ignoreFormAction}
+        onSubmit={submit}
+        noValidate
+        testIds={{
+          sheet: 'order-sheet',
+          form: ORDER_FORM_TESTID,
+          cancel: ORDER_FORM_CANCEL_TESTID,
+          submit: ORDER_FORM_SUBMIT_TESTID,
+          title: ORDER_FORM_TITLE_TESTID,
+        }}
+        saveLabel={texts.save}
+        canSave={canSave}
+        busy={isPending}
+        saveTouch="class"
+        title={isEdit ? texts.editTitle(order.numberText) : texts.createTitle}
+        description={isEdit ? texts.editDescription : texts.createDescription}
+        headerExtra={
+          isEdit && coverage !== undefined ? (
+            <div data-testid={ORDER_SHEET_COVERAGE_TESTID}>
+              <OrderCoverageBadge coverage={coverage} />
+            </div>
+          ) : null
+        }
+      >
+        {showLinesNotice && state.status === 'error' ? (
+          <Notice
+            tone="danger"
+            testId={ORDER_FORM_LINES_ERROR_TESTID}
+            actions={
+              state.error.code === WOULD_BLOCK_CODE ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={touchTarget}
+                    onClick={() => setClosedNotice(state)}
+                    data-testid={ORDER_FORM_REVIEW_LINE_TESTID}
+                  >
+                    {texts.reviewLine}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className={touchTarget}
+                    onClick={saveBlocked}
+                    disabled={isPending}
+                    data-testid={ORDER_FORM_SAVE_BLOCKED_TESTID}
+                  >
+                    {texts.saveBlocked}
+                  </Button>
+                </>
+              ) : undefined
             }
-            onChange={chooseVersion}
-            error={fieldErrors.recipeVersionId}
-          />
+          >
+            {failed.map((line) => (
+              <span key={line.key} className="block" data-testid={ORDER_FORM_LINES_ERROR_ITEM_TESTID}>
+                {MATERIAL_CODES.has(state.error.code)
+                  ? texts.materialLine(line.name, line.number)
+                  : texts.catalogLine(state.error.message, line.name, line.number)}
+              </span>
+            ))}
+          </Notice>
+        ) : null}
 
+        {formError === undefined ? null : (
+          <ErrorAlert
+            error={formError}
+            id={`${fieldId}-form-error`}
+            className="flex flex-col gap-2 rounded-lg border border-destructive/40 p-3 text-sm text-destructive"
+            testId={ORDER_FORM_ERROR_TESTID}
+            renderCatalogued={(catalogued) => (
+              <>
+                <p data-testid="order-form-error-message">{catalogued.message}</p>
+                <p className="text-xs" data-testid="order-form-error-code">
+                  {catalogued.code}
+                </p>
+              </>
+            )}
+          />
+        )}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <label htmlFor={customerFieldId} className="text-sm font-medium">
-              {FIELD_LABELS.customer}
+              {texts.customer}
             </label>
             <OrderCustomerPicker
               purpose="assign"
@@ -744,142 +364,69 @@ export function OrderForm({
               id={customerFieldId}
               value={customer}
               onChange={setCustomer}
-              placeholder={CUSTOMER_PLACEHOLDER}
-              emptyMessage={CUSTOMER_EMPTY_LABEL}
+              placeholder={texts.customerPlaceholder}
+              emptyMessage={texts.customerEmpty}
             />
           </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-
-            {/*
-              Cantidad: control NUMERICO del navegador. Con `step="any"` para que el decimal no
-              choque contra el paso entero por defecto, y `min="0.01"` para que el navegador no
-              ofrezca negativos ni cero -el «mayor que cero» real lo sigue cerrando el esquema del
-              contrato al enviar. El valor sigue viajando
-              como cadena en el `FormData`.
-
-              Al SOLTAR EL FOCO el valor se coloca a DOS decimales y sin ceros finales (decision
-              humana del 2026-09-09): «25.00» y «25.0» quedan como «25», «25.3» y «25.08» conservan
-              sus decimales. El `FormData` viaja con el valor ya colocado.
-            */}
-            <div className="sm:col-span-4">
-              <OrderField
-                name="quantity"
-                label={FIELD_LABELS.quantity}
-                required
-                type="number"
-                step="any"
-                min="0.01"
-                inputMode="decimal"
-                roundDecimals={2}
-                defaultValue={initialValue('quantity', trimDecimal(order?.quantity ?? ''))}
-                onValueChange={(value) => {
-                  setQuantity(value);
-                  quote.onQuantityChange(effectiveRecipeId, value, unitId);
-                }}
-                error={fieldErrors.quantity}
-              />
-            </div>
-
-            <div className="sm:col-span-4">
-              <PresentationUnitSelect
-                units={units}
-                value={unitId}
-                onValueChange={(next) => {
-                  setUnitId(next);
-                  quote.onUnitChange(effectiveRecipeId, quantity, next);
-                }}
-                error={fieldErrors.unitId}
-              />
-            </div>
-
-            {/* Prioridad opcional, con el defecto del contrato PRESELECCIONADO y VISIBLE. */}
-            <div className="sm:col-span-4">
-              <SelectField
-                name="priority"
-                label={FIELD_LABELS.priority}
-                defaultValue={initialValue('priority', order?.priority ?? DEFAULT_ORDER_PRIORITY)}
-                options={ORDER_PRIORITY_VALUES.map((value) => ({
-                  value,
-                  label: ORDER_PRIORITY_LABELS[value],
-                }))}
-                triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
-                optionTestId={ORDER_PRIORITY_OPTION_TESTID}
-                optionValueAttribute
-                error={fieldErrors.priority}
-                errorTestId="order-error-priority"
-                errorAlert={false}
-              />
-            </div>
-          </div>
-
-          <OrderDistributionField
-            lines={lines}
-            onLinesChange={(next) => {
-              setLines(next);
-              quote.onDistributionChange(effectiveRecipeId, quantity, unitId, next);
-            }}
-            unitId={unitId}
-            compatibleUnitIds={compatibleIds}
-            unitLabel={unitLabel}
-            quantity={quantity}
-            units={units}
-            availability={availability}
-            error={fieldErrors.presentationLines}
-            submitLines
+          <SelectField
+            name="priority"
+            label={texts.priority}
+            defaultValue={order?.priority ?? DEFAULT_ORDER_PRIORITY}
+            options={ORDER_PRIORITY_VALUES.map((value) => ({
+              value,
+              label: ORDER_PRIORITY_LABELS[value],
+            }))}
+            triggerTestId={ORDER_PRIORITY_SELECT_TESTID}
+            optionTestId={ORDER_PRIORITY_OPTION_TESTID}
+            optionValueAttribute
+            errorAlert={false}
           />
-
-          {/* Sin `roundDecimals`: el esquema admite 4 decimales y redondear al soltar el foco
-              cambiaria en silencio el precio escrito. */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div className="sm:col-span-4">
-              <OrderField
-                name="salePrice"
-                label={FIELD_LABELS.salePrice}
-                type="number"
-                step="any"
-                min="0"
-                inputMode="decimal"
-                defaultValue={initialValue('salePrice', trimDecimal(order?.salePrice ?? ''))}
-                error={fieldErrors.salePrice}
-              />
-            </div>
-          </div>
-
-          {/* El bloque de coste: DEBAJO de la fila, no entre los campos. Fuera de la condicion
-              de receta elegida, para verse con guion sin receta. */}
-          <OrderCostQuote {...quote.state} approximate={costApproximate} />
         </div>
-      </div>
 
-      {/*
-        Los ingredientes de la receta elegida: se montan solo con receta elegida -en la edicion
-        ya lo esta al abrir el panel-. El JOIN con `products` lo hace el detalle de `recetas`;
-        aqui se pinta la tabla con los datos que ya vienen resueltos.
-      */}
-      {recipeId === '' ? null : (
-        <OrderIngredientsTable
-          lines={ingredients}
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">
+            {texts.lines}{' '}
+            <span className="text-muted-foreground" data-testid={ORDER_FORM_LINES_COUNT_TESTID}>
+              {lines.length}
+            </span>
+          </h3>
+          <Button
+            type="button"
+            variant="outline"
+            className={touchTarget}
+            onClick={() => openSubPanel(null)}
+            data-testid={ORDER_FORM_ADD_LINE_TESTID}
+          >
+            <PlusIcon aria-hidden="true" />
+            {texts.addLine}
+          </Button>
+        </div>
+
+        {totals.activeLines === 0 ? <OrderLinesEmpty /> : null}
+        <OrderLinesTable
+          lines={lines}
+          markedKeys={markedKeys}
+          onEdit={(key) => openSubPanel(lines.find((line) => line.key === key) ?? null)}
+        />
+        {lines.length === 0 ? null : <OrderLinesTotals totals={totals} />}
+      </FormSheet>
+
+      {subPanel === null ? null : (
+        <OrderLineSheet
+          key={subPanel.session}
+          open={subPanelOpen}
+          onOpenChange={setSubPanelOpen}
+          line={subPanel.line}
+          lines={lines}
+          recipes={recipes}
           units={units}
-          quantity={quantity}
-          orderUnitId={unitId}
           bridge={bridge}
-          loading={ingredientsLoading}
-          error={ingredientsError}
+          onApply={applyLine}
+          onRemove={removeLine}
         />
       )}
-
-    </FormSheet>
+    </>
   );
 }
 
-/** El catalogo puede no traer la unidad guardada; entonces vale la etiqueta que trajo el pedido. */
-function orderUnitLabel(
-  units: readonly UnitView[],
-  unitId: string,
-  order: OrderSummary | undefined,
-): string | null {
-  const unit = units.find((candidate) => candidate.id === unitId);
-  if (unit !== undefined) return unit.symbol ?? unit.name;
-  return order !== undefined && order.unitId === unitId ? order.unitLabel : null;
-}
+function ignoreFormAction(): void {}

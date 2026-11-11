@@ -24,6 +24,7 @@ import {
   ORDER_CUSTOMER_NAME_COLUMN_ID,
   ORDER_NUMBER_COLUMN_ID,
   PRODUCTION_COST_COLUMN_ID,
+  PROGRESS_COLUMN_ID,
   RECIPE_NAME_COLUMN_ID,
   SALE_PRICE_COLUMN_ID,
 } from './order-columns';
@@ -109,15 +110,15 @@ export const ORDER_TABLE_TEXTS: DataTableTexts = {
 };
 
 /**
- * La tarjeta de telefono: el precio de venta y los dos costes van en los datos secundarios, en el
- * orden de la tabla, con la MISMA celda (rotulo de tarjeta, importe o «Sin dato»). Sin condicion
- * propia: la pantalla entera exige `pedidos.consultar`, que es lo que decide tambien las columnas.
+ * La tarjeta de telefono: la primera receta con «+N más» de titulo, y el avance, el precio de venta
+ * y los dos costes en los datos secundarios, con la MISMA celda que la tabla.
  */
 const ORDER_TABLE_CARD: DataTableCardLayout = {
   primary: ORDER_NUMBER_COLUMN_ID,
   status: STATUS_COLUMN_ID,
   title: RECIPE_NAME_COLUMN_ID,
   meta: [
+    PROGRESS_COLUMN_ID,
     ORDER_CUSTOMER_NAME_COLUMN_ID,
     CREATED_AT_COLUMN_ID,
     SALE_PRICE_COLUMN_ID,
@@ -179,6 +180,8 @@ export type OrderTableProps = {
   readonly canEditCustomer?: boolean;
   /** Si el actor puede entregar pedidos; lo resuelve el servidor. */
   readonly canDeliver?: boolean;
+  /** Si el actor puede cancelar una receta (modificar pedidos); lo resuelve el servidor. */
+  readonly canCancelLine?: boolean;
   /** Si el actor puede anular entregas; lo resuelve el servidor. */
   readonly canVoidDelivery?: boolean;
   /** Por pedido, el producto terminado de cada presentación, ya resuelto en el servidor. */
@@ -205,6 +208,7 @@ export function OrderTable({
   canEditDistribution,
   canEditCustomer,
   canDeliver,
+  canCancelLine,
   canVoidDelivery,
   producedProductsByOrder,
   customerFilter = null,
@@ -265,7 +269,7 @@ export function OrderTable({
         canEditDistribution,
         canEditCustomer,
         canDeliver,
-        producedProductsByOrder,
+        canCancelLine,
         onAction: handleAction,
       }),
     [
@@ -277,7 +281,7 @@ export function OrderTable({
       canEditDistribution,
       canEditCustomer,
       canDeliver,
-      producedProductsByOrder,
+      canCancelLine,
       handleAction,
     ],
   );
@@ -376,12 +380,14 @@ export function OrderTable({
           action={active.action}
           open={active.open}
           onOpenChange={handleActiveOpenChange}
+          onAction={handleAction}
           recipes={recipes}
           units={units}
           bridge={bridge}
           responsibles={responsiblesByOrder?.[activeOrder.id] ?? []}
           responsiblesCatalog={responsiblesCatalog}
           coverage={coverageByOrder?.[activeOrder.id]}
+          producedProducts={producedProductsByOrder?.[activeOrder.id]}
           canVoidDelivery={canVoidDelivery}
         />
       )}

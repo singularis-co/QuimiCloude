@@ -18,6 +18,7 @@ import {
 } from '../../helpers/viewport';
 import { arbolAccesible, nuncaResuelve, resolverServerComponents } from './arbol-accesible';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 /**
  * Paridad de la lista de pedidos. Sus vacio, error y esqueleto locales se conservan y pasan a
@@ -158,42 +159,30 @@ const UNIDAD: UnitView = {
 };
 
 function pedido(overrides: Partial<OrderSummary> = {}): OrderSummary {
+  const lineStatus = overrides.status === 'CANCELADO' ? 'CANCELADO' : 'PENDIENTE';
   return {
     ...VISTA_SIN_LINEAS,
+    lines: [
+      lineaPedido({
+        recipeId: RECETA.id,
+        recipeName: RECETA.name,
+        originalRecipeId: RECETA.id,
+        status: lineStatus,
+      }),
+    ],
+    progress: { total: lineStatus === 'CANCELADO' ? 0 : 1, finished: 0 },
     id: '33333333-3333-4333-8333-333333333333',
     number: { year: 2026, sequence: 42 },
     numberText: formatOrderNumber({ year: 2026, sequence: 42 }),
-    recipeId: RECETA.id,
-    recipeName: RECETA.name,
-    recipeVersion: null,
-    quantity: '12.5000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [
-      {
-        presentationId: '44444444-4444-4444-8444-444444444444',
-        presentationName: 'Bidón 20L',
-        packages: 1,
-        packagingProductId: null,
-        packagingName: null,
-        presentationContent: null,
-        presentationUnitLabel: null,
-      },
-    ],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }

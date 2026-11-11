@@ -26,8 +26,8 @@ import {
   addPackagingLine,
   openOrderRowMenu,
   orderMenuTrigger,
-  submitOrderWithLeftover,
 } from './helpers/order-distribution';
+import { applyOrderLine, chooseLineUnit, openAddOrderLine, openCreateOrderPanel, saveOrder } from './helpers/order-form';
 import { seedPackaging } from './helpers/packaging';
 import { deleteOrdersWithLines } from './helpers/delete-orders';
 import { createOrderWithLine } from '../tests/helpers/only-order-line';
@@ -86,13 +86,10 @@ const LIST_SORT = 'createdAt:desc';
 
 const ORDERS_TITLE = 'pedidos-title';
 const CUSTOMER_CELL = 'data-table-cell-customer';
-const CREATE_OPEN = 'order-create-open';
 const ORDER_FORM = 'order-form';
 const RECIPE_PICKER = 'recipe-picker';
 const RECIPE_PICKER_OPTION = 'recipe-picker-option';
 const RECIPE_PICKER_VALUE = 'recipe-picker-value';
-const UNIT_SELECT = 'presentation-unit-select';
-const UNIT_OPTION = 'presentation-unit-option';
 const DISTRIBUTION_FIELD = 'order-distribution-field';
 const DISTRIBUTION_AVAILABLE = 'order-distribution-available';
 const QUANTITY_FIELD = 'order-field-quantity';
@@ -408,38 +405,37 @@ test.describe('pedido con cliente', () => {
     await page.goto(ordersUrl());
     await expect(page.getByTestId(ORDERS_TITLE)).toBeVisible({ timeout: 60_000 });
 
-    await page.getByTestId(CREATE_OPEN).first().click();
-    const form = page.getByTestId(ORDER_FORM);
-    await expect(form).toBeVisible({ timeout: 60_000 });
+    // QT-314: la receta se escribe en su sub-panel; el cliente sigue en el panel del pedido.
+    const form = await openCreateOrderPanel(page);
+    const lineSheet = await openAddOrderLine(page, form);
 
-    const recipePicker = page.getByTestId(RECIPE_PICKER);
+    const recipePicker = lineSheet.getByTestId(RECIPE_PICKER);
     await recipePicker.click();
     await recipePicker.fill(RECIPE_NAME);
     const recipeOption = page.getByTestId(RECIPE_PICKER_OPTION).filter({ hasText: RECIPE_NAME });
     await expect(recipeOption).toHaveCount(1, { timeout: 60_000 });
     await recipeOption.click();
-    await expect(page.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(required(recipeId, 'la receta'));
+    await expect(lineSheet.getByTestId(RECIPE_PICKER_VALUE)).toHaveValue(required(recipeId, 'la receta'));
 
-    await page.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
-    await form.getByTestId(UNIT_SELECT).click();
-    await page.locator(`[data-testid="${UNIT_OPTION}"][data-value="${unitId}"]`).click();
+    await lineSheet.getByTestId(QUANTITY_FIELD).fill(ORDER_QUANTITY);
+    await chooseLineUnit(page, lineSheet, required(unitId, 'la unidad'));
 
     await addPackagingLine(
       page,
-      form,
+      lineSheet,
       { productId: required(packagingId, 'el envase'), name: PACKAGING_NAME },
       ORDER_PACKAGES,
     );
     await expect(
-      page.getByTestId(DISTRIBUTION_FIELD).getByTestId(DISTRIBUTION_AVAILABLE),
+      lineSheet.getByTestId(DISTRIBUTION_FIELD).getByTestId(DISTRIBUTION_AVAILABLE),
     ).toHaveAttribute('data-state', 'ready', { timeout: 60_000 });
+    // 3 en un envase de 1: queda sobrante y, con QT-314, «Aplicar» pregunta antes.
+    await applyOrderLine(page, lineSheet, { leftover: true });
 
     await chooseCustomer(page, ORDER_FORM, customerLabel(CUSTOMER_MAIN));
     await expect(form.getByTestId(CUSTOMER_PICKER_VALUE)).toHaveValue(mainId);
 
-    // 3 en un envase de 1: queda sobrante y Guardar pregunta antes.
-    await submitOrderWithLeftover(page, form);
-    await expect(form).toHaveCount(0, { timeout: 60_000 });
+    await saveOrder(page, form);
 
     const created = await prisma.order.findMany({
       where: { companyId: required(companyId, 'la empresa'), id: { notIn: seededOrderIds() } },

@@ -29,6 +29,7 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/shared/pagination';
 import { ORDERS_ROUTE } from '@/lib/shared/routes';
 import { WIDE_VIEWPORT, resetViewport, setViewportWidth } from '../../helpers/viewport';
 import { VISTA_SIN_LINEAS } from '../../helpers/order-view-lines';
+import { lineaPedido } from '../../helpers/order-form-ui';
 
 const { routerMock } = vi.hoisted(() => ({
   routerMock: {
@@ -100,30 +101,19 @@ vi.mock('@/lib/modules/inventario/adapters/driving/presentation-actions', () => 
 function pedido(id: string, sequence: number, overrides: Partial<OrderSummary> = {}): OrderSummary {
   return {
     ...VISTA_SIN_LINEAS,
+    lines: [lineaPedido({ recipeName: `Receta ${sequence}` })],
     id,
     number: { year: 2026, sequence },
     numberText: formatOrderNumber({ year: 2026, sequence }),
-    recipeId: '22222222-2222-4222-8222-222222222222',
-    recipeName: `Receta ${sequence}`,
-    recipeVersion: null,
-    quantity: '1.0000',
     priority: 'MEDIA',
     status: 'PENDIENTE',
     cancellationReason: null,
-    ingredientsCost: null,
-    packagingCost: null,
-    actualCost: null,
-    salePrice: null,
     createdAt: new Date('2026-01-15T10:00:00.000Z'),
     updatedAt: new Date('2026-01-15T10:00:00.000Z'),
     createdBy: null,
     updatedBy: null,
-    presentationLines: [],
-    unitId: null,
-    unitLabel: null,
     pendingDelivery: { kind: 'not_packed' },
     customer: null,
-    recipeImageUrl: null,
     ...overrides,
   };
 }
@@ -746,24 +736,24 @@ describe('R13: la tabla monta un solo panel o dialogo, el del pedido elegido', (
 });
 
 describe('la lista de pedidos lleva la columna «Por entregar», traida del dashboard', () => {
-  it('su cabecera aparece justo antes de «Presentación» (2026-10-22)', () => {
+  it('su cabecera aparece justo antes de «Fecha de solicitud»', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
-    const presentacion = cabeceras.findIndex((texto) => texto.includes('Presentación'));
+    const fecha = cabeceras.findIndex((texto) => texto.includes('Fecha de solicitud'));
 
-    expect(presentacion).toBeGreaterThanOrEqual(1);
-    expect(cabeceras[presentacion - 1]).toContain('Por entregar');
+    expect(fecha).toBeGreaterThanOrEqual(1);
+    expect(cabeceras[fecha - 1]).toContain('Por entregar');
   });
 });
 
 describe('la lista de pedidos ya no lleva la columna «Cantidad» (decision humana del 2026-10-16)', () => {
-  it('ninguna cabecera dice «Cantidad» y «Presentación» y «Por entregar» siguen', () => {
+  it('R23: ninguna cabecera dice «Cantidad» ni «Presentación», y «Por entregar» sigue', () => {
     montar();
     const cabeceras = screen.getAllByRole('columnheader').map((th) => th.textContent ?? '');
 
     expect(cabeceras.some((texto) => texto.includes('Cantidad'))).toBe(false);
     expect(screen.queryByTestId('data-table-head-quantity')).toBeNull();
-    expect(cabeceras.some((texto) => texto.includes('Presentación'))).toBe(true);
+    expect(cabeceras.some((texto) => texto.includes('Presentación'))).toBe(false);
     expect(cabeceras.some((texto) => texto.includes('Por entregar'))).toBe(true);
   });
 });

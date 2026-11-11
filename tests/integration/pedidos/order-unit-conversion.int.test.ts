@@ -294,7 +294,7 @@ describe('QC-204 — la necesidad se convierte a la unidad del insumo', () => {
 
       const vista = await getOrder(orderId, actorDe(fixture));
 
-      expect(vista.ingredientsCost).toBe('300.0000');
+      expect(vista.lines[0]?.ingredientsCost).toBe('300.0000');
       expect(await movimientosDe(orderId)).toEqual([{ kind: 'reserve', quantity: '100.0000' }]);
       const guardado = await prisma.orderLine.findFirstOrThrow({ where: { orderId: orderId }, orderBy: { position: 'asc' }, select: { ingredientsCost: true } });
       expect(guardado.ingredientsCost?.toFixed(4)).toBe('300.0000');

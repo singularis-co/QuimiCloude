@@ -408,7 +408,7 @@ describe('QT-313 T14a — el flujo de planta escribe la linea y deriva el pedido
 });
 
 describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
-  it('QT-313 R44, R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
+  it('QT-313 R45: OrderView de un pedido de una linea lleva el coste real de la linea, y la linea su etapa y su fecha de terminado', async () => {
     await conFixture(async (fixture) => {
       const { orderId, lines } = await crearPedido(fixture, ['4']);
       const [linea] = lines as [string];
@@ -419,7 +419,7 @@ describe('QT-313 T14a — con una linea, las salidas son las de hoy', () => {
       const vista = await pedidos.getOrder(orderId, actorDe(fixture));
       expect(vista.status).toBe('TERMINADO');
       // 4 del insumo a 2.5000 y 4 envases a 0.5000.
-      expect(vista.actualCost).toBe('12.0000');
+      expect(vista.lines[0]?.actualCost).toBe('12.0000');
       expect(vista.actualCostTotal).toBe('12.0000');
       expect(vista.lines[0]?.finishedAt?.toISOString()).toBe(terminado.toISOString());
       const etapa = await lineaDe(linea);
