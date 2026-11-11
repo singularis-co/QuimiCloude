@@ -5,8 +5,8 @@
 >
 > El bloque de Alcance, «Lo que NO entra», la tabla de decisiones y los criterios de aceptación se
 > copian **tal cual** de la ficha (`feature_list.json > QC-241`). Los fijó el humano antes del spec y
-> no se reabren. Lo que la ficha no dice y hace falta para escribir requisitos testeables va a
-> `## Preguntas abiertas`, con el valor por defecto que este spec usa mientras el humano no responda.
+> no se reabren. Lo que la ficha no decía y hacía falta para escribir requisitos testeables se
+> preguntó como P1–P10; el humano las cerró el 2026-11-11 y hoy son las filas D6–D15.
 
 ## Alcance (de la ficha)
 
@@ -63,15 +63,27 @@ masivos o campañas.
 | D3 | Solo se reintentan los errores temporales | Un número inválido no se arregla reintentando. |
 | D4 | `sending` atascado pasa a `failed` sin reintentar | Mejor un fallo visible que un mensaje duplicado al cliente. |
 | D5 | El notifier nunca hace fallar al que lo llama | WhatsApp es un aviso, no parte de la operación. |
+| D6 | (2026-11-11, era P1) `WHATSAPP_SEND_MAX_RETRIES` vale `3` por defecto y cuenta reintentos **después** del primer intento: tope de intentos = `1 + 3 = 4`. Que `retries` de QStash cuente igual se verifica contra el SDK instalado en la task del adaptador (T4) | Mismo valor que `DOCUMENT_PROCESSING_MAX_RETRIES` (`.env.example`); el humano acepta el valor por defecto. |
+| D7 | (2026-11-11, era P2) El barrido corre **cada hora** (`0 * * * *`), como cron de Vercel en `/api/cron/barrer-envios-whatsapp`, protegido con `CRON_SECRET`. Los umbrales no cambian: `QUEUED` de más de 5 min y `SENDING` de más de 10 min | Decisión del humano. **Consecuencia aceptada:** como el barrido pasa una vez por hora, un mensaje perdido (publicación inicial fallida, `SENDING` atascado o reintentos agotados) puede tardar hasta ~1 h en republicarse o quedar en `FAILED`. |
+| D8 | (2026-11-11, era P3) `plantilla = { name, language }`; `parámetros` = valores por **clave de constante** (`cliente.nombre`), los mismos que manda el front en QC-240; las variables propias las completa el back con su valor guardado; un faltante se registra por su clave | Nombre e idioma son estables entre sincronizaciones y conexiones, a diferencia del id local; el humano acepta el valor por defecto. |
+| D9 | (2026-11-11, era P4) Si al enviar el añadido está apagado, la conexión no está viva y `ACTIVE`, la credencial es ilegible o el contacto está bloqueado: `FAILED` sin llamar a Meta y `200` | Reintentar no lo arregla (mismo criterio que D3); el humano acepta el valor por defecto. |
+| D10 | (2026-11-11, era P5) El barrido de `SENDING` atascados (y todo el barrido) aplica **solo** a origen `SYSTEM` | La ficha habla de envíos del sistema; ampliar cambiaría el comportamiento aprobado de QC-240. El humano acepta el valor por defecto. |
+| D11 | (2026-11-11, era P6) Los textos de los motivos nuevos son los de `design.md > 7` | El humano acepta la propuesta. |
+| D12 | (2026-11-11, era P7) La guardia de imports de `@upstash/qstash` no existía: esta feature **crea** `tests/guards/guard-qstash-aislado.test.ts` con la lista cerrada de importadores y actualiza la fila de `docs/dependencias.md` y los dos comentarios de `documentos` | Sin test, la «lista» solo vivía en texto y nadie la hacía cumplir; el humano acepta el valor por defecto. |
+| D13 | (2026-11-11, era P8) Sin variable nueva para la URL: `APP_BASE_URL` + `/api/integraciones/whatsapp/envios`, reutilizando `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY` y `QSTASH_NEXT_SIGNING_KEY`; sin `APP_BASE_URL`, la publicación falla y se aplica R11 | Misma cuenta de QStash; una variable más por entorno no aporta nada. El humano acepta el valor por defecto. |
+| D14 | (2026-11-11, era P9) El contacto que crea o vincula `enqueue` queda con vínculo **de sistema** (`customerLinkedBy` nulo) | No hay usuario; el recálculo de QC-239 puede rehacerlo si el número cambia de dueño. El humano acepta el valor por defecto. |
+| D15 | (2026-11-11, era P10) Con el añadido apagado, el barrido no republica y pasa a `FAILED` los `QUEUED` de más de 5 min de esa empresa | Que un aviso viejo no salga días después al reactivar el añadido; el humano acepta el valor por defecto. |
 
-Cobertura: D1 → R1, R8, R10, R11 · D2 → R17, R18 · D3 → R22, R23 · D4 → R32 · D5 → R2–R7, R11.
+Cobertura: D1 → R1, R8, R10, R11 · D2 → R17, R18 · D3 → R22, R23 · D4 → R32 · D5 → R2–R7, R11 ·
+D6 → R25 · D7 → R29, R32, R35 · D8 → R1, R6, R8 · D9 → R19 · D10 → R33 · D11 → R19, R31, R32 ·
+D12 → R38 · D13 → R10, R11 · D14 → R9 · D15 → R34.
 
 ## Glosario
 
 - **Mensaje del sistema:** fila de `whatsapp_messages` con dirección `OUT` y origen `SYSTEM`.
 - **Trabajo de envío:** el mensaje que se publica en la cola, con el id del mensaje del sistema y la
   empresa a la que pertenece.
-- **Tope de intentos:** `1 + WHATSAPP_SEND_MAX_RETRIES` (el primer intento más los reintentos; P1).
+- **Tope de intentos:** `1 + WHATSAPP_SEND_MAX_RETRIES` (el primer intento más los reintentos; D6).
 - **Plantilla enviable:** plantilla local viva, habilitada, con todos sus huecos relacionados y
   `APPROVED` en Meta (la misma regla que usa QC-240).
 - **Error temporal de Meta:** sin respuesta (red, tiempo agotado), respuesta 5xx, respuesta correcta
@@ -151,7 +163,7 @@ nada; y dos entregas simultáneas del mismo trabajo DEBEN producir una sola llam
 
 **R19.** SI, ya reclamado el mensaje, el añadido `integraciones` está apagado, la conexión no está
 viva y `ACTIVE`, su credencial no se puede descifrar o el contacto está bloqueado, ENTONCES el sistema
-DEBE dejar el mensaje en `FAILED` con un motivo en español, sin llamar a Meta, y responder `200` (P4).
+DEBE dejar el mensaje en `FAILED` con un motivo en español, sin llamar a Meta, y responder `200` (D9).
 
 **R20.** CUANDO el mensaje reclamado se envía, el sistema DEBE llamar a Meta con el token descifrado de
 la conexión, el `waId` del contacto y la plantilla guardada en el mensaje (nombre, idioma y
@@ -173,7 +185,7 @@ responder `500`.
 
 **R25.** El sistema DEBE leer el número de reintentos de `WHATSAPP_SEND_MAX_RETRIES`, usarlo como
 número de reintentos de la cola al publicar y como base del tope de intentos; SI la variable falta o
-está vacía, ENTONCES DEBE aplicar el valor por defecto (P1); SI no es un entero ≥ 0, ENTONCES la
+está vacía, ENTONCES DEBE aplicar el valor por defecto `3` (D6); SI no es un entero ≥ 0, ENTONCES la
 lectura DEBE fallar nombrando la variable sin mostrar su valor.
 
 **R26.** Las líneas de log del consumidor NO DEBEN contener el texto de Meta, el texto del mensaje, los
@@ -204,13 +216,14 @@ DEBE dejarlo en `FAILED` con un motivo fijo en español.
 **R32.** MIENTRAS un mensaje del sistema está en `SENDING` y lleva más de 10 minutos sin cambiar, el
 barrido DEBE dejarlo en `FAILED` con un motivo fijo en español y NO DEBE volver a publicarlo.
 
-**R33.** El barrido NO DEBE tocar mensajes de origen `USER` ni `AGENT` (P5).
+**R33.** El barrido NO DEBE tocar mensajes de origen `USER` ni `AGENT` (D10).
 
 **R34.** SI el añadido `integraciones` está apagado para una empresa, ENTONCES el barrido NO DEBE
 republicar sus mensajes, y DEBE dejar en `FAILED`, con el motivo de R19, los `QUEUED` de más de
-5 minutos (P10).
+5 minutos (D15).
 
-**R35.** El barrido DEBE quedar declarado en `vercel.json` como tarea programada (P2).
+**R35.** El barrido DEBE quedar declarado en `vercel.json` como tarea programada en la ruta
+`/api/cron/barrer-envios-whatsapp` con la frecuencia `0 * * * *` (una vez por hora) (D7).
 
 ### Transversales
 
@@ -224,7 +237,7 @@ del sistema ya `SENT`, el sistema DEBE aplicarlo por su `wamid` igual que a los 
 **R38.** El sistema DEBE tener su propio adaptador de la cola en el módulo `integraciones`; `domain/` y
 `ports/` NO DEBEN importar `@upstash/qstash`, `next/*` ni `@prisma/client`; y los únicos archivos del
 repositorio que importan `@upstash/qstash` DEBEN ser los dos de `documentos` y los del adaptador nuevo,
-lo que DEBE vigilar una guardia del gate (P7).
+lo que DEBE vigilar una guardia del gate (D12).
 
 **R39.** El sistema NO DEBE incorporar dependencias nuevas.
 
@@ -236,57 +249,4 @@ como del añadido `integraciones`, cada una con su prueba.
 
 ## Preguntas abiertas
 
-Cada una con el valor por defecto que usa el spec mientras el humano no responda.
-
-**P1. Valor por defecto y significado de `WHATSAPP_SEND_MAX_RETRIES`.** Ni la ficha ni `docs/` lo
-fijan. *Por defecto:* `3`, el mismo que `DOCUMENT_PROCESSING_MAX_RETRIES` (`.env.example`), y se lee
-como reintentos **después** del primer intento: tope de intentos = `1 + 3 = 4`. Que `retries` de
-QStash cuente igual (reintentos tras la primera entrega) está **[POR CONFIRMAR]** contra el SDK
-instalado en la task del adaptador.
-
-**P2. El cron de barrido no existe y necesita una frecuencia sub-diaria.** `vercel.json` hoy declara
-tres crons, los tres diarios (`caducar-pedidos`, `purgar-notificaciones`,
-`sincronizar-plantillas-whatsapp`). Para que «más de 5 min» y «más de 10 min» tengan sentido, el
-barrido tiene que correr cada pocos minutos. **Desconocido:** si el plan de Vercel del proyecto admite
-crons sub-diarios (no está en `docs/`). *Por defecto:* `*/5 * * * *` en la ruta
-`/api/cron/barrer-envios-whatsapp`. Si el plan no lo permite, el humano decide la alternativa (otra
-frecuencia, o un programador externo).
-
-**P3. Cómo se identifica la plantilla y qué son los «parámetros».** La ficha dice
-`enqueue(companyId, customerId, plantilla, parámetros)` sin fijar la forma. *Por defecto:*
-`plantilla = { name, language }` (estable entre sincronizaciones y entre conexiones, a diferencia del
-id local) y `parámetros` = valores por **clave de constante** (`cliente.nombre`), los mismos que el
-front manda en QC-240; las variables propias las completa el back con su valor guardado. Sin
-etiquetas: un faltante se registra por su clave.
-
-**P4. Qué hace el consumidor si al enviar la conexión ya no está activa, el añadido se apagó, la
-credencial es ilegible o el contacto se bloqueó.** La ficha no lo dice. *Por defecto:* `FAILED` sin
-llamar a Meta y `200` (R19), con motivos propuestos en `design.md > 7`. Reintentar no lo arregla
-(mismo criterio que D3).
-
-**P5. ¿El barrido de `SENDING` atascados aplica también a los envíos de usuario (QC-240)?** QC-240
-§9 dejó el `SENDING` colgado sin barrido y dijo que «sería de QC-241». *Por defecto:* **solo origen
-`SYSTEM`** (R33), porque la ficha habla de los envíos del sistema y ampliar cambiaría el comportamiento
-aprobado de QC-240.
-
-**P6. Textos de los motivos nuevos** (`errorReason` del atascado, del agotado y de R19). Propuesta en
-`design.md > 7`; el humano los ve al aprobar.
-
-**P7. La «guardia de imports de `@upstash/qstash`» no existe como test.** Buscado en `tests/`: no hay
-ninguna guardia que fije los importadores; la «lista» vive solo en la fila de `docs/dependencias.md`
-(«Aislada en dos archivos») y en los comentarios de los dos adaptadores de `documentos`. *Por
-defecto:* esta feature **crea** la guardia `tests/guards/guard-qstash-aislado.test.ts` con la lista
-cerrada de importadores (forma de `guard-envio-de-correo.test.ts`), y actualiza la fila y los dos
-comentarios.
-
-**P8. URL que llama la cola.** `QSTASH_TARGET_URL` es la de documentos. *Por defecto:* sin variable
-nueva: `APP_BASE_URL` + `/api/integraciones/whatsapp/envios`, y se reutilizan `QSTASH_TOKEN`,
-`QSTASH_CURRENT_SIGNING_KEY` y `QSTASH_NEXT_SIGNING_KEY` (la misma cuenta de QStash). Sin
-`APP_BASE_URL`, la publicación falla y R11 se aplica.
-
-**P9. Vínculo del contacto que crea o vincula `enqueue`.** *Por defecto:* vínculo **de sistema**
-(`customerLinkedBy` nulo), porque no hay usuario; el recálculo de QC-239 puede rehacerlo si el número
-cambia de dueño.
-
-**P10. Añadido apagado en el barrido.** *Por defecto:* R34 (no se republica; los `QUEUED` viejos de
-esa empresa pasan a `FAILED`), para que un aviso viejo no salga días después al reactivar el añadido.
+Ninguna. P1–P10 se cerraron el 2026-11-11 (D6–D15).

@@ -35,11 +35,11 @@ Buscado `WhatsappNotifier`, `enqueue`, `QUEUED`, `queueMessageId`, `origin SYSTE
 | QC-240 (`done`): `deliver`, `sendFailureOf`/`TOKEN_INVALID_MESSAGE`, `buildTemplateMessage`, `isSendable`, `recipientByCustomer` | Envío síncrono de usuario | **Se reutilizan** las piezas puras y la traducción de fallos; el flujo es otro (cola) |
 | QC-240: `WhatsappOutboxRepository` (`findContactsByWaIds`, `ensureContact`, `linkContact`, `markSent`, `markFailed`, `touchContact`) | Puerto de salientes | **Se reutiliza** sin cambiar su firma; las operaciones de la cola van en un puerto nuevo (§5.3) |
 | QC-240: `WhatsappGraphClient.sendMessage` (fetch y canned) | Envío a Meta | **Se reutiliza** tal cual |
-| QC-240 §9 y §11: «`SENDING` colgado… sería de QC-241»; «QC-241 usará `SYSTEM`, `QUEUED`, `queueMessageId`» | Frontera declarada | Se cumple; P5 decide si el barrido toca también los de usuario |
+| QC-240 §9 y §11: «`SENDING` colgado… sería de QC-241»; «QC-241 usará `SYSTEM`, `QUEUED`, `queueMessageId`» | Frontera declarada | Se cumple; D10: el barrido solo toca los de origen `SYSTEM` |
 | QC-111 (`done`): `processing-queue-qstash.ts`, `queue-signature-qstash.ts`, `processing-config-env.ts` | Adaptadores de QStash de `documentos` | **Patrón** que se copia. No se importan: un módulo no importa adaptadores de otro |
 | QC-242 (`done`): `verifyCronSecret` (cableado en `integraciones`), `listActiveCompanyIds`, `integrationsSwitch`, `createSyncAllWhatsappTemplates` | Cron de plantillas | **Se reutilizan** el secreto, la lista de empresas, el interruptor del añadido y la forma del recorrido |
-| `vercel.json`: tres crons, todos diarios | Tareas programadas | Se añade el barrido (P2) |
-| Guardia de importadores de `@upstash/qstash` | **No existe** como test; solo la fila de `docs/dependencias.md` y dos comentarios | Se crea (P7, §9) |
+| `vercel.json`: tres crons, todos diarios | Tareas programadas | Se añade el barrido, horario (D7) |
+| Guardia de importadores de `@upstash/qstash` | **No existe** como test; solo la fila de `docs/dependencias.md` y dos comentarios | Se crea (D12, §9) |
 | QC-247 (`pending`), QC-297 (`pending`) | Consumidores futuros del puerto | Fuera de alcance; usarán `integraciones.whatsappNotifier` |
 | QT-303 (agente IA) | Origen `AGENT` | No se toca; el barrido no mira `AGENT` (R33) |
 
@@ -117,7 +117,8 @@ CREATE INDEX "whatsapp_messages_system_pending_idx"
 `down.sql`: `DROP INDEX "whatsapp_messages_system_pending_idx"` y `ALTER TABLE … DROP COLUMN
 "template_components"`. El índice es parcial, escrito a mano como el único parcial de
 `whatsapp_templates` (QC-242): Prisma no lo representa. Sirve a las tres consultas del barrido, que
-corre cada pocos minutos (`docs/architecture.md`: nada de consultas sin índice en crons frecuentes).
+corre cada hora en todas las empresas (D7; `docs/architecture.md`: nada de consultas sin índice en
+crons frecuentes).
 El timestamp se re-fecha en F2.3 si `dev` trae una migración posterior.
 
 ---
@@ -127,7 +128,7 @@ El timestamp se re-fecha en F2.3 si `dev` trae una migración posterior.
 ### 3.1 Puerto `WhatsappNotifier` (`domain/whatsapp-notifier.ts`)
 
 ```ts
-export type WhatsappTemplateRef = { readonly name: string; readonly language: string };   // P3
+export type WhatsappTemplateRef = { readonly name: string; readonly language: string };   // D8
 
 export type WhatsappEnqueueSkipReason =
   | 'addon_off' | 'no_active_connection' | 'customer_not_found' | 'no_phone'
@@ -196,11 +197,15 @@ Sin cookie, sin actor, sin permiso (R16). Respuestas sin cuerpo. `route.ts`: `ru
 companiesFailed })` (R28), `500` si alguna empresa falló. `route.ts`: `runtime = 'nodejs'`,
 `maxDuration = 300` (presupuesto interno de 240 s, como el cron de plantillas).
 
-`vercel.json` (P2, **[POR CONFIRMAR]**):
+`vercel.json` (D7, cerrada 2026-11-11):
 
 ```json
-{ "path": "/api/cron/barrer-envios-whatsapp", "schedule": "*/5 * * * *" }
+{ "path": "/api/cron/barrer-envios-whatsapp", "schedule": "0 * * * *" }
 ```
+
+Una pasada por hora, en punto. Los umbrales de §4.1 no cambian (5 y 10 min): deciden **qué** mensaje
+está viejo cuando pasa el barrido, no **cuándo** pasa. Consecuencia aceptada por el humano (D7): un
+mensaje perdido puede tardar hasta ~1 h en republicarse o quedar en `FAILED` (ver §8).
 
 ---
 
@@ -211,7 +216,7 @@ companiesFailed })` (R28), `500` si alguna empresa falló. `route.ts`: `runtime 
 ```ts
 export const QUEUED_STALE_MS = 5 * 60 * 1000;
 export const SENDING_STUCK_MS = 10 * 60 * 1000;
-export function maxAttemptsOf(maxRetries: number): number;          // 1 + maxRetries (P1)
+export function maxAttemptsOf(maxRetries: number): number;          // 1 + maxRetries (D6)
 export function isTemporarySendFailure(failure: GraphFailure): boolean;
 //   kind 'unreachable' (red, tiempo, 5xx, 2xx sin wamid) ⇒ true
 //   code ∈ {130429, 131056} ⇒ true
@@ -249,7 +254,7 @@ Todo el cuerpo va dentro de un `try`; el `catch` registra `whatsapp_enqueue_fail
 2. `connections.findLive(scope)`; `null` o `status !== 'ACTIVE'` ⇒ `skipped/no_active_connection`
    (R3).
 3. **Destinatario** (R4, R5, R9): se reutiliza `recipientByCustomer` de QC-240 con un adaptador de
-   contexto: su `actorId` se pasa como `null` ⇒ vínculo de sistema (P9). Hace falta un cambio mínimo:
+   contexto: su `actorId` se pasa como `null` ⇒ vínculo de sistema (D14). Hace falta un cambio mínimo:
    `RecipientContext.actorId: string | null` (hoy `string`); QC-240 sigue pasando el id del usuario.
    Sus errores se traducen a motivo: `LinkedCustomerNotFoundError` ⇒ `customer_not_found`,
    `WhatsappCustomerWithoutPhoneError` ⇒ `no_phone`, `WhatsappContactLinkedElsewhereError` ⇒
@@ -301,8 +306,9 @@ El diagnóstico es el mismo de QC-240 (`Graph enviar mensaje: <kind>; code=<n>; 
 extrae a una función compartida en `whatsapp-send-failure.ts` para no duplicarla (R26).
 
 Un mensaje que agotó el tope y sigue en `QUEUED` no se reclama (paso 2): el barrido lo pasa a
-`FAILED` (R31). Un `SENDING` que quedó colgado porque el proceso murió tras el reclamo lo cierra el
-barrido a los 10 minutos (R32).
+`FAILED` (R31). Un `SENDING` que quedó colgado porque el proceso murió tras el reclamo lo cierra la
+primera pasada del barrido en que lleve más de 10 minutos sin cambiar: con el barrido horario (D7),
+entre 10 min y ~1 h 10 min después (R32).
 
 ### 4.4 Barrido (`domain/sweep-whatsapp-sends.ts`)
 
@@ -321,7 +327,7 @@ propio (R28). Por empresa, con `scope = { companyId }` y `at = now()`:
    (`whatsapp_sweep_publish_failed`, `{ messageId }`) y se sigue (R30).
 
 `SWEEP_BATCH = 100` por empresa y pasada **[POR CONFIRMAR]**: acota lo que una pasada publica; lo que
-quede sale en la siguiente. Todas las consultas filtran `origin = 'SYSTEM'` (R33).
+quede sale en la siguiente pasada, una hora después (D7). Todas las consultas filtran `origin = 'SYSTEM'` (R33).
 
 ```ts
 type SweepResult = {
@@ -363,9 +369,9 @@ export function readWhatsappSendMaxRetries(): number;   // R25
 ```
 
 - `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`: las mismas de `documentos`
-  (P8); si falta alguna, lanza nombrándolas sin su valor.
+  (D13); si falta alguna, lanza nombrándolas sin su valor.
 - `targetUrl = readPublicBaseUrl() + WHATSAPP_SEND_ROUTE`; sin `APP_BASE_URL` lanza nombrándola.
-- `WHATSAPP_SEND_MAX_RETRIES`: vacía ⇒ `3` (P1); no entero o negativa ⇒ lanza nombrándola.
+- `WHATSAPP_SEND_MAX_RETRIES`: vacía ⇒ `3` (D6); no entero o negativa ⇒ lanza nombrándola.
 
 Lector propio y no el de `documentos`: un módulo no importa los adaptadores de otro
 (`docs/perfil-agentes.md > Reglas de capa`, regla 2). `ports/whatsapp-send-config.ts` expone solo
@@ -468,7 +474,7 @@ ficha; el doble evita que un E2E futuro que entregue un pedido dependa de QStash
 
 ---
 
-## 7. Motivos en español (P6, propuesta)
+## 7. Motivos en español (D11, aceptados 2026-11-11)
 
 | Constante | Texto |
 |---|---|
@@ -488,7 +494,13 @@ textos se fijan en un test.
   aunque QStash tenga un reintento pendiente con espera larga. Las dos entregas compiten por el
   reclamo y solo una envía; el tope de intentos acota el total.
 - **Meta acepta pero `markSent` no llega a escribirse** (la base cae): el mensaje queda `SENDING` y
-  el barrido lo pasa a `FAILED` a los 10 min aunque se entregó. Es lo que elige D4.
+  el barrido lo pasa a `FAILED` en su primera pasada tras los 10 min aunque se entregó. Es lo que
+  elige D4.
+- **Latencia del barrido (D7, consecuencia aceptada).** El barrido corre cada hora, así que todo lo
+  que depende de él tarda hasta ~1 h más que su umbral: un `QUEUED` cuya publicación inicial falló
+  (R11) sale entre 5 min y ~1 h 5 min después; un `SENDING` atascado y un `QUEUED` con los
+  intentos agotados quedan visibles como `FAILED` con el mismo retraso. Los reintentos de QStash ante
+  errores temporales no dependen del barrido y no se ven afectados.
 - **Status de Meta antes del `wamid`**: igual que QC-240 §9; el status se pierde y el mensaje queda
   `SENT` por el paso 5.
 - **`2xx` sin `wamid` o tiempo agotado**: se reintenta (temporal) y puede duplicar si Meta sí lo
@@ -496,7 +508,7 @@ textos se fijan en un test.
 
 ---
 
-## 9. Guardia de `@upstash/qstash` (R38, P7)
+## 9. Guardia de `@upstash/qstash` (R38, D12)
 
 `tests/guards/guard-qstash-aislado.test.ts`, forma de `guard-envio-de-correo.test.ts`:
 
@@ -534,7 +546,7 @@ Mapa `R<n> → test` en `tasks.md`.
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-queue-qstash.test.ts` | `publishJSON` con URL, cuerpo y `retries` (R10, R25); config leída al llamar; `vi.mock('@upstash/qstash')` |
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-queue-signature-qstash.test.ts` | R14: firma ausente, `verify` que lanza ⇒ `false`; `vi.mock` |
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-config-env.test.ts` | R25: defecto, inválida nombra la variable sin valor, faltan QSTASH_* / `APP_BASE_URL` |
-| `tests/unit/integraciones/whatsapp/queue/whatsapp-send-schedule.test.ts` | R35: `vercel.json` declara la ruta del barrido y existe su `route.ts` |
+| `tests/unit/integraciones/whatsapp/queue/whatsapp-send-schedule.test.ts` | R35: `vercel.json` declara la ruta del barrido con `schedule` `0 * * * *` y existe su `route.ts` |
 | `tests/integration/integraciones/whatsapp-send-queue-prisma.int.test.ts` | Adaptador: ámbito (R36), reclamo concurrente ⇒ una fila (R18), tope de intentos, `release`, los tres `fail*` solo `SYSTEM` (R33), `updated_at` renovado |
 | `tests/integration/integraciones/whatsapp-system-send-flow.int.test.ts` | Composición real con cola y Graph dobles: `enqueue` → consumidor → `SENT` (R8, R9 concurrente, R21); status `delivered` por webhook (R37); trabajo con otra empresa ⇒ sin efecto (R36) |
 | `tests/integration/integraciones/whatsapp-system-send-migration.int.test.ts` | R40: down y up dejan el mismo esquema; el índice existe |
@@ -575,7 +587,7 @@ R39 lo cubre `guard-dependencias-aprobadas.test.ts` (sin cambios: `package.json`
 6. **Ampliar `WhatsappOutboxRepository`** con las operaciones de la cola. Cambiaría un puerto
    aprobado y su lista exacta en la guardia de ámbito; uno nuevo deja intacto lo de QC-240.
 7. **Variable nueva para la URL de la cola** (`WHATSAPP_SEND_QSTASH_URL`). Es una variable más por
-   entorno para un dato que ya se deriva de `APP_BASE_URL` (P8).
+   entorno para un dato que ya se deriva de `APP_BASE_URL` (D13).
 
 ---
 
@@ -586,6 +598,6 @@ importadores (§9). `pino` y `zod`, ya aprobadas. `package.json` no cambia.
 
 ## 13. Variables de entorno
 
-- **Nueva:** `WHATSAPP_SEND_MAX_RETRIES` (opcional; defecto P1), documentada en `.env.example`.
+- **Nueva:** `WHATSAPP_SEND_MAX_RETRIES` (opcional; defecto `3`, D6), documentada en `.env.example`.
 - **Reutilizadas:** `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`,
   `APP_BASE_URL`, `CRON_SECRET`, las de cifrado (QC-234) y `WHATSAPP_GRAPH_API_VERSION` (QC-237).

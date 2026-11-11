@@ -5,7 +5,7 @@
 > Cada task cierra con `pnpm run typecheck`, `pnpm run lint` y
 > `pnpm exec vitest related --run <archivos tocados>`; las que tocan guardias, además
 > `pnpm exec vitest run guard`. Nadie corre `pnpm test` completo.
-> Antes de T5, el humano responde (o acepta los defectos de) P1–P10 de `requirements.md`.
+> P1–P10 de `requirements.md` quedaron cerradas el 2026-11-11 (D6–D15); el barrido es horario (D7).
 
 ## T1 — Esquema y migración · R40
 
@@ -43,7 +43,7 @@
 - `adapters/driven/config/whatsapp-send-config-env.ts` (design §5.2).
 - `adapters/driven/queue/whatsapp-send-queue-qstash.ts` y
   `adapters/driven/queue/whatsapp-queue-signature-qstash.ts` (design §5.1). **Verificar contra el
-  SDK instalado** (`node_modules/@upstash/qstash`) la semántica de `retries` (P1) y anotarla en
+  SDK instalado** (`node_modules/@upstash/qstash`) la semántica de `retries` (D6) y anotarla en
   `progress/impl_QC-241-envio-whatsapp-sistema.md`.
 - `lib/shared/routes.ts`: `WHATSAPP_SEND_ROUTE`.
 - `.env.example`: bloque de `WHATSAPP_SEND_MAX_RETRIES` (opcional, defecto) y nota de que reutiliza
@@ -86,12 +86,14 @@
 - `domain/sweep-whatsapp-sends.ts` (design §4.4).
 - `adapters/driving/whatsapp-send-sweep-cron-route.ts` y
   `app/api/cron/barrer-envios-whatsapp/route.ts`.
-- `vercel.json`: el cron con la frecuencia que fije P2.
+- `vercel.json`: `{ "path": "/api/cron/barrer-envios-whatsapp", "schedule": "0 * * * *" }` (D7,
+  cada hora), sin tocar los tres crons existentes.
 - Tests `sweep-whatsapp-sends.test.ts`, `whatsapp-send-sweep-cron-route.test.ts`,
   `whatsapp-send-schedule.test.ts`.
 - `tests/guards/guard-rutas-fuera-de-sesion.test.ts`: ruta del barrido como añadido `integraciones`.
 - **Hecho:** 401/500 sin leer; atascados `FAILED` sin publicar; agotados `FAILED`; viejos
-  republicados; una empresa que falla no detiene a las demás.
+  republicados; una empresa que falla no detiene a las demás; `whatsapp-send-schedule.test.ts` fija
+  la ruta y el `schedule` `0 * * * *`.
 
 ## T9 — Composición, contrato y flujo · R1, R9, R21, R36, R37 · depende de T4–T8
 
@@ -123,7 +125,7 @@
 | R25 | `whatsapp-send-config-env.test.ts`, `whatsapp-send-queue-qstash.test.ts` |
 | R27, R28 | `whatsapp-send-sweep-cron-route.test.ts`, `sweep-whatsapp-sends.test.ts` |
 | R29–R34 | `sweep-whatsapp-sends.test.ts`; R31–R33 también `whatsapp-send-queue-prisma.int.test.ts` |
-| R35 | `whatsapp-send-schedule.test.ts` |
+| R35 | `whatsapp-send-schedule.test.ts` (ruta y `schedule` `0 * * * *`) |
 | R36 | `whatsapp-send-queue-prisma.int.test.ts`, `whatsapp-system-send-flow.int.test.ts`, `guard-ambito-empresa-integraciones.test.ts` |
 | R37 | `whatsapp-system-send-flow.int.test.ts` |
 | R38 | `guard-qstash-aislado.test.ts`, `guard-arquitectura-modulos.test.ts` |
