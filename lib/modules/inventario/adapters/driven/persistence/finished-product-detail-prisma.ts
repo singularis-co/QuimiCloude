@@ -137,7 +137,7 @@ export async function listFinishedProductBatches(
         createdAt: true,
         movements: {
           where: { AND: [movementCompanyScope(scope), { kind: 'production' }] },
-          select: { orderId: true },
+          select: { orderId: true, orderLineId: true },
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           take: 1,
         },
@@ -150,6 +150,7 @@ export async function listFinishedProductBatches(
     id: row.id,
     lot: row.lot,
     orderId: row.movements[0]?.orderId ?? null,
+    orderLineId: row.movements[0]?.orderLineId ?? null,
     purchaseDate: toCivilDate(row.purchaseDate),
     productionDate: row.productionDate === null ? null : toCivilDate(row.productionDate),
     expiryDate: row.expiryDate === null ? null : toCivilDate(row.expiryDate),

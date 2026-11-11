@@ -6,6 +6,7 @@ import { ProductNotFoundError, UnauthorizedError, ValidationError } from '@/lib/
 import {
   EMPTY_BATCH_ID,
   FINISHED_ORDER_ID,
+  FINISHED_ORDER_LINE_ID,
   FINISHED_ORDER_NUMBER,
   FINISHED_PRODUCT_ID,
   LITER_BATCH_ID,
@@ -40,7 +41,11 @@ const REGISTRO: FinishedProductRecord = {
 };
 
 /** La fila de la fixture tal como la devuelve el puerto: con `orderId` y sin lo que resuelve el caso de uso. */
-function crudoDe(fila: FinishedProductBatchRow, orderId: string | null): FinishedProductBatchRecord {
+function crudoDe(
+  fila: FinishedProductBatchRow,
+  orderId: string | null,
+  orderLineId: string | null = orderId === null ? null : FINISHED_ORDER_LINE_ID,
+): FinishedProductBatchRecord {
   return {
     id: fila.id,
     lot: fila.lot,
@@ -51,6 +56,7 @@ function crudoDe(fila: FinishedProductBatchRow, orderId: string | null): Finishe
     stock: fila.stock,
     createdAt: fila.createdAt,
     orderId,
+    orderLineId,
   };
 }
 
@@ -174,6 +180,19 @@ describe('listFinishedProductBatches', () => {
       [LITER_BATCH_ID, FINISHED_ORDER_ID],
       [UNPACKAGED_BATCH_ID, null],
       [EMPTY_BATCH_ID, FINISHED_ORDER_ID],
+    ]);
+  });
+
+  it('QT-316 R5: cada fila conserva el orderLineId del puerto, o null en un lote sin pedido', async () => {
+    const OTRA_LINEA = 'a1000000-0000-4000-8000-000000000999';
+    const m = montar([loteCrudo(), LOTE_SIN_PEDIDO, loteCrudo({ id: EMPTY_BATCH_ID, orderLineId: OTRA_LINEA })]);
+
+    const pagina = await m.listar(FINISHED_PRODUCT_ID, {}, LECTOR);
+
+    expect(pagina.items.map((item) => [item.id, item.orderId, item.orderLineId])).toEqual([
+      [LITER_BATCH_ID, FINISHED_ORDER_ID, FINISHED_ORDER_LINE_ID],
+      [UNPACKAGED_BATCH_ID, null, null],
+      [EMPTY_BATCH_ID, FINISHED_ORDER_ID, OTRA_LINEA],
     ]);
   });
 

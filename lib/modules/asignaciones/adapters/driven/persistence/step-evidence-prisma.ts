@@ -203,5 +203,20 @@ export function createStepEvidenceRepository(db: PrismaClient = prisma): StepEvi
       });
       return new Map(groups.map((group) => [group.orderId, group._count._all]));
     },
+
+    async countByLines(companyId, lines) {
+      if (lines.length === 0) return new Map();
+      const orderOfLine = new Map(lines.map((line) => [line.lineId, line.orderId]));
+      const groups = await db.orderStepEvidence.groupBy({
+        by: ['orderId', 'orderLineId'],
+        where: { companyId, orderLineId: { in: [...orderOfLine.keys()] } },
+        _count: { _all: true },
+      });
+      return new Map(
+        groups
+          .filter((group) => orderOfLine.get(group.orderLineId) === group.orderId)
+          .map((group) => [group.orderLineId, group._count._all]),
+      );
+    },
   };
 }

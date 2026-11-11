@@ -15,6 +15,8 @@ export const FINISHED_PRODUCT_ID = 'f0000000-0000-4000-8000-000000000225';
 export const FINISHED_UNIT_ID = 'c0000000-0000-4000-8000-000000000225';
 export const FINISHED_PRESENTATION_ID = 'c1000000-0000-4000-8000-000000000225';
 export const FINISHED_ORDER_ID = 'a0000000-0000-4000-8000-000000000225';
+/** La linea del pedido que produjo los lotes con pedido. */
+export const FINISHED_ORDER_LINE_ID = 'a1000000-0000-4000-8000-000000000225';
 export const FINISHED_ORDER_NUMBER = '2026-0000225';
 export const FINISHED_CUSTOMER_ID = 'b0000000-0000-4000-8000-000000000225';
 
@@ -61,6 +63,7 @@ export function finishedProductBatchRow(overrides: Partial<FinishedProductBatchR
     id: LITER_BATCH_ID,
     lot: 'L-2026-0225',
     orderId: FINISHED_ORDER_ID,
+    orderLineId: FINISHED_ORDER_LINE_ID,
     orderNumberText: FINISHED_ORDER_NUMBER,
     purchaseDate: '2026-10-10',
     productionDate: '2026-10-10',
@@ -78,6 +81,7 @@ export const UNPACKAGED_BATCH_ROW = finishedProductBatchRow({
   id: UNPACKAGED_BATCH_ID,
   lot: 'L-2026-0227',
   orderId: null,
+  orderLineId: null,
   orderNumberText: null,
   productionDate: null,
   expiryDate: null,

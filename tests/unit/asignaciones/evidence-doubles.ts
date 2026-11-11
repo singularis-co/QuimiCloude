@@ -163,6 +163,16 @@ export function repositorioEnMemoria(iniciales: readonly FilaGuardada[] = []) {
       }
       return conteo;
     }),
+    countByLines: vi.fn<StepEvidenceRepository['countByLines']>(async (companyId, lines) => {
+      const conteo = new Map<string, number>();
+      for (const { orderId, lineId } of lines) {
+        const total = filas.filter(
+          (f) => f.companyId === companyId && f.orderId === orderId && f.orderLineId === lineId,
+        ).length;
+        if (total > 0) conteo.set(lineId, total);
+      }
+      return conteo;
+    }),
   } satisfies StepEvidenceRepository;
 
   return { repo, filas };

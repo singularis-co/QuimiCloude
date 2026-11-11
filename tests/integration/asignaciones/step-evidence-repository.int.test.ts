@@ -488,6 +488,115 @@ describe('countByOrders: fotos por pedido de la empresa (QC-271 R6, R29)', () =>
   });
 });
 
+/** Un repositorio sobre el cliente global que cuenta las llamadas a `groupBy`. */
+function watchGroupBy(): { readonly repo: ReturnType<typeof createStepEvidenceRepository>; readonly calls: () => number } {
+  let groupByCalls = 0;
+  const delegate = prisma.orderStepEvidence;
+  const watched = new Proxy(prisma, {
+    get(target, property, receiver) {
+      if (property !== 'orderStepEvidence') return Reflect.get(target, property, receiver) as unknown;
+      return new Proxy(delegate, {
+        get(innerTarget, innerProperty, innerReceiver) {
+          if (innerProperty === 'groupBy') groupByCalls += 1;
+          return Reflect.get(innerTarget, innerProperty, innerReceiver) as unknown;
+        },
+      });
+    },
+  });
+  return { repo: createStepEvidenceRepository(watched), calls: () => groupByCalls };
+}
+
+describe('countByLines: fotos por linea de la empresa (QT-316)', () => {
+  it('QT-316 R1: dos lineas del mismo pedido se cuentan por separado, en una sola consulta', async () => {
+    const orderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    const lineB = await addSecondLine(a, orderId);
+    inserted(await repo.insert(evidence(a, orderId)));
+    inserted(await repo.insert(evidence(a, orderId, { stepPosition: 2 })));
+    inserted(await repo.insert(evidence(a, orderId, { orderLineId: lineB, phase: 'packing' })));
+    const watched = watchGroupBy();
+
+    const counts = await watched.repo.countByLines(a.companyId, [
+      { orderId, lineId: lineA },
+      { orderId, lineId: lineB },
+    ]);
+
+    expect(counts).toEqual(
+      new Map([
+        [lineA, 2],
+        [lineB, 1],
+      ]),
+    );
+    expect(watched.calls()).toBe(1);
+  });
+
+  it('QT-316 R20: las fotos de acondicionamiento cuentan junto a las de fabricacion y envasado', async () => {
+    const orderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    inserted(await repo.insert(evidence(a, orderId)));
+    inserted(await repo.insert(evidence(a, orderId, { phase: 'packing' })));
+    inserted(await repo.insert(evidence(a, orderId, { phase: 'conditioning' })));
+    inserted(await repo.insert(evidence(a, orderId, { phase: 'conditioning', stepPosition: 2 })));
+
+    expect(await repo.countByLines(a.companyId, [{ orderId, lineId: lineA }])).toEqual(new Map([[lineA, 4]]));
+  });
+
+  it('QT-316 R2: una linea sin fotos no sale en el resultado', async () => {
+    const orderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    const empty = await addSecondLine(a, orderId);
+    inserted(await repo.insert(evidence(a, orderId)));
+
+    const counts = await repo.countByLines(a.companyId, [
+      { orderId, lineId: lineA },
+      { orderId, lineId: empty },
+    ]);
+
+    expect(counts.has(empty)).toBe(false);
+    expect(counts).toEqual(new Map([[lineA, 1]]));
+  });
+
+  it('QT-316 R15: una fila de otra empresa no cuenta aunque se pida su linea', async () => {
+    const ofB = await createOrder(b.companyId);
+    const ofA = await createOrder(a.companyId);
+    inserted(await repo.insert(evidence(b, ofB)));
+    inserted(await repo.insert(evidence(b, ofB, { phase: 'packing' })));
+    inserted(await repo.insert(evidence(a, ofA)));
+    const pairs = [
+      { orderId: ofA, lineId: line(ofA) },
+      { orderId: ofB, lineId: line(ofB) },
+    ];
+
+    expect(await repo.countByLines(a.companyId, pairs)).toEqual(new Map([[line(ofA), 1]]));
+    expect(await repo.countByLines(b.companyId, pairs)).toEqual(new Map([[line(ofB), 2]]));
+  });
+
+  it('QT-316 R15: un par con el orderId cambiado no cuenta las fotos de la linea', async () => {
+    const orderId = await createOrder(a.companyId);
+    const otherOrderId = await createOrder(a.companyId);
+    const lineA = line(orderId);
+    inserted(await repo.insert(evidence(a, orderId)));
+    inserted(await repo.insert(evidence(a, otherOrderId)));
+
+    expect(await repo.countByLines(a.companyId, [{ orderId: otherOrderId, lineId: lineA }])).toEqual(new Map());
+    expect(
+      await repo.countByLines(a.companyId, [
+        { orderId: otherOrderId, lineId: lineA },
+        { orderId: otherOrderId, lineId: line(otherOrderId) },
+      ]),
+    ).toEqual(new Map([[line(otherOrderId), 1]]));
+  });
+
+  it('QT-316 R4: con la lista vacia devuelve un Map vacio sin consultar', async () => {
+    const watched = watchGroupBy();
+
+    const counts = await watched.repo.countByLines(a.companyId, []);
+
+    expect(counts).toEqual(new Map());
+    expect(watched.calls()).toBe(0);
+  });
+});
+
 describe('cancelar o dar de baja el pedido no borra sus fotos (R38)', () => {
   it('R38: las filas siguen tras pasar el pedido a CANCELADO', async () => {
     const orderId = await createOrder(a.companyId);

@@ -19,7 +19,7 @@
 
 ## Tanda 1 — contratos (backend_dev)
 
-- [ ] **T1 [P] · backend_dev — la línea del lote en `inventario`** (design § 3.1 · R5)
+- [x] **T1 [P] · backend_dev — la línea del lote en `inventario`** (design § 3.1 · R5)
   - `FinishedProductBatchRow.orderLineId: string | null`.
   - `listFinishedProductBatches` (Prisma) lee `orderLineId` del asiento `production`.
   - Comentario de `listBatches` en el puerto.
@@ -30,7 +30,7 @@
       ese asiento; lote de apertura → `null`;
     - `list-finished-product-batches.test.ts` comprueba que la fila conserva `orderLineId`;
     - typecheck y guardias en verde.
-- [ ] **T2 [P] · backend_dev — `StepEvidenceRepository.countByLines`** (design § 3.2 · R4, R15, R20)
+- [x] **T2 [P] · backend_dev — `StepEvidenceRepository.countByLines`** (design § 3.2 · R4, R15, R20)
   - Método en el puerto existente: no nace ningún archivo en `ports/`. `countByOrders` se queda
     hasta T8.
   - Adaptador Prisma con un solo `groupBy`, de las tres fases.

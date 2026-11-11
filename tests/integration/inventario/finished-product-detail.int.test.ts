@@ -567,6 +567,8 @@ describe('findAliveFinishedProduct', () => {
 describe('listFinishedProductBatches', () => {
   it('R13, R14: todos los lotes, agotado incluido, con el pedido de su asiento production aunque el pedido este borrado', async () => {
     const page = await listFinishedProductBatches(seed.productId, { page: 1 }, seed.a.scope)
+    const lineLive = await ensureOnlyLine(prisma, seed.orderLive)
+    const lineDeleted = await ensureOnlyLine(prisma, seed.orderDeleted)
 
     expect(page.total).toBe(3)
     expect(page.items).toEqual([
@@ -574,6 +576,7 @@ describe('listFinishedProductBatches', () => {
         id: seed.batchOpening.id,
         lot: seed.batchOpening.lot,
         orderId: null,
+        orderLineId: null,
         purchaseDate: '2026-09-01',
         productionDate: null,
         expiryDate: null,
@@ -585,6 +588,7 @@ describe('listFinishedProductBatches', () => {
         id: seed.batchEmpty.id,
         lot: seed.batchEmpty.lot,
         orderId: seed.orderDeleted,
+        orderLineId: lineDeleted,
         purchaseDate: '2026-09-01',
         productionDate: null,
         expiryDate: null,
@@ -596,6 +600,7 @@ describe('listFinishedProductBatches', () => {
         id: seed.batchProduced.id,
         lot: seed.batchProduced.lot,
         orderId: seed.orderLive,
+        orderLineId: lineLive,
         purchaseDate: '2026-09-01',
         productionDate: '2026-09-28',
         expiryDate: '2027-09-28',
@@ -603,6 +608,24 @@ describe('listFinishedProductBatches', () => {
         stock: '22.0000',
         createdAt: at(1).toISOString(),
       },
+    ])
+  })
+
+  it('QT-316 R5: cada lote con asiento production trae la linea de ese asiento; el de apertura, null', async () => {
+    const asientos = await prisma.inventoryMovement.findMany({
+      where: { id: { in: [seed.movements.productionLive, seed.movements.productionDeleted] } },
+      select: { batchId: true, orderLineId: true },
+    })
+    const lineaDelAsiento = new Map(asientos.map((asiento) => [asiento.batchId, asiento.orderLineId]))
+    expect(lineaDelAsiento.get(seed.batchProduced.id)).toBe(await ensureOnlyLine(prisma, seed.orderLive))
+    expect(lineaDelAsiento.get(seed.batchEmpty.id)).toBe(await ensureOnlyLine(prisma, seed.orderDeleted))
+
+    const page = await listFinishedProductBatches(seed.productId, { page: 1 }, seed.a.scope)
+
+    expect(page.items.map((row) => [row.id, row.orderId, row.orderLineId])).toEqual([
+      [seed.batchOpening.id, null, null],
+      [seed.batchEmpty.id, seed.orderDeleted, lineaDelAsiento.get(seed.batchEmpty.id)],
+      [seed.batchProduced.id, seed.orderLive, lineaDelAsiento.get(seed.batchProduced.id)],
     ])
   })
 

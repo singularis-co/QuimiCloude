@@ -56,6 +56,8 @@ export type FinishedProductBatchRow = {
   readonly lot: string;
   /** `null` en los dos: el lote no tiene asiento `production`. */
   readonly orderId: string | null;
+  /** La linea del pedido que produjo el lote; `null` exactamente cuando `orderId` lo es. */
+  readonly orderLineId: string | null;
   readonly orderNumberText: string | null;
   /** YYYY-MM-DD */
   readonly purchaseDate: string;

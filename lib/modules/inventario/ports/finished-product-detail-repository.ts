@@ -63,7 +63,7 @@ export type FinishedProductCostRecord = {
 export interface FinishedProductDetailRepository {
   /** Vivo, de la empresa y `FINISHED_PRODUCT`; si no, `null`. */
   findAliveFinished(id: string, scope: InventoryScope): Promise<FinishedProductRecord | null>;
-  /** `orderId` sale del asiento `production` del lote. */
+  /** `orderId` y `orderLineId` salen del asiento `production` del lote. */
   listBatches(
     productId: string,
     page: PageRequest,
