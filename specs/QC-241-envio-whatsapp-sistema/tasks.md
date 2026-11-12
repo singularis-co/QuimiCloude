@@ -116,7 +116,7 @@
 - **Hecho:** `pnpm exec vitest run guard` verde; la guardia muerde con un importador ficticio;
   `package.json` sin cambios.
 
-## [ ] T11 — Línea de log cuando faltan las claves de firma [P] · R42 · depende de T4, T7
+## [x] T11 — Línea de log cuando faltan las claves de firma [P] · R42 · depende de T4, T7
 
 - `adapters/driven/queue/whatsapp-queue-signature-qstash.ts` (design §5.1, «Claves que faltan»): con
   firma presente y alguna clave ausente o vacía, `log.error('whatsapp_send_signing_keys_missing',
@@ -131,7 +131,7 @@
   o con firma inválida y claves puestas, ninguna línea; `whatsapp-send-route.test.ts` sigue verde
   (`401`).
 
-## [ ] T12 — Variables por entorno en la documentación [P] · D17 · depende de T10
+## [x] T12 — Variables por entorno en la documentación [P] · D17 · depende de T10
 
 - `docs/architecture.md > Variables por entorno` (design §13):
   - fila `WHATSAPP_SEND_MAX_RETRIES`: `opcional | vacia (valor por defecto, 3) | vacia (valor por

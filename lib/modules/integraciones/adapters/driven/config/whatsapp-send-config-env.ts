@@ -53,6 +53,10 @@ export function readWhatsappSendMaxRetries(): number {
   return Number(trimmed);
 }
 
+export function missingWhatsappQueueSigningKeys(): readonly string[] {
+  return [CURRENT_SIGNING_KEY_VAR, NEXT_SIGNING_KEY_VAR].filter((name) => isBlank(process.env[name]));
+}
+
 /** La verificación de la firma solo necesita las dos claves: no exige ni la URL ni el token. */
 export function readWhatsappQueueSigningKeys(): WhatsappQueueSigningKeys {
   const env = readRequired([CURRENT_SIGNING_KEY_VAR, NEXT_SIGNING_KEY_VAR]);

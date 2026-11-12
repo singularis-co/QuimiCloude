@@ -302,6 +302,7 @@ Modificados (aditivos):
 | R39 | `guard-dependencias-aprobadas.test.ts` |
 | R40 | `whatsapp-system-send-migration.int.test.ts` |
 | R41 | `guard-rutas-fuera-de-sesion.test.ts` |
+| R42 | `whatsapp-queue-signature-qstash.test.ts > R42: claves de firma que faltan con la firma presente` (8 casos; T11, vuelta 1 de review) |
 
 ### Verificación final (implementer, tras `9306d887b`)
 
@@ -357,3 +358,17 @@ Otras listas cerradas tocadas por el mismo motivo (añadidos mínimos): `module-
    está en los dobles, pero ningún test lo usa todavía.
 7. **Límite de `retries` del plan de QStash** sin verificar (dato de la cuenta). Si es menor, el
    barrido republica lo que QStash deje de reintentar (sección D6).
+
+## Vuelta 1 de review: T11 (R42) y T12 (D17), 2026-11-11
+
+- Modificados: `lib/modules/integraciones/adapters/driven/queue/whatsapp-queue-signature-qstash.ts`
+  (constante exportada `WHATSAPP_SYSTEM_SEND_FLOW`, `log.error('whatsapp_send_signing_keys_missing')`
+  con firma presente y claves ausentes o vacías), `.../config/whatsapp-send-config-env.ts`
+  (`missingWhatsappQueueSigningKeys()`, devuelve los nombres sin parsear el error),
+  `tests/unit/integraciones/whatsapp/queue/whatsapp-queue-signature-qstash.test.ts` (8 casos R42),
+  `docs/architecture.md` (fila propia de `APP_BASE_URL`; Local de `WHATSAPP_SEND_MAX_RETRIES`).
+- R42 → `whatsapp-queue-signature-qstash.test.ts > R42: claves de firma que faltan con la firma presente`.
+- typecheck verde; lint 0 errores (11 warnings preexistentes, ninguno en archivos tocados);
+  `vitest run tests/unit/integraciones/whatsapp tests/unit/integraciones/module-shape.test.ts`: 81 archivos,
+  1802 pass, 1 skipped, 0 fail; `vitest run guard`: 88 archivos, 1359 pass, 22 skipped, 0 fail.
+- Veredicto: T11 y T12 listas para la vuelta 2.
