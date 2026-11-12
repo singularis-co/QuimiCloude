@@ -229,3 +229,131 @@ Veredicto: T6–T8 completas y verdes; T9 adelantada solo en lo que exige el typ
   `whatsapp-system-send-migration`): 3 archivos, 26 passed.
 
 **Veredicto:** T9 y T10 completas; todo verde.
+
+## Consolidado (implementer) — 2026-11-11
+
+T1–T10 marcadas `[x]` en `tasks.md`. Commits de la rama (todos con push):
+
+| Tanda | Tasks | Commit |
+|---|---|---|
+| 1 | T1–T3 | `02e8dc2e0` + `d7a0c12f3` (test de QT-303, ver justificación 1) |
+| 2 | T4–T5 | `15923da28` |
+| 3 | T6–T8 | `bab84afe7` |
+| 4 | T9–T10 | `9306d887b` |
+
+### Archivos tocados (`git diff --name-status origin/dev...HEAD`, sin `specs/` ni `progress/`)
+
+Creados:
+- `app/api/cron/barrer-envios-whatsapp/route.ts`, `app/api/integraciones/whatsapp/envios/route.ts`
+- `db/migrations/20261111120000_whatsapp_system_send/migration.sql`, `down.sql`
+- `lib/modules/integraciones/adapters/driven/config/whatsapp-send-config-env.ts`
+- `lib/modules/integraciones/adapters/driven/persistence/whatsapp-send-queue-prisma.ts`
+- `lib/modules/integraciones/adapters/driven/queue/whatsapp-queue-signature-qstash.ts`, `whatsapp-send-queue-qstash.ts`
+- `lib/modules/integraciones/adapters/driving/whatsapp-send-route.ts`, `whatsapp-send-sweep-cron-route.ts`
+- `lib/modules/integraciones/domain/`: `enqueue-whatsapp-message.ts`, `process-whatsapp-send.ts`,
+  `sweep-whatsapp-sends.ts`, `whatsapp-notifier.ts`, `whatsapp-send-job.ts`, `whatsapp-send-retry-policy.ts`
+- `lib/modules/integraciones/ports/`: `whatsapp-queue-log.ts`, `whatsapp-queue-signature.ts`,
+  `whatsapp-send-config.ts`, `whatsapp-send-queue-repository.ts`, `whatsapp-send-queue.ts`
+- `tests/guards/guard-qstash-aislado.test.ts`
+- `tests/integration/integraciones/`: `whatsapp-send-queue-prisma.int.test.ts`,
+  `whatsapp-system-send-flow.int.test.ts`, `whatsapp-system-send-migration.int.test.ts`
+- `tests/unit/integraciones/whatsapp/queue/`: `enqueue-whatsapp-message`, `process-whatsapp-send`,
+  `sweep-whatsapp-sends`, `whatsapp-queue-signature-qstash`, `whatsapp-send-config-env`,
+  `whatsapp-send-queue-qstash`, `whatsapp-send-retry-policy`, `whatsapp-send-route`,
+  `whatsapp-send-schedule`, `whatsapp-send-sweep-cron-route` (`.test.ts`)
+
+Modificados (aditivos):
+- `.env.example`, `db/schema.prisma`, `docs/architecture.md` (fila de `WHATSAPP_SEND_MAX_RETRIES`, ver
+  decisión 3), `docs/dependencias.md`, `lib/composition/index.ts`, `lib/shared/routes.ts`, `vercel.json`
+- `lib/modules/documentos/adapters/driven/queue/processing-queue-qstash.ts`, `queue-signature-qstash.ts`
+  (solo cabecera)
+- `lib/modules/integraciones/index.ts`; `domain/send-whatsapp-message.ts`,
+  `whatsapp-outbound-message.ts`, `whatsapp-send-failure.ts`, `whatsapp-send-recipient.ts`
+- `tests/guards/guard-ambito-empresa-integraciones.test.ts` (`PUERTO_COLA` en `PUERTOS`),
+  `guard-identificador-de-request.test.ts`, `guard-rutas-fuera-de-sesion.test.ts`
+- `tests/integration/aislamiento.json`, `tests/integration/integraciones/whatsapp-agent-schema.int.test.ts`
+- `tests/unit/integraciones/module-shape.test.ts`, `whatsapp/send/send-whatsapp-message.test.ts`,
+  `whatsapp/whatsapp-doubles.ts`
+
+`package.json` sin cambios; ninguna dependencia nueva.
+
+### Mapa R1–R41 → test
+
+| R | Test |
+|---|---|
+| R1–R13 | `enqueue-whatsapp-message.test.ts`; R1, R8, R10 también en `whatsapp-system-send-flow.int.test.ts`; R9 (concurrente y vínculo) en `whatsapp-system-send-flow.int.test.ts` y `send-whatsapp-message.test.ts`; R8, R10 también en `whatsapp-send-queue-prisma.int.test.ts`; R10 también en `whatsapp-send-queue-qstash.test.ts` |
+| R14 | `whatsapp-send-route.test.ts`, `whatsapp-queue-signature-qstash.test.ts`, `whatsapp-send-config-env.test.ts` |
+| R15 | `whatsapp-send-route.test.ts`, `whatsapp-send-retry-policy.test.ts` (esquema del trabajo) |
+| R16 | `process-whatsapp-send.test.ts`, `whatsapp-send-route.test.ts` |
+| R17, R18 | `process-whatsapp-send.test.ts`, `whatsapp-send-route.test.ts`; concurrencia en `whatsapp-send-queue-prisma.int.test.ts` |
+| R19, R20 | `process-whatsapp-send.test.ts`; motivos fijos de R19 en `whatsapp-send-retry-policy.test.ts` |
+| R21 | `process-whatsapp-send.test.ts`, `whatsapp-send-route.test.ts`, `whatsapp-system-send-flow.int.test.ts` |
+| R22, R23 | `process-whatsapp-send.test.ts`, `whatsapp-send-route.test.ts`, `whatsapp-send-retry-policy.test.ts`; `release` de R22 en `whatsapp-send-queue-prisma.int.test.ts` |
+| R24 | `whatsapp-send-route.test.ts`, `process-whatsapp-send.test.ts` |
+| R25 | `whatsapp-send-config-env.test.ts`, `whatsapp-send-queue-qstash.test.ts`, `whatsapp-send-retry-policy.test.ts` |
+| R26 | `process-whatsapp-send.test.ts`, `whatsapp-send-retry-policy.test.ts` |
+| R27 | `whatsapp-send-sweep-cron-route.test.ts` |
+| R28 | `whatsapp-send-sweep-cron-route.test.ts`, `sweep-whatsapp-sends.test.ts` |
+| R29–R34 | `sweep-whatsapp-sends.test.ts`; R29, R31–R34 también en `whatsapp-send-queue-prisma.int.test.ts` |
+| R35 | `whatsapp-send-schedule.test.ts` (ruta y `0 * * * *`) |
+| R36 | `whatsapp-send-queue-prisma.int.test.ts`, `whatsapp-system-send-flow.int.test.ts`, `guard-ambito-empresa-integraciones.test.ts`, `process-whatsapp-send.test.ts`, `sweep-whatsapp-sends.test.ts` |
+| R37 | `whatsapp-system-send-flow.int.test.ts` |
+| R38 | `guard-qstash-aislado.test.ts` (muerde con un importador ficticio en disco, borrado después), `guard-arquitectura-modulos.test.ts` |
+| R39 | `guard-dependencias-aprobadas.test.ts` |
+| R40 | `whatsapp-system-send-migration.int.test.ts` |
+| R41 | `guard-rutas-fuera-de-sesion.test.ts` |
+
+### Verificación final (implementer, tras `9306d887b`)
+
+| Comando | Resultado |
+|---|---|
+| `pnpm run typecheck` | exit 0 |
+| `pnpm run lint` | exit 0 — `✖ 11 problems (0 errors, 11 warnings)`, todas en archivos ajenos a la feature |
+| `pnpm exec vitest run tests/unit/integraciones/whatsapp tests/unit/integraciones/module-shape.test.ts` | `Test Files 81 passed (81)` · `Tests 1794 passed \| 1 skipped (1795)` |
+| `pnpm exec vitest run guard` | `Test Files 88 passed (88)` · `Tests 1359 passed \| 22 skipped (1381)` |
+| integración (`.env` del repo principal): flow, queue-prisma, system-send-migration, agent-schema | `Test Files 4 passed (4)` · `Tests 45 passed (45)`; base efímera copia de `qct_tpl_7f2e8b9de890`, borrada al terminar |
+
+**`vitest related` no se usa en este worktree:** `pnpm exec vitest related --run <archivos>` sale con
+código 127 sin más salida que la cabecera `RUN`. Sobre `send-whatsapp-message.ts`, además, arrastra
+casi toda la suite por el contrato y la composición. Por eso todas las tandas corrieron sus archivos
+de test directamente (tabla de arriba). No se corrió la suite completa: la corre `gate-completo` en CI.
+No hay E2E: la feature no añade ni toca specs de Playwright.
+
+### Justificaciones fuera de `tasks.md`
+
+1. **`tests/integration/integraciones/whatsapp-agent-schema.int.test.ts` (QT-303), commit `d7a0c12f3`.**
+   El índice parcial nuevo filtra por `origin = 'SYSTEM'::whatsapp_message_origin`. Ese test revierte
+   y reaplica por su cuenta `20261030120000_whatsapp_agent`, que renombra y recrea el tipo, y con el
+   índice en pie fallaba con `42883 operator does not exist` (5 casos). Se adaptó con el patrón que ya
+   usa `whatsapp-messages-migration.int.test.ts`: revertir antes las migraciones posteriores que
+   filtran por `"origin"` y reaplicarlas después. El SQL de la migración queda como en design §2.2.
+   El leader lo aceptó el 2026-11-11.
+2. **`tests/guards/guard-identificador-de-request.test.ts` (+2 líneas).** `MIGRACIONES_ESPERADAS` es
+   una lista cerrada de migraciones; toda migración nueva entra en ella o la guardia se pone en rojo.
+   Necesario por T1.
+
+Otras listas cerradas tocadas por el mismo motivo (añadidos mínimos): `module-shape.test.ts`
+(archivos, contrato, cableado e importadores) y `guard-ambito-empresa-integraciones.test.ts`
+(`PUERTO_COLA`).
+
+### Decisiones de los backend_dev que el reviewer o el humano deben mirar
+
+1. **Orden de `enqueue` distinto de design §4.2:** la plantilla se resuelve antes que el destinatario.
+   `recipientByCustomer` puede crear o vincular el contacto, y con el orden literal una plantilla
+   inexistente, no enviable o con valores que faltan dejaba ese contacto escrito, en contra de R6 y del
+   «Hecho» de T6. Los motivos de omisión no cambian.
+2. **Claves de firma vacías ⇒ 401 sin log.** `verify` no lanza, así que el adaptador devuelve `false`.
+   Ni design §3.3 ni R14 piden registrarlo y no se añadió. Un despliegue sin
+   `QSTASH_*_SIGNING_KEY` rechaza todas las entregas sin rastro. Si se quiere un log, se decide en el spec.
+3. **Fila nueva en `docs/architecture.md > Variables por entorno`** para `WHATSAPP_SEND_MAX_RETRIES`
+   (`opcional | vacía (defecto 3) | vacía`), copiada de `DOCUMENT_PROCESSING_MAX_RETRIES`. La exige
+   `guard-variables-por-entorno`. El spec no dice qué valor llevan Production y Preview: hay que confirmarlo.
+4. **Barrido:** si `listCompanyIds` o `maxRetries()` lanzan, el error se propaga (500). `SweepResult`
+   no expresa un fallo sin empresa y el design no lo fija.
+5. **`ProcessWhatsappSendDeps.connections`** es el repositorio completo (lo pide `decryptStoredSecret`);
+   se quitó `now`, que el consumidor no usa.
+6. **Doble de `publish`** con `INTEGRATIONS_E2E_DOUBLES`: va dentro de la composición, igual que el de
+   Graph, sin archivo `*-canned.ts`. Design §5.5 no fija dónde va. `makeQueueSignature` (design §10.2)
+   está en los dobles, pero ningún test lo usa todavía.
+7. **Límite de `retries` del plan de QStash** sin verificar (dato de la cuenta). Si es menor, el
+   barrido republica lo que QStash deje de reintentar (sección D6).
