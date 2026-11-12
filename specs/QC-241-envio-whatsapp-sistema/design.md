@@ -679,7 +679,8 @@ importadores (§9). `pino` y `zod`, ya aprobadas. `package.json` no cambia.
 - `WHATSAPP_SEND_MAX_RETRIES` mantiene la fila que exige `guard-variables-por-entorno`. Solo se
   confirma: opcional y vacía en los dos entornos no productivos.
 - `APP_BASE_URL` sale de la fila del correo, que dice «ausentes (solo las lee el correo)» en Preview,
-  y pasa a una fila propia: en Production la de producción; en Preview **hace falta si se prueba
-  WhatsApp**, porque también la lee la cola de envíos para formar la URL del consumidor (D13); en Local,
+  y pasa a una fila propia: en Production la de producción; en Preview **ausente** (enmienda
+  m6, 2026-11-12: el build de Preview exige `QSTASH_TOKEN` ausente, así que allí no hay envíos del
+  sistema); la fila nombra a la cola de envíos como lectora, que forma con ella la URL del consumidor (D13); en Local,
   según dev. El texto exacto lo escribe la task T12; la guardia `guard-variables-por-entorno` sigue en
   verde porque la variable conserva su fila.

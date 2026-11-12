@@ -837,7 +837,7 @@ primera columna; lo vigila `tests/guards/guard-variables-por-entorno.test.ts`.
 | `MAIL_TRANSPORT` | el de hoy (`resend` o `smtp`) | **`desactivado`** | vacia, `outbox` (E2E) o `smtp` |
 | `RESEND_API_KEY`, `SMTP_PASS` | de produccion | **ausentes** (comprobacion previa) | segun dev |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `MAIL_FROM_ADDRESS` | de produccion | ausentes (solo las lee el correo) | segun dev |
-| `APP_BASE_URL` | de produccion | necesaria si se prueba WhatsApp (la lee tambien la cola de envios de WhatsApp para la URL del consumidor); si no, ausente | segun dev |
+| `APP_BASE_URL` | de produccion | ausente (la leen el correo y la cola de envios de WhatsApp; en Preview no hay envios del sistema porque `QSTASH_TOKEN` esta ausente) | segun dev |
 | `MAIL_OUTBOX_DIR` | ausente | ausente | solo con `outbox` |
 | `QSTASH_TOKEN` | de produccion | **ausente** (comprobacion previa) | segun dev |
 | `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `QSTASH_TARGET_URL` | de produccion | ausentes (sin ellas, el webhook rechaza todo) | segun dev |
