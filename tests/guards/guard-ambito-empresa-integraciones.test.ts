@@ -168,6 +168,7 @@ const PUERTOS: readonly PuertoVigilado[] = [
   PUERTO_VARIABLES,
   PUERTO_SALIDA,
   PUERTO_CONVERSACIONES,
+  PUERTO_COLA,
 ]
 
 /**
@@ -696,8 +697,8 @@ describe.each(PUERTOS)('R2 — cada metodo de $nombre declara Y consume el ambit
   }
 })
 
-// El lado del puerto de la cola se vigila ya, aunque su adaptador llegue despues: cuando exista,
-// `PUERTO_COLA` entra en `PUERTOS` y el barrido de arriba comprueba tambien la implementacion.
+// El barrido de `PUERTOS` ya comprueba la implementacion de la cola; aqui se fija ademas la forma del
+// puerto: sus ocho metodos y el ambito como ultimo parametro.
 describe(`R36 — el puerto ${PUERTO_COLA.nombre} exige el ambito de empresa en cada metodo`, () => {
   const metodos = metodosDeLaInterfaz(PUERTO_COLA.ruta, PUERTO_COLA.nombre)
 

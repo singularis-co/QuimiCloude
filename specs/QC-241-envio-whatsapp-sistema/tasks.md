@@ -38,7 +38,7 @@
 - **Hecho:** typecheck verde; ningún archivo de `ports/` importa `@upstash/qstash`, `next/*` ni
   `@prisma/client`; la guardia de ámbito ve el puerto nuevo.
 
-## T4 — Adaptadores de QStash y configuración [P] · R10, R14, R25, R38
+## [x] T4 — Adaptadores de QStash y configuración [P] · R10, R14, R25, R38
 
 - `adapters/driven/config/whatsapp-send-config-env.ts` (design §5.2).
 - `adapters/driven/queue/whatsapp-send-queue-qstash.ts` y
@@ -53,7 +53,7 @@
 - **Hecho:** importar los adaptadores con las variables vacías no lanza; la configuración se lee al
   llamar; faltantes nombrados sin valor.
 
-## T5 — Persistencia · R8, R17, R18, R29, R31–R33, R36 · depende de T1, T3
+## [x] T5 — Persistencia · R8, R17, R18, R29, R31–R33, R36 · depende de T1, T3
 
 - `adapters/driven/persistence/whatsapp-send-queue-prisma.ts` (design §5.3): reclamo en una sola
   sentencia; `updated_at = now()` en el SQL crudo; todo con ámbito y `origin = 'SYSTEM'`.

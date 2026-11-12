@@ -385,6 +385,9 @@ export function whatsappWebhookPath(connectionId: string): string {
   return `${WHATSAPP_WEBHOOK_ROUTE_BASE}/${connectionId}`;
 }
 
+/** Ruta pública del consumidor de la cola de envíos: la llama la cola sin sesión, con el cuerpo firmado. */
+export const WHATSAPP_SEND_ROUTE = '/api/integraciones/whatsapp/envios';
+
 /** Ruta de la imagen de un mensaje de WhatsApp: relativa a la aplicación, la pide el navegador con su sesión. */
 export const WHATSAPP_MEDIA_ROUTE_BASE = '/api/integraciones/whatsapp/media';
 

@@ -739,6 +739,11 @@
       "desde": "2026-10-23"
     },
     {
+      "archivo": "integraciones/whatsapp-send-queue-prisma.int.test.ts",
+      "motivo": "Ejercita createWhatsappSendQueueRepository() de whatsapp-send-queue-prisma.ts construido sobre el cliente Prisma GLOBAL, como en lib/composition, asi que una transaccion del test con ROLLBACK no lo envolveria; ademas el caso de varios claim a la vez del mismo mensaje necesita conexiones que confirmen de verdad para comprobar que solo uno gana. Cada caso fabrica su empresa efimera con randomUUID (tipo de documento, rol, empresa, usuario, conexion y contacto) y 'afterAll' borra mensajes -> contactos -> conexiones por 'company_id', afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-11"
+    },
+    {
       "archivo": "integraciones/whatsapp-send-flow.int.test.ts",
       "motivo": "T10 (QC-240): recorre sendWhatsappMessage y retryWhatsappMessage por la fachada real de lib/composition (Prisma, cifrado AES-GCM, telefonos de clientes y el doble canned de Graph con un espia), que escriben con el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria; ademas dos envios a la vez al mismo cliente sin contacto necesitan confirmar de verdad contra el unico (connection_id, wa_id). Cada caso siembra en cuatro empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> relaciones -> plantillas -> variables -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-23"
