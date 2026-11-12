@@ -79,3 +79,42 @@ Ninguno es BLOQUEANTE.
 ### Veredicto
 
 **OK**: 0 bloqueantes, 5 menores (m1–m5). Las desviaciones 1, 4, 5 y 6 son aceptables; las 2 y 3 son menores. Antes de pedir el merge, el leader debe llevar m2, m3 y m4 al humano. `gate-completo` sigue pendiente en CI.
+
+## Vuelta 2 (acotada a 5180a56d1..HEAD)
+
+Commits: 5b040f1cd (review vuelta 1), 5c73b1779 (enmienda del spec: R42, D16–D18, T11–T12) y 4f4eeb3ad (arreglo: m2, m3). El alcance es el que fijó el leader: R42, m1/m4/m5 en design.md y T12 en `docs/architecture.md`. No se rehace la trazabilidad de R1–R41.
+
+### Checklist
+
+- [x] **R42 en EARS.** Es un requisito no deseado: «SI … ENTONCES el sistema DEBE … y NO DEBE …». Es testeable: pide `401`, una línea `error` con el flujo y los nombres, y que no salga ningún valor. Cubre D16, y figura en la cobertura de D y en el Mapa R → test de `tasks.md`.
+- [x] **R42 tiene un test real.** Está en `whatsapp-queue-signature-qstash.test.ts`, en el bloque `R42`:
+  - cuatro casos `it.each`: las dos claves ausentes, las dos vacías o con espacios, falta la actual, la siguiente vacía. Cada caso comprueba `false`, una sola llamada a `error` con el evento, el flujo y los nombres exactos, y que no se construye `Receiver`;
+  - el valor centinela de la clave presente no aparece en ninguna llamada;
+  - sin firma no hay línea;
+  - con firma inválida (`verify` lanza) o que no corresponde (`verify` ⇒ `false`) y las claves puestas, tampoco hay línea.
+
+  El `401` lo sigue cubriendo `whatsapp-send-route.test.ts`.
+- [x] **El test pasa.** `vitest run` sobre signature, route, config-env y queue-qstash: 4 archivos, 45/45 en verde.
+- [x] **Código de T11.** `missingWhatsappQueueSigningKeys()` usa el mismo `isBlank` que `readRequired`, así que no hay divergencia entre «falta» y «lanza». El adaptador registra con `forModule('integraciones')`: un adaptador driven que importa `lib/shared`, lo que está permitido. `missing` lleva solo los nombres. El puerto no cambia y la firma se comprueba antes que las claves, como dice el design §5.1.
+- [x] **m1 resuelto.** En §4.2 el paso 3 es la plantilla y el 4 el destinatario, con el motivo: R6 y que el destinatario puede escribir por R9. `tasks.md` T6 se corrige a «paso 4».
+- [x] **m4 resuelto.** §4.4 queda en `SWEEP_BATCH = 100 (D18, confirmado por el humano el 2026-11-11)` y ya no lleva `[POR CONFIRMAR]`.
+- [x] **m5 resuelto.** §5.5 declara la excepción de E2E frente a `CHECKPOINTS.md > Calidad de codigo`. Da el motivo, cita los precedentes QC-111 y QC-238 y nombra la cobertura que lo sustituye: `whatsapp-send-route.test.ts` y el flujo `.int`.
+- [x] **m2 llevado al design.** §8 lo recoge como límite conocido (D16), con los tres casos, y deja escrito que no hay tope.
+- [x] **T12 aplicada en `docs/architecture.md`.** `APP_BASE_URL` sale de la fila del correo, que conserva el resto de sus variables y su texto, y pasa a una fila propia con el texto literal de T12. La fila `WHATSAPP_SEND_MAX_RETRIES` queda `opcional | vacia (valor por defecto, 3) | vacia (valor por defecto, 3)`. Ninguna fila dice ya que `APP_BASE_URL` solo la lee el correo.
+- [x] **Guardias.** `vitest run guard`: 88 archivos, 1359 tests en verde y 22 skipped; incluye `guard-variables-por-entorno` y `guard-dependencias-aprobadas`.
+- [x] **eslint y tsc.** `eslint` sobre los 3 archivos tocados, limpio. `tsc --noEmit`, sin errores.
+- [x] Las tasks T11 y T12 están marcadas `[x]`. `docs/architecture.md` figura en «Archivos esperados» y en el design §2.
+
+### Hallazgos
+
+Ninguno es BLOQUEANTE.
+
+- **m6 — menor. `docs/architecture.md` sigue siendo incoherente sobre `APP_BASE_URL` en Preview.** T12 está aplicada al pie de la letra (D17), pero hay dos problemas que el leader debe llevar al humano. No hace falta otra vuelta de código:
+  1. «Lo que hace el humano (fuera del codigo)» (línea ~813) sigue mandando **borrar** `APP_BASE_URL` en Preview. Eso contradice la fila nueva («necesaria si se prueba WhatsApp»).
+  2. En Preview, `QSTASH_TOKEN` tiene que estar ausente: `scripts/entorno-de-preview.mjs`, `SIN_VALOR`, hace fallar el build si tiene valor. Sin ese token la publicación falla siempre (R11). Por eso «probar WhatsApp en Preview» con la cola no es posible hoy, y poner `APP_BASE_URL` no cambia nada.
+
+  La forma más simple de corregirlo sería dejar Preview en «ausente (sin `QSTASH_TOKEN` la cola no publica)». También vale ajustar la viñeta de «borrar». Decide el humano, porque D17 es suyo.
+
+### Veredicto
+
+**OK**: 0 bloqueantes, 1 menor (m6). m1–m5 de la vuelta 1 quedan resueltos: m1, m4 y m5 en el design; m2 con R42 y su test; m3 con T12. `gate-completo` sigue pendiente en CI.
