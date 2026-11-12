@@ -16,6 +16,7 @@ import {
   rejectedWithCodeReason,
 } from '@/lib/modules/integraciones/domain/whatsapp-send-failure'
 import { WHATSAPP_TEXT_MAX_LENGTH } from '@/lib/modules/integraciones/domain/whatsapp-send-input'
+import { recipientByCustomer } from '@/lib/modules/integraciones/domain/whatsapp-send-recipient'
 import type { WhatsappTemplateRecord } from '@/lib/modules/integraciones/domain/whatsapp-template'
 import type { WhatsappVariableKeyRecord } from '@/lib/modules/integraciones/domain/whatsapp-variable-key'
 import type { GraphMessageSent } from '@/lib/modules/integraciones/ports/whatsapp-graph-client'
@@ -704,5 +705,35 @@ describe('sendWhatsappMessage — el mensaje y la llamada a Meta', () => {
       'markSent',
       'touchContact',
     ])
+  })
+})
+
+describe('el contexto del destinatario admite un vinculo de sistema', () => {
+  it('QC-241 R9: el envio de un usuario sigue vinculando el contacto como manual de ese usuario', async () => {
+    const s = setup({ mainPhone: { e164: '525512345678' }, contacts: [] })
+    await s.send(templateTo({ customerId: CUSTOMER_ID }), sender())
+
+    const [created] = s.outbox.allContacts()
+    expect(s.outbox.linkContact).toHaveBeenCalledWith(
+      created?.id,
+      { customerId: CUSTOMER_ID, linkedBy: ACTOR_ID },
+      { companyId: COMPANY_ID },
+    )
+  })
+
+  it('QC-241 R9: sin actor (actorId null) el vinculo queda puesto por el sistema', async () => {
+    const s = setup({ mainPhone: { e164: '525512345678' }, contacts: [] })
+    const { contact } = await recipientByCustomer(
+      { outbox: s.outbox.outbox, customerPhones: s.phones.customerPhones },
+      CUSTOMER_ID,
+      { connectionId: CONNECTION_ID, actorId: null, scope: { companyId: COMPANY_ID } },
+    )
+
+    expect(contact).toMatchObject({ customerId: CUSTOMER_ID, customerLinkedBy: null })
+    expect(s.outbox.linkContact).toHaveBeenCalledWith(
+      contact.id,
+      { customerId: CUSTOMER_ID, linkedBy: null },
+      { companyId: COMPANY_ID },
+    )
   })
 })

@@ -1436,6 +1436,7 @@ model WhatsappMessage {
   templateLanguage String?                @map("template_language")
   attempts       Int                      @default(0)
   queueMessageId String?                  @map("queue_message_id")
+  templateComponents Json?                @map("template_components")
   createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 

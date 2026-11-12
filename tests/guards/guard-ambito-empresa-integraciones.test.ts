@@ -147,6 +147,19 @@ const PUERTO_CONVERSACIONES: PuertoVigilado = {
   fabrica: 'createWhatsappConversationRepository',
 }
 
+// 2026-11-11: la cola de envios del sistema, un puerto propio para no cambiar el de salida. Su
+// adaptador se cablea en su fabrica `create…(db)` y entra en el barrido sin exencion.
+const ADAPTADOR_COLA = 'whatsapp-send-queue-prisma.ts'
+const PUERTO_COLA: PuertoVigilado = {
+  nombre: 'WhatsappSendQueueRepository',
+  ruta: join(MODULE_ROOT, 'ports', 'whatsapp-send-queue-repository.ts'),
+  constante: 'whatsappSendQueueRepository',
+  metodosEsperados: 8,
+  adaptador: ADAPTADOR_COLA,
+  ayudantes: [],
+  fabrica: 'createWhatsappSendQueueRepository',
+}
+
 const PUERTOS: readonly PuertoVigilado[] = [
   PUERTO,
   PUERTO_INBOX,
@@ -155,6 +168,7 @@ const PUERTOS: readonly PuertoVigilado[] = [
   PUERTO_VARIABLES,
   PUERTO_SALIDA,
   PUERTO_CONVERSACIONES,
+  PUERTO_COLA,
 ]
 
 /**
@@ -681,6 +695,43 @@ describe.each(PUERTOS)('R2 — cada metodo de $nombre declara Y consume el ambit
       expect(adaptador.consumidoras.has(funcion.nombre), `${funcion.nombre} no lleva el ambito a ./company-scope`).toBe(true)
     })
   }
+})
+
+// El barrido de `PUERTOS` ya comprueba la implementacion de la cola; aqui se fija ademas la forma del
+// puerto: sus ocho metodos y el ambito como ultimo parametro.
+describe(`R36 — el puerto ${PUERTO_COLA.nombre} exige el ambito de empresa en cada metodo`, () => {
+  const metodos = metodosDeLaInterfaz(PUERTO_COLA.ruta, PUERTO_COLA.nombre)
+
+  it(`${PUERTO_COLA.nombre}: declara exactamente sus ${String(PUERTO_COLA.metodosEsperados)} metodos`, () => {
+    expect([...metodos.keys()].sort()).toEqual([
+      'claim',
+      'failExhausted',
+      'failStaleQueued',
+      'failStuckSending',
+      'insertQueued',
+      'listStaleQueued',
+      'recordPublished',
+      'release',
+    ])
+    expect(metodos.size).toBe(PUERTO_COLA.metodosEsperados)
+  })
+
+  for (const [metodo, parametros] of metodos) {
+    it(`${PUERTO_COLA.nombre}.${metodo} exige \`${LITERAL}\` como ultimo parametro, y no opcional`, () => {
+      expect(FORMA_DE_AMBITO.declaracion.test(parametros), `${metodo} no exige \`${LITERAL}\``).toBe(true)
+      expect(/\bscope\s*\?\s*:/.test(parametros) || /\bscope\s*:[^,)]*=/.test(parametros)).toBe(false)
+      expect(parametros.trim().replace(/,\s*$/, '')).toMatch(/\bscope\s*:\s*IntegracionesScope$/)
+    })
+  }
+
+  it('R36 (sensibilidad): un metodo sin ambito, con ambito opcional o con el ambito en medio se ve', () => {
+    const sinAmbito = 'id: string, maxAttempts: number'
+    const opcional = 'id: string, scope?: IntegracionesScope'
+    const enMedio = 'scope: IntegracionesScope, id: string'
+    expect(FORMA_DE_AMBITO.declaracion.test(sinAmbito)).toBe(false)
+    expect(/\bscope\s*\?\s*:/.test(opcional)).toBe(true)
+    expect(enMedio.trim().replace(/,\s*$/, '')).not.toMatch(/\bscope\s*:\s*IntegracionesScope$/)
+  })
 })
 
 describe('R2 — las escrituras sobre una conexion existente llevan el ambito en el `where` de cada `updateMany`', () => {

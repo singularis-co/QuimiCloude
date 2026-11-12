@@ -5,9 +5,9 @@ import { readProcessingConfigFromEnv, readQstashConfigFromEnv } from '../config/
 import type { ProcessingQueue, QueuedMessage } from '../../../ports/processing-queue';
 
 /**
- * Implementa el puerto `ProcessingQueue` con `Client.publishJSON` de `@upstash/qstash`. **Unico
- * archivo del repositorio, junto a `queue-signature-qstash.ts`, que importa la libreria**:
- * sustituirla es reescribir estos dos archivos, no buscarla por el arbol.
+ * Implementa el puerto `ProcessingQueue` con `Client.publishJSON` de `@upstash/qstash`. Con
+ * `queue-signature-qstash.ts`, uno de los dos archivos de `documentos` que importan la libreria
+ * (`integraciones` tiene los suyos): sustituirla aqui es reescribir estos dos.
  *
  * La configuracion se lee EN CADA LLAMADA, nunca al importar el modulo, y el cliente se
  * construye dentro de la funcion: importar este archivo sin invocar `publishToQstash` no debe

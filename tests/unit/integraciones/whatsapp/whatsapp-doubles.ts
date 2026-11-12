@@ -62,7 +62,11 @@ import type {
   WhatsappConversationRepository,
 } from '@/lib/modules/integraciones/ports/whatsapp-conversation-repository'
 import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports/whatsapp-outbox-repository'
+import type { WhatsappQueueLog } from '@/lib/modules/integraciones/ports/whatsapp-queue-log'
+import type { WhatsappQueueSignature } from '@/lib/modules/integraciones/ports/whatsapp-queue-signature'
 import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log'
+import type { WhatsappSendQueue } from '@/lib/modules/integraciones/ports/whatsapp-send-queue'
+import type { WhatsappSendQueueRepository } from '@/lib/modules/integraciones/ports/whatsapp-send-queue-repository'
 import type { WhatsappVariableKeyRepository } from '@/lib/modules/integraciones/ports/whatsapp-variable-key-repository'
 import type { WhatsappWebhookDirectory } from '@/lib/modules/integraciones/ports/whatsapp-webhook-directory'
 
@@ -449,6 +453,69 @@ export function makeSendLog() {
   const sendFailed = vi.fn<WhatsappSendLog['sendFailed']>()
   const sendLog: WhatsappSendLog = { sendFailed }
   return { sendLog, sendFailed }
+}
+
+/** La cola de envíos: cada publicación devuelve `cola-<messageId>` sin red. */
+export function makeSendQueue() {
+  const publish = vi.fn<WhatsappSendQueue['publish']>(async (job) => `cola-${job.messageId}`)
+  const queue: WhatsappSendQueue = { publish }
+  return { queue, publish }
+}
+
+/** La firma de la cola: acepta o rechaza toda entrega según `valid`. */
+export function makeQueueSignature(valid = true) {
+  const verify = vi.fn<WhatsappQueueSignature['verify']>(async () => valid)
+  const signature: WhatsappQueueSignature = { verify }
+  return { signature, verify }
+}
+
+/** Las líneas de log de la cola, anotadas sin escribir en la consola. */
+export function makeQueueLog() {
+  const log = {
+    info: vi.fn<WhatsappQueueLog['info']>(),
+    warn: vi.fn<WhatsappQueueLog['warn']>(),
+    error: vi.fn<WhatsappQueueLog['error']>(),
+  }
+  const text = () => JSON.stringify([...log.info.mock.calls, ...log.warn.mock.calls, ...log.error.mock.calls])
+  return { log, text }
+}
+
+export const QUEUED_MESSAGE_ID = '00000000-0000-4000-8000-000000000401'
+
+/**
+ * El repositorio de la cola con respuestas neutras: inserta `QUEUED_MESSAGE_ID`, no reclama nada y
+ * no cambia ninguna fila. Cada caso sustituye lo que necesita con `mockImplementation`.
+ */
+export function makeSendQueueRepository() {
+  const insertQueued = vi.fn<WhatsappSendQueueRepository['insertQueued']>(async () => ({ id: QUEUED_MESSAGE_ID }))
+  const recordPublished = vi.fn<WhatsappSendQueueRepository['recordPublished']>(async () => undefined)
+  const claim = vi.fn<WhatsappSendQueueRepository['claim']>(async () => null)
+  const release = vi.fn<WhatsappSendQueueRepository['release']>(async () => undefined)
+  const listStaleQueued = vi.fn<WhatsappSendQueueRepository['listStaleQueued']>(async () => [])
+  const failExhausted = vi.fn<WhatsappSendQueueRepository['failExhausted']>(async () => 0)
+  const failStaleQueued = vi.fn<WhatsappSendQueueRepository['failStaleQueued']>(async () => 0)
+  const failStuckSending = vi.fn<WhatsappSendQueueRepository['failStuckSending']>(async () => 0)
+  const queueStore: WhatsappSendQueueRepository = {
+    insertQueued,
+    recordPublished,
+    claim,
+    release,
+    listStaleQueued,
+    failExhausted,
+    failStaleQueued,
+    failStuckSending,
+  }
+  return {
+    queueStore,
+    insertQueued,
+    recordPublished,
+    claim,
+    release,
+    listStaleQueued,
+    failExhausted,
+    failStaleQueued,
+    failStuckSending,
+  }
 }
 
 /** Unidad de trabajo sin base: corre el trabajo con los puertos dados y cuenta las aperturas. */

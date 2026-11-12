@@ -24,7 +24,8 @@ export type ResolvedRecipient = { readonly contact: OutboundContact; readonly cu
 
 export type RecipientContext = {
   readonly connectionId: string;
-  readonly actorId: string;
+  /** `null` cuando no hay usuario detrás: el vínculo queda puesto por el sistema. */
+  readonly actorId: string | null;
   readonly scope: IntegracionesScope;
 };
 

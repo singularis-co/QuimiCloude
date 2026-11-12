@@ -9,7 +9,6 @@ import {
   WhatsappTemplateValuesMissingError,
   WhatsappWindowClosedError,
 } from './errors';
-import type { GraphFailure } from './graph-failure';
 import { scopeOf, type IntegracionesScope } from './integraciones-scope';
 import type { WhatsappConnectionRecord } from './whatsapp-connection';
 import type {
@@ -17,7 +16,7 @@ import type {
   OutboundContact,
   WhatsappOutboundMessageView,
 } from './whatsapp-outbound-message';
-import { sendFailureOf, TOKEN_INVALID_MESSAGE } from './whatsapp-send-failure';
+import { sendDiagnosticOf, sendFailureOf, TOKEN_INVALID_MESSAGE } from './whatsapp-send-failure';
 import { sendWhatsappMessageSchema } from './whatsapp-send-input';
 import { resolveRecipient, type WhatsappSendRecipientDeps } from './whatsapp-send-recipient';
 import { isWindowOpen } from './whatsapp-send-window';
@@ -117,10 +116,6 @@ function newMessageOf(plan: DeliveryPlan, actor: Actor): NewOutboundMessage {
   };
 }
 
-function diagnosticOf(failure: GraphFailure): string {
-  return `Graph enviar mensaje: ${failure.kind}; code=${failure.code ?? '-'}; subcode=${failure.subcode ?? '-'}`;
-}
-
 type DeliveryResult = {
   readonly status: 'SENT' | 'FAILED';
   readonly errorCode: string | null;
@@ -160,7 +155,7 @@ export async function deliver(
       await deps.connections.update(connection.id, { status: 'ERROR', lastError: TOKEN_INVALID_MESSAGE }, ctx.scope);
     }
     result = { status: 'FAILED', errorCode: failure.errorCode, errorReason: failure.errorReason };
-    deps.sendLog.sendFailed({ messageId: inserted.id, diagnostic: diagnosticOf(sent) });
+    deps.sendLog.sendFailed({ messageId: inserted.id, diagnostic: sendDiagnosticOf(sent) });
   }
 
   await deps.outbox.touchContact(contact.id, ctx.at, ctx.scope);
