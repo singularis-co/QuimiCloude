@@ -99,3 +99,76 @@ Verificado el 2026-11-11 contra el SDK instalado: `node_modules/@upstash/qstash`
   El adaptador no lo configura.
 - `Receiver.verify` (`client-CsnfJpnA.d.ts:70-79`): «If that fails, the signature is invalid and a
   `SignatureError` is thrown» — por eso el adaptador de firma captura y devuelve `false`.
+
+## Tanda 3 (T6, T7, T8) — 2026-11-11, backend_dev
+
+### Archivos
+
+Creados:
+- `lib/modules/integraciones/domain/enqueue-whatsapp-message.ts` (`createWhatsappNotifier`)
+- `lib/modules/integraciones/domain/process-whatsapp-send.ts` (`createProcessWhatsappSend`)
+- `lib/modules/integraciones/domain/sweep-whatsapp-sends.ts` (`createSweepWhatsappSends`, `SWEEP_BATCH = 100`)
+- `lib/modules/integraciones/adapters/driving/whatsapp-send-route.ts` (POST)
+- `lib/modules/integraciones/adapters/driving/whatsapp-send-sweep-cron-route.ts` (GET)
+- `app/api/integraciones/whatsapp/envios/route.ts` (`runtime = 'nodejs'`, `maxDuration = 60`)
+- `app/api/cron/barrer-envios-whatsapp/route.ts` (`runtime = 'nodejs'`, `maxDuration = 300`)
+- Tests en `tests/unit/integraciones/whatsapp/queue/`: `enqueue-whatsapp-message.test.ts`,
+  `process-whatsapp-send.test.ts`, `sweep-whatsapp-sends.test.ts`, `whatsapp-send-route.test.ts`,
+  `whatsapp-send-sweep-cron-route.test.ts`, `whatsapp-send-schedule.test.ts`
+
+Modificados:
+- `domain/whatsapp-send-recipient.ts`: `RecipientContext.actorId: string | null`.
+- `vercel.json`: + `{ "path": "/api/cron/barrer-envios-whatsapp", "schedule": "0 * * * *" }`; los tres crons intactos.
+- `tests/guards/guard-rutas-fuera-de-sesion.test.ts`: + las dos rutas como `anadido: 'integraciones'` y su caso R41.
+- `tests/unit/integraciones/whatsapp/send/send-whatsapp-message.test.ts`: + 2 casos (usuario sigue con su id; `actorId null` ⇒ `linkedBy null`).
+- **Adelanto mínimo de T9** (sin él no compilan los adaptadores driving, que piden todo a `@/lib/composition`):
+  - `lib/modules/integraciones/index.ts`: + `whatsappSendJobSchema`, `createProcessWhatsappSend`, `createSweepWhatsappSends`.
+  - `lib/composition/index.ts`: imports al final de la lista de `integraciones`; consts `whatsappSendQueueRepository`,
+    `whatsappSendQueue`, `whatsappQueueSignature`, `whatsappSendConfig` (diferido), `whatsappQueueLog` tras
+    `whatsappMediaDeps`; miembros `whatsappQueueSignature`, `processWhatsappSend`, `sweepWhatsappSends` al final de
+    `integraciones`. Sin reordenar nada.
+  - `tests/unit/integraciones/module-shape.test.ts`: listas cerradas ampliadas (5 archivos del módulo, 3 nombres del
+    contrato, 3 miembros del cableado + 5 `typeOf`, 2 rutas importadoras).
+  - Queda para T9: `whatsappNotifier` en la composición, `createWhatsappNotifier` y tipos en el contrato, el doble de
+    `publish` con `INTEGRATIONS_E2E_DOUBLES`, `whatsapp-doubles.ts` y el flujo de integración.
+
+### Decisiones
+
+- **Orden en `enqueue`: plantilla antes que destinatario.** design §4.2 numera destinatario (3) y plantilla (4), pero
+  `recipientByCustomer` puede crear o vincular el contacto; con ese orden una plantilla inexistente dejaría una
+  escritura, contra R6 («NO DEBE escribir… nada») y el «Hecho» de T6. Las lecturas de plantilla van primero; el
+  resultado de cada caso no cambia.
+- `ProcessWhatsappSendDeps.connections` es el `WhatsappConnectionRepository` completo (lo exige `decryptStoredSecret`);
+  sin `now`, que el consumidor no usa.
+- `listCompanyIds` o `maxRetries()` que lanzan en el barrido se propagan (500 de la plataforma): `SweepResult` no tiene
+  forma de expresar un fallo sin empresa y design no lo pide.
+- Firma con claves vacías ⇒ 401 sin log: design §3.3 y R14 no piden registrarlo; no se añade.
+
+### R → test (esta tanda)
+
+| R | Test |
+|---|---|
+| R1–R13 | `enqueue-whatsapp-message.test.ts` (R9 también `send-whatsapp-message.test.ts`, 2 casos `QC-241 R9`) |
+| R14, R15 | `whatsapp-send-route.test.ts` |
+| R16 | `process-whatsapp-send.test.ts`, `whatsapp-send-route.test.ts` |
+| R17–R23, R26 | `process-whatsapp-send.test.ts`; R18/R21/R22/R23 (códigos HTTP) en `whatsapp-send-route.test.ts` |
+| R24 | `whatsapp-send-route.test.ts`, `process-whatsapp-send.test.ts` |
+| R27 | `whatsapp-send-sweep-cron-route.test.ts` |
+| R28 | `sweep-whatsapp-sends.test.ts`, `whatsapp-send-sweep-cron-route.test.ts` |
+| R29–R34 | `sweep-whatsapp-sends.test.ts` |
+| R35 | `whatsapp-send-schedule.test.ts` |
+| R36 | `process-whatsapp-send.test.ts` (trabajo de otra empresa), `sweep-whatsapp-sends.test.ts` |
+| R41 | `guard-rutas-fuera-de-sesion.test.ts` |
+
+### Verificación
+
+- `pnpm run typecheck` → exit 0.
+- `pnpm run lint` → exit 0, 0 errores, 11 warnings preexistentes en archivos que esta tanda no toca.
+- `pnpm exec vitest run tests/unit/integraciones/whatsapp tests/unit/integraciones/module-shape.test.ts` →
+  81 archivos, 1794 passed, 1 skipped, 0 failed.
+- `pnpm exec vitest run guard` → 87 archivos, 1355 passed, 22 skipped, 0 failed.
+- Tests que barren rutas o `vercel.json` fuera de integraciones (route-segment-config, qc111/qc78 alcance, purge-route,
+  etc., 7 archivos) → 85 passed, 24 skipped.
+- Integración: no corrida; esta tanda no toca adaptadores con base.
+
+Veredicto: T6–T8 completas y verdes; T9 adelantada solo en lo que exige el typecheck de los adaptadores driving.

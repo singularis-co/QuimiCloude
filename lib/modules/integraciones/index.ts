@@ -124,6 +124,9 @@ export { createSyncAllWhatsappTemplates } from './domain/sync-all-whatsapp-templ
 export type { WhatsappOutboundMessageView } from './domain/whatsapp-outbound-message';
 export { createSendWhatsappMessage } from './domain/send-whatsapp-message';
 export { createRetryWhatsappMessage } from './domain/retry-whatsapp-message';
+export { whatsappSendJobSchema } from './domain/whatsapp-send-job';
+export { createProcessWhatsappSend } from './domain/process-whatsapp-send';
+export { createSweepWhatsappSends } from './domain/sweep-whatsapp-sends';
 export type {
   WhatsappMessageDirection,
   WhatsappMessageStatus,

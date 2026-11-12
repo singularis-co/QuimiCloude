@@ -60,6 +60,14 @@ export const RUTAS_FUERA_DE_SESION: Readonly<Record<string, Clasificacion>> = {
     anadido: 'integraciones',
     prueba: 'tests/unit/integraciones/whatsapp/conversations/whatsapp-media-route.test.ts',
   },
+  'app/api/integraciones/whatsapp/envios/route.ts': {
+    anadido: 'integraciones',
+    prueba: 'tests/unit/integraciones/whatsapp/queue/process-whatsapp-send.test.ts',
+  },
+  'app/api/cron/barrer-envios-whatsapp/route.ts': {
+    anadido: 'integraciones',
+    prueba: 'tests/unit/integraciones/whatsapp/queue/sweep-whatsapp-sends.test.ts',
+  },
 };
 
 export function listApiRoutes(root: string): readonly string[] {
@@ -153,6 +161,19 @@ describe('guardia: rutas que corren sin sesión', () => {
     expect(RUTAS_FUERA_DE_SESION['app/api/integraciones/whatsapp/media/[mensajeId]/route.ts']).toEqual({
       anadido: 'integraciones',
       prueba: 'tests/unit/integraciones/whatsapp/conversations/whatsapp-media-route.test.ts',
+    });
+  });
+
+  it('QC-241 R41: el consumidor de la cola de envíos y su barrido son del añadido `integraciones`, cada uno con su prueba', () => {
+    expect(rutas).toContain('app/api/integraciones/whatsapp/envios/route.ts');
+    expect(RUTAS_FUERA_DE_SESION['app/api/integraciones/whatsapp/envios/route.ts']).toEqual({
+      anadido: 'integraciones',
+      prueba: 'tests/unit/integraciones/whatsapp/queue/process-whatsapp-send.test.ts',
+    });
+    expect(rutas).toContain('app/api/cron/barrer-envios-whatsapp/route.ts');
+    expect(RUTAS_FUERA_DE_SESION['app/api/cron/barrer-envios-whatsapp/route.ts']).toEqual({
+      anadido: 'integraciones',
+      prueba: 'tests/unit/integraciones/whatsapp/queue/sweep-whatsapp-sends.test.ts',
     });
   });
 

@@ -170,6 +170,8 @@ const MODULE_CODE_FILES = [
   'adapters/driving/whatsapp-conversation-actions.ts',
   'adapters/driving/whatsapp-media-route.ts',
   'adapters/driving/whatsapp-message-actions.ts',
+  'adapters/driving/whatsapp-send-route.ts',
+  'adapters/driving/whatsapp-send-sweep-cron-route.ts',
   'adapters/driving/whatsapp-template-actions.ts',
   'adapters/driving/whatsapp-template-cron-route.ts',
   'adapters/driving/whatsapp-variable-key-actions.ts',
@@ -185,6 +187,7 @@ const MODULE_CODE_FILES = [
   'domain/create-whatsapp-template.ts',
   'domain/delete-whatsapp-template.ts',
   'domain/disconnect-ai-provider.ts',
+  'domain/enqueue-whatsapp-message.ts',
   'domain/errors.ts',
   'domain/get-ai-provider-connection.ts',
   'domain/get-ai-provider-readiness.ts',
@@ -203,6 +206,7 @@ const MODULE_CODE_FILES = [
   'domain/list-whatsapp-templates.ts',
   'domain/manage-whatsapp-variable-keys.ts',
   'domain/mark-whatsapp-chat-read.ts',
+  'domain/process-whatsapp-send.ts',
   'domain/receive-whatsapp-webhook.ts',
   'domain/refresh-whatsapp-contact-links.ts',
   'domain/regenerate-whatsapp-verify-token.ts',
@@ -219,6 +223,7 @@ const MODULE_CODE_FILES = [
   'domain/set-whatsapp-connection-enabled.ts',
   'domain/set-whatsapp-contact-blocked.ts',
   'domain/stored-secret.ts',
+  'domain/sweep-whatsapp-sends.ts',
   'domain/sync-all-whatsapp-templates.ts',
   'domain/sync-whatsapp-templates.ts',
   'domain/template-connection.ts',
@@ -588,6 +593,7 @@ describe('la forma del modulo integraciones', () => {
       'createListWhatsappDictionary',
       'createListWhatsappTemplates',
       'createMarkWhatsappChatRead',
+      'createProcessWhatsappSend',
       'createReceiveWhatsappWebhook',
       'createRefreshWhatsappContactLinks',
       'createRegenerateWhatsappVerifyToken',
@@ -604,6 +610,7 @@ describe('la forma del modulo integraciones', () => {
       'createSetWhatsappConnectionEnabled',
       'createSetWhatsappContactBlocked',
       'createSetWhatsappTemplateEnabled',
+      'createSweepWhatsappSends',
       'createSyncAllWhatsappTemplates',
       'createSyncWhatsappTemplates',
       'createTestAiProviderKey',
@@ -621,6 +628,7 @@ describe('la forma del modulo integraciones', () => {
       'resolveContactLink',
       'validateKeyedTemplateDraft',
       'validateWhatsappVariableKeyInput',
+      'whatsappSendJobSchema',
     ])
     expect(reexports.filter((r) => r.typeOnly).map((r) => r.name).sort()).toEqual([
       'Actor',
@@ -814,7 +822,9 @@ describe('la forma del modulo integraciones', () => {
       'app/(private)/integraciones/whatsapp/page.tsx',
       'app/(private)/produccion/formulas/page.tsx',
       'app/(private)/proveedores/[id]/page.tsx',
+      'app/api/cron/barrer-envios-whatsapp/route.ts',
       'app/api/cron/sincronizar-plantillas-whatsapp/route.ts',
+      'app/api/integraciones/whatsapp/envios/route.ts',
       'app/api/integraciones/whatsapp/media/[mensajeId]/route.ts',
       'app/api/integraciones/whatsapp/webhook/[conexionId]/route.ts',
     ])
@@ -886,6 +896,7 @@ describe('la forma del modulo integraciones', () => {
       'listWhatsappDictionary',
       'listWhatsappTemplates',
       'markWhatsappChatRead',
+      'processWhatsappSend',
       'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'relateWhatsappTemplateVariables',
@@ -903,6 +914,7 @@ describe('la forma del modulo integraciones', () => {
       'setWhatsappConnectionEnabled',
       'setWhatsappContactBlocked',
       'setWhatsappTemplateEnabled',
+      'sweepWhatsappSends',
       'syncAllWhatsappTemplates',
       'syncWhatsappTemplates',
       'testAiProviderKey',
@@ -913,6 +925,7 @@ describe('la forma del modulo integraciones', () => {
       'updateWhatsappVariableKey',
       'verifyCronSecret',
       'verifyWhatsappWebhook',
+      'whatsappQueueSignature',
       'whatsappWebhookUrl',
     ])
     expect(cableado?.typeOf.whatsappContactRepository).toBe('WhatsappContactRepository')
@@ -938,6 +951,11 @@ describe('la forma del modulo integraciones', () => {
     expect(cableado?.typeOf.whatsappSendLog).toBe('WhatsappSendLog')
     expect(cableado?.typeOf.whatsappConversationRepository).toBe('WhatsappConversationRepository')
     expect(cableado?.typeOf.customerOrderDirectory).toBe('CustomerOrderDirectory')
+    expect(cableado?.typeOf.whatsappSendQueueRepository).toBe('WhatsappSendQueueRepository')
+    expect(cableado?.typeOf.whatsappSendQueue).toBe('WhatsappSendQueue')
+    expect(cableado?.typeOf.whatsappQueueSignature).toBe('WhatsappQueueSignature')
+    expect(cableado?.typeOf.whatsappSendConfig).toBe('WhatsappSendConfig')
+    expect(cableado?.typeOf.whatsappQueueLog).toBe('WhatsappQueueLog')
   })
 
   it('R58: el contexto del chat se cablea con los pedidos del cliente, el nombre de la empresa y los catalogos por contrato, y el archivo con Graph y el cifrado', () => {

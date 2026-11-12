@@ -61,7 +61,7 @@
 - **Hecho:** dos reclamos concurrentes ⇒ uno gana; tope de intentos respetado; `fail*` no toca
   `USER`/`AGENT`; otra empresa ⇒ cero filas.
 
-## T6 — `enqueue` · R1–R13 · depende de T2, T3
+## [x] T6 — `enqueue` · R1–R13 · depende de T2, T3
 
 - `domain/whatsapp-send-recipient.ts`: `RecipientContext.actorId: string | null` (design §4.2,
   paso 3); `send-whatsapp-message.test.ts` comprueba que el envío de usuario no cambia.
@@ -70,7 +70,7 @@
 - **Hecho:** cada omisión sin escrituras ni publicación y con su línea de log; ningún caso rechaza la
   promesa; el log no lleva valores, número ni texto.
 
-## T7 — Consumidor · R14–R24, R26 · depende de T2–T5
+## [x] T7 — Consumidor · R14–R24, R26 · depende de T2–T5
 
 - `domain/process-whatsapp-send.ts` (design §4.3).
 - `adapters/driving/whatsapp-send-route.ts` (design §3.3) y
@@ -81,7 +81,7 @@
 - **Hecho:** firma inválida ⇒ 401 sin tocar nada; duplicado ⇒ 200 sin Meta; 5xx ⇒ `QUEUED` + 500;
   4xx ⇒ `FAILED` + 200.
 
-## T8 — Barrido · R27–R35 · depende de T2–T5
+## [x] T8 — Barrido · R27–R35 · depende de T2–T5
 
 - `domain/sweep-whatsapp-sends.ts` (design §4.4).
 - `adapters/driving/whatsapp-send-sweep-cron-route.ts` y

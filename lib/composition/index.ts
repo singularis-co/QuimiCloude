@@ -2856,6 +2856,8 @@ import {
   createListSendableWhatsappTemplates,
   createGetWhatsappChatContext,
   createGetWhatsappMedia,
+  createProcessWhatsappSend,
+  createSweepWhatsappSends,
 } from '@/lib/modules/integraciones';
 import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
 import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
@@ -2912,6 +2914,15 @@ import type { WhatsappOutboxRepository } from '@/lib/modules/integraciones/ports
 import type { WhatsappConversationRepository } from '@/lib/modules/integraciones/ports/whatsapp-conversation-repository';
 import type { WhatsappSendLog } from '@/lib/modules/integraciones/ports/whatsapp-send-log';
 import type { CustomerPhoneLinks } from '@/lib/modules/integraciones/ports/customer-phone-links';
+import { readWhatsappSendMaxRetries } from '@/lib/modules/integraciones/adapters/driven/config/whatsapp-send-config-env';
+import { createWhatsappSendQueueRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-send-queue-prisma';
+import { whatsappQueueSignatureQstash } from '@/lib/modules/integraciones/adapters/driven/queue/whatsapp-queue-signature-qstash';
+import { whatsappSendQueueQstash } from '@/lib/modules/integraciones/adapters/driven/queue/whatsapp-send-queue-qstash';
+import type { WhatsappQueueLog } from '@/lib/modules/integraciones/ports/whatsapp-queue-log';
+import type { WhatsappQueueSignature } from '@/lib/modules/integraciones/ports/whatsapp-queue-signature';
+import type { WhatsappSendConfig } from '@/lib/modules/integraciones/ports/whatsapp-send-config';
+import type { WhatsappSendQueue } from '@/lib/modules/integraciones/ports/whatsapp-send-queue';
+import type { WhatsappSendQueueRepository } from '@/lib/modules/integraciones/ports/whatsapp-send-queue-repository';
 import { whatsappMediaPath, whatsappWebhookPath } from '@/lib/shared/routes';
 
 /** El doble se elige en cada llamada: la variable puede cambiar dentro del mismo proceso. */
@@ -3065,6 +3076,13 @@ const whatsappMediaDeps = {
   cipher: secretCipher,
 };
 
+const whatsappSendQueueRepository: WhatsappSendQueueRepository = createWhatsappSendQueueRepository();
+const whatsappSendQueue: WhatsappSendQueue = whatsappSendQueueQstash;
+const whatsappQueueSignature: WhatsappQueueSignature = whatsappQueueSignatureQstash;
+/** Diferido: una variable inválida falla al procesar o barrer, no al importar la composición. */
+const whatsappSendConfig: WhatsappSendConfig = { maxRetries: () => readWhatsappSendMaxRetries() };
+const whatsappQueueLog: WhatsappQueueLog = forModule('integraciones');
+
 type WhatsappWebhookUrl = { readonly url: string; readonly complete: boolean };
 
 /** Sin `APP_BASE_URL` devuelve la ruta relativa: la pantalla avisa en vez de fallar. */
@@ -3215,6 +3233,25 @@ export const integraciones = {
   handOffWhatsappConversation: createHandOffWhatsappConversation({ contacts: whatsappContactRepository }),
   returnWhatsappConversationToAgent: createReturnWhatsappConversationToAgent({ contacts: whatsappContactRepository }),
   getWhatsappConversationMode: createGetWhatsappConversationMode({ contacts: whatsappContactRepository }),
+  whatsappQueueSignature,
+  processWhatsappSend: createProcessWhatsappSend({
+    integrations: integrationsSwitch,
+    connections: whatsappConnectionRepository,
+    cipher: secretCipher,
+    queueStore: whatsappSendQueueRepository,
+    outbox: whatsappOutboxRepository,
+    graph: whatsappGraphClient,
+    config: whatsappSendConfig,
+    sendLog: whatsappSendLog,
+  }),
+  sweepWhatsappSends: createSweepWhatsappSends({
+    listCompanyIds: listActiveCompanyIds,
+    integrations: integrationsSwitch,
+    queueStore: whatsappSendQueueRepository,
+    queue: whatsappSendQueue,
+    config: whatsappSendConfig,
+    log: whatsappQueueLog,
+  }),
 } as const;
 
 import {
