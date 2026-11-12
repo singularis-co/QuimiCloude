@@ -6,7 +6,7 @@
 // la migracion se lee del archivo.
 import { randomUUID } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { Prisma } from '@prisma/client'
@@ -63,8 +63,35 @@ function statementsOf(sql: string): readonly string[] {
     .filter((statement) => statement.length > 0)
 }
 
-const UP_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8'))
-const DOWN_STATEMENTS = statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8'))
+/**
+ * Las migraciones POSTERIORES que filtran por `"origin"` (un indice parcial, p. ej.) dependen del
+ * tipo que esta migracion renombra y recrea: con ellas puestas el cambio de tipo falla. Su DOWN va
+ * antes (de la mas reciente a la mas antigua) y su UP despues, como en
+ * `whatsapp-messages-migration.int.test.ts`. La primera es la del envio del sistema (2026-11-11).
+ */
+const timestampDe = (nombre: string): string => nombre.split('_')[0] as string
+const DEPENDIENTES_DEL_ORIGEN = readdirSync(migrationsDir)
+  .filter((nombre) => timestampDe(nombre) > timestampDe(basename(migrationDir)))
+  .filter((nombre) => existsSync(join(migrationsDir, nombre, 'migration.sql')))
+  .filter((nombre) => /"origin"\s*(?:=|IN\b)/.test(readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')))
+  .sort()
+const DOWN_DE_DEPENDIENTES = [...DEPENDIENTES_DEL_ORIGEN]
+  .reverse()
+  .flatMap((nombre) => statementsOf(readFileSync(join(migrationsDir, nombre, 'down.sql'), 'utf8')))
+const UP_DE_DEPENDIENTES = DEPENDIENTES_DEL_ORIGEN.flatMap((nombre) =>
+  statementsOf(readFileSync(join(migrationsDir, nombre, 'migration.sql'), 'utf8')),
+)
+
+const UP_STATEMENTS = [
+  ...DOWN_DE_DEPENDIENTES,
+  ...statementsOf(readFileSync(join(migrationDir, 'migration.sql'), 'utf8')),
+  ...UP_DE_DEPENDIENTES,
+]
+const DOWN_STATEMENTS = [
+  ...DOWN_DE_DEPENDIENTES,
+  ...statementsOf(readFileSync(join(migrationDir, 'down.sql'), 'utf8')),
+  ...UP_DE_DEPENDIENTES,
+]
 
 const SETTINGS = 'whatsapp_agent_settings'
 const MODE_COLUMNS = [
