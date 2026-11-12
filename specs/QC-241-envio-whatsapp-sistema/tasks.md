@@ -6,6 +6,7 @@
 > `pnpm exec vitest related --run <archivos tocados>`; las que tocan guardias, además
 > `pnpm exec vitest run guard`. Nadie corre `pnpm test` completo.
 > P1–P10 de `requirements.md` quedaron cerradas el 2026-11-11 (D6–D15); el barrido es horario (D7).
+> Enmienda tras la vuelta 1 de review (2026-11-11, D16–D18): T11 y T12, en paralelo, después de T10.
 
 ## [x] T1 — Esquema y migración · R40
 
@@ -64,7 +65,7 @@
 ## [x] T6 — `enqueue` · R1–R13 · depende de T2, T3
 
 - `domain/whatsapp-send-recipient.ts`: `RecipientContext.actorId: string | null` (design §4.2,
-  paso 3); `send-whatsapp-message.test.ts` comprueba que el envío de usuario no cambia.
+  paso 4); `send-whatsapp-message.test.ts` comprueba que el envío de usuario no cambia.
 - `domain/enqueue-whatsapp-message.ts` (`createWhatsappNotifier`, design §4.2).
 - Test `tests/unit/integraciones/whatsapp/queue/enqueue-whatsapp-message.test.ts`.
 - **Hecho:** cada omisión sin escrituras ni publicación y con su línea de log; ningún caso rechaza la
@@ -115,6 +116,34 @@
 - **Hecho:** `pnpm exec vitest run guard` verde; la guardia muerde con un importador ficticio;
   `package.json` sin cambios.
 
+## [ ] T11 — Línea de log cuando faltan las claves de firma [P] · R42 · depende de T4, T7
+
+- `adapters/driven/queue/whatsapp-queue-signature-qstash.ts` (design §5.1, «Claves que faltan»): con
+  firma presente y alguna clave ausente o vacía, `log.error('whatsapp_send_signing_keys_missing',
+  { flow: 'whatsapp_system_send', missing: <nombres> })` y `false`. El identificador del flujo, como
+  constante exportada.
+- `adapters/driven/config/whatsapp-send-config-env.ts`, solo si hace falta para conocer los nombres
+  que faltan sin parsear el texto del error.
+- Test `tests/unit/integraciones/whatsapp/queue/whatsapp-queue-signature-qstash.test.ts`: casos `R42`
+  del design §10.1. Si cambia el lector, `whatsapp-send-config-env.test.ts` sigue verde.
+- **Hecho:** con firma y sin claves, una línea `error` con el flujo y los nombres, y sin ningún valor
+  de clave (el test pone un valor centinela en la clave presente y comprueba que no aparece); sin firma,
+  o con firma inválida y claves puestas, ninguna línea; `whatsapp-send-route.test.ts` sigue verde
+  (`401`).
+
+## [ ] T12 — Variables por entorno en la documentación [P] · D17 · depende de T10
+
+- `docs/architecture.md > Variables por entorno` (design §13):
+  - fila `WHATSAPP_SEND_MAX_RETRIES`: `opcional | vacia (valor por defecto, 3) | vacia (valor por
+    defecto, 3)`;
+  - `APP_BASE_URL` sale de la fila del correo y pasa a una fila propia: Production «de produccion»;
+    Preview «necesaria si se prueba WhatsApp (la lee tambien la cola de envios de WhatsApp para la URL
+    del consumidor); si no, ausente»; Local «segun dev». La fila del correo conserva el resto de sus
+    variables y su texto.
+- Sin requisito nuevo (D17).
+- **Hecho:** `pnpm exec vitest run guard-variables-por-entorno` verde; ninguna fila dice que
+  `APP_BASE_URL` solo la lee el correo.
+
 ## Mapa R → test
 
 | R | Test |
@@ -132,6 +161,7 @@
 | R39 | `guard-dependencias-aprobadas.test.ts` |
 | R40 | `whatsapp-system-send-migration.int.test.ts` |
 | R41 | `guard-rutas-fuera-de-sesion.test.ts` |
+| R42 | `tests/unit/integraciones/whatsapp/queue/whatsapp-queue-signature-qstash.test.ts` (línea `error` con `flow: 'whatsapp_system_send'`, sin valores de clave); el `401` también `whatsapp-send-route.test.ts` |
 
 ## Archivos esperados
 
@@ -169,6 +199,7 @@
 - `vercel.json`
 - `.env.example`
 - `docs/dependencias.md`
+- `docs/architecture.md`
 - `tests/unit/integraciones/whatsapp/queue/enqueue-whatsapp-message.test.ts`
 - `tests/unit/integraciones/whatsapp/queue/process-whatsapp-send.test.ts`
 - `tests/unit/integraciones/whatsapp/queue/sweep-whatsapp-sends.test.ts`

@@ -6,7 +6,8 @@
 > El bloque de Alcance, «Lo que NO entra», la tabla de decisiones y los criterios de aceptación se
 > copian **tal cual** de la ficha (`feature_list.json > QC-241`). Los fijó el humano antes del spec y
 > no se reabren. Lo que la ficha no decía y hacía falta para escribir requisitos testeables se
-> preguntó como P1–P10; el humano las cerró el 2026-11-11 y hoy son las filas D6–D15.
+> preguntó como P1–P10; el humano las cerró el 2026-11-11 y hoy son las filas D6–D15. Tras la
+> vuelta 1 de review, el humano cerró D16–D18 el mismo día y se añadió R42.
 
 ## Alcance (de la ficha)
 
@@ -73,10 +74,15 @@ masivos o campañas.
 | D13 | (2026-11-11, era P8) Sin variable nueva para la URL: `APP_BASE_URL` + `/api/integraciones/whatsapp/envios`, reutilizando `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY` y `QSTASH_NEXT_SIGNING_KEY`; sin `APP_BASE_URL`, la publicación falla y se aplica R11 | Misma cuenta de QStash; una variable más por entorno no aporta nada. El humano acepta el valor por defecto. |
 | D14 | (2026-11-11, era P9) El contacto que crea o vincula `enqueue` queda con vínculo **de sistema** (`customerLinkedBy` nulo) | No hay usuario; el recálculo de QC-239 puede rehacerlo si el número cambia de dueño. El humano acepta el valor por defecto. |
 | D15 | (2026-11-11, era P10) Con el añadido apagado, el barrido no republica y pasa a `FAILED` los `QUEUED` de más de 5 min de esa empresa | Que un aviso viejo no salga días después al reactivar el añadido; el humano acepta el valor por defecto. |
+| D16 | (2026-11-11, review vuelta 1, m2) Si el consumidor rechaza una entrega porque faltan las claves de firma de la cola, deja una línea de log de nivel `error` con el identificador del flujo de envíos automáticos del sistema y **nunca** los valores de las claves. **No** se añade tope de republicaciones. Una `APP_BASE_URL` mal puesta (y unas claves presentes pero equivocadas) quedan como límite conocido (`design.md > 8`) | Sin la línea, una configuración rota deja los mensajes en `QUEUED` y el barrido los republica cada hora sin que nadie lo vea. Decisión del humano. |
+| D17 | (2026-11-11, review vuelta 1, m3) En `docs/architecture.md > Variables por entorno`, `WHATSAPP_SEND_MAX_RETRIES` queda opcional y vacía en Preview y en Local (vale `3`); la fila de `APP_BASE_URL` se corrige: también la lee la cola de envíos de WhatsApp, y en Preview hace falta si se prueba WhatsApp | La fila decía «solo las lee el correo», que dejó de ser cierto con esta feature. Decisión del humano; sin requisito nuevo. |
+| D18 | (2026-11-11, review vuelta 1, m4) `SWEEP_BATCH = 100` mensajes por empresa y pasada del barrido | Acota lo que una pasada publica; lo que quede sale en la pasada siguiente. Decisión del humano. |
 
 Cobertura: D1 → R1, R8, R10, R11 · D2 → R17, R18 · D3 → R22, R23 · D4 → R32 · D5 → R2–R7, R11 ·
 D6 → R25 · D7 → R29, R32, R35 · D8 → R1, R6, R8 · D9 → R19 · D10 → R33 · D11 → R19, R31, R32 ·
-D12 → R38 · D13 → R10, R11 · D14 → R9 · D15 → R34.
+D12 → R38 · D13 → R10, R11 · D14 → R9 · D15 → R34 · D16 → R42 · D17 → R10, R25 (documentación de
+las dos variables que leen; el cambio de docs es `tasks.md > T12`) · D18 → R29 (el lote acota la
+republicación).
 
 ## Glosario
 
@@ -247,6 +253,14 @@ lo que DEBE vigilar una guardia del gate (D12).
 **R41.** Las dos rutas nuevas sin sesión DEBEN figurar en la clasificación de rutas fuera de sesión
 como del añadido `integraciones`, cada una con su prueba.
 
+### Enmienda tras la vuelta 1 de review (2026-11-11)
+
+**R42.** SI llega al consumidor una entrega firmada y falta, o está vacía, alguna de las claves de
+firma de la cola, ENTONCES el sistema DEBE responder `401` como en R14 y DEBE dejar una línea de log
+de nivel `error` que lleve el identificador del flujo de envíos automáticos del sistema y los nombres
+de las claves que faltan, y que NO DEBE contener el valor de ninguna clave (D16).
+
 ## Preguntas abiertas
 
-Ninguna. P1–P10 se cerraron el 2026-11-11 (D6–D15).
+Ninguna. P1–P10 se cerraron el 2026-11-11 (D6–D15); m2–m4 de la vuelta 1 de review, el mismo día
+(D16–D18).

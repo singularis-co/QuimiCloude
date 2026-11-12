@@ -3,7 +3,8 @@
 > Zona: `backend` · Complejidad: `medium` · depends_on: QC-240 · Rama:
 > `feature/QC-241-envio-whatsapp-sistema`
 >
-> El **qué** está en `requirements.md` (R1–R41). Aquí va el **cómo**. Precedentes que se copian:
+> El **qué** está en `requirements.md` (R1–R42). Aquí va el **cómo**. Enmendado el 2026-11-11 tras
+> la vuelta 1 de review (m1–m5; D16–D18, R42). Precedentes que se copian:
 >
 > - **QC-111** (`documentos`): `document-job-route.ts` (firma antes que el cuerpo, `200` = no
 >   reintentar, `500` = reintentar), `processing-queue-qstash.ts` y `queue-signature-qstash.ts`
@@ -82,6 +83,7 @@ app/api/integraciones/whatsapp/envios/route.ts          ← enchufe + runtime/ma
 app/api/cron/barrer-envios-whatsapp/route.ts            ← enchufe + runtime/maxDuration
 lib/composition/index.ts                                ← cableado
 vercel.json, .env.example, docs/dependencias.md         ← cron, variable, fila de qstash
+docs/architecture.md                                    ← filas de variables por entorno (D17, §13)
 lib/modules/documentos/adapters/driven/queue/*.ts       ← solo el comentario «único archivo»
 tests/**                                                ← §10
 ```
@@ -253,17 +255,23 @@ Todo el cuerpo va dentro de un `try`; el `catch` registra `whatsapp_enqueue_fail
 1. `integrations.isOn(companyId)` falso ⇒ `skipped/addon_off` (R2).
 2. `connections.findLive(scope)`; `null` o `status !== 'ACTIVE'` ⇒ `skipped/no_active_connection`
    (R3).
-3. **Destinatario** (R4, R5, R9): se reutiliza `recipientByCustomer` de QC-240 con un adaptador de
+3. **Plantilla** (R6, R12): `templates.findLiveByNameAndLanguage(connection.id, name, language,
+   scope)`; `null` ⇒ `template_not_found`; `!isSendable` ⇒ `template_not_sendable`;
+   `buildTemplateMessage(template, ownValues, values, {})` con `ok: false` ⇒ `template_values_missing`
+   y el log lleva `missing.map(m => m.key)`. `WhatsappTemplateNotSendableError` lanzado por
+   `buildTemplateMessage` ⇒ `template_not_sendable`. Nunca texto libre, nunca ventana.
+4. **Destinatario** (R4, R5, R9): se reutiliza `recipientByCustomer` de QC-240 con un adaptador de
    contexto: su `actorId` se pasa como `null` ⇒ vínculo de sistema (D14). Hace falta un cambio mínimo:
    `RecipientContext.actorId: string | null` (hoy `string`); QC-240 sigue pasando el id del usuario.
    Sus errores se traducen a motivo: `LinkedCustomerNotFoundError` ⇒ `customer_not_found`,
    `WhatsappCustomerWithoutPhoneError` ⇒ `no_phone`, `WhatsappContactLinkedElsewhereError` ⇒
    `contact_linked_elsewhere`, `WhatsappContactBlockedError` ⇒ `contact_blocked`.
-4. **Plantilla** (R6, R12): `templates.findLiveByNameAndLanguage(connection.id, name, language,
-   scope)`; `null` ⇒ `template_not_found`; `!isSendable` ⇒ `template_not_sendable`;
-   `buildTemplateMessage(template, ownValues, values, {})` con `ok: false` ⇒ `template_values_missing`
-   y el log lleva `missing.map(m => m.key)`. `WhatsappTemplateNotSendableError` lanzado por
-   `buildTemplateMessage` ⇒ `template_not_sendable`. Nunca texto libre, nunca ventana.
+
+**Por qué primero la plantilla y después el destinatario** (enmienda del 2026-11-11, m1): resolver el
+destinatario puede **escribir** (crea o vincula el contacto, R9). Si fuera antes, una plantilla
+inexistente, no enviable o con valores que faltan dejaría un contacto creado o vinculado, y R6 exige
+que en ese caso no se escriba nada. Resolviendo antes la plantilla, que solo lee, toda omisión de R6
+termina sin escrituras. Es el orden que ya sigue el código.
 5. `queueStore.insertQueued({ connectionId, contactId, body, templateName, templateLanguage,
    payload: message.values, templateComponents: message.components }, scope)` ⇒ `id` (R8).
 6. `outbox.touchContact(contact.id, now, scope)` (R13).
@@ -326,8 +334,8 @@ propio (R28). Por empresa, con `scope = { companyId }` y `at = now()`:
    queueMessageId, scope)` (renueva `updated_at`, R29). Un `publish` que lanza se registra
    (`whatsapp_sweep_publish_failed`, `{ messageId }`) y se sigue (R30).
 
-`SWEEP_BATCH = 100` por empresa y pasada **[POR CONFIRMAR]**: acota lo que una pasada publica; lo que
-quede sale en la siguiente pasada, una hora después (D7). Todas las consultas filtran `origin = 'SYSTEM'` (R33).
+`SWEEP_BATCH = 100` por empresa y pasada (D18, confirmado por el humano el 2026-11-11): acota lo que
+una pasada publica; lo que quede sale en la siguiente pasada, una hora después (D7). Todas las consultas filtran `origin = 'SYSTEM'` (R33).
 
 ```ts
 type SweepResult = {
@@ -356,6 +364,35 @@ configuración se lee en cada llamada (`readWhatsappSendQueueConfig()`), nunca a
 
 `adapters/driven/queue/whatsapp-queue-signature-qstash.ts`: `Receiver` con las dos claves; `verify`
 captura la excepción de la librería y devuelve `false`; firma ausente ⇒ `false`.
+
+**Claves que faltan (R42, D16; enmienda del 2026-11-11, m2).** Con firma presente, si
+`readWhatsappQueueSigningKeys()` lanza porque falta o está vacía alguna de las dos claves, el adaptador
+deja, antes de devolver `false`:
+
+```ts
+log.error('whatsapp_send_signing_keys_missing', {
+  flow: 'whatsapp_system_send',
+  missing: 'QSTASH_CURRENT_SIGNING_KEY, QSTASH_NEXT_SIGNING_KEY',   // solo los nombres que faltan
+});
+```
+
+- `log = forModule('integraciones')`, como en `whatsapp-send-route.ts`: un adaptador driven puede
+  importar `lib/shared/**`. El puerto `WhatsappQueueSignature` no cambia (`verify` sigue devolviendo
+  `boolean` y sin lanzar), así que la ruta responde `401` igual (R14).
+- **Nombres según las convenciones de log del repo.** El mensaje es un evento en `snake_case` con el
+  prefijo `whatsapp_`, como el resto de eventos del módulo (`whatsapp_send_job_crashed`,
+  `whatsapp_enqueue_failed`). Los campos van en `camelCase` y con primitivas (`LogFields`). El
+  identificador del flujo usa la misma forma que los eventos: `flow: 'whatsapp_system_send'`. Se fija
+  como constante exportada del adaptador para que el test la compare.
+- `missing` lleva los **nombres** de las variables, nunca su valor (`docs/architecture.md >
+  Anti-patrones`; el logger solo admite primitivas). El lector necesita exponer qué nombres faltan sin
+  parsear el texto del error: `readWhatsappQueueSigningKeys` pasa a lanzar un error con la lista de
+  nombres como propiedad (`missing: readonly string[]`), o el adaptador comprueba los nombres antes
+  de leerlos. Decide el implementer; el test fija la línea, no la forma interna.
+- Sin firma (`signature === null`) no se leen las claves y no hay línea: QStash siempre firma, así que
+  una entrega sin firma no es la de la cola y no dice nada de la configuración.
+- Una clave **presente pero equivocada** no se distingue de una firma inválida y sigue sin línea: es
+  un límite conocido (§8).
 
 Son los dos únicos archivos de `integraciones` que importan `@upstash/qstash` (R38). El
 identificador de mensaje de la cola **no** se usa en el consumidor: el candado es el reclamo por
@@ -434,7 +471,8 @@ exigen `SENDING` en su `WHERE`, que es lo que necesita el consumidor.
 `{ info, warn, error }(mensaje, campos?)`, la forma de `DocumentJobLog`; la composición lo cablea con
 `forModule('integraciones')` (`pino`, ya aprobada). Eventos: `whatsapp_enqueue_skipped`,
 `whatsapp_enqueue_failed`, `whatsapp_enqueue_publish_failed`, `whatsapp_sweep_publish_failed`,
-`whatsapp_sweep_company_failed`, `whatsapp_send_job_crashed`. Los fallos de Meta siguen yendo a
+`whatsapp_sweep_company_failed`, `whatsapp_send_job_crashed`. El adaptador de la firma registra
+`whatsapp_send_signing_keys_missing` con su propio `forModule('integraciones')` (§5.1, R42). Los fallos de Meta siguen yendo a
 `WhatsappSendLog` (`whatsapp_send_failed`, QC-240).
 
 ### 5.5 Composición
@@ -457,6 +495,25 @@ sweepWhatsappSends: createSweepWhatsappSends({ ..., listCompanyIds: listActiveCo
 Con `INTEGRATIONS_E2E_DOUBLES` puesta, `publish` no llama a QStash: devuelve un id fijo
 (`e2e-<messageId>`) sin red, igual que el resto de dobles de `integraciones`. No hay E2E en esta
 ficha; el doble evita que un E2E futuro que entregue un pedido dependa de QStash.
+
+**Excepción de E2E frente a `CHECKPOINTS.md > Calidad de codigo`** (enmienda del 2026-11-11, m5).
+El consumidor `POST /api/integraciones/whatsapp/envios` es un webhook, y los webhooks son flujo
+crítico; esta ficha lo deja **sin E2E de Playwright**, como excepción declarada. Sigue los precedentes
+de QC-111 (webhook de la cola de `documentos`) y QC-238 (webhook de Meta), que se aceptaron igual en
+su review.
+
+- **Motivo.** El que llama es QStash, no un navegador. Un E2E tendría que firmar el cuerpo con claves
+  reales o falsear `Receiver.verify`, y en los dos casos no ejercita nada que no cubran ya los tests de
+  abajo. Además la feature no tiene UI ni disparador visible: el primer evento de negocio que encola
+  un mensaje llega con QC-247, y es ahí donde un E2E de extremo a extremo tiene algo que recorrer (el
+  doble de `publish` ya está puesto para ese caso).
+- **Cobertura que lo sustituye.**
+  - `tests/unit/integraciones/whatsapp/queue/whatsapp-send-route.test.ts`: la ruta real. Comprueba la
+    firma antes que el cuerpo (`401` sin tocar nada), el `400` del cuerpo inválido, el `200` (enviado,
+    duplicado y fallo permanente), el `500` (temporal y error no previsto) y que no hay sesión.
+  - `tests/integration/integraciones/whatsapp-system-send-flow.int.test.ts`: la composición real contra
+    Postgres, con la cola y Graph dobles. Recorre `enqueue`, el consumidor y `SENT`, aplica el status
+    `delivered` del webhook y comprueba que un trabajo de otra empresa no tiene efecto.
 
 ---
 
@@ -505,6 +562,17 @@ textos se fijan en un test.
   `SENT` por el paso 5.
 - **`2xx` sin `wamid` o tiempo agotado**: se reintenta (temporal) y puede duplicar si Meta sí lo
   recibió; mismo riesgo que acepta QC-240 P6.
+- **Consumidor que nunca reclama: republicación horaria sin fin (D16, límite conocido).** Si la cola
+  no llega a reclamar el mensaje, `attempts` no sube, `failExhausted` nunca lo alcanza y el mensaje
+  sigue en `QUEUED`. El barrido lo republica en cada pasada, hasta `SWEEP_BATCH` por empresa y hora,
+  indefinidamente. Pasa en tres casos:
+  - **Faltan las claves de firma.** El consumidor responde `401` y deja la línea `error` de R42
+    (§5.1). Es el único de los tres casos que deja rastro.
+  - **Claves presentes pero equivocadas.** No se distinguen de una firma inválida: `401` sin línea.
+  - **`APP_BASE_URL` mal puesta** (apunta a otro despliegue o a una ruta que no existe). La cola entrega
+    en una URL que responde `404` o que no es este consumidor, y aquí no llega nada que registrar.
+
+  **No** se añade tope de republicaciones (D16). Si hace falta acotarlo, va en otra ficha.
 
 ---
 
@@ -544,7 +612,7 @@ Mapa `R<n> → test` en `tasks.md`.
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-route.test.ts` | R14, R15, R18 (200), R22 (500), R23 (200), R24: firma antes que el cuerpo; sin sesión |
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-sweep-cron-route.test.ts` | R27, R28 |
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-queue-qstash.test.ts` | `publishJSON` con URL, cuerpo y `retries` (R10, R25); config leída al llamar; `vi.mock('@upstash/qstash')` |
-| `tests/unit/integraciones/whatsapp/queue/whatsapp-queue-signature-qstash.test.ts` | R14: firma ausente, `verify` que lanza ⇒ `false`; `vi.mock` |
+| `tests/unit/integraciones/whatsapp/queue/whatsapp-queue-signature-qstash.test.ts` | R14: firma ausente, `verify` que lanza ⇒ `false`; `vi.mock`. R42: con firma y una o las dos claves ausentes o vacías ⇒ `false` y una sola línea `error` `whatsapp_send_signing_keys_missing` con `flow: 'whatsapp_system_send'` y los nombres que faltan; la línea no contiene el valor de la clave presente; sin firma o con firma inválida y claves puestas ⇒ sin línea (logger con `vi.mock`) |
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-config-env.test.ts` | R25: defecto, inválida nombra la variable sin valor, faltan QSTASH_* / `APP_BASE_URL` |
 | `tests/unit/integraciones/whatsapp/queue/whatsapp-send-schedule.test.ts` | R35: `vercel.json` declara la ruta del barrido con `schedule` `0 * * * *` y existe su `route.ts` |
 | `tests/integration/integraciones/whatsapp-send-queue-prisma.int.test.ts` | Adaptador: ámbito (R36), reclamo concurrente ⇒ una fila (R18), tope de intentos, `release`, los tres `fail*` solo `SYSTEM` (R33), `updated_at` renovado |
@@ -601,3 +669,17 @@ importadores (§9). `pino` y `zod`, ya aprobadas. `package.json` no cambia.
 - **Nueva:** `WHATSAPP_SEND_MAX_RETRIES` (opcional; defecto `3`, D6), documentada en `.env.example`.
 - **Reutilizadas:** `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`,
   `APP_BASE_URL`, `CRON_SECRET`, las de cifrado (QC-234) y `WHATSAPP_GRAPH_API_VERSION` (QC-237).
+
+`docs/architecture.md > Variables por entorno` (D17, enmienda del 2026-11-11, m3):
+
+| Variable | Production | Preview | Local |
+|---|---|---|---|
+| `WHATSAPP_SEND_MAX_RETRIES` | opcional | vacía (vale `3`) | vacía (vale `3`) |
+
+- `WHATSAPP_SEND_MAX_RETRIES` mantiene la fila que exige `guard-variables-por-entorno`. Solo se
+  confirma: opcional y vacía en los dos entornos no productivos.
+- `APP_BASE_URL` sale de la fila del correo, que dice «ausentes (solo las lee el correo)» en Preview,
+  y pasa a una fila propia: en Production la de producción; en Preview **hace falta si se prueba
+  WhatsApp**, porque también la lee la cola de envíos para formar la URL del consumidor (D13); en Local,
+  según dev. El texto exacto lo escribe la task T12; la guardia `guard-variables-por-entorno` sigue en
+  verde porque la variable conserva su fila.
