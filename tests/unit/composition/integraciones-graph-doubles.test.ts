@@ -157,6 +157,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'listWhatsappDictionary',
       'listWhatsappTemplates',
       'markWhatsappChatRead',
+      'processWhatsappSend',
       'receiveWhatsappWebhook',
       'regenerateWhatsappVerifyToken',
       'relateWhatsappTemplateVariables',
@@ -174,6 +175,7 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'setWhatsappConnectionEnabled',
       'setWhatsappContactBlocked',
       'setWhatsappTemplateEnabled',
+      'sweepWhatsappSends',
       'syncAllWhatsappTemplates',
       'syncWhatsappTemplates',
       'testAiProviderKey',
@@ -184,6 +186,8 @@ describe('integraciones — eleccion del cliente de Graph en la composicion', ()
       'updateWhatsappVariableKey',
       'verifyCronSecret',
       'verifyWhatsappWebhook',
+      'whatsappNotifier',
+      'whatsappQueueSignature',
       'whatsappWebhookUrl',
     ])
   })

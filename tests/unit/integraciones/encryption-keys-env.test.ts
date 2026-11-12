@@ -286,6 +286,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'listWhatsappDictionary',
         'listWhatsappTemplates',
         'markWhatsappChatRead',
+        'processWhatsappSend',
         'receiveWhatsappWebhook',
         'regenerateWhatsappVerifyToken',
         'relateWhatsappTemplateVariables',
@@ -303,6 +304,7 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'setWhatsappConnectionEnabled',
         'setWhatsappContactBlocked',
         'setWhatsappTemplateEnabled',
+        'sweepWhatsappSends',
         'syncAllWhatsappTemplates',
         'syncWhatsappTemplates',
         'testAiProviderKey',
@@ -313,6 +315,8 @@ describe('la composición se importa sin las variables del cifrado', () => {
         'updateWhatsappVariableKey',
         'verifyCronSecret',
         'verifyWhatsappWebhook',
+        'whatsappNotifier',
+        'whatsappQueueSignature',
         'whatsappWebhookUrl',
       ])
       expect(composition.integraciones.secretCipher).toBe(secretCipherAesGcm)

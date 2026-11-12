@@ -372,3 +372,33 @@ Otras listas cerradas tocadas por el mismo motivo (añadidos mínimos): `module-
   `vitest run tests/unit/integraciones/whatsapp tests/unit/integraciones/module-shape.test.ts`: 81 archivos,
   1802 pass, 1 skipped, 0 fail; `vitest run guard`: 88 archivos, 1359 pass, 22 skipped, 0 fail.
 - Veredicto: T11 y T12 listas para la vuelta 2.
+
+## Rojos de gate-completo en el PR #320 (run 43244357301), 2026-11-12
+
+Tres eran nuestros y uno no. Los nuestros eran listas cerradas que no declaraban lo que añade la
+feature. Se arreglaron declarando esos miembros: las aserciones siguen siendo `toEqual` sobre la
+lista completa.
+
+| Archivo | Causa | Arreglo |
+|---|---|---|
+| `tests/unit/composition/integraciones-graph-doubles.test.ts` | Lista cerrada de `Object.keys(integraciones)`: faltaban `processWhatsappSend`, `sweepWhatsappSends`, `whatsappNotifier` y `whatsappQueueSignature` (T7–T9) | Se añaden los 4 en orden |
+| `tests/unit/integraciones/encryption-keys-env.test.ts` | La misma lista cerrada (R10/R19) | Se añaden los 4 en orden |
+| `tests/unit/recetas-ui/recipe-route-contract.test.ts` | Lista cerrada de exports de `lib/shared/routes.ts` (QC-64 R12): faltaba `WHATSAPP_SEND_ROUTE` (T4) | Se añade con su nota de alta, como QC-237 y QC-245 |
+| `tests/integration/pedidos/order-conditioning.int.test.ts` | **No es nuestro.** Es intermitente: en CI falló «R10: dos Comenzar reales a la vez…», con `23514 order_lines_conditioned_by_matches_status` en `tests/helpers/only-order-line.ts:136`. La feature no toca `pedidos`, `tests/helpers` ni `order_lines`; respecto de `origin/dev` solo añade la migración de WhatsApp | Sin cambio (ver prueba) |
+
+Prueba de `order-conditioning`:
+- La rama contiene `origin/dev` entero (`behind=0`).
+- 5/5 verdes en la rama: `Tests 10 passed (10)` cada vez.
+- 3/3 verdes en un checkout de `origin/dev` (`89f8f03f1`), cada uno contra su propia base efímera (`qct_devcheck_…`).
+- Es una prueba de carrera. Las mismas violaciones del CHECK salen en el log de Postgres de corridas
+  verdes de otras ramas (QT-314, run 42698943281: 10 líneas), así que el fallo depende del
+  entrelazado y no del código de la rama.
+
+Verificación tras el arreglo:
+
+| Comando | Resultado |
+|---|---|
+| Los 3 tests unit | `Test Files 3 passed (3)` · `Tests 62 passed (62)` |
+| `pnpm run typecheck` | exit 0 |
+| `pnpm run lint` | `✖ 11 problems (0 errors, 11 warnings)` |
+| `pnpm exec vitest run guard` | `Test Files 88 passed (88)` · `Tests 1359 passed \| 22 skipped (1381)` |

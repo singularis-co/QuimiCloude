@@ -1532,6 +1532,10 @@ describe('QC-64 R12 — el asistente de lectura no tiene ruta propia', () => {
         // patron de arriba ni apunta a ninguna de sus URL. La lista sigue CERRADA.
         'WHATSAPP_MEDIA_ROUTE_BASE',
         'whatsappMediaPath',
+        // Alta 2026-11-11: la URL del consumidor de la cola de envios de WhatsApp
+        // (`/api/integraciones/whatsapp/envios`). Es un endpoint de API, no una pantalla ni una ruta
+        // del asistente de lectura. La lista sigue CERRADA.
+        'WHATSAPP_SEND_ROUTE',
         // Las pantallas del Maestro, bajo /maestro: ninguna es del asistente de lectura.
         'MAESTRO_ADMINISTRATORS_ROUTE',
         'MAESTRO_COMPANIES_ROUTE',
