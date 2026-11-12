@@ -5,9 +5,9 @@ import { readQstashConfigFromEnv } from '../config/processing-config-env';
 import type { QueueSignature, SignedDelivery } from '../../../ports/queue-signature';
 
 /**
- * Implementa el puerto `QueueSignature` con `Receiver` de `@upstash/qstash`. **Unico archivo del
- * repositorio, junto a `processing-queue-qstash.ts`, que importa la libreria**: sustituirla es
- * reescribir estos dos archivos, no buscarla por el arbol.
+ * Implementa el puerto `QueueSignature` con `Receiver` de `@upstash/qstash`. Con
+ * `processing-queue-qstash.ts`, uno de los dos archivos de `documentos` que importan la libreria
+ * (`integraciones` tiene los suyos): sustituirla aqui es reescribir estos dos.
  *
  * Las claves se leen EN CADA LLAMADA, nunca al importar el modulo, y el `Receiver` se construye
  * dentro de la funcion: importar este archivo sin invocar `verifyQstashSignature` no debe fallar

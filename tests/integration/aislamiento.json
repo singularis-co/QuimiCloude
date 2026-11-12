@@ -744,6 +744,11 @@
       "desde": "2026-11-11"
     },
     {
+      "archivo": "integraciones/whatsapp-system-send-flow.int.test.ts",
+      "motivo": "Recorre whatsappNotifier.enqueue, processWhatsappSend y receiveWhatsappWebhook por la fachada real de lib/composition (Prisma, cifrado AES-GCM, telefonos de clientes, el doble canned de Graph con un espia y la publicacion sin red de INTEGRATIONS_E2E_DOUBLES), que escriben con el cliente Prisma GLOBAL y la recepcion abre su PROPIA 'prisma.$transaction', asi que una transaccion del test con ROLLBACK no los envolveria; ademas dos enqueue a la vez al mismo numero nuevo necesitan confirmar de verdad contra el unico (connection_id, wa_id). Cada caso siembra en dos empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> relaciones -> plantillas -> variables -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
+      "desde": "2026-11-11"
+    },
+    {
       "archivo": "integraciones/whatsapp-send-flow.int.test.ts",
       "motivo": "T10 (QC-240): recorre sendWhatsappMessage y retryWhatsappMessage por la fachada real de lib/composition (Prisma, cifrado AES-GCM, telefonos de clientes y el doble canned de Graph con un espia), que escriben con el cliente Prisma GLOBAL, asi que una transaccion del test con ROLLBACK no los envolveria; ademas dos envios a la vez al mismo cliente sin contacto necesitan confirmar de verdad contra el unico (connection_id, wa_id). Cada caso siembra en cuatro empresas efimeras con randomUUID (tipo de documento, rol, empresa, usuario y conexion) y 'afterAll' borra por 'company_id' mensajes -> relaciones -> plantillas -> variables -> contactos -> conexiones -> vinculos -> numeros -> clientes, afirma contando que no queda ninguno y despues borra usuario -> rol -> tipo de documento -> empresa. Se apoya en que la base de la corrida es suya.",
       "desde": "2026-10-23"

@@ -95,7 +95,7 @@
   republicados; una empresa que falla no detiene a las demás; `whatsapp-send-schedule.test.ts` fija
   la ruta y el `schedule` `0 * * * *`.
 
-## T9 — Composición, contrato y flujo · R1, R9, R21, R36, R37 · depende de T4–T8
+## [x] T9 — Composición, contrato y flujo · R1, R9, R21, R36, R37 · depende de T4–T8
 
 - `lib/composition/index.ts` (design §5.5), incluido el doble de `publish` con
   `INTEGRATIONS_E2E_DOUBLES`.
@@ -106,7 +106,7 @@
 - **Hecho:** `enqueue` → consumidor → `SENT` con la composición real; status `delivered` aplicado;
   trabajo con otra empresa sin efecto.
 
-## T10 — Guardia de QStash y documentación · R38, R39 · depende de T4
+## [x] T10 — Guardia de QStash y documentación · R38, R39 · depende de T4
 
 - `tests/guards/guard-qstash-aislado.test.ts` (design §9).
 - `docs/dependencias.md`: fila de `@upstash/qstash`, «aislada en cuatro archivos».

@@ -172,3 +172,60 @@ Modificados:
 - Integración: no corrida; esta tanda no toca adaptadores con base.
 
 Veredicto: T6–T8 completas y verdes; T9 adelantada solo en lo que exige el typecheck de los adaptadores driving.
+
+## Tanda 4 (T9, T10) — 2026-11-11, backend_dev
+
+### Archivos
+
+- `lib/composition/index.ts`: `whatsappSendQueue` pasa a elegir en cada llamada (con
+  `INTEGRATIONS_E2E_DOUBLES` devuelve `e2e-<messageId>` sin red; sin ella, QStash); nuevo miembro
+  `whatsappNotifier: createWhatsappNotifier({...})` con los mismos repositorios del envío de usuario,
+  `whatsappSendQueueRepository`, `whatsappSendQueue` y `whatsappQueueLog`. Aditivo, sin reordenar.
+- `lib/modules/integraciones/index.ts`: + `createWhatsappNotifier`, tipos `WhatsappNotifier`,
+  `WhatsappTemplateRef`, `WhatsappEnqueueOutcome`, `WhatsappEnqueueSkipReason` y `WhatsappSendJob`.
+- `tests/unit/integraciones/module-shape.test.ts`: contrato (+6 nombres, 5 de tipo) y cableado
+  (+`whatsappNotifier`).
+- `tests/unit/integraciones/whatsapp/whatsapp-doubles.ts`: + `makeSendQueue`, `makeQueueSignature`,
+  `makeQueueLog`, `makeSendQueueRepository`, `QUEUED_MESSAGE_ID`.
+- `tests/unit/integraciones/whatsapp/queue/enqueue-whatsapp-message.test.ts`: usa los dobles nuevos
+  (sin cambiar ningún caso).
+- `tests/integration/integraciones/whatsapp-system-send-flow.int.test.ts` (nuevo, 5 casos) y su
+  entrada `commit` en `tests/integration/aislamiento.json`.
+- `tests/guards/guard-qstash-aislado.test.ts` (nuevo, 4 casos).
+- `docs/dependencias.md`: fila de `@upstash/qstash`, «Aislada en cuatro archivos».
+- `lib/modules/documentos/adapters/driven/queue/processing-queue-qstash.ts` y
+  `queue-signature-qstash.ts`: solo el comentario de cabecera.
+- `package.json`: sin cambios.
+
+### Decisiones
+
+- El doble de `publish` va en línea en la composición (como la elección de Graph), no como archivo
+  `*-canned.ts`: no añade archivos al módulo ni a `guard-dobles-e2e` (la consulta
+  `integrationsE2EDoublesEnabled(` acompaña a la elección).
+- `makeQueueSignature` queda disponible en los dobles; el test de la ruta sigue doblando la
+  composición con `vi.mock`, como antes.
+- La guardia se comprobó además en disco: un `lib/modules/pedidos/zz-ficticio-qstash.ts` con
+  `import { Client } from '@upstash/qstash'` la pone en rojo (1 failed); el archivo se borró.
+
+### R → test (esta tanda)
+
+| R | Test |
+|---|---|
+| R1, R8, R10 | `whatsapp-system-send-flow.int.test.ts` > «R1, R8, R10: enqueue deja el mensaje QUEUED…» |
+| R9 | `whatsapp-system-send-flow.int.test.ts` > «R9: dos enqueue a la vez…» y «R9: un contacto sin cliente…» |
+| R21, R37 | `whatsapp-system-send-flow.int.test.ts` > «R21, R37: el consumidor envia lo encolado…» |
+| R36 | `whatsapp-system-send-flow.int.test.ts` > «R36: un trabajo firmado con otra empresa…» |
+| R38 | `guard-qstash-aislado.test.ts` (4 casos), `guard-arquitectura-modulos.test.ts` |
+| R39 | `guard-dependencias-aprobadas.test.ts` (package.json sin cambios) |
+
+### Verificación
+
+- `pnpm run typecheck`: exit 0.
+- `pnpm run lint`: 0 errores, 11 warnings preexistentes en archivos que esta tanda no toca.
+- `pnpm exec vitest run tests/unit/integraciones/whatsapp tests/unit/integraciones/module-shape.test.ts tests/unit/documentos/processing-queue-qstash.test.ts tests/unit/documentos/queue-signature-qstash.test.ts tests/unit/documentos/qc111-alcance.test.ts tests/unit/composition/documentos-facade.test.ts`:
+  85 archivos, 1841 passed, 3 skipped.
+- `pnpm exec vitest run guard`: 88 archivos, 1359 passed, 22 skipped.
+- Integración (`whatsapp-system-send-flow`, `whatsapp-send-queue-prisma`,
+  `whatsapp-system-send-migration`): 3 archivos, 26 passed.
+
+**Veredicto:** T9 y T10 completas; todo verde.

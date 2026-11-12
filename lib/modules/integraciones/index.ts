@@ -127,6 +127,14 @@ export { createRetryWhatsappMessage } from './domain/retry-whatsapp-message';
 export { whatsappSendJobSchema } from './domain/whatsapp-send-job';
 export { createProcessWhatsappSend } from './domain/process-whatsapp-send';
 export { createSweepWhatsappSends } from './domain/sweep-whatsapp-sends';
+export type { WhatsappSendJob } from './domain/whatsapp-send-job';
+export { createWhatsappNotifier } from './domain/enqueue-whatsapp-message';
+export type {
+  WhatsappEnqueueOutcome,
+  WhatsappEnqueueSkipReason,
+  WhatsappNotifier,
+  WhatsappTemplateRef,
+} from './domain/whatsapp-notifier';
 export type {
   WhatsappMessageDirection,
   WhatsappMessageStatus,

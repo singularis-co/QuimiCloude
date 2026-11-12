@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   createWhatsappNotifier,
@@ -6,9 +6,6 @@ import {
 } from '@/lib/modules/integraciones/domain/enqueue-whatsapp-message'
 import type { WhatsappConnectionRecord } from '@/lib/modules/integraciones/domain/whatsapp-connection'
 import type { WhatsappTemplateRecord } from '@/lib/modules/integraciones/domain/whatsapp-template'
-import type { WhatsappQueueLog } from '@/lib/modules/integraciones/ports/whatsapp-queue-log'
-import type { WhatsappSendQueue } from '@/lib/modules/integraciones/ports/whatsapp-send-queue'
-import type { WhatsappSendQueueRepository } from '@/lib/modules/integraciones/ports/whatsapp-send-queue-repository'
 
 import {
   COMPANY_ID,
@@ -19,11 +16,15 @@ import {
   OTHER_COMPANY_ID,
   OTHER_CONTACT_ID,
   OTHER_CUSTOMER_ID,
+  QUEUED_MESSAGE_ID,
   makeCipher,
   makeCustomerPhoneLinks,
   makeIntegrationsSwitch,
   makeOutbox,
+  makeQueueLog,
   makeRepository,
+  makeSendQueue,
+  makeSendQueueRepository,
   makeTemplateRepository,
   makeVariableKeyRepository,
   outboxContact,
@@ -35,7 +36,7 @@ import {
 
 const ACCOUNT_KEY = storedVariableKey()
 const MAIN_PHONE = { e164: '525512345678' }
-const QUEUED_ID = '00000000-0000-4000-8000-000000000401'
+const QUEUED_ID = QUEUED_MESSAGE_ID
 const QUEUE_MESSAGE_ID = 'msg_cola_1'
 const CUSTOMER_NAME = 'Ana Torres'
 const TEMPLATE = { name: 'aviso_cuenta', language: 'es_MX' }
@@ -75,14 +76,10 @@ function setup(options: SetupOptions = {}) {
   const templateDouble = makeTemplateRepository(options.templates ?? [mappedTemplate()])
   const keyDouble = makeVariableKeyRepository([ACCOUNT_KEY])
   const phones = makeCustomerPhoneLinks({ mainPhone: options.mainPhone ?? MAIN_PHONE })
-  const insertQueued = vi.fn<WhatsappSendQueueRepository['insertQueued']>(async () => ({ id: QUEUED_ID }))
-  const recordPublished = vi.fn<WhatsappSendQueueRepository['recordPublished']>(async () => undefined)
-  const publish = vi.fn<WhatsappSendQueue['publish']>(async () => QUEUE_MESSAGE_ID)
-  const log = {
-    info: vi.fn<WhatsappQueueLog['info']>(),
-    warn: vi.fn<WhatsappQueueLog['warn']>(),
-    error: vi.fn<WhatsappQueueLog['error']>(),
-  }
+  const { insertQueued, recordPublished } = makeSendQueueRepository()
+  const { publish } = makeSendQueue()
+  publish.mockImplementation(async () => QUEUE_MESSAGE_ID)
+  const { log } = makeQueueLog()
   const deps: EnqueueWhatsappMessageDeps = {
     integrations: switchDouble.integrations,
     connections: repository.connections,

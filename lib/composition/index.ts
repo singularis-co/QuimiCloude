@@ -2858,6 +2858,7 @@ import {
   createGetWhatsappMedia,
   createProcessWhatsappSend,
   createSweepWhatsappSends,
+  createWhatsappNotifier,
 } from '@/lib/modules/integraciones';
 import { createWhatsappContactRepository } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-prisma';
 import { withWhatsappContactTransaction } from '@/lib/modules/integraciones/adapters/driven/persistence/whatsapp-contact-unit-of-work-prisma';
@@ -3077,7 +3078,11 @@ const whatsappMediaDeps = {
 };
 
 const whatsappSendQueueRepository: WhatsappSendQueueRepository = createWhatsappSendQueueRepository();
-const whatsappSendQueue: WhatsappSendQueue = whatsappSendQueueQstash;
+/** El doble se elige en cada llamada, como el de Graph: con él, publicar no sale a la red. */
+const whatsappSendQueue: WhatsappSendQueue = {
+  publish: (job) =>
+    integrationsE2EDoublesEnabled() ? Promise.resolve(`e2e-${job.messageId}`) : whatsappSendQueueQstash.publish(job),
+};
 const whatsappQueueSignature: WhatsappQueueSignature = whatsappQueueSignatureQstash;
 /** Diferido: una variable inválida falla al procesar o barrer, no al importar la composición. */
 const whatsappSendConfig: WhatsappSendConfig = { maxRetries: () => readWhatsappSendMaxRetries() };
@@ -3233,6 +3238,17 @@ export const integraciones = {
   handOffWhatsappConversation: createHandOffWhatsappConversation({ contacts: whatsappContactRepository }),
   returnWhatsappConversationToAgent: createReturnWhatsappConversationToAgent({ contacts: whatsappContactRepository }),
   getWhatsappConversationMode: createGetWhatsappConversationMode({ contacts: whatsappContactRepository }),
+  whatsappNotifier: createWhatsappNotifier({
+    integrations: integrationsSwitch,
+    connections: whatsappConnectionRepository,
+    templates: whatsappTemplateRepository,
+    variableKeys: whatsappVariableKeyRepository,
+    outbox: whatsappOutboxRepository,
+    customerPhones: whatsappSendCustomerPhones,
+    queueStore: whatsappSendQueueRepository,
+    queue: whatsappSendQueue,
+    log: whatsappQueueLog,
+  }),
   whatsappQueueSignature,
   processWhatsappSend: createProcessWhatsappSend({
     integrations: integrationsSwitch,
